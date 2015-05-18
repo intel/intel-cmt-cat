@@ -1120,7 +1120,7 @@ static void monitoring_ctrlc(int signo)
  * @brief Gets scale factors to display events data
  *
  * LLC factor is scaled to kilobytes (1024 bytes = 1KB)
- * MBM factors are scaled to megabytes (1024x104 bytes = 1MB)
+ * MBM factors are scaled to megabytes / s (1024x1024 bytes = 1MB)
  *
  * @param cap capability structure
  * @param llc_factor cache occupancy monitoring data
@@ -1392,6 +1392,11 @@ monitoring_loop(FILE *fp,
         }
 
         /**
+         * A coefficient to display the data as MB / s
+         */
+        double coeff = ((double)10 / interval);
+        
+        /**
          * Interval is passed in  100[ms] units
          * This converts interval to microseconds
          */
@@ -1414,10 +1419,10 @@ monitoring_loop(FILE *fp,
                         strncat(header, "    LLC[KB]",
                                 sz_header - strlen(header) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
-                        strncat(header, "   MBL[MB]",
+                        strncat(header, " MBL[MB/s]",
                                 sz_header - strlen(header) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
-                        strncat(header, "   MBR[MB]",
+                        strncat(header, " MBR[MB/s]",
                                 sz_header - strlen(header) - 1);
         }
 
@@ -1479,10 +1484,10 @@ monitoring_loop(FILE *fp,
                                 llc_factor;
                         double mbr =
                                 ((double)mon_data[i].values.mbm_remote_delta) *
-                                mbr_factor;
+                                mbr_factor * coeff;
                         double mbl =
                                 ((double)mon_data[i].values.mbm_local_delta) *
-                                mbl_factor;
+                                mbl_factor * coeff;
 
                         if (istext) {
                                 /* Text */
