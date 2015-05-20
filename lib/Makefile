@@ -111,6 +111,7 @@ help:
 	@echo "    make clean        - clean build files"
 	@echo "    make clobber      - clear even more files than clean"
 	@echo "    make doxy         - make doxygen documentation" 
+	@echo "    make style        - coding style check" 
 
 doxy:
 	doxygen api_doxygen.cfg
@@ -124,6 +125,20 @@ clobber:
 	-rm -rf $(DOXY_DIRS)
 	-make clean -C examples/CAT
 	-make clean -C examples/CMT_MBM
+
+CHECKPATCH?=checkpatch.pl
+.PHONY: style
+style:
+	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
+	-f host_cap.c -f host_cap.h -f host_allocation.c \
+	-f host_allocation.h -f host_monitoring.c -f host_monitoring.h \
+	-f log.c -f log.h -f list.h -f types.h -f machine.c -f machine.h \
+	-f utils.c -f cpuinfo.c -f cpuinfo.h
+	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
+	NEW_TYPEDEFS \
+	-f pqos.h
 
 # dependecies file
 -include $(DEPFILE)  

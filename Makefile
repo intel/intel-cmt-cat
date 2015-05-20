@@ -85,3 +85,9 @@ clobber:
 TAGS:
 	etags ./*.[ch] ./lib/*.[ch]
 
+CHECKPATCH?=checkpatch.pl
+.PHONY: style
+style:
+	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
+	 -f main.c -f profiles.c -f profiles.h

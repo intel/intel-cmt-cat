@@ -70,3 +70,10 @@ $(LIBNAME):
 
 clean:
 	-rm -f $(MONITORAPP) ./*.o 
+
+CHECKPATCH?=checkpatch.pl
+.PHONY: style
+style:
+	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
+	-f monitor_app.c
