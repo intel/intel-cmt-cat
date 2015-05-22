@@ -1,13 +1,13 @@
 /*
  * BSD LICENSE
- * 
+ *
  * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright
  *     notice, this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  *   * Neither the name of Intel Corporation nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -29,7 +29,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- * 
+ *
  *  version: CMT_CAT_Refcode.L.0.1.3-10
  */
 
@@ -1087,9 +1087,19 @@ parse_config_file(const char *fname)
         fclose(fp);
 }
 
-
+/**
+ * @brief Compare LLC occupancy in two monitoring data sets
+ *
+ * @param a monitoring data A
+ * @param b monitoring data B
+ *
+ * @return LLC monitoring data compare status for descending order
+ * @retval 0 if \a  = \b
+ * @retval >0 if \b > \a
+ * @retval <0 if \b < \a
+ */
 static int
-mon_qsort_cmp_desc(const void *a, const void *b)
+mon_qsort_llc_cmp_desc(const void *a, const void *b)
 {
         const struct pqos_mon_data *ap = (const struct pqos_mon_data *)a;
         const struct pqos_mon_data *bp = (const struct pqos_mon_data *)b;
@@ -1099,6 +1109,31 @@ mon_qsort_cmp_desc(const void *a, const void *b)
          */
         return (int) (((int64_t)bp->values.llc) - ((int64_t)ap->values.llc));
 }
+
+/**
+ * @brief Compare core id in two monitoring data sets
+ *
+ * @param a monitoring data A
+ * @param b monitoring data B
+ *
+ * @return Core id compare status for ascending order
+ * @retval 0 if \a  = \b
+ * @retval >0 if \b > \a
+ * @retval <0 if \b < \a
+ */
+static int
+mon_qsort_coreid_cmp_asc(const void *a, const void *b)
+{
+        const struct pqos_mon_data *ap = (const struct pqos_mon_data *)a;
+        const struct pqos_mon_data *bp = (const struct pqos_mon_data *)b;
+        /**
+         * This (a-b) is to get ascending order
+         * otherwise it would be (b-a)
+         */
+        return (int)ap->cores[0] - (int)bp->cores[0];
+}
+
+
 
 /**
  * Stop monitoring indicator for infinite monitoring loop
@@ -1394,8 +1429,8 @@ monitoring_loop(FILE *fp,
         /**
          * A coefficient to display the data as MB / s
          */
-        double coeff = ((double)10 / interval);
-        
+        double coeff = 10.0 / (double)interval;
+
         /**
          * Interval is passed in  100[ms] units
          * This converts interval to microseconds
@@ -1467,9 +1502,13 @@ monitoring_loop(FILE *fp,
                         strncpy(cb_time, "error", DIM(cb_time)-1);
                 }
 
-                if (top_mode)
+                if (top_mode) {
                         qsort(mon_data, mon_number, sizeof(mon_data[0]),
-                              mon_qsort_cmp_desc);
+                              mon_qsort_llc_cmp_desc);
+                } else {
+                        qsort(mon_data, mon_number, sizeof(mon_data[0]),
+                              mon_qsort_coreid_cmp_asc);
+                }
 
                 if (max_lines > 0) {
                         if ((mon_number+TERM_MIN_NUM_LINES-1) > max_lines)
