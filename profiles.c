@@ -54,6 +54,8 @@
 #define ASSERT(x)
 #endif
 
+#define PROFILES_MIN_COS 4
+
 /**
  * 12-cache ways
  */
@@ -287,14 +289,17 @@ int profile_l3ca_get(const char *id, const struct pqos_cap_l3ca *l3ca,
         if (id == NULL || l3ca == NULL || p_tab == NULL || p_num == NULL)
                 return PQOS_RETVAL_PARAM;
 
+	if (l3ca->num_classes < PROFILES_MIN_COS)
+	        return PQOS_RETVAL_RESOURCE;
+
         for (i = 0; i < DIM(allocation_tab); i++) {
                 const struct llc_allocation *ap = &allocation_tab[i];
 
                 if (strcasecmp(id, ap->id) != 0)
                         continue;
                 for (j = 0; j < ap->num_config; j++) {
-                        if (ap->config[j].num_classes != l3ca->num_classes ||
-                            ap->config[j].num_ways != l3ca->num_ways)
+		        /* no need to check number of classes here */
+                        if (ap->config[j].num_ways != l3ca->num_ways)
                                 continue;
                         *p_num = ap->config[j].num_classes;
                         *p_tab = ap->config[j].tab;
