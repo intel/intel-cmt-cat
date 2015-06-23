@@ -406,7 +406,8 @@ discover_alloc_llc_brandstr(struct pqos_cap_l3ca *cap)
        static const char * const supported_brands[] = {
                 "E5-2658 v3",
                 "E5-2648L v3", "E5-2628L v3",
-                "E5-2618L v3", "E5-2608L v3"
+                "E5-2618L v3", "E5-2608L v3",
+                "E5-2658A v3"
         };
         struct cpuid_out res;
         int ret = PQOS_RETVAL_OK,
