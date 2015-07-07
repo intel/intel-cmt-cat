@@ -120,7 +120,7 @@ static struct {
         enum pqos_mon_event events;
 } sel_monitor_tab[PQOS_MAX_CORES];
 
-static struct pqos_mon_data m_mon_grps[PQOS_MAX_CORES];
+static struct pqos_mon_data *m_mon_grps[PQOS_MAX_CORES];
 
 /**
  * Maintains number of Class of Services supported by socket for
@@ -385,8 +385,14 @@ parse_monitor_event(char *str)
                         sel_monitor_tab[sel_monitor_num].core =
                                 (unsigned) cores[i];
                         sel_monitor_tab[sel_monitor_num].events = evt;
+			m_mon_grps[sel_monitor_num] =
+                                malloc(sizeof(**m_mon_grps));
+                        if (m_mon_grps[sel_monitor_num] == NULL) {
+                                printf("Error with memory allocation");
+                                exit(EXIT_FAILURE);
+                        }
                         sel_monitor_tab[sel_monitor_num].pgrp =
-                                &m_mon_grps[sel_monitor_num];
+                                m_mon_grps[sel_monitor_num];
                         ++sel_monitor_num;
                 }
         }
@@ -462,8 +468,14 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         sel_monitor_tab[sel_monitor_num].core = lcore;
                         sel_monitor_tab[sel_monitor_num].events =
                                 sel_events_max;
+			m_mon_grps[sel_monitor_num] =
+                                malloc(sizeof(**m_mon_grps));
+                        if (m_mon_grps[sel_monitor_num] == NULL) {
+                                printf("Error with memory allocation");
+                                exit(EXIT_FAILURE);
+                        }
                         sel_monitor_tab[sel_monitor_num].pgrp =
-                                &m_mon_grps[sel_monitor_num];
+                                m_mon_grps[sel_monitor_num];
                         sel_monitor_num++;
                 }
         }
@@ -501,7 +513,7 @@ stop_monitoring(void)
         int ret;
 
         for (i = 0; i < (unsigned)sel_monitor_num; i++) {
-                ret = pqos_mon_stop(&m_mon_grps[i]);
+                ret = pqos_mon_stop(m_mon_grps[i]);
                 ASSERT(ret == PQOS_RETVAL_OK);
                 if (ret != PQOS_RETVAL_OK)
                         printf("Monitoring stop error!\n");
@@ -1100,8 +1112,12 @@ parse_config_file(const char *fname)
 static int
 mon_qsort_llc_cmp_desc(const void *a, const void *b)
 {
-        const struct pqos_mon_data *ap = (const struct pqos_mon_data *)a;
-        const struct pqos_mon_data *bp = (const struct pqos_mon_data *)b;
+        const struct pqos_mon_data *const *app =
+                (const struct pqos_mon_data * const *)a;
+        const struct pqos_mon_data *const *bpp =
+                (const struct pqos_mon_data * const *)b;
+        const struct pqos_mon_data *ap = *app;
+        const struct pqos_mon_data *bp = *bpp;
         /**
          * This (b-a) is to get descending order
          * otherwise it would be (a-b)
@@ -1123,8 +1139,12 @@ mon_qsort_llc_cmp_desc(const void *a, const void *b)
 static int
 mon_qsort_coreid_cmp_asc(const void *a, const void *b)
 {
-        const struct pqos_mon_data *ap = (const struct pqos_mon_data *)a;
-        const struct pqos_mon_data *bp = (const struct pqos_mon_data *)b;
+        const struct pqos_mon_data * const *app =
+                (const struct pqos_mon_data * const *)a;
+        const struct pqos_mon_data * const *bpp =
+                (const struct pqos_mon_data * const *)b;
+        const struct pqos_mon_data *ap = *app;
+        const struct pqos_mon_data *bp = *bpp;
         /**
          * This (a-b) is to get ascending order
          * otherwise it would be (b-a)
@@ -1461,7 +1481,7 @@ monitoring_loop(FILE *fp,
         }
 
         while (!stop_monitoring_loop) {
-                struct pqos_mon_data mon_data[PQOS_MAX_CORES];
+                struct pqos_mon_data *mon_data[PQOS_MAX_CORES];
                 unsigned mon_number = (unsigned) sel_monitor_num;
                 struct timeval tv_s, tv_e;
                 struct tm *ptm = NULL;
@@ -1518,28 +1538,29 @@ monitoring_loop(FILE *fp,
                         fputs(header, fp);
 
                 for (i = 0; i < mon_number; i++) {
-                        double llc = ((double)mon_data[i].values.llc) *
+                        double llc = ((double)mon_data[i]->values.llc) *
                                 llc_factor;
                         double mbr =
-                                ((double)mon_data[i].values.mbm_remote_delta) *
+                                ((double)mon_data[i]->values.mbm_remote_delta) *
                                 mbr_factor * coeff;
                         double mbl =
-                                ((double)mon_data[i].values.mbm_local_delta) *
+                                ((double)mon_data[i]->values.mbm_local_delta) *
                                 mbl_factor * coeff;
 
                         if (istext) {
                                 /* Text */
                                 fillin_text_row(data, sz_data,
-                                                mon_data[i].event,
+                                                mon_data[i]->event,
                                                 llc, mbr, mbl);
                                 fprintf(fp, "\n%6u %8u %8u %s",
-                                        mon_data[i].socket,
-                                        mon_data[i].cores[0],
-                                        mon_data[i].rmid,
+                                        mon_data[i]->socket,
+                                        mon_data[i]->cores[0],
+                                        mon_data[i]->rmid,
                                         data);
                         } else {
                                 /* XML */
-                                fillin_xml_row(data, sz_data, mon_data[i].event,
+                                fillin_xml_row(data, sz_data,
+                                               mon_data[i]->event,
                                                llc, mbr, mbl);
                                 fprintf(fp,
                                         "%s\n"
@@ -1552,9 +1573,9 @@ monitoring_loop(FILE *fp,
                                         "%s",
                                         xml_child_open,
                                         cb_time,
-                                        mon_data[i].socket,
-                                        mon_data[i].cores[0],
-                                        mon_data[i].rmid,
+                                        mon_data[i]->socket,
+                                        mon_data[i]->cores[0],
+                                        mon_data[i]->rmid,
                                         data,
                                         xml_child_close,
                                         xml_root_close);
@@ -1981,6 +2002,11 @@ int main(int argc, char **argv)
                 free(sel_log_file);
         if (sel_config_file != NULL)
                 free(sel_config_file);
+
+        int i;
+
+        for (i = 0; i < sel_monitor_num; i++)
+                free(m_mon_grps[i]);
 
         return exit_val;
 }

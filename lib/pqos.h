@@ -313,12 +313,12 @@ int pqos_mon_stop(struct pqos_mon_data *group);
 /**
  * @brief Polls monitoring data from requested cores
  *
- * @param [in] groups pointer to monitoring groups to be be updated
- * @param [in] num_groups number of monitoring groups to be updated
+ * @param [in] groups table of monitoring group pointers to be be updated
+ * @param [in] num_groups number of monitoring groups in the table
  *
  * @return Operations status
  */
-int pqos_mon_poll(struct pqos_mon_data *groups,
+int pqos_mon_poll(struct pqos_mon_data **groups,
                   const unsigned num_groups);
 
 /*

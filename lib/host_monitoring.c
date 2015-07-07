@@ -1038,7 +1038,7 @@ pqos_mon_stop(struct pqos_mon_data *group)
 }
 
 int
-pqos_mon_poll(struct pqos_mon_data *groups,
+pqos_mon_poll(struct pqos_mon_data **groups,
               const unsigned num_groups)
 {
         int ret = PQOS_RETVAL_OK;
@@ -1049,6 +1049,10 @@ pqos_mon_poll(struct pqos_mon_data *groups,
         if (groups == NULL || num_groups == 0)
                 return PQOS_RETVAL_PARAM;
 
+        for (i = 0; i < num_groups; i++) {
+                if(groups[i] == NULL)
+                        return PQOS_RETVAL_PARAM;
+        }
         _pqos_api_lock();
 
         ret = _pqos_check_init(1);
@@ -1058,60 +1062,60 @@ pqos_mon_poll(struct pqos_mon_data *groups,
         }
 
         for (i = 0; i < num_groups; i++) {
-                if (groups[i].event & PQOS_MON_EVENT_L3_OCCUP) {
-                        ret = mon_read(groups[i].cores[0], groups[i].rmid,
+                if (groups[i]->event & PQOS_MON_EVENT_L3_OCCUP) {
+                        ret = mon_read(groups[i]->cores[0], groups[i]->rmid,
                                        get_event_id(PQOS_MON_EVENT_L3_OCCUP),
-                                       &groups[i].values.llc);
+                                       &groups[i]->values.llc);
                         if (ret != PQOS_RETVAL_OK)
                                 LOG_WARN("Failed to read LLC occupancy on "
                                          "core %u (RMID%u)\n",
-                                         groups[i].cores[0], groups[i].rmid);
+                                         groups[i]->cores[0], groups[i]->rmid);
                 }
-                if ((groups[i].event & PQOS_MON_EVENT_LMEM_BW) ||
-                    (groups[i].event & PQOS_MON_EVENT_RMEM_BW)) {
-                        uint64_t old_value = groups[i].values.mbm_local;
+                if ((groups[i]->event & PQOS_MON_EVENT_LMEM_BW) ||
+                    (groups[i]->event & PQOS_MON_EVENT_RMEM_BW)) {
+                        uint64_t old_value = groups[i]->values.mbm_local;
 
-                        ret = mon_read(groups[i].cores[0], groups[i].rmid,
+                        ret = mon_read(groups[i]->cores[0], groups[i]->rmid,
                                        get_event_id(PQOS_MON_EVENT_LMEM_BW),
-                                       &groups[i].values.mbm_local);
+                                       &groups[i]->values.mbm_local);
                         if (ret != PQOS_RETVAL_OK)
                                 LOG_WARN("Failed to read local memory bandwidth"
                                          " on core %u (RMID%u)\n",
-                                         groups[i].cores[0], groups[i].rmid);
+                                         groups[i]->cores[0], groups[i]->rmid);
                         else
-                                groups[i].values.mbm_local_delta =
+                                groups[i]->values.mbm_local_delta =
                                         get_delta(old_value,
-                                                  groups[i].values.mbm_local);
+                                                  groups[i]->values.mbm_local);
                 }
-                if ((groups[i].event & PQOS_MON_EVENT_TMEM_BW) ||
-                    (groups[i].event & PQOS_MON_EVENT_RMEM_BW)) {
-                        uint64_t old_value = groups[i].values.mbm_total;
+                if ((groups[i]->event & PQOS_MON_EVENT_TMEM_BW) ||
+                    (groups[i]->event & PQOS_MON_EVENT_RMEM_BW)) {
+                        uint64_t old_value = groups[i]->values.mbm_total;
 
-                        ret = mon_read(groups[i].cores[0], groups[i].rmid,
+                        ret = mon_read(groups[i]->cores[0], groups[i]->rmid,
                                        get_event_id(PQOS_MON_EVENT_TMEM_BW),
-                                       &groups[i].values.mbm_total);
+                                       &groups[i]->values.mbm_total);
                         if (ret != PQOS_RETVAL_OK)
                                 LOG_WARN("Failed to read total memory bandwidth"
                                          " on core %u (RMID%u)\n",
-                                         groups[i].cores[0], groups[i].rmid);
+                                         groups[i]->cores[0], groups[i]->rmid);
                         else
-                                groups[i].values.mbm_total_delta =
+                                groups[i]->values.mbm_total_delta =
                                         get_delta(old_value,
-                                                  groups[i].values.mbm_total);
+                                                  groups[i]->values.mbm_total);
                 }
-                if (groups[i].event & PQOS_MON_EVENT_RMEM_BW) {
-                        groups[i].values.mbm_remote = 0;
-                        if (groups[i].values.mbm_total >
-                            groups[i].values.mbm_local)
-                                groups[i].values.mbm_remote =
-                                        groups[i].values.mbm_total -
-                                        groups[i].values.mbm_local;
-                        groups[i].values.mbm_remote_delta = 0;
-                        if (groups[i].values.mbm_total_delta >
-                            groups[i].values.mbm_local_delta)
-                                groups[i].values.mbm_remote_delta =
-                                        groups[i].values.mbm_total_delta -
-                                        groups[i].values.mbm_local_delta;
+                if (groups[i]->event & PQOS_MON_EVENT_RMEM_BW) {
+                        groups[i]->values.mbm_remote = 0;
+                        if (groups[i]->values.mbm_total >
+                            groups[i]->values.mbm_local)
+                                groups[i]->values.mbm_remote =
+                                        groups[i]->values.mbm_total -
+                                        groups[i]->values.mbm_local;
+                        groups[i]->values.mbm_remote_delta = 0;
+                        if (groups[i]->values.mbm_total_delta >
+                            groups[i]->values.mbm_local_delta)
+                                groups[i]->values.mbm_remote_delta =
+                                        groups[i]->values.mbm_total_delta -
+                                        groups[i]->values.mbm_local_delta;
                 }
         }
 
