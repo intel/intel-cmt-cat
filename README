@@ -55,9 +55,11 @@ generations supports Core/Logical thread association with a
 class of service can be changed dynamically. 
 CMT is supported on all Intel(R) Xeon(R) processor E5 v3 and 
 Intel(R) Xeon(R) processor D SKUs. 
-CAT is supported on the following 5 SKUs for 
-Intel(R) Xeon(R) process E5 v3 family:
-E5-2658 v3,  E5-2648L v3, E5-2628L v3, E5-2618L v3, E5-2608L v3 and E5-2658A v3
+CAT is supported on the following:
+6 SKUs for Intel(R) Xeon(R) processor E5 v3 family:
+E5-2658 v3, E5-2648L v3, E5-2628L v3, E5-2618L v3, E5-2608L v3 and E5-2658A v3
+2 SKUs for Intel(R) Xeon(R) processor E3 v4 family:
+E3-1258L v4 and E3-1278L v4
 and all Intel(R) Xeon(R) processor D SKUs.
 
 Use of concurrent monitoring instances is possible as long as each
