@@ -1899,15 +1899,6 @@ int main(int argc, char **argv)
                 }
         }
 
-        if (sel_show_allocation_config) {
-                /**
-                 * Show info about allocation config and exit
-                 */
-		print_allocation_config(cap_mon, cap_l3ca, sock_count,
-                                        sockets, p_cpu);
-                goto allocation_exit;
-        }
-
         if (sel_reset_CAT) {
                 /**
                  * Reset CAT configuration to after-reset state and exit
@@ -1916,6 +1907,15 @@ int main(int argc, char **argv)
                         printf("CAT reset failed!\n");
                 else
                         printf("CAT reset successful\n");
+                goto allocation_exit;
+        }
+
+        if (sel_show_allocation_config) {
+                /**
+                 * Show info about allocation config and exit
+                 */
+		print_allocation_config(cap_mon, cap_l3ca, sock_count,
+                                        sockets, p_cpu);
                 goto allocation_exit;
         }
 
