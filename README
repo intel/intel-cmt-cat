@@ -3,7 +3,7 @@
 ========================================================================
 README for CMT, MBM and CAT Software Package
 
-April 2015
+September 2015
 ========================================================================
 
 
@@ -106,6 +106,14 @@ To compile PQoS library:
         "make clean" for cleaning build files.
         "make clobber" for clearing even more files than "make clean".
         "make doxy" for make doxygen documentation.
+
+Note:   In case of compilation error such as:
+        "host_pidapi.c:46:30: fatal error: linux/perf_event.h:
+        No such file or directory compilation terminated."
+        To compile the code without PID monitoring support:
+        "make all NO_PID_API=y"
+        This occurs on Linux kernels that do not support perf
+        monitoring events.
 
 To compile CAT, CMT and MBM sample applications:
         
