@@ -42,9 +42,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <dirent.h>
 
 #include "pqos.h"
-
+#include "host_pidapi.h"
 #include "host_cap.h"
 #include "host_monitoring.h"
 
@@ -102,9 +103,9 @@
 #define RMID0 (0)
 
 /**
-* Max value of the memory bandwidth data = 2^24
-* assuming there is 24 bit space available
-*/
+ * Max value of the memory bandwidth data = 2^24
+ * assuming there is 24 bit space available
+ */
 #define MBM_MAX_VALUE (1<<24)
 /**
  * ---------------------------------------
@@ -185,6 +186,9 @@ mon_read(const unsigned lcore,
          uint64_t *value);
 
 static int
+pqos_core_poll(struct pqos_mon_data *group);
+
+static int
 rmid_alloc(const unsigned cluster,
            const enum pqos_mon_event event,
            pqos_rmid_t *rmid);
@@ -221,6 +225,15 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 
         m_cpu = cpu;
         m_cap = cap;
+
+#ifndef PQOS_NO_PID_API
+        /**
+         * Init monitoring processes
+         */
+        ret = pqos_pid_init();
+        if (ret == PQOS_RETVAL_ERROR)
+                return ret;
+#endif /* PQOS_NO_PID_API */
 
         /**
          * If monitoring capability has been discovered
@@ -353,6 +366,14 @@ int
 pqos_mon_fini(void)
 {
         int retval = PQOS_RETVAL_OK;
+
+#ifndef PQOS_NO_PID_API
+        /**
+         * Shut down monitoring processes
+         */
+        if (pqos_pid_fini() != PQOS_RETVAL_OK)
+                LOG_ERROR("Failed to finalize PID monitoring API\n");
+#endif /* PQOS_NO_PID_API */
 
         if (m_core_map != NULL && m_cpu != NULL) {
                 /**
@@ -800,6 +821,86 @@ mon_read(const unsigned lcore,
         return retval;
 }
 
+/**
+ * @brief Reads monitoring event data from given core
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+pqos_core_poll(struct pqos_mon_data *group)
+{
+        int ret = PQOS_RETVAL_OK;
+        int retval = PQOS_RETVAL_OK;
+
+        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
+                ret = mon_read(group->cores[0],
+                               group->rmid,
+                               get_event_id(PQOS_MON_EVENT_L3_OCCUP),
+                               &group->values.llc);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_WARN("Failed to read LLC occupancy on "
+                                 "core %u (RMID%u)\n",
+                                 group->cores[0],
+                                 group->rmid);
+                        retval = PQOS_RETVAL_ERROR;
+                }
+        }
+        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = group->values.mbm_local;
+
+                ret = mon_read(group->cores[0],
+                               group->rmid,
+                               get_event_id(PQOS_MON_EVENT_LMEM_BW),
+                               &group->values.mbm_local);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_WARN("Failed to read local memory bandwidth"
+                                 " on core %u (RMID%u)\n",
+                                 group->cores[0],
+                                 group->rmid);
+                        retval = PQOS_RETVAL_ERROR;
+                } else
+                        group->values.mbm_local_delta =
+                                get_delta(old_value,
+                                          group->values.mbm_local);
+        }
+        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = group->values.mbm_total;
+
+                ret = mon_read(group->cores[0], group->rmid,
+                               get_event_id(PQOS_MON_EVENT_TMEM_BW),
+                               &group->values.mbm_total);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_WARN("Failed to read total memory bandwidth"
+                                 " on core %u (RMID%u)\n",
+                                 group->cores[0],
+                                 group->rmid);
+                        retval = PQOS_RETVAL_ERROR;
+                } else
+                        group->values.mbm_total_delta =
+                                get_delta(old_value,
+                                          group->values.mbm_total);
+        }
+        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
+                group->values.mbm_remote = 0;
+                if (group->values.mbm_total > group->values.mbm_local)
+                        group->values.mbm_remote =
+                                group->values.mbm_total -
+                                group->values.mbm_local;
+                group->values.mbm_remote_delta = 0;
+                if (group->values.mbm_total_delta >
+                    group->values.mbm_local_delta)
+                        group->values.mbm_remote_delta =
+                                group->values.mbm_total_delta -
+                                group->values.mbm_local_delta;
+        }
+        return retval;
+}
+
 int
 pqos_mon_start(const unsigned num_cores,
                const unsigned *cores,
@@ -956,6 +1057,52 @@ pqos_mon_start(const unsigned num_cores,
 }
 
 int
+pqos_mon_start_pid(const pid_t pid,
+                   const enum pqos_mon_event event,
+                   void *context,
+                   struct pqos_mon_data *group)
+{
+        /**
+         * Check params
+         */
+        if (group == NULL || event == 0 || pid < 0)
+                return PQOS_RETVAL_PARAM;
+#ifdef PQOS_NO_PID_API
+        LOG_ERROR("PID monitoring API not built\n");
+        return PQOS_RETVAL_ERROR;
+#else
+        int ret = PQOS_RETVAL_OK;
+        char pid_dir[32];
+        DIR *dir;
+
+        /**
+         * Check PID exists
+         */
+        snprintf(pid_dir, sizeof(pid_dir)-1, "/proc/%d", (int)pid);
+        dir = opendir(pid_dir);
+        if (dir == NULL)
+                return PQOS_RETVAL_PARAM;
+        closedir(dir);
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+	group->event = event;
+        group->pid = pid;
+        group->context = context;
+
+        ret = pqos_pid_start(group);
+        _pqos_api_unlock();
+
+        return ret;
+#endif /* PQOS_NO_PID_API */
+}
+
+int
 pqos_mon_stop(struct pqos_mon_data *group)
 {
         int ret = PQOS_RETVAL_OK;
@@ -965,15 +1112,36 @@ pqos_mon_stop(struct pqos_mon_data *group)
         if (group == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        if (group->num_cores == 0 || group->cores == NULL)
-                return PQOS_RETVAL_PARAM;
-
         _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
+        }
+
+        /**
+         * If monitoring PID's then stop
+         * counters and return
+         */
+        if (group->pid > 0) {
+#ifdef PQOS_NO_PID_API
+                LOG_ERROR("PID monitoring API not built\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
+#else
+                /**
+                 * Stop perf counters
+                 */
+                ret = pqos_pid_stop(group);
+                _pqos_api_unlock();
+                return ret;
+#endif /* PQOS_NO_PID_API */
+        }
+
+        if (group->num_cores == 0 || group->cores == NULL) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_PARAM;
         }
 
         ASSERT(m_cpu != NULL);
@@ -1046,7 +1214,7 @@ pqos_mon_poll(struct pqos_mon_data **groups,
 
         ASSERT(groups != NULL);
         ASSERT(num_groups > 0);
-        if (groups == NULL || num_groups == 0)
+        if (groups == NULL || num_groups == 0 || *groups == NULL)
                 return PQOS_RETVAL_PARAM;
 
         for (i = 0; i < num_groups; i++) {
@@ -1062,62 +1230,28 @@ pqos_mon_poll(struct pqos_mon_data **groups,
         }
 
         for (i = 0; i < num_groups; i++) {
-                if (groups[i]->event & PQOS_MON_EVENT_L3_OCCUP) {
-                        ret = mon_read(groups[i]->cores[0], groups[i]->rmid,
-                                       get_event_id(PQOS_MON_EVENT_L3_OCCUP),
-                                       &groups[i]->values.llc);
+	        /**
+                 * If monitoring PID then read
+                 * counter values
+                 */
+                if (groups[i]->pid > 0) {
+#ifdef PQOS_NO_PID_API
+                        LOG_ERROR("PID monitoring API not built\n");
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_ERROR;
+#else
+                        ret = pqos_pid_poll(groups[i]);
+			if (ret != PQOS_RETVAL_OK)
+			        LOG_WARN("Failed to read event values "
+					 "for PID %u!\n", groups[i]->pid);
+#endif /* PQOS_NO_PID_API */
+                } else {
+                        ret = pqos_core_poll(groups[i]);
                         if (ret != PQOS_RETVAL_OK)
-                                LOG_WARN("Failed to read LLC occupancy on "
-                                         "core %u (RMID%u)\n",
-                                         groups[i]->cores[0], groups[i]->rmid);
+                                LOG_WARN("Failed to read event on "
+                                         "core %u\n", groups[i]->cores[0]);
                 }
-                if ((groups[i]->event & PQOS_MON_EVENT_LMEM_BW) ||
-                    (groups[i]->event & PQOS_MON_EVENT_RMEM_BW)) {
-                        uint64_t old_value = groups[i]->values.mbm_local;
-
-                        ret = mon_read(groups[i]->cores[0], groups[i]->rmid,
-                                       get_event_id(PQOS_MON_EVENT_LMEM_BW),
-                                       &groups[i]->values.mbm_local);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_WARN("Failed to read local memory bandwidth"
-                                         " on core %u (RMID%u)\n",
-                                         groups[i]->cores[0], groups[i]->rmid);
-                        else
-                                groups[i]->values.mbm_local_delta =
-                                        get_delta(old_value,
-                                                  groups[i]->values.mbm_local);
-                }
-                if ((groups[i]->event & PQOS_MON_EVENT_TMEM_BW) ||
-                    (groups[i]->event & PQOS_MON_EVENT_RMEM_BW)) {
-                        uint64_t old_value = groups[i]->values.mbm_total;
-
-                        ret = mon_read(groups[i]->cores[0], groups[i]->rmid,
-                                       get_event_id(PQOS_MON_EVENT_TMEM_BW),
-                                       &groups[i]->values.mbm_total);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_WARN("Failed to read total memory bandwidth"
-                                         " on core %u (RMID%u)\n",
-                                         groups[i]->cores[0], groups[i]->rmid);
-                        else
-                                groups[i]->values.mbm_total_delta =
-                                        get_delta(old_value,
-                                                  groups[i]->values.mbm_total);
-                }
-                if (groups[i]->event & PQOS_MON_EVENT_RMEM_BW) {
-                        groups[i]->values.mbm_remote = 0;
-                        if (groups[i]->values.mbm_total >
-                            groups[i]->values.mbm_local)
-                                groups[i]->values.mbm_remote =
-                                        groups[i]->values.mbm_total -
-                                        groups[i]->values.mbm_local;
-                        groups[i]->values.mbm_remote_delta = 0;
-                        if (groups[i]->values.mbm_total_delta >
-                            groups[i]->values.mbm_local_delta)
-                                groups[i]->values.mbm_remote_delta =
-                                        groups[i]->values.mbm_total_delta -
-                                        groups[i]->values.mbm_local_delta;
-                }
-        }
+	}
 
         _pqos_api_unlock();
         return PQOS_RETVAL_OK;
