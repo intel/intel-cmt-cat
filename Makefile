@@ -61,6 +61,11 @@ else
 CFLAGS += -g -O3
 endif 
 
+# PID API build option
+ifeq ($(NO_PID_API), y)
+export NO_PID_API
+endif
+
 # Build targets and dependencies
 APP = pqos
 

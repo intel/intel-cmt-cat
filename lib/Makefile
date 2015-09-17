@@ -80,6 +80,14 @@ endif
 
 # Build targets and dependencies
 OBJS = cpuinfo.o machine.o host_cap.o host_allocation.o host_monitoring.o utils.o log.o
+
+# PID API build option
+ifeq ($(NO_PID_API), y)
+CFLAGS += -DPQOS_NO_PID_API
+else
+OBJS += host_pidapi.o
+endif
+
 DEPFILE = $(LIBANAME).dep
 
 all: $(LIBNAME)
@@ -133,7 +141,7 @@ style:
 	-f host_cap.c -f host_cap.h -f host_allocation.c \
 	-f host_allocation.h -f host_monitoring.c -f host_monitoring.h \
 	-f log.c -f log.h -f list.h -f types.h -f machine.c -f machine.h \
-	-f utils.c -f cpuinfo.c -f cpuinfo.h
+	-f utils.c -f cpuinfo.c -f cpuinfo.h -f host_pidapi.c -f host_pidapi.h
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS \

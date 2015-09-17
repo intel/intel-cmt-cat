@@ -44,6 +44,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -55,8 +56,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION        100         /**< version 1.00 */
-
+#define PQOS_VERSION        101         /**< version 1.01 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16xCOS */
 
 /*
@@ -265,14 +265,32 @@ struct pqos_event_values {
  * Monitoring group data structure
  */
 struct pqos_mon_data {
+        /**
+         * Common section
+         */
+        enum pqos_mon_event event;      /**< monitored event */
+        void *context;                  /**< application specific context pointer */
+        struct pqos_event_values values; /**< RMID events value */
+
+        pid_t pid; /**< if not zero then this group tracks a process */
+
+        /**
+         * Task specific section
+         */
+        int tid_nr;
+        pid_t *tid_map;
+        int *fds_llc;
+        int *fds_mbl;
+        int *fds_mbt;
+
+        /**
+         * Core specific section
+         */
         pqos_rmid_t rmid;               /**< RMID allocated for the group */
         unsigned cluster;               /**< cluster id group belongs to */
         unsigned socket;                /**< socket id group belongs to */
-        enum pqos_mon_event event;      /**< monitored event */
-        void *context;                  /**< application specific context pointer */
         unsigned num_cores;             /**< number of cores in the group */
         unsigned *cores;                /**< list of cores in the group */
-        struct pqos_event_values values; /**< RMID events value */
 };
 
 /**
@@ -300,6 +318,20 @@ int pqos_mon_start(const unsigned num_cores,
                    const enum pqos_mon_event event,
                    void *context,
                    struct pqos_mon_data *group);
+
+/**
+ * @brief Starts resource monitoring of \a pid process
+ *
+ * @param [in] pid process ID
+ * @param [in] event monitoring event id
+ * @param [in] context application dependent context pointer
+ *
+ * @return Operations status
+ */
+int pqos_mon_start_pid(const pid_t pid,
+                       const enum pqos_mon_event event,
+                       void *context,
+                       struct pqos_mon_data *group);
 
 /**
  * @brief Stops resource monitoring data for selected monitoring group
