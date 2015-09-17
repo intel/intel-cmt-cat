@@ -33,40 +33,82 @@
  */
 
 /**
- * @brief Internal header file to PQoS allocation initialization
+ * @brief Platform QoS Process Monitoring API
  */
 
-#ifndef __PQOS_HOSTALLOC_H__
-#define __PQOS_HOSTALLOC_H__
+#include "pqos.h"
+
+#ifndef __PQOS_PIDAPI_H__
+#define __PQOS_PIDAPI_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief Initializes allocation sub-module of PQoS library
+ * @brief This function initializes the PID monitoring module
  *
- * @param cpu cpu topology structure
- * @param cap capabilities structure
- * @param cfg library configuration structure
+ * Checks kernel and event support and sets up event attributes
  *
  * @return Operation status
- * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE pid mon not supported/no events found
+ * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int pqos_alloc_init(const struct pqos_cpuinfo *cpu,
-                    const struct pqos_cap *cap,
-                    const struct pqos_config *cfg);
+int
+pqos_pid_init(void);
 
 /**
- * @brief Shuts down allocation sub-module of PQoS library
+ * @brief This function finalizes the PID monitoring module
  *
  * @return Operation status
- * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int pqos_alloc_fini(void);
+int
+pqos_pid_fini(void);
+
+/**
+ * @brief This function starts all perf counters for a process
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+int
+pqos_pid_start(struct pqos_mon_data *group);
+
+/**
+ * @brief This function stops all perf counters for a process
+ *
+ * Stops all counters and frees associated data structures
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+int
+pqos_pid_stop(struct pqos_mon_data *group);
+
+/**
+ * @brief This function reads all perf counters for a process
+ *
+ * Reads counters for all events and stores values
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+int
+pqos_pid_poll(struct pqos_mon_data *group);
 
 #ifdef __cplusplus
 }
 #endif
-
-#endif /* __PQOS_HOSTALLOC_H__ */
+#endif
