@@ -36,21 +36,17 @@
  * @brief Platform QoS utility module
  *
  */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-
 #include <ctype.h>                                      /**< isspace() */
-
 #include <sys/types.h>                                  /**< open() */
 #include <sys/stat.h>
 #include <sys/ioctl.h>                                  /**< terminal ioctl */
-
-#include <sys/time.h>                                   /** gettimeofday() */
-#include <time.h>                                       /** localtime() */
+#include <sys/time.h>                                   /**< gettimeofday() */
+#include <time.h>                                       /**< localtime() */
 #include <fcntl.h>
 
 #include "pqos.h"
@@ -63,7 +59,6 @@
 /**
  * Macros
  */
-
 #ifndef DIM
 #define DIM(x) (sizeof(x)/sizeof(x[0]))
 #endif
@@ -77,12 +72,12 @@
 #define PQOS_MAX_SOCKETS      2
 #define PQOS_MAX_SOCKET_CORES 64
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
+#define PQOS_MAX_PIDS         128
 
 /**
  * Local data structures
  *
  */
-
 const char *xml_root_open = "<records>";
 const char *xml_root_close = "</records>";
 const char *xml_child_open = "<record>";
@@ -92,7 +87,7 @@ const long xml_root_close_size = DIM("</records>") - 1;
 /**
  * Free RMID's being in use
  */
-int sel_free_in_use_rmid = 0;
+static int sel_free_in_use_rmid = 0;
 
 /**
  * Reset CAT configuration
@@ -118,9 +113,24 @@ static struct {
         unsigned core;
         struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
-} sel_monitor_tab[PQOS_MAX_CORES];
+} sel_monitor_core_tab[PQOS_MAX_CORES];
 
 static struct pqos_mon_data *m_mon_grps[PQOS_MAX_CORES];
+
+/**
+ * Maintains a table of process id, event, number of events that are selected
+ * in config string for monitoring
+ */
+static struct {
+        pid_t pid;
+        struct pqos_mon_data *pgrp;
+        enum pqos_mon_event events;
+} sel_monitor_pid_tab[PQOS_MAX_PIDS];
+
+/**
+ * Maintains the number of process ids you want to track
+ */
+static int sel_process_num = 0;
 
 /**
  * Maintains number of Class of Services supported by socket for
@@ -199,6 +209,19 @@ static char *sel_allocation_profile = NULL;
  * Maintains verbose mode choice selected in config string
  */
 static int sel_verbose_mode = 0;
+
+/**
+ * @brief Check to determine if processes or cores are monitored
+ *
+ * @return Process monitoring mode status
+ * @retval 0 monitoring cores
+ * @retval 1 monitoring processes
+ */
+static inline int
+process_mode(void)
+{
+        return (sel_process_num <= 0) ? 0 : 1;
+}
 
 /**
  * @brief Converts string into 64-bit unsigned number.
@@ -330,6 +353,33 @@ parse_error(const char *arg, const char *note)
 }
 
 /**
+ * @brief Common function to parse selected events
+ *
+ * @param str string of the event
+ * @param pqos_mon_event pointer to the selected events so far
+ */
+
+static void
+parse_event(char *str, enum pqos_mon_event *evt)
+{
+        ASSERT(str != NULL);
+        ASSERT(evt != NULL);
+        if (strncasecmp(str, "llc:", 4) == 0)
+		*evt = PQOS_MON_EVENT_L3_OCCUP;
+        else if (strncasecmp(str, "mbr:", 4) == 0)
+                *evt = PQOS_MON_EVENT_RMEM_BW;
+        else if (strncasecmp(str, "mbl:", 4) == 0)
+                *evt = PQOS_MON_EVENT_LMEM_BW;
+        else
+                parse_error(str, "Unrecognized monitoring event type");
+
+	/**
+         * This is to tell which events to display (out of all possible)
+         */
+        sel_events_max |= *evt;
+}
+
+/**
  * @brief Verifies and translates monitoring config string into
  *        internal monitoring configuration.
  *
@@ -342,56 +392,47 @@ parse_monitor_event(char *str)
         unsigned i = 0, n = 0;
         enum pqos_mon_event evt = 0;
 
-        if (strncasecmp(str, "llc:", 4) == 0)
-		evt = PQOS_MON_EVENT_L3_OCCUP;
-        else if (strncasecmp(str, "mbr:", 4) == 0)
-                evt = PQOS_MON_EVENT_RMEM_BW;
-        else if (strncasecmp(str, "mbl:", 4) == 0)
-                evt = PQOS_MON_EVENT_LMEM_BW;
-        else
-                parse_error(str, "Unrecognized monitoring event type");
-
-        /**
-         * This is to tell which events to display (out of all possible)
-         */
-        sel_events_max |= evt;
+	parse_event(str, &evt);
 
         n = strlisttotab(strchr(str, ':') + 1, cores, DIM(cores));
 
         if (n == 0)
                 parse_error(str, "No cores selected for an event");
 
-        if (n >= DIM(sel_monitor_tab))
+        if (n >= DIM(sel_monitor_core_tab))
                 parse_error(str,
                             "too many cores selected "
                             "for monitoring");
 
         /**
          *  For each core we are processing:
-         *  - if it's already there in the sel_monitor_tab - update the entry
-         *  - else - add it to the sel_monitor_tab
+         *  - if it's already there in the sel_monitor_core_tab
+         *    => update the entry
+         *  - else
+         *    => add it to the sel_monitor_core_tab
          */
         for (i = 0; i < n; i++) {
                 unsigned found;
                 int j;
 
                 for (found = 0, j = 0; j < sel_monitor_num && found == 0; j++) {
-                        if (sel_monitor_tab[j].core == (unsigned) cores[i]) {
-                                sel_monitor_tab[j].events |= evt;
+                        if (sel_monitor_core_tab[j].core ==
+                            (unsigned) cores[i]) {
+                                sel_monitor_core_tab[j].events |= evt;
                                 found = 1;
                         }
                 }
                 if (!found) {
-                        sel_monitor_tab[sel_monitor_num].core =
+                        sel_monitor_core_tab[sel_monitor_num].core =
                                 (unsigned) cores[i];
-                        sel_monitor_tab[sel_monitor_num].events = evt;
+                        sel_monitor_core_tab[sel_monitor_num].events = evt;
 			m_mon_grps[sel_monitor_num] =
                                 malloc(sizeof(**m_mon_grps));
                         if (m_mon_grps[sel_monitor_num] == NULL) {
                                 printf("Error with memory allocation");
                                 exit(EXIT_FAILURE);
                         }
-                        sel_monitor_tab[sel_monitor_num].pgrp =
+                        sel_monitor_core_tab[sel_monitor_num].pgrp =
                                 m_mon_grps[sel_monitor_num];
                         ++sel_monitor_num;
                 }
@@ -453,50 +494,92 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
         unsigned i;
         int ret;
 
-        if (sel_monitor_num == 0) {
+        ASSERT(sel_monitor_num >= 0);
+        ASSERT(sel_process_num >= 0);
+
+        if (sel_monitor_num == 0 && sel_process_num == 0) {
+	        /**
+                 * sel_monitor_num==0 may indicate processes
+		 * have been selected,
+		 * if so then lines below should be skipped
+                 */
+	        for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
+		        sel_events_max |= (cap_mon->u.mon->events[i].type);
                 /**
                  * no cores and events selected through command line
                  * by default let's monitor all cores
                  */
+		for (i = 0; i < cpu_info->num_cores; i++) {
+		        unsigned lcore = cpu_info->cores[i].lcore;
 
-                for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
-                        sel_events_max |= (cap_mon->u.mon->events[i].type);
-
-                for (i = 0; i < cpu_info->num_cores; i++) {
-                        unsigned lcore = cpu_info->cores[i].lcore;
-
-                        sel_monitor_tab[sel_monitor_num].core = lcore;
-                        sel_monitor_tab[sel_monitor_num].events =
-                                sel_events_max;
+			sel_monitor_core_tab[sel_monitor_num].core = lcore;
+			sel_monitor_core_tab[sel_monitor_num].events =
+			        sel_events_max;
 			m_mon_grps[sel_monitor_num] =
-                                malloc(sizeof(**m_mon_grps));
-                        if (m_mon_grps[sel_monitor_num] == NULL) {
-                                printf("Error with memory allocation");
-                                exit(EXIT_FAILURE);
-                        }
-                        sel_monitor_tab[sel_monitor_num].pgrp =
-                                m_mon_grps[sel_monitor_num];
-                        sel_monitor_num++;
-                }
+			        malloc(sizeof(**m_mon_grps));
+			if (m_mon_grps[sel_monitor_num] == NULL) {
+			        printf("Error with memory allocation");
+				exit(EXIT_FAILURE);
+			}
+			sel_monitor_core_tab[sel_monitor_num].pgrp =
+			        m_mon_grps[sel_monitor_num];
+			sel_monitor_num++;
+		}
         }
 
-        for (i = 0; i < (unsigned)sel_monitor_num; i++) {
-                unsigned lcore = sel_monitor_tab[i].core;
+	/**< check for process and core tracking, can not have both */
+	if (sel_process_num > 0 && sel_monitor_num > 0) {
+	        /**
+		 * The error raised also if two instances of PQoS
+		 * attempt to use the same core id.
+		 */
+		printf("Monitoring start error, process and core"
+		       " tracking can not be done simultaneously\n");
+		return -1;
+	}
 
-                ret = pqos_mon_start(1, &lcore,
-                                     sel_monitor_tab[i].events,
-                                     NULL,
-                                     sel_monitor_tab[i].pgrp);
-                ASSERT(ret == PQOS_RETVAL_OK);
-
+        /**< check for processes tracking */
+	if (!process_mode()) {
                 /**
-                 * The error raised also if two instances of PQoS
-                 *attempt to use the same core id.
+                 * Make calls to pqos_mon_start - track cores
                  */
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Monitoring start error on core %u, status %d\n",
-                               lcore, ret);
-                        return -1;
+                for (i = 0; i < (unsigned)sel_monitor_num; i++) {
+                        unsigned lcore = sel_monitor_core_tab[i].core;
+
+                        ret = pqos_mon_start(1, &lcore,
+                                             sel_monitor_core_tab[i].events,
+                                             NULL,
+                                             sel_monitor_core_tab[i].pgrp);
+                        ASSERT(ret == PQOS_RETVAL_OK);
+                        /**
+                         * The error raised also if two instances of PQoS
+                         * attempt to use the same core id.
+                         */
+                        if (ret != PQOS_RETVAL_OK) {
+                                printf("Monitoring start error on core "
+                                       "%u, status %d\n", lcore, ret);
+                                return -1;
+                        }
+	        }
+	} else {
+                /**
+                 * Make calls to pqos_mon_start_pid - track PIDs
+                 */
+                for (i = 0; i < (unsigned)sel_process_num; i++) {
+                        ret = pqos_mon_start_pid(sel_monitor_pid_tab[i].pid,
+                                                 sel_monitor_pid_tab[i].events,
+                                                 NULL,
+                                                 sel_monitor_pid_tab[i].pgrp);
+                        ASSERT(ret == PQOS_RETVAL_OK);
+                        /**
+                         * Any problem with monitoring the process?
+                         */
+                        if (ret != PQOS_RETVAL_OK) {
+                                printf("PID %d monitoring start error,"
+                                       "status %d\n",
+                                       sel_monitor_pid_tab[i].pid, ret);
+                                return -1;
+                        }
                 }
 	}
         return 0;
@@ -509,15 +592,20 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 static void
 stop_monitoring(void)
 {
-        unsigned i;
+        unsigned i, mon_number;
         int ret;
 
-        for (i = 0; i < (unsigned)sel_monitor_num; i++) {
-                ret = pqos_mon_stop(m_mon_grps[i]);
-                ASSERT(ret == PQOS_RETVAL_OK);
-                if (ret != PQOS_RETVAL_OK)
-                        printf("Monitoring stop error!\n");
-        }
+	if (!process_mode())
+	        mon_number = (unsigned)sel_monitor_num;
+	else
+	        mon_number = (unsigned)sel_process_num;
+
+	for (i = 0; i < mon_number; i++) {
+	        ret = pqos_mon_stop(m_mon_grps[i]);
+		ASSERT(ret == PQOS_RETVAL_OK);
+		if (ret != PQOS_RETVAL_OK)
+		        printf("Monitoring stop error!\n");
+	}
 }
 
 /**
@@ -1000,6 +1088,101 @@ selfn_verbose_mode(const char *arg)
 }
 
 /**
+ * @brief Stores the process ids given in a table for future use
+ *
+ * @param str string of process ids
+ */
+static void
+sel_store_process_id(char *str)
+{
+        uint64_t processes[PQOS_MAX_PIDS];
+        unsigned i = 0, n = 0;
+        enum pqos_mon_event evt = 0;
+
+	parse_event(str, &evt);
+
+        n = strlisttotab(strchr(str, ':') + 1, processes, DIM(processes));
+
+        if (n == 0)
+                parse_error(str, "No process ids selected for monitoring");
+
+        if (n >= DIM(sel_monitor_pid_tab))
+                parse_error(str,
+                            "too many processes selected "
+                            "for monitoring");
+
+        /**
+         *  For each process:
+         *  - if it's already there in the sel_monitor_pid_tab
+         *  - update the entry
+         *  - else - add it to the sel_monitor_pid_tab
+         */
+        for (i = 0; i < n; i++) {
+                unsigned found;
+                int j;
+
+                for (found = 0, j = 0; j < sel_process_num && found == 0; j++) {
+                        if ((unsigned) sel_monitor_pid_tab[j].pid
+			    == processes[i]) {
+                                sel_monitor_pid_tab[j].events |= evt;
+                                found = 1;
+                        }
+                }
+		if (!found) {
+		        sel_monitor_pid_tab[sel_process_num].pid =
+			        (unsigned) processes[i];
+			sel_monitor_pid_tab[sel_process_num].events = evt;
+			m_mon_grps[sel_process_num] =
+			        malloc(sizeof(**m_mon_grps));
+			if (m_mon_grps[sel_process_num] == NULL) {
+			        printf("Error with memory allocation");
+			        exit(EXIT_FAILURE);
+			}
+			sel_monitor_pid_tab[sel_process_num].pgrp =
+			        m_mon_grps[sel_process_num];
+			++sel_process_num;
+		}
+        }
+}
+
+/**
+ * @brief Selects process mode on and stores process ids
+ *        and event types given by user
+ *
+ * @param arg string of process ids
+ */
+static void
+selfn_process_mode(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+	char *saveptr = NULL;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (strlen(arg) <= 0)
+                parse_error(arg, "Empty string!");
+
+        /**
+         * The parser will add to the display only necessary columns
+         */
+        cp = strdup(arg);
+        ASSERT(cp != NULL);
+	sel_events_max = 0;
+
+        for (str = cp; ; str = NULL) {
+                char *token = NULL;
+
+                token = strtok_r(str, ";", &saveptr);
+                if (token == NULL)
+                        break;
+                sel_store_process_id(token);
+        }
+
+        free(cp);
+}
+
+/**
  * @brief Selects showing allocation settings
  *
  * @param arg not used
@@ -1149,10 +1332,8 @@ mon_qsort_coreid_cmp_asc(const void *a, const void *b)
          * This (a-b) is to get ascending order
          * otherwise it would be (b-a)
          */
-        return (int)ap->cores[0] - (int)bp->cores[0];
+        return (int) (((unsigned)ap->cores[0]) - ((unsigned)bp->cores[0]));
 }
-
-
 
 /**
  * Stop monitoring indicator for infinite monitoring loop
@@ -1371,8 +1552,8 @@ fillin_xml_row(char data[], const size_t sz_data,
                                     "l3_occupancy_kB");
 
         offset += fillin_xml_column(mbl, data + offset, sz_data - offset,
-                                     mon_event & PQOS_MON_EVENT_LMEM_BW,
-                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW,
+                                    mon_event & PQOS_MON_EVENT_LMEM_BW,
+                                    sel_events_max & PQOS_MON_EVENT_LMEM_BW,
                                     "mbm_local_MB");
 
         offset += fillin_xml_column(mbr, data + offset, sz_data - offset,
@@ -1412,6 +1593,19 @@ monitoring_loop(FILE *fp,
         const size_t sz_header = 128, sz_data = 128;
         char *header = NULL;
         char data[sz_data];
+	unsigned mon_number = 0;
+	struct pqos_mon_data **mon_data = NULL;
+
+	if (!process_mode())
+	        mon_number = (unsigned) sel_monitor_num;
+	else
+	        mon_number = (unsigned) sel_process_num;
+
+	mon_data = malloc(sizeof(*mon_data) * mon_number);
+	if (mon_data == NULL) {
+	        printf("Error with memory allocation");
+		exit(EXIT_FAILURE);
+	}
 
         if ((!istext)  && (strcasecmp(output_type, "xml") != 0)) {
                 printf("Invalid selection of output file type '%s'!\n",
@@ -1468,7 +1662,16 @@ monitoring_loop(FILE *fp,
                         return;
                 }
                 memset(header, 0, sz_header);
-                strncpy(header, "SOCKET     CORE     RMID", sz_header - 1);
+		/* Different header for process ids */
+		if (!process_mode())
+		        strncpy(header,
+				"SOCKET     CORE     RMID",
+				sz_header - 1);
+		else
+		        strncpy(header,
+				"PID     CORE     RMID",
+				sz_header - 1);
+
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(header, "    LLC[KB]",
                                 sz_header - strlen(header) - 1);
@@ -1481,9 +1684,7 @@ monitoring_loop(FILE *fp,
         }
 
         while (!stop_monitoring_loop) {
-                struct pqos_mon_data *mon_data[PQOS_MAX_CORES];
-                unsigned mon_number = (unsigned) sel_monitor_num;
-                struct timeval tv_s, tv_e;
+		struct timeval tv_s, tv_e;
                 struct tm *ptm = NULL;
                 unsigned i = 0;
                 struct timespec req, rem;
@@ -1491,15 +1692,15 @@ monitoring_loop(FILE *fp,
                 char cb_time[64];
 
                 gettimeofday(&tv_s, NULL);
+		ret = pqos_mon_poll(m_mon_grps,
+				    (unsigned) mon_number);
+		if (ret != PQOS_RETVAL_OK) {
+		        printf("Failed to poll monitoring data!\n");
+			return;
+		}
 
-                ret = pqos_mon_poll(m_mon_grps, (unsigned) sel_monitor_num);
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to poll monitoring data!\n");
-                        return;
-                }
-
-                memcpy(mon_data, m_mon_grps,
-                       sel_monitor_num * sizeof(m_mon_grps[0]));
+		memcpy(mon_data, m_mon_grps,
+		       mon_number * sizeof(m_mon_grps[0]));
 
                 if (istty)
                         fprintf(fp, "\033[2J");   /**< clear screen */
@@ -1522,12 +1723,12 @@ monitoring_loop(FILE *fp,
                 }
 
                 if (top_mode) {
-                        qsort(mon_data, mon_number, sizeof(mon_data[0]),
-                              mon_qsort_llc_cmp_desc);
-                } else {
-                        qsort(mon_data, mon_number, sizeof(mon_data[0]),
-                              mon_qsort_coreid_cmp_asc);
-                }
+		        qsort(mon_data, mon_number, sizeof(mon_data[0]),
+			      mon_qsort_llc_cmp_desc);
+		} else if (!process_mode()) {
+		        qsort(mon_data, mon_number, sizeof(mon_data[0]),
+			      mon_qsort_coreid_cmp_asc);
+		}
 
                 if (max_lines > 0) {
                         if ((mon_number+TERM_MIN_NUM_LINES-1) > max_lines)
@@ -1540,47 +1741,79 @@ monitoring_loop(FILE *fp,
                 for (i = 0; i < mon_number; i++) {
                         double llc = ((double)mon_data[i]->values.llc) *
                                 llc_factor;
-                        double mbr =
+			double mbr =
                                 ((double)mon_data[i]->values.mbm_remote_delta) *
                                 mbr_factor * coeff;
-                        double mbl =
+			double mbl =
                                 ((double)mon_data[i]->values.mbm_local_delta) *
                                 mbl_factor * coeff;
 
                         if (istext) {
                                 /* Text */
-                                fillin_text_row(data, sz_data,
-                                                mon_data[i]->event,
-                                                llc, mbr, mbl);
-                                fprintf(fp, "\n%6u %8u %8u %s",
-                                        mon_data[i]->socket,
-                                        mon_data[i]->cores[0],
-                                        mon_data[i]->rmid,
-                                        data);
+				/* Checking what to print,
+				 * cores or process ids */
+			        fillin_text_row(data, sz_data,
+						mon_data[i]->event,
+						llc, mbr, mbl);
+				if (!process_mode()) {
+				        fprintf(fp, "\n%6u %8u %8u %s",
+                                                mon_data[i]->socket,
+						mon_data[i]->cores[0],
+						mon_data[i]->rmid,
+						data);
+				} else {
+				        fprintf(fp, "\n%5u %6s %8s %s",
+						mon_data[i]->pid,
+						"N/A",
+						"N/A",
+						data);
+				}
                         } else {
                                 /* XML */
-                                fillin_xml_row(data, sz_data,
-                                               mon_data[i]->event,
-                                               llc, mbr, mbl);
-                                fprintf(fp,
-                                        "%s\n"
-                                        "\t<time>%s</time>\n"
-                                        "\t<socket>%u</socket>\n"
-                                        "\t<core>%u</core>\n"
-                                        "\t<rmid>%u</rmid>\n"
-                                        "%s"
-                                        "%s\n"
-                                        "%s",
-                                        xml_child_open,
-                                        cb_time,
-                                        mon_data[i]->socket,
-                                        mon_data[i]->cores[0],
-                                        mon_data[i]->rmid,
-                                        data,
-                                        xml_child_close,
-                                        xml_root_close);
-                                fseek(fp, -xml_root_close_size, SEEK_CUR);
-                        }
+			        fillin_xml_row(data, sz_data,
+					       mon_data[i]->event,
+					       llc, mbr, mbl);
+			        if (!process_mode()) {
+					fprintf(fp,
+						"%s\n"
+						"\t<time>%s</time>\n"
+						"\t<socket>%u</socket>\n"
+						"\t<core>%u</core>\n"
+						"\t<rmid>%u</rmid>\n"
+						"%s"
+						"%s\n"
+						"%s",
+						xml_child_open,
+						cb_time,
+						mon_data[i]->socket,
+						mon_data[i]->cores[0],
+						mon_data[i]->rmid,
+						data,
+						xml_child_close,
+						xml_root_close);
+				} else {
+					fprintf(fp,
+						"%s\n"
+						"\t<time>%s</time>\n"
+						"\t<pid>%u</pid>\n"
+						"\t<core>%s</core>\n"
+						"\t<rmid>%s</rmid>\n"
+						"%s"
+						"%s\n"
+						"%s",
+						xml_child_open,
+						cb_time,
+						mon_data[i]->pid,
+						"N/A",
+						"N/A",
+						data,
+						xml_child_close,
+						xml_root_close);
+				}
+				fseek(fp,
+				      -xml_root_close_size,
+				      SEEK_CUR);
+			}
                 }
                 fflush(fp);
 
@@ -1630,6 +1863,7 @@ monitoring_loop(FILE *fp,
                 }
 
         }
+	free(mon_data);
 
 }
 
@@ -1680,7 +1914,10 @@ static void print_help(void)
                "default 10=10x100ms=1s\n"
                "\t-T\ttop like monitoring output\n"
                "\t-t\tdefine monitoring time (use 'inf' or 'infinite' for "
-               "inifinite loop monitoring loop)\n",
+               "inifinite loop monitoring loop)\n"
+               "\t-p\tselect process ids and events to monitor, "
+	       "example: \"llc:22,2,7-15\""
+	       ", it is not possible to track both processes and cores\n",
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
                m_cmd_name, m_cmd_name);
 }
@@ -1694,10 +1931,11 @@ int main(int argc, char **argv)
         unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
         int cmd, ret, exit_val = EXIT_SUCCESS;
         FILE *fp_monitor = NULL;
+        int j = 0;
 
         m_cmd_name = argv[0];
 
-        while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:srvR"))
+        while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:p:srvR"))
                != -1) {
                 switch (cmd) {
                 case 'h':
@@ -1717,6 +1955,9 @@ int main(int argc, char **argv)
                         break;
                 case 'i':
                         selfn_monitor_interval(optarg);
+                        break;
+                case 'p':
+		        selfn_process_mode(optarg);
                         break;
                 case 'm':
                         selfn_monitor_events(optarg);
@@ -1854,7 +2095,6 @@ int main(int argc, char **argv)
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
-
         ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
         ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
 
@@ -1903,9 +2143,10 @@ int main(int argc, char **argv)
                 /**
                  * Reset CAT configuration to after-reset state and exit
                  */
-                if (pqos_l3ca_reset(p_cap, p_cpu) != PQOS_RETVAL_OK)
+                if (pqos_l3ca_reset(p_cap, p_cpu) != PQOS_RETVAL_OK) {
+                        exit_val = EXIT_FAILURE;
                         printf("CAT reset failed!\n");
-                else
+                } else
                         printf("CAT reset successful\n");
                 goto allocation_exit;
         }
@@ -1930,12 +2171,14 @@ int main(int argc, char **argv)
                 ret_cos = set_allocation_class(sock_count, sockets);
                 if (ret_cos < 0) {
                         printf("Allocation configuration error!\n");
+                        exit_val = EXIT_FAILURE;
                         goto error_exit_2;
                 }
 
                 ret_assoc = set_allocation_assoc();
                 if (ret_assoc < 0) {
                         printf("CAT association error!\n");
+                        exit_val = EXIT_FAILURE;
                         goto error_exit_2;
                 }
 
@@ -1961,8 +2204,10 @@ int main(int argc, char **argv)
                 goto error_exit_2;
         }
 
-        if (setup_monitoring(p_cpu, cap_mon) != 0)
+        if (setup_monitoring(p_cpu, cap_mon) != 0) {
+                exit_val = EXIT_FAILURE;
                 goto error_exit_2;
+        }
 
         monitoring_loop(fp_monitor, sel_timeout, sel_mon_interval,
                         sel_mon_top_like, p_cap, sel_output_type);
@@ -2003,10 +2248,8 @@ int main(int argc, char **argv)
         if (sel_config_file != NULL)
                 free(sel_config_file);
 
-        int i;
-
-        for (i = 0; i < sel_monitor_num; i++)
-                free(m_mon_grps[i]);
+        for (j = 0; j < sel_monitor_num; j++)
+                free(m_mon_grps[j]);
 
         return exit_val;
 }
