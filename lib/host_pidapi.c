@@ -485,17 +485,28 @@ pqos_pid_fini(void)
 int
 pqos_pid_start(struct pqos_mon_data *group)
 {
-        char name[64];
+        char dir_buf[64];
 	struct dirent **namelist = NULL;
 	int i, ret;
         struct pid_supported_event *pe;
         enum pqos_mon_event started_evts = 0;
+        DIR *dir;
+
+        /**
+         * Check PID exists
+         */
+        snprintf(dir_buf, sizeof(dir_buf)-1, "/proc/%d", (int)group->pid);
+        dir = opendir(dir_buf);
+        if (dir == NULL)
+                return PQOS_RETVAL_PARAM;
+        closedir(dir);
+        memset(dir_buf, 0, sizeof(dir_buf));
 
         /**
          * Get TID's for each thread
          */
-	snprintf(name, sizeof(name)-1, "/proc/%d/task", group->pid);
-	group->tid_nr = scandir(name, &namelist, filter, NULL);
+	snprintf(dir_buf, sizeof(dir_buf)-1, "/proc/%d/task", (int)group->pid);
+	group->tid_nr = scandir(dir_buf, &namelist, filter, NULL);
 	if (group->tid_nr <= 0) {
 		LOG_ERROR("Failed to read TID's\n");
 		return PQOS_RETVAL_ERROR;

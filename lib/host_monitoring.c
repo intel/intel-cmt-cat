@@ -1073,20 +1073,8 @@ pqos_mon_start_pid(const pid_t pid,
         return PQOS_RETVAL_ERROR;
 #else
         int ret = PQOS_RETVAL_OK;
-        char pid_dir[32];
-        DIR *dir;
-
-        /**
-         * Check PID exists
-         */
-        snprintf(pid_dir, sizeof(pid_dir)-1, "/proc/%d", (int)pid);
-        dir = opendir(pid_dir);
-        if (dir == NULL)
-                return PQOS_RETVAL_PARAM;
-        closedir(dir);
 
         _pqos_api_lock();
-
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
