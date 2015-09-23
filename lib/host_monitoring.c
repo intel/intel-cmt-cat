@@ -1068,6 +1068,7 @@ pqos_mon_start_pid(const pid_t pid,
         if (group == NULL || event == 0 || pid < 0)
                 return PQOS_RETVAL_PARAM;
 #ifdef PQOS_NO_PID_API
+        UNUSED_PARAM(context);
         LOG_ERROR("PID monitoring API not built\n");
         return PQOS_RETVAL_ERROR;
 #else
