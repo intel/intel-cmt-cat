@@ -35,7 +35,7 @@
 /**
  * @brief  Set of utility functions to operate on Platform QoS (pqos) data structures.
  *
- * These functions need no synchronisation mechanisms.
+ * These functions need no synchronization mechanisms.
  *
  */
 #include <stdlib.h>
@@ -80,6 +80,21 @@ __get_num_sockets(const struct pqos_cpuinfo *cpu)
         }
 
         return scount;
+}
+
+int
+pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *cpu,
+			 unsigned *count)
+{
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+
+        if (cpu == NULL || count == NULL)
+		return PQOS_RETVAL_PARAM;
+	*count = __get_num_sockets(cpu);
+	if (*count == 0)
+		return PQOS_RETVAL_ERROR;
+	return PQOS_RETVAL_OK;
 }
 
 int
@@ -154,7 +169,7 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
                         }
 
                         /**
-                         * Is there is more cores than \a cores can accomodate?
+                         * Is there is more cores than \a cores can accommodate?
                          */
                         if (cnt >= max_count)
                                 return PQOS_RETVAL_ERROR;
@@ -305,6 +320,30 @@ pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
 }
 
 int
+pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
+                      int *cdp_supported,
+                      int *cdp_enabled)
+{
+        const struct pqos_capability *item = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cap != NULL && (cdp_enabled != NULL || cdp_supported != NULL));
+        if (cap == NULL || (cdp_enabled == NULL && cdp_supported == NULL))
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &item);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;                           /**< no L3CA capability */
+
+        ASSERT(item != NULL);
+        if (cdp_supported != NULL)
+                *cdp_supported = item->u.l3ca->cdp;
+        if (cdp_enabled != NULL)
+                *cdp_enabled = item->u.l3ca->cdp_on;
+        return ret;
+}
+
+int
 pqos_l3ca_reset(const struct pqos_cap *cap,
                 const struct pqos_cpuinfo *cpu)
 {
@@ -325,8 +364,8 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
 
         /**
          * Figure out number of sockets in the system
-         * - allocate enough memory to accomodate all socket id's
-         * - use stcak frame allocator for it (not heap)
+         * - allocate enough memory to accommodate all socket id's
+         * - use stack frame allocator for it (not heap)
          * - get list of socket id's through another API
          * - validate that number of socket id's obtained in
          *   two different ways match
@@ -357,6 +396,7 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
                 for (i = 0; i < item->u.l3ca->num_classes; i++) {
                         struct pqos_l3ca cos;
 
+                        cos.cdp = 0;
                         cos.class_id = i;
                         cos.ways_mask = ways_mask;
                         ret = pqos_l3ca_set(sockets[j], 1, &cos);
