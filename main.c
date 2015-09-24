@@ -75,6 +75,13 @@
 #define PQOS_MAX_PIDS         128
 
 /**
+ * Defines used to identify CAT mask definitions
+ */
+#define CAT_UPDATE_SCOPE_BOTH 0    /**< update COS code & data masks */
+#define CAT_UPDATE_SCOPE_DATA 1    /**< update COS data mask */
+#define CAT_UPDATE_SCOPE_CODE 2    /**< update COS code mask */
+
+/**
  * Local data structures
  *
  */
@@ -83,6 +90,11 @@ const char *xml_root_close = "</records>";
 const char *xml_child_open = "<record>";
 const char *xml_child_close = "</record>";
 const long xml_root_close_size = DIM("</records>") - 1;
+
+/**
+ * Default CDP configuration option - don't enforce on or off
+ */
+static enum pqos_cdp_config selfn_cdp_config = PQOS_REQUIRE_CDP_ANY;
 
 /**
  * Free RMID's being in use
@@ -128,7 +140,7 @@ static struct {
 } sel_monitor_pid_tab[PQOS_MAX_PIDS];
 
 /**
- * Maintains the number of process ids you want to track
+ * Maintains the number of process id's you want to track
  */
 static int sel_process_num = 0;
 
@@ -356,7 +368,7 @@ parse_error(const char *arg, const char *note)
  * @brief Common function to parse selected events
  *
  * @param str string of the event
- * @param pqos_mon_event pointer to the selected events so far
+ * @param evt pointer to the selected events so far
  */
 
 static void
@@ -643,6 +655,43 @@ set_allocation_class(unsigned sock_count,
 }
 
 /**
+ * @brief Converts string describing CAT COS into ID and mask scope
+ *
+ * Current string format is: <ID>[CcDd]
+ *
+ * Some examples:
+ *  1d  - class 1, data mask
+ *  5C  - class 5, code mask
+ *  0   - class 0, common mask for code & data
+ *
+ * @param [in] str string describing CAT COS. Function may modify
+ *             the last character of the string in some conditions.
+ * @param [out] scope indicates if string \a str refers to both COS masks
+ *              or just one of them
+ * @param [out] id class ID referred to in the string \a str
+ */
+static void
+parse_cos_mask_type(char *str, int *scope, unsigned *id)
+{
+        size_t len = 0;
+
+        ASSERT(str != NULL);
+        ASSERT(scope != NULL);
+        ASSERT(id != NULL);
+        len = strlen(str);
+        if (len > 1 && (str[len - 1] == 'c' || str[len - 1] == 'C')) {
+                *scope = CAT_UPDATE_SCOPE_CODE;
+                str[len - 1] = '\0';
+        } else if (len > 1 && (str[len - 1] == 'd' || str[len - 1] == 'D')) {
+                *scope = CAT_UPDATE_SCOPE_DATA;
+                str[len - 1] = '\0';
+        } else {
+                *scope = CAT_UPDATE_SCOPE_BOTH;
+        }
+        *id = (unsigned) strtouint64(str);
+}
+
+/**
  * @brief Verifies and translates definition of single
  *        allocation class of service
  *        from text string into internal configuration.
@@ -656,21 +705,15 @@ parse_allocation_cos(char *str)
         unsigned class_id = 0;
         uint64_t mask = 0;
         int j = 0;
+        int update_scope = CAT_UPDATE_SCOPE_BOTH;
 
         p = strchr(str, '=');
         if (p == NULL)
                 parse_error(str, "invalid class of service definition");
         *p = '\0';
 
-        class_id = (unsigned) strtouint64(str);
+        parse_cos_mask_type(str, &update_scope, &class_id);
         mask = strtouint64(p+1);
-
-        if (sel_l3ca_cos_num <= 0) {
-                sel_l3ca_cos_tab[0].class_id = class_id;
-                sel_l3ca_cos_tab[0].ways_mask = mask;
-                sel_l3ca_cos_num = 1;
-                return;
-        }
 
         for (j = 0; j < sel_l3ca_cos_num; j++)
                 if (sel_l3ca_cos_tab[j].class_id == class_id)
@@ -678,15 +721,29 @@ parse_allocation_cos(char *str)
 
         if (j < sel_l3ca_cos_num) {
                 /**
-                 * this class is already on the list
-                 * - update mask but warn about it
+                 * This class is already on the list.
+                 * Don't allow for mixing CDP and non-CDP formats.
                  */
-                printf("warn: updating COS %u definition from mask "
-                       "0x%llx to 0x%llx\n",
-                       class_id,
-                       (long long) sel_l3ca_cos_tab[j].ways_mask,
-                       (long long) mask);
-                sel_l3ca_cos_tab[j].ways_mask = mask;
+                if ((sel_l3ca_cos_tab[j].cdp &&
+                     update_scope == CAT_UPDATE_SCOPE_BOTH) ||
+                    (!sel_l3ca_cos_tab[j].cdp &&
+                     update_scope != CAT_UPDATE_SCOPE_BOTH)) {
+                        printf("error: COS%u defined twice using CDP and "
+                               "non-CDP format\n", class_id);
+                        exit(EXIT_FAILURE);
+                }
+
+                switch (update_scope) {
+                case CAT_UPDATE_SCOPE_BOTH:
+                        sel_l3ca_cos_tab[j].ways_mask = mask;
+                        break;
+                case CAT_UPDATE_SCOPE_CODE:
+                        sel_l3ca_cos_tab[j].code_mask = mask;
+                        break;
+                case CAT_UPDATE_SCOPE_DATA:
+                        sel_l3ca_cos_tab[j].data_mask = mask;
+                        break;
+                }
         } else {
                 /**
                  * New class selected - extend the list
@@ -698,7 +755,32 @@ parse_allocation_cos(char *str)
                                     "too many allocation classes selected");
 
                 sel_l3ca_cos_tab[k].class_id = class_id;
-                sel_l3ca_cos_tab[k].ways_mask = mask;
+
+                switch (update_scope) {
+                case CAT_UPDATE_SCOPE_BOTH:
+                        sel_l3ca_cos_tab[k].cdp = 0;
+                        sel_l3ca_cos_tab[k].ways_mask = mask;
+                        break;
+                case CAT_UPDATE_SCOPE_CODE:
+                        sel_l3ca_cos_tab[k].cdp = 1;
+                        sel_l3ca_cos_tab[k].code_mask = mask;
+                        /**
+                         * This will result in error during set operation
+                         * if data mask is not defined by the user.
+                         */
+                        sel_l3ca_cos_tab[k].data_mask = (uint64_t) (-1LL);
+                        break;
+                case CAT_UPDATE_SCOPE_DATA:
+                        sel_l3ca_cos_tab[k].cdp = 1;
+                        sel_l3ca_cos_tab[k].data_mask = mask;
+                        /**
+                         * This will result in error during set operation
+                         * if code mask is not defined by the user.
+                         */
+                        sel_l3ca_cos_tab[k].code_mask = (uint64_t) (-1LL);
+                        break;
+                }
+
                 sel_l3ca_cos_num++;
         }
 }
@@ -927,9 +1009,17 @@ print_allocation_config(const struct pqos_capability *cap_mon,
                 printf("L3CA COS definitions for Socket %u:\n",
                        sockets[i]);
                 for (n = 0; n < num; n++) {
-                        printf("    L3CA COS%u => MASK 0x%llx\n",
-                               tab[n].class_id,
-                               (unsigned long long)tab[n].ways_mask);
+                        if (tab[n].cdp) {
+                                printf("    L3CA COS%u => DATA 0x%llx,"
+                                       "CODE 0x%llx\n",
+                                       tab[n].class_id,
+                                       (unsigned long long)tab[n].data_mask,
+                                       (unsigned long long)tab[n].code_mask);
+                        } else {
+                                printf("    L3CA COS%u => MASK 0x%llx\n",
+                                       tab[n].class_id,
+                                       (unsigned long long)tab[n].ways_mask);
+                        }
                 }
         }
 
@@ -1088,9 +1178,9 @@ selfn_verbose_mode(const char *arg)
 }
 
 /**
- * @brief Stores the process ids given in a table for future use
+ * @brief Stores the process id's given in a table for future use
  *
- * @param str string of process ids
+ * @param str string of process id's
  */
 static void
 sel_store_process_id(char *str)
@@ -1104,7 +1194,7 @@ sel_store_process_id(char *str)
         n = strlisttotab(strchr(str, ':') + 1, processes, DIM(processes));
 
         if (n == 0)
-                parse_error(str, "No process ids selected for monitoring");
+                parse_error(str, "No process id selected for monitoring");
 
         if (n >= DIM(sel_monitor_pid_tab))
                 parse_error(str,
@@ -1146,7 +1236,7 @@ sel_store_process_id(char *str)
 }
 
 /**
- * @brief Selects process mode on and stores process ids
+ * @brief Selects process mode on and stores process id's
  *        and event types given by user
  *
  * @param arg string of process ids
@@ -1195,6 +1285,28 @@ selfn_show_allocation(const char *arg)
 }
 
 /**
+ * @brief Processes configuration setting
+ *
+ * For now CDP config settings are only accepted.
+ *
+ * @param arg string detailing configuration setting
+ */
+static void
+selfn_set_config(const char *arg)
+{
+        if (strcasecmp(arg, "cdp-on") == 0)
+                selfn_cdp_config = PQOS_REQUIRE_CDP_ON;
+        else if (strcasecmp(arg, "cdp-off") == 0)
+                selfn_cdp_config = PQOS_REQUIRE_CDP_OFF;
+        else if (strcasecmp(arg, "cdp-any") == 0)
+                selfn_cdp_config = PQOS_REQUIRE_CDP_ANY;
+        else {
+                printf("Unrecognized '%s' setting!\n", arg);
+                exit(EXIT_FAILURE);
+        }
+}
+
+/**
  * @brief Opens configuration file and parses its contents
  *
  * @param fname Name of the file with configuration parameters
@@ -1218,6 +1330,7 @@ parse_config_file(const char *fname)
                 { "monitor-file:",          selfn_monitor_file },     /**< -o */
                 { "monitor-file-type:",     selfn_monitor_file_type },/**< -u */
                 { "monitor-top-like:",      selfn_monitor_top_like }, /**< -T */
+                { "set-config:",            selfn_set_config },       /**< -S */
         };
         FILE *fp = NULL;
         char cb[256];
@@ -1662,7 +1775,7 @@ monitoring_loop(FILE *fp,
                         return;
                 }
                 memset(header, 0, sz_header);
-		/* Different header for process ids */
+		/* Different header for process id's */
 		if (!process_mode())
 		        strncpy(header,
 				"SOCKET     CORE     RMID",
@@ -1751,7 +1864,7 @@ monitoring_loop(FILE *fp,
                         if (istext) {
                                 /* Text */
 				/* Checking what to print,
-				 * cores or process ids */
+				 * cores or process id's */
 			        fillin_text_row(data, sz_data,
 						mon_data[i]->event,
 						llc, mbr, mbl);
@@ -1889,6 +2002,7 @@ static void print_help(void)
                "          [-a <allocation_type>:<class_num>=<core_list>;"
                "...]\n"
                "       %s [-R]\n"
+               "       %s [-S cdp-on|cdp-off|cdp-any]\n"
                "       %s [-s]\n"
                "Notes:\n"
                "\t-h\thelp\n"
@@ -1905,6 +2019,11 @@ static void print_help(void)
                "\t-r\tuses all RMID's and cores in the system\n"
                "\t-R\tresets CAT configuration\n"
                "\t-s\tshow current cache allocation configuration\n"
+               "\t-S\tset a configuration setting:\n"
+               "\t\tcdp-on\tsets CDP on\n"
+               "\t\tcdp-off\tsets CDP off\n"
+               "\t\tcdp-any\tkeep current CDP setting (default)\n"
+               "\t\tNOTE: change of CDP on/off setting results in CAT reset.\n"
                "\t-m\tselect cores and events for monitoring, example: "
                "\"llc:0,2,4-10;mbl:1,3;mbr:3,4\"\n"
                "\t-o\tselect output file to store monitored data in. "
@@ -1920,7 +2039,7 @@ static void print_help(void)
 	       "example: \"llc:22,2,7-15\""
 	       ", it is not possible to track both processes and cores\n",
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
-               m_cmd_name, m_cmd_name);
+               m_cmd_name, m_cmd_name, m_cmd_name);
 }
 
 int main(int argc, char **argv)
@@ -1936,7 +2055,7 @@ int main(int argc, char **argv)
 
         m_cmd_name = argv[0];
 
-        while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:p:srvR"))
+        while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:p:S:srvR"))
                != -1) {
                 switch (cmd) {
                 case 'h':
@@ -1945,6 +2064,9 @@ int main(int argc, char **argv)
                 case 'H':
                         profile_l3ca_list(stdout);
                         return EXIT_SUCCESS;
+                case 'S':
+                        selfn_set_config(optarg);
+                        break;
                 case 'f':
                         if (sel_config_file != NULL) {
                                 printf("Only one config file argument is "
@@ -2010,6 +2132,7 @@ int main(int argc, char **argv)
         memset(&cfg, 0, sizeof(cfg));
         cfg.verbose = sel_verbose_mode;
         cfg.free_in_use_rmid = sel_free_in_use_rmid;
+        cfg.cdp_cfg = selfn_cdp_config;
 
         /**
          * Check output file type
@@ -2183,7 +2306,7 @@ int main(int argc, char **argv)
                         goto error_exit_2;
                 }
 
-                if ((ret_assoc > 0 || ret_cos > 0) && sel_config_file == NULL) {
+                if (ret_assoc > 0 || ret_cos > 0) {
                         printf("Allocation configuration altered.\n");
                         goto allocation_exit;
                 }
