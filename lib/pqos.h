@@ -56,7 +56,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION        101         /**< version 1.01 */
+#define PQOS_VERSION       102          /**< version 1.02 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16xCOS */
 
 /*
@@ -77,6 +77,13 @@ extern "C" {
  * =======================================
  */
 
+enum pqos_cdp_config {
+        PQOS_REQUIRE_CDP_OFF = 0,       /**< app not compatible with CDP */
+        PQOS_REQUIRE_CDP_ON,            /**< app requires CDP */
+        PQOS_REQUIRE_CDP_ANY            /**< app will work with any CDP
+                                           setting */
+};
+
 /**
  * PQoS library configuration structure
  */
@@ -93,6 +100,7 @@ struct pqos_config {
                                            cores and RMIDs in the system even
                                            if cores may seem to be subject of
                                            monitoring activity */
+        enum pqos_cdp_config cdp_cfg;   /**< requires CDP as described above */
 };
 
 /**
@@ -140,6 +148,9 @@ struct pqos_cap_l3ca {
         unsigned num_classes;           /**< number of classes of service */
         unsigned num_ways;              /**< number of cache ways */
         unsigned way_size;              /**< way size in bytes */
+        uint64_t way_contention;        /**< ways contention bit mask */
+        int cdp;                        /**< code data prioratization feature presence */
+        int cdp_on;                     /**< code data prioratization on or off*/
 };
 
 /**
@@ -363,7 +374,14 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
  */
 struct pqos_l3ca {
         unsigned class_id;              /**< class of service */
-        uint64_t ways_mask;             /**< bit mask for L3 cache ways */
+        int cdp;                        /**< data & code masks used if true */
+        union {
+                uint64_t ways_mask;     /**< bit mask for L3 cache ways */
+                struct {
+                        uint64_t data_mask;
+                        uint64_t code_mask;
+                };
+        };
 };
 
 /**
@@ -439,6 +457,19 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
                      const unsigned max_count,
                      unsigned *count,
                      unsigned *sockets);
+
+/**
+ * @brief Retrieves number of sockets in CPU topology
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [out] count place to store actual number of sockets returned
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *cpu,
+			 unsigned *count);
 
 /**
  * @brief Retrieves core id's from cpu info structure for \a socket
@@ -550,6 +581,22 @@ pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
                       unsigned *cos_num);
 
 /**
+ * @brief Retrieves CDP status
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] cdp_supported place to store CDP support status
+ * @param [out] cdp_enabled place to store CDP enable status
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
+                      int *cdp_supported,
+                      int *cdp_enabled);
+
+/**
  * @brief Resets configuration of cache allocation technology
  *
  * Reverts CAT state to the one after reset:
@@ -581,9 +628,7 @@ pqos_mon_get_event_value(uint64_t * const value,
                          const enum pqos_mon_event event_id,
                          const struct pqos_mon_data * const group)
 {
-	if (group == NULL)
-		return PQOS_RETVAL_PARAM;
-	if (value == NULL)
+	if (group == NULL || value == NULL)
 		return PQOS_RETVAL_PARAM;
 
 	switch (event_id) {
