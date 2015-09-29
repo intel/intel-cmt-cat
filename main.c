@@ -454,12 +454,12 @@ parse_monitor_event(char *str)
 
 /**
  * @brief Verifies and translates multiple monitoring config strings into
- *        internal monitoring configuration.
+ *        internal core monitoring configuration
  *
  * @param str string passed to -m command line option
  */
 static void
-selfn_monitor_events(const char *arg)
+selfn_monitor_cores(const char *arg)
 {
         char *cp = NULL, *str = NULL;
         char *saveptr = NULL;
@@ -1178,6 +1178,18 @@ selfn_verbose_mode(const char *arg)
 }
 
 /**
+ * @brief Sets CAT reset flag
+ *
+ * @param arg not used
+ */
+static void
+selfn_reset_cat(const char *arg)
+{
+        arg = arg;
+        sel_reset_CAT = 1;
+}
+
+/**
  * @brief Stores the process id's given in a table for future use
  *
  * @param str string of process id's
@@ -1236,13 +1248,13 @@ sel_store_process_id(char *str)
 }
 
 /**
- * @brief Selects process mode on and stores process id's
- *        and event types given by user
+ * @brief Verifies and translates multiple monitoring config strings into
+ *        internal PID monitoring configuration
  *
- * @param arg string of process ids
+ * @param arg argument passed to -p command line option
  */
 static void
-selfn_process_mode(const char *arg)
+selfn_monitor_pids(const char *arg)
 {
         char *cp = NULL, *str = NULL;
 	char *saveptr = NULL;
@@ -1324,13 +1336,15 @@ parse_config_file(const char *fname)
                 { "alloc-class-set:",       selfn_allocation_class }, /**< -e */
                 { "alloc-assoc-set:",       selfn_allocation_assoc }, /**< -a */
                 { "alloc-class-select:",    selfn_allocation_select },/**< -c */
-                { "monitor-select-events:", selfn_monitor_events },   /**< -m */
+                { "monitor-pids:",          selfn_monitor_pids },     /**< -p */
+                { "monitor-cores:",         selfn_monitor_cores },    /**< -m */
                 { "monitor-time:",          selfn_monitor_time },     /**< -t */
                 { "monitor-interval:",      selfn_monitor_interval }, /**< -i */
                 { "monitor-file:",          selfn_monitor_file },     /**< -o */
                 { "monitor-file-type:",     selfn_monitor_file_type },/**< -u */
                 { "monitor-top-like:",      selfn_monitor_top_like }, /**< -T */
                 { "set-config:",            selfn_set_config },       /**< -S */
+                { "reset-cat:",             selfn_reset_cat },        /**< -R */
         };
         FILE *fp = NULL;
         char cb[256];
@@ -1782,7 +1796,7 @@ monitoring_loop(FILE *fp,
 				sz_header - 1);
 		else
 		        strncpy(header,
-				"PID     CORE     RMID",
+				"PID      CORE     RMID",
 				sz_header - 1);
 
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
@@ -1875,7 +1889,7 @@ monitoring_loop(FILE *fp,
 						mon_data[i]->rmid,
 						data);
 				} else {
-				        fprintf(fp, "\n%5u %6s %8s %s",
+				        fprintf(fp, "\n%6u %6s %8s %s",
 						mon_data[i]->pid,
 						"N/A",
 						"N/A",
@@ -2080,10 +2094,10 @@ int main(int argc, char **argv)
                         selfn_monitor_interval(optarg);
                         break;
                 case 'p':
-		        selfn_process_mode(optarg);
+		        selfn_monitor_pids(optarg);
                         break;
                 case 'm':
-                        selfn_monitor_events(optarg);
+                        selfn_monitor_cores(optarg);
                         break;
                 case 't':
                         selfn_monitor_time(optarg);
@@ -2107,7 +2121,7 @@ int main(int argc, char **argv)
                         sel_free_in_use_rmid = 1;
                         break;
                 case 'R':
-                        sel_reset_CAT = 1;
+                        selfn_reset_cat(NULL);
                         break;
                 case 'a':
                         selfn_allocation_assoc(optarg);
