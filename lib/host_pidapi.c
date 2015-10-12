@@ -361,6 +361,7 @@ pqos_pid_init(void)
 	}
         if (fgets(evt, sizeof(evt), fd) == NULL) {
 		LOG_ERROR("Failed to read cqm_event type\n");
+		fclose(fd);
                 return PQOS_RETVAL_ERROR;
         }
 	fclose(fd);
