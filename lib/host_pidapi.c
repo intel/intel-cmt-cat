@@ -423,7 +423,6 @@ pqos_pid_init(void)
 
                         strsep(&event_ptr, "=");
                         if (event_ptr == NULL) {
-                                fclose(fd);
                                 LOG_ERROR("Failed to parse PID "
                                           "monitoring event value\n");
                                 return PQOS_RETVAL_ERROR;
