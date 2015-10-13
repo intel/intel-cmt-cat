@@ -1737,12 +1737,14 @@ monitoring_loop(FILE *fp,
         if ((!istext)  && (strcasecmp(output_type, "xml") != 0)) {
                 printf("Invalid selection of output file type '%s'!\n",
                        output_type);
+                free(mon_data);
                 return;
         }
 
         ret = get_event_factors(cap, &llc_factor, &mbr_factor, &mbl_factor);
         if (ret != PQOS_RETVAL_OK) {
                 printf("Error in retrieving monitoring scale factors!\n");
+                free(mon_data);
                 return;
         }
 
@@ -1786,6 +1788,7 @@ monitoring_loop(FILE *fp,
                 header = (char *) alloca(sz_header);
                 if (header == NULL) {
                         printf("Failed to allocate stack frame memory!\n");
+                        free(mon_data);
                         return;
                 }
                 memset(header, 0, sz_header);
@@ -1823,6 +1826,7 @@ monitoring_loop(FILE *fp,
 				    (unsigned) mon_number);
 		if (ret != PQOS_RETVAL_OK) {
 		        printf("Failed to poll monitoring data!\n");
+			free(mon_data);
 			return;
 		}
 
