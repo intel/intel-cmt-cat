@@ -147,5 +147,16 @@ style:
 	NEW_TYPEDEFS \
 	-f pqos.h
 
+CPPCHECK?=cppcheck
+.PHONY: cppcheck
+cppcheck:
+	$(CPPCHECK) \
+	--enable=warning,portability,performance,missingInclude \
+	--std=c99 --template=gcc \
+	host_cap.c host_cap.h host_allocation.c \
+	host_allocation.h host_monitoring.c host_monitoring.h \
+	log.c log.h list.h types.h machine.c machine.h \
+	utils.c cpuinfo.c cpuinfo.h host_pidapi.c host_pidapi.h
+
 # dependecies file
 -include $(DEPFILE)  

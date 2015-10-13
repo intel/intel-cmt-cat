@@ -76,3 +76,10 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
 	-f monitor_app.c
+
+CPPCHECK?=cppcheck
+.PHONY: cppcheck
+cppcheck:
+	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
+	--std=c99 -I./lib --template=gcc \
+	monitor_app.c

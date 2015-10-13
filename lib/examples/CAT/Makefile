@@ -81,3 +81,10 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
 	-f allocation_app.c -f association_app.c -f reset_app.c
+
+CPPCHECK?=cppcheck
+.PHONY: cppcheck
+cppcheck:
+	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
+	--std=c99 -I./lib --template=gcc \
+	allocation_app.c association_app.c reset_app.c
