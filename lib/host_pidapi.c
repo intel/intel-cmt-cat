@@ -355,9 +355,9 @@ pqos_pid_init(void)
          */
 	fd = fopen("/sys/devices/intel_cqm/type", "r");
 	if (fd == NULL) {
-                LOG_INFO("No Linux perf process monitoring support. "
-                         "Ensure kernel version 4.0 or higher is installed.\n");
-		return PQOS_RETVAL_RESOURCE;
+                LOG_INFO("PID monitoring not supported. "
+                         "Kernel version 4.1 or higher required.\n");
+                return PQOS_RETVAL_RESOURCE;
 	}
         if (fgets(evt, sizeof(evt), fd) == NULL) {
 		LOG_ERROR("Failed to read cqm_event type\n");
