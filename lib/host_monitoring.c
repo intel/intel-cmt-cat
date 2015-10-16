@@ -298,7 +298,6 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
          */
         for (i = 0; i < m_cpu->num_cores; i++) {
                 pqos_rmid_t rmid = 0;
-                int ret = PQOS_RETVAL_OK;
                 unsigned coreid = m_cpu->cores[i].lcore;
                 unsigned clusterid = m_cpu->cores[i].cluster;
 

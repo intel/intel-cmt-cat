@@ -639,7 +639,7 @@ set_allocation_class(unsigned sock_count,
 
         while (sock_count > 0 && sel_l3ca_cos_num > 0) {
                 ret = pqos_l3ca_set(*sockets,
-                                    sel_l3ca_cos_num,
+                                    (unsigned)sel_l3ca_cos_num,
                                     sel_l3ca_cos_tab);
                 ASSERT(ret == PQOS_RETVAL_OK);
                 if (ret != PQOS_RETVAL_OK) {
@@ -1232,7 +1232,7 @@ sel_store_process_id(char *str)
                 }
 		if (!found) {
 		        sel_monitor_pid_tab[sel_process_num].pid =
-			        (unsigned) processes[i];
+			        (pid_t) processes[i];
 			sel_monitor_pid_tab[sel_process_num].events = evt;
 			m_mon_grps[sel_process_num] =
 			        malloc(sizeof(**m_mon_grps));
@@ -1373,24 +1373,24 @@ parse_config_file(const char *fname)
                         continue; /**< comment */
 
                 cp = cb+j;
-                remain = strlen(cp);
+                remain = (int)strlen(cp);
 
                 /**
                  * remove trailing white spaces
                  */
-                for (i = strlen(cp)-1; i > 0; i--)
+                for (i = (int)strlen(cp)-1; i > 0; i--)
                         if (!isspace(cp[i])) {
                                 cp[i+1] = '\0';
                                 break;
                         }
 
                 for (i = 0; i < (int)DIM(optab); i++) {
-                        int len = strlen(optab[i].option);
+                        int len = (int)strlen(optab[i].option);
 
                         if (len > remain)
                                 continue;
 
-                        if (strncasecmp(cp, optab[i].option, len) != 0)
+                        if (strncasecmp(cp, optab[i].option, (size_t)len) != 0)
                                 continue;
 
                         while (isspace(cp[len]))
