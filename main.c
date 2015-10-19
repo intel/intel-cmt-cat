@@ -1947,9 +1947,11 @@ monitoring_loop(FILE *fp,
 						xml_child_close,
 						xml_root_close);
 				}
-				fseek(fp,
-				      -xml_root_close_size,
-				      SEEK_CUR);
+				if (fseek(fp, -xml_root_close_size,
+                                          SEEK_CUR) == -1) {
+                                        perror("File seek error");
+                                        return;
+                                }
 			}
                 }
                 fflush(fp);
@@ -2196,13 +2198,22 @@ int main(int argc, char **argv)
                         goto error_exit_1;
                 }
                 if (strcasecmp(sel_output_type, "xml") == 0) {
-                        fseek(fp_monitor, 0, SEEK_END);
+                        if (fseek(fp_monitor, 0, SEEK_END) == -1) {
+                                perror("File seek error");
+                                exit_val = EXIT_FAILURE;
+                                goto error_exit_1;
+                        }
                         if (ftell(fp_monitor) == 0)
                                 fprintf(fp_monitor,
                                         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                                         "%s\n%s",
                                         xml_root_open, xml_root_close);
-                        fseek(fp_monitor, -xml_root_close_size, SEEK_CUR);
+                        if (fseek(fp_monitor,
+                                  -xml_root_close_size, SEEK_CUR) == -1) {
+                                perror("File seek error");
+                                exit_val = EXIT_FAILURE;
+                                goto error_exit_1;
+                        }
                 }
         }
 
