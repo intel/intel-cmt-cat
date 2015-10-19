@@ -223,6 +223,11 @@ static char *sel_allocation_profile = NULL;
 static int sel_verbose_mode = 0;
 
 /**
+ * Function prototypes
+ */
+static void selfn_strdup(char **sel, const char *arg);
+
+/**
  * @brief Check to determine if processes or cores are monitored
  *
  * @return Process monitoring mode status
@@ -475,8 +480,7 @@ selfn_monitor_cores(const char *arg)
          */
         sel_events_max = 0;
 
-        cp = strdup(arg);
-        ASSERT(cp != NULL);
+        selfn_strdup(&cp, arg);
 
         for (str = cp; ; str = NULL) {
                 char *token = NULL;
@@ -827,8 +831,7 @@ selfn_allocation_class(const char *arg)
         if (strlen(arg) <= 0)
                 parse_error(arg, "Empty string!");
 
-        cp = strdup(arg);
-        ASSERT(cp != NULL);
+        selfn_strdup(&cp, arg);
 
         for (str = cp; ; str = NULL) {
                 char *token = NULL;
@@ -964,8 +967,7 @@ selfn_allocation_assoc(const char *arg)
         if (strlen(arg) <= 0)
                 parse_error(arg, "Empty string!");
 
-        cp = strdup(arg);
-        ASSERT(cp != NULL);
+        selfn_strdup(&cp, arg);
 
         for (str = cp; ; str = NULL) {
                 char *token = NULL;
@@ -1096,6 +1098,11 @@ selfn_strdup(char **sel, const char *arg)
                 *sel = NULL;
         }
         *sel = strdup(arg);
+        ASSERT(*sel != NULL);
+        if (*sel == NULL) {
+                printf("String duplicate error!\n");
+                exit(EXIT_FAILURE);
+        }
 }
 
 /**
@@ -1268,8 +1275,7 @@ selfn_monitor_pids(const char *arg)
         /**
          * The parser will add to the display only necessary columns
          */
-        cp = strdup(arg);
-        ASSERT(cp != NULL);
+        selfn_strdup(&cp, arg);
 	sel_events_max = 0;
 
         for (str = cp; ; str = NULL) {
