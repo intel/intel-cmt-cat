@@ -1964,18 +1964,16 @@ monitoring_loop(FILE *fp,
 
                 gettimeofday(&tv_e, NULL);
 
-                if (stop_monitoring_loop) {
-                        if (istty)
-                                fputs("\n", fp);
+                if (stop_monitoring_loop)
                         break;
-                }
 
                 /**
                  * Calculate microseconds to the nearest measurement interval
                  */
                 usec_start = ((long)tv_s.tv_usec) +
-                        ((long)tv_s.tv_sec*1000000L);
-                usec_end = ((long)tv_e.tv_usec) + ((long)tv_e.tv_sec*1000000L);
+                        ((long)tv_s.tv_sec * 1000000L);
+                usec_end = ((long)tv_e.tv_usec) +
+                        ((long)tv_e.tv_sec * 1000000L);
                 usec_diff = usec_end - usec_start;
 
                 if (usec_diff < interval) {
@@ -1983,12 +1981,14 @@ monitoring_loop(FILE *fp,
                         memset(&req, 0, sizeof(req));
 
                         req.tv_sec = (interval - usec_diff) / 1000000L;
-                        req.tv_nsec = ((interval - usec_diff)%1000000L) *
-                                1000L;
+                        req.tv_nsec =
+                                ((interval - usec_diff) % 1000000L) * 1000L;
                         if (nanosleep(&req, &rem) == -1) {
                                 /**
                                  * nanosleep interrupted by a signal
                                  */
+                                if (stop_monitoring_loop)
+                                        break;
                                 req = rem;
                                 memset(&rem, 0, sizeof(rem));
                                 nanosleep(&req, &rem);
@@ -2002,6 +2002,10 @@ monitoring_loop(FILE *fp,
                 }
 
         }
+
+        if (istty)
+                fputs("\n\n", fp);
+
 	free(mon_data);
 
 }
