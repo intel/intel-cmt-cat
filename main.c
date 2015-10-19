@@ -2148,10 +2148,14 @@ int main(int argc, char **argv)
                         selfn_verbose_mode(NULL);
                         break;
                 default:
-                        printf("Unsupported option: %c\n", optopt);
+                        printf("Unsupported option: -%c. "
+                               "See option -h for help.\n", optopt);
+                        return EXIT_FAILURE;
+                        break;
                 case '?':
                         print_help();
                         return EXIT_SUCCESS;
+                        break;
                 }
         }
 
@@ -2390,7 +2394,7 @@ int main(int argc, char **argv)
         /**
          * Close file descriptor for message log
          */
-        if (sel_log_file != NULL)
+        if (cfg.fd_log > 0 && cfg.fd_log != STDOUT_FILENO)
                 close(cfg.fd_log);
 
         /**
