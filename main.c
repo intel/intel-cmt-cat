@@ -1564,14 +1564,14 @@ static size_t
 fillin_text_column(const double val, char data[], const size_t sz_data,
                    const int is_monitored, const int is_column_present)
 {
-        const char blank_column[] = "          ";
+        const char blank_column[] = "           ";
         size_t offset = 0;
 
         if (is_monitored) {
                 /**
                  * This is monitored and we have the data
                  */
-                snprintf(data, sz_data - 1, "%10.1f", val);
+                snprintf(data, sz_data - 1, "%11.1f", val);
                 offset = strlen(data);
         } else if (is_column_present) {
                 /**
@@ -1812,10 +1812,10 @@ monitoring_loop(FILE *fp,
                         strncat(header, "    LLC[KB]",
                                 sz_header - strlen(header) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
-                        strncat(header, " MBL[MB/s]",
+                        strncat(header, "  MBL[MB/s]",
                                 sz_header - strlen(header) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
-                        strncat(header, " MBR[MB/s]",
+                        strncat(header, "  MBR[MB/s]",
                                 sz_header - strlen(header) - 1);
         }
 
@@ -1893,13 +1893,13 @@ monitoring_loop(FILE *fp,
 						mon_data[i]->event,
 						llc, mbr, mbl);
 				if (!process_mode()) {
-				        fprintf(fp, "\n%6u %8u %8u %s",
+				        fprintf(fp, "\n%6u %8u %8u%s",
                                                 mon_data[i]->socket,
 						mon_data[i]->cores[0],
 						mon_data[i]->rmid,
 						data);
 				} else {
-				        fprintf(fp, "\n%6u %6s %8s %s",
+				        fprintf(fp, "\n%6u %6s %8s%s",
 						mon_data[i]->pid,
 						"N/A",
 						"N/A",
