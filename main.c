@@ -69,7 +69,7 @@
 #define ASSERT(x)
 #endif
 
-#define PQOS_MAX_SOCKETS      2
+#define PQOS_MAX_SOCKETS      8
 #define PQOS_MAX_SOCKET_CORES 64
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
 #define PQOS_MAX_PIDS         128
