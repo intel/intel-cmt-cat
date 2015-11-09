@@ -91,14 +91,13 @@ For installation of the PQoS utility untar the gzip image and follow
 below instructions to create pqos executable.
 
 To compile PQoS utility:
-        cd pqos/
         "make all" for building static library.
         "make all DEBUG=y" for building utility for debugging.
         "make clean" for cleaning build files.
         "make clobber" for clearing even more files than "make clean".
 
 To compile PQoS library:
-        cd pqos/lib/
+        cd lib/
         "make help" lists various make options.
         "make all" for building static library.
         "make all SHARED=y" for building shared library.
@@ -118,7 +117,7 @@ Note:   In case of compilation error such as:
 To compile CAT, CMT and MBM sample applications:
         
 For CAT sample application:
-        cd pqos/lib/examples/CAT/
+        cd lib/examples/CAT/
         "make all" for building static library.
         "make clean" for cleaning build files.
 CAT sample application build will create three targets as follows:
@@ -135,7 +134,7 @@ resetting all classes of service to system default bit mask.
 Please refer "./reset_app -h" option for usage details.
 
 For CMT/MBM sample application:
-        cd pqos/lib/examples/CMT_MBM/
+        cd lib/examples/CMT_MBM/
         "make all" for building static library.
         "make clean" for cleaning build files.
 CMT_MBM sample application build will create one target as follows:
@@ -153,7 +152,6 @@ last level cache allocation feature and monitor the last level cache
 occupancy as well as memory bandwidth.
 
 Usage: For pqos utility:
-        cd pqos/
         "./pqos -h"    This option will display extensive help page.
                        Please refer to "-h" option for usage details.
         "./pqos -s"    Shows current CAT, CMT and MBM configuration.
