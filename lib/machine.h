@@ -68,7 +68,7 @@ struct cpuid_out {
  * @brief Initializes machine module
  *
  * @param [in] max_core_id maximum logical core id to be handled by machine module
- *             If zero then defualt value assumed \a MACHINE_DEFAULT_MAX_COREID
+ *             If zero then default value assumed \a MACHINE_DEFAULT_MAX_COREID
  *
  * @return Operation status
  * @retval MACHINE_RETVAL_OK on success
