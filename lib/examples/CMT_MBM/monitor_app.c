@@ -164,13 +164,15 @@ monitoring_get_input(int argc, char *argv[])
 		printf("Eg   : %s 1 2 6\n\n", argv[0]);
 		sel_monitor_num = 0;
 	} else {
+                if (numberOfCores > PQOS_MAX_CORES)
+                        numberOfCores = PQOS_MAX_CORES;
+
 		for (i = 0; i < numberOfCores; i++) {
-			sel_monitor_tab[i].core = (unsigned)atoi(argv[i+1]);
-                        m_mon_grps[sel_monitor_num] =
-                                malloc(sizeof(**m_mon_grps));
+                        m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
 			sel_monitor_tab[i].pgrp = m_mon_grps[i];
-			sel_monitor_num = (int) numberOfCores;
+			sel_monitor_tab[i].core = (unsigned) atoi(argv[i+1]);
 		}
+                sel_monitor_num = (int) numberOfCores;
 	}
 }
 /**
