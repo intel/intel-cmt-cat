@@ -1,13 +1,13 @@
 /*
  * BSD LICENSE
- * 
+ *
  * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
- * 
+ *
  *   * Redistributions of source code must retain the above copyright
  *     notice, this list of conditions and the following disclaimer.
  *   * Redistributions in binary form must reproduce the above copyright
@@ -17,7 +17,7 @@
  *   * Neither the name of Intel Corporation nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -29,7 +29,7 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- * 
+ *
  */
 
 /**
@@ -70,7 +70,8 @@ static struct {
         struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
 } sel_monitor_tab[PQOS_MAX_CORES];
-static struct pqos_mon_data m_mon_grps[PQOS_MAX_CORES];
+static struct pqos_mon_data *m_mon_grps[PQOS_MAX_CORES];
+
 /**
  * Stop monitoring indicator for infinite monitoring loop
  */
@@ -165,7 +166,9 @@ monitoring_get_input(int argc, char *argv[])
 	} else {
 		for (i = 0; i < numberOfCores; i++) {
 			sel_monitor_tab[i].core = (unsigned)atoi(argv[i+1]);
-			sel_monitor_tab[i].pgrp = &m_mon_grps[i];
+                        m_mon_grps[sel_monitor_num] =
+                                malloc(sizeof(**m_mon_grps));
+			sel_monitor_tab[i].pgrp = m_mon_grps[i];
 			sel_monitor_num = (int) numberOfCores;
 		}
 	}
@@ -194,8 +197,10 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         sel_monitor_tab[sel_monitor_num].core = lcore;
                         sel_monitor_tab[sel_monitor_num].events =
                                 sel_events_max;
+                        m_mon_grps[sel_monitor_num] =
+                                malloc(sizeof(**m_mon_grps));
                         sel_monitor_tab[sel_monitor_num].pgrp =
-                                &m_mon_grps[sel_monitor_num];
+                                m_mon_grps[sel_monitor_num];
                         sel_monitor_num++;
                 }
         }
@@ -226,9 +231,10 @@ static void stop_monitoring(void)
 	for (i = 0; i < (unsigned) sel_monitor_num; i++) {
                 int ret;
 
-		ret = pqos_mon_stop(&m_mon_grps[i]);
+		ret = pqos_mon_stop(m_mon_grps[i]);
 		if (ret != PQOS_RETVAL_OK)
 			printf("Monitoring stop error!\n");
+                free(m_mon_grps[i]);
 	}
 }
 /**
@@ -240,9 +246,7 @@ static void monitoring_loop(const struct pqos_cap *cap)
 {
 	double llc_factor = 1, mbr_factor = 1, mbl_factor = 1;
 	int ret = PQOS_RETVAL_OK;
-	struct pqos_mon_data mon_data[PQOS_MAX_CORES];
-	unsigned mon_number = (unsigned)sel_monitor_num;
-	unsigned i = 0;
+	int i = 0;
 
 	if (signal(SIGINT, monitoring_ctrlc) == SIG_ERR)
 		printf("Failed to catch SIGINT!\n");
@@ -255,27 +259,22 @@ static void monitoring_loop(const struct pqos_cap *cap)
 			printf("Failed to poll monitoring data!\n");
 			return;
 		}
-		memcpy(mon_data, m_mon_grps, sel_monitor_num *
-                       sizeof(m_mon_grps[0]));
 		printf("SOCKET     CORE     RMID    LLC[KB]"
                        "    MBL[MB]    MBR[MB]\n");
-		for (i = 0; i < mon_number; i++) {
-			double llc =
-                                ((double)(mon_data[i].values.llc * llc_factor));
-			double mbr =
-                                ((double)mon_data[i].values.mbm_remote_delta) *
-                                mbr_factor;
-			double mbl =
-                                ((double)mon_data[i].values.mbm_local_delta) *
-                                mbl_factor;
+		for (i = 0; i < sel_monitor_num; i++) {
+                        const struct pqos_event_values *pv =
+                                &m_mon_grps[i]->values;
+                        double llc = (double)pv->llc,
+                                mbr = (double)pv->mbm_remote_delta,
+                                mbl = (double)pv->mbm_local_delta;
 
 			printf("%6u %8u %8u %10.1f %10.1f %10.1f\n",
-                               mon_data[i].socket,
-                               mon_data[i].cores[0],
-                               mon_data[i].rmid,
-                               llc,
-                               mbl,
-                               mbr);
+                               m_mon_grps[i]->socket,
+                               m_mon_grps[i]->cores[0],
+                               m_mon_grps[i]->rmid,
+                               llc * llc_factor,
+                               mbl * mbl_factor,
+                               mbr * mbr_factor);
 		}
 		printf("\nPress Enter to continue or Ctrl+c to exit");
 		if (getchar() != '\n')
