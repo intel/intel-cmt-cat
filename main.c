@@ -121,8 +121,10 @@ static enum pqos_mon_event sel_events_max = 0;
  * Maintains a table of core, event, number of events that are selected in
  * config string for monitoring LLC occupancy
  */
-static struct {
-        unsigned core;
+static struct core_group {
+        char *desc;
+        int num_cores;
+        unsigned *cores;
         struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
 } sel_monitor_core_tab[PQOS_MAX_CORES];
@@ -241,6 +243,88 @@ process_mode(void)
 }
 
 /**
+ * @brief Function to safely translate an unsigned int
+ *        value to a string
+ *
+ * @param val value to be translated
+ *
+ * @return Pointer to allocated string
+ */
+static char*
+uinttostr(const unsigned val)
+{
+        char buf[16], *str = NULL;
+
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf), "%u", val);
+        selfn_strdup(&str, buf);
+
+        return str;
+}
+
+/**
+ * @brief Function to check if a value is already contained in a table
+ *
+ * @param tab table of values to check
+ * @param size size of the table
+ * @param val value to search for
+ *
+ * @return If the value is already in the table
+ * @retval 1 if value if found
+ * @retval 0 if value is not found
+ */
+static int
+isdup(const uint64_t *tab, const unsigned size, const uint64_t val)
+{
+        unsigned i;
+
+        for (i = 0; i < size; i++)
+                if (tab[i] == val)
+                        return 1;
+        return 0;
+}
+
+/**
+ * @brief Function to set cores group values
+ *
+ * @param cg pointer to core_group structure
+ * @param desc string containing core group description
+ * @param cores pointer to table of core values
+ * @param num_cores number of cores contained in the table
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+static int
+set_cgrp(struct core_group *cg, char *desc,
+         const uint64_t *cores, const int num_cores)
+{
+        int i;
+
+        ASSERT(cg != NULL);
+        ASSERT(desc != NULL);
+        ASSERT(cores != NULL);
+        ASSERT(num_cores > 0);
+
+        cg->desc = desc;
+        cg->cores = malloc(sizeof(unsigned)*num_cores);
+        if (cg->cores == NULL) {
+                printf("Error allocating core group table\n");
+                return -1;
+        }
+        cg->num_cores = num_cores;
+
+        /**
+         * Transfer cores from buffer to table
+         */
+        for (i = 0; i < num_cores; i++)
+                cg->cores[i] = (unsigned)cores[i];
+
+        return 0;
+}
+
+/**
  * @brief Converts string into 64-bit unsigned number.
  *
  * Numbers can be in decimal or hexadecimal format.
@@ -333,23 +417,144 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                                 end = n;
                         }
                         for (n = start; n <= end; n++) {
-                                tab[index] = n;
-                                index++;
+                                if (!(isdup(tab, index, n))) {
+                                        tab[index] = n;
+                                        index++;
+                                }
                                 if (index >= max)
                                         return index;
                         }
                 } else {
                         /**
                          * single number provided here
+                         * remove duplicates if necessary
                          */
-                        tab[index] = strtouint64(token);
-                        index++;
+                        uint64_t val = strtouint64(token);
+
+                        if (!strcmp(token, " "))
+                                continue;
+
+                        if (!(isdup(tab, index, val))) {
+                                tab[index] = val;
+                                index++;
+                        }
                         if (index >= max)
                                 return index;
                 }
         }
 
         return index;
+}
+
+/**
+ * @brief Function to set the descriptions and cores for each core group
+ *
+ * Takes a string containing individual cores and groups of cores and
+ * breaks it into substrings which are used to set core group values
+ *
+ * @param s string containing cores to be divided into substrings
+ * @param tab table of core groups to set values in
+ * @param max maximum number of core groups allowed
+ *
+ * @return Number of core groups set up
+ * @retval -1 on error
+ */
+static int
+strtocgrps(char *s, struct core_group *tab, const unsigned max)
+{
+        unsigned i, n, index = 0;
+        uint64_t cbuf[PQOS_MAX_CORES];
+        char *non_grp = NULL;
+
+        ASSERT(tab != NULL);
+        ASSERT(max > 0);
+
+        if (s == NULL)
+                return index;
+
+        while ((non_grp = strsep(&s, "[")) != NULL) {
+                int ret;
+                /**
+                 * If group contains single core
+                 */
+                if ((strlen(non_grp)) > 0) {
+                        n = strlisttotab(non_grp, cbuf, (max-index));
+                        if ((index+n) > max)
+                                return -1;
+                        /* set core group info */
+                        for (i = 0; i < n; i++) {
+                                char *desc = uinttostr((unsigned)cbuf[i]);
+
+                                ret = set_cgrp(&tab[index], desc, &cbuf[i], 1);
+                                if (ret < 0)
+                                        return -1;
+                                index++;
+                        }
+                }
+                /**
+                 * If group contains multiple cores
+                 */
+                char *grp = strsep(&s, "]");
+
+                if (grp != NULL) {
+                        char *desc = NULL;
+
+                        selfn_strdup(&desc, grp);
+                        n = strlisttotab(grp, cbuf, (max-index));
+                        if (index+n > max)
+                                return -1;
+                        /* set core group info */
+                        ret = set_cgrp(&tab[index], desc, cbuf, n);
+                        if (ret < 0)
+                                return -1;
+                        index++;
+                }
+        }
+
+        return index;
+}
+
+/**
+ * @brief Function to compare cores in 2 core groups
+ *
+ * This function takes 2 core groups and compares their core values
+ *
+ * @param cg_a pointer to core group a
+ * @param cg_b pointer to core group b
+ *
+ * @return Whether both groups contain some/none/all of the same cores
+ * @retval 1 if both groups contain the same cores
+ * @retval 0 if none of their cores match
+ * @retval -1 if some but not all cores match
+ */
+static int
+cmp_cgrps(const struct core_group *cg_a,
+          const struct core_group *cg_b)
+{
+        int i, found = 0;
+        const int sz_a = cg_a->num_cores;
+        const int sz_b = cg_b->num_cores;
+        const unsigned *tab_a = cg_a->cores;
+        const unsigned *tab_b = cg_b->cores;
+
+        ASSERT(cg_a != NULL);
+        ASSERT(cg_b != NULL);
+
+        for (i = 0; i < sz_a; i++) {
+                int j;
+
+                for (j = 0; j < sz_b; j++)
+                        if (tab_a[i] == tab_b[j])
+                                found++;
+        }
+        /* if no cores are the same */
+        if (!found)
+                return 0;
+        /* if group contains same cores */
+        if (sz_a == sz_b && sz_b == found)
+                return 1;
+        /* if not all cores are the same */
+        return -1;
 }
 
 /**
@@ -405,43 +610,41 @@ parse_event(char *str, enum pqos_mon_event *evt)
 static void
 parse_monitor_event(char *str)
 {
-        uint64_t cores[PQOS_MAX_CORES];
-        unsigned i = 0, n = 0;
+        int i = 0, n = 0;
         enum pqos_mon_event evt = 0;
+        struct core_group cgrp_tab[PQOS_MAX_CORES];
 
-	parse_event(str, &evt);
+        parse_event(str, &evt);
 
-        n = strlisttotab(strchr(str, ':') + 1, cores, DIM(cores));
-
-        if (n == 0)
-                parse_error(str, "No cores selected for an event");
-
-        if (n >= DIM(sel_monitor_core_tab))
-                parse_error(str,
-                            "too many cores selected "
-                            "for monitoring");
-
+        n = strtocgrps(strchr(str, ':') + 1,
+                       cgrp_tab, PQOS_MAX_CORES);
+        if (n < 0) {
+                printf("Error: Too many cores selected\n");
+                exit(EXIT_FAILURE);
+        }
         /**
-         *  For each core we are processing:
-         *  - if it's already there in the sel_monitor_core_tab
-         *    => update the entry
+         *  For each core group we are processing:
+         *  - if it's already in the sel_monitor_core_tab
+         *    =>  update the entry
          *  - else
          *    => add it to the sel_monitor_core_tab
          */
         for (i = 0; i < n; i++) {
-                unsigned found;
-                int j;
+                int j, found;
 
                 for (found = 0, j = 0; j < sel_monitor_num && found == 0; j++) {
-                        if (sel_monitor_core_tab[j].core ==
-                            (unsigned) cores[i]) {
-                                sel_monitor_core_tab[j].events |= evt;
-                                found = 1;
+                        found = cmp_cgrps(&sel_monitor_core_tab[j],
+                                             &cgrp_tab[i]);
+                        if (found < 0) {
+                                printf("Error: cannot monitor same "
+                                       "cores in different groups\n");
+                                exit(EXIT_FAILURE);
                         }
+                        if (found)
+                                sel_monitor_core_tab[j].events |= evt;
                 }
                 if (!found) {
-                        sel_monitor_core_tab[sel_monitor_num].core =
-                                (unsigned) cores[i];
+                        sel_monitor_core_tab[sel_monitor_num] = cgrp_tab[i];
                         sel_monitor_core_tab[sel_monitor_num].events = evt;
 			m_mon_grps[sel_monitor_num] =
                                 malloc(sizeof(**m_mon_grps));
@@ -474,7 +677,6 @@ selfn_monitor_cores(const char *arg)
 
         if (strlen(arg) <= 0)
                 parse_error(arg, "Empty string!");
-
         /**
          * The parser will add to the display only necessary columns
          */
@@ -526,10 +728,12 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                  * by default let's monitor all cores
                  */
 		for (i = 0; i < cpu_info->num_cores; i++) {
-		        unsigned lcore = cpu_info->cores[i].lcore;
+                        unsigned lcore  = cpu_info->cores[i].lcore;
+                        uint64_t core = (uint64_t)lcore;
 
-			sel_monitor_core_tab[sel_monitor_num].core = lcore;
-			sel_monitor_core_tab[sel_monitor_num].events =
+                        ret = set_cgrp(&sel_monitor_core_tab[sel_monitor_num],
+                                       uinttostr(lcore), &core, 1);
+                        sel_monitor_core_tab[sel_monitor_num].events =
 			        sel_events_max;
 			m_mon_grps[sel_monitor_num] =
 			        malloc(sizeof(**m_mon_grps));
@@ -539,8 +743,8 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 			}
 			sel_monitor_core_tab[sel_monitor_num].pgrp =
 			        m_mon_grps[sel_monitor_num];
-			sel_monitor_num++;
-		}
+                        sel_monitor_num++;
+                }
         }
 
 	/**< check for process and core tracking, can not have both */
@@ -560,23 +764,23 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                  * Make calls to pqos_mon_start - track cores
                  */
                 for (i = 0; i < (unsigned)sel_monitor_num; i++) {
-                        unsigned lcore = sel_monitor_core_tab[i].core;
+                        struct core_group *cg = &sel_monitor_core_tab[i];
 
-                        ret = pqos_mon_start(1, &lcore,
-                                             sel_monitor_core_tab[i].events,
-                                             NULL,
-                                             sel_monitor_core_tab[i].pgrp);
+                        ret = pqos_mon_start(cg->num_cores, cg->cores,
+                                             cg->events, (void *)cg->desc,
+                                             cg->pgrp);
                         ASSERT(ret == PQOS_RETVAL_OK);
                         /**
                          * The error raised also if two instances of PQoS
                          * attempt to use the same core id.
                          */
                         if (ret != PQOS_RETVAL_OK) {
-                                printf("Monitoring start error on core "
-                                       "%u, status %d\n", lcore, ret);
+                                printf("Monitoring start error on core(s) "
+                                       "%s, status %d\n",
+                                       cg->desc, ret);
                                 return -1;
                         }
-	        }
+                }
 	} else {
                 /**
                  * Make calls to pqos_mon_start_pid - track PIDs
@@ -622,6 +826,12 @@ stop_monitoring(void)
 		if (ret != PQOS_RETVAL_OK)
 		        printf("Monitoring stop error!\n");
 	}
+        if(!process_mode()) {
+                for(i = 0; (int)i < sel_monitor_num; i++) {
+                        free(sel_monitor_core_tab[i].desc);
+                        free(sel_monitor_core_tab[i].cores);
+                }
+        }
 }
 
 /**
@@ -1801,7 +2011,7 @@ monitoring_loop(FILE *fp,
 		/* Different header for process id's */
 		if (!process_mode())
 		        strncpy(header,
-				"SOCKET     CORE     RMID",
+				"SKT     CORE     RMID",
 				sz_header - 1);
 		else
 		        strncpy(header,
@@ -1893,9 +2103,9 @@ monitoring_loop(FILE *fp,
 						mon_data[i]->event,
 						llc, mbr, mbl);
 				if (!process_mode()) {
-				        fprintf(fp, "\n%6u %8u %8u%s",
+				        fprintf(fp, "\n%3u %8.8s %8u%s",
                                                 mon_data[i]->socket,
-						mon_data[i]->cores[0],
+						(char *)mon_data[i]->context,
 						mon_data[i]->rmid,
 						data);
 				} else {
@@ -1915,7 +2125,7 @@ monitoring_loop(FILE *fp,
 						"%s\n"
 						"\t<time>%s</time>\n"
 						"\t<socket>%u</socket>\n"
-						"\t<core>%u</core>\n"
+						"\t<core>%s</core>\n"
 						"\t<rmid>%u</rmid>\n"
 						"%s"
 						"%s\n"
@@ -1923,7 +2133,7 @@ monitoring_loop(FILE *fp,
 						xml_child_open,
 						cb_time,
 						mon_data[i]->socket,
-						mon_data[i]->cores[0],
+						(char *)mon_data[i]->context,
 						mon_data[i]->rmid,
 						data,
 						xml_child_close,
