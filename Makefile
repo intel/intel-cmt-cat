@@ -77,14 +77,14 @@ $(APP): main.o profiles.o $(LIBNAME)
 $(LIBNAME):
 	make -C lib all
 
-.PHONY: clean clobber TAGS
+.PHONY: clean rinse TAGS
 
-clean:
+rinse:
 	-rm -f $(APP) main.o profiles.o
 
-clobber:
+clean:
 	-rm -f $(APP) main.o profiles.o $(DEPFILE) ./*~
-	-make -C lib clobber
+	-make -C lib clean
 
 TAGS:
 	etags ./*.[ch] ./lib/*.[ch]

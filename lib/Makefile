@@ -108,15 +108,15 @@ $(DEPFILE): $(subst .o,.c,$(OBJS))
 	$(CC) -MM $(CFLAGS) $^ > $@
 
 
-.PHONY: clean clobber doxy help
+.PHONY: clean rinse doxy help
 
 help:
 	@echo "PQoS library make targets:"
 	@echo "    make all          - build static library"
 	@echo "    make all SHARED=y - build shared library"
 	@echo "    make all DEBUG=y  - build static library for debugging"
-	@echo "    make clean        - clean build files"
-	@echo "    make clobber      - clear even more files than clean"
+	@echo "    make rinse        - remove build files"
+	@echo "    make clean        - remove even more files than rinse"
 	@echo "    make doxy         - make doxygen documentation" 
 	@echo "    make style        - coding style check" 
 
@@ -124,10 +124,10 @@ doxy:
 	doxygen api_doxygen.cfg
 	doxygen lib_doxygen.cfg
 
-clean:
+rinse:
 	-rm -f $(OBJS) $(LIBNAME)* $(DEPFILE)
 
-clobber:
+clean:
 	-rm -f $(OBJS) $(LIBANAME) $(LIBSONAME_) $(LIBSONAME)* $(DEPFILE) ./*~
 	-rm -rf $(DOXY_DIRS)
 	-make clean -C examples/CAT
