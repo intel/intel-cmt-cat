@@ -398,6 +398,12 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
 
                 s = NULL;
 
+                /* get rid of leading spaces & skip empty tokens */
+                while (isspace(*token))
+                        token++;
+                if (*token == '\0')
+                        continue;
+
                 p = strchr(token, '-');
                 if (p != NULL) {
                         /**
@@ -430,9 +436,6 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                          * remove duplicates if necessary
                          */
                         uint64_t val = strtouint64(token);
-
-                        if (!strcmp(token, " "))
-                                continue;
 
                         if (!(isdup(tab, index, val))) {
                                 tab[index] = val;
