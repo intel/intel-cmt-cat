@@ -212,6 +212,7 @@ get_l3_cache_info(unsigned *p_num_ways,
                 return PQOS_RETVAL_ERROR;
 
         num_ways = (res.ebx>>22) + 1;
+        ASSERT(num_ways > 0);
         if (p_num_ways != NULL)
                 *p_num_ways = num_ways;
         line_size = (res.ebx & 0xfff) + 1;
@@ -976,6 +977,8 @@ discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
                  */
                 LOG_INFO("CPUID.0x7.0: CAT supported\n");
                 ret = discover_alloc_llc_cpuid(cap, config->cdp_cfg, cpu);
+                if (ret == PQOS_RETVAL_OK)
+                        ret = get_l3_cache_info(NULL, &cap->way_size);
         } else {
                 /**
                  * Use brand string matching method
@@ -983,6 +986,8 @@ discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
                 LOG_INFO("CPUID.0x7.0: CAT not supported. "
 			 "Check brand string.\n");
                 ret = discover_alloc_llc_brandstr(cap, config->cdp_cfg);
+                if (ret == PQOS_RETVAL_OK)
+                        ret = get_l3_cache_info(&cap->num_ways, &cap->way_size);
         }
 
         if (ret == PQOS_RETVAL_OK) {
@@ -990,20 +995,11 @@ discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
                          "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
                          cap->cdp, cap->cdp_on, cap->num_classes,
                          cap->num_ways, cap->way_contention);
-                /**
-                 * Detect number of LLC ways and LLC size
-                 * Calculate byte size of one cache way
-                 */
-                ret = get_l3_cache_info(&cap->num_ways, &cap->way_size);
-                if (ret == PQOS_RETVAL_OK) {
-                        LOG_INFO("LLC cache size %u bytes, %u ways\n",
-                                 cap->way_size, cap->num_ways);
-                        ASSERT(cap->num_ways > 0);
-                        if (cap->num_ways > 0)
-                                cap->way_size = cap->way_size / cap->num_ways;
-                        LOG_INFO("LLC cache way size %u bytes\n",
-                                 cap->way_size);
-                }
+                LOG_INFO("LLC cache size %u bytes, %u ways\n",
+                         cap->way_size, cap->num_ways);
+                if (cap->num_ways > 0)
+                        cap->way_size = cap->way_size / cap->num_ways;
+                LOG_INFO("LLC cache way size %u bytes\n", cap->way_size);
         }
 
         if (ret == PQOS_RETVAL_OK)
