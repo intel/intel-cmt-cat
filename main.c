@@ -352,7 +352,7 @@ strtouint64(const char *s)
 
         n = strtoull(s, &endptr, base);
 
-        if ((endptr != NULL) && (*endptr != '\0') && !isspace(*endptr)) {
+        if (!(*s != '\0' && *endptr == '\0')) {
                 printf("Error converting '%s' to unsigned number!\n", str);
                 exit(EXIT_FAILURE);
         }
@@ -829,8 +829,8 @@ stop_monitoring(void)
 		if (ret != PQOS_RETVAL_OK)
 		        printf("Monitoring stop error!\n");
 	}
-        if(!process_mode()) {
-                for(i = 0; (int)i < sel_monitor_num; i++) {
+        if (!process_mode()) {
+                for (i = 0; (int)i < sel_monitor_num; i++) {
                         free(sel_monitor_core_tab[i].desc);
                         free(sel_monitor_core_tab[i].cores);
                 }
