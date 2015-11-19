@@ -37,7 +37,7 @@
  */
 
 #define _XOPEN_SOURCE 500
-
+#define _LARGEFILE64_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -112,7 +112,7 @@ cpuid(const unsigned lcore,
       struct cpuid_out *out)
 {
         char fname[32];
-        off_t offset = ((off_t)leaf) + ((off_t) subleaf << 32);
+        const off64_t offset = ((off64_t)leaf) + ((off64_t) subleaf << 32);
         ssize_t read_ret = 0;
         int ret = MACHINE_RETVAL_OK;
         int fd = -1;
@@ -129,8 +129,12 @@ cpuid(const unsigned lcore,
                 LOG_ERROR("Error opening file '%s'!\n", fname);
                 return MACHINE_RETVAL_ERROR;
         }
+        if (lseek64(fd, offset, SEEK_SET) < 0) {
+                close(fd);
+                return MACHINE_RETVAL_ERROR;
+        }
 
-        read_ret = pread(fd, out, sizeof(*out), offset);
+        read_ret = read(fd, out, sizeof(*out));
         if (read_ret != sizeof(*out))
                 ret = MACHINE_RETVAL_ERROR;
 
