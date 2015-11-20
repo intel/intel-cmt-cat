@@ -513,6 +513,10 @@ pqos_pid_start(struct pqos_mon_data *group)
         }
         group->tid_map =
                 malloc(sizeof(group->tid_map[0])*group->tid_nr);
+        if (group->tid_map == NULL) {
+                LOG_ERROR("TID map memory allocation error\n");
+                return PQOS_RETVAL_ERROR;
+        }
 	for (i = 0; i < group->tid_nr; i++)
 		group->tid_map[i] = atoi(namelist[i]->d_name);
         free(namelist);
