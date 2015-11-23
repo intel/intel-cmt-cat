@@ -51,6 +51,7 @@
 #define PQOS_MAX_SOCKETS      2
 #define PQOS_MAX_SOCKET_CORES 64
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
+#define PQOS_MAX_PIDS         16
 #define PQOS_MAX_MON_EVENTS   1
 /**
  * Number of cores that are selected in config string
@@ -62,16 +63,29 @@ static int sel_monitor_num = 0;
  */
 static enum pqos_mon_event sel_events_max = 0;
 /**
- * Maintains a table of core, event, number of events that are selected in
- * config string for monitoring LLC occupancy
+ * Maintains a table of core, event, number of events that are 
+ * selected in config string for monitoring
  */
 static struct {
         unsigned core;
         struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
-} sel_monitor_tab[PQOS_MAX_CORES];
+} sel_monitor_core_tab[PQOS_MAX_CORES];
 static struct pqos_mon_data *m_mon_grps[PQOS_MAX_CORES];
 
+/**
+ * Maintains a table of process id, event, number of events that are selected
+ * in config string for monitoring LLC occupancy
+ */
+static struct {
+        pid_t pid;
+        struct pqos_mon_data *pgrp;
+        enum pqos_mon_event events;
+} sel_monitor_pid_tab[PQOS_MAX_PIDS];
+/**
+ * Maintains the number of process id's you want to track
+ */
+static int sel_process_num = 0;
 /**
  * Stop monitoring indicator for infinite monitoring loop
  */
@@ -85,6 +99,18 @@ static void monitoring_ctrlc(int signo)
 {
 	printf("\nExiting[%d]... Press Enter\n", signo);
         stop_monitoring_loop = 1;
+}
+/**
+ * @brief Check to determine if processes or cores are monitored
+ *
+ * @return Process monitoring mode status
+ * @retval 0 monitoring cores
+ * @retval 1 monitoring processes
+ */
+static inline int
+process_mode(void)
+{
+        return (sel_process_num <= 0) ? 0 : 1;
 }
 /**
  * @brief Gets scale factors to display events data
@@ -155,28 +181,54 @@ get_event_factors(const struct pqos_cap * const cap,
 static void
 monitoring_get_input(int argc, char *argv[])
 {
-	int numberOfCores = argc-1, i = 0;
+	int num_args = 0, i = 0, sel_pid = 0;
 
-	if (numberOfCores == 0)
+        if (argc > 1) {
+                if (!strcmp(argv[1], "-p")) {
+                        sel_pid = 1;
+                        num_args = argc-2;
+                } else
+                        num_args = argc-1;
+        }
+	if (num_args == 0)
 		sel_monitor_num = 0;
 	else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H")) {
-		printf("Usage: %s [<core1> <core2> <core3> ...]\n", argv[0]);
-		printf("Eg   : %s 1 2 6\n\n", argv[0]);
+		printf("Usage:  %s [<core1> <core2> <core3> ...]\n"
+                       "        %s -p [<pid1> <pid2> <pid3> ...]\n",
+                       argv[0], argv[0]);
+		printf("Eg   :  %s 1 2 6\n        "
+                       "%s -p 3564 7638 356\n"
+                       "Notes:\n        "
+                       "-h      help\n        "
+                       "-p      select process ids to monitor LLC occupancy"
+                       "\n\n", argv[0], argv[0]);
 		sel_monitor_num = 0;
 	} else {
-                if (numberOfCores > PQOS_MAX_CORES)
-                        numberOfCores = PQOS_MAX_CORES;
-
-		for (i = 0; i < numberOfCores; i++) {
-                        m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
-			sel_monitor_tab[i].pgrp = m_mon_grps[i];
-			sel_monitor_tab[i].core = (unsigned) atoi(argv[i+1]);
-		}
-                sel_monitor_num = (int) numberOfCores;
+                if (sel_pid) {
+                        if (num_args > PQOS_MAX_PIDS)
+                                num_args = PQOS_MAX_PIDS;
+                        for (i = 0; i < num_args; i++) {
+                                m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
+                                sel_monitor_pid_tab[i].pgrp = m_mon_grps[i];
+                                sel_monitor_pid_tab[i].pid =
+                                        (unsigned) atoi(argv[i+2]);
+                        }
+                        sel_process_num = (int) num_args;
+                } else {
+                        if (num_args > PQOS_MAX_CORES)
+                                num_args = PQOS_MAX_CORES;
+                        for (i = 0; i < num_args; i++) {
+                                m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
+                                sel_monitor_core_tab[i].pgrp = m_mon_grps[i];
+                                sel_monitor_core_tab[i].core =
+                                        (unsigned) atoi(argv[i+1]);
+                        }
+                        sel_monitor_num = (int) num_args;
+                }
 	}
 }
 /**
- * @brief Starts monitoring on selected cores
+ * @brief Starts monitoring on selected cores/PIDs
  *
  * @param cpu_info cpu information structure
  *
@@ -192,34 +244,50 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 
 	for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
                 sel_events_max |= (cap_mon->u.mon->events[i].type);
-        if (sel_monitor_num == 0) {
+        if (sel_monitor_num == 0 && sel_process_num == 0) {
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore = cpu_info->cores[i].lcore;
 
-                        sel_monitor_tab[sel_monitor_num].core = lcore;
-                        sel_monitor_tab[sel_monitor_num].events =
+                        sel_monitor_core_tab[sel_monitor_num].core = lcore;
+                        sel_monitor_core_tab[sel_monitor_num].events =
                                 sel_events_max;
                         m_mon_grps[sel_monitor_num] =
                                 malloc(sizeof(**m_mon_grps));
-                        sel_monitor_tab[sel_monitor_num].pgrp =
+                        sel_monitor_core_tab[sel_monitor_num].pgrp =
                                 m_mon_grps[sel_monitor_num];
                         sel_monitor_num++;
                 }
         }
-	for (i = 0; i < (unsigned) sel_monitor_num; i++) {
-		unsigned lcore = sel_monitor_tab[i].core;
-                int ret;
+        if (!process_mode()) {
+                for (i = 0; i < (unsigned) sel_monitor_num; i++) {
+                        unsigned lcore = sel_monitor_core_tab[i].core;
+                        int ret;
 
-		ret = pqos_mon_start(1, &lcore,
-                                     sel_events_max,
-                                     NULL,
-                                     sel_monitor_tab[i].pgrp);
-		if (ret != PQOS_RETVAL_OK) {
-			printf("Monitoring start error on core %u,"
-                               "status %d\n", lcore, ret);
-			return ret;
-		}
-	}
+                        ret = pqos_mon_start(1, &lcore,
+                                             sel_events_max,
+                                             NULL,
+                                             sel_monitor_core_tab[i].pgrp);
+                        if (ret != PQOS_RETVAL_OK) {
+                                printf("Monitoring start error on core %u,"
+                                       "status %d\n", lcore, ret);
+                                return ret;
+                        }
+                }
+        } else {
+                for (i = 0; i < (unsigned) sel_process_num; i++) {
+                        pid_t pid = sel_monitor_pid_tab[i].pid;
+                        int ret;
+
+                        ret = pqos_mon_start_pid(pid, PQOS_MON_EVENT_L3_OCCUP,
+                                                 NULL,
+                                                 sel_monitor_pid_tab[i].pgrp);
+                        if (ret != PQOS_RETVAL_OK) {
+                                printf("Monitoring start error on pid %u,"
+                                       "status %d\n", pid, ret);
+                                return ret;
+                        }
+                }
+        }
 	return PQOS_RETVAL_OK;
 }
 /**
@@ -228,9 +296,14 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
  */
 static void stop_monitoring(void)
 {
-	unsigned i;
+	unsigned i, mon_number = 0;
 
-	for (i = 0; i < (unsigned) sel_monitor_num; i++) {
+        if (!process_mode())
+                mon_number = (unsigned) sel_monitor_num;
+        else
+                mon_number = (unsigned) sel_process_num;
+
+	for (i = 0; i < mon_number; i++) {
                 int ret;
 
 		ret = pqos_mon_stop(m_mon_grps[i]);
@@ -247,6 +320,7 @@ static void stop_monitoring(void)
 static void monitoring_loop(const struct pqos_cap *cap)
 {
 	double llc_factor = 1, mbr_factor = 1, mbl_factor = 1;
+        unsigned mon_number = 0;
 	int ret = PQOS_RETVAL_OK;
 	int i = 0;
 
@@ -255,29 +329,48 @@ static void monitoring_loop(const struct pqos_cap *cap)
 	ret = get_event_factors(cap, &llc_factor, &mbr_factor, &mbl_factor);
 	if (ret != PQOS_RETVAL_OK)
 		return;
-	while (!stop_monitoring_loop) {
-		ret = pqos_mon_poll(m_mon_grps, (unsigned)sel_monitor_num);
-		if (ret != PQOS_RETVAL_OK) {
-			printf("Failed to poll monitoring data!\n");
-			return;
-		}
-		printf("SOCKET     CORE     RMID    LLC[KB]"
-                       "    MBL[MB]    MBR[MB]\n");
-		for (i = 0; i < sel_monitor_num; i++) {
-                        const struct pqos_event_values *pv =
-                                &m_mon_grps[i]->values;
-                        double llc = (double)pv->llc,
-                                mbr = (double)pv->mbm_remote_delta,
-                                mbl = (double)pv->mbm_local_delta;
 
-			printf("%6u %8u %8u %10.1f %10.1f %10.1f\n",
-                               m_mon_grps[i]->socket,
-                               m_mon_grps[i]->cores[0],
-                               m_mon_grps[i]->rmid,
-                               llc * llc_factor,
-                               mbl * mbl_factor,
-                               mbr * mbr_factor);
-		}
+        if (!process_mode())
+	        mon_number = (unsigned) sel_monitor_num;
+	else
+	        mon_number = (unsigned) sel_process_num;
+
+	while (!stop_monitoring_loop) {
+                ret = pqos_mon_poll(m_mon_grps, (unsigned)mon_number);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Failed to poll monitoring data!\n");
+                        return;
+                }
+                if (!process_mode()) {
+                        printf("SOCKET     CORE     RMID    LLC[KB]"
+                               "    MBL[MB]    MBR[MB]\n");
+                        for (i = 0; i < sel_monitor_num; i++) {
+                                const struct pqos_event_values *pv =
+                                        &m_mon_grps[i]->values;
+                                double llc = (double)pv->llc,
+                                        mbr = (double)pv->mbm_remote_delta,
+                                        mbl = (double)pv->mbm_local_delta;
+
+                                printf("%6u %8u %8u %10.1f %10.1f %10.1f\n",
+                                       m_mon_grps[i]->socket,
+                                       m_mon_grps[i]->cores[0],
+                                       m_mon_grps[i]->rmid,
+                                       llc * llc_factor,
+                                       mbl * mbl_factor,
+                                       mbr * mbr_factor);
+                        }
+                } else {
+                        printf("PID       LLC[KB]\n");
+                        for (i = 0; i < sel_process_num; i++) {
+                                const struct pqos_event_values *pv =
+                                        &m_mon_grps[i]->values;
+                                double llc = (double)pv->llc;
+
+                                printf("%6d %10.1f\n",
+                                       m_mon_grps[i]->pid,
+                                       llc * llc_factor);
+                        }
+                }
 		printf("\nPress Enter to continue or Ctrl+c to exit");
 		if (getchar() != '\n')
 			break;
