@@ -69,6 +69,13 @@ endif
 # Build targets and dependencies
 APP = pqos
 
+MAN = pqos.8
+
+# XXX: modify as desired
+PREFIX ?= /usr/local
+BIN_DIR = $(PREFIX)/bin
+MAN_DIR = $(PREFIX)/man/man8
+
 all: $(APP)
 
 $(APP): main.o profiles.o $(LIBNAME)
@@ -77,7 +84,15 @@ $(APP): main.o profiles.o $(LIBNAME)
 $(LIBNAME):
 	make -C lib all
 
-.PHONY: clean rinse TAGS
+install: $(APP) $(MAN)
+	install -D -s $(APP) $(BIN_DIR)/$(APP)
+	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
+
+uninstall:
+	-rm $(BIN_DIR)/$(APP)
+	-rm $(MAN_DIR)/$(MAN)
+
+.PHONY: clean rinse TAGS install uninstall
 
 rinse:
 	-rm -f $(APP) main.o profiles.o
