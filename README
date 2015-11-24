@@ -96,6 +96,10 @@ To compile PQoS utility:
         "make clean" for cleaning build files.
         "make clobber" for clearing even more files than "make clean".
 
+To install the PQoS utility (optional), first compile, then:
+        "sudo make install" to install below /usr/local.
+        "sudo make install PREFIX=/some/where" to install below /some/where.
+
 To compile PQoS library:
         cd lib/
         "make help" lists various make options.
