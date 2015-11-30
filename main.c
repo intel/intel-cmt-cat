@@ -73,6 +73,7 @@
 #define PQOS_MAX_SOCKET_CORES 64
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
 #define PQOS_MAX_PIDS         128
+#define PQOS_MON_EVENT_ALL    -1
 
 /**
  * Defines used to identify CAT mask definitions
@@ -589,19 +590,24 @@ parse_event(char *str, enum pqos_mon_event *evt)
 {
         ASSERT(str != NULL);
         ASSERT(evt != NULL);
-        if (strncasecmp(str, "llc:", 4) == 0)
+        /**
+         * Set event value and sel_event_max which determines
+         * what events to display (out of all possible)
+         */
+        if (strncasecmp(str, "llc:", 4) == 0) {
 		*evt = PQOS_MON_EVENT_L3_OCCUP;
-        else if (strncasecmp(str, "mbr:", 4) == 0)
+                sel_events_max |= *evt;
+        } else if (strncasecmp(str, "mbr:", 4) == 0) {
                 *evt = PQOS_MON_EVENT_RMEM_BW;
-        else if (strncasecmp(str, "mbl:", 4) == 0)
+                sel_events_max |= *evt;
+        } else if (strncasecmp(str, "mbl:", 4) == 0) {
                 *evt = PQOS_MON_EVENT_LMEM_BW;
+                sel_events_max |= *evt;
+        } else if (strncasecmp(str, "all:", 4) == 0 ||
+                   strncasecmp(str, ":", 1) == 0)
+                *evt = PQOS_MON_EVENT_ALL;
         else
                 parse_error(str, "Unrecognized monitoring event type");
-
-	/**
-         * This is to tell which events to display (out of all possible)
-         */
-        sel_events_max |= *evt;
 }
 
 /**
@@ -714,23 +720,21 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 {
         unsigned i;
         int ret;
+        enum pqos_mon_event all_events = 0;
 
         ASSERT(sel_monitor_num >= 0);
         ASSERT(sel_process_num >= 0);
 
+        /* get all available events */
+        for (i = 0; i < cap_mon->u.mon->num_events; i++)
+                all_events |= (cap_mon->u.mon->events[i].type);
+        /**
+         * If no cores and events selected through command line
+         * by default let's monitor all cores
+         */
         if (sel_monitor_num == 0 && sel_process_num == 0) {
-	        /**
-                 * sel_monitor_num==0 may indicate processes
-		 * have been selected,
-		 * if so then lines below should be skipped
-                 */
-	        for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
-		        sel_events_max |= (cap_mon->u.mon->events[i].type);
-                /**
-                 * no cores and events selected through command line
-                 * by default let's monitor all cores
-                 */
-		for (i = 0; i < cpu_info->num_cores; i++) {
+	        sel_events_max = all_events;
+                for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore  = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
 
@@ -750,7 +754,7 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                 }
         }
 
-	/**< check for process and core tracking, can not have both */
+	/* check for process and core tracking, can not have both */
 	if (sel_process_num > 0 && sel_monitor_num > 0) {
 	        /**
 		 * The error raised also if two instances of PQoS
@@ -761,14 +765,21 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 		return -1;
 	}
 
-        /**< check for processes tracking */
+        /* check for processes tracking */
 	if (!process_mode()) {
+                const enum pqos_mon_event evt_all =
+                        (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
                 /**
                  * Make calls to pqos_mon_start - track cores
                  */
                 for (i = 0; i < (unsigned)sel_monitor_num; i++) {
                         struct core_group *cg = &sel_monitor_core_tab[i];
 
+                        /* check if all available events were selected */
+                        if (cg->events == evt_all) {
+                                cg->events = all_events;
+                                sel_events_max |= all_events;
+                        }
                         ret = pqos_mon_start(cg->num_cores, cg->cores,
                                              cg->events, (void *)cg->desc,
                                              cg->pgrp);
