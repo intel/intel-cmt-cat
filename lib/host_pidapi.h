@@ -48,7 +48,10 @@ extern "C" {
 /**
  * @brief This function initializes the PID monitoring module
  *
- * Checks kernel and event support and sets up event attributes
+ * Checks kernel and event support, sets up event attributes
+ * and update capabilities structure
+ *
+ * @param cap capabilities structure to be updated
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
@@ -56,7 +59,7 @@ extern "C" {
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
 int
-pqos_pid_init(void);
+pqos_pid_init(const struct pqos_cap *cap);
 
 /**
  * @brief This function finalizes the PID monitoring module

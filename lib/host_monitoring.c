@@ -230,7 +230,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         /**
          * Init monitoring processes
          */
-        ret = pqos_pid_init();
+        ret = pqos_pid_init(m_cap);
         if (ret == PQOS_RETVAL_ERROR)
                 return ret;
 #endif /* PQOS_NO_PID_API */

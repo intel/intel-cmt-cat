@@ -182,6 +182,8 @@ struct pqos_monitor {
                                            this event */
         uint32_t scale_factor;          /**< factor to scale RMID value
                                            to bytes */
+        unsigned pid_support;           /**< flag to show if PID monitoring
+                                           is supported */
 };
 
 struct pqos_cap_mon {

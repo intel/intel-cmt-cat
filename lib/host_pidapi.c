@@ -342,14 +342,17 @@ stop_events(struct pqos_mon_data *group,
 }
 
 int
-pqos_pid_init(void)
+pqos_pid_init(const struct pqos_cap *cap)
 {
         FILE *fd;
-	int i, files;
+	int files;
+        unsigned i;
 	char name[64], evt[8];
 	struct dirent **namelist = NULL;
         enum pqos_mon_event events = 0;
 
+        if (cap == NULL)
+                return PQOS_RETVAL_PARAM;
         /**
          * Check if kernel supports PID monitoring
          */
@@ -386,7 +389,7 @@ pqos_pid_init(void)
 	/**
          * Loop through each file
          */
-	for (i = 0; i < files; i++) {
+	for (i = 0; i < (unsigned)files; i++) {
                 unsigned j;
 
 		/**
@@ -463,16 +466,37 @@ pqos_pid_init(void)
                 return PQOS_RETVAL_RESOURCE;
         }
         all_evt_mask = events;
-        unsigned j;
 
         /**
-         * Log supported events
+         * Update capabilities structure with
+         * perf supported events
          */
-        LOG_INFO("PID monitoring capability detected\n");
-        for (j = 0; j < DIM(events_tab); j++)
-                if (events_tab[j].supported)
-                        LOG_INFO("PID mon event: %s supported\n",
-                                 events_tab[j].desc);
+        const struct pqos_capability *p_cap = NULL;
+        int ret;
+
+        /* find monitoring capability */
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &p_cap);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_OK;
+
+        /* update capabilities structure */
+        for (i = 0; i < DIM(events_tab); i++) {
+                unsigned j;
+
+                if (!events_tab[i].supported)
+                        continue;
+                for (j = 0; j < p_cap->u.mon->num_events; j++) {
+                        struct pqos_monitor *mon = &p_cap->u.mon->events[j];
+
+                        if (events_tab[i].event != mon->type)
+                                continue;
+                        mon->pid_support = 1;
+                        LOG_INFO("Detected PID API (perf) support"
+                                 " for %s\n", events_tab[j].desc);
+                        break;
+                }
+        }
+
         return PQOS_RETVAL_OK;
 }
 
