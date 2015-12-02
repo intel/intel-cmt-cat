@@ -505,12 +505,16 @@ strtocgrps(char *s, struct core_group *tab, const unsigned max)
 
                         selfn_strdup(&desc, grp);
                         n = strlisttotab(grp, cbuf, (max-index));
-                        if (index+n > max)
+                        if (index+n > max) {
+                                free(desc);
                                 return -1;
+                        }
                         /* set core group info */
                         ret = set_cgrp(&tab[index], desc, cbuf, n);
-                        if (ret < 0)
+                        if (ret < 0) {
+                                free(desc);
                                 return -1;
+                        }
                         index++;
                 }
         }
@@ -2184,6 +2188,7 @@ monitoring_loop(FILE *fp,
 				if (fseek(fp, -xml_root_close_size,
                                           SEEK_CUR) == -1) {
                                         perror("File seek error");
+                                        free(mon_data);
                                         return;
                                 }
 			}
