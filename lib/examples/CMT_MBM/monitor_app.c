@@ -28,7 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -63,7 +63,7 @@ static int sel_monitor_num = 0;
  */
 static enum pqos_mon_event sel_events_max = 0;
 /**
- * Maintains a table of core, event, number of events that are 
+ * Maintains a table of core, event, number of events that are
  * selected in config string for monitoring
  */
 static struct {
