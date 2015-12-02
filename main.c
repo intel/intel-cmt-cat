@@ -69,6 +69,8 @@
 #define ASSERT(x)
 #endif
 
+#define UNUSED_ARG(_x) ((void)(_x))
+
 #define PQOS_MAX_SOCKETS      8
 #define PQOS_MAX_SOCKET_CORES 64
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
@@ -540,13 +542,14 @@ cmp_cgrps(const struct core_group *cg_a,
           const struct core_group *cg_b)
 {
         int i, found = 0;
+
+        ASSERT(cg_a != NULL);
+        ASSERT(cg_b != NULL);
+
         const int sz_a = cg_a->num_cores;
         const int sz_b = cg_b->num_cores;
         const unsigned *tab_a = cg_a->cores;
         const unsigned *tab_b = cg_b->cores;
-
-        ASSERT(cg_a != NULL);
-        ASSERT(cg_b != NULL);
 
         for (i = 0; i < sz_a; i++) {
                 int j;
@@ -1384,7 +1387,7 @@ selfn_monitor_interval(const char *arg)
 static void
 selfn_monitor_top_like(const char *arg)
 {
-        arg = arg;
+        UNUSED_ARG(arg);
         sel_mon_top_like = 1;
 }
 
@@ -1418,7 +1421,7 @@ selfn_log_file(const char *arg)
 static void
 selfn_verbose_mode(const char *arg)
 {
-        arg = arg;
+        UNUSED_ARG(arg);
         sel_verbose_mode = 1;
 }
 
@@ -1430,7 +1433,7 @@ selfn_verbose_mode(const char *arg)
 static void
 selfn_reset_cat(const char *arg)
 {
-        arg = arg;
+        UNUSED_ARG(arg);
         sel_reset_CAT = 1;
 }
 
@@ -1536,7 +1539,7 @@ selfn_monitor_pids(const char *arg)
 static void
 selfn_show_allocation(const char *arg)
 {
-        arg = arg;
+        UNUSED_ARG(arg);
         sel_show_allocation_config = 1;
 }
 
@@ -1718,7 +1721,7 @@ static int stop_monitoring_loop = 0;
  */
 static void monitoring_ctrlc(int signo)
 {
-        signo = signo;
+        UNUSED_ARG(signo);
         stop_monitoring_loop = 1;
 }
 
@@ -2085,7 +2088,7 @@ monitoring_loop(FILE *fp,
                         /**
                          * Print time
                          */
-                        strftime(cb_time, DIM(cb_time)-1,
+                        strftime(cb_time, sizeof(cb_time) - 1,
                                  "%Y-%m-%d %H:%M:%S", ptm);
 
                         if (istty)
@@ -2094,7 +2097,7 @@ monitoring_loop(FILE *fp,
                         if (istext)
                                 fprintf(fp, "TIME %s\n", cb_time);
                 } else {
-                        strncpy(cb_time, "error", DIM(cb_time)-1);
+                        strncpy(cb_time, "error", sizeof(cb_time) - 1);
                 }
 
                 if (top_mode) {
@@ -2504,8 +2507,20 @@ int main(int argc, char **argv)
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
+
         ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
+        if (ret == PQOS_RETVAL_PARAM) {
+                printf("Error retrieving monitoring capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_2;
+        }
+
         ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
+        if (ret == PQOS_RETVAL_PARAM) {
+                printf("Error retrieving allocation capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_2;
+        }
 
         if (sel_allocation_profile != NULL) {
                 /**
