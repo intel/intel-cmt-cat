@@ -2303,8 +2303,8 @@ static void print_help(void)
                "\t-t\tdefine monitoring time (use 'inf' or 'infinite' for "
                "infinite loop monitoring loop)\n"
                "\t-p\tselect process ids and events to monitor, "
-	       "example: \"llc:22,2,7-15\""
-	       ", it is not possible to track both processes and cores\n",
+	       "example: \"llc:22,25673\" or \"all:892,4588-4592\"\n\t\tNote: "
+	       "it is not possible to track both processes and cores\n",
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
                m_cmd_name, m_cmd_name, m_cmd_name);
 }
