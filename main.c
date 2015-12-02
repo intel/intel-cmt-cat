@@ -720,20 +720,27 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 {
         unsigned i;
         int ret;
-        enum pqos_mon_event all_events = 0;
+        enum pqos_mon_event all_core_evts = 0, all_pid_evts = 0;
+        const enum pqos_mon_event evt_all =
+                        (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
 
         ASSERT(sel_monitor_num >= 0);
         ASSERT(sel_process_num >= 0);
 
         /* get all available events */
-        for (i = 0; i < cap_mon->u.mon->num_events; i++)
-                all_events |= (cap_mon->u.mon->events[i].type);
+        for (i = 0; i < cap_mon->u.mon->num_events; i++) {
+                struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
+
+                all_core_evts |= mon->type;
+                if (mon->pid_support)
+                        all_pid_evts |= mon->type;
+        }
         /**
          * If no cores and events selected through command line
          * by default let's monitor all cores
          */
         if (sel_monitor_num == 0 && sel_process_num == 0) {
-	        sel_events_max = all_events;
+	        sel_events_max = all_core_evts;
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore  = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
@@ -767,8 +774,6 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 
         /* check for processes tracking */
 	if (!process_mode()) {
-                const enum pqos_mon_event evt_all =
-                        (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
                 /**
                  * Make calls to pqos_mon_start - track cores
                  */
@@ -777,8 +782,8 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 
                         /* check if all available events were selected */
                         if (cg->events == evt_all) {
-                                cg->events = all_events;
-                                sel_events_max |= all_events;
+                                cg->events = all_core_evts;
+                                sel_events_max |= all_core_evts;
                         }
                         ret = pqos_mon_start(cg->num_cores, cg->cores,
                                              cg->events, (void *)cg->desc,
@@ -800,6 +805,11 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                  * Make calls to pqos_mon_start_pid - track PIDs
                  */
                 for (i = 0; i < (unsigned)sel_process_num; i++) {
+                        /* check if all available events were selected */
+                        if (sel_monitor_pid_tab[i].events == evt_all) {
+                                sel_monitor_pid_tab[i].events = all_pid_evts;
+                                sel_events_max |= all_pid_evts;
+                        }
                         ret = pqos_mon_start_pid(sel_monitor_pid_tab[i].pid,
                                                  sel_monitor_pid_tab[i].events,
                                                  NULL,
