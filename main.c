@@ -1808,6 +1808,9 @@ fillin_text_column(const double val, char data[], const size_t sz_data,
         const char blank_column[] = "           ";
         size_t offset = 0;
 
+        if (sz_data <= sizeof(blank_column))
+                return 0;
+
         if (is_monitored) {
                 /**
                  * This is monitored and we have the data
