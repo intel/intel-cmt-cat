@@ -28,7 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -85,11 +85,11 @@ struct core_info {
 static int
 get_str_value(const char *str, unsigned *val)
 {
-        char *endptr = NULL;
-        const char *s = strchr(str, ':');
-
         ASSERT(str != NULL);
         ASSERT(val != NULL);
+
+        char *endptr = NULL;
+        const char *s = strchr(str, ':');
 
         if (s == NULL)
                 return -1;

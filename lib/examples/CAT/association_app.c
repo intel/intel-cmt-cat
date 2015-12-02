@@ -104,7 +104,7 @@ enforcement_get_input(int argc, char *argv[])
 static void
 print_allocation_config(void)
 {
-	int ret = PQOS_RETVAL_OK;
+	int ret;
 	unsigned i;
 	unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
 	const struct pqos_cpuinfo *p_cpu = NULL;

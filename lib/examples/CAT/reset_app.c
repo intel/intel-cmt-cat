@@ -166,7 +166,7 @@ int main(int argc, char *argv[])
                 exit_val = EXIT_FAILURE;
                 goto error_exit;
         }
-	ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
+	(void) pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
 	/* Print COS and associated cores */
 	print_allocation_config(cap_l3ca, sock_count, sockets, p_cpu);
  error_exit:

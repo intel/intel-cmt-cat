@@ -405,7 +405,7 @@ int main(int argc, char *argv[])
 	}
 	/* Get input from user */
 	monitoring_get_input(argc, argv);
-	ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
+	(void) pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
 	/* Setup the monitoring resources */
 	ret = setup_monitoring(p_cpu, cap_mon);
 	if (ret != PQOS_RETVAL_OK) {

@@ -524,7 +524,6 @@ pqos_pid_start(struct pqos_mon_data *group)
         if (dir == NULL)
                 return PQOS_RETVAL_PARAM;
         closedir(dir);
-        memset(dir_buf, 0, sizeof(dir_buf));
 
         /**
          * Get TID's for each thread

@@ -155,11 +155,10 @@ cpuid(const unsigned lcore,
 static int
 msr_file_open(const unsigned lcore)
 {
-        int fd = -1;
-
         ASSERT(lcore < m_maxcores);
         ASSERT(m_msr_fd != NULL);
-        fd = m_msr_fd[lcore];
+
+        int fd = m_msr_fd[lcore];
 
         if (fd < 0) {
                 char fname[32];
