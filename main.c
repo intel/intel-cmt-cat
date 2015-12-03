@@ -569,6 +569,17 @@ cmp_cgrps(const struct core_group *cg_a,
 }
 
 /**
+ * @brief Function to print warning to users as utility begins
+ */
+static void
+print_warning(void)
+{
+        printf("NOTE:  Mixed use of MSR and kernel interfaces "
+               "to manage\n       CAT or CMT & MBM may lead to "
+               "unexpected behaviour.\n");
+}
+
+/**
  * @brief Common function to handle string parsing errors
  *
  * On error, this function causes process to exit with FAILURE code.
@@ -2332,6 +2343,8 @@ int main(int argc, char **argv)
         int j = 0;
 
         m_cmd_name = argv[0];
+
+        print_warning();
 
         while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:p:S:srvR"))
                != -1) {
