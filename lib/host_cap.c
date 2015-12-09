@@ -249,9 +249,9 @@ add_monitoring_event(struct pqos_cap_mon *mon,
                 return;
         }
 
-        LOG_INFO("Adding monitoring event: resource ID %u, "
-                 "type %d to table index %u\n",
-                 res_id, event_type, mon->num_events);
+        LOG_DEBUG("Adding monitoring event: resource ID %u, "
+                  "type %d to table index %u\n",
+                  res_id, event_type, mon->num_events);
 
         mon->events[mon->num_events].type = (enum pqos_mon_event) event_type;
         mon->events[mon->num_events].max_rmid = max_rmid;
@@ -751,7 +751,7 @@ discover_alloc_llc_brandstr(struct pqos_cap_l3ca *cap,
                 *brand_u32++ = res.edx;
         }
 
-        LOG_INFO("CPU brand string '%s'\n", brand_str);
+        LOG_DEBUG("CPU brand string '%s'\n", brand_str);
 
         /**
          * match brand against supported ones
@@ -984,8 +984,8 @@ discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
                 /**
                  * Use brand string matching method
                  */
-                LOG_INFO("CPUID.0x7.0: CAT not supported. "
-			 "Check brand string.\n");
+                LOG_INFO("CPUID.0x7.0: CAT not detected. "
+			 "Checking brand string...\n");
                 ret = discover_alloc_llc_brandstr(cap, config->cdp_cfg);
                 if (ret == PQOS_RETVAL_OK)
                         ret = get_l3_cache_info(&cap->num_ways, &cap->way_size);
@@ -1247,7 +1247,7 @@ pqos_init(const struct pqos_config *config)
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("monitoring init error %d\n", ret);
         } else {
-                LOG_INFO("monitoring init OK\n");
+                LOG_DEBUG("monitoring init OK\n");
                 mon_init = 1;
         }
 
@@ -1255,7 +1255,7 @@ pqos_init(const struct pqos_config *config)
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("allocation init error %d\n", ret);
         } else {
-                LOG_INFO("allocation init OK\n");
+                LOG_DEBUG("allocation init OK\n");
                 cat_init = 1;
         }
 

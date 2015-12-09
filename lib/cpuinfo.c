@@ -202,8 +202,8 @@ cpuinfo_init(const struct cpuinfo_topology **topology)
                                 goto cpuinfo_init_error;
                         }
 
-                        LOG_INFO("Detected core %u on socket %u, cluster %u\n",
-                                 lcore_id, socket_id, socket_id);
+                        LOG_DEBUG("Detected core %u on socket %u, cluster %u\n",
+                                  lcore_id, socket_id, socket_id);
 
                         /**
                          * Fill in logical core data

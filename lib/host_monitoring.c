@@ -254,7 +254,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
                 return PQOS_RETVAL_PARAM;
         }
 
-        LOG_INFO("Max RMID per monitoring cluster is %u\n", m_rmid_max);
+        LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
 
         ASSERT(m_cpu != NULL);
 
@@ -291,7 +291,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
                                                        meaning */
         }
 
-        LOG_INFO("RMID internal tables allocated\n");
+        LOG_DEBUG("RMID internal tables allocated\n");
 
         /**
          * Read current core<=>RMID associations
@@ -327,10 +327,10 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
                         if (!cfg->free_in_use_rmid) {
                                 enum rmid_state *pstate = NULL;
 
-                                LOG_INFO("Detected RMID%u is associated with "
-                                         "core %u. "
-                                         "Marking RMID & core unavailable.\n",
-                                         rmid, coreid);
+                                LOG_DEBUG("Detected RMID%u is associated with "
+                                          "core %u. "
+                                          "Marking RMID & core unavailable.\n",
+                                          rmid, coreid);
 
                                 ASSERT(clusterid < m_num_clusters);
                                 pstate = m_rmid_cluster_map[clusterid];
@@ -338,10 +338,10 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 
                                 m_core_map[coreid].unavailable = 1;
                         } else {
-                                LOG_INFO("Detected RMID%u is associated with "
-                                         "core %u. "
-                                         "Freeing the RMID and associateing "
-                                         "core with RMID0.\n",
+                                LOG_DEBUG("Detected RMID%u is associated with "
+                                          "core %u. "
+                                          "Freeing the RMID and associateing "
+                                          "core with RMID0.\n",
                                          rmid, coreid);
                                 ret = mon_assoc_set_nocheck(coreid, RMID0);
                                 if (ret != PQOS_RETVAL_OK) {
