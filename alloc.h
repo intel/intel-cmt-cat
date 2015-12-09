@@ -32,43 +32,68 @@
  */
 
 /**
- * Allocation profiles API
+ * Allocation module
  */
 
 #include <stdint.h>
 #include <stdio.h>
 #include "pqos.h"
 
-#ifndef __PROFILES_H__
-#define __PROFILES_H__
+#ifndef __ALLOCATION_H__
+#define __ALLOCATION_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief Prints list of supported L3CA profiles to STDOUT
+ * @brief Defines allocation class of service
  *
- * @param [in] fp file stream to write profile descriptions to
+ * @param [in] arg string passed to -e command line option
  */
-void profile_l3ca_list(FILE *fp);
+void selfn_allocation_class(const char *arg);
 
 /**
- * @brief Applies selected profile via selfn_allocation_class()
+ * @brief Associates cores with selected class of service
  *
- * @param [in] name of the profile
- * @param [in] l3ca L3CA capability structure
- *
- * @return Operations status
- * @retval 0 OK
- * @retval -1 error
+ * @param [in] arg string passed to -a command line option
  */
-int profile_l3ca_apply(const char *name,
-                       const struct pqos_capability *cap_l3ca);
+void selfn_allocation_assoc(const char *arg);
+
+/**
+ * @brief Prints information about cache allocation settings in the system
+ *
+ * @param [in] cap_mon monitoring capability structure
+ * @param [in] cap_l3ca CAT capability structures
+ * @param [in] sock_count number of detected CPU sockets
+ * @param [in] sockets arrays with detected CPU socket id's
+ * @param [in] cpu_info cpu information structure
+ */
+void alloc_print_config(const struct pqos_capability *cap_mon,
+                        const struct pqos_capability *cap_l3ca,
+                        const unsigned sock_count,
+                        const unsigned *sockets,
+                        const struct pqos_cpuinfo *cpu_info);
+
+/**
+ * @brief Applies allocation settings previously selected via
+ *        selfn_xxxx() functions
+ *
+ * @param [in] cap_l3ca CAT capability structures
+ * @param [in] sock_count number of detected CPU sockets
+ * @param [in] sockets arrays with detected CPU socket id's
+ *
+ * @return Operation status
+ * @retval 0 there was no new config to apply
+ * @retavl 1 there was new config to apply and it went smoothly
+ * @retval -1 an error occurred when applying new config
+ */
+int alloc_apply(const struct pqos_capability *cap_l3ca,
+                unsigned sock_count, unsigned *sockets);
 
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __PROFILES_H__ */
+#endif /* __ALLOCATION_H__ */

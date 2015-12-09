@@ -31,7 +31,7 @@
 # DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 ###############################################################################
 
@@ -76,9 +76,11 @@ PREFIX ?= /usr/local
 BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
 
+OBJS = main.o monitor.o alloc.o profiles.o
+
 all: $(APP)
 
-$(APP): main.o profiles.o $(LIBNAME)
+$(APP): $(OBJS) $(LIBNAME)
 	$(CC) $^ $(LDFLAGS) -o $@
 
 $(LIBNAME):
@@ -95,10 +97,10 @@ uninstall:
 .PHONY: clean rinse TAGS install uninstall
 
 rinse:
-	-rm -f $(APP) main.o profiles.o
+	-rm -f $(APP) $(OBJS)
 
 clean:
-	-rm -f $(APP) main.o profiles.o $(DEPFILE) ./*~
+	-rm -f $(APP) $(OBJS) $(DEPFILE) ./*~
 	-make -C lib clean
 
 TAGS:
@@ -109,11 +111,11 @@ CHECKPATCH?=checkpatch.pl
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
-	 -f main.c -f profiles.c -f profiles.h
+	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I./lib --template=gcc \
-	main.c profiles.c profiles.h
+	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h

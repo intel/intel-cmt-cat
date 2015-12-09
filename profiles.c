@@ -28,8 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- *
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /**
@@ -37,21 +36,11 @@
  */
 #include <stdio.h>
 #include <string.h>
-#ifdef DEBUG
-#include <assert.h>
-#endif
+
 #include "profiles.h"
 #include "pqos.h"
-
-#ifndef DIM
-#define DIM(x) (sizeof(x)/sizeof(x[0]))
-#endif
-
-#ifdef DEBUG
-#define ASSERT assert
-#else
-#define ASSERT(x)
-#endif
+#include "main.h"
+#include "alloc.h"
 
 #define PROFILES_MIN_COS 4
 
@@ -275,8 +264,20 @@ void profile_l3ca_list(FILE *fp)
         }
 }
 
-int profile_l3ca_get(const char *id, const struct pqos_cap_l3ca *l3ca,
-                     unsigned *p_num, const char * const **p_tab)
+/**
+ * @brief Retrieves selected L3CA profile by its \a id
+ *
+ * @param [in] id profile identity (string)
+ * @param [in] l3ca L3CA capability structure
+ * @param [out] p_num number of L3CA classes of service retrieved for the profile
+ * @param [out] p_tab pointer to definition of L3CA classes of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+profile_l3ca_get(const char *id, const struct pqos_cap_l3ca *l3ca,
+                 unsigned *p_num, const char * const **p_tab)
 {
         unsigned i = 0, j = 0;
 
@@ -307,4 +308,45 @@ int profile_l3ca_get(const char *id, const struct pqos_cap_l3ca *l3ca,
         }
 
         return PQOS_RETVAL_RESOURCE;
+}
+
+int
+profile_l3ca_apply(const char *name,
+                   const struct pqos_capability *cap_l3ca)
+{
+        unsigned cnum = 0;
+        const char * const *cptr = NULL;
+
+        if (cap_l3ca != NULL &&
+            profile_l3ca_get(name, cap_l3ca->u.l3ca, &cnum,
+                             &cptr) == PQOS_RETVAL_OK) {
+                /**
+                 * All profile classes are defined as strings
+                 * in format that is command line friendly.
+                 *
+                 * This effectively simulates series of -e command
+                 * line options. "llc:" is glued to each of the strings
+                 * so that profile class definitions don't have to
+                 * include it.
+                 */
+                char cb[64];
+                unsigned i = 0, offset = 0;
+
+                memset(cb, 0, sizeof(cb));
+                strcpy(cb, "llc:");
+                offset = (unsigned)strlen("llc:");
+
+                for (i = 0; i < cnum; i++) {
+                        strncpy(cb+offset, cptr[i],
+                                sizeof(cb)-1-offset);
+                        selfn_allocation_class(cb);
+                }
+        } else {
+                printf("Allocation profile '%s' not found or "
+                       "cache allocation not supported!\n",
+                       name);
+                return -1;
+        }
+
+        return 0;
 }
