@@ -28,7 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -52,13 +52,17 @@ extern "C" {
 #define LOG_OPT_INFO  (1<<0)
 #define LOG_OPT_WARN  (1<<1)
 #define LOG_OPT_ERROR (1<<2)
+#define LOG_OPT_DEBUG (1<<3)
 
-#define LOG_OPT_VERBOSE (LOG_OPT_INFO|LOG_OPT_WARN|LOG_OPT_ERROR)
-#define LOG_OPT_DEFAULT (LOG_OPT_WARN|LOG_OPT_ERROR)
+#define LOG_OPT_DEFAULT         (LOG_OPT_WARN|LOG_OPT_ERROR)
+#define LOG_OPT_VERBOSE         (LOG_OPT_WARN|LOG_OPT_ERROR|LOG_OPT_INFO)
+#define LOG_OPT_SUPER_VERBOSE   (LOG_OPT_WARN|LOG_OPT_ERROR|LOG_OPT_INFO| \
+                                 LOG_OPT_DEBUG)
 
 #define LOG_INFO(str...)  log_printf(LOG_OPT_INFO, "INFO: " str)
 #define LOG_WARN(str...)  log_printf(LOG_OPT_WARN, "WARN: " str)
 #define LOG_ERROR(str...) log_printf(LOG_OPT_ERROR, "ERROR: " str)
+#define LOG_DEBUG(str...) log_printf(LOG_OPT_DEBUG, "DEBUG: " str)
 
 /**
  * @brief Initializes PQoS log module
@@ -68,6 +72,7 @@ extern "C" {
  *         LOG_OPT_INFO  - information messeges
  *         LOG_OPT_WARN  - warnging messegaes
  *         LOG_OPT_ERROR - error messegaes
+ *         LOG_OPT_DEBUG - debug messeges
  *
  * @return Operation status
  * @retval LOG_RETVAL_OK on success
