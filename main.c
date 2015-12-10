@@ -264,6 +264,18 @@ selfn_verbose_mode(const char *arg)
 }
 
 /**
+ * @brief Selects super verbose mode on
+ *
+ * @param arg not used
+ */
+static void
+selfn_super_verbose_mode(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_verbose_mode = 2;
+}
+
+/**
  * @brief Processes configuration setting
  *
  * For now CDP config settings are only accepted.
@@ -485,7 +497,7 @@ int main(int argc, char **argv)
         m_cmd_name = argv[0];
         print_warning();
 
-        while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:p:S:srvR"))
+        while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:p:S:srvVR"))
                != -1) {
                 switch (cmd) {
                 case 'h':
@@ -550,6 +562,9 @@ int main(int argc, char **argv)
                         break;
                 case 'v':
                         selfn_verbose_mode(NULL);
+                        break;
+                case 'V':
+                        selfn_super_verbose_mode(NULL);
                         break;
                 default:
                         printf("Unsupported option: -%c. "
