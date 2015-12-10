@@ -41,6 +41,7 @@
 #include <unistd.h>
 #include <ctype.h>                                      /**< isspace() */
 #include <sys/types.h>                                  /**< open() */
+#include <sys/stat.h>
 #include <fcntl.h>
 
 #include "pqos.h"
@@ -447,6 +448,7 @@ static void print_help(void)
                "Notes:\n"
                "\t-h\thelp\n"
                "\t-v\tverbose mode\n"
+               "\t-V\tsuper-verbose mode\n"
                "\t-H\tlist of supported allocation profiles\n"
                "\t-f\tloads parameters from selected configuration file\n"
                "\t-l\tlogs messages into selected log file\n"
