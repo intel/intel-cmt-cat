@@ -31,7 +31,7 @@
 # DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 # 
 ###############################################################################
 
@@ -81,5 +81,5 @@ CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
-	--std=c99 -I./lib --template=gcc \
+	--std=c99 -I../../ --template=gcc \
 	monitor_app.c
