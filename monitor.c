@@ -486,7 +486,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         }
 
         if (strcasecmp(sel_output_type, "text") != 0 &&
-            strcasecmp(sel_output_type, "xml") != 0) {
+            strcasecmp(sel_output_type, "xml") != 0 &&
+            strcasecmp(sel_output_type, "csv") != 0) {
                 printf("Invalid selection of file output type'%s'!\n",
                        sel_output_type);
                 return -1;
@@ -498,7 +499,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         if (sel_output_file == NULL) {
                 fp_monitor = stdout;
         } else {
-                if (strcasecmp(sel_output_type, "xml") == 0)
+                if (strcasecmp(sel_output_type, "xml") == 0 ||
+                    strcasecmp(sel_output_type, "csv") == 0)
                         fp_monitor = fopen(sel_output_file, "w+");
                 else
                         fp_monitor = fopen(sel_output_file, "a");
@@ -1033,6 +1035,224 @@ fillin_xml_row(char data[], const size_t sz_data,
                                     sel_events_max & PQOS_MON_EVENT_RMEM_BW,
                                     "mbm_remote_MB");
 }
+/**
+ * @brief Fills in single CSV column in the monitoring table
+ *
+ * @param val numerical value to be put into the column
+ * @param data place to put formatted column into
+ * @param sz_data available size for the column
+ * @param is_monitored if true then \a val holds valid data
+ * @param is_column_present if true then corresponding event is
+ *        selected for display
+ * @return Number of characters added to \a data excluding NULL
+ */
+static size_t
+fillin_csv_column(const double val, char data[], const size_t sz_data,
+                  const int is_monitored, const int is_column_present)
+{
+        size_t offset = 0;
+
+        if (is_monitored) {
+                /**
+                 * This is monitored and we have the data
+                 */
+                snprintf(data, sz_data - 1, ",%.1f", val);
+                offset = strlen(data);
+        } else if (is_column_present) {
+                /**
+                 * The column exists though there's no data
+                 */
+                snprintf(data, sz_data - 1, ",");
+                offset = strlen(data);
+        }
+
+        return offset;
+}
+
+/**
+ * @brief Fills in the row in the CSV file with the monitoring data
+ *
+ * @param data the table to store the data row
+ * @param sz_data the size of the table
+ * @param mon_event events selected in monitoring group
+ * @param llc LLC occupancy data
+ * @param mbr remote memory bandwidth data
+ * @param mbl local memory bandwidth data
+ */
+static void
+fillin_csv_row(char data[], const size_t sz_data,
+               const enum pqos_mon_event mon_event,
+               const double llc, const double mbr,
+               const double mbl)
+{
+        size_t offset = 0;
+
+        ASSERT(sz_data >= 128);
+
+        memset(data, 0, sz_data);
+
+        offset += fillin_csv_column(llc, data + offset, sz_data - offset,
+                                    mon_event & PQOS_MON_EVENT_L3_OCCUP,
+                                    sel_events_max & PQOS_MON_EVENT_L3_OCCUP);
+
+        offset += fillin_csv_column(mbl, data + offset, sz_data - offset,
+                                    mon_event & PQOS_MON_EVENT_LMEM_BW,
+                                    sel_events_max & PQOS_MON_EVENT_LMEM_BW);
+
+        offset += fillin_csv_column(mbr, data + offset, sz_data - offset,
+                                    mon_event & PQOS_MON_EVENT_RMEM_BW,
+                                    sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+}
+
+/**
+ * @brief Prints row of monitoring data in text format
+ *
+ * @param fp pointer to file to direct output
+ * @param data string containing monitor data to be printed
+ * @param mon_data pointer to pqos_mon_data structure
+ * @param sz_data size of table to fill data into
+ * @param llc LLC occupancy data
+ * @param mbr remote memory bandwidth data
+ * @param mbl local memory bandwidth data
+ */
+static void
+print_text_row(FILE *fp, char *data,
+               struct pqos_mon_data *mon_data,
+               const size_t sz_data,
+               const double llc,
+               const double mbr,
+               const double mbl)
+{
+        ASSERT(fp != NULL);
+        ASSERT(data != NULL);
+        ASSERT(mon_data != NULL);
+
+        fillin_text_row(data, sz_data,
+                        mon_data->event,
+                        llc, mbr, mbl);
+
+        if (!process_mode()) {
+                fprintf(fp, "\n%3u %8.8s %8u%s",
+                        mon_data->socket,
+                        (char *)mon_data->context,
+                        mon_data->rmid,
+                        data);
+        } else
+                fprintf(fp, "\n%6u %6s %8s%s",
+                        mon_data->pid, "N/A", "N/A", data);
+}
+
+/**
+ * @brief Prints row of monitoring data in xml format
+ *
+ * @param fp pointer to file to direct output
+ * @param time pointer to string containing time data
+ * @param data string containing monitor data to be printed
+ * @param mon_data pointer to pqos_mon_data structure
+ * @param sz_data size of table to fill data into
+ * @param llc LLC occupancy data
+ * @param mbr remote memory bandwidth data
+ * @param mbl local memory bandwidth data
+ */
+static void
+print_xml_row(FILE *fp, char *time, char *data,
+              struct pqos_mon_data *mon_data,
+              const size_t sz_data,
+              const double llc,
+              const double mbr,
+              const double mbl)
+{
+        ASSERT(fp != NULL);
+        ASSERT(time != NULL);
+        ASSERT(data != NULL);
+        ASSERT(mon_data != NULL);
+
+        fillin_xml_row(data, sz_data,
+                       mon_data->event,
+                       llc, mbr, mbl);
+
+        if (!process_mode()) {
+                fprintf(fp,
+                        "%s\n"
+                        "\t<time>%s</time>\n"
+                        "\t<socket>%u</socket>\n"
+                        "\t<core>%s</core>\n"
+                        "\t<rmid>%u</rmid>\n"
+                        "%s"
+                        "%s\n",
+                        xml_child_open,
+                        time,
+                        mon_data->socket,
+                        (char *)mon_data->context,
+                        mon_data->rmid,
+                        data,
+                        xml_child_close);
+        } else {
+                fprintf(fp,
+                        "%s\n"
+                        "\t<time>%s</time>\n"
+                        "\t<pid>%u</pid>\n"
+                        "\t<core>%s</core>\n"
+                        "\t<rmid>%s</rmid>\n"
+                        "%s"
+                        "%s\n",
+                        xml_child_open,
+                        time,
+                        mon_data->pid,
+                        "N/A",
+                        "N/A",
+                        data,
+                        xml_child_close);
+        }
+}
+
+/**
+ * @brief Prints row of monitoring data in csv format
+ *
+ * @param fp pointer to file to direct output
+ * @param time pointer to string containing time data
+ * @param data string containing monitor data to be printed
+ * @param mon_data pointer to pqos_mon_data structure
+ * @param sz_data size of table to fill data into
+ * @param llc LLC occupancy data
+ * @param mbr remote memory bandwidth data
+ * @param mbl local memory bandwidth data
+ */
+static void
+print_csv_row(FILE *fp, char *time, char *data,
+              struct pqos_mon_data *mon_data,
+              const size_t sz_data,
+              const double llc,
+              const double mbr,
+              const double mbl)
+{
+        ASSERT(fp != NULL);
+        ASSERT(time != NULL);
+        ASSERT(data != NULL);
+        ASSERT(mon_data != NULL);
+
+        fillin_csv_row(data, sz_data,
+                       mon_data->event,
+                       llc, mbr, mbl);
+
+        if (!process_mode()) {
+                fprintf(fp,
+                        "%s,%u,%s,%u%s\n",
+                        time,
+                        mon_data->socket,
+                        (char *)mon_data->context,
+                        mon_data->rmid,
+                        data);
+        } else {
+                fprintf(fp,
+                        "%s,%u,%s,%s%s\n",
+                        time,
+                        mon_data->pid,
+                        "N/A",
+                        "N/A",
+                        data);
+        }
+}
 
 void monitor_loop(const struct pqos_cap *cap)
 {
@@ -1050,6 +1270,8 @@ void monitor_loop(const struct pqos_cap *cap)
         int istty = 0;
         unsigned max_lines = 0;
         const int istext = !strcasecmp(output_type, "text");
+        const int isxml = !strcasecmp(output_type, "xml");
+        const int iscsv = !strcasecmp(output_type, "csv");
 
         /* for the dynamic display */
         const size_t sz_header = 128, sz_data = 128;
@@ -1069,7 +1291,7 @@ void monitor_loop(const struct pqos_cap *cap)
 		exit(EXIT_FAILURE);
 	}
 
-        if ((!istext)  && (strcasecmp(output_type, "xml") != 0)) {
+        if ((!istext)  && (!isxml) && (!iscsv)) {
                 printf("Invalid selection of output file type '%s'!\n",
                        output_type);
                 free(mon_data);
@@ -1119,7 +1341,7 @@ void monitor_loop(const struct pqos_cap *cap)
         /**
          * Build the header
          */
-        if (istext) {
+        if (!isxml) {
                 header = (char *) alloca(sz_header);
                 if (header == NULL) {
                         printf("Failed to allocate stack frame memory!\n");
@@ -1127,25 +1349,44 @@ void monitor_loop(const struct pqos_cap *cap)
                         return;
                 }
                 memset(header, 0, sz_header);
-		/* Different header for process id's */
-		if (!process_mode())
-		        strncpy(header,
-				"SKT     CORE     RMID",
-				sz_header - 1);
-		else
-		        strncpy(header,
-				"PID      CORE     RMID",
-				sz_header - 1);
-
-                if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
-                        strncat(header, "    LLC[KB]",
-                                sz_header - strlen(header) - 1);
-                if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
-                        strncat(header, "  MBL[MB/s]",
-                                sz_header - strlen(header) - 1);
-                if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
-                        strncat(header, "  MBR[MB/s]",
-                                sz_header - strlen(header) - 1);
+                if (istext) {
+                        /* Different header for process id's */
+                        if (!process_mode())
+                                strncpy(header,
+                                        "SKT     CORE     RMID",
+                                        sz_header - 1);
+                        else
+                                strncpy(header,
+                                        "PID      CORE     RMID",
+                                        sz_header - 1);
+                        if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
+                                strncat(header, "    LLC[KB]",
+                                        sz_header - strlen(header) - 1);
+                        if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
+                                strncat(header, "  MBL[MB/s]",
+                                        sz_header - strlen(header) - 1);
+                        if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
+                                strncat(header, "  MBR[MB/s]",
+                                        sz_header - strlen(header) - 1);
+                } else {
+                        /* CSV output */
+                        if (!process_mode())
+                                strncpy(header, "Time,Socket,Core,RMID",
+                                        sz_header - 1);
+                        else
+                                strncpy(header, "Time,PID,Core,RMID",
+                                        sz_header - 1);
+                        if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
+                                strncat(header, ",LLC[KB]",
+                                        sz_header - strlen(header) - 1);
+                        if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
+                                strncat(header, ",MBL[MB/s]",
+                                        sz_header - strlen(header) - 1);
+                        if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
+                                strncat(header, ",MBR[MB/s]",
+                                        sz_header - strlen(header) - 1);
+                        fprintf(fp, "%s\n", header);
+                }
         }
 
         while (!stop_monitoring_loop) {
@@ -1216,63 +1457,17 @@ void monitor_loop(const struct pqos_cap *cap)
 
                         if (istext) {
                                 /* Text */
-				/* Checking what to print,
-				 * cores or process id's */
-			        fillin_text_row(data, sz_data,
-						mon_data[i]->event,
-						llc, mbr, mbl);
-				if (!process_mode()) {
-				        fprintf(fp, "\n%3u %8.8s %8u%s",
-                                                mon_data[i]->socket,
-						(char *)mon_data[i]->context,
-						mon_data[i]->rmid,
-						data);
-				} else {
-				        fprintf(fp, "\n%6u %6s %8s%s",
-						mon_data[i]->pid,
-						"N/A",
-						"N/A",
-						data);
-				}
-                        } else {
+			        print_text_row(fp, data, mon_data[i],
+                                               sz_data, llc, mbr, mbl);
+                        } else if (isxml) {
                                 /* XML */
-			        fillin_xml_row(data, sz_data,
-					       mon_data[i]->event,
-					       llc, mbr, mbl);
-			        if (!process_mode()) {
-					fprintf(fp,
-						"%s\n"
-						"\t<time>%s</time>\n"
-						"\t<socket>%u</socket>\n"
-						"\t<core>%s</core>\n"
-						"\t<rmid>%u</rmid>\n"
-						"%s"
-						"%s\n",
-						xml_child_open,
-						cb_time,
-						mon_data[i]->socket,
-						(char *)mon_data[i]->context,
-						mon_data[i]->rmid,
-						data,
-						xml_child_close);
-				} else {
-					fprintf(fp,
-						"%s\n"
-						"\t<time>%s</time>\n"
-						"\t<pid>%u</pid>\n"
-						"\t<core>%s</core>\n"
-						"\t<rmid>%s</rmid>\n"
-						"%s"
-						"%s\n",
-						xml_child_open,
-						cb_time,
-						mon_data[i]->pid,
-						"N/A",
-						"N/A",
-						data,
-						xml_child_close);
-				}
-			}
+                                print_xml_row(fp, cb_time, data, mon_data[i],
+                                              sz_data, llc, mbr, mbl);
+			} else {
+                                /* CSV */
+                                print_csv_row(fp, cb_time, data, mon_data[i],
+                                              sz_data, llc, mbr, mbl);
+                        }
                 }
                 fflush(fp);
 
@@ -1321,7 +1516,7 @@ void monitor_loop(const struct pqos_cap *cap)
                                 break;
                 }
         }
-        if (!istext)
+        if (isxml)
                 fprintf(fp, "%s\n", xml_root_close);
 
         if (istty)
