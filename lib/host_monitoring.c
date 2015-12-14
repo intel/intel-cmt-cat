@@ -28,8 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- *
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /**
@@ -95,6 +94,15 @@
         (PQOS_MSR_L3CA_MASK_END-PQOS_MSR_L3CA_MASK_START+1)
 
 /**
+ * MSR's to read instructions retired and unhlated cycles
+ * - they are needed to calculate IPC (instructions per clock)
+ */
+#define PQOS_MSR_INST_RETIRED_ANY     0x309
+#define PQOS_MSR_CPU_UNHALTED_THREAD  0x30A
+#define PQOS_MSR_FIXED_CTR_CTRL       0x38D
+#define PQOS_MSR_PERF_GLOBAL_CTRL     0x38F
+
+/**
  * Special RMID - after reset all cores are associated with it.
  *
  * The assumption is that if core is not assigned to it
@@ -153,7 +161,7 @@ static unsigned m_num_clusters = 0;     /**< number of clusters
 static unsigned m_rmid_max = 0;         /**< max RMID */
 static unsigned m_dim_cores = 0;        /**< max coreid in the topology */
 static struct mon_entry *m_core_map = NULL; /**< map of core states */
-
+static int m_force_mon = 0;
 /**
  * ---------------------------------------
  * Local Functions
@@ -292,6 +300,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         }
 
         LOG_DEBUG("RMID internal tables allocated\n");
+        m_force_mon = cfg->free_in_use_rmid;
 
         /**
          * Read current core<=>RMID associations
@@ -340,7 +349,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
                         } else {
                                 LOG_DEBUG("Detected RMID%u is associated with "
                                           "core %u. "
-                                          "Freeing the RMID and associateing "
+                                          "Freeing the RMID and associating "
                                           "core with RMID0.\n",
                                          rmid, coreid);
                                 ret = mon_assoc_set_nocheck(coreid, RMID0);
@@ -816,6 +825,9 @@ mon_read(const unsigned lcore,
          */
         if (retval == PQOS_RETVAL_OK)
                 *value = (val & PQOS_MSR_MON_QMC_DATA_MASK);
+        else
+                LOG_WARN("Error reading event %u on core %u (RMID%u)!\n",
+                         (unsigned) event, lcore, (unsigned) rmid);
 
         return retval;
 }
@@ -823,80 +835,99 @@ mon_read(const unsigned lcore,
 /**
  * @brief Reads monitoring event data from given core
  *
- * @param group monitoring structure
+ * @param p pointer to monitoring structure
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-pqos_core_poll(struct pqos_mon_data *group)
+pqos_core_poll(struct pqos_mon_data *p)
 {
-        int ret = PQOS_RETVAL_OK;
+        struct pqos_event_values *pv = &p->values;
         int retval = PQOS_RETVAL_OK;
 
-        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = mon_read(group->cores[0],
-                               group->rmid,
-                               get_event_id(PQOS_MON_EVENT_L3_OCCUP),
-                               &group->values.llc);
+        if (p->event & PQOS_MON_EVENT_L3_OCCUP) {
+                int ret = mon_read(p->cores[0], p->rmid,
+                                   get_event_id(PQOS_MON_EVENT_L3_OCCUP),
+                                   &pv->llc);
+
                 if (ret != PQOS_RETVAL_OK) {
-                        LOG_WARN("Failed to read LLC occupancy on "
-                                 "core %u (RMID%u)\n",
-                                 group->cores[0],
-                                 group->rmid);
                         retval = PQOS_RETVAL_ERROR;
+                        goto pqos_core_poll__exit;
                 }
         }
-        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t old_value = group->values.mbm_local;
+        if (p->event & (PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = pv->mbm_local;
+                int ret = mon_read(p->cores[0], p->rmid,
+                                   get_event_id(PQOS_MON_EVENT_LMEM_BW),
+                                   &pv->mbm_local);
 
-                ret = mon_read(group->cores[0],
-                               group->rmid,
-                               get_event_id(PQOS_MON_EVENT_LMEM_BW),
-                               &group->values.mbm_local);
                 if (ret != PQOS_RETVAL_OK) {
-                        LOG_WARN("Failed to read local memory bandwidth"
-                                 " on core %u (RMID%u)\n",
-                                 group->cores[0],
-                                 group->rmid);
                         retval = PQOS_RETVAL_ERROR;
-                } else
-                        group->values.mbm_local_delta =
-                                get_delta(old_value,
-                                          group->values.mbm_local);
+                        goto pqos_core_poll__exit;
+                }
+                pv->mbm_local_delta = get_delta(old_value, pv->mbm_local);
         }
-        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t old_value = group->values.mbm_total;
+        if (p->event & (PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = pv->mbm_total;
+                int ret = mon_read(p->cores[0], p->rmid,
+                                   get_event_id(PQOS_MON_EVENT_TMEM_BW),
+                                   &pv->mbm_total);
 
-                ret = mon_read(group->cores[0], group->rmid,
-                               get_event_id(PQOS_MON_EVENT_TMEM_BW),
-                               &group->values.mbm_total);
                 if (ret != PQOS_RETVAL_OK) {
-                        LOG_WARN("Failed to read total memory bandwidth"
-                                 " on core %u (RMID%u)\n",
-                                 group->cores[0],
-                                 group->rmid);
                         retval = PQOS_RETVAL_ERROR;
-                } else
-                        group->values.mbm_total_delta =
-                                get_delta(old_value,
-                                          group->values.mbm_total);
+                        goto pqos_core_poll__exit;
+                }
+                pv->mbm_total_delta = get_delta(old_value, pv->mbm_total);
         }
-        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
-                group->values.mbm_remote = 0;
-                if (group->values.mbm_total > group->values.mbm_local)
-                        group->values.mbm_remote =
-                                group->values.mbm_total -
-                                group->values.mbm_local;
-                group->values.mbm_remote_delta = 0;
-                if (group->values.mbm_total_delta >
-                    group->values.mbm_local_delta)
-                        group->values.mbm_remote_delta =
-                                group->values.mbm_total_delta -
-                                group->values.mbm_local_delta;
+        if (p->event & PQOS_MON_EVENT_RMEM_BW) {
+                pv->mbm_remote = 0;
+                if (pv->mbm_total > pv->mbm_local)
+                        pv->mbm_remote = pv->mbm_total - pv->mbm_local;
+                pv->mbm_remote_delta = 0;
+                if (pv->mbm_total_delta > pv->mbm_local_delta)
+                        pv->mbm_remote_delta =
+                                pv->mbm_total_delta - pv->mbm_local_delta;
         }
+        if (p->event & PQOS_MON_EVENT_IPC) {
+                /**
+                 * If multiple cores monitored in one group
+                 * then we have to accumulate the values in the group.
+                 */
+                uint64_t unhalted = 0, retired = 0;
+                unsigned n;
+
+                for (n = 0; n < p->num_cores; n++) {
+                        uint64_t tmp = 0;
+                        int ret = msr_read(p->cores[n],
+                                           PQOS_MSR_INST_RETIRED_ANY, &tmp);
+                        if (ret != MACHINE_RETVAL_OK) {
+                                retval = PQOS_RETVAL_ERROR;
+                                goto pqos_core_poll__exit;
+                        }
+                        retired += tmp;
+
+                        ret = msr_read(p->cores[n],
+                                       PQOS_MSR_CPU_UNHALTED_THREAD, &tmp);
+                        if (ret != MACHINE_RETVAL_OK) {
+                                retval = PQOS_RETVAL_ERROR;
+                                goto pqos_core_poll__exit;
+                        }
+                        unhalted += tmp;
+                }
+
+                pv->ipc_unhalted_delta = unhalted - pv->ipc_unhalted;
+                pv->ipc_retired_delta = retired - pv->ipc_retired;
+                pv->ipc_unhalted = unhalted;
+                pv->ipc_retired = retired;
+                if (pv->ipc_unhalted_delta == 0)
+                        pv->ipc = 0.0;
+                else
+                        pv->ipc = (double) pv->ipc_retired_delta /
+                                (double) pv->ipc_unhalted_delta;
+        }
+
+ pqos_core_poll__exit:
         return retval;
 }
 
@@ -924,11 +955,11 @@ pqos_mon_start(const unsigned num_cores,
         }
 
         ASSERT(m_cpu != NULL);
+        /**
+         * Check if all requested cores are valid
+         * and not used by other monitoring processes.
+         */
         for (i = 0; i < num_cores; i++) {
-                /**
-                 * Check if all requested cores are valid
-                 * and not used by other monitoring processes.
-                 */
                 unsigned lcore = cores[i];
 
                 ret = pqos_cpu_check_core(m_cpu, lcore);
@@ -939,6 +970,26 @@ pqos_mon_start(const unsigned num_cores,
                 if (m_core_map[lcore].unavailable) {
                         _pqos_api_unlock();
                         return PQOS_RETVAL_RESOURCE;
+                }
+                if ((event & PQOS_MON_EVENT_IPC) && (!m_force_mon)) {
+                        /**
+                         * Fixed counters are used for IPC calculations.
+                         * Let's check if they are in use
+                         */
+                        uint64_t global_inuse = 0;
+
+                        ret = msr_read(lcore, PQOS_MSR_PERF_GLOBAL_CTRL,
+                                       &global_inuse);
+                        if (ret != MACHINE_RETVAL_OK) {
+                                _pqos_api_unlock();
+                                return PQOS_RETVAL_RESOURCE;
+                        }
+                        if (global_inuse & 3) {
+                                LOG_ERROR("IPC fixed counters 0 and 1 already "
+                                          "in use!\n");
+                                _pqos_api_unlock();
+                                return PQOS_RETVAL_RESOURCE;
+                        }
                 }
         }
 
@@ -997,9 +1048,17 @@ pqos_mon_start(const unsigned num_cores,
 
         /**
          * Validate event parameter - only combinations of events allowed
+         * Do not allow non-PQoS events to be monitored on its own
          */
         if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW))) {
+                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
+                       PQOS_MON_EVENT_IPC))) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_PARAM;
+        }
+        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
+            (event & PQOS_MON_EVENT_IPC) != 0) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
         }
@@ -1014,11 +1073,49 @@ pqos_mon_start(const unsigned num_cores,
                 return PQOS_RETVAL_RESOURCE;
         }
 
-        ret = rmid_alloc(cluster, event, &rmid);
+        ret = rmid_alloc(cluster, event & (~PQOS_MON_EVENT_IPC), &rmid);
         if (ret != PQOS_RETVAL_OK) {
                 free(group->cores);
                 _pqos_api_unlock();
                 return PQOS_RETVAL_RESOURCE;
+        }
+
+        if (event & PQOS_MON_EVENT_IPC) {
+                /**
+                 * Program fixed counters for IPC calculations:
+                 * - disable counters in global control,
+                 * - reset counter values to 0 and
+                 * - enable in fixed counter control
+                 * - enable in global counter control
+                 */
+                const uint64_t global_ctrl = 0x300000000ULL,
+                        fixed_ctrl = 0x33ULL;
+
+                for (i = 0; i < num_cores; i++) {
+                        ret = msr_write(cores[i], PQOS_MSR_PERF_GLOBAL_CTRL, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i], PQOS_MSR_INST_RETIRED_ANY, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i],
+                                        PQOS_MSR_CPU_UNHALTED_THREAD, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i],
+                                        PQOS_MSR_FIXED_CTR_CTRL, fixed_ctrl);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i],
+                                        PQOS_MSR_PERF_GLOBAL_CTRL, global_ctrl);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                }
+                if (i < num_cores) {
+                        free(group->cores);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_ERROR;
+                }
         }
 
         /**
@@ -1183,6 +1280,27 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 return PQOS_RETVAL_RESOURCE;
         }
 
+        if (group->event & PQOS_MON_EVENT_IPC) {
+                /**
+                 * Stop IPC fixed counters
+                 */
+                for (i = 0; i < group->num_cores; i++) {
+                        ret = msr_write(group->cores[i],
+                                        PQOS_MSR_PERF_GLOBAL_CTRL, 0);
+                        if (ret != MACHINE_RETVAL_OK) {
+                                _pqos_api_unlock();
+                                return PQOS_RETVAL_ERROR;
+                        }
+                        ret = msr_write(group->cores[i],
+                                        PQOS_MSR_FIXED_CTR_CTRL, 0);
+                        if (ret != MACHINE_RETVAL_OK) {
+                                _pqos_api_unlock();
+                                return PQOS_RETVAL_ERROR;
+                        }
+                }
+                ret = PQOS_RETVAL_OK;
+        }
+
         /**
          * Free the core list and clear the group structure
          */
@@ -1318,11 +1436,13 @@ get_event_id(const enum pqos_mon_event event)
                 return 2;
                 break;
         case PQOS_MON_EVENT_RMEM_BW:
+        default:
                 ASSERT(0); /**< this means bug */
                 break;
         }
         return 0;
 }
+
 /**
  * @brief Gives the difference between two values with regard to the possible overrun
  *

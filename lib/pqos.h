@@ -28,7 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -45,6 +45,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,7 +57,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION       102          /**< version 1.02 */
+#define PQOS_VERSION       103          /**< version 1.03 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16xCOS */
 
 /*
@@ -163,6 +164,7 @@ enum pqos_mon_event {
         PQOS_MON_EVENT_TMEM_BW = 4,     /**< Total memory bandwidth */
         PQOS_MON_EVENT_RMEM_BW = 8,     /**< Remote memory bandwidth
                                            (virtual event) */
+        PQOS_MON_EVENT_IPC     = 0x8000,/**< instructions per clock */
 };
 
 /**
@@ -266,12 +268,17 @@ typedef uint32_t pqos_rmid_t;
  */
 struct pqos_event_values {
 	uint64_t llc;                   /**< cache occupancy */
-	uint64_t mbm_local;             /**< bandwidth local - current reading */
-	uint64_t mbm_total;             /**< bandwidth total - current reading */
-	uint64_t mbm_remote;            /**< bandwidth remote - current reading */
+	uint64_t mbm_local;             /**< bandwidth local - reading */
+	uint64_t mbm_total;             /**< bandwidth total - reading */
+	uint64_t mbm_remote;            /**< bandwidth remote - reading */
 	uint64_t mbm_local_delta;       /**< bandwidth local - delta */
 	uint64_t mbm_total_delta;       /**< bandwidth total - delta */
 	uint64_t mbm_remote_delta;      /**< bandwidth remote - delta */
+        uint64_t ipc_retired;           /**< instructions retired - reading */
+        uint64_t ipc_retired_delta;     /**< instructions retired - delta */
+        uint64_t ipc_unhalted;          /**< unhalted cycles - reading */
+        uint64_t ipc_unhalted_delta;    /**< unhalted cycles - delta */
+        double ipc;
 };
 
 /**
@@ -319,6 +326,9 @@ int pqos_mon_assoc_get(const unsigned lcore,
 
 /**
  * @brief Starts resource monitoring data logging on \a lcore
+ *
+ * Note that \a event cannot select PQOS_MON_EVENT_IPC event
+ * without any PQoS event selected at the same time.
  *
  * @param [in] lcore CPU logical core id
  * @param [in] event monitoring event id
@@ -626,25 +636,31 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
  * @retval PQOS_RETVAL_OK on success
  */
 static inline int
-pqos_mon_get_event_value(uint64_t * const value,
+pqos_mon_get_event_value(void * const value,
                          const enum pqos_mon_event event_id,
                          const struct pqos_mon_data * const group)
 {
+        uint64_t * const p_64 = value;
+        double * const p_dbl = value;
+
 	if (group == NULL || value == NULL)
 		return PQOS_RETVAL_PARAM;
 
 	switch (event_id) {
         case PQOS_MON_EVENT_L3_OCCUP:
-                *value = group->values.llc;
+                *p_64 = group->values.llc;
                 break;
         case PQOS_MON_EVENT_LMEM_BW:
-                *value = group->values.mbm_local_delta;
+                *p_64 = group->values.mbm_local_delta;
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
-                *value = group->values.mbm_total_delta;
+                *p_64 = group->values.mbm_total_delta;
                 break;
         case PQOS_MON_EVENT_RMEM_BW:
-                *value = group->values.mbm_remote_delta;
+                *p_64 = group->values.mbm_remote_delta;
+                break;
+        case PQOS_MON_EVENT_IPC:
+                *p_dbl = group->values.ipc;
                 break;
         default:
                 return PQOS_RETVAL_PARAM;

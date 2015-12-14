@@ -28,8 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- *
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /**
@@ -276,7 +275,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
 static int
 discover_monitoring(struct pqos_cap_mon **r_mon)
 {
-        struct cpuid_out res;
+        struct cpuid_out res, res_cpuid_0xa;
         int ret = PQOS_RETVAL_OK;
         unsigned sz = 0, max_rmid = 0,
                 l3_size = 0, num_events = 0;
@@ -341,6 +340,20 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
         if (!num_events)
                 return PQOS_RETVAL_ERROR;
 
+        /**
+         * Check if IPC can be calculated & supported
+         */
+        ret = lcpuid(0xa, 0x0, &res_cpuid_0xa);
+        if (ret != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
+        if (((res_cpuid_0xa.ebx & 3) == 0) && ((res_cpuid_0xa.edx & 31) > 1))
+                num_events++;
+
+        /**
+         * Allocate memory for detected events and
+         * fill the events in.
+         */
         sz = (num_events * sizeof(struct pqos_monitor)) + sizeof(*mon);
         mon = (struct pqos_cap_mon *) malloc(sz);
         if (mon == NULL)
@@ -390,6 +403,10 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
                                              tmp_res.ebx,
                                              num_events);
         }
+
+        if (((res_cpuid_0xa.ebx & 3) == 0) && ((res_cpuid_0xa.edx & 31) > 1))
+                add_monitoring_event(mon, 0, PQOS_MON_EVENT_IPC, 0, 0,
+                                     num_events);
 
         (*r_mon) = mon;
         return PQOS_RETVAL_OK;
