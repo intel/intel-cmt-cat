@@ -451,7 +451,9 @@ get_cpu_sockets(const struct pqos_cpuinfo *cpu,
         if (ret == PQOS_RETVAL_OK) {
 		*number = sockets_num;
 		*table = sockets;
-	}
+	} else {
+                free(sockets);
+        }
 
 	return ret;
 }
