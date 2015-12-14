@@ -515,14 +515,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         }
                         if (ftell(fp_monitor) == 0)
                                 fprintf(fp_monitor,
-                                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                                        "%s\n%s",
-                                        xml_root_open, xml_root_close);
-                        if (fseek(fp_monitor,
-                                  -xml_root_close_size, SEEK_CUR) == -1) {
-                                perror("File seek error");
-                                return -1;
-                        }
+                                        "<?xml version=\"1.0\" encoding="
+                                        "\"UTF-8\"?>\n%s\n", xml_root_open);
                 }
         }
 
@@ -1253,16 +1247,14 @@ void monitor_loop(const struct pqos_cap *cap)
 						"\t<core>%s</core>\n"
 						"\t<rmid>%u</rmid>\n"
 						"%s"
-						"%s\n"
-						"%s",
+						"%s\n",
 						xml_child_open,
 						cb_time,
 						mon_data[i]->socket,
 						(char *)mon_data[i]->context,
 						mon_data[i]->rmid,
 						data,
-						xml_child_close,
-						xml_root_close);
+						xml_child_close);
 				} else {
 					fprintf(fp,
 						"%s\n"
@@ -1271,23 +1263,15 @@ void monitor_loop(const struct pqos_cap *cap)
 						"\t<core>%s</core>\n"
 						"\t<rmid>%s</rmid>\n"
 						"%s"
-						"%s\n"
-						"%s",
+						"%s\n",
 						xml_child_open,
 						cb_time,
 						mon_data[i]->pid,
 						"N/A",
 						"N/A",
 						data,
-						xml_child_close,
-						xml_root_close);
+						xml_child_close);
 				}
-				if (fseek(fp, -xml_root_close_size,
-                                          SEEK_CUR) == -1) {
-                                        perror("File seek error");
-                                        free(mon_data);
-                                        return;
-                                }
 			}
                 }
                 fflush(fp);
@@ -1336,8 +1320,9 @@ void monitor_loop(const struct pqos_cap *cap)
                         if ((tv_e.tv_sec - tv_start.tv_sec) > sel_time)
                                 break;
                 }
-
         }
+        if (!istext)
+                fprintf(fp, "%s\n", xml_root_close);
 
         if (istty)
                 fputs("\n\n", fp);
