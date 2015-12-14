@@ -544,12 +544,16 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
 
                         ret = set_cgrp(&sel_monitor_core_tab[sel_monitor_num],
                                        uinttostr(lcore), &core, 1);
+                        if (ret != 0) {
+			        printf("Core group setup error!\n");
+				exit(EXIT_FAILURE);
+                        }
                         sel_monitor_core_tab[sel_monitor_num].events =
 			        sel_events_max;
 			m_mon_grps[sel_monitor_num] =
 			        malloc(sizeof(**m_mon_grps));
 			if (m_mon_grps[sel_monitor_num] == NULL) {
-			        printf("Error with memory allocation");
+			        printf("Error with memory allocation!\n");
 				exit(EXIT_FAILURE);
 			}
 			sel_monitor_core_tab[sel_monitor_num].pgrp =
