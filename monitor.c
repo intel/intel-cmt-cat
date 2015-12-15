@@ -579,7 +579,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         if (cg->events == evt_all) {
                                 cg->events = all_core_evts;
                                 sel_events_max |= all_core_evts;
-                        }
+                        } else
+                                cg->events |= PQOS_MON_EVENT_IPC;
                         ret = pqos_mon_start(cg->num_cores, cg->cores,
                                              cg->events, (void *)cg->desc,
                                              cg->pgrp);
@@ -1136,13 +1137,13 @@ print_text_row(FILE *fp, char *data,
                         llc, mbr, mbl);
 
         if (!process_mode()) {
-                fprintf(fp, "\n%3u %8.8s %8u%s",
+                fprintf(fp, "\n%3u %8.8s %5.2f%s",
                         mon_data->socket,
                         (char *)mon_data->context,
-                        mon_data->rmid,
+                        mon_data->values.ipc,
                         data);
         } else
-                fprintf(fp, "\n%6u %6s %8s%s",
+                fprintf(fp, "\n%6u %6s %6s%s",
                         mon_data->pid, "N/A", "N/A", data);
 }
 
@@ -1181,14 +1182,14 @@ print_xml_row(FILE *fp, char *time, char *data,
                         "\t<time>%s</time>\n"
                         "\t<socket>%u</socket>\n"
                         "\t<core>%s</core>\n"
-                        "\t<rmid>%u</rmid>\n"
+                        "\t<ipc>%.2f</ipc>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
                         time,
                         mon_data->socket,
                         (char *)mon_data->context,
-                        mon_data->rmid,
+                        mon_data->values.ipc,
                         data,
                         xml_child_close);
         } else {
@@ -1197,7 +1198,7 @@ print_xml_row(FILE *fp, char *time, char *data,
                         "\t<time>%s</time>\n"
                         "\t<pid>%u</pid>\n"
                         "\t<core>%s</core>\n"
-                        "\t<rmid>%s</rmid>\n"
+                        "\t<ipc>%s</ipc>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
@@ -1241,11 +1242,11 @@ print_csv_row(FILE *fp, char *time, char *data,
 
         if (!process_mode()) {
                 fprintf(fp,
-                        "%s,%u,%s,%u%s\n",
+                        "%s,%u,%s,%.2f%s\n",
                         time,
                         mon_data->socket,
                         (char *)mon_data->context,
-                        mon_data->rmid,
+                        mon_data->values.ipc,
                         data);
         } else {
                 fprintf(fp,
@@ -1357,11 +1358,11 @@ void monitor_loop(const struct pqos_cap *cap)
                         /* Different header for process id's */
                         if (!process_mode())
                                 strncpy(header,
-                                        "SKT     CORE     RMID",
+                                        "SKT     CORE   IPC",
                                         sz_header - 1);
                         else
                                 strncpy(header,
-                                        "PID      CORE     RMID",
+                                        "   PID   CORE    IPC",
                                         sz_header - 1);
                         if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                                 strncat(header, "    LLC[KB]",
@@ -1375,10 +1376,10 @@ void monitor_loop(const struct pqos_cap *cap)
                 } else {
                         /* CSV output */
                         if (!process_mode())
-                                strncpy(header, "Time,Socket,Core,RMID",
+                                strncpy(header, "Time,Socket,Core,IPC",
                                         sz_header - 1);
                         else
-                                strncpy(header, "Time,PID,Core,RMID",
+                                strncpy(header, "Time,PID,Core,IPC",
                                         sz_header - 1);
                         if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                                 strncat(header, ",LLC[KB]",
