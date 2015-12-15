@@ -474,7 +474,7 @@ static void print_help(void)
                "\t-o\tselect output file to store monitored data in. "
                "stdout by default.\n"
                "\t-u\tselect output format type for monitored data. "
-               "\"text\" (default) and \"xml\" are the options.\n"
+               "\"text\" (default), \"xml\" and \"csv\" are the options.\n"
                "\t-i\tdefine monitoring sampling interval, 1=100ms, "
                "default 10=10x100ms=1s\n"
                "\t-T\ttop like monitoring output\n"
