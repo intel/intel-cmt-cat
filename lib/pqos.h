@@ -164,7 +164,8 @@ enum pqos_mon_event {
         PQOS_MON_EVENT_TMEM_BW = 4,     /**< Total memory bandwidth */
         PQOS_MON_EVENT_RMEM_BW = 8,     /**< Remote memory bandwidth
                                            (virtual event) */
-        PQOS_MON_EVENT_IPC     = 0x8000,/**< instructions per clock */
+        PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC miss ratio */
+        PQOS_PERF_EVENT_IPC    = 0x8000, /**< instructions per clock */
 };
 
 /**
@@ -278,7 +279,12 @@ struct pqos_event_values {
         uint64_t ipc_retired_delta;     /**< instructions retired - delta */
         uint64_t ipc_unhalted;          /**< unhalted cycles - reading */
         uint64_t ipc_unhalted_delta;    /**< unhalted cycles - delta */
-        double ipc;
+        double ipc;                     /**< retired instructions / cycles */
+        uint64_t llc_ref;               /**< LLC references - reading */
+        uint64_t llc_ref_delta;         /**< LLC references - delta */
+        uint64_t llc_misses;            /**< LLC misses - reading */
+        uint64_t llc_misses_delta;      /**< LLC misses - delta */
+        double llc_miss;                /**< LLC misses / references */
 };
 
 /**
@@ -327,8 +333,9 @@ int pqos_mon_assoc_get(const unsigned lcore,
 /**
  * @brief Starts resource monitoring data logging on \a lcore
  *
- * Note that \a event cannot select PQOS_MON_EVENT_IPC event
- * without any PQoS event selected at the same time.
+ * Note that \a event cannot select PQOS_PERF_EVENT_IPC or
+ * PQOS_PERF_EVENT_L3_MISS events without any PQoS event
+ * selected at the same time.
  *
  * @param [in] lcore CPU logical core id
  * @param [in] event monitoring event id
@@ -659,8 +666,11 @@ pqos_mon_get_event_value(void * const value,
         case PQOS_MON_EVENT_RMEM_BW:
                 *p_64 = group->values.mbm_remote_delta;
                 break;
-        case PQOS_MON_EVENT_IPC:
+        case PQOS_PERF_EVENT_IPC:
                 *p_dbl = group->values.ipc;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS:
+                *p_dbl = group->values.llc_miss;
                 break;
         default:
                 return PQOS_RETVAL_PARAM;

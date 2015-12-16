@@ -94,13 +94,24 @@
         (PQOS_MSR_L3CA_MASK_END-PQOS_MSR_L3CA_MASK_START+1)
 
 /**
- * MSR's to read instructions retired and unhlated cycles
- * - they are needed to calculate IPC (instructions per clock)
+ * MSR's to read instructions retired, unhlated cycles,
+ * LLC references and LLC misses.
+ * These MSR's are needed to calculate IPC (instructions per clock) and
+ * LLC miss ratio.
  */
-#define PQOS_MSR_INST_RETIRED_ANY     0x309
-#define PQOS_MSR_CPU_UNHALTED_THREAD  0x30A
-#define PQOS_MSR_FIXED_CTR_CTRL       0x38D
-#define PQOS_MSR_PERF_GLOBAL_CTRL     0x38F
+#define IA32_MSR_INST_RETIRED_ANY     0x309
+#define IA32_MSR_CPU_UNHALTED_THREAD  0x30A
+#define IA32_MSR_FIXED_CTR_CTRL       0x38D
+#define IA32_MSR_PERF_GLOBAL_CTRL     0x38F
+#define IA32_MSR_PMC0                 0x0C1
+#define IA32_MSR_PMC1                 0x0C2
+#define IA32_MSR_PERFEVTSEL0          0x186
+#define IA32_MSR_PERFEVTSEL1          0x187
+
+#define IA32_EVENT_LLC_REF_MASK       0x2EULL
+#define IA32_EVENT_LLC_REF_UMASK      0x4FULL
+#define IA32_EVENT_LLC_MISS_MASK      0x2EULL
+#define IA32_EVENT_LLC_MISS_UMASK     0x41ULL
 
 /**
  * Special RMID - after reset all cores are associated with it.
@@ -889,7 +900,7 @@ pqos_core_poll(struct pqos_mon_data *p)
                         pv->mbm_remote_delta =
                                 pv->mbm_total_delta - pv->mbm_local_delta;
         }
-        if (p->event & PQOS_MON_EVENT_IPC) {
+        if (p->event & PQOS_PERF_EVENT_IPC) {
                 /**
                  * If multiple cores monitored in one group
                  * then we have to accumulate the values in the group.
@@ -900,7 +911,7 @@ pqos_core_poll(struct pqos_mon_data *p)
                 for (n = 0; n < p->num_cores; n++) {
                         uint64_t tmp = 0;
                         int ret = msr_read(p->cores[n],
-                                           PQOS_MSR_INST_RETIRED_ANY, &tmp);
+                                           IA32_MSR_INST_RETIRED_ANY, &tmp);
                         if (ret != MACHINE_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
                                 goto pqos_core_poll__exit;
@@ -908,7 +919,7 @@ pqos_core_poll(struct pqos_mon_data *p)
                         retired += tmp;
 
                         ret = msr_read(p->cores[n],
-                                       PQOS_MSR_CPU_UNHALTED_THREAD, &tmp);
+                                       IA32_MSR_CPU_UNHALTED_THREAD, &tmp);
                         if (ret != MACHINE_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
                                 goto pqos_core_poll__exit;
@@ -926,8 +937,192 @@ pqos_core_poll(struct pqos_mon_data *p)
                         pv->ipc = (double) pv->ipc_retired_delta /
                                 (double) pv->ipc_unhalted_delta;
         }
+        if (p->event & PQOS_PERF_EVENT_LLC_MISS) {
+                /**
+                 * If multiple cores monitored in one group
+                 * then we have to accumulate the values in the group.
+                 */
+                uint64_t ref = 0, missed = 0;
+                unsigned n;
+
+                for (n = 0; n < p->num_cores; n++) {
+                        uint64_t tmp = 0;
+                        int ret = msr_read(p->cores[n],
+                                           IA32_MSR_PMC0, &tmp);
+                        if (ret != MACHINE_RETVAL_OK) {
+                                retval = PQOS_RETVAL_ERROR;
+                                goto pqos_core_poll__exit;
+                        }
+                        missed += tmp;
+
+                        ret = msr_read(p->cores[n],
+                                       IA32_MSR_PMC1, &tmp);
+                        if (ret != MACHINE_RETVAL_OK) {
+                                retval = PQOS_RETVAL_ERROR;
+                                goto pqos_core_poll__exit;
+                        }
+                        ref += tmp;
+                }
+
+                pv->llc_ref_delta = ref - pv->llc_ref;
+                pv->llc_misses_delta = missed - pv->llc_misses;
+                pv->llc_ref = ref;
+                pv->llc_misses = missed;
+                if (pv->llc_ref_delta == 0)
+                        pv->llc_miss = 0.0;
+                else
+                        pv->llc_miss = (double) pv->llc_misses_delta /
+                                (double) pv->llc_ref_delta;
+        }
 
  pqos_core_poll__exit:
+        return retval;
+}
+
+/**
+ * @brief Sets up IA32 performance counters for IPC and LL3 miss ratio events
+ *
+ * @param num_cores number of cores in \a cores table
+ * @param cores table with core id's
+ * @param event mask of selected monitoring events
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+ia32_perf_counter_start(const unsigned num_cores,
+                        const unsigned *cores,
+                        const enum pqos_mon_event event)
+{
+        uint64_t global_ctrl_mask = 0;
+        unsigned i;
+
+        ASSERT(cores != NULL && num_cores > 0);
+
+        if (!(event & (PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_IPC)))
+                return PQOS_RETVAL_OK;
+
+        if (event & PQOS_PERF_EVENT_IPC)
+                global_ctrl_mask |= (0x3ULL << 32); /**< fixed counters 0&1 */
+
+        if (event & PQOS_PERF_EVENT_LLC_MISS)
+                global_ctrl_mask |= 0x3ULL;  /**< programmable counters 0&1 */
+
+        if (!m_force_mon) {
+                /**
+                 * Fixed counters are used for IPC calculations.
+                 * Programmable counters are used for LLC miss calculations.
+                 * Let's check if they are in use.
+                 */
+                for (i = 0; i < num_cores; i++) {
+                        uint64_t global_inuse = 0;
+                        int ret;
+
+                        ret = msr_read(cores[i], IA32_MSR_PERF_GLOBAL_CTRL,
+                                           &global_inuse);
+                        if (ret != MACHINE_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+                        if (global_inuse & global_ctrl_mask) {
+                                LOG_ERROR("IPC and/or LLC miss performance "
+                                          "counters already in use!\n");
+                                return PQOS_RETVAL_RESOURCE;
+                        }
+                }
+        }
+
+        /**
+         * - Disable counters in global control and
+         *   reset counter values to 0.
+         * - Program counters for desired events
+         * - Enable counters in global control
+         */
+        for (i = 0; i < num_cores; i++) {
+                const uint64_t fixed_ctrl = 0x33ULL; /**< track usr + os */
+                int ret;
+
+                ret = msr_write(cores[i], IA32_MSR_PERF_GLOBAL_CTRL, 0);
+                if (ret != MACHINE_RETVAL_OK)
+                        break;
+
+                if (event & PQOS_PERF_EVENT_IPC) {
+                        ret = msr_write(cores[i], IA32_MSR_INST_RETIRED_ANY, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i],
+                                        IA32_MSR_CPU_UNHALTED_THREAD, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i],
+                                        IA32_MSR_FIXED_CTR_CTRL, fixed_ctrl);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                }
+
+                if (event & PQOS_PERF_EVENT_LLC_MISS) {
+                        const uint64_t evtsel0_miss = IA32_EVENT_LLC_MISS_MASK |
+                                (IA32_EVENT_LLC_MISS_UMASK << 8) |
+                                (1ULL << 16) | (1ULL << 17) | (1ULL << 22);
+                        const uint64_t evtsel1_ref = IA32_EVENT_LLC_REF_MASK |
+                                (IA32_EVENT_LLC_REF_UMASK << 8) |
+                                (1ULL << 16) | (1ULL << 17) | (1ULL << 22);
+
+                        ret = msr_write(cores[i], IA32_MSR_PMC0, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i], IA32_MSR_PMC1, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i], IA32_MSR_PERFEVTSEL0,
+                                        evtsel0_miss);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i], IA32_MSR_PERFEVTSEL1,
+                                        evtsel1_ref);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                }
+
+                ret = msr_write(cores[i],
+                                IA32_MSR_PERF_GLOBAL_CTRL, global_ctrl_mask);
+                if (ret != MACHINE_RETVAL_OK)
+                                break;
+        }
+
+        if (i < num_cores)
+                return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Disables IA32 performance counters
+ *
+ * @param num_cores number of cores in \a cores table
+ * @param cores table with core id's
+ * @param event mask of selected monitoring events
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+ia32_perf_counter_stop(const unsigned num_cores,
+                       const unsigned *cores,
+                       const enum pqos_mon_event event)
+{
+        int retval = PQOS_RETVAL_OK;
+        unsigned i;
+
+        ASSERT(cores != NULL && num_cores > 0);
+
+        if (!(event & (PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_IPC)))
+                return retval;
+
+        for (i = 0; i < num_cores; i++) {
+                int ret = msr_write(cores[i], IA32_MSR_PERF_GLOBAL_CTRL, 0);
+
+                if (ret != MACHINE_RETVAL_OK)
+                        retval = PQOS_RETVAL_ERROR;
+        }
         return retval;
 }
 
@@ -955,6 +1150,7 @@ pqos_mon_start(const unsigned num_cores,
         }
 
         ASSERT(m_cpu != NULL);
+
         /**
          * Check if all requested cores are valid
          * and not used by other monitoring processes.
@@ -970,26 +1166,6 @@ pqos_mon_start(const unsigned num_cores,
                 if (m_core_map[lcore].unavailable) {
                         _pqos_api_unlock();
                         return PQOS_RETVAL_RESOURCE;
-                }
-                if ((event & PQOS_MON_EVENT_IPC) && (!m_force_mon)) {
-                        /**
-                         * Fixed counters are used for IPC calculations.
-                         * Let's check if they are in use
-                         */
-                        uint64_t global_inuse = 0;
-
-                        ret = msr_read(lcore, PQOS_MSR_PERF_GLOBAL_CTRL,
-                                       &global_inuse);
-                        if (ret != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
-                                return PQOS_RETVAL_RESOURCE;
-                        }
-                        if (global_inuse & 3) {
-                                LOG_ERROR("IPC fixed counters 0 and 1 already "
-                                          "in use!\n");
-                                _pqos_api_unlock();
-                                return PQOS_RETVAL_RESOURCE;
-                        }
                 }
         }
 
@@ -1047,20 +1223,38 @@ pqos_mon_start(const unsigned num_cores,
         }
 
         /**
-         * Validate event parameter - only combinations of events allowed
-         * Do not allow non-PQoS events to be monitored on its own
+         * Validate event parameter
+         * - only combinations of events allowed
+         * - do not allow non-PQoS events to be monitored on its own
          */
         if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                        PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_MON_EVENT_IPC))) {
+                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS))) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
         }
         if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & PQOS_MON_EVENT_IPC) != 0) {
+            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) != 0) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
+        }
+
+        /**
+         * Validate if event is listed in capabilities
+         */
+        for (i = 0; i < (sizeof(event) * 8); i++) {
+                const enum pqos_mon_event evt_mask = (1 << i);
+                const struct pqos_monitor *ptr = NULL;
+
+                if (!(evt_mask & event))
+                        continue;
+
+                ret = pqos_cap_get_event(m_cap, evt_mask, &ptr);
+                if (ret != PQOS_RETVAL_OK || ptr == NULL) {
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
         }
 
         /**
@@ -1073,49 +1267,19 @@ pqos_mon_start(const unsigned num_cores,
                 return PQOS_RETVAL_RESOURCE;
         }
 
-        ret = rmid_alloc(cluster, event & (~PQOS_MON_EVENT_IPC), &rmid);
+        ret = rmid_alloc(cluster, event & (~(PQOS_PERF_EVENT_IPC |
+                                             PQOS_PERF_EVENT_LLC_MISS)), &rmid);
         if (ret != PQOS_RETVAL_OK) {
                 free(group->cores);
                 _pqos_api_unlock();
                 return PQOS_RETVAL_RESOURCE;
         }
 
-        if (event & PQOS_MON_EVENT_IPC) {
-                /**
-                 * Program fixed counters for IPC calculations:
-                 * - disable counters in global control,
-                 * - reset counter values to 0 and
-                 * - enable in fixed counter control
-                 * - enable in global counter control
-                 */
-                const uint64_t global_ctrl = 0x300000000ULL,
-                        fixed_ctrl = 0x33ULL;
-
-                for (i = 0; i < num_cores; i++) {
-                        ret = msr_write(cores[i], PQOS_MSR_PERF_GLOBAL_CTRL, 0);
-                        if (ret != MACHINE_RETVAL_OK)
-                                break;
-                        ret = msr_write(cores[i], PQOS_MSR_INST_RETIRED_ANY, 0);
-                        if (ret != MACHINE_RETVAL_OK)
-                                break;
-                        ret = msr_write(cores[i],
-                                        PQOS_MSR_CPU_UNHALTED_THREAD, 0);
-                        if (ret != MACHINE_RETVAL_OK)
-                                break;
-                        ret = msr_write(cores[i],
-                                        PQOS_MSR_FIXED_CTR_CTRL, fixed_ctrl);
-                        if (ret != MACHINE_RETVAL_OK)
-                                break;
-                        ret = msr_write(cores[i],
-                                        PQOS_MSR_PERF_GLOBAL_CTRL, global_ctrl);
-                        if (ret != MACHINE_RETVAL_OK)
-                                break;
-                }
-                if (i < num_cores) {
-                        free(group->cores);
-                        _pqos_api_unlock();
-                        return PQOS_RETVAL_ERROR;
-                }
+        ret = ia32_perf_counter_start(num_cores, cores, event);
+        if (ret != PQOS_RETVAL_OK) {
+                free(group->cores);
+                _pqos_api_unlock();
+                return ret;
         }
 
         /**
@@ -1280,25 +1444,14 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 return PQOS_RETVAL_RESOURCE;
         }
 
-        if (group->event & PQOS_MON_EVENT_IPC) {
-                /**
-                 * Stop IPC fixed counters
-                 */
-                for (i = 0; i < group->num_cores; i++) {
-                        ret = msr_write(group->cores[i],
-                                        PQOS_MSR_PERF_GLOBAL_CTRL, 0);
-                        if (ret != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
-                                return PQOS_RETVAL_ERROR;
-                        }
-                        ret = msr_write(group->cores[i],
-                                        PQOS_MSR_FIXED_CTR_CTRL, 0);
-                        if (ret != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
-                                return PQOS_RETVAL_ERROR;
-                        }
-                }
-                ret = PQOS_RETVAL_OK;
+        /**
+         * Stop IA32 perfromance counters
+         */
+        ret = ia32_perf_counter_stop(group->num_cores, group->cores,
+                                     group->event);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_RESOURCE;
         }
 
         /**

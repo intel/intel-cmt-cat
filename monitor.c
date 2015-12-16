@@ -580,7 +580,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 cg->events = all_core_evts;
                                 sel_events_max |= all_core_evts;
                         } else
-                                cg->events |= PQOS_MON_EVENT_IPC;
+                                cg->events |= PQOS_PERF_EVENT_IPC;
                         ret = pqos_mon_start(cg->num_cores, cg->cores,
                                              cg->events, (void *)cg->desc,
                                              cg->pgrp);

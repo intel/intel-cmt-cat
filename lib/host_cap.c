@@ -351,6 +351,12 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
                 num_events++;
 
         /**
+         * This means we can program LLC misses too
+         */
+        if (((res_cpuid_0xa.eax >> 8) & 0xff) > 1)
+                num_events++;
+
+        /**
          * Allocate memory for detected events and
          * fill the events in.
          */
@@ -405,7 +411,11 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
         }
 
         if (((res_cpuid_0xa.ebx & 3) == 0) && ((res_cpuid_0xa.edx & 31) > 1))
-                add_monitoring_event(mon, 0, PQOS_MON_EVENT_IPC, 0, 0,
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC, 0, 0,
+                                     num_events);
+
+        if (((res_cpuid_0xa.eax >> 8) & 0xff) > 1)
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS, 0, 0,
                                      num_events);
 
         (*r_mon) = mon;
