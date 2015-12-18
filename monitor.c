@@ -570,8 +570,13 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         if (cg->events == evt_all) {
                                 cg->events = all_core_evts;
                                 sel_events_max |= all_core_evts;
-                        } else
-                                cg->events |= PQOS_PERF_EVENT_IPC;
+                        } else {
+                                if (all_core_evts & PQOS_PERF_EVENT_IPC)
+                                        cg->events |= PQOS_PERF_EVENT_IPC;
+                                if (all_core_evts & PQOS_PERF_EVENT_LLC_MISS)
+                                        cg->events |= PQOS_PERF_EVENT_LLC_MISS;
+                        }
+
                         ret = pqos_mon_start(cg->num_cores, cg->cores,
                                              cg->events, (void *)cg->desc,
                                              cg->pgrp);
@@ -1026,12 +1031,12 @@ print_text_row(FILE *fp,
                                      sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
-                fprintf(fp, "\n%3u %8.8s %5.2f%s",
+                fprintf(fp, "\n%3u %8.8s %5.2f %5.2f%s",
                         mon_data->socket, (char *)mon_data->context,
-                        mon_data->values.ipc,  data);
+                        mon_data->values.ipc, mon_data->values.llc_miss, data);
         else
-                fprintf(fp, "\n%6u %6s %6s%s",
-                        mon_data->pid, "N/A", "N/A", data);
+                fprintf(fp, "\n%6u %6s %6s %6s %s",
+                        mon_data->pid, "N/A", "N/A", "N/A", data);
 }
 
 /**
@@ -1081,6 +1086,7 @@ print_xml_row(FILE *fp, char *time,
                         "\t<socket>%u</socket>\n"
                         "\t<core>%s</core>\n"
                         "\t<ipc>%.2f</ipc>\n"
+                        "\t<llc_miss_ratio>%.2f</llc_miss_ratio>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
@@ -1088,6 +1094,7 @@ print_xml_row(FILE *fp, char *time,
                         mon_data->socket,
                         (char *)mon_data->context,
                         mon_data->values.ipc,
+                        mon_data->values.llc_miss,
                         data,
                         xml_child_close);
         else
@@ -1097,11 +1104,13 @@ print_xml_row(FILE *fp, char *time,
                         "\t<pid>%u</pid>\n"
                         "\t<core>%s</core>\n"
                         "\t<ipc>%s</ipc>\n"
+                        "\t<llc_miss_ratio>%s</llc_miss_ratio>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
                         time,
                         mon_data->pid,
+                        "N/A",
                         "N/A",
                         "N/A",
                         data,
@@ -1149,13 +1158,14 @@ print_csv_row(FILE *fp, char *time,
 
         if (!process_mode())
                 fprintf(fp,
-                        "%s,%u,%s,%.2f%s\n",
+                        "%s,%u,%s,%.2f,%.2f%s\n",
                         time, mon_data->socket, (char *)mon_data->context,
-                        mon_data->values.ipc, data);
+                        mon_data->values.ipc, mon_data->values.llc_miss,
+                        data);
         else
                 fprintf(fp,
-                        "%s,%u,%s,%s%s\n",
-                        time, mon_data->pid, "N/A", "N/A", data);
+                        "%s,%u,%s,%s,%s%s\n",
+                        time, mon_data->pid, "N/A", "N/A", "N/A", data);
 }
 
 /**
@@ -1181,9 +1191,10 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (istext) {
                 if (!process_mode())
-                        strncpy(hdr, "SKT     CORE   IPC", sz_hdr - 1);
+                        strncpy(hdr, "SKT     CORE   IPC  MISS", sz_hdr - 1);
                 else
-                        strncpy(hdr, "   PID   CORE    IPC", sz_hdr - 1);
+                        strncpy(hdr, "   PID   CORE    IPC   MISS ",
+                                sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(hdr, "    LLC[KB]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
@@ -1194,9 +1205,9 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (iscsv) {
                 if (!process_mode())
-                        strncpy(hdr, "Time,Socket,Core,IPC", sz_hdr - 1);
+                        strncpy(hdr, "Time,Socket,Core,IPC,LLC Miss Ratio", sz_hdr - 1);
                 else
-                        strncpy(hdr, "Time,PID,Core,IPC", sz_hdr - 1);
+                        strncpy(hdr, "Time,PID,Core,IPC,LLC Miss Ratio", sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(hdr, ",LLC[KB]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
@@ -1375,8 +1386,7 @@ void monitor_loop(const struct pqos_cap *cap)
                                 "\033[0;0H");  /* move to position 0:0 */
 
                 if (istext)
-                        fprintf(fp_monitor, "TIME %s\n%s",
-                                cb_time, header);
+                        fprintf(fp_monitor, "TIME %s\n%s", cb_time, header);
 
                 for (i = 0; i < display_num; i++) {
                         const struct pqos_event_values *pv =
@@ -1395,6 +1405,9 @@ void monitor_loop(const struct pqos_cap *cap)
                                 print_csv_row(fp_monitor, cb_time, mon_data[i],
                                               llc, mbr, mbl);
                 }
+                if (!istty && istext)
+                        fputs("\n", fp_monitor);
+
                 fflush(fp_monitor);
 
                 gettimeofday(&tv_e, NULL);
