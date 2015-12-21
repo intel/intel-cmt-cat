@@ -46,10 +46,17 @@
 #include <linux/perf_event.h>
 #include <dirent.h>
 
+#include "perf.h"
 #include "host_pidapi.h"
 #include "pqos.h"
 #include "log.h"
 #include "types.h"
+
+
+/**
+ * PID monitoring event type
+ */
+static int cqm_event_type = 0;
 
 /**
  * Table of structures used to store data about
@@ -61,7 +68,6 @@ static struct pid_supported_event {
         const char *desc;
         enum pqos_mon_event event;
         int supported;
-        int evt_value;
         struct perf_event_attr attrs;
 } events_tab[] = {
         { .name = "llc_occupancy",
@@ -80,20 +86,26 @@ static struct pid_supported_event {
           .desc = "Remote Memory B/W",
           .event = PQOS_MON_EVENT_RMEM_BW,
           .supported = 0 },
+        { .name = "IPC",
+          .desc = "Instructions/Cycle",
+          .event = PQOS_PERF_EVENT_IPC,
+          .supported = 1 }, /**< assumed support */
 };
 
 /**
  * Event indexes in table of supported events
  */
-#define PID_EVENT_INDEX_LLC 0
+#define PID_EVENT_INDEX_LLC  0
 #define PID_EVENT_INDEX_LMBM 1
 #define PID_EVENT_INDEX_TMBM 2
 #define PID_EVENT_INDEX_RMBM 3
+#define PID_EVENT_INDEX_IPC  4
 
 /**
- * PID monitoring event type
+ * IPC fd array indexes
  */
-static int cqm_event_type = 0;
+#define CYCLES       0
+#define INSTRUCTIONS 1
 
 /**
  * All supported events mask
@@ -120,6 +132,8 @@ get_supported_event(const enum pqos_mon_event event)
                 return &events_tab[PID_EVENT_INDEX_TMBM];
         case PQOS_MON_EVENT_RMEM_BW:
                 return &events_tab[PID_EVENT_INDEX_RMBM];
+        case PQOS_PERF_EVENT_IPC:
+                return &events_tab[PID_EVENT_INDEX_IPC];
         default:
                 ASSERT(0);
                 return NULL;
@@ -164,9 +178,59 @@ filter(const struct dirent *dir)
 }
 
 /**
- * @brief This function starts perf counters
+ * @brief This function starts perf pqos event counters
  *
- * Starts perf counters for a specific event
+ * Starts perf pqos event counters for a specific event
+ *
+ * Used to start pqos counters and request file
+ * descriptors used to read the counters
+ *
+ * @param group monitoring structure
+ * @param pe supported event structure
+ * @param fds array to store fd's
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+start_pqos_counters(const struct pqos_mon_data *group,
+                    struct pid_supported_event *pe,
+                    int **fds)
+{
+        int i, *fd;
+
+        ASSERT(group != NULL);
+        ASSERT(pe != NULL);
+        ASSERT(fds != NULL);
+
+        fd = malloc(sizeof(fd[0])*group->tid_nr);
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        /**
+         * For each TID assign fd to read counter
+         */
+        for (i = 0; i < group->tid_nr; i++) {
+                int ret;
+
+                ret = perf_setup_counter(&pe->attrs,
+                                         group->tid_map[i],
+                                         -1, -1, 0, &fd[i]);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to start perf "
+                                  "counters for %s\n", pe->name);
+                        free(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+        *fds = fd;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief This function starts perf event counters
+ *
+ * Starts perf counters for specified events
  *
  * Used to start counters and request file
  * descriptors used to read the counters
@@ -179,42 +243,71 @@ filter(const struct dirent *dir)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-start_counters(struct pqos_mon_data *group,
-               struct pid_supported_event *pe,
-               int **fds)
+start_perf_counters(const struct pqos_mon_data *group,
+                    struct pid_supported_event *pe,
+                    int **fds)
 {
-        int i, *fds_ptr;
+        int ret, leader = -1, *fd;
+        struct perf_event_attr attr;
 
         ASSERT(group != NULL);
         ASSERT(pe != NULL);
         ASSERT(fds != NULL);
 
-        fds_ptr = malloc(sizeof(fds_ptr[0])*group->tid_nr);
-        if (fds_ptr == NULL)
-                return PQOS_RETVAL_ERROR;
+        memset(&attr, 0, sizeof(attr));
+        attr.disabled = 1;
+        attr.type = PERF_TYPE_HARDWARE;
+
         /**
-         * For each TID assign fd to read counter
+         * Setup counters for selected events
          */
-        for (i = 0; i < group->tid_nr; i++) {
-                fds_ptr[i] = syscall(__NR_perf_event_open,
-                                     &pe->attrs,
-                                     group->tid_map[i],
-                                     -1, -1, 0);
-                if (fds_ptr[i] < 0) {
-                        LOG_ERROR("Failed to start perf "
-                                  "counters for %s\n", pe->name);
-                        free(fds_ptr);
+        if (pe->event & PQOS_PERF_EVENT_IPC) {
+                fd = malloc(sizeof(fd[0])*2);
+                if (fd == NULL)
+                        return PQOS_RETVAL_ERROR;
+
+                attr.config = PERF_COUNT_HW_CPU_CYCLES;
+                ret = perf_setup_counter(&attr, group->tid_map[0],
+                                         -1, leader, 0, &fd[CYCLES]);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to setup perf cycles "
+                                  "counter for %s\n", pe->name);
+                        free(fd);
                         return PQOS_RETVAL_ERROR;
                 }
+                /* set group leader */
+                leader = fd[0];
+
+                attr.disabled = 0;
+                attr.config = PERF_COUNT_HW_INSTRUCTIONS;
+                ret = perf_setup_counter(&attr, group->tid_map[0], -1,
+                                         leader, 0, &fd[INSTRUCTIONS]);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to setup perf instructions "
+                                  "for %s\n", pe->name);
+                        free(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
+        }  /* no valid events selected */
+        if (leader == -1)
+                return PQOS_RETVAL_ERROR;
+
+        *fds = fd;
+
+        ret = perf_start_counter(leader);
+        if (ret != PQOS_RETVAL_OK) {
+                free(fd);
+                *fds = NULL;
+                return ret;
         }
-        *fds = fds_ptr;
+
         return PQOS_RETVAL_OK;
 }
 
 /**
- * @brief This function stops perf counters
+ * @brief This function stops perf pqos event counters
  *
- * Stops perf counters for a specific event
+ * Stops perf pqos event counters for a specified event
  *
  * @param group monitoring structure
  * @param fds array of fd's
@@ -223,53 +316,94 @@ start_counters(struct pqos_mon_data *group,
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-stop_counters(struct pqos_mon_data *group, int **fds)
+stop_pqos_counters(struct pqos_mon_data *group, int **fds)
 {
-        int i, *fds_ptr;
+        int i, *fd;
 
         ASSERT(group != NULL);
         ASSERT(fds != NULL);
-        fds_ptr = *fds;
-        ASSERT(fds_ptr != NULL);
+        fd = *fds;
+        ASSERT(fd != NULL);
 
         /**
          * For each TID close associated fd
          */
         for (i = 0; i < group->tid_nr; i++) {
-                ASSERT(fds_ptr[i] >= 0);
-                if (close(fds_ptr[i]) < 0) {
-                        LOG_ERROR("Failed to stop perf "
-                                  "counter for TID: %d\n",
+                int ret;
+
+                ret = perf_shutdown_counter(fd[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        LOG_ERROR("Failed to shutdown perf "
+                                  "counters for TID: %d\n",
                                   group->tid_map[i]);
-                }
         }
-        free(fds_ptr);
+        free(fd);
         *fds = NULL;
+
         return PQOS_RETVAL_OK;
 }
 
 /**
- * @brief This function reads perf counters
+ * @brief This function stops perf event counters
  *
- * Reads counters and stores values for a specific event
+ * Stops perf event counters for a specified event
  *
  * @param group monitoring structure
- * @param evt_value destination to store value
  * @param fds array of fd's
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-read_counters(struct pqos_mon_data *group,
-              uint64_t *evt_value,
-              int *fds)
+stop_perf_counters(struct pqos_mon_data *group, int **fds)
+{
+        int ret, *fd;
+        enum pqos_mon_event event;
+
+        ASSERT(group != NULL);
+        ASSERT(fds != NULL);
+        fd = *fds;
+        ASSERT(fd != NULL);
+
+        event = group->event;
+        if (event & PQOS_PERF_EVENT_IPC) {
+                ret = perf_shutdown_counter(fd[CYCLES]);
+                if (ret != PQOS_RETVAL_OK)
+                        LOG_ERROR("Failed to shutdown "
+                                  "perf cycles counter\n");
+                ret = perf_shutdown_counter(fd[INSTRUCTIONS]);
+                if (ret != PQOS_RETVAL_OK)
+                        LOG_ERROR("Failed to shutdown perf "
+                                  "instructions counter\n");
+        } else
+                return PQOS_RETVAL_ERROR;
+        free(fd);
+        *fds = NULL;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Function to read perf pqos event counters
+ *
+ * Reads pqos counters and stores values for a specified event
+ *
+ * @param group monitoring structure
+ * @param value destination to store value
+ * @param fds array of fd's
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+read_pqos_counters(struct pqos_mon_data *group,
+                   uint64_t *value, int *fds)
 {
         int i;
         uint64_t total_value = 0;
 
         ASSERT(group != NULL);
-        ASSERT(evt_value != NULL);
+        ASSERT(value != NULL);
         ASSERT(fds != NULL);
 
         /**
@@ -278,15 +412,50 @@ read_counters(struct pqos_mon_data *group,
          */
         for (i = 0; i < group->tid_nr; i++) {
                 uint64_t counter_value;
-                int nb = read(fds[i], &counter_value,
-                              sizeof(counter_value));
-                if (nb != sizeof(counter_value)) {
-                        LOG_ERROR("Failed to read counter value\n");
-                        return PQOS_RETVAL_ERROR;
-                }
+                int n = perf_read_counter(fds[i], &counter_value);
+
+                if (n != PQOS_RETVAL_OK)
+                        return n;
                 total_value += counter_value;
         }
-        *evt_value = total_value;
+        *value = total_value;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief This function reads perf IPC counters
+ *
+ * Reads counters perf counters, calculates IPC
+ * and stores values in monitoring structure \group
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+read_ipc_counters(struct pqos_mon_data *group)
+{
+        int ret = PQOS_RETVAL_OK;
+        uint64_t cycles = 0;
+        uint64_t instructions = 0;
+
+        ASSERT(group != NULL);
+
+        ret = perf_read_counter(group->fds_ipc[CYCLES], &cycles);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = perf_read_counter(group->fds_ipc[INSTRUCTIONS],
+                                &instructions);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (cycles > 0)
+                group->values.ipc = (double)instructions/(double)cycles;
+        else
+                group->values.ipc = 0;
 
         return PQOS_RETVAL_OK;
 }
@@ -315,24 +484,30 @@ stop_events(struct pqos_mon_data *group,
          * fd's and free associated memory
          */
         if (events & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = stop_counters(group, &group->fds_llc);
+                ret = stop_pqos_counters(group, &group->fds_llc);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
                 stopped_evts |= PQOS_MON_EVENT_L3_OCCUP;
         }
         if  ((events & PQOS_MON_EVENT_LMEM_BW) ||
              (events & PQOS_MON_EVENT_RMEM_BW)) {
-                ret = stop_counters(group, &group->fds_mbl);
+                ret = stop_pqos_counters(group, &group->fds_mbl);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
                 stopped_evts |= PQOS_MON_EVENT_LMEM_BW;
         }
         if  ((events & PQOS_MON_EVENT_TMEM_BW) ||
              (events & PQOS_MON_EVENT_RMEM_BW)) {
-                ret = stop_counters(group, &group->fds_mbt);
+                ret = stop_pqos_counters(group, &group->fds_mbt);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
                 stopped_evts |= PQOS_MON_EVENT_LMEM_BW;
+        }
+        if (events & PQOS_PERF_EVENT_IPC) {
+                ret = stop_perf_counters(group, &group->fds_ipc);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                stopped_evts |= PQOS_PERF_EVENT_IPC;
         }
         if (events ^ stopped_evts) {
                 LOG_ERROR("Failed to stop all events\n");
@@ -342,38 +517,184 @@ stop_events(struct pqos_mon_data *group,
 }
 
 int
-pqos_pid_init(const struct pqos_cap *cap)
+pqos_pid_start(struct pqos_mon_data *group)
 {
-        FILE *fd;
-	int files;
-        unsigned i;
-	char name[64], evt[8];
-	struct dirent **namelist = NULL;
-        enum pqos_mon_event events = 0;
+        DIR *dir;
+        int i, ret, n;
+        char dir_buf[64];
+        pid_t pid, *tids;
+        struct pid_supported_event *pe;
+        struct dirent **namelist = NULL;
+        enum pqos_mon_event started_evts = 0;
 
-        if (cap == NULL)
-                return PQOS_RETVAL_PARAM;
         /**
-         * Check if kernel supports PID monitoring
+         * Check PID exists
          */
-	fd = fopen("/sys/devices/intel_cqm/type", "r");
-	if (fd == NULL) {
-                LOG_INFO("PID monitoring not supported. "
-                         "Kernel version 4.1 or higher required.\n");
-                return PQOS_RETVAL_RESOURCE;
-	}
-        if (fgets(evt, sizeof(evt), fd) == NULL) {
-		LOG_ERROR("Failed to read cqm_event type\n");
-		fclose(fd);
-                return PQOS_RETVAL_ERROR;
-        }
-	fclose(fd);
+        pid = group->pid;
+        snprintf(dir_buf, sizeof(dir_buf)-1, "/proc/%d", (int)pid);
+        dir = opendir(dir_buf);
+        if (dir == NULL)
+                return PQOS_RETVAL_PARAM;
+        closedir(dir);
 
-        cqm_event_type = (int) strtol(evt, NULL, 0);
-        if (cqm_event_type == 0) {
-                LOG_ERROR("Failed to convert cqm_event type\n");
+        /**
+         * Get TID's for each thread
+         */
+	snprintf(dir_buf, sizeof(dir_buf)-1,
+                 "/proc/%d/task", (int)pid);
+	n = scandir(dir_buf, &namelist, filter, NULL);
+	if (n <= 0) {
+		LOG_ERROR("Failed to read TID's\n");
+		return PQOS_RETVAL_ERROR;
+        }
+        tids = malloc(sizeof(tids[0])*n);
+        if (tids == NULL) {
+                LOG_ERROR("TID map memory allocation error\n");
                 return PQOS_RETVAL_ERROR;
         }
+	for (i = 0; i < n; i++)
+		tids[i] = atoi(namelist[i]->d_name);
+        free(namelist);
+
+        /**
+         * Determine if user selected a PID or TID
+         * If TID selected, only monitor events for that thread
+         * otherwise monitor all threads in the process
+         */
+        if (pid != tids[0]) {
+                group->tid_nr = 1;
+                group->tid_map[0] = pid;
+        } else {
+                group->tid_nr = n;
+                group->tid_map = tids;
+        }
+        /**
+         * Determine selected events and start perf counters
+         */
+        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
+                if (!is_event_supported(PQOS_MON_EVENT_L3_OCCUP))
+                        return PQOS_RETVAL_ERROR;
+                pe = get_supported_event(PQOS_MON_EVENT_L3_OCCUP);
+                ret = start_pqos_counters(group, pe, &group->fds_llc);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                started_evts |= PQOS_MON_EVENT_L3_OCCUP;
+        }
+        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                if (!is_event_supported(PQOS_MON_EVENT_LMEM_BW))
+                        return PQOS_RETVAL_ERROR;
+                pe = get_supported_event(PQOS_MON_EVENT_LMEM_BW);
+                ret = start_pqos_counters(group, pe, &group->fds_mbl);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                started_evts |= PQOS_MON_EVENT_LMEM_BW;
+        }
+        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                if (!is_event_supported(PQOS_MON_EVENT_TMEM_BW))
+                        return PQOS_RETVAL_ERROR;
+                pe = get_supported_event(PQOS_MON_EVENT_TMEM_BW);
+                ret = start_pqos_counters(group, pe, &group->fds_mbt);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                started_evts |= PQOS_MON_EVENT_TMEM_BW;
+        }
+        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
+                group->values.mbm_remote = 0;
+                started_evts |= PQOS_MON_EVENT_RMEM_BW;
+        }
+        if (group->event & PQOS_PERF_EVENT_IPC) {
+                if (!is_event_supported(PQOS_PERF_EVENT_IPC))
+                        return PQOS_RETVAL_ERROR;
+                pe = get_supported_event(PQOS_PERF_EVENT_IPC);
+                ret = start_perf_counters(group, pe, &group->fds_ipc);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                started_evts |= PQOS_PERF_EVENT_IPC;
+        }
+        /**
+         * Check if all selected events were started
+         */
+        if (group->event ^ started_evts) {
+                stop_events(group, started_evts);
+                LOG_ERROR("Failed to start all selected "
+                          "PID monitoring events\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+pqos_pid_stop(struct pqos_mon_data *group)
+{
+        /**
+         * Stop all started events
+         */
+        return stop_events(group, group->event);
+}
+
+int
+pqos_pid_poll(struct pqos_mon_data *group)
+{
+        int ret;
+
+        /**
+         * Read and store counter values
+         * for each event
+         */
+        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
+                ret = read_pqos_counters(group,
+                                         &group->values.llc,
+                                         group->fds_llc);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                ret = read_pqos_counters(group,
+                                         &group->values.mbm_local,
+                                         group->fds_mbl);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                ret = read_pqos_counters(group,
+                                         &group->values.mbm_total,
+                                         group->fds_mbt);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
+                group->values.mbm_remote =
+                        group->values.mbm_total -
+                        group->values.mbm_local;
+        }
+        if (group->event & PQOS_PERF_EVENT_IPC) {
+                ret = read_ipc_counters(group);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Function to detect kernel support for perf
+ *        pqos events and update events table
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+init_pqos_events(void)
+{
+	int files, i;
+        FILE *fd;
+        char name[64];
+        enum pqos_mon_event events = 0;
+        struct dirent **namelist = NULL;
 
         /**
          * Read and store event data in table
@@ -385,17 +706,17 @@ pqos_pid_init(const struct pqos_cap *cap)
                           "event files\n");
 		return PQOS_RETVAL_ERROR;
 	}
-
 	/**
          * Loop through each file
          */
-	for (i = 0; i < (unsigned)files; i++) {
+	for (i = 0; i < files; i++) {
                 unsigned j;
 
 		/**
                  * Loop through each event
                  */
 		for (j = 0; j < DIM(events_tab); j++) {
+                        int config;
                         char event_cb[32];
                         char *event_ptr = event_cb;
 
@@ -431,8 +752,7 @@ pqos_pid_init(const struct pqos_cap *cap)
                                 return PQOS_RETVAL_ERROR;
                         }
 
-                        events_tab[j].evt_value =
-                                (int) strtol(event_ptr, NULL, 0);
+                        config = (int)strtol(event_ptr, NULL, 0);
                         events_tab[j].supported = 1;
 
                         /**
@@ -442,8 +762,7 @@ pqos_pid_init(const struct pqos_cap *cap)
                                sizeof(events_tab[0].attrs));
                         events_tab[j].attrs.type =
                                 cqm_event_type;
-                        events_tab[j].attrs.config =
-                                events_tab[j].evt_value;
+                        events_tab[j].attrs.config = config;
                         events_tab[j].attrs.size =
                                 sizeof(struct perf_event_attr);
                         events_tab[j].attrs.inherit = 1;
@@ -465,14 +784,49 @@ pqos_pid_init(const struct pqos_cap *cap)
                 LOG_ERROR("Failed to find PID monitoring events\n");
                 return PQOS_RETVAL_RESOURCE;
         }
-        all_evt_mask = events;
+        all_evt_mask |= events;
 
+        return PQOS_RETVAL_OK;
+}
+
+int
+pqos_pid_init(const struct pqos_cap *cap)
+{
+        FILE *fd;
+	char evt[8];
+        unsigned i, ret;
+
+        if (cap == NULL)
+                return PQOS_RETVAL_PARAM;
+        /**
+         * Check if kernel supports PID monitoring
+         */
+	fd = fopen("/sys/devices/intel_cqm/type", "r");
+	if (fd == NULL) {
+                LOG_INFO("PID monitoring not supported. "
+                         "Kernel version 4.1 or higher required.\n");
+                return PQOS_RETVAL_RESOURCE;
+	}
+        if (fgets(evt, sizeof(evt), fd) == NULL) {
+		LOG_ERROR("Failed to read cqm_event type\n");
+		fclose(fd);
+                return PQOS_RETVAL_ERROR;
+        }
+	fclose(fd);
+
+        cqm_event_type = (int) strtol(evt, NULL, 0);
+        if (cqm_event_type == 0) {
+                LOG_ERROR("Failed to convert cqm_event type\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        ret = init_pqos_events();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         /**
          * Update capabilities structure with
          * perf supported events
          */
         const struct pqos_capability *p_cap = NULL;
-        int ret;
 
         /* find monitoring capability */
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &p_cap);
@@ -486,7 +840,8 @@ pqos_pid_init(const struct pqos_cap *cap)
                 if (!events_tab[i].supported)
                         continue;
                 for (j = 0; j < p_cap->u.mon->num_events; j++) {
-                        struct pqos_monitor *mon = &p_cap->u.mon->events[j];
+                        struct pqos_monitor *mon =
+                                &p_cap->u.mon->events[j];
 
                         if (events_tab[i].event != mon->type)
                                 continue;
@@ -496,158 +851,12 @@ pqos_pid_init(const struct pqos_cap *cap)
                         break;
                 }
         }
-
         return PQOS_RETVAL_OK;
 }
+
 
 int
 pqos_pid_fini(void)
 {
-        return PQOS_RETVAL_OK;
-}
-
-int
-pqos_pid_start(struct pqos_mon_data *group)
-{
-        char dir_buf[64];
-	struct dirent **namelist = NULL;
-	int i, ret;
-        struct pid_supported_event *pe;
-        enum pqos_mon_event started_evts = 0;
-        DIR *dir;
-
-        /**
-         * Check PID exists
-         */
-        snprintf(dir_buf, sizeof(dir_buf)-1, "/proc/%d", (int)group->pid);
-        dir = opendir(dir_buf);
-        if (dir == NULL)
-                return PQOS_RETVAL_PARAM;
-        closedir(dir);
-
-        /**
-         * Get TID's for each thread
-         */
-	snprintf(dir_buf, sizeof(dir_buf)-1, "/proc/%d/task", (int)group->pid);
-	group->tid_nr = scandir(dir_buf, &namelist, filter, NULL);
-	if (group->tid_nr <= 0) {
-		LOG_ERROR("Failed to read TID's\n");
-		return PQOS_RETVAL_ERROR;
-        }
-        group->tid_map =
-                malloc(sizeof(group->tid_map[0])*group->tid_nr);
-        if (group->tid_map == NULL) {
-                LOG_ERROR("TID map memory allocation error\n");
-                return PQOS_RETVAL_ERROR;
-        }
-	for (i = 0; i < group->tid_nr; i++)
-		group->tid_map[i] = atoi(namelist[i]->d_name);
-        free(namelist);
-
-        /**
-         * Determine if user selected a PID or TID
-         * If TID selected, only monitor events for that thread
-         * otherwise monitor all threads in the process
-         */
-        if (group->pid != group->tid_map[0]) {
-                group->tid_nr = 1;
-                group->tid_map[0] = group->pid;
-        }
-
-        /**
-         * Determine selected events and start perf counters
-         */
-        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
-                if (!is_event_supported(PQOS_MON_EVENT_L3_OCCUP))
-                        return PQOS_RETVAL_ERROR;
-                pe = get_supported_event(PQOS_MON_EVENT_L3_OCCUP);
-                ret = start_counters(group, pe, &group->fds_llc);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                started_evts |= PQOS_MON_EVENT_L3_OCCUP;
-        }
-        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                if (!is_event_supported(PQOS_MON_EVENT_LMEM_BW))
-                        return PQOS_RETVAL_ERROR;
-                pe = get_supported_event(PQOS_MON_EVENT_LMEM_BW);
-                ret = start_counters(group, pe, &group->fds_mbl);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                started_evts |= PQOS_MON_EVENT_LMEM_BW;
-        }
-        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                if (!is_event_supported(PQOS_MON_EVENT_TMEM_BW))
-                        return PQOS_RETVAL_ERROR;
-                pe = get_supported_event(PQOS_MON_EVENT_TMEM_BW);
-                ret = start_counters(group, pe, &group->fds_mbt);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                started_evts |= PQOS_MON_EVENT_TMEM_BW;
-        }
-        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
-                group->values.mbm_remote = 0;
-                started_evts |= PQOS_MON_EVENT_RMEM_BW;
-        }
-        /**
-         * Check if all selected events were started
-         */
-        if (group->event ^ started_evts) {
-                stop_events(group, started_evts);
-                LOG_ERROR("Failed to start all selected "
-                          " PID monitoring events\n");
-                return PQOS_RETVAL_ERROR;
-        }
-
-        return PQOS_RETVAL_OK;
-}
-
-int
-pqos_pid_stop(struct pqos_mon_data *group)
-{
-        /**
-         * Stop all started events
-         */
-        return stop_events(group, group->event);
-}
-
-int
-pqos_pid_poll(struct pqos_mon_data *group)
-{
-        int ret;
-
-        /**
-         * Read and store counter values
-         * for each event
-         */
-        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = read_counters(group,
-                                    &group->values.llc,
-                                    group->fds_llc);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-        }
-        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                ret = read_counters(group,
-                                    &group->values.mbm_local,
-                                    group->fds_mbl);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-        }
-        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                ret = read_counters(group,
-                                    &group->values.mbm_total,
-                                    group->fds_mbt);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-        }
-        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
-                group->values.mbm_remote =
-                        group->values.mbm_total -
-                        group->values.mbm_local;
-        }
         return PQOS_RETVAL_OK;
 }

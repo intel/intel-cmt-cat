@@ -31,8 +31,7 @@
 # DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
-# 
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 ###############################################################################
 
 
@@ -79,7 +78,7 @@ CFLAGS += -g -O3
 endif 
 
 # Build targets and dependencies
-OBJS = cpuinfo.o machine.o host_cap.o host_allocation.o host_monitoring.o utils.o log.o
+OBJS = cpuinfo.o machine.o host_cap.o host_allocation.o host_monitoring.o utils.o log.o perf.o
 
 # PID API build option
 ifeq ($(NO_PID_API), y)
@@ -138,7 +137,7 @@ CHECKPATCH?=checkpatch.pl
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
-	-f host_cap.c -f host_cap.h -f host_allocation.c \
+	-f host_cap.c -f host_cap.h -f host_allocation.c -f perf.c -f perf.h \
 	-f host_allocation.h -f host_monitoring.c -f host_monitoring.h \
 	-f log.c -f log.h -f list.h -f types.h -f machine.c -f machine.h \
 	-f utils.c -f cpuinfo.c -f cpuinfo.h -f host_pidapi.c -f host_pidapi.h
@@ -153,7 +152,7 @@ cppcheck:
 	$(CPPCHECK) \
 	--enable=warning,portability,performance,missingInclude \
 	--std=c99 --template=gcc \
-	host_cap.c host_cap.h host_allocation.c \
+	host_cap.c host_cap.h host_allocation.c perf.c perf.h \
 	host_allocation.h host_monitoring.c host_monitoring.h \
 	log.c log.h list.h types.h machine.c machine.h \
 	utils.c cpuinfo.c cpuinfo.h host_pidapi.c host_pidapi.h
