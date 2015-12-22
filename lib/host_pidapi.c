@@ -556,6 +556,9 @@ pqos_pid_start(struct pqos_mon_data *group)
 		tids[i] = atoi(namelist[i]->d_name);
         free(namelist);
 
+        group->tid_nr = n;
+        group->tid_map = tids;
+
         /**
          * Determine if user selected a PID or TID
          * If TID selected, only monitor events for that thread
@@ -564,9 +567,6 @@ pqos_pid_start(struct pqos_mon_data *group)
         if (pid != tids[0]) {
                 group->tid_nr = 1;
                 group->tid_map[0] = pid;
-        } else {
-                group->tid_nr = n;
-                group->tid_map = tids;
         }
         /**
          * Determine selected events and start perf counters
