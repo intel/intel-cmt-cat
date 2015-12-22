@@ -164,7 +164,7 @@ enum pqos_mon_event {
         PQOS_MON_EVENT_TMEM_BW = 4,     /**< Total memory bandwidth */
         PQOS_MON_EVENT_RMEM_BW = 8,     /**< Remote memory bandwidth
                                            (virtual event) */
-        PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC miss ratio */
+        PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC misses */
         PQOS_PERF_EVENT_IPC    = 0x8000, /**< instructions per clock */
 };
 
@@ -280,11 +280,8 @@ struct pqos_event_values {
         uint64_t ipc_unhalted;          /**< unhalted cycles - reading */
         uint64_t ipc_unhalted_delta;    /**< unhalted cycles - delta */
         double ipc;                     /**< retired instructions / cycles */
-        uint64_t llc_ref;               /**< LLC references - reading */
-        uint64_t llc_ref_delta;         /**< LLC references - delta */
         uint64_t llc_misses;            /**< LLC misses - reading */
         uint64_t llc_misses_delta;      /**< LLC misses - delta */
-        double llc_miss;                /**< LLC misses / references */
 };
 
 /**
@@ -671,7 +668,7 @@ pqos_mon_get_event_value(void * const value,
                 *p_dbl = group->values.ipc;
                 break;
         case PQOS_PERF_EVENT_LLC_MISS:
-                *p_dbl = group->values.llc_miss;
+                *p_64 = group->values.llc_misses_delta;
                 break;
         default:
                 return PQOS_RETVAL_PARAM;

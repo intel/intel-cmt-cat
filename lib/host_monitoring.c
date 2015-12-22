@@ -104,12 +104,8 @@
 #define IA32_MSR_FIXED_CTR_CTRL       0x38D
 #define IA32_MSR_PERF_GLOBAL_CTRL     0x38F
 #define IA32_MSR_PMC0                 0x0C1
-#define IA32_MSR_PMC1                 0x0C2
 #define IA32_MSR_PERFEVTSEL0          0x186
-#define IA32_MSR_PERFEVTSEL1          0x187
 
-#define IA32_EVENT_LLC_REF_MASK       0x2EULL
-#define IA32_EVENT_LLC_REF_UMASK      0x4FULL
 #define IA32_EVENT_LLC_MISS_MASK      0x2EULL
 #define IA32_EVENT_LLC_MISS_UMASK     0x41ULL
 
@@ -942,7 +938,7 @@ pqos_core_poll(struct pqos_mon_data *p)
                  * If multiple cores monitored in one group
                  * then we have to accumulate the values in the group.
                  */
-                uint64_t ref = 0, missed = 0;
+                uint64_t missed = 0;
                 unsigned n;
 
                 for (n = 0; n < p->num_cores; n++) {
@@ -954,25 +950,10 @@ pqos_core_poll(struct pqos_mon_data *p)
                                 goto pqos_core_poll__exit;
                         }
                         missed += tmp;
-
-                        ret = msr_read(p->cores[n],
-                                       IA32_MSR_PMC1, &tmp);
-                        if (ret != MACHINE_RETVAL_OK) {
-                                retval = PQOS_RETVAL_ERROR;
-                                goto pqos_core_poll__exit;
-                        }
-                        ref += tmp;
                 }
 
-                pv->llc_ref_delta = ref - pv->llc_ref;
                 pv->llc_misses_delta = missed - pv->llc_misses;
-                pv->llc_ref = ref;
                 pv->llc_misses = missed;
-                if (pv->llc_ref_delta == 0)
-                        pv->llc_miss = 0.0;
-                else
-                        pv->llc_miss = (double) pv->llc_misses_delta /
-                                (double) pv->llc_ref_delta;
         }
 
  pqos_core_poll__exit:
@@ -1006,7 +987,7 @@ ia32_perf_counter_start(const unsigned num_cores,
                 global_ctrl_mask |= (0x3ULL << 32); /**< fixed counters 0&1 */
 
         if (event & PQOS_PERF_EVENT_LLC_MISS)
-                global_ctrl_mask |= 0x3ULL;  /**< programmable counters 0&1 */
+                global_ctrl_mask |= 0x1ULL;     /**< programmable counter 0 */
 
         if (!m_force_mon) {
                 /**
@@ -1024,7 +1005,9 @@ ia32_perf_counter_start(const unsigned num_cores,
                                 return PQOS_RETVAL_ERROR;
                         if (global_inuse & global_ctrl_mask) {
                                 LOG_ERROR("IPC and/or LLC miss performance "
-                                          "counters already in use!\n");
+                                          "counters already in use!\n"
+                                          "Use -r option to start monitoring "
+                                          "anyway.\n");
                                 return PQOS_RETVAL_RESOURCE;
                         }
                 }
@@ -1062,22 +1045,12 @@ ia32_perf_counter_start(const unsigned num_cores,
                         const uint64_t evtsel0_miss = IA32_EVENT_LLC_MISS_MASK |
                                 (IA32_EVENT_LLC_MISS_UMASK << 8) |
                                 (1ULL << 16) | (1ULL << 17) | (1ULL << 22);
-                        const uint64_t evtsel1_ref = IA32_EVENT_LLC_REF_MASK |
-                                (IA32_EVENT_LLC_REF_UMASK << 8) |
-                                (1ULL << 16) | (1ULL << 17) | (1ULL << 22);
 
                         ret = msr_write(cores[i], IA32_MSR_PMC0, 0);
                         if (ret != MACHINE_RETVAL_OK)
                                 break;
-                        ret = msr_write(cores[i], IA32_MSR_PMC1, 0);
-                        if (ret != MACHINE_RETVAL_OK)
-                                break;
                         ret = msr_write(cores[i], IA32_MSR_PERFEVTSEL0,
                                         evtsel0_miss);
-                        if (ret != MACHINE_RETVAL_OK)
-                                break;
-                        ret = msr_write(cores[i], IA32_MSR_PERFEVTSEL1,
-                                        evtsel1_ref);
                         if (ret != MACHINE_RETVAL_OK)
                                 break;
                 }

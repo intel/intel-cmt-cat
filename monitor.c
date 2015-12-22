@@ -1035,11 +1035,13 @@ print_text_row(FILE *fp,
                                      sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
-                fprintf(fp, "\n%3u %8.8s %5.2f %5.2f%s",
+                fprintf(fp, "\n%3u %8.8s %5.2f %6uk%s",
                         mon_data->socket, (char *)mon_data->context,
-                        mon_data->values.ipc, mon_data->values.llc_miss, data);
+                        mon_data->values.ipc,
+                        (unsigned)mon_data->values.llc_misses_delta/1000,
+                        data);
         else
-                fprintf(fp, "\n%6u %6s %6.2f %6s %s",
+                fprintf(fp, "\n%6u %6s %6.2f %8s %s",
                         mon_data->pid, "N/A",
                         mon_data->values.ipc, "N/A", data);
 }
@@ -1091,7 +1093,7 @@ print_xml_row(FILE *fp, char *time,
                         "\t<socket>%u</socket>\n"
                         "\t<core>%s</core>\n"
                         "\t<ipc>%.2f</ipc>\n"
-                        "\t<llc_miss_ratio>%.2f</llc_miss_ratio>\n"
+                        "\t<llc_misses>%llu</llc_misses>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
@@ -1099,7 +1101,7 @@ print_xml_row(FILE *fp, char *time,
                         mon_data->socket,
                         (char *)mon_data->context,
                         mon_data->values.ipc,
-                        mon_data->values.llc_miss,
+                        (unsigned long long)mon_data->values.llc_misses_delta,
                         data,
                         xml_child_close);
         else
@@ -1109,7 +1111,7 @@ print_xml_row(FILE *fp, char *time,
                         "\t<pid>%u</pid>\n"
                         "\t<core>%s</core>\n"
                         "\t<ipc>%.2f</ipc>\n"
-                        "\t<llc_miss_ratio>%s</llc_miss_ratio>\n"
+                        "\t<llc_misses>%s</llc_misses>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
@@ -1163,9 +1165,10 @@ print_csv_row(FILE *fp, char *time,
 
         if (!process_mode())
                 fprintf(fp,
-                        "%s,%u,%s,%.2f,%.2f%s\n",
+                        "%s,%u,%s,%.2f,%llu%s\n",
                         time, mon_data->socket, (char *)mon_data->context,
-                        mon_data->values.ipc, mon_data->values.llc_miss,
+                        mon_data->values.ipc,
+                        (unsigned long long)mon_data->values.llc_misses_delta,
                         data);
         else
                 fprintf(fp,
@@ -1197,9 +1200,9 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (istext) {
                 if (!process_mode())
-                        strncpy(hdr, "SKT     CORE   IPC  MISS", sz_hdr - 1);
+                        strncpy(hdr, "SKT     CORE   IPC  MISSES", sz_hdr - 1);
                 else
-                        strncpy(hdr, "   PID   CORE    IPC   MISS ",
+                        strncpy(hdr, "   PID   CORE    IPC   MISSES ",
                                 sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(hdr, "    LLC[KB]", sz_hdr - strlen(hdr) - 1);
@@ -1211,11 +1214,11 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (iscsv) {
                 if (!process_mode())
-                        strncpy(hdr, "Time,Socket,Core,IPC,"
-                                "LLC Miss Ratio", sz_hdr - 1);
+                        strncpy(hdr, "Time,Socket,Core,IPC,LLC Misses",
+                                sz_hdr - 1);
                 else
-                        strncpy(hdr, "Time,PID,Core,IPC,LLC "
-                                "Miss Ratio", sz_hdr - 1);
+                        strncpy(hdr, "Time,PID,Core,IPC,LLC,LLC Misses",
+                                sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(hdr, ",LLC[KB]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
