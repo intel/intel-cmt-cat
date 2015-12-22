@@ -597,11 +597,15 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                  * Make calls to pqos_mon_start_pid - track PIDs
                  */
                 for (i = 0; i < (unsigned)sel_process_num; i++) {
+                        struct pid_group *pg = &sel_monitor_pid_tab[i];
+
                         /* check if all available events were selected */
-                        if (sel_monitor_pid_tab[i].events == evt_all) {
-                                sel_monitor_pid_tab[i].events = all_pid_evts;
+                        if (pg->events == evt_all) {
+                                pg->events = all_pid_evts;
                                 sel_events_max |= all_pid_evts;
-                        }
+                        } else
+                                if (all_pid_evts & PQOS_PERF_EVENT_IPC)
+                                        pg->events |= PQOS_PERF_EVENT_IPC;
                         ret = pqos_mon_start_pid(sel_monitor_pid_tab[i].pid,
                                                  sel_monitor_pid_tab[i].events,
                                                  NULL,
@@ -1035,8 +1039,9 @@ print_text_row(FILE *fp,
                         mon_data->socket, (char *)mon_data->context,
                         mon_data->values.ipc, mon_data->values.llc_miss, data);
         else
-                fprintf(fp, "\n%6u %6s %6s %6s %s",
-                        mon_data->pid, "N/A", "N/A", "N/A", data);
+                fprintf(fp, "\n%6u %6s %6.2f %6s %s",
+                        mon_data->pid, "N/A",
+                        mon_data->values.ipc, "N/A", data);
 }
 
 /**
@@ -1103,7 +1108,7 @@ print_xml_row(FILE *fp, char *time,
                         "\t<time>%s</time>\n"
                         "\t<pid>%u</pid>\n"
                         "\t<core>%s</core>\n"
-                        "\t<ipc>%s</ipc>\n"
+                        "\t<ipc>%.2f</ipc>\n"
                         "\t<llc_miss_ratio>%s</llc_miss_ratio>\n"
                         "%s"
                         "%s\n",
@@ -1111,7 +1116,7 @@ print_xml_row(FILE *fp, char *time,
                         time,
                         mon_data->pid,
                         "N/A",
-                        "N/A",
+                        mon_data->values.ipc,
                         "N/A",
                         data,
                         xml_child_close);
@@ -1164,8 +1169,9 @@ print_csv_row(FILE *fp, char *time,
                         data);
         else
                 fprintf(fp,
-                        "%s,%u,%s,%s,%s%s\n",
-                        time, mon_data->pid, "N/A", "N/A", "N/A", data);
+                        "%s,%u,%s,%.2f,%s%s\n",
+                        time, mon_data->pid, "N/A",
+                        mon_data->values.ipc, "N/A", data);
 }
 
 /**
@@ -1205,9 +1211,11 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (iscsv) {
                 if (!process_mode())
-                        strncpy(hdr, "Time,Socket,Core,IPC,LLC Miss Ratio", sz_hdr - 1);
+                        strncpy(hdr, "Time,Socket,Core,IPC,"
+                                "LLC Miss Ratio", sz_hdr - 1);
                 else
-                        strncpy(hdr, "Time,PID,Core,IPC,LLC Miss Ratio", sz_hdr - 1);
+                        strncpy(hdr, "Time,PID,Core,IPC,LLC "
+                                "Miss Ratio", sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(hdr, ",LLC[KB]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
