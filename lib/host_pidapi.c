@@ -185,148 +185,6 @@ filter(const struct dirent *dir)
 }
 
 /**
- * @brief This function starts perf pqos event counters
- *
- * Starts perf pqos event counters for a specific event
- *
- * Used to start pqos counters and request file
- * descriptors used to read the counters
- *
- * @param group monitoring structure
- * @param pe supported event structure
- * @param fds array to store fd's
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-start_pqos_counters(const struct pqos_mon_data *group,
-                    struct pid_supported_event *pe,
-                    int **fds)
-{
-        int i, *fd;
-
-        ASSERT(group != NULL);
-        ASSERT(pe != NULL);
-        ASSERT(fds != NULL);
-
-        fd = malloc(sizeof(fd[0])*group->tid_nr);
-        if (fd == NULL)
-                return PQOS_RETVAL_ERROR;
-        /**
-         * For each TID assign fd to read counter
-         */
-        for (i = 0; i < group->tid_nr; i++) {
-                int ret;
-
-                ret = perf_setup_counter(&pe->attrs,
-                                         group->tid_map[i],
-                                         -1, -1, 0, &fd[i]);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Failed to start perf "
-                                  "counters for %s\n", pe->name);
-                        free(fd);
-                        return PQOS_RETVAL_ERROR;
-                }
-        }
-        *fds = fd;
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief This function starts perf event counters
- *
- * Starts perf counters for specified events
- *
- * Used to start counters and request file
- * descriptors used to read the counters
- *
- * @param group monitoring structure
- * @param pe supported event structure
- * @param fds array to store fd's
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-start_perf_counters(const struct pqos_mon_data *group,
-                    struct pid_supported_event *pe,
-                    int **fds)
-{
-        int ret, leader = -1, *fd;
-        struct perf_event_attr attr;
-
-        ASSERT(group != NULL);
-        ASSERT(pe != NULL);
-        ASSERT(fds != NULL);
-
-        memset(&attr, 0, sizeof(attr));
-        attr.disabled = 1;
-        attr.type = PERF_TYPE_HARDWARE;
-
-        /**
-         * Setup counters for selected events
-         */
-        if (pe->event & PQOS_PERF_EVENT_IPC) {
-                fd = malloc(sizeof(fd[0])*2);
-                if (fd == NULL)
-                        return PQOS_RETVAL_ERROR;
-
-                attr.config = PERF_COUNT_HW_CPU_CYCLES;
-                ret = perf_setup_counter(&attr, group->tid_map[0],
-                                         -1, leader, 0, &fd[CYCLES]);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Failed to setup perf "
-                                  "counter for %s\n", pe->name);
-                        free(fd);
-                        return PQOS_RETVAL_ERROR;
-                }
-                /* set group leader */
-                leader = fd[0];
-
-                attr.disabled = 0;
-                attr.config = PERF_COUNT_HW_INSTRUCTIONS;
-                ret = perf_setup_counter(&attr, group->tid_map[0], -1,
-                                         leader, 0, &fd[INSTRUCTIONS]);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Failed to setup perf "
-                                  "counter for %s\n", pe->name);
-                        free(fd);
-                        return PQOS_RETVAL_ERROR;
-                }
-        } else if (pe->event & PQOS_PERF_EVENT_LLC_MISS) {
-                fd = malloc(sizeof(fd[0]));
-                if (fd == NULL)
-                        return PQOS_RETVAL_ERROR;
-
-                attr.config = PERF_COUNT_HW_CACHE_MISSES;
-                ret = perf_setup_counter(&attr, group->tid_map[0],
-                                         -1, leader, 0, &fd[0]);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Failed to setup perf "
-                                  "counter for %s\n", pe->name);
-                        free(fd);
-                        return PQOS_RETVAL_ERROR;
-                }
-                leader = fd[0];
-        }
-        if (leader < 0)
-                return PQOS_RETVAL_ERROR;
-
-        *fds = fd;
-
-        ret = perf_start_counter(leader);
-        if (ret != PQOS_RETVAL_OK) {
-                free(fd);
-                *fds = NULL;
-                return ret;
-        }
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief This function stops perf pqos event counters
  *
  * Stops perf pqos event counters for a specified event
@@ -403,6 +261,151 @@ stop_perf_counters(const enum pqos_mon_event event, int **fds)
                 return PQOS_RETVAL_ERROR;
         free(fd);
         *fds = NULL;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief This function starts perf pqos event counters
+ *
+ * Starts perf pqos event counters for a specific event
+ *
+ * Used to start pqos counters and request file
+ * descriptors used to read the counters
+ *
+ * @param group monitoring structure
+ * @param pe supported event structure
+ * @param fds array to store fd's
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+start_pqos_counters(const struct pqos_mon_data *group,
+                    struct pid_supported_event *pe,
+                    int **fds)
+{
+        int i, *fd;
+
+        ASSERT(group != NULL);
+        ASSERT(pe != NULL);
+        ASSERT(fds != NULL);
+
+        fd = malloc(sizeof(fd[0])*group->tid_nr);
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        /**
+         * For each TID assign fd to read counter
+         */
+        for (i = 0; i < group->tid_nr; i++) {
+                int ret;
+
+                ret = perf_setup_counter(&pe->attrs,
+                                         group->tid_map[i],
+                                         -1, -1, 0, &fd[i]);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to start perf "
+                                  "counters for %s\n", pe->name);
+                        free(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+        *fds = fd;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief This function starts perf event counters
+ *
+ * Starts perf counters for specified events
+ *
+ * Used to start counters and request file
+ * descriptors used to read the counters
+ *
+ * @param group monitoring structure
+ * @param pe supported event structure
+ * @param fds array to store fd's
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+start_perf_counters(const struct pqos_mon_data *group,
+                    struct pid_supported_event *pe,
+                    int **fds)
+{
+        int ret, leader = -1, *fd = NULL;
+        struct perf_event_attr attr;
+
+        ASSERT(group != NULL);
+        ASSERT(pe != NULL);
+        ASSERT(fds != NULL);
+
+        memset(&attr, 0, sizeof(attr));
+        attr.disabled = 1;
+        attr.type = PERF_TYPE_HARDWARE;
+
+        /**
+         * Setup counters for selected events
+         */
+        if (pe->event & PQOS_PERF_EVENT_IPC) {
+                fd = malloc(sizeof(fd[0])*2);
+                if (fd == NULL)
+                        return PQOS_RETVAL_ERROR;
+
+                attr.config = PERF_COUNT_HW_CPU_CYCLES;
+                ret = perf_setup_counter(&attr, group->tid_map[0],
+                                         -1, leader, 0, &fd[CYCLES]);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to setup perf "
+                                  "counter for %s\n", pe->name);
+                        free(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
+                /* set group leader */
+                leader = fd[CYCLES];
+
+                attr.disabled = 0;
+                attr.config = PERF_COUNT_HW_INSTRUCTIONS;
+                ret = perf_setup_counter(&attr, group->tid_map[0], -1,
+                                         leader, 0, &fd[INSTRUCTIONS]);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to setup perf "
+                                  "counter for %s\n", pe->name);
+                        perf_shutdown_counter(leader);
+                        free(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
+        } else if (pe->event & PQOS_PERF_EVENT_LLC_MISS) {
+                fd = malloc(sizeof(fd[0]));
+                if (fd == NULL)
+                        return PQOS_RETVAL_ERROR;
+
+                attr.config = PERF_COUNT_HW_CACHE_MISSES;
+                ret = perf_setup_counter(&attr, group->tid_map[0],
+                                         -1, leader, 0, &fd[0]);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to setup perf "
+                                  "counter for %s\n", pe->name);
+                        free(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
+                leader = *fd;
+        }
+        /* if no group leader set then return error */
+        if (leader < 0) {
+                if (fd != NULL)
+                        free(fd);
+                return PQOS_RETVAL_ERROR;
+        }
+        *fds = fd;
+
+        ret = perf_start_counter(leader);
+        if (ret != PQOS_RETVAL_OK) {
+                stop_perf_counters(pe->event, fds);
+                return ret;
+        }
 
         return PQOS_RETVAL_OK;
 }
