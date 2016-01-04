@@ -62,74 +62,99 @@ Chapter 17.14 and 17.15.
 .SH OPTIONS
 pqos options are as follow:
 .TP
-.B \-h
+.B \-h, \-\-help
 show help
 .TP
-.B \-v
+.B \-v, \-\-verbose
 verbose mode
 .TP
-.B \-V
+.B \-V, \-\-super\-verbose
 super-verbose mode
 .TP
-.B \-H
-list supported allocation profiles
+.B \-l FILE, \-\-log\-file=FILE
+log messages into selected log FILE
 .TP
-.B \-f config_file_name
-load parameters from selected configuration file
+.B \-s, \-\-show
+show the current allocation and monitoring configuration
 .TP
-.B \-l log_file_name
-log messages into selected log file
+.B \-S cdp-on|cdp-off|cdp-any, \-\-set cdp-on|cdp-off|cdp-any
+cdp-on	sets CDP on
+.br
+cdp-off	sets CDP off
+.br
+cdp-any	keep current CDP setting (default)
 .TP
-.B \-e allocation_type:class_num=class_definition;...
-define the allocation classes, for example: \-e llc:0=0xffff;llc:1=0x00ff;
+.B \-f FILE, \-\-config\-file=FILE
+load commands from selected configuration FILE
 .TP
-.B \-c allocation_type:profile_name;...
-select a profile of predefined allocation classes, see \-H to list available
-profiles
+.B \-e CLASSDEF, \-\-alloc\-class=CLASSDEF
+define the allocation classes. CLASSDEF format is "TYPE:ID=DEFINITION;...".
+.br
+For CAT, TYPE is "llc", ID is a CLOS number and DEFINITION is a bitmask.
+.br
+For example: "\-e llc:0=0xffff;llc:1=0x00ff;".
 .TP
-.B \-a allocation_type:class_num=core_list;...
-associate the cores with allocation classes, for example \-a
-llc:0=0,2,4,6-10;llc:1=1
+.B \-a CLASS2CORE, \-\-alloc\-assoc=CLASS2CORE
+associate allocation classes with cores. CLASS2CORE format is "TYPE:ID=CORE_LIST;...".
+.br
+For CAT, TYPE is "llc" and ID is a class number. CORE_LIST is comma or dash separated list of cores.
+.br
+For example "\-a llc:0=0,2,4,6-10;llc:1=1;" associates cores 0, 2, 4, 6, 7, 8, 9, 10 with CAT class 0 and core 1 with class 1. 
 .TP
-.B \-r
-use all RMID's and cores in the system
-.TP
-.B \-R
+.B \-R, \-\-alloc\-reset
 reset the CAT configuration
 .TP
-.B \-s
-show the current cache allocation configuration
-.TP
-.B \-S cdp-on|cdp-off|cdp-any
-.TS
-l l.
-cdp-on	sets CDP on
-cdp-off	sets CDP off
-cdp-any	keep current CDP setting (default)
-.TE
-.TP
-.B \-m event_type:core_list
-select the cores and events for monitoring, for example -m all:0,2,4-10;llc:1,3;mbr:11-12
+.B \-m EVTCORES, \-\-mon\-core=EVTCORES
+select the cores and events for monitoring, EVTCORES format is "EVENT:CORE_LIST". Valid EVENT settings are:
 .br
-group core statistics together by enclosing the core list in square brackets, for example -m llc:[0-3];all:[4,5,6];mbr:[0-3],7,8
+\- "llc" for CMT (LLC occupancy)
+.br
+\- "mbr" for MBR (remote memory bandwidth)
+.br
+\- "mbl" for MBL (local memory bandwidth)
+.br
+\- "all" or ""  for all detected event types
+.br
+CORE_LIST is comma or dash separated list of cores.
+.br
+.br
+Example "-m all:0,2,4-10;llc:1,3;mbr:11-12".
+.br
+.br
+Core statistics can be grouped by enclosing the core list in square brackets.
+.br
+Example "-m llc:[0-3];all:[4,5,6];mbr:[0-3],7,8".
 .TP
-.B \-o output_file
-select output file to store monitored data in, the default is stdout
+.B \-p EVTPIDS, \-\-mon-pid=EVTPIDS
+select the process ids and events to monitor, EVTPIDS format is "EVENT:PID_LIST". See \-m option for valid EVENT settings. PID_LIST is comma separated list of process ids.
+.br
+Examples "-p llc:22,25673" or "-p all:892,4588-4592".
+.br
+.B Note: it is not possible to track both processes and cores at the same time.
 .TP
-.B \-u output_type
-select the output format type for monitored data. Allowed options are "text" (default), "xml" and "csv".
+.B \-T, \-\-mon-top
+enable top like monitoring output sorted by highest LLC occupancy.
 .TP
-.B \-i interval
-define monitoring sampling interval in 100ms intervals, 1=100ms, default 10=10x100ms=1s
+.B \-o FILE, \-\-mon-file FILE
+select output FILE to store monitored data in, the default is 'stdout'.
 .TP
-.B \-T
-enable top like monitoring output
+.B \-u TYPE, \-\-mon-file-type=TYPE
+select the output format TYPE for monitored data. Supported TYPE settings are: "text" (default), "xml" and "csv".
 .TP
-.B \-t time_in_sec
-define monitoring time in seconds, use 'inf' or 'infinite' for infinite loop monitoring loop
+.B \-i INTERVAL, \-\-mon-interval=INTERVAL
+define monitoring sampling INTERVAL in 100ms units, 1=100ms, default 10=10x100ms=1s.
 .TP
-.B \-p event_type:pid_list
-select the process ids and events to monitor, for example: -p llc:22,25673 or -p all:892,4588-4592 - note it is not possible to track both processes and cores
+.B \-t SECONDS, \-\-mon-time=SECONDS
+define monitoring time in seconds, use 'inf' or 'infinite' for infinite monitoring. Use CTRL+C to stop monitoring at any time.
+.TP
+.B \-r, \-\-mon\-reset
+reset monitoring and use all RMID's and cores in the system
+.TP
+.B \-H, \-\-profile\-list
+list supported allocation profiles
+.TP
+.B \-c PROFILE, \-\-profile\-set=PROFILE
+select a PROFILE from predefined allocation classes, use \-H to list available profiles.
 .SH NOTES
 .PP
 CMT, MBM and CAT are configured using Model Specific Registers (MSRs)
