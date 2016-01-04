@@ -43,6 +43,7 @@
 #include <sys/types.h>                                  /**< open() */
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <getopt.h>                                     /**< getopt_long() */
 
 #include "pqos.h"
 
@@ -346,6 +347,7 @@ parse_config_file(const char *fname)
                 { "show-alloc:",            selfn_show_allocation },  /**< -s */
                 { "log-file:",              selfn_log_file },         /**< -l */
                 { "verbose-mode:",          selfn_verbose_mode },     /**< -v */
+                { "super-verbose-mode:",          selfn_verbose_mode },     /**< -V */
                 { "alloc-class-set:",       selfn_allocation_class }, /**< -e */
                 { "alloc-assoc-set:",       selfn_allocation_assoc }, /**< -a */
                 { "alloc-class-select:",    selfn_allocation_select },/**< -c */
@@ -421,71 +423,112 @@ parse_config_file(const char *fname)
         fclose(fp);
 }
 
-const char *m_cmd_name = "pqos";                          /**< command name */
+static const char *m_cmd_name = "pqos";                     /**< command name */
+static const char help_printf_short[] =
+        "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
+        "          [-l FILE] [--log-file=FILE] [-S CONFIG] [--set CONFIG]\n"
+        "       %s [-s] [--show]\n"
+        "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p EVTPIDS] "
+        "[--mon-pid=EVTPIDS]\n"
+        "          [-t SECONDS] [--mon-time=SECONDS]\n"
+        "          [-i N] [--mon-interval=N]\n"
+        "          [-T] [--mon-top]\n"
+        "          [-o FILE] [--mon-file=FILE]\n"
+        "          [-u TYPE] [--mon-file-type=TYPE]\n"
+        "          [-r] [--mon-reset]\n"
+        "       %s [-e CLASSDEF] [--alloc-class=CLASSDEF]\n"
+        "          [-a CLASS2CORE] [--alloc-assoc=CLASS2CORE]\n"
+        "       %s [-R] [--alloc-reset]\n"
+        "       %s [-H] [--profile-list] | [-c PROFILE] "
+        "[--profile-set=PROFILE]\n"
+        "       %s [-f FILE] [--config-file=FILE]\n";
+
+static const char help_printf_long[] =
+        "Description:\n"
+        "  -h, --help                  help\n"
+        "  -v, --verbose               verbose mode\n"
+        "  -V, --super-verbose         super-verbose mode\n"
+        "  -s, --show                  show current PQoS configuration\n"
+        "  -f FILE, --config-file=FILE load commands from selected file\n"
+        "  -l FILE, --log-file=FILE    log messages into selected file\n"
+        "  -S CONFIG, --set=CONFIG     set configuration parameter.\n"
+        "          CONFIG can be: cdp-on, cdp-off or cdp-any (default).\n"
+        "          NOTE: change of CDP from ON to OFF, or from OFF to ON\n"
+        "                results in allocation (CAT) reset.\n"
+        "  -e CLASSDEF, --alloc-class=CLASSDEF\n"
+        "          define allocation classes.\n"
+        "          CLASSDEF format is 'TYPE:ID=DEFINITION;'.\n"
+        "          Example 'llc:0=0xffff;llc:1=0x00ff;'.\n"
+        "  -a CLASS2CORE, --alloc-assoc=CLASS2CORE\n"
+        "          associate cores with an allocation class,\n"
+        "          CLASS2CORE format is 'TYPE:ID=CORE_LIST'.\n"
+        "          Example 'llc:0=0,2,4,6-10;llc:1=1'\n"
+        "  -R, --alloc-reset           reset allocation (CAT) configuration\n"
+        "  -m EVTCORES, --mon-core=EVTCORES\n"
+        "          select cores and events for monitoring,\n"
+        "          EVTCORES format is 'EVENT:CORE_LIST'.\n"
+        "          Example: \"all:0,2,4-10;llc:1,3;mbr:11-12\".\n"
+        "          Cores can be grouped by enclosing them in square brackets,\n"
+        "          example: \"llc:[0-3];all:[4,5,6];mbr:[0-3],7,8\".\n"
+        "  -p EVTPIDS, --mon-pid=EVTPIDS\n"
+        "          select process ids and events to monitor.\n"
+        "          EVTPIDS format is 'EVENT:PID_LIST'.\n"
+        "          Example 'llc:22,25673' or 'all:892,4588-4592'.\n"
+        "          Note: processes and cores cannot be monitored together.\n"
+        "  -o FILE, --mon-file=FILE    output monitored data in a FILE\n"
+        "  -u TYPE, --mpn-file-type=TYPE\n"
+        "          select output file format type for monitored data.\n"
+        "          TYPE is one of: text (default), xml or csv.\n"
+        "  -i N, --mon-interval=N      set sampling interval to Nx100ms,\n"
+        "                              default 10 = 10 x 100ms = 1s\n"
+        "  -T, --mon-top               top like monitoring output\n"
+        "  -t SECONDS, --mon-time=SECONDS\n"
+        "          set monitoring time in seconds. Use 'inf' or 'infinite'\n"
+        "          for infinite monitoring. CTRL+C stops monitoring.\n"
+        "  -r, --mon-reset             monitoring reset, claim all RMID's\n"
+        "  -H, --profile-list          list supported allocation profiles\n"
+        "  -c PROFILE, --profile-set=PROFILE\n"
+        "          select a PROFILE of predefined allocation classes.\n"
+        "          Use -H to list available profiles.\n";
 
 /**
  * @brief Displays help information
  *
+ * @param is_long print long help version or a short one
+ *
  */
-static void print_help(void)
+static void print_help(const int is_long)
 {
-        printf("Usage: %s [-h] [-H]\n"
-               "       %s [-f <config_file_name>]\n"
-               "       %s [-l <log_file_name>]\n"
-               "       %s [-m <event_type>:<core_list> | -p <event_type>:"
-               "<pid_list>]\n"
-               "          [-t <time in sec>]\n"
-               "          [-i <interval in 100ms>] [-T]\n"
-               "          [-o <output_file>] [-u <output_type>] [-r]\n"
-               "       %s [-e <allocation_type>:<class_num>=<class_definition>;"
-               "...]\n"
-               "          [-c <allocation_type>:<profile_name>;...]\n"
-               "          [-a <allocation_type>:<class_num>=<core_list>;"
-               "...]\n"
-               "       %s [-R]\n"
-               "       %s [-S cdp-on|cdp-off|cdp-any]\n"
-               "       %s [-s]\n"
-               "Notes:\n"
-               "\t-h\thelp\n"
-               "\t-v\tverbose mode\n"
-               "\t-V\tsuper-verbose mode\n"
-               "\t-H\tlist of supported allocation profiles\n"
-               "\t-f\tloads parameters from selected configuration file\n"
-               "\t-l\tlogs messages into selected log file\n"
-               "\t-e\tdefine allocation classes, example: \"llc:0=0xffff;"
-               "llc:1=0x00ff;\"\n"
-               "\t-c\tselect a profile of predefined allocation classes, "
-               "see -H to list available profiles\n"
-               "\t-a\tassociate cores with allocation classes, example: "
-               "\"llc:0=0,2,4,6-10;llc:1=1\"\n"
-               "\t-r\tuses all RMID's and cores in the system\n"
-               "\t-R\tresets CAT configuration\n"
-               "\t-s\tshow current cache allocation configuration\n"
-               "\t-S\tset a configuration setting:\n"
-               "\t\tcdp-on\tsets CDP on\n"
-               "\t\tcdp-off\tsets CDP off\n"
-               "\t\tcdp-any\tkeep current CDP setting (default)\n"
-               "\t\tNOTE: change of CDP on/off setting results in CAT reset.\n"
-               "\t-m\tselect cores and events for monitoring, example: "
-               "\"all:0,2,4-10;llc:1,3;mbr:11-12\"\n"
-               "\t\tNOTE: group core statistics together by enclosing the core "
-               "list in\n\t\tsquare brackets, example: "
-               "\"llc:[0-3];all:[4,5,6];mbr:[0-3],7,8\"\n"
-               "\t-o\tselect output file to store monitored data in. "
-               "stdout by default.\n"
-               "\t-u\tselect output format type for monitored data. "
-               "\"text\" (default), \"xml\" and \"csv\" are the options.\n"
-               "\t-i\tdefine monitoring sampling interval, 1=100ms, "
-               "default 10=10x100ms=1s\n"
-               "\t-T\ttop like monitoring output\n"
-               "\t-t\tdefine monitoring time (use 'inf' or 'infinite' for "
-               "infinite loop monitoring loop)\n"
-               "\t-p\tselect process ids and events to monitor, "
-	       "example: \"llc:22,25673\" or \"all:892,4588-4592\"\n\t\tNote: "
-	       "it is not possible to track both processes and cores\n",
-               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
+        printf(help_printf_short,
+               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
                m_cmd_name, m_cmd_name, m_cmd_name);
+        if (is_long)
+                printf(help_printf_long);
 }
+
+static struct option long_cmd_opts[] = {
+        {"help",          no_argument,       0, 'h'},
+        {"log-file",      required_argument, 0, 'l'},
+        {"set",           required_argument, 0, 'S'},
+        {"config-file",   required_argument, 0, 'f'},
+        {"show",          no_argument,       0, 's'},
+        {"profile-list",  no_argument,       0, 'H'},
+        {"profile-set",   required_argument, 0, 'c'},
+        {"mon-interval",  required_argument, 0, 'i'},
+        {"mon-pid",       required_argument, 0, 'p'},
+        {"mon-core",      required_argument, 0, 'm'},
+        {"mon-time",      required_argument, 0, 't'},
+        {"mon-top",       no_argument,       0, 'T'},
+        {"mon-file",      required_argument, 0, 'o'},
+        {"mon-file-type", required_argument, 0, 'u'},
+        {"mon-reset",     no_argument,       0, 'r'},
+        {"alloc-class",   required_argument, 0, 'e'},
+        {"alloc-reset",   no_argument,       0, 'R'},
+        {"alloc-assoc",   required_argument, 0, 'a'},
+        {"verbose",       no_argument,       0, 'v'},
+        {"super-verbose", no_argument,       0, 'V'},
+        {0, 0, 0, 0} /* end */
+};
 
 int main(int argc, char **argv)
 {
@@ -495,15 +538,17 @@ int main(int argc, char **argv)
         const struct pqos_capability *cap_mon = NULL, *cap_l3ca = NULL;
         unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
         int cmd, ret, exit_val = EXIT_SUCCESS;
+        int opt_index = 0;
 
         m_cmd_name = argv[0];
         print_warning();
 
-        while ((cmd = getopt(argc, argv, "Hhf:i:m:Tt:l:o:u:e:c:a:p:S:srvVR"))
-               != -1) {
+        while ((cmd = getopt_long(argc, argv,
+                                  "Hhf:i:m:Tt:l:o:u:e:c:a:p:S:srvVR",
+                                  long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
-                        print_help();
+                        print_help(1);
                         return EXIT_SUCCESS;
                 case 'H':
                         profile_l3ca_list(stdout);
@@ -574,7 +619,7 @@ int main(int argc, char **argv)
                         return EXIT_FAILURE;
                         break;
                 case '?':
-                        print_help();
+                        print_help(0);
                         return EXIT_SUCCESS;
                         break;
                 }
