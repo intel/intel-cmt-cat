@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -344,22 +344,22 @@ parse_config_file(const char *fname)
                 const char *option;
                 void (*fn)(const char *);
         } optab[] = {
-                { "show-alloc:",            selfn_show_allocation },  /**< -s */
-                { "log-file:",              selfn_log_file },         /**< -l */
-                { "verbose-mode:",          selfn_verbose_mode },     /**< -v */
-                { "super-verbose-mode:",          selfn_verbose_mode },     /**< -V */
-                { "alloc-class-set:",       selfn_allocation_class }, /**< -e */
-                { "alloc-assoc-set:",       selfn_allocation_assoc }, /**< -a */
-                { "alloc-class-select:",    selfn_allocation_select },/**< -c */
-                { "monitor-pids:",          selfn_monitor_pids },     /**< -p */
-                { "monitor-cores:",         selfn_monitor_cores },    /**< -m */
-                { "monitor-time:",          selfn_monitor_time },     /**< -t */
-                { "monitor-interval:",      selfn_monitor_interval }, /**< -i */
-                { "monitor-file:",          selfn_monitor_file },     /**< -o */
-                { "monitor-file-type:",     selfn_monitor_file_type },/**< -u */
-                { "monitor-top-like:",      selfn_monitor_top_like }, /**< -T */
-                { "set-config:",            selfn_set_config },       /**< -S */
-                { "reset-cat:",             selfn_reset_cat },        /**< -R */
+                {"show-alloc:",         selfn_show_allocation },   /**< -s */
+                {"log-file:",           selfn_log_file },          /**< -l */
+                {"verbose-mode:",       selfn_verbose_mode },      /**< -v */
+                {"super-verbose-mode:", selfn_super_verbose_mode },/**< -V */
+                {"alloc-class-set:",    selfn_allocation_class },  /**< -e */
+                {"alloc-assoc-set:",    selfn_allocation_assoc },  /**< -a */
+                {"alloc-class-select:", selfn_allocation_select }, /**< -c */
+                {"monitor-pids:",       selfn_monitor_pids },      /**< -p */
+                {"monitor-cores:",      selfn_monitor_cores },     /**< -m */
+                {"monitor-time:",       selfn_monitor_time },      /**< -t */
+                {"monitor-interval:",   selfn_monitor_interval },  /**< -i */
+                {"monitor-file:",       selfn_monitor_file },      /**< -o */
+                {"monitor-file-type:",  selfn_monitor_file_type }, /**< -u */
+                {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
+                {"set-config:",         selfn_set_config },        /**< -S */
+                {"reset-cat:",          selfn_reset_cat },         /**< -R */
         };
         FILE *fp = NULL;
         char cb[256];
@@ -445,7 +445,7 @@ static const char help_printf_short[] =
 
 static const char help_printf_long[] =
         "Description:\n"
-        "  -h, --help                  help\n"
+        "  -h, --help                  help page\n"
         "  -v, --verbose               verbose mode\n"
         "  -V, --super-verbose         super-verbose mode\n"
         "  -s, --show                  show current PQoS configuration\n"
@@ -460,12 +460,12 @@ static const char help_printf_long[] =
         "          CLASSDEF format is 'TYPE:ID=DEFINITION;'.\n"
         "          Example 'llc:0=0xffff;llc:1=0x00ff;'.\n"
         "  -a CLASS2CORE, --alloc-assoc=CLASS2CORE\n"
-        "          associate cores with an allocation class,\n"
+        "          associate cores with an allocation class.\n"
         "          CLASS2CORE format is 'TYPE:ID=CORE_LIST'.\n"
-        "          Example 'llc:0=0,2,4,6-10;llc:1=1'\n"
+        "          Example 'llc:0=0,2,4,6-10;llc:1=1'.\n"
         "  -R, --alloc-reset           reset allocation (CAT) configuration\n"
         "  -m EVTCORES, --mon-core=EVTCORES\n"
-        "          select cores and events for monitoring,\n"
+        "          select cores and events for monitoring.\n"
         "          EVTCORES format is 'EVENT:CORE_LIST'.\n"
         "          Example: \"all:0,2,4-10;llc:1,3;mbr:11-12\".\n"
         "          Cores can be grouped by enclosing them in square brackets,\n"
@@ -476,11 +476,11 @@ static const char help_printf_long[] =
         "          Example 'llc:22,25673' or 'all:892,4588-4592'.\n"
         "          Note: processes and cores cannot be monitored together.\n"
         "  -o FILE, --mon-file=FILE    output monitored data in a FILE\n"
-        "  -u TYPE, --mpn-file-type=TYPE\n"
+        "  -u TYPE, --mon-file-type=TYPE\n"
         "          select output file format type for monitored data.\n"
         "          TYPE is one of: text (default), xml or csv.\n"
         "  -i N, --mon-interval=N      set sampling interval to Nx100ms,\n"
-        "                              default 10 = 10 x 100ms = 1s\n"
+        "                              default 10 = 10 x 100ms = 1s.\n"
         "  -T, --mon-top               top like monitoring output\n"
         "  -t SECONDS, --mon-time=SECONDS\n"
         "          set monitoring time in seconds. Use 'inf' or 'infinite'\n"
