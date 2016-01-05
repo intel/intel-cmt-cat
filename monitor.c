@@ -603,9 +603,12 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         if (pg->events == evt_all) {
                                 pg->events = all_pid_evts;
                                 sel_events_max |= all_pid_evts;
-                        } else
+                        } else {
                                 if (all_pid_evts & PQOS_PERF_EVENT_IPC)
                                         pg->events |= PQOS_PERF_EVENT_IPC;
+                                if (all_pid_evts & PQOS_PERF_EVENT_LLC_MISS)
+                                        pg->events |= PQOS_PERF_EVENT_LLC_MISS;
+                        }
                         ret = pqos_mon_start_pid(sel_monitor_pid_tab[i].pid,
                                                  sel_monitor_pid_tab[i].events,
                                                  NULL,
