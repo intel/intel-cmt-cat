@@ -71,6 +71,7 @@ extern "C" {
 #define PQOS_RETVAL_RESOURCE     3      /**< resource error */
 #define PQOS_RETVAL_INIT         4      /**< initialization error */
 #define PQOS_RETVAL_TRANSPORT    5      /**< transport error */
+#define PQOS_RETVAL_PERF_CTR     6      /**< performance counter error */
 
 /*
  * =======================================

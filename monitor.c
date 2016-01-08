@@ -586,6 +586,9 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                          * attempt to use the same core id.
                          */
                         if (ret != PQOS_RETVAL_OK) {
+                                if (ret == PQOS_RETVAL_PERF_CTR)
+                                        printf("Use -r option to start "
+                                               "monitoring anyway.\n");
                                 printf("Monitoring start error on core(s) "
                                        "%s, status %d\n",
                                        cg->desc, ret);

@@ -1005,10 +1005,8 @@ ia32_perf_counter_start(const unsigned num_cores,
                                 return PQOS_RETVAL_ERROR;
                         if (global_inuse & global_ctrl_mask) {
                                 LOG_ERROR("IPC and/or LLC miss performance "
-                                          "counters already in use!\n"
-                                          "Use -r option to start monitoring "
-                                          "anyway.\n");
-                                return PQOS_RETVAL_RESOURCE;
+                                          "counters already in use!\n");
+                                return PQOS_RETVAL_PERF_CTR;
                         }
                 }
         }
