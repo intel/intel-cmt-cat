@@ -241,9 +241,14 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                  const struct pqos_capability const *cap_mon)
 {
 	unsigned i;
+        const enum pqos_mon_event perf_events =
+                PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS;
 
-	for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
+        for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
                 sel_events_max |= (cap_mon->u.mon->events[i].type);
+
+        /* Remove perf events IPC and LLC MISSES */
+        sel_events_max &= ~perf_events;
         if (sel_monitor_num == 0 && sel_process_num == 0) {
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore = cpu_info->cores[i].lcore;
