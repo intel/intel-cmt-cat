@@ -76,7 +76,7 @@ perf_setup_counter(struct perf_event_attr *attr,
 
         fd = perf_event_open(attr, pid, cpu, group_fd, flags);
         if (fd < 0) {
-                LOG_ERROR("Failed to open perf event!");
+                LOG_ERROR("Failed to open perf event!\n");
                 return PQOS_RETVAL_ERROR;
         }
         *counter_fd = fd;
@@ -94,7 +94,7 @@ perf_shutdown_counter(int counter_fd)
 
         ret = close(counter_fd);
         if (ret < 0) {
-                LOG_ERROR("Failed to shutdown perf counter");
+                LOG_ERROR("Failed to shutdown perf counter\n");
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -111,7 +111,7 @@ perf_start_counter(int counter_fd)
 
         ret = ioctl(counter_fd, PERF_EVENT_IOC_ENABLE);
         if (ret < 0) {
-                LOG_ERROR("Failed to start perf counter!");
+                LOG_ERROR("Failed to start perf counter!\n");
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -128,7 +128,7 @@ perf_stop_counter(int counter_fd)
 
         ret = ioctl(counter_fd, PERF_EVENT_IOC_DISABLE);
         if (ret < 0) {
-                LOG_ERROR("Failed to stop perf counter!");
+                LOG_ERROR("Failed to stop perf counter!\n");
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -145,7 +145,7 @@ perf_read_counter(int counter_fd, uint64_t *value)
 
         res = read(counter_fd, value, sizeof(*value));
         if (res != sizeof(uint64_t)) {
-                LOG_ERROR("Failed to read perf counter!");
+                LOG_ERROR("Failed to read perf counter!\n");
                 return PQOS_RETVAL_ERROR;
         }
 
