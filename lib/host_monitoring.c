@@ -94,7 +94,7 @@
         (PQOS_MSR_L3CA_MASK_END-PQOS_MSR_L3CA_MASK_START+1)
 
 /**
- * MSR's to read instructions retired, unhlated cycles,
+ * MSR's to read instructions retired, unhalted cycles,
  * LLC references and LLC misses.
  * These MSR's are needed to calculate IPC (instructions per clock) and
  * LLC miss ratio.
@@ -852,39 +852,65 @@ pqos_core_poll(struct pqos_mon_data *p)
 {
         struct pqos_event_values *pv = &p->values;
         int retval = PQOS_RETVAL_OK;
+        unsigned i;
 
         if (p->event & PQOS_MON_EVENT_L3_OCCUP) {
-                int ret = mon_read(p->cores[0], p->rmid,
-                                   get_event_id(PQOS_MON_EVENT_L3_OCCUP),
-                                   &pv->llc);
+                uint64_t total = 0;
 
-                if (ret != PQOS_RETVAL_OK) {
-                        retval = PQOS_RETVAL_ERROR;
-                        goto pqos_core_poll__exit;
+                for (i = 0; i < p->num_poll_ctx; i++) {
+                        uint64_t tmp = 0;
+                        int ret;
+
+                        ret = mon_read(p->poll_ctx[i].lcore,
+                                       p->poll_ctx[i].rmid,
+                                       get_event_id(PQOS_MON_EVENT_L3_OCCUP),
+                                       &tmp);
+                        if (ret != PQOS_RETVAL_OK) {
+                                retval = PQOS_RETVAL_ERROR;
+                                goto pqos_core_poll__exit;
+                        }
+                        total += tmp;
                 }
+                pv->llc = total;
         }
         if (p->event & (PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t old_value = pv->mbm_local;
-                int ret = mon_read(p->cores[0], p->rmid,
-                                   get_event_id(PQOS_MON_EVENT_LMEM_BW),
-                                   &pv->mbm_local);
+                uint64_t total = 0, old_value = pv->mbm_local;
 
-                if (ret != PQOS_RETVAL_OK) {
-                        retval = PQOS_RETVAL_ERROR;
-                        goto pqos_core_poll__exit;
+                for (i = 0; i < p->num_poll_ctx; i++) {
+                        uint64_t tmp = 0;
+                        int ret;
+
+                        ret = mon_read(p->poll_ctx[i].lcore,
+                                       p->poll_ctx[i].rmid,
+                                       get_event_id(PQOS_MON_EVENT_LMEM_BW),
+                                       &tmp);
+                        if (ret != PQOS_RETVAL_OK) {
+                                retval = PQOS_RETVAL_ERROR;
+                                goto pqos_core_poll__exit;
+                        }
+                        total += tmp;
                 }
+                pv->mbm_local = total;
                 pv->mbm_local_delta = get_delta(old_value, pv->mbm_local);
         }
         if (p->event & (PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t old_value = pv->mbm_total;
-                int ret = mon_read(p->cores[0], p->rmid,
-                                   get_event_id(PQOS_MON_EVENT_TMEM_BW),
-                                   &pv->mbm_total);
+                uint64_t total = 0, old_value = pv->mbm_total;
 
-                if (ret != PQOS_RETVAL_OK) {
-                        retval = PQOS_RETVAL_ERROR;
-                        goto pqos_core_poll__exit;
+                for (i = 0; i < p->num_poll_ctx; i++) {
+                        uint64_t tmp = 0;
+                        int ret;
+
+                        ret = mon_read(p->poll_ctx[i].lcore,
+                                       p->poll_ctx[i].rmid,
+                                       get_event_id(PQOS_MON_EVENT_TMEM_BW),
+                                       &tmp);
+                        if (ret != PQOS_RETVAL_OK) {
+                                retval = PQOS_RETVAL_ERROR;
+                                goto pqos_core_poll__exit;
+                        }
+                        total += tmp;
                 }
+                pv->mbm_total = total;
                 pv->mbm_total_delta = get_delta(old_value, pv->mbm_total);
         }
         if (p->event & PQOS_MON_EVENT_RMEM_BW) {
@@ -961,7 +987,7 @@ pqos_core_poll(struct pqos_mon_data *p)
 }
 
 /**
- * @brief Sets up IA32 performance counters for IPC and LL3 miss ratio events
+ * @brief Sets up IA32 performance counters for IPC and LLC miss ratio events
  *
  * @param num_cores number of cores in \a cores table
  * @param cores table with core id's
@@ -1104,13 +1130,17 @@ pqos_mon_start(const unsigned num_cores,
                void *context,
                struct pqos_mon_data *group)
 {
-        unsigned cluster = 0, socket = 0;
+        unsigned core2cluster[num_cores];
+        struct pqos_mon_poll_ctx ctxs[num_cores];
+        unsigned num_ctxs = 0;
         unsigned i = 0;
         int ret = PQOS_RETVAL_OK;
-        pqos_rmid_t rmid = 0;
+        int retval = PQOS_RETVAL_OK;
 
         if (group == NULL || cores == NULL || num_cores == 0)
                 return PQOS_RETVAL_PARAM;
+
+        memset(group, 0, sizeof(*group));
 
         _pqos_api_lock();
 
@@ -1121,77 +1151,6 @@ pqos_mon_start(const unsigned num_cores,
         }
 
         ASSERT(m_cpu != NULL);
-
-        /**
-         * Check if all requested cores are valid
-         * and not used by other monitoring processes.
-         */
-        for (i = 0; i < num_cores; i++) {
-                unsigned lcore = cores[i];
-
-                ret = pqos_cpu_check_core(m_cpu, lcore);
-                if (ret != PQOS_RETVAL_OK) {
-                        _pqos_api_unlock();
-                        return PQOS_RETVAL_PARAM;
-                }
-                if (m_core_map[lcore].unavailable) {
-                        _pqos_api_unlock();
-                        return PQOS_RETVAL_RESOURCE;
-                }
-        }
-
-        if (num_cores > 1) {
-                /**
-                 * Checks if requested cores belong
-                 * to the same cluster
-                 */
-                unsigned cluster_0 = 0, cluster_i = 0;
-
-                for (i = 0; i < num_cores; i++) {
-                        ret = pqos_cpu_get_clusterid(m_cpu, cores[i],
-                                                     (i == 0) ?
-                                                     &cluster_0 : &cluster_i);
-                        if (ret != PQOS_RETVAL_OK) {
-                                _pqos_api_unlock();
-                                return PQOS_RETVAL_PARAM;
-                        }
-                        if (i == 0)
-                                continue;
-
-                        if (cluster_i != cluster_0) {
-                                /**
-                                 * Restrict usage to cores from a single cluster
-                                 */
-                                _pqos_api_unlock();
-                                return PQOS_RETVAL_PARAM;
-                        }
-                }
-        }
-
-        ret = pqos_cpu_get_clusterid(m_cpu, cores[0], &cluster);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_PARAM;
-        }
-
-        ret = pqos_cpu_get_socketid(m_cpu, cores[0], &socket);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_PARAM;
-        }
-
-        for (i = 0; i < num_cores; i++) {
-                /**
-                 * Check if any of requested cores is already subject to monitoring
-                 * within this process
-                 */
-                unsigned lcore = cores[i];
-
-                if (m_core_map[lcore].grp != NULL) {
-                        _pqos_api_unlock();
-                        return PQOS_RETVAL_RESOURCE;
-                }
-        }
 
         /**
          * Validate event parameter
@@ -1229,28 +1188,90 @@ pqos_mon_start(const unsigned num_cores,
         }
 
         /**
-         * Fill in the monitoring group structure
+         * Check if all requested cores are valid
+         * and not used by other monitoring processes.
+         *
+         * Check if any of requested cores is already subject to monitoring
+         * within this process.
+         *
+         * Initialize poll context table:
+         * - get core cluster
+         * - allocate RMID
          */
-        memset(group, 0, sizeof(*group));
-        group->cores = (unsigned *) malloc(sizeof(group->cores[0]) * num_cores);
-        if (group->cores == NULL) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_RESOURCE;
+        for (i = 0; i < num_cores; i++) {
+                const unsigned lcore = cores[i];
+                unsigned j, cluster = 0;
+
+                ret = pqos_cpu_check_core(m_cpu, lcore);
+                if (ret != PQOS_RETVAL_OK) {
+                        retval = PQOS_RETVAL_PARAM;
+                        goto pqos_mon_start_error1;
+                }
+
+                if (m_core_map[lcore].unavailable) {
+                        retval = PQOS_RETVAL_RESOURCE;
+                        goto pqos_mon_start_error1;
+                }
+
+                if (m_core_map[lcore].grp != NULL) {
+                        retval = PQOS_RETVAL_RESOURCE;
+                        goto pqos_mon_start_error1;
+                }
+
+                ret = pqos_cpu_get_clusterid(m_cpu, lcore, &cluster);
+                if (ret != PQOS_RETVAL_OK) {
+                        retval = PQOS_RETVAL_PARAM;
+                        goto pqos_mon_start_error1;
+                }
+                core2cluster[i] = cluster;
+
+                for (j = 0; j < num_ctxs; j++)
+                        if (ctxs[j].lcore == lcore ||
+                            ctxs[j].cluster == cluster)
+                                break;
+
+                if (j >= num_ctxs) {
+                        /**
+                         * New cluster is found
+                         * - save cluster id in the table
+                         * - allocate RMID for the cluster
+                         */
+                        ctxs[num_ctxs].lcore = lcore;
+                        ctxs[num_ctxs].cluster = cluster;
+
+                        ret = rmid_alloc(cluster,
+                                         event & (~(PQOS_PERF_EVENT_IPC |
+                                                    PQOS_PERF_EVENT_LLC_MISS)),
+                                         &ctxs[num_ctxs].rmid);
+                        if (ret != PQOS_RETVAL_OK) {
+                                retval = ret;
+                                goto pqos_mon_start_error1;
+                        }
+
+                        num_ctxs++;
+                }
         }
 
-        ret = rmid_alloc(cluster, event & (~(PQOS_PERF_EVENT_IPC |
-                                             PQOS_PERF_EVENT_LLC_MISS)), &rmid);
-        if (ret != PQOS_RETVAL_OK) {
-                free(group->cores);
-                _pqos_api_unlock();
-                return PQOS_RETVAL_RESOURCE;
+        /**
+         * Fill in the monitoring group structure
+         */
+        group->cores = (unsigned *) malloc(sizeof(group->cores[0]) * num_cores);
+        if (group->cores == NULL) {
+                retval = PQOS_RETVAL_RESOURCE;
+                goto pqos_mon_start_error1;
+        }
+
+        group->poll_ctx = (struct pqos_mon_poll_ctx *)
+                malloc(sizeof(group->poll_ctx[0]) * num_ctxs);
+        if (group->poll_ctx == NULL) {
+                retval = PQOS_RETVAL_RESOURCE;
+                goto pqos_mon_start_error2;
         }
 
         ret = ia32_perf_counter_start(num_cores, cores, event);
         if (ret != PQOS_RETVAL_OK) {
-                free(group->cores);
-                _pqos_api_unlock();
-                return ret;
+                retval = ret;
+                goto pqos_mon_start_error2;
         }
 
         /**
@@ -1259,32 +1280,62 @@ pqos_mon_start(const unsigned num_cores,
          */
         group->num_cores = num_cores;
         for (i = 0; i < num_cores; i++) {
+                unsigned cluster, j;
+                pqos_rmid_t rmid;
+
+                cluster = core2cluster[i];
+                for (j = 0; j < num_ctxs; j++)
+                        if (ctxs[j].cluster == cluster)
+                                break;
+                if (j >= num_ctxs) {
+                        retval = PQOS_RETVAL_ERROR;
+                        goto pqos_mon_start_error2;
+                }
+                rmid = ctxs[j].rmid;
+
                 group->cores[i] = cores[i];
                 ret = mon_assoc_set(cores[i], cluster, rmid);
                 if (ret != PQOS_RETVAL_OK) {
-                        free(group->cores);
-                        _pqos_api_unlock();
-                        return ret;
+                        retval = ret;
+                        goto pqos_mon_start_error2;
                 }
         }
 
+        group->num_poll_ctx = num_ctxs;
+        for (i = 0; i < num_ctxs; i++)
+                group->poll_ctx[i] = ctxs[i];
+
         group->event = event;
-        group->rmid = rmid;
-        group->cluster = cluster;
-        group->socket = socket;
         group->context = context;
 
         for (i = 0; i < num_cores; i++) {
                 /**
                  * Mark monitoring activity in the core map
                  */
-                unsigned lcore = cores[i];
+                const unsigned lcore = cores[i];
 
                 m_core_map[lcore].grp = group;
         }
 
+ pqos_mon_start_error2:
+        if (retval != PQOS_RETVAL_OK) {
+                for (i = 0; i < num_cores; i++)
+                        (void) mon_assoc_set(cores[i], core2cluster[i], RMID0);
+
+                if (group->poll_ctx != NULL)
+                        free(group->poll_ctx);
+
+                if (group->cores != NULL)
+                        free(group->cores);
+        }
+ pqos_mon_start_error1:
+        if (retval != PQOS_RETVAL_OK) {
+                for (i = 0; i < num_ctxs; i++)
+                        (void) rmid_free(ctxs[i].cluster, ctxs[i].rmid);
+        }
+
         _pqos_api_unlock();
-        return ret;
+        return retval;
 }
 
 int
@@ -1326,8 +1377,8 @@ int
 pqos_mon_stop(struct pqos_mon_data *group)
 {
         int ret = PQOS_RETVAL_OK;
+        int retval = PQOS_RETVAL_OK;
         unsigned i = 0;
-        unsigned cluster = 0;
 
         if (group == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -1359,7 +1410,8 @@ pqos_mon_stop(struct pqos_mon_data *group)
 #endif /* PQOS_NO_PID_API */
         }
 
-        if (group->num_cores == 0 || group->cores == NULL) {
+        if (group->num_cores == 0 || group->cores == NULL ||
+            group->num_poll_ctx == 0 || group->poll_ctx == NULL) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
         }
@@ -1369,7 +1421,7 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 /**
                  * Validate core list in the group structure is correct
                  */
-                unsigned lcore = group->cores[i];
+                const unsigned lcore = group->cores[i];
 
                 ret = pqos_cpu_check_core(m_cpu, lcore);
                 if (ret != PQOS_RETVAL_OK) {
@@ -1382,57 +1434,46 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 }
         }
 
-        /**
-         * add check for the same cluster id
-         */
-        ret = pqos_cpu_get_clusterid(m_cpu, group->cores[0], &cluster);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_PARAM;
-        }
-
         for (i = 0; i < group->num_cores; i++) {
                 /**
                  * Associate cores from the group back with RMID0
                  */
-                unsigned lcore = group->cores[i];
+                const unsigned lcore = group->cores[i];
 
                 m_core_map[lcore].grp = NULL;
                 m_core_map[lcore].rmid = 0;
                 ret = mon_assoc_set_nocheck(lcore, RMID0);
-                if (ret != PQOS_RETVAL_OK) {
-                        _pqos_api_unlock();
-                        return PQOS_RETVAL_RESOURCE;
-                }
+                if (ret != PQOS_RETVAL_OK)
+                        retval = PQOS_RETVAL_RESOURCE;
         }
 
         /**
          * Free previously allocated RMID
          */
-        ret = rmid_free(cluster, group->rmid);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_RESOURCE;
+        for (i = 0; i < group->num_poll_ctx; i++) {
+                ret = rmid_free(group->poll_ctx[i].cluster,
+                                group->poll_ctx[i].rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        retval = PQOS_RETVAL_RESOURCE;
         }
 
         /**
-         * Stop IA32 perfromance counters
+         * Stop IA32 performance counters
          */
         ret = ia32_perf_counter_stop(group->num_cores, group->cores,
                                      group->event);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_RESOURCE;
-        }
+        if (ret != PQOS_RETVAL_OK)
+                retval = PQOS_RETVAL_RESOURCE;
 
         /**
-         * Free the core list and clear the group structure
+         * Free poll contexts, core list and clear the group structure
          */
         free(group->cores);
+        free(group->poll_ctx);
         memset(group, 0, sizeof(*group));
 
         _pqos_api_unlock();
-        return ret;
+        return retval;
 }
 
 int

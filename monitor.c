@@ -1041,8 +1041,8 @@ print_text_row(FILE *fp,
                                      sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
-                fprintf(fp, "\n%3u %8.8s %5.2f %6uk%s",
-                        mon_data->socket, (char *)mon_data->context,
+                fprintf(fp, "\n%8.8s %5.2f %6uk%s",
+                        (char *)mon_data->context,
                         mon_data->values.ipc,
                         (unsigned)mon_data->values.llc_misses_delta/1000,
                         data);
@@ -1098,7 +1098,6 @@ print_xml_row(FILE *fp, char *time,
                 fprintf(fp,
                         "%s\n"
                         "\t<time>%s</time>\n"
-                        "\t<socket>%u</socket>\n"
                         "\t<core>%s</core>\n"
                         "\t<ipc>%.2f</ipc>\n"
                         "\t<llc_misses>%llu</llc_misses>\n"
@@ -1106,7 +1105,6 @@ print_xml_row(FILE *fp, char *time,
                         "%s\n",
                         xml_child_open,
                         time,
-                        mon_data->socket,
                         (char *)mon_data->context,
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
@@ -1173,8 +1171,8 @@ print_csv_row(FILE *fp, char *time,
 
         if (!process_mode())
                 fprintf(fp,
-                        "%s,%u,%s,%.2f,%llu%s\n",
-                        time, mon_data->socket, (char *)mon_data->context,
+                        "%s,%s,%.2f,%llu%s\n",
+                        time, (char *)mon_data->context,
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
                         data);
@@ -1210,7 +1208,7 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (istext) {
                 if (!process_mode())
-                        strncpy(hdr, "SKT     CORE   IPC  MISSES", sz_hdr - 1);
+                        strncpy(hdr, "    CORE   IPC  MISSES", sz_hdr - 1);
                 else
                         strncpy(hdr, "   PID   CORE    IPC  MISSES",
                                 sz_hdr - 1);
@@ -1224,7 +1222,7 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (iscsv) {
                 if (!process_mode())
-                        strncpy(hdr, "Time,Socket,Core,IPC,LLC Misses",
+                        strncpy(hdr, "Time,Core,IPC,LLC Misses",
                                 sz_hdr - 1);
                 else
                         strncpy(hdr, "Time,PID,Core,IPC,LLC Misses",

@@ -286,6 +286,15 @@ struct pqos_event_values {
 };
 
 /**
+ * Core monitoring poll context
+ */
+struct pqos_mon_poll_ctx {
+        unsigned lcore;
+        unsigned cluster;
+        pqos_rmid_t rmid;
+};
+
+/**
  * Monitoring group data structure
  */
 struct pqos_mon_data {
@@ -312,11 +321,10 @@ struct pqos_mon_data {
         /**
          * Core specific section
          */
-        pqos_rmid_t rmid;               /**< RMID allocated for the group */
-        unsigned cluster;               /**< cluster id group belongs to */
-        unsigned socket;                /**< socket id group belongs to */
-        unsigned num_cores;             /**< number of cores in the group */
+        struct pqos_mon_poll_ctx *poll_ctx; /**< core, cluster & rmid */
+        unsigned num_poll_ctx;          /**< number of poll contexts */
         unsigned *cores;                /**< list of cores in the group */
+        unsigned num_cores;             /**< number of cores in the group */
 };
 
 /**

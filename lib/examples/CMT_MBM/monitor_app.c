@@ -347,7 +347,7 @@ static void monitoring_loop(const struct pqos_cap *cap)
                         return;
                 }
                 if (!process_mode()) {
-                        printf("SOCKET     CORE     RMID    LLC[KB]"
+                        printf("    CORE     RMID    LLC[KB]"
                                "    MBL[MB]    MBR[MB]\n");
                         for (i = 0; i < sel_monitor_num; i++) {
                                 const struct pqos_event_values *pv =
@@ -356,10 +356,9 @@ static void monitoring_loop(const struct pqos_cap *cap)
                                         mbr = (double)pv->mbm_remote_delta,
                                         mbl = (double)pv->mbm_local_delta;
 
-                                printf("%6u %8u %8u %10.1f %10.1f %10.1f\n",
-                                       m_mon_grps[i]->socket,
+                                printf("%8u %8u %10.1f %10.1f %10.1f\n",
                                        m_mon_grps[i]->cores[0],
-                                       m_mon_grps[i]->rmid,
+                                       m_mon_grps[i]->poll_ctx[0].rmid,
                                        llc * llc_factor,
                                        mbl * mbl_factor,
                                        mbr * mbr_factor);
