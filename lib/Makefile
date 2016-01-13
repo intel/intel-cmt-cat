@@ -4,7 +4,7 @@
 # @par
 # BSD LICENSE
 # 
-# Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+# Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -50,7 +50,7 @@ CFLAGS = -pthread -I./ \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
-	-Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
+	-Wformat -Wformat-security -fstack-protector -D_FORTIFY_SOURCE=2\
 	-Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
@@ -65,16 +65,16 @@ endif
 
 # so or static build
 ifeq ($(SHARED),y)
-CFLAGS += -fPIC -g
+CFLAGS += -fPIC
 else
-CFLAGS += 
+CFLAGS += -fPIE
 endif 
 
 # DEBUG build
 ifeq ($(DEBUG),y)
 CFLAGS += -g -ggdb -O0 -DDEBUG
 else
-CFLAGS += -g -O3
+CFLAGS += -g -O2
 endif 
 
 # Build targets and dependencies

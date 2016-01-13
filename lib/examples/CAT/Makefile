@@ -4,7 +4,7 @@
 # @par
 # BSD LICENSE
 # 
-# Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+# Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -44,7 +44,7 @@ CFLAGS = -I./../../ \
 	-Wcast-qual -Wundef -Wwrite-strings  \
         -Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
         -Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels \
-	-g -O3
+	-g -O2
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
