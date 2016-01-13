@@ -224,10 +224,42 @@ stop_pqos_counters(struct pqos_mon_data *group, int **fds)
 }
 
 /**
+ * @brief Small utility function to support stop_perf_counters()
+ *
+ * It stops perf counter and closes it.
+ *
+ * @param fd perf counter file descriptor
+ * @param counter_str counter name
+ *
+ * @retrun Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on error
+ */
+static int stop_one_perf_counter(int fd, const char *counter_str)
+{
+        int ret1, ret2;
+
+        ASSERT(counter_str != NULL);
+
+        ret1 = perf_stop_counter(fd);
+        if (ret1 != PQOS_RETVAL_OK)
+                LOG_ERROR("Failed to stop perf %s counter!\n", counter_str);
+
+        ret2 = perf_shutdown_counter(fd);
+        if (ret2 != PQOS_RETVAL_OK)
+                LOG_ERROR("Failed to shutdown perf %s counter!\n", counter_str);
+
+        return (ret1 == PQOS_RETVAL_OK && ret2 == PQOS_RETVAL_OK) ?
+                PQOS_RETVAL_OK : PQOS_RETVAL_ERROR;
+}
+
+/**
  * @brief This function stops perf event counters
  *
  * Stops perf event counters for a specified event
  * and closes associated file descriptors
+ *
+ * It also frees \a fds so this pointer is no longer valid.
  *
  * @param event pqos monitor event bitmask
  * @param fds array of fd's
@@ -235,55 +267,38 @@ stop_pqos_counters(struct pqos_mon_data *group, int **fds)
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERRROR if there were errors when stopping counters
  */
 static int
 stop_perf_counters(const enum pqos_mon_event event, int **fds, const int tid_nr)
 {
-        int i, ret, *fd;
+        int i, stopped = 0;
 
         ASSERT(fds != NULL);
         ASSERT(tid_nr > 0);
 
-        if (event & PQOS_PERF_EVENT_IPC) {
-                for (i = 0; i < tid_nr; i++) {
-                        fd = fds[i];
-                        ret = perf_stop_counter(fd[CYC]);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_ERROR("Failed to stop perf "
-                                          "cycles counter\n");
-                        ret = perf_shutdown_counter(fd[CYC]);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_ERROR("Failed to shutdown perf "
-                                          "cycles counter\n");
-                        ret = perf_stop_counter(fd[INS]);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_ERROR("Failed to stop perf "
-                                          "instructions counter\n");
-                        ret = perf_shutdown_counter(fd[INS]);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_ERROR("Failed to shutdown perf "
-                                          "instructions counter\n");
-                        free(fd);
-                }
-        } else if (event & PQOS_PERF_EVENT_LLC_MISS) {
-                for (i = 0; i < tid_nr; i++) {
-                        fd = fds[i];
-                        ret = perf_stop_counter(fd[0]);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_ERROR("Failed to stop perf "
-                                          "LLC misses counter\n");
-                        ret = perf_shutdown_counter(fd[0]);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_ERROR("Failed to shutdown perf "
-                                          "cache misses counter\n");
-                        free(fd);
-                }
-        } else
-                return PQOS_RETVAL_ERROR;
-        free(fds);
-        *fds = NULL;
+        for (i = 0; i < tid_nr; i++) {
+                int *fd = fds[i];
 
-        return PQOS_RETVAL_OK;
+                if (fd == NULL)
+                        continue;
+
+                if (event & PQOS_PERF_EVENT_IPC) {
+                        stop_one_perf_counter(fd[CYC], "cycles");
+                        stop_one_perf_counter(fd[INS], "instructions");
+                        stopped++;
+                } else if (event & PQOS_PERF_EVENT_LLC_MISS) {
+                        stop_one_perf_counter(fd[0], "LLC misses");
+                        stopped++;
+                } else {
+                        ASSERT(0); /* unsupported event */
+                }
+
+                free(fd);
+        }
+
+        free(fds);
+        return (stopped == tid_nr) ? PQOS_RETVAL_OK : PQOS_RETVAL_ERROR;
 }
 
 /**
@@ -554,39 +569,48 @@ stop_events(struct pqos_mon_data *group,
          */
         if (events & PQOS_MON_EVENT_L3_OCCUP) {
                 ret = stop_pqos_counters(group, &group->fds_llc);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                stopped_evts |= PQOS_MON_EVENT_L3_OCCUP;
+                if (ret == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_MON_EVENT_L3_OCCUP;
         }
-        if  ((events & PQOS_MON_EVENT_LMEM_BW) ||
-             (events & PQOS_MON_EVENT_RMEM_BW)) {
+        if  (events & PQOS_MON_EVENT_LMEM_BW) {
                 ret = stop_pqos_counters(group, &group->fds_mbl);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                stopped_evts |= PQOS_MON_EVENT_LMEM_BW;
+                if (ret == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_MON_EVENT_LMEM_BW;
         }
-        if  ((events & PQOS_MON_EVENT_TMEM_BW) ||
-             (events & PQOS_MON_EVENT_RMEM_BW)) {
+        if  (events & PQOS_MON_EVENT_TMEM_BW) {
                 ret = stop_pqos_counters(group, &group->fds_mbt);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                stopped_evts |= PQOS_MON_EVENT_LMEM_BW;
+                if (ret == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_MON_EVENT_TMEM_BW;
+        }
+        if (events & PQOS_MON_EVENT_RMEM_BW) {
+                int ret2;
+
+                if (!(events & PQOS_MON_EVENT_LMEM_BW))
+                        ret = stop_pqos_counters(group, &group->fds_mbl);
+                else
+                        ret = PQOS_RETVAL_OK;
+
+                if (!(events & PQOS_MON_EVENT_TMEM_BW))
+                        ret2 = stop_pqos_counters(group, &group->fds_mbt);
+                else
+                        ret2 = PQOS_RETVAL_OK;
+
+                if (ret == PQOS_RETVAL_OK && ret2 == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_MON_EVENT_RMEM_BW;
         }
         if (events & PQOS_PERF_EVENT_IPC) {
                 ret = stop_perf_counters(PQOS_PERF_EVENT_IPC,
                                          group->fds_ipc,
                                          group->tid_nr);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                stopped_evts |= PQOS_PERF_EVENT_IPC;
+                if (ret == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_PERF_EVENT_IPC;
         }
         if (events & PQOS_PERF_EVENT_LLC_MISS) {
                 ret = stop_perf_counters(PQOS_PERF_EVENT_LLC_MISS,
                                          group->fds_misses,
                                          group->tid_nr);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                stopped_evts |= PQOS_PERF_EVENT_LLC_MISS;
+                if (ret == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_PERF_EVENT_LLC_MISS;
         }
         if (events ^ stopped_evts) {
                 LOG_ERROR("Failed to stop all events\n");
