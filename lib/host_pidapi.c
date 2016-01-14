@@ -371,7 +371,9 @@ start_perf_counters(const struct pqos_mon_data *group,
                     struct pid_supported_event *pe,
                     int ***fds)
 {
-        int i, ret, **fd_array = NULL;
+        int i = 0, to_stop = 0;
+        int ret = PQOS_RETVAL_ERROR;
+        int **fd_array = NULL;
         struct perf_event_attr attr;
 
         ASSERT(group != NULL);
@@ -386,25 +388,31 @@ start_perf_counters(const struct pqos_mon_data *group,
          * Allocate array to hold pointers to event fd's
          * and setup counters for selected events
          */
+        fd_array = malloc(sizeof(fd_array[0]) * group->tid_nr);
+        if (fd_array == NULL)
+                return PQOS_RETVAL_ERROR;
+
         if (pe->event & PQOS_PERF_EVENT_IPC) {
-                fd_array = malloc(sizeof(int *)*group->tid_nr);
-                if (fd_array == NULL)
-                        return PQOS_RETVAL_ERROR;
                 /**
                  * For every task, allocate memory to hold fd's
                  * and setup counters for selected events
                  */
                 for (i = 0; i < group->tid_nr; i++) {
-                        int *fd  = malloc(sizeof(fd[0])*2);
+                        int *fd = malloc(sizeof(fd[0]) * 2);
+
+                        to_stop = i;
+                        if (fd == NULL) {
+                                ret = PQOS_RETVAL_RESOURCE;
+                                break;
+                        }
+
                         /* set attributes for cpu cycles event */
                         attr.config = PERF_COUNT_HW_CPU_CYCLES;
                         ret = perf_setup_counter(&attr, group->tid_map[i],
                                                  -1, -1, 0, &fd[CYC]);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Failed to setup perf "
-                                          "counter for %s\n", pe->name);
-                                stop_perf_counters(pe->event, fd_array, i+1);
-                                return ret;
+                                free(fd);
+                                break;
                         }
                         /* set attributes for instructions event */
                         attr.disabled = 0;
@@ -412,50 +420,62 @@ start_perf_counters(const struct pqos_mon_data *group,
                         ret = perf_setup_counter(&attr, group->tid_map[i],
                                                  -1, fd[CYC], 0, &fd[INS]);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Failed to setup perf "
-                                          "counter for %s\n", pe->name);
-                                stop_perf_counters(pe->event, fd_array, i+1);
-                                return ret;
+                                stop_one_perf_counter(fd[CYC], "cycles");
+                                free(fd);
+                                break;
                         }
                         /**
                          * Start counters by enabling the group leader
                          */
+                        fd_array[i] = fd;
                         ret = perf_start_counter(fd[CYC]);
                         if (ret != PQOS_RETVAL_OK) {
-                                stop_perf_counters(pe->event, fd_array,
-                                                   group->tid_nr);
-                                return ret;
+                                /* it will be stopped by error handler below */
+                                to_stop = i + 1;
+                                break;
                         }
-                        fd_array[i] = fd;
                 }
         } else if (pe->event & PQOS_PERF_EVENT_LLC_MISS) {
-                fd_array = malloc(sizeof(int *)*group->tid_nr);
-                if (fd_array == NULL)
-                        return PQOS_RETVAL_ERROR;
-
                 for (i = 0; i < group->tid_nr; i++) {
                         int *fd = malloc(sizeof(fd[0]));
+
+                        to_stop = i;
+                        if (fd == NULL) {
+                                ret = PQOS_RETVAL_RESOURCE;
+                                break;
+                        }
+
                         /* set attributes for cache misses event */
                         attr.config = PERF_COUNT_HW_CACHE_MISSES;
                         ret = perf_setup_counter(&attr, group->tid_map[i],
                                                  -1, -1, 0, &fd[0]);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Failed to setup perf "
-                                          "counter for %s\n", pe->name);
-                                stop_perf_counters(pe->event, fd_array, i+1);
-                                return ret;
-                        }
-                        ret = perf_start_counter(fd[0]);
-                        if (ret != PQOS_RETVAL_OK) {
-                                stop_perf_counters(pe->event, fd_array,
-                                                   group->tid_nr);
-                                return ret;
+                                free(fd);
+                                break;
                         }
                         fd_array[i] = fd;
+                        ret = perf_start_counter(fd[0]);
+                        if (ret != PQOS_RETVAL_OK) {
+                                /* it will be stopped by error handler below */
+                                to_stop = i + 1;
+                                break;
+                        }
                 }
+        } else {
+                /* unsupported event */
+                free(fd_array);
+                return PQOS_RETVAL_ERROR;
         }
-        *fds = fd_array;
 
+        if (i < group->tid_nr) {
+                /* error condition, ret holds error code */
+                LOG_ERROR("Failed to setup perf counter for %s\n",
+                          pe->name);
+                stop_perf_counters(pe->event, fd_array, to_stop);
+                return ret;
+        }
+
+        *fds = fd_array;
         return PQOS_RETVAL_OK;
 }
 
