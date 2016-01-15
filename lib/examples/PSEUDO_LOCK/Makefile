@@ -69,7 +69,6 @@ $(LIBNAME):
 .PHONY: clean
 clean:
 	-rm -f $(APP) $(OBJS) *.o
-	make -C ../../ clean
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
