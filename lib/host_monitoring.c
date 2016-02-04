@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1137,7 +1137,7 @@ pqos_mon_start(const unsigned num_cores,
         int ret = PQOS_RETVAL_OK;
         int retval = PQOS_RETVAL_OK;
 
-        if (group == NULL || cores == NULL || num_cores == 0)
+        if (group == NULL || cores == NULL || num_cores == 0 || event == 0)
                 return PQOS_RETVAL_PARAM;
 
         memset(group, 0, sizeof(*group));
