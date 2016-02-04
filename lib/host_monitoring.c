@@ -122,6 +122,14 @@
  * assuming there is 24 bit space available
  */
 #define MBM_MAX_VALUE (1<<24)
+
+/**
+ * Value marking monitoring group structure as "valid".
+ * Group becomes "valid" after successful pqos_mon_start() or
+ * pqos_mon_start_pid() call.
+ */
+#define GROUP_VALID_MARKER (0x00DEAD00)
+
 /**
  * ---------------------------------------
  * Local data types
@@ -1334,6 +1342,9 @@ pqos_mon_start(const unsigned num_cores,
                         (void) rmid_free(ctxs[i].cluster, ctxs[i].rmid);
         }
 
+        if (retval == PQOS_RETVAL_OK)
+                group->valid = GROUP_VALID_MARKER;
+
         _pqos_api_unlock();
         return retval;
 }
@@ -1367,8 +1378,11 @@ pqos_mon_start_pid(const pid_t pid,
         group->context = context;
 
         ret = pqos_pid_start(group);
-        _pqos_api_unlock();
 
+        if (ret == PQOS_RETVAL_OK)
+                group->valid = GROUP_VALID_MARKER;
+
+        _pqos_api_unlock();
         return ret;
 #endif /* PQOS_NO_PID_API */
 }
@@ -1381,6 +1395,9 @@ pqos_mon_stop(struct pqos_mon_data *group)
         unsigned i = 0;
 
         if (group == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
         _pqos_api_lock();
@@ -1405,6 +1422,7 @@ pqos_mon_stop(struct pqos_mon_data *group)
                  * Stop perf counters
                  */
                 ret = pqos_pid_stop(group);
+                group->valid = 0;
                 _pqos_api_unlock();
                 return ret;
 #endif /* PQOS_NO_PID_API */
@@ -1490,6 +1508,8 @@ pqos_mon_poll(struct pqos_mon_data **groups,
 
         for (i = 0; i < num_groups; i++) {
                 if (groups[i] == NULL)
+                        return PQOS_RETVAL_PARAM;
+                if (groups[i]->valid != GROUP_VALID_MARKER)
                         return PQOS_RETVAL_PARAM;
         }
         _pqos_api_lock();
