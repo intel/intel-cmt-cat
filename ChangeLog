@@ -1,5 +1,5 @@
 ======================================================================
-Unreleased
+Release  v0.1.4  2016-02-04
 ======================================================================
 
 Contributors (alphabetical order):
@@ -20,6 +20,7 @@ Summary:
 	- IPC (instructions per clock) performance event
 	- LLC misses performance event
 	- CSV output
+	- Monitoring core groups
 3. Allocation
 	- CDP (code data prioritization) detection and management
 4. General
