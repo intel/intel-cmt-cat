@@ -1148,6 +1148,9 @@ pqos_mon_start(const unsigned num_cores,
         if (group == NULL || cores == NULL || num_cores == 0 || event == 0)
                 return PQOS_RETVAL_PARAM;
 
+        if (group->valid == GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
         memset(group, 0, sizeof(*group));
 
         _pqos_api_lock();
@@ -1356,6 +1359,9 @@ pqos_mon_start_pid(const pid_t pid,
                    struct pqos_mon_data *group)
 {
         if (group == NULL || event == 0 || pid < 0)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid == GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
 #ifdef PQOS_NO_PID_API
