@@ -63,7 +63,6 @@ static const char *xml_root_open = "<records>";
 static const char *xml_root_close = "</records>";
 static const char *xml_child_open = "<record>";
 static const char *xml_child_close = "</record>";
-static const long xml_root_close_size = DIM("</records>") - 1;
 
 /**
  * Number of cores that are selected in config string
