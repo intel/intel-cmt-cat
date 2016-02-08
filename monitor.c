@@ -1040,13 +1040,13 @@ print_text_row(FILE *fp,
                                      sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
-                fprintf(fp, "\n%8.8s %5.2f %6uk%s",
+                fprintf(fp, "\n%8.8s %5.2f %7uk%s",
                         (char *)mon_data->context,
                         mon_data->values.ipc,
                         (unsigned)mon_data->values.llc_misses_delta/1000,
                         data);
         else
-                fprintf(fp, "\n%6u %6s %6.2f %6uk%s",
+                fprintf(fp, "\n%6u %6s %6.2f %7uk%s",
                         mon_data->pid, "N/A",
                         mon_data->values.ipc,
                         (unsigned)mon_data->values.llc_misses_delta/1000,
@@ -1207,9 +1207,9 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (istext) {
                 if (!process_mode())
-                        strncpy(hdr, "    CORE   IPC  MISSES", sz_hdr - 1);
+                        strncpy(hdr, "    CORE   IPC   MISSES", sz_hdr - 1);
                 else
-                        strncpy(hdr, "   PID   CORE    IPC  MISSES",
+                        strncpy(hdr, "   PID   CORE    IPC   MISSES",
                                 sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(hdr, "    LLC[KB]", sz_hdr - strlen(hdr) - 1);
