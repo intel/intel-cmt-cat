@@ -86,10 +86,9 @@ static struct {
  * Maintains the number of process id's you want to track
  */
 static int sel_process_num = 0;
-/**
- * Stop monitoring indicator for infinite monitoring loop
- */
-static int stop_monitoring_loop = 0;
+
+static void stop_monitoring(void);
+
 /**
  * @brief CTRL-C handler for infinite monitoring loop
  *
@@ -97,8 +96,13 @@ static int stop_monitoring_loop = 0;
  */
 static void monitoring_ctrlc(int signo)
 {
-	printf("\nExiting[%d]... Press Enter\n", signo);
-        stop_monitoring_loop = 1;
+	printf("\nExiting[%d]...\n", signo);
+        stop_monitoring();
+        if (pqos_fini() != PQOS_RETVAL_OK) {
+		printf("Error shutting down PQoS library!\n");
+                exit(EXIT_FAILURE);
+        }
+	exit(EXIT_SUCCESS);
 }
 /**
  * @brief Check to determine if processes or cores are monitored
@@ -340,7 +344,7 @@ static void monitoring_loop(const struct pqos_cap *cap)
 	else
 	        mon_number = (unsigned) sel_process_num;
 
-	while (!stop_monitoring_loop) {
+	while (1) {
                 ret = pqos_mon_poll(m_mon_grps, (unsigned)mon_number);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to poll monitoring data!\n");
