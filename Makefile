@@ -4,7 +4,7 @@
 # @par
 # BSD LICENSE
 # 
-# Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+# Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
 # All rights reserved.
 # 
 # Redistribution and use in source and binary forms, with or without
@@ -68,13 +68,16 @@ endif
 
 # Build targets and dependencies
 APP = pqos
-
+HDR = pqos.h
 MAN = pqos.8
+LIB = libpqos.a
 
 # XXX: modify as desired
 PREFIX ?= /usr/local
 BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
+HDR_DIR = $(PREFIX)/include
+LIB_DIR = $(PREFIX)/lib
 
 OBJS = main.o monitor.o alloc.o profiles.o
 
@@ -86,13 +89,17 @@ $(APP): $(OBJS) $(LIBNAME)
 $(LIBNAME):
 	make -C lib all
 
-install: $(APP) $(MAN)
+install: $(APP) $(MAN) lib/$(LIB) lib/$(HDR)
 	install -D -s $(APP) $(BIN_DIR)/$(APP)
 	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
+	install -m 0644 lib/$(HDR) -D $(HDR_DIR)/$(HDR)
+	install -m 0644 lib/$(LIB) -D $(LIB_DIR)/$(LIB)
 
 uninstall:
 	-rm $(BIN_DIR)/$(APP)
 	-rm $(MAN_DIR)/$(MAN)
+	-rm $(HDR_DIR)/$(HDR)
+	-rm $(LIB_DIR)/$(LIB)
 
 .PHONY: clean rinse TAGS install uninstall
 
