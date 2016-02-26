@@ -237,9 +237,11 @@ void selfn_strdup(char **sel, const char *arg)
 static void
 print_warning(void)
 {
+#ifdef __linux__
         printf("NOTE:  Mixed use of MSR and kernel interfaces "
                "to manage\n       CAT or CMT & MBM may lead to "
                "unexpected behavior.\n");
+#endif
 }
 
 /**
@@ -475,6 +477,7 @@ static const char help_printf_long[] =
         "          EVTPIDS format is 'EVENT:PID_LIST'.\n"
         "          Example 'llc:22,25673' or 'all:892,4588-4592'.\n"
         "          Note: processes and cores cannot be monitored together.\n"
+        "                Requires Linux and kernel versions 4.1 and newer.\n"
         "  -o FILE, --mon-file=FILE    output monitored data in a FILE\n"
         "  -u TYPE, --mon-file-type=TYPE\n"
         "          select output file format type for monitored data.\n"

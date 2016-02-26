@@ -36,10 +36,15 @@
  * @brief Provides access to machine operations (CPUID, MSR read & write)
  */
 
+#ifdef __linux__
 #define _XOPEN_SOURCE 500
 #define _LARGEFILE64_SOURCE
-#include <stdlib.h>
+#endif /* __linux__ */
+#ifdef __FreeBSD__
+#define _WITH_DPRINTF
+#endif /* __FreeBSD__ */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -103,43 +108,6 @@ machine_fini(void)
         m_maxcores = 0;
 
         return MACHINE_RETVAL_OK;
-}
-
-int
-cpuid(const unsigned lcore,
-      const unsigned leaf,
-      const unsigned subleaf,
-      struct cpuid_out *out)
-{
-        char fname[32];
-        const off64_t offset = ((off64_t)leaf) + ((off64_t) subleaf << 32);
-        ssize_t read_ret = 0;
-        int ret = MACHINE_RETVAL_OK;
-        int fd = -1;
-
-        ASSERT(out != NULL);
-        if (out == NULL)
-                return MACHINE_RETVAL_PARAM;
-
-        memset(fname, 0, sizeof(fname));
-        snprintf(fname, sizeof(fname)-1,
-                 "/dev/cpu/%u/cpuid", lcore);
-        fd = open(fname, O_RDONLY);
-        if (fd < 0) {
-                LOG_ERROR("Error opening file '%s'!\n", fname);
-                return MACHINE_RETVAL_ERROR;
-        }
-        if (lseek64(fd, offset, SEEK_SET) < 0) {
-                close(fd);
-                return MACHINE_RETVAL_ERROR;
-        }
-
-        read_ret = read(fd, out, sizeof(*out));
-        if (read_ret != sizeof(*out))
-                ret = MACHINE_RETVAL_ERROR;
-
-        close(fd);
-        return ret;
 }
 
 /**

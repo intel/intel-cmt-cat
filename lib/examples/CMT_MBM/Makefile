@@ -35,7 +35,6 @@
 # 
 ###############################################################################
 
-CC = gcc
 LIBNAME = ./../../libpqos.a
 LDFLAGS = -L./../../ -lpqos
 CFLAGS = -I./../../ \
@@ -63,7 +62,7 @@ all: $(MONITORAPP)
 $(MONITORAPP): $(LIBNAME)
 
 $(LIBNAME):
-	make -C ../../ all
+	$(MAKE) -C ../../ all
 
 .PHONY: clean
 

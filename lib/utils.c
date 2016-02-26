@@ -40,7 +40,10 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#include <alloca.h>
+#ifdef __linux__
+#include <alloca.h>       /* alloca() */
+#endif /* __linux__ */
+
 #include "pqos.h"
 #include "types.h"
 

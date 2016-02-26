@@ -35,7 +35,6 @@
 # 
 ###############################################################################
 
-CC = gcc
 LIBNAME = ./lib/libpqos.a
 LDFLAGS = -L./lib -lpqos -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -I./lib \
@@ -61,9 +60,15 @@ else
 CFLAGS += -g -O3
 endif 
 
+# On FreeBSD build with NO_PID_API option
+ifeq ($(shell uname), FreeBSD)
+NO_PID_API=y
+endif
+
 # PID API build option
 ifeq ($(NO_PID_API), y)
 export NO_PID_API
+CFLAGS += -DNO_PID_API
 endif
 
 # Build targets and dependencies
@@ -87,7 +92,7 @@ $(APP): $(OBJS) $(LIBNAME)
 	$(CC) $^ $(LDFLAGS) -o $@
 
 $(LIBNAME):
-	make -C lib all
+	$(MAKE) -C lib all
 
 install: $(APP) $(MAN) lib/$(LIB) lib/$(HDR)
 	install -D -s $(APP) $(BIN_DIR)/$(APP)
@@ -108,7 +113,7 @@ rinse:
 
 clean:
 	-rm -f $(APP) $(OBJS) $(DEPFILE) ./*~
-	-make -C lib clean
+	$(MAKE) -C lib clean
 
 TAGS:
 	etags ./*.[ch] ./lib/*.[ch]

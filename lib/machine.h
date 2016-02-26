@@ -84,23 +84,6 @@ int machine_init(const unsigned max_core_id);
 int machine_fini(void);
 
 /**
- * @brief Executes CPUID.leaf.sbuleaf on \a lcore
- *
- * @param [in] lcore logical core id
- * @param [in] leaf CPUID leaf number
- * @param [in] subleaf CPUID sub-leaf number
- * @param [out] out structure to write CPUID results into
- *
- * @return Operation status
- * @retval MACHINE_RETVAL_OK on success
- */
-int
-cpuid(const unsigned lcore,
-      const unsigned leaf,
-      const unsigned subleaf,
-      struct cpuid_out *out);
-
-/**
  * @brief Executes CPUID.leaf.sbuleaf on current core
  *
  * @param [in] leaf CPUID leaf number

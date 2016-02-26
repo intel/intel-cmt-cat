@@ -35,7 +35,6 @@
 # 
 ###############################################################################
 
-CC = gcc
 LIBNAME = ./../../libpqos.a
 LDFLAGS = -L./../../ -lpqos
 CFLAGS = -I./../../ \
@@ -69,7 +68,7 @@ $(ASSOCAPP): $(LIBNAME)
 $(RESETAPP): $(LIBNAME)
 
 $(LIBNAME):
-	make -C ../../
+	$(MAKE) -C ../../
 
 .PHONY: clean
 clean:

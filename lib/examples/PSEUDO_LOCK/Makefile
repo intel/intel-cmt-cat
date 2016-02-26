@@ -35,7 +35,6 @@
 #
 ###############################################################################
 
-CC = gcc
 LIBNAME = ./../../libpqos.a
 LDFLAGS = -L./../../ -lpqos -lrt
 CFLAGS = -I./../../ \
@@ -64,7 +63,7 @@ all: $(APP)
 $(APP): $(LIBNAME) $(OBJS)
 
 $(LIBNAME):
-	make -C ../../ DEBUG=n
+	$(MAKE) -C ../../ DEBUG=n
 
 .PHONY: clean
 clean:

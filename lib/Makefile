@@ -34,7 +34,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 ###############################################################################
 
-
 LIBSONAME_ = libpqos.so
 LIBSONAME = $(LIBSONAME_).1
 LIBANAME = libpqos.a
@@ -44,7 +43,6 @@ else
 LIBNAME = $(LIBANAME)
 endif 
 
-CC = gcc
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
@@ -78,13 +76,18 @@ CFLAGS += -g -O2
 endif 
 
 # Build targets and dependencies
-OBJS = cpuinfo.o machine.o host_cap.o host_allocation.o host_monitoring.o utils.o log.o perf.o
+OBJS = cpuinfo.o machine.o host_cap.o host_allocation.o host_monitoring.o utils.o log.o
+
+# On FreeBSD build with NO_PID_API option
+ifeq ($(shell uname), FreeBSD)
+NO_PID_API=y
+endif
 
 # PID API build option
 ifeq ($(NO_PID_API), y)
 CFLAGS += -DPQOS_NO_PID_API
 else
-OBJS += host_pidapi.o
+OBJS += host_pidapi.o perf.o
 endif
 
 DEPFILE = $(LIBANAME).dep
@@ -97,7 +100,7 @@ ifeq ($(SHARED),y)
 	-ln -s $(LIBNAME).0.1 $(LIBNAME)
 	-ln -s $(LIBNAME).0.1 $(LIBSONAME_)
 else
-	$(AR) crvs $@ $^
+	$(AR) crvs -D $@ $^
 endif
 
 .PHONY: dep
@@ -129,8 +132,8 @@ rinse:
 clean:
 	-rm -f $(OBJS) $(LIBANAME) $(LIBSONAME_) $(LIBSONAME)* $(DEPFILE) ./*~
 	-rm -rf $(DOXY_DIRS)
-	-make clean -C examples/CAT
-	-make clean -C examples/CMT_MBM
+	-$(MAKE) clean -C examples/CAT
+	-$(MAKE) clean -C examples/CMT_MBM
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
