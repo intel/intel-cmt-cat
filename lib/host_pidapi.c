@@ -68,24 +68,29 @@ static struct pid_supported_event {
         const char *desc;
         enum pqos_mon_event event;
         int supported;
+        double scale;
         struct perf_event_attr attrs;
 } events_tab[] = {
         { .name = "llc_occupancy",
           .desc = "LLC Occupancy",
           .event = PQOS_MON_EVENT_L3_OCCUP,
-          .supported = 0 },
+          .supported = 0,
+          .scale = 1 },
         { .name = "local_bw",
           .desc = "Local Memory B/W",
           .event = PQOS_MON_EVENT_LMEM_BW,
-          .supported = 0 },
+          .supported = 0,
+          .scale = 1 },
         { .name = "total_bw",
           .desc = "Total Memory B/W",
           .event = PQOS_MON_EVENT_TMEM_BW,
-          .supported = 0 },
+          .supported = 0,
+          .scale = 1 },
         { .name = "",
           .desc = "Remote Memory B/W",
           .event = PQOS_MON_EVENT_RMEM_BW,
-          .supported = 0 },
+          .supported = 0,
+          .scale = 1 },
         { .name = "IPC",
           .desc = "Instructions/Cycle",
           .event = PQOS_PERF_EVENT_IPC,
@@ -834,6 +839,91 @@ pqos_pid_poll(struct pqos_mon_data *group)
 }
 
 /**
+ * @brief This function sets perf event attributes
+ *
+ * Reads perf event attributes from the file system, sets
+ * attributes for each event and adds them to the events table
+ *
+ * @param idx index of the events table
+ * @param fname name of event file
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on error
+ */
+static int
+set_attrs(const int idx, const char *fname)
+{
+        FILE *fd;
+        int config;
+        double sf = 0;
+        char file[64], buf[32], *p = buf;
+
+        /**
+         * Read event type from file system
+         */
+        snprintf(file, sizeof(file)-1,
+                 "/sys/devices/intel_cqm/events/%s", fname);
+        fd = fopen(file, "r");
+        if (fd == NULL) {
+                LOG_ERROR("Failed to open PID monitoring "
+                          "event file\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        if (fgets(p, sizeof(buf), fd) == NULL) {
+                fclose(fd);
+                LOG_ERROR("Failed to read PID "
+                          "monitoring event\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        fclose(fd);
+        strsep(&p, "=");
+        if (p == NULL) {
+                LOG_ERROR("Failed to parse PID "
+                          "monitoring event value\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        config = (int)strtol(p, NULL, 0);
+        p = buf;
+
+        /**
+         * Read scale factor from file system
+         */
+        snprintf(file, sizeof(file)-1,
+                 "/sys/devices/intel_cqm/events/%s.scale", fname);
+        fd = fopen(file, "r");
+        if (fd == NULL) {
+                LOG_ERROR("Failed to open PID "
+                          "monitoring event scale file\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        if (fscanf(fd, "%lf", &sf) < 1) {
+                LOG_ERROR("Failed to read PID monitoring "
+                          "event scale factor!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        fclose(fd);
+        events_tab[idx].scale = sf;
+        events_tab[idx].supported = 1;
+
+        /**
+         * Set event attributes
+         */
+        memset(&events_tab[idx].attrs, 0,
+               sizeof(events_tab[0].attrs));
+        events_tab[idx].attrs.type =
+                cqm_event_type;
+        events_tab[idx].attrs.config = config;
+        events_tab[idx].attrs.size =
+                sizeof(struct perf_event_attr);
+        events_tab[idx].attrs.inherit = 1;
+        events_tab[idx].attrs.disabled = 0;
+        events_tab[idx].attrs.enable_on_exec = 0;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Function to detect kernel support for perf
  *        pqos events and update events table
  *
@@ -844,8 +934,6 @@ static int
 init_pqos_events(void)
 {
 	int files, i;
-        FILE *fd;
-        char name[64];
         enum pqos_mon_event events = 0;
         struct dirent **namelist = NULL;
 
@@ -869,11 +957,7 @@ init_pqos_events(void)
                  * Loop through each event
                  */
 		for (j = 0; j < DIM(events_tab); j++) {
-                        int config;
-                        char event_cb[32];
-                        char *event_ptr = event_cb;
-
-			/**
+                        /**
                          * Check if event exists and if
                          * so, set up event attributes
                          */
@@ -881,46 +965,10 @@ init_pqos_events(void)
                                     namelist[i]->d_name)) != 0)
                                 continue;
 
-                        snprintf(name, sizeof(name)-1,
-                                 "/sys/devices/intel_cqm/events/%s",
-                                 namelist[i]->d_name);
-                        fd = fopen(name, "r");
-                        if (fd == NULL) {
-                                LOG_ERROR("Failed to open PID monitoring "
-                                          "event file\n");
+                        if (set_attrs(j, namelist[i]->d_name)
+                            != PQOS_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
-                        }
-                        if (fgets(event_ptr, sizeof(event_cb), fd) == NULL) {
-                                fclose(fd);
-                                LOG_ERROR("Failed to read PID "
-                                          "monitoring event\n");
-                                return PQOS_RETVAL_ERROR;
-                        }
-                        fclose(fd);
 
-                        strsep(&event_ptr, "=");
-                        if (event_ptr == NULL) {
-                                LOG_ERROR("Failed to parse PID "
-                                          "monitoring event value\n");
-                                return PQOS_RETVAL_ERROR;
-                        }
-
-                        config = (int)strtol(event_ptr, NULL, 0);
-                        events_tab[j].supported = 1;
-
-                        /**
-                         * Set event attributes
-                         */
-                        memset(&events_tab[j].attrs, 0,
-                               sizeof(events_tab[0].attrs));
-                        events_tab[j].attrs.type =
-                                cqm_event_type;
-                        events_tab[j].attrs.config = config;
-                        events_tab[j].attrs.size =
-                                sizeof(struct perf_event_attr);
-                        events_tab[j].attrs.inherit = 1;
-                        events_tab[j].attrs.disabled = 0;
-                        events_tab[j].attrs.enable_on_exec = 0;
                         events |= events_tab[j].event;
 		}
 	}
@@ -937,6 +985,7 @@ init_pqos_events(void)
                 LOG_ERROR("Failed to find PID monitoring events\n");
                 return PQOS_RETVAL_RESOURCE;
         }
+
         all_evt_mask |= events;
 
         return PQOS_RETVAL_OK;
