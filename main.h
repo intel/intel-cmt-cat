@@ -109,7 +109,7 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max);
  * @param arg string that caused error when parsing
  * @param note context and information about encountered error
  */
-void parse_error(const char *arg, const char *note);
+void parse_error(const char *arg, const char *note) __attribute__ ((noreturn));
 
 /**
  * @brief Duplicates \a arg and stores at \a sel
