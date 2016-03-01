@@ -739,7 +739,7 @@ int main(int argc, char **argv)
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
-        monitor_loop(p_cap);
+        monitor_loop();
         monitor_stop();
 
  allocation_exit:

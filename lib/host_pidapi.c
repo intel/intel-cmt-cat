@@ -792,11 +792,14 @@ pqos_pid_poll(struct pqos_mon_data *group)
                                          group->fds_llc);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
+
+                group->values.llc = group->values.llc *
+                        events_tab[PID_EVENT_INDEX_LLC].scale;
         }
         if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
             (group->event & PQOS_MON_EVENT_RMEM_BW)) {
                 ret = read_pqos_counters(group,
-                                         &group->values.mbm_local,
+                                         &group->values.mbm_local_delta,
                                          group->fds_mbl);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
@@ -804,15 +807,15 @@ pqos_pid_poll(struct pqos_mon_data *group)
         if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
             (group->event & PQOS_MON_EVENT_RMEM_BW)) {
                 ret = read_pqos_counters(group,
-                                         &group->values.mbm_total,
+                                         &group->values.mbm_total_delta,
                                          group->fds_mbt);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
         }
         if (group->event & PQOS_MON_EVENT_RMEM_BW) {
-                group->values.mbm_remote =
-                        group->values.mbm_total -
-                        group->values.mbm_local;
+                group->values.mbm_remote_delta =
+                        group->values.mbm_total_delta -
+                        group->values.mbm_local_delta;
         }
         if (group->event & PQOS_PERF_EVENT_IPC) {
                 ret = read_ipc_counters(group);

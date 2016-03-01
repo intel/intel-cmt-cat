@@ -141,14 +141,35 @@ static int stop_monitoring_loop = 0;
 static FILE *fp_monitor = NULL;
 
 /**
+ * @brief Scale byte value up to KB
+ *
+ * @param bytes value to be scaled up
+ * @return scaled up value in KB's
+ */
+static inline double bytes_to_kb(const double bytes)
+{
+        return bytes / 1024.0;
+}
+
+/**
+ * @brief Scale byte value up to MB
+ *
+ * @param bytes value to be scaled up
+ * @return scaled up value in MB's
+ */
+static inline double bytes_to_mb(const double bytes)
+{
+        return bytes / (1024.0 * 1024.0);
+}
+
+/**
  * @brief Check to determine if processes or cores are monitored
  *
  * @return Process monitoring mode status
  * @retval 0 monitoring cores
  * @retval 1 monitoring processes
  */
-static inline int
-process_mode(void)
+static inline int process_mode(void)
 {
         return (sel_process_num <= 0) ? 0 : 1;
 }
@@ -161,8 +182,7 @@ process_mode(void)
  *
  * @return Pointer to allocated string
  */
-static char*
-uinttostr(const unsigned val)
+static char *uinttostr(const unsigned val)
 {
         char buf[16], *str = NULL;
 
@@ -828,71 +848,6 @@ static void monitoring_ctrlc(int signo)
 }
 
 /**
- * @brief Gets scale factors to display events data
- *
- * LLC factor is scaled to kilobytes (1024 bytes = 1KB)
- * MBM factors are scaled to megabytes / s (1024x1024 bytes = 1MB)
- *
- * @param cap capability structure
- * @param llc_factor cache occupancy monitoring data
- * @param mbr_factor remote memory bandwidth monitoring data
- * @param mbl_factor local memory bandwidth monitoring data
- * @return operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-get_event_factors(const struct pqos_cap * const cap,
-                  double * const llc_factor,
-                  double * const mbr_factor,
-                  double * const mbl_factor)
-{
-        const struct pqos_monitor *l3mon = NULL, *mbr_mon = NULL,
-                *mbl_mon = NULL;
-        int ret = PQOS_RETVAL_OK;
-
-        if ((cap == NULL) || (llc_factor == NULL) ||
-            (mbr_factor == NULL) || (mbl_factor == NULL))
-                return PQOS_RETVAL_PARAM;
-
-        if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = pqos_cap_get_event(cap, PQOS_MON_EVENT_L3_OCCUP, &l3mon);
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to obtain LLC occupancy event data!\n");
-                        return PQOS_RETVAL_ERROR;
-                }
-                *llc_factor = ((double)l3mon->scale_factor) / 1024.0;
-        } else {
-                *llc_factor = 1.0;
-        }
-
-        if (sel_events_max & PQOS_MON_EVENT_RMEM_BW) {
-                ret = pqos_cap_get_event(cap, PQOS_MON_EVENT_RMEM_BW, &mbr_mon);
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to obtain MBR event data!\n");
-                        return PQOS_RETVAL_ERROR;
-                }
-                *mbr_factor = ((double) mbr_mon->scale_factor) /
-                        (1024.0*1024.0);
-        } else {
-                *mbr_factor = 1.0;
-        }
-
-        if (sel_events_max & PQOS_MON_EVENT_LMEM_BW) {
-                ret = pqos_cap_get_event(cap, PQOS_MON_EVENT_LMEM_BW, &mbl_mon);
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to obtain MBL occupancy event data!\n");
-                        return PQOS_RETVAL_ERROR;
-                }
-                *mbl_factor = ((double)mbl_mon->scale_factor) /
-                        (1024.0*1024.0);
-        } else {
-                *mbl_factor = 1.0;
-        }
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Fills in single text column in the monitoring table
  *
  * @param val numerical value to be put into the column
@@ -1288,13 +1243,12 @@ get_mon_arrays(struct pqos_mon_data ***parray1,
         return mon_number;
 }
 
-void monitor_loop(const struct pqos_cap *cap)
+void monitor_loop(void)
 {
 #define TERM_MIN_NUM_LINES 3
 
         const long interval =
                 (long)sel_mon_interval * 100000LL; /* interval in [us] units */
-        double llc_factor = 1, mbr_factor = 1, mbl_factor = 1;
         struct timeval tv_start;
         int ret = PQOS_RETVAL_OK;
         const int istty = isatty(fileno(fp_monitor));
@@ -1309,12 +1263,6 @@ void monitor_loop(const struct pqos_cap *cap)
         if ((!istext)  && (!isxml) && (!iscsv)) {
                 printf("Invalid selection of output file type '%s'!\n",
                        sel_output_type);
-                return;
-        }
-
-        ret = get_event_factors(cap, &llc_factor, &mbr_factor, &mbl_factor);
-        if (ret != PQOS_RETVAL_OK) {
-                printf("Error in retrieving monitoring scale factors!\n");
                 return;
         }
 
@@ -1347,9 +1295,6 @@ void monitor_loop(const struct pqos_cap *cap)
          * Coefficient to display the data as MB / s
          */
         const double coeff = 10.0 / (double)sel_mon_interval;
-
-        mbr_factor = mbr_factor * coeff;
-        mbl_factor = mbl_factor * coeff;
 
         /**
          * Build the header
@@ -1409,9 +1354,9 @@ void monitor_loop(const struct pqos_cap *cap)
                 for (i = 0; i < display_num; i++) {
                         const struct pqos_event_values *pv =
                                 &mon_data[i]->values;
-                        double llc = (double)pv->llc * llc_factor;
-			double mbr = (double)pv->mbm_remote_delta * mbr_factor;
-			double mbl = (double)pv->mbm_local_delta * mbl_factor;
+                        double llc = bytes_to_kb(pv->llc);
+			double mbr = bytes_to_mb(pv->mbm_remote_delta) * coeff;
+			double mbl = bytes_to_mb(pv->mbm_local_delta) * coeff;
 
                         if (istext)
 			        print_text_row(fp_monitor, mon_data[i],

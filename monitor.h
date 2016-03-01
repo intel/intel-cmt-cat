@@ -124,10 +124,8 @@ void monitor_cleanup(void);
 
 /**
  * @brief Monitors resources and writes data into selected stream.
- *
- * @param cap detected PQoS capabilities
  */
-void monitor_loop(const struct pqos_cap *cap);
+void monitor_loop(void);
 
 #ifdef __cplusplus
 }

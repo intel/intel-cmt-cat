@@ -226,6 +226,9 @@ get_event_id(const enum pqos_mon_event event);
 static uint64_t
 get_delta(const uint64_t old_value, const uint64_t new_value);
 
+static uint64_t
+scale_event(const enum pqos_mon_event event, const uint64_t val);
+
 /**
  * =======================================
  * =======================================
@@ -617,6 +620,31 @@ rmid_free(const unsigned cluster,
  */
 
 /**
+ * @brief Scale event values to bytes
+ *
+ * Retrieve event scale factor and scale value to bytes
+ *
+ * @param event event scale factor to retrieve
+ * @param val value to be scaled
+ *
+ * @return scaled value
+ * @retval value in bytes
+ */
+static uint64_t
+scale_event(const enum pqos_mon_event event, const uint64_t val)
+{
+        const struct pqos_monitor *pmon;
+        int ret;
+
+        ret = pqos_cap_get_event(m_cap, event, &pmon);
+        ASSERT(ret == PQOS_RETVAL_OK);
+        if (ret != PQOS_RETVAL_OK)
+                return val;
+        else
+                return val * pmon->scale_factor;
+}
+
+/**
  * @brief Checks logical core parameter for core association get operation
  *
  * @param lcore logical core id
@@ -879,7 +907,7 @@ pqos_core_poll(struct pqos_mon_data *p)
                         }
                         total += tmp;
                 }
-                pv->llc = total;
+                pv->llc = scale_event(PQOS_MON_EVENT_L3_OCCUP, total);
         }
         if (p->event & (PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
                 uint64_t total = 0, old_value = pv->mbm_local;
@@ -900,6 +928,8 @@ pqos_core_poll(struct pqos_mon_data *p)
                 }
                 pv->mbm_local = total;
                 pv->mbm_local_delta = get_delta(old_value, pv->mbm_local);
+                pv->mbm_local_delta = scale_event(PQOS_MON_EVENT_LMEM_BW,
+                                                  pv->mbm_local_delta);
         }
         if (p->event & (PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
                 uint64_t total = 0, old_value = pv->mbm_total;
@@ -920,6 +950,10 @@ pqos_core_poll(struct pqos_mon_data *p)
                 }
                 pv->mbm_total = total;
                 pv->mbm_total_delta = get_delta(old_value, pv->mbm_total);
+                pv->mbm_total_delta = scale_event(PQOS_MON_EVENT_TMEM_BW,
+                                                  pv->mbm_total_delta);
+                if (retval != PQOS_RETVAL_OK)
+                        goto pqos_core_poll__exit;
         }
         if (p->event & PQOS_MON_EVENT_RMEM_BW) {
                 pv->mbm_remote = 0;
