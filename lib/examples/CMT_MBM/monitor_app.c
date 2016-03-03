@@ -45,6 +45,7 @@
 #include <sys/stat.h>
 #include <signal.h>
 #include "pqos.h"
+
 /**
  * Defines
  */
@@ -53,15 +54,18 @@
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
 #define PQOS_MAX_PIDS         16
 #define PQOS_MAX_MON_EVENTS   1
+
 /**
  * Number of cores that are selected in config string
  * for monitoring LLC occupancy
  */
 static int sel_monitor_num = 0;
+
 /**
  * The mask to tell which events to display
  */
 static enum pqos_mon_event sel_events_max = 0;
+
 /**
  * Maintains a table of core, event, number of events that are
  * selected in config string for monitoring
@@ -82,6 +86,7 @@ static struct {
         struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
 } sel_monitor_pid_tab[PQOS_MAX_PIDS];
+
 /**
  * Maintains the number of process id's you want to track
  */
@@ -104,6 +109,29 @@ static void monitoring_ctrlc(int signo)
         }
 	exit(EXIT_SUCCESS);
 }
+
+/**
+ * @brief Scale byte value up to KB
+ *
+ * @param bytes value to be scaled up
+ * @return scaled up value in KB's
+ */
+static inline double bytes_to_kb(const double bytes)
+{
+        return bytes / 1024.0;
+}
+
+/**
+ * @brief Scale byte value up to MB
+ *
+ * @param bytes value to be scaled up
+ * @return scaled up value in MB's
+ */
+static inline double bytes_to_mb(const double bytes)
+{
+        return bytes / (1024.0 * 1024.0);
+}
+
 /**
  * @brief Check to determine if processes or cores are monitored
  *
@@ -111,70 +139,11 @@ static void monitoring_ctrlc(int signo)
  * @retval 0 monitoring cores
  * @retval 1 monitoring processes
  */
-static inline int
-process_mode(void)
+static inline int process_mode(void)
 {
         return (sel_process_num <= 0) ? 0 : 1;
 }
-/**
- * @brief Gets scale factors to display events data
- *
- * LLC factor is scaled to kilobytes (1024 bytes = 1KB)
- * MBM factors are scales to megabytes (1024x104 bytes = 1MB)
- *
- * @param cap capability structure
- * @param llc_factor cache occupancy monitoring data
- * @param mbr_factor remote memory bandwidth monitoring data
- * @param mbl_factor local memory bandwidth monitoring data
- * @return operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-get_event_factors(const struct pqos_cap * const cap,
-                  double * const llc_factor,
-                  double * const mbr_factor,
-                  double * const mbl_factor)
-{
-        if ((cap == NULL) || (llc_factor == NULL) ||
-            (mbr_factor == NULL) || (mbl_factor == NULL))
-                return PQOS_RETVAL_PARAM;
-        const struct pqos_monitor *l3mon = NULL, *mbr_mon = NULL,
-                *mbl_mon = NULL;
-        int ret = PQOS_RETVAL_OK;
 
-        if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = pqos_cap_get_event(cap, PQOS_MON_EVENT_L3_OCCUP, &l3mon);
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to obtain LLC occupancy event data!\n");
-                        return PQOS_RETVAL_ERROR;
-                }
-                *llc_factor = ((double)l3mon->scale_factor) / 1024.0;
-        } else {
-                *llc_factor = 1.0;
-        }
-        if (sel_events_max & PQOS_MON_EVENT_RMEM_BW) {
-                ret = pqos_cap_get_event(cap, PQOS_MON_EVENT_RMEM_BW, &mbr_mon);
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to obtain MBR event data!\n");
-                        return PQOS_RETVAL_ERROR;
-                }
-                *mbr_factor = ((double) mbr_mon->scale_factor)
-                        / (1024.0*1024.0);
-        } else {
-                *mbr_factor = 1.0;
-        }
-        if (sel_events_max & PQOS_MON_EVENT_LMEM_BW) {
-                ret = pqos_cap_get_event(cap, PQOS_MON_EVENT_LMEM_BW, &mbl_mon);
-                if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to obtain MBL occupancy event data!\n");
-                        return PQOS_RETVAL_ERROR;
-                }
-                *mbl_factor = ((double)mbl_mon->scale_factor) / (1024.0*1024.0);
-        } else {
-                *mbl_factor = 1.0;
-        }
-        return PQOS_RETVAL_OK;
-}
 /**
  * @brief Verifies and translates monitoring config string into
  *        internal monitoring configuration.
@@ -231,6 +200,7 @@ monitoring_get_input(int argc, char *argv[])
                 }
 	}
 }
+
 /**
  * @brief Starts monitoring on selected cores/PIDs
  *
@@ -299,6 +269,7 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
         }
 	return PQOS_RETVAL_OK;
 }
+
 /**
  * @brief Stops monitoring on selected cores
  *
@@ -321,23 +292,20 @@ static void stop_monitoring(void)
                 free(m_mon_grps[i]);
 	}
 }
+
 /**
  * @brief Reads monitoring event data at given \a interval for \a sel_time time span
  *
  * @param cap detected PQoS capabilites
  */
-static void monitoring_loop(const struct pqos_cap *cap)
+static void monitoring_loop(void)
 {
-	double llc_factor = 1, mbr_factor = 1, mbl_factor = 1;
         unsigned mon_number = 0;
 	int ret = PQOS_RETVAL_OK;
 	int i = 0;
 
 	if (signal(SIGINT, monitoring_ctrlc) == SIG_ERR)
 		printf("Failed to catch SIGINT!\n");
-	ret = get_event_factors(cap, &llc_factor, &mbr_factor, &mbl_factor);
-	if (ret != PQOS_RETVAL_OK)
-		return;
 
         if (!process_mode())
 	        mon_number = (unsigned) sel_monitor_num;
@@ -356,27 +324,24 @@ static void monitoring_loop(const struct pqos_cap *cap)
                         for (i = 0; i < sel_monitor_num; i++) {
                                 const struct pqos_event_values *pv =
                                         &m_mon_grps[i]->values;
-                                double llc = (double)pv->llc,
-                                        mbr = (double)pv->mbm_remote_delta,
-                                        mbl = (double)pv->mbm_local_delta;
+                                double llc = bytes_to_kb(pv->llc);
+                                double mbr = bytes_to_mb(pv->mbm_remote_delta);
+                                double mbl = bytes_to_mb(pv->mbm_local_delta);
 
                                 printf("%8u %8u %10.1f %10.1f %10.1f\n",
                                        m_mon_grps[i]->cores[0],
                                        m_mon_grps[i]->poll_ctx[0].rmid,
-                                       llc * llc_factor,
-                                       mbl * mbl_factor,
-                                       mbr * mbr_factor);
+                                       llc, mbl, mbr);
                         }
                 } else {
                         printf("PID       LLC[KB]\n");
                         for (i = 0; i < sel_process_num; i++) {
                                 const struct pqos_event_values *pv =
                                         &m_mon_grps[i]->values;
-                                double llc = (double)pv->llc;
+                                double llc = bytes_to_kb(pv->llc);
 
                                 printf("%6d %10.1f\n",
-                                       m_mon_grps[i]->pid,
-                                       llc * llc_factor);
+                                       m_mon_grps[i]->pid, llc);
                         }
                 }
 		printf("\nPress Enter to continue or Ctrl+c to exit");
@@ -422,7 +387,7 @@ int main(int argc, char *argv[])
                 goto error_exit;
         }
 	/* Start Monitoring */
-	monitoring_loop(p_cap);
+	monitoring_loop();
 	/* Stop Monitoring */
 	stop_monitoring();
  error_exit:
