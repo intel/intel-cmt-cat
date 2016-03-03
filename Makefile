@@ -95,10 +95,21 @@ $(LIBNAME):
 	$(MAKE) -C lib all
 
 install: $(APP) $(MAN) lib/$(LIB) lib/$(HDR)
+ifeq ($(shell uname), FreeBSD)
+	install -d $(BIN_DIR)
+	install -d $(MAN_DIR)
+	install -d $(HDR_DIR)
+	install -d $(LIB_DIR)
+	install -s $(APP) $(BIN_DIR)
+	install -m 0444 $(MAN) $(MAN_DIR)
+	install -m 0644 lib/$(HDR) $(HDR_DIR)
+	install -m 0644 lib/$(LIB) $(LIB_DIR)
+else
 	install -D -s $(APP) $(BIN_DIR)/$(APP)
 	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
 	install -m 0644 lib/$(HDR) -D $(HDR_DIR)/$(HDR)
 	install -m 0644 lib/$(LIB) -D $(LIB_DIR)/$(LIB)
+endif
 
 uninstall:
 	-rm $(BIN_DIR)/$(APP)

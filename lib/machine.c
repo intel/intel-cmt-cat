@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -40,9 +40,11 @@
 #define _XOPEN_SOURCE 500
 #define _LARGEFILE64_SOURCE
 #endif /* __linux__ */
+
 #ifdef __FreeBSD__
 #define _WITH_DPRINTF
 #endif /* __FreeBSD__ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,6 +52,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#ifdef __FreeBSD__
+#include <sys/cpuctl.h>
+#include <sys/ioctl.h>
+#endif
 
 #include "machine.h"
 #include "log.h"
@@ -132,8 +138,14 @@ msr_file_open(const unsigned lcore)
                 char fname[32];
 
                 memset(fname, 0, sizeof(fname));
+#ifdef __linux__
                 snprintf(fname, sizeof(fname)-1,
                          "/dev/cpu/%u/msr", lcore);
+#endif
+#ifdef __FreeBSD__
+                snprintf(fname, sizeof(fname)-1,
+                         "/dev/cpuctl%u", lcore);
+#endif
                 fd = open(fname, O_RDWR);
                 if (fd < 0)
                         LOG_WARN("Error opening file '%s'!\n", fname);
@@ -152,6 +164,9 @@ msr_read(const unsigned lcore,
         int ret = MACHINE_RETVAL_OK;
         int fd = -1;
         ssize_t read_ret = 0;
+#ifdef __FreeBSD__
+        cpuctl_msr_args_t io;
+#endif
 
         ASSERT(value != NULL);
         if (value == NULL)
@@ -169,13 +184,25 @@ msr_read(const unsigned lcore,
         if (fd < 0)
                 return MACHINE_RETVAL_ERROR;
 
+#ifdef __linux__
         read_ret = pread(fd, value, sizeof(value[0]), (off_t)reg);
+#endif
+
+#ifdef __FreeBSD__
+        io.msr = reg;
+        if (ioctl(fd, CPUCTL_RDMSR, &io) != 0) {
+                read_ret = 0;
+        } else {
+                read_ret = sizeof(value[0]);
+                *value = io.data;
+        }
+#endif
+
         if (read_ret != sizeof(value[0])) {
                 LOG_ERROR("RDMSR failed for reg[0x%x] on lcore %u\n",
                           (unsigned)reg, lcore);
                 ret = MACHINE_RETVAL_ERROR;
         }
-
         return ret;
 }
 
@@ -187,6 +214,9 @@ msr_write(const unsigned lcore,
         int ret = MACHINE_RETVAL_OK;
         int fd = -1;
         ssize_t write_ret = 0;
+#ifdef __FreeBSD__
+        cpuctl_msr_args_t io;
+#endif
 
         ASSERT(lcore < m_maxcores);
         if (lcore >= m_maxcores)
@@ -200,7 +230,19 @@ msr_write(const unsigned lcore,
         if (fd < 0)
                 return MACHINE_RETVAL_ERROR;
 
+#ifdef __linux__
         write_ret = pwrite(fd, &value, sizeof(value), (off_t)reg);
+#endif
+
+#ifdef __FreeBSD__
+        io.msr = reg;
+        io.data = value;
+        if (ioctl(fd, CPUCTL_WRMSR, &io) != 0)
+                write_ret = 0;
+        else
+                write_ret = sizeof(value);
+#endif
+
         if (write_ret != sizeof(value)) {
                 LOG_ERROR("WRMSR failed for reg[0x%x] <- value[0x%llx] on "
                           "lcore %u\n",
@@ -210,4 +252,3 @@ msr_write(const unsigned lcore,
 
         return ret;
 }
-

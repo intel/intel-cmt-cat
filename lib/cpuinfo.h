@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -61,10 +61,7 @@ struct cpuinfo_topology {
 /**
  * @brief Initializes CPU information module
  *
- * It scans /proc/cpuinfo to discover
- * CPU sockets and logical cores in the system.
- * Based on this data it builds structure with
- * system CPU information.
+ * CPU topology detection method is OS dependant.
  *
  * Passing \a topology is optional and it can be NULL.
  * After successful init cpuinfo_get() can be used
