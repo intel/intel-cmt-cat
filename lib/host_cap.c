@@ -85,6 +85,7 @@
 #define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL           /**< CDP enable bit */
 
 #define PQOS_MSR_L3CA_MASK_START     0xC90          /**< CAT class 0 register */
+#define PQOS_MSR_L3CA_MASK_END       0xD8F          /**< CAT class 255 register */
 #define PQOS_MSR_ASSOC               0xC8F          /**< CAT class to core association register */
 #define PQOS_MSR_ASSOC_QECOS_SHIFT   32
 #define PQOS_MSR_ASSOC_QECOS_MASK    0xffffffff00000000ULL
@@ -698,6 +699,72 @@ cdp_enable_exit:
 }
 
 /**
+ * @brief Detects presence of CAT based on register probing.
+ *
+ * This is 3rd and the last method of detecting CAT.
+ * - probe COS registers one by one and exit on first error
+ * - if procedure fails on COS0 then CAT is not supported
+ * - use CPUID.0x4.0x3 to get number of cache ways
+ *
+ * @param cap CAT structure to be initialized
+ * @param cdp_cfg CAT CDP configuration
+ * @param cpu CPU topology structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_PARAM invalid input configuration/parameters
+ * @retval PQOS_RETVAL_RESOURCE technology not supported
+ */
+static int
+discover_alloc_llc_probe(struct pqos_cap_l3ca *cap,
+                         const enum pqos_cdp_config cdp_cfg,
+                         const struct pqos_cpuinfo *cpu)
+{
+        unsigned i = 0, lcore;
+        const unsigned max_classes =
+                PQOS_MSR_L3CA_MASK_END - PQOS_MSR_L3CA_MASK_START + 1;
+
+        ASSERT(cap != NULL && cpu != NULL);
+
+        switch (cdp_cfg) {
+        case PQOS_REQUIRE_CDP_OFF:
+        case PQOS_REQUIRE_CDP_ANY:
+                break;
+        case PQOS_REQUIRE_CDP_ON:
+                LOG_ERROR("CDP requested but not supported by the platform!\n");
+                return PQOS_RETVAL_PARAM;
+        default:
+                LOG_ERROR("Unrecognized CDP configuration setting %d!\n",
+                          (int) cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        /**
+         * Pick a valid core and run series of MSR reads on it
+         */
+        lcore = cpu->cores[0].lcore;
+        for (i = 0; i < max_classes; i++) {
+                int msr_ret;
+                uint64_t value;
+
+                msr_ret = msr_read(lcore, PQOS_MSR_L3CA_MASK_START + i, &value);
+                if (msr_ret != MACHINE_RETVAL_OK)
+                        break;
+        }
+
+        if (i == 0) {
+		LOG_WARN("Error probing COS0 on core %u\n", lcore);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * Number of ways and CBM is detected with CPUID.0x4.0x3 later on
+         */
+        cap->num_classes = i;
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Detects presence of CAT based on brand string.
  *
  * If CPUID.0x7.0 doesn't report CAT feature
@@ -1011,11 +1078,15 @@ discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
                         ret = get_l3_cache_info(NULL, &cap->way_size);
         } else {
                 /**
-                 * Use brand string matching method
+                 * Use brand string matching method 1st.
+                 * If it fails then try register probing.
                  */
                 LOG_INFO("CPUID.0x7.0: CAT not detected. "
 			 "Checking brand string...\n");
                 ret = discover_alloc_llc_brandstr(cap, config->cdp_cfg);
+                if (ret != PQOS_RETVAL_OK)
+                        ret = discover_alloc_llc_probe(cap, config->cdp_cfg,
+                                                       cpu);
                 if (ret == PQOS_RETVAL_OK)
                         ret = get_l3_cache_info(&cap->num_ways, &cap->way_size);
         }
