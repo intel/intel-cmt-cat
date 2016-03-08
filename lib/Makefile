@@ -100,7 +100,7 @@ ifeq ($(SHARED),y)
 	-ln -s $(LIBNAME).0.1 $(LIBNAME)
 	-ln -s $(LIBNAME).0.1 $(LIBSONAME_)
 else
-	$(AR) crvs -D $@ $^
+	$(AR) crvsD $@ $^
 endif
 
 .PHONY: dep
