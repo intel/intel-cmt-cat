@@ -88,11 +88,13 @@ cdp-any	keep current CDP setting (default)
 load commands from selected configuration FILE
 .TP
 .B \-e CLASSDEF, \-\-alloc\-class=CLASSDEF
-define the allocation classes. CLASSDEF format is "TYPE:ID=DEFINITION;...".
+define the allocation classes on all CPU sockets. CLASSDEF format is "TYPE:ID=DEFINITION;...".
+.br
+define classes for selected CPU sockets. CLASSDEF format is "TYPE[@SOCK_LIST]:ID=DEFINITION;...".
 .br
 For CAT, TYPE is "llc", ID is a CLOS number and DEFINITION is a bitmask.
 .br
-For example: "\-e llc:0=0xffff;llc:1=0x00ff;".
+For example: "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00".
 .TP
 .B \-a CLASS2CORE, \-\-alloc\-assoc=CLASS2CORE
 associate allocation classes with cores. CLASS2CORE format is "TYPE:ID=CORE_LIST;...".
