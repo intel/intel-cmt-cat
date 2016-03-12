@@ -858,7 +858,7 @@ static int
 set_attrs(const int idx, const char *fname)
 {
         FILE *fd;
-        int config;
+        int config, ret;
         double sf = 0;
         char file[64], buf[32], *p = buf;
 
@@ -900,12 +900,14 @@ set_attrs(const int idx, const char *fname)
                           "monitoring event scale file\n");
                 return PQOS_RETVAL_ERROR;
         }
-        if (fscanf(fd, "%lf", &sf) < 1) {
+        ret = fscanf(fd, "%lf", &sf);
+        fclose(fd);
+
+        if (ret < 1) {
                 LOG_ERROR("Failed to read PID monitoring "
                           "event scale factor!\n");
                 return PQOS_RETVAL_ERROR;
         }
-        fclose(fd);
         events_tab[idx].scale = sf;
         events_tab[idx].supported = 1;
 
