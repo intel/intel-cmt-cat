@@ -952,8 +952,6 @@ pqos_core_poll(struct pqos_mon_data *p)
                 pv->mbm_total_delta = get_delta(old_value, pv->mbm_total);
                 pv->mbm_total_delta = scale_event(PQOS_MON_EVENT_TMEM_BW,
                                                   pv->mbm_total_delta);
-                if (retval != PQOS_RETVAL_OK)
-                        goto pqos_core_poll__exit;
         }
         if (p->event & PQOS_MON_EVENT_RMEM_BW) {
                 pv->mbm_remote = 0;
