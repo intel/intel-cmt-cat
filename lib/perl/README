@@ -1,0 +1,68 @@
+
+
+========================================================================
+README for libpqos SWIG interface
+
+March 2016
+========================================================================
+
+
+Contents
+========
+
+- Overview
+- Requirements, compilation and installation
+- Usage
+- Legal Disclaimer
+
+
+Overview
+========
+
+In this folder you'll find "pqos.i" a SWIG interface file
+that allow libpqos usage in scripting languages (e.g. in Perl).
+Currently full API is exported but only CAT related part was tested.
+
+
+Requirements, compilation and installation
+==========================================
+
+Requires SWIG and Perl (-devel).
+Tested with SWIG Version 3.0.5 and Perl v5.18.4.
+
+To compile lipqos interface file:
+        "make" for building SWIG Perl interface (Perl module and shared lib).
+        "make clean" for cleaning.
+
+Copy Perl module "pqos.pm" and shared lib "pqos.so" to one of the directories
+listed in Perl's @INC e.g. to "/usr/local/lib64/perl5"
+(run "perl -le 'print for @INC'" to list directories)
+or to directory where Perl script using module is located.
+
+
+Usage
+=====
+
+Add "use pqos;" to your Perl script.
+
+Note:   In case of error while running script such as:
+        "Can't locate pqos.pm in @INC ..."
+        make sure that "pqos.pm" Perl module was copied to directory listed in
+        Perl's @INC or to directory where Perl script using module is located.
+
+        "Can't locate loadable object for module pqos in @INC"
+        make sure that "pqos.so" shared lib was copied to directory listed in
+        Perl's @INC or to directory where Perl script using module is located.
+
+
+Legal Disclaimer
+================
+
+THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
+IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
+ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
+CONDITIONS OF SALE, INTEL ASSUMES NO LIABILITY WHATSOEVER AND INTEL
+DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY, RELATING TO SALE AND/OR
+USE OF INTEL PRODUCTS INCLUDING LIABILITY OR WARRANTIES RELATING TO
+FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR INFRINGEMENT
+OF ANY PATENT, COPYRIGHT OR OTHER INTELLECTUAL PROPERTY RIGHT.
