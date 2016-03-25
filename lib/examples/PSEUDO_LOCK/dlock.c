@@ -32,11 +32,17 @@
  */
 
 #define _GNU_SOURCE
-#include <sched.h>    /* sched_setaffinity() */
 #include <stdint.h>   /* uint64_t etc. */
 #include <stdlib.h>   /* malloc() */
 #include <string.h>   /* memcpy() */
 #include <pqos.h>
+#ifdef __linux__
+#include <sched.h>    /* sched_setaffinity() */
+#endif
+#ifdef __FreeBSD__
+#include <sys/param.h>   /* sched affinity */
+#include <sys/cpuset.h>  /* sched affinity */
+#endif
 #include "dlock.h"
 
 #define MAX_SOCK_NUM 16
@@ -173,8 +179,13 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
 	const struct pqos_cap *p_cap = NULL;
         const struct pqos_capability *p_l3ca_cap = NULL;
         unsigned sockets[8], socket_count = 0, i = 0;
-        cpu_set_t cpuset_save, cpuset;
         int ret = 0, res = 0;
+#ifdef __linux__
+        cpu_set_t cpuset_save, cpuset;
+#endif
+#ifdef __FreeBSD__
+        cpuset_t cpuset_save, cpuset;
+#endif
 
         if (m_chunk_start != NULL)
                 return -1;
@@ -204,7 +215,13 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         /**
          * Get task affinity to restore it later
          */
+#ifdef __linux__
         res = sched_getaffinity(0, sizeof(cpuset_save), &cpuset_save);
+#endif
+#ifdef __FreeBSD__
+        res = cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
+                                 sizeof(cpuset_save), &cpuset_save);
+#endif
         if (res != 0) {
                 perror("dlock_init() error");
                 ret = -4;
@@ -212,11 +229,17 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         }
 
         /**
-         * Set task affinity to coreid for data locking phase
+         * Set task affinity to cpuid for data locking phase
          */
         CPU_ZERO(&cpuset);
         CPU_SET(cpuid, &cpuset);
+#ifdef __linux__
         res = sched_setaffinity(0, sizeof(cpuset), &cpuset);
+#endif
+#ifdef __FreeBSD__
+        res = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
+                                 sizeof(cpuset), &cpuset);
+#endif
         if (res != 0) {
                 perror("dlock_init() error");
                 ret = -4;
@@ -396,7 +419,13 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                 if (m_socket_cos[i].cos_tab != NULL)
                         free(m_socket_cos[i].cos_tab);
 
+#ifdef __linux__
         res = sched_setaffinity(0, sizeof(cpuset_save), &cpuset_save);
+#endif
+#ifdef __FreeBSD__
+        res = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
+                                 sizeof(cpuset_save), &cpuset_save);
+#endif
         if (res != 0)
                 perror("dlock_init() error restoring affinity");
 

@@ -3,14 +3,14 @@
 #
 # @par
 # BSD LICENSE
-# 
+#
 # Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
-# 
+#
 #   * Redistributions of source code must retain the above copyright
 #     notice, this list of conditions and the following disclaimer.
 #   * Redistributions in binary form must reproduce the above copyright
@@ -20,7 +20,7 @@
 #   * Neither the name of Intel Corporation nor the names of its
 #     contributors may be used to endorse or promote products derived
 #     from this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 # "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 # LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,7 +31,7 @@
 # DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
 LIBSONAME_ = libpqos.so
@@ -41,7 +41,7 @@ ifeq ($(SHARED),y)
 LIBNAME = $(LIBSONAME)
 else
 LIBNAME = $(LIBANAME)
-endif 
+endif
 
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ \
@@ -66,14 +66,14 @@ ifeq ($(SHARED),y)
 CFLAGS += -fPIC
 else
 CFLAGS += -fPIE
-endif 
+endif
 
 # DEBUG build
 ifeq ($(DEBUG),y)
 CFLAGS += -g -ggdb -O0 -DDEBUG
 else
 CFLAGS += -g -O2
-endif 
+endif
 
 # Build targets and dependencies
 OBJS = cpuinfo.o machine.o host_cap.o host_allocation.o host_monitoring.o utils.o log.o
@@ -119,8 +119,8 @@ help:
 	@echo "    make all DEBUG=y  - build static library for debugging"
 	@echo "    make rinse        - remove build files"
 	@echo "    make clean        - remove even more files than rinse"
-	@echo "    make doxy         - make doxygen documentation" 
-	@echo "    make style        - coding style check" 
+	@echo "    make doxy         - make doxygen documentation"
+	@echo "    make style        - coding style check"
 
 doxy:
 	doxygen api_doxygen.cfg
@@ -134,6 +134,7 @@ clean:
 	-rm -rf $(DOXY_DIRS)
 	-$(MAKE) clean -C examples/CAT
 	-$(MAKE) clean -C examples/CMT_MBM
+	-$(MAKE) clean -C examples/PSEUDO_LOCK
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
