@@ -134,6 +134,34 @@ pqos_alloc_fini(void)
  * =======================================
  */
 
+/**
+ * @brief Tests if \a bitmask is contiguous
+ *
+ * Zero bit mask is regarded as not contiguous.
+ *
+ * The function shifts out first group of contiguous 1's in the bit mask.
+ * Next it checks remaining bitmask content to make a decision.
+ *
+ * @param bitmask bit mask to be validated for contiguity
+ *
+ * @return Bit mask contiguity check result
+ * @retval 0 not contiguous
+ * @retval 1 contiguous
+ */
+static int is_contiguous(uint64_t bitmask)
+{
+        if (bitmask == 0)
+                return 0;
+
+        while ((bitmask & 1) == 0) /**< Shift until 1 found at position 0 */
+                bitmask >>= 1;
+
+        while ((bitmask & 1) != 0) /**< Shift until 0 found at position 0 */
+                bitmask >>= 1;
+
+        return (bitmask) ? 0 : 1;  /**< non-zero bitmask is not contiguous */
+}
+
 int
 pqos_l3ca_set(const unsigned socket,
               const unsigned num_ca,
@@ -154,6 +182,26 @@ pqos_l3ca_set(const unsigned socket,
         if (ca == NULL || num_ca == 0) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
+        }
+
+        /**
+         * Check if class bitmasks are contiguous.
+         */
+        for (i = 0; i < num_ca; i++) {
+                int is_contig = 0;
+
+                if (ca[i].cdp) {
+                        is_contig = is_contiguous(ca[i].data_mask) &&
+                                is_contiguous(ca[i].code_mask);
+                } else {
+                        is_contig = is_contiguous(ca[i].ways_mask);
+                }
+                if (!is_contig) {
+                        LOG_ERROR("COS%u bit mask is not contiguous!\n",
+                                  ca[i].class_id);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
         }
 
         ASSERT(m_cap != NULL);
