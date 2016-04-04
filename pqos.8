@@ -94,7 +94,9 @@ define classes for selected CPU sockets. CLASSDEF format is "TYPE[@SOCK_LIST]:ID
 .br
 For CAT, TYPE is "llc", ID is a CLOS number and DEFINITION is a bitmask.
 .br
-For example: "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00".
+.B Note: When CDP is on, ID can be postfixed with 'D' for data or 'C' for code.
+.br
+For example: "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00", or for CDP: "\-e llc:0d=0xfff;llc:0c=0xfff00."
 .TP
 .B \-a CLASS2CORE, \-\-alloc\-assoc=CLASS2CORE
 associate allocation classes with cores. CLASS2CORE format is "TYPE:ID=CORE_LIST;...".
