@@ -3,14 +3,14 @@
 #
 # @par
 # BSD LICENSE
-# 
+#
 # Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
 # All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
-# 
+#
 #   * Redistributions of source code must retain the above copyright
 #     notice, this list of conditions and the following disclaimer.
 #   * Redistributions in binary form must reproduce the above copyright
@@ -20,7 +20,7 @@
 #   * Neither the name of Intel Corporation nor the names of its
 #     contributors may be used to endorse or promote products derived
 #     from this software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 # "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 # LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -32,7 +32,7 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-# 
+#
 ###############################################################################
 
 LIBNAME = ./lib/libpqos.a
@@ -58,7 +58,7 @@ ifeq ($(DEBUG),y)
 CFLAGS += -g -ggdb -O0 -DDEBUG
 else
 CFLAGS += -g -O3
-endif 
+endif
 
 # On FreeBSD build with NO_PID_API option
 ifeq ($(shell uname), FreeBSD)
@@ -73,7 +73,6 @@ endif
 
 # Build targets and dependencies
 APP = pqos
-HDR = pqos.h
 MAN = pqos.8
 LIB = libpqos.a
 
@@ -81,8 +80,6 @@ LIB = libpqos.a
 PREFIX ?= /usr/local
 BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
-HDR_DIR = $(PREFIX)/include
-LIB_DIR = $(PREFIX)/lib
 
 OBJS = main.o monitor.o alloc.o profiles.o
 
@@ -102,20 +99,16 @@ ifeq ($(shell uname), FreeBSD)
 	install -d $(LIB_DIR)
 	install -s $(APP) $(BIN_DIR)
 	install -m 0444 $(MAN) $(MAN_DIR)
-	install -m 0644 lib/$(HDR) $(HDR_DIR)
-	install -m 0644 lib/$(LIB) $(LIB_DIR)
 else
 	install -D -s $(APP) $(BIN_DIR)/$(APP)
 	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
-	install -m 0644 lib/$(HDR) -D $(HDR_DIR)/$(HDR)
-	install -m 0644 lib/$(LIB) -D $(LIB_DIR)/$(LIB)
 endif
+	$(MAKE) -C lib install
 
 uninstall:
 	-rm $(BIN_DIR)/$(APP)
 	-rm $(MAN_DIR)/$(MAN)
-	-rm $(HDR_DIR)/$(HDR)
-	-rm $(LIB_DIR)/$(LIB)
+	$(MAKE) -C lib uninstall
 
 .PHONY: clean rinse TAGS install uninstall
 

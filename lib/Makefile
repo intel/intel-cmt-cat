@@ -34,15 +34,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-LIBSONAME_ = libpqos.so
-LIBSONAME = $(LIBSONAME_).1
-LIBANAME = libpqos.a
-ifeq ($(SHARED),y)
-LIBNAME = $(LIBSONAME)
-else
-LIBNAME = $(LIBANAME)
-endif
-
+LIB = libpqos
+VERSION = 0.1.5
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
@@ -64,8 +57,12 @@ endif
 # so or static build
 ifeq ($(SHARED),y)
 CFLAGS += -fPIC
+LIBNAME = $(LIB)-$(VERSION).so
+LIBPERM = 0755
 else
 CFLAGS += -fPIE
+LIBNAME = $(LIB).a
+LIBPERM = 0644
 endif
 
 # DEBUG build
@@ -90,25 +87,49 @@ else
 OBJS += host_pidapi.o perf.o
 endif
 
-DEPFILE = $(LIBANAME).dep
+HDR = pqos.h
+PREFIX ?= /usr/local
+LIBDIR ?= $(PREFIX)/lib
+HDR_DIR ?= $(PREFIX)/include
+DEPFILE = $(LIB).dep
 
 all: $(LIBNAME)
 
 $(LIBNAME): $(OBJS)
 ifeq ($(SHARED),y)
-	$(CC) -shared -Wl,-soname,$(LIBNAME) -o $(LIBNAME).0.1 $^ -l c
-	-ln -s $(LIBNAME).0.1 $(LIBNAME)
-	-ln -s $(LIBNAME).0.1 $(LIBSONAME_)
+	$(CC) -shared -Wl,-soname,$(LIBNAME) -o $(LIBNAME) $^ -l c
+	ln -s $(LIB).so.0 $(LIB).so
+	ln -s $(LIBNAME) $(LIB).so.0
 else
 	$(AR) crvsD $@ $^
 endif
+
+install: $(LIBNAME)
+# Install on FreeBSD
+ifeq ($(shell uname), FreeBSD)
+	install -d $(LIBDIR)
+	install -m $(LIBPERM) $(LIBNAME) $(LIBDIR)
+	install -m 0644 $(HDR) $(HDR_DIR)
+# Install on Linux
+else
+	install -m $(LIBPERM) $(LIBNAME) -D $(LIBDIR)/$(LIBNAME)
+	install -m 0644 $(HDR) -D $(HDR_DIR)/$(HDR)
+endif
+
+# Create symlinks to DSO
+ifeq ($(SHARED),y)
+	ln -s $(LIBDIR)/$(LIB).so.0 $(LIBDIR)/$(LIB).so
+	ln -s $(LIBDIR)/$(LIBNAME) $(LIBDIR)/$(LIB).so.0
+endif
+
+uninstall:
+	-rm $(LIBDIR)/libpqos*
 
 .PHONY: dep
 dep: $(DEPFILE)
 
 $(DEPFILE): $(subst .o,.c,$(OBJS))
 	$(CC) -MM $(CFLAGS) $^ > $@
-
 
 .PHONY: clean rinse doxy help
 
@@ -127,10 +148,10 @@ doxy:
 	doxygen lib_doxygen.cfg
 
 rinse:
-	-rm -f $(OBJS) $(LIBNAME)* $(DEPFILE)
+	-rm -f $(OBJS) $(LIB)* $(DEPFILE)
 
 clean:
-	-rm -f $(OBJS) $(LIBANAME) $(LIBSONAME_) $(LIBSONAME)* $(DEPFILE) ./*~
+	-rm -f $(OBJS) $(LIB)* $(DEPFILE) ./*~
 	-rm -rf $(DOXY_DIRS)
 	-$(MAKE) clean -C examples/CAT
 	-$(MAKE) clean -C examples/CMT_MBM
