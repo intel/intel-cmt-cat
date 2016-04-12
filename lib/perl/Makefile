@@ -34,10 +34,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-INCLUDE = -I/usr/local/include/ -I/usr/lib64/perl5/CORE
+ifeq ($(shell uname), FreeBSD)
+SWIG = swig3.0
+else
+SWIG = swig
+endif
+
+PERL_ARCHLIB = $(shell perl -MConfig -e 'print $$Config{archlib};')
+INCLUDE = -I/usr/local/include/ -I$(PERL_ARCHLIB)/CORE
 CFLAGS = -O2 -fPIC -D_LARGEFILE64_SOURCE $(INCLUDE)
 LDFLAGS = -shared -L/usr/local/lib -lpqos
-SWIG = swig
 SWIGFLAGS = -perl $(INCLUDE)
 
 all: pqos.so

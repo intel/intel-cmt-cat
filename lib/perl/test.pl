@@ -48,14 +48,55 @@ my $num_ways;
 my $num_cores;
 my $num_sockets;
 
+sub read_msr {
+	my ($cpu_id, $msr) = @_;
+
+	my $cmd;
+	if ($^O eq "freebsd") {
+		$cmd = sprintf("cpucontrol -m 0x%x /dev/cpuctl%u", $msr, $cpu_id);
+	} else {
+		$cmd = sprintf("rdmsr -p%u -0 -c 0x%x", $cpu_id, $msr);
+	}
+
+	my @result = `$cmd`;
+
+	if ($? != 0) {
+		print __LINE__, " $cmd FAILED!\n";
+		return;
+	}
+
+	if ($^O eq "freebsd") {
+		my @result_array = split / /, $result[0];
+		return int(($result_array[2] << 32) + $result_array[3]);
+	} else {
+		return int(hex $result[0]);
+	}
+}
+
 sub __func__ {
 	return (caller(1))[3];
 }
 
 sub check_msr_tools {
-	my @result = `rdmsr -V`;
-	if ($? != 0) {
-		print __LINE__, " unable to run rdmsr...\n";
+
+	if ($^O eq "freebsd") {
+		`cpucontrol -m 0xC8F /dev/cpuctl0`;
+	} else {
+		`rdmsr -p 0 -u 0xC8F`;
+	}
+
+	if ($? == -1) {
+		if ($^O eq "freebsd") {
+			print __LINE__, " cpucontrol tool not found... ";
+		} else {
+			print __LINE__, " rdmsr tool not found... ";
+		}
+		print "please install.\n";
+		return -1;
+	}
+
+	if (!defined read_msr(0, 0xC8F)) {
+		print __LINE__, " unable to read MSR!...\n";
 		return -1;
 	}
 
@@ -67,7 +108,7 @@ sub shutdown_pqos {
 	print "Shutting down pqos lib...\n";
 	pqos::pqos_fini();
 	$l3ca_cap_p = undef;
-	$cpuinfo_p = undef;
+	$cpuinfo_p  = undef;
 	return;
 }
 
@@ -174,14 +215,7 @@ sub generate_ways_mask {
 # Function to get CoS assigned to CPU via MSRs (using rdmsr from msr-tools)
 sub get_msr_assoc {
 	my ($cpu_id) = @_;
-	my $cmd = sprintf("rdmsr -p %u -u -f63:32 0xC8F", $cpu_id);
-	my @result = `$cmd`;
-	if ($? != 0) {
-		print __LINE__, " $cmd FAILED!\n";
-		return;
-	}
-
-	return $result[0];
+	return read_msr($cpu_id, 0xC8F) >> 32;
 }
 
 # Function to get CoS's ways mask via MSRs (using rdmsr from msr-tools)
@@ -208,14 +242,7 @@ sub get_msr_ways_mask {
 		}
 	}
 
-	my $cmd = sprintf("rdmsr -p %u -u -f31:0 0x%x", $cpu_id, ($cos_id + 0xc90));
-	my @result = `$cmd`;
-	if ($? != 0) {
-		print __LINE__, " $cmd FAILED!\n";
-		goto EXIT;
-	}
-
-	$ret = $result[0];
+	$ret = read_msr($cpu_id, int(0xC90 + $cos_id)) & (2**32 - 1);
 
   EXIT:
 	pqos::delete_uintp($socket_p);
@@ -247,7 +274,7 @@ sub print_cfg {
 			}
 
 			printf("Socket: %d, CoS: %d, CDP: %d",
-				$l3ca->{cdp}, $socket_id, $l3ca->{class_id}, $l3ca->{cdp});
+				$socket_id, $l3ca->{class_id}, $l3ca->{cdp});
 			if (int($l3ca->{cdp}) == 1) {
 				printf(", data_mask: 0x%x, code_mask: 0x%x",
 					$l3ca->{data_mask}, $l3ca->{code_mask});
@@ -424,7 +451,8 @@ sub test_way_masks {
 			}
 
 			if ($msr_ways_mask != $gen_ways_mask) {
-				print __LINE__, " $msr_ways_mask != $gen_ways_mask FAILED!\n";
+				print __LINE__, ' $msr_ways_mask != $gen_ways_mask FAILED!',
+				  "\n";
 				goto EXIT;
 			}
 		}
@@ -480,9 +508,7 @@ sub reset_cfg {
 	return sprintf("%s: %s", __func__, $ret == 0 ? "PASS" : "FAILED!");
 }
 
-if (0 != check_msr_tools) {
-	die ("rdmsr tool not detected, please install msr-tools package.\n");
-}
+(0 == check_msr_tools) or die("MSR reading tool issue...\n");
 
 printf("%d %s\n", __LINE__, init_pqos());
 printf("%d %s\n", __LINE__, test_assoc());
