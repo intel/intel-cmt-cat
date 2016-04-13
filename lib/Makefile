@@ -73,7 +73,8 @@ CFLAGS += -g -O2
 endif
 
 # Build targets and dependencies
-OBJS = cpuinfo.o machine.o host_cap.o host_allocation.o host_monitoring.o utils.o log.o
+SRCS = $(wildcard *.c)
+OBJS = $(SRCS:.c=.o)
 
 # On FreeBSD build with NO_PID_API option
 ifeq ($(shell uname), FreeBSD)
@@ -83,8 +84,7 @@ endif
 # PID API build option
 ifeq ($(NO_PID_API), y)
 CFLAGS += -DPQOS_NO_PID_API
-else
-OBJS += host_pidapi.o perf.o
+OBJS := $(filter-out host_pidapi.o perf.o,$(OBJS))
 endif
 
 HDR = pqos.h
@@ -125,11 +125,13 @@ endif
 uninstall:
 	-rm $(LIBDIR)/libpqos*
 
-.PHONY: dep
-dep: $(DEPFILE)
+DEPFILES = $(SRCS:.c=.d)
 
-$(DEPFILE): $(subst .o,.c,$(OBJS))
-	$(CC) -MM $(CFLAGS) $^ > $@
+%.o: %.c %.d
+
+%.d: %.c
+	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
+	grep -e "\.o:" $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
 .PHONY: clean rinse doxy help
 
@@ -148,10 +150,10 @@ doxy:
 	doxygen lib_doxygen.cfg
 
 rinse:
-	-rm -f $(OBJS) $(LIB)* $(DEPFILE)
+	-rm -f $(OBJS) $(LIB)* $(DEPFILES)
 
 clean:
-	-rm -f $(OBJS) $(LIB)* $(DEPFILE) ./*~
+	-rm -f $(OBJS) $(LIB)* $(DEPFILES) ./*~
 	-rm -rf $(DOXY_DIRS)
 	-$(MAKE) clean -C examples/CAT
 	-$(MAKE) clean -C examples/CMT_MBM
@@ -183,4 +185,4 @@ cppcheck:
 	utils.c cpuinfo.c cpuinfo.h host_pidapi.c host_pidapi.h
 
 # dependecies file
--include $(DEPFILE)  
+-include $(DEPFILES)

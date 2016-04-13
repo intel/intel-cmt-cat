@@ -81,7 +81,15 @@ PREFIX ?= /usr/local
 BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
 
+SRCS = $(wildcard *.c)
 OBJS = main.o monitor.o alloc.o profiles.o
+DEPFILES = $(SRCS:.c=.d)
+
+%.o: %.c %.d
+
+%.d: %.c
+	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
+	grep -e "\.o:" $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
 all: $(APP)
 
@@ -95,8 +103,6 @@ install: $(APP) $(MAN) lib/$(LIB) lib/$(HDR)
 ifeq ($(shell uname), FreeBSD)
 	install -d $(BIN_DIR)
 	install -d $(MAN_DIR)
-	install -d $(HDR_DIR)
-	install -d $(LIB_DIR)
 	install -s $(APP) $(BIN_DIR)
 	install -m 0444 $(MAN) $(MAN_DIR)
 else
@@ -116,7 +122,7 @@ rinse:
 	-rm -f $(APP) $(OBJS)
 
 clean:
-	-rm -f $(APP) $(OBJS) $(DEPFILE) ./*~
+	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
 	$(MAKE) -C lib clean
 
 TAGS:
@@ -135,3 +141,5 @@ cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I./lib --template=gcc \
 	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h
+
+-include $(DEPFILES)
