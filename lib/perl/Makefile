@@ -57,3 +57,37 @@ pqos_wrap.c: pqos.i
 .PHONY: clean
 clean:
 	rm -f pqos.so pqos.pm pqos_wrap.c pqos_wrap.o
+
+PERLTIDY?=perltidy
+
+PERLTIDY_STYLE=-bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs
+# http://perltidy.sourceforge.net/stylekey.html
+# http://perltidy.sourceforge.net/perltidy.html
+# -bar - keep the brace on the right even for multiple-line test expressions
+# -ce - Cuddled Else
+# -pt=2 - parentheses horizontal tightness - space is never used
+# -sbt=2 - square brackets horizontal tightness - space is never used
+# -bbt=2 - code block curly braces horizontal tightness - space is never used
+# -et=4 - entab leading whitespace with one tab character for each 4 spaces
+# -baao - "break after all operators"
+# -nsfs - no space before a semicolon in a for statement
+
+# List of Perl scripts to be processed, space separated list
+PERL_SCRIPTS_LIST=test.pl
+
+# To check if required style is followed, perltidy is called and
+# formatted output is compared to actual file,
+# if there are no differences, it means that file meets the requirements
+.PHONY: style
+style:
+	@bash -c 'for i in $(PERL_SCRIPTS_LIST); do \
+		$(PERLTIDY) $(PERLTIDY_STYLE) ./$${i} -st |\
+		diff - ./$${i} && echo "$${i} style OK" ||\
+		{ echo "$${i} style check failed!"; exit 1; }; \
+	done'
+
+.PHONY: style-fix
+style-fix:
+	@bash -c 'for i in $(PERL_SCRIPTS_LIST); do \
+		$(PERLTIDY) $(PERLTIDY_STYLE) -b ./$${i}; \
+	done'
