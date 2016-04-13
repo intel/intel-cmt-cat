@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -1243,13 +1243,37 @@ get_mon_arrays(struct pqos_mon_data ***parray1,
         return mon_number;
 }
 
+/**
+ * @brief Converts microseconds into timeval structure
+ *
+ * @param tv pointer to timeval structure to be filled in
+ * @param usec microseconds to be used to fill in \a tv
+ */
+static void usec_to_timeval(struct timeval *tv, const long usec)
+{
+        tv->tv_sec = usec / 1000000L;
+        tv->tv_usec = usec % 1000000L;
+}
+
+/**
+ * @brief Converts timeval structure into microseconds
+ *
+ * @param tv pointer to timeval structure to be filled in
+ *
+ * @return Number of microseconds corresponding to \a tv
+ */
+static long timeval_to_usec(const struct timeval *tv)
+{
+        return ((long)tv->tv_usec) + ((long)tv->tv_sec * 1000000L);
+}
+
 void monitor_loop(void)
 {
 #define TERM_MIN_NUM_LINES 3
 
         const long interval =
                 (long)sel_mon_interval * 100000LL; /* interval in [us] units */
-        struct timeval tv_start;
+        struct timeval tv_start, tv_s;
         int ret = PQOS_RETVAL_OK;
         const int istty = isatty(fileno(fp_monitor));
         const int istext = !strcasecmp(sel_output_type, "text");
@@ -1305,16 +1329,14 @@ void monitor_loop(void)
                 fprintf(fp_monitor, "%s\n", header);
 
         gettimeofday(&tv_start, NULL);
+        tv_s = tv_start;
 
         while (!stop_monitoring_loop) {
-		struct timeval tv_s, tv_e;
+		struct timeval tv_e;
                 struct tm *ptm = NULL;
                 unsigned i = 0;
-                struct timespec req, rem;
                 long usec_start = 0, usec_end = 0, usec_diff = 0;
                 char cb_time[64];
-
-                gettimeofday(&tv_s, NULL);
 
 		ret = pqos_mon_poll(mon_grps, mon_number);
 		if (ret != PQOS_RETVAL_OK) {
@@ -1381,13 +1403,13 @@ void monitor_loop(void)
                 /**
                  * Calculate microseconds to the nearest measurement interval
                  */
-                usec_start = ((long)tv_s.tv_usec) +
-                        ((long)tv_s.tv_sec * 1000000L);
-                usec_end = ((long)tv_e.tv_usec) +
-                        ((long)tv_e.tv_sec * 1000000L);
+                usec_start = timeval_to_usec(&tv_s);
+                usec_end = timeval_to_usec(&tv_e);
                 usec_diff = usec_end - usec_start;
 
-                if (usec_diff < interval) {
+                if (usec_diff < interval && usec_diff > 0) {
+                        struct timespec req, rem;
+
                         memset(&rem, 0, sizeof(rem));
                         memset(&req, 0, sizeof(req));
 
@@ -1405,6 +1427,9 @@ void monitor_loop(void)
                                 nanosleep(&req, &rem);
                         }
                 }
+
+                /* move tv_s to the next interval */
+                usec_to_timeval(&tv_s, usec_start + interval);
 
                 if (sel_timeout >= 0) {
                         gettimeofday(&tv_e, NULL);
