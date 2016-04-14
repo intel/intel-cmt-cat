@@ -35,9 +35,8 @@
 #
 ###############################################################################
 
-LIBNAME = ./../../libpqos.a
-LDFLAGS = -L./../../ -lpqos
-CFLAGS = -I./../../ \
+LIBDIR ?= ../../
+CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
@@ -59,12 +58,9 @@ MONITORAPP = monitor_app
 
 all: $(MONITORAPP)
 
-$(MONITORAPP): $(LIBNAME)
-
-$(LIBNAME):
-	$(MAKE) -C ../../ all
-
-.PHONY: clean
+.PHONY: lib clean
+lib:
+	$(MAKE) -C $(LIBDIR) all
 
 clean:
 	-rm -f $(MONITORAPP) ./*.o
@@ -80,5 +76,5 @@ CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
-	--std=c99 -I../../ --template=gcc \
+	--std=c99 -I$(LIBDIR) --template=gcc \
 	monitor_app.c

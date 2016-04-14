@@ -36,6 +36,7 @@
 
 LIB = libpqos
 VERSION = 0.1.5
+SHARED ?= y
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \

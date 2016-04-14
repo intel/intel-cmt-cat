@@ -3,7 +3,10 @@
 ========================================================================
 README for CMT, MBM and CAT Software Package
 
-February 2016
+April 2016
+
+* The instructions contained in this file are temporary as the directory
+  structure will be changing soon.
 ========================================================================
 
 
@@ -88,28 +91,33 @@ modular kernels the driver may need to be loaded manually:
 
 $ modprobe msr
 
-For installation of the PQoS utility untar the gzip image and follow
-below instructions to create pqos executable.
+For installation of the PQoS library and utility, untar the gzip image
+and follow below instructions to create pqos executable.
+
+First compile PQoS library:
+        cd lib/
+        "make help" lists various make options.
+        "make" or "make all" for building shared library.
+        "make all SHARED=n" for building static library.
+
+To install the PQoS library:
+        cd lib/
+	"sudo make install" to install the shared library.
+	"sudo make install SHARED=n" to install the static library.
+	Note: It may be necessary to add the installation directory to the
+	linker search path. For first time installation, update ld cache
+	with "sudo ldconfig".
 
 To compile PQoS utility:
-        "make" or "make all" for building utility (builds library if missing).
+        "make" or "make all" for building utility.
         "make all DEBUG=y" for building utility for debugging.
-        "make rinse" for cleaning local build files.
         "make clean" for clearing even more files than "make rinse".
+        Note: Having both local and installed copies of the library
+        may cause undefined behaviour when building the utility.
 
 To install the PQoS utility (optional), first compile, then:
         "sudo make install" to install below /usr/local.
         "sudo make install PREFIX=/some/where" to install below /some/where.
-
-To compile PQoS library:
-        cd lib/
-        "make help" lists various make options.
-        "make" or "make all" for building static library.
-        "make all SHARED=y" for building shared library.
-        "make all DEBUG=y" for building static library for debugging.
-        "make rinse" for cleaning local build files.
-        "make clean" for clearing even more files than "make rinse".
-        "make doxy" to create doxygen documentation.
 
 Note:   In case of compilation error such as:
         "host_pidapi.c:46:30: fatal error: linux/perf_event.h:
@@ -123,8 +131,9 @@ To compile CAT, CMT and MBM sample applications:
 
 For CAT sample application:
         cd lib/examples/CAT/
-        "make all" for building static library.
+        "make all" for building the application.
         "make clean" for cleaning build files.
+        "make LDLIBS=path/to/libpqos.a" to link to static library.
 CAT sample application build will create three targets as follows:
 1. allocation_app - Demonstrates usage of pqos library APIs related
 to set bit mask for class of service(CLOS) and displaying
@@ -140,8 +149,9 @@ Please refer "./reset_app -h" option for usage details.
 
 For CMT/MBM sample application:
         cd lib/examples/CMT_MBM/
-        "make all" for building static library.
+        "make all" for building the application.
         "make clean" for cleaning build files.
+        "make LDLIBS=path/to/libpqos.a" to link to static library.
 CMT_MBM sample application build will create one target as follows:
 1. monitor_app - Demonstrates usage of pqos library APIs related
 monitoring events like cache occupancy, local memory bandwidth usage
@@ -173,8 +183,18 @@ $ pkg install gmake
 For installation of the PQoS utility untar the gzip image and follow
 below instructions to create pqos executable.
 
+First compile PQoS library:
+        cd lib/
+        "gmake" or "gmake all" for building shared library.
+        "gmake all SHARED=n" for building static library.
+
+To install the PQoS library:
+        cd lib/
+	"sudo gmake install" to install the shared library.
+	"sudo gmake install SHARED=n" to install the static library.
+
 To compile PQoS utility:
-        "gmake" or "gmake all" for building utility (builds library if missing).
+        "gmake" or "gmake all" for building utility.
 
 To install the PQoS utility (optional), first compile, then:
         "sudo gmake install" to install below /usr/local.
@@ -203,6 +223,8 @@ Usage: For pqos utility:
         "./pqos -s"    Shows current CAT, CMT and MBM configuration.
         "./pqos -T"    Starts CMT and MBM monitoring on all detected
                        cores(depends of hardware feature availability).
+        Note: It may be necessary to set "LD_LIBRARY_PATH=path/to/libpqos.so"
+              when running the utility with local shared library.
 
 Legal Disclaimer
 ================

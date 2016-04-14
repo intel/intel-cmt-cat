@@ -35,9 +35,9 @@
 #
 ###############################################################################
 
-LIBNAME = ./lib/libpqos.a
-LDFLAGS = -L./lib -lpqos -lpthread -fPIE -z noexecstack -z relro -z now
-CFLAGS = -I./lib \
+LIBDIR ?= ./lib
+LDFLAGS = -L$(LIBDIR) -lpqos -lpthread -fPIE -z noexecstack -z relro -z now
+CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
@@ -74,7 +74,6 @@ endif
 # Build targets and dependencies
 APP = pqos
 MAN = pqos.8
-LIB = libpqos.a
 
 # XXX: modify as desired
 PREFIX ?= /usr/local
@@ -93,13 +92,10 @@ DEPFILES = $(SRCS:.c=.d)
 
 all: $(APP)
 
-$(APP): $(OBJS) $(LIBNAME)
+$(APP): $(OBJS)
 	$(CC) $^ $(LDFLAGS) -o $@
 
-$(LIBNAME):
-	$(MAKE) -C lib all
-
-install: $(APP) $(MAN) lib/$(LIB) lib/$(HDR)
+install: $(APP) $(MAN)
 ifeq ($(shell uname), FreeBSD)
 	install -d $(BIN_DIR)
 	install -d $(MAN_DIR)
@@ -109,24 +105,21 @@ else
 	install -D -s $(APP) $(BIN_DIR)/$(APP)
 	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
 endif
-	$(MAKE) -C lib install
 
 uninstall:
 	-rm $(BIN_DIR)/$(APP)
 	-rm $(MAN_DIR)/$(MAN)
-	$(MAKE) -C lib uninstall
 
-.PHONY: clean rinse TAGS install uninstall
+.PHONY: lib clean rinse TAGS install uninstall
 
-rinse:
-	-rm -f $(APP) $(OBJS)
+lib:
+	$(MAKE) -C $(LIBDIR) all
 
 clean:
 	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
-	$(MAKE) -C lib clean
 
 TAGS:
-	etags ./*.[ch] ./lib/*.[ch]
+	etags ./*.[ch] $(LIBDIR)/*.[ch]
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
@@ -139,7 +132,7 @@ CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
-	--std=c99 -I./lib --template=gcc \
+	--std=c99 -I$(LIBDIR) --template=gcc \
 	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h
 
 -include $(DEPFILES)

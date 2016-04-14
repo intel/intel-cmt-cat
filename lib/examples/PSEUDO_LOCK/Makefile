@@ -35,9 +35,9 @@
 #
 ###############################################################################
 
-LIBNAME = ./../../libpqos.a
-LDFLAGS = -L./../../ -lpqos -lrt
-CFLAGS = -I./../../ \
+LIBDIR ?= ../../
+LDFLAGS = -L$(LIBDIR) -lpqos -lrt
+CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings  \
@@ -60,12 +60,12 @@ OBJS = pseudo_lock.o dlock.o tsc.o
 
 all: $(APP)
 
-$(APP): $(LIBNAME) $(OBJS)
+$(APP): $(OBJS)
 
-$(LIBNAME):
-	$(MAKE) -C ../../ DEBUG=n
+.PHONY: lib clean
+lib:
+	$(MAKE) -C $(LIBDIR) all
 
-.PHONY: clean
 clean:
 	-rm -f $(APP) $(OBJS) *.o
 
@@ -80,5 +80,5 @@ CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
-	--std=c99 -I../../ --template=gcc \
+	--std=c99 -I$(LIBDIR) --template=gcc \
 	pseudo_lock.c dlock.c dlock.h tsc.c tsc.h
