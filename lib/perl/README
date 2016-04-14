@@ -28,16 +28,15 @@ Requirements, compilation and installation
 ==========================================
 
 Requires SWIG and Perl (-devel).
-Tested with SWIG Version 3.0.5 and Perl v5.18.4.
+Tested Linux running SWIG Version 3.0.5 and Perl v5.18.4
+and FreeBSD running SWIG Version 3.0.8 and Perl v5.14.2
 
 To compile lipqos interface file:
-        "make" for building SWIG Perl interface (Perl module and shared lib).
+        "perl Makefile.PL" to generate Makefile.
+        "make" to build SWIG Perl interface (Perl module and shared lib).
         "make clean" for cleaning.
-
-Copy Perl module "pqos.pm" and shared lib "pqos.so" to one of the directories
-listed in Perl's @INC e.g. to "/usr/local/lib64/perl5"
-(run "perl -le 'print for @INC'" to list directories)
-or to directory where Perl script using module is located.
+        "sudo make test" to test.
+        "sudo make install" to install SWIG Perl interface.
 
 
 Usage
@@ -45,14 +44,19 @@ Usage
 
 Add "use pqos;" to your Perl script.
 
-Note:   In case of error while running script such as:
-        "Can't locate pqos.pm in @INC ..."
-        make sure that "pqos.pm" Perl module was copied to directory listed in
-        Perl's @INC or to directory where Perl script using module is located.
+Note:
+        In case of error while running "sudo make install" such as:
+        "touch: cannot touch ‘pqos.bs’: Permission denied
+        Makefile:442: recipe for target 'pqos.bs' failed
+        make: *** [pqos.bs] Error 1"
+        please rerun make
 
+        In case of error while running script such as:
+        "Can't locate pqos.pm in @INC ..."
+        or
         "Can't locate loadable object for module pqos in @INC"
-        make sure that "pqos.so" shared lib was copied to directory listed in
-        Perl's @INC or to directory where Perl script using module is located.
+        make sure that you have installed SWIG Perl interface,
+        if not, just run "sudo make install"
 
 
 Legal Disclaimer
