@@ -288,6 +288,39 @@ update_l3ca_cos_tab(struct l3ca_cos_sock *sock, const unsigned id,
 }
 
 /**
+ * @brief   Check bitmask is valid of not. Each COS bitmask must have at least
+ *          2 contiguous bits set (i.e. 2 cache ways) because it depends on CPU
+ *          model to accept non-contiguous ways of allocaton.
+ *
+ * @param   mask integer representation of cache allocation bitmask
+ *
+ * @return  0 for valid, otherwise invalid
+ */
+static int
+check_bitmask(uint64_t mask)
+{
+        unsigned i;
+        int one_pos_prev = -1, one_pos_curr = -1;
+        unsigned cnt = 0;
+
+        for (i = 0; i < sizeof(mask) * 8; i++) {
+                if (mask & 1L<<i) {
+                        cnt++;
+                        one_pos_prev = one_pos_curr;
+                        one_pos_curr = i;
+
+                        if (one_pos_prev != -1 && one_pos_curr != one_pos_prev + 1)
+                                return -1;
+                }
+        }
+
+        if (cnt < 2)
+                return -1;
+
+        return 0;
+}
+
+/**
  * @brief Verifies and translates definition of single allocation
  *        class of service from text string into internal configuration
  *        for specified sockets.
@@ -309,9 +342,16 @@ parse_allocation_cos(char *str, const uint64_t *sockets,
         if (p == NULL)
                 parse_error(str, "Invalid class of service definition");
         *p = '\0';
+        p++;
 
         parse_cos_mask_type(str, &update_scope, &class_id);
-        mask = strtouint64(p+1);
+        mask = strtouint64(p);
+
+        if (check_bitmask(mask) != 0)
+            parse_error(p, "Invalid bitmask, must contain at least two ways and be contiguous");
+
+        parse_cos_mask_type(str, &update_scope, &class_id);
+        mask = strtouint64(p);
 
         /**
          * Update all sockets COS table
