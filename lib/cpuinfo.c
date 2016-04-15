@@ -41,7 +41,9 @@
 #include <string.h>
 #include <stdint.h>
 #include <ctype.h>
-
+#ifdef __linux__
+#include <limits.h>
+#endif
 #ifdef __FreeBSD__
 #include <sys/param.h>   /* sched affinity */
 #include <sys/cpuset.h>  /* sched affinity */
@@ -175,7 +177,7 @@ parse_socket_id(const char *buf, unsigned *socket_id)
 static struct cpuinfo_topology *cpuinfo_build_topo(void)
 {
         FILE *f = NULL;
-        unsigned lcore_id = 0, socket_id = 0,
+        unsigned lcore_id = UINT_MAX, socket_id = 0,
                 core_count = 0, sockets = 0,
                 di = 0;
         LIST_HEAD_DECLARE(core_list);
@@ -204,7 +206,7 @@ static struct cpuinfo_topology *cpuinfo_build_topo(void)
                         continue;
                 }
 
-                if (buf[0] == '\n') {
+                if (buf[0] == '\n' && lcore_id != UINT_MAX) {
                         struct core_info *inf =
                                 (struct core_info *) malloc(sizeof(*inf));
 
@@ -222,7 +224,7 @@ static struct cpuinfo_topology *cpuinfo_build_topo(void)
                         inf->socket = socket_id;
                         inf->cluster = socket_id;
                         list_add_tail(&inf->list, &core_list);
-
+                        lcore_id = UINT_MAX;
                         core_count++;
                 }
         }
