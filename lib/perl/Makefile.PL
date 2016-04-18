@@ -1,5 +1,5 @@
 ###############################################################################
-# Makefile script for PQoS library SWIG Perl interface
+# Makefile.PL script for PQoS library SWIG Perl interface
 #
 # @par
 # BSD LICENSE
@@ -34,30 +34,31 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-ifeq ($(shell uname), FreeBSD)
-SWIG = swig3.0
-else
-SWIG = swig
-endif
+use strict;
+use warnings;
 
-PERL_ARCHLIB = $(shell perl -MConfig -e 'print $$Config{archlib};')
-INCLUDE = -I/usr/local/include/ -I$(PERL_ARCHLIB)/CORE
-CFLAGS = -O2 -fPIC -D_LARGEFILE64_SOURCE $(INCLUDE)
-LDFLAGS = -shared -L/usr/local/lib -lpqos
-SWIGFLAGS = -perl $(INCLUDE)
+use ExtUtils::MakeMaker;
 
-all: pqos.so
+WriteMakefile(
+	'NAME'    => 'pqos',
+	'VERSION' => "0.1",
+	'LIBS'    => ['-lpqos', '-L/usr/local/lib -lpqos'],
+	'OBJECT'  => 'pqos_wrap.o',
+	'clean'   => {FILES => "pqos_wrap.c"},
+);
 
-pqos.so: pqos_wrap.o
-	$(LD) $(LDFLAGS) $< -o $@
+sub MY::postamble {
+	my $swig = "swig";
+	if ($^O eq "freebsd") {
+		$swig = $swig . "3.0";
+	}
 
-pqos_wrap.c: pqos.i
-	$(SWIG) $(SWIGFLAGS) $<
+	my $swig_target = <<"SWIG_MAKEFILE";
+pqos_wrap.c:
+	$swig -perl -outdir \$(INST_LIB) -I/usr/local/include pqos.i
+SWIG_MAKEFILE
 
-.PHONY: clean
-clean:
-	rm -f pqos.so pqos.pm pqos_wrap.c pqos_wrap.o
-
+	my $perltidy_targets = <<'PERLTIDY_MAKEFILE';
 PERLTIDY?=perltidy
 
 PERLTIDY_STYLE=-bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs
@@ -91,3 +92,7 @@ style-fix:
 	@bash -c 'for i in $(PERL_SCRIPTS_LIST); do \
 		$(PERLTIDY) $(PERLTIDY_STYLE) -b ./$${i}; \
 	done'
+PERLTIDY_MAKEFILE
+
+	return $swig_target . $perltidy_targets;
+}
