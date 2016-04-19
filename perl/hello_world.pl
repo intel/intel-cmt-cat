@@ -35,18 +35,14 @@
 
 use strict;
 use warnings;
-use lib '../lib/perl/';
 use pqos;
 
 =begin
 Script to test PQoS Perl interface
 =cut
 
-my $cfg           = pqos::pqos_config->new();
-my $l3ca          = pqos::pqos_l3ca->new();
-my $cos_p         = pqos::new_uintp();
-my $socket_p      = pqos::new_uintp();
-my $num_sockets_p = pqos::new_uintp();
+my $cfg  = pqos::pqos_config->new();
+my $l3ca = pqos::pqos_l3ca->new();
 
 # Setup config
 $cfg->{verbose} = 0;
@@ -69,18 +65,18 @@ my $cpu_num   = pqos::cpuinfo_p_value($cpuinfo_p)->{num_cores};
 for (my $i = 0; $i < $cpu_num; $i++) {
 
 	# Get core association
-	if (0 != pqos::pqos_l3ca_assoc_get($i, $cos_p)) {
+	(my $result, my $cos) = pqos::pqos_l3ca_assoc_get($i);
+	if (0 != $result) {
 		next;
 	}
 
 	# Get socket ID for this core
-	if (0 != pqos::pqos_cpu_get_socketid($cpuinfo_p, $i, $socket_p)) {
+	($result, my $socket_id) = pqos::pqos_cpu_get_socketid($cpuinfo_p, $i);
+	if (0 != $result) {
 		next;
 	}
-	my $socket_id = pqos::uintp_value($socket_p);
 
 	# Get way mask info
-	my $cos = pqos::uintp_value($cos_p);
 	if (0 != pqos::get_l3ca($l3ca, $socket_id, $cos)) {
 		next;
 	}

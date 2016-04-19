@@ -60,7 +60,7 @@ sub read_msr {
 
 	my @result = `$cmd`;
 
-	if ($? != 0) {
+	if (0 != $?) {
 		print __LINE__, " $cmd FAILED!\n";
 		return;
 	}
@@ -85,7 +85,7 @@ sub check_msr_tools {
 		`rdmsr -p 0 -u 0xC8F`;
 	}
 
-	if ($? == -1) {
+	if (-1 == $?) {
 		if ($^O eq "freebsd") {
 			print __LINE__, " cpucontrol tool not found... ";
 		} else {
@@ -112,28 +112,10 @@ sub shutdown_pqos {
 	return;
 }
 
-# Function to get CoS assigned to CPU
-sub get_l3ca_assoc {
-	my ($cpu_id) = @_;
-	my $ret      = undef;
-	my $cos      = pqos::new_uintp();
-
-	if (0 != pqos::pqos_l3ca_assoc_get($cpu_id, $cos)) {
-		print __LINE__, " pqos::pqos_l3ca_assoc_get FAILED!\n";
-	} else {
-		$ret = pqos::uintp_value($cos);
-	}
-
-	pqos::delete_uintp($cos);
-
-	return $ret;
-}
-
 # Function to initialize libpqos
 sub init_pqos {
-	my $cfg           = pqos::pqos_config->new();
-	my $num_sockets_p = pqos::new_uintp();
-	my $ret           = -1;
+	my $cfg = pqos::pqos_config->new();
+	my $ret = -1;
 
 	$cfg->{verbose} = 2;                             # SUPER_VERBOSE
 	$cfg->{fd_log}  = fileno(STDOUT);
@@ -145,7 +127,7 @@ sub init_pqos {
 	}
 
 	$l3ca_cap_p = pqos::get_cap_l3ca();
-	if ($l3ca_cap_p == 0) {
+	if (0 == $l3ca_cap_p) {
 		print __LINE__, " pqos::get_cap_l3ca FAILED!\n";
 		goto EXIT;
 	}
@@ -155,23 +137,22 @@ sub init_pqos {
 	$num_ways = $l3ca_cap->{num_ways};
 
 	$cpuinfo_p = pqos::get_cpuinfo();
-	if ($cpuinfo_p == 0) {
+	if (0 == $cpuinfo_p) {
 		print __LINE__, " pqos::get_cpuinfo FAILED!\n";
 		goto EXIT;
 	}
 
 	$num_cores = pqos::cpuinfo_p_value($cpuinfo_p)->{num_cores};
 
-	if (0 != pqos::pqos_cpu_get_num_sockets($cpuinfo_p, $num_sockets_p)) {
+	(my $result, $num_sockets) = pqos::pqos_cpu_get_num_sockets($cpuinfo_p);
+	if (0 != $result) {
 		print __LINE__, " pqos::pqos_cpu_get_num_sockets FAILED!\n";
 		goto EXIT;
 	}
-	$num_sockets = pqos::uintp_value($num_sockets_p);
 
 	$ret = 0;
 
   EXIT:
-	pqos::delete_uintp($num_sockets_p);
 	return sprintf("%s: %s", __func__, $ret == 0 ? "PASS" : "FAILED!");
 }
 
@@ -205,7 +186,7 @@ sub generate_ways_mask {
 	my $ways_mask = $base_mask << ($cos_id * $bits_per_cos + $socket_id % 3);
 	my $result = $ways_mask & (2**$num_ways - 1);
 
-	if ($result == 0) {
+	if (0 == $result) {
 		$result = $base_mask;
 	}
 
@@ -218,50 +199,43 @@ sub get_msr_assoc {
 	return read_msr($cpu_id, 0xC8F) >> 32;
 }
 
-# Function to get CoS's ways mask via MSRs (using rdmsr from msr-tools)
+# Function to get CoS ways mask via MSRs (using rdmsr from msr-tools)
 sub get_msr_ways_mask {
 	my ($cos_id, $socket_id) = @_;
-
-	my $socket_p = pqos::new_uintp();
 	my $cpu_id;
-	my $ret = undef;
 
 	if (!defined $cpuinfo_p || !defined $num_cores) {
 		print __LINE__, " !defined ... FAILED!\n";
-		goto EXIT;
+		return;
 	}
 
 	for ($cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		if (0 != pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id, $socket_p)) {
+		(my $result, my $cpu_socket_id) =
+		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
-			goto EXIT;
+			return;
 		}
 
-		if ($socket_id == pqos::uintp_value($socket_p)) {
+		if ($socket_id == $cpu_socket_id) {
 			last;
 		}
 	}
 
-	$ret = read_msr($cpu_id, int(0xC90 + $cos_id)) & (2**32 - 1);
-
-  EXIT:
-	pqos::delete_uintp($socket_p);
-	return $ret;
+	return read_msr($cpu_id, int(0xC90 + $cos_id)) & (2**32 - 1);
 }
 
 # Function to print current CAT configuration
 sub print_cfg {
 	my $socket_id;
-	my $socket_p = pqos::new_uintp();
 	my $cos_id;
-	my $ret  = -1;
 	my $l3ca = pqos::pqos_l3ca->new();
 
 	if (!defined $cpuinfo_p ||
 		!defined $num_cores   ||
 		!defined $num_sockets ||
 		!defined $num_cos) {
-		goto EXIT;
+		return -1;
 	}
 
 	print "CoS configuration:\n";
@@ -270,7 +244,7 @@ sub print_cfg {
 		for ($cos_id = 0; $cos_id < $num_cos; $cos_id++) {
 			if (0 != pqos::get_l3ca($l3ca, $socket_id, $cos_id)) {
 				print __LINE__, " pqos::get_l3ca FAILED!\n";
-				goto EXIT;
+				return -1;
 			}
 
 			printf("Socket: %d, CoS: %d, CDP: %d",
@@ -289,27 +263,24 @@ sub print_cfg {
 	print "CoS association:\n";
 
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		$cos_id = get_l3ca_assoc($cpu_id);
-		if (!defined $cos_id) {
-			print __LINE__, " get_l3ca_assoc FAILED!\n";
-			goto EXIT;
+		(my $result, $cos_id) = pqos::pqos_l3ca_assoc_get($cpu_id);
+		if (0 != $result) {
+			print __LINE__, " pqos::pqos_l3ca_assoc_get FAILED!\n";
+			return -1;
 		}
 
-		if (0 != pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id, $socket_p)) {
+		($result, $socket_id) =
+		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
-			goto EXIT;
+			return -1;
 		}
 
-		$socket_id = pqos::uintp_value($socket_p);
 		print "Socket: ", $socket_id, ", Core: ", $cpu_id, ", CoS: ", $cos_id,
 		  "\n";
 	}
 
-	$ret = 0;
-
-  EXIT:
-	pqos::delete_uintp($socket_p);
-	return $ret;
+	return 0;
 }
 
 # Function to test CoS association to CPUs
@@ -318,8 +289,8 @@ sub print_cfg {
 sub test_assoc {
 	my $cos_id;
 	my $gen_cos_id;
-	my $socket_p = pqos::new_uintp();
 	my $socket_id;
+	my $result;
 	my $ret = -1;
 
 	if (!defined $cpuinfo_p || !defined $num_cores) {
@@ -327,17 +298,18 @@ sub test_assoc {
 	}
 
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		$cos_id = get_l3ca_assoc($cpu_id);
-		if (!defined $cos_id) {
-			print __LINE__, " get_l3ca_assoc FAILED!\n";
+		($result, $cos_id) = pqos::pqos_l3ca_assoc_get($cpu_id);
+		if (0 != $result) {
+			print __LINE__, " pqos::pqos_l3ca_assoc_get FAILED!\n";
 			goto EXIT;
 		}
 
-		if (0 != pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id, $socket_p)) {
+		($result, $socket_id) =
+		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
 			goto EXIT;
 		}
-		$socket_id = pqos::uintp_value($socket_p);
 
 		$gen_cos_id = generate_cos($cpu_id, $socket_id);
 		if (!defined $gen_cos_id) {
@@ -352,17 +324,18 @@ sub test_assoc {
 	}
 
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		$cos_id = get_l3ca_assoc($cpu_id);
-		if (!defined $cos_id) {
-			print __LINE__, " get_l3ca_assoc FAILED!\n";
+		($result, $cos_id) = pqos::pqos_l3ca_assoc_get($cpu_id);
+		if (0 != $result) {
+			print __LINE__, " pqos::pqos_l3ca_assoc_get FAILED!\n";
 			goto EXIT;
 		}
 
-		if (0 != pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id, $socket_p)) {
+		($result, $socket_id) =
+		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
 			goto EXIT;
 		}
-		$socket_id = pqos::uintp_value($socket_p);
 
 		$gen_cos_id = generate_cos($cpu_id, $socket_id);
 		if (!defined $gen_cos_id) {
@@ -390,7 +363,6 @@ sub test_assoc {
 	$ret = 0;
 
   EXIT:
-	pqos::delete_uintp($socket_p);
 	return sprintf("%s: %s", __func__, $ret == 0 ? "PASS" : "FAILED!");
 }
 
@@ -461,7 +433,7 @@ sub test_way_masks {
 	$ret = 0;
 
   EXIT:
-	return sprintf("%s: %s", __func__, $ret == 0 ? "PASS" : "FAILED!");
+	return sprintf("%s: %s", __func__, 0 == $ret ? "PASS" : "FAILED!");
 }
 
 # Function to reset CAT configuration - for testing purposes only

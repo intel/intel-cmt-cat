@@ -32,6 +32,12 @@
  */
 
 %module pqos
+
+%include typemaps.i
+int pqos_l3ca_assoc_get(const unsigned, unsigned *OUTPUT);
+int pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *, unsigned *OUTPUT);
+int pqos_cpu_get_socketid(const struct pqos_cpuinfo *, const unsigned, unsigned *OUTPUT);
+
 %{
 /* Includes the header in the wrapper code */
 #include <pqos.h>
