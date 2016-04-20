@@ -1,10 +1,10 @@
 ###############################################################################
-# Makefile script for CAT PQoS sample applications
+# Makefile script for PQoS sample application
 #
 # @par
 # BSD LICENSE
 #
-# Copyright(c) 2016 Intel Corporation. All rights reserved.
+# Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -35,15 +35,14 @@
 #
 ###############################################################################
 
-LIBDIR ?= ../../
-LDFLAGS = -L$(LIBDIR) -lpqos -lrt
-CFLAGS = -I$(LIBDIR) \
+LIBDIR ?= ../../../lib
+CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
-	-Wcast-qual -Wundef -Wwrite-strings  \
-        -Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
+	-Wcast-qual -Wundef -Wwrite-strings \
+	-Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
         -Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels \
-	-g -O2
+        -g -O2
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -55,30 +54,24 @@ CFLAGS += -Wcast-align -Wnested-externs
 endif
 
 # Build targets and dependencies
-APP = pseudo_lock
-OBJS = pseudo_lock.o dlock.o tsc.o
+MONITORAPP = monitor_app
 
-all: $(APP)
+all: $(MONITORAPP)
 
-$(APP): $(OBJS)
-
-.PHONY: lib clean
-lib:
-	$(MAKE) -C $(LIBDIR) all
-
+.PHONY: clean
 clean:
-	-rm -f $(APP) $(OBJS) *.o
+	-rm -f $(MONITORAPP) ./*.o
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
-	-f pseudo_lock.c -f tsc.c -f tsc.h -f dlock.c -f dlock.h
+	-f monitor_app.c
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
-	pseudo_lock.c dlock.c dlock.h tsc.c tsc.h
+	monitor_app.c

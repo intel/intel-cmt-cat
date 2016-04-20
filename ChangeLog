@@ -1,4 +1,23 @@
 ======================================================================
+Not Released
+======================================================================
+
+Summary:
+1. General
+	- Project file layout changed to accomodate extensions
+2. Library
+	- Support for Intel(R) Xeon(R) processor E5 v4 support
+	- DSO built by default
+	- examples moved to the top folder
+	- Perl interface created for the library
+3. PQoS Utility
+	- pqos directory created to accomodate the utility files
+	- link against DSO
+4. Examples
+	- copied examples previously located in library directory
+	- Perl hello world script created
+
+======================================================================
 Release  v0.1.4  2016-02-04
 ======================================================================
 

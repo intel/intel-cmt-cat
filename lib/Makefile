@@ -121,6 +121,7 @@ endif
 ifeq ($(SHARED),y)
 	ln -s $(LIBDIR)/$(LIB).so.0 $(LIBDIR)/$(LIB).so
 	ln -s $(LIBDIR)/$(LIBNAME) $(LIBDIR)/$(LIB).so.0
+        ldconfig
 endif
 
 uninstall:
@@ -156,9 +157,6 @@ rinse:
 clean:
 	-rm -f $(OBJS) $(LIB)* $(DEPFILES) ./*~
 	-rm -rf $(DOXY_DIRS)
-	-$(MAKE) clean -C examples/CAT
-	-$(MAKE) clean -C examples/CMT_MBM
-	-$(MAKE) clean -C examples/PSEUDO_LOCK
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style

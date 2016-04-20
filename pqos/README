@@ -1,0 +1,239 @@
+
+
+========================================================================
+README for CMT, MBM and CAT Software Package
+
+April 2016
+
+* The instructions contained in this file are temporary as the directory
+  structure will be changing soon.
+========================================================================
+
+
+Contents
+========
+
+- Overview
+- Linux Requirements and Installation
+- FreeBSD Requirements and Installation (experimental)
+- Usage
+- Legal Disclaimer
+
+
+Overview
+========
+
+This software package provides basic support for
+Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM)
+and Cache Allocation Technology (CAT).
+This release supports last level cache occupancy monitoring and
+memory bandwidth monitoring on a per core or logical thread basis.
+MBM supports two types of events reporting local and remote
+memory bandwidth.
+Both events are reported on a per core or logical thread basis.
+Local memory bandwidth reports the bandwidth of a thread accessing
+memory associated with the local socket.
+In a dual socket system, the remote memory bandwidth reports the
+bandwidth of a thread accessing the remote socket.
+The monitoring utility does not track application migration across
+cores as this would require scheduler integration.
+Instead, applications should be pinned to cores to track
+last level cache occupancy and memory bandwidth.
+Scheduler-integrated alternatives such as cgroups and perf are being
+researched to track the application PID (and all associated TIDs)
+rather than static assignment. The monitoring utility currently
+associates a Resource Monitoring ID(RMID) per core or logical
+thread when it initially comes up.
+
+The command line utility provides the necessary functionality to set
+up the CAT capabilities. The software provides flags to configure the
+class of service (CLOS) and associate cores / logical threads with a
+class of service. The Intel(R) Xeon(R) processor E5 v3 generation
+supports four classes of service and a set of pre-defined
+classes of service that should not be changed at run time.
+Intel(R) Xeon(R) processor D generation supports sixteen
+classes of service. There are no pre-defined classes of service and
+they can be changed at run time.
+Intel(R) Xeon(R) processor E5 v3 and Intel(R) Xeon(R) processor D
+generations supports Core/Logical thread association with a
+class of service can be changed dynamically.
+CMT is supported on all Intel(R) Xeon(R) processor E5 v3 and
+Intel(R) Xeon(R) processor D SKUs.
+CAT is supported on the following:
+6 SKUs for Intel(R) Xeon(R) processor E5 v3 family:
+E5-2658 v3, E5-2648L v3, E5-2628L v3, E5-2618L v3, E5-2608L v3 and E5-2658A v3
+2 SKUs for Intel(R) Xeon(R) processor E3 v4 family:
+E3-1258L v4 and E3-1278L v4
+and all Intel(R) Xeon(R) processor D SKUs.
+
+Use of concurrent monitoring instances is possible as long as each
+instance monitors exclusive set of cores. Library APIs are also thread safe.
+
+For additional CMT, MBM and CAT details please see refer to the Intel(R)
+Architecture Software Development Manuals available at:
+http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
+Specific information with regard to CMT, MBM and CAT can be found in
+Chapter 17.16 and 17.17.
+
+
+Linux Requirements and Installation
+===================================
+
+CMT, MBM and CAT are configured using Model Specific Registers (MSRs)
+to measure occupancy, set up the class of service masks and manage
+the association of the cores/logical threads to a class of service.
+The pqos software executes in user space, and access to the MSRs is
+obtained through a standard Linux* interface. The virtual file system
+structure /dev/cpu/CPUNUM/msr provides an interface to read and write
+the MSRs. The msr file interface is protected and requires root
+privileges. The msr driver might not be auto-loaded and on some
+modular kernels the driver may need to be loaded manually:
+
+$ modprobe msr
+
+For installation of the PQoS library and utility, untar the gzip image
+and follow below instructions to create pqos executable.
+
+First compile PQoS library:
+        cd lib/
+        "make help" lists various make options.
+        "make" or "make all" for building shared library.
+        "make all SHARED=n" for building static library.
+
+To install the PQoS library:
+        cd lib/
+	"sudo make install" to install the shared library.
+	"sudo make install SHARED=n" to install the static library.
+	Note: It may be necessary to add the installation directory to the
+	linker search path. For first time installation, update ld cache
+	with "sudo ldconfig".
+
+To compile PQoS utility:
+        "make" or "make all" for building utility.
+        "make all DEBUG=y" for building utility for debugging.
+        "make clean" for clearing even more files than "make rinse".
+        Note: Having both local and installed copies of the library
+        may cause undefined behaviour when building the utility.
+
+To install the PQoS utility (optional), first compile, then:
+        "sudo make install" to install below /usr/local.
+        "sudo make install PREFIX=/some/where" to install below /some/where.
+
+Note:   In case of compilation error such as:
+        "host_pidapi.c:46:30: fatal error: linux/perf_event.h:
+         No such file or directory compilation terminated."
+        compile the code without PID monitoring support:
+        "make all NO_PID_API=y".
+        This occurs on Linux kernels that do not support perf
+        monitoring events.
+
+To compile CAT, CMT and MBM sample applications:
+
+For CAT sample application:
+        cd lib/examples/CAT/
+        "make all" for building the application.
+        "make clean" for cleaning build files.
+        "make LDLIBS=path/to/libpqos.a" to link to static library.
+CAT sample application build will create three targets as follows:
+1. allocation_app - Demonstrates usage of pqos library APIs related
+to set bit mask for class of service(CLOS) and displaying
+class of service(CLOS) and associated bit mask.
+Please refer "./allocation_app -h" option for usage details.
+2. association_app - Demonstrates usage of pqos library APIs related
+to association of class of service(CLOS) to cores and displaying
+class of service(CLOS) and core association.
+Please refer "./association_app -h" option for usage details.
+3. reset_app - Demonstrates usage of pqos library APIs related to
+resetting all classes of service to system default bit mask.
+Please refer "./reset_app -h" option for usage details.
+
+For CMT/MBM sample application:
+        cd lib/examples/CMT_MBM/
+        "make all" for building the application.
+        "make clean" for cleaning build files.
+        "make LDLIBS=path/to/libpqos.a" to link to static library.
+CMT_MBM sample application build will create one target as follows:
+1. monitor_app - Demonstrates usage of pqos library APIs related
+monitoring events like cache occupancy, local memory bandwidth usage
+and remote memory bandwidth usage.
+Please refer "./monitor_app -h" option for usage details.
+
+
+FreeBSD Requirements and Installation (experimental)
+====================================================
+
+CMT, MBM and CAT are configured using Model Specific Registers (MSRs)
+to measure occupancy, set up the class of service masks and manage
+the association of the cores/logical threads to a class of service.
+The pqos software executes in user space, and access to the MSRs is
+obtained through a standard FreeBSD* cpuctl driver interface. The virtual
+file system structure /dev/cpuctlCPUNUM provides an interface to read
+and write the MSR registers. The MSR file interface is protected and
+requires root privileges.
+The cpuctl driver might not be auto-loaded on some systems. Please follow
+cpuctl (4) man page to load cpuctl driver on your system.
+
+$ man 4 cpuctl
+
+Please note that PQoS build scripts have been written for GNU Make so
+it is required to install GNU Make and use it for PQoS compilation.
+
+$ pkg install gmake
+
+For installation of the PQoS utility untar the gzip image and follow
+below instructions to create pqos executable.
+
+First compile PQoS library:
+        cd lib/
+        "gmake" or "gmake all" for building shared library.
+        "gmake all SHARED=n" for building static library.
+
+To install the PQoS library:
+        cd lib/
+	"sudo gmake install" to install the shared library.
+	"sudo gmake install SHARED=n" to install the static library.
+
+To compile PQoS utility:
+        "gmake" or "gmake all" for building utility.
+
+To install the PQoS utility (optional), first compile, then:
+        "sudo gmake install" to install below /usr/local.
+        "sudo gmake install PREFIX=/some/where" to install below /some/where.
+
+For extended utility, library and sample code compilation options
+please refer to Linux Requirements and Installation section above.
+Please remember to replace "make" command with "gmake" on FreeBSD.
+
+Currently verified configuration is:
+- FreeBSD 9.1
+- GNU Compiler Collection 5 (gcc 5.3.1)
+- GNU Make 4.1
+
+
+Usage
+=====
+
+After compilation the PQoS executable can be used to configure the
+last level cache allocation feature and monitor the last level cache
+occupancy as well as memory bandwidth.
+
+Usage: For pqos utility:
+        "./pqos -h"    This option will display extensive help page.
+                       Please refer to "-h" option for usage details.
+        "./pqos -s"    Shows current CAT, CMT and MBM configuration.
+        "./pqos -T"    Starts CMT and MBM monitoring on all detected
+                       cores(depends of hardware feature availability).
+        Note: It may be necessary to set "LD_LIBRARY_PATH=path/to/libpqos.so"
+              when running the utility with local shared library.
+
+Legal Disclaimer
+================
+
+THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
+IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
+ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
+CONDITIONS OF SALE, INTEL ASSUMES NO LIABILITY WHATSOEVER AND INTEL
+DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY, RELATING TO SALE AND/OR
+USE OF INTEL PRODUCTS INCLUDING LIABILITY OR WARRANTIES RELATING TO
+FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR INFRINGEMENT
+OF ANY PATENT, COPYRIGHT OR OTHER INTELLECTUAL PROPERTY RIGHT.

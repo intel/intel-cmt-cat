@@ -1,5 +1,5 @@
 ###############################################################################
-# Makefile script for PQoS sample application
+# Makefile script for CAT PQoS sample applications
 #
 # @par
 # BSD LICENSE
@@ -35,50 +35,45 @@
 #
 ###############################################################################
 
-NO_PID_API ?= n
-export NO_PID_API
+LIBDIR ?= ../../../lib
+CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
+	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
+	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
+	-Wcast-qual -Wundef -Wwrite-strings  \
+        -Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
+        -Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels \
+	-g -O2
+ifneq ($(EXTRA_CFLAGS),)
+CFLAGS += $(EXTRA_CFLAGS)
+endif
 
-# XXX: modify as desired
-PREFIX ?= /usr/local
-export PREFIX
+# ICC and GCC options
+ifeq ($(CC),icc)
+else
+CFLAGS += -Wcast-align -Wnested-externs
+endif
 
-.PHONY: all clean TAGS install uninstall style cppcheck
+# Build targets and dependencies
+ALLOCAPP = allocation_app
+ASSOCAPP = association_app
+RESETAPP = reset_app
 
-all:
-	$(MAKE) -C lib
-	$(MAKE) -C pqos
-	$(MAKE) -C examples/c/CAT
-	$(MAKE) -C examples/c/CMT_MBM
-	$(MAKE) -C examples/c/PSEUDO_LOCK
+all: $(ALLOCAPP) $(ASSOCAPP) $(RESETAPP)
 
+.PHONY: clean
 clean:
-	$(MAKE) -C lib clean
-	$(MAKE) -C pqos clean
-	$(MAKE) -C examples/c/CAT clean
-	$(MAKE) -C examples/c/CMT_MBM clean
-	$(MAKE) -C examples/c/PSEUDO_LOCK clean
+	-rm -f $(ALLOCAPP) $(ASSOCAPP) $(RESETAPP) *.o
 
+CHECKPATCH?=checkpatch.pl
+.PHONY: style
 style:
-	$(MAKE) -C lib style
-	$(MAKE) -C pqos style
-	$(MAKE) -C examples/c/CAT style
-	$(MAKE) -C examples/c/CMT_MBM style 
-	$(MAKE) -C examples/c/PSEUDO_LOCK style
+	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
+	-f allocation_app.c -f association_app.c -f reset_app.c
 
+CPPCHECK?=cppcheck
+.PHONY: cppcheck
 cppcheck:
-	$(MAKE) -C lib cppcheck
-	$(MAKE) -C pqos cppcheck
-	$(MAKE) -C examples/c/CAT cppcheck
-	$(MAKE) -C examples/c/CMT_MBM cppcheck 
-	$(MAKE) -C examples/c/PSEUDO_LOCK cppcheck
-
-install:
-	$(MAKE) -C lib install
-	$(MAKE) -C pqos install
-
-uninstall:
-	$(MAKE) -C lib uninstall
-	$(MAKE) -C pqos uninstall
-
-TAGS:
-	find ./ -name "*.[ch]" -print | etags -
+	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
+	--std=c99 -I$(LIBDIR) --template=gcc \
+	allocation_app.c association_app.c reset_app.c

@@ -4,7 +4,7 @@
 # @par
 # BSD LICENSE
 #
-# Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+# Copyright(c) 2016 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -35,8 +35,9 @@
 #
 ###############################################################################
 
-LIBDIR ?= ../../
-CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
+LIBDIR ?= ../../../lib
+LDFLAGS = -L$(LIBDIR) -lpqos -lrt
+CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings  \
@@ -54,29 +55,27 @@ CFLAGS += -Wcast-align -Wnested-externs
 endif
 
 # Build targets and dependencies
-ALLOCAPP = allocation_app
-ASSOCAPP = association_app
-RESETAPP = reset_app
+APP = pseudo_lock
+OBJS = pseudo_lock.o dlock.o tsc.o
 
-all: $(ALLOCAPP) $(ASSOCAPP) $(RESETAPP)
+all: $(APP)
 
-.PHONY: lib clean
-lib:
-	$(MAKE) -C $(LIBDIR) all
+$(APP): $(OBJS)
 
+.PHONY: clean
 clean:
-	-rm -f $(ALLOCAPP) $(ASSOCAPP) $(RESETAPP) *.o
+	-rm -f $(APP) $(OBJS) *.o
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
-	-f allocation_app.c -f association_app.c -f reset_app.c
+	-f pseudo_lock.c -f tsc.c -f tsc.h -f dlock.c -f dlock.h
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
-	allocation_app.c association_app.c reset_app.c
+	pseudo_lock.c dlock.c dlock.h tsc.c tsc.h

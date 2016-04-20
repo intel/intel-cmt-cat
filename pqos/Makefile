@@ -35,14 +35,14 @@
 #
 ###############################################################################
 
-LIBDIR ?= ../../
-CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
+LIBDIR ?= ../lib
+LDFLAGS = -L$(LIBDIR) -lpqos -lpthread -fPIE -z noexecstack -z relro -z now
+CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
-        -Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels \
-        -g -O2
+	-Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -53,28 +53,80 @@ else
 CFLAGS += -Wcast-align -Wnested-externs
 endif
 
+# DEBUG build
+ifeq ($(DEBUG),y)
+CFLAGS += -g -ggdb -O0 -DDEBUG
+else
+CFLAGS += -g -O3
+endif
+
+# On FreeBSD build with NO_PID_API option
+ifeq ($(shell uname), FreeBSD)
+NO_PID_API=y
+endif
+
+# PID API build option
+ifeq ($(NO_PID_API), y)
+export NO_PID_API
+CFLAGS += -DNO_PID_API
+endif
+
 # Build targets and dependencies
-MONITORAPP = monitor_app
+APP = pqos
+MAN = pqos.8
 
-all: $(MONITORAPP)
+# XXX: modify as desired
+PREFIX ?= /usr/local
+BIN_DIR = $(PREFIX)/bin
+MAN_DIR = $(PREFIX)/man/man8
 
-.PHONY: lib clean
-lib:
-	$(MAKE) -C $(LIBDIR) all
+SRCS = $(wildcard *.c)
+OBJS = main.o monitor.o alloc.o profiles.o
+DEPFILES = $(SRCS:.c=.d)
+
+%.o: %.c %.d
+
+%.d: %.c
+	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
+	grep -e "\.o:" $@ | sed 's/$(@:.d=.o)/$@/' >> $@
+
+all: $(APP)
+
+$(APP): $(OBJS)
+	$(CC) $^ $(LDFLAGS) -o $@
+
+.PHONY: clean install uninstall
+
+install: $(APP) $(MAN)
+ifeq ($(shell uname), FreeBSD)
+	install -d $(BIN_DIR)
+	install -d $(MAN_DIR)
+	install -s $(APP) $(BIN_DIR)
+	install -m 0444 $(MAN) $(MAN_DIR)
+else
+	install -D -s $(APP) $(BIN_DIR)/$(APP)
+	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
+endif
+
+uninstall:
+	-rm $(BIN_DIR)/$(APP)
+	-rm $(MAN_DIR)/$(MAN)
 
 clean:
-	-rm -f $(MONITORAPP) ./*.o
+	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
-	-f monitor_app.c
+	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
-	monitor_app.c
+	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h
+
+-include $(DEPFILES)
