@@ -121,7 +121,7 @@ endif
 ifeq ($(SHARED),y)
 	ln -s $(LIBDIR)/$(LIB).so.0 $(LIBDIR)/$(LIB).so
 	ln -s $(LIBDIR)/$(LIBNAME) $(LIBDIR)/$(LIB).so.0
-        ldconfig
+	ldconfig
 endif
 
 uninstall:
