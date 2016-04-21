@@ -10,9 +10,12 @@ Summary:
 	- DSO built by default
 	- examples moved to the top folder
 	- Perl interface created for the library
+	- cross socket monitoring
 3. PQoS Utility
 	- pqos directory created to accomodate the utility files
 	- link against DSO
+	- cross socket monitoring
+	- COS managment on a per socket basis
 4. Examples
 	- copied examples previously located in library directory
 	- Perl hello world script created

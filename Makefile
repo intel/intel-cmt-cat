@@ -42,6 +42,14 @@ export NO_PID_API
 PREFIX ?= /usr/local
 export PREFIX
 
+ifdef DEBUG
+export DEBUG
+endif
+
+ifdef SHARED
+export SHARED
+endif
+
 .PHONY: all clean TAGS install uninstall style cppcheck
 
 all:

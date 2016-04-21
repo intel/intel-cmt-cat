@@ -5,7 +5,6 @@ README for Intel(R) RDT Software Package
 
 April 2016
 
-* Under construction due to file layout change
 ========================================================================
 
 
@@ -13,11 +12,8 @@ Contents
 ========
 
 - Overview
+- Package Content
 - Hardware Support
-- Linux Requirements and Installation
-- FreeBSD Requirements and Installation (experimental)
-- PQoS Utility Usage
-- Examples
 - Legal Disclaimer
 
 
@@ -26,211 +22,99 @@ Overview
 
 This software package provides basic support for
 Intel(R) Resource Director Technology (Intel(R) RDT) including:
-Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM)
-and Cache Allocation Technology (CAT).
-In principle the software accesses the technologies via MSR registers
-on a per core or hardware thread basis. MSR access is arraneged via
-standard operating system driver: msr on Linux and cpuctl on FreeBSD.
-Library detects presence of Linux perf extensions for
+Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
+Cache Allocation Technology (CAT) and Code and Data Prioritization (CDP).
+
+In principle, the software programs the technologies via
+Model Specific Registers (MSR) on a per core or hardware thread basis.
+MSR access is arranged via standard operating system driver: msr on Linux and
+cpuctl on FreeBSD. Presence of the technologies is detected via CPUID
+instruction. In some cases CAT is detected via brand string read from CPUID.
+
+Software detects presence of Linux perf extensions for
 the monitoring technologies. In such case it enables library API's for
 monitoring processes.
+
+This software package is maintained, updated and developed on
+https://github.com/01org/intel-cmt-cat
+
+https://github.com/01org/intel-cmt-cat/wiki provides FAQ, usage examples and
+useful links.
+
+Please refer to INSTALL file for package installation instructions.
+
+
+Package Content
+===============
+
+"lib" directory:
+    Includes files of software library providing API's for technology detection,
+    monitoring and allocation.
+    Please refer to the library README for more details (lib/README).
+"pqos" directory:
+    Includes files of utility that provides command line access to Intel(R) RDT.
+    The utility links against the library and programs the technologies
+    via its API's.
+    Please refer to the utility README for more details "pqos/README".
+    Manual page of "pqos" utility also provides information about tool usage:
+    $ man pqos
+"examples" directory:
+    Includes C and Perl examples of Intel(R) RDT via the library API's.
+    Please refer to README file for more details "examples/README".
+"srpm" directory:
+    Includes *.src.rpm and *.spec files for the software package.
+    Please refer to README file for more details "srpm/README".
+"ChangeLog" file:
+    Brief description of changes between releases.
+"INSTALL" file:
+    Installation instructions.
+"LICENSE" file:
+    License of the package.
+
 
 Hardware Support
 ================
 
-The Intel(R) Xeon(R) processor E5 v3 generation
-supports four CAT classes of service and a set of pre-defined
-classes of service that should not be changed at run time.
-Intel(R) Xeon(R) processor D generation supports sixteen CAT
-classes of service. There are no pre-defined classes of service and
-they can be changed at run time.
-All processor products supporting CAT also support dynamic changes of
-Core/Logical thread association with a class of service.
++-----------------------------------------------------------+
+|                                 | CMT | MBM |  CAT  | CDP |
+|---------------------------------+-----+-----+-------+-----|
+|Intel(R) Xeon(R) processor E5 v3 | Yes | No  |Yes (1)| No  |
+|---------------------------------+-----+-----+-------+-----|
+|Intel(R) Xeon(R) processor D     | Yes | Yes |Yes (2)| No  |
+|---------------------------------+-----+-----+-------+-----|
+|Intel(R) Xeon(R) processor E3 v4 | No  | No  |Yes (3)| No  |
+|---------------------------------+-----+-----+-------+-----|
+|Intel(R) Xeon(R) processor E5 v4 | Yes | Yes |Yes (2)| Yes |
++-----------------------------------------------------------+
 
-CMT Support:
-All Intel(R) Xeon(R) processor E5 v3
-All Intel(R) Xeon(R) processor D
-All Intel(R) Xeon(R) processor E5 v4
+References:
+(1) Selected SKU's only:
+        Intel(R) Xeon(R) processor E5-2658 v3
+        Intel(R) Xeon(R) processor E5-2648L v3
+        Intel(R) Xeon(R) processor E5-2628L v3
+        Intel(R) Xeon(R) processor E5-2618L v3
+        Intel(R) Xeon(R) processor E5-2608L v3
+        Intel(R) Xeon(R) processor E5-2658A v3
+    Four CAT classes of service (CLOS) and a set of pre-defined classes that
+    should not be changed at run time.
+    CAT CLOS to hardware thread association can be changed at run time.
 
-MBM Support:
-All Intel(R) Xeon(R) processor D
-All Intel(R) Xeon(R) processor E5 v4
+(2) Sixteen CAT classes of service (CLOS). There are no pre-defined
+    classes of service and they can be changed at run time.
+    CAT CLOS to hardware thread association can be changed at run time.
 
-CAT Support:
-Intel(R) Xeon(R) processor E5-2658 v3
-Intel(R) Xeon(R) processor E5-2648L v3
-Intel(R) Xeon(R) processor E5-2628L v3
-Intel(R) Xeon(R) processor E5-2618L v3
-Intel(R) Xeon(R) processor E5-2608L v3
-Intel(R) Xeon(R) processor E5-2658A v3
-All Intel(R) Xeon(R) processor D
-Intel(R) Xeon(R) processor E3-1258L v4
-Intel(R) Xeon(R) processor E3-1278L v4
-All Intel(R) Xeon(R) processor E5 v4
+(3) Selected SKU's only:
+        Intel(R) Xeon(R) processor E3-1258L v4
+        Intel(R) Xeon(R) processor E3-1278L v4
+    Four CAT classes of service (CLOS) and a set of pre-defined classes that
+    should not be changed at run time.
+    CAT CLOS to hardware thread association can be changed at run time.
 
-CDP Support:
-All Intel(R) Xeon(R) processor E5 v4
-
-For additional Intel(R) RDT details please see refer to the Intel(R)
+For additional Intel(R) RDT details please refer to the Intel(R)
 Architecture Software Development Manuals available at:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
-Specific information can be found in Chapter 17.16 and 17.17 (revision 058).
+Specific information can be found in Chapters 17.16 and 17.17 (revision 058).
 
-Linux Requirements and Installation
-===================================
-
-CMT, MBM and CAT are configured using Model Specific Registers (MSRs)
-to measure occupancy, set up the class of service masks and manage
-the association of the cores/logical threads to a class of service.
-The pqos software executes in user space, and access to the MSRs is
-obtained through a standard Linux* interface. The virtual file system
-structure /dev/cpu/CPUNUM/msr provides an interface to read and write
-the MSRs. The msr file interface is protected and requires root
-privileges. The msr driver might not be auto-loaded and on some
-modular kernels the driver may need to be loaded manually:
-
-$ modprobe msr
-
-For installation of the PQoS library and utility, untar the gzip image
-and follow below instructions to create pqos executable.
-
-Compilation:
-	To compile all package components including library, utlity and examples
-	please run:
-    	"make" or "make all"
-
-        In case of compilation error such as:
-        "host_pidapi.c:46:30: fatal error: linux/perf_event.h:
-         No such file or directory compilation terminated."
-        Please compile the code without PID monitoring support:
-        "make NO_PID_API=y".
-        This occurs on Linux kernels that do not support perf
-        monitoring events.
-
-Installation:
-	To install previously compiled files:
-	"sudo make install" to install below default PREFIX /usr/local.
-	"sudo make install PREFIX=/some/where" to install below /some/where.
-
-Removing installation:
-	To uninstall previously installed files:
-	"sudo make uninstall" to uninstall files below default PREFIX /usr/local.
-	"sudo make uninstall PREFIX=/some/where" to uninstall below /some/where.
-
-Cleaning the built files:
-	To clean all built package components including library, utlity and examples
-	please run:
-    	"make clean"
-
-FreeBSD Requirements and Installation (experimental)
-====================================================
-
-CMT, MBM and CAT are configured using Model Specific Registers (MSRs)
-to measure occupancy, set up the class of service masks and manage
-the association of the cores/logical threads to a class of service.
-The pqos software executes in user space, and access to the MSRs is
-obtained through a standard FreeBSD* cpuctl driver interface. The virtual
-file system structure /dev/cpuctlCPUNUM provides an interface to read
-and write the MSR registers. The MSR file interface is protected and
-requires root privileges.
-The cpuctl driver might not be auto-loaded on some systems. Please follow
-cpuctl (4) man page to load cpuctl driver on your system.
-
-$ man 4 cpuctl
-
-Please note that PQoS build scripts have been written for GNU Make so
-it is required to install GNU Make and use it for PQoS compilation.
-
-$ pkg install gmake
-
-For installation of the PQoS utility untar the gzip image and follow
-below instructions to create pqos executable.
-
-Compilation:
-	To compile all package components including library, utlity and examples
-	please run:
-    	"gmake" or "gmake all"
-
-Installation:
-	To install previously compiled files:
-	"sudo gmake install" to install below default PREFIX /usr/local.
-	"sudo gmake install PREFIX=/some/where" to install below /some/where.
-
-Removing installation:
-	To uninstall previously installed files:
-	"sudo gmake uninstall" to uninstall files below default PREFIX /usr/local.
-	"sudo gmake uninstall PREFIX=/some/where" to uninstall below /some/where.
-
-Cleaning the built files:
-	To clean all built package components including library, utlity and examples
-	please run:
-    	"gmake clean"
-
-For extended utility, library and sample code compilation options
-please refer to Linux Requirements and Installation section above.
-Please remember to replace "make" command with "gmake" on FreeBSD.
-
-Currently verified configuration is:
-- FreeBSD 9.1
-- GNU Compiler Collection 5 (gcc 5.3.1)
-- GNU Make 4.1
-
-PQoS Utility Usage
-==================
-
-After compilation and installation the PQoS executable can be used to
-configure the last level cache allocation feature, monitor 
-the last level cache occupancy and memory bandwidth.
-
-Usage: For pqos utility:
-        "pqos -h"    This option will display extensive help page.
-                     Please refer to "-h" option for usage details.
-        "pqos -s"    Shows current CAT, CMT and MBM configuration.
-        "pqos -T"    Starts CMT and MBM monitoring on all detected
-                     cores (depends of hardware feature availability).
-
-Use of concurrent monitoring instances is possible as long as each
-instance monitors exclusive set of cores.
-
-Note: It may be necessary to set "LD_LIBRARY_PATH=path/to/libpqos.so"
-      when running the utility with local shared library if installation step
-      has been skipped.
-
-Examples
-========
-To compile CAT, CMT and MBM sample applications:
-
-For CAT sample application:
-        cd examples/c/CAT/
-        "make all" for building the application.
-        "make clean" for cleaning build files.
-        "make LDLIBS=path/to/libpqos.a" to link to static library.
-CAT sample application build will create three targets as follows:
-1. allocation_app - Demonstrates usage of pqos library APIs related
-to set bit mask for class of service(CLOS) and displaying
-class of service(CLOS) and associated bit mask.
-Please refer "./allocation_app -h" option for usage details.
-2. association_app - Demonstrates usage of pqos library APIs related
-to association of class of service(CLOS) to cores and displaying
-class of service(CLOS) and core association.
-Please refer "./association_app -h" option for usage details.
-3. reset_app - Demonstrates usage of pqos library APIs related to
-resetting all classes of service to system default bit mask.
-Please refer "./reset_app -h" option for usage details.
-
-For CMT/MBM sample application:
-        cd examples/c/CMT_MBM/
-        "make all" for building the application.
-        "make clean" for cleaning build files.
-        "make LDLIBS=path/to/libpqos.a" to link to static library.
-CMT_MBM sample application build will create one target as follows:
-1. monitor_app - Demonstrates usage of pqos library APIs related
-monitoring events like cache occupancy, local memory bandwidth usage
-and remote memory bandwidth usage.
-Please refer "./monitor_app -h" option for usage details.
-
-To learn more about PSEUDO LOCK sample application please refer to
-README file located in examples/c/PSEUDO_LOCK/README.
 
 Legal Disclaimer
 ================
