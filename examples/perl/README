@@ -20,8 +20,9 @@ Overview
 ========
 
 hello_world.pl is a simple Perl script to demonstrate the use of the
-PQoS library Perl wrapper API. This script shows how to initialize the
-library, read COS bitmasks and associations and shutdown the library.
+PQoS/Intel(R) RDT library Perl wrapper API. This script shows how to
+initialize the library, read COS bitmasks and associations and shutdown
+the library.
 
 Requirements
 ============
@@ -29,9 +30,8 @@ Requirements
 Tested with SWIG Version 3.0.5 and Perl v5.18.4.
 
 The hello_world.pl script depends on the pqos.pm Perl module generated
-by SWIG. This can be found in the "../lib/perl" directory. For more
-information about this module and how to build it, please refer to the
-README found in the "../lib/perl" directory.
+by SWIG. For more information about this module and how to build it,
+please refer to the README found in the "lib/perl" directory.
 
 Usage
 =====
