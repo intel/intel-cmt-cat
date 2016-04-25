@@ -139,13 +139,16 @@ DEPFILES = $(SRCS:.c=.d)
 
 help:
 	@echo "PQoS library make targets:"
-	@echo "    make all          - build static library"
-	@echo "    make all SHARED=y - build shared library"
-	@echo "    make all DEBUG=y  - build static library for debugging"
-	@echo "    make rinse        - remove build files"
-	@echo "    make clean        - remove even more files than rinse"
-	@echo "    make doxy         - make doxygen documentation"
-	@echo "    make style        - coding style check"
+	@echo "    make           - build shared library"
+	@echo "    make SHARED=n  - build static library"
+	@echo "    make DEBUG=y   - build shared library for debugging"
+	@echo "    make install   - install library (accepts PREFIX=/some/where)"
+	@echo "    make uninstall - uninstall library (accepts PREFIX=/some/where)"
+	@echo "    make rinse     - remove build files"
+	@echo "    make clean     - remove even more files than rinse"
+	@echo "    make doxy      - make doxygen documentation"
+	@echo "    make style     - coding style check (accepts CHECKPATCH=/some/where/checkpatch.pl)"
+	@echo "    make cppcheck  - static code analysis (accepts CPPCHECK=/some/where/cppcheck)"
 
 doxy:
 	doxygen api_doxygen.cfg
