@@ -1,0 +1,107 @@
+================================================================================
+README for rdtset
+
+April 2016
+================================================================================
+
+CONTENTS
+========
+
+- Overview
+- Compilation
+- Usage
+- Legal Disclaimer
+
+
+OVERVIEW
+========
+
+rdtset is a taskset like tool allowing user to launch a new command with a given
+CPU affinity and L3 cache configuration. Supports Linux and FreeBSD.
+
+
+COMPILATION
+===========
+
+Note: The PQoS/Intel(R) RDT library should be installed before compilation.
+
+Run "make all" or "make" to compile the programs. If compilation is successful
+"rdtset" binary should be present in the directory.
+
+Run "make clean" to clean the build files.
+
+
+USAGE
+=====
+
+Usage: rdtset -3 <cbm@cpulist> -c <cpulist> [options] (-p <pid> | cmd [<args>...]])
+
+Options:
+ -3 <cbm@cpulist>, --l3 <cbm@cpulist>  specify L3 CAT configuration
+ -c <cpulist>, --cpu <cpulist>         specify CPUs
+ -p <pid>, --pid <pid>                 operate on existing given pid
+ -k, --sudokeep                        do not drop sudo elevated privileges
+ -v, --verbose                         prints out additional logging information
+ -h, --help                            display this help
+
+Examples L3 CAT configuration strings:
+    -3 '0xf@1'
+        CPU 1 uses four cache-ways (mask 0xf)
+
+    -3 '0xf@2,0xf0@(3,4,5)'
+        CPU 2 uses four cache-ways (mask 0xf), CPUs 3-5 share four cache-ways
+        (mask 0xf0), cache-ways used by CPU 2 and 3-4 are non-overlapping
+
+    -3 '0xf@(0-2),0xf0@(3,4,5)'
+        CPUs 0-2 share four cache-ways (mask 0xf), CPUs 3-5 share four cache-ways
+        (mask 0xf0), cache-ways used by CPUs 0-2 and 3-5 are non-overlapping
+
+    -3 '(0xf,0xf0)@1'
+        On CDP enabled system, CPU 1 uses four cache-ways for code (mask 0xf)
+        and four cache-ways for data (mask 0xf0),
+        data and code cache-ways are non-overlapping
+
+Example CPUs configuration string:
+    -c 1-3,4,5 - CPUs 1,2,3,4,5
+
+Run "id" command to test privilege drop:
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 id
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -k id
+
+Show current proc status to verify CPU affinity:
+- Linux:
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 cat /proc/self/status
+
+- FreeBSD:
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -k bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
+$ bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
+
+Display current L3 CAT configuration to verify L3 configuration (and clean-up on exit):
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -k pqos -s
+$ sudo pqos -s
+
+Test operation on existing, given PID:
+- Linux:
+$ taskset -pc $BASHPID
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -p $BASHPID
+$ taskset -pc $BASHPID
+$ sudo pqos -s
+
+- FreeBSD:
+$ cpuset -g -p $BASHPID
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -p $BASHPID
+$ cpuset -g -p $BASHPID
+$ sudo pqos -s
+
+
+LEGAL DISCLAIMER
+================
+
+THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
+IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
+ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
+CONDITIONS OF SALE, INTEL ASSUMES NO LIABILITY WHATSOEVER AND INTEL
+DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY, RELATING TO SALE AND/OR
+USE OF INTEL PRODUCTS INCLUDING LIABILITY OR WARRANTIES RELATING TO
+FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR INFRINGEMENT
+OF ANY PATENT, COPYRIGHT OR OTHER INTELLECTUAL PROPERTY RIGHT.

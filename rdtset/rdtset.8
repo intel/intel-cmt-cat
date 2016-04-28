@@ -1,0 +1,122 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH RDTSET 8 "May 10, 2016"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+rtdset \- Intel Platform Quality of Service
+.br
+.SH SYNOPSIS
+.B rdtset
+.RI "-3 <cbm@cpulist> -c <cpulist> [options] (-p <pid> | cmd [<args>...]])"
+.SH DESCRIPTION
+Intel Platform QoS technologies (also known as Intel Platform Shared
+Resource Monitoring/Control technologies) are designed to help improve
+performance and manageability for virtual machines.
+.PP
+The rdtset tool provides support to set up the Intel CAT (Cache Allocation
+Technology) capabilities.
+.PP
+The software provides flags to configure the
+class of service (CLOS) and associate cores / logical threads with a class
+of service. The Intel(R) Xeon(R) processor E5 v3 generation supports four
+classes of service and a set of pre-defined classes of service that should
+not be changed at run time.  Intel(R) Xeon(R) processor D generation supports
+sixteen classes of service. There are no pre-defined classes of service and
+they can be changed at run time.  Intel(R) Xeon(R) processor E5 v3 and
+Intel(R) Xeon(R) processor D generations supports Core/Logical thread
+association with a class of service can be changed dynamically.
+.PP
+CAT is supported on the following: 6 SKUs for Intel(R) Xeon(R) processor E5
+v3 family: E5-2658 v3, E5-2648L v3, E5-2628L v3, E5-2618L v3, E5-2608L v3 and E5-2658A v3 2 SKUs for Intel(R) Xeon(R) processor E3 v4 family: E3-1258L v4 and E3-1278L v4 and all Intel(R) Xeon(R) processor D SKUs.
+.PP
+For additional CAT details please see refer to the Intel(R)
+Architecture Software Development Manuals, Volume 3 System Programming Guide available at:
+http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
+Specific information with regard to CAT can be found in
+Chapter 17.17.
+.SH OPTIONS
+rdtset options are as follow:
+.TP
+.B \-h, \-\-help
+Show help
+.TP
+.B \-v, \-\-verbose
+Verbose mode
+.TP
+.B \-3\ <cbm@cpulist>, \-\-l3\ <cbm@cpulist>
+Specify L3 CAT configuration, multiple
+.B cbm@cpulist
+are separated by commas. 
+.br
+For example:
+
+.B \-3\ '0xf@1'
+.br
+CPU 1 uses four cache-ways (mask 0xf)
+
+.B \-3\ '0xf@2,0xf0@(3,4,5)'
+.br
+CPU 2 uses four cache-ways (mask 0xf), CPUs 3-5 share four cache-ways
+(mask 0xf0), cache-ways used by CPU 2 and 3-4 are non-overlapping
+
+.B \-3\ '0xf@(0-2),0xf0@(3,4,5)'
+.br
+CPUs 0-2 share four cache-ways (mask 0xf), CPUs 3-5 share four cache-ways
+(mask 0xf0), cache-ways used by CPUs 0-2 and 3-5 are non-overlapping
+
+.B \-3\ '(0xf,0xf0)@1'
+.br
+On CDP enabled system, CPU 1 uses four cache-ways for code (mask 0xf)
+and four cache-ways for data (mask 0xf0),
+data and code cache-ways are non-overlapping
+.TP
+.B \-c <cpulist>, \-\-cpu <cpulist>
+Specify CPU affinity configuration, a numerical list of processors. The numbers
+are separated by commas and may include ranges. For example:
+.BR 1-3,4,5 .
+.TP
+.B \-p <pid>, \-\-pid <pid>
+Operate on existing, given pid
+.TP
+.B \-k, \-\-sudokeep
+Do not drop sudo elevated privileges
+.SH NOTES
+.PP
+CAT is configured using Model Specific Registers (MSRs)
+to set up the class of service masks and manage
+the association of the cores/logical threads to a class of service.
+The rdtset software executes in user space, and access to the MSRs is
+obtained through a standard Linux*/FreeBSD* interface.
+Under Linux, the virtual file system structure /dev/cpu/CPUNUM/msr provides
+an interface to read and write the MSRs, under FreeBSD it is /dev/cpuctlCPUNUM.
+The msr/cpuctl file interface is protected and requires root
+privileges. The msr/cpuctl driver might not be auto-loaded and on some
+modular kernels the driver may need to be loaded manually:
+.PP
+Under Linux:
+.br
+sudo modprobe msr
+.PP
+Under FreeBSD:
+.br
+sudo kldload cpuctl
+.SH SEE ALSO
+.BR msr (4)
+.SH AUTHOR
+rdtset was written by Wojciech Andralojc <wojciechx.andralojc@intel.com>, Tomasz Kantecki <tomasz.kantecki@intel.com>
+.P
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

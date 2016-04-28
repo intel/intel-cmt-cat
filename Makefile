@@ -55,6 +55,7 @@ endif
 all:
 	$(MAKE) -C lib
 	$(MAKE) -C pqos
+	$(MAKE) -C rdtset
 	$(MAKE) -C examples/c/CAT
 	$(MAKE) -C examples/c/CMT_MBM
 	$(MAKE) -C examples/c/PSEUDO_LOCK
@@ -62,6 +63,7 @@ all:
 clean:
 	$(MAKE) -C lib clean
 	$(MAKE) -C pqos clean
+	$(MAKE) -C rdtset clean
 	$(MAKE) -C examples/c/CAT clean
 	$(MAKE) -C examples/c/CMT_MBM clean
 	$(MAKE) -C examples/c/PSEUDO_LOCK clean
@@ -69,24 +71,28 @@ clean:
 style:
 	$(MAKE) -C lib style
 	$(MAKE) -C pqos style
+	$(MAKE) -C rdtset style
 	$(MAKE) -C examples/c/CAT style
-	$(MAKE) -C examples/c/CMT_MBM style 
+	$(MAKE) -C examples/c/CMT_MBM style
 	$(MAKE) -C examples/c/PSEUDO_LOCK style
 
 cppcheck:
 	$(MAKE) -C lib cppcheck
 	$(MAKE) -C pqos cppcheck
+	$(MAKE) -C rdtset cppcheck
 	$(MAKE) -C examples/c/CAT cppcheck
-	$(MAKE) -C examples/c/CMT_MBM cppcheck 
+	$(MAKE) -C examples/c/CMT_MBM cppcheck
 	$(MAKE) -C examples/c/PSEUDO_LOCK cppcheck
 
 install:
 	$(MAKE) -C lib install
 	$(MAKE) -C pqos install
+	$(MAKE) -C rdtset install
 
 uninstall:
 	$(MAKE) -C lib uninstall
 	$(MAKE) -C pqos uninstall
+	$(MAKE) -C rdtset uninstall
 
 TAGS:
 	find ./ -name "*.[ch]" -print | etags -
