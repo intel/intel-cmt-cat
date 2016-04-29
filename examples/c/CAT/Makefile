@@ -36,7 +36,7 @@
 ###############################################################################
 
 LIBDIR ?= ../../../lib
-CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
+CFLAGS =-I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings  \
@@ -46,6 +46,8 @@ CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
+LDFLAGS=-L$(LIBDIR)
+LDLIBS=-lpqos
 
 # ICC and GCC options
 ifeq ($(CC),icc)
@@ -59,6 +61,10 @@ ASSOCAPP = association_app
 RESETAPP = reset_app
 
 all: $(ALLOCAPP) $(ASSOCAPP) $(RESETAPP)
+
+$(ALLOCAPP): $(ALLOCAPP).o
+$(ASSOCAPP): $(ASSOCAPP).o
+$(RESETAPP): $(RESETAPP).o
 
 .PHONY: clean
 clean:

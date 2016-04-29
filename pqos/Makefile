@@ -36,7 +36,8 @@
 ###############################################################################
 
 LIBDIR ?= ../lib
-LDFLAGS = -L$(LIBDIR) -lpqos -lpthread -fPIE -z noexecstack -z relro -z now
+LDFLAGS = -L$(LIBDIR) -fPIE -z noexecstack -z relro -z now
+LDLIBS = -lpqos -lpthread
 CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
@@ -81,19 +82,19 @@ BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
 
 SRCS = $(wildcard *.c)
-OBJS = main.o monitor.o alloc.o profiles.o
+OBJS = $(SRCS:.c=.o)
 DEPFILES = $(SRCS:.c=.d)
+
+all: $(APP)
+
+$(APP): $(OBJS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 %.o: %.c %.d
 
 %.d: %.c
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
 	grep -e "\.o:" $@ | sed 's/$(@:.d=.o)/$@/' >> $@
-
-all: $(APP)
-
-$(APP): $(OBJS)
-	$(CC) $^ $(LDFLAGS) -o $@
 
 .PHONY: clean install uninstall
 

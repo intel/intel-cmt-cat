@@ -36,7 +36,7 @@
 ###############################################################################
 
 LIBDIR ?= ../../../lib
-CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
+CFLAGS =-I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
@@ -46,6 +46,8 @@ CFLAGS = -L$(LIBDIR) -lpqos -I$(LIBDIR) \
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
+LDFLAGS=-L$(LIBDIR)
+LDLIBS=-lpqos
 
 # ICC and GCC options
 ifeq ($(CC),icc)
@@ -57,6 +59,8 @@ endif
 MONITORAPP = monitor_app
 
 all: $(MONITORAPP)
+
+$(MONITORAPP): $(MONITORAPP).o
 
 .PHONY: clean
 clean:
