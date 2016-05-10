@@ -491,18 +491,3 @@ cpuinfo_fini(void)
         m_cpu = NULL;
         return CPUINFO_RETVAL_OK;
 }
-
-int
-cpuinfo_get(const struct cpuinfo_topology **topology)
-{
-        ASSERT(topology != NULL);
-        if (topology == NULL)
-                return CPUINFO_RETVAL_PARAM;
-
-        ASSERT(m_cpu != NULL);
-        if (m_cpu == NULL)
-                return CPUINFO_RETVAL_ERROR;
-
-        *topology = m_cpu;
-        return CPUINFO_RETVAL_OK;
-}

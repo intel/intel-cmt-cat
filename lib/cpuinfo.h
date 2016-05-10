@@ -82,16 +82,6 @@ int cpuinfo_init(const struct cpuinfo_topology **topology);
  */
 int cpuinfo_fini(void);
 
-/**
- * @brief Provides system CPU information
- *
- * @param [out] topology place to store pointer to CPU topology data
- *
- * @return Operation status
- * @retval CPUINFO_RETVAL_OK on success
- */
-int cpuinfo_get(const struct cpuinfo_topology **topology);
-
 #ifdef __cplusplus
 }
 #endif
