@@ -47,6 +47,12 @@ CFLAGS = -pthread -I./ \
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
+
+# Add _GNU_SOURCE on Linux
+ifeq ($(shell uname), Linux)
+CFLAGS += -D_GNU_SOURCE
+endif
+
 DOXY_DIRS = doc_api doc_lib
 
 # ICC and GCC options
@@ -98,9 +104,9 @@ all: $(LIBNAME)
 
 $(LIBNAME): $(OBJS)
 ifeq ($(SHARED),y)
-	$(CC) -shared -Wl,-soname,$(LIBNAME) -o $(LIBNAME) $^ -l c
-	ln -s $(LIB).so.0 $(LIB).so
-	ln -s $(LIBNAME) $(LIB).so.0
+	$(CC) -shared -Wl,-soname,$(LIBNAME) -o $(LIBNAME) $^ -lc
+	ln -f -s $(LIB).so.0 $(LIB).so
+	ln -f -s $(LIBNAME) $(LIB).so.0
 else
 	$(AR) crvsD $@ $^
 endif
@@ -119,8 +125,8 @@ endif
 
 # Create symlinks to DSO
 ifeq ($(SHARED),y)
-	ln -s $(LIBDIR)/$(LIB).so.0 $(LIBDIR)/$(LIB).so
-	ln -s $(LIBDIR)/$(LIBNAME) $(LIBDIR)/$(LIB).so.0
+	ln -f -s $(LIBDIR)/$(LIB).so.0 $(LIBDIR)/$(LIB).so
+	ln -f -s $(LIBDIR)/$(LIBNAME) $(LIBDIR)/$(LIB).so.0
 	ldconfig
 endif
 
@@ -169,11 +175,11 @@ style:
 	-f host_cap.c -f host_cap.h -f host_allocation.c -f perf.c -f perf.h \
 	-f host_allocation.h -f host_monitoring.c -f host_monitoring.h \
 	-f log.c -f log.h -f list.h -f types.h -f machine.c -f machine.h \
-	-f utils.c -f cpuinfo.c -f cpuinfo.h -f host_pidapi.c -f host_pidapi.h
+	-f utils.c -f cpuinfo.h -f host_pidapi.c -f host_pidapi.h
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS \
-	-f pqos.h
+	-f pqos.h -f cpuinfo.c
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck

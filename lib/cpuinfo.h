@@ -28,7 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -47,6 +47,8 @@ struct cpuinfo_core {
         unsigned lcore;                 /**< logical core id */
         unsigned socket;                /**< socket id in the system */
         unsigned cluster;               /**< cluster id in the system */
+        unsigned l3_id;                 /**< L3/LLC cluster id */
+        unsigned l2_id;                 /**< L2 cluster id */
 };
 
 struct cpuinfo_topology {
@@ -62,10 +64,6 @@ struct cpuinfo_topology {
  * @brief Initializes CPU information module
  *
  * CPU topology detection method is OS dependant.
- *
- * Passing \a topology is optional and it can be NULL.
- * After successful init cpuinfo_get() can be used
- * anytime to retrieve detected topology.
  *
  * @param [out] topology place to store pointer to CPU topology data
  *

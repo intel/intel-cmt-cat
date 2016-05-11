@@ -36,246 +36,34 @@
  * @brief CPU sockets and cores enumeration module.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <stdint.h>
-#include <ctype.h>
-#ifdef __linux__
 #include <limits.h>
-#endif
+#include <errno.h>
+#include <unistd.h>      /* sysconf() */
 #ifdef __FreeBSD__
 #include <sys/param.h>   /* sched affinity */
 #include <sys/cpuset.h>  /* sched affinity */
-#include <unistd.h>      /* sysconf() */
+#endif
+#ifdef __linux__
+#include <sched.h>       /* sched affinity */
 #endif
 
 #include "log.h"
 #include "cpuinfo.h"
 #include "types.h"
 #include "list.h"
-#ifdef __FreeBSD__
 #include "machine.h"
-#endif
 
 /**
  * This structure will be made externally available
- *
  * If not NULL then module is initialized.
  */
 static struct cpuinfo_topology *m_cpu = NULL;
 
 /**
- * Core info structure needed internally
- * to build list of cores in the system
+ * Internal APIC information structure
  */
-struct core_info {
-        struct list_item list;
-        unsigned lcore;
-        unsigned socket;
-        unsigned cluster;
-};
-
-#ifdef __linux__
-#ifndef PROC_CPUINFO_FILE_NAME
-#define PROC_CPUINFO_FILE_NAME "/proc/cpuinfo"
-#endif
-
-/**
- * @brief Converts \a str to numeric value
- *
- * \a str is assumed to be in the following format:
- * "<some text>: <number_base_10>"
- *
- * @param [in] str string to be converted
- * @param [out] val place to store converted value
- *
- * @return Operation status
- * @retval 0 OK
- * @retval -1 conversion error
- */
-static int
-get_str_value(const char *str, unsigned *val)
-{
-        ASSERT(str != NULL);
-        ASSERT(val != NULL);
-
-        char *endptr = NULL;
-        const char *s = strchr(str, ':');
-
-        if (s == NULL)
-                return -1;
-
-        *val = (unsigned) strtoul(s+1, &endptr, 10);
-        if (endptr != NULL && *endptr != '\0' && !isspace(*endptr))
-                return -1;
-
-        return 0;
-}
-
-/**
- * @brief Matches \a buf against "processor" and
- *        converts the number subsequent to the string.
- *
- * @param [in] buf string to be matched and converted
- * @param [out] lcore_id place to store converted number
- *
- * @return Operation status
- * @retval 0 OK
- * @retval -1 conversion error
- */
-static int
-parse_processor_id(const char *buf, unsigned *lcore_id)
-{
-        static const char *_processor = "processor";
-
-        ASSERT(buf != NULL);
-        ASSERT(lcore_id != NULL);
-
-        if (strncmp(buf, _processor, strlen(_processor)) != 0)
-                return -1;
-
-        return get_str_value(buf, lcore_id);
-}
-
-/**
- * @brief Matches \a buf against "physical id" and
- *        converts the number subsequent to the string.
- *
- * @param [in] buf string to be matched and converted
- * @param [out] socket_id place to store converted number
- *
- * @return Operation status
- * @retval 0 OK
- * @retval -1 conversion error
- */
-static int
-parse_socket_id(const char *buf, unsigned *socket_id)
-{
-        static const char *_physical_id = "physical id";
-
-        ASSERT(buf != NULL);
-        ASSERT(socket_id != NULL);
-
-        if (strncmp(buf, _physical_id, strlen(_physical_id)) != 0)
-                return -1;
-
-        return get_str_value(buf, socket_id);
-}
-
-/**
- * @brief Builds CPU topology structure (Linux)
- *
- * It scans /proc/cpuinfo to discover
- * CPU sockets and logical cores in the system.
- * Based on this data it builds structure with
- * system CPU information.
- *
- * @return Pointer to CPU topology structure
- * @retval NULL on error
- */
-static struct cpuinfo_topology *cpuinfo_build_topo(void)
-{
-        FILE *f = NULL;
-        unsigned lcore_id = UINT_MAX, socket_id = 0,
-                core_count = 0, sockets = 0,
-                di = 0;
-        LIST_HEAD_DECLARE(core_list);
-        struct list_item *p = NULL, *aux = NULL;
-        char buf[160];
-        struct cpuinfo_topology *l_cpu = NULL;
-
-        /**
-         * Open cpuinfo file in proc file system
-         */
-        f = fopen(PROC_CPUINFO_FILE_NAME, "r");
-        if (f == NULL) {
-                LOG_ERROR("Cannot open " PROC_CPUINFO_FILE_NAME "\n");
-                return NULL;
-        }
-
-        /**
-         * Parse lines of /proc/cpuinfo and fill in core_table
-         */
-        while (fgets(buf, sizeof(buf), f) != NULL) {
-                if (parse_processor_id(buf, &lcore_id) == 0)
-                        continue;
-
-                if (parse_socket_id(buf, &socket_id) == 0) {
-                        sockets++;
-                        continue;
-                }
-
-                if (buf[0] == '\n' && lcore_id != UINT_MAX) {
-                        struct core_info *inf =
-                                (struct core_info *) malloc(sizeof(*inf));
-
-                        ASSERT(inf != NULL);
-                        if (inf == NULL)
-                                goto cpuinfo_build_topo_error;
-
-                        LOG_DEBUG("Detected core %u on socket %u, cluster %u\n",
-                                  lcore_id, socket_id, socket_id);
-
-                        /**
-                         * Fill in logical core data
-                         */
-                        inf->lcore = lcore_id;
-                        inf->socket = socket_id;
-                        inf->cluster = socket_id;
-                        list_add_tail(&inf->list, &core_list);
-                        lcore_id = UINT_MAX;
-                        core_count++;
-                }
-        }
-
-        if (!sockets) {
-                LOG_INFO("No physical id detected in "
-                         PROC_CPUINFO_FILE_NAME ".\n"
-                         "Most likely running on a VM.\n");
-        }
-
-        /**
-         * Fill in l_cpu structure that will be made
-         * visible to other modules
-         */
-        l_cpu = (struct cpuinfo_topology *)
-                malloc(sizeof(*l_cpu) +
-                       (core_count * sizeof(struct cpuinfo_core)));
-
-        if (l_cpu == NULL)
-                goto cpuinfo_build_topo_error;
-
-        l_cpu->num_cores = core_count;
-        di = 0;
-
-        list_for_each(p, aux, &core_list) {
-                struct core_info *inf =
-                        list_get_container(p, struct core_info, list);
-
-                l_cpu->cores[di].lcore = inf->lcore;
-                l_cpu->cores[di].socket = inf->socket;
-                l_cpu->cores[di].cluster = inf->cluster;
-                di++;
-        }
-        ASSERT(di == core_count);
-
- cpuinfo_build_topo_error:
-        fclose(f);
-
-        list_for_each(p, aux, &core_list) {
-                struct core_info *inf =
-                        list_get_container(p, struct core_info, list);
-
-                list_del(p);
-                free(inf);
-        }
-
-        return l_cpu;
-}
-#endif /* __linux__ */
-
-#ifdef __FreeBSD__
 struct apic_info {
         uint32_t smt_mask;      /**< mask to get SMT ID */
         uint32_t smt_size;      /**< size of SMT ID mask */
@@ -283,12 +71,82 @@ struct apic_info {
         uint32_t core_smt_mask; /**< mask to get CORE+SMT ID */
         uint32_t pkg_mask;      /**< mask to get PACKAGE ID */
         uint32_t pkg_shift;     /**< bits to shift to get PACKAGE ID */
+        uint32_t l2_shift;      /**< bits to shift to get L2 ID */
+        uint32_t l3_shift;      /**< bits to shift to get L3 ID */
 };
+
+/**
+ * Own typedef to simplify dealing with cpu set differences.
+ */
+#ifdef __FreeBSD__
+typedef cpuset_t cpu_set_t; /* stick with Linux typedef */
+#endif
+
+/**
+ * @brief Sets current task CPU affinity as specified by \a p_set mask
+ *
+ * @param [in] p_set CPU set
+ *
+ * @return Operation status
+ * @retval 0 OK
+ */
+static int set_affinity_mask(const cpu_set_t *p_set)
+{
+        if (p_set == NULL)
+                return -EFAULT;
+#ifdef __linux__
+        return sched_setaffinity(0, sizeof(*p_set), p_set);
+#endif
+#ifdef __FreeBSD__
+        return cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
+                                  sizeof(*p_set), p_set);
+#endif
+}
+
+/**
+ * @brief Sets current task CPU affinity to specified core \a id
+ *
+ * @param [in] id core id
+ *
+ * @return Operation status
+ * @retval 0 OK
+ */
+static int set_affinity(const int id)
+{
+        cpu_set_t cpuset;
+
+        CPU_ZERO(&cpuset);
+        CPU_SET(id, &cpuset);
+        return set_affinity_mask(&cpuset);
+}
+
+/**
+ * @brief Retrieves current task core affinity
+ *
+ * @param [out] p_set place to store current CPU set
+ *
+ * @return Operation status
+ * @retval 0 OK
+ */
+static int get_affinity(cpu_set_t *p_set)
+{
+        if (p_set == NULL)
+                return -EFAULT;
+
+        CPU_ZERO(p_set);
+#ifdef __linux__
+        return sched_getaffinity(0, sizeof(*p_set), p_set);
+#endif
+#ifdef __FreeBSD__
+        return cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
+                                  sizeof(*p_set), p_set);
+#endif
+}
 
 /**
  * @brief Discovers APICID structure information
  *
- * Uses CPUID leaf 0xB to find SMT and CORE APICID information.
+ * Uses CPUID leaf 0xB to find SMT, CORE and package APICID information.
  *
  * @param [out] apic structure to be filled in with details
  *
@@ -296,16 +154,11 @@ struct apic_info {
  * @retval 0 OK
  * @retval -1 error
  */
-static int detect_apic_masks(struct apic_info *apic)
+static int detect_apic_core_masks(struct apic_info *apic)
 {
         int core_reported = 0;
         int thread_reported = 0;
         unsigned subleaf = 0;
-
-        if (apic == NULL)
-                return -1;
-
-        memset(apic, 0, sizeof(*apic));
 
         for (subleaf = 0; ; subleaf++) {
                 struct cpuid_out leafB;
@@ -313,12 +166,12 @@ static int detect_apic_masks(struct apic_info *apic)
                 uint32_t mask;
 
                 lcpuid(0xb, subleaf, &leafB);
-                if (leafB.ebx == 0) /* invalid subleaf */
+                if (leafB.ebx == 0) /* invalid sub-leaf */
                         break;
 
                 level_type = (leafB.ecx >> 8) & 0xff;     /* ECX bits 15:8 */
                 level_shift = leafB.eax & 0x1f;           /* EAX bits 4:0 */
-                mask = ~(((uint32_t)-1) << level_shift);
+                mask = ~(UINT32_MAX << level_shift);
 
                 if (level_type == 1) {
                         /* level_type 1 is for SMT  */
@@ -350,15 +203,130 @@ static int detect_apic_masks(struct apic_info *apic)
 }
 
 /**
+ * @brief Calculates number of bits needed for \a n.
+ *
+ * This is utility function for detect_apic_cache_masks() and
+ * the logic follows Table 3-18 Intel(R) SDM recommendations.
+ * It finds nearest power of 2 that is not smaller than \a n
+ * and returns number of bits required to encode \a n.
+ *
+ * @param [out] p_set place to store current CPU set
+ *
+ * @return Operation status
+ * @retval 0 OK
+ */
+static unsigned nearest_pow2(const unsigned n)
+{
+        unsigned r, p;
+
+        for (r = 1, p = 0; r != 0; r <<= 1, p++)
+                if (r >= n)
+                        break;
+        return p;
+}
+
+/**
+ * @brief Discovers cache APICID structure information
+ *
+ * Uses CPUID leaf 0x4 to find L3 and L2 cache APICID information.
+ *
+ * Assumes apic->pkg_shift is already set, this is in case
+ * L3/LLC is not detected.
+ *
+ * @param [out] apic structure to be filled in with details
+ *
+ * @return Operation status
+ * @retval 0 OK
+ * @retval -1 error
+ */
+static int detect_apic_cache_masks(struct apic_info *apic)
+{
+        unsigned cache_level_shift[4] = {0, 0, 0, 0};
+        unsigned subleaf = 0;
+
+        for (subleaf = 0; ; subleaf++) {
+                struct cpuid_out leaf4;
+                unsigned cache_type, cache_level, id, shift;
+
+                lcpuid(0x4, subleaf, &leaf4);
+                cache_type = leaf4.eax & 0x1f;            /* EAX bits 04:00 */
+                cache_level = (leaf4.eax >> 5) & 0x7;     /* EAX bits 07:05 */
+                id = (leaf4.eax >> 14) & 0xfff;           /* EAX bits 25:14 */
+                shift = nearest_pow2(id + 1);
+
+                if (cache_type == 0 || cache_type >= 4)
+                        break;    /* no more caches or reserved */
+
+                if (cache_level < DIM(cache_level_shift))
+                        cache_level_shift[cache_level] = shift;
+
+                LOG_INFO("CACHE: type %u, level %u, "
+                         "max id sharing this cache %u (%u bits)\n",
+                         cache_type, cache_level, id + 1, shift);
+
+                LOG_DEBUG("CACHE: %sinclusive, %s, %s%u ways, "
+                          "%u sets, line size %u\n",
+                          (leaf4.edx & 2) ? "" : "not ",
+                          (leaf4.edx & 4) ? "complex cache indexing" :
+                          "direct mapped",
+                          (leaf4.eax & 0x200) ? "fully associative, " : "",
+                          (leaf4.ebx >> 22) + 1, leaf4.ecx + 1,
+                          (leaf4.ebx & 0xfff) + 1);
+
+        }
+
+        if (!cache_level_shift[2] || !cache_level_shift[1])
+                return -1; /* L1 or L2 not detected */
+
+        apic->l2_shift = cache_level_shift[2];
+
+        if (cache_level_shift[3])
+                apic->l3_shift = cache_level_shift[3];
+        else
+                apic->l3_shift = apic->pkg_shift;
+        return 0;
+}
+
+/**
+ * @brief Discovers core and cache APICID information
+ *
+ * @param [out] apic structure to be filled in with details
+ *
+ * @return Operation status
+ * @retval 0 OK
+ * @retval -1 input parameter error
+ * @retval -2 error detecting APIC masks for cores & packages
+ * @retval -3 error detecting APIC masks for cache levels
+ */
+static int detect_apic_masks(struct apic_info *apic)
+{
+        if (apic == NULL)
+                return -1;
+
+        memset(apic, 0, sizeof(*apic));
+
+        if (detect_apic_core_masks(apic) != 0)
+                return -2;
+
+        if (detect_apic_cache_masks(apic) != 0)
+                return -3;
+
+        return 0;
+}
+
+/**
  * @brief Detects CPU information
  *
  * - schedules current task to run on \a cpu
  * - runs CPUID leaf 0xB to get cpu's APICID
- * - uses \a apic information to retrieve socket id from the APICID
+ * - uses \a apic & APICID information to:
+ *   - retrieve socket id (physical package id)
+ *   - retrieve L3/LLC cluster id
+ *   - retrieve L2/MLC cluster id
  *
  * @param [in] cpu logical cpu id used by OS
  * @param [in] apic information about APICID structure
- * @param [out] info cpu information structure to be filled by the function
+ * @param [out] info CPU information structure to be filled by the function
  *
  * @return Operation status
  * @retval 0 OK
@@ -369,14 +337,10 @@ detect_cpu(const int cpu,
            const struct apic_info *apic,
            struct cpuinfo_core *info)
 {
-        cpuset_t new_mask;
         struct cpuid_out leafB;
         uint32_t apicid;
 
-        CPU_ZERO(&new_mask);
-        CPU_SET(cpu, &new_mask);
-        if (cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
-                               sizeof(new_mask), &new_mask) != 0)
+        if (set_affinity(cpu) != 0)
                 return -1;
 
         lcpuid(0xb, 0, &leafB);
@@ -385,16 +349,19 @@ detect_cpu(const int cpu,
         info->lcore = cpu;
         info->socket = (apicid & apic->pkg_mask) >> apic->pkg_shift;
         info->cluster = info->socket;
+        info->l3_id = apicid >> apic->l3_shift;
+        info->l2_id = apicid >> apic->l2_shift;
 
-        LOG_DEBUG("Detected core %u, socket %u, cluster %u, APICID core %u\n",
+        LOG_DEBUG("Detected core %u, socket %u, cluster %u, "
+                  "L2 ID %u, L3 ID %u, APICID %u\n",
                   info->lcore, info->socket, info->cluster,
-                  apicid & apic->core_smt_mask);
+                  info->l2_id, info->l3_id, apicid);
 
         return 0;
 }
 
 /**
- * @brief Builds CPU topology structure (FreeBSD)
+ * @brief Builds CPU topology structure
  *
  * - saves current task CPU affinity
  * - retrieves number of processors in the system
@@ -405,18 +372,17 @@ detect_cpu(const int cpu,
  *      - retrieve package & cluster data from the APICID
  * - restores initial task CPU affinity
  *
- * @return Pointer to cpu topology structure
+ * @return Pointer to CPU topology structure
  * @retval NULL on error
  */
 static struct cpuinfo_topology *cpuinfo_build_topo(void)
 {
         unsigned i, max_core_count, core_count = 0;
         struct cpuinfo_topology *l_cpu = NULL;
-        cpuset_t current_mask;
+        cpu_set_t current_mask;
         struct apic_info apic;
 
-        if (cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
-                               sizeof(current_mask), &current_mask) == -1) {
+        if (get_affinity(&current_mask) != 0) {
                 LOG_ERROR("Error retrieving CPU affinity mask!");
                 return NULL;
         }
@@ -432,23 +398,21 @@ static struct cpuinfo_topology *cpuinfo_build_topo(void)
                 return NULL;
         }
 
-        l_cpu = (struct cpuinfo_topology *)
-                malloc(sizeof(*l_cpu) +
-                       (max_core_count * sizeof(struct cpuinfo_core)));
+        const size_t mem_sz = sizeof(*l_cpu) +
+                (max_core_count * sizeof(struct cpuinfo_core));
 
+        l_cpu = (struct cpuinfo_topology *)malloc(mem_sz);
         for (i = 0; i < max_core_count; i++)
                 if (detect_cpu(i, &apic, &l_cpu->cores[core_count]) == 0)
                         core_count++;
 
-        if (cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
-                               sizeof(current_mask), &current_mask) != 0) {
+        if (set_affinity_mask(&current_mask) != 0) {
                 LOG_ERROR("Couldn't restore original CPU affinity mask!");
                 free(l_cpu);
                 return NULL;
         }
 
         l_cpu->num_cores = core_count;
-
         if (core_count == 0) {
                 free(l_cpu);
                 l_cpu = NULL;
@@ -456,7 +420,6 @@ static struct cpuinfo_topology *cpuinfo_build_topo(void)
 
         return l_cpu;
 }
-#endif /* __FreeBSD__ */
 
 /**
  * Detect number of logical processors on the machine
@@ -465,6 +428,9 @@ static struct cpuinfo_topology *cpuinfo_build_topo(void)
 int
 cpuinfo_init(const struct cpuinfo_topology **topology)
 {
+        if (topology == NULL)
+                return CPUINFO_RETVAL_PARAM;
+
         ASSERT(m_cpu == NULL);
         if (m_cpu != NULL)
                 return CPUINFO_RETVAL_ERROR;
@@ -475,9 +441,7 @@ cpuinfo_init(const struct cpuinfo_topology **topology)
                 return CPUINFO_RETVAL_ERROR;
         }
 
-        if (topology != NULL)
-                *topology = m_cpu;
-
+        *topology = m_cpu;
         return CPUINFO_RETVAL_OK;
 }
 
