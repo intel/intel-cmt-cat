@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,7 +54,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <pthread.h>
+#include <semaphore.h> /* sem_open(), sem_wait(), sem_post() */
+#include <fcntl.h>     /* O_CREAT */
 
 #include "pqos.h"
 
@@ -122,9 +123,9 @@ static struct pqos_cpuinfo *m_cpu = NULL;
 static int m_init_done = 0;
 
 /**
- * API thread safe access is secured through this mutex.
+ * API thread/process safe access is secured through this semaphore.
  */
-static pthread_mutex_t m_apilock = PTHREAD_MUTEX_INITIALIZER;
+static sem_t *m_apilock = SEM_FAILED;
 
 /**
  * ---------------------------------------
@@ -132,24 +133,57 @@ static pthread_mutex_t m_apilock = PTHREAD_MUTEX_INITIALIZER;
  * ---------------------------------------
  */
 
-void _pqos_api_lock(void)
+/**
+ * @brief Opens POSIX named semaphore for API lock use
+ *
+ * @return Operation status
+ * @retval 0 success
+ * @retval -1 semaphore already open error
+ * @retval -2 semaphore open error
+ */
+static int _pqos_api_init(void)
+{
+        if (m_apilock != SEM_FAILED) {
+                LOG_ERROR("Semaphore already open!\n");
+                return -1;
+        }
+        m_apilock = sem_open("/pqos-semaphore", O_CREAT, 0644, 1);
+        if (m_apilock == SEM_FAILED) {
+                LOG_ERROR("sem_open() error!\n");
+                return -2;
+        }
+        return 0;
+}
+
+/**
+ * @brief Closes POSIX named semaphore
+ *
+ * @return Operation status
+ * @retval 0 success
+ * @retval -1 error
+ */
+static int _pqos_api_exit(void)
 {
         int ret = 0;
 
-        ret = pthread_mutex_lock(&m_apilock);
-        ASSERT(ret == 0);
-        if (ret != 0)
-                LOG_ERROR("API lock failed!\n");
+        if (sem_close(m_apilock) != 0) {
+                LOG_ERROR("sem_close() error!\n");
+                ret = -1;
+        }
+        m_apilock = SEM_FAILED;
+        return ret;
+}
+
+void _pqos_api_lock(void)
+{
+        if (sem_wait(m_apilock) != 0)
+                LOG_ERROR("API lock error!\n");
 }
 
 void _pqos_api_unlock(void)
 {
-        int ret = 0;
-
-        ret = pthread_mutex_unlock(&m_apilock);
-        ASSERT(ret == 0);
-        if (ret != 0)
-                LOG_ERROR("API unlock failed!\n");
+        if (sem_post(m_apilock) != 0)
+                LOG_ERROR("API unlock error!\n");
 }
 
 /**
@@ -1243,6 +1277,9 @@ pqos_init(const struct pqos_config *config)
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
 
+        if (_pqos_api_init() != 0)
+                return PQOS_RETVAL_ERROR;
+
         _pqos_api_lock();
 
         ret = _pqos_check_init(0);
@@ -1449,6 +1486,10 @@ pqos_fini(void)
         m_init_done = 0;
 
         _pqos_api_unlock();
+
+        if (_pqos_api_exit() != 0)
+                retval = PQOS_RETVAL_ERROR;
+
         return retval;
 }
 

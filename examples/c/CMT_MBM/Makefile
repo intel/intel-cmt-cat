@@ -36,7 +36,7 @@
 ###############################################################################
 
 LIBDIR ?= ../../../lib
-CFLAGS =-I$(LIBDIR) \
+CFLAGS =-I$(LIBDIR) -pthread \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
@@ -47,7 +47,7 @@ ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
 LDFLAGS=-L$(LIBDIR)
-LDLIBS=-lpqos
+LDLIBS=-lpqos -lpthread
 
 # ICC and GCC options
 ifeq ($(CC),icc)

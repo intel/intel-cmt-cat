@@ -47,7 +47,7 @@ ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
 LDFLAGS=-L$(LIBDIR)
-LDLIBS=-lpqos
+LDLIBS=-lpqos -lpthread
 
 # ICC and GCC options
 ifeq ($(CC),icc)
