@@ -110,8 +110,8 @@ print_allocation_config(const struct pqos_capability *cap_l3ca,
 			int ret1 = PQOS_RETVAL_OK;
 
 			if (cap_l3ca != NULL)
-				ret1 = pqos_l3ca_assoc_get(lcores[n],
-                                                           &class_id);
+				ret1 = pqos_alloc_assoc_get(lcores[n],
+                                                            &class_id);
 			if (ret1 == PQOS_RETVAL_OK)
 				printf("    Core %u => COS%u\n",
                                        lcores[n], class_id);

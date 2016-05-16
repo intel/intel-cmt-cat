@@ -412,7 +412,7 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
          * Associate all cores with COS0
          */
         for (j = 0; j < cpu->num_cores; j++) {
-                ret = pqos_l3ca_assoc_set(cpu->cores[j].lcore, 0);
+                ret = pqos_alloc_assoc_set(cpu->cores[j].lcore, 0);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
         }

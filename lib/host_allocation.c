@@ -71,9 +71,14 @@
  * Allocation class of service (COS) MSR registers
  */
 #define PQOS_MSR_L3CA_MASK_START 0xC90
-#define PQOS_MSR_L3CA_MASK_END   0xD8F
+#define PQOS_MSR_L3CA_MASK_END   0xD0F
 #define PQOS_MSR_L3CA_MASK_NUMOF \
-        (PQOS_MSR_L3CA_MASK_END-PQOS_MSR_L3CA_MASK_START+1)
+        (PQOS_MSR_L3CA_MASK_END - PQOS_MSR_L3CA_MASK_START + 1)
+
+#define PQOS_MSR_L2CA_MASK_START 0xD10
+#define PQOS_MSR_L2CA_MASK_END   0xD4F
+#define PQOS_MSR_L2CA_MASK_NUMOF \
+        (PQOS_MSR_L2CA_MASK_END - PQOS_MSR_L2CA_MASK_START + 1)
 
 /**
  * ---------------------------------------
@@ -376,8 +381,8 @@ pqos_l3ca_get(const unsigned socket,
 }
 
 int
-pqos_l3ca_assoc_set(const unsigned lcore,
-                    const unsigned class_id)
+pqos_alloc_assoc_set(const unsigned lcore,
+                     const unsigned class_id)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned num_classes = 0;
@@ -433,8 +438,8 @@ pqos_l3ca_assoc_set(const unsigned lcore,
 }
 
 int
-pqos_l3ca_assoc_get(const unsigned lcore,
-                    unsigned *class_id)
+pqos_alloc_assoc_get(const unsigned lcore,
+                     unsigned *class_id)
 {
         const struct pqos_capability *cap = NULL;
         int ret = PQOS_RETVAL_OK;

@@ -57,7 +57,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION       103          /**< version 1.03 */
+#define PQOS_VERSION       104          /**< version 1.04 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16xCOS */
 
 /*
@@ -134,7 +134,8 @@ int pqos_fini(void);
  */
 enum pqos_cap_type {
         PQOS_CAP_TYPE_MON = 0,          /**< QoS monitoring */
-        PQOS_CAP_TYPE_L3CA,             /**< LLC cache allocation */
+        PQOS_CAP_TYPE_L3CA,             /**< L3/LLC cache allocation */
+        PQOS_CAP_TYPE_L2CA,             /**< L2 cache allocation */
         PQOS_CAP_TYPE_NUMOF
 };
 
@@ -149,6 +150,17 @@ struct pqos_cap_l3ca {
         uint64_t way_contention;        /**< ways contention bit mask */
         int cdp;                        /**< code data prioratization feature presence */
         int cdp_on;                     /**< code data prioratization on or off*/
+};
+
+/**
+ * L2 Cache Allocation (CA) capability structure
+ */
+struct pqos_cap_l2ca {
+        unsigned mem_size;              /**< byte size of the structure */
+        unsigned num_classes;           /**< number of classes of service */
+        unsigned num_ways;              /**< number of cache ways */
+        unsigned way_size;              /**< way size in bytes */
+        uint64_t way_contention;        /**< ways contention bit mask */
 };
 
 /**
@@ -203,6 +215,7 @@ struct pqos_capability {
         union {
                 struct pqos_cap_mon *mon;
                 struct pqos_cap_l3ca *l3ca;
+                struct pqos_cap_l2ca *l2ca;
                 void *generic_ptr;
         } u;
 };
@@ -391,9 +404,38 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
 
 /*
  * =======================================
+ * Allocation Technology
+ * =======================================
+ */
+
+/**
+ * @brief Associates \a lcore with given class of service
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ */
+int pqos_alloc_assoc_set(const unsigned lcore,
+                         const unsigned class_id);
+
+/**
+ * @brief Reads association of \a lcore with class of service
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ */
+int pqos_alloc_assoc_get(const unsigned lcore,
+                         unsigned *class_id);
+
+/*
+ * =======================================
  * L3 cache allocation
  * =======================================
  */
+
 /**
  * L3 cache allocation class of service data structure
  */
@@ -438,27 +480,48 @@ int pqos_l3ca_get(const unsigned socket,
                   unsigned *num_ca,
                   struct pqos_l3ca *ca);
 
-/**
- * @brief Associates \a lcore with given L3CA class of service
- *
- * @param [in] lcore CPU logical core id
- * @param [in] class_id L3CA class of service
- *
- * @return Operations status
+/*
+ * =======================================
+ * L2 cache allocation
+ * =======================================
  */
-int pqos_l3ca_assoc_set(const unsigned lcore,
-                        const unsigned class_id);
 
 /**
- * @brief Reads association of \a lcore with L3CA class of service
+ * L2 cache allocation class of service data structure
+ */
+struct pqos_l2ca {
+        unsigned class_id;      /**< class of service */
+        uint32_t ways_mask;     /**< bit mask for L2 cache ways */
+};
+
+/**
+ * @brief Sets classes of service defined by \a ca on \a socket
  *
- * @param [in] lcore CPU logical core id
- * @param [out] class_id L3CA class of service
+ * @param [in] socket CPU socket id
+ * @param [in] num_cos number of classes of service at \a ca
+ * @param [in] ca table with class of service definitions
  *
  * @return Operations status
  */
-int pqos_l3ca_assoc_get(const unsigned lcore,
-                        unsigned *class_id);
+int pqos_l2ca_set(const unsigned socket,
+                  const unsigned num_cos,
+                  const struct pqos_l2ca *ca);
+
+/**
+ * @brief Reads classes of service from \a socket
+ *
+ * @param [in] socket CPU socket id
+ * @param [in] max_num_cos maximum number of classes of service
+ *             that can be accommodated at \a ca
+ * @param [out] num_cos number of classes of service read into \a ca
+ * @param [out] ca table with read classes of service
+ *
+ * @return Operations status
+ */
+int pqos_l2ca_get(const unsigned socket,
+                  const unsigned max_num_ca,
+                  unsigned *num_ca,
+                  struct pqos_l2ca *ca);
 
 /*
  * =======================================

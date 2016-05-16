@@ -140,7 +140,7 @@ print_allocation_config(void)
 		for (n = 0; n < lcount; n++) {
 			unsigned class_id = 0;
 
-			ret = pqos_l3ca_assoc_get(lcores[n], &class_id);
+			ret = pqos_alloc_assoc_get(lcores[n], &class_id);
 			if (ret == PQOS_RETVAL_OK)
 				printf("    Core %u => COS%u\n",
                                        lcores[n], class_id);
@@ -166,8 +166,8 @@ set_allocation_assoc(void)
 	for (i = 0; i < sel_l3ca_assoc_num; i++) {
                 int ret;
 
-		ret = pqos_l3ca_assoc_set(sel_l3ca_assoc_tab[i].core,
-                                          sel_l3ca_assoc_tab[i].class_id);
+		ret = pqos_alloc_assoc_set(sel_l3ca_assoc_tab[i].core,
+                                           sel_l3ca_assoc_tab[i].class_id);
 		if (ret != PQOS_RETVAL_OK) {
 			printf("Setting allocation class of service "
                                "association failed!\n");

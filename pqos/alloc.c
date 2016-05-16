@@ -437,8 +437,8 @@ set_allocation_assoc(void)
         int ret;
 
         for (i = 0; i < sel_l3ca_assoc_num; i++) {
-                ret = pqos_l3ca_assoc_set(sel_l3ca_assoc_tab[i].core,
-                                          sel_l3ca_assoc_tab[i].class_id);
+                ret = pqos_alloc_assoc_set(sel_l3ca_assoc_tab[i].core,
+                                           sel_l3ca_assoc_tab[i].class_id);
                 ASSERT(ret == PQOS_RETVAL_OK);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Setting allocation class of service "
@@ -609,8 +609,8 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         int ret2 = PQOS_RETVAL_OK;
 
 			if (cap_l3ca != NULL)
-				ret1 = pqos_l3ca_assoc_get(lcores[n],
-                                                           &class_id);
+				ret1 = pqos_alloc_assoc_get(lcores[n],
+                                                            &class_id);
 			if (cap_mon != NULL)
 				ret2 = pqos_mon_assoc_get(lcores[n], &rmid);
 

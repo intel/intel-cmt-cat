@@ -283,10 +283,10 @@ check_cpus(void)
 				return -ENODEV;
 			}
 
-			ret = pqos_l3ca_assoc_get(cpu_id, &cos_id);
+			ret = pqos_alloc_assoc_get(cpu_id, &cos_id);
 			if (ret != PQOS_RETVAL_OK) {
-				printf("L3: Failed to read COS associated to "
-					"cpu %u.\n", cpu_id);
+				printf("L3: Failed to read cpu %u COS "
+                                       "association.\n", cpu_id);
 				return -EFAULT;
 			}
 
@@ -396,9 +396,9 @@ l3ca_get_avail(const unsigned socket, const unsigned max_num_ca,
 		unsigned i = 0, j = 0;
 
 		/* Get COS associated to core */
-		ret = pqos_l3ca_assoc_get(cores[k], &class_id);
+		ret = pqos_alloc_assoc_get(cores[k], &class_id);
 		if (ret != PQOS_RETVAL_OK) {
-			printf("Error retrieving L3CA Assoc configuration!\n");
+			printf("Error reading class association!\n");
 			return ret;
 		}
 
@@ -513,11 +513,10 @@ l3ca_atomic_set(const unsigned num, struct pqos_l3ca *ca, cpu_set_t *cpu)
 				if (0 == CPU_ISSET(k, &cpusets[i][j]))
 					continue;
 
-				ret = pqos_l3ca_assoc_set(k, ca[i].class_id);
+				ret = pqos_alloc_assoc_set(k, ca[i].class_id);
 				if (ret != PQOS_RETVAL_OK) {
-					printf("Error associating L3CA COS,"
-						"core: %u, COS: %u!\n",
-						k, ca[i].class_id);
+					printf("Error associating cpu %u with "
+                                               "COS %u!\n", k, ca[i].class_id);
 					return ret;
 				}
 			}
@@ -627,7 +626,7 @@ cat_exit(void)
 			if (CPU_ISSET(cpu_id, &m_config[i].cpumask) == 0)
 				continue;
 
-			ret = pqos_l3ca_assoc_set(cpu_id, 0);
+			ret = pqos_alloc_assoc_set(cpu_id, 0);
 			if (ret != PQOS_RETVAL_OK)
 				printf("L3: Failed to associate COS 0 to "
 					"cpu %u\n", cpu_id);
