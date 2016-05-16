@@ -115,7 +115,7 @@ static struct pqos_cap *m_cap = NULL;
  * This gets allocated and initialized in this module.
  * This hold information about CPU topology in PQoS format.
  */
-static struct pqos_cpuinfo *m_cpu = NULL;
+static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /**
  * Library initialization status.
@@ -1245,20 +1245,6 @@ discover_capabilities(struct pqos_cap **p_cap,
 }
 
 /**
- * @brief Calculates byte size of pqos_cpuinfo to accommodate \a num_cores
- *
- * @param num_cores number of cores
- *
- * @return Size of pqos_coreinfo structure in bytes
- */
-static unsigned
-pqos_cpuinfo_get_memsize(const unsigned num_cores)
-{
-        return (num_cores * sizeof(struct pqos_coreinfo)) +
-                sizeof(struct pqos_cpuinfo);
-}
-
-/**
  * =======================================
  * =======================================
  *
@@ -1307,65 +1293,17 @@ pqos_init(const struct pqos_config *config)
                 goto init_error;
         }
 
-        if (config->topology == NULL) {
-                /**
-                 * Topology not provided through config.
-                 * CPU discovery done through internal mechanism.
-                 */
-                const struct cpuinfo_topology *topology = NULL;
-                unsigned n, ms;
-
-                if (cpuinfo_init(&topology) != CPUINFO_RETVAL_OK) {
-                        LOG_ERROR("cpuinfo_init() error %d\n", ret);
-                        ret = PQOS_RETVAL_ERROR;
-                        goto log_init_error;
-                }
-                ASSERT(topology != NULL);
-                ms = pqos_cpuinfo_get_memsize(topology->num_cores);
-                m_cpu = (struct pqos_cpuinfo *)malloc(ms);
-                if (m_cpu == NULL) {
-                        LOG_ERROR("Memory allocation error\n");
-                        ret = PQOS_RETVAL_ERROR;
-                        goto log_init_error;
-                }
-                m_cpu->mem_size = ms;
-                m_cpu->num_cores = topology->num_cores;
-                for (n = 0; n < topology->num_cores; n++) {
-                        m_cpu->cores[n].lcore = topology->cores[n].lcore;
-                        m_cpu->cores[n].socket = topology->cores[n].socket;
-                        m_cpu->cores[n].cluster = topology->cores[n].cluster;
-                }
-        } else {
-                /**
-                 * App provides CPU topology.
-                 */
-                unsigned n, ms;
-
-                if (config->topology->num_cores == 0) {
-                        LOG_ERROR("Provided CPU topology is empty!\n");
-                        ret = PQOS_RETVAL_PARAM;
-                        goto log_init_error;
-                }
-
-                ms = pqos_cpuinfo_get_memsize(config->topology->num_cores);
-                m_cpu = (struct pqos_cpuinfo *)malloc(ms);
-                if (m_cpu == NULL) {
-                        LOG_ERROR("Memory allocation error\n");
-                        ret = PQOS_RETVAL_ERROR;
-                        goto log_init_error;
-                }
-                m_cpu->mem_size = ms;
-                m_cpu->num_cores = config->topology->num_cores;
-                for (n = 0; n < config->topology->num_cores; n++) {
-                        m_cpu->cores[n].lcore =
-                                config->topology->cores[n].lcore;
-                        m_cpu->cores[n].socket =
-                                config->topology->cores[n].socket;
-                        m_cpu->cores[n].cluster =
-                                config->topology->cores[n].cluster;
-                }
+        /**
+         * Topology not provided through config.
+         * CPU discovery done through internal mechanism.
+         */
+        ret = cpuinfo_init(&m_cpu);
+        if (ret != 0 || m_cpu == NULL) {
+                LOG_ERROR("cpuinfo_init() error %d\n", ret);
+                ret = PQOS_RETVAL_ERROR;
+                goto log_init_error;
         }
-        ASSERT(m_cpu != NULL);
+        ret = PQOS_RETVAL_OK;
 
         /**
          * Find max core id in the topology
@@ -1425,8 +1363,6 @@ pqos_init(const struct pqos_config *config)
                 (void) log_fini();
  init_error:
         if (ret != PQOS_RETVAL_OK) {
-                if (m_cpu != NULL)
-                        free(m_cpu);
                 if (m_cap != NULL)
                         free(m_cap);
                 m_cpu = NULL;
@@ -1460,7 +1396,7 @@ pqos_fini(void)
         pqos_alloc_fini();
 
         ret = cpuinfo_fini();
-        if (ret != CPUINFO_RETVAL_OK) {
+        if (ret != 0) {
                 retval = PQOS_RETVAL_ERROR;
                 LOG_ERROR("cpuinfo_fini() error %d\n", ret);
         }
@@ -1475,7 +1411,6 @@ pqos_fini(void)
         if (ret != PQOS_RETVAL_OK)
                 retval = ret;
 
-        free((void *)m_cpu);
         m_cpu = NULL;
 
         for (i = 0; i < m_cap->num_cap; i++)

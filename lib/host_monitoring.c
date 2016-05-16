@@ -326,7 +326,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         for (i = 0; i < m_cpu->num_cores; i++) {
                 pqos_rmid_t rmid = 0;
                 unsigned coreid = m_cpu->cores[i].lcore;
-                unsigned clusterid = m_cpu->cores[i].cluster;
+                unsigned clusterid = m_cpu->cores[i].l3_id;
 
                 ret = mon_assoc_get(coreid, &rmid);
                 if (ret != PQOS_RETVAL_OK) {
@@ -1630,8 +1630,8 @@ cpu_get_num_clusters(const struct pqos_cpuinfo *cpu)
 
         ASSERT(cpu != NULL);
         for (i = 0; i < cpu->num_cores; i++)
-                if (cpu->cores[i].cluster > n)
-                        n = cpu->cores[i].cluster;
+                if (cpu->cores[i].l3_id > n)
+                        n = cpu->cores[i].l3_id;
 
         return n+1;
 }

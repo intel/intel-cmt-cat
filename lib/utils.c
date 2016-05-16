@@ -235,7 +235,7 @@ pqos_cpu_get_clusterid(const struct pqos_cpuinfo *cpu,
 
         for (i = 0; i < cpu->num_cores; i++)
                 if (cpu->cores[i].lcore == lcore) {
-                        *cluster = cpu->cores[i].cluster;
+                        *cluster = cpu->cores[i].l3_id;
                         return PQOS_RETVAL_OK;
                 }
 

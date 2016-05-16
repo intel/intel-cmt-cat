@@ -39,26 +39,12 @@
 #ifndef __PQOS_CPUINFO_H__
 #define __PQOS_CPUINFO_H__
 
+#include <errno.h>
+#include "pqos.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-struct cpuinfo_core {
-        unsigned lcore;                 /**< logical core id */
-        unsigned socket;                /**< socket id in the system */
-        unsigned cluster;               /**< cluster id in the system */
-        unsigned l3_id;                 /**< L3/LLC cluster id */
-        unsigned l2_id;                 /**< L2 cluster id */
-};
-
-struct cpuinfo_topology {
-        unsigned num_cores;             /**< number of cores in the system */
-        struct cpuinfo_core cores[];
-};
-
-#define CPUINFO_RETVAL_OK    0          /**< all good */
-#define CPUINFO_RETVAL_ERROR 1          /**< generic error */
-#define CPUINFO_RETVAL_PARAM 2          /**< parameter error */
 
 /**
  * @brief Initializes CPU information module
@@ -68,15 +54,19 @@ struct cpuinfo_topology {
  * @param [out] topology place to store pointer to CPU topology data
  *
  * @return Operation status
- * @retval CPUINFO_RETVAL_OK on success
+ * @retval 0 success
+ * @retval EINVAL invalid argument
+ * @retval EPERM cpuinfo already initialized
+ * @retval EFAULT error building & discovering the topology
  */
-int cpuinfo_init(const struct cpuinfo_topology **topology);
+int cpuinfo_init(const struct pqos_cpuinfo **topology);
 
 /**
  * @brief Shuts down CPU information module
  *
  * @return Operation status
- * @retval CPUINFO_RETVAL_OK on success
+ * @retval 0 success
+ * @retval EPERM cpuinfo not initialized
  */
 int cpuinfo_fini(void);
 

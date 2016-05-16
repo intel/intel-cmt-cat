@@ -58,7 +58,7 @@
  * This structure will be made externally available
  * If not NULL then module is initialized.
  */
-static struct cpuinfo_topology *m_cpu = NULL;
+static struct pqos_cpuinfo *m_cpu = NULL;
 
 /**
  * Internal APIC information structure
@@ -334,7 +334,7 @@ static int detect_apic_masks(struct apic_info *apic)
 static int
 detect_cpu(const int cpu,
            const struct apic_info *apic,
-           struct cpuinfo_core *info)
+           struct pqos_coreinfo *info)
 {
         struct cpuid_out leafB;
         uint32_t apicid;
@@ -347,13 +347,12 @@ detect_cpu(const int cpu,
 
         info->lcore = cpu;
         info->socket = (apicid & apic->pkg_mask) >> apic->pkg_shift;
-        info->cluster = info->socket;
         info->l3_id = apicid >> apic->l3_shift;
         info->l2_id = apicid >> apic->l2_shift;
 
-        LOG_DEBUG("Detected core %u, socket %u, cluster %u, "
+        LOG_DEBUG("Detected core %u, socket %u, "
                   "L2 ID %u, L3 ID %u, APICID %u\n",
-                  info->lcore, info->socket, info->cluster,
+                  info->lcore, info->socket,
                   info->l2_id, info->l3_id, apicid);
 
         return 0;
@@ -374,10 +373,10 @@ detect_cpu(const int cpu,
  * @return Pointer to CPU topology structure
  * @retval NULL on error
  */
-static struct cpuinfo_topology *cpuinfo_build_topo(void)
+static struct pqos_cpuinfo *cpuinfo_build_topo(void)
 {
         unsigned i, max_core_count, core_count = 0;
-        struct cpuinfo_topology *l_cpu = NULL;
+        struct pqos_cpuinfo *l_cpu = NULL;
         cpu_set_t current_mask;
         struct apic_info apic;
 
@@ -398,9 +397,15 @@ static struct cpuinfo_topology *cpuinfo_build_topo(void)
         }
 
         const size_t mem_sz = sizeof(*l_cpu) +
-                (max_core_count * sizeof(struct cpuinfo_core));
+                (max_core_count * sizeof(struct pqos_coreinfo));
 
-        l_cpu = (struct cpuinfo_topology *)malloc(mem_sz);
+        l_cpu = (struct pqos_cpuinfo *)malloc(mem_sz);
+        if (l_cpu == NULL) {
+                LOG_ERROR("Couldn't allocate CPU topology structure!");
+                return NULL;
+        }
+        l_cpu->mem_size = (unsigned) mem_sz;
+
         for (i = 0; i < max_core_count; i++)
                 if (detect_cpu(i, &apic, &l_cpu->cores[core_count]) == 0)
                         core_count++;
@@ -425,32 +430,30 @@ static struct cpuinfo_topology *cpuinfo_build_topo(void)
  * and their location.
  */
 int
-cpuinfo_init(const struct cpuinfo_topology **topology)
+cpuinfo_init(const struct pqos_cpuinfo **topology)
 {
         if (topology == NULL)
-                return CPUINFO_RETVAL_PARAM;
+                return -EINVAL;
 
-        ASSERT(m_cpu == NULL);
         if (m_cpu != NULL)
-                return CPUINFO_RETVAL_ERROR;
+                return -EPERM;
 
         m_cpu = cpuinfo_build_topo();
         if (m_cpu == NULL) {
                 LOG_ERROR("CPU topology detection error!");
-                return CPUINFO_RETVAL_ERROR;
+                return -EFAULT;
         }
 
         *topology = m_cpu;
-        return CPUINFO_RETVAL_OK;
+        return 0;
 }
 
 int
 cpuinfo_fini(void)
 {
-        ASSERT(m_cpu != NULL);
         if (m_cpu == NULL)
-                return CPUINFO_RETVAL_ERROR;
+                return -EPERM;
         free(m_cpu);
         m_cpu = NULL;
-        return CPUINFO_RETVAL_OK;
+        return 0;
 }

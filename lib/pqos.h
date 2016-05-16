@@ -94,10 +94,6 @@ struct pqos_config {
                                            library to log messages */
         int verbose;                    /**< if true increases library
                                            verbosity level */
-        const struct pqos_cpuinfo *topology; /**< application may choose to
-                                                pass CPU topology to the library.
-                                                In such case, library will not
-                                                run its own CPU discovery. */
         int free_in_use_rmid;           /**< forces the library to take all
                                            cores and RMIDs in the system even
                                            if cores may seem to be subject of
@@ -227,7 +223,8 @@ struct pqos_cap {
 struct pqos_coreinfo {
         unsigned lcore;                 /**< logical core id */
         unsigned socket;                /**< socket id in the system */
-        unsigned cluster;               /**< cluster id in the socket */
+        unsigned l3_id;                 /**< L3/LLC cluster id */
+        unsigned l2_id;                 /**< L2 cluster id */
 };
 
 /**
