@@ -52,7 +52,6 @@
 #include "log.h"
 #include "cpuinfo.h"
 #include "types.h"
-#include "list.h"
 #include "machine.h"
 
 /**

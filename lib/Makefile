@@ -174,7 +174,7 @@ style:
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
 	-f host_cap.c -f host_cap.h -f host_allocation.c -f perf.c -f perf.h \
 	-f host_allocation.h -f host_monitoring.c -f host_monitoring.h \
-	-f log.c -f log.h -f list.h -f types.h -f machine.c -f machine.h \
+	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
 	-f utils.c -f cpuinfo.h -f host_pidapi.c -f host_pidapi.h
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
@@ -189,7 +189,7 @@ cppcheck:
 	--std=c99 --template=gcc \
 	host_cap.c host_cap.h host_allocation.c perf.c perf.h \
 	host_allocation.h host_monitoring.c host_monitoring.h \
-	log.c log.h list.h types.h machine.c machine.h \
+	log.c log.h types.h machine.c machine.h \
 	utils.c cpuinfo.c cpuinfo.h host_pidapi.c host_pidapi.h
 
 # dependecies file
