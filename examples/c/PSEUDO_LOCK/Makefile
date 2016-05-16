@@ -37,7 +37,7 @@
 
 LIBDIR ?= ../../../lib
 LDFLAGS = -L$(LIBDIR)
-LDLIBS = -lpqos -lrt
+LDLIBS = -lpqos -lrt -lpthread
 CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
