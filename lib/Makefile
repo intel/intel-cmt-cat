@@ -38,7 +38,7 @@ LIB = libpqos
 VERSION = 0.1.5
 SHARED ?= y
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
-CFLAGS = -pthread -I./ \
+CFLAGS = -pthread -I./ -D_GNU_SOURCE \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
@@ -46,11 +46,6 @@ CFLAGS = -pthread -I./ \
 	-Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
-endif
-
-# Add _GNU_SOURCE on Linux
-ifeq ($(shell uname), Linux)
-CFLAGS += -D_GNU_SOURCE
 endif
 
 DOXY_DIRS = doc_api doc_lib

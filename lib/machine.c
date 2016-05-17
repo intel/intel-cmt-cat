@@ -36,11 +36,6 @@
  * @brief Provides access to machine operations (CPUID, MSR read & write)
  */
 
-#ifdef __linux__
-#define _XOPEN_SOURCE 500
-#define _LARGEFILE64_SOURCE
-#endif /* __linux__ */
-
 #ifdef __FreeBSD__
 #define _WITH_DPRINTF
 #endif /* __FreeBSD__ */

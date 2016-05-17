@@ -54,8 +54,9 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <semaphore.h> /* sem_open(), sem_wait(), sem_post() */
 #include <fcntl.h>     /* O_CREAT */
+#include <unistd.h>    /* usleep(), lockf() */
+#include <sys/stat.h>  /* S_Ixxx */
 
 #include "pqos.h"
 
@@ -123,9 +124,9 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 static int m_init_done = 0;
 
 /**
- * API thread/process safe access is secured through this semaphore.
+ * API thread/process safe access is secured through this lock.
  */
-static sem_t *m_apilock = SEM_FAILED;
+static int m_apilock = -1;
 
 /**
  * ---------------------------------------
@@ -134,24 +135,28 @@ static sem_t *m_apilock = SEM_FAILED;
  */
 
 /**
- * @brief Opens POSIX named semaphore for API lock use
+ * @brief Opens lock file
  *
  * @return Operation status
  * @retval 0 success
- * @retval -1 semaphore already open error
- * @retval -2 semaphore open error
+ * @retval -1 error
  */
 static int _pqos_api_init(void)
 {
-        if (m_apilock != SEM_FAILED) {
-                LOG_ERROR("Semaphore already open!\n");
+#ifdef __FreeBSD__
+        const char *lock_filename = "/var/lib/libpqos.lockfile";
+#else
+        const char *lock_filename = "/var/lock/libpqos";
+#endif
+
+        if (m_apilock != -1)
                 return -1;
-        }
-        m_apilock = sem_open("/pqos-semaphore", O_CREAT, 0644, 1);
-        if (m_apilock == SEM_FAILED) {
-                LOG_ERROR("sem_open() error!\n");
-                return -2;
-        }
+
+        m_apilock = open(lock_filename, O_WRONLY | O_CREAT,
+                         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+        if (m_apilock == -1)
+                return -1;
+
         return 0;
 }
 
@@ -166,23 +171,22 @@ static int _pqos_api_exit(void)
 {
         int ret = 0;
 
-        if (sem_close(m_apilock) != 0) {
-                LOG_ERROR("sem_close() error!\n");
+        if (close(m_apilock) != 0)
                 ret = -1;
-        }
-        m_apilock = SEM_FAILED;
+
+        m_apilock = -1;
         return ret;
 }
 
 void _pqos_api_lock(void)
 {
-        if (sem_wait(m_apilock) != 0)
+        if (lockf(m_apilock, F_LOCK, 0) != 0)
                 LOG_ERROR("API lock error!\n");
 }
 
 void _pqos_api_unlock(void)
 {
-        if (sem_post(m_apilock) != 0)
+        if (lockf(m_apilock, F_ULOCK, 0) != 0)
                 LOG_ERROR("API unlock error!\n");
 }
 
@@ -1263,8 +1267,10 @@ pqos_init(const struct pqos_config *config)
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        if (_pqos_api_init() != 0)
+        if (_pqos_api_init() != 0) {
+                fprintf(stderr, "API lock initialization error!\n");
                 return PQOS_RETVAL_ERROR;
+        }
 
         _pqos_api_lock();
 
