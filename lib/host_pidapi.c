@@ -900,7 +900,7 @@ set_attrs(const int idx, const char *fname)
                           "monitoring event scale file\n");
                 return PQOS_RETVAL_ERROR;
         }
-        ret = fscanf(fd, "%lf", &sf);
+        ret = fscanf(fd, "%10lf", &sf);
         fclose(fd);
 
         if (ret < 1) {
