@@ -656,7 +656,7 @@ int
 cat_init(void)
 {
 	int ret = 0;
-	struct pqos_config cfg = { 0 };
+	struct pqos_config cfg;
 
 	if (m_cap != NULL || m_cpu != NULL) {
 		printf("L3: CAT module already initialized!\n");
@@ -664,6 +664,7 @@ cat_init(void)
 	}
 
 	/* PQoS Initialization - Check and initialize CAT capability */
+        memset(&cfg, 0, sizeof(cfg));
 	cfg.fd_log = STDOUT_FILENO;
 	cfg.verbose = 0;
 	cfg.cdp_cfg = PQOS_REQUIRE_CDP_ANY;
