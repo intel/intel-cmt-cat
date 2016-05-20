@@ -263,9 +263,9 @@ sub print_cfg {
 	print "CoS association:\n";
 
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		(my $result, $cos_id) = pqos::pqos_l3ca_assoc_get($cpu_id);
+		(my $result, $cos_id) = pqos::pqos_alloc_assoc_get($cpu_id);
 		if (0 != $result) {
-			print __LINE__, " pqos::pqos_l3ca_assoc_get FAILED!\n";
+			print __LINE__, " pqos::pqos_alloc_assoc_get FAILED!\n";
 			return -1;
 		}
 
@@ -298,9 +298,9 @@ sub test_assoc {
 	}
 
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		($result, $cos_id) = pqos::pqos_l3ca_assoc_get($cpu_id);
+		($result, $cos_id) = pqos::pqos_alloc_assoc_get($cpu_id);
 		if (0 != $result) {
-			print __LINE__, " pqos::pqos_l3ca_assoc_get FAILED!\n";
+			print __LINE__, " pqos::pqos_alloc_assoc_get FAILED!\n";
 			goto EXIT;
 		}
 
@@ -317,16 +317,16 @@ sub test_assoc {
 			goto EXIT;
 		}
 
-		if (0 != pqos::pqos_l3ca_assoc_set($cpu_id, $gen_cos_id)) {
-			print __LINE__, " pqos::pqos_l3ca_assoc_set FAILED!\n";
+		if (0 != pqos::pqos_alloc_assoc_set($cpu_id, $gen_cos_id)) {
+			print __LINE__, " pqos::pqos_alloc_assoc_set FAILED!\n";
 			goto EXIT;
 		}
 	}
 
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		($result, $cos_id) = pqos::pqos_l3ca_assoc_get($cpu_id);
+		($result, $cos_id) = pqos::pqos_alloc_assoc_get($cpu_id);
 		if (0 != $result) {
-			print __LINE__, " pqos::pqos_l3ca_assoc_get FAILED!\n";
+			print __LINE__, " pqos::pqos_alloc_assoc_get FAILED!\n";
 			goto EXIT;
 		}
 
@@ -450,8 +450,8 @@ sub reset_cfg {
 	}
 
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		if (0 != pqos::pqos_l3ca_assoc_set($cpu_id, 0)) {
-			print __LINE__, " pqos::pqos_l3ca_assoc_set FAILED!\n";
+		if (0 != pqos::pqos_alloc_assoc_set($cpu_id, 0)) {
+			print __LINE__, " pqos::pqos_alloc_assoc_set FAILED!\n";
 			goto EXIT;
 		}
 	}

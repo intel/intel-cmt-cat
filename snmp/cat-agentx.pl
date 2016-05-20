@@ -185,7 +185,7 @@ sub data_update {
 
 	%data_assoc = ();
 	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
-		($ret, my $cos_id) = pqos::pqos_l3ca_assoc_get($cpu_id);
+		($ret, my $cos_id) = pqos::pqos_alloc_assoc_get($cpu_id);
 		if (0 != $ret) {
 			last;
 		}
@@ -359,7 +359,7 @@ sub handle_assoc {
 	if (MODE_SET_ACTION == $mode) {
 		my $cpu_id = ($oid->to_array())[$oid->length - 1];
 		my $cos_id = $request->getValue();
-		if (0 != pqos::pqos_l3ca_assoc_set($cpu_id, $cos_id)) {
+		if (0 != pqos::pqos_alloc_assoc_set($cpu_id, $cos_id)) {
 			$request->setError($request_info, SNMP_ERR_GENERR);
 		}
 	}

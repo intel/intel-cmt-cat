@@ -375,13 +375,13 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
 
         res = pqos_alloc_assoc_get(cpuid, &clos_save);
         if (res != PQOS_RETVAL_OK) {
-                printf("pqos_l3ca_assoc_get() error!\n");
+                printf("pqos_alloc_assoc_get() error!\n");
                 ret = -11;
                 goto dlock_init_error2;
         }
         res = pqos_alloc_assoc_set(cpuid, clos);
         if (res != PQOS_RETVAL_OK) {
-                printf("pqos_l3ca_assoc_set() error!\n");
+                printf("pqos_alloc_assoc_set() error!\n");
                 ret = -12;
                 goto dlock_init_error2;
         }
@@ -409,7 +409,7 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
          */
         res = pqos_alloc_assoc_set(cpuid, clos_save);
         if (res != PQOS_RETVAL_OK) {
-                printf("pqos_l3ca_assoc_set() error (revert)!\n");
+                printf("pqos_alloc_assoc_set() error (revert)!\n");
                 ret = -13;
                 goto dlock_init_error2;
         }

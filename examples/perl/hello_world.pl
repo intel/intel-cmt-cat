@@ -65,7 +65,7 @@ my $cpu_num   = pqos::cpuinfo_p_value($cpuinfo_p)->{num_cores};
 for (my $i = 0; $i < $cpu_num; $i++) {
 
 	# Get core association
-	(my $result, my $cos) = pqos::pqos_l3ca_assoc_get($i);
+	(my $result, my $cos) = pqos::pqos_alloc_assoc_get($i);
 	if (0 != $result) {
 		next;
 	}
