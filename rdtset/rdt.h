@@ -34,26 +34,11 @@
 #ifndef _RDT_H
 #define _RDT_H
 
-#include <stdint.h>
-
 #include "common.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/* L3 cache allocation class of service data structure */
-struct cat_config {
-	cpu_set_t cpumask;	/**< CPUs bitmask */
-	int cdp;			/**< data & code masks used if true */
-	union {
-		uint64_t mask;		/**< capacity bitmask (CBM) */
-		struct {
-			uint64_t data_mask; /**< data capacity bitmask (CBM) */
-			uint64_t code_mask; /**< code capacity bitmask (CBM) */
-		};
-	};
-};
 
 /**
  * @brief Initialize libpqos and configure L3 CAT
@@ -96,9 +81,30 @@ void cat_exit(void);
  * @param l3ca params string
  *
  * @return 0 on success
- * @retval -EINVAL on error
+ * @retval negative on error (-errno)
  */
 int parse_l3(const char *l3ca);
+
+/**
+ * @brief Parse -r/--reset params
+ *
+ * @param cpu params string
+ *
+ * @return 0 on success
+ * @retval negative on error (-errno)
+ */
+int parse_reset(const char *cpu);
+
+/*
+ * @brief Check is it possible to fulfill requested L3 CAT configuration
+ * and then configure system.
+ */
+int cat_set(void);
+
+/*
+ * @brief Reset COS association (assign COS#0) on listed CPUs
+ */
+int cat_reset(void);
 
 /**
  * @brief Print parsed -3/--l3 config

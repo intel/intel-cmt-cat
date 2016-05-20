@@ -58,6 +58,14 @@ Package Content
     Please refer to the utility README for more details "pqos/README".
     Manual page of "pqos" utility also provides information about tool usage:
     $ man pqos
+"rdtset" directory:
+    Includes files of utility that provides "taskset"-like functionality and
+    CAT configuration.
+    The utility links against the library and programs the technologies
+    via its API's.
+    Please refer to the utility README for more details "rdtset/README".
+    Manual page of "rdtset" utility also provides information about tool usage:
+    $ man rdtset
 "examples" directory:
     Includes C and Perl examples of Intel(R) RDT via the library API's.
     Please refer to README file for more details "examples/README".

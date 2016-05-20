@@ -49,8 +49,6 @@
 static const struct pqos_cap *m_cap;
 static const struct pqos_cpuinfo *m_cpu;
 static const struct pqos_capability *m_cap_l3ca;
-static struct cat_config m_config[CPU_SETSIZE];
-static unsigned m_config_count;
 
 /* Return number of set bits in bitmask */
 static unsigned
@@ -91,27 +89,32 @@ is_contiguous(uint64_t bitmask)
 	return 1;
 }
 
+/* Convert hex string to UINT */
 static int
 xstr_to_uint(const char *xstr, uint64_t *value)
 {
 	const char *xstr_start = xstr;
 	char *xstr_end = NULL;
 
+	if (NULL == xstr || NULL == value)
+		return -EINVAL;
+
 	while (isblank(*xstr_start))
 		xstr_start++;
 
 	if (!isxdigit(*xstr_start))
-		return -1;
+		return -EINVAL;
 
 	errno = 0;
 	*value = strtoul(xstr_start, &xstr_end, 16);
 	if (errno != 0 || xstr_end == NULL || xstr_end == xstr_start ||
 			*value == 0)
-		return -1;
+		return -EINVAL;
 
 	return xstr_end - xstr;
 }
 
+/* Parse CBM masks */
 static int
 parse_mask_set(const char *cbm, uint64_t *mask, uint64_t *cmask)
 {
@@ -144,8 +147,7 @@ parse_mask_set(const char *cbm, uint64_t *mask, uint64_t *cmask)
 	return cbm_start + offset - cbm;
 
 err:
-	return -1;
-
+	return -EINVAL;
 }
 
 int
@@ -155,19 +157,20 @@ parse_l3(const char *l3ca)
 	const char *end = NULL;
 
 	if (l3ca == NULL)
-		goto err;
+		return -EINVAL;
 
 	/* Get cbm */
 	do {
 		uint64_t mask = 0, cmask = 0;
 		const char *cbm_start = NULL;
 		int offset = 0;
+		unsigned cpustr_len = 0;
 
 		while (isblank(*l3ca))
 			l3ca++;
 
 		if (*l3ca == '\0')
-			goto err;
+			return -EINVAL;
 
 		/* record mask_set start point */
 		cbm_start = l3ca;
@@ -176,55 +179,72 @@ parse_l3(const char *l3ca)
 		if (*cbm_start == '(') {
 			l3ca += strcspn(l3ca, ")");
 			if (*l3ca++ == '\0')
-				goto err;
+				return -EINVAL;
 		}
 
 		/* scan the separator '@' */
 		l3ca += strcspn(l3ca, "@");
 
 		if (*l3ca != '@')
-			goto err;
+			return -EINVAL;
 
 		l3ca++;
 
 		/* explicit assign cpu_set */
-		offset = parse_cpu_set(l3ca, &m_config[idx].cpumask);
-		if (offset < 0 || CPU_COUNT(&m_config[idx].cpumask) == 0)
-			goto err;
+		if (*l3ca == '(') {
+			l3ca++;
+			cpustr_len = strcspn(l3ca, ")");
+		} else
+			cpustr_len = strcspn(l3ca, ",");
+
+		offset = str_to_cpuset(l3ca, cpustr_len,
+			&g_cfg.l3_config[idx].cpumask);
+
+		if (offset < 0 || CPU_COUNT(&g_cfg.l3_config[idx].cpumask) == 0)
+			return -EINVAL;
 
 		end = l3ca + offset;
 
+		if (*end == ')')
+			end++;
+
 		if (*end != ',' && *end != '\0')
-			goto err;
+			return -EINVAL;
 
 		offset = parse_mask_set(cbm_start, &mask, &cmask);
 		if (offset < 0 || 0 == mask)
-			goto err;
+			return -EINVAL;
 
 		if (is_contiguous(mask) == 0 ||
 				(cmask != 0 && is_contiguous(cmask) == 0))
-			goto err;
+			return -EINVAL;
 
 		if (cmask != 0) {
-			m_config[idx].cdp = 1;
-			m_config[idx].code_mask = cmask;
-			m_config[idx].data_mask = mask;
+			g_cfg.l3_config[idx].cdp = 1;
+			g_cfg.l3_config[idx].code_mask = cmask;
+			g_cfg.l3_config[idx].data_mask = mask;
 		} else
-			m_config[idx].mask = mask;
+			g_cfg.l3_config[idx].mask = mask;
 
-		m_config_count++;
+		g_cfg.l3_config_count++;
 
 		l3ca = end + 1;
 		idx++;
 	} while (*end != '\0' && idx < CPU_SETSIZE);
 
-	if (m_config_count == 0)
-		goto err;
+	if (g_cfg.l3_config_count == 0)
+		return -EINVAL;
 
 	return 0;
+}
 
-err:
-	return -EINVAL;
+int parse_reset(const char *cpustr)
+{
+	unsigned cpustr_len = strlen(cpustr);
+	int ret = 0;
+
+	ret = str_to_cpuset(cpustr, cpustr_len, &g_cfg.reset_cpuset);
+	return ret > 0 ? 0 : ret;
 }
 
 /* Check are configured CPU sets overlapping */
@@ -233,21 +253,21 @@ check_cpus_overlapping(void)
 {
 	unsigned i = 0;
 
-	for (i = 0; i < m_config_count; i++) {
+	for (i = 0; i < g_cfg.l3_config_count; i++) {
 		unsigned j = 0;
 
-		for (j = i + 1; j < m_config_count; j++) {
+		for (j = i + 1; j < g_cfg.l3_config_count; j++) {
 			unsigned overlapping = 0;
 #ifdef __linux__
 			cpu_set_t mask;
 
-			CPU_AND(&mask, &m_config[i].cpumask,
-				&m_config[j].cpumask);
+			CPU_AND(&mask, &g_cfg.l3_config[i].cpumask,
+				&g_cfg.l3_config[j].cpumask);
 			overlapping = CPU_COUNT(&mask) != 0;
 #endif
 #ifdef __FreeBSD__
-			overlapping = CPU_OVERLAP(&m_config[i].cpumask,
-				&m_config[j].cpumask);
+			overlapping = CPU_OVERLAP(&g_cfg.l3_config[i].cpumask,
+				&g_cfg.l3_config[j].cpumask);
 #endif
 			if (1 == overlapping) {
 				printf("L3: Requested CPUs sets are "
@@ -267,13 +287,13 @@ check_cpus(void)
 	unsigned i = 0;
 	int ret = 0;
 
-	for (i = 0; i < m_config_count; i++) {
+	for (i = 0; i < g_cfg.l3_config_count; i++) {
 		unsigned cpu_id = 0;
 
 		for (cpu_id = 0; cpu_id < CPU_SETSIZE; cpu_id++) {
 			unsigned cos_id = 0;
 
-			if (CPU_ISSET(cpu_id, &m_config[i].cpumask) == 0)
+			if (CPU_ISSET(cpu_id, &g_cfg.l3_config[i].cpumask) == 0)
 				continue;
 
 			ret = pqos_cpu_check_core(m_cpu, cpu_id);
@@ -286,7 +306,7 @@ check_cpus(void)
 			ret = pqos_alloc_assoc_get(cpu_id, &cos_id);
 			if (ret != PQOS_RETVAL_OK) {
 				printf("L3: Failed to read cpu %u COS "
-                                       "association.\n", cpu_id);
+					"association.\n", cpu_id);
 				return -EFAULT;
 			}
 
@@ -315,17 +335,19 @@ check_cdp(void)
 {
 	unsigned i = 0;
 
-	for (i = 0; i < m_config_count; i++) {
-		if (m_config[i].cdp == 1 && m_cap_l3ca->u.l3ca->cdp_on == 0) {
-			if (m_cap_l3ca->u.l3ca->cdp == 0)
-				printf("L3: CDP requested but not "
-					"supported.\n");
-			else
-				printf("L3: CDP requested but not enabled. "
-					"Please enable CDP.\n");
+	for (i = 0; i < g_cfg.l3_config_count; i++) {
+		if (0 == g_cfg.l3_config[i].cdp ||
+				1 == m_cap_l3ca->u.l3ca->cdp_on)
+			continue;
 
-			return -ENOTSUP;
-		}
+		if (m_cap_l3ca->u.l3ca->cdp == 0)
+			printf("L3: CDP requested but not "
+				"supported.\n");
+		else
+			printf("L3: CDP requested but not enabled. "
+				"Please enable CDP.\n");
+
+		return -ENOTSUP;
 	}
 
 	return 0;
@@ -340,17 +362,18 @@ check_cbm_len_and_contention(void)
 {
 	unsigned i = 0;
 
-	for (i = 0; i < m_config_count; i++) {
+	for (i = 0; i < g_cfg.l3_config_count; i++) {
 		const uint64_t not_cbm =
 			(UINT64_MAX << (m_cap_l3ca->u.l3ca->num_ways));
 		const uint64_t contention_cbm =
 			m_cap_l3ca->u.l3ca->way_contention;
 		uint64_t mask = 0;
 
-		if (m_config[i].cdp == 1)
-			mask = m_config[i].code_mask | m_config[i].data_mask;
+		if (g_cfg.l3_config[i].cdp == 1)
+			mask = g_cfg.l3_config[i].code_mask |
+				g_cfg.l3_config[i].data_mask;
 		else
-			mask = m_config[i].mask;
+			mask = g_cfg.l3_config[i].mask;
 
 		if ((mask & not_cbm) != 0) {
 			printf("L3: One or more of requested CBM masks not "
@@ -368,6 +391,7 @@ check_cbm_len_and_contention(void)
 	return 0;
 }
 
+/* Get unassigned COS */
 static int
 l3ca_get_avail(const unsigned socket, const unsigned max_num_ca,
 		unsigned *num_ca, struct pqos_l3ca *ca)
@@ -418,6 +442,7 @@ l3ca_get_avail(const unsigned socket, const unsigned max_num_ca,
 	return ret;
 }
 
+/* Search for available/unassigned COS to use for passed config */
 static int
 l3ca_select(const unsigned socket, const unsigned num_cos, struct pqos_l3ca *ca)
 {
@@ -442,6 +467,10 @@ l3ca_select(const unsigned socket, const unsigned num_cos, struct pqos_l3ca *ca)
 	return ret;
 }
 
+/*
+ * Set L3 configuration, search for available COS on each socket
+ * (pqos_l3ca.class_id value is ignored)
+ * */
 static int
 l3ca_atomic_set(const unsigned num, struct pqos_l3ca *ca, cpu_set_t *cpu)
 {
@@ -516,7 +545,7 @@ l3ca_atomic_set(const unsigned num, struct pqos_l3ca *ca, cpu_set_t *cpu)
 				ret = pqos_alloc_assoc_set(k, ca[i].class_id);
 				if (ret != PQOS_RETVAL_OK) {
 					printf("Error associating cpu %u with "
-                                               "COS %u!\n", k, ca[i].class_id);
+						"COS %u!\n", k, ca[i].class_id);
 					return ret;
 				}
 			}
@@ -555,32 +584,61 @@ cat_validate(void)
  * Check is it possible to fulfill requested L3 CAT configuration
  * and then configure system.
  */
-static int
+int
 cat_set(void)
 {
-	struct pqos_l3ca ca[m_config_count];
-	cpu_set_t cpu[m_config_count];
+	struct pqos_l3ca ca[g_cfg.l3_config_count];
+	cpu_set_t cpu[g_cfg.l3_config_count];
 	unsigned i = 0;
 	int ret = 0;
 
-	for (i = 0; i < m_config_count; i++) {
-		ca[i].cdp = m_config[i].cdp;
-		if (1 == m_config[i].cdp) {
-			ca[i].code_mask = m_config[i].code_mask;
-			ca[i].data_mask = m_config[i].data_mask;
-		} else
-			ca[i].ways_mask = m_config[i].mask;
-
-		cpu[i] = m_config[i].cpumask;
+	/* Validate cmd line configuration */
+	ret = cat_validate();
+	if (ret != 0) {
+		printf("L3: Requested CAT configuration is not valid!\n");
+		return ret;
 	}
 
-	ret =  l3ca_atomic_set(m_config_count, ca, cpu);
+	for (i = 0; i < g_cfg.l3_config_count; i++) {
+		ca[i].cdp = g_cfg.l3_config[i].cdp;
+		if (1 == g_cfg.l3_config[i].cdp) {
+			ca[i].code_mask = g_cfg.l3_config[i].code_mask;
+			ca[i].data_mask = g_cfg.l3_config[i].data_mask;
+		} else
+			ca[i].ways_mask = g_cfg.l3_config[i].mask;
+
+		cpu[i] = g_cfg.l3_config[i].cpumask;
+	}
+
+	ret =  l3ca_atomic_set(g_cfg.l3_config_count, ca, cpu);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("L3: Failed to configure L3CA!\n");
-		ret = -1;
+		ret = -EFAULT;
 	}
 
 	return ret;
+}
+
+int
+cat_reset(void)
+{
+	unsigned i = 0;
+	int ret = 0;
+
+	/* Associate COS#0 to cores */
+	for (i = 0; i < CPU_SETSIZE; i++) {
+		if (0 == CPU_ISSET(i, &g_cfg.reset_cpuset))
+			continue;
+
+		ret = pqos_alloc_assoc_set(i, 0);
+		if (ret != PQOS_RETVAL_OK) {
+			printf("Error associating L3CA COS,"
+				"core: %u, COS: 0!\n", i);
+			return -EFAULT;
+		}
+	}
+
+	return 0;
 }
 
 void
@@ -588,7 +646,7 @@ cat_fini(void)
 {
 	int ret = 0;
 
-	if (g_verbose)
+	if (g_cfg.verbose)
 		printf("L3: Shutting down PQoS library...\n");
 
 	/* deallocate all the resources */
@@ -599,8 +657,8 @@ cat_fini(void)
 	m_cap = NULL;
 	m_cpu = NULL;
 	m_cap_l3ca = NULL;
-	memset(m_config, 0, sizeof(m_config));
-	m_config_count = 0;
+	memset(g_cfg.l3_config, 0, sizeof(g_cfg.l3_config));
+	g_cfg.l3_config_count = 0;
 }
 
 void
@@ -613,17 +671,18 @@ cat_exit(void)
 	if (m_cap == NULL && m_cpu == NULL)
 		return;
 
-	if (g_verbose)
+	if (g_cfg.verbose)
 		printf("L3: Reverting CAT configuration...\n");
 
-	for (i = 0; i < m_config_count; i++) {
+	for (i = 0; i < g_cfg.l3_config_count; i++) {
 		unsigned j = 0;
 
 		for (j = 0; j < m_cpu->num_cores; j++) {
 			unsigned cpu_id = 0;
 
 			cpu_id = m_cpu->cores[j].lcore;
-			if (CPU_ISSET(cpu_id, &m_config[i].cpumask) == 0)
+			if (CPU_ISSET(cpu_id, &g_cfg.l3_config[i].cpumask)
+					== 0)
 				continue;
 
 			ret = pqos_alloc_assoc_set(cpu_id, 0);
@@ -641,7 +700,7 @@ static void
 signal_handler(int signum)
 {
 	if (signum == SIGINT || signum == SIGTERM) {
-		printf("\nPQOS: Signal %d received, preparing to exit...\n",
+		printf("\nRDTSET: Signal %d received, preparing to exit...\n",
 			signum);
 
 		cat_exit();
@@ -664,7 +723,7 @@ cat_init(void)
 	}
 
 	/* PQoS Initialization - Check and initialize CAT capability */
-        memset(&cfg, 0, sizeof(cfg));
+	memset(&cfg, 0, sizeof(cfg));
 	cfg.fd_log = STDOUT_FILENO;
 	cfg.verbose = 0;
 	cfg.cdp_cfg = PQOS_REQUIRE_CDP_ANY;
@@ -692,20 +751,6 @@ cat_init(void)
 		goto err;
 	}
 
-	/* Validate cmd line configuration */
-	ret = cat_validate();
-	if (ret != 0) {
-		printf("L3: Requested CAT configuration is not valid!\n");
-		goto err;
-	}
-
-	/* configure system */
-	ret = cat_set();
-	if (ret != 0) {
-		printf("L3: Failed to configure CAT!\n");
-		goto err;
-	}
-
 	signal(SIGINT, signal_handler);
 	signal(SIGTERM, signal_handler);
 
@@ -727,21 +772,32 @@ err:
 void
 print_cmd_line_l3_config(void)
 {
-	char cpustr[CPU_SETSIZE * 3] = { 0 };
-	unsigned i = 0;
+	char cpustr[CPU_SETSIZE * 3];
+	unsigned i;
 
-	for (i = 0; i < m_config_count; i++) {
-		cpuset_to_str(cpustr, sizeof(cpustr), &m_config[i].cpumask);
+	if (CPU_COUNT(&g_cfg.reset_cpuset) != 0) {
+		cpuset_to_str(cpustr, sizeof(cpustr), &g_cfg.reset_cpuset);
+		printf("L3 Reset: CPUs: %s\n", cpustr);
+	}
+
+	for (i = 0; i < g_cfg.l3_config_count; i++) {
+		if (CPU_COUNT(&g_cfg.l3_config[i].cpumask) == 0)
+			continue;
+
+		cpuset_to_str(cpustr, sizeof(cpustr),
+			&g_cfg.l3_config[i].cpumask);
 
 		printf("L3 Allocation: CPUs: %s", cpustr);
 
-		if (m_config[i].cdp == 1)
+		if (g_cfg.l3_config[i].cdp == 1)
 			printf(" code MASK: 0x%llx, data MASK: 0x%llx\n",
-				(unsigned long long) m_config[i].code_mask,
-				(unsigned long long) m_config[i].data_mask);
+				(unsigned long long)
+				g_cfg.l3_config[i].code_mask,
+				(unsigned long long)
+				g_cfg.l3_config[i].data_mask);
 		else
 			printf(" MASK: 0x%llx\n",
-				(unsigned long long) m_config[i].mask);
+				(unsigned long long) g_cfg.l3_config[i].mask);
 	}
 }
 

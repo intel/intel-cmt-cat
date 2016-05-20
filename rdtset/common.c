@@ -41,31 +41,23 @@
 #include "rdt.h"
 
 int
-parse_cpu_set(const char *input, cpu_set_t *cpusetp)
+str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 {
-	unsigned idx, min, max, bracket_used = 0;
-	const char *str = input;
+	unsigned idx, min, max;
+	char *buff = malloc(cpustr_len + 1);
 	char *end = NULL;
+	const char *str = buff;
 
-	CPU_ZERO(cpusetp);
+	memcpy(buff, cpustr, cpustr_len);
+	buff[cpustr_len] = 0;
+	CPU_ZERO(cpuset);
 
 	while (isblank(*str))
 		str++;
 
-	/* only digit or left bracket is qualify for start point */
-	if ((!isdigit(*str) && *str != '(') || *str == '\0')
-		return -1;
-
-	if (*str == '(') {
-		bracket_used = 1;
-		str++;
-
-		while (isblank(*str))
-			str++;
-	}
-
-	if (*str == '\0')
-		return -1;
+	/* only digit is qualify for start point */
+	if (!isdigit(*str) || *str == '\0')
+		return -EINVAL;
 
 	min = CPU_SETSIZE;
 	do {
@@ -74,16 +66,16 @@ parse_cpu_set(const char *input, cpu_set_t *cpusetp)
 			str++;
 
 		if (!isdigit(*str))
-			return -1;
+			return -EINVAL;
 
 		/* get the digit value */
 		errno = 0;
 		idx = strtoul(str, &end, 10);
 		if (errno != 0 || end == NULL || end == str ||
 				idx >= CPU_SETSIZE)
-			return -1;
+			return -EINVAL;
 
-		/* go ahead to separator '-',',' and ')' */
+		/* go ahead to separator '-',',' */
 		while (isblank(*end))
 			end++;
 
@@ -92,50 +84,41 @@ parse_cpu_set(const char *input, cpu_set_t *cpusetp)
 				min = idx;
 			else
 				/* avoid continuous '-' */
-				return -1;
-		} else if (*end == ',' ||
-				(bracket_used && (*end == ')')) ||
-				(!bracket_used && (*end == 0))) {
+				return -EINVAL;
+		} else if (*end == ',' || *end == 0) {
 			max = idx;
 
 			if (min == CPU_SETSIZE)
 				min = idx;
 
-			for (idx = RDT_MIN(min, max); idx <= RDT_MAX(min, max);
+			for (idx = MIN(min, max); idx <= MAX(min, max);
 					idx++)
-				CPU_SET(idx, cpusetp);
+				CPU_SET(idx, cpuset);
 
 			min = CPU_SETSIZE;
 		} else
-			return -1;
+			return -EINVAL;
 
 		str = end + 1;
-	} while (*end != '\0' &&
-			((bracket_used && *end != ')') ||
-			(!bracket_used && *end != ',')));
+	} while (*end != '\0');
 
-	if (bracket_used)
-		return end - input + 1;
-	else
-		return end - input;
+	return end - buff;
 }
 
 void
 cpuset_to_str(char *cpustr, const unsigned cpustr_len,
-		const cpu_set_t *cpumask)
+		const cpu_set_t *cpuset)
 {
-	unsigned len = 0;
-	unsigned j = 0;
+	unsigned len = 0, j = 0;
 
 	memset(cpustr, 0, cpustr_len);
 
 	/* Generate CPU list */
 	for (j = 0; j < CPU_SETSIZE; j++) {
-		if (CPU_ISSET(j, cpumask) != 1)
+		if (CPU_ISSET(j, cpuset) != 1)
 			continue;
 
-		len += snprintf(cpustr + len, cpustr_len - len - 1,
-				"%u,", j);
+		len += snprintf(cpustr + len, cpustr_len - len - 1, "%u,", j);
 
 		if (len >= cpustr_len - 1) {
 			len = cpustr_len;

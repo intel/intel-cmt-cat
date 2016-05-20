@@ -34,6 +34,8 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
+#include <stdint.h>
+
 #include "cpu.h"
 
 #ifdef __cplusplus
@@ -42,45 +44,74 @@ extern "C" {
 
 #define RDT_MAX_SOCKETS 8
 
+#ifndef MIN
 /**
  * Macro to return the minimum of two numbers
  */
-#define RDT_MIN(a, b) ({ \
+#define MIN(a, b) ({ \
 	typeof(a) _a = (a); \
 	typeof(b) _b = (b); \
 	_a < _b ? _a : _b; \
 })
+#endif /* !MIN */
 
+#ifndef MAX
 /**
  * Macro to return the maximum of two numbers
  */
-#define RDT_MAX(a, b) ({ \
+#define MAX(a, b) ({ \
 	typeof(a) _a = (a); \
 	typeof(b) _b = (b); \
 	_a > _b ? _a : _b; \
 })
+#endif /* !MAX */
 
-int g_sudo_keep; /* keep elevated privileges */
-int g_verbose; /* be verbose, print out additional logging information */
-pid_t g_pid; /* process id while rdtset called with -p*/
+/* L3 cache allocation class of service data structure */
+struct cat_config {
+	cpu_set_t cpumask;		/**< CPUs bitmask */
+	int cdp;			/**< data & code masks used if true */
+	union {
+		uint64_t mask;		/**< capacity bitmask (CBM) */
+		struct {
+			uint64_t data_mask; /**< data capacity bitmask (CBM) */
+			uint64_t code_mask; /**< code capacity bitmask (CBM) */
+		};
+	};
+};
+
+/* rdtset command line configuration structure */
+struct rdtset {
+	pid_t pid;			/**< process PID */
+	struct cat_config l3_config[CPU_SETSIZE]; /**< L3 configuration */
+	unsigned l3_config_count;	/**< Num of L3 config entries */
+	cpu_set_t cpu_aff_cpuset;	/**< CPU affinity configuration */
+	cpu_set_t reset_cpuset;		/**< List of CPUs to reset COS assoc */
+	unsigned int	sudo_keep:1,	/**< don't drop elevated privileges */
+			verbose:1,	/**< be verobose */
+			command:1;	/**< command to be executed detected */
+};
+
+struct rdtset g_cfg;
 
 /**
- * @brief Parse CPU set
+ * @brief Parse CPU set string
  *
- * @note Parse elem, the elem could be single number/range or '(' ')' group
+ * @note Parse elem, the elem could be single number/range or group
  *       1) A single number elem, it's just a simple digit. e.g. 9
- *       A single range elem, two digits with a '-' between. e.g. 2-6
- *       3) A group elem, combines multiple 1) or 2) with '( )'. e.g (0,2-4,6)
+ *       2) A single range elem, two digits with a '-' between. e.g. 2-6
+ *       3) A group elem, combines multiple 1) or 2) with e.g 0,2-4,6
  *       Within group elem, '-' used for a range separator;
  *       ',' used for a single number.
  *
- * @param input set as a string
- * @param cpusetp parsed cpuset
+ * @param cpustr set as a string
+ * @param cpustr_len set as a string len
+ * @param cpuset parsed cpuset
  *
  * @return number of parsed characters on success
- * @retval -1 on error
+ * @retval -ERRNO on error
  */
-int parse_cpu_set(const char *input, cpu_set_t *cpusetp);
+int str_to_cpuset(const char *cpustr, const unsigned cpustr_len,
+		cpu_set_t *cpuset);
 
 /**
  * @brief Converts CPU set (cpu_set_t) to string

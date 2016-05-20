@@ -37,6 +37,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include <sys/types.h>
@@ -91,7 +92,7 @@ sudo_drop(void)
 	if (0 != setuid(uid))
 		goto err;
 
-	if (g_verbose)
+	if (g_cfg.verbose)
 		printf("Privileges dropped to uid: %d, gid: %d...\n", uid, gid);
 
 	return 0;
@@ -119,7 +120,7 @@ execute_cmd(int argc, char **argv)
 	if (0 >= argc || NULL == argv)
 		return -1;
 
-	if (g_verbose) {
+	if (g_cfg.verbose) {
 		printf("Trying to execute ");
 		for (i = 0; i < argc; i++)
 			printf("%s ", argv[i]);
@@ -141,12 +142,13 @@ execute_cmd(int argc, char **argv)
 		/* set cpu affinity */
 		if (0 != set_affinity(0)) {
 			fprintf(stderr, "%s,%s:%d Failed to set core "
-				"affinity!\n", __FILE__, __func__, __LINE__);
+				"affinity!\n", __FILE__, __func__,
+				__LINE__);
 			_Exit(EXIT_FAILURE);
 		}
 
 		/* drop elevated root privileges */
-		if (0 == g_sudo_keep && 0 != sudo_drop())
+		if (0 == g_cfg.sudo_keep && 0 != sudo_drop())
 			_Exit(EXIT_FAILURE);
 
 		/* execute command */
@@ -163,24 +165,41 @@ execute_cmd(int argc, char **argv)
 }
 
 static void
-print_usage(char *prgname)
+print_usage(char *prgname, unsigned short_usage)
 {
-	printf("Usage: %s -3 <cbm@cpulist> -c <cpulist> [options] "
-		"(-p <pid> | cmd [<args>...]])\n\n", prgname);
+	printf("Usage: %s [-3 <cbm@cpulist>] -c <cpulist> "
+		"(-p <pid> | [-k] cmd [<args>...])\n"
+		"       %s -r <cpulist> -3 <cbm@cpulist> -c <cpulist> "
+		"(-p <pid> | [-k] cmd [<args>...])\n"
+		"       %s -r <cpulist> -c <cpulist> "
+		"(-p <pid> | [-k] cmd [<args>...])\n"
+		"       %s -r <cpulist> [-3 <cbm@cpulist>] -p <pid>\n\n",
+		prgname, prgname, prgname, prgname);
 
 	printf("Options:\n"
-	" -3 <cbm@cpulist>, --l3 <cbm@cpulist>  specify L3 CAT configuration\n"
-	" -c <cpulist>, --cpu <cpulist>         specify CPUs\n"
-	" -p <pid>, --pid <pid>                 operate on existing given pid\n"
-	" -k, --sudokeep                        do not drop sudo elevated "
-	"privileges\n"
-	" -v, --verbose                         prints out additional logging "
-	"information\n"
-	" -h, --help                            display this help\n\n");
+		" -3 <cbm@cpulist>, --l3 <cbm@cpulist>  "
+		"specify L3 CAT configuration\n"
+		" -c <cpulist>, --cpu <cpulist>         "
+		"specify CPUs (affinity)\n"
+		" -p <pid>, --pid <pid>                 "
+		"operate on existing given pid\n"
+		" -r <cpulist>, --reset <cpulist>       "
+		"reset L3 CAT for CPUs\n"
+		" -k, --sudokeep                        "
+		"do not drop sudo elevated privileges\n"
+		" -v, --verbose                         "
+		"prints out additional logging information\n"
+		" -h, --help                            "
+		"display help\n\n");
+
+	if (short_usage) {
+		printf("For more help run with -h/--help\n");
+		return;
+	}
 
 	printf("Run \"id\" command on CPU 1 using four L3 cache-ways (mask 0xf)"
 		",\nkeeping sudo elevated privileges:\n"
-		"    %s -3 '0xf@1' -c 1 -k id\n\n", prgname);
+		"    -3 '0xf@1' -c 1 -k id\n\n");
 
 	printf("Examples L3 CAT configuration strings:\n"
 		"    -3 '0xf@1'\n"
@@ -205,7 +224,31 @@ print_usage(char *prgname)
 		"        data and code cache-ways are non-overlapping\n\n");
 
 	printf("Example CPUs configuration string:\n"
-		"    -c 1-3,4,5 - CPUs 1,2,3,4,5\n\n");
+		"    -c 0-3,4,5\n"
+		"        CPUs 0,1,2,3,4,5\n\n");
+
+	printf("Example RESET configuration string:\n"
+		"    -r 0-3,4,5\n"
+		"        reset CAT for CPUs 0,1,2,3,4,5\n\n");
+
+	printf("Example usage of RESET option:\n"
+		"    -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-5 -p $BASHPID\n"
+		"        Configure CAT and CPU affinity for BASH process\n\n"
+		"    -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID\n"
+		"        Change CAT configuration of CPUs used by BASH "
+		"process\n\n"
+		"    -r 0-5 -p $BASHPID\n"
+		"        Reset CAT configuration of CPUs used by BASH "
+		"process\n\n");
+}
+
+static int
+validate_args(const int f_r, __attribute__((unused)) const int f_3,
+		const int f_c, const int f_p, const int cmd)
+{
+	return (f_c && !f_p && cmd) ||
+			(f_c && f_p && !cmd) ||
+			(f_r && f_p && !cmd);
 }
 
 /**
@@ -222,67 +265,60 @@ parse_args(int argc, char **argv)
 {
 	int opt = 0;
 	int retval = 0;
-	int flag3 = 0;
-	int flagc = 0;
 	char **argvopt = argv;
-
-	g_sudo_keep = 0;
-	g_verbose = 0;
-	g_pid = 0;
 
 	static const struct option lgopts[] = {
 		{ "l3",		required_argument,	0, '3' },
 		{ "cpu",	required_argument,	0, 'c' },
 		{ "pid",	required_argument,	0, 'p' },
+		{ "reset",	required_argument,	0, 'r' },
 		{ "sudokeep",	no_argument,		0, 'k' },
 		{ "verbose",	no_argument,		0, 'v' },
 		{ "help",	no_argument,		0, 'h' },
 		{ NULL, 0, 0, 0 } };
 
 	while (-1 != (opt = getopt_long
-				(argc, argvopt, "+3:c:p:kvh", lgopts, NULL))) {
+			(argc, argvopt, "+3:c:p:r:kvh", lgopts, NULL))) {
 		if (opt == '3') {
 			retval = parse_l3(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid L3 parameters!\n");
 				goto exit;
 			}
-			flag3 = 1;
 		} else if (opt == 'c') {
 			retval = parse_cpu(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid CPU parameters!\n");
 				goto exit;
 			}
-			flagc = 1;
 		} else if (opt == 'p') {
 			char *tailp = NULL;
 
 			errno = 0;
-			g_pid = (pid_t) strtol(optarg, &tailp, 10);
+			g_cfg.pid = (pid_t) strtol(optarg, &tailp, 10);
 			if (NULL == tailp || *tailp != '\0' || errno != 0 ||
-					optarg == tailp || 0 == g_pid) {
+					optarg == tailp || 0 == g_cfg.pid) {
 				fprintf(stderr, "Invalid PID parameter!\n");
+				retval = -EINVAL;
+				goto exit;
+			}
+		} else if (opt == 'r') {
+			retval = parse_reset(optarg);
+			if (retval != 0) {
+				fprintf(stderr, "Invalid RESET parameters!\n");
 				goto exit;
 			}
 		} else if (opt == 'k') {
-			g_sudo_keep = 1;
+			g_cfg.sudo_keep = 1;
 		} else if (opt == 'v') {
-			g_verbose = 1;
-		} else if (opt == '?' || opt == 'h') {
-			retval = -1;
+			g_cfg.verbose = 1;
+		} else if (opt == '?') {
+			retval = -EINVAL;
+			goto exit;
+		} else if (opt == 'h') {
+			retval = -EAGAIN;
 			goto exit;
 		}
-	}
-
-	if (!flag3) {
-		fprintf(stderr, "Missing L3 parameters!\n");
-		retval = -1;
-	}
-
-	if (!flagc) {
-		fprintf(stderr, "Missing CPU parameters!\n");
-		retval = -1;
 	}
 
 exit:
@@ -294,20 +330,33 @@ main(int argc, char **argv)
 {
 	int ret = 0;
 
+	memset(&g_cfg, 0, sizeof(g_cfg));
+
 	/* Parse cmd line args */
-	if (0 != parse_args(argc, argv)) {
-		print_usage(argv[0]);
+	ret = parse_args(argc, argv);
+	if (ret != 0) {
+		if (-EINVAL == ret)
+			printf("Incorrect argument value!\n");
+
+		print_usage(argv[0], ret == -EINVAL ? 1 : 0);
 		exit(EXIT_FAILURE);
 	}
 
-	/* If expecting cmd to be run, eg. PID was not provided via -p param */
-	if (0 == g_pid && argc - optind < 1) {
-		fprintf(stderr, "Missing executable name!\n");
+	if (argc - optind >= 1)
+		g_cfg.command = 1;
+
+	if (!validate_args(0 != CPU_COUNT(&g_cfg.reset_cpuset),
+			0 != g_cfg.l3_config_count,
+			0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset),
+			0 != g_cfg.pid,
+			0 != g_cfg.command)) {
+		printf("Incorrect invocation!\n");
+		print_usage(argv[0], 1);
 		exit(EXIT_FAILURE);
 	}
 
 	/* Print cmd line configuration */
-	if (g_verbose) {
+	if (g_cfg.verbose) {
 		print_cmd_line_l3_config();
 		print_cmd_line_cpu_config();
 	}
@@ -320,17 +369,54 @@ main(int argc, char **argv)
 		exit(EXIT_FAILURE);
 	}
 
-	/* If no PID provided via -p param, execute command */
-	if (0 == g_pid) {
-		if (0 != execute_cmd(argc - optind, argv + optind))
+	/* reset COS association */
+	if (0 != CPU_COUNT(&g_cfg.reset_cpuset)) {
+		if (g_cfg.verbose)
+			printf("L3: Resetting CAT configuration...\n");
+
+		ret = cat_reset();
+		if (ret != 0) {
+			printf("L3: Failed to reset COS association!\n");
 			exit(EXIT_FAILURE);
-	} else if (0 != set_affinity(g_pid)) {
-		fprintf(stderr, "%s,%s:%d Failed to set core "
-			"affinity!\n", __FILE__, __func__, __LINE__);
-		exit(EXIT_FAILURE);
+		}
 	}
 
-	if (0 == g_pid)
+	/* configure CAT */
+	if (0 != g_cfg.l3_config_count) {
+		if (g_cfg.verbose)
+			printf("L3: Configuring L3CA...\n");
+
+		ret = cat_set();
+		if (ret != 0) {
+			printf("L3: Failed to configure CAT!\n");
+			cat_fini();
+			_Exit(EXIT_FAILURE);
+		}
+	}
+
+	/* execute command */
+	if (0 != g_cfg.command) {
+		if (g_cfg.verbose)
+			printf("CMD: Executing command...\n");
+
+		if (0 != execute_cmd(argc - optind, argv + optind))
+			exit(EXIT_FAILURE);
+	}
+
+	/* set core affinity */
+	if (0 != g_cfg.pid && 0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset)) {
+		if (g_cfg.verbose)
+			printf("PID: Setting CPU affinity...\n");
+
+		if (0 != set_affinity(g_cfg.pid)) {
+			fprintf(stderr, "%s,%s:%d Failed to set core "
+				"affinity!\n", __FILE__, __func__,
+				__LINE__);
+			exit(EXIT_FAILURE);
+		}
+	}
+
+	if (0 != g_cfg.command)
 		/*
 		 * If we were running some command, do clean-up.
 		 * Clean-up function is executed on process exit.
@@ -338,9 +424,11 @@ main(int argc, char **argv)
 		 **/
 		exit(EXIT_SUCCESS);
 	else {
-		/* If we were doing operation on PID, just deinit libpqos */
+		/*
+		 * If we were doing operation on PID or RESET,
+		 * just deinit libpqos
+		 **/
 		cat_fini();
 		_Exit(EXIT_SUCCESS);
 	}
 }
-

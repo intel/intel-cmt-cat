@@ -34,15 +34,23 @@ Run "make clean" to clean the build files.
 USAGE
 =====
 
-Usage: rdtset -3 <cbm@cpulist> -c <cpulist> [options] (-p <pid> | cmd [<args>...]])
+Usage: rdtset [-3 <cbm@cpulist>] -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+       rdtset -r <cpulist> -3 <cbm@cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+       rdtset -r <cpulist> (-3 <cbm@cpulist> | -c <cpulist>) (-p <pid> | [-k] cmd [<args>...])
+       rdtset -r <cpulist> -p <pid>
 
 Options:
  -3 <cbm@cpulist>, --l3 <cbm@cpulist>  specify L3 CAT configuration
- -c <cpulist>, --cpu <cpulist>         specify CPUs
+ -c <cpulist>, --cpu <cpulist>         specify CPUs (affinity)
  -p <pid>, --pid <pid>                 operate on existing given pid
+ -r <cpulist>, --reset <cpulist>       reset L3 CAT for CPUs
  -k, --sudokeep                        do not drop sudo elevated privileges
  -v, --verbose                         prints out additional logging information
  -h, --help                            display this help
+
+Run "id" command on CPU 1 using four L3 cache-ways (mask 0xf),
+keeping sudo elevated privileges:
+    -3 '0xf@1' -c 1 -k id
 
 Examples L3 CAT configuration strings:
     -3 '0xf@1'
@@ -62,35 +70,56 @@ Examples L3 CAT configuration strings:
         data and code cache-ways are non-overlapping
 
 Example CPUs configuration string:
-    -c 1-3,4,5 - CPUs 1,2,3,4,5
+    -c 0-3,4,5
+        CPUs 0,1,2,3,4,5
+
+Example RESET configuration string:
+    -r 0-3,4,5
+        reset CAT for CPUs 0,1,2,3,4,5
+
+Example usage of RESET option:
+    -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-5 -p $BASHPID
+        Configure CAT and CPU affinity for BASH process
+
+    -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
+        Change CAT configuration of CPUs used by BASH process
+
+    -r 0-5 -p $BASHPID
+        Reset CAT configuration of CPUs used by BASH process
 
 Run "id" command to test privilege drop:
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 id
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -k id
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 id
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k id
 
 Show current proc status to verify CPU affinity:
 - Linux:
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 cat /proc/self/status
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 cat /proc/self/status
 
 - FreeBSD:
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -k bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
 $ bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
 
 Display current L3 CAT configuration to verify L3 configuration (and clean-up on exit):
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -k pqos -s
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k pqos -s
 $ sudo pqos -s
 
 Test operation on existing, given PID:
 - Linux:
 $ taskset -pc $BASHPID
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -p $BASHPID
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -p $BASHPID
 $ taskset -pc $BASHPID
+$ sudo pqos -s
+In order to reconfigure CAT, it is needed to reset current CAT configuration:
+$ sudo rdtset -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
 $ sudo pqos -s
 
 - FreeBSD:
 $ cpuset -g -p $BASHPID
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 1-3,4,5 -p $BASHPID
+$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -p $BASHPID
 $ cpuset -g -p $BASHPID
+$ sudo pqos -s
+In order to reconfigure CAT, it is needed to reset current CAT configuration:
+$ sudo rdtset -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
 $ sudo pqos -s
 
 

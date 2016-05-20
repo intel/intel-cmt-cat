@@ -40,39 +40,14 @@
 #include "cpu.h"
 #include "common.h"
 
-static cpu_set_t m_cpuset;
-
 int
-parse_cpu(const char *cpu)
+parse_cpu(const char *cpustr)
 {
-	char *cpu_str = NULL;
+	unsigned cpustr_len = strlen(cpustr);
 	int ret = 0;
 
-	if (NULL == cpu)
-		return -EINVAL;
-
-	while (isblank(*cpu))
-		cpu++;
-
-	/* Add enclosing delimiters "(" and ")", required by parse_set(...) */
-	int len = strlen(cpu) + strlen("()") + 1;
-
-	cpu_str = malloc(len);
-
-	if (NULL != cpu_str)
-		snprintf(cpu_str, len, "(%s)", cpu);
-	else
-		return -EINVAL;
-
-	/* Parse CPU set string*/
-	CPU_ZERO(&m_cpuset);
-	if (-1 == parse_cpu_set(cpu_str, &m_cpuset))
-		ret = -EINVAL;
-
-	if (NULL != cpu_str)
-		free(cpu_str);
-
-	return ret;
+	ret = str_to_cpuset(cpustr, cpustr_len, &g_cfg.cpu_aff_cpuset);
+	return ret > 0 ? 0 : -EINVAL;
 }
 
 int
@@ -80,29 +55,20 @@ set_affinity(pid_t pid)
 {
 	int ret = 0;
 
-	/* Is affinity configured ? */
-	if (0 == CPU_COUNT(&m_cpuset)) {
-		if (g_verbose) {
-			printf("CPU affinity, CPU list empty, "
-				"nothing to do...\n");
-		}
-
-		return 0;
-	}
-
 	/* Set affinity */
 #ifdef __linux__
-	ret = sched_setaffinity(pid, sizeof(m_cpuset), &m_cpuset);
+	ret = sched_setaffinity(pid, sizeof(g_cfg.cpu_aff_cpuset),
+		&g_cfg.cpu_aff_cpuset);
 #endif
 #ifdef __FreeBSD__
 	/* Current thread */
 	if (0 == pid)
 		ret = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
-				sizeof(m_cpuset), &m_cpuset);
+			sizeof(g_cfg.cpu_aff_cpuset), &g_cfg.cpu_aff_cpuset);
 	/* Process via PID */
 	else
 		ret = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, pid,
-						sizeof(m_cpuset), &m_cpuset);
+			sizeof(g_cfg.cpu_aff_cpuset), &g_cfg.cpu_aff_cpuset);
 #endif
 
 	return ret;
@@ -113,8 +79,8 @@ print_cmd_line_cpu_config(void)
 {
 	char cpustr[CPU_SETSIZE * 3] = { 0 };
 
-	if (0 != CPU_COUNT(&m_cpuset)) {
-		cpuset_to_str(cpustr, sizeof(cpustr), &m_cpuset);
+	if (0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset)) {
+		cpuset_to_str(cpustr, sizeof(cpustr), &g_cfg.cpu_aff_cpuset);
 		printf("Core Affinity: CPUs: %s\n", cpustr);
 	}
 }

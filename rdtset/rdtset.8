@@ -16,37 +16,35 @@
 .\" .sp <n>    insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-rtdset \- Intel Platform Quality of Service
+rtdset \- Task Set for Intel(R) Resource Director Technology
 .br
 .SH SYNOPSIS
 .B rdtset
-.RI "-3 <cbm@cpulist> -c <cpulist> [options] (-p <pid> | cmd [<args>...]])"
+.RI "[-3 <cbm@cpulist>] -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
+.br		
+.B rdtset
+.RI "-r <cpulist> -3 <cbm@cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
+.br		
+.B rdtset
+.RI "-r <cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
+.br		
+.B rdtset
+.RI "-r <cpulist> [-3 <cbm@cpulist>] -p <pid>"
 .SH DESCRIPTION
-Intel Platform QoS technologies (also known as Intel Platform Shared
-Resource Monitoring/Control technologies) are designed to help improve
-performance and manageability for virtual machines.
+For more details on Intel(R) Resource Director Technology see
+.br
+http://www.intel.com/content/www/us/en/architecture-and-technology/resource-director-technology.html
+.br
+or https://github.com/01org/intel-cmt-cat/wiki
 .PP
-The rdtset tool provides support to set up the Intel CAT (Cache Allocation
-Technology) capabilities.
-.PP
-The software provides flags to configure the
-class of service (CLOS) and associate cores / logical threads with a class
-of service. The Intel(R) Xeon(R) processor E5 v3 generation supports four
-classes of service and a set of pre-defined classes of service that should
-not be changed at run time.  Intel(R) Xeon(R) processor D generation supports
-sixteen classes of service. There are no pre-defined classes of service and
-they can be changed at run time.  Intel(R) Xeon(R) processor E5 v3 and
-Intel(R) Xeon(R) processor D generations supports Core/Logical thread
-association with a class of service can be changed dynamically.
-.PP
-CAT is supported on the following: 6 SKUs for Intel(R) Xeon(R) processor E5
-v3 family: E5-2658 v3, E5-2648L v3, E5-2628L v3, E5-2618L v3, E5-2608L v3 and E5-2658A v3 2 SKUs for Intel(R) Xeon(R) processor E3 v4 family: E3-1258L v4 and E3-1278L v4 and all Intel(R) Xeon(R) processor D SKUs.
-.PP
-For additional CAT details please see refer to the Intel(R)
-Architecture Software Development Manuals, Volume 3 System Programming Guide available at:
-http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
-Specific information with regard to CAT can be found in
-Chapter 17.17.
+The rdtset tool provides support to set up the CAT (Cache Allocation
+Technology) capabilities for a task and set its cpu affinity.
+Current operations of the utility are based on controlling MSR registers
+(via libpqos library). Class of service 0 (CLOS0) is assumed as default one.
+In command mode, rdtset forks and in one process executes the command.
+In another process it waits for the task to terminate and restores default
+state by assigning cpu's back to CLOS0.
+This behavior is not in place in PID mode.
 .SH OPTIONS
 rdtset options are as follow:
 .TP
@@ -90,6 +88,22 @@ are separated by commas and may include ranges. For example:
 .TP
 .B \-p <pid>, \-\-pid <pid>
 Operate on existing, given pid
+.TP
+.B \-r <cpulist>, \-\-reset <cpulist>
+Reset CAT for CPUs (assign COS#0 to listed CPUs)
+.br
+For example:
+
+.B \-r 0-5
+.br
+Reset CAT configuration of CPUs 0-5
+
+.B \-r 0-5 \-3\ '0xf0@(0-5)' \-c 0-5 \-p $BASHPID
+.br
+Reconfigure CAT for CPUs 0-5
+.br
+In order to reconfigure CAT, it is needed to reset current CAT configuration
+
 .TP
 .B \-k, \-\-sudokeep
 Do not drop sudo elevated privileges

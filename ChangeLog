@@ -4,7 +4,7 @@ Not Released
 
 Summary:
 1. General
-	- Project file layout changed to accomodate extensions
+	- Project file layout changed to accommodate extensions
 2. Library
 	- Support for Intel(R) Xeon(R) processor E5 v4 support
 	- DSO built by default
@@ -12,11 +12,15 @@ Summary:
 	- Perl interface created for the library
 	- cross socket monitoring
 3. PQoS Utility
-	- pqos directory created to accomodate the utility files
+	- pqos directory created to accommodate the utility files
 	- link against DSO
 	- cross socket monitoring
-	- COS managment on a per socket basis
-4. Examples
+	- COS management on a per socket basis
+4. rdtset Utility
+	- rdtset directory created to accommodate the utility files
+	- link against DSO
+	- taskset-like functionality and CAT configuration
+5. Examples
 	- copied examples previously located in library directory
 	- Perl hello world script created
 

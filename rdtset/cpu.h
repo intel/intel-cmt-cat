@@ -69,7 +69,7 @@ CPU_COUNT(cpu_set_t *set)
  * @param cpu params string
  *
  * @return 0 on success
- * @retval -EINVAL on error
+ * @retval negative on error (-errno)
  */
 int parse_cpu(const char *cpu);
 
