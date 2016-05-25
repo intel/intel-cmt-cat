@@ -79,18 +79,22 @@
  * Available types of allocation resource IDs.
  * (matches CPUID enumeration)
  */
-#define PQOS_RES_ID_L3_ALLOCATION    1              /**< L3 cache allocation */
+#define PQOS_RES_ID_L3_ALLOCATION    1       /**< L3 cache allocation */
+#define PQOS_RES_ID_L2_ALLOCATION    2       /**< L2 cache allocation */
 
-#define PQOS_CPUID_CAT_CDP_BIT       2              /**< CDP supported bit */
+#define PQOS_CPUID_CAT_CDP_BIT       2       /**< CDP supported bit */
 
-#define PQOS_MSR_L3_QOS_CFG          0xC81          /**< CAT config register */
-#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL           /**< CDP enable bit */
+#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< CAT config register */
+#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< CDP enable bit */
 
-#define PQOS_MSR_L3CA_MASK_START     0xC90          /**< CAT class 0 register */
-#define PQOS_MSR_L3CA_MASK_END       0xD8F          /**< CAT class 255 register */
-#define PQOS_MSR_ASSOC               0xC8F          /**< CAT class to core association register */
+#define PQOS_MSR_L3CA_MASK_START     0xC90   /**< L3 CAT class 0 register */
+#define PQOS_MSR_L3CA_MASK_END       0xD0F   /**< L3 CAT class 127 register */
+#define PQOS_MSR_ASSOC               0xC8F   /**< CAT class to core association register */
 #define PQOS_MSR_ASSOC_QECOS_SHIFT   32
 #define PQOS_MSR_ASSOC_QECOS_MASK    0xffffffff00000000ULL
+
+#define PQOS_MSR_L2CA_MASK_START     0xC10   /**< L2 CAT class 0 register */
+#define PQOS_MSR_L2CA_MASK_END       0xD8F   /**< L2 CAT class 127 register */
 
 /**
  * ---------------------------------------
@@ -264,6 +268,48 @@ get_l3_cache_info(unsigned *p_num_ways,
 }
 
 /**
+ * @brief Detects L2 cache size and number of ways
+ *
+ * Retrieves information about L2 cache
+ * and calculates its size. Uses CPUID.0x04.0x02
+ *
+ * @param p_num_ways place to store number of detected cache ways
+ * @param p_size_in_bytes place to store size of L2 in bytes
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+get_l2_cache_info(unsigned *p_num_ways,
+                  unsigned *p_size_in_bytes)
+{
+        unsigned num_ways = 0, line_size = 0, num_partitions = 0,
+                num_sets = 0, size_in_bytes = 0;
+        struct cpuid_out res;
+        int ret = PQOS_RETVAL_OK;
+
+        if (p_num_ways == NULL && p_size_in_bytes == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        ret = lcpuid(0x4, 0x2, &res);
+        if (ret != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
+        num_ways = (res.ebx >> 22) + 1;
+        ASSERT(num_ways > 0);
+        if (p_num_ways != NULL)
+                *p_num_ways = num_ways;
+        line_size = (res.ebx & 0xfff) + 1;
+        num_partitions = ((res.ebx >> 12) & 0x3ff) + 1;
+        num_sets = res.ecx + 1;
+        size_in_bytes = num_ways * num_partitions * line_size * num_sets;
+        if (p_size_in_bytes != NULL)
+                *p_size_in_bytes = size_in_bytes;
+
+        return ret;
+}
+
+/**
  * @brief Adds new event type to \a mon monitoring structure
  *
  * @param mon Monitoring structure which is to be updated with the new event type
@@ -283,7 +329,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
 {
         if (mon->num_events >= max_num_events) {
                 LOG_WARN("%s() no space for event type %d (resource id %u)!\n",
-                          __func__, event_type, res_id);
+                         __func__, event_type, res_id);
                 return;
         }
 
@@ -310,11 +356,14 @@ add_monitoring_event(struct pqos_cap_mon *mon,
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_RESOURCE monitoring not supported
+ * @retval PQOS_RETVAL_ERROR enumeration error
  */
 static int
 discover_monitoring(struct pqos_cap_mon **r_mon)
 {
-        struct cpuid_out res, res_cpuid_0xa;
+        struct cpuid_out res, cpuid_0xa;
+        struct cpuid_out cpuid_0xf_1;
         int ret = PQOS_RETVAL_OK;
         unsigned sz = 0, max_rmid = 0,
                 l3_size = 0, num_events = 0;
@@ -330,10 +379,9 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
         if (ret != MACHINE_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
-        if (!(res.ebx&(1<<12))) {
-                LOG_WARN("Cache monitoring "
-                          "capability not supported!\n");
-                return PQOS_RETVAL_ERROR;
+        if (!(res.ebx & (1 << 12))) {
+                LOG_WARN("CPUID.0x7.0: Monitoring capability not supported!\n");
+                return PQOS_RETVAL_RESOURCE;
         }
 
         /**
@@ -344,37 +392,37 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
         if (ret != MACHINE_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
+        if (!(res.edx & (1 << 1))) {
+                LOG_WARN("CPUID.0xf.0: Monitoring capability not supported!\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+
         /**
          * MAX_RMID for the socket
          */
         max_rmid = (unsigned) res.ebx + 1;
         ret = get_l3_cache_info(NULL, &l3_size);   /**< L3 cache size */
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Error reading L3 information!\n");
+                return PQOS_RETVAL_ERROR;
+        }
 
         /**
          * Check number of monitoring events to allocate memory for
+         * Subleaf 1 provides information on monitoring.
          */
-        if (res.edx&(1<<1)) {
-                /**
-                 * Bit 1 resource monitoring available
-                 */
-                struct cpuid_out tmp_res;
+        ret = lcpuid(0xf, 1, &cpuid_0xf_1); /**< query resource monitoring */
+        if (ret != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
 
-                ret = lcpuid(0xf, 1, &tmp_res); /**< query resource
-                                                   monitoring */
-                if (ret != MACHINE_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                if (tmp_res.edx&1)
-                        num_events++; /**< LLC occupancy */
-                if (tmp_res.edx&2)
-                        num_events++; /**< local memory bandwidth event */
-                if (tmp_res.edx&4)
-                        num_events++; /**< total memory bandwidth event */
-                if ((tmp_res.edx&2) && (tmp_res.edx&4))
-                        num_events++; /**< remote memory bandwidth
-                                         virtual event */
-        }
+        if (cpuid_0xf_1.edx & 1)
+                num_events++; /**< LLC occupancy */
+        if (cpuid_0xf_1.edx & 2)
+                num_events++; /**< local memory bandwidth event */
+        if (cpuid_0xf_1.edx & 4)
+                num_events++; /**< total memory bandwidth event */
+        if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
+                num_events++; /**< remote memory bandwidth virtual event */
 
         if (!num_events)
                 return PQOS_RETVAL_ERROR;
@@ -382,17 +430,17 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
         /**
          * Check if IPC can be calculated & supported
          */
-        ret = lcpuid(0xa, 0x0, &res_cpuid_0xa);
+        ret = lcpuid(0xa, 0x0, &cpuid_0xa);
         if (ret != MACHINE_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
-        if (((res_cpuid_0xa.ebx & 3) == 0) && ((res_cpuid_0xa.edx & 31) > 1))
+        if (((cpuid_0xa.ebx & 3) == 0) && ((cpuid_0xa.edx & 31) > 1))
                 num_events++;
 
         /**
          * This means we can program LLC misses too
          */
-        if (((res_cpuid_0xa.eax >> 8) & 0xff) > 1)
+        if (((cpuid_0xa.eax >> 8) & 0xff) > 1)
                 num_events++;
 
         /**
@@ -409,53 +457,31 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
         mon->max_rmid = max_rmid;
         mon->l3_size = l3_size;
 
-        if (res.edx&(1<<1)) {
-                /**
-                 * Bit 1 resource monitoring available
-                 */
-                struct cpuid_out tmp_res;
-
-                ret = lcpuid(0xf, 1, &tmp_res); /**< query resource
-                                                   monitoring */
-                if (ret != MACHINE_RETVAL_OK) {
-                        free(mon);
-                        return PQOS_RETVAL_ERROR;
-                }
-
-                if (tmp_res.edx&1)
-                        add_monitoring_event(mon, 1,
-                                             PQOS_MON_EVENT_L3_OCCUP,
-                                             tmp_res.ecx+1,
-                                             tmp_res.ebx,
-                                             num_events);
-                if (tmp_res.edx&2)
-                        add_monitoring_event(mon, 1,
-                                             PQOS_MON_EVENT_LMEM_BW,
-                                             tmp_res.ecx+1,
-                                             tmp_res.ebx,
-                                             num_events);
-                if (tmp_res.edx&4)
-                        add_monitoring_event(mon, 1,
-                                             PQOS_MON_EVENT_TMEM_BW,
-                                             tmp_res.ecx+1,
-                                             tmp_res.ebx,
-                                             num_events);
-
-                if ((tmp_res.edx&2) && (tmp_res.edx&4))
-                        add_monitoring_event(mon, 1,
-                                             PQOS_MON_EVENT_RMEM_BW,
-                                             tmp_res.ecx+1,
-                                             tmp_res.ebx,
-                                             num_events);
-        }
-
-        if (((res_cpuid_0xa.ebx & 3) == 0) && ((res_cpuid_0xa.edx & 31) > 1))
-                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC, 0, 0,
+        if (cpuid_0xf_1.edx & 1)
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_L3_OCCUP,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
+                                     num_events);
+        if (cpuid_0xf_1.edx & 2)
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
+                                     num_events);
+        if (cpuid_0xf_1.edx & 4)
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_TMEM_BW,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
                                      num_events);
 
-        if (((res_cpuid_0xa.eax >> 8) & 0xff) > 1)
-                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS, 0, 0,
+        if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_RMEM_BW,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
                                      num_events);
+
+        if (((cpuid_0xa.ebx & 3) == 0) && ((cpuid_0xa.edx & 31) > 1))
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC,
+                                     0, 0, num_events);
+
+        if (((cpuid_0xa.eax >> 8) & 0xff) > 1)
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS,
+                                     0, 0, num_events);
 
         (*r_mon) = mon;
         return PQOS_RETVAL_OK;
@@ -595,7 +621,7 @@ cat_reset(const struct pqos_cap_l3ca *cap,
 		}
         }
 
-cat_reset_exit:
+ cat_reset_exit:
 	free(sockets);
         return ret;
 }
@@ -669,7 +695,7 @@ cdp_is_enabled(const struct pqos_cpuinfo *cpu,
         LOG_INFO("CDP is %s\n",
                  (*enabled) ? "enabled" : "disabled");
 
-cdp_is_enabled_exit:
+ cdp_is_enabled_exit:
 	free(sockets);
         return ret;
 }
@@ -731,13 +757,13 @@ cdp_enable(const struct pqos_cpuinfo *cpu,
 		}
         }
 
-cdp_enable_exit:
+ cdp_enable_exit:
 	free(sockets);
         return ret;
 }
 
 /**
- * @brief Detects presence of CAT based on register probing.
+ * @brief Detects presence of L3 CAT based on register probing.
  *
  * This is 3rd and the last method of detecting CAT.
  * - probe COS registers one by one and exit on first error
@@ -754,9 +780,9 @@ cdp_enable_exit:
  * @retval PQOS_RETVAL_RESOURCE technology not supported
  */
 static int
-discover_alloc_llc_probe(struct pqos_cap_l3ca *cap,
-                         const enum pqos_cdp_config cdp_cfg,
-                         const struct pqos_cpuinfo *cpu)
+discover_alloc_l3_probe(struct pqos_cap_l3ca *cap,
+                        const enum pqos_cdp_config cdp_cfg,
+                        const struct pqos_cpuinfo *cpu)
 {
         unsigned i = 0, lcore;
         const unsigned max_classes =
@@ -803,7 +829,7 @@ discover_alloc_llc_probe(struct pqos_cap_l3ca *cap,
 }
 
 /**
- * @brief Detects presence of CAT based on brand string.
+ * @brief Detects presence of L3 CAT based on brand string.
  *
  * If CPUID.0x7.0 doesn't report CAT feature
  * platform may still support it:
@@ -818,14 +844,14 @@ discover_alloc_llc_probe(struct pqos_cap_l3ca *cap,
  * @retval PQOS_RETVAL_RESOURCE technology not supported
  */
 static int
-discover_alloc_llc_brandstr(struct pqos_cap_l3ca *cap,
-                            const enum pqos_cdp_config cdp_cfg)
+discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap,
+                           const enum pqos_cdp_config cdp_cfg)
 {
 #define CPUID_LEAF_BRAND_START 0x80000002UL
 #define CPUID_LEAF_BRAND_END   0x80000004UL
 #define CPUID_LEAF_BRAND_NUM   (CPUID_LEAF_BRAND_END-CPUID_LEAF_BRAND_START+1)
 #define MAX_BRAND_STRING_LEN   (CPUID_LEAF_BRAND_NUM*4*sizeof(uint32_t))
-       static const char * const supported_brands[] = {
+        static const char * const supported_brands[] = {
                 "E5-2658 v3",
                 "E5-2648L v3", "E5-2628L v3",
                 "E5-2618L v3", "E5-2608L v3",
@@ -866,7 +892,7 @@ discover_alloc_llc_brandstr(struct pqos_cap_l3ca *cap,
 
         if (res.eax < CPUID_LEAF_BRAND_END) {
                 LOG_ERROR("Brand string CPU-ID extended functions "
-                           "not supported\n");
+                          "not supported\n");
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -914,7 +940,7 @@ discover_alloc_llc_brandstr(struct pqos_cap_l3ca *cap,
 }
 
 /**
- * @brief Detects presence of CAT based on CPUID
+ * @brief Detects presence of L3 CAT based on CPUID
  *
  * @param cap CAT structure to be initialized
  * @param cdp_cfg CAT CDP configuration
@@ -925,13 +951,11 @@ discover_alloc_llc_brandstr(struct pqos_cap_l3ca *cap,
  * @retval PQOS_RETVAL_RESOURCE technology not supported
  */
 static int
-discover_alloc_llc_cpuid(struct pqos_cap_l3ca *cap,
-                         const enum pqos_cdp_config cdp_cfg,
-                         const struct pqos_cpuinfo *cpu)
+discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
+                        const enum pqos_cdp_config cdp_cfg,
+                        const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
-        uint32_t res_id = 0;
-        int detected = 0;
         int ret = PQOS_RETVAL_OK;
 
         /**
@@ -944,120 +968,105 @@ discover_alloc_llc_cpuid(struct pqos_cap_l3ca *cap,
                 return PQOS_RETVAL_ERROR;
         }
 
-        res_id = res.ebx;
+        if (!(res.ebx & (1 << PQOS_RES_ID_L3_ALLOCATION))) {
+                LOG_INFO("CPUID.0x10.0: L3 CAT not detected.\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
 
-        if (res_id & (1 << PQOS_RES_ID_L3_ALLOCATION)) {
+        /**
+         * L3 CAT detected
+         * - get more info about it
+         */
+        ret = lcpuid(0x10, PQOS_RES_ID_L3_ALLOCATION, &res);
+        if (ret != MACHINE_RETVAL_OK) {
+                LOG_ERROR("CPUID 0x10.%d error!\n", PQOS_RES_ID_L3_ALLOCATION);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        cap->num_classes = res.edx + 1;
+        cap->num_ways = res.eax + 1;
+        cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
+        cap->cdp_on = 0;
+        cap->way_contention = (uint64_t) res.ebx;
+
+        if (cap->cdp) {
                 /**
-                 * L3 CAT detected
-                 * - get more info about it
+                 * CDP is supported but is it on?
                  */
-                ret = lcpuid(0x10, PQOS_RES_ID_L3_ALLOCATION, &res);
-                if (ret != MACHINE_RETVAL_OK) {
-                        LOG_ERROR("CPUID 0x10.%d error!\n",
-                                  PQOS_RES_ID_L3_ALLOCATION);
-                        return PQOS_RETVAL_ERROR;
+                int cdp_on = 0;
+
+                ret = cdp_is_enabled(cpu, &cdp_on);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("CDP detection error!\n");
+                        return ret;
                 }
+                cap->cdp_on = cdp_on;
+        }
 
-                cap->num_classes = res.edx+1;
-                cap->num_ways = res.eax+1;
-                cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
-                cap->cdp_on = 0;
-                cap->way_contention = (uint64_t) res.ebx;
-
-                if (cap->cdp) {
+        switch (cdp_cfg) {
+        case PQOS_REQUIRE_CDP_ON:
+                if (!cap->cdp) {
+                        LOG_ERROR("CAT/CDP requested but not supported "
+                                  "by the platform!\n");
+                        return PQOS_RETVAL_ERROR;
+                } else if (!cap->cdp_on) {
                         /**
-                         * CDP is supported but is it on?
+                         * Turn on CDP
                          */
-                        int cdp_on = 0;
-
-                        ret = cdp_is_enabled(cpu, &cdp_on);
+                        LOG_INFO("Turning CDP ON ...\n");
+                        ret = cat_reset(cap, cpu);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("CDP detection error!\n");
+                                LOG_ERROR("CAT reset error!\n");
                                 return ret;
                         }
-                        cap->cdp_on = cdp_on;
-                }
-
-                switch (cdp_cfg) {
-                case PQOS_REQUIRE_CDP_ON:
-                        if (!cap->cdp) {
-                                LOG_ERROR("CAT/CDP requested but not supported "
-                                          "by the platform!\n");
-                                return PQOS_RETVAL_ERROR;
-                        } else if (!cap->cdp_on) {
-                                /**
-                                 * Turn on CDP
-                                 */
-                                LOG_INFO("Turning CDP ON ...\n");
-                                ret = cat_reset(cap, cpu);
-                                if (ret != PQOS_RETVAL_OK) {
-                                        LOG_ERROR("CAT reset error!\n");
-                                        return ret;
-                                }
-                                ret = cdp_enable(cpu, 1);
-                                if (ret != PQOS_RETVAL_OK) {
-                                        LOG_ERROR("CDP enable error!\n");
-                                        return ret;
-                                }
-                                cap->cdp_on = 1;
+                        ret = cdp_enable(cpu, 1);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("CDP enable error!\n");
+                                return ret;
                         }
-                        break;
-                case PQOS_REQUIRE_CDP_OFF:
-                        if (cap->cdp && cap->cdp_on) {
-                                /**
-                                 * Turn off CDP
-                                 */
-                                LOG_INFO("Turning CDP OFF ...\n");
-                                ret = cat_reset(cap, cpu);
-                                if (ret != PQOS_RETVAL_OK) {
-                                        LOG_ERROR("CAT reset error!\n");
-                                        return ret;
-                                }
-                                ret = cdp_enable(cpu, 0);
-                                if (ret != PQOS_RETVAL_OK) {
-                                        LOG_ERROR("CDP disable error!\n");
-                                        return ret;
-                                }
-                                cap->cdp_on = 0;
-                        }
-                        break;
-                case PQOS_REQUIRE_CDP_ANY:
-                        break;
-                default:
-                        LOG_ERROR("Unrecognized CDP configuration %d!\n",
-                                  cdp_cfg);
-                        return PQOS_RETVAL_PARAM;
-                        break;
+                        cap->cdp_on = 1;
                 }
-
-                if (cap->cdp_on) {
+                break;
+        case PQOS_REQUIRE_CDP_OFF:
+                if (cap->cdp && cap->cdp_on) {
                         /**
-                         * Divide number of classes by 2.
-                         * This is because CDP needs 2 bit-masks per one class.
+                         * Turn off CDP
                          */
-                        cap->num_classes = cap->num_classes / 2;
+                        LOG_INFO("Turning CDP OFF ...\n");
+                        ret = cat_reset(cap, cpu);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("CAT reset error!\n");
+                                return ret;
+                        }
+                        ret = cdp_enable(cpu, 0);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("CDP disable error!\n");
+                                return ret;
+                        }
+                        cap->cdp_on = 0;
                 }
-
-                detected = 1;
-                res_id &= ~(1 << PQOS_RES_ID_L3_ALLOCATION);
+                break;
+        case PQOS_REQUIRE_CDP_ANY:
+                break;
+        default:
+                LOG_ERROR("Unrecognized CDP configuration %d!\n", cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+                break;
         }
 
-        if (res_id != 0) {
-                LOG_INFO("Unsupported resource ID's detected: "
-                         "CPUID(0x10,0).ebx = 0x%x\n",
-                         res_id);
-        }
-
-        if (!detected) {
-                LOG_INFO("No resource allocation capabilities detected.\n");
-                ret = PQOS_RETVAL_RESOURCE;
+        if (cap->cdp_on) {
+                /**
+                 * Divide number of classes by 2.
+                 * This is because CDP needs 2 bit-masks per one class.
+                 */
+                cap->num_classes = cap->num_classes / 2;
         }
 
         return ret;
 }
 
 /**
- * @brief Discovers CAT
+ * @brief Discovers L3 CAT
  *
  * First it tries to detects CAT through CPUID.0x7.0
  * if this fails then falls into brand string check.
@@ -1078,13 +1087,14 @@ discover_alloc_llc_cpuid(struct pqos_cap_l3ca *cap,
  * @retval PQOS_RETVAL_OK success
  */
 static int
-discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
-                   const struct pqos_config *config,
-                   const struct pqos_cpuinfo *cpu)
+discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
+                  const struct pqos_config *config,
+                  const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
         struct pqos_cap_l3ca *cap = NULL;
         const unsigned sz = sizeof(*cap);
+        unsigned l3_size = 0;
         int ret = PQOS_RETVAL_OK;
 
         cap = (struct pqos_cap_l3ca *)malloc(sz);
@@ -1110,35 +1120,34 @@ discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
                 /**
                  * Use CPUID method
                  */
-                LOG_INFO("CPUID.0x7.0: CAT supported\n");
-                ret = discover_alloc_llc_cpuid(cap, config->cdp_cfg, cpu);
+                LOG_INFO("CPUID.0x7.0: L3 CAT supported\n");
+                ret = discover_alloc_l3_cpuid(cap, config->cdp_cfg, cpu);
                 if (ret == PQOS_RETVAL_OK)
-                        ret = get_l3_cache_info(NULL, &cap->way_size);
+                        ret = get_l3_cache_info(NULL, &l3_size);
         } else {
                 /**
                  * Use brand string matching method 1st.
                  * If it fails then try register probing.
                  */
-                LOG_INFO("CPUID.0x7.0: CAT not detected. "
+                LOG_INFO("CPUID.0x7.0: L3 CAT not detected. "
 			 "Checking brand string...\n");
-                ret = discover_alloc_llc_brandstr(cap, config->cdp_cfg);
+                ret = discover_alloc_l3_brandstr(cap, config->cdp_cfg);
                 if (ret != PQOS_RETVAL_OK)
-                        ret = discover_alloc_llc_probe(cap, config->cdp_cfg,
-                                                       cpu);
+                        ret = discover_alloc_l3_probe(cap, config->cdp_cfg,
+                                                      cpu);
                 if (ret == PQOS_RETVAL_OK)
-                        ret = get_l3_cache_info(&cap->num_ways, &cap->way_size);
+                        ret = get_l3_cache_info(&cap->num_ways, &l3_size);
         }
 
         if (ret == PQOS_RETVAL_OK) {
-                LOG_INFO("CAT details: CDP support=%d, CDP on=%d, "
+                if (cap->num_ways > 0)
+                        cap->way_size = l3_size / cap->num_ways;
+                LOG_INFO("L3 CAT details: CDP support=%d, CDP on=%d, "
                          "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
                          cap->cdp, cap->cdp_on, cap->num_classes,
                          cap->num_ways, cap->way_contention);
-                LOG_INFO("LLC cache size %u bytes, %u ways\n",
-                         cap->way_size, cap->num_ways);
-                if (cap->num_ways > 0)
-                        cap->way_size = cap->way_size / cap->num_ways;
-                LOG_INFO("LLC cache way size %u bytes\n", cap->way_size);
+                LOG_INFO("L3 CAT details: cache size %u bytes, "
+                         "way size %u bytes\n", l3_size, cap->way_size);
         }
 
         if (ret == PQOS_RETVAL_OK)
@@ -1146,6 +1155,93 @@ discover_alloc_llc(struct pqos_cap_l3ca **r_cap,
         else
                 free(cap);
 
+        return ret;
+}
+
+/**
+ * @brief Discovers L2 CAT
+ *
+ * @param r_cap place to store L2 CAT capabilities structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+discover_alloc_l2(struct pqos_cap_l2ca **r_cap)
+{
+        struct cpuid_out res;
+        struct pqos_cap_l2ca *cap = NULL;
+        const unsigned sz = sizeof(*cap);
+	unsigned l2_size = 0;
+        int ret = PQOS_RETVAL_OK;
+
+        cap = (struct pqos_cap_l2ca *)malloc(sz);
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        ASSERT(cap != NULL);
+
+        memset(cap, 0, sz);
+        cap->mem_size = sz;
+
+        /**
+         * Run CPUID.0x7.0 to check
+         * for allocation capability (bit 15 of ebx)
+         */
+        ret = lcpuid(0x7, 0x0, &res);
+        if (ret != MACHINE_RETVAL_OK) {
+                free(cap);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        if (!(res.ebx & (1 << 15))) {
+                LOG_INFO("CPUID.0x7.0: L2 CAT not supported\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+	}
+
+        /**
+         * We can go to CPUID.0x10.0 to obtain more info
+         */
+        ret = lcpuid(0x10, 0x0, &res);
+        if (ret != MACHINE_RETVAL_OK) {
+                LOG_ERROR("CPUID 0x10.0 error!\n");
+                free(cap);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        if (!(res.ebx & (1 << PQOS_RES_ID_L2_ALLOCATION))) {
+		LOG_INFO("CPUID 0x10.0: L2 CAT not supported!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+	}
+
+	ret = lcpuid(0x10, PQOS_RES_ID_L2_ALLOCATION, &res);
+	if (ret != MACHINE_RETVAL_OK) {
+		LOG_ERROR("CPUID 0x10.%d error!\n", PQOS_RES_ID_L2_ALLOCATION);
+                free(cap);
+		return PQOS_RETVAL_ERROR;
+	}
+
+	cap->num_classes = res.edx+1;
+	cap->num_ways = res.eax+1;
+	cap->way_contention = (uint64_t) res.ebx;
+	ret = get_l2_cache_info(NULL, &l2_size);
+	if (ret != PQOS_RETVAL_OK) {
+		LOG_ERROR("Error reading L2 info!\n");
+                free(cap);
+		return PQOS_RETVAL_ERROR;
+	}
+	if (cap->num_ways > 0)
+		cap->way_size = l2_size / cap->num_ways;
+
+	LOG_INFO("L2 CAT details: "
+		 "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
+		 cap->num_classes, cap->num_ways, cap->way_contention);
+	LOG_INFO("L2 CAT details: cache size %u bytes, way size %u bytes\n",
+		 l2_size, cap->way_size);
+
+	(*r_cap) = cap;
         return ret;
 }
 
@@ -1166,6 +1262,7 @@ discover_capabilities(struct pqos_cap **p_cap,
 {
         struct pqos_cap_mon *det_mon = NULL;
         struct pqos_cap_l3ca *det_l3ca = NULL;
+        struct pqos_cap_l2ca *det_l2ca = NULL;
         struct pqos_cap *_cap = NULL;
         struct pqos_capability *item = NULL;
         unsigned sz = 0;
@@ -1175,17 +1272,24 @@ discover_capabilities(struct pqos_cap **p_cap,
          * Monitoring init
          */
         ret = discover_monitoring(&det_mon);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_INFO("Monitoring capability not detected\n");
-        } else {
+        switch (ret) {
+        case PQOS_RETVAL_OK:
                 LOG_INFO("Monitoring capability detected\n");
                 sz += sizeof(struct pqos_capability);
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                LOG_INFO("Monitoring capability not detected\n");
+                break;
+        default:
+                LOG_ERROR("Error encounter in monitoring discovery!\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto error_exit;
         }
 
         /**
-         * Cache allocation init
+         * L3 Cache allocation init
          */
-        ret = discover_alloc_llc(&det_l3ca, config, cpu);
+        ret = discover_alloc_l3(&det_l3ca, config, cpu);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("L3CA capability detected\n");
@@ -1195,7 +1299,25 @@ discover_capabilities(struct pqos_cap **p_cap,
                 LOG_INFO("L3CA capability not detected\n");
                 break;
         default:
-                LOG_ERROR("Fatal error encounter in CAT discovery!\n");
+                LOG_ERROR("Fatal error encounter in L3 CAT discovery!\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto error_exit;
+        }
+
+        /**
+         * L2 Cache allocation init
+         */
+        ret = discover_alloc_l2(&det_l2ca);
+        switch (ret) {
+        case PQOS_RETVAL_OK:
+                LOG_INFO("L2CA capability detected\n");
+                sz += sizeof(struct pqos_capability);
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                LOG_INFO("L2CA capability not detected\n");
+                break;
+        default:
+                LOG_ERROR("Fatal error encounter in L2 CAT discovery!\n");
                 ret = PQOS_RETVAL_ERROR;
                 goto error_exit;
         }
@@ -1235,6 +1357,14 @@ discover_capabilities(struct pqos_cap **p_cap,
                 ret = PQOS_RETVAL_OK;
         }
 
+        if (det_l2ca != NULL) {
+                _cap->num_cap++;
+                item->type = PQOS_CAP_TYPE_L2CA;
+                item->u.l2ca = det_l2ca;
+                item++;
+                ret = PQOS_RETVAL_OK;
+        }
+
         (*p_cap) = _cap;
 
  error_exit:
@@ -1243,6 +1373,8 @@ discover_capabilities(struct pqos_cap **p_cap,
                         free(det_mon);
                 if (det_l3ca != NULL)
                         free(det_l3ca);
+                if (det_l2ca != NULL)
+                        free(det_l2ca);
         }
 
         return ret;

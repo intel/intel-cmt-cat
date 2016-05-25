@@ -218,6 +218,9 @@ static unsigned nearest_pow2(const unsigned n)
 {
         unsigned r, p;
 
+	if (n < 2)
+                return n;
+
         for (r = 1, p = 0; r != 0; r <<= 1, p++)
                 if (r >= n)
                         break;
