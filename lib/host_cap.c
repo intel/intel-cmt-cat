@@ -249,9 +249,7 @@ get_l3_cache_info(unsigned *p_num_ways,
         if (p_num_ways == NULL && p_size_in_bytes == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        ret = lcpuid(0x4, 0x3, &res);
-        if (ret != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
+        lcpuid(0x4, 0x3, &res);
 
         num_ways = (res.ebx>>22) + 1;
         ASSERT(num_ways > 0);
@@ -291,9 +289,7 @@ get_l2_cache_info(unsigned *p_num_ways,
         if (p_num_ways == NULL && p_size_in_bytes == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        ret = lcpuid(0x4, 0x2, &res);
-        if (ret != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
+        lcpuid(0x4, 0x2, &res);
 
         num_ways = (res.ebx >> 22) + 1;
         ASSERT(num_ways > 0);
@@ -375,10 +371,7 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
          * Run CPUID.0x7.0 to check
          * for quality monitoring capability (bit 12 of ebx)
          */
-        ret = lcpuid(0x7, 0x0, &res);
-        if (ret != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
-
+        lcpuid(0x7, 0x0, &res);
         if (!(res.ebx & (1 << 12))) {
                 LOG_WARN("CPUID.0x7.0: Monitoring capability not supported!\n");
                 return PQOS_RETVAL_RESOURCE;
@@ -388,10 +381,7 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
          * We can go to CPUID.0xf.0 for further
          * exploration of monitoring capabilities
          */
-        ret = lcpuid(0xf, 0x0, &res);
-        if (ret != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
-
+        lcpuid(0xf, 0x0, &res);
         if (!(res.edx & (1 << 1))) {
                 LOG_WARN("CPUID.0xf.0: Monitoring capability not supported!\n");
                 return PQOS_RETVAL_RESOURCE;
@@ -411,9 +401,7 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
          * Check number of monitoring events to allocate memory for
          * Subleaf 1 provides information on monitoring.
          */
-        ret = lcpuid(0xf, 1, &cpuid_0xf_1); /**< query resource monitoring */
-        if (ret != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
+        lcpuid(0xf, 1, &cpuid_0xf_1); /**< query resource monitoring */
 
         if (cpuid_0xf_1.edx & 1)
                 num_events++; /**< LLC occupancy */
@@ -430,10 +418,7 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
         /**
          * Check if IPC can be calculated & supported
          */
-        ret = lcpuid(0xa, 0x0, &cpuid_0xa);
-        if (ret != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
-
+        lcpuid(0xa, 0x0, &cpuid_0xa);
         if (((cpuid_0xa.ebx & 3) == 0) && ((cpuid_0xa.edx & 31) > 1))
                 num_events++;
 
@@ -884,12 +869,7 @@ discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap,
                 return PQOS_RETVAL_PARAM;
         }
 
-        ret = lcpuid(0x80000000, 0, &res);
-        if (ret != MACHINE_RETVAL_OK) {
-                LOG_ERROR("CPUID.0x80000000.0 error!\n");
-                return PQOS_RETVAL_ERROR;
-        }
-
+        lcpuid(0x80000000, 0, &res);
         if (res.eax < CPUID_LEAF_BRAND_END) {
                 LOG_ERROR("Brand string CPU-ID extended functions "
                           "not supported\n");
@@ -899,12 +879,7 @@ discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap,
         memset(brand_str, 0, sizeof(brand_str));
 
         for (i = 0; i < CPUID_LEAF_BRAND_NUM; i++) {
-                ret = lcpuid((unsigned)CPUID_LEAF_BRAND_START + i, 0, &res);
-                if (ret != MACHINE_RETVAL_OK) {
-                        LOG_ERROR("CPUID.0x%x.0 error!\n",
-                                  (unsigned)CPUID_LEAF_BRAND_START + i);
-                        return PQOS_RETVAL_ERROR;
-                }
+                lcpuid((unsigned)CPUID_LEAF_BRAND_START + i, 0, &res);
                 *brand_u32++ = res.eax;
                 *brand_u32++ = res.ebx;
                 *brand_u32++ = res.ecx;
@@ -962,12 +937,7 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
          * We can go to CPUID.0x10.0 to explore
          * allocation capabilities
          */
-        ret = lcpuid(0x10, 0x0, &res);
-        if (ret != MACHINE_RETVAL_OK) {
-                LOG_ERROR("CPUID 0x10.0 error!\n");
-                return PQOS_RETVAL_ERROR;
-        }
-
+        lcpuid(0x10, 0x0, &res);
         if (!(res.ebx & (1 << PQOS_RES_ID_L3_ALLOCATION))) {
                 LOG_INFO("CPUID.0x10.0: L3 CAT not detected.\n");
                 return PQOS_RETVAL_RESOURCE;
@@ -977,12 +947,7 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
          * L3 CAT detected
          * - get more info about it
          */
-        ret = lcpuid(0x10, PQOS_RES_ID_L3_ALLOCATION, &res);
-        if (ret != MACHINE_RETVAL_OK) {
-                LOG_ERROR("CPUID 0x10.%d error!\n", PQOS_RES_ID_L3_ALLOCATION);
-                return PQOS_RETVAL_ERROR;
-        }
-
+        lcpuid(0x10, PQOS_RES_ID_L3_ALLOCATION, &res);
         cap->num_classes = res.edx + 1;
         cap->num_ways = res.eax + 1;
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
@@ -1110,11 +1075,7 @@ discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
          * Run CPUID.0x7.0 to check
          * for allocation capability (bit 15 of ebx)
          */
-        ret = lcpuid(0x7, 0x0, &res);
-        if (ret != MACHINE_RETVAL_OK) {
-                free(cap);
-                return PQOS_RETVAL_ERROR;
-        }
+        lcpuid(0x7, 0x0, &res);
 
         if (res.ebx & (1 << 15)) {
                 /**
@@ -1188,12 +1149,7 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap)
          * Run CPUID.0x7.0 to check
          * for allocation capability (bit 15 of ebx)
          */
-        ret = lcpuid(0x7, 0x0, &res);
-        if (ret != MACHINE_RETVAL_OK) {
-                free(cap);
-                return PQOS_RETVAL_ERROR;
-        }
-
+        lcpuid(0x7, 0x0, &res);
         if (!(res.ebx & (1 << 15))) {
                 LOG_INFO("CPUID.0x7.0: L2 CAT not supported\n");
                 free(cap);
@@ -1203,29 +1159,19 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap)
         /**
          * We can go to CPUID.0x10.0 to obtain more info
          */
-        ret = lcpuid(0x10, 0x0, &res);
-        if (ret != MACHINE_RETVAL_OK) {
-                LOG_ERROR("CPUID 0x10.0 error!\n");
-                free(cap);
-                return PQOS_RETVAL_ERROR;
-        }
-
+        lcpuid(0x10, 0x0, &res);
         if (!(res.ebx & (1 << PQOS_RES_ID_L2_ALLOCATION))) {
 		LOG_INFO("CPUID 0x10.0: L2 CAT not supported!\n");
                 free(cap);
                 return PQOS_RETVAL_RESOURCE;
 	}
 
-	ret = lcpuid(0x10, PQOS_RES_ID_L2_ALLOCATION, &res);
-	if (ret != MACHINE_RETVAL_OK) {
-		LOG_ERROR("CPUID 0x10.%d error!\n", PQOS_RES_ID_L2_ALLOCATION);
-                free(cap);
-		return PQOS_RETVAL_ERROR;
-	}
+	lcpuid(0x10, PQOS_RES_ID_L2_ALLOCATION, &res);
 
 	cap->num_classes = res.edx+1;
 	cap->num_ways = res.eax+1;
 	cap->way_contention = (uint64_t) res.ebx;
+
 	ret = get_l2_cache_info(NULL, &l2_size);
 	if (ret != PQOS_RETVAL_OK) {
 		LOG_ERROR("Error reading L2 info!\n");

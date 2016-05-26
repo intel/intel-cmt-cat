@@ -89,18 +89,15 @@ int machine_fini(void);
  * @param [in] leaf CPUID leaf number
  * @param [in] subleaf CPUID sub-leaf number
  * @param [out] out structure to write CPUID results into
- *
- * @return Operation status
- * @retval MACHINE_RETVAL_OK on success
  */
-static inline int
+static inline void
 lcpuid(const unsigned leaf,
        const unsigned subleaf,
        struct cpuid_out *out)
 {
         ASSERT(out != NULL);
         if (out == NULL)
-                return MACHINE_RETVAL_PARAM;
+                return;
 
 #ifdef __x86_64__
         asm volatile("mov %4, %%eax\n\t"
@@ -129,7 +126,6 @@ lcpuid(const unsigned leaf,
                      : "g" (leaf), "g" (subleaf)
                      : "%eax", "%ecx", "%edx");
 #endif
-        return MACHINE_RETVAL_OK;
 }
 
 /**
