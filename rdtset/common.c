@@ -47,6 +47,10 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 	char *buff = malloc(cpustr_len + 1);
 	char *end = NULL;
 	const char *str = buff;
+	int ret = 0;
+
+	if (NULL == buff || NULL == cpustr || NULL == cpuset || 0 == cpustr_len)
+		goto err;
 
 	memcpy(buff, cpustr, cpustr_len);
 	buff[cpustr_len] = 0;
@@ -57,7 +61,7 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 
 	/* only digit is qualify for start point */
 	if (!isdigit(*str) || *str == '\0')
-		return -EINVAL;
+		goto err;
 
 	min = CPU_SETSIZE;
 	do {
@@ -66,14 +70,14 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 			str++;
 
 		if (!isdigit(*str))
-			return -EINVAL;
+			goto err;
 
 		/* get the digit value */
 		errno = 0;
 		idx = strtoul(str, &end, 10);
 		if (errno != 0 || end == NULL || end == str ||
 				idx >= CPU_SETSIZE)
-			return -EINVAL;
+			goto err;
 
 		/* go ahead to separator '-',',' */
 		while (isblank(*end))
@@ -82,9 +86,8 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 		if (*end == '-') {
 			if (min == CPU_SETSIZE)
 				min = idx;
-			else
-				/* avoid continuous '-' */
-				return -EINVAL;
+			else /* avoid continuous '-' */
+				goto err;
 		} else if (*end == ',' || *end == 0) {
 			max = idx;
 
@@ -97,12 +100,21 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 
 			min = CPU_SETSIZE;
 		} else
-			return -EINVAL;
+			goto err;
 
 		str = end + 1;
 	} while (*end != '\0');
 
-	return end - buff;
+	ret = end - buff;
+
+	if (buff != NULL)
+		free(buff);
+	return ret;
+
+err:
+	if (buff != NULL)
+		free(buff);
+	return -EINVAL;
 }
 
 void
