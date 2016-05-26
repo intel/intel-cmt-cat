@@ -60,7 +60,7 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 
 	/* only digit is qualify for start point */
 	if (!isdigit(*str) || *str == '\0')
-		return -EINVAL;
+		goto err;
 
 	min = CPU_SETSIZE;
 	do {
@@ -69,14 +69,14 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 			str++;
 
 		if (!isdigit(*str))
-			return -EINVAL;
+			goto err;
 
 		/* get the digit value */
 		errno = 0;
 		idx = strtoul(str, &end, 10);
 		if (errno != 0 || end == NULL || end == str ||
 				idx >= CPU_SETSIZE)
-			return -EINVAL;
+			goto err;
 
 		/* go ahead to separator '-',',' */
 		while (isblank(*end))
@@ -100,12 +100,16 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 
 			min = CPU_SETSIZE;
 		} else
-			return -EINVAL;
+			goto err;
 
 		str = end + 1;
 	} while (*end != '\0');
 
 	return end - buff;
+
+err:
+	free(buff);
+	return -EINVAL;
 }
 
 void
