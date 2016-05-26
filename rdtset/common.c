@@ -48,6 +48,9 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 	char *end = NULL;
 	const char *str = buff;
 
+	if (!buff)
+		return -ENOMEM;
+
 	memcpy(buff, cpustr, cpustr_len);
 	buff[cpustr_len] = 0;
 	CPU_ZERO(cpuset);
