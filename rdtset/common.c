@@ -107,8 +107,7 @@ str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 
 	ret = end - buff;
 
-	if (buff != NULL)
-		free(buff);
+	free(buff);
 	return ret;
 
 err:
