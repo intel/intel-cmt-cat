@@ -150,17 +150,6 @@ enum rmid_state {
 };
 
 /**
- * Per logical core entry to track monitoring processes
- */
-struct mon_entry {
-        pqos_rmid_t rmid;               /**< current RMID association */
-        int unavailable;                /**< if true then core is subject of
-                                           monitoring by another process */
-        struct pqos_mon_data *grp;      /**< monitoring group the core
-                                           belongs to */
-};
-
-/**
  * ---------------------------------------
  * Local data structures
  * ---------------------------------------
@@ -175,7 +164,6 @@ static unsigned m_num_clusters = 0;     /**< number of clusters
                                            in the topology */
 static unsigned m_rmid_max = 0;         /**< max RMID */
 static unsigned m_dim_cores = 0;        /**< max coreid in the topology */
-static struct mon_entry *m_core_map = NULL; /**< map of core states */
 static int m_force_mon = 0;
 /**
  * ---------------------------------------
@@ -246,7 +234,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
               const struct pqos_config *cfg)
 {
         const struct pqos_capability *item = NULL;
-        unsigned i = 0, fails = 0;
+        unsigned i = 0;
         int ret = PQOS_RETVAL_OK;
 
         m_cpu = cpu;
@@ -283,17 +271,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
 
         ASSERT(m_cpu != NULL);
-
         m_dim_cores = cpu_get_num_cores(m_cpu);
-        m_core_map =
-                (struct mon_entry *)malloc(m_dim_cores * sizeof(m_core_map[0]));
-        ASSERT(m_core_map != NULL);
-        if (m_core_map == NULL) {
-                pqos_mon_fini();
-                return PQOS_RETVAL_ERROR;
-        }
-        memset(m_core_map, 0, m_dim_cores*sizeof(m_core_map[0]));
-
         m_rmid_cluster_map =
                 (enum rmid_state **)malloc(m_num_clusters *
                                            sizeof(m_rmid_cluster_map[0]));
@@ -320,72 +298,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         LOG_DEBUG("RMID internal tables allocated\n");
         m_force_mon = cfg->free_in_use_rmid;
 
-        /**
-         * Read current core<=>RMID associations
-         */
-        for (i = 0; i < m_cpu->num_cores; i++) {
-                pqos_rmid_t rmid = 0;
-                unsigned coreid = m_cpu->cores[i].lcore;
-                unsigned clusterid = m_cpu->cores[i].l3_id;
-
-                ret = mon_assoc_get(coreid, &rmid);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Failed to read RMID association of "
-                                  "lcore %u!\n", coreid);
-                        fails++;
-                } else {
-                        ASSERT(rmid < m_rmid_max);
-
-                        m_core_map[coreid].rmid = rmid;
-                        m_core_map[coreid].unavailable = 0;
-                        m_core_map[coreid].grp = NULL;
-
-                        if (rmid == RMID0)
-                                continue;
-
-                        /**
-                         * At this stage we know core is assigned to non-zero RMID
-                         * This means it may be used by another instance of
-                         * the program for monitoring.
-                         * The other option is that previously ran program
-                         * died and it didn't revert RMID association.
-                         */
-
-                        if (!cfg->free_in_use_rmid) {
-                                enum rmid_state *pstate = NULL;
-
-                                LOG_DEBUG("Detected RMID%u is associated with "
-                                          "core %u. "
-                                          "Marking RMID & core unavailable.\n",
-                                          rmid, coreid);
-
-                                ASSERT(clusterid < m_num_clusters);
-                                pstate = m_rmid_cluster_map[clusterid];
-                                pstate[rmid] = RMID_STATE_UNAVAILABLE;
-
-                                m_core_map[coreid].unavailable = 1;
-                        } else {
-                                LOG_DEBUG("Detected RMID%u is associated with "
-                                          "core %u. "
-                                          "Freeing the RMID and associating "
-                                          "core with RMID0.\n",
-                                         rmid, coreid);
-                                ret = mon_assoc_set_nocheck(coreid, RMID0);
-                                if (ret != PQOS_RETVAL_OK) {
-                                        LOG_ERROR("Failed to associate core %u "
-                                                  "with RMID0!\n", coreid);
-                                        fails++;
-                                }
-                        }
-                }
-        }
-
-        ret = (fails == 0) ? PQOS_RETVAL_OK : PQOS_RETVAL_ERROR;
-
-        if (ret != PQOS_RETVAL_OK)
-                pqos_mon_fini();
-
-        return ret;
+        return PQOS_RETVAL_OK;
 }
 
 int
@@ -400,25 +313,6 @@ pqos_mon_fini(void)
         if (pqos_pid_fini() != PQOS_RETVAL_OK)
                 LOG_ERROR("Failed to finalize PID monitoring API\n");
 #endif /* PQOS_NO_PID_API */
-
-        if (m_core_map != NULL && m_cpu != NULL) {
-                /**
-                 * Assign monitored cores back to RMID0
-                 */
-                unsigned i;
-
-                for (i = 0; i < m_cpu->num_cores; i++) {
-                        if (m_core_map[i].rmid == RMID0 ||
-                            m_core_map[i].unavailable != 0)
-                                continue;
-
-                        if (mon_assoc_set_nocheck(m_cpu->cores[i].lcore,
-                                                  RMID0) != PQOS_RETVAL_OK)
-                                LOG_ERROR("Failed to associate core %u "
-                                          "with RMID0!\n",
-                                          m_cpu->cores[i].lcore);
-                }
-        }
 
         /**
          * Free up allocated cluster structures for tracking
@@ -439,14 +333,6 @@ pqos_mon_fini(void)
         m_rmid_max = 0;
         m_num_clusters = 0;
 
-        /**
-         * Free up allocated core map used to track
-         * core <=> RMID assignment
-         */
-        if (m_core_map != NULL) {
-                free(m_core_map);
-                m_core_map = NULL;
-        }
         m_dim_cores = 0;
         m_cpu = NULL;
         m_cap = NULL;
@@ -750,8 +636,6 @@ mon_assoc_set(const unsigned lcore,
         ret = mon_assoc_set_nocheck(lcore, rmid);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-
-        m_core_map[lcore].rmid = rmid;
 
         return PQOS_RETVAL_OK;
 }
@@ -1244,6 +1128,7 @@ pqos_mon_start(const unsigned num_cores,
         for (i = 0; i < num_cores; i++) {
                 const unsigned lcore = cores[i];
                 unsigned j, cluster = 0;
+                pqos_rmid_t rmid = RMID0;
 
                 ret = pqos_cpu_check_core(m_cpu, lcore);
                 if (ret != PQOS_RETVAL_OK) {
@@ -1251,14 +1136,23 @@ pqos_mon_start(const unsigned num_cores,
                         goto pqos_mon_start_error1;
                 }
 
-                if (m_core_map[lcore].unavailable) {
-                        retval = PQOS_RETVAL_RESOURCE;
+                ret = mon_assoc_get(lcore, &rmid);
+                if (ret != PQOS_RETVAL_OK) {
+                        retval = PQOS_RETVAL_PARAM;
                         goto pqos_mon_start_error1;
                 }
 
-                if (m_core_map[lcore].grp != NULL) {
-                        retval = PQOS_RETVAL_RESOURCE;
-                        goto pqos_mon_start_error1;
+                if (rmid != RMID0) {
+                        if (m_force_mon)
+                                LOG_INFO("Hijacking core %u currently assigned "
+                                         "to RMID%u.\n", lcore, rmid);
+                        else {
+                                /* If not RMID0 then it is already monitored */
+                                LOG_INFO("Core %u is already monitoresd with "
+                                         "RMID%u.\n", lcore, rmid);
+                                retval = PQOS_RETVAL_RESOURCE;
+                                goto pqos_mon_start_error1;
+                        }
                 }
 
                 ret = pqos_cpu_get_clusterid(m_cpu, lcore, &cluster);
@@ -1350,15 +1244,6 @@ pqos_mon_start(const unsigned num_cores,
 
         group->event = event;
         group->context = context;
-
-        for (i = 0; i < num_cores; i++) {
-                /**
-                 * Mark monitoring activity in the core map
-                 */
-                const unsigned lcore = cores[i];
-
-                m_core_map[lcore].grp = group;
-        }
 
  pqos_mon_start_error2:
         if (retval != PQOS_RETVAL_OK) {
@@ -1492,32 +1377,34 @@ pqos_mon_stop(struct pqos_mon_data *group)
         }
 
         ASSERT(m_cpu != NULL);
-        for (i = 0; i < group->num_cores; i++) {
+        for (i = 0; i < group->num_poll_ctx; i++) {
                 /**
                  * Validate core list in the group structure is correct
                  */
-                const unsigned lcore = group->cores[i];
+                const unsigned lcore = group->poll_ctx[i].lcore;
+                pqos_rmid_t rmid = RMID0;
 
                 ret = pqos_cpu_check_core(m_cpu, lcore);
                 if (ret != PQOS_RETVAL_OK) {
                         _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
-                if (m_core_map[lcore].grp == NULL) {
+                ret = mon_assoc_get(lcore, &rmid);
+                if (ret != PQOS_RETVAL_OK) {
                         _pqos_api_unlock();
-                        return PQOS_RETVAL_RESOURCE;
+                        return PQOS_RETVAL_PARAM;
                 }
+                if (rmid != group->poll_ctx[i].rmid)
+                        LOG_WARN("Core %u RMID association changed from %u "
+                                 "to %u! The core has been hijacked!\n",
+                                 lcore, group->poll_ctx[i].rmid, rmid);
         }
 
         for (i = 0; i < group->num_cores; i++) {
                 /**
                  * Associate cores from the group back with RMID0
                  */
-                const unsigned lcore = group->cores[i];
-
-                m_core_map[lcore].grp = NULL;
-                m_core_map[lcore].rmid = 0;
-                ret = mon_assoc_set_nocheck(lcore, RMID0);
+                ret = mon_assoc_set_nocheck(group->cores[i], RMID0);
                 if (ret != PQOS_RETVAL_OK)
                         retval = PQOS_RETVAL_RESOURCE;
         }
