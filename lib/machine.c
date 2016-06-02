@@ -111,6 +111,44 @@ machine_fini(void)
         return MACHINE_RETVAL_OK;
 }
 
+void
+lcpuid(const unsigned leaf,
+       const unsigned subleaf,
+       struct cpuid_out *out)
+{
+        ASSERT(out != NULL);
+        if (out == NULL)
+                return;
+
+#ifdef __x86_64__
+        asm volatile("mov %4, %%eax\n\t"
+                     "mov %5, %%ecx\n\t"
+                     "cpuid\n\t"
+                     "mov %%eax, %0\n\t"
+                     "mov %%ebx, %1\n\t"
+                     "mov %%ecx, %2\n\t"
+                     "mov %%edx, %3\n\t"
+                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
+                       "=g" (out->edx)
+                     : "g" (leaf), "g" (subleaf)
+                     : "%eax", "%ebx", "%ecx", "%edx");
+#else
+        asm volatile("push %%ebx\n\t"
+                     "mov %4, %%eax\n\t"
+                     "mov %5, %%ecx\n\t"
+                     "cpuid\n\t"
+                     "mov %%eax, %0\n\t"
+                     "mov %%ebx, %1\n\t"
+                     "mov %%ecx, %2\n\t"
+                     "mov %%edx, %3\n\t"
+                     "pop %%ebx\n\t"
+                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
+                       "=g" (out->edx)
+                     : "g" (leaf), "g" (subleaf)
+                     : "%eax", "%ecx", "%edx");
+#endif
+}
+
 /**
  * @brief Returns MSR driver file descriptor for given core id
  *
