@@ -340,6 +340,13 @@ struct pqos_mon_data {
 };
 
 /**
+ * @brief Resets monitoring by binding all cores with RMID0
+ *
+ * @return Operations status
+ */
+int pqos_mon_reset(void);
+
+/**
  * @brief Reads RMID association of the \a lcore
  *
  * @param [in] lcore CPU logical core id
@@ -559,6 +566,23 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
 int
 pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *cpu,
 			 unsigned *count);
+
+/**
+ * @brief Creates list of cores belonging to given L3 cluster
+ *
+ * Function allocates memory for the core list that needs to be freed by
+ * the caller.
+ *
+ * @param [in] cpu CPU topology
+ * @param [in] l3_id L3 cluster ID
+ * @param [out] count place to put number of cores found
+ *
+ * @return Pointer to list of cores belonging to the L3 cluster
+ * @retval NULL on error or if no core found
+ */
+unsigned *
+pqos_cpu_get_cores_l3id(const struct pqos_cpuinfo *cpu, const unsigned l3_id,
+                        unsigned *count);
 
 /**
  * @brief Retrieves core id's from cpu info structure for \a socket

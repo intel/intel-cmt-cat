@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,8 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- *
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /**
@@ -47,42 +46,61 @@
 #include "pqos.h"
 #include "types.h"
 
+#define TOPO_OBJ_SOCKET     0
+#define TOPO_OBJ_L2_CLUSTER 2
+#define TOPO_OBJ_L3_CLUSTER 3
+
 /**
- * @brief Calculates number of sockets in CPU topology
+ * @brief Calculates number of CPU topology objects
  *
  * @param [in] cpu CPU topology
+ * @param [in] type CPU topology object type to be counted
+ *             TOPO_OBJ_SOCKET - sockets
+ *             TOPO_OBJ_L2_CLUSTER - L2 cache clusters
+ *             TOPO_OBJ_L3_CLUSTER - L3 cache clusters
  *
- * @return Number of CPU sockets
- * @retval 0 on error
+ * @return Number of CPU topology objects
+ * @retval 0 on error or if no object found
  */
 static unsigned
-__get_num_sockets(const struct pqos_cpuinfo *cpu)
+__get_num_of_topology_objs(const struct pqos_cpuinfo *cpu, const int type)
 {
-        unsigned scount = 0, i = 0;
+        unsigned count = 0, i = 0;
 
         ASSERT(cpu != NULL);
         if (cpu == NULL)
+                return 0;
+        if (type != TOPO_OBJ_SOCKET && type != TOPO_OBJ_L2_CLUSTER &&
+            type != TOPO_OBJ_L3_CLUSTER)
                 return 0;
 
         ASSERT(cpu->num_cores > 0);
         if (cpu->num_cores == 0)
                 return 0;
 
-        for (i = 1, scount = 1; i < cpu->num_cores; i++) {
+        for (i = 1, count = 1; i < cpu->num_cores; i++) {
                 /**
-                 * Check if this socket id was already counted in
+                 * Check if topology object was already counted in
                  */
                 unsigned j = 0;
 
-                for (j = 0; j < i; j++)
-                        if (cpu->cores[i].socket == cpu->cores[j].socket)
+                for (j = 0; j < i; j++) {
+                        if (type == TOPO_OBJ_SOCKET &&
+                            cpu->cores[i].socket == cpu->cores[j].socket)
                                 break;
+                        if (type == TOPO_OBJ_L2_CLUSTER &&
+                            cpu->cores[i].l2_id == cpu->cores[j].l2_id)
+                                break;
+                        if (type == TOPO_OBJ_L3_CLUSTER &&
+                            cpu->cores[i].l3_id == cpu->cores[j].l3_id)
+                                break;
+                }
 
                 if (j >= i)
-                        scount++; /**< socket not reported yet */
+                        count++; /**< object not reported yet */
         }
 
-        return scount;
+        return count;
 }
 
 int
@@ -94,7 +112,7 @@ pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *cpu,
 
         if (cpu == NULL || count == NULL)
 		return PQOS_RETVAL_PARAM;
-	*count = __get_num_sockets(cpu);
+	*count = __get_num_of_topology_objs(cpu, TOPO_OBJ_SOCKET);
 	if (*count == 0)
 		return PQOS_RETVAL_ERROR;
 	return PQOS_RETVAL_OK;
@@ -139,6 +157,63 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
 
         *count = scount;
         return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Creates list of cores belonging to given topology object
+ *
+ * @param [in] cpu CPU topology
+ * @param [in] type CPU topology object type to search cores for
+ *             TOPO_OBJ_SOCKET - sockets
+ *             TOPO_OBJ_L2_CLUSTER - L2 cache clusters
+ *             TOPO_OBJ_L3_CLUSTER - L3 cache clusters
+ * @param [in] id CPU topology object ID to search cores for
+ * @param [out] count place to put number of objects found
+ *
+ * @return Pointer to list of cores for given topology object
+ * @retval NULL on error or if no core found
+ */
+static unsigned *
+__get_cores_per_topology_obj(const struct pqos_cpuinfo *cpu,
+                             const int type,
+                             const unsigned id,
+                             unsigned *count)
+{
+        unsigned num = 0, i = 0;
+        unsigned *core_list = NULL;
+
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+        if (cpu == NULL || count == NULL)
+                return NULL;
+
+        core_list = (unsigned *) malloc(cpu->num_cores * sizeof(core_list[0]));
+        if (core_list == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if ((type == TOPO_OBJ_L3_CLUSTER &&
+                     id == cpu->cores[i].l3_id) ||
+                    (type == TOPO_OBJ_L2_CLUSTER &&
+                     id == cpu->cores[i].l2_id) ||
+                    (type == TOPO_OBJ_SOCKET && id == cpu->cores[i].socket))
+                        core_list[num++] = cpu->cores[i].lcore;
+
+        if (num == 0) {
+                free(core_list);
+                return NULL;
+        }
+
+        *count = num;
+        return core_list;
+}
+
+unsigned *
+pqos_cpu_get_cores_l3id(const struct pqos_cpuinfo *cpu, const unsigned l3_id,
+                        unsigned *count)
+{
+        return __get_cores_per_topology_obj(cpu, TOPO_OBJ_L3_CLUSTER, l3_id,
+                                            count);
 }
 
 int
@@ -393,7 +468,7 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
          * - validate that number of socket id's obtained in
          *   two different ways match
          */
-        sockets_num = __get_num_sockets(cpu);
+        sockets_num = __get_num_of_topology_objs(cpu, TOPO_OBJ_SOCKET);
         if (sockets_num == 0)
                 return PQOS_RETVAL_RESOURCE;
 
@@ -439,4 +514,3 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
 
         return ret;
 }
-

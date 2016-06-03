@@ -137,19 +137,6 @@
  */
 
 /**
- * List of RMID states
- */
-enum rmid_state {
-        RMID_STATE_FREE = 0,            /**< RMID is currently unused and can
-                                           be used by the library */
-        RMID_STATE_ALLOCATED,           /**< RMID was free at start but now it
-                                           is used for monitoring */
-        RMID_STATE_UNAVAILABLE          /**< RMID was associated to some core
-                                           at start-up. It may be used by
-                                           another process for monitoring */
-};
-
-/**
  * ---------------------------------------
  * Local data structures
  * ---------------------------------------
@@ -158,12 +145,7 @@ static const struct pqos_cap *m_cap = NULL; /**< capabilities structure
                                                passed from host_cap */
 static const struct pqos_cpuinfo *m_cpu = NULL; /**< cpu topology passed
                                                    from host_cap */
-static enum rmid_state **m_rmid_cluster_map = NULL; /**< 32 is max supported
-                                                       monitoring clusters */
-static unsigned m_num_clusters = 0;     /**< number of clusters
-                                           in the topology */
 static unsigned m_rmid_max = 0;         /**< max RMID */
-static unsigned m_dim_cores = 0;        /**< max coreid in the topology */
 static int m_force_mon = 0;
 /**
  * ---------------------------------------
@@ -171,24 +153,15 @@ static int m_force_mon = 0;
  * ---------------------------------------
  */
 
-static unsigned
-cpu_get_num_clusters(const struct pqos_cpuinfo *cpu);
-
-static unsigned
-cpu_get_num_cores(const struct pqos_cpuinfo *cpu);
-
-static int
-mon_assoc_set_nocheck(const unsigned lcore,
-                      const pqos_rmid_t rmid);
-
 static int
 mon_assoc_set(const unsigned lcore,
-              const unsigned cluster,
               const pqos_rmid_t rmid);
 
 static int
 mon_assoc_get(const unsigned lcore,
               pqos_rmid_t *rmid);
+
+static int mon_reset(void);
 
 static int
 mon_read(const unsigned lcore,
@@ -203,10 +176,6 @@ static int
 rmid_alloc(const unsigned cluster,
            const enum pqos_mon_event event,
            pqos_rmid_t *rmid);
-
-static int
-rmid_free(const unsigned cluster,
-          const pqos_rmid_t rmid);
 
 static unsigned
 get_event_id(const enum pqos_mon_event event);
@@ -234,7 +203,6 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
               const struct pqos_config *cfg)
 {
         const struct pqos_capability *item = NULL;
-        unsigned i = 0;
         int ret = PQOS_RETVAL_OK;
 
         m_cpu = cpu;
@@ -256,10 +224,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
          */
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        m_num_clusters = cpu_get_num_clusters(m_cpu);
-        ASSERT(m_num_clusters >= 1);
+                return PQOS_RETVAL_RESOURCE;
 
         ASSERT(item != NULL);
         m_rmid_max = item->u.mon->max_rmid;
@@ -271,32 +236,9 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
 
         ASSERT(m_cpu != NULL);
-        m_dim_cores = cpu_get_num_cores(m_cpu);
-        m_rmid_cluster_map =
-                (enum rmid_state **)malloc(m_num_clusters *
-                                           sizeof(m_rmid_cluster_map[0]));
-        ASSERT(m_rmid_cluster_map != NULL);
-        if (m_rmid_cluster_map == NULL) {
-                pqos_mon_fini();
-                return PQOS_RETVAL_ERROR;
-        }
-
-        for (i = 0 ; i < m_num_clusters; i++) {
-                const size_t size = m_rmid_max * sizeof(enum rmid_state);
-                enum rmid_state *st = (enum rmid_state *)malloc(size);
-
-                if (st == NULL) {
-                        pqos_mon_fini();
-                        return PQOS_RETVAL_RESOURCE;
-                }
-                m_rmid_cluster_map[i] = st;
-                memset(st, 0, size);
-                st[RMID0] = RMID_STATE_UNAVAILABLE; /**< RMID0 has a special
-                                                       meaning */
-        }
-
-        LOG_DEBUG("RMID internal tables allocated\n");
         m_force_mon = cfg->free_in_use_rmid;
+        if (m_force_mon)
+                mon_reset();
 
         return PQOS_RETVAL_OK;
 }
@@ -314,26 +256,8 @@ pqos_mon_fini(void)
                 LOG_ERROR("Failed to finalize PID monitoring API\n");
 #endif /* PQOS_NO_PID_API */
 
-        /**
-         * Free up allocated cluster structures for tracking
-         * RMID allocations.
-         */
-        if (m_rmid_cluster_map != NULL) {
-                unsigned i;
-
-                for (i = 0; i < m_num_clusters; i++) {
-                        if (m_rmid_cluster_map[i] != NULL) {
-                                free(m_rmid_cluster_map[i]);
-                                m_rmid_cluster_map[i] = NULL;
-                        }
-                }
-                free(m_rmid_cluster_map);
-                m_rmid_cluster_map = NULL;
-        }
         m_rmid_max = 0;
-        m_num_clusters = 0;
 
-        m_dim_cores = 0;
         m_cpu = NULL;
         m_cap = NULL;
         return retval;
@@ -350,39 +274,6 @@ pqos_mon_fini(void)
  */
 
 /**
- * @brief Validates cluster id parameter for RMID allocation operation
- *
- * @param cluster cluster id on which rmid is to allocated from
- * @param p_table place to store pointer to cluster map of RMIDs
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-mon_rmid_alloc_param_check(const unsigned cluster,
-                           enum rmid_state **p_table)
-{
-        int ret;
-
-        if (cluster >= m_num_clusters)
-                return PQOS_RETVAL_PARAM;
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        if (m_rmid_cluster_map[cluster] == NULL) {
-                LOG_WARN("Monitoring capability not detected for "
-                         "cluster id %u\n", cluster);
-                return PQOS_RETVAL_PARAM;
-        }
-
-        (*p_table) = m_rmid_cluster_map[cluster];
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Allocates RMID for given \a event
  *
  * @param [in] cluster CPU cluster id
@@ -396,22 +287,17 @@ rmid_alloc(const unsigned cluster,
            const enum pqos_mon_event event,
            pqos_rmid_t *rmid)
 {
-        enum rmid_state *rmid_table = NULL;
         const struct pqos_capability *item = NULL;
         const struct pqos_cap_mon *mon = NULL;
         int ret = PQOS_RETVAL_OK;
         unsigned max_rmid = 0;
-        unsigned i;
-        int j;
         unsigned mask_found = 0;
+        unsigned i, core_count;
+        unsigned *core_list = NULL;
+        pqos_rmid_t *rmid_list = NULL;
 
         if (rmid == NULL)
                 return PQOS_RETVAL_PARAM;
-
-        ret = mon_rmid_alloc_param_check(cluster, &rmid_table);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-        ASSERT(rmid_table != NULL);
 
         /**
          * This is not so straight forward as it appears to be.
@@ -429,15 +315,14 @@ rmid_alloc(const unsigned cluster,
         ASSERT(item != NULL);
         mon = item->u.mon;
 
-        /* Find which events are supported */
+        /* Find which events are supported vs requested */
         max_rmid = m_rmid_max;
-        for (i = 0; i < mon->num_events; i++) {
+        for (i = 0; i < mon->num_events; i++)
                 if (event & mon->events[i].type) {
                         mask_found |= mon->events[i].type;
                         max_rmid = (max_rmid > mon->events[i].max_rmid) ?
                                     mon->events[i].max_rmid : max_rmid;
                 }
-        }
 
         /**
          * Check if all of the events are supported
@@ -447,51 +332,46 @@ rmid_alloc(const unsigned cluster,
         ASSERT(m_rmid_max >= max_rmid);
 
         /**
-         * Check for free RMID in the table
+         * Check for free RMID in the cluster by reading current associations.
          * Do it backwards (from max to 0) in order to preserve low RMID values
          * for overlapping RMID ranges for future events.
          */
-        ret = PQOS_RETVAL_ERROR;
-        for (j = (int)max_rmid-1; j >= 0; j--) {
-                if (rmid_table[j] != RMID_STATE_FREE)
-                        continue;
-                rmid_table[j] = RMID_STATE_ALLOCATED;
-                *rmid = (pqos_rmid_t) j;
-                ret = PQOS_RETVAL_OK;
-                break;
+        core_list = pqos_cpu_get_cores_l3id(m_cpu, cluster, &core_count);
+        if (core_list == NULL)
+                return PQOS_RETVAL_ERROR;
+        ASSERT(core_count > 0);
+        rmid_list = (pqos_rmid_t *)malloc(sizeof(rmid_list[0]) * core_count);
+        if (rmid_list == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto rmid_alloc_error;
         }
 
-        return ret;
-}
+        for (i = 0; i < core_count; i++) {
+                ret = mon_assoc_get(core_list[i], &rmid_list[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        goto rmid_alloc_error;
+        }
 
-/**
- * @brief Frees previously allocated \a rmid
- *
- * @param [in] cluster CPU cluster id
- * @param [in] rmid resource monitoring id
- *
- * @return Operations status
- */
-static int
-rmid_free(const unsigned cluster,
-          const pqos_rmid_t rmid)
-{
-        enum rmid_state *rmid_table = NULL;
-        int ret = PQOS_RETVAL_OK;
+        ret = PQOS_RETVAL_ERROR;
+        for (i = max_rmid; i > 0; i--) {
+                const unsigned tmp_rmid = i - 1;
+                unsigned j = 0;
 
-        ret = mon_rmid_alloc_param_check(cluster, &rmid_table);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-        ASSERT(rmid_table != NULL);
+                for (j = 0; j < core_count; j++)
+                        if (tmp_rmid == rmid_list[j])
+                                break;
+                if (j >= core_count) {
+                        ret = PQOS_RETVAL_OK;
+                        *rmid = tmp_rmid;
+                        break;
+                }
+        }
 
-        if (rmid >= m_rmid_max)
-                return PQOS_RETVAL_PARAM;
-
-        if (rmid_table[rmid] != RMID_STATE_ALLOCATED)
-                return PQOS_RETVAL_ERROR;
-
-        rmid_table[rmid] = RMID_STATE_FREE;
-
+ rmid_alloc_error:
+        if (rmid_list != NULL)
+                free(rmid_list);
+        if (core_list != NULL)
+                free(core_list);
         return ret;
 }
 
@@ -531,46 +411,6 @@ scale_event(const enum pqos_mon_event event, const uint64_t val)
 }
 
 /**
- * @brief Checks logical core parameter for core association get operation
- *
- * @param lcore logical core id
- * @param p_cluster place to store pointer to cluster map of RMIDs
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-mon_assoc_param_check(const unsigned lcore,
-                      unsigned *p_cluster)
-{
-        int ret = PQOS_RETVAL_OK;
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_check_core(m_cpu, lcore);
-        if (ret != PQOS_RETVAL_OK)
-                return PQOS_RETVAL_PARAM;
-
-        ASSERT(p_cluster != NULL);
-        ret = pqos_cpu_get_clusterid(m_cpu, lcore, p_cluster);
-        if (ret != PQOS_RETVAL_OK)
-                return PQOS_RETVAL_PARAM;
-
-        if ((*p_cluster) >= m_num_clusters)
-                return PQOS_RETVAL_PARAM;
-
-        if (m_rmid_cluster_map[(*p_cluster)] == NULL) {
-                LOG_WARN("Monitoring capability not detected\n");
-                return PQOS_RETVAL_PARAM;
-        }
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Associates core with RMID at register level
  *
  * This function doesn't acquire API lock
@@ -583,8 +423,8 @@ mon_assoc_param_check(const unsigned lcore,
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-mon_assoc_set_nocheck(const unsigned lcore,
-                      const pqos_rmid_t rmid)
+mon_assoc_set(const unsigned lcore,
+              const pqos_rmid_t rmid)
 {
         int ret = 0;
         uint32_t reg = 0;
@@ -606,41 +446,6 @@ mon_assoc_set_nocheck(const unsigned lcore,
 }
 
 /**
- * @brief Associates core with RMID
- *
- * This function doesn't acquire API lock
- * and can be used internally when lock is already taken.
- *
- * @param lcore logical core id
- * @param cluster cluster that core belongs to
- * @param rmid resource monitoring ID
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-mon_assoc_set(const unsigned lcore,
-              const unsigned cluster,
-              const pqos_rmid_t rmid)
-{
-        enum rmid_state *rmid_table = NULL;
-        int ret = 0;
-
-        if (cluster >= m_num_clusters)
-                return PQOS_RETVAL_PARAM;
-
-        rmid_table = m_rmid_cluster_map[cluster];
-        if (rmid_table[rmid] != RMID_STATE_ALLOCATED)
-                return PQOS_RETVAL_PARAM;
-
-        ret = mon_assoc_set_nocheck(lcore, rmid);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Reads \a lcore to RMID association
  *
  * @param lcore logical core id
@@ -648,6 +453,7 @@ mon_assoc_set(const unsigned lcore,
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_ERROR on error
  */
 static int
 mon_assoc_get(const unsigned lcore,
@@ -674,23 +480,67 @@ pqos_mon_assoc_get(const unsigned lcore,
                    pqos_rmid_t *rmid)
 {
         int ret = PQOS_RETVAL_OK;
-        unsigned cluster = 0;
 
         _pqos_api_lock();
 
-        ret = mon_assoc_param_check(lcore, &cluster);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_mon_assoc_get__error;
 
         if (rmid == NULL) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_PARAM;
+                ret = PQOS_RETVAL_PARAM;
+                goto pqos_mon_assoc_get__error;
+        }
+
+        ASSERT(m_cpu != NULL);
+        ret = pqos_cpu_check_core(m_cpu, lcore);
+        if (ret != PQOS_RETVAL_OK) {
+                ret = PQOS_RETVAL_PARAM;
+                goto pqos_mon_assoc_get__error;
         }
 
         ret = mon_assoc_get(lcore, rmid);
 
+ pqos_mon_assoc_get__error:
+        _pqos_api_unlock();
+        return ret;
+}
+
+/**
+ * @brief Resets monitoring by binding all cores with RMID0
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_ERROR on error
+ */
+static int mon_reset(void)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+
+        ASSERT(m_cpu != NULL);
+        for (i = 0; i < m_cpu->num_cores; i++) {
+                int retval = mon_assoc_set(m_cpu->cores[i].lcore, RMID0);
+
+                if (retval != PQOS_RETVAL_OK)
+                        ret = retval;
+        }
+        return ret;
+}
+
+int pqos_mon_reset(void)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_mon_reset_error;
+
+        ret = mon_reset();
+
+ pqos_mon_reset_error:
         _pqos_api_unlock();
         return ret;
 }
@@ -1231,7 +1081,7 @@ pqos_mon_start(const unsigned num_cores,
                 rmid = ctxs[j].rmid;
 
                 group->cores[i] = cores[i];
-                ret = mon_assoc_set(cores[i], cluster, rmid);
+                ret = mon_assoc_set(cores[i], rmid);
                 if (ret != PQOS_RETVAL_OK) {
                         retval = ret;
                         goto pqos_mon_start_error2;
@@ -1248,7 +1098,7 @@ pqos_mon_start(const unsigned num_cores,
  pqos_mon_start_error2:
         if (retval != PQOS_RETVAL_OK) {
                 for (i = 0; i < num_cores; i++)
-                        (void) mon_assoc_set(cores[i], core2cluster[i], RMID0);
+                        (void) mon_assoc_set(cores[i], RMID0);
 
                 if (group->poll_ctx != NULL)
                         free(group->poll_ctx);
@@ -1257,11 +1107,6 @@ pqos_mon_start(const unsigned num_cores,
                         free(group->cores);
         }
  pqos_mon_start_error1:
-        if (retval != PQOS_RETVAL_OK) {
-                for (i = 0; i < num_ctxs; i++)
-                        (void) rmid_free(ctxs[i].cluster, ctxs[i].rmid);
-        }
-
         if (retval == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
 
@@ -1404,17 +1249,7 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 /**
                  * Associate cores from the group back with RMID0
                  */
-                ret = mon_assoc_set_nocheck(group->cores[i], RMID0);
-                if (ret != PQOS_RETVAL_OK)
-                        retval = PQOS_RETVAL_RESOURCE;
-        }
-
-        /**
-         * Free previously allocated RMID
-         */
-        for (i = 0; i < group->num_poll_ctx; i++) {
-                ret = rmid_free(group->poll_ctx[i].cluster,
-                                group->poll_ctx[i].rmid);
+                ret = mon_assoc_set(group->cores[i], RMID0);
                 if (ret != PQOS_RETVAL_OK)
                         retval = PQOS_RETVAL_RESOURCE;
         }
@@ -1501,48 +1336,6 @@ pqos_mon_poll(struct pqos_mon_data **groups,
  * =======================================
  */
 
-/**
- * @brief Finds maximum number of clusters in the topology
- *
- * @param cpu cpu topology structure
- *
- * @return Max cluster id (plus one) in the topology.
- *         This indicates size of look up table for cases in which
- *         cluster_id is an index.
- */
-static unsigned
-cpu_get_num_clusters(const struct pqos_cpuinfo *cpu)
-{
-        unsigned i = 0, n = 0;
-
-        ASSERT(cpu != NULL);
-        for (i = 0; i < cpu->num_cores; i++)
-                if (cpu->cores[i].l3_id > n)
-                        n = cpu->cores[i].l3_id;
-
-        return n+1;
-}
-
-/**
- * @brief Finds maximum number of logical cores in the topology
- *
- * @param cpu cpu topology structure
- *
- * @return Max core id (plus one) in the topology.
- *         This indicates size of look up table where core id is an index.
- */
-static unsigned
-cpu_get_num_cores(const struct pqos_cpuinfo *cpu)
-{
-        unsigned i = 0, n = 0;
-
-        ASSERT(cpu != NULL);
-        for (i = 0; i < cpu->num_cores; i++)
-                if (cpu->cores[i].lcore > n)
-                        n = cpu->cores[i].lcore;
-
-        return n+1;
-}
 /**
  * @brief Maps PQoS API event onto an MSR event id
  *
