@@ -1473,6 +1473,7 @@ pqos_fini(void)
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
+                _pqos_api_exit();
                 return ret;
         }
 

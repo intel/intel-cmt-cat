@@ -136,8 +136,12 @@ execute_cmd(int argc, char **argv)
 				argv[0]);
 		return -1;
 	} else if (0 < pid) {
+		int status = EXIT_FAILURE;
 		/* Wait for child */
-		waitpid(pid, NULL, 0);
+		waitpid(pid, &status, 0);
+
+		if (EXIT_SUCCESS != status)
+			return -1;
 	} else {
 		/* set cpu affinity */
 		if (0 != set_affinity(0)) {
@@ -151,12 +155,13 @@ execute_cmd(int argc, char **argv)
 		if (0 == g_cfg.sudo_keep && 0 != sudo_drop())
 			_Exit(EXIT_FAILURE);
 
+		errno = 0;
 		/* execute command */
 		execvp(argv[0], argv);
 
-		fprintf(stderr, "%s,%s:%d Failed to execute %s !\n",
+		fprintf(stderr, "%s,%s:%d Failed to execute %s, %s (%i) !\n",
 				__FILE__, __func__, __LINE__,
-				argv[0]);
+				argv[0], strerror(errno), errno);
 
 		_Exit(EXIT_FAILURE);
 	}
