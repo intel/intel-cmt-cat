@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -554,6 +554,7 @@ void selfn_allocation_assoc(const char *arg)
 
 void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
+                        const struct pqos_capability *cap_l2ca,
                         const unsigned sock_count,
                         const unsigned *sockets,
                         const struct pqos_cpuinfo *cpu_info)
@@ -586,6 +587,24 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                                        (unsigned long long)tab[n].ways_mask);
                         }
                 }
+        }
+
+        for (i = 0; (i < sock_count) && (cap_l2ca != NULL); i++) {
+                struct pqos_l2ca tab[PQOS_MAX_L2CA_COS];
+                unsigned num = 0;
+                unsigned n = 0;
+
+                ret = pqos_l2ca_get(sockets[i], PQOS_MAX_L2CA_COS,
+                                    &num, tab);
+                if (ret != PQOS_RETVAL_OK)
+                        continue;
+
+                printf("L2CA COS definitions for Socket %u:\n",
+                       sockets[i]);
+                for (n = 0; n < num; n++)
+                        printf("    L2CA COS%u => MASK 0x%llx\n",
+                               tab[n].class_id,
+                               (unsigned long long)tab[n].ways_mask);
         }
 
         for (i = 0; i < sock_count; i++) {

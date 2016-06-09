@@ -57,8 +57,9 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION       104          /**< version 1.04 */
+#define PQOS_VERSION       105          /**< version 1.05 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16xCOS */
+#define PQOS_MAX_L2CA_COS  16           /**< 16xCOS */
 
 /*
  * =======================================
@@ -655,7 +656,8 @@ pqos_cap_get_event(const struct pqos_cap *cap,
                    const struct pqos_monitor **p_mon);
 
 /**
- * @brief Retrieves number of allocation classes of service from \a cap structure.
+ * @brief Retrieves number of L3 allocation classes of service from
+ *        \a cap structure.
  *
  * @param [in] cap platform QoS capabilities structure
  *                 returned by \a pqos_cap_get
@@ -666,6 +668,21 @@ pqos_cap_get_event(const struct pqos_cap *cap,
  */
 int
 pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
+                      unsigned *cos_num);
+
+/**
+ * @brief Retrieves number of L2 allocation classes of service from
+ *        \a cap structure.
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] cos_num place to store number of classes of service
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
                       unsigned *cos_num);
 
 /**

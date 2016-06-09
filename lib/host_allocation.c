@@ -402,22 +402,38 @@ pqos_l2ca_set(const unsigned socket,
         }
 
         /**
-         * Check if class bitmasks are contiguous.
+         * Check if L2 CAT is supported
          */
-        for (i = 0; i < num_ca; i++) {
-                if (is_contiguous(ca[i].ways_mask))
-                        continue;
-
-                LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
-                          ca[i].class_id);
+        ASSERT(m_cap != NULL);
+        ret = pqos_l2ca_get_cos_num(m_cap, &count);
+        if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
-                return PQOS_RETVAL_PARAM;
+                return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
         }
 
-        ASSERT(m_cap != NULL);
-        /* @todo check if L2 CAT is supported */
-        /* @todo add check for valid class id's etc. */
+        /**
+         * Check if class bitmasks are contiguous and
+         * if class id's are within allowed range.
+         */
+        for (i = 0; i < num_ca; i++) {
+                if (!is_contiguous(ca[i].ways_mask)) {
+                        LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
+                                  ca[i].class_id);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+                if (ca[i].class_id >= count) {
+                        LOG_ERROR("L2 COS%u is out of range (COS%u is max)!\n",
+                                  ca[i].class_id, count - 1);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
 
+        /**
+         * Pick one core from the socket and
+         * perfrom MSR writes to COS registers on the socket.
+         */
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_cores(m_cpu, socket, 1, &count, &core);
         if (ret != PQOS_RETVAL_OK) {
@@ -465,9 +481,17 @@ pqos_l2ca_get(const unsigned socket,
         }
 
         ASSERT(m_cap != NULL);
-        /* @todo check if L2 CAT is supported */
-        /* @todo check if enough space to store the classes */
-        count = max_num_ca; /* @todo fixme */
+        ret = pqos_l2ca_get_cos_num(m_cap, &count);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
+        }
+
+        if (max_num_ca < count) {
+                /* Not enough space to store the classes */
+                _pqos_api_unlock();
+                return PQOS_RETVAL_PARAM;
+        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_cores(m_cpu, socket, 1, &core_count, &core);
@@ -491,7 +515,6 @@ pqos_l2ca_get(const unsigned socket,
         }
 
         *num_ca = count;
-
         _pqos_api_unlock();
         return ret;
 }

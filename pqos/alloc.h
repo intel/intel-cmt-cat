@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -64,13 +64,15 @@ void selfn_allocation_assoc(const char *arg);
  * @brief Prints information about cache allocation settings in the system
  *
  * @param [in] cap_mon monitoring capability structure
- * @param [in] cap_l3ca CAT capability structures
+ * @param [in] cap_l3ca L3 CAT capability structures
+ * @param [in] cap_l2ca L2 CAT capability structures
  * @param [in] sock_count number of detected CPU sockets
  * @param [in] sockets arrays with detected CPU socket id's
  * @param [in] cpu_info cpu information structure
  */
 void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
+                        const struct pqos_capability *cap_l2ca,
                         const unsigned sock_count,
                         const unsigned *sockets,
                         const struct pqos_cpuinfo *cpu_info);

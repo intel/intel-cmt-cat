@@ -540,7 +540,8 @@ int main(int argc, char **argv)
         struct pqos_config cfg;
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
-        const struct pqos_capability *cap_mon = NULL, *cap_l3ca = NULL;
+        const struct pqos_capability *cap_mon = NULL, *cap_l3ca = NULL,
+                *cap_l2ca = NULL;
         unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
         int cmd, ret, exit_val = EXIT_SUCCESS;
         int opt_index = 0;
@@ -682,7 +683,14 @@ int main(int argc, char **argv)
 
         ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
         if (ret == PQOS_RETVAL_PARAM) {
-                printf("Error retrieving allocation capabilities!\n");
+                printf("Error retrieving L3 allocation capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_2;
+        }
+
+        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L2CA, &cap_l2ca);
+        if (ret == PQOS_RETVAL_PARAM) {
+                printf("Error retrieving L2 allocation capabilities!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
@@ -703,7 +711,7 @@ int main(int argc, char **argv)
                 /**
                  * Show info about allocation config and exit
                  */
-		alloc_print_config(cap_mon, cap_l3ca, sock_count,
+		alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, sock_count,
                                    sockets, p_cpu);
                 goto allocation_exit;
         }
