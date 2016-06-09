@@ -192,7 +192,7 @@ parse_l3(const char *l3ca)
 
 		/* explicit assign cpu_set */
 		if (*l3ca == '(') {
-			if (NULL == strchr(l3ca,')'))
+			if (NULL == strchr(l3ca, ')'))
 				return -EINVAL;
 			l3ca++;
 			cpustr_len = strcspn(l3ca, ")");
