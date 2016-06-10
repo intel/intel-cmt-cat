@@ -740,8 +740,8 @@ pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
  * @retval PQOS_RETVAL_OK on success
  */
 int
-pqos_l3ca_reset(const struct pqos_cap *cap,
-                const struct pqos_cpuinfo *cpu);
+pqos_alloc_reset(const struct pqos_cap *cap,
+                 const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Retrieves a monitoring value from a group for a specific event.

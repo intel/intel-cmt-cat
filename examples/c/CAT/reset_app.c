@@ -153,7 +153,7 @@ int main(int argc, char *argv[])
 		goto error_exit;
 	}
 	/* Reset Api */
-	if (pqos_l3ca_reset(p_cap, p_cpu) != PQOS_RETVAL_OK)
+	if (pqos_alloc_reset(p_cap, p_cpu) != PQOS_RETVAL_OK)
 		printf("CAT reset failed!\n");
 	else
 		printf("CAT reset successful\n");

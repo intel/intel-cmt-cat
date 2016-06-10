@@ -442,23 +442,25 @@ pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
 }
 
 int
-pqos_l3ca_reset(const struct pqos_cap *cap,
-                const struct pqos_cpuinfo *cpu)
+pqos_alloc_reset(const struct pqos_cap *cap,
+                 const struct pqos_cpuinfo *cpu)
 {
         unsigned *sockets = NULL;
         unsigned sockets_num = 0, sockets_num_ret = 0;
-        const struct pqos_capability *item = NULL;
+        const struct pqos_capability *l2_item = NULL;
+        const struct pqos_capability *l3_item = NULL;
         int ret = PQOS_RETVAL_OK;
+        int retval = PQOS_RETVAL_OK;
         unsigned j;
 
         ASSERT(cap != NULL && cpu != NULL);
         if (cap == NULL || cpu == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &item);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;                           /**< no L3CA capability */
-        ASSERT(item != NULL);
+        (void) pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &l3_item);
+        (void) pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &l2_item);
+        if (l2_item == NULL && l3_item == NULL)
+                return PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
 
         /**
          * Figure out number of sockets in the system
@@ -488,18 +490,36 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
          * so that each COS allows for access to all cache ways
          */
         for (j = 0; j < sockets_num; j++) {
-                const uint64_t ways_mask = (1ULL<<item->u.l3ca->num_ways)-1ULL;
-                unsigned i;
+                if (l3_item != NULL) {
+                        const uint64_t ways_mask =
+                                (1ULL << l3_item->u.l3ca->num_ways) - 1ULL;
+                        unsigned i;
 
-                for (i = 0; i < item->u.l3ca->num_classes; i++) {
-                        struct pqos_l3ca cos;
+                        for (i = 0; i < l3_item->u.l3ca->num_classes; i++) {
+                                struct pqos_l3ca cos;
 
-                        cos.cdp = 0;
-                        cos.class_id = i;
-                        cos.ways_mask = ways_mask;
-                        ret = pqos_l3ca_set(sockets[j], 1, &cos);
-                        if (ret != PQOS_RETVAL_OK)
-                                return ret;
+                                cos.cdp = 0;
+                                cos.class_id = i;
+                                cos.ways_mask = ways_mask;
+                                ret = pqos_l3ca_set(sockets[j], 1, &cos);
+                                if (ret != PQOS_RETVAL_OK)
+                                        retval = ret;
+                        }
+                }
+                if (l2_item != NULL) {
+                        const uint64_t ways_mask =
+                                (1ULL << l2_item->u.l2ca->num_ways) - 1ULL;
+                        unsigned i;
+
+                        for (i = 0; i < l2_item->u.l2ca->num_classes; i++) {
+                                struct pqos_l2ca cos;
+
+                                cos.class_id = i;
+                                cos.ways_mask = ways_mask;
+                                ret = pqos_l2ca_set(sockets[j], 1, &cos);
+                                if (ret != PQOS_RETVAL_OK)
+                                        retval = ret;
+                        }
                 }
         }
 
@@ -509,8 +529,8 @@ pqos_l3ca_reset(const struct pqos_cap *cap,
         for (j = 0; j < cpu->num_cores; j++) {
                 ret = pqos_alloc_assoc_set(cpu->cores[j].lcore, 0);
                 if (ret != PQOS_RETVAL_OK)
-                        return ret;
+                        retval = ret;
         }
 
-        return ret;
+        return retval;
 }
