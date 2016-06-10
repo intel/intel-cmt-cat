@@ -524,10 +524,9 @@ pqos_alloc_assoc_set(const unsigned lcore,
                      const unsigned class_id)
 {
         int ret = PQOS_RETVAL_OK;
-        unsigned num_classes = 0;
-        uint32_t reg = 0;
+        unsigned num_l2_cos = 0, num_l3_cos = 0;
+        const uint32_t reg = PQOS_MSR_ASSOC;
         uint64_t val = 0;
-        int retval = MACHINE_RETVAL_OK;
 
         _pqos_api_lock();
 
@@ -545,20 +544,26 @@ pqos_alloc_assoc_set(const unsigned lcore,
         }
 
         ASSERT(m_cap != NULL);
-        ret = pqos_l3ca_get_cos_num(m_cap, &num_classes);
-        if (ret != PQOS_RETVAL_OK) {
+        ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
                 _pqos_api_unlock();
-                return ret;             /**< perhaps no L3CA capability */
+                return ret;
         }
 
-        if (class_id > num_classes) {
+        ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (class_id > num_l3_cos && class_id > num_l2_cos) {
+                /* class_id is out of bounds */
                 _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
         }
 
-        reg = PQOS_MSR_ASSOC;
-        retval = msr_read(lcore, reg, &val);
-        if (retval != MACHINE_RETVAL_OK) {
+        ret = msr_read(lcore, reg, &val);
+        if (ret != MACHINE_RETVAL_OK) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_ERROR;
         }
@@ -566,25 +571,25 @@ pqos_alloc_assoc_set(const unsigned lcore,
         val &= (~PQOS_MSR_ASSOC_QECOS_MASK);
         val |= (((uint64_t) class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
 
-        retval = msr_write(lcore, reg, val);
-        if (retval != MACHINE_RETVAL_OK) {
+        ret = msr_write(lcore, reg, val);
+        if (ret != MACHINE_RETVAL_OK) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_ERROR;
         }
 
         _pqos_api_unlock();
-        return ret;
+        return PQOS_RETVAL_OK;
 }
 
 int
 pqos_alloc_assoc_get(const unsigned lcore,
                      unsigned *class_id)
 {
-        const struct pqos_capability *cap = NULL;
+        const struct pqos_capability *l3_cap = NULL;
+        const struct pqos_capability *l2_cap = NULL;
         int ret = PQOS_RETVAL_OK;
-        uint32_t reg = 0;
+        const uint32_t reg = PQOS_MSR_ASSOC;
         uint64_t val = 0;
-        int retval = MACHINE_RETVAL_OK;
 
         _pqos_api_lock();
 
@@ -607,15 +612,25 @@ pqos_alloc_assoc_get(const unsigned lcore,
         }
 
         ASSERT(m_cap != NULL);
-        ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &cap);
-        if (ret != PQOS_RETVAL_OK) {
+        ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &l3_cap);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
                 _pqos_api_unlock();
-                return ret;             /**< no L3CA capability */
+                return ret;
         }
 
-        reg = PQOS_MSR_ASSOC;
-        retval = msr_read(lcore, reg, &val);
-        if (retval != MACHINE_RETVAL_OK) {
+        ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (l2_cap == NULL && l3_cap == NULL) {
+                /* no L2/L3 CAT detected */
+                _pqos_api_unlock();
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK) {
                 _pqos_api_unlock();
                 return PQOS_RETVAL_ERROR;
         }
@@ -624,5 +639,5 @@ pqos_alloc_assoc_get(const unsigned lcore,
         *class_id = (unsigned) val;
 
         _pqos_api_unlock();
-        return ret;
+        return PQOS_RETVAL_OK;
 }

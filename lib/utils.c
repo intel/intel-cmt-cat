@@ -322,7 +322,7 @@ pqos_cap_get_type(const struct pqos_cap *cap,
                   const enum pqos_cap_type type,
                   const struct pqos_capability **cap_item)
 {
-        int ret = PQOS_RETVAL_ERROR;
+        int ret = PQOS_RETVAL_RESOURCE;
         unsigned i;
 
         ASSERT(cap != NULL && cap_item != NULL);
