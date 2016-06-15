@@ -1125,7 +1125,7 @@ print_csv_row(FILE *fp, char *time,
 
         if (!process_mode())
                 fprintf(fp,
-                        "%s,%s,%.2f,%llu%s\n",
+                        "%s,\"%s\",%.2f,%llu%s\n",
                         time, (char *)mon_data->context,
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
