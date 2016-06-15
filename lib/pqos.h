@@ -337,6 +337,7 @@ struct pqos_mon_data {
         unsigned num_poll_ctx;          /**< number of poll contexts */
         unsigned *cores;                /**< list of cores in the group */
         unsigned num_cores;             /**< number of cores in the group */
+        int valid_mbm_read;             /**< flag to discard 1st invalid read */
 };
 
 /**

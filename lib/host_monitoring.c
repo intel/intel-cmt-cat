@@ -755,7 +755,13 @@ pqos_core_poll(struct pqos_mon_data *p)
                 pv->llc_misses_delta = missed - pv->llc_misses;
                 pv->llc_misses = missed;
         }
-
+        if (!p->valid_mbm_read) {
+                /* Report zero memory bandwidth with first read */
+                pv->mbm_remote_delta = 0;
+                pv->mbm_local_delta = 0;
+                pv->mbm_total_delta = 0;
+                p->valid_mbm_read = 1;
+        }
  pqos_core_poll__exit:
         return retval;
 }
