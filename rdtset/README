@@ -1,7 +1,7 @@
 ================================================================================
 README for rdtset
 
-April 2016
+June 2016
 ================================================================================
 
 CONTENTS
@@ -16,8 +16,8 @@ CONTENTS
 OVERVIEW
 ========
 
-rdtset is a taskset like tool allowing user to launch a new command with a given
-CPU affinity and L3 cache configuration. Supports Linux and FreeBSD.
+rdtset is a taskset like tool allowing the user to launch a new command with
+a given CPU affinity and L3 cache configuration. Supports Linux and FreeBSD.
 
 
 COMPILATION
@@ -34,40 +34,64 @@ Run "make clean" to clean the build files.
 USAGE
 =====
 
-Usage: rdtset [-3 <cbm@cpulist>] -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+Usage: rdtset -3 <cbm@cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+       rdtset -t <feature(mask)...@(cpulist);> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+
        rdtset -r <cpulist> -3 <cbm@cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
-       rdtset -r <cpulist> (-3 <cbm@cpulist> | -c <cpulist>) (-p <pid> | [-k] cmd [<args>...])
-       rdtset -r <cpulist> -p <pid>
+       rdtset -r <cpulist> -t <feature(mask)...@(cpulist);> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+
+       rdtset -r <cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+
+       rdtset -r <cpulist> -3 <cbm@cpulist> -p <pid>
+       rdtset -r <cpulist> -t <feature(mask)...@(cpulist);> -p <pid>
 
 Options:
  -3 <cbm@cpulist>, --l3 <cbm@cpulist>  specify L3 CAT configuration
+ -t <feature(mask)...@(cpulist);>      specify RDT configuration
+ --rdt <feature(mask)...@(cpulist);>   specify RDT configuration
+  Features:
+   2, l2
+   3, l3
  -c <cpulist>, --cpu <cpulist>         specify CPUs (affinity)
  -p <pid>, --pid <pid>                 operate on existing given pid
  -r <cpulist>, --reset <cpulist>       reset L3 CAT for CPUs
  -k, --sudokeep                        do not drop sudo elevated privileges
  -v, --verbose                         prints out additional logging information
- -h, --help                            display this help
+ -h, --help                            display help
 
 Run "id" command on CPU 1 using four L3 cache-ways (mask 0xf),
 keeping sudo elevated privileges:
     -3 '0xf@1' -c 1 -k id
+    -t 'l3(0xf)@(1)' -c 1 -k id
 
-Examples L3 CAT configuration strings:
+Examples CAT configuration strings:
     -3 '0xf@1'
-        CPU 1 uses four cache-ways (mask 0xf)
+    -t 'l3(0xf)@(1)'
+        CPU 1 uses four L3 cache-ways (mask 0xf)
+
+    -t 'l2(0x1)l3(0xf)@(1)'
+        CPU 1 uses one L2 (mask 0x1) and four L3 (mask 0xf) cache-ways
+
+    -t 'l2(0x1)l3(0xf)@(1);l2(0x1)@(2)'
+        CPU 1 uses one L2 (mask 0x1) and four L3 (mask 0xf) cache-ways
+        CPU 2 uses one L2 (mask 0x1) and default number of L3 cache-ways
+        L2 cache-ways used by CPU 1 and 2 are overlapping
 
     -3 '0xf@2,0xf0@(3,4,5)'
-        CPU 2 uses four cache-ways (mask 0xf), CPUs 3-5 share four cache-ways
-        (mask 0xf0), cache-ways used by CPU 2 and 3-4 are non-overlapping
+    -t 'l3(0xf)@(2);l3(0xf0)@(3,4,5)'
+        CPU 2 uses four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
+        (mask 0xf0), L3 cache-ways used by CPU 2 and 3-4 are non-overlapping
 
     -3 '0xf@(0-2),0xf0@(3,4,5)'
-        CPUs 0-2 share four cache-ways (mask 0xf), CPUs 3-5 share four cache-ways
-        (mask 0xf0), cache-ways used by CPUs 0-2 and 3-5 are non-overlapping
+    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)'
+        CPUs 0-2 share four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
+        (mask 0xf0), L3 cache-ways used by CPUs 0-2 and 3-5 are non-overlapping
 
     -3 '(0xf,0xf0)@1'
-        On CDP enabled system, CPU 1 uses four cache-ways for code (mask 0xf)
-        and four cache-ways for data (mask 0xf0),
-        data and code cache-ways are non-overlapping
+    -t 'l3(0xf,0xf0)@(1)'
+        On CDP enabled system, CPU 1 uses four L3 cache-ways for code (mask 0xf)
+        and four L3 cache-ways for data (mask 0xf0),
+        data and code L3 cache-ways are non-overlapping
 
 Example CPUs configuration string:
     -c 0-3,4,5
@@ -79,49 +103,77 @@ Example RESET configuration string:
 
 Example usage of RESET option:
     -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-5 -p $BASHPID
+    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-5 -p $BASHPID
         Configure CAT and CPU affinity for BASH process
 
     -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
+    -r 0-5 -t 'l3(0xff)@(0-5)' -c 0-5 -p $BASHPID
         Change CAT configuration of CPUs used by BASH process
 
     -r 0-5 -p $BASHPID
         Reset CAT configuration of CPUs used by BASH process
 
-Run "id" command to test privilege drop:
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 id
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k id
+1. Run "id" command to test privilege drop:
+ $ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 id
+ $ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k id
+ or
+ $ sudo rdtset -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-3,4,5 id
+ $ sudo rdtset -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-3,4,5 -k id
 
-Show current proc status to verify CPU affinity:
-- Linux:
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 cat /proc/self/status
+2. Show current proc status to verify CPU affinity:
+2.1 Linux:
+ $ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 cat /proc/self/status
+ or
+ $ sudo rdtset -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-3,4,5 cat /proc/self/status
 
-- FreeBSD:
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
-$ bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
+2.2 FreeBSD:
+ $ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
+ or
+ $ sudo rdtset -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-3,4,5 -k bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
 
-Display current L3 CAT configuration to verify L3 configuration (and clean-up on exit):
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k pqos -s
-$ sudo pqos -s
+ $ bash -c 'bash -c "sleep 1" & cpuset -g -p `pgrep -n bash`'
 
-Test operation on existing, given PID:
-- Linux:
-$ taskset -pc $BASHPID
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -p $BASHPID
-$ taskset -pc $BASHPID
-$ sudo pqos -s
-In order to reconfigure CAT, it is needed to reset current CAT configuration:
-$ sudo rdtset -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
-$ sudo pqos -s
+3. Display current L3 CAT configuration to verify L3 configuration (and clean-up on exit):
+ $ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -k pqos -s
+ or
+ $ sudo rdtset -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-3,4,5 -k pqos -s
 
-- FreeBSD:
-$ cpuset -g -p $BASHPID
-$ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -p $BASHPID
-$ cpuset -g -p $BASHPID
-$ sudo pqos -s
-In order to reconfigure CAT, it is needed to reset current CAT configuration:
-$ sudo rdtset -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
-$ sudo pqos -s
+ $ sudo pqos -s
 
+4. Test operation on existing, given PID:
+4.1 Linux:
+ $ taskset -pc $BASHPID
+
+ $ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -p $BASHPID
+ or
+ $ sudo rdtset -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-3,4,5 -p $BASHPID
+
+ $ taskset -pc $BASHPID
+ $ sudo pqos -s
+
+ In order to reconfigure CAT, it is needed to reset current CAT configuration:
+ $ sudo rdtset -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
+ or
+ $ sudo rdtset -r 0-5 -t 'l3(0xff)@(0-5)' -c 0-5 -p $BASHPID
+
+ $ sudo pqos -s
+
+4.2 FreeBSD:
+ $ cpuset -g -p $BASHPID
+
+ $ sudo rdtset -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-3,4,5 -p $BASHPID
+ or
+ $ sudo rdtset -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-3,4,5 -p $BASHPID
+
+ $ cpuset -g -p $BASHPID
+ $ sudo pqos -s
+
+ In order to reconfigure CAT, it is needed to reset current CAT configuration:
+ $ sudo rdtset -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID
+ or
+ $ sudo rdtset -r 0-5 -t 'l3(0xff)@(0-5)' -c 0-5 -p $BASHPID
+
+ $ sudo pqos -s
 
 LEGAL DISCLAIMER
 ================

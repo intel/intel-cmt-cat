@@ -90,26 +90,47 @@ int parse_l3(const char *l3ca);
  *
  * @param cpu params string
  *
- * @return 0 on success
+ * @return parse status
+ * @retval 0 on success
  * @retval negative on error (-errno)
  */
 int parse_reset(const char *cpu);
 
+/**
+ * @brief Parse -t/--rdt params and stores configuration in g_cfg
+ *
+ * @param rdtstr params string
+ *
+ * @return parse status
+ * @retval 0 on success*
+ * @retval negative on error (-errno)
+ */
+int parse_rdt(char *rdtstr);
+
 /*
  * @brief Check is it possible to fulfill requested L3 CAT configuration
  * and then configure system.
+ *
+ * @return status
+ * @retval 0 on success*
+ * @retval negative on error (-errno)
  */
 int cat_set(void);
 
 /*
  * @brief Reset COS association (assign COS#0) on listed CPUs
+ *
+ * @return status
+ * @retval 0 on success*
+ * @retval negative on error (-errno)
  */
 int cat_reset(void);
 
 /**
- * @brief Print parsed -3/--l3 config
+ * @brief This function dumps internal config structures
+ * (updated by parse_rdt())
  */
-void print_cmd_line_l3_config(void);
+void print_cmd_line_rdt_config(void);
 
 #ifdef __cplusplus
 }

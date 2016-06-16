@@ -172,18 +172,34 @@ execute_cmd(int argc, char **argv)
 static void
 print_usage(char *prgname, unsigned short_usage)
 {
-	printf("Usage: %s [-3 <cbm@cpulist>] -c <cpulist> "
+	printf("Usage: %s -3 <cbm@cpulist> -c <cpulist> "
 		"(-p <pid> | [-k] cmd [<args>...])\n"
+		"       %s -t <feature(mask)...@(cpulist);> -c <cpulist> "
+		"(-p <pid> | [-k] cmd [<args>...])\n\n"
+
 		"       %s -r <cpulist> -3 <cbm@cpulist> -c <cpulist> "
 		"(-p <pid> | [-k] cmd [<args>...])\n"
+		"       %s -r <cpulist> -t <feature(mask)...@(cpulist);> "
+		"-c <cpulist> (-p <pid> | [-k] cmd [<args>...])\n\n"
+
 		"       %s -r <cpulist> -c <cpulist> "
-		"(-p <pid> | [-k] cmd [<args>...])\n"
-		"       %s -r <cpulist> [-3 <cbm@cpulist>] -p <pid>\n\n",
-		prgname, prgname, prgname, prgname);
+		"(-p <pid> | [-k] cmd [<args>...])\n\n"
+
+		"       %s -r <cpulist> -3 <cbm@cpulist> -p <pid>\n"
+		"       %s -r <cpulist> -t <feature(mask)...@(cpulist);> "
+		"-p <pid>\n\n",
+		prgname, prgname, prgname, prgname, prgname, prgname, prgname);
 
 	printf("Options:\n"
 		" -3 <cbm@cpulist>, --l3 <cbm@cpulist>  "
 		"specify L3 CAT configuration\n"
+		" -t <feature(mask)...@(cpulist);>      "
+		"specify RDT configuration\n"
+		" --rdt <feature(mask)...@(cpulist);>   "
+		"specify RDT configuration\n"
+		"  Features:\n"
+		"   2, l2\n"
+		"   3, l3\n"
 		" -c <cpulist>, --cpu <cpulist>         "
 		"specify CPUs (affinity)\n"
 		" -p <pid>, --pid <pid>                 "
@@ -204,29 +220,45 @@ print_usage(char *prgname, unsigned short_usage)
 
 	printf("Run \"id\" command on CPU 1 using four L3 cache-ways (mask 0xf)"
 		",\nkeeping sudo elevated privileges:\n"
-		"    -3 '0xf@1' -c 1 -k id\n\n");
+		"    -3 '0xf@1' -c 1 -k id\n"
+		"    -t '(0xf)@(1)' -c 1 -k id\n\n");
 
-	printf("Examples L3 CAT configuration strings:\n"
+	printf("Examples CAT configuration strings:\n"
 		"    -3 '0xf@1'\n"
-		"        CPU 1 uses four cache-ways (mask 0xf)\n\n"
+		"    -t 'l3(0xf)@(1)'\n"
+		"        CPU 1 uses four L3 cache-ways (mask 0xf)\n\n"
+
+		"    -t 'l2(0x1)l3(0xf)@(1)'\n"
+		"        CPU 1 uses one L2 (mask 0x1) and four L3 (mask 0xf) "
+		"cache-ways\n\n"
+
+		"    -t 'l2(0x1)l3(0xf)@(1);l2(0x1)@(2)'\n"
+		"        CPU 1 uses one L2 (mask 0x1) and four L3 (mask 0xf) "
+		"cache-ways\n"
+		"        CPU 2 uses one L2 (mask 0x1) and default number of L3 "
+		"cache-ways\n"
+		"        L2 cache-ways used by CPU 1 and 2 are overlapping\n\n"
 
 		"    -3 '0xf@2,0xf0@(3,4,5)'\n"
-		"        CPU 2 uses four cache-ways (mask 0xf), "
-		"CPUs 3-5 share four cache-ways\n"
-		"        (mask 0xf0), cache-ways used by CPU 2 and 3-4 are "
+		"    -t 'l3(0xf)@(2);l3(0xf0)@(3,4,5)'\n"
+		"        CPU 2 uses four L3 cache-ways (mask 0xf), "
+		"CPUs 3-5 share four L3 cache-ways\n"
+		"        (mask 0xf0), L3 cache-ways used by CPU 2 and 3-4 are "
 		"non-overlapping\n\n"
 
 		"    -3 '0xf@(0-2),0xf0@(3,4,5)'\n"
-		"        CPUs 0-2 share four cache-ways (mask 0xf), CPUs 3-5 "
-		"share four cache-ways\n"
-		"        (mask 0xf0), cache-ways used by CPUs 0-2 and 3-5 are "
-		"non-overlapping\n\n"
+		"    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)'\n"
+		"        CPUs 0-2 share four L3 cache-ways (mask 0xf), "
+		"CPUs 3-5 share four L3 cache-ways\n"
+		"        (mask 0xf0), L3 cache-ways used by CPUs 0-2 and 3-5 "
+		"are non-overlapping\n\n"
 
 		"    -3 '(0xf,0xf0)@1'\n"
-		"        On CDP enabled system, CPU 1 uses four cache-ways for "
-		"code (mask 0xf)\n"
-		"        and four cache-ways for data (mask 0xf0),\n"
-		"        data and code cache-ways are non-overlapping\n\n");
+		"    -t 'l3(0xf,0xf0)@(1)'\n"
+		"        On CDP enabled system, CPU 1 uses four L3 cache-ways "
+		"for code (mask 0xf)\n"
+		"        and four L3 cache-ways for data (mask 0xf0),\n"
+		"        data and code L3 cache-ways are non-overlapping\n\n");
 
 	printf("Example CPUs configuration string:\n"
 		"    -c 0-3,4,5\n"
@@ -238,8 +270,10 @@ print_usage(char *prgname, unsigned short_usage)
 
 	printf("Example usage of RESET option:\n"
 		"    -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-5 -p $BASHPID\n"
+		"    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-5 -p $BASHPID\n"
 		"        Configure CAT and CPU affinity for BASH process\n\n"
 		"    -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID\n"
+		"    -r 0-5 -t 'l3(0xff)@(0-5)' -c 0-5 -p $BASHPID\n"
 		"        Change CAT configuration of CPUs used by BASH "
 		"process\n\n"
 		"    -r 0-5 -p $BASHPID\n"
@@ -248,12 +282,12 @@ print_usage(char *prgname, unsigned short_usage)
 }
 
 static int
-validate_args(const int f_r, __attribute__((unused)) const int f_3,
+validate_args(const int f_r, __attribute__((unused)) const int f_3_or_t,
 		const int f_c, const int f_p, const int cmd)
 {
 	return (f_c && !f_p && cmd) ||
-			(f_c && f_p && !cmd) ||
-			(f_r && f_p && !cmd);
+		(f_c && f_p && !cmd) ||
+		(f_r && f_p && !cmd);
 }
 
 /**
@@ -277,13 +311,14 @@ parse_args(int argc, char **argv)
 		{ "cpu",	required_argument,	0, 'c' },
 		{ "pid",	required_argument,	0, 'p' },
 		{ "reset",	required_argument,	0, 'r' },
+		{ "rdt",	required_argument,	0, 't' },
 		{ "sudokeep",	no_argument,		0, 'k' },
 		{ "verbose",	no_argument,		0, 'v' },
 		{ "help",	no_argument,		0, 'h' },
 		{ NULL, 0, 0, 0 } };
 
 	while (-1 != (opt = getopt_long
-			(argc, argvopt, "+3:c:p:r:kvh", lgopts, NULL))) {
+			(argc, argvopt, "+3:c:p:r:t:kvh", lgopts, NULL))) {
 		if (opt == '3') {
 			retval = parse_l3(optarg);
 			if (retval != 0) {
@@ -311,6 +346,12 @@ parse_args(int argc, char **argv)
 			retval = parse_reset(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid RESET parameters!\n");
+				goto exit;
+			}
+		} else if (opt == 't') {
+			retval = parse_rdt(optarg);
+			if (retval != 0) {
+				fprintf(stderr, "Invalid RDT parameters!\n");
 				goto exit;
 			}
 		} else if (opt == 'k') {
@@ -351,7 +392,7 @@ main(int argc, char **argv)
 		g_cfg.command = 1;
 
 	if (!validate_args(0 != CPU_COUNT(&g_cfg.reset_cpuset),
-			0 != g_cfg.l3_config_count,
+			0 != g_cfg.config_count,
 			0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset),
 			0 != g_cfg.pid,
 			0 != g_cfg.command)) {
@@ -362,14 +403,14 @@ main(int argc, char **argv)
 
 	/* Print cmd line configuration */
 	if (g_cfg.verbose) {
-		print_cmd_line_l3_config();
+		print_cmd_line_rdt_config();
 		print_cmd_line_cpu_config();
 	}
 
 	/* Initialize the PQoS library and configure L3 CAT */
 	ret = cat_init();
 	if (ret < 0) {
-		fprintf(stderr, "%s,%s:%d L3 init failed!\n",
+		fprintf(stderr, "%s,%s:%d CAT init failed!\n",
 				__FILE__, __func__, __LINE__);
 		exit(EXIT_FAILURE);
 	}
@@ -377,23 +418,23 @@ main(int argc, char **argv)
 	/* reset COS association */
 	if (0 != CPU_COUNT(&g_cfg.reset_cpuset)) {
 		if (g_cfg.verbose)
-			printf("L3: Resetting CAT configuration...\n");
+			printf("CAT: Resetting CAT configuration...\n");
 
 		ret = cat_reset();
 		if (ret != 0) {
-			printf("L3: Failed to reset COS association!\n");
+			printf("CAT: Failed to reset COS association!\n");
 			exit(EXIT_FAILURE);
 		}
 	}
 
 	/* configure CAT */
-	if (0 != g_cfg.l3_config_count) {
+	if (0 != g_cfg.config_count) {
 		if (g_cfg.verbose)
-			printf("L3: Configuring L3CA...\n");
+			printf("CAT: Configuring CAT...\n");
 
 		ret = cat_set();
 		if (ret != 0) {
-			printf("L3: Failed to configure CAT!\n");
+			printf("CAT: Failed to configure CAT!\n");
 			cat_fini();
 			_Exit(EXIT_FAILURE);
 		}

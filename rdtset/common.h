@@ -36,6 +36,8 @@
 
 #include <stdint.h>
 
+#include <pqos.h>
+
 #include "cpu.h"
 
 #ifdef __cplusplus
@@ -66,27 +68,51 @@ extern "C" {
 })
 #endif /* !MAX */
 
-/* L3 cache allocation class of service data structure */
-struct cat_config {
-	cpu_set_t cpumask;		/**< CPUs bitmask */
-	int cdp;			/**< data & code masks used if true */
+#ifndef DIM
+#define DIM(x) (sizeof(x)/sizeof(x[0]))
+#endif /* !DIM */
+
+struct rdt_ca {
+	enum pqos_cap_type type;
 	union {
-		uint64_t mask;		/**< capacity bitmask (CBM) */
-		struct {
-			uint64_t data_mask; /**< data capacity bitmask (CBM) */
-			uint64_t code_mask; /**< code capacity bitmask (CBM) */
-		};
-	};
+		struct pqos_l2ca *l2;
+		struct pqos_l3ca *l3;
+		void *generic_ptr;
+	} u;
+};
+
+static inline struct rdt_ca wrap_l2ca(struct pqos_l2ca *l2)
+{
+	struct rdt_ca result;
+
+	result.type = PQOS_CAP_TYPE_L2CA;
+	result.u.l2 = l2;
+	return result;
+}
+
+static inline struct rdt_ca wrap_l3ca(struct pqos_l3ca *l3)
+{
+	struct rdt_ca result;
+
+	result.type = PQOS_CAP_TYPE_L3CA;
+	result.u.l3 = l3;
+	return result;
+}
+
+struct rdt_config {
+	cpu_set_t cpumask;	/**< CPUs bitmask */
+	struct pqos_l3ca l3;	/**< L3 configuration */
+	struct pqos_l2ca l2;	/**< L2 configuration */
 };
 
 /* rdtset command line configuration structure */
 struct rdtset {
 	pid_t pid;			/**< process PID */
-	struct cat_config l3_config[CPU_SETSIZE]; /**< L3 configuration */
-	unsigned l3_config_count;	/**< Num of L3 config entries */
+	struct rdt_config config[CPU_SETSIZE];	/**< RDT configuration */
+	unsigned config_count;		/**< Num of RDT config entries */
 	cpu_set_t cpu_aff_cpuset;	/**< CPU affinity configuration */
 	cpu_set_t reset_cpuset;		/**< List of CPUs to reset COS assoc */
-	unsigned int	sudo_keep:1,	/**< don't drop elevated privileges */
+	unsigned	sudo_keep:1,	/**< don't drop elevated privileges */
 			verbose:1,	/**< be verobose */
 			command:1;	/**< command to be executed detected */
 };
