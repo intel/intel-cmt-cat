@@ -55,7 +55,7 @@ sub MY::postamble {
 
 	my $swig_target = <<"SWIG_MAKEFILE";
 pqos_wrap.c:
-	$swig -perl -outdir \$(INST_LIB) -I/usr/local/include pqos.i
+	$swig -perl -outdir \$(INST_LIB) -I/usr/local/include \$(EXTRA_SWIGFLAGS) pqos.i
 SWIG_MAKEFILE
 
 	my $perltidy_targets = <<'PERLTIDY_MAKEFILE';
