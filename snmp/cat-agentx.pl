@@ -219,12 +219,12 @@ sub data_update {
 
 			if (1 == int($l3ca->{cdp})) {
 				$data_cos{new NetSNMP::OID("$oid_num.$COS_DATA_MASK_ID")} =
-				  int($l3ca->{data_mask});
+				  int($l3ca->{u}->{s}->{data_mask});
 				$data_cos{new NetSNMP::OID("$oid_num.$COS_CODE_MASK_ID")} =
-				  int($l3ca->{code_mask});
+				  int($l3ca->{u}->{s}->{code_mask});
 			} else {
 				$data_cos{new NetSNMP::OID("$oid_num.$COS_WAYS_MASK_ID")} =
-				  int($l3ca->{ways_mask});
+				  int($l3ca->{u}->{ways_mask});
 			}
 		}
 	}
@@ -447,11 +447,11 @@ sub handle_cos {
 		}
 
 		if ($field_id == $COS_WAYS_MASK_ID) {
-			$l3ca->{ways_mask} = $value;
+			$l3ca->{u}->{ways_mask} = $value;
 		} elsif ($field_id == $COS_DATA_MASK_ID) {
-			$l3ca->{data_mask} = $value;
+			$l3ca->{u}->{s}->{data_mask} = $value;
 		} elsif ($field_id == $COS_CODE_MASK_ID) {
-			$l3ca->{code_mask} = $value;
+			$l3ca->{u}->{s}->{code_mask} = $value;
 		}
 
 		if (0 != pqos::pqos_l3ca_set($socket_id, 1, $l3ca)) {

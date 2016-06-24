@@ -114,7 +114,7 @@ allocation_get_input(int argc, char *argv[])
 	} else {
 		sel_l3ca_cos_tab[0].class_id = (unsigned)atoi(argv[1]);
 		mask = strtouint64(argv[2]);
-		sel_l3ca_cos_tab[0].ways_mask = mask;
+		sel_l3ca_cos_tab[0].u.ways_mask = mask;
 		sel_l3ca_cos_num = 1;
 	}
 }
@@ -178,7 +178,7 @@ print_allocation_config(const unsigned sock_count,
 			for (n = 0; n < num; n++) {
 				printf("    L3CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
-                                       (unsigned long long)tab[n].ways_mask);
+                                       (unsigned long long)tab[n].u.ways_mask);
 			}
 		} else {
 			printf("Error:%d", ret);

@@ -235,13 +235,13 @@ update_l3ca_cos_tab(struct l3ca_cos_sock *sock, const unsigned id,
 
                 switch (scope) {
                 case CAT_UPDATE_SCOPE_BOTH:
-                        sock->cos_tab[i].ways_mask = mask;
+                        sock->cos_tab[i].u.ways_mask = mask;
                         break;
                 case CAT_UPDATE_SCOPE_CODE:
-                        sock->cos_tab[i].code_mask = mask;
+                        sock->cos_tab[i].u.s.code_mask = mask;
                         break;
                 case CAT_UPDATE_SCOPE_DATA:
-                        sock->cos_tab[i].data_mask = mask;
+                        sock->cos_tab[i].u.s.data_mask = mask;
                         break;
                 }
         } else {
@@ -260,25 +260,25 @@ update_l3ca_cos_tab(struct l3ca_cos_sock *sock, const unsigned id,
                 switch (scope) {
                 case CAT_UPDATE_SCOPE_BOTH:
                         sock->cos_tab[k].cdp = 0;
-                        sock->cos_tab[k].ways_mask = mask;
+                        sock->cos_tab[k].u.ways_mask = mask;
                         break;
                 case CAT_UPDATE_SCOPE_CODE:
                         sock->cos_tab[k].cdp = 1;
-                        sock->cos_tab[k].code_mask = mask;
+                        sock->cos_tab[k].u.s.code_mask = mask;
                         /**
                          * This will result in error during set operation
                          * if data mask is not defined by the user.
                          */
-                        sock->cos_tab[k].data_mask = (uint64_t) (-1LL);
+                        sock->cos_tab[k].u.s.data_mask = (uint64_t) (-1LL);
                         break;
                 case CAT_UPDATE_SCOPE_DATA:
                         sock->cos_tab[k].cdp = 1;
-                        sock->cos_tab[k].data_mask = mask;
+                        sock->cos_tab[k].u.s.data_mask = mask;
                         /**
                          * This will result in error during set operation
                          * if code mask is not defined by the user.
                          */
-                        sock->cos_tab[k].code_mask = (uint64_t) (-1LL);
+                        sock->cos_tab[k].u.s.code_mask = (uint64_t) (-1LL);
                         break;
                 }
 
@@ -579,12 +579,13 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                                 printf("    L3CA COS%u => DATA 0x%llx,"
                                        "CODE 0x%llx\n",
                                        tab[n].class_id,
-                                       (unsigned long long)tab[n].data_mask,
-                                       (unsigned long long)tab[n].code_mask);
+                                       (unsigned long long)tab[n].u.s.data_mask,
+                                       (unsigned long long)
+                                       tab[n].u.s.code_mask);
                         } else {
                                 printf("    L3CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
-                                       (unsigned long long)tab[n].ways_mask);
+                                       (unsigned long long)tab[n].u.ways_mask);
                         }
                 }
         }

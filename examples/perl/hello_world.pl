@@ -83,7 +83,7 @@ for (my $i = 0; $i < $cpu_num; $i++) {
 
 	# Print info
 	printf("Hello from core %d on socket %d\tCOS %d \t\t0x%x\n",
-		$i, $socket_id, $cos, $l3ca->{ways_mask});
+		$i, $socket_id, $cos, $l3ca->{u}->{ways_mask});
 }
 
 # Shutdown the library

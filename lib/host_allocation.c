@@ -196,10 +196,10 @@ pqos_l3ca_set(const unsigned socket,
                 int is_contig = 0;
 
                 if (ca[i].cdp) {
-                        is_contig = is_contiguous(ca[i].data_mask) &&
-                                is_contiguous(ca[i].code_mask);
+                        is_contig = is_contiguous(ca[i].u.s.data_mask) &&
+                                is_contiguous(ca[i].u.s.code_mask);
                 } else {
-                        is_contig = is_contiguous(ca[i].ways_mask);
+                        is_contig = is_contiguous(ca[i].u.ways_mask);
                 }
                 if (!is_contig) {
                         LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
@@ -242,11 +242,11 @@ pqos_l3ca_set(const unsigned socket,
                         uint64_t cmask = 0, dmask = 0;
 
                         if (ca[i].cdp) {
-                                dmask = ca[i].data_mask;
-                                cmask = ca[i].code_mask;
+                                dmask = ca[i].u.s.data_mask;
+                                cmask = ca[i].u.s.code_mask;
                         } else {
-                                dmask = ca[i].ways_mask;
-                                cmask = ca[i].ways_mask;
+                                dmask = ca[i].u.ways_mask;
+                                cmask = ca[i].u.ways_mask;
                         }
 
                         retval = msr_write(core, reg, dmask);
@@ -265,7 +265,7 @@ pqos_l3ca_set(const unsigned socket,
                 for (i = 0; i < num_ca; i++) {
                         uint32_t reg =
                                 ca[i].class_id + PQOS_MSR_L3CA_MASK_START;
-                        uint64_t val = ca[i].ways_mask;
+                        uint64_t val = ca[i].u.ways_mask;
                         int retval = MACHINE_RETVAL_OK;
 
                         if (ca[i].cdp) {
@@ -351,14 +351,14 @@ pqos_l3ca_get(const unsigned socket,
                                 _pqos_api_unlock();
                                 return PQOS_RETVAL_ERROR;
                         }
-                        ca[i].data_mask = val;
+                        ca[i].u.s.data_mask = val;
 
                         retval = msr_read(core, reg+1, &val);
                         if (retval != MACHINE_RETVAL_OK) {
                                 _pqos_api_unlock();
                                 return PQOS_RETVAL_ERROR;
                         }
-                        ca[i].code_mask = val;
+                        ca[i].u.s.code_mask = val;
                 }
         } else {
                 for (i = 0, reg = PQOS_MSR_L3CA_MASK_START;
@@ -370,7 +370,7 @@ pqos_l3ca_get(const unsigned socket,
                         }
                         ca[i].cdp = 0;
                         ca[i].class_id = i;
-                        ca[i].ways_mask = val;
+                        ca[i].u.ways_mask = val;
                 }
         }
 

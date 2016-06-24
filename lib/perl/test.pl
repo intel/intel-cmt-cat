@@ -251,9 +251,9 @@ sub print_cfg {
 				$socket_id, $l3ca->{class_id}, $l3ca->{cdp});
 			if (int($l3ca->{cdp}) == 1) {
 				printf(", data_mask: 0x%x, code_mask: 0x%x",
-					$l3ca->{data_mask}, $l3ca->{code_mask});
+					$l3ca->{u}->{s}->{data_mask}, $l3ca->{u}->{s}->{code_mask});
 			} else {
-				printf(", ways_mask: 0x%x", $l3ca->{ways_mask});
+				printf(", ways_mask: 0x%x", $l3ca->{u}->{ways_mask});
 			}
 
 			print "\n";
@@ -386,7 +386,7 @@ sub test_way_masks {
 				print __LINE__, " generate_ways_mask FAILED!\n";
 				goto EXIT;
 			}
-			$l3ca->{ways_mask} = $gen_ways_mask;
+			$l3ca->{u}->{ways_mask} = $gen_ways_mask;
 			$l3ca->{class_id}  = $cos_id;
 			$l3ca->{cdp}       = 0;
 
@@ -410,8 +410,8 @@ sub test_way_masks {
 				goto EXIT;
 			}
 
-			if ($l3ca->{ways_mask} != $gen_ways_mask) {
-				print __LINE__, ' $l3ca->{ways_mask} != $gen_ways_mask FAILED!',
+			if ($l3ca->{u}->{ways_mask} != $gen_ways_mask) {
+				print __LINE__, ' $l3ca->{u}->{ways_mask} != $gen_ways_mask FAILED!',
 				  "\n";
 				goto EXIT;
 			}
@@ -465,7 +465,7 @@ sub reset_cfg {
 			}
 
 			$l3ca->{cdp}       = 0;
-			$l3ca->{ways_mask} = (1 << $num_ways) - 1;
+			$l3ca->{u}->{ways_mask} = (1 << $num_ways) - 1;
 
 			if (0 != pqos::pqos_l3ca_set($socket_id, 1, $l3ca)) {
 				print __LINE__, " pqos::pqos_l3ca_set FAILED!\n";

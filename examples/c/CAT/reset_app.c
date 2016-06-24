@@ -87,7 +87,7 @@ print_allocation_config(const struct pqos_capability *cap_l3ca,
                         for (n = 0; n < num; n++) {
                                 printf("   L3CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
-                                       (unsigned long long)tab[n].ways_mask);
+                                       (unsigned long long)tab[n].u.ways_mask);
                         }
                 }
         }

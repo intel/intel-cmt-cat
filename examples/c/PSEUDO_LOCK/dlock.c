@@ -346,17 +346,17 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                 for (j = 0; j < m_num_clos; j++) {
                         if (cos[j].cdp) {
                                 if (cos[j].class_id == (unsigned)clos) {
-                                        cos[j].code_mask = dlock_mask;
-                                        cos[j].data_mask = dlock_mask;
+                                        cos[j].u.s.code_mask = dlock_mask;
+                                        cos[j].u.s.data_mask = dlock_mask;
                                 } else {
-                                        cos[j].code_mask &= ~dlock_mask;
-                                        cos[j].data_mask &= ~dlock_mask;
+                                        cos[j].u.s.code_mask &= ~dlock_mask;
+                                        cos[j].u.s.data_mask &= ~dlock_mask;
                                 }
                         } else {
                                 if (cos[j].class_id == (unsigned)clos)
-                                        cos[j].ways_mask = dlock_mask;
+                                        cos[j].u.ways_mask = dlock_mask;
                                 else
-                                        cos[j].ways_mask &= ~dlock_mask;
+                                        cos[j].u.ways_mask &= ~dlock_mask;
                         }
                 }
 

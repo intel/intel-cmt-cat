@@ -500,7 +500,7 @@ pqos_alloc_reset(const struct pqos_cap *cap,
 
                                 cos.cdp = 0;
                                 cos.class_id = i;
-                                cos.ways_mask = ways_mask;
+                                cos.u.ways_mask = ways_mask;
                                 ret = pqos_l3ca_set(sockets[j], 1, &cos);
                                 if (ret != PQOS_RETVAL_OK)
                                         retval = ret;

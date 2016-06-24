@@ -456,8 +456,8 @@ struct pqos_l3ca {
                 struct {
                         uint64_t data_mask;
                         uint64_t code_mask;
-                };
-        };
+                } s;
+        } u;
 };
 
 /**

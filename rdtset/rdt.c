@@ -60,13 +60,15 @@ print_rdt_ca(struct rdt_ca ca)
 		return;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
-		printf("MASK: 0x%llx", (unsigned long long) ca.u.l2->ways_mask);
+		printf("MASK: 0x%llx",
+			(unsigned long long) ca.u.l2->ways_mask);
 	else if (ca.u.l3->cdp == 1)
 		printf("code MASK: 0x%llx, data MASK: 0x%llx",
-			(unsigned long long) ca.u.l3->code_mask,
-			(unsigned long long) ca.u.l3->data_mask);
+			(unsigned long long) ca.u.l3->u.s.code_mask,
+			(unsigned long long) ca.u.l3->u.s.data_mask);
 	else
-		printf("MASK: 0x%llx", (unsigned long long) ca.u.l3->ways_mask);
+		printf("MASK: 0x%llx",
+			(unsigned long long) ca.u.l3->u.ways_mask);
 }
 
 /* Get short string representation of configuration type of struct rdt_ca */
@@ -92,8 +94,9 @@ is_valid_rdt_ca(struct rdt_ca ca)
 		return NULL != ca.u.l2 && 0 != ca.u.l2->ways_mask;
 	else
 		return NULL != ca.u.l3 && ((1 == ca.u.l3->cdp &&
-			0 != ca.u.l3->code_mask && 0 != ca.u.l3->data_mask) ||
-			(0 == ca.u.l3->cdp && 0 != ca.u.l3->ways_mask));
+			0 != ca.u.l3->u.s.code_mask &&
+			0 != ca.u.l3->u.s.data_mask) ||
+			(0 == ca.u.l3->cdp && 0 != ca.u.l3->u.ways_mask));
 }
 
 /*
@@ -327,10 +330,10 @@ parse_l3(const char *l3ca)
 
 		if (cmask != 0) {
 			g_cfg.config[idx].l3.cdp = 1;
-			g_cfg.config[idx].l3.code_mask = cmask;
-			g_cfg.config[idx].l3.data_mask = mask;
+			g_cfg.config[idx].l3.u.s.code_mask = cmask;
+			g_cfg.config[idx].l3.u.s.data_mask = mask;
 		} else
-			g_cfg.config[idx].l3.ways_mask = mask;
+			g_cfg.config[idx].l3.u.ways_mask = mask;
 
 		l3ca = end + 1;
 		idx++;
@@ -379,10 +382,10 @@ str_to_cbm_rdt_ca(const char *param, struct rdt_ca ca)
 			return -EINVAL;
 		if (mask2 != 0) {
 			ca.u.l3->cdp = 1;
-			ca.u.l3->data_mask = mask;
-			ca.u.l3->code_mask = mask2;
+			ca.u.l3->u.s.data_mask = mask;
+			ca.u.l3->u.s.code_mask = mask2;
 		} else
-			ca.u.l3->ways_mask = mask;
+			ca.u.l3->u.ways_mask = mask;
 	}
 
 	return 0;
@@ -633,9 +636,9 @@ get_ored_cbm_rdt_ca(struct rdt_ca ca)
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
 		return ca.u.l2->ways_mask;
 	else if (ca.u.l3->cdp == 1)
-		return ca.u.l3->code_mask | ca.u.l3->data_mask;
+		return ca.u.l3->u.s.code_mask | ca.u.l3->u.s.data_mask;
 	else
-		return ca.u.l3->ways_mask;
+		return ca.u.l3->u.ways_mask;
 }
 /*
  * Check are requested CBMs supported by system,
