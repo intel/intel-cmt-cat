@@ -72,6 +72,13 @@ extern "C" {
 #define DIM(x) (sizeof(x)/sizeof(x[0]))
 #endif /* !DIM */
 
+#ifdef __FreeBSD__
+/* Fix for "undefined reference to '__bitcountl'" */
+#ifndef __bitcountl
+#define __bitcountl(x) __builtin_popcountl((unsigned long)(x))
+#endif /* !__bitcountl(x) */
+#endif /* __FreeBSD__ */
+
 struct rdt_ca {
 	enum pqos_cap_type type;
 	union {

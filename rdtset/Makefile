@@ -44,7 +44,7 @@ CFLAGS = -I$(LIBDIR) \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
 	-Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels \
-	-D_GNU_SOURCE
+	-D_GNU_SOURCE -D_BSD_SOURCE
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
