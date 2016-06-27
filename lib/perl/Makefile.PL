@@ -34,6 +34,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
+use Config;
 use strict;
 use warnings;
 
@@ -42,6 +43,7 @@ use ExtUtils::MakeMaker;
 WriteMakefile(
 	'NAME'    => 'pqos',
 	'VERSION' => "0.1",
+	'CCFLAGS' => "$Config{ccflags} -Wno-unused-variable -Wno-unused-value",
 	'LIBS'    => ['-lpqos', '-L/usr/local/lib -lpqos'],
 	'OBJECT'  => 'pqos_wrap.o',
 	'clean'   => {FILES => "pqos_wrap.c"},
