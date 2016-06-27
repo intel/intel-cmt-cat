@@ -1,0 +1,10 @@
+sudo: required
+dist: trusty
+before_script:
+    - sudo apt-get -q update
+    - sudo apt-get install -y swig cppcheck
+script: make cppcheck && make && sudo make install && (cd lib/perl && perl Makefile.PL && make && sudo make install)
+language: c
+compiler:
+    - gcc
+#    - clang
