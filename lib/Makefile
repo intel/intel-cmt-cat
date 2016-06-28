@@ -166,14 +166,15 @@ CHECKPATCH?=checkpatch.pl
 .PHONY: style
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
-	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
+	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,GLOBAL_INITIALISERS \
 	-f host_cap.c -f host_cap.h -f host_allocation.c -f perf.c -f perf.h \
 	-f host_allocation.h -f host_monitoring.c -f host_monitoring.h \
 	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
 	-f utils.c -f cpuinfo.h -f host_pidapi.c -f host_pidapi.h
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
-	NEW_TYPEDEFS \
+	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE \
 	-f pqos.h -f cpuinfo.c
 
 CPPCHECK?=cppcheck

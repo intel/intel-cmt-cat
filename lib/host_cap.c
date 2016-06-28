@@ -89,7 +89,8 @@
 
 #define PQOS_MSR_L3CA_MASK_START     0xC90   /**< L3 CAT class 0 register */
 #define PQOS_MSR_L3CA_MASK_END       0xD0F   /**< L3 CAT class 127 register */
-#define PQOS_MSR_ASSOC               0xC8F   /**< CAT class to core association register */
+#define PQOS_MSR_ASSOC               0xC8F   /**< CAT class to core association
+                                                register */
 #define PQOS_MSR_ASSOC_QECOS_SHIFT   32
 #define PQOS_MSR_ASSOC_QECOS_MASK    0xffffffff00000000ULL
 
@@ -308,7 +309,8 @@ get_l2_cache_info(unsigned *p_num_ways,
 /**
  * @brief Adds new event type to \a mon monitoring structure
  *
- * @param mon Monitoring structure which is to be updated with the new event type
+ * @param mon Monitoring structure which is to be updated with the new
+ *        event type
  * @param res_id resource id
  * @param event_type event type
  * @param max_rmid max RMID for the event

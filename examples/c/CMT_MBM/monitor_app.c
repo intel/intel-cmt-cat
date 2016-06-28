@@ -97,7 +97,7 @@ static void stop_monitoring(void);
 /**
  * @brief CTRL-C handler for infinite monitoring loop
  *
- * @param signo signal number
+ * @param [in] signo signal number
  */
 static void monitoring_ctrlc(int signo)
 {
@@ -113,7 +113,7 @@ static void monitoring_ctrlc(int signo)
 /**
  * @brief Scale byte value up to KB
  *
- * @param bytes value to be scaled up
+ * @param [in] bytes value to be scaled up
  * @return scaled up value in KB's
  */
 static inline double bytes_to_kb(const double bytes)
@@ -124,7 +124,7 @@ static inline double bytes_to_kb(const double bytes)
 /**
  * @brief Scale byte value up to MB
  *
- * @param bytes value to be scaled up
+ * @param [in] bytes value to be scaled up
  * @return scaled up value in MB's
  */
 static inline double bytes_to_mb(const double bytes)
@@ -148,8 +148,8 @@ static inline int process_mode(void)
  * @brief Verifies and translates monitoring config string into
  *        internal monitoring configuration.
  *
- * @param argc Number of arguments in input command
- * @param argv Input arguments for LLC occupancy monitoring
+ * @param [in] argc Number of arguments in input command
+ * @param [in] argv Input arguments for LLC occupancy monitoring
  */
 static void
 monitoring_get_input(int argc, char *argv[])
@@ -204,7 +204,8 @@ monitoring_get_input(int argc, char *argv[])
 /**
  * @brief Starts monitoring on selected cores/PIDs
  *
- * @param cpu_info cpu information structure
+ * @param [in] cpu_info cpu information structure
+ * @param [in] cap_mon monitoring capabilities structure
  *
  * @return Operation status
  * @retval 0 OK
@@ -212,7 +213,7 @@ monitoring_get_input(int argc, char *argv[])
  */
 static int
 setup_monitoring(const struct pqos_cpuinfo *cpu_info,
-                 const struct pqos_capability const *cap_mon)
+                 const struct pqos_capability * const cap_mon)
 {
 	unsigned i;
         const enum pqos_mon_event perf_events =
@@ -294,9 +295,7 @@ static void stop_monitoring(void)
 }
 
 /**
- * @brief Reads monitoring event data at given \a interval for \a sel_time time span
- *
- * @param cap detected PQoS capabilites
+ * @brief Reads monitoring event data
  */
 static void monitoring_loop(void)
 {

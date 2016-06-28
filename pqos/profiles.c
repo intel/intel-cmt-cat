@@ -269,7 +269,8 @@ void profile_l3ca_list(FILE *fp)
  *
  * @param [in] id profile identity (string)
  * @param [in] l3ca L3CA capability structure
- * @param [out] p_num number of L3CA classes of service retrieved for the profile
+ * @param [out] p_num number of L3CA classes of service retrieved for
+ *              the profile
  * @param [out] p_tab pointer to definition of L3CA classes of service
  *
  * @return Operations status

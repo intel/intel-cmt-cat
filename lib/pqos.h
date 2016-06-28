@@ -149,8 +149,10 @@ struct pqos_cap_l3ca {
         unsigned num_ways;              /**< number of cache ways */
         unsigned way_size;              /**< way size in bytes */
         uint64_t way_contention;        /**< ways contention bit mask */
-        int cdp;                        /**< code data prioratization feature presence */
-        int cdp_on;                     /**< code data prioratization on or off*/
+        int cdp;                        /**< code data prioratization feature
+                                           presence */
+        int cdp_on;                     /**< code data prioratization on or
+                                           off*/
 };
 
 /**
@@ -314,7 +316,8 @@ struct pqos_mon_data {
          */
         int valid;                      /**< structure validity marker */
         enum pqos_mon_event event;      /**< monitored event */
-        void *context;                  /**< application specific context pointer */
+        void *context;                  /**< application specific context
+                                           pointer */
         struct pqos_event_values values; /**< RMID events value */
 
         pid_t pid; /**< if not zero then this group tracks a process */
@@ -542,7 +545,8 @@ int pqos_l2ca_get(const unsigned socket,
  * @brief Retrieves socket id's from cpu info structure
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param [in] max_count maximum number of sockets that \a sockets can accommodate
+ * @param [in] max_count maximum number of sockets that \a sockets can
+ *             accommodate
  * @param [out] count place to store actual number of sockets returned
  * @param [out] sockets array to store socket id's in
  *
