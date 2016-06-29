@@ -92,11 +92,11 @@ is_valid_rdt_ca(struct rdt_ca ca)
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
 		return NULL != ca.u.l2 && 0 != ca.u.l2->ways_mask;
-	else
-		return NULL != ca.u.l3 && ((1 == ca.u.l3->cdp &&
-			0 != ca.u.l3->u.s.code_mask &&
-			0 != ca.u.l3->u.s.data_mask) ||
-			(0 == ca.u.l3->cdp && 0 != ca.u.l3->u.ways_mask));
+
+	return NULL != ca.u.l3 &&
+		((1 == ca.u.l3->cdp && 0 != ca.u.l3->u.s.code_mask &&
+		0 != ca.u.l3->u.s.data_mask) ||
+		(0 == ca.u.l3->cdp && 0 != ca.u.l3->u.ways_mask));
 }
 
 /*
@@ -151,8 +151,8 @@ get_rdt_ca(const unsigned socket, const unsigned max_num_ca, unsigned *num_ca,
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
 		return pqos_l2ca_get(socket, max_num_ca, num_ca, ca.u.l2);
-	else
-		return pqos_l3ca_get(socket, max_num_ca, num_ca, ca.u.l3);
+
+	return pqos_l3ca_get(socket, max_num_ca, num_ca, ca.u.l3);
 }
 
 /* Return number of set bits in bitmask */
@@ -369,8 +369,10 @@ str_to_cbm_rdt_ca(const char *param, struct rdt_ca ca)
 
 	force_dual_mask = (NULL != strchr(param, ','));
 	ret = parse_mask_set(param, force_dual_mask, &mask, &mask2);
-	if (ret < 0 || 0 == mask || is_contiguous(
-			PQOS_CAP_TYPE_L2CA == ca.type ? "L2" : "L3", mask) == 0)
+	if (ret < 0)
+		return -EINVAL;
+
+	if (0 == mask || is_contiguous(get_type_str_rdt_ca(ca), mask) == 0)
 		return -EINVAL;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type) {
@@ -405,7 +407,7 @@ parse_rdt(char *rdtstr)
 	while (group != NULL) {
 		char *feature_saveptr = NULL;
 
-		/* Min len check, 1 feature + 1 CPU eg. "3(f)@0" */
+		/* Min len check, 1 feature + 1 CPU e.g. "3(f)@0" */
 		if (strlen(group) < 6) {
 			printf("Invalid group: \"%s\"\n", group);
 			return -EINVAL;
@@ -444,10 +446,10 @@ parse_rdt(char *rdtstr)
 			} else if (1 == strspn(feature, "@")) {
 				ret = str_to_cpuset(param, strlen(param),
 					&g_cfg.config[idx].cpumask);
+				if (ret <= 0)
+					return -EINVAL;
 
-				if (ret <= 0 || CPU_COUNT(
-						&g_cfg.config[idx].cpumask) ==
-						0)
+				if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0)
 					return -EINVAL;
 			}
 
@@ -572,7 +574,8 @@ check_cdp(void)
 }
 
 /*
- * Check if configuration (L2CA, L3CA) is supported by the system
+ * Check if CAT configuration requested by a user via cmd line
+ * is supported by the system.
  */
 static int
 check_supported(void)
@@ -580,15 +583,15 @@ check_supported(void)
 	unsigned i = 0;
 
 	for (i = 0; i < g_cfg.config_count; i++) {
-		if (NULL == m_cap_l3ca && is_valid_rdt_ca(
-				wrap_l3ca(&g_cfg.config[i].l3))) {
+		if (is_valid_rdt_ca(wrap_l3ca(&g_cfg.config[i].l3)) &&
+				NULL == m_cap_l3ca) {
 			printf("CAT: L3CA requested but not supported by "
 				"system!\n");
 			return -ENOTSUP;
 		}
 
-		if (NULL == m_cap_l2ca && is_valid_rdt_ca(
-				wrap_l2ca(&g_cfg.config[i].l2))) {
+		if (is_valid_rdt_ca(wrap_l2ca(&g_cfg.config[i].l2)) &&
+				NULL == m_cap_l2ca) {
 			printf("CAT: L2CA requested but not supported by "
 				"system!\n");
 			return -ENOTSUP;
@@ -600,7 +603,7 @@ check_supported(void)
 
 /* Returns negation of max CBM mask for requested type (L2 or L3) */
 static uint64_t
-get_not_cbm(enum pqos_cap_type type)
+get_not_cbm(const enum pqos_cap_type type)
 {
 	if (PQOS_CAP_TYPE_L2CA == type && NULL != m_cap_l2ca)
 		return (UINT64_MAX << (m_cap_l2ca->u.l2ca->num_ways));
@@ -612,7 +615,7 @@ get_not_cbm(enum pqos_cap_type type)
 
 /* Returns contention mask for requested type (L2 or L3) */
 static uint64_t
-get_contention_mask(enum pqos_cap_type type)
+get_contention_mask(const enum pqos_cap_type type)
 {
 	if (PQOS_CAP_TYPE_L2CA == type && NULL != m_cap_l2ca)
 		return m_cap_l2ca->u.l2ca->way_contention;
@@ -635,10 +638,10 @@ get_ored_cbm_rdt_ca(struct rdt_ca ca)
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
 		return ca.u.l2->ways_mask;
-	else if (ca.u.l3->cdp == 1)
+	if (ca.u.l3->cdp == 1)
 		return ca.u.l3->u.s.code_mask | ca.u.l3->u.s.data_mask;
-	else
-		return ca.u.l3->u.ways_mask;
+
+	return ca.u.l3->u.ways_mask;
 }
 /*
  * Check are requested CBMs supported by system,
@@ -1252,15 +1255,15 @@ cat_init(void)
 	/* Get L2CA capabilities */
 	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &m_cap_l2ca);
 	if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_l2ca == NULL))
-		printf("CAT: PQOS_CAP_TYPE_L2CA capability not supported!\n");
+		printf("CAT: L2 CAT capability not supported!\n");
 
 	/* Get L3CA capabilities */
 	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &m_cap_l3ca);
 	if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_l3ca == NULL))
-		printf("CAT: PQOS_CAP_TYPE_L3CA capability not supported!\n");
+		printf("CAT: L3 CAT capability not supported!\n");
 
 	if (m_cap_l3ca == NULL && m_cap_l2ca == NULL) {
-		printf("CAT: PQOS_CAP_TYPE_L2CA, PQOS_CAP_TYPE_L3CA "
+		printf("CAT: L2 CAT, L3 CAT "
 			"capabilities not supported!\n");
 		ret = -EFAULT;
 		goto err;

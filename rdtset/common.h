@@ -119,9 +119,9 @@ struct rdtset {
 	unsigned config_count;		/**< Num of RDT config entries */
 	cpu_set_t cpu_aff_cpuset;	/**< CPU affinity configuration */
 	cpu_set_t reset_cpuset;		/**< List of CPUs to reset COS assoc */
-	unsigned	sudo_keep:1,	/**< don't drop elevated privileges */
-			verbose:1,	/**< be verobose */
-			command:1;	/**< command to be executed detected */
+	unsigned sudo_keep:1,		/**< don't drop elevated privileges */
+		 verbose:1,		/**< be verbose */
+		 command:1;		/**< command to be executed detected */
 };
 
 struct rdtset g_cfg;
@@ -136,8 +136,8 @@ struct rdtset g_cfg;
  *       Within group elem, '-' used for a range separator;
  *       ',' used for a single number.
  *
- * @param cpustr set as a string
- * @param cpustr_len set as a string len
+ * @param cpustr string representation of a cpu set
+ * @param cpustr_len len of \a cpustr
  * @param cpuset parsed cpuset
  *
  * @return number of parsed characters on success
