@@ -66,7 +66,7 @@ CPU_COUNT(cpu_set_t *set)
 /**
  * @brief Parse -c/--cpu params
  *
- * @param cpu params string
+ * @param [in] cpu params string
  *
  * @return status
  * @retval 0 on success
@@ -77,7 +77,7 @@ int parse_cpu(const char *cpu);
 /**
  * @brief Set process CPU affinity
  *
- * @param pid pid of process (0 for current)
+ * @param [in] pid pid of process (0 for current)
  *
  * @return status
  * @retval 0 on success

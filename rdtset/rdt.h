@@ -79,7 +79,7 @@ void cat_exit(void);
  *       - cpus 1 and 3 have access to 2 ways for code and 2 ways for data,
  *       code and data ways are not overlapping.;
  *
- * @param l3ca params string
+ * @param [in] l3ca params string
  *
  * @return parse status
  * @retval 0 on success
@@ -90,7 +90,7 @@ int parse_l3(const char *l3ca);
 /**
  * @brief Parse -r/--reset params
  *
- * @param cpu params string
+ * @param [in] cpu params string
  *
  * @return parse status
  * @retval 0 on success
@@ -101,7 +101,7 @@ int parse_reset(const char *cpu);
 /**
  * @brief Parse -t/--rdt params and stores configuration in g_cfg
  *
- * @param rdtstr params string
+ * @param [in] rdtstr params string
  *
  * @return parse status
  * @retval 0 on success

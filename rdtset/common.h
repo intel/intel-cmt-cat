@@ -88,6 +88,13 @@ struct rdt_ca {
 	} u;
 };
 
+/**
+ * @brief Creates \a rdt_ca struct from \a pqos_l2ca struct
+ *
+ * @param [in] l2 L2 CAT class configuration
+ *
+ * @return rdt_ca struct
+ */
 static inline struct rdt_ca wrap_l2ca(struct pqos_l2ca *l2)
 {
 	struct rdt_ca result;
@@ -97,6 +104,13 @@ static inline struct rdt_ca wrap_l2ca(struct pqos_l2ca *l2)
 	return result;
 }
 
+/**
+ * @brief Creates \a rdt_ca struct from \a pqos_l3ca struct
+ *
+ * @param [in] l3 L3 CAT class configuration
+ *
+ * @return rdt_ca struct
+ */
 static inline struct rdt_ca wrap_l3ca(struct pqos_l3ca *l3)
 {
 	struct rdt_ca result;
@@ -136,9 +150,9 @@ struct rdtset g_cfg;
  *       Within group elem, '-' used for a range separator;
  *       ',' used for a single number.
  *
- * @param cpustr string representation of a cpu set
- * @param cpustr_len len of \a cpustr
- * @param cpuset parsed cpuset
+ * @param [in] cpustr string representation of a cpu set
+ * @param [in] cpustr_len len of \a cpustr
+ * @param [out] cpuset parsed cpuset
  *
  * @return number of parsed characters on success
  * @retval -ERRNO on error
@@ -149,9 +163,9 @@ int str_to_cpuset(const char *cpustr, const unsigned cpustr_len,
 /**
  * @brief Converts CPU set (cpu_set_t) to string
  *
- * @param cpustr output string
- * @param cpustr_len max output string len
- * @param cpumask input cpuset
+ * @param [out] cpustr output string
+ * @param [in] cpustr_len max output string len
+ * @param [in] cpumask input cpuset
  */
 void cpuset_to_str(char *cpustr, const unsigned cpustr_len,
 		const cpu_set_t *cpumask);

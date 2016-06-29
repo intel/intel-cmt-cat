@@ -106,8 +106,8 @@ err:
 /**
  * @brief Execute command (fork, exec, wait)
  *
- * @param argc number of cmd args
- * @param argv cmd args
+ * @param [in] argc number of cmd args
+ * @param [in] argv cmd args
  *
  * @return 0 on success
  * @retval -1 on error
@@ -169,6 +169,12 @@ execute_cmd(int argc, char **argv)
 	return 0;
 }
 
+/**
+ * @brief Prints help page about usage
+ *
+ * @param [in] prgname executable name to be printed out
+ * @param [in] short_usage flag to print short version
+ */
 static void
 print_usage(char *prgname, unsigned short_usage)
 {
@@ -280,7 +286,19 @@ print_usage(char *prgname, unsigned short_usage)
 		"        Reset CAT configuration of CPUs used by BASH "
 		"process\n\n");
 }
-
+/**
+ * @brief Validates arguments combination
+ *
+ * @param [in] f_r flag for -r argument
+ * @param [in] f_3_or_t flag for -3 or -t arguments
+ * @param [in] f_c flag for -c argument
+ * @param [in] f_p flag for -p argument
+ * @param [in] cmd flag for command to be executed
+ *
+ * @return Result
+ * @retval 1 on success
+ * @retval 0 on failure
+ */
 static int
 validate_args(const int f_r, __attribute__((unused)) const int f_3_or_t,
 		const int f_c, const int f_p, const int cmd)
@@ -293,8 +311,8 @@ validate_args(const int f_r, __attribute__((unused)) const int f_3_or_t,
 /**
  * @brief Parse the argument given in the command line of the application
  *
- * @param argc number of args
- * @param argv args
+ * @param [in] argc number of args
+ * @param [in] argv args
  *
  * @return 0 on success
  * @retval -EINVAL on error
@@ -371,6 +389,12 @@ exit:
 	return retval;
 }
 
+/**
+ * @brief main
+ *
+ * @param [in] argc number of args
+ * @param [in] argv args
+ */
 int
 main(int argc, char **argv)
 {

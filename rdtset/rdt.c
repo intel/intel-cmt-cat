@@ -51,7 +51,11 @@ static const struct pqos_cpuinfo *m_cpu;
 static const struct pqos_capability *m_cap_l2ca;
 static const struct pqos_capability *m_cap_l3ca;
 
-/* Print L2 or L3 configuration contained in struct rdt_ca */
+/**
+ * @brief Prints L2 or L3 configuration in \a ca
+ *
+ * @param [in] ca CAT COS configuration
+ */
 static void
 print_rdt_ca(struct rdt_ca ca)
 {
@@ -70,8 +74,13 @@ print_rdt_ca(struct rdt_ca ca)
 		printf("MASK: 0x%llx",
 			(unsigned long long) ca.u.l3->u.ways_mask);
 }
-
-/* Get short string representation of configuration type of struct rdt_ca */
+/**
+ * @brief Gets short string representation of configuration type of \a ca
+ *
+ * @param [in] ca CAT COS configuration
+ *
+ * @return String representation of configuration type
+ */
 static const char *
 get_type_str_rdt_ca(struct rdt_ca ca)
 {
@@ -82,7 +91,15 @@ get_type_str_rdt_ca(struct rdt_ca ca)
 	return PQOS_CAP_TYPE_L2CA == ca.type ? "L2" : "L3";
 }
 
-/* Validates configuration contained in struct rdt_ca */
+/**
+ * @brief Validates configuration in \a ca
+ *
+ * @param [in] ca CAT COS configuration
+ *
+ * @return Result
+ * @retval 1 on success
+ * @retval 0 on failure
+ */
 static int
 is_valid_rdt_ca(struct rdt_ca ca)
 {
@@ -99,9 +116,14 @@ is_valid_rdt_ca(struct rdt_ca ca)
 		(0 == ca.u.l3->cdp && 0 != ca.u.l3->u.ways_mask));
 }
 
-/*
- * Reads COS#0 (default) configuration (L2 or L3) and stores it in
- * struct rdt_ca
+/**
+ * @brief Reads COS#0 (default) configuration (L2 or L3) on \a socket
+ *        and stores it in \a ca
+ *
+ * @param [in] socket socket to read CAT COS configuration from
+ * @param [out] ca CAT COS configuration
+ *
+ * @return Operations status
  */
 static int
 get_default_rdt_ca(const unsigned socket, struct rdt_ca ca)
@@ -140,7 +162,17 @@ get_default_rdt_ca(const unsigned socket, struct rdt_ca ca)
 	return PQOS_RETVAL_OK;
 }
 
-/* Reads requested COS configuration (L2 or L3) and stores it in struct rdt_ca*/
+/**
+ * @brief Reads COS configuration (L2 or L3) on \a socket and stores it in \a ca
+ *
+ * @param [in] socket CPU socket id
+ * @param [in] max_num_cos maximum number of classes of service
+ *             that can be accommodated at \a ca
+ * @param [out] num_cos number of classes of service read into \a ca
+ * @param [out] ca table with read classes of service
+ *
+ * @return Operations status
+ */
 static int
 get_rdt_ca(const unsigned socket, const unsigned max_num_ca, unsigned *num_ca,
 		struct rdt_ca ca)
@@ -155,7 +187,13 @@ get_rdt_ca(const unsigned socket, const unsigned max_num_ca, unsigned *num_ca,
 	return pqos_l3ca_get(socket, max_num_ca, num_ca, ca.u.l3);
 }
 
-/* Return number of set bits in bitmask */
+/**
+ * @brief Returns number of set bits in \a bitmask
+ *
+ * @param [in] bitmask
+ *
+ * @return bits count
+ */
 static unsigned
 bits_count(uint64_t bitmask)
 {
@@ -167,7 +205,16 @@ bits_count(uint64_t bitmask)
 	return count;
 }
 
-/* Test if bitmask is contiguous */
+/**
+ * @brief Tests if \a bitmask is contiguous
+ *
+ * @param [in] cat_type string to identify CAT type (L2 or L3) on error
+ * @param [in] bitmask bitmask to be tested
+ *
+ * @return Result
+ * @retval 1 on success
+ * @retval 0 on failure
+ */
 static int
 is_contiguous(const char *cat_type, const uint64_t bitmask)
 {
@@ -194,7 +241,16 @@ is_contiguous(const char *cat_type, const uint64_t bitmask)
 	return 1;
 }
 
-/* Convert hex string to UINT */
+/**
+ * @brief Converts hex string \a xstr to UINT \a value
+ *
+ * @param [in] xstr hex string
+ * @param [out] value UINT value
+ *
+ * @return number of parsed characters
+ * @retval >0 on success
+ * @retval negative on error (-errno)
+ */
 static int
 xstr_to_uint(const char *xstr, uint64_t *value)
 {
@@ -219,7 +275,19 @@ xstr_to_uint(const char *xstr, uint64_t *value)
 	return xstr_end - xstr;
 }
 
-/* Parse CBM masks */
+/**
+ * @brief Parses CBM (Capacity Bit Mask) string \a cbm
+ *        and stores result in \a mask and \a cmask
+ *
+ * @param [in] cbm CBM string
+ * @param [in] force_dual_mask expect two masks separated with ','
+ * @param [out] mask common (L2 or L3 non CDP) or data mask (L3 CDP)
+ * @param [out] cmask code mask (L3 CDP)
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
 static int
 parse_mask_set(const char *cbm, const int force_dual_mask, uint64_t *mask,
 		uint64_t *cmask)
@@ -356,7 +424,16 @@ parse_reset(const char *cpustr)
 	return ret > 0 ? 0 : ret;
 }
 
-/* parses CBM string and stores in struct rdt_ca*/
+/**
+ * @brief Parses CBMs string \a param and stores in \a ca
+ *
+ * @param [in] param CBMs string
+ * @param [out] ca to store result
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
 static int
 str_to_cbm_rdt_ca(const char *param, struct rdt_ca ca)
 {
@@ -399,6 +476,7 @@ parse_rdt(char *rdtstr)
 	char *group_saveptr = NULL;
 	char *group = strtok_r(rdtstr, ";", &group_saveptr);
 	unsigned idx = 0;
+	unsigned min_len = strlen("3(f)@0");
 	int ret;
 
 	if (NULL == rdtstr)
@@ -408,7 +486,7 @@ parse_rdt(char *rdtstr)
 		char *feature_saveptr = NULL;
 
 		/* Min len check, 1 feature + 1 CPU e.g. "3(f)@0" */
-		if (strlen(group) < 6) {
+		if (strlen(group) < min_len) {
 			printf("Invalid group: \"%s\"\n", group);
 			return -EINVAL;
 		}
@@ -467,7 +545,13 @@ parse_rdt(char *rdtstr)
 	return 0;
 }
 
-/* Check are configured CPU sets overlapping */
+/**
+ * @brief Checks are configured CPU sets overlapping
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
 static int
 check_cpus_overlapping(void)
 {
@@ -500,7 +584,13 @@ check_cpus_overlapping(void)
 	return 0;
 }
 
-/* Check are configured CPUs valid and have no COS associated */
+/**
+ * @brief Checks are configured CPUs valid and have no COS associated
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
 static int
 check_cpus(void)
 {
@@ -546,12 +636,15 @@ check_cpus(void)
 	return 0;
 }
 
-/*
- * Check if CPU supports requested CDP configuration,
- * notify user if it supported but not enabled
+/**
+ * @brief Checks if CPU supports requested CDP configuration
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
  */
 static int
-check_cdp(void)
+check_cdp_support(void)
 {
 	unsigned i = 0;
 
@@ -574,8 +667,12 @@ check_cdp(void)
 }
 
 /*
- * Check if CAT configuration requested by a user via cmd line
- * is supported by the system.
+ * @brief Checks if CAT configuration requested by a user via cmd line
+ *        is supported by the system.
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
  */
 static int
 check_supported(void)
@@ -601,7 +698,14 @@ check_supported(void)
 	return 0;
 }
 
-/* Returns negation of max CBM mask for requested type (L2 or L3) */
+/**
+ * @brief Returns negation of max CBM for requested \a type (L2 or L3)
+ *
+ * @param [in] type type of pqos CAT capability, L2 or L3
+ *
+ * @return mask
+ * @retval UINT64_MAX on error
+ */
 static uint64_t
 get_not_cbm(const enum pqos_cap_type type)
 {
@@ -610,10 +714,18 @@ get_not_cbm(const enum pqos_cap_type type)
 	else if (PQOS_CAP_TYPE_L3CA == type && NULL != m_cap_l3ca)
 		return (UINT64_MAX << (m_cap_l3ca->u.l3ca->num_ways));
 	else
-		return 0;
+		return UINT64_MAX;
 }
 
-/* Returns contention mask for requested type (L2 or L3) */
+/**
+ * @brief Returns contention mask for requested \a type (L2 or L3)
+ *
+ * @param [in] type type of pqos CAT capability, L2 or L3
+ *
+ * @return contention mask
+ * @retval UINT64_MAX on error
+ *
+ */
 static uint64_t
 get_contention_mask(const enum pqos_cap_type type)
 {
@@ -622,19 +734,26 @@ get_contention_mask(const enum pqos_cap_type type)
 	else if (PQOS_CAP_TYPE_L3CA == type && NULL != m_cap_l3ca)
 		return m_cap_l3ca->u.l3ca->way_contention;
 	else
-		return 0;
+		return UINT64_MAX;
 }
 
-/*
- * Returns ORed masks (for L3 CDP config) or single mask of configuration
- * contained in struct rdt_ca
+/**
+ * @brief Returns cumulative mask for \a ca CAT config
+ *
+ * For L3 CDP config returns ORed code_mask and data_mask,
+ * for L2 or L3 non-CDP config returns ways_mask
+ *
+ * @param [in] ca CAT COS configuration
+ *
+ * @return cumulative mask
+ * @retval UINT64_MAX on error
  */
 static uint64_t
-get_ored_cbm_rdt_ca(struct rdt_ca ca)
+get_cumulative_cbm_rdt_ca(struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
 			NULL == ca.u.generic_ptr || 0 == is_valid_rdt_ca(ca))
-		return 0;
+		return UINT64_MAX;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
 		return ca.u.l2->ways_mask;
@@ -643,12 +762,20 @@ get_ored_cbm_rdt_ca(struct rdt_ca ca)
 
 	return ca.u.l3->u.ways_mask;
 }
-/*
- * Check are requested CBMs supported by system,
- * warn if CBM overlaps contention mask
+
+/**
+ * @brief Checks are requested CBMs of \a type supported by system.
+ *
+ * Warn if CBM overlaps contention mask
+ *
+ * @param [in] type type of pqos CAT capability, L2 or L3
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
  */
 static int
-check_cbm_len_and_contention_type(enum pqos_cap_type type)
+check_cbm_len_and_contention(enum pqos_cap_type type)
 {
 	unsigned i = 0;
 	struct rdt_ca ca;
@@ -660,7 +787,7 @@ check_cbm_len_and_contention_type(enum pqos_cap_type type)
 	const uint64_t not_cbm = get_not_cbm(type);
 	const uint64_t contention_cbm = get_contention_mask(type);
 
-	if (0 == not_cbm)
+	if (UINT64_MAX == not_cbm || UINT64_MAX == contention_cbm)
 		return -EINVAL;
 
 	for (i = 0; i < g_cfg.config_count; i++) {
@@ -672,11 +799,13 @@ check_cbm_len_and_contention_type(enum pqos_cap_type type)
 		if (!is_valid_rdt_ca(ca))
 			continue;
 
-		mask = get_ored_cbm_rdt_ca(ca);
+		mask = get_cumulative_cbm_rdt_ca(ca);
+		if (UINT64_MAX == mask)
+			return -EFAULT;
 
 		if ((mask & not_cbm) != 0) {
-			printf("CAT: One or more of requested %s CBM "
-				"masks (", get_type_str_rdt_ca(ca));
+			printf("CAT: One or more of requested %s CBMs "
+				"(", get_type_str_rdt_ca(ca));
 			print_rdt_ca(ca);
 			printf(") not supported by system "
 				"(too long).\n");
@@ -685,34 +814,38 @@ check_cbm_len_and_contention_type(enum pqos_cap_type type)
 
 		/* Just a note */
 		if ((mask & contention_cbm) != 0) {
-			printf("CAT: One or more of requested %s CBM "
-				"masks (", get_type_str_rdt_ca(ca));
+			printf("CAT: One or more of requested %s CBMs "
+				"(", get_type_str_rdt_ca(ca));
 			print_rdt_ca(ca);
-			printf(") overlap CBM contention mask.\n");
+			printf(") overlap contention mask.\n");
 		}
 	}
 
 	return 0;
 }
 
-
-/*
- * Check are requested CBMs supported by system,
- * warn if CBM overlaps contention mask
+/**
+ * @brief Checks are requested CBMs (of all types) supported by system
+ *
+ * Warn if CBM overlaps contention mask
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
  */
 static int
-check_cbm_len_and_contention(void)
+check_cbm_len_and_contention_all(void)
 {
 	int ret;
 
 	if (NULL != m_cap_l2ca) {
-		ret = check_cbm_len_and_contention_type(PQOS_CAP_TYPE_L2CA);
+		ret = check_cbm_len_and_contention(PQOS_CAP_TYPE_L2CA);
 		if (ret < 0)
 			return ret;
 	}
 
 	if (NULL != m_cap_l3ca) {
-		ret = check_cbm_len_and_contention_type(PQOS_CAP_TYPE_L3CA);
+		ret = check_cbm_len_and_contention(PQOS_CAP_TYPE_L3CA);
 		if (ret < 0)
 			return ret;
 	}
@@ -720,10 +853,23 @@ check_cbm_len_and_contention(void)
 	return 0;
 }
 
-/* Get unassigned COS */
+/**
+ * @brief Gets unassigned COS on \a socket
+ *
+ * With id no higher than \a hi_cos_id and store them in \a ca
+ *
+ * @param [in] socket CPU socket id
+ * @param [in] max_num_ca maximum number of classes of service
+ *             that can be accommodated at \a ca
+ * @param [in] hi_cos_id highest acceptable COS id
+ * @param [out] num_ca number of classes of service read into \a ca
+ * @param [out] ca table with read classes of service
+ *
+ * @return operation status
+ */
 static int
 get_avail_rdt_ca(const unsigned socket, const unsigned max_num_ca,
-		unsigned *num_ca, const unsigned hi_cos_id, struct rdt_ca ca)
+		const unsigned hi_cos_id, unsigned *num_ca, struct rdt_ca ca)
 {
 	unsigned cores[CPU_SETSIZE], cores_count = 0, num = 0;
 	unsigned class_id = 0, rdt_ca_class_id = 0, i = 0, j = 0,  k = 0;
@@ -799,7 +945,19 @@ get_avail_rdt_ca(const unsigned socket, const unsigned max_num_ca,
 	return ret;
 }
 
-/* Search for available/unassigned COS to use for passed config */
+/**
+ * @brief Searches for available/unassigned COS on \a socket.
+ *
+ * With id not higher than \a hi_cos_id to be use for config passed in \a ca,
+ * and store them in \a ca.
+ *
+ * @param [in] socket CPU socket id
+ * @param [in] num_cos number of config entries in \a ca
+ * @param [in] hi_cos_id highest acceptable COS id
+ * @param [out] ca CAT config to have COS id selected
+ *
+ * @return operation status
+ */
 static int
 select_rdt_ca(const unsigned socket, const unsigned num_cos,
 		const unsigned hi_cos_id, struct rdt_ca ca)
@@ -814,11 +972,11 @@ select_rdt_ca(const unsigned socket, const unsigned num_cos,
 		return PQOS_RETVAL_PARAM;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
-		ret = get_avail_rdt_ca(socket, PQOS_MAX_L2CA_COS, &num,
-			hi_cos_id, wrap_l2ca(avail_l2_ca));
+		ret = get_avail_rdt_ca(socket, PQOS_MAX_L2CA_COS, hi_cos_id,
+			&num, wrap_l2ca(avail_l2_ca));
 	else
-		ret = get_avail_rdt_ca(socket, PQOS_MAX_L3CA_COS, &num,
-			hi_cos_id, wrap_l3ca(avail_l3_ca));
+		ret = get_avail_rdt_ca(socket, PQOS_MAX_L3CA_COS, hi_cos_id,
+			&num, wrap_l3ca(avail_l3_ca));
 
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Error retrieving list of available %s COS!\n",
@@ -840,6 +998,16 @@ select_rdt_ca(const unsigned socket, const unsigned num_cos,
 	return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Gets highest COS id which could be used to configure pairs of classes
+ *        from \a l2 and \a l3.
+ *
+ * @param [in] l2 L2 CAT configuration
+ * @param [in] l3 L3 CAT configuration
+ *
+ * @return highest usable COS id
+ * @retval 0 on error
+ */
 static unsigned
 get_hi_cos_id(struct pqos_l2ca *l2, struct pqos_l3ca *l3)
 {
@@ -865,6 +1033,17 @@ get_hi_cos_id(struct pqos_l2ca *l2, struct pqos_l3ca *l3)
 		return num_l3_cos;
 }
 
+/**
+ * @brief Selects COS to be used on \a socket to configure
+ *        configuration contained in \a l2 , \a l3 pairs.
+ *
+ * @param [in] socket CPU socket id
+ * @param [in] num_cos number of entries in tables l2 and l3
+ * @param [in,out] l2 L2 CAT configuration table
+ * @param [in,out] l3 L3 CAT configuration table
+ *
+ * @return operation status
+ */
 static int
 cat_cos_assign(const unsigned socket, const unsigned num_cos,
 		struct pqos_l2ca *l2, struct pqos_l3ca *l3)
@@ -917,10 +1096,18 @@ cat_cos_assign(const unsigned socket, const unsigned num_cos,
 	return PQOS_RETVAL_OK;
 }
 
-/*
- * Set L2/L3 configuration, search for available COS on each socket
+/**
+ * @brief Sets L2/L3 configuration.
+ *
+ * Searches for available COS on each socket
  * (pqos_l*ca.class_id value is ignored)
- * */
+ *
+ * @param [in] num number of configuration entries in tables l2ca and l3ca
+ * @param [in] l2ca L2 CAT configuration table
+ * @param [in] l3ca L3 CAT configuration table
+ *
+ * @return operation status
+ */
 static int
 cat_atomic_set(const unsigned num, struct pqos_l2ca *l2ca,
 		struct pqos_l3ca *l3ca, cpu_set_t *cpu)
@@ -1065,7 +1252,11 @@ cat_atomic_set(const unsigned num, struct pqos_l2ca *l2ca,
 	return PQOS_RETVAL_OK;
 }
 
-/* Validate requested L3 CAT configuration */
+/**
+ * @brief Validates requested CAT configuration
+ *
+ * @return operation status
+ */
 static int
 cat_validate(void)
 {
@@ -1075,7 +1266,7 @@ cat_validate(void)
 	if (ret != 0)
 		return ret;
 
-	ret = check_cdp();
+	ret = check_cdp_support();
 	if (ret != 0)
 		return ret;
 
@@ -1083,7 +1274,7 @@ cat_validate(void)
 	if (ret != 0)
 		return ret;
 
-	ret = check_cbm_len_and_contention();
+	ret = check_cbm_len_and_contention_all();
 	if (ret != 0)
 		return ret;
 
@@ -1094,10 +1285,6 @@ cat_validate(void)
 	return 0;
 }
 
-/*
- * Check is it possible to fulfill requested L3 CAT configuration
- * and then configure system.
- */
 int
 cat_set(void)
 {
@@ -1205,7 +1392,11 @@ cat_exit(void)
 	cat_fini();
 }
 
-/* Signal handler to do clean-up on exit on signal */
+/**
+ * @brief Signal handler to do clean-up on exit on signal
+ *
+ * @param [in] signum signal
+ */
 static void
 signal_handler(int signum)
 {
@@ -1320,4 +1511,3 @@ print_cmd_line_rdt_config(void)
 		}
 	}
 }
-
