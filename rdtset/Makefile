@@ -118,7 +118,7 @@ CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
-	--std=c99 -I$(LIBDIR) --template=gcc \
+	--std=c99 -I$(LIBDIR) --template=gcc --suppress=uninitvar \
 	rdtset.c rdt.c rdt.h cpu.c cpu.h common.c common.h
 
 -include $(DEPFILES)
