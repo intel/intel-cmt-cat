@@ -862,7 +862,7 @@ ia32_perf_counter_start(const unsigned num_cores,
                 ret = msr_write(cores[i],
                                 IA32_MSR_PERF_GLOBAL_CTRL, global_ctrl_mask);
                 if (ret != MACHINE_RETVAL_OK)
-                                break;
+                        break;
         }
 
         if (i < num_cores)
@@ -1372,7 +1372,8 @@ get_event_id(const enum pqos_mon_event event)
 }
 
 /**
- * @brief Gives the difference between two values with regard to the possible overrun
+ * @brief Gives the difference between two values with regard to the possible
+ *        overrun
  *
  * @param old_value previous value
  * @param new_value current value

@@ -32,7 +32,8 @@
  */
 
 /**
- * @brief  Set of utility functions to operate on Platform QoS (pqos) data structures.
+ * @brief Set of utility functions to operate on Platform QoS (pqos) data
+ *        structures.
  *
  * These functions need no synchronization mechanisms.
  *

@@ -114,7 +114,7 @@ void monitor_stop(void);
  * @retval -1 error
  */
 int monitor_setup(const struct pqos_cpuinfo *cpu_info,
-                  const struct pqos_capability const *cap_mon);
+                  const struct pqos_capability * const cap_mon);
 
 /**
  * @brief Frees any allocated memory during parameter selection and

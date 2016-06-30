@@ -479,7 +479,7 @@ void selfn_monitor_cores(const char *arg)
 }
 
 int monitor_setup(const struct pqos_cpuinfo *cpu_info,
-                  const struct pqos_capability const *cap_mon)
+                  const struct pqos_capability * const cap_mon)
 {
         unsigned i;
         int ret;

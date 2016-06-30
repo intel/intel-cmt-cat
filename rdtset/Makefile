@@ -110,7 +110,8 @@ CHECKPATCH?=checkpatch.pl
 .PHONY: style
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
-	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,NEW_TYPEDEFS \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,NEW_TYPEDEFS,\
+	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,CONSTANT_COMPARISON \
 	-f rdtset.c -f rdt.c -f rdt.h -f cpu.c -f cpu.h -f common.c -f common.h
 
 CPPCHECK?=cppcheck

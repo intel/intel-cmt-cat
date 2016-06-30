@@ -562,9 +562,9 @@ read_ipc_counters(struct pqos_mon_data *group)
          * Calculate and set IPC value
          */
         if (cycles > 0)
-                        group->values.ipc = (double)instructions/(double)cycles;
-                else
-                        group->values.ipc = 0;
+                group->values.ipc = (double)instructions/(double)cycles;
+        else
+                group->values.ipc = 0;
 
         return PQOS_RETVAL_OK;
 }
