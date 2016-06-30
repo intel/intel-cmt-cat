@@ -68,7 +68,8 @@ CPU_COUNT(cpu_set_t *set)
  *
  * @param cpu params string
  *
- * @return 0 on success
+ * @return status
+ * @retval 0 on success
  * @retval negative on error (-errno)
  */
 int parse_cpu(const char *cpu);
@@ -78,7 +79,8 @@ int parse_cpu(const char *cpu);
  *
  * @param pid pid of process (0 for current)
  *
- * @return 0 on success
+ * @return status
+ * @retval 0 on success
  * @retval -1 on error
  */
 int set_affinity(pid_t pid);

@@ -221,7 +221,7 @@ print_usage(char *prgname, unsigned short_usage)
 	printf("Run \"id\" command on CPU 1 using four L3 cache-ways (mask 0xf)"
 		",\nkeeping sudo elevated privileges:\n"
 		"    -3 '0xf@1' -c 1 -k id\n"
-		"    -t '(0xf)@(1)' -c 1 -k id\n\n");
+		"    -t 'l3(0xf)@(1)' -c 1 -k id\n\n");
 
 	printf("Examples CAT configuration strings:\n"
 		"    -3 '0xf@1'\n"

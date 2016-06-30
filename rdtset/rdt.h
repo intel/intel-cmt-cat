@@ -43,7 +43,8 @@ extern "C" {
 /**
  * @brief Initialize libpqos and configure L3 CAT
  *
- * @return 0 on success
+ * @return status
+ * @retval 0 on success
  * @retval negative on error (-errno)
  */
 int cat_init(void);
@@ -71,7 +72,7 @@ void cat_exit(void);
  *       e.g. '0x00F00@(1,3), 0x0FF00@(4-6), 0xF0000@7'
  *       - CPUs 1 and 3 share its 4 ways with CPUs 4, 5 and 6;
  *       - CPUs 4,5 and 6 share half (4 out of 8 ways) of its L3 with 1 and 3;
- *       - CPUs 4,5 and 6 have exclusive access to 4 out of  8 ways;
+ *       - CPUs 4,5 and 6 have exclusive access to 4 out of 8 ways;
  *       - CPU 7 has exclusive access to all of its 4 ways;
  *
  *       e.g. '(0x00C00,0x00300)@(1,3)' for a CDP enabled system
@@ -80,7 +81,8 @@ void cat_exit(void);
  *
  * @param l3ca params string
  *
- * @return 0 on success
+ * @return parse status
+ * @retval 0 on success
  * @retval negative on error (-errno)
  */
 int parse_l3(const char *l3ca);
@@ -102,7 +104,7 @@ int parse_reset(const char *cpu);
  * @param rdtstr params string
  *
  * @return parse status
- * @retval 0 on success*
+ * @retval 0 on success
  * @retval negative on error (-errno)
  */
 int parse_rdt(char *rdtstr);
@@ -112,7 +114,7 @@ int parse_rdt(char *rdtstr);
  * and then configure system.
  *
  * @return status
- * @retval 0 on success*
+ * @retval 0 on success
  * @retval negative on error (-errno)
  */
 int cat_set(void);
@@ -121,7 +123,7 @@ int cat_set(void);
  * @brief Reset COS association (assign COS#0) on listed CPUs
  *
  * @return status
- * @retval 0 on success*
+ * @retval 0 on success
  * @retval negative on error (-errno)
  */
 int cat_reset(void);
