@@ -178,30 +178,18 @@ execute_cmd(int argc, char **argv)
 static void
 print_usage(char *prgname, unsigned short_usage)
 {
-	printf("Usage: %s -3 <cbm@cpulist> -c <cpulist> "
-		"(-p <pid> | [-k] cmd [<args>...])\n"
-		"       %s -t <feature(mask)...@(cpulist);> -c <cpulist> "
-		"(-p <pid> | [-k] cmd [<args>...])\n\n"
-
-		"       %s -r <cpulist> -3 <cbm@cpulist> -c <cpulist> "
+	printf("Usage: %s -t <feature(mask)...@(cpulist);> -c <cpulist> "
 		"(-p <pid> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -t <feature(mask)...@(cpulist);> "
-		"-c <cpulist> (-p <pid> | [-k] cmd [<args>...])\n\n"
-
+		"-c <cpulist> (-p <pid> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -c <cpulist> "
-		"(-p <pid> | [-k] cmd [<args>...])\n\n"
-
-		"       %s -r <cpulist> -3 <cbm@cpulist> -p <pid>\n"
+		"(-p <pid> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -t <feature(mask)...@(cpulist);> "
 		"-p <pid>\n\n",
-		prgname, prgname, prgname, prgname, prgname, prgname, prgname);
+		prgname, prgname, prgname, prgname);
 
 	printf("Options:\n"
-		" -3 <cbm@cpulist>, --l3 <cbm@cpulist>  "
-		"specify L3 CAT configuration\n"
-		" -t <feature(mask)...@(cpulist);>      "
-		"specify RDT configuration\n"
-		" --rdt <feature(mask)...@(cpulist);>   "
+		" -t/--rdt <feature(mask)...@(cpulist);>   "
 		"specify RDT configuration\n"
 		"  Features:\n"
 		"   2, l2\n"
@@ -211,7 +199,7 @@ print_usage(char *prgname, unsigned short_usage)
 		" -p <pid>, --pid <pid>                 "
 		"operate on existing given pid\n"
 		" -r <cpulist>, --reset <cpulist>       "
-		"reset L3 CAT for CPUs\n"
+		"reset CAT for CPUs\n"
 		" -k, --sudokeep                        "
 		"do not drop sudo elevated privileges\n"
 		" -v, --verbose                         "
@@ -226,11 +214,9 @@ print_usage(char *prgname, unsigned short_usage)
 
 	printf("Run \"id\" command on CPU 1 using four L3 cache-ways (mask 0xf)"
 		",\nkeeping sudo elevated privileges:\n"
-		"    -3 '0xf@1' -c 1 -k id\n"
 		"    -t 'l3(0xf)@(1)' -c 1 -k id\n\n");
 
 	printf("Examples CAT configuration strings:\n"
-		"    -3 '0xf@1'\n"
 		"    -t 'l3(0xf)@(1)'\n"
 		"        CPU 1 uses four L3 cache-ways (mask 0xf)\n\n"
 
@@ -245,21 +231,18 @@ print_usage(char *prgname, unsigned short_usage)
 		"cache-ways\n"
 		"        L2 cache-ways used by CPU 1 and 2 are overlapping\n\n"
 
-		"    -3 '0xf@2,0xf0@(3,4,5)'\n"
 		"    -t 'l3(0xf)@(2);l3(0xf0)@(3,4,5)'\n"
 		"        CPU 2 uses four L3 cache-ways (mask 0xf), "
 		"CPUs 3-5 share four L3 cache-ways\n"
 		"        (mask 0xf0), L3 cache-ways used by CPU 2 and 3-4 are "
 		"non-overlapping\n\n"
 
-		"    -3 '0xf@(0-2),0xf0@(3,4,5)'\n"
 		"    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)'\n"
 		"        CPUs 0-2 share four L3 cache-ways (mask 0xf), "
 		"CPUs 3-5 share four L3 cache-ways\n"
 		"        (mask 0xf0), L3 cache-ways used by CPUs 0-2 and 3-5 "
 		"are non-overlapping\n\n"
 
-		"    -3 '(0xf,0xf0)@1'\n"
 		"    -t 'l3(0xf,0xf0)@(1)'\n"
 		"        On CDP enabled system, CPU 1 uses four L3 cache-ways "
 		"for code (mask 0xf)\n"
@@ -275,10 +258,8 @@ print_usage(char *prgname, unsigned short_usage)
 		"        reset CAT for CPUs 0,1,2,3,4,5\n\n");
 
 	printf("Example usage of RESET option:\n"
-		"    -3 '0xf@(0-2),0xf0@(3,4,5)' -c 0-5 -p $BASHPID\n"
 		"    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-5 -p $BASHPID\n"
 		"        Configure CAT and CPU affinity for BASH process\n\n"
-		"    -r 0-5 -3 '0xff@(0-5)' -c 0-5 -p $BASHPID\n"
 		"    -r 0-5 -t 'l3(0xff)@(0-5)' -c 0-5 -p $BASHPID\n"
 		"        Change CAT configuration of CPUs used by BASH "
 		"process\n\n"
@@ -290,7 +271,7 @@ print_usage(char *prgname, unsigned short_usage)
  * @brief Validates arguments combination
  *
  * @param [in] f_r flag for -r argument
- * @param [in] f_3_or_t flag for -3 or -t arguments
+ * @param [in] f_t flag for -t arguments
  * @param [in] f_c flag for -c argument
  * @param [in] f_p flag for -p argument
  * @param [in] cmd flag for command to be executed
@@ -300,7 +281,7 @@ print_usage(char *prgname, unsigned short_usage)
  * @retval 0 on failure
  */
 static int
-validate_args(const int f_r, __attribute__((unused)) const int f_3_or_t,
+validate_args(const int f_r, __attribute__((unused)) const int f_t,
 		const int f_c, const int f_p, const int cmd)
 {
 	return (f_c && !f_p && cmd) ||
@@ -325,7 +306,6 @@ parse_args(int argc, char **argv)
 	char **argvopt = argv;
 
 	static const struct option lgopts[] = {
-		{ "l3",		required_argument,	0, '3' },
 		{ "cpu",	required_argument,	0, 'c' },
 		{ "pid",	required_argument,	0, 'p' },
 		{ "reset",	required_argument,	0, 'r' },
@@ -336,14 +316,8 @@ parse_args(int argc, char **argv)
 		{ NULL, 0, 0, 0 } };
 
 	while (-1 != (opt = getopt_long
-			(argc, argvopt, "+3:c:p:r:t:kvh", lgopts, NULL))) {
-		if (opt == '3') {
-			retval = parse_l3(optarg);
-			if (retval != 0) {
-				fprintf(stderr, "Invalid L3 parameters!\n");
-				goto exit;
-			}
-		} else if (opt == 'c') {
+			(argc, argvopt, "+c:p:r:t:kvh", lgopts, NULL))) {
+		if (opt == 'c') {
 			retval = parse_cpu(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid CPU parameters!\n");
@@ -431,7 +405,7 @@ main(int argc, char **argv)
 		print_cmd_line_cpu_config();
 	}
 
-	/* Initialize the PQoS library and configure L3 CAT */
+	/* Initialize the PQoS library and configure CAT */
 	ret = cat_init();
 	if (ret < 0) {
 		fprintf(stderr, "%s,%s:%d CAT init failed!\n",
