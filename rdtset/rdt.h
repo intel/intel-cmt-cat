@@ -74,21 +74,21 @@ int parse_reset(const char *cpu);
  * @brief Parses -t/--rdt params and stores configuration in g_cfg
  *
  * @note The format pattern:
- *       --rdt='<[l3(cbm)|l2(cbm)]@(cpus)>[;<l3(ccbm,dcbm)@(cpus)>...]'
+ *       --rdt='l2=cbm;l3=cbm;cpu=cpulist'
  *       Capacity bit mask (cbm) could be a single mask
  *       or for a L3 CDP enabled system, a group of two masks
  *       ("code cbm" and "data cbm")
  *       cpus could be a single digit/range or a group.
  *
- *       e.g. 'l3(0x00F00)@(1,3);l3(0x0FF00)@(4-6);l3(0xF0000)@7'
- *       - CPUs 1 and 3 share its 4 ways of L3 with CPUs 4, 5 and 6;
- *       - CPUs 4,5 and 6 share half (4 out of 8 ways) of its L3 with 1 and 3;
- *       - CPUs 4,5 and 6 have exclusive access to 4 out of 8 L3 ways;
- *       - CPU 7 has exclusive access to all of its 4 L3 ways;
+ *       e.g. 'l3=0x00F00;cpu=1,3'
+ *       - CPUs 1 and 3 have 4 ways of L3 assigned;
  *
- *       e.g. 'l3(0x00C00,0x00300)@(1,3)' for a CDP enabled system
- *       - cpus 1 and 3 have access to 2 L3 ways for code
- *       and 2 L3 ways for data, code and data ways are not overlapping.;
+ *       e.g. 'l2=0xF0000;l3=0x0FF00;cpu=4-6'
+ *       - CPUs 4,5 and 6 have 4 ways of L2 and 8 ways of L3 assigned;
+ *
+ *       e.g. 'l3=0x00C00,0x00300;cpu=1,3' for a CDP enabled system
+ *       - cpus 1 and 3 have access to 2 ways of L3 for code
+ *       and 2 ways of L3 for data, code and data ways are not overlapping.;
  *
  * @param [in] rdtstr params string
  *

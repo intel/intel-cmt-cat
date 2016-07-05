@@ -381,77 +381,122 @@ str_to_cbm_rdt_ca(const char *param, struct rdt_ca ca)
 	return 0;
 }
 
+static char
+simplify_feature(const char *feature)
+{
+	static const struct {
+		const char *feature_long;
+		const char feature_char;
+	} feature_lut[] = {
+		{"cpu", 'c'},
+		{"l2", '2'},
+		{"l3", '3'},
+		{NULL, 0}
+	};
+
+
+	if (feature == NULL)
+		return '?';
+
+	if (strlen(feature) > 1) {
+		unsigned i = 0;
+
+		while (feature_lut[i].feature_long != NULL) {
+			if (strcmp(feature, feature_lut[i].feature_long) == 0)
+				return feature_lut[i].feature_char;
+
+			i++;
+		}
+	} else
+		return feature[0];
+
+	return '?';
+}
+
 int
 parse_rdt(char *rdtstr)
 {
-	char *group_saveptr = NULL;
-	char *group = strtok_r(rdtstr, ";", &group_saveptr);
-	unsigned idx = 0;
-	unsigned min_len = strlen("3(f)@0");
+	char *rdtstr_saveptr = NULL;
+	char *group = NULL;
+	unsigned idx = g_cfg.config_count;
+	const struct rdt_ca l2ca = wrap_l2ca(&g_cfg.config[idx].l2);
+	const struct rdt_ca l3ca = wrap_l3ca(&g_cfg.config[idx].l3);
+	const unsigned min_len_arg = strlen("3=f;c=0");
+	const unsigned min_len_group = strlen("3=f");
 	int ret;
 
-	if (NULL == rdtstr)
+	if (rdtstr == NULL)
 		return -EINVAL;
 
-	while (group != NULL) {
-		char *feature_saveptr = NULL;
+	/* Min len check, 1 feature + 1 CPU e.g. "3=f;c=0" */
+	if (strlen(rdtstr) < min_len_arg) {
+		printf("Invalid argument: \"%s\"\n", rdtstr);
+		return -EINVAL;
+	}
 
-		/* Min len check, 1 feature + 1 CPU e.g. "3(f)@0" */
-		if (strlen(group) < min_len) {
-			printf("Invalid group: \"%s\"\n", group);
+	group = strtok_r(rdtstr, ";", &rdtstr_saveptr);
+	while (group != NULL) {
+		char *group_saveptr = NULL;
+
+		/* Min len check, 1 feature "3=f" */
+		if (strlen(group) < min_len_group) {
+			printf("Invalid option: \"%s\"\n", group);
 			return -EINVAL;
 		}
 
-		char *feature = strtok_r(group, ")", &feature_saveptr);
+		const char *feature = strtok_r(group, "=", &group_saveptr);
+		const char *param = strtok_r(NULL, "=", &group_saveptr);
 
-		while (feature != NULL) {
-			if (strlen(feature) < 2 ||
-					(0 == strspn(feature, "23@") &&
-					(2 != strspn(feature, "l23")))) {
-				printf("Invalid option: \"%s\"\n", feature);
-				return -EINVAL;
-			}
-
-			char *param = strstr(feature, "(");
-
-			if (param == NULL) {
-				printf("Invalid option: \"%s\"\n", feature);
-				return -EINVAL;
-			}
-			param++;
-
-			if (1 == strspn(feature, "2") ||
-					feature == strstr(feature, "l2")) {
-				ret = str_to_cbm_rdt_ca(param,
-					wrap_l2ca(&g_cfg.config[idx].l2));
-				if (ret < 0)
-					return ret;
-			} else if (1 == strspn(feature, "3") ||
-					feature == strstr(feature, "l3")) {
-				ret = str_to_cbm_rdt_ca(param,
-					wrap_l3ca(&g_cfg.config[idx].l3));
-				if (ret < 0)
-					return ret;
-			} else if (1 == strspn(feature, "@")) {
-				ret = str_to_cpuset(param, strlen(param),
-					&g_cfg.config[idx].cpumask);
-				if (ret <= 0)
-					return -EINVAL;
-
-				if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0)
-					return -EINVAL;
-			}
-
-			feature = strtok_r(NULL, ")", &feature_saveptr);
+		if (feature == NULL || param == NULL) {
+			printf("Invalid option: \"%s\"\n", group);
+			return -EINVAL;
 		}
 
-		group = strtok_r(NULL, ";", &group_saveptr);
-		idx++;
+		switch (simplify_feature(feature)) {
+		case '2':
+			if (is_valid_rdt_ca(l2ca))
+				return -EINVAL;
+
+			ret = str_to_cbm_rdt_ca(param, l2ca);
+			if (ret < 0)
+				return ret;
+			break;
+
+		case '3':
+			if (is_valid_rdt_ca(l3ca))
+				return -EINVAL;
+
+			ret = str_to_cbm_rdt_ca(param, l3ca);
+			if (ret < 0)
+				return ret;
+			break;
+
+		case 'c':
+			if (CPU_COUNT(&g_cfg.config[idx].cpumask) != 0)
+				return -EINVAL;
+
+			ret = str_to_cpuset(param, strlen(param),
+				&g_cfg.config[idx].cpumask);
+			if (ret <= 0)
+				return -EINVAL;
+
+			if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0)
+				return -EINVAL;
+			break;
+
+		default:
+			printf("Invalid option: \"%s\"\n", feature);
+			return -EINVAL;
+		}
+
+		group = strtok_r(NULL, ";", &rdtstr_saveptr);
 	}
 
-	g_cfg.config_count = idx;
-	if (g_cfg.config_count == 0)
+	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0 ||
+			(!is_valid_rdt_ca(l2ca) && !is_valid_rdt_ca(l3ca)))
 		return -EINVAL;
+
+	g_cfg.config_count++;
 
 	return 0;
 }

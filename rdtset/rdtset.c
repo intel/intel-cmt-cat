@@ -178,18 +178,18 @@ execute_cmd(int argc, char **argv)
 static void
 print_usage(char *prgname, unsigned short_usage)
 {
-	printf("Usage: %s -t <feature(mask)...@(cpulist);> -c <cpulist> "
+	printf("Usage: %s <-t feature=value;...cpu=cpulist>... -c <cpulist> "
 		"(-p <pid> | [-k] cmd [<args>...])\n"
-		"       %s -r <cpulist> -t <feature(mask)...@(cpulist);> "
+		"       %s -r <cpulist> <-t feature=value;...cpu=cpulist>... "
 		"-c <cpulist> (-p <pid> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -c <cpulist> "
 		"(-p <pid> | [-k] cmd [<args>...])\n"
-		"       %s -r <cpulist> -t <feature(mask)...@(cpulist);> "
+		"       %s -r <cpulist> <-t feature=value;...cpu=cpulist>... "
 		"-p <pid>\n\n",
 		prgname, prgname, prgname, prgname);
 
 	printf("Options:\n"
-		" -t/--rdt <feature(mask)...@(cpulist);>   "
+		" -t/--rdt feature=value;...cpu=cpulist "
 		"specify RDT configuration\n"
 		"  Features:\n"
 		"   2, l2\n"
@@ -214,36 +214,36 @@ print_usage(char *prgname, unsigned short_usage)
 
 	printf("Run \"id\" command on CPU 1 using four L3 cache-ways (mask 0xf)"
 		",\nkeeping sudo elevated privileges:\n"
-		"    -t 'l3(0xf)@(1)' -c 1 -k id\n\n");
+		"    -t 'l3=0xf;cpu=1' -c 1 -k id\n\n");
 
 	printf("Examples CAT configuration strings:\n"
-		"    -t 'l3(0xf)@(1)'\n"
+		"    -t 'l3=0xf;cpu=1'\n"
 		"        CPU 1 uses four L3 cache-ways (mask 0xf)\n\n"
 
-		"    -t 'l2(0x1)l3(0xf)@(1)'\n"
+		"    -t 'l2=0x1;l3=0xf;cpu=1'\n"
 		"        CPU 1 uses one L2 (mask 0x1) and four L3 (mask 0xf) "
 		"cache-ways\n\n"
 
-		"    -t 'l2(0x1)l3(0xf)@(1);l2(0x1)@(2)'\n"
+		"    -t 'l2=0x1;l3=0xf;cpu=1' -t 'l2=0x1;cpu=2'\n"
 		"        CPU 1 uses one L2 (mask 0x1) and four L3 (mask 0xf) "
 		"cache-ways\n"
 		"        CPU 2 uses one L2 (mask 0x1) and default number of L3 "
 		"cache-ways\n"
 		"        L2 cache-ways used by CPU 1 and 2 are overlapping\n\n"
 
-		"    -t 'l3(0xf)@(2);l3(0xf0)@(3,4,5)'\n"
+		"    -t 'l3=0xf;cpu=2' -t 'l3=0xf0;cpu=3,4,5'\n"
 		"        CPU 2 uses four L3 cache-ways (mask 0xf), "
 		"CPUs 3-5 share four L3 cache-ways\n"
 		"        (mask 0xf0), L3 cache-ways used by CPU 2 and 3-4 are "
 		"non-overlapping\n\n"
 
-		"    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)'\n"
+		"    -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5'\n"
 		"        CPUs 0-2 share four L3 cache-ways (mask 0xf), "
 		"CPUs 3-5 share four L3 cache-ways\n"
 		"        (mask 0xf0), L3 cache-ways used by CPUs 0-2 and 3-5 "
 		"are non-overlapping\n\n"
 
-		"    -t 'l3(0xf,0xf0)@(1)'\n"
+		"    -t 'l3=0xf,0xf0;cpu=1'\n"
 		"        On CDP enabled system, CPU 1 uses four L3 cache-ways "
 		"for code (mask 0xf)\n"
 		"        and four L3 cache-ways for data (mask 0xf0),\n"
@@ -258,9 +258,9 @@ print_usage(char *prgname, unsigned short_usage)
 		"        reset CAT for CPUs 0,1,2,3,4,5\n\n");
 
 	printf("Example usage of RESET option:\n"
-		"    -t 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)' -c 0-5 -p $BASHPID\n"
+		"    -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-5 -p $BASHPID\n"
 		"        Configure CAT and CPU affinity for BASH process\n\n"
-		"    -r 0-5 -t 'l3(0xff)@(0-5)' -c 0-5 -p $BASHPID\n"
+		"    -r 0-5 -t 'l3=0xff;cpu=0-5' -c 0-5 -p $BASHPID\n"
 		"        Change CAT configuration of CPUs used by BASH "
 		"process\n\n"
 		"    -r 0-5 -p $BASHPID\n"

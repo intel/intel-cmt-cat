@@ -20,16 +20,16 @@ rtdset \- Task Set for Intel(R) Resource Director Technology
 .br
 .SH SYNOPSIS
 .B rdtset
-.RI "[-t <feature(mask)...@(cpulist);>] -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
-.br		
+.RI "<-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
+.br
 .B rdtset
-.RI "-r <cpulist> -t <feature(mask)...@(cpulist);> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
-.br		
+.RI "-r <cpulist> <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
+.br
 .B rdtset
 .RI "-r <cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
-.br		
+.br
 .B rdtset
-.RI "-r <cpulist> [-t <feature(mask)...@(cpulist);>] -p <pid>"
+.RI "-r <cpulist> <-t feature=value;...cpu=cpulist>... -p <pid>"
 .SH DESCRIPTION
 For more details on Intel(R) Resource Director Technology see
 .br
@@ -54,10 +54,8 @@ Show help
 .B \-v, \-\-verbose
 Verbose mode
 .TP
-.B \-t\ <feature(mask)...@(cpulist)>, \-\-rdt\ <feature(mask)...@(cpulist)>
-Specify RDT configuration, multiple
-.B <feature(mask)...@(cpulist)>
-are separated by semicolon.
+.B \-t\ feature=value;...cpu=cpulist, \-\-rdt\ feature=value;...cpu=cpulist
+Specify RDT configuration, single class configuration per -t, multiple -t options allowed.
 .br
 Features:
 .br
@@ -67,21 +65,21 @@ Features:
 
 For example:
 
-.B \-t\ 'l3(0xf)@(1)'
+.B \-t\ 'l3=0xf;cpu=1'
 .br
 CPU 1 uses four L3 cache-ways (mask 0xf)
 
-.B \-t\ 'l3(0xf)@(2);l3(0xf0)@(3,4,5)'
+.B \-t\ 'l3=0xf;cpu=2' -t 'l3=0xf0;cpu=3,4,5'
 .br
 CPU 2 uses four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
 (mask 0xf0), L3 cache-ways used by CPU 2 and 3-4 are non-overlapping
 
-.B \-t\ 'l3(0xf)@(0-2);l3(0xf0)@(3,4,5)'
+.B \-t\ 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5'
 .br
 CPUs 0-2 share four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
 (mask 0xf0), L3 cache-ways used by CPUs 0-2 and 3-5 are non-overlapping
 
-.B \-t\ 'l3(0xf,0xf0)@(1)'
+.B \-t\ 'l3=0xf,0xf0;cpu=1'
 .br
 On CDP enabled system, CPU 1 uses four cache-ways for code (mask 0xf)
 and four cache-ways for data (mask 0xf0),
@@ -104,7 +102,7 @@ For example:
 .br
 Reset CAT configuration of CPUs 0-5
 
-.B \-r 0-5 \-t\ 'l3(0xf0)@(0-5)' \-c 0-5 \-p $BASHPID
+.B \-r 0-5 \-t\ 'l3=0xf0;cpu=0-5' \-c 0-5 \-p $BASHPID
 .br
 Reconfigure CAT for CPUs 0-5
 .br
