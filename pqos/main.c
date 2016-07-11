@@ -462,7 +462,7 @@ static const char help_printf_long[] =
         "          CLASSDEF format is 'TYPE:ID=DEFINITION;'.\n"
         "          To specify sockets 'TYPE[@SOCK_LIST]:ID=DEFINITION;'.\n"
         "          Example: 'llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00',\n"
-	"                   'llc:0d=0xfff;llc:0c=0xfff00'.\n"
+	"                   'llc:0d=0xfff;llc:0c=0xfff00;l2:2=0x3f;l2@2:1=0xf'.\n"
         "  -a CLASS2CORE, --alloc-assoc=CLASS2CORE\n"
         "          associate cores with an allocation class.\n"
         "          CLASS2CORE format is 'TYPE:ID=CORE_LIST'.\n"
@@ -540,8 +540,8 @@ int main(int argc, char **argv)
         struct pqos_config cfg;
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
-        const struct pqos_capability *cap_mon = NULL, *cap_l3ca = NULL,
-                *cap_l2ca = NULL;
+        const struct pqos_capability *cap_mon = NULL,
+		*cap_l3ca = NULL, *cap_l2ca = NULL;
         unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
         int cmd, ret, exit_val = EXIT_SUCCESS;
         int opt_index = 0;
@@ -723,7 +723,7 @@ int main(int argc, char **argv)
                 }
         }
 
-        switch (alloc_apply(cap_l3ca, sock_count, sockets)) {
+        switch (alloc_apply(cap_l3ca, cap_l2ca, sock_count, sockets)) {
         case 0: /* nothing to apply */
                 break;
         case 1: /* new allocation config applied and all is good */

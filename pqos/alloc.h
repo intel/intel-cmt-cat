@@ -82,6 +82,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
  *        selfn_xxxx() functions
  *
  * @param [in] cap_l3ca CAT capability structures
+ * @param [in] cap_l2ca CAT capability structures
  * @param [in] sock_count number of detected CPU sockets
  * @param [in] sockets arrays with detected CPU socket id's
  *
@@ -91,6 +92,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
  * @retval -1 an error occurred when applying new config
  */
 int alloc_apply(const struct pqos_capability *cap_l3ca,
+                const struct pqos_capability *cap_l2ca,
                 unsigned sock_count, unsigned *sockets);
 
 

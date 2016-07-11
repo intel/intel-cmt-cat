@@ -52,42 +52,94 @@
 #define CAT_UPDATE_SCOPE_CODE 2    /**< update COS code mask */
 
 /**
- * Number of classes of service (COS) selected for modification
- * (L3 cache allocation)
+ * L3/L2 CAT selected
  */
-static int sel_l3ca_cos_num = 0;
+enum sel_cat_type {
+	L3CA,
+	L2CA
+};
 
 /**
- * New settings for L3 cache
+ * Number of classes of service (COS) selected for modification
+ * (L3/L2 cache allocation)
+ */
+static int sel_cat_cos_num = 0;
+
+/**
+ * New settings for L3 & L2 cache
  * allocation classes of service
  */
-struct l3ca_cos_sock {
-        unsigned cos_num;
-        struct pqos_l3ca cos_tab[PQOS_MAX_L3CA_COS];
+struct cat_cos_sock {
+        unsigned cos_num_l3ca;
+	unsigned cos_num_l2ca;
+        struct pqos_l3ca cos_tab_l3ca[PQOS_MAX_L3CA_COS];
+	struct pqos_l2ca cos_tab_l2ca[PQOS_MAX_L2CA_COS];
 };
 
 /**
  * Table of COS settings for selected sockets
  */
-static struct l3ca_cos_sock sel_l3ca_cos_tab[PQOS_MAX_SOCKETS];
+static struct cat_cos_sock sel_cat_cos_tab[PQOS_MAX_SOCKETS];
 
 /**
  * COS settings for all sockets
  */
-static struct l3ca_cos_sock sel_l3ca_cos_all;
+static struct cat_cos_sock sel_cat_cos_all;
 
 /**
  * Number of core to COS associations to be done
  */
-static int sel_l3ca_assoc_num = 0;
+static int sel_cat_assoc_num = 0;
 
 /**
- * Core to L3 COS associations details
+ * Core to COS associations details
  */
 static struct {
         unsigned core;
         unsigned class_id;
-} sel_l3ca_assoc_tab[PQOS_MAX_CORES];
+} sel_cat_assoc_tab[PQOS_MAX_CORES];
+
+/**
+ * @brief Sets L3/L2 allocation classes on a socket
+ *
+ * @param ca structure containing L3/L2 CAT info
+ * @param s socket id
+ * @return number of classes that have been set
+ * @retval positive - number of classes set
+ * @retval negative - error
+ */
+static int
+set_alloc(struct cat_cos_sock *ca, const unsigned s)
+{
+	int ret, set = 0;
+
+	if (s >= PQOS_MAX_SOCKETS || ca == NULL)
+		return -1;
+
+	if (ca->cos_num_l3ca) {
+		ret = pqos_l3ca_set(s, ca->cos_num_l3ca, ca->cos_tab_l3ca);
+		ASSERT(ret == PQOS_RETVAL_OK);
+		if (ret != PQOS_RETVAL_OK)
+			goto set_l3_cos_failure;
+		set += ca->cos_num_l3ca;
+	}
+	if (ca->cos_num_l2ca) {
+		ret = pqos_l2ca_set(s, ca->cos_num_l2ca, ca->cos_tab_l2ca);
+		ASSERT(ret == PQOS_RETVAL_OK);
+		if (ret != PQOS_RETVAL_OK)
+			goto set_l2_cos_failure;
+		set += ca->cos_num_l2ca;
+	}
+	return set;
+
+set_l3_cos_failure:
+	printf("Setting up L3 CAT class of service failed!\n");
+	return -1;
+
+set_l2_cos_failure:
+	printf("Setting up L2 CAT class of service failed!\n");
+	return -1;
+}
 
 /**
  * @brief Sets up allocation classes of service on selected CPU sockets
@@ -108,10 +160,11 @@ set_allocation_class(const unsigned sock_count, const unsigned *sockets)
         /**
          * Check if selected sockets exist on the system
          */
-        for (i = 0; i < DIM(sel_l3ca_cos_tab); i++) {
+        for (i = 0; i < DIM(sel_cat_cos_tab); i++) {
                 unsigned j;
 
-                if (sel_l3ca_cos_tab[i].cos_num == 0)
+                if (sel_cat_cos_tab[i].cos_num_l3ca == 0 &&
+		    sel_cat_cos_tab[i].cos_num_l2ca == 0)
                         continue;
 
                 for (j = 0; j < sock_count; j++)
@@ -126,44 +179,27 @@ set_allocation_class(const unsigned sock_count, const unsigned *sockets)
          * Set selected classes of service
          */
         for (i = 0; i < sock_count; i++) {
+		int ret;
                 unsigned s = sockets[i];
-                int ret;
 
-                if (s >= DIM(sel_l3ca_cos_tab))
+                if (s >= DIM(sel_cat_cos_tab))
                         continue;
                 /**
-                 * Set COS that apply to all sockets
+                 * Set L3/L2 COS that apply to all sockets
                  */
-                if (sel_l3ca_cos_all.cos_num) {
-                        ret = pqos_l3ca_set(s, sel_l3ca_cos_all.cos_num,
-                                            sel_l3ca_cos_all.cos_tab);
-                        ASSERT(ret == PQOS_RETVAL_OK);
-                        if (ret != PQOS_RETVAL_OK)
-                                goto set_cos_failure;
-
-                        set += sel_l3ca_cos_all.cos_num;
-                }
+		ret = set_alloc(&sel_cat_cos_all, s);
+		if (ret < 0)
+			return ret;
+		set += ret;
                 /**
-                 * Set COS that apply to this socket
+                 * Set L3/L2 COS that apply to this socket
                  */
-                if (sel_l3ca_cos_tab[s].cos_num) {
-                        ret = pqos_l3ca_set(s, sel_l3ca_cos_tab[s].cos_num,
-                                            sel_l3ca_cos_tab[s].cos_tab);
-                        ASSERT(ret == PQOS_RETVAL_OK);
-                        if (ret != PQOS_RETVAL_OK)
-                                goto set_cos_failure;
-
-                        set += sel_l3ca_cos_tab[s].cos_num;
-                }
+		ret = set_alloc(&sel_cat_cos_tab[s], s);
+		if (ret < 0)
+			return ret;
+		set += ret;
         }
-
         return set;
-
-set_cos_failure:
-        printf("Setting up cache allocation "
-               "class of service failed!\n");
-
-        return -1;
 }
 
 /**
@@ -204,87 +240,157 @@ parse_cos_mask_type(char *str, int *scope, unsigned *id)
 }
 
 /**
- * @brief Updates the COS table with specified COS for a socket
+ * @brief Function to update L3 COS table
+ *
+ * @param sock structure that holds COS info for a socket
+ * @param id class id
+ * @param mask CBM to set
+ * @param scope CDP scope to be updated
+ */
+static void
+update_l3_tab(struct cat_cos_sock *sock, const unsigned id,
+	      const uint64_t mask, const int scope)
+{
+	unsigned i;
+
+	for (i = 0; i < sock->cos_num_l3ca; i++)
+                if (sock->cos_tab_l3ca[i].class_id == id)
+                        break;
+
+        if (i < sock->cos_num_l3ca) {
+		/**
+		 * This class is already on the list.
+                 * Don't allow for mixing CDP and non-CDP formats.
+                 */
+                if ((sock->cos_tab_l3ca[i].cdp &&
+                     scope == CAT_UPDATE_SCOPE_BOTH) ||
+                    (!sock->cos_tab_l3ca[i].cdp &&
+                     scope != CAT_UPDATE_SCOPE_BOTH)) {
+                        printf("error: L3 COS%u defined twice using "
+			       "CDP and non-CDP format\n", id);
+                        exit(EXIT_FAILURE);
+                }
+
+                switch (scope) {
+                case CAT_UPDATE_SCOPE_BOTH:
+                        sock->cos_tab_l3ca[i].u.ways_mask = mask;
+                        break;
+                case CAT_UPDATE_SCOPE_CODE:
+                        sock->cos_tab_l3ca[i].u.s.code_mask = mask;
+                        break;
+                case CAT_UPDATE_SCOPE_DATA:
+                        sock->cos_tab_l3ca[i].u.s.data_mask = mask;
+                        break;
+                }
+        } else {
+		/**
+		 * New class selected - extend the list
+		 */
+                unsigned k = sock->cos_num_l3ca;
+
+                if (k >= PQOS_MAX_L3CA_COS) {
+                        printf("too many L3 allocation classes selected!\n");
+                        exit(EXIT_FAILURE);
+                }
+
+                sock->cos_tab_l3ca[k].class_id = id;
+
+                switch (scope) {
+                case CAT_UPDATE_SCOPE_BOTH:
+                        sock->cos_tab_l3ca[k].cdp = 0;
+                        sock->cos_tab_l3ca[k].u.ways_mask = mask;
+                        break;
+                case CAT_UPDATE_SCOPE_CODE:
+                        sock->cos_tab_l3ca[k].cdp = 1;
+                        sock->cos_tab_l3ca[k].u.s.code_mask = mask;
+                        /**
+                         * This will result in error during set operation
+                         * if data mask is not defined by the user.
+                         */
+                        sock->cos_tab_l3ca[k].u.s.data_mask = (uint64_t) (-1LL);
+                        break;
+                case CAT_UPDATE_SCOPE_DATA:
+                        sock->cos_tab_l3ca[k].cdp = 1;
+                        sock->cos_tab_l3ca[k].u.s.data_mask = mask;
+                        /**
+                         * This will result in error during set operation
+                         * if code mask is not defined by the user.
+                         */
+                        sock->cos_tab_l3ca[k].u.s.code_mask = (uint64_t) (-1LL);
+                        break;
+                }
+
+                sock->cos_num_l3ca++;
+                sel_cat_cos_num++;
+        }
+}
+
+/**
+ * @brief Function to update L2 COS tables
+ *
+ * @param sock structure that holds COS info for a socket
+ * @param id class id
+ * @param mask CBM to set
+ */
+static void
+update_l2_tab(struct cat_cos_sock *sock, const unsigned id, const uint64_t mask)
+{
+	unsigned i;
+
+	for (i = 0; i < sock->cos_num_l2ca; i++)
+		if (sock->cos_tab_l2ca[i].class_id == id)
+			break;
+
+	if (i < sock->cos_num_l2ca)
+		/**
+		 * This class is already on the list.
+		 */
+		sock->cos_tab_l2ca[i].ways_mask = mask;
+	else {
+		/**
+		 * New class selected - extend the list
+		 */
+		unsigned k = sock->cos_num_l2ca;
+
+		if (k >= PQOS_MAX_L2CA_COS) {
+			printf("too many L2 allocation "
+			       "classes selected!\n");
+			exit(EXIT_FAILURE);
+		}
+
+		sock->cos_tab_l2ca[k].class_id = id;
+		sock->cos_tab_l2ca[k].ways_mask = mask;
+		sock->cos_num_l2ca++;
+		sel_cat_cos_num++;
+	}
+}
+
+/**
+ * @brief Updates the COS tables with specified COS for a socket
  *
  * @param sock pointer to socket COS structure to be updated
  * @param id COS id to be added to the table
  * @param mask CBM to be added to the table
  * @param scope CDP config update scope
+ * @param type CAT type (L2/L3)
  */
 static void
-update_l3ca_cos_tab(struct l3ca_cos_sock *sock, const unsigned id,
-                    const uint64_t mask, const int scope)
+update_cat_cos_tab(struct cat_cos_sock *sock, const unsigned id,
+		   const uint64_t mask, const int scope,
+		   const enum sel_cat_type type)
 {
-        unsigned i;
-
-        for (i = 0; i < sock->cos_num; i++)
-                if (sock->cos_tab[i].class_id == id)
-                        break;
-
-        if (i < sock->cos_num) {
-                /**
-                 * This class is already on the list.
-                 * Don't allow for mixing CDP and non-CDP formats.
-                 */
-                if ((sock->cos_tab[i].cdp && scope == CAT_UPDATE_SCOPE_BOTH) ||
-                    (!sock->cos_tab[i].cdp && scope != CAT_UPDATE_SCOPE_BOTH)) {
-                        printf("error: COS%u defined twice using CDP and "
-                               "non-CDP format\n", id);
-                        exit(EXIT_FAILURE);
-                }
-
-                switch (scope) {
-                case CAT_UPDATE_SCOPE_BOTH:
-                        sock->cos_tab[i].u.ways_mask = mask;
-                        break;
-                case CAT_UPDATE_SCOPE_CODE:
-                        sock->cos_tab[i].u.s.code_mask = mask;
-                        break;
-                case CAT_UPDATE_SCOPE_DATA:
-                        sock->cos_tab[i].u.s.data_mask = mask;
-                        break;
-                }
-        } else {
-                /**
-                 * New class selected - extend the list
-                 */
-                unsigned k = sock->cos_num;
-
-                if (k >= PQOS_MAX_L3CA_COS) {
-                        printf("too many allocation classes selected!\n");
-                        exit(EXIT_FAILURE);
-                }
-
-                sock->cos_tab[k].class_id = id;
-
-                switch (scope) {
-                case CAT_UPDATE_SCOPE_BOTH:
-                        sock->cos_tab[k].cdp = 0;
-                        sock->cos_tab[k].u.ways_mask = mask;
-                        break;
-                case CAT_UPDATE_SCOPE_CODE:
-                        sock->cos_tab[k].cdp = 1;
-                        sock->cos_tab[k].u.s.code_mask = mask;
-                        /**
-                         * This will result in error during set operation
-                         * if data mask is not defined by the user.
-                         */
-                        sock->cos_tab[k].u.s.data_mask = (uint64_t) (-1LL);
-                        break;
-                case CAT_UPDATE_SCOPE_DATA:
-                        sock->cos_tab[k].cdp = 1;
-                        sock->cos_tab[k].u.s.data_mask = mask;
-                        /**
-                         * This will result in error during set operation
-                         * if code mask is not defined by the user.
-                         */
-                        sock->cos_tab[k].u.s.code_mask = (uint64_t) (-1LL);
-                        break;
-                }
-
-                sock->cos_num++;
-                sel_l3ca_cos_num++;
-        }
+	/**
+	 * If L2 CAT selected - Update L2 COS table
+	 * - Otherwise update L3 COS table
+	 */
+	if (type == L2CA)
+		update_l2_tab(sock, id, mask);
+	else if (type == L3CA)
+		update_l3_tab(sock, id, mask, scope);
+	else {
+		printf("error: invalid CAT type selected!\n");
+		exit(EXIT_FAILURE);
+	}
 }
 
 /**
@@ -295,30 +401,37 @@ update_l3ca_cos_tab(struct l3ca_cos_sock *sock, const unsigned id,
  * @param str fragment of string passed to -e command line option
  * @param sockets array of sockets to set COS tables
  * @param sock_num number of sockets in array
+ * @param type CAT type (L2/L3)
  */
 static void
 parse_allocation_cos(char *str, const uint64_t *sockets,
-                     const unsigned sock_num)
+                     const unsigned sock_num, const enum sel_cat_type type)
 {
-        char *p = NULL;
+        char *sp, *p = NULL;
         uint64_t mask = 0;
         unsigned i, class_id = 0;
         int update_scope = CAT_UPDATE_SCOPE_BOTH;
 
+        sp = strdup(str);
+        if (sp == NULL)
+                sp = str;
+
         p = strchr(str, '=');
         if (p == NULL)
-                parse_error(str, "Invalid class of service definition");
+                parse_error(sp, "Invalid class of service definition");
         *p = '\0';
 
         parse_cos_mask_type(str, &update_scope, &class_id);
         mask = strtouint64(p+1);
 
+        if (type == L2CA && update_scope != CAT_UPDATE_SCOPE_BOTH)
+                parse_error(sp, "CDP not supported for L2 CAT!\n");
         /**
          * Update all sockets COS table
          */
         if (sockets == NULL) {
-                update_l3ca_cos_tab(&sel_l3ca_cos_all, class_id,
-                                    mask, update_scope);
+                update_cat_cos_tab(&sel_cat_cos_all, class_id,
+                                   mask, update_scope, type);
                 return;
         }
         /**
@@ -329,9 +442,10 @@ parse_allocation_cos(char *str, const uint64_t *sockets,
                 /**
                  * Update specified socket COS table
                  */
-                update_l3ca_cos_tab(&sel_l3ca_cos_tab[s], class_id,
-                                    mask, update_scope);
+                update_cat_cos_tab(&sel_cat_cos_tab[s], class_id,
+                                   mask, update_scope, type);
         }
+        free(sp);
 }
 
 /**
@@ -343,29 +457,31 @@ parse_allocation_cos(char *str, const uint64_t *sockets,
 static void
 parse_allocation_class(char *str)
 {
-        char *p = NULL;
+        char *s, *q, *p = NULL;
         char *saveptr = NULL;
         uint64_t *sp = NULL;
         uint64_t sockets[PQOS_MAX_SOCKETS];
         unsigned i, n = 1;
+	enum sel_cat_type type;
 
-        /**
-         * Set up selected sockets table
-         */
+        s = strdup(str);
+        if (s == NULL)
+                s = str;
+
         p = strchr(str, ':');
         if (p == NULL)
                 parse_error(str, "Unrecognized allocation format");
-        if (strncasecmp(str, "llc@", 4) == 0) {
-                char *s = strdup(str);
+	/**
+         * Set up selected sockets table
+         */
+	q = strchr(str, '@');
+	if (q != NULL) {
                 /**
-                 * Socket ID's selected
-                 * - add selected sockets to the table
+                 * Socket ID's selected - set up sockets table
                  */
-                if (s == NULL)
-                        s = str;
                 *p = '\0';
-                str += strlen("llc@");
-                n = strlisttotab(str, sockets, DIM(sockets));
+		*q = '\0';
+                n = strlisttotab(++q, sockets, DIM(sockets));
                 if (n == 0)
                         parse_error(s, "No socket ID specified");
                 /**
@@ -375,16 +491,19 @@ parse_allocation_class(char *str)
                         if (sockets[i] >= PQOS_MAX_SOCKETS)
                                 parse_error(s, "Socket ID out of range");
                 sp = sockets;
-                free(s);
-        } else {
-                /**
-                 * No sockets selected
-                 * - apply COS to all sockets
-                 */
-                if (strncasecmp(str, "llc:", 4) != 0)
-                        parse_error(str, "Unrecognized allocation type");
-        }
+	} else
+                *p = '\0';
         /**
+	 * Determine selected CAT type (L3/L2)
+	 */
+	if (strcasecmp(str, "llc") == 0)
+		type = L3CA;
+	else if (strcasecmp(str, "l2") == 0)
+		type = L2CA;
+	else
+		parse_error(s, "Unrecognized allocation type");
+
+	/**
          * Parse COS masks and apply to selected sockets
          */
         for (++p; ; p = NULL) {
@@ -393,8 +512,9 @@ parse_allocation_class(char *str)
                 token = strtok_r(p, ",", &saveptr);
                 if (token == NULL)
                         break;
-                parse_allocation_cos(token, sp, n);
+                parse_allocation_cos(token, sp, n, type);
         }
+        free(s);
 }
 
 void selfn_allocation_class(const char *arg)
@@ -436,9 +556,9 @@ set_allocation_assoc(void)
         int i;
         int ret;
 
-        for (i = 0; i < sel_l3ca_assoc_num; i++) {
-                ret = pqos_alloc_assoc_set(sel_l3ca_assoc_tab[i].core,
-                                           sel_l3ca_assoc_tab[i].class_id);
+        for (i = 0; i < sel_cat_assoc_num; i++) {
+                ret = pqos_alloc_assoc_set(sel_cat_assoc_tab[i].core,
+                                           sel_cat_assoc_tab[i].class_id);
                 ASSERT(ret == PQOS_RETVAL_OK);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Setting allocation class of service "
@@ -447,7 +567,7 @@ set_allocation_assoc(void)
                 }
         }
 
-        return sel_l3ca_assoc_num;
+        return sel_cat_assoc_num;
 }
 
 /**
@@ -480,49 +600,49 @@ parse_allocation_assoc(char *str)
         if (n == 0)
                 return;
 
-        if (sel_l3ca_assoc_num <= 0) {
+        if (sel_cat_assoc_num <= 0) {
                 for (i = 0; i < n; i++) {
-                        if (i >= DIM(sel_l3ca_assoc_tab))
+                        if (i >= DIM(sel_cat_assoc_tab))
                                 parse_error(str,
                                             "too many cores selected for "
                                             "allocation association");
-                        sel_l3ca_assoc_tab[i].core = (unsigned) cores[i];
-                        sel_l3ca_assoc_tab[i].class_id = cos;
+                        sel_cat_assoc_tab[i].core = (unsigned) cores[i];
+                        sel_cat_assoc_tab[i].class_id = cos;
                 }
-                sel_l3ca_assoc_num = (int) n;
+                sel_cat_assoc_num = (int) n;
                 return;
         }
 
         for (i = 0; i < n; i++) {
                 int j;
 
-                for (j = 0; j < sel_l3ca_assoc_num; j++)
-                        if (sel_l3ca_assoc_tab[j].core == (unsigned) cores[i])
+                for (j = 0; j < sel_cat_assoc_num; j++)
+                        if (sel_cat_assoc_tab[j].core == (unsigned) cores[i])
                                 break;
 
-                if (j < sel_l3ca_assoc_num) {
+                if (j < sel_cat_assoc_num) {
                         /**
                          * this core is already on the list
                          * - update COS but warn about it
                          */
                         printf("warn: updating COS for core %u from %u to %u\n",
                                (unsigned) cores[i],
-                               sel_l3ca_assoc_tab[j].class_id, cos);
-                        sel_l3ca_assoc_tab[j].class_id = cos;
+                               sel_cat_assoc_tab[j].class_id, cos);
+                        sel_cat_assoc_tab[j].class_id = cos;
                 } else {
                         /**
                          * New core is selected - extend the list
                          */
-                        unsigned k = (unsigned) sel_l3ca_assoc_num;
+                        unsigned k = (unsigned) sel_cat_assoc_num;
 
-                        if (k >= DIM(sel_l3ca_assoc_tab))
+                        if (k >= DIM(sel_cat_assoc_tab))
                                 parse_error(str,
                                             "too many cores selected for "
                                             "allocation association");
 
-                        sel_l3ca_assoc_tab[k].core = (unsigned) cores[i];
-                        sel_l3ca_assoc_tab[k].class_id = cos;
-                        sel_l3ca_assoc_num++;
+                        sel_cat_assoc_tab[k].core = (unsigned) cores[i];
+                        sel_cat_assoc_tab[k].class_id = cos;
+                        sel_cat_assoc_num++;
                 }
         }
 }
@@ -655,9 +775,10 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
 }
 
 int alloc_apply(const struct pqos_capability *cap_l3ca,
+                const struct pqos_capability *cap_l2ca,
                 unsigned sock_count, unsigned *sockets)
 {
-        if (cap_l3ca != NULL) {
+        if (cap_l3ca != NULL || cap_l2ca != NULL) {
                 /**
                  * If allocation config changed then exit.
                  * For monitoring, start the program again unless
@@ -684,7 +805,7 @@ int alloc_apply(const struct pqos_capability *cap_l3ca,
                         return 1;
                 }
         } else {
-                if (sel_l3ca_assoc_num > 0 || sel_l3ca_cos_num > 0) {
+                if (sel_cat_assoc_num > 0 || sel_cat_cos_num > 0) {
                         printf("Allocation capability not detected!\n");
                         return -1;
                 }

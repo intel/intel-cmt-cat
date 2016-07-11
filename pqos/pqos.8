@@ -96,7 +96,7 @@ For CAT, TYPE is "llc", ID is a CLOS number and DEFINITION is a bitmask.
 .br
 .B Note: When CDP is on, ID can be postfixed with 'D' for data or 'C' for code.
 .br
-For example: "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00", or for CDP: "\-e llc:0d=0xfff;llc:0c=0xfff00."
+For example: "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00;l2:2=0x3f;l2@2:1=0xf", or for CDP: "\-e llc:0d=0xfff;llc:0c=0xfff00."
 .TP
 .B \-a CLASS2CORE, \-\-alloc\-assoc=CLASS2CORE
 associate allocation classes with cores. CLASS2CORE format is "TYPE:ID=CORE_LIST;...".
