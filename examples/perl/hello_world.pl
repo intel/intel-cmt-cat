@@ -47,7 +47,6 @@ my $l3ca = pqos::pqos_l3ca->new();
 # Setup config
 $cfg->{verbose} = 0;
 $cfg->{fd_log}  = 1;
-$cfg->{cdp_cfg} = $pqos::PQOS_REQUIRE_CDP_ANY;
 
 # Initialize the library
 if (0 != pqos::pqos_init($cfg)) {

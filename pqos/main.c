@@ -634,7 +634,6 @@ int main(int argc, char **argv)
         memset(&cfg, 0, sizeof(cfg));
         cfg.verbose = sel_verbose_mode;
         cfg.free_in_use_rmid = sel_free_in_use_rmid;
-        cfg.cdp_cfg = selfn_cdp_config;
 
         /**
          * Set up file descriptor for message log

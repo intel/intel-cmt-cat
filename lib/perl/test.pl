@@ -119,7 +119,6 @@ sub init_pqos {
 
 	$cfg->{verbose} = 2;                             # SUPER_VERBOSE
 	$cfg->{fd_log}  = fileno(STDOUT);
-	$cfg->{cdp_cfg} = $pqos::PQOS_REQUIRE_CDP_ANY;
 
 	if (0 != pqos::pqos_init($cfg)) {
 		print __LINE__, " pqos::pqos_init FAILED!\n";

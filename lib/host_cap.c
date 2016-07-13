@@ -521,105 +521,12 @@ get_cpu_sockets(const struct pqos_cpuinfo *cpu,
 }
 
 /**
- * @brief Resets CAT configuration at lower level than \a pqos_l3ca_reset
- *
- * Low level CAT reset is required for CDP in scenarios when
- * - CDP is ON and it is requested to turn it OFF
- * - CDP is OFF and it is requested to turn it ON
- *
- * @param cap detected CAT capabilities
- * @param cpu detected CPU topology
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-cat_reset(const struct pqos_cap_l3ca *cap,
-          const struct pqos_cpuinfo *cpu)
-{
-        unsigned *sockets = NULL;
-        unsigned sockets_num = 0;
-        int ret = PQOS_RETVAL_OK;
-        unsigned j;
-
-        ASSERT(cap != NULL && cpu != NULL);
-        if (cap == NULL || cpu == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        LOG_INFO("Resetting CAT configuration across all sockets...\n");
-
-        /**
-         * Get list of socket id's through another API
-         */
-	ret = get_cpu_sockets(cpu, &sockets_num, &sockets);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-	ASSERT(sockets_num > 0);
-	ASSERT(sockets != NULL);
-
-        /**
-         * Change COS definition on all sockets
-         * so that each COS allows for access to all cache ways
-         */
-        for (j = 0; j < sockets_num; j++) {
-                unsigned i = 0, core = 0, count = 0;
-                const uint64_t ways_mask = (1ULL << cap->num_ways) - 1ULL;
-
-                ret = pqos_cpu_get_cores(cpu, sockets[j], 1, &count, &core);
-                if (ret != PQOS_RETVAL_OK)
-			goto cat_reset_exit;
-
-                for (i = 0; i < cap->num_classes; i++) {
-                        uint32_t reg = i + PQOS_MSR_L3CA_MASK_START;
-                        uint64_t val = ways_mask;
-                        int retval = MACHINE_RETVAL_OK;
-
-                        retval = msr_write(core, reg, val);
-                        if (retval != MACHINE_RETVAL_OK) {
-                                ret = PQOS_RETVAL_ERROR;
-				goto cat_reset_exit;
-			}
-                }
-        }
-
-        /**
-         * Associate all cores with COS0
-         */
-        for (j = 0; j < cpu->num_cores; j++) {
-                const unsigned class_id = 0;
-                uint32_t reg = PQOS_MSR_ASSOC;
-                uint64_t val = 0;
-                int retval = MACHINE_RETVAL_OK;
-
-                retval = msr_read(cpu->cores[j].lcore, reg, &val);
-                if (retval != MACHINE_RETVAL_OK) {
-			ret = PQOS_RETVAL_ERROR;
-			goto cat_reset_exit;
-		}
-
-                val &= (~PQOS_MSR_ASSOC_QECOS_MASK);
-                val |= (((uint64_t) class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
-
-                retval = msr_write(cpu->cores[j].lcore, reg, val);
-                if (retval != MACHINE_RETVAL_OK) {
-			ret = PQOS_RETVAL_ERROR;
-			goto cat_reset_exit;
-		}
-        }
-
- cat_reset_exit:
-	free(sockets);
-        return ret;
-}
-
-/**
  * @brief Checks CDP enable status across all CPU sockets
  *
  * It also validates if CDP enabling is consistent across
  * CPU sockets.
  * At the moment, such scenario is considered as error
- * that requires system reboot.
+ * that requires CAT reset.
  *
  * @param cpu detected CPU topology
  * @param enabled place to store CDP enabling status
@@ -671,7 +578,7 @@ cdp_is_enabled(const struct pqos_cpuinfo *cpu,
 
         if (disabled_num > 0 && enabled_num > 0) {
                 LOG_ERROR("Inconsistent CDP settings across sockets."
-                          "Please reboot your system!\n");
+                          "Please reset CAT or reboot your system!\n");
                 ret = PQOS_RETVAL_ERROR;
 		goto cdp_is_enabled_exit;
         }
@@ -688,68 +595,6 @@ cdp_is_enabled(const struct pqos_cpuinfo *cpu,
 }
 
 /**
- * @brief Enables or disables CDP across all CPU sockets
- *
- * @param cpu detected CPU topology
- * @param enable CDP enable/disable flag, 1 - enable, 0 - disable
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-cdp_enable(const struct pqos_cpuinfo *cpu,
-           const int enable)
-{
-        unsigned *sockets = NULL;
-        unsigned sockets_num = 0, j = 0;
-        int ret = PQOS_RETVAL_OK;
-
-        LOG_INFO("%s CDP across all sockets...\n",
-                 (enable) ? "Enabling" : "Disabling");
-
-        ASSERT(cpu != NULL);
-        if (cpu == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        /**
-         * Get list of socket id's
-         */
-	ret = get_cpu_sockets(cpu, &sockets_num, &sockets);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        for (j = 0; j < sockets_num; j++) {
-                uint64_t reg = 0;
-                unsigned core = 0, count = 0;
-
-                ret = pqos_cpu_get_cores(cpu, sockets[j], 1, &count, &core);
-                if (ret != PQOS_RETVAL_OK)
-                        goto cdp_enable_exit;
-
-                if (msr_read(core, PQOS_MSR_L3_QOS_CFG, &reg) !=
-                    MACHINE_RETVAL_OK) {
-                        ret = PQOS_RETVAL_ERROR;
-			goto cdp_enable_exit;
-		}
-
-                if (enable)
-                        reg |= PQOS_MSR_L3_QOS_CFG_CDP_EN;
-                else
-                        reg &= ~PQOS_MSR_L3_QOS_CFG_CDP_EN;
-
-                if (msr_write(core, PQOS_MSR_L3_QOS_CFG, reg) !=
-                    MACHINE_RETVAL_OK) {
-                        ret = PQOS_RETVAL_ERROR;
-			goto cdp_enable_exit;
-		}
-        }
-
- cdp_enable_exit:
-	free(sockets);
-        return ret;
-}
-
-/**
  * @brief Detects presence of L3 CAT based on register probing.
  *
  * This is 3rd and the last method of detecting CAT.
@@ -758,7 +603,6 @@ cdp_enable(const struct pqos_cpuinfo *cpu,
  * - use CPUID.0x4.0x3 to get number of cache ways
  *
  * @param cap CAT structure to be initialized
- * @param cdp_cfg CAT CDP configuration
  * @param cpu CPU topology structure
  *
  * @return Operation status
@@ -768,7 +612,6 @@ cdp_enable(const struct pqos_cpuinfo *cpu,
  */
 static int
 discover_alloc_l3_probe(struct pqos_cap_l3ca *cap,
-                        const enum pqos_cdp_config cdp_cfg,
                         const struct pqos_cpuinfo *cpu)
 {
         unsigned i = 0, lcore;
@@ -776,19 +619,6 @@ discover_alloc_l3_probe(struct pqos_cap_l3ca *cap,
                 PQOS_MSR_L3CA_MASK_END - PQOS_MSR_L3CA_MASK_START + 1;
 
         ASSERT(cap != NULL && cpu != NULL);
-
-        switch (cdp_cfg) {
-        case PQOS_REQUIRE_CDP_OFF:
-        case PQOS_REQUIRE_CDP_ANY:
-                break;
-        case PQOS_REQUIRE_CDP_ON:
-                LOG_ERROR("CDP requested but not supported by the platform!\n");
-                return PQOS_RETVAL_PARAM;
-        default:
-                LOG_ERROR("Unrecognized CDP configuration setting %d!\n",
-                          (int) cdp_cfg);
-                return PQOS_RETVAL_PARAM;
-        }
 
         /**
          * Pick a valid core and run series of MSR reads on it
@@ -824,15 +654,13 @@ discover_alloc_l3_probe(struct pqos_cap_l3ca *cap,
  * - use CPUID.0x4.0x3 to get number of cache ways
  *
  * @param cap CAT structure to be initialized
- * @param cdp_cfg CAT CDP configuration
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  * @retval PQOS_RETVAL_RESOURCE technology not supported
  */
 static int
-discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap,
-                           const enum pqos_cdp_config cdp_cfg)
+discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap)
 {
 #define CPUID_LEAF_BRAND_START 0x80000002UL
 #define CPUID_LEAF_BRAND_END   0x80000004UL
@@ -857,19 +685,6 @@ discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap,
          * Adequate check has to be done in the caller.
          */
         ASSERT(cap != NULL);
-
-        switch (cdp_cfg) {
-        case PQOS_REQUIRE_CDP_OFF:
-        case PQOS_REQUIRE_CDP_ANY:
-                break;
-        case PQOS_REQUIRE_CDP_ON:
-                LOG_ERROR("CDP requested but not supported by the platform!\n");
-                return PQOS_RETVAL_PARAM;
-        default:
-                LOG_ERROR("Unrecognized CDP configuration setting %d!\n",
-                          (int) cdp_cfg);
-                return PQOS_RETVAL_PARAM;
-        }
 
         lcpuid(0x80000000, 0, &res);
         if (res.eax < CPUID_LEAF_BRAND_END) {
@@ -920,7 +735,6 @@ discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap,
  * @brief Detects presence of L3 CAT based on CPUID
  *
  * @param cap CAT structure to be initialized
- * @param cdp_cfg CAT CDP configuration
  * @param cpu CPU topology structure
  *
  * @return Operation status
@@ -929,7 +743,6 @@ discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap,
  */
 static int
 discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
-                        const enum pqos_cdp_config cdp_cfg,
                         const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
@@ -970,65 +783,6 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
                 cap->cdp_on = cdp_on;
         }
 
-        switch (cdp_cfg) {
-        case PQOS_REQUIRE_CDP_ON:
-                if (!cap->cdp) {
-                        LOG_ERROR("CAT/CDP requested but not supported "
-                                  "by the platform!\n");
-                        return PQOS_RETVAL_ERROR;
-                } else if (!cap->cdp_on) {
-                        /**
-                         * Turn on CDP
-                         */
-                        LOG_INFO("Turning CDP ON ...\n");
-                        ret = cat_reset(cap, cpu);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("CAT reset error!\n");
-                                return ret;
-                        }
-                        ret = cdp_enable(cpu, 1);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("CDP enable error!\n");
-                                return ret;
-                        }
-                        cap->cdp_on = 1;
-                }
-                break;
-        case PQOS_REQUIRE_CDP_OFF:
-                if (cap->cdp && cap->cdp_on) {
-                        /**
-                         * Turn off CDP
-                         */
-                        LOG_INFO("Turning CDP OFF ...\n");
-                        ret = cat_reset(cap, cpu);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("CAT reset error!\n");
-                                return ret;
-                        }
-                        ret = cdp_enable(cpu, 0);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("CDP disable error!\n");
-                                return ret;
-                        }
-                        cap->cdp_on = 0;
-                }
-                break;
-        case PQOS_REQUIRE_CDP_ANY:
-                break;
-        default:
-                LOG_ERROR("Unrecognized CDP configuration %d!\n", cdp_cfg);
-                return PQOS_RETVAL_PARAM;
-                break;
-        }
-
-        if (cap->cdp_on) {
-                /**
-                 * Divide number of classes by 2.
-                 * This is because CDP needs 2 bit-masks per one class.
-                 */
-                cap->num_classes = cap->num_classes / 2;
-        }
-
         return ret;
 }
 
@@ -1041,13 +795,9 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
  * Function allocates memory for CAT capabilities
  * and returns it to the caller through \a r_cap.
  *
- * \a config and \a cpu are only needed because of CDP.
- * Namely, this may be required to reset CAT on all sockets
- * in order to turn on/off CDP. For this operation
- * CPU topology and library config context are needed.
+ * \a cpu is only needed to detect CDP status.
  *
  * @param r_cap place to store CAT capabilities structure
- * @param config library config passed from an application
  * @param cpu detected cpu topology
  *
  * @return Operation status
@@ -1055,7 +805,6 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
  */
 static int
 discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
-                  const struct pqos_config *config,
                   const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
@@ -1084,7 +833,7 @@ discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
                  * Use CPUID method
                  */
                 LOG_INFO("CPUID.0x7.0: L3 CAT supported\n");
-                ret = discover_alloc_l3_cpuid(cap, config->cdp_cfg, cpu);
+                ret = discover_alloc_l3_cpuid(cap, cpu);
                 if (ret == PQOS_RETVAL_OK)
                         ret = get_l3_cache_info(NULL, &l3_size);
         } else {
@@ -1094,10 +843,9 @@ discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
                  */
                 LOG_INFO("CPUID.0x7.0: L3 CAT not detected. "
 			 "Checking brand string...\n");
-                ret = discover_alloc_l3_brandstr(cap, config->cdp_cfg);
+                ret = discover_alloc_l3_brandstr(cap);
                 if (ret != PQOS_RETVAL_OK)
-                        ret = discover_alloc_l3_probe(cap, config->cdp_cfg,
-                                                      cpu);
+                        ret = discover_alloc_l3_probe(cap, cpu);
                 if (ret == PQOS_RETVAL_OK)
                         ret = get_l3_cache_info(&cap->num_ways, &l3_size);
         }
@@ -1197,7 +945,6 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap)
  * @brief Runs detection of platform monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
- * @param config library configuration passed on by an application
  * @param cpu detected cpu topology
  *
  * @return Operation status
@@ -1205,7 +952,6 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap)
  */
 static int
 discover_capabilities(struct pqos_cap **p_cap,
-                      const struct pqos_config *config,
                       const struct pqos_cpuinfo *cpu)
 {
         struct pqos_cap_mon *det_mon = NULL;
@@ -1237,7 +983,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * L3 Cache allocation init
          */
-        ret = discover_alloc_l3(&det_l3ca, config, cpu);
+        ret = discover_alloc_l3(&det_l3ca, cpu);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("L3CA capability detected\n");
@@ -1404,7 +1150,7 @@ pqos_init(const struct pqos_config *config)
                 goto cpuinfo_init_error;
         }
 
-        ret = discover_capabilities(&m_cap, config, m_cpu);
+        ret = discover_capabilities(&m_cap, m_cpu);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("discover_capabilities() error %d\n", ret);
                 goto machine_init_error;

@@ -1383,7 +1383,6 @@ cat_init(void)
 	memset(&cfg, 0, sizeof(cfg));
 	cfg.fd_log = STDOUT_FILENO;
 	cfg.verbose = 0;
-	cfg.cdp_cfg = PQOS_REQUIRE_CDP_ANY;
 	ret = pqos_init(&cfg);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("CAT: Error initializing PQoS library!\n");

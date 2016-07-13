@@ -99,7 +99,6 @@ struct pqos_config {
                                            cores and RMIDs in the system even
                                            if cores may seem to be subject of
                                            monitoring activity */
-        enum pqos_cdp_config cdp_cfg;   /**< requires CDP as described above */
 };
 
 /**
