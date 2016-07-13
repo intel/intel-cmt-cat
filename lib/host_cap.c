@@ -781,6 +781,8 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
                         return ret;
                 }
                 cap->cdp_on = cdp_on;
+                if (cdp_on)
+                        cap->num_classes = cap->num_classes / 2;
         }
 
         return ret;
@@ -1307,4 +1309,33 @@ pqos_cap_get(const struct pqos_cap **cap,
 
         _pqos_api_unlock();
         return PQOS_RETVAL_OK;
+}
+
+void _pqos_cap_l3cdp_change(const int prev, const int next)
+{
+        struct pqos_cap_l3ca *l3_cap = NULL;
+        unsigned i;
+
+        ASSERT(m_cap != NULL);
+        if (m_cap == NULL)
+                return;
+
+        for (i = 0; i < m_cap->num_cap && l3_cap == NULL; i++)
+                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                        l3_cap = m_cap->capabilities[i].u.l3ca;
+
+        if (l3_cap == NULL)
+                return;
+
+        if (!prev && next) {
+                /* turn on */
+                l3_cap->cdp_on = 1;
+                l3_cap->num_classes = l3_cap->num_classes / 2;
+        }
+
+        if (prev && !next) {
+                /* turn off */
+                l3_cap->cdp_on = 0;
+                l3_cap->num_classes = l3_cap->num_classes * 2;
+        }
 }

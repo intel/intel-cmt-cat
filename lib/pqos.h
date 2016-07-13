@@ -736,16 +736,16 @@ pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
  * - all cores associated with COS0
  * - all COS are set to give access to all cache ways
  *
- * @param [in] cap platform QoS capabilities structure
- *                 returned by \a pqos_cap_get
- * @param [in] cpu CPU information structure from cpu info module
+ * As part of CAT reset CDP reconfiguration can be performed.
+ * This can be requested via \a l3_cdp_cfg.
+ *
+ * @param [in] l3_cdp_cfg requested L3 CAT CDP config
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 int
-pqos_alloc_reset(const struct pqos_cap *cap,
-                 const struct pqos_cpuinfo *cpu);
+pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg);
 
 /**
  * @brief Retrieves a monitoring value from a group for a specific event.

@@ -282,7 +282,7 @@ static int init_pqos(void)
 	}
 
         /* Reset CAT */
-	ret = pqos_alloc_reset(p_cap, p_cpu);
+	ret = pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY);
 	if (ret != PQOS_RETVAL_OK) {
                 pqos_fini();
 		printf("Error resetting CAT!\n");

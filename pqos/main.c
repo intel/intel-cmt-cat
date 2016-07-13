@@ -698,7 +698,7 @@ int main(int argc, char **argv)
                 /**
                  * Reset CAT configuration to after-reset state and exit
                  */
-                if (pqos_alloc_reset(p_cap, p_cpu) != PQOS_RETVAL_OK) {
+                if (pqos_alloc_reset(selfn_cdp_config) != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("CAT reset failed!\n");
                 } else

@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -79,6 +79,9 @@
 #define PQOS_MSR_L2CA_MASK_END   0xD4F
 #define PQOS_MSR_L2CA_MASK_NUMOF \
         (PQOS_MSR_L2CA_MASK_END - PQOS_MSR_L2CA_MASK_START + 1)
+
+#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< CAT config register */
+#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< CDP enable bit */
 
 /**
  * ---------------------------------------
@@ -640,4 +643,286 @@ pqos_alloc_assoc_get(const unsigned lcore,
 
         _pqos_api_unlock();
         return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Enables or disables CDP across selected CPU sockets
+ *
+ * @param [in] sockets_num dimension of \a sockets array
+ * @param [in] sockets array with socket ids to change CDP config on
+ * @param [in] enable CDP enable/disable flag, 1 - enable, 0 - disable
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ */
+static int
+cdp_enable(const unsigned sockets_num,
+           const unsigned *sockets,
+           const int enable)
+{
+        unsigned j = 0;
+
+        ASSERT(socket_num > 0 && sockets != NULL);
+
+        LOG_INFO("%s CDP across sockets...\n",
+                 (enable) ? "Enabling" : "Disabling");
+
+        for (j = 0; j < sockets_num; j++) {
+                uint64_t reg = 0;
+                unsigned core = 0, count = 0;
+                int ret = PQOS_RETVAL_OK;
+
+                ret = pqos_cpu_get_cores(m_cpu, sockets[j], 1, &count, &core);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                ret = msr_read(core, PQOS_MSR_L3_QOS_CFG, &reg);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                if (enable)
+                        reg |= PQOS_MSR_L3_QOS_CFG_CDP_EN;
+                else
+                        reg &= ~PQOS_MSR_L3_QOS_CFG_CDP_EN;
+
+                ret = msr_write(core, PQOS_MSR_L3_QOS_CFG, reg);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Writes range of CAT COS MSR's with \a msr_val value
+ *
+ * Used as part of CAT reset process.
+ *
+ * @param [in] msr_start First MSR to be written
+ * @param [in] msr_num Number of MSR's to be written
+ * @param [in] coreid Core ID to be used for MSR write operations
+ * @param [in] msr_val Value to be written to MSR's
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on MSR write error
+ */
+static int
+cat_cos_reset(const unsigned msr_start,
+              const unsigned msr_num,
+              const unsigned coreid,
+              const uint64_t msr_val)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+
+        for (i = 0; i < msr_num; i++) {
+                int retval = msr_write(coreid, msr_start + i, msr_val);
+
+                if (retval != MACHINE_RETVAL_OK)
+                        ret = PQOS_RETVAL_ERROR;
+        }
+
+        return ret;
+}
+
+/**
+ * @brief Associates each of the cores with COS0
+ *
+ * Operates on m_cpu structure.
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on MSR write error
+ */
+static int
+cat_assoc_reset(void)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+
+        for (i = 0; i < m_cpu->num_cores; i++) {
+                const unsigned class_id = 0;
+                const uint32_t reg = PQOS_MSR_ASSOC;
+                uint64_t val = 0;
+                int retval = MACHINE_RETVAL_OK;
+
+                retval = msr_read(m_cpu->cores[i].lcore, reg, &val);
+                if (retval != MACHINE_RETVAL_OK) {
+			ret = PQOS_RETVAL_ERROR;
+                        continue;
+		}
+
+                val &= (~PQOS_MSR_ASSOC_QECOS_MASK);
+                val |= (((uint64_t) class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
+
+                retval = msr_write(m_cpu->cores[i].lcore, reg, val);
+                if (retval != MACHINE_RETVAL_OK) {
+			ret = PQOS_RETVAL_ERROR;
+                        continue;
+		}
+        }
+
+        return ret;
+}
+
+int
+pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
+{
+        unsigned *sockets = NULL;
+        unsigned sockets_num = 0, sockets_count = 0;
+        const struct pqos_capability *cat_cap = NULL;
+        const struct pqos_cap_l3ca *l3_cap = NULL;
+        const struct pqos_cap_l2ca *l2_cap = NULL;
+        int ret = PQOS_RETVAL_OK;
+        unsigned max_l3_cos = 0;
+        unsigned j;
+
+        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
+            l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
+                LOG_ERROR("Unrecognized L3 CDP configuration %d!\n",
+                          l3_cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        /* Get L3 CAT capabilities */
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &cat_cap);
+        if (cat_cap != NULL)
+                l3_cap = cat_cap->u.l3ca;
+
+        /* Get L2 CAT capabilities */
+        cat_cap = NULL;
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &cat_cap);
+        if (cat_cap != NULL)
+                l2_cap = cat_cap->u.l2ca;
+
+        /* Check if either L2 or L3 CAT is supported */
+        if (l2_cap == NULL && l3_cap == NULL) {
+                ret = PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
+                goto pqos_alloc_reset_exit;
+        }
+        if (l3_cap != NULL) {
+                /* Check against erroneous CDP request */
+                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
+                        LOG_ERROR("CAT/CDP requested but not supported by the "
+                                  "platform!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto pqos_alloc_reset_exit;
+                }
+
+                /* Get maximum number of L3 CAT classes */
+                max_l3_cos = l3_cap->num_classes;
+                if (l3_cap->cdp && l3_cap->cdp_on)
+                        max_l3_cos = max_l3_cos * 2;
+        }
+
+        /**
+         * Get number & list of sockets in the system
+         */
+        ret = pqos_cpu_get_num_sockets(m_cpu, &sockets_count);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_alloc_reset_exit;
+
+	sockets = malloc(sizeof(sockets[0]) * sockets_count);
+	if (sockets == NULL) {
+		ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_alloc_reset_exit;
+        }
+        ret = pqos_cpu_get_sockets(m_cpu, sockets_count,
+				   &sockets_num, sockets);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_alloc_reset_exit;
+
+        if (sockets_num != sockets_count || sockets_num == 0) {
+                ret = PQOS_RETVAL_ERROR;
+                goto pqos_alloc_reset_exit;
+        }
+
+        /**
+         * Change COS definition on all sockets
+         * so that each COS allows for access to all cache ways
+         */
+        for (j = 0; j < sockets_num; j++) {
+                unsigned core = 0, count = 0;
+
+                ret = pqos_cpu_get_cores(m_cpu, sockets[j], 1, &count, &core);
+                if (ret != PQOS_RETVAL_OK)
+                        goto pqos_alloc_reset_exit;
+
+                if (l3_cap != NULL) {
+                        const uint64_t ways_mask =
+                                (1ULL << l3_cap->num_ways) - 1ULL;
+
+                        ret = cat_cos_reset(PQOS_MSR_L3CA_MASK_START,
+                                            max_l3_cos, core, ways_mask);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
+                }
+
+                if (l2_cap != NULL) {
+                        const uint64_t ways_mask =
+                                (1ULL << l2_cap->num_ways) - 1ULL;
+
+                        ret = cat_cos_reset(PQOS_MSR_L2CA_MASK_START,
+                                            l2_cap->num_classes, core,
+                                            ways_mask);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
+                }
+        }
+
+        /**
+         * Associate all cores with COS0
+         */
+        ret = cat_assoc_reset();
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_alloc_reset_exit;
+
+        /**
+         * Turn L3 CDP ON or OFF upon the request
+         */
+        if (l3_cap != NULL) {
+                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp_on) {
+                        /**
+                         * Turn on CDP
+                         */
+                        LOG_INFO("Turning CDP ON ...\n");
+                        ret = cdp_enable(sockets_num, sockets, 1);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("CDP enable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+                        _pqos_cap_l3cdp_change(l3_cap->cdp_on, 1);
+                }
+
+                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF &&
+                    l3_cap->cdp_on && l3_cap->cdp) {
+                        /**
+                         * Turn off CDP
+                         */
+                        LOG_INFO("Turning CDP OFF ...\n");
+                        ret = cdp_enable(sockets_num, sockets, 0);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("CDP disable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+                        _pqos_cap_l3cdp_change(l3_cap->cdp_on, 0);
+                }
+        }
+
+ pqos_alloc_reset_exit:
+        if (sockets != NULL)
+                free(sockets);
+        _pqos_api_unlock();
+        return ret;
 }

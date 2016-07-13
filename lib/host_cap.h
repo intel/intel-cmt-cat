@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,8 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- *
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 /**
@@ -43,6 +42,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * @brief Modifies L3 CAT capability structure upon CDP config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for L3 CAT & CDP support.
+ *
+ * @param [in] prev old CDP setting
+ * @param [in] next new CDP setting
+ */
+void _pqos_cap_l3cdp_change(const int prev, const int next);
 
 /**
  * @brief Aquires lock for PQoS API use
