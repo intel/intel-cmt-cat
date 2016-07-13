@@ -57,7 +57,7 @@ static const struct pqos_capability *m_cap_l3ca;
  * @param [in] ca CAT COS configuration
  */
 static void
-print_rdt_ca(struct rdt_ca ca)
+rdt_ca_print(const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
 			NULL == ca.u.generic_ptr)
@@ -82,7 +82,7 @@ print_rdt_ca(struct rdt_ca ca)
  * @return String representation of configuration type
  */
 static const char *
-get_type_str_rdt_ca(struct rdt_ca ca)
+rdt_ca_get_type_str(const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
 			NULL == ca.u.generic_ptr)
@@ -101,7 +101,7 @@ get_type_str_rdt_ca(struct rdt_ca ca)
  * @retval 0 on failure
  */
 static int
-is_valid_rdt_ca(struct rdt_ca ca)
+rdt_ca_is_valid(const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
 			NULL == ca.u.generic_ptr)
@@ -126,7 +126,7 @@ is_valid_rdt_ca(struct rdt_ca ca)
  * @return Operations status
  */
 static int
-get_default_rdt_ca(const unsigned socket, struct rdt_ca ca)
+rdt_ca_get_default(const unsigned socket, struct rdt_ca ca)
 {
 	struct pqos_l2ca l2_ca[PQOS_MAX_L3CA_COS];
 	struct pqos_l3ca l3_ca[PQOS_MAX_L3CA_COS];
@@ -174,7 +174,7 @@ get_default_rdt_ca(const unsigned socket, struct rdt_ca ca)
  * @return Operations status
  */
 static int
-get_rdt_ca(const unsigned socket, const unsigned max_num_ca, unsigned *num_ca,
+rdt_ca_get(const unsigned socket, const unsigned max_num_ca, unsigned *num_ca,
 		struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
@@ -346,7 +346,7 @@ parse_reset(const char *cpustr)
  * @retval negative on error (-errno)
  */
 static int
-str_to_cbm_rdt_ca(const char *param, struct rdt_ca ca)
+rdt_ca_str_to_cbm(const char *param, struct rdt_ca ca)
 {
 	uint64_t mask = 0, mask2 = 0;
 	int ret, force_dual_mask;
@@ -360,7 +360,7 @@ str_to_cbm_rdt_ca(const char *param, struct rdt_ca ca)
 	if (ret < 0)
 		return -EINVAL;
 
-	if (0 == mask || is_contiguous(get_type_str_rdt_ca(ca), mask) == 0)
+	if (0 == mask || is_contiguous(rdt_ca_get_type_str(ca), mask) == 0)
 		return -EINVAL;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type) {
@@ -381,8 +381,17 @@ str_to_cbm_rdt_ca(const char *param, struct rdt_ca ca)
 	return 0;
 }
 
+/*
+* @brief Simplifies feature string
+*
+* @param [in] feature feature string
+*
+* @return simplified feature as char
+* @retval char representation of feature
+* @retval '?' on error
+*/
 static char
-simplify_feature(const char *feature)
+simplify_feature_str(const char *feature)
 {
 	static const struct {
 		const char *feature_long;
@@ -452,21 +461,21 @@ parse_rdt(char *rdtstr)
 			return -EINVAL;
 		}
 
-		switch (simplify_feature(feature)) {
+		switch (simplify_feature_str(feature)) {
 		case '2':
-			if (is_valid_rdt_ca(l2ca))
+			if (rdt_ca_is_valid(l2ca))
 				return -EINVAL;
 
-			ret = str_to_cbm_rdt_ca(param, l2ca);
+			ret = rdt_ca_str_to_cbm(param, l2ca);
 			if (ret < 0)
 				return ret;
 			break;
 
 		case '3':
-			if (is_valid_rdt_ca(l3ca))
+			if (rdt_ca_is_valid(l3ca))
 				return -EINVAL;
 
-			ret = str_to_cbm_rdt_ca(param, l3ca);
+			ret = rdt_ca_str_to_cbm(param, l3ca);
 			if (ret < 0)
 				return ret;
 			break;
@@ -493,7 +502,7 @@ parse_rdt(char *rdtstr)
 	}
 
 	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0 ||
-			(!is_valid_rdt_ca(l2ca) && !is_valid_rdt_ca(l3ca)))
+			(!rdt_ca_is_valid(l2ca) && !rdt_ca_is_valid(l3ca)))
 		return -EINVAL;
 
 	g_cfg.config_count++;
@@ -636,14 +645,14 @@ check_supported(void)
 	unsigned i = 0;
 
 	for (i = 0; i < g_cfg.config_count; i++) {
-		if (is_valid_rdt_ca(wrap_l3ca(&g_cfg.config[i].l3)) &&
+		if (rdt_ca_is_valid(wrap_l3ca(&g_cfg.config[i].l3)) &&
 				NULL == m_cap_l3ca) {
 			printf("CAT: L3CA requested but not supported by "
 				"system!\n");
 			return -ENOTSUP;
 		}
 
-		if (is_valid_rdt_ca(wrap_l2ca(&g_cfg.config[i].l2)) &&
+		if (rdt_ca_is_valid(wrap_l2ca(&g_cfg.config[i].l2)) &&
 				NULL == m_cap_l2ca) {
 			printf("CAT: L2CA requested but not supported by "
 				"system!\n");
@@ -705,10 +714,10 @@ get_contention_mask(const enum pqos_cap_type type)
  * @retval UINT64_MAX on error
  */
 static uint64_t
-get_cumulative_cbm_rdt_ca(struct rdt_ca ca)
+rdt_ca_get_cumulative_cbm(const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
-			NULL == ca.u.generic_ptr || 0 == is_valid_rdt_ca(ca))
+			NULL == ca.u.generic_ptr || 0 == rdt_ca_is_valid(ca))
 		return UINT64_MAX;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
@@ -731,7 +740,7 @@ get_cumulative_cbm_rdt_ca(struct rdt_ca ca)
  * @retval negative on error (-errno)
  */
 static int
-check_cbm_len_and_contention(enum pqos_cap_type type)
+check_cbm_len_and_contention(const enum pqos_cap_type type)
 {
 	unsigned i = 0;
 	struct rdt_ca ca;
@@ -752,17 +761,17 @@ check_cbm_len_and_contention(enum pqos_cap_type type)
 		else
 			ca = wrap_l3ca(&g_cfg.config[i].l3);
 
-		if (!is_valid_rdt_ca(ca))
+		if (!rdt_ca_is_valid(ca))
 			continue;
 
-		mask = get_cumulative_cbm_rdt_ca(ca);
+		mask = rdt_ca_get_cumulative_cbm(ca);
 		if (UINT64_MAX == mask)
 			return -EFAULT;
 
 		if ((mask & not_cbm) != 0) {
 			printf("CAT: One or more of requested %s CBMs "
-				"(", get_type_str_rdt_ca(ca));
-			print_rdt_ca(ca);
+				"(", rdt_ca_get_type_str(ca));
+			rdt_ca_print(ca);
 			printf(") not supported by system "
 				"(too long).\n");
 			return -ENOTSUP;
@@ -771,8 +780,8 @@ check_cbm_len_and_contention(enum pqos_cap_type type)
 		/* Just a note */
 		if ((mask & contention_cbm) != 0) {
 			printf("CAT: One or more of requested %s CBMs "
-				"(", get_type_str_rdt_ca(ca));
-			print_rdt_ca(ca);
+				"(", rdt_ca_get_type_str(ca));
+			rdt_ca_print(ca);
 			printf(") overlap contention mask.\n");
 		}
 	}
@@ -824,7 +833,7 @@ check_cbm_len_and_contention_all(void)
  * @return operation status
  */
 static int
-get_avail_rdt_ca(const unsigned socket, const unsigned max_num_ca,
+rdt_ca_get_avail(const unsigned socket, const unsigned max_num_ca,
 		const unsigned hi_cos_id, unsigned *num_ca, struct rdt_ca ca)
 {
 	unsigned cores[CPU_SETSIZE], cores_count = 0, num = 0;
@@ -835,7 +844,7 @@ get_avail_rdt_ca(const unsigned socket, const unsigned max_num_ca,
 			NULL == ca.u.generic_ptr)
 		return PQOS_RETVAL_PARAM;
 
-	ret = get_rdt_ca(socket, max_num_ca, &num, ca);
+	ret = rdt_ca_get(socket, max_num_ca, &num, ca);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Error retrieving %s configuration!\n",
 			PQOS_CAP_TYPE_L2CA == ca.type ? "L2CA" : "L3CA");
@@ -915,7 +924,7 @@ get_avail_rdt_ca(const unsigned socket, const unsigned max_num_ca,
  * @return operation status
  */
 static int
-select_rdt_ca(const unsigned socket, const unsigned num_cos,
+rdt_ca_select(const unsigned socket, const unsigned num_cos,
 		const unsigned hi_cos_id, struct rdt_ca ca)
 {
 	struct pqos_l2ca avail_l2_ca[PQOS_MAX_L2CA_COS];
@@ -928,15 +937,15 @@ select_rdt_ca(const unsigned socket, const unsigned num_cos,
 		return PQOS_RETVAL_PARAM;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
-		ret = get_avail_rdt_ca(socket, PQOS_MAX_L2CA_COS, hi_cos_id,
+		ret = rdt_ca_get_avail(socket, PQOS_MAX_L2CA_COS, hi_cos_id,
 			&num, wrap_l2ca(avail_l2_ca));
 	else
-		ret = get_avail_rdt_ca(socket, PQOS_MAX_L3CA_COS, hi_cos_id,
+		ret = rdt_ca_get_avail(socket, PQOS_MAX_L3CA_COS, hi_cos_id,
 			&num, wrap_l3ca(avail_l3_ca));
 
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Error retrieving list of available %s COS!\n",
-			get_type_str_rdt_ca(ca));
+			rdt_ca_get_type_str(ca));
 		return ret;
 	}
 
@@ -962,7 +971,7 @@ select_rdt_ca(const unsigned socket, const unsigned num_cos,
  * @param [in] l3 L3 CAT configuration
  *
  * @return highest usable COS id
- * @retval 0 on error
+ * @retval UINT_MAX on error
  */
 static unsigned
 get_hi_cos_id(struct pqos_l2ca *l2, struct pqos_l3ca *l3)
@@ -970,11 +979,11 @@ get_hi_cos_id(struct pqos_l2ca *l2, struct pqos_l3ca *l3)
 	unsigned num_l3_cos = 0, num_l2_cos = 0;
 	int l2_valid = 0, l3_valid = 0;
 
-	l2_valid = is_valid_rdt_ca(wrap_l2ca(l2));
-	l3_valid = is_valid_rdt_ca(wrap_l3ca(l3));
+	l2_valid = rdt_ca_is_valid(wrap_l2ca(l2));
+	l3_valid = rdt_ca_is_valid(wrap_l3ca(l3));
 
 	if (!l2_valid && !l3_valid)
-		return 0;
+		return UINT_MAX;
 
 	if (m_cap_l2ca != NULL)
 		num_l2_cos = m_cap_l2ca->u.l2ca->num_classes;
@@ -1022,11 +1031,11 @@ cat_cos_assign(const unsigned socket, const unsigned num_cos,
 
 		const unsigned hi_cos_id = get_hi_cos_id(l2_cos, l3_cos);
 
-		if (0 == hi_cos_id)
+		if (UINT_MAX == hi_cos_id)
 			return PQOS_RETVAL_PARAM;
 
 		if (NULL != m_cap_l3ca && NULL != l3_cos) {
-			ret = select_rdt_ca(socket, 1, hi_cos_id,
+			ret = rdt_ca_select(socket, 1, hi_cos_id,
 				wrap_l3ca(l3_cos));
 			if (PQOS_RETVAL_OK != ret) {
 				printf("Error selecting available L3 COS!\n");
@@ -1036,7 +1045,7 @@ cat_cos_assign(const unsigned socket, const unsigned num_cos,
 			if (NULL != l2_cos)
 				l2_cos->class_id = l3_cos->class_id;
 		} else if (NULL != m_cap_l2ca && NULL != l2_cos) {
-			ret = select_rdt_ca(socket, 1, hi_cos_id,
+			ret = rdt_ca_select(socket, 1, hi_cos_id,
 				wrap_l2ca(l2_cos));
 			if (PQOS_RETVAL_OK != ret) {
 				printf("Error selecting available L2 COS!\n");
@@ -1130,11 +1139,11 @@ cat_atomic_set(const unsigned num, struct pqos_l2ca *l2ca,
 			/* Configure COS */
 			if (m_cap_l3ca != NULL && l3ca != NULL) {
 				int valid_ca =
-					is_valid_rdt_ca(wrap_l3ca(&l3ca[i]));
+					rdt_ca_is_valid(wrap_l3ca(&l3ca[i]));
 
 				if (!valid_ca && 0 != l3ca[i].class_id) {
 					/* Set same config as L3 COS#0 */
-					ret = get_default_rdt_ca(j,
+					ret = rdt_ca_get_default(j,
 						wrap_l3ca(&l3ca[i]));
 					if (ret != PQOS_RETVAL_OK) {
 						printf("Error getting default "
@@ -1157,11 +1166,11 @@ cat_atomic_set(const unsigned num, struct pqos_l2ca *l2ca,
 
 			if (m_cap_l2ca != NULL && l2ca != NULL) {
 				int valid_ca =
-					is_valid_rdt_ca(wrap_l2ca(&l2ca[i]));
+					rdt_ca_is_valid(wrap_l2ca(&l2ca[i]));
 
 				if (!valid_ca && 0 != l2ca[i].class_id) {
 					/* Set same config as L2 COS#0 */
-					ret = get_default_rdt_ca(j,
+					ret = rdt_ca_get_default(j,
 						wrap_l2ca(&l2ca[i]));
 					if (ret != PQOS_RETVAL_OK) {
 						printf("Error getting default "
@@ -1457,11 +1466,11 @@ print_cmd_line_rdt_config(void)
 		ca_array[1] = wrap_l3ca(&g_cfg.config[i].l3);
 
 		for (j = 0; j < DIM(ca_array); j++) {
-			if (!is_valid_rdt_ca(ca_array[j]))
+			if (!rdt_ca_is_valid(ca_array[j]))
 				continue;
 			printf("%s Allocation: CPUs: %s ",
-				get_type_str_rdt_ca(ca_array[j]), cpustr);
-			print_rdt_ca(ca_array[j]);
+				rdt_ca_get_type_str(ca_array[j]), cpustr);
+			rdt_ca_print(ca_array[j]);
 			printf("\n");
 		}
 	}
