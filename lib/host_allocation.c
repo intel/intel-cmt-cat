@@ -663,7 +663,7 @@ cdp_enable(const unsigned sockets_num,
 {
         unsigned j = 0;
 
-        ASSERT(socket_num > 0 && sockets != NULL);
+        ASSERT(sockets_num > 0 && sockets != NULL);
 
         LOG_INFO("%s CDP across sockets...\n",
                  (enable) ? "Enabling" : "Disabling");
