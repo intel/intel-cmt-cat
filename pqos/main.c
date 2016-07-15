@@ -55,7 +55,7 @@
 /**
  * Default CDP configuration option - don't enforce on or off
  */
-static enum pqos_cdp_config selfn_cdp_config = PQOS_REQUIRE_CDP_ANY;
+static enum pqos_cdp_config selfn_l3cdp_config = PQOS_REQUIRE_CDP_ANY;
 
 /**
  * Free RMID's being in use
@@ -280,35 +280,34 @@ selfn_super_verbose_mode(const char *arg)
 }
 
 /**
- * @brief Processes configuration setting
- *
- * For now CDP config settings are only accepted.
- *
- * @param arg string detailing configuration setting
- */
-static void
-selfn_set_config(const char *arg)
-{
-        if (strcasecmp(arg, "cdp-on") == 0)
-                selfn_cdp_config = PQOS_REQUIRE_CDP_ON;
-        else if (strcasecmp(arg, "cdp-off") == 0)
-                selfn_cdp_config = PQOS_REQUIRE_CDP_OFF;
-        else if (strcasecmp(arg, "cdp-any") == 0)
-                selfn_cdp_config = PQOS_REQUIRE_CDP_ANY;
-        else {
-                printf("Unrecognized '%s' setting!\n", arg);
-                exit(EXIT_FAILURE);
-        }
-}
-
-/**
  * @brief Sets CAT reset flag
  *
- * @param arg not used
+ * @param [in] arg optional configuration string
+ *             if NULL or zero length  then configuration check is skipped
  */
 static void selfn_reset_cat(const char *arg)
 {
-        UNUSED_ARG(arg);
+        if (arg != NULL && (strlen(arg) > 0)) {
+                const struct {
+                        const char *name;
+                        enum pqos_cdp_config cdp;
+                } patterns[] = {
+                        {"l3cdp-on",  PQOS_REQUIRE_CDP_ON},
+                        {"l3cdp-off", PQOS_REQUIRE_CDP_OFF},
+                        {"l3cdp-any", PQOS_REQUIRE_CDP_ANY},
+                };
+                unsigned i;
+
+                for (i = 0; i < DIM(patterns); i++)
+                        if (strcasecmp(arg, patterns[i].name) == 0)
+                                break;
+
+                if (i >= DIM(patterns)) {
+                        printf("Unrecognized '%s' CAT reset option!\n", arg);
+                        exit(EXIT_FAILURE);
+                }
+                selfn_l3cdp_config = patterns[i].cdp;
+        }
         sel_reset_CAT = 1;
 }
 
@@ -360,7 +359,6 @@ parse_config_file(const char *fname)
                 {"monitor-file:",       selfn_monitor_file },      /**< -o */
                 {"monitor-file-type:",  selfn_monitor_file_type }, /**< -u */
                 {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
-                {"set-config:",         selfn_set_config },        /**< -S */
                 {"reset-cat:",          selfn_reset_cat },         /**< -R */
         };
         FILE *fp = NULL;
@@ -428,7 +426,7 @@ parse_config_file(const char *fname)
 static const char *m_cmd_name = "pqos";                     /**< command name */
 static const char help_printf_short[] =
         "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
-        "          [-l FILE] [--log-file=FILE] [-S CONFIG] [--set CONFIG]\n"
+        "          [-l FILE] [--log-file=FILE]\n"
         "       %s [-s] [--show]\n"
         "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p EVTPIDS] "
         "[--mon-pid=EVTPIDS]\n"
@@ -453,10 +451,6 @@ static const char help_printf_long[] =
         "  -s, --show                  show current PQoS configuration\n"
         "  -f FILE, --config-file=FILE load commands from selected file\n"
         "  -l FILE, --log-file=FILE    log messages into selected file\n"
-        "  -S CONFIG, --set=CONFIG     set configuration parameter.\n"
-        "          CONFIG can be: cdp-on, cdp-off or cdp-any (default).\n"
-        "          NOTE: change of CDP from ON to OFF, or from OFF to ON\n"
-        "                results in allocation (CAT) reset.\n"
         "  -e CLASSDEF, --alloc-class=CLASSDEF\n"
         "          define allocation classes.\n"
         "          CLASSDEF format is 'TYPE:ID=DEFINITION;'.\n"
@@ -467,7 +461,9 @@ static const char help_printf_long[] =
         "          associate cores with an allocation class.\n"
         "          CLASS2CORE format is 'TYPE:ID=CORE_LIST'.\n"
         "          Example 'llc:0=0,2,4,6-10;llc:1=1'.\n"
-        "  -R, --alloc-reset           reset allocation (CAT) configuration\n"
+        "  -R [CONFIG], --alloc-reset[=CONFIG]\n"
+        "          reset allocation configuration (L2/L3 CAT)\n"
+        "          CONFIG can be: l3cdp-on, l3cdp-off or l3cdp-any (default).\n"
         "  -m EVTCORES, --mon-core=EVTCORES\n"
         "          select cores and events for monitoring.\n"
         "          EVTCORES format is 'EVENT:CORE_LIST'.\n"
@@ -514,7 +510,6 @@ static void print_help(const int is_long)
 static struct option long_cmd_opts[] = {
         {"help",          no_argument,       0, 'h'},
         {"log-file",      required_argument, 0, 'l'},
-        {"set",           required_argument, 0, 'S'},
         {"config-file",   required_argument, 0, 'f'},
         {"show",          no_argument,       0, 's'},
         {"profile-list",  no_argument,       0, 'H'},
@@ -528,7 +523,7 @@ static struct option long_cmd_opts[] = {
         {"mon-file-type", required_argument, 0, 'u'},
         {"mon-reset",     no_argument,       0, 'r'},
         {"alloc-class",   required_argument, 0, 'e'},
-        {"alloc-reset",   no_argument,       0, 'R'},
+        {"alloc-reset",   required_argument, 0, 'R'},
         {"alloc-assoc",   required_argument, 0, 'a'},
         {"verbose",       no_argument,       0, 'v'},
         {"super-verbose", no_argument,       0, 'V'},
@@ -550,7 +545,7 @@ int main(int argc, char **argv)
         print_warning();
 
         while ((cmd = getopt_long(argc, argv,
-                                  "Hhf:i:m:Tt:l:o:u:e:c:a:p:S:srvVR",
+                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:srvVR:",
                                   long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
@@ -559,9 +554,6 @@ int main(int argc, char **argv)
                 case 'H':
                         profile_l3ca_list(stdout);
                         return EXIT_SUCCESS;
-                case 'S':
-                        selfn_set_config(optarg);
-                        break;
                 case 'f':
                         if (sel_config_file != NULL) {
                                 printf("Only one config file argument is "
@@ -602,7 +594,33 @@ int main(int argc, char **argv)
                         sel_free_in_use_rmid = 1;
                         break;
                 case 'R':
-                        selfn_reset_cat(NULL);
+                        if (optarg != NULL && *optarg == '-') {
+                                /**
+                                 * Next switch option wrongly assumed to be
+                                 * argument to '-R'.
+                                 * Pass NULL as argument to '-R' function and
+                                 * rewind \a optind.
+                                 */
+                                selfn_reset_cat(NULL);
+                                optind--;
+                        } else {
+                                selfn_reset_cat(optarg);
+                        }
+                        break;
+                case ':':
+                        /**
+                         * This is handler for missing mandatory argument
+                         * (enabled by leading ':' in getopt() argument).
+                         * -R is only allowed switch for optional argument.
+                         * Other switches need to report error.
+                         */
+                        if (optopt != 'R') {
+                                printf("Option -%c is missing required "
+                                       "argument\n", optopt);
+                                return EXIT_FAILURE;
+                        } else {
+                                selfn_reset_cat(NULL);
+                        }
                         break;
                 case 'a':
                         selfn_allocation_assoc(optarg);
@@ -698,7 +716,7 @@ int main(int argc, char **argv)
                 /**
                  * Reset CAT configuration to after-reset state and exit
                  */
-                if (pqos_alloc_reset(selfn_cdp_config) != PQOS_RETVAL_OK) {
+                if (pqos_alloc_reset(selfn_l3cdp_config) != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("CAT reset failed!\n");
                 } else
