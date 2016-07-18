@@ -441,6 +441,36 @@ int pqos_alloc_assoc_set(const unsigned lcore,
 int pqos_alloc_assoc_get(const unsigned lcore,
                          unsigned *class_id);
 
+/**
+ * @brief Assign first available COS to cores in \a core_array
+ *
+ * While searching for available COS take technologies it is intended to use
+ * with into account.
+ *
+ * @param [in] technology bit mask selecting technologies
+ *             (1 << enum pqos_cap_type)
+ * @param [in] core_array list of core ids
+ * @param [in] core_num number of core ids in the \a core_array
+ * @param [out] classid place to store reserved COS id
+ *
+ * @return Operations status
+ */
+int pqos_alloc_assign(const unsigned technology,
+                      const unsigned *core_array,
+                      const unsigned core_num,
+                      unsigned *class_id);
+
+/**
+ * @brief Reassign cores in \a core_array to default COS#0
+ *
+ * @param [in] core_array list of core ids
+ * @param [in] core_num number of core ids in the \a core_array
+ *
+ * @return Operations status
+ */
+int pqos_alloc_release(const unsigned *core_array,
+                       const unsigned core_num);
+
 /*
  * =======================================
  * L3 cache allocation

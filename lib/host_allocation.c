@@ -522,14 +522,68 @@ pqos_l2ca_get(const unsigned socket,
         return ret;
 }
 
+/**
+ * @brief Gets COS associated to \a lcore
+ *
+ * @param [in] lcore lcore to read COS association from
+ * @param [out] class_id associated COS
+ *
+ * @return Operation status
+ */
+static int
+cos_assoc_get(const unsigned lcore, unsigned *class_id)
+{
+        const uint32_t reg = PQOS_MSR_ASSOC;
+        uint64_t val = 0;
+
+        if (class_id == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
+        val >>= PQOS_MSR_ASSOC_QECOS_SHIFT;
+        *class_id = (unsigned) val;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Sets COS associated to \a lcore
+ *
+ * @param [in] lcore lcore to set COS association
+ * @param [in] class_id COS to associate lcore to
+ *
+ * @return Operation status
+ */
+
+static int
+cos_assoc_set(const unsigned lcore, const unsigned class_id)
+{
+        const uint32_t reg = PQOS_MSR_ASSOC;
+        uint64_t val = 0;
+        int ret;
+
+        ret = msr_read(lcore, reg, &val);
+        if (ret != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
+        val &= (~PQOS_MSR_ASSOC_QECOS_MASK);
+        val |= (((uint64_t) class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
+
+        ret = msr_write(lcore, reg, val);
+        if (ret != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 pqos_alloc_assoc_set(const unsigned lcore,
                      const unsigned class_id)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned num_l2_cos = 0, num_l3_cos = 0;
-        const uint32_t reg = PQOS_MSR_ASSOC;
-        uint64_t val = 0;
 
         _pqos_api_lock();
 
@@ -565,23 +619,10 @@ pqos_alloc_assoc_set(const unsigned lcore,
                 return PQOS_RETVAL_PARAM;
         }
 
-        ret = msr_read(lcore, reg, &val);
-        if (ret != MACHINE_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-        val &= (~PQOS_MSR_ASSOC_QECOS_MASK);
-        val |= (((uint64_t) class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
-
-        ret = msr_write(lcore, reg, val);
-        if (ret != MACHINE_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
+        ret = cos_assoc_set(lcore, class_id);
 
         _pqos_api_unlock();
-        return PQOS_RETVAL_OK;
+        return ret;
 }
 
 int
@@ -591,8 +632,6 @@ pqos_alloc_assoc_get(const unsigned lcore,
         const struct pqos_capability *l3_cap = NULL;
         const struct pqos_capability *l2_cap = NULL;
         int ret = PQOS_RETVAL_OK;
-        const uint32_t reg = PQOS_MSR_ASSOC;
-        uint64_t val = 0;
 
         _pqos_api_lock();
 
@@ -633,16 +672,195 @@ pqos_alloc_assoc_get(const unsigned lcore,
                 return PQOS_RETVAL_RESOURCE;
         }
 
-        if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-        val >>= PQOS_MSR_ASSOC_QECOS_SHIFT;
-        *class_id = (unsigned) val;
+        ret = cos_assoc_get(lcore, class_id);
 
         _pqos_api_unlock();
+        return ret;
+}
+
+/**
+ * @brief Gets highest COS id which could be used to configure set technologies
+ *
+ * @param [in] technology technologies bitmask to get highest common COS id for
+ * @param [out] class_id highest common COS id
+ *
+ * @return Operation status
+ */
+static int
+get_hi_cos_id(const unsigned technology,
+              unsigned *hi_class_id)
+{
+        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+        const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
+        unsigned num_l2_cos = 0, num_l3_cos = 0;
+        int ret;
+
+        if ((!l2_req && !l3_req) || hi_class_id == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        ASSERT(m_cap != NULL);
+
+        if (l3_req) {
+                ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
+
+                if (num_l3_cos > 0)
+                        num_l3_cos--;
+                else
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        if (l2_req) {
+                ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
+
+                if (num_l2_cos > 0)
+                        num_l2_cos--;
+                else
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        if (l2_req && l3_req)
+                *hi_class_id = (num_l2_cos < num_l3_cos) ?
+                       num_l2_cos : num_l3_cos;
+        else if (l2_req)
+                *hi_class_id = num_l2_cos;
+        else
+                *hi_class_id = num_l3_cos;
+
         return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Gets unused COS on \a socket
+ *
+ * @param [in] socket Socket ID to search for unused COS on
+ * @param [in] hi_class_id highest acceptable COS id
+ * @param [out] class_id unused COS
+ *
+ * @return Operation status
+ */
+static int
+get_unused_cos(const unsigned socket,
+               const unsigned hi_class_id,
+               unsigned *class_id)
+{
+        unsigned used_classes[hi_class_id + 1];
+        unsigned i, cos;
+        int ret;
+
+        if (class_id == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        memset(used_classes, 0, sizeof(used_classes));
+
+        /* Create a list of COS used on socket */
+        for (i = 0; i < m_cpu->num_cores; i++) {
+                if (m_cpu->cores[i].socket != socket)
+                        continue;
+
+                ret = cos_assoc_get(m_cpu->cores[i].lcore, &cos);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                if (cos > hi_class_id)
+                        continue;
+
+                /* Mark as used */
+                used_classes[cos] = 1;
+        }
+
+        /* Find unused COS */
+        for (cos = 0; cos <= hi_class_id; cos++) {
+                if (used_classes[cos] == 0) {
+                        *class_id = cos;
+                        return PQOS_RETVAL_OK;
+                }
+        }
+
+        return PQOS_RETVAL_RESOURCE;
+}
+
+int pqos_alloc_assign(const unsigned technology,
+                      const unsigned *core_array,
+                      const unsigned core_num,
+                      unsigned *class_id)
+{
+        unsigned socket = 0, i, hi_cos_id;
+        int ret;
+
+        ASSERT(core_num > 0 && core_array != NULL && class_id != NULL &&
+                technology != 0);
+
+        if (core_num == 0 || core_array == NULL || class_id == NULL ||
+                        technology == 0)
+                return PQOS_RETVAL_PARAM;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_alloc_assign_exit;
+
+        for (i = 0; i < core_num; i++) {
+                const unsigned prev_socket = socket;
+
+                ret = pqos_cpu_get_socketid(m_cpu, core_array[i], &socket);
+                if (ret != PQOS_RETVAL_OK)
+                        goto pqos_alloc_assign_exit;
+
+                if (i != 0 && socket != prev_socket) {
+                        ret = PQOS_RETVAL_PARAM;
+                        goto pqos_alloc_assign_exit;
+                }
+        }
+
+        ret = get_hi_cos_id(technology, &hi_cos_id);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_alloc_assign_exit;
+
+        ret = get_unused_cos(socket, hi_cos_id, class_id);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_alloc_assign_exit;
+
+        for (i = 0; i < core_num; i++) {
+                ret = cos_assoc_set(core_array[i], *class_id);
+                if (ret != PQOS_RETVAL_OK)
+                        goto pqos_alloc_assign_exit;
+        }
+
+pqos_alloc_assign_exit:
+        _pqos_api_unlock();
+        return ret;
+}
+
+int pqos_alloc_release(const unsigned *core_array,
+                       const unsigned core_num)
+{
+        unsigned i;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(core_num > 0 && core_array != NULL);
+        if (core_num == 0 || core_array == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        for (i = 0; i < core_num; i++)
+                if (cos_assoc_set(core_array[i], 0) != PQOS_RETVAL_OK)
+                        ret = PQOS_RETVAL_ERROR;
+
+        _pqos_api_unlock();
+
+        return ret;
 }
 
 /**
@@ -742,27 +960,9 @@ cat_assoc_reset(void)
         int ret = PQOS_RETVAL_OK;
         unsigned i;
 
-        for (i = 0; i < m_cpu->num_cores; i++) {
-                const unsigned class_id = 0;
-                const uint32_t reg = PQOS_MSR_ASSOC;
-                uint64_t val = 0;
-                int retval = MACHINE_RETVAL_OK;
-
-                retval = msr_read(m_cpu->cores[i].lcore, reg, &val);
-                if (retval != MACHINE_RETVAL_OK) {
-			ret = PQOS_RETVAL_ERROR;
-                        continue;
-		}
-
-                val &= (~PQOS_MSR_ASSOC_QECOS_MASK);
-                val |= (((uint64_t) class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
-
-                retval = msr_write(m_cpu->cores[i].lcore, reg, val);
-                if (retval != MACHINE_RETVAL_OK) {
-			ret = PQOS_RETVAL_ERROR;
-                        continue;
-		}
-        }
+        for (i = 0; i < m_cpu->num_cores; i++)
+                if (cos_assoc_set(m_cpu->cores[i].lcore, 0) != PQOS_RETVAL_OK)
+                        ret = PQOS_RETVAL_ERROR;
 
         return ret;
 }
