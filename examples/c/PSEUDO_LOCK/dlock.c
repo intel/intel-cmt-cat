@@ -50,7 +50,6 @@
 
 static int m_is_chunk_allocated = 0;
 static char *m_chunk_start = NULL;
-static size_t m_chunk_pos = 0;
 static size_t m_chunk_size = 0;
 static unsigned m_num_clos = 0;
 static struct {
@@ -210,7 +209,6 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                 mem_init(m_chunk_start, size);
         }
         m_chunk_size = size;
-        m_chunk_pos = 0;
 
         /**
          * Get task affinity to restore it later
@@ -435,9 +433,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
 
         if (ret != 0) {
                 m_chunk_start = NULL;
+                m_chunk_size = 0;
                 m_is_chunk_allocated = 0;
-                m_chunk_start = 0;
-                m_chunk_pos = 0;
         }
 
         return ret;
@@ -468,33 +465,8 @@ int dlock_exit(void)
                 free(m_chunk_start);
 
         m_chunk_start = NULL;
+        m_chunk_size = 0;
         m_is_chunk_allocated = 0;
-        m_chunk_start = 0;
-        m_chunk_pos = 0;
 
         return ret;
-}
-
-void *dlock_alloc(size_t size)
-{
-        const size_t remain = m_chunk_size - m_chunk_pos;
-        void *p = (void *)&m_chunk_start[m_chunk_pos];
-
-        if (m_chunk_start == NULL)
-                return NULL;
-
-        if (size > remain)
-                return NULL;
-
-        m_chunk_pos += size;
-        return p;
-}
-
-void dlock_free(void *ptr)
-{
-        /**
-         * Current simplistic implementation doesn't allow to free memory.
-         * The module needs to be shut down to free memory up.
-         */
-        (void) ptr;
 }

@@ -77,25 +77,6 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid);
  */
 int dlock_exit(void);
 
-/**
- * @brief Allocates \a size bytes from within locked memory chunk.
- *
- * @note Implementation of this function is very simplistic and
- *       it doesn't allow to free allocated memory blocks.
- *
- * @return Pointer to allocated memory
- * @retval NULL on error
- */
-void *dlock_alloc(size_t size);
-
-/**
- * @brief Frees previously allocated memory block pointed by \a ptr
- *
- * @note Implementation of this function is just a stub.
- *       Nothing really happens here.
- */
-void dlock_free(void *ptr);
-
 #ifdef __cplusplus
 }
 #endif
