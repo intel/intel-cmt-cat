@@ -782,7 +782,7 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
             l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
             l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
-                LOG_ERROR("Unrecognized L3 CDP configuration %d!\n",
+                LOG_ERROR("Unrecognized L3 CDP configuration setting %d!\n",
                           l3_cdp_cfg);
                 return PQOS_RETVAL_PARAM;
         }
@@ -808,7 +808,14 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 
         /* Check if either L2 or L3 CAT is supported */
         if (l2_cap == NULL && l3_cap == NULL) {
+                LOG_ERROR("L2/L3 CAT not present!\n");
                 ret = PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
+                goto pqos_alloc_reset_exit;
+        }
+        /* Check L3 CDP requested while not present */
+        if (l3_cap == NULL && l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
+                LOG_ERROR("L3 CDP setting requested but no L3 CAT present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
                 goto pqos_alloc_reset_exit;
         }
         if (l3_cap != NULL) {
