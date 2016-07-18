@@ -2,7 +2,7 @@
 ================================================================================
 README for PQoS Utility Configuration files
 
-October 2015
+July 2016
 ================================================================================
 
 Contents
@@ -86,11 +86,10 @@ Currently supported allocation type(s):
 3.1 LLC Allocation
 ==================
 
-Description:    Sets configuration setting.
-Syntax:         set-config: [cdp-on|cdp-off|cdp-any]
-Example:
-                set-config: cdp-on
-
+Description:    Resets allocation technologies (L2/L3 CAT) and
+                optionally reconfigures L3 CDP.
+Syntax:         reset-cat: [l3cdp-on|l3cdp-off|l3cdp-any]
+Example:        reset-cat: l3cdp-on
 
 Description:    Sets allocation class(es) of service
                 For CDP, 'c' or 'd' letters can be used after class id to

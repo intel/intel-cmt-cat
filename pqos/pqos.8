@@ -77,13 +77,6 @@ log messages into selected log FILE
 .B \-s, \-\-show
 show the current allocation and monitoring configuration
 .TP
-.B \-S cdp-on|cdp-off|cdp-any, \-\-set cdp-on|cdp-off|cdp-any
-cdp-on	sets CDP on
-.br
-cdp-off	sets CDP off
-.br
-cdp-any	keep current CDP setting (default)
-.TP
 .B \-f FILE, \-\-config\-file=FILE
 load commands from selected configuration FILE
 .TP
@@ -105,8 +98,14 @@ For CAT, TYPE is "llc" and ID is a class number. CORE_LIST is comma or dash sepa
 .br
 For example "\-a llc:0=0,2,4,6-10;llc:1=1;" associates cores 0, 2, 4, 6, 7, 8, 9, 10 with CAT class 0 and core 1 with class 1.
 .TP
-.B \-R, \-\-alloc\-reset
-reset the CAT configuration
+.B \-R [CONFIG], \-\-alloc\-reset[=CONFIG]
+reset allocation setting (L3 CAT, L2 CAT) and reconfigure L3 CDP. CONFIG is one of the following options:
+.br
+l3cdp-on	sets L3 CDP on
+.br
+l3cdp-off	sets L3 CDP off
+.br
+l3cdp-any	keep current L3 CDP setting (default)
 .TP
 .B \-m EVTCORES, \-\-mon\-core=EVTCORES
 select the cores and events for monitoring, EVTCORES format is "EVENT:CORE_LIST". Valid EVENT settings are:
