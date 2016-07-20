@@ -721,7 +721,6 @@ int main(int argc, char **argv)
                         printf("CAT reset failed!\n");
                 } else
                         printf("CAT reset successful\n");
-                goto allocation_exit;
         }
 
         if (sel_show_allocation_config) {
@@ -752,6 +751,12 @@ int main(int argc, char **argv)
                 goto error_exit_2;
                 break;
         }
+
+        /**
+         * If -R was present ignore all monitoring related options
+         */
+        if (sel_reset_CAT)
+                goto allocation_exit;
 
         /**
          * Just monitoring option left on the table now
