@@ -106,7 +106,7 @@ int parse_rdt(char *rdtstr);
  * @retval 0 on success
  * @retval negative on error (-errno)
  */
-int cat_set(void);
+int cat_configure(void);
 
 /*
  * @brief Resets COS association (assign COS#0) on listed CPUs

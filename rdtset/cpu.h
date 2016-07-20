@@ -50,7 +50,7 @@ extern "C" {
 typedef cpuset_t cpu_set_t;
 #ifndef CPU_COUNT
 static inline int
-CPU_COUNT(cpu_set_t *set)
+CPU_COUNT(const cpu_set_t *set)
 {
 	int i = 0, count = 0;
 

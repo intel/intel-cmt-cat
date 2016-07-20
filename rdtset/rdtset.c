@@ -290,7 +290,7 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
 }
 
 /**
- * @brief Parse the argument given in the command line of the application
+ * @brief Parses the arguments given in the command line of the application
  *
  * @param [in] argc number of args
  * @param [in] argv args
@@ -364,7 +364,12 @@ exit:
 }
 
 /**
- * @brief main
+ * @brief main function for rdtset
+ *
+ * Parses cmd line args and validates them,
+ * initializes PQoS lib and configures CAT,
+ * sets core affinity for executed command process or provided PID,
+ * when running command, resets CAT configuration on exit.
  *
  * @param [in] argc number of args
  * @param [in] argv args
@@ -430,7 +435,7 @@ main(int argc, char **argv)
 		if (g_cfg.verbose)
 			printf("CAT: Configuring CAT...\n");
 
-		ret = cat_set();
+		ret = cat_configure();
 		if (ret != 0) {
 			printf("CAT: Failed to configure CAT!\n");
 			cat_fini();
