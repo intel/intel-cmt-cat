@@ -736,6 +736,8 @@ get_hi_cos_id(const unsigned technology,
 /**
  * @brief Gets unused COS on \a socket
  *
+ * The lowest acceptable COS is 1, as 0 is a default one
+ *
  * @param [in] socket Socket ID to search for unused COS on
  * @param [in] hi_class_id highest acceptable COS id
  * @param [out] class_id unused COS
@@ -773,7 +775,7 @@ get_unused_cos(const unsigned socket,
         }
 
         /* Find unused COS */
-        for (cos = 0; cos <= hi_class_id; cos++) {
+        for (cos = hi_class_id; cos != 0; cos--) {
                 if (used_classes[cos] == 0) {
                         *class_id = cos;
                         return PQOS_RETVAL_OK;
