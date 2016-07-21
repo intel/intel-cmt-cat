@@ -426,6 +426,7 @@ parse_allocation_cos(char *str, const uint64_t *sockets,
 
         if (type == L2CA && update_scope != CAT_UPDATE_SCOPE_BOTH)
                 parse_error(sp, "CDP not supported for L2 CAT!\n");
+        free(sp);
         /**
          * Update all sockets COS table
          */
@@ -445,7 +446,6 @@ parse_allocation_cos(char *str, const uint64_t *sockets,
                 update_cat_cos_tab(&sel_cat_cos_tab[s], class_id,
                                    mask, update_scope, type);
         }
-        free(sp);
 }
 
 /**
