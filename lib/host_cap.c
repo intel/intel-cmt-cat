@@ -97,6 +97,15 @@
 #define PQOS_MSR_L2CA_MASK_START     0xC10   /**< L2 CAT class 0 register */
 #define PQOS_MSR_L2CA_MASK_END       0xD8F   /**< L2 CAT class 127 register */
 
+#ifndef LOCKFILE
+#ifdef __linux__
+#define LOCKFILE "/var/lock/libpqos"
+#endif
+#ifdef __FreeBSD__
+#define LOCKFILE "/var/lib/libpqos.lockfile"
+#endif
+#endif /*!LOCKFILE*/
+
 /**
  * ---------------------------------------
  * Local data types
@@ -148,11 +157,8 @@ static int m_apilock = -1;
  */
 static int _pqos_api_init(void)
 {
-#ifdef __FreeBSD__
-        const char *lock_filename = "/var/lib/libpqos.lockfile";
-#else
-        const char *lock_filename = "/var/lock/libpqos";
-#endif
+
+        const char *lock_filename = LOCKFILE;
 
         if (m_apilock != -1)
                 return -1;
