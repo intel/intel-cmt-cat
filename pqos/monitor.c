@@ -676,6 +676,9 @@ void monitor_stop(void)
 
 void selfn_monitor_time(const char *arg)
 {
+        if (arg == NULL)
+                parse_error(arg, "NULL monitor time argument!");
+
         if (!strcasecmp(arg, "inf") || !strcasecmp(arg, "infinite"))
                 sel_timeout = -1; /**< infinite timeout */
         else
