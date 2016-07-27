@@ -109,6 +109,7 @@ struct pqos_config {
  *        file descriptor.
  *
  * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_init(const struct pqos_config *config);
 
@@ -116,6 +117,7 @@ int pqos_init(const struct pqos_config *config);
  * @brief Shuts down PQoS module
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_fini(void);
 
@@ -131,6 +133,7 @@ int pqos_fini(void);
  * For now there are:
  * - monitoring capability
  * - L3 cache allocation capability
+ * - L2 cache allocation capability
  */
 enum pqos_cap_type {
         PQOS_CAP_TYPE_MON = 0,          /**< QoS monitoring */
@@ -243,10 +246,25 @@ struct pqos_coreinfo {
 };
 
 /**
+ * CPU cache information structure
+ */
+struct pqos_cacheinfo {
+        int detected;                   /**< Indicates cache detected & valid */
+        unsigned num_ways;              /**< Number of cache ways */
+        unsigned num_sets;              /**< Number of sets */
+        unsigned num_partitions;        /**< Number of partitions */
+        unsigned line_size;             /**< Cache line size in bytes */
+        unsigned total_size;            /**< Total cache size in bytes */
+        unsigned way_size;              /**< Cache way size in bytes */
+};
+
+/**
  * CPU topology structure
  */
 struct pqos_cpuinfo {
         unsigned mem_size;              /**< byte size of the structure */
+        struct pqos_cacheinfo l2;       /**< L2 cache information */
+        struct pqos_cacheinfo l3;       /**< L3 cache information */
         unsigned num_cores;             /**< number of cores in the system */
         struct pqos_coreinfo cores[0];
 };
@@ -262,6 +280,7 @@ struct pqos_cpuinfo {
  *                  logical cores and their assignment.
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_cap_get(const struct pqos_cap **cap,
                  const struct pqos_cpuinfo **cpu);
@@ -346,6 +365,7 @@ struct pqos_mon_data {
  * @brief Resets monitoring by binding all cores with RMID0
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_reset(void);
 
@@ -356,6 +376,7 @@ int pqos_mon_reset(void);
  * @param [out] rmid place to store resource monitoring id
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_assoc_get(const unsigned lcore,
                        pqos_rmid_t *rmid);
@@ -372,6 +393,7 @@ int pqos_mon_assoc_get(const unsigned lcore,
  * @param [in] context application dependent context pointer
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_start(const unsigned num_cores,
                    const unsigned *cores,
@@ -387,6 +409,7 @@ int pqos_mon_start(const unsigned num_cores,
  * @param [in] context application dependent context pointer
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_start_pid(const pid_t pid,
                        const enum pqos_mon_event event,
@@ -399,6 +422,7 @@ int pqos_mon_start_pid(const pid_t pid,
  * @param [in] group monitoring context for selected number of cores
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_stop(struct pqos_mon_data *group);
 
@@ -409,6 +433,7 @@ int pqos_mon_stop(struct pqos_mon_data *group);
  * @param [in] num_groups number of monitoring groups in the table
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_poll(struct pqos_mon_data **groups,
                   const unsigned num_groups);
@@ -437,6 +462,7 @@ int pqos_alloc_assoc_set(const unsigned lcore,
  * @param [out] class_id class of service
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_alloc_assoc_get(const unsigned lcore,
                          unsigned *class_id);
@@ -500,6 +526,7 @@ struct pqos_l3ca {
  * @param [in] ca table with class of service definitions
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_l3ca_set(const unsigned socket,
                   const unsigned num_cos,
@@ -515,6 +542,7 @@ int pqos_l3ca_set(const unsigned socket,
  * @param [out] ca table with read classes of service
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_l3ca_get(const unsigned socket,
                   const unsigned max_num_ca,
@@ -543,6 +571,7 @@ struct pqos_l2ca {
  * @param [in] ca table with class of service definitions
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_l2ca_set(const unsigned socket,
                   const unsigned num_cos,
@@ -558,6 +587,7 @@ int pqos_l2ca_set(const unsigned socket,
  * @param [out] ca table with read classes of service
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 int pqos_l2ca_get(const unsigned socket,
                   const unsigned max_num_ca,
