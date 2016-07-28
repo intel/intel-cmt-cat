@@ -58,9 +58,9 @@
 static enum pqos_cdp_config selfn_l3cdp_config = PQOS_REQUIRE_CDP_ANY;
 
 /**
- * Free RMID's being in use
+ * Monitoring reset
  */
-static int sel_free_in_use_rmid = 0;
+static int sel_mon_reset = 0;
 
 /**
  * Maintains pointer to selected log file name
@@ -591,7 +591,7 @@ int main(int argc, char **argv)
                         selfn_allocation_class(optarg);
                         break;
                 case 'r':
-                        sel_free_in_use_rmid = 1;
+                        sel_mon_reset = 1;
                         break;
                 case 'R':
                         if (optarg != NULL && *optarg == '-') {
@@ -651,7 +651,6 @@ int main(int argc, char **argv)
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.verbose = sel_verbose_mode;
-        cfg.free_in_use_rmid = sel_free_in_use_rmid;
 
         /**
          * Set up file descriptor for message log
@@ -710,6 +709,15 @@ int main(int argc, char **argv)
                 printf("Error retrieving L2 allocation capabilities!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
+        }
+
+        if (sel_mon_reset && cap_mon != NULL) {
+                if (pqos_mon_reset() != PQOS_RETVAL_OK) {
+                        exit_val = EXIT_FAILURE;
+                        printf("CMT/MBM reset failed!\n");
+                } else {
+                        printf("CMT/MBM reset successful\n");
+                }
         }
 
         if (sel_reset_CAT) {
