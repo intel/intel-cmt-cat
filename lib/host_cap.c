@@ -233,83 +233,35 @@ int _pqos_check_init(const int expect)
  */
 
 /**
- * @brief Detects LLC size and number of ways
+ * @brief Retrieves cache size and number of ways
  *
- * Retrieves information about L3 cache
- * and calculates its size. Uses CPUID.0x04.0x03
+ * Retrieves information about cache from \a cache_info structure.
  *
- * @param p_num_ways place to store number of detected cache ways
- * @param p_size_in_bytes place to store size of LLC in bytes
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-get_l3_cache_info(unsigned *p_num_ways,
-                  unsigned *p_size_in_bytes)
-{
-        unsigned num_ways = 0, line_size = 0, num_partitions = 0,
-                num_sets = 0, size_in_bytes = 0;
-        struct cpuid_out res;
-        int ret = PQOS_RETVAL_OK;
-
-        if (p_num_ways == NULL && p_size_in_bytes == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        lcpuid(0x4, 0x3, &res);
-
-        num_ways = (res.ebx>>22) + 1;
-        ASSERT(num_ways > 0);
-        if (p_num_ways != NULL)
-                *p_num_ways = num_ways;
-        line_size = (res.ebx & 0xfff) + 1;
-        num_partitions = ((res.ebx >> 12) & 0x3ff) + 1;
-        num_sets = res.ecx + 1;
-        size_in_bytes = num_ways*num_partitions*line_size*num_sets;
-        if (p_size_in_bytes != NULL)
-                *p_size_in_bytes = size_in_bytes;
-
-        return ret;
-}
-
-/**
- * @brief Detects L2 cache size and number of ways
- *
- * Retrieves information about L2 cache
- * and calculates its size. Uses CPUID.0x04.0x02
- *
- * @param p_num_ways place to store number of detected cache ways
- * @param p_size_in_bytes place to store size of L2 in bytes
+ * @param cache_info cache information structure
+ * @param num_ways place to store number of cache ways
+ * @param size place to store cache size in bytes
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_PARAM incorrect parameters
+ * @retval PQOS_RETVAL_RESOURCE cache not detected
  */
 static int
-get_l2_cache_info(unsigned *p_num_ways,
-                  unsigned *p_size_in_bytes)
+get_cache_info(const struct pqos_cacheinfo *cache_info,
+               unsigned *num_ways,
+               unsigned *size)
 {
-        unsigned num_ways = 0, line_size = 0, num_partitions = 0,
-                num_sets = 0, size_in_bytes = 0;
-        struct cpuid_out res;
-        int ret = PQOS_RETVAL_OK;
-
-        if (p_num_ways == NULL && p_size_in_bytes == NULL)
+        if (num_ways == NULL && size == NULL)
                 return PQOS_RETVAL_PARAM;
-
-        lcpuid(0x4, 0x2, &res);
-
-        num_ways = (res.ebx >> 22) + 1;
-        ASSERT(num_ways > 0);
-        if (p_num_ways != NULL)
-                *p_num_ways = num_ways;
-        line_size = (res.ebx & 0xfff) + 1;
-        num_partitions = ((res.ebx >> 12) & 0x3ff) + 1;
-        num_sets = res.ecx + 1;
-        size_in_bytes = num_ways * num_partitions * line_size * num_sets;
-        if (p_size_in_bytes != NULL)
-                *p_size_in_bytes = size_in_bytes;
-
-        return ret;
+        if (cache_info == NULL)
+                return PQOS_RETVAL_PARAM;
+        if (!cache_info->detected)
+                return PQOS_RETVAL_RESOURCE;
+        if (num_ways != NULL)
+                *num_ways = cache_info->num_ways;
+        if (size != NULL)
+                *size = cache_info->total_size;
+        return PQOS_RETVAL_OK;
 }
 
 /**
@@ -357,6 +309,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
  * returns it through \a r_mon to the caller.
  *
  * @param r_mon place to store created monitoring structure
+ * @param cpu CPU topology structure
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
@@ -364,7 +317,8 @@ add_monitoring_event(struct pqos_cap_mon *mon,
  * @retval PQOS_RETVAL_ERROR enumeration error
  */
 static int
-discover_monitoring(struct pqos_cap_mon **r_mon)
+discover_monitoring(struct pqos_cap_mon **r_mon,
+                    const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res, cpuid_0xa;
         struct cpuid_out cpuid_0xf_1;
@@ -373,7 +327,7 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
                 l3_size = 0, num_events = 0;
         struct pqos_cap_mon *mon = NULL;
 
-        ASSERT(r_mon != NULL);
+        ASSERT(r_mon != NULL && cpu != NULL);
 
         /**
          * Run CPUID.0x7.0 to check
@@ -399,7 +353,7 @@ discover_monitoring(struct pqos_cap_mon **r_mon)
          * MAX_RMID for the socket
          */
         max_rmid = (unsigned) res.ebx + 1;
-        ret = get_l3_cache_info(NULL, &l3_size);   /**< L3 cache size */
+        ret = get_cache_info(&cpu->l3, NULL, &l3_size);  /**< L3 cache size */
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Error reading L3 information!\n");
                 return PQOS_RETVAL_ERROR;
@@ -843,7 +797,7 @@ discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
                 LOG_INFO("CPUID.0x7.0: L3 CAT supported\n");
                 ret = discover_alloc_l3_cpuid(cap, cpu);
                 if (ret == PQOS_RETVAL_OK)
-                        ret = get_l3_cache_info(NULL, &l3_size);
+                        ret = get_cache_info(&cpu->l3, NULL, &l3_size);
         } else {
                 /**
                  * Use brand string matching method 1st.
@@ -855,7 +809,8 @@ discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
                 if (ret != PQOS_RETVAL_OK)
                         ret = discover_alloc_l3_probe(cap, cpu);
                 if (ret == PQOS_RETVAL_OK)
-                        ret = get_l3_cache_info(&cap->num_ways, &l3_size);
+                        ret = get_cache_info(&cpu->l3, &cap->num_ways,
+                                             &l3_size);
         }
 
         if (ret == PQOS_RETVAL_OK) {
@@ -881,18 +836,22 @@ discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
  * @brief Discovers L2 CAT
  *
  * @param r_cap place to store L2 CAT capabilities structure
+ * @param cpu CPU topology structure
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
 static int
-discover_alloc_l2(struct pqos_cap_l2ca **r_cap)
+discover_alloc_l2(struct pqos_cap_l2ca **r_cap,
+                  const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
         struct pqos_cap_l2ca *cap = NULL;
         const unsigned sz = sizeof(*cap);
 	unsigned l2_size = 0;
         int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cpu != NULL);
 
         cap = (struct pqos_cap_l2ca *)malloc(sz);
         if (cap == NULL)
@@ -930,7 +889,7 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap)
 	cap->num_ways = res.eax+1;
 	cap->way_contention = (uint64_t) res.ebx;
 
-	ret = get_l2_cache_info(NULL, &l2_size);
+	ret = get_cache_info(&cpu->l2, NULL, &l2_size);
 	if (ret != PQOS_RETVAL_OK) {
 		LOG_ERROR("Error reading L2 info!\n");
                 free(cap);
@@ -973,7 +932,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * Monitoring init
          */
-        ret = discover_monitoring(&det_mon);
+        ret = discover_monitoring(&det_mon, cpu);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("Monitoring capability detected\n");
@@ -1009,7 +968,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * L2 Cache allocation init
          */
-        ret = discover_alloc_l2(&det_l2ca);
+        ret = discover_alloc_l2(&det_l2ca, cpu);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("L2CA capability detected\n");
