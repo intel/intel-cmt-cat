@@ -1221,6 +1221,9 @@ pqos_init(const struct pqos_config *config)
 
         _pqos_api_unlock();
 
+        if (ret != PQOS_RETVAL_OK)
+                _pqos_api_exit();
+
         return ret;
 }
 
