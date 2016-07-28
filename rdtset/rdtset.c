@@ -385,7 +385,7 @@ main(int argc, char **argv)
 	ret = parse_args(argc, argv);
 	if (ret != 0) {
 		if (-EINVAL == ret)
-			printf("Incorrect argument value!\n");
+			fprintf(stderr, "Incorrect argument value!\n");
 
 		print_usage(argv[0], ret == -EINVAL ? 1 : 0);
 		exit(EXIT_FAILURE);
@@ -399,7 +399,7 @@ main(int argc, char **argv)
 			0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset),
 			0 != g_cfg.pid,
 			0 != g_cfg.command)) {
-		printf("Incorrect invocation!\n");
+		fprintf(stderr, "Incorrect invocation!\n");
 		print_usage(argv[0], 1);
 		exit(EXIT_FAILURE);
 	}
@@ -425,7 +425,8 @@ main(int argc, char **argv)
 
 		ret = cat_reset();
 		if (ret != 0) {
-			printf("CAT: Failed to reset COS association!\n");
+			fprintf(stderr, "CAT: Failed to reset COS association!"
+				"\n");
 			exit(EXIT_FAILURE);
 		}
 	}
@@ -437,7 +438,7 @@ main(int argc, char **argv)
 
 		ret = cat_configure();
 		if (ret != 0) {
-			printf("CAT: Failed to configure CAT!\n");
+			fprintf(stderr, "CAT: Failed to configure CAT!\n");
 			cat_fini();
 			_Exit(EXIT_FAILURE);
 		}
