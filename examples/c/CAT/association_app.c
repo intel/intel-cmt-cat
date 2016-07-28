@@ -50,9 +50,7 @@
 /**
  * Defines
  */
-#define PQOS_MAX_SOCKETS      2
-#define PQOS_MAX_SOCKET_CORES 64
-#define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
+#define PQOS_MAX_CORES        (1024)
 
 /**
  * Number of cores selected for cache allocation association
@@ -106,7 +104,7 @@ print_allocation_config(void)
 {
 	int ret;
 	unsigned i;
-	unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
+	unsigned sock_count, *sockets = NULL;
 	const struct pqos_cpuinfo *p_cpu = NULL;
 	const struct pqos_cap *p_cap = NULL;
 
@@ -117,22 +115,19 @@ print_allocation_config(void)
 		return;
 	}
 	/* Get CPU socket information to set COS */
-	ret = pqos_cpu_get_sockets(p_cpu, PQOS_MAX_SOCKETS,
-			&sock_count,
-			sockets);
-	if (ret != PQOS_RETVAL_OK) {
+	sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
+	if (sockets == NULL) {
 		printf("Error retrieving CPU socket information!\n");
 		return;
 	}
 	for (i = 0; i < sock_count; i++) {
-		unsigned lcores[PQOS_MAX_SOCKET_CORES];
+		unsigned *lcores = NULL;
 		unsigned lcount = 0, n = 0;
 
-		ret = pqos_cpu_get_cores(p_cpu, sockets[i],
-				PQOS_MAX_SOCKET_CORES,
-				&lcount, &lcores[0]);
-		if (ret != PQOS_RETVAL_OK) {
+		lcores = pqos_cpu_get_cores(p_cpu, sockets[i], &lcount);
+		if (lcores == NULL || lcount == 0) {
 			printf("Error retrieving core information!\n");
+                        free(sockets);
 			return;
 		}
 		printf("Core information for socket %u:\n",
@@ -148,7 +143,9 @@ print_allocation_config(void)
 				printf("    Core %u => ERROR\n",
                                        lcores[n]);
 		}
+                free(lcores);
 	}
+        free(sockets);
 }
 /**
  * @brief Sets up association between cores and allocation classes of service

@@ -537,7 +537,7 @@ int main(int argc, char **argv)
         const struct pqos_cap *p_cap = NULL;
         const struct pqos_capability *cap_mon = NULL,
 		*cap_l3ca = NULL, *cap_l2ca = NULL;
-        unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
+        unsigned sock_count, *sockets = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
         int opt_index = 0;
 
@@ -681,10 +681,8 @@ int main(int argc, char **argv)
                 goto error_exit_2;
         }
 
-        ret = pqos_cpu_get_sockets(p_cpu, PQOS_MAX_SOCKETS,
-                                   &sock_count,
-                                   sockets);
-        if (ret != PQOS_RETVAL_OK) {
+        sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
+        if (sockets == NULL) {
                 printf("Error retrieving CPU socket information!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
@@ -807,6 +805,8 @@ int main(int argc, char **argv)
                 free(sel_log_file);
         if (sel_config_file != NULL)
                 free(sel_config_file);
+        if (sockets != NULL)
+                free(sockets);
 
         return exit_val;
 }

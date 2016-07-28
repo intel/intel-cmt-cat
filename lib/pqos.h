@@ -497,6 +497,24 @@ int pqos_alloc_assign(const unsigned technology,
 int pqos_alloc_release(const unsigned *core_array,
                        const unsigned core_num);
 
+/**
+ * @brief Resets configuration of cache allocation technology
+ *
+ * Reverts CAT state to the one after reset:
+ * - all cores associated with COS0
+ * - all COS are set to give access to all cache ways
+ *
+ * As part of CAT reset CDP reconfiguration can be performed.
+ * This can be requested via \a l3_cdp_cfg.
+ *
+ * @param [in] l3_cdp_cfg requested L3 CAT CDP config
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg);
+
 /*
  * =======================================
  * L3 cache allocation
@@ -596,7 +614,7 @@ int pqos_l2ca_get(const unsigned socket,
 
 /*
  * =======================================
- * PQoS utility API
+ * Utility API
  * =======================================
  */
 
@@ -604,32 +622,14 @@ int pqos_l2ca_get(const unsigned socket,
  * @brief Retrieves socket id's from cpu info structure
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param [in] max_count maximum number of sockets that \a sockets can
- *             accommodate
  * @param [out] count place to store actual number of sockets returned
- * @param [out] sockets array to store socket id's in
  *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
+ * @return Allocated array of size \a count populated with socket id's
+ * @retval NULL on error
  */
-int
+unsigned *
 pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
-                     const unsigned max_count,
-                     unsigned *count,
-                     unsigned *sockets);
-
-/**
- * @brief Retrieves number of sockets in CPU topology
- *
- * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param [out] count place to store actual number of sockets returned
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-int
-pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *cpu,
-			 unsigned *count);
+                     unsigned *count);
 
 /**
  * @brief Creates list of cores belonging to given L3 cluster
@@ -653,20 +653,30 @@ pqos_cpu_get_cores_l3id(const struct pqos_cpuinfo *cpu, const unsigned l3_id,
  *
  * @param [in] cpu CPU information structure from cpu info module
  * @param [in] socket CPU socket id to enumerate
- * @param [in] max_count maximum number of core id's that
- *             \a cores array can accommodate
  * @param [out] count place to store actual number of core id's returned
- * @param [out] cores array to store core id's in
+ *
+ * @return Allocated core id array
+ * @retval NULL on error
+ */
+unsigned *
+pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
+                   const unsigned socket,
+                   unsigned *count);
+
+/**
+ * @brief Retrieves one core id from cpu info structure for \a socket
+ *
+ * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] socket CPU socket id to enumerate
+ * @param [out] lcore place to store returned core id
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 int
-pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
-                   const unsigned socket,
-                   const unsigned max_count,
-                   unsigned *count,
-                   unsigned *cores);
+pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
+                      const unsigned socket,
+                      unsigned *lcore);
 
 /**
  * @brief Verifies if \a core is a valid logical core id
@@ -675,7 +685,7 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
  * @param [in] lcore logical core id
  *
  * @return Operation status
- * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_OK on success (\a lcore is valid)
  */
 int
 pqos_cpu_check_core(const struct pqos_cpuinfo *cpu,
@@ -788,24 +798,6 @@ int
 pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
                       int *cdp_supported,
                       int *cdp_enabled);
-
-/**
- * @brief Resets configuration of cache allocation technology
- *
- * Reverts CAT state to the one after reset:
- * - all cores associated with COS0
- * - all COS are set to give access to all cache ways
- *
- * As part of CAT reset CDP reconfiguration can be performed.
- * This can be requested via \a l3_cdp_cfg.
- *
- * @param [in] l3_cdp_cfg requested L3 CAT CDP config
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-int
-pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg);
 
 /**
  * @brief Retrieves a monitoring value from a group for a specific event.

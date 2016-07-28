@@ -49,10 +49,8 @@
 /**
  * Defines
  */
-#define PQOS_MAX_SOCKETS      2
-#define PQOS_MAX_SOCKET_CORES 64
-#define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
 #define PQOS_MAX_MON_EVENTS   1
+
 /**
  * Maintains number of Class of Services supported by socket for
  * L3 cache allocation
@@ -192,7 +190,7 @@ int main(int argc, char *argv[])
 	struct pqos_config cfg;
 	const struct pqos_cpuinfo *p_cpu = NULL;
 	const struct pqos_cap *p_cap = NULL;
-	unsigned sock_count, sockets[PQOS_MAX_SOCKETS];
+	unsigned sock_count, *sockets = NULL;
 	int ret, exit_val = EXIT_SUCCESS;
 
 	memset(&cfg, 0, sizeof(cfg));
@@ -213,10 +211,8 @@ int main(int argc, char *argv[])
 		goto error_exit;
 	}
 	/* Get CPU socket information to set COS */
-	ret = pqos_cpu_get_sockets(p_cpu, PQOS_MAX_SOCKETS,
-                                   &sock_count,
-                                   sockets);
-	if (ret != PQOS_RETVAL_OK) {
+	sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
+	if (sockets == NULL) {
 		printf("Error retrieving CPU socket information!\n");
 		exit_val = EXIT_FAILURE;
 		goto error_exit;
@@ -244,5 +240,7 @@ int main(int argc, char *argv[])
 	ret = pqos_fini();
 	if (ret != PQOS_RETVAL_OK)
 		printf("Error shutting down PQoS library!\n");
+        if (sockets != NULL)
+                free(sockets);
 	return exit_val;
 }

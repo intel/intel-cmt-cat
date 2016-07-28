@@ -435,52 +435,6 @@ discover_monitoring(struct pqos_cap_mon **r_mon,
 }
 
 /**
- * @brief Retrieves & allocates memory for list of socket ID's
- *
- * @param cpu detected CPU topology
- * @param number place to store number of sockets
- * @param table place to put pointer to allocated table wit socket ID's
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-get_cpu_sockets(const struct pqos_cpuinfo *cpu,
-		unsigned *number,
-		unsigned **table)
-{
-        unsigned *sockets = NULL;
-        unsigned sockets_num = 0, sockets_count = 0;
-        int ret = PQOS_RETVAL_OK;
-
-        ASSERT(cpu != NULL);
-        ASSERT(number != NULL);
-        ASSERT(table != NULL);
-
-	*number = 0;
-	*table = NULL;
-
-        ret = pqos_cpu_get_num_sockets(cpu, &sockets_count);
-        if (ret != PQOS_RETVAL_OK)
-		return ret;
-
-	sockets = malloc(sizeof(sockets[0]) * sockets_count);
-	if (sockets == NULL)
-		return PQOS_RETVAL_RESOURCE;
-
-        ret = pqos_cpu_get_sockets(cpu, sockets_count,
-				   &sockets_num, sockets);
-        if (ret == PQOS_RETVAL_OK) {
-		*number = sockets_num;
-		*table = sockets;
-	} else {
-                free(sockets);
-        }
-
-	return ret;
-}
-
-/**
  * @brief Checks CDP enable status across all CPU sockets
  *
  * It also validates if CDP enabling is consistent across
@@ -512,15 +466,15 @@ cdp_is_enabled(const struct pqos_cpuinfo *cpu,
         /**
          * Get list of socket id's
          */
-	ret = get_cpu_sockets(cpu, &sockets_num, &sockets);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
+	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
+        if (sockets == NULL)
+                return PQOS_RETVAL_RESOURCE;
 
         for (j = 0; j < sockets_num; j++) {
                 uint64_t reg = 0;
-                unsigned core = 0, count = 0;
+                unsigned core = 0;
 
-                ret = pqos_cpu_get_cores(cpu, sockets[j], 1, &count, &core);
+                ret = pqos_cpu_get_one_core(cpu, sockets[j], &core);
                 if (ret != PQOS_RETVAL_OK)
 			goto cdp_is_enabled_exit;
 

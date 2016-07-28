@@ -177,7 +177,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
 	const struct pqos_cpuinfo *p_cpu = NULL;
 	const struct pqos_cap *p_cap = NULL;
         const struct pqos_capability *p_l3ca_cap = NULL;
-        unsigned sockets[8], socket_count = 0, i = 0;
+        unsigned *sockets = NULL;
+        unsigned socket_count = 0, i = 0;
         int ret = 0, res = 0;
 #ifdef __linux__
         cpu_set_t cpuset_save, cpuset;
@@ -264,9 +265,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         /**
          * Retrieve list of CPU sockets
          */
-	res = pqos_cpu_get_sockets(p_cpu, DIM(sockets),
-                                   &socket_count, sockets);
-	if (res != PQOS_RETVAL_OK) {
+	sockets = pqos_cpu_get_sockets(p_cpu, &socket_count);
+	if (sockets == NULL) {
 		ret = -6;
 		goto dlock_init_error2;
 	}
@@ -436,6 +436,9 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                 m_chunk_size = 0;
                 m_is_chunk_allocated = 0;
         }
+
+        if (sockets != NULL)
+                free(sockets);
 
         return ret;
 }

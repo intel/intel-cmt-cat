@@ -231,7 +231,7 @@ pqos_l3ca_set(const unsigned socket,
         }
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_cores(m_cpu, socket, 1, &count, &core);
+        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
@@ -297,8 +297,7 @@ pqos_l3ca_get(const unsigned socket,
               struct pqos_l3ca *ca)
 {
         int ret = PQOS_RETVAL_OK;
-        unsigned i = 0, count = 0,
-                core = 0, core_count = 0;
+        unsigned i = 0, count = 0, core = 0;
         uint32_t reg = 0;
         uint64_t val = 0;
         int retval = MACHINE_RETVAL_OK;
@@ -336,12 +335,11 @@ pqos_l3ca_get(const unsigned socket,
         }
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_cores(m_cpu, socket, 1, &core_count, &core);
+        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
         }
-        ASSERT(core_count > 0);
 
         if (cdp_enabled) {
                 for (i = 0, reg = PQOS_MSR_L3CA_MASK_START;
@@ -438,7 +436,7 @@ pqos_l2ca_set(const unsigned socket,
          * perfrom MSR writes to COS registers on the socket.
          */
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_cores(m_cpu, socket, 1, &count, &core);
+        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
@@ -468,7 +466,7 @@ pqos_l2ca_get(const unsigned socket,
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0;
-        unsigned core = 0, core_count = 0;
+        unsigned core = 0;
 
         _pqos_api_lock();
 
@@ -497,15 +495,14 @@ pqos_l2ca_get(const unsigned socket,
         }
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_cores(m_cpu, socket, 1, &core_count, &core);
+        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
         }
-        ASSERT(core_count > 0);
 
         for (i = 0; i < count; i++) {
-                uint32_t reg = PQOS_MSR_L2CA_MASK_START + i;
+                const uint32_t reg = PQOS_MSR_L2CA_MASK_START + i;
                 uint64_t val = 0;
                 int retval = msr_read(core, reg, &val);
 
@@ -890,10 +887,10 @@ cdp_enable(const unsigned sockets_num,
 
         for (j = 0; j < sockets_num; j++) {
                 uint64_t reg = 0;
-                unsigned core = 0, count = 0;
+                unsigned core = 0;
                 int ret = PQOS_RETVAL_OK;
 
-                ret = pqos_cpu_get_cores(m_cpu, sockets[j], 1, &count, &core);
+                ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
@@ -973,7 +970,7 @@ int
 pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 {
         unsigned *sockets = NULL;
-        unsigned sockets_num = 0, sockets_count = 0;
+        unsigned sockets_num = 0;
         const struct pqos_capability *cat_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
@@ -1038,33 +1035,18 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         /**
          * Get number & list of sockets in the system
          */
-        ret = pqos_cpu_get_num_sockets(m_cpu, &sockets_count);
-        if (ret != PQOS_RETVAL_OK)
+        sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+        if (sockets == NULL || sockets_num == 0)
                 goto pqos_alloc_reset_exit;
-
-	sockets = malloc(sizeof(sockets[0]) * sockets_count);
-	if (sockets == NULL) {
-		ret = PQOS_RETVAL_RESOURCE;
-                goto pqos_alloc_reset_exit;
-        }
-        ret = pqos_cpu_get_sockets(m_cpu, sockets_count,
-				   &sockets_num, sockets);
-        if (ret != PQOS_RETVAL_OK)
-                goto pqos_alloc_reset_exit;
-
-        if (sockets_num != sockets_count || sockets_num == 0) {
-                ret = PQOS_RETVAL_ERROR;
-                goto pqos_alloc_reset_exit;
-        }
 
         /**
          * Change COS definition on all sockets
          * so that each COS allows for access to all cache ways
          */
         for (j = 0; j < sockets_num; j++) {
-                unsigned core = 0, count = 0;
+                unsigned core = 0;
 
-                ret = pqos_cpu_get_cores(m_cpu, sockets[j], 1, &count, &core);
+                ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
                 if (ret != PQOS_RETVAL_OK)
                         goto pqos_alloc_reset_exit;
 

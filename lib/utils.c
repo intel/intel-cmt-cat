@@ -51,91 +51,23 @@
 #define TOPO_OBJ_L2_CLUSTER 2
 #define TOPO_OBJ_L3_CLUSTER 3
 
-/**
- * @brief Calculates number of CPU topology objects
- *
- * @param [in] cpu CPU topology
- * @param [in] type CPU topology object type to be counted
- *             TOPO_OBJ_SOCKET - sockets
- *             TOPO_OBJ_L2_CLUSTER - L2 cache clusters
- *             TOPO_OBJ_L3_CLUSTER - L3 cache clusters
- *
- * @return Number of CPU topology objects
- * @retval 0 on error or if no object found
- */
-static unsigned
-__get_num_of_topology_objs(const struct pqos_cpuinfo *cpu, const int type)
-{
-        unsigned count = 0, i = 0;
-
-        ASSERT(cpu != NULL);
-        if (cpu == NULL)
-                return 0;
-        if (type != TOPO_OBJ_SOCKET && type != TOPO_OBJ_L2_CLUSTER &&
-            type != TOPO_OBJ_L3_CLUSTER)
-                return 0;
-
-        ASSERT(cpu->num_cores > 0);
-        if (cpu->num_cores == 0)
-                return 0;
-
-        for (i = 1, count = 1; i < cpu->num_cores; i++) {
-                /**
-                 * Check if topology object was already counted in
-                 */
-                unsigned j = 0;
-
-                for (j = 0; j < i; j++) {
-                        if (type == TOPO_OBJ_SOCKET &&
-                            cpu->cores[i].socket == cpu->cores[j].socket)
-                                break;
-                        if (type == TOPO_OBJ_L2_CLUSTER &&
-                            cpu->cores[i].l2_id == cpu->cores[j].l2_id)
-                                break;
-                        if (type == TOPO_OBJ_L3_CLUSTER &&
-                            cpu->cores[i].l3_id == cpu->cores[j].l3_id)
-                                break;
-                }
-
-                if (j >= i)
-                        count++; /**< object not reported yet */
-        }
-
-        return count;
-}
-
-int
-pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *cpu,
-			 unsigned *count)
-{
-        ASSERT(cpu != NULL);
-        ASSERT(count != NULL);
-
-        if (cpu == NULL || count == NULL)
-		return PQOS_RETVAL_PARAM;
-	*count = __get_num_of_topology_objs(cpu, TOPO_OBJ_SOCKET);
-	if (*count == 0)
-		return PQOS_RETVAL_ERROR;
-	return PQOS_RETVAL_OK;
-}
-
-int
+unsigned *
 pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
-                     const unsigned max_count,
-                     unsigned *count,
-                     unsigned *sockets)
+                     unsigned *count)
 {
         unsigned scount = 0, i = 0;
+        unsigned *sockets = NULL;
 
         ASSERT(cpu != NULL);
         ASSERT(count != NULL);
-        ASSERT(sockets != NULL);
-        ASSERT(max_count > 0);
-        if (cpu == NULL || count == NULL ||
-            sockets == NULL || max_count == 0)
-                return PQOS_RETVAL_PARAM;
+        if (cpu == NULL || count == NULL)
+                return NULL;
 
-        for (i = 1; i < cpu->num_cores; i++) {
+        sockets = (unsigned *) malloc(sizeof(sockets[0]) * cpu->num_cores);
+        if (sockets == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++) {
                 unsigned j = 0;
 
                 /**
@@ -149,15 +81,12 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
                         /**
                          * This socket wasn't reported before
                          */
-                        if (scount >= max_count)
-                                return PQOS_RETVAL_ERROR;
-                        sockets[scount] = cpu->cores[i].socket;
-                        scount++;
+                        sockets[scount++] = cpu->cores[i].socket;
                 }
         }
 
         *count = scount;
-        return PQOS_RETVAL_OK;
+        return sockets;
 }
 
 /**
@@ -217,50 +146,57 @@ pqos_cpu_get_cores_l3id(const struct pqos_cpuinfo *cpu, const unsigned l3_id,
                                             count);
 }
 
-int
+unsigned *
 pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
                    const unsigned socket,
-                   const unsigned max_count,
-                   unsigned *count,
-                   unsigned *cores)
+                   unsigned *count)
 {
         unsigned i = 0, cnt = 0;
+        unsigned *cores = NULL;
 
         ASSERT(cpu != NULL);
         ASSERT(count != NULL);
-        ASSERT(cores != NULL);
-        ASSERT(max_count > 0);
 
-        if (cpu == NULL || count == NULL ||
-            cores == NULL || max_count == 0)
+        if (cpu == NULL || count == NULL)
+                return NULL;
+
+        cores = (unsigned *) malloc(cpu->num_cores * sizeof(cores[0]));
+        if (cores == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].socket == socket)
+                        cores[cnt++] = cpu->cores[i].lcore;
+
+        if (!cnt) {
+                free(cores);
+                return NULL;
+        }
+
+        *count = cnt;
+        return cores;
+}
+
+int
+pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
+                      const unsigned socket,
+                      unsigned *lcore)
+{
+        unsigned i = 0;
+
+        ASSERT(cpu != NULL);
+        ASSERT(lcore != NULL);
+
+        if (cpu == NULL || lcore == NULL)
                 return PQOS_RETVAL_PARAM;
 
         for (i = 0; i < cpu->num_cores; i++)
                 if (cpu->cores[i].socket == socket) {
-                        if (max_count == 1) {
-                                /**
-                                 * Special case when app wants to get
-                                 * just one core for the socket
-                                 */
-                                *cores = cpu->cores[i].lcore;
-                                *count = 1;
-                                return PQOS_RETVAL_OK;
-                        }
-
-                        /**
-                         * Is there is more cores than \a cores can accommodate?
-                         */
-                        if (cnt >= max_count)
-                                return PQOS_RETVAL_ERROR;
-                        cores[cnt] = cpu->cores[i].lcore;
-                        cnt++;
+                        *lcore = cpu->cores[i].lcore;
+                        return PQOS_RETVAL_OK;
                 }
 
-        if (!cnt)
-                return PQOS_RETVAL_ERROR;               /**< no core found */
-
-        *count = cnt;
-        return PQOS_RETVAL_OK;
+        return PQOS_RETVAL_ERROR;
 }
 
 int

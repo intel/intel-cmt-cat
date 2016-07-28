@@ -439,7 +439,7 @@ parse_allocation_cos(char *str, const uint64_t *sockets,
          * Update COS tables
          */
         for (i = 0; i < sock_num; i++) {
-                unsigned s = (unsigned) sockets[i];
+                const unsigned s = (unsigned) sockets[i];
                 /**
                  * Update specified socket COS table
                  */
@@ -729,17 +729,14 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
         }
 
         for (i = 0; i < sock_count; i++) {
-                unsigned lcores[PQOS_MAX_SOCKET_CORES];
+                unsigned *lcores = NULL;
                 unsigned lcount = 0, n = 0;
 
-                ret = pqos_cpu_get_cores(cpu_info, sockets[i],
-                                         PQOS_MAX_SOCKET_CORES,
-                                         &lcount, &lcores[0]);
-                if (ret != PQOS_RETVAL_OK) {
+                lcores = pqos_cpu_get_cores(cpu_info, sockets[i], &lcount);
+                if (lcores == NULL) {
                         printf("Error retrieving core information!\n");
                         return;
                 }
-                ASSERT(ret == PQOS_RETVAL_OK);
                 printf("Core information for socket %u:\n",
                        sockets[i]);
                 for (n = 0; n < lcount; n++) {
@@ -771,6 +768,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                                 printf("    Core %u => RMID%u\n", lcores[n],
                                        (unsigned)rmid);
                 }
+                free(lcores);
         }
 }
 
