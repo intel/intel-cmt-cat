@@ -54,24 +54,25 @@ static const struct pqos_capability *m_cap_l3ca;
 /**
  * @brief Prints L2 or L3 configuration in \a ca
  *
+ * @param [in] stream to write output to
  * @param [in] ca CAT COS configuration
  */
 static void
-rdt_ca_print(const struct rdt_ca ca)
+rdt_ca_print(FILE *stream, const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
 			NULL == ca.u.generic_ptr)
 		return;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
-		printf("MASK: 0x%llx",
+		fprintf(stream, "MASK: 0x%llx",
 			(unsigned long long) ca.u.l2->ways_mask);
 	else if (ca.u.l3->cdp == 1)
-		printf("code MASK: 0x%llx, data MASK: 0x%llx",
+		fprintf(stream, "code MASK: 0x%llx, data MASK: 0x%llx",
 			(unsigned long long) ca.u.l3->u.s.code_mask,
 			(unsigned long long) ca.u.l3->u.s.data_mask);
 	else
-		printf("MASK: 0x%llx",
+		fprintf(stream, "MASK: 0x%llx",
 			(unsigned long long) ca.u.l3->u.ways_mask);
 }
 /**
@@ -162,7 +163,7 @@ is_contiguous(const char *cat_type, const uint64_t bitmask)
 	}
 
 	if (bits_count(bitmask) != j) {
-		printf("CAT: %s mask 0x%llx is not contiguous.\n",
+		fprintf(stderr, "CAT: %s mask 0x%llx is not contiguous.\n",
 			cat_type, (unsigned long long) bitmask);
 		return 0;
 	}
@@ -368,7 +369,7 @@ parse_rdt(char *rdtstr)
 
 	/* Min len check, 1 feature + 1 CPU e.g. "3=f;c=0" */
 	if (strlen(rdtstr) < min_len_arg) {
-		printf("Invalid argument: \"%s\"\n", rdtstr);
+		fprintf(stderr, "Invalid argument: \"%s\"\n", rdtstr);
 		return -EINVAL;
 	}
 
@@ -378,7 +379,7 @@ parse_rdt(char *rdtstr)
 
 		/* Min len check, 1 feature "3=f" */
 		if (strlen(group) < min_len_group) {
-			printf("Invalid option: \"%s\"\n", group);
+			fprintf(stderr, "Invalid option: \"%s\"\n", group);
 			return -EINVAL;
 		}
 
@@ -386,7 +387,7 @@ parse_rdt(char *rdtstr)
 		const char *param = strtok_r(NULL, "=", &group_saveptr);
 
 		if (feature == NULL || param == NULL) {
-			printf("Invalid option: \"%s\"\n", group);
+			fprintf(stderr, "Invalid option: \"%s\"\n", group);
 			return -EINVAL;
 		}
 
@@ -423,7 +424,7 @@ parse_rdt(char *rdtstr)
 			break;
 
 		default:
-			printf("Invalid option: \"%s\"\n", feature);
+			fprintf(stderr, "Invalid option: \"%s\"\n", feature);
 			return -EINVAL;
 		}
 
@@ -468,7 +469,7 @@ check_cpus_overlapping(void)
 				&g_cfg.config[j].cpumask);
 #endif
 			if (1 == overlapping) {
-				printf("CAT: Requested CPUs sets are "
+				fprintf(stderr, "CAT: Requested CPUs sets are "
 					"overlapping.\n");
 				return -EINVAL;
 			}
@@ -502,15 +503,15 @@ check_cpus(void)
 
 			ret = pqos_cpu_check_core(m_cpu, cpu_id);
 			if (ret != PQOS_RETVAL_OK) {
-				printf("CAT: %u is not a valid logical core id."
-					"\n", cpu_id);
+				fprintf(stderr, "CAT: %u is not a valid "
+					"logical core id.\n", cpu_id);
 				return -ENODEV;
 			}
 
 			ret = pqos_alloc_assoc_get(cpu_id, &cos_id);
 			if (ret != PQOS_RETVAL_OK) {
-				printf("CAT: Failed to read cpu %u COS "
-					"association.\n", cpu_id);
+				fprintf(stderr, "CAT: Failed to read cpu %u "
+					"COS association.\n", cpu_id);
 				return -EFAULT;
 			}
 
@@ -519,9 +520,9 @@ check_cpus(void)
 			 * then default one (#0)
 			 */
 			if (cos_id != 0) {
-				printf("CAT: cpu %u has already associated "
-					"COS#%u. Please reset CAT.\n",
-					cpu_id, cos_id);
+				fprintf(stderr, "CAT: cpu %u has already "
+					"associated COS#%u. Please reset CAT."
+					"\n", cpu_id, cos_id);
 				return -EBUSY;
 			}
 		}
@@ -541,17 +542,23 @@ static int
 check_cdp_support(void)
 {
 	unsigned i = 0;
+	const int cdp_supported = m_cap_l3ca != NULL &&
+		m_cap_l3ca->u.l3ca->cdp == 1;
+	const int cdp_enabled = cdp_supported &&
+		m_cap_l3ca->u.l3ca->cdp_on == 1;
+
+	if (cdp_enabled)
+		return 0;
 
 	for (i = 0; i < g_cfg.config_count; i++) {
-		if (0 == g_cfg.config[i].l3.cdp ||
-				1 == m_cap_l3ca->u.l3ca->cdp_on)
+		if (0 == g_cfg.config[i].l3.cdp)
 			continue;
 
-		if (m_cap_l3ca->u.l3ca->cdp == 0)
-			printf("CAT: CDP requested but not "
-				"supported.\n");
+		if (!cdp_supported)
+			fprintf(stderr, "CAT: CDP requested but not supported."
+				"\n");
 		else
-			printf("CAT: CDP requested but not enabled. "
+			fprintf(stderr, "CAT: CDP requested but not enabled. "
 				"Please enable CDP.\n");
 
 		return -ENOTSUP;
@@ -576,15 +583,15 @@ check_supported(void)
 	for (i = 0; i < g_cfg.config_count; i++) {
 		if (rdt_ca_is_valid(wrap_l3ca(&g_cfg.config[i].l3)) &&
 				NULL == m_cap_l3ca) {
-			printf("CAT: L3CA requested but not supported by "
-				"system!\n");
+			fprintf(stderr, "CAT: L3CA requested but not supported "
+				"by system!\n");
 			return -ENOTSUP;
 		}
 
 		if (rdt_ca_is_valid(wrap_l2ca(&g_cfg.config[i].l2)) &&
 				NULL == m_cap_l2ca) {
-			printf("CAT: L2CA requested but not supported by "
-				"system!\n");
+			fprintf(stderr, "CAT: L2CA requested but not supported "
+				"by system!\n");
 			return -ENOTSUP;
 		}
 	}
@@ -698,10 +705,10 @@ check_cbm_len_and_contention(const enum pqos_cap_type type)
 			return -EFAULT;
 
 		if ((mask & not_cbm) != 0) {
-			printf("CAT: One or more of requested %s CBMs "
+			fprintf(stderr, "CAT: One or more of requested %s CBMs "
 				"(", rdt_ca_get_type_str(ca));
-			rdt_ca_print(ca);
-			printf(") not supported by system "
+			rdt_ca_print(stderr, ca);
+			fprintf(stderr, ") not supported by system "
 				"(too long).\n");
 			return -ENOTSUP;
 		}
@@ -710,7 +717,7 @@ check_cbm_len_and_contention(const enum pqos_cap_type type)
 		if ((mask & contention_cbm) != 0) {
 			printf("CAT: One or more of requested %s CBMs "
 				"(", rdt_ca_get_type_str(ca));
-			rdt_ca_print(ca);
+			rdt_ca_print(stdout, ca);
 			printf(") overlap contention mask.\n");
 		}
 	}
@@ -764,11 +771,11 @@ cat_validate(void)
 	if (ret != 0)
 		return ret;
 
-	ret = check_cdp_support();
+	ret = check_supported();
 	if (ret != 0)
 		return ret;
 
-	ret = check_supported();
+	ret = check_cdp_support();
 	if (ret != 0)
 		return ret;
 
@@ -946,8 +953,8 @@ cat_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 
 		ret = pqos_l3ca_set(socket_id, 1, &ca);
 		if (ret != PQOS_RETVAL_OK) {
-			printf("Error configuring L3 COS#%u on socket %u!\n",
-				cos_id, socket_id);
+			fprintf(stderr, "Error configuring L3 COS#%u on socket "
+				"%u!\n", cos_id, socket_id);
 			return -EFAULT;
 		}
 	}
@@ -964,8 +971,8 @@ cat_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 
 		ret = pqos_l2ca_set(socket_id, 1, &ca);
 		if (ret != PQOS_RETVAL_OK) {
-			printf("Error configuring L2 COS#%u on socket %u!\n",
-				cos_id, socket_id);
+			fprintf(stderr, "Error configuring L2 COS#%u on socket "
+				"%u!\n", cos_id, socket_id);
 			return -EFAULT;
 		}
 	}
@@ -1024,11 +1031,11 @@ cat_set(const unsigned num, struct pqos_l2ca l2ca[const],
 				core_num, &cos_id);
 			if (ret != PQOS_RETVAL_OK) {
 				if (ret == PQOS_RETVAL_RESOURCE)
-					printf("No free COS available on "
-						"socket %u.\n", j);
+					fprintf(stderr, "No free COS available "
+						"on socket %u.\n", j);
 				else
-					printf("Unable to assign COS on "
-						"socket %u!\n", j);
+					fprintf(stderr, "Unable to assign COS "
+						"on socket %u!\n", j);
 
 				goto err;
 			}
@@ -1062,7 +1069,8 @@ cat_configure(void)
 	/* Validate cmd line configuration */
 	ret = cat_validate();
 	if (ret != 0) {
-		printf("CAT: Requested CAT configuration is not valid!\n");
+		fprintf(stderr, "CAT: Requested CAT configuration is not valid!"
+			"\n");
 		return ret;
 	}
 
@@ -1074,7 +1082,7 @@ cat_configure(void)
 
 	ret = cat_set(g_cfg.config_count, l2ca, l3ca, cpu);
 	if (ret != 0)
-		printf("CAT: Failed to configure CAT!\n");
+		fprintf(stderr, "CAT: Failed to configure CAT!\n");
 
 	return ret;
 }
@@ -1092,7 +1100,7 @@ cat_reset(void)
 
 		ret = pqos_alloc_assoc_set(i, 0);
 		if (ret != PQOS_RETVAL_OK) {
-			printf("Error associating COS,"
+			fprintf(stderr, "Error associating COS,"
 				"core: %u, COS: 0!\n", i);
 			return -EFAULT;
 		}
@@ -1112,7 +1120,7 @@ cat_fini(void)
 	/* deallocate all the resources */
 	ret = pqos_fini();
 	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_INIT)
-		printf("Error shutting down PQoS library!\n");
+		fprintf(stderr, "Error shutting down PQoS library!\n");
 
 	m_cap = NULL;
 	m_cpu = NULL;
@@ -1135,7 +1143,7 @@ cat_exit(void)
 
 	for (i = 0; i < g_cfg.config_count; i++)
 		if (alloc_release(&g_cfg.config[i].cpumask) != 0)
-			printf("Failed to release COS!\n");
+			fprintf(stderr, "Failed to release COS!\n");
 
 	cat_fini();
 }
@@ -1167,7 +1175,7 @@ cat_init(void)
 	struct pqos_config cfg;
 
 	if (m_cap != NULL || m_cpu != NULL) {
-		printf("CAT: CAT module already initialized!\n");
+		fprintf(stderr, "CAT: CAT module already initialized!\n");
 		return -EEXIST;
 	}
 
@@ -1177,7 +1185,7 @@ cat_init(void)
 	cfg.verbose = 0;
 	ret = pqos_init(&cfg);
 	if (ret != PQOS_RETVAL_OK) {
-		printf("CAT: Error initializing PQoS library!\n");
+		fprintf(stderr, "CAT: Error initializing PQoS library!\n");
 		ret = -EFAULT;
 		goto err;
 	}
@@ -1185,7 +1193,7 @@ cat_init(void)
 	/* Get capability and CPU info pointer */
 	ret = pqos_cap_get(&m_cap, &m_cpu);
 	if (ret != PQOS_RETVAL_OK || m_cap == NULL || m_cpu == NULL) {
-		printf("CAT: Error retrieving PQoS capabilities!\n");
+		fprintf(stderr, "CAT: Error retrieving PQoS capabilities!\n");
 		ret = -EFAULT;
 		goto err;
 	}
@@ -1193,15 +1201,15 @@ cat_init(void)
 	/* Get L2CA capabilities */
 	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &m_cap_l2ca);
 	if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_l2ca == NULL))
-		printf("CAT: L2 CAT capability not supported!\n");
+		printf("CAT: L2 CAT capability not supported.\n");
 
 	/* Get L3CA capabilities */
 	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &m_cap_l3ca);
 	if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_l3ca == NULL))
-		printf("CAT: L3 CAT capability not supported!\n");
+		printf("CAT: L3 CAT capability not supported.\n");
 
 	if (m_cap_l3ca == NULL && m_cap_l2ca == NULL) {
-		printf("CAT: L2 CAT, L3 CAT "
+		fprintf(stderr, "CAT: L2 CAT, L3 CAT "
 			"capabilities not supported!\n");
 		ret = -EFAULT;
 		goto err;
@@ -1213,7 +1221,7 @@ cat_init(void)
 	ret = atexit(cat_exit);
 	if (ret != 0) {
 		ret = -EFAULT;
-		printf("CAT: Cannot set exit function\n");
+		fprintf(stderr, "CAT: Cannot set exit function\n");
 		goto err;
 	}
 
@@ -1253,7 +1261,7 @@ print_cmd_line_rdt_config(void)
 				continue;
 			printf("%s Allocation: CPUs: %s ",
 				rdt_ca_get_type_str(ca_array[j]), cpustr);
-			rdt_ca_print(ca_array[j]);
+			rdt_ca_print(stdout, ca_array[j]);
 			printf("\n");
 		}
 	}
