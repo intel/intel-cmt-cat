@@ -84,7 +84,7 @@ NO_PID_API=y
 endif
 
 # PID API build option
-ifeq ($(NO_PID_API), y)
+ifneq ($(NO_PID_API), n)
 CFLAGS += -DPQOS_NO_PID_API
 OBJS := $(filter-out host_pidapi.o perf.o,$(OBJS))
 endif
@@ -140,16 +140,17 @@ DEPFILES = $(SRCS:.c=.d)
 
 help:
 	@echo "PQoS library make targets:"
-	@echo "    make           - build shared library"
-	@echo "    make SHARED=n  - build static library"
-	@echo "    make DEBUG=y   - build shared library for debugging"
-	@echo "    make install   - install library (accepts PREFIX=/some/where)"
-	@echo "    make uninstall - uninstall library (accepts PREFIX=/some/where)"
-	@echo "    make rinse     - remove build files"
-	@echo "    make clean     - remove even more files than rinse"
-	@echo "    make doxy      - make doxygen documentation"
-	@echo "    make style     - coding style check (accepts CHECKPATCH=/some/where/checkpatch.pl)"
-	@echo "    make cppcheck  - static code analysis (accepts CPPCHECK=/some/where/cppcheck)"
+	@echo "    make              - build shared library"
+	@echo "    make SHARED=n     - build static library"
+	@echo "    make NO_PID_API=n - build library with PID monitoring suppport"
+	@echo "    make DEBUG=y      - build shared library for debugging"
+	@echo "    make install      - install library (accepts PREFIX=/some/where)"
+	@echo "    make uninstall    - uninstall library (accepts PREFIX=/some/where)"
+	@echo "    make rinse        - remove build files"
+	@echo "    make clean        - remove even more files than rinse"
+	@echo "    make doxy         - make doxygen documentation"
+	@echo "    make style        - coding style check (accepts CHECKPATCH=/some/where/checkpatch.pl)"
+	@echo "    make cppcheck     - static code analysis (accepts CPPCHECK=/some/where/cppcheck)"
 
 doxy:
 	doxygen api_doxygen.cfg

@@ -61,17 +61,6 @@ else
 CFLAGS += -g -O3
 endif
 
-# On FreeBSD build with NO_PID_API option
-ifeq ($(shell uname), FreeBSD)
-NO_PID_API=y
-endif
-
-# PID API build option
-ifeq ($(NO_PID_API), y)
-export NO_PID_API
-CFLAGS += -DNO_PID_API
-endif
-
 # Build targets and dependencies
 APP = pqos
 MAN = pqos.8
