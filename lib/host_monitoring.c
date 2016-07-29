@@ -146,7 +146,6 @@ static const struct pqos_cap *m_cap = NULL; /**< capabilities structure
 static const struct pqos_cpuinfo *m_cpu = NULL; /**< cpu topology passed
                                                    from host_cap */
 static unsigned m_rmid_max = 0;         /**< max RMID */
-static int m_force_mon = 0;
 /**
  * ---------------------------------------
  * Local Functions
@@ -160,8 +159,6 @@ mon_assoc_set(const unsigned lcore,
 static int
 mon_assoc_get(const unsigned lcore,
               pqos_rmid_t *rmid);
-
-static int mon_reset(void);
 
 static int
 mon_read(const unsigned lcore,
@@ -205,6 +202,8 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         const struct pqos_capability *item = NULL;
         int ret = PQOS_RETVAL_OK;
 
+        UNUSED_PARAM(cfg);
+
         m_cpu = cpu;
         m_cap = cap;
 
@@ -234,12 +233,6 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         }
 
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
-
-        ASSERT(m_cpu != NULL);
-        m_force_mon = cfg->free_in_use_rmid;
-        if (m_force_mon)
-                mon_reset();
-
         return PQOS_RETVAL_OK;
 }
 
@@ -506,17 +499,16 @@ pqos_mon_assoc_get(const unsigned lcore,
         return ret;
 }
 
-/**
- * @brief Resets monitoring by binding all cores with RMID0
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- * @retval PQOS_RETVAL_ERROR on error
- */
-static int mon_reset(void)
+int pqos_mon_reset(void)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_mon_reset_error;
 
         ASSERT(m_cpu != NULL);
         for (i = 0; i < m_cpu->num_cores; i++) {
@@ -525,20 +517,6 @@ static int mon_reset(void)
                 if (retval != PQOS_RETVAL_OK)
                         ret = retval;
         }
-        return ret;
-}
-
-int pqos_mon_reset(void)
-{
-        int ret = PQOS_RETVAL_OK;
-
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK)
-                goto pqos_mon_reset_error;
-
-        ret = mon_reset();
 
  pqos_mon_reset_error:
         _pqos_api_unlock();
@@ -795,26 +773,22 @@ ia32_perf_counter_start(const unsigned num_cores,
         if (event & PQOS_PERF_EVENT_LLC_MISS)
                 global_ctrl_mask |= 0x1ULL;     /**< programmable counter 0 */
 
-        if (!m_force_mon) {
-                /**
-                 * Fixed counters are used for IPC calculations.
-                 * Programmable counters are used for LLC miss calculations.
-                 * Let's check if they are in use.
-                 */
-                for (i = 0; i < num_cores; i++) {
-                        uint64_t global_inuse = 0;
-                        int ret;
+        /**
+         * Fixed counters are used for IPC calculations.
+         * Programmable counters are used for LLC miss calculations.
+         * Let's check if they are in use.
+         */
+        for (i = 0; i < num_cores; i++) {
+                uint64_t global_inuse = 0;
+                int ret;
 
-                        ret = msr_read(cores[i], IA32_MSR_PERF_GLOBAL_CTRL,
-                                           &global_inuse);
-                        if (ret != MACHINE_RETVAL_OK)
-                                return PQOS_RETVAL_ERROR;
-                        if (global_inuse & global_ctrl_mask) {
-                                LOG_ERROR("IPC and/or LLC miss performance "
-                                          "counters already in use!\n");
-                                return PQOS_RETVAL_PERF_CTR;
-                        }
-                }
+                ret = msr_read(cores[i], IA32_MSR_PERF_GLOBAL_CTRL,
+                               &global_inuse);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                if (global_inuse & global_ctrl_mask)
+                        LOG_WARN("Hijacking performance counters on core %u\n",
+                                 cores[i]);
         }
 
         /**
@@ -999,16 +973,11 @@ pqos_mon_start(const unsigned num_cores,
                 }
 
                 if (rmid != RMID0) {
-                        if (m_force_mon)
-                                LOG_INFO("Hijacking core %u currently assigned "
-                                         "to RMID%u.\n", lcore, rmid);
-                        else {
-                                /* If not RMID0 then it is already monitored */
-                                LOG_INFO("Core %u is already monitoresd with "
-                                         "RMID%u.\n", lcore, rmid);
-                                retval = PQOS_RETVAL_RESOURCE;
-                                goto pqos_mon_start_error1;
-                        }
+                        /* If not RMID0 then it is already monitored */
+                        LOG_INFO("Core %u is already monitored with "
+                                 "RMID%u.\n", lcore, rmid);
+                        retval = PQOS_RETVAL_RESOURCE;
+                        goto pqos_mon_start_error1;
                 }
 
                 ret = pqos_cpu_get_clusterid(m_cpu, lcore, &cluster);
