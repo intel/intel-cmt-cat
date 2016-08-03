@@ -35,7 +35,7 @@
 #
 ###############################################################################
 
-NO_PID_API ?= n
+NO_PID_API ?= y
 export NO_PID_API
 
 # XXX: modify as desired
