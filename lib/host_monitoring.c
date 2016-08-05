@@ -1095,17 +1095,20 @@ pqos_mon_start_pid(const pid_t pid,
                    void *context,
                    struct pqos_mon_data *group)
 {
+#ifdef PQOS_NO_PID_API
+        UNUSED_PARAM(pid);
+        UNUSED_PARAM(event);
+        UNUSED_PARAM(context);
+        UNUSED_PARAM(group);
+        LOG_ERROR("PID monitoring API not built\n");
+        return PQOS_RETVAL_ERROR;
+#else
         if (group == NULL || event == 0 || pid < 0)
                 return PQOS_RETVAL_PARAM;
 
         if (group->valid == GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-#ifdef PQOS_NO_PID_API
-        UNUSED_PARAM(context);
-        LOG_ERROR("PID monitoring API not built\n");
-        return PQOS_RETVAL_ERROR;
-#else
         int ret = PQOS_RETVAL_OK;
 
         memset(group, 0, sizeof(*group));
