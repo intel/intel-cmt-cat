@@ -47,6 +47,7 @@ my $num_cos;
 my $num_ways;
 my $num_cores;
 my $num_sockets;
+my $sockets_a;
 
 sub read_msr {
 	my ($cpu_id, $msr) = @_;
@@ -109,6 +110,12 @@ sub shutdown_pqos {
 	pqos::pqos_fini();
 	$l3ca_cap_p = undef;
 	$cpuinfo_p  = undef;
+
+	if (defined $sockets_a) {
+		pqos::delete_uint_a($sockets_a);
+		$sockets_a = undef;
+	}
+
 	return;
 }
 
@@ -143,9 +150,9 @@ sub init_pqos {
 
 	$num_cores = pqos::cpuinfo_p_value($cpuinfo_p)->{num_cores};
 
-	(my $result, $num_sockets) = pqos::pqos_cpu_get_num_sockets($cpuinfo_p);
-	if (0 != $result) {
-		print __LINE__, " pqos::pqos_cpu_get_num_sockets FAILED!\n";
+	($sockets_a, $num_sockets) = pqos::pqos_cpu_get_sockets($cpuinfo_p);
+	if (0 == $sockets_a || 0 == $num_sockets) {
+		print __LINE__, " pqos::pqos_cpu_get_sockets FAILED!\n";
 		goto EXIT;
 	}
 
@@ -226,20 +233,21 @@ sub get_msr_ways_mask {
 
 # Function to print current CAT configuration
 sub print_cfg {
-	my $socket_id;
 	my $cos_id;
 	my $l3ca = pqos::pqos_l3ca->new();
 
 	if (!defined $cpuinfo_p ||
 		!defined $num_cores   ||
 		!defined $num_sockets ||
+		!defined $sockets_a ||
 		!defined $num_cos) {
 		return -1;
 	}
 
 	print "CoS configuration:\n";
 
-	for ($socket_id = 0; $socket_id < $num_sockets; $socket_id++) {
+	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
+		my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
 		for ($cos_id = 0; $cos_id < $num_cos; $cos_id++) {
 			if (0 != pqos::get_l3ca($l3ca, $socket_id, $cos_id)) {
 				print __LINE__, " pqos::get_l3ca FAILED!\n";
@@ -268,7 +276,7 @@ sub print_cfg {
 			return -1;
 		}
 
-		($result, $socket_id) =
+		($result, my $socket_id) =
 		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
 		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
@@ -374,12 +382,13 @@ sub test_way_masks {
 	my $msr_ways_mask;
 	my $ret = -1;
 
-	if (!defined $num_sockets || !defined $num_cos) {
+	if (!defined $num_sockets || !defined $sockets_a || !defined $num_cos) {
 		goto EXIT;
 	}
 
-	for (my $socket_id = 0; $socket_id < $num_sockets; $socket_id++) {
+	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
 		for (my $cos_id = 0; $cos_id < $num_cos; $cos_id++) {
+			my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
 			$gen_ways_mask = generate_ways_mask($cos_id, $socket_id);
 			if (!defined $gen_ways_mask) {
 				print __LINE__, " generate_ways_mask FAILED!\n";
@@ -396,7 +405,8 @@ sub test_way_masks {
 		}
 	}
 
-	for (my $socket_id = 0; $socket_id < $num_sockets; $socket_id++) {
+	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
+		my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
 		for (my $cos_id = 0; $cos_id < $num_cos; $cos_id++) {
 			if (0 != pqos::get_l3ca($l3ca, $socket_id, $cos_id)) {
 				print __LINE__, " pqos::get_l3ca FAILED!\n";
@@ -444,6 +454,7 @@ sub reset_cfg {
 	if (!defined $num_ways ||
 		!defined $num_cores   ||
 		!defined $num_sockets ||
+		!defined $sockets_a ||
 		!defined $num_cos) {
 		goto EXIT;
 	}
@@ -455,9 +466,9 @@ sub reset_cfg {
 		}
 	}
 
-	for (my $socket_id = 0; $socket_id < $num_sockets; $socket_id++) {
+	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
+		my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
 		for ($cos_id = 0; $cos_id < $num_cos; $cos_id++) {
-
 			if (0 != pqos::get_l3ca($l3ca, $socket_id, $cos_id)) {
 				print __LINE__, " pqos::get_l3ca FAILED!\n";
 				goto EXIT;
