@@ -66,6 +66,10 @@ and activate AgentX support by putting the following lines:
 
 in the snmpd.conf file.
 
+Or run snmpd from command line (e.g. for debugging purposes):
+
+        sudo snmpd -f -Dagentx -Lo -C --rwcommunity=pqos --master=agentx
+
 To run the cat-agentx.pl script:
         "sudo ./cat-agentx.pl"
 

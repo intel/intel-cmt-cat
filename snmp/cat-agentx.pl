@@ -105,6 +105,7 @@ my $num_cos;
 my $num_ways;
 my $num_cores;
 my $num_sockets;
+my $sockets_a;
 
 my $active = 1;
 
@@ -115,6 +116,11 @@ Shutdowns AgentX agent
 =cut
 
 sub shutdown_agent {
+	if (defined $sockets_a) {
+		pqos::delete_uint_a($sockets_a);
+		$sockets_a = undef;
+	}
+
 	print "Shutting down pqos lib...\n";
 	pqos::pqos_fini();
 	$active = 0;
@@ -132,7 +138,7 @@ Initializes PQoS library
 sub pqos_init {
 	my $cfg = pqos::pqos_config->new();
 
-	$cfg->{verbose} = 2;                             # SUPER_VERBOSE
+	$cfg->{verbose} = 2;                # SUPER_VERBOSE
 	$cfg->{fd_log}  = fileno(STDOUT);
 
 	if (0 != pqos::pqos_init($cfg)) {
@@ -158,9 +164,9 @@ sub pqos_init {
 
 	$num_cores = pqos::cpuinfo_p_value($cpuinfo_p)->{num_cores};
 
-	(my $result, $num_sockets) = pqos::pqos_cpu_get_num_sockets($cpuinfo_p);
-	if (0 != $result) {
-		print __LINE__, " pqos::pqos_cpu_get_num_sockets FAILED!\n";
+	($sockets_a, $num_sockets) = pqos::pqos_cpu_get_sockets($cpuinfo_p);
+	if (0 == $sockets_a || 0 == $num_sockets) {
+		print __LINE__, " pqos::pqos_cpu_get_sockets FAILED!\n";
 		return -1;
 	}
 
@@ -206,7 +212,8 @@ sub data_update {
 	%data_cos = ();
 	my $l3ca = pqos::pqos_l3ca->new();
 
-	for (my $socket_id = 0; $socket_id < $num_sockets; $socket_id++) {
+	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
+		my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
 		for (my $cos_id = 0; $cos_id < $num_cos; $cos_id++) {
 			if (0 != pqos::get_l3ca($l3ca, $socket_id, $cos_id)) {
 				last;
