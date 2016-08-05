@@ -35,7 +35,7 @@
 
 %include typemaps.i
 int pqos_alloc_assoc_get(const unsigned, unsigned *OUTPUT);
-int pqos_cpu_get_num_sockets(const struct pqos_cpuinfo *, unsigned *OUTPUT);
+unsigned *pqos_cpu_get_sockets(const struct pqos_cpuinfo *, unsigned *OUTPUT);
 int pqos_cpu_get_socketid(const struct pqos_cpuinfo *, const unsigned, unsigned *OUTPUT);
 
 %{
@@ -149,8 +149,12 @@ exit:
 /* Parse the header file to generate wrappers */
 %include <pqos.h>
 
+%include carrays.i
 %include cpointer.i
 %include stdint.i
+
+/* Generate wrappers around C arrays */
+%array_functions(unsigned int, uint_a);
 
 /* Generate wrappers around C pointers */
 %pointer_functions(int, intp);
