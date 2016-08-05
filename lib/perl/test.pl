@@ -124,7 +124,7 @@ sub init_pqos {
 	my $cfg = pqos::pqos_config->new();
 	my $ret = -1;
 
-	$cfg->{verbose} = 2;                             # SUPER_VERBOSE
+	$cfg->{verbose} = 2;                # SUPER_VERBOSE
 	$cfg->{fd_log}  = fileno(STDOUT);
 
 	if (0 != pqos::pqos_init($cfg)) {
@@ -184,12 +184,13 @@ sub generate_ways_mask {
 	}
 
 	my $bits_per_cos = int($num_ways / $num_cos);
-	if ($bits_per_cos == 0) {
-		$bits_per_cos = 1;
+	if ($bits_per_cos < 2) {
+		$bits_per_cos = 2;
 	}
 
 	my $base_mask = (1 << ($bits_per_cos)) - 1;
-	my $ways_mask = $base_mask << ($cos_id * $bits_per_cos + $socket_id % 3);
+	my $ways_mask =
+	  $base_mask << (($cos_id * $bits_per_cos + $socket_id % 3) % ($num_ways - 1));
 	my $result = $ways_mask & (2**$num_ways - 1);
 
 	if (0 == $result) {
@@ -239,7 +240,7 @@ sub print_cfg {
 	if (!defined $cpuinfo_p ||
 		!defined $num_cores   ||
 		!defined $num_sockets ||
-		!defined $sockets_a ||
+		!defined $sockets_a   ||
 		!defined $num_cos) {
 		return -1;
 	}
@@ -258,7 +259,8 @@ sub print_cfg {
 				$socket_id, $l3ca->{class_id}, $l3ca->{cdp});
 			if (int($l3ca->{cdp}) == 1) {
 				printf(", data_mask: 0x%x, code_mask: 0x%x",
-					$l3ca->{u}->{s}->{data_mask}, $l3ca->{u}->{s}->{code_mask});
+					$l3ca->{u}->{s}->{data_mask},
+					$l3ca->{u}->{s}->{code_mask});
 			} else {
 				printf(", ways_mask: 0x%x", $l3ca->{u}->{ways_mask});
 			}
@@ -395,8 +397,8 @@ sub test_way_masks {
 				goto EXIT;
 			}
 			$l3ca->{u}->{ways_mask} = $gen_ways_mask;
-			$l3ca->{class_id}  = $cos_id;
-			$l3ca->{cdp}       = 0;
+			$l3ca->{class_id}       = $cos_id;
+			$l3ca->{cdp}            = 0;
 
 			if (0 != pqos::pqos_l3ca_set($socket_id, 1, $l3ca)) {
 				print __LINE__, " pqos::pqos_l3ca_set FAILED!\n";
@@ -420,8 +422,8 @@ sub test_way_masks {
 			}
 
 			if ($l3ca->{u}->{ways_mask} != $gen_ways_mask) {
-				print __LINE__, ' $l3ca->{u}->{ways_mask} != $gen_ways_mask FAILED!',
-				  "\n";
+				print __LINE__,
+				  ' $l3ca->{u}->{ways_mask} != $gen_ways_mask FAILED!', "\n";
 				goto EXIT;
 			}
 
@@ -454,7 +456,7 @@ sub reset_cfg {
 	if (!defined $num_ways ||
 		!defined $num_cores   ||
 		!defined $num_sockets ||
-		!defined $sockets_a ||
+		!defined $sockets_a   ||
 		!defined $num_cos) {
 		goto EXIT;
 	}
@@ -474,7 +476,7 @@ sub reset_cfg {
 				goto EXIT;
 			}
 
-			$l3ca->{cdp}       = 0;
+			$l3ca->{cdp} = 0;
 			$l3ca->{u}->{ways_mask} = (1 << $num_ways) - 1;
 
 			if (0 != pqos::pqos_l3ca_set($socket_id, 1, $l3ca)) {
