@@ -57,6 +57,7 @@
 #include <fcntl.h>     /* O_CREAT */
 #include <unistd.h>    /* usleep(), lockf() */
 #include <sys/stat.h>  /* S_Ixxx */
+#include <pthread.h>
 
 #include "pqos.h"
 
@@ -138,9 +139,10 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 static int m_init_done = 0;
 
 /**
- * API thread/process safe access is secured through this lock.
+ * API thread/process safe access is secured through these locks.
  */
 static int m_apilock = -1;
+static pthread_mutex_t m_apilock_mutex;
 
 /**
  * ---------------------------------------
@@ -168,6 +170,12 @@ static int _pqos_api_init(void)
         if (m_apilock == -1)
                 return -1;
 
+        if (pthread_mutex_init(&m_apilock_mutex, NULL) != 0) {
+                close(m_apilock);
+                m_apilock = -1;
+                return -1;
+        }
+
         return 0;
 }
 
@@ -185,19 +193,39 @@ static int _pqos_api_exit(void)
         if (close(m_apilock) != 0)
                 ret = -1;
 
+        if (pthread_mutex_destroy(&m_apilock_mutex) != 0)
+                ret = -1;
+
         m_apilock = -1;
+
         return ret;
 }
 
 void _pqos_api_lock(void)
 {
+        int err = 0;
+
         if (lockf(m_apilock, F_LOCK, 0) != 0)
+                err = 1;
+
+        if (pthread_mutex_lock(&m_apilock_mutex) != 0)
+                err = 1;
+
+        if (err)
                 LOG_ERROR("API lock error!\n");
 }
 
 void _pqos_api_unlock(void)
 {
+        int err = 0;
+
         if (lockf(m_apilock, F_ULOCK, 0) != 0)
+                err = 1;
+
+        if (pthread_mutex_unlock(&m_apilock_mutex) != 0)
+                err = 1;
+
+        if (err)
                 LOG_ERROR("API unlock error!\n");
 }
 
