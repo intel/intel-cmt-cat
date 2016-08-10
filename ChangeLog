@@ -1,28 +1,48 @@
 ======================================================================
-Not Released
+Release  v0.1.5  2016-08-11
 ======================================================================
+
+Contributors (alphabetical order):
+	Aaron Hetherington <aaron.hetherington@intel.com>
+	Colin Ian King <colin.king@canonical.com>
+	Marcel Cornu <marcel.d.cornu@intel.com>
+	Tomasz Kantecki <tomasz.kantecki@intel.com>
+	Wojciech Andralojc <wojciechx.andralojc@intel.com>
 
 Summary:
 1. General
 	- Project file layout changed to accommodate extensions
+	- Support for FreeBSD
+	- Travis CI
 2. Library
 	- Support for Intel(R) Xeon(R) processor E5 v4 support
 	- DSO built by default
 	- examples moved to the top folder
 	- Perl interface created for the library
-	- cross socket monitoring
+	- Cross socket monitoring
+	- PID API no longer compiled by default
+	- Support for L2 CAT
+	- Makefile dependencies improved
 3. PQoS Utility
 	- pqos directory created to accommodate the utility files
-	- link against DSO
-	- cross socket monitoring
+	- Link against DSO
+	- Cross socket monitoring
 	- COS management on a per socket basis
+	- Support for L2 CAT
+	- Makefile dependencies improved
 4. rdtset Utility
 	- rdtset directory created to accommodate the utility files
-	- link against DSO
+	- Link against DSO
 	- taskset-like functionality and CAT configuration
+	- Support for L2 CAT
+	- Makefile dependencies improved
 5. Examples
-	- copied examples previously located in library directory
+	- Copied examples previously located in library directory
 	- Perl hello world script created
+6. SNMP
+	- Net-SNMP Agent X
+7. SRPM
+	- Source package file and spec file
 
 ======================================================================
 Release  v0.1.4  2016-02-04
