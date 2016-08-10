@@ -33,7 +33,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-# PerlTidy options -bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs
+# PerlTidy options:
+# -bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs -vtc=1 -ci=4
 
 =head1 NAME
 
@@ -196,7 +197,7 @@ sub data_update {
 		}
 
 		($ret, my $socket_id) =
-		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+			pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
 		if (0 != $ret) {
 			last;
 		}
@@ -206,8 +207,8 @@ sub data_update {
 	}
 
 	@data_assoc_keys =
-	  sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)}
-	  keys %data_assoc;
+		sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)}
+		keys %data_assoc;
 
 	%data_cos = ();
 	my $l3ca = pqos::pqos_l3ca->new();
@@ -221,22 +222,22 @@ sub data_update {
 
 			my $oid_num = "$OID_NUM_PQOS_COS.$socket_id.$l3ca->{class_id}";
 			$data_cos{new NetSNMP::OID("$oid_num.$COS_CDP_ID")} =
-			  int($l3ca->{cdp});
+				int($l3ca->{cdp});
 
 			if (1 == int($l3ca->{cdp})) {
 				$data_cos{new NetSNMP::OID("$oid_num.$COS_DATA_MASK_ID")} =
-				  int($l3ca->{u}->{s}->{data_mask});
+					int($l3ca->{u}->{s}->{data_mask});
 				$data_cos{new NetSNMP::OID("$oid_num.$COS_CODE_MASK_ID")} =
-				  int($l3ca->{u}->{s}->{code_mask});
+					int($l3ca->{u}->{s}->{code_mask});
 			} else {
 				$data_cos{new NetSNMP::OID("$oid_num.$COS_WAYS_MASK_ID")} =
-				  int($l3ca->{u}->{ways_mask});
+					int($l3ca->{u}->{ways_mask});
 			}
 		}
 	}
 
 	@data_cos_keys =
-	  sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)} keys %data_cos;
+		sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)} keys %data_cos;
 
 	return;
 }
@@ -507,10 +508,10 @@ if (0 == pqos_init) {
 	$oid_pqos_assoc = NetSNMP::OID->new($OID_NUM_PQOS_ASSOC);
 
 	$agent->register("pqos_cos_cfg", $oid_pqos_cos, \&handle_snmp_req) or
-	  die "registration of pqos_cos_cfg handler failed!\n";
+		die "registration of pqos_cos_cfg handler failed!\n";
 
 	$agent->register("pqos_cos_assoc", $oid_pqos_assoc, \&handle_snmp_req) or
-	  die "registration of pqos_cos_assoc handler failed!\n";
+		die "registration of pqos_cos_assoc handler failed!\n";
 
 	while ($active) {
 		$agent->agent_check_and_process(1);
