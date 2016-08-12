@@ -89,7 +89,7 @@ $(APP): $(OBJS)
 
 %.d: %.c
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
-	grep -e "\.o:" $@ | sed 's/$(@:.d=.o)/$@/' >> $@
+	cat $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
 .PHONY: clean install uninstall
 
@@ -126,4 +126,7 @@ cppcheck:
 	--std=c99 -I$(LIBDIR) --template=gcc --suppress=uninitvar \
 	rdtset.c rdt.c rdt.h cpu.c cpu.h common.c common.h
 
+# if target not clean then make dependencies
+ifneq ($(MAKECMDGOALS),clean)
 -include $(DEPFILES)
+endif
