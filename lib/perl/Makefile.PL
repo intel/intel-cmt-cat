@@ -63,17 +63,21 @@ SWIG_MAKEFILE
 	my $perltidy_targets = <<'PERLTIDY_MAKEFILE';
 PERLTIDY?=perltidy
 
-PERLTIDY_STYLE=-bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs
+PERLTIDY_STYLE=-bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs -vtc=1 -ci=4
 # http://perltidy.sourceforge.net/stylekey.html
 # http://perltidy.sourceforge.net/perltidy.html
 # -bar - keep the brace on the right even for multiple-line test expressions
-# -ce - Cuddled Else
+# -ce - cuddled else
 # -pt=2 - parentheses horizontal tightness - space is never used
 # -sbt=2 - square brackets horizontal tightness - space is never used
 # -bbt=2 - code block curly braces horizontal tightness - space is never used
 # -et=4 - entab leading whitespace with one tab character for each 4 spaces
 # -baao - "break after all operators"
 # -nsfs - no space before a semicolon in a for statement
+# -vtc=1 - do not break before a closing token which is followed by a semicolon
+#          or another closing token, and is not in a list environment
+# -ci=4 - continuation indentation - extra indentation spaces applied when
+#         a long line is broken, 4 spaces
 
 # List of Perl scripts to be processed, space separated list
 PERL_SCRIPTS_LIST=test.pl

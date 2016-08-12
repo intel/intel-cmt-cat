@@ -33,7 +33,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-# PerlTidy options -bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs
+# PerlTidy options:
+# -bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs -vtc=1 -ci=4
 
 use bigint;
 use strict;
@@ -158,7 +159,7 @@ sub init_pqos {
 
 	$ret = 0;
 
-  EXIT:
+EXIT:
 	return sprintf("%s: %s", __func__, $ret == 0 ? "PASS" : "FAILED!");
 }
 
@@ -190,7 +191,8 @@ sub generate_ways_mask {
 
 	my $base_mask = (1 << ($bits_per_cos)) - 1;
 	my $ways_mask =
-	  $base_mask << (($cos_id * $bits_per_cos + $socket_id % 3) % ($num_ways - 1));
+		$base_mask
+		<< (($cos_id * $bits_per_cos + $socket_id % 3) % ($num_ways - 1));
 	my $result = $ways_mask & (2**$num_ways - 1);
 
 	if (0 == $result) {
@@ -218,7 +220,7 @@ sub get_msr_ways_mask {
 
 	for ($cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
 		(my $result, my $cpu_socket_id) =
-		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+			pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
 		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
 			return;
@@ -258,13 +260,13 @@ sub print_cfg {
 			printf("Socket: %d, CoS: %d, CDP: %d",
 				$socket_id, $l3ca->{class_id}, $l3ca->{cdp});
 			if (int($l3ca->{cdp}) == 1) {
-				printf(", data_mask: 0x%x, code_mask: 0x%x",
+				printf(
+					", data_mask: 0x%x, code_mask: 0x%x",
 					$l3ca->{u}->{s}->{data_mask},
 					$l3ca->{u}->{s}->{code_mask});
 			} else {
 				printf(", ways_mask: 0x%x", $l3ca->{u}->{ways_mask});
 			}
-
 			print "\n";
 		}
 	}
@@ -279,14 +281,14 @@ sub print_cfg {
 		}
 
 		($result, my $socket_id) =
-		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+			pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
 		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
 			return -1;
 		}
 
 		print "Socket: ", $socket_id, ", Core: ", $cpu_id, ", CoS: ", $cos_id,
-		  "\n";
+			"\n";
 	}
 
 	return 0;
@@ -314,7 +316,7 @@ sub test_assoc {
 		}
 
 		($result, $socket_id) =
-		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+			pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
 		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
 			goto EXIT;
@@ -340,7 +342,7 @@ sub test_assoc {
 		}
 
 		($result, $socket_id) =
-		  pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+			pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
 		if (0 != $result) {
 			print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
 			goto EXIT;
@@ -371,7 +373,7 @@ sub test_assoc {
 
 	$ret = 0;
 
-  EXIT:
+EXIT:
 	return sprintf("%s: %s", __func__, $ret == 0 ? "PASS" : "FAILED!");
 }
 
@@ -423,7 +425,7 @@ sub test_way_masks {
 
 			if ($l3ca->{u}->{ways_mask} != $gen_ways_mask) {
 				print __LINE__,
-				  ' $l3ca->{u}->{ways_mask} != $gen_ways_mask FAILED!', "\n";
+					' $l3ca->{u}->{ways_mask} != $gen_ways_mask FAILED!', "\n";
 				goto EXIT;
 			}
 
@@ -435,7 +437,7 @@ sub test_way_masks {
 
 			if ($msr_ways_mask != $gen_ways_mask) {
 				print __LINE__, ' $msr_ways_mask != $gen_ways_mask FAILED!',
-				  "\n";
+					"\n";
 				goto EXIT;
 			}
 		}
@@ -443,7 +445,7 @@ sub test_way_masks {
 
 	$ret = 0;
 
-  EXIT:
+EXIT:
 	return sprintf("%s: %s", __func__, 0 == $ret ? "PASS" : "FAILED!");
 }
 
@@ -488,7 +490,7 @@ sub reset_cfg {
 
 	$ret = 0;
 
-  EXIT:
+EXIT:
 	return sprintf("%s: %s", __func__, $ret == 0 ? "PASS" : "FAILED!");
 }
 
