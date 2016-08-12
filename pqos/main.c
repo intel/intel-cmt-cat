@@ -341,6 +341,9 @@ selfn_allocation_select(const char *arg)
 static void
 parse_config_file(const char *fname)
 {
+        if (fname == NULL)
+                parse_error("-f", "Invalid configuration file name!\n");
+
         static const struct {
                 const char *option;
                 void (*fn)(const char *);
