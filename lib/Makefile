@@ -134,7 +134,7 @@ DEPFILES = $(SRCS:.c=.d)
 
 %.d: %.c
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
-	grep -e "\.o:" $@ | sed 's/$(@:.d=.o)/$@/' >> $@
+	cat $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
 .PHONY: clean rinse doxy help
 
@@ -189,5 +189,9 @@ cppcheck:
 	log.c log.h types.h machine.c machine.h \
 	utils.c cpuinfo.c cpuinfo.h host_pidapi.c host_pidapi.h
 
-# dependecies file
+# if target not clean or rinse then make dependencies
+ifneq ($(MAKECMDGOALS),clean)
+ifneq ($(MAKECMDGOALS),rinse)
 -include $(DEPFILES)
+endif
+endif
