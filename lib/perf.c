@@ -45,7 +45,7 @@
  * @param attr perf event attribute structure
  * @param pid pid to monitor
  * @param cpu cpu to monitor
- * @param groupfd fd of group leader (-1 if no leader)
+ * @param group_fd fd of group leader (-1 if no leader)
  * @param flags perf event flags
  *
  * @return fd used to read specified perf events

@@ -77,7 +77,7 @@
  */
 
 /**
- * Available types of allocation resource IDs.
+ * Available types of allocation resource ID's.
  * (matches CPUID enumeration)
  */
 #define PQOS_RES_ID_L3_ALLOCATION    1       /**< L3 cache allocation */
@@ -250,7 +250,7 @@ int _pqos_check_init(const int expect)
         return PQOS_RETVAL_OK;
 }
 
-/**
+/*
  * =======================================
  * =======================================
  *
@@ -389,7 +389,7 @@ discover_monitoring(struct pqos_cap_mon **r_mon,
 
         /**
          * Check number of monitoring events to allocate memory for
-         * Subleaf 1 provides information on monitoring.
+         * Sub-leaf 1 provides information on monitoring.
          */
         lcpuid(0xf, 1, &cpuid_0xf_1); /**< query resource monitoring */
 
@@ -1023,7 +1023,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         return ret;
 }
 
-/**
+/*
  * =======================================
  * =======================================
  *

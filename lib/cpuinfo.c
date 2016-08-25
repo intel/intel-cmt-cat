@@ -215,10 +215,9 @@ static int detect_apic_core_masks(struct apic_info *apic)
  * It finds nearest power of 2 that is not smaller than \a n
  * and returns number of bits required to encode \a n.
  *
- * @param [out] p_set place to store current CPU set
+ * @param [in] n input number to find nearest power of 2 for
  *
- * @return Operation status
- * @retval 0 OK
+ * @return Nearest power of 2 not smaller than \a n
  */
 static unsigned nearest_pow2(const unsigned n)
 {

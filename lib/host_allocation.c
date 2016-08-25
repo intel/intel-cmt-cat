@@ -33,7 +33,7 @@
  */
 
 /**
- * @brief Implementation of CAT releated PQoS API
+ * @brief Implementation of CAT related PQoS API
  *
  * CPUID and MSR operations are done on the 'local'/host system.
  * Module operate directly on CAT registers.
@@ -60,8 +60,9 @@
 
 /**
  * Allocation & Monitoring association MSR register
- *
- * [63..<QE COS>..32][31..<RESERVED>..10][9..<RMID>..0]
+ * - bits [63..32] QE COS
+ * - bits [31..10] Reserved
+ * - bits [9..0] RMID
  */
 #define PQOS_MSR_ASSOC             0xC8F
 #define PQOS_MSR_ASSOC_QECOS_SHIFT 32
@@ -433,7 +434,7 @@ pqos_l2ca_set(const unsigned socket,
 
         /**
          * Pick one core from the socket and
-         * perfrom MSR writes to COS registers on the socket.
+         * perform MSR writes to COS registers on the socket.
          */
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
@@ -679,7 +680,7 @@ pqos_alloc_assoc_get(const unsigned lcore,
  * @brief Gets highest COS id which could be used to configure set technologies
  *
  * @param [in] technology technologies bitmask to get highest common COS id for
- * @param [out] class_id highest common COS id
+ * @param [out] hi_class_id highest common COS id
  *
  * @return Operation status
  */

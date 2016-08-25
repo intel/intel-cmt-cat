@@ -58,8 +58,8 @@ extern "C" {
  */
 
 #define PQOS_VERSION       105          /**< version 1.05 */
-#define PQOS_MAX_L3CA_COS  16           /**< 16xCOS */
-#define PQOS_MAX_L2CA_COS  16           /**< 16xCOS */
+#define PQOS_MAX_L3CA_COS  16           /**< 16 x COS */
+#define PQOS_MAX_L2CA_COS  16           /**< 16 x COS */
 
 /*
  * =======================================
@@ -91,14 +91,8 @@ enum pqos_cdp_config {
  * PQoS library configuration structure
  */
 struct pqos_config {
-        int fd_log;                     /**< file descriptor to be used for
-                                           library to log messages */
-        int verbose;                    /**< if true increases library
-                                           verbosity level */
-        int free_in_use_rmid;           /**< forces the library to take all
-                                           cores and RMIDs in the system even
-                                           if cores may seem to be subject of
-                                           monitoring activity */
+        int fd_log;     /**< file descriptor for library log messages */
+        int verbose;    /**< if true increases library verbosity level */
 };
 
 /**
@@ -151,9 +145,9 @@ struct pqos_cap_l3ca {
         unsigned num_ways;              /**< number of cache ways */
         unsigned way_size;              /**< way size in bytes */
         uint64_t way_contention;        /**< ways contention bit mask */
-        int cdp;                        /**< code data prioratization feature
+        int cdp;                        /**< code data prioritization feature
                                            presence */
-        int cdp_on;                     /**< code data prioratization on or
+        int cdp_on;                     /**< code data prioritization on or
                                            off*/
 };
 
@@ -274,10 +268,10 @@ struct pqos_cpuinfo {
  *
  * @param [out] cap location to store PQoS capabilities information at
  * @param [out] cpu location to store CPU information at
- *                  This parameter is optional and when NULL is passed then
- *                  no cpu information is returned.
- *                  CPU information includes data about number of sockets,
- *                  logical cores and their assignment.
+ *              This parameter is optional and when NULL is passed then
+ *              no cpu information is returned.
+ *              CPU information includes data about number of sockets,
+ *              logical cores and their assignment.
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
@@ -354,7 +348,7 @@ struct pqos_mon_data {
         /**
          * Core specific section
          */
-        struct pqos_mon_poll_ctx *poll_ctx; /**< core, cluster & rmid */
+        struct pqos_mon_poll_ctx *poll_ctx; /**< core, cluster & RMID */
         unsigned num_poll_ctx;          /**< number of poll contexts */
         unsigned *cores;                /**< list of cores in the group */
         unsigned num_cores;             /**< number of cores in the group */
@@ -382,15 +376,20 @@ int pqos_mon_assoc_get(const unsigned lcore,
                        pqos_rmid_t *rmid);
 
 /**
- * @brief Starts resource monitoring data logging on \a lcore
+ * @brief Starts resource monitoring on selected group of cores
+ *
+ * The function sets up content of the \a group structure.
  *
  * Note that \a event cannot select PQOS_PERF_EVENT_IPC or
  * PQOS_PERF_EVENT_L3_MISS events without any PQoS event
  * selected at the same time.
  *
- * @param [in] lcore CPU logical core id
- * @param [in] event monitoring event id
- * @param [in] context application dependent context pointer
+ * @param [in] num_cores number of cores in \a cores array
+ * @param [in] cores array of logical core id's
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [in,out] group a pointer to monitoring structure
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
@@ -402,11 +401,13 @@ int pqos_mon_start(const unsigned num_cores,
                    struct pqos_mon_data *group);
 
 /**
- * @brief Starts resource monitoring of \a pid process
+ * @brief Starts resource monitoring of selected \a pid (process)
  *
  * @param [in] pid process ID
  * @param [in] event monitoring event id
- * @param [in] context application dependent context pointer
+ * @param [in] context a pointer for application's convenience
+ *             (unused by the library)
+ * @param [in,out] group a pointer to monitoring structure
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
@@ -477,7 +478,7 @@ int pqos_alloc_assoc_get(const unsigned lcore,
  *             (1 << enum pqos_cap_type)
  * @param [in] core_array list of core ids
  * @param [in] core_num number of core ids in the \a core_array
- * @param [out] classid place to store reserved COS id
+ * @param [out] class_id place to store reserved COS id
  *
  * @return Operations status
  */
@@ -554,9 +555,9 @@ int pqos_l3ca_set(const unsigned socket,
  * @brief Reads classes of service from \a socket
  *
  * @param [in] socket CPU socket id
- * @param [in] max_num_cos maximum number of classes of service
- *             that can be accommodated at \a ca
- * @param [out] num_cos number of classes of service read into \a ca
+ * @param [in] max_num_ca maximum number of classes of service
+ *            that can be accommodated at \a ca
+ * @param [out] num_ca number of classes of service read into \a ca
  * @param [out] ca table with read classes of service
  *
  * @return Operations status
@@ -599,9 +600,9 @@ int pqos_l2ca_set(const unsigned socket,
  * @brief Reads classes of service from \a socket
  *
  * @param [in] socket CPU socket id
- * @param [in] max_num_cos maximum number of classes of service
+ * @param [in] max_num_ca maximum number of classes of service
  *             that can be accommodated at \a ca
- * @param [out] num_cos number of classes of service read into \a ca
+ * @param [out] num_ca number of classes of service read into \a ca
  * @param [out] ca table with read classes of service
  *
  * @return Operations status
@@ -692,7 +693,7 @@ pqos_cpu_check_core(const struct pqos_cpuinfo *cpu,
                     const unsigned lcore);
 
 /**
- * @brief Retrieves socket id for given \logical core id
+ * @brief Retrieves socket id for given logical core id
  *
  * @param [in] cpu CPU information structure from cpu info module
  * @param [in] lcore logical core id

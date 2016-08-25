@@ -60,30 +60,34 @@
 
 /**
  * Allocation & Monitoring association MSR register
- *
- * [63..<QE COS>..32][31..<RESERVED>..10][9..<RMID>..0]
+ * - bits [63..32] QE COS
+ * - bits [31..10] Reserved
+ * - bits [9..0]   RMID
  */
 #define PQOS_MSR_ASSOC             0xC8F
 #define PQOS_MSR_ASSOC_QECOS_SHIFT 32
 #define PQOS_MSR_ASSOC_QECOS_MASK  0xffffffff00000000ULL
-#define PQOS_MSR_ASSOC_RMID_MASK   ((1ULL<<10)-1ULL)
+#define PQOS_MSR_ASSOC_RMID_MASK   ((1ULL << 10) - 1ULL)
 
 /**
  * Monitoring data read MSR register
  */
 #define PQOS_MSR_MON_QMC             0xC8E
-#define PQOS_MSR_MON_QMC_DATA_MASK   ((1ULL<<62)-1ULL)
-#define PQOS_MSR_MON_QMC_ERROR       (1ULL<<63)
-#define PQOS_MSR_MON_QMC_UNAVAILABLE (1ULL<<62)
+#define PQOS_MSR_MON_QMC_DATA_MASK   ((1ULL << 62) - 1ULL)
+#define PQOS_MSR_MON_QMC_ERROR       (1ULL << 63)
+#define PQOS_MSR_MON_QMC_UNAVAILABLE (1ULL << 62)
 
 /**
  * Monitoring event selection MSR register
- * [63..<RESERVED>..42][41..<RMID>..32][31..<RESERVED>..8][7..<EVENTID>..0]
+ * - bits [63..42] Reserved
+ * - bits [41..32] RMID
+ * - bits [31..8] Reserved
+ * - bits [7..0] Event ID
  */
 #define PQOS_MSR_MON_EVTSEL            0xC8D
 #define PQOS_MSR_MON_EVTSEL_RMID_SHIFT 32
-#define PQOS_MSR_MON_EVTSEL_RMID_MASK  ((1ULL<<10)-1ULL)
-#define PQOS_MSR_MON_EVTSEL_EVTID_MASK ((1ULL<<8)-1ULL)
+#define PQOS_MSR_MON_EVTSEL_RMID_MASK  ((1ULL << 10) - 1ULL)
+#define PQOS_MSR_MON_EVTSEL_EVTID_MASK ((1ULL << 8) - 1ULL)
 
 /**
  * Allocation class of service (COS) MSR registers
@@ -91,7 +95,7 @@
 #define PQOS_MSR_L3CA_MASK_START 0xC90
 #define PQOS_MSR_L3CA_MASK_END   0xD8F
 #define PQOS_MSR_L3CA_MASK_NUMOF \
-        (PQOS_MSR_L3CA_MASK_END-PQOS_MSR_L3CA_MASK_START+1)
+        (PQOS_MSR_L3CA_MASK_END - PQOS_MSR_L3CA_MASK_START + 1)
 
 /**
  * MSR's to read instructions retired, unhalted cycles,
@@ -121,7 +125,7 @@
  * Max value of the memory bandwidth data = 2^24
  * assuming there is 24 bit space available
  */
-#define MBM_MAX_VALUE (1<<24)
+#define MBM_MAX_VALUE (1 << 24)
 
 /**
  * Value marking monitoring group structure as "valid".
@@ -183,7 +187,7 @@ get_delta(const uint64_t old_value, const uint64_t new_value);
 static uint64_t
 scale_event(const enum pqos_mon_event event, const uint64_t val);
 
-/**
+/*
  * =======================================
  * =======================================
  *
@@ -256,7 +260,7 @@ pqos_mon_fini(void)
         return retval;
 }
 
-/**
+/*
  * =======================================
  * =======================================
  *
@@ -368,7 +372,7 @@ rmid_alloc(const unsigned cluster,
         return ret;
 }
 
-/**
+/*
  * =======================================
  * =======================================
  *
@@ -1304,7 +1308,7 @@ pqos_mon_poll(struct pqos_mon_data **groups,
         _pqos_api_unlock();
         return PQOS_RETVAL_OK;
 }
-/**
+/*
  * =======================================
  * =======================================
  *

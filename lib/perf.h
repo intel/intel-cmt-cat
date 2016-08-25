@@ -48,7 +48,7 @@ extern "C" {
  * @param attr perf event attribute structure
  * @param pid pid to monitor
  * @param cpu cpu to monitor
- * @param groupfd fd of group leader (-1 for no leader)
+ * @param group_fd fd of group leader (-1 for no leader)
  * @param flags perf event flags
  * @param counter_fd pointer to counter fd variable to be set
  *
