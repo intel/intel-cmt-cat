@@ -77,6 +77,7 @@ endif
 # Build targets and dependencies
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
+CLEAN_OBJS = $(SRCS:.c=.o)
 
 # On FreeBSD build with NO_PID_API option
 ifeq ($(shell uname), FreeBSD)
@@ -136,7 +137,7 @@ DEPFILES = $(SRCS:.c=.d)
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
 	cat $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
-.PHONY: clean rinse doxy help
+.PHONY: clean clobber doxy help
 
 help:
 	@echo "PQoS library make targets:"
@@ -146,8 +147,8 @@ help:
 	@echo "    make DEBUG=y      - build shared library for debugging"
 	@echo "    make install      - install library (accepts PREFIX=/some/where)"
 	@echo "    make uninstall    - uninstall library (accepts PREFIX=/some/where)"
-	@echo "    make rinse        - remove build files"
-	@echo "    make clean        - remove even more files than rinse"
+	@echo "    make clean        - remove files produced normally by make"
+	@echo "    make clobber      - clean and remove documentation"
 	@echo "    make doxy         - make doxygen documentation"
 	@echo "    make style        - coding style check (accepts CHECKPATCH=/some/where/checkpatch.pl)"
 	@echo "    make cppcheck     - static code analysis (accepts CPPCHECK=/some/where/cppcheck)"
@@ -156,11 +157,11 @@ doxy:
 	doxygen api_doxygen.cfg
 	doxygen lib_doxygen.cfg
 
-rinse:
-	-rm -f $(OBJS) $(LIB)* $(DEPFILES)
-
 clean:
-	-rm -f $(OBJS) $(LIB)* $(DEPFILES) ./*~
+	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
+
+clobber:
+	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
 	-rm -rf $(DOXY_DIRS)
 
 CHECKPATCH?=checkpatch.pl
@@ -191,7 +192,7 @@ cppcheck:
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)
-ifneq ($(MAKECMDGOALS),rinse)
+ifneq ($(MAKECMDGOALS),clobber)
 -include $(DEPFILES)
 endif
 endif
