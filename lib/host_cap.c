@@ -151,7 +151,7 @@ static pthread_mutex_t m_apilock_mutex;
  */
 
 /**
- * @brief Opens lock file
+ * @brief Initalizes API locks
  *
  * @return Operation status
  * @retval 0 success
@@ -180,7 +180,7 @@ static int _pqos_api_init(void)
 }
 
 /**
- * @brief Closes POSIX named semaphore
+ * @brief Uninitializes API locks
  *
  * @return Operation status
  * @retval 0 success
@@ -539,7 +539,7 @@ cdp_is_enabled(const struct pqos_cpuinfo *cpu,
 /**
  * @brief Detects presence of L3 CAT based on register probing.
  *
- * This is 3rd and the last method of detecting CAT.
+ * This method of detecting CAT does the following steps.
  * - probe COS registers one by one and exit on first error
  * - if procedure fails on COS0 then CAT is not supported
  * - use CPUID.0x4.0x3 to get number of cache ways

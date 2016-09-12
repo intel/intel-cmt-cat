@@ -50,7 +50,8 @@
 /**
  * @brief Detect if sudo was used to elevate privileges and drop them
  *
- * @return 0 on success
+ * @return Operation status
+ * @retval 0 on success
  * @retval -1 on error
  */
 static int
@@ -109,7 +110,8 @@ err:
  * @param [in] argc number of cmd args
  * @param [in] argv cmd args
  *
- * @return 0 on success
+ * @return Operation status
+ * @retval 0 on success
  * @retval -1 on error
  */
 static int
@@ -276,9 +278,9 @@ print_usage(char *prgname, unsigned short_usage)
  * @param [in] f_p flag for -p argument
  * @param [in] cmd flag for command to be executed
  *
- * @return Result
+ * @return Operation status
  * @retval 1 on success
- * @retval 0 on failure
+ * @retval 0 on error
  */
 static int
 validate_args(const int f_r, __attribute__((unused)) const int f_t,
@@ -295,7 +297,8 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
  * @param [in] argc number of args
  * @param [in] argv args
  *
- * @return 0 on success
+ * @return Operation status
+ * @retval 0 on success
  * @retval -EINVAL on error
  */
 static int
@@ -373,6 +376,10 @@ exit:
  *
  * @param [in] argc number of args
  * @param [in] argv args
+ *
+ * @return Operation status
+ * @retval EXIT_SUCCESS on success
+ * @retval EXIT_FAILURE on error
  */
 int
 main(int argc, char **argv)

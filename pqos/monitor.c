@@ -1261,7 +1261,7 @@ static void usec_to_timeval(struct timeval *tv, const long usec)
 /**
  * @brief Converts timeval structure into microseconds
  *
- * @param tv pointer to timeval structure to be filled in
+ * @param tv pointer to timeval structure to be converted
  *
  * @return Number of microseconds corresponding to \a tv
  */
