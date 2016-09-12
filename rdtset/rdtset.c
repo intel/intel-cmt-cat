@@ -315,8 +315,8 @@ parse_args(int argc, char **argv)
 		{ "help",	no_argument,		0, 'h' },
 		{ NULL, 0, 0, 0 } };
 
-	while (-1 != (opt = getopt_long
-			(argc, argvopt, "+c:p:r:t:kvh", lgopts, NULL))) {
+	while ((opt = getopt_long(argc, argvopt,
+                                  "+c:p:r:t:kvh", lgopts, NULL)) != -1) {
 		if (opt == 'c') {
 			retval = parse_cpu(optarg);
 			if (retval != 0) {

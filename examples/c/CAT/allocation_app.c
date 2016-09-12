@@ -46,10 +46,6 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include "pqos.h"
-/**
- * Defines
- */
-#define PQOS_MAX_MON_EVENTS   1
 
 /**
  * Maintains number of Class of Services supported by socket for
@@ -190,7 +186,7 @@ int main(int argc, char *argv[])
 	struct pqos_config cfg;
 	const struct pqos_cpuinfo *p_cpu = NULL;
 	const struct pqos_cap *p_cap = NULL;
-	unsigned sock_count, *sockets = NULL;
+	unsigned sock_count, *p_sockets = NULL;
 	int ret, exit_val = EXIT_SUCCESS;
 
 	memset(&cfg, 0, sizeof(cfg));
@@ -211,8 +207,8 @@ int main(int argc, char *argv[])
 		goto error_exit;
 	}
 	/* Get CPU socket information to set COS */
-	sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
-	if (sockets == NULL) {
+	p_sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
+	if (p_sockets == NULL) {
 		printf("Error retrieving CPU socket information!\n");
 		exit_val = EXIT_FAILURE;
 		goto error_exit;
@@ -221,7 +217,7 @@ int main(int argc, char *argv[])
 	allocation_get_input(argc, argv);
 	if (sel_l3ca_cos_num != 0) {
 		/* Set bit mask for COS allocation */
-		ret = set_allocation_class(sock_count, sockets);
+		ret = set_allocation_class(sock_count, p_sockets);
 		if (ret < 0) {
 			printf("Allocation configuration error!\n");
 			goto error_exit;
@@ -229,7 +225,7 @@ int main(int argc, char *argv[])
 		printf("Allocation configuration altered.\n");
 	}
 	/* Print COS and associated bit mask */
-	ret = print_allocation_config(sock_count, sockets);
+	ret = print_allocation_config(sock_count, p_sockets);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Allocation capability not detected!\n");
 		exit_val = EXIT_FAILURE;
@@ -240,7 +236,7 @@ int main(int argc, char *argv[])
 	ret = pqos_fini();
 	if (ret != PQOS_RETVAL_OK)
 		printf("Error shutting down PQoS library!\n");
-        if (sockets != NULL)
-                free(sockets);
+        if (p_sockets != NULL)
+                free(p_sockets);
 	return exit_val;
 }
