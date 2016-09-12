@@ -40,7 +40,8 @@ Scheduler-integrated alternatives such as cgroups and perf are being
 researched to track the application PID (and all associated TIDs)
 rather than static assignment. The monitoring utility currently associates
 a Resource Monitoring ID (RMID) per hardware thread or group of hardware
-threads when monitoring is started.
+threads when monitoring is started. By default, PID tracking is not enabled.
+Details on enabling this feature can be found in INSTALL and lib/README.
 
 The command line utility provides the necessary functionality to set
 up the CAT capabilities. The software provides flags to configure the

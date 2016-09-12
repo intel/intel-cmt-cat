@@ -46,6 +46,10 @@ By default, library files are installed in "lib" directory below "/usr/local"
 but it can be changed with use of PREFIX to install files below "/some/where":
 $ sudo make install PREFIX=/some/where
 
+By default, make builds the library without PID tracking enabled. PID tracking
+can be enabled at compile time:
+$ sudo make NO_PID_API=n
+
 Library files can be removed but the same PREFIX has to be
 used for uninstall and install targets.
 

@@ -18,7 +18,9 @@ OVERVIEW
 
 This is example code to demonstrate the use of PQoS/Intel(R) Resource Director
 Technology (Intel(R) RDT) library APIs to manage Cache Allocation Technology
-(CAT). CAT sample application build will create three targets as follows:
+(CAT). Refer to https://github.com/01org/intel-cmt-cat/blob/master/README table
+1 for a list of processors supporting CAT. CAT sample application build will
+create three targets as follows:
 1. allocation_app - Demonstrates usage of PQoS/Intel(R) RDT library APIs
 related to set bit mask for class of service (CLOS) and displaying
 class of service (CLOS) and associated bit mask.
@@ -28,7 +30,6 @@ class of service (CLOS) and core association.
 3. reset_app - Demonstrates usage of PQoS/Intel(R) RDT library APIs related to
 resetting all classes of service to system default bit mask.
 All apps operate in user space and use PQoS/Intel(R) RDT and C libraries only.
-Note: Monitor events are hardware dependant. Only supported event will be shown.
 
 
 COMPILATION

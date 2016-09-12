@@ -76,6 +76,7 @@ To run the cat-agentx.pl script:
 Note:
 "cat-agentx" needs to be restarted when CDP config changes.
 
+Examples:
 Example use of snmp-tools to read and set CAT configuration:
 1. Get CAT configuration:
 $ snmpwalk -v2c -c pqos localhost SNMPv2-SMI::enterprises.343.3
@@ -86,10 +87,11 @@ $ snmpset -v2c -c pqos localhost SNMPv2-SMI::enterprises.343.3.1.0.1 u 3
 3. Set way_masks to 15 (0xf) for COS# 1 on Socket# 0
 $ snmpset -v2c -c pqos localhost SNMPv2-SMI::enterprises.343.3.0.0.1.1 u 15
 
+Troubleshooting:
 Error: "Warning: Failed to connect to the agentx master agent ([NIL]):"
 - Make sure that Net-SNMP (snmpd) daemon is running and has AgentX support enabled.
 
-Error "Timeout: No Response from localhost"
+Error: "Timeout: No Response from localhost"
 - Make sure that snmpd daemon is running;
 - Make sure that snmpd.conf consists "rwcommunity pqos ..." line;
 

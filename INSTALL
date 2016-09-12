@@ -27,6 +27,8 @@ installed:
 - PQoS DSO and its header file (libpqos.so and pqos.h)
 - PQoS utility executable (pqos)
 - PQoS man page (pqos.8)
+- rdtset tool executable (rdtset)
+- rdtset man page (rdtset.8)
 
 NOTE to FreeBSD users, remember to replace "make" with "gmake" in
 the steps described below.

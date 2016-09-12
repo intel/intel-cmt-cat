@@ -18,7 +18,9 @@ OVERVIEW
 
 This is example code to demonstrate the use of PQoS/Intel(R) Resource Director
 Technology (Intel(R) RDT) library APIs to manage Cache Monitoring Technology
-(CMT), Memory Bandwidth Monitoring (MBM).
+(CMT), Memory Bandwidth Monitoring (MBM). Refer to
+https://github.com/01org/intel-cmt-cat/blob/master/README table 1 for a list
+of processors supporting CMT and MBM.
 CMT_MBM sample application build will create one target as follows:
 1. monitor_app - Demonstrates usage of PQoS/Intel(R) RDT library APIs related
 to monitoring events like cache occupancy, local memory bandwidth usage and
