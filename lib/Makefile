@@ -128,6 +128,9 @@ endif
 
 uninstall:
 	-rm $(LIBDIR)/libpqos*
+ifeq ($(SHARED),y)
+	ldconfig
+endif
 
 DEPFILES = $(SRCS:.c=.d)
 
