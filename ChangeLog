@@ -1,5 +1,5 @@
 ======================================================================
-Release  v0.1.5  2016-09-12
+Release  v0.1.5  2016-09-20
 ======================================================================
 
 Contributors (alphabetical order):
@@ -20,14 +20,12 @@ Summary:
 	- DSO built by default
 	- examples moved to the top folder
 	- Perl interface created for the library
-	- Cross socket monitoring in one group
 	- PID API no longer compiled by default
 	- Support for L2 CAT
 	- Makefile dependencies improved
 3. PQoS Utility
 	- pqos directory created to accommodate the utility files
 	- Link against DSO
-	- Cross socket monitoring in one group
 	- COS management on a per socket basis
 	- Support for L2 CAT
 	- Makefile dependencies improved
