@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH RDTSET 8 "July 7, 2016"
+.TH RDTSET 8 "September 20, 2016"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -16,7 +16,7 @@
 .\" .sp <n>    insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-rtdset \- Task Set for Intel(R) Resource Director Technology
+rtdset \- Task CPU affinity and Intel(R) Resource Director Technology control tool
 .br
 .SH SYNOPSIS
 .B rdtset
@@ -37,14 +37,12 @@ http://www.intel.com/content/www/us/en/architecture-and-technology/resource-dire
 .br
 or https://github.com/01org/intel-cmt-cat/wiki
 .PP
-The rdtset tool provides support to set up the CAT (Cache Allocation
-Technology) capabilities for a task and set its cpu affinity.
-Current operations of the utility are based on controlling MSR registers
-(via libpqos library). Class of service 0 (CLOS0) is assumed as default one.
-In command mode, rdtset forks and in one process executes the command.
-In another process it waits for the task to terminate and restores default
-state by assigning cpu's back to CLOS0.
-This behavior is not in place in PID mode.
+The rdtset tool provides support to set up the CAT (Cache Allocation Technology) capabilities
+for a task and set its CPU affinity. Current RDT/CAT operations of the utility are based on controlling
+MSR registers (via libpqos library). Class of service 0 (CLOS0) is assumed as default one.
+In command mode, rdtset forks and one process executes the command. Another process waits
+for the task to terminate and restores default CAT state by assigning cpu's back to CLOS0. This
+behavior is not in place in PID mode.
 .SH OPTIONS
 rdtset options are as follow:
 .TP
@@ -54,14 +52,14 @@ Show help
 .B \-v, \-\-verbose
 Verbose mode
 .TP
-.B \-t\ feature=value;...cpu=cpulist, \-\-rdt\ feature=value;...cpu=cpulist
+.B \-t\ , \-\-rdt\ feature=value;...cpu=cpulist
 Specify RDT configuration, single class configuration per -t, multiple -t options allowed.
 .br
-Features:
+Accepted values for features:
 .br
-.B 2, l2
+.B 2, l2   for level 2 cache
 .br
-.B 3, l3
+.B 3, l3   for level 3 cache
 
 For example:
 

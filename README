@@ -1,9 +1,7 @@
-
-
 ========================================================================
 README for Intel(R) RDT Software Package
 
-April 2016
+September 2016
 
 ========================================================================
 
@@ -27,14 +25,23 @@ Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
 Cache Allocation Technology (CAT) and Code and Data Prioritization (CDP).
 
 In principle, the software programs the technologies via
-Model Specific Registers (MSR) on a per core or hardware thread basis.
-MSR access is arranged via standard operating system driver: msr on Linux and
-cpuctl on FreeBSD. Presence of the technologies is detected via CPUID
-instruction. In some cases CAT is detected via brand string read from CPUID.
+Model Specific Registers (MSR) on a hardware thread basis.
+MSR access is arranged via a standard operating system driver:
+msr on Linux and cpuctl on FreeBSD. In the most common architectural
+implementations, presence of the technologies is detected via the
+CPUID instruction.
 
-Software detects presence of Linux perf extensions for
+In a limited number of special cases where CAT is not architecturally
+supported on a particular SKU (but instead a non-architectural
+(model-specific) implementation exists) it can be detected via brand
+string. This brand string is read from CPUID and compared to a table
+of known-supported SKUs. If needed, a final check is to probe the
+specific MSR’s to discover hardware capabilities, however it is
+recommended that CPUID enumeration should be used wherever possible.
+
+If compiled with PID API the software detects presence of Linux perf extensions for
 the monitoring technologies. In such case it enables library API's for
-monitoring processes.
+monitoring processes. PID API is not complied by default.
 
 This software package is maintained, updated and developed on
 https://github.com/01org/intel-cmt-cat
@@ -52,6 +59,9 @@ Package Content
     Includes software library files providing API's for
     technology detection, monitoring and allocation.
     Please refer to the library README for more details (lib/README).
+“lib/perl” directory:
+    Includes PQoS library Perl wrapper.
+    Please refer to the interface README for more details (lib/perl/README).
 "pqos" directory:
     Includes utility files providing command line access to
     Intel(R) RDT. The utility links against the library and programs
@@ -68,11 +78,14 @@ Package Content
     Manual page of "rdtset" utility also provides information about tool usage:
     $ man rdtset
 "examples" directory:
-    Includes C and Perl examples of Intel(R) RDT via the library API's.
+    Includes C and Perl examples of Intel(R) RDT usage via the library API's.
     Please refer to README file for more details "examples/README".
+"snmp" directory:
+    Includes Net-SNMP AgentX subagent written in Perl to demonstrate the use of
+    the PQoS library Perl wrapper API.
+    Please refer to README file for more details "snmp/README".
 "srpm" directory:
     Includes *.src.rpm and *.spec files for the software package.
-    Please refer to README file for more details "srpm/README".
 "ChangeLog" file:
     Brief description of changes between releases.
 "INSTALL" file:
@@ -123,7 +136,7 @@ References:
 For additional Intel(R) RDT details please refer to the Intel(R)
 Architecture Software Development Manuals available at:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
-Specific information can be found in Chapters 17.16 and 17.17 (revision 058).
+Specific information can be found in volume 3, Chapters 17.16 and 17.17 (revision 059).
 
 
 Software Compatibility
