@@ -43,6 +43,35 @@ int pqos_cpu_get_socketid(const struct pqos_cpuinfo *, const unsigned, unsigned 
 #include <pqos.h>
 
 /**
+ * @brief Helper function to get L2CA capabilities data
+ *
+ * @return Pointer to capabilities data or NULL on error
+ */
+struct pqos_cap_l2ca * get_cap_l2ca(void)
+{
+	const struct pqos_cap *cap = NULL;
+	const struct pqos_capability *cap_l2ca = NULL;
+	int ret = 0;
+
+	/* Get capability pointer */
+	ret = pqos_cap_get(&cap, NULL);
+	if (ret != PQOS_RETVAL_OK || cap == NULL) {
+		printf("PQOS: Error retrieving PQoS capabilities!\n");
+		return NULL;
+	}
+
+	/* Get L2CA capabilities */
+	ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &cap_l2ca);
+	if (ret != PQOS_RETVAL_OK || cap_l2ca == NULL) {
+		printf("PQOS: Error retrieving PQOS_CAP_TYPE_L2CA "
+			"capabilities!\n");
+		return NULL;
+	}
+
+	return cap_l2ca->u.l2ca;
+}
+
+/**
  * @brief Helper function to get L3CA capabilities data
  *
  * @return Pointer to capabilities data or NULL on error
@@ -92,12 +121,62 @@ const struct pqos_cpuinfo * get_cpuinfo(void)
 }
 
 /**
- * @brief Helper function to get single COS configuration
+ * @brief Helper function to get single L2 COS configuration
  *
  * @param [in] socket - CPU socket id
+ * @param [in] cos_id - id of L2CA class of service to read
+ * @param [out] l2ca - read class of service
  *
+ * @return Operation status (0 on success)
+ */
+int get_l2ca(struct pqos_l2ca *l2ca, unsigned int socket, unsigned int cos_id)
+{
+	unsigned num = 0;
+	unsigned i = 0;
+	int ret = -1;
+	struct pqos_l2ca *temp_ca = NULL;
+	struct pqos_cap_l2ca *cap_l2ca = NULL;
+
+	cap_l2ca = get_cap_l2ca();
+	if (cap_l2ca == NULL)
+		return -1;
+
+	const unsigned max_cos_num = cap_l2ca->num_classes;
+	temp_ca = (struct pqos_l2ca *) malloc(sizeof(*temp_ca) * max_cos_num);
+	if (temp_ca == NULL)
+		return -1;
+
+	memset(temp_ca, 0, sizeof(*temp_ca) * max_cos_num);
+
+	if (pqos_l2ca_get(socket, max_cos_num, &num, temp_ca) !=
+			PQOS_RETVAL_OK) {
+		printf("PQOS: Error retrieving L2 COS!\n");
+		goto exit;
+	}
+
+	for (i = 0; i < num;  i++) {
+		if (temp_ca[i].class_id == cos_id) {
+			*l2ca = temp_ca[i];
+			ret = 0;
+			break;
+		}
+	}
+
+	if (ret == -1)
+		printf("PQOS: Error retrieving L2 COS! COS not found!\n");
+
+exit:
+	if (temp_ca != NULL)
+		free(temp_ca);
+
+	return ret;
+}
+
+/**
+ * @brief Helper function to get single L3 COS configuration
+ *
+ * @param [in] socket - CPU socket id
  * @param [in] cos_id - id of L3CA class of service to read
- *
  * @param [out] l3ca - read class of service
  *
  * @return Operation status (0 on success)
@@ -123,7 +202,7 @@ int get_l3ca(struct pqos_l3ca *l3ca, unsigned int socket, unsigned int cos_id)
 
 	if (pqos_l3ca_get(socket, max_cos_num, &num, temp_ca) !=
 			PQOS_RETVAL_OK) {
-		printf("PQOS: Error retrieving COS!\n");
+		printf("PQOS: Error retrieving L3 COS!\n");
 		goto exit;
 	}
 
@@ -136,7 +215,7 @@ int get_l3ca(struct pqos_l3ca *l3ca, unsigned int socket, unsigned int cos_id)
 	}
 
 	if (ret == -1)
-		printf("PQOS: Error retrieving COS! COS not found!\n");
+		printf("PQOS: Error retrieving L3 COS! COS not found!\n");
 
 exit:
 	if (temp_ca != NULL)
@@ -160,6 +239,7 @@ exit:
 /* Generate wrappers around C pointers */
 %pointer_functions(int, intp);
 %pointer_functions(unsigned int, uintp);
+%pointer_functions(struct pqos_cap_l2ca, l2ca_cap_p);
 %pointer_functions(struct pqos_cap_l3ca, l3ca_cap_p);
 %pointer_functions(struct pqos_mon_data, pqos_mon_data_p);
 %pointer_functions(struct pqos_monitor*, pqos_monitor_p_p);
@@ -168,6 +248,8 @@ exit:
 %pointer_functions(struct pqos_cpuinfo*, pqos_cpuinfo_p_p);
 
 /* Helper functions for libpqos */
+struct pqos_cap_l2ca * get_cap_l2ca(void);
 struct pqos_cap_l3ca * get_cap_l3ca(void);
 const struct pqos_cpuinfo * get_cpuinfo(void);
+int get_l2ca(struct pqos_l2ca *l2ca, unsigned int socket, unsigned int idx);
 int get_l3ca(struct pqos_l3ca *l3ca, unsigned int socket, unsigned int idx);
