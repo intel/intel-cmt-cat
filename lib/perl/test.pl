@@ -43,6 +43,7 @@ use warnings;
 use pqos;
 
 my $l3ca_cap_p;
+my $cap_p;
 my $cpuinfo_p;
 my $num_cos;
 my $num_ways;
@@ -110,6 +111,7 @@ sub shutdown_pqos {
 	print "Shutting down pqos lib...\n";
 	pqos::pqos_fini();
 	$l3ca_cap_p = undef;
+	$cap_p      = undef;
 	$cpuinfo_p  = undef;
 
 	if (defined $sockets_a) {
@@ -143,11 +145,16 @@ sub init_pqos {
 	$num_cos  = $l3ca_cap->{num_classes};
 	$num_ways = $l3ca_cap->{num_ways};
 
-	$cpuinfo_p = pqos::get_cpuinfo();
-	if (0 == $cpuinfo_p) {
-		print __LINE__, " pqos::get_cpuinfo FAILED!\n";
+	my $cap_p_p     = pqos::new_pqos_cap_p_p();
+	my $cpuinfo_p_p = pqos::new_pqos_cpuinfo_p_p();
+	if (0 != pqos::pqos_cap_get($cap_p_p, $cpuinfo_p_p)) {
+		print __LINE__, " pqos::pqos_cap_get FAILED!\n";
 		goto EXIT;
 	}
+	$cap_p     = pqos::pqos_cap_p_p_value($cap_p_p);
+	$cpuinfo_p = pqos::pqos_cpuinfo_p_p_value($cpuinfo_p_p);
+	pqos::delete_pqos_cap_p_p($cap_p_p);
+	pqos::delete_pqos_cpuinfo_p_p($cpuinfo_p_p);
 
 	$num_cores = pqos::cpuinfo_p_value($cpuinfo_p)->{num_cores};
 
@@ -449,6 +456,102 @@ EXIT:
 	return sprintf("%s: %s", __func__, 0 == $ret ? "PASS" : "FAILED!");
 }
 
+# Function to test CMT LLC occupancy monitoring
+# CMT is detected and LLC occupancy is polled using libpqos API
+sub test_cmt_llc {
+	my $ret              = -1;
+	my $monitor_p_p      = pqos::new_pqos_monitor_p_p();
+	my $llc_mon_data_p_a = pqos::new_pqos_mon_data_p_a($num_cores);
+	my $cpu_id_p         = pqos::new_uintp();
+
+	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+		pqos::pqos_mon_data_p_a_setitem($llc_mon_data_p_a, $cpu_id, undef);
+	}
+
+	if (
+		0 == pqos::pqos_cap_get_event(
+			$cap_p, $pqos::PQOS_MON_EVENT_L3_OCCUP, $monitor_p_p)
+		) {
+		my $llc_mon_data_p;
+
+		for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+			pqos::uintp_assign($cpu_id_p, $cpu_id);
+
+			$llc_mon_data_p = pqos::new_pqos_mon_data_p();
+			pqos::pqos_mon_data_p_a_setitem($llc_mon_data_p_a, $cpu_id,
+				$llc_mon_data_p);
+
+			if (
+				0 != pqos::pqos_mon_start(
+					1, $cpu_id_p, $pqos::PQOS_MON_EVENT_L3_OCCUP,
+					undef, $llc_mon_data_p)
+				) {
+				print __LINE__, " pqos::pqos_mon_start FAILED!\n";
+				goto EXIT;
+			}
+		}
+
+		if (0 != pqos::pqos_mon_poll($llc_mon_data_p_a, $num_cores)) {
+			print __LINE__, " pqos::pqos_mon_poll FAILED!\n";
+			goto EXIT;
+		}
+
+		print "CMT LLC Occupancy:\n";
+
+		for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+
+			(my $result, my $socket_id) =
+				pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+			if (0 != $result) {
+				print __LINE__, " pqos::pqos_cpu_get_socketid FAILED!\n";
+				goto EXIT;
+			}
+
+			$llc_mon_data_p =
+				pqos::pqos_mon_data_p_a_getitem($llc_mon_data_p_a, $cpu_id);
+
+			print "Socket: ", $socket_id, ", Core: ", $cpu_id,
+				", LLC[KB]: ",
+				pqos::pqos_mon_data_p_value($llc_mon_data_p)->{values}->{llc} /
+				1024,
+				"\n";
+
+			if (0 != pqos::pqos_mon_stop($llc_mon_data_p)) {
+				print __LINE__, " pqos::pqos_mon_stop FAILED!\n";
+				goto EXIT;
+			}
+		}
+	} else {
+		print "CMT LLC monitoring capability not detected...\n";
+	}
+
+	$ret = 0;
+
+EXIT:
+	if (defined $cpu_id_p) {
+		pqos::delete_uintp($cpu_id_p);
+	}
+
+	if (defined $monitor_p_p) {
+		pqos::delete_pqos_monitor_p_p($monitor_p_p);
+	}
+
+	if (defined $llc_mon_data_p_a) {
+		for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+			my $llc_mon_data_p =
+				pqos::pqos_mon_data_p_a_getitem($llc_mon_data_p_a, $cpu_id);
+			if (defined $llc_mon_data_p) {
+				pqos::delete_pqos_mon_data_p($llc_mon_data_p);
+			}
+		}
+
+		pqos::delete_pqos_mon_data_p_a($llc_mon_data_p_a);
+		$llc_mon_data_p_a = undef;
+	}
+
+	return sprintf("%s: %s", __func__, 0 == $ret ? "PASS" : "FAILED!");
+}
+
 # Function to reset CAT configuration - for testing purposes only
 sub reset_cfg {
 	my $l3ca = pqos::pqos_l3ca->new();
@@ -503,5 +606,6 @@ printf("%d %s\n", __LINE__, test_way_masks());
 print_cfg;
 
 printf("%d %s\n", __LINE__, reset_cfg());
+printf("%d %s\n", __LINE__, test_cmt_llc());
 
 shutdown_pqos();

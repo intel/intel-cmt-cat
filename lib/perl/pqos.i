@@ -155,12 +155,17 @@ exit:
 
 /* Generate wrappers around C arrays */
 %array_functions(unsigned int, uint_a);
+%array_functions(struct pqos_mon_data*, pqos_mon_data_p_a);
 
 /* Generate wrappers around C pointers */
 %pointer_functions(int, intp);
 %pointer_functions(unsigned int, uintp);
 %pointer_functions(struct pqos_cap_l3ca, l3ca_cap_p);
+%pointer_functions(struct pqos_mon_data, pqos_mon_data_p);
+%pointer_functions(struct pqos_monitor*, pqos_monitor_p_p);
+%pointer_functions(struct pqos_cap*, pqos_cap_p_p);
 %pointer_functions(struct pqos_cpuinfo, cpuinfo_p);
+%pointer_functions(struct pqos_cpuinfo*, pqos_cpuinfo_p_p);
 
 /* Helper functions for libpqos */
 struct pqos_cap_l3ca * get_cap_l3ca(void);
