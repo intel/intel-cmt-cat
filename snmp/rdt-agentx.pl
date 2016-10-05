@@ -38,13 +38,14 @@
 
 =head1 NAME
 
-    cat-agentx.pl - Net-SNMP AgentX subagent
+    rdt-agentx.pl - Net-SNMP AgentX subagent
 
 =head1 DESCRIPTION
 
     This is a Net-SNMP AgentX subagent written in Perl to demonstrate
     the use of the PQoS library Perl wrapper API. This subagent allows to
-    read and change CAT configuration via SNMP.
+    read and change CAT configuration and to monitor LLC occupancy using
+    CMT via SNMP.
 
     Supported OIDs:
     COS configuration OID: SNMPv2-SMI::enterprises.343.3.0.x.y.z
@@ -53,15 +54,27 @@
     z - field (cdp (RO): 1, ways_mask: 2, data_mask: 3, code_mask: 4)
 
     value:
-     - z = 1, current CDP setting, Read-Only
-     - z = 2, ways_mask configuration
-     - z = 3, data_mask configuration (if CDP == 1)
-     - z = 4, code_mask configuration (if CDP == 1)
+    - z = 1, current CDP setting, Read-Only
+    - z = 2, ways_mask configuration (if CDP == 0)
+    - z = 3, data_mask configuration (if CDP == 1)
+    - z = 4, code_mask configuration (if CDP == 1)
 
-    CPU-COS association OID: SNMPv2-SMI::enterprises.343.3.1.x.y
+    Core properties CAT/Monitoring OID: SNMPv2-SMI::enterprises.343.3.1.x.y.z
     x - socket id
     y - cpu id
-    value - COS ID
+    z - field (COS ID: 0, LLC occupancy(RO): 1)
+
+    value:
+    - z = 0, CAT, COS ID assigned
+    - z = 1, CMT, LLC occupancy, bytes, Read-Only
+
+    Monitoring Control OID: SNMPv2-SMI::enterprises.343.3.2.x.y
+    x - monitoring technology (CMT: 0)
+    y - field (CMT supported (RO): 0, CMT state: 1)
+
+    value:
+    - y = 0, CMT, supported, true(1)/false(0), Read-Only
+    - y = 1, CMT, current state, enable(1)/disable(0)
 
 =cut
 
@@ -76,11 +89,13 @@ use NetSNMP::OID;
 
 use pqos;
 
-my %data_cos        = ();
-my @data_cos_keys   = ();
-my %data_assoc      = ();
-my @data_assoc_keys = ();
-my $data_timestamp  = 0;
+my %data_cos            = ();
+my @data_cos_keys       = ();
+my %data_core_prop      = ();
+my @data_core_prop_keys = ();
+my %data_mon_ctrl       = ();
+my @data_mon_ctrl_keys  = ();
+my $data_timestamp      = 0;
 
 Readonly my $DATA_TIMEOUT => 1;
 
@@ -94,12 +109,21 @@ Readonly my $COS_WAYS_MASK_ID         => 1;
 Readonly my $COS_DATA_MASK_ID         => 2;
 Readonly my $COS_CODE_MASK_ID         => 3;
 
-Readonly::Scalar my $OID_NUM_PQOS_ASSOC => "$OID_NUM_EXPERIMENTAL.1";
+Readonly::Scalar my $OID_NUM_PQOS_CORE_PROP => "$OID_NUM_EXPERIMENTAL.1";
+Readonly my $CORE_COS_ID                    => 0;
+Readonly my $CORE_CMT_LLC_ID                => 1;
+
+Readonly::Scalar my $OID_NUM_PQOS_MON_CTRL => "$OID_NUM_EXPERIMENTAL.2";
+Readonly my $MON_CMT_ID                    => 0;
+Readonly my $MON_LLC_SUPP_ID               => 0;
+Readonly my $MON_LLC_STATE_ID              => 1;
 
 my $oid_pqos_cos;
-my $oid_pqos_assoc;
+my $oid_pqos_core_prop;
+my $oid_pqos_mon_ctrl;
 
 my $l3ca_cap_p;
+my $cap_p;
 my $cpuinfo_p;
 
 my $num_cos;
@@ -109,6 +133,9 @@ my $num_sockets;
 my $sockets_a;
 
 my $active = 1;
+
+my $llc_mon_supp;
+my $llc_mon_data_p_a;
 
 =item shutdown_agent()
 
@@ -120,6 +147,10 @@ sub shutdown_agent {
 	if (defined $sockets_a) {
 		pqos::delete_uint_a($sockets_a);
 		$sockets_a = undef;
+	}
+
+	if (defined $llc_mon_data_p_a) {
+		cmt_llc_stop();
 	}
 
 	print "Shutting down pqos lib...\n";
@@ -148,18 +179,36 @@ sub pqos_init {
 	}
 
 	$l3ca_cap_p = pqos::get_cap_l3ca();
-	if (0 == $l3ca_cap_p) {
-		print __LINE__, " pqos::get_cap_l3ca FAILED!\n";
-		return -1;
+	if (defined $l3ca_cap_p) {
+		print __LINE__, " L3CA capability detected...\n";
+		my $l3ca_cap = pqos::l3ca_cap_p_value($l3ca_cap_p);
+		$num_cos  = $l3ca_cap->{num_classes};
+		$num_ways = $l3ca_cap->{num_ways};
 	}
 
-	my $l3ca_cap = pqos::l3ca_cap_p_value($l3ca_cap_p);
-	$num_cos  = $l3ca_cap->{num_classes};
-	$num_ways = $l3ca_cap->{num_ways};
+	my $cap_p_p     = pqos::new_pqos_cap_p_p();
+	my $cpuinfo_p_p = pqos::new_pqos_cpuinfo_p_p();
+	if (0 != pqos::pqos_cap_get($cap_p_p, $cpuinfo_p_p)) {
+		print __LINE__, " pqos::pqos_cap_get FAILED!\n";
+		goto EXIT;
+	}
+	$cap_p     = pqos::pqos_cap_p_p_value($cap_p_p);
+	$cpuinfo_p = pqos::pqos_cpuinfo_p_p_value($cpuinfo_p_p);
+	pqos::delete_pqos_cap_p_p($cap_p_p);
+	pqos::delete_pqos_cpuinfo_p_p($cpuinfo_p_p);
 
-	$cpuinfo_p = pqos::get_cpuinfo();
-	if (0 == $cpuinfo_p) {
-		print __LINE__, " pqos::get_cpuinfo FAILED!\n";
+	my $monitor_p_p = pqos::new_pqos_monitor_p_p();
+	if (
+		0 == pqos::pqos_cap_get_event(
+			$cap_p, $pqos::PQOS_MON_EVENT_L3_OCCUP, $monitor_p_p)
+		) {
+		print __LINE__, " LLC monitoring capability detected...\n";
+		$llc_mon_supp = 1;
+	}
+	pqos::delete_pqos_monitor_p_p($monitor_p_p);
+
+	if (!defined $l3ca_cap_p && !defined $llc_mon_supp) {
+		print __LINE__, " No L3CA or LLC monitoring detected... FAILED!\n";
 		return -1;
 	}
 
@@ -176,21 +225,42 @@ sub pqos_init {
 
 =item data_update()
 
-Reads current CAT configuration
+Reads current CAT configuration and CMT state and values
 and updates local hashes with OIDs and values
 
 =cut
 
 sub data_update {
-	my $ret = 0;
 	my $now = time;
 	if (($now - $data_timestamp) < $DATA_TIMEOUT) {
 		return;
 	}
 	$data_timestamp = $now;
 
-	%data_assoc = ();
-	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+	data_update_core_prop();
+
+	data_update_cos();
+
+	data_update_mon_ctrl();
+
+	return;
+}
+
+=item data_update_core_prop()
+
+Handles $OID_NUM_PQOS_CORE_PROP updates
+
+=cut
+
+sub data_update_core_prop {
+	my $ret = 0;
+
+	%data_core_prop = ();
+	for (
+		my $cpu_id = 0;
+		defined $l3ca_cap_p && $cpu_id < $num_cores;
+		$cpu_id++
+		) {
 		($ret, my $cos_id) = pqos::pqos_alloc_assoc_get($cpu_id);
 		if (0 != $ret) {
 			last;
@@ -202,18 +272,60 @@ sub data_update {
 			last;
 		}
 
-		my $oid = NetSNMP::OID->new("$OID_NUM_PQOS_ASSOC.$socket_id.$cpu_id");
-		$data_assoc{$oid} = $cos_id;
+		my $oid = NetSNMP::OID->new(
+			"$OID_NUM_PQOS_CORE_PROP.$socket_id.$cpu_id.$CORE_COS_ID");
+		$data_core_prop{$oid} = $cos_id;
 	}
 
-	@data_assoc_keys =
-		sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)}
-		keys %data_assoc;
+	if (defined $llc_mon_data_p_a) {
+		if (0 != pqos::pqos_mon_poll($llc_mon_data_p_a, $num_cores)) {
+			print __LINE__, " pqos::pqos_mon_poll FAILED!\n";
+			return;
+		}
+	}
 
+	for (
+		my $cpu_id = 0;
+		defined $llc_mon_data_p_a && $cpu_id < $num_cores;
+		$cpu_id++
+		) {
+		($ret, my $socket_id) =
+			pqos::pqos_cpu_get_socketid($cpuinfo_p, $cpu_id);
+		if (0 != $ret) {
+			last;
+		}
+
+		my $llc_mon_data_p =
+			pqos::pqos_mon_data_p_a_getitem($llc_mon_data_p_a, $cpu_id);
+
+		if (defined $llc_mon_data_p) {
+			my $oid = NetSNMP::OID->new(
+				"$OID_NUM_PQOS_CORE_PROP.$socket_id.$cpu_id.$CORE_CMT_LLC_ID");
+			$data_core_prop{$oid} =
+				pqos::pqos_mon_data_p_value($llc_mon_data_p)->{values}->{llc};
+		}
+	}
+
+	@data_core_prop_keys =
+		sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)}
+		keys %data_core_prop;
+}
+
+=item data_update_cos()
+
+Handles $OID_NUM_PQOS_COS updates
+
+=cut
+
+sub data_update_cos {
 	%data_cos = ();
 	my $l3ca = pqos::pqos_l3ca->new();
 
-	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
+	for (
+		my $socket_idx = 0;
+		defined $l3ca_cap_p && $socket_idx < $num_sockets;
+		$socket_idx++
+		) {
 		my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
 		for (my $cos_id = 0; $cos_id < $num_cos; $cos_id++) {
 			if (0 != pqos::get_l3ca($l3ca, $socket_id, $cos_id)) {
@@ -238,8 +350,32 @@ sub data_update {
 
 	@data_cos_keys =
 		sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)} keys %data_cos;
+}
 
-	return;
+=item data_update_mon_ctrl()
+
+Handles $OID_NUM_PQOS_MON_CTRL updates
+
+=cut
+
+sub data_update_mon_ctrl {
+	%data_mon_ctrl = ();
+
+	my $oid =
+		NetSNMP::OID->new(
+		"$OID_NUM_PQOS_MON_CTRL.$MON_CMT_ID.$MON_LLC_SUPP_ID");
+	$data_mon_ctrl{$oid} = defined $llc_mon_supp ? 1 : 0;
+
+	if (defined $llc_mon_supp) {
+		$oid =
+			NetSNMP::OID->new(
+			"$OID_NUM_PQOS_MON_CTRL.$MON_CMT_ID.$MON_LLC_STATE_ID");
+		$data_mon_ctrl{$oid} = defined $llc_mon_data_p_a ? 1 : 0;
+	}
+
+	@data_mon_ctrl_keys =
+		sort {NetSNMP::OID->new($a) <=> NetSNMP::OID->new($b)}
+		keys %data_mon_ctrl;
 }
 
 =item is_whole_number()
@@ -315,34 +451,34 @@ sub is_contiguous {
 	return 1;
 }
 
-=item handle_assoc()
+=item handle_core_prop()
 
  Arguments:
     $request, $request_info: request related data
 
-Handle $OID_NUM_PQOS_ASSOC OID requests
+Handle $OID_NUM_PQOS_CORE_PROP OID requests
 
 =cut
 
-sub handle_assoc {
+sub handle_core_prop {
 	my ($request, $request_info) = @_;
 	my $oid  = $request->getOID();
 	my $mode = $request_info->getMode();
 
 	if (MODE_GET == $mode) {
-		if (exists $data_assoc{$oid}) {
-			$request->setValue(ASN_UNSIGNED, $data_assoc{$oid});
+		if (exists $data_core_prop{$oid}) {
+			$request->setValue(ASN_UNSIGNED, $data_core_prop{$oid});
 		}
 
 		return;
 	}
 
 	if (MODE_GETNEXT == $mode) {
-		foreach (@data_assoc_keys) {
+		foreach (@data_core_prop_keys) {
 			$_ = NetSNMP::OID->new($_);
 			if ($oid < $_) {
 				$request->setOID($_);
-				$request->setValue(ASN_UNSIGNED, $data_assoc{$_});
+				$request->setValue(ASN_UNSIGNED, $data_core_prop{$_});
 				last;
 			}
 		}
@@ -352,9 +488,19 @@ sub handle_assoc {
 
 	if (MODE_SET_RESERVE1 == $mode) {
 		my $value = $request->getValue();
-		if (!exists $data_assoc{$oid}) {
+		if (!exists $data_core_prop{$oid}) {
 			$request->setError($request_info, SNMP_ERR_NOSUCHNAME);
-		} elsif (!is_whole_number($value)) {
+			return;
+		}
+
+		my $field_id = ($oid->to_array())[$oid->length - 1];
+
+		if ($field_id != $CORE_COS_ID) {
+			$request->setError($request_info, SNMP_ERR_READONLY);
+			return;
+		}
+
+		if (!is_whole_number($value)) {
 			$request->setError($request_info, SNMP_ERR_WRONGTYPE);
 		} elsif ($value < 0 || $value >= $num_cos) {
 			$request->setError($request_info, SNMP_ERR_WRONGVALUE);
@@ -364,7 +510,7 @@ sub handle_assoc {
 	}
 
 	if (MODE_SET_ACTION == $mode) {
-		my $cpu_id = ($oid->to_array())[$oid->length - 1];
+		my $cpu_id = ($oid->to_array())[$oid->length - 2];
 		my $cos_id = $request->getValue();
 		if (0 != pqos::pqos_alloc_assoc_set($cpu_id, $cos_id)) {
 			$request->setError($request_info, SNMP_ERR_GENERR);
@@ -469,6 +615,176 @@ sub handle_cos {
 	return;
 }
 
+=item handle_mon_ctrl()
+
+ Arguments:
+    $request, $request_info: request related data
+
+Handle $OID_NUM_PQOS_MON_CTRL OID requests
+
+=cut
+
+sub handle_mon_ctrl {
+	my ($request, $request_info) = @_;
+	my $oid  = $request->getOID();
+	my $mode = $request_info->getMode();
+
+	if (MODE_GET == $mode) {
+		if (exists $data_mon_ctrl{$oid}) {
+			$request->setValue(ASN_UNSIGNED, $data_mon_ctrl{$oid});
+		}
+
+		return;
+	}
+
+	if (MODE_GETNEXT == $mode) {
+		foreach (@data_mon_ctrl_keys) {
+			$_ = NetSNMP::OID->new($_);
+			if ($oid < $_) {
+				$request->setOID($_);
+				$request->setValue(ASN_UNSIGNED, $data_mon_ctrl{$_});
+				last;
+			}
+		}
+
+		return;
+	}
+
+	if (MODE_SET_RESERVE1 == $mode) {
+		my $mon_tech_id = ($oid->to_array())[$oid->length - 2];
+		my $field_id    = ($oid->to_array())[$oid->length - 1];
+		my $value       = $request->getValue();
+		if (!exists $data_mon_ctrl{$oid}) {
+			$request->setError($request_info, SNMP_ERR_NOSUCHNAME);
+			return;
+		}
+
+		if ($mon_tech_id == $MON_CMT_ID && $field_id != $MON_LLC_STATE_ID) {
+			$request->setError($request_info, SNMP_ERR_READONLY);
+			return;
+		}
+
+		if (!is_whole_number($value)) {
+			$request->setError($request_info, SNMP_ERR_WRONGTYPE);
+		} elsif ($value < 0 || $value > 1) {
+			$request->setError($request_info, SNMP_ERR_WRONGVALUE);
+		}
+
+		return;
+	}
+
+	if (MODE_SET_ACTION == $mode) {
+		my $mon_tech_id = ($oid->to_array())[$oid->length - 2];
+		my $field_id    = ($oid->to_array())[$oid->length - 1];
+		my $value       = $request->getValue();
+
+		if ($mon_tech_id == $MON_CMT_ID && $field_id == $MON_LLC_STATE_ID) {
+			if ($value == 0) {
+				cmt_llc_stop();
+				if (defined $llc_mon_data_p_a) {
+					$request->setError($request_info, SNMP_ERR_GENERR);
+				}
+			} else {
+				cmt_llc_start();
+				if (!defined $llc_mon_data_p_a) {
+					$request->setError($request_info, SNMP_ERR_GENERR);
+				}
+			}
+		}
+	}
+
+	return;
+}
+
+=item cmt_llc_start()
+
+Subroutine to start LLC monitoring
+
+=cut
+
+sub cmt_llc_start {
+	if (defined $llc_mon_data_p_a) {
+		print __LINE__, " LLC monitoring started already!\n";
+		return;
+	}
+
+	print "Starting LLC monitoring...\n";
+
+	my $monitor_p_p = pqos::new_pqos_monitor_p_p();
+	if (
+		0 != pqos::pqos_cap_get_event(
+			$cap_p, $pqos::PQOS_MON_EVENT_L3_OCCUP, $monitor_p_p)
+		) {
+		print __LINE__, " LLC monitoring not supported!\n";
+		pqos::delete_pqos_monitor_p_p($monitor_p_p);
+		return;
+	}
+
+	$llc_mon_data_p_a = pqos::new_pqos_mon_data_p_a($num_cores);
+	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+		pqos::pqos_mon_data_p_a_setitem($llc_mon_data_p_a, $cpu_id, undef);
+	}
+
+	my $cpu_id_p = pqos::new_uintp();
+
+	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+		pqos::uintp_assign($cpu_id_p, $cpu_id);
+
+		my $llc_mon_data_p = pqos::new_pqos_mon_data_p();
+		if (
+			0 != pqos::pqos_mon_start(
+				1, $cpu_id_p, $pqos::PQOS_MON_EVENT_L3_OCCUP,
+				undef, $llc_mon_data_p)
+			) {
+			print __LINE__, " pqos::pqos_mon_start for core ", $cpu_id,
+				" FAILED!\n";
+			pqos::delete_pqos_mon_data_p($llc_mon_data_p);
+			cmt_llc_stop();
+			last;
+		}
+		pqos::pqos_mon_data_p_a_setitem($llc_mon_data_p_a, $cpu_id,
+			$llc_mon_data_p);
+	}
+
+	if (defined $cpu_id_p) {
+		pqos::delete_uintp($cpu_id_p);
+	}
+
+	if (defined $monitor_p_p) {
+		pqos::delete_pqos_monitor_p_p($monitor_p_p);
+	}
+}
+
+=item cmt_llc_stop()
+
+Subroutine to stop LLC monitoring
+
+=cut
+
+sub cmt_llc_stop {
+	if (!defined $llc_mon_data_p_a) {
+		print __LINE__, " LLC monitoring not started!\n";
+		return;
+	}
+
+	print "Stopping LLC monitoring...\n";
+
+	for (my $cpu_id = 0; $cpu_id < $num_cores; $cpu_id++) {
+		my $llc_mon_data_p =
+			pqos::pqos_mon_data_p_a_getitem($llc_mon_data_p_a, $cpu_id);
+		if (defined $llc_mon_data_p) {
+			if (0 != pqos::pqos_mon_stop($llc_mon_data_p)) {
+				print __LINE__, " pqos::pqos_mon_stop for core ", $cpu_id,
+					" FAILED!\n";
+			}
+			pqos::delete_pqos_mon_data_p($llc_mon_data_p);
+		}
+	}
+
+	pqos::delete_pqos_mon_data_p_a($llc_mon_data_p_a);
+	$llc_mon_data_p_a = undef;
+}
+
 =item handle_snmp_req()
 
  Arguments:
@@ -490,8 +806,10 @@ sub handle_snmp_req {
 			$data_timestamp = 0;
 		} elsif ($root_oid == $oid_pqos_cos) {
 			handle_cos($request, $request_info);
-		} elsif ($root_oid == $oid_pqos_assoc) {
-			handle_assoc($request, $request_info);
+		} elsif ($root_oid == $oid_pqos_core_prop) {
+			handle_core_prop($request, $request_info);
+		} elsif ($root_oid == $oid_pqos_mon_ctrl) {
+			handle_mon_ctrl($request, $request_info);
 		}
 	}
 
@@ -504,14 +822,19 @@ if (0 == pqos_init) {
 
 	my $agent = NetSNMP::agent->new('Name' => "pqos", 'AgentX' => 1);
 
-	$oid_pqos_cos   = NetSNMP::OID->new($OID_NUM_PQOS_COS);
-	$oid_pqos_assoc = NetSNMP::OID->new($OID_NUM_PQOS_ASSOC);
+	$oid_pqos_cos       = NetSNMP::OID->new($OID_NUM_PQOS_COS);
+	$oid_pqos_core_prop = NetSNMP::OID->new($OID_NUM_PQOS_CORE_PROP);
+	$oid_pqos_mon_ctrl  = NetSNMP::OID->new($OID_NUM_PQOS_MON_CTRL);
 
-	$agent->register("pqos_cos_cfg", $oid_pqos_cos, \&handle_snmp_req) or
-		die "registration of pqos_cos_cfg handler failed!\n";
+	$agent->register("pqos_cos", $oid_pqos_cos, \&handle_snmp_req) or
+		die "registration of oid_pqos_cos handler failed!\n";
 
-	$agent->register("pqos_cos_assoc", $oid_pqos_assoc, \&handle_snmp_req) or
-		die "registration of pqos_cos_assoc handler failed!\n";
+	$agent->register("pqos_core_prop", $oid_pqos_core_prop, \&handle_snmp_req)
+		or
+		die "registration of oid_pqos_core_prop handler failed!\n";
+
+	$agent->register("pqos_mon_ctrl", $oid_pqos_mon_ctrl, \&handle_snmp_req) or
+		die "registration of oid_pqos_mon_ctrl handler failed!\n";
 
 	while ($active) {
 		$agent->agent_check_and_process(1);

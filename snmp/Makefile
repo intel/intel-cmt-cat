@@ -1,5 +1,5 @@
 ###############################################################################
-# Makefile script for PQoS CAT SNMP Subagent Perl script
+# Makefile script for RDT SNMP Subagent Perl script
 #
 # @par
 # BSD LICENSE
@@ -53,7 +53,7 @@ PERLTIDY_STYLE=-bar -ce -pt=2 -sbt=2 -bt=2 -bbt=2 -et=4 -baao -nsfs -vtc=1 -ci=4
 #         a long line is broken, 4 spaces
 
 # List of Perl scripts to be processed, space separated list
-PERL_SCRIPTS_LIST=cat-agentx.pl
+PERL_SCRIPTS_LIST=rdt-agentx.pl
 
 # To check if required style is followed, perltidy is called and
 # formatted output is compared to actual file,
