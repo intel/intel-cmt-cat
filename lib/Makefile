@@ -85,7 +85,7 @@ NO_PID_API=y
 endif
 
 # PID API build option
-ifneq ($(NO_PID_API), n)
+ifneq ($(NO_PID_API), y)
 CFLAGS += -DPQOS_NO_PID_API
 OBJS := $(filter-out host_pidapi.o perf.o,$(OBJS))
 endif
