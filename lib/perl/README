@@ -21,7 +21,8 @@ Overview
 
 In this folder you'll find "pqos.i" a SWIG interface file
 that allow libpqos usage in scripting languages (e.g. in Perl).
-Currently full API is exported but only CAT related part was tested.
+Currently the full API is exported but only CAT and CMT (LLC occupancy) related
+parts were tested.
 
 
 Requirements, compilation and installation
