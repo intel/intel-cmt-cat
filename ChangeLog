@@ -1,4 +1,20 @@
 ======================================================================
+Not Released
+======================================================================
+
+Contributors (alphabetical order):
+	Aaron Hetherington <aaron.hetherington@intel.com>
+	Marcel Cornu <marcel.d.cornu@intel.com>
+	Tomasz Kantecki <tomasz.kantecki@intel.com>
+	Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+Summary:
+1. Library
+	- Perl interface extended to support L2 CAT and CMT
+2. SNMP
+	- Added CMT support to Net-SNMP sub-agent
+
+======================================================================
 Release  v0.1.5  2016-09-20
 ======================================================================
 
@@ -7,6 +23,7 @@ Contributors (alphabetical order):
 	Colin Ian King <colin.king@canonical.com>
 	Fan Du <fan.du@intel.com>
 	Marcel Cornu <marcel.d.cornu@intel.com>
+	Pablo Marcos Oltra <pablo.marcos.oltra@intel.com>
 	Tomasz Kantecki <tomasz.kantecki@intel.com>
 	Wojciech Andralojc <wojciechx.andralojc@intel.com>
 
