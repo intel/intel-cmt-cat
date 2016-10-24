@@ -37,6 +37,7 @@
 int pqos_alloc_assoc_get(const unsigned, unsigned *OUTPUT);
 unsigned *pqos_cpu_get_sockets(const struct pqos_cpuinfo *, unsigned *OUTPUT);
 int pqos_cpu_get_socketid(const struct pqos_cpuinfo *, const unsigned, unsigned *OUTPUT);
+int pqos_mon_assoc_get(const unsigned lcore, pqos_rmid_t *OUTPUT);
 
 %{
 /* Includes the header in the wrapper code */
