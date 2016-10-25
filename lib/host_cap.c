@@ -1037,7 +1037,7 @@ pqos_init(const struct pqos_config *config)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, max_core = 0;
-        int cat_init = 0, mon_init = 0, log_opt = 0;
+        int cat_init = 0, mon_init = 0;
 
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -1054,23 +1054,13 @@ pqos_init(const struct pqos_config *config)
                 _pqos_api_unlock();
                 return ret;
         }
-        /**
-         * Set log message verbosity
-         */
-        switch (config->verbose) {
-        case 0:
-                log_opt = LOG_OPT_DEFAULT;
-                break;
-        case 1:
-                log_opt = LOG_OPT_VERBOSE;
-                break;
-        default:
-                log_opt = LOG_OPT_SUPER_VERBOSE;
-        }
 
-        ret = log_init(config->fd_log, log_opt);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("log_init() error %d\n", ret);
+        ret = log_init(config->fd_log,
+		config->callback_log,
+		config->context_log,
+		config->verbose);
+        if (ret != LOG_RETVAL_OK) {
+                fprintf(stderr, "log_init() error\n");
                 goto init_error;
         }
 

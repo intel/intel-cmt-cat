@@ -54,7 +54,7 @@
  * Local data types
  * ---------------------------------------
  */
-
+#define AP_BUFFER_SIZE  256
 
 /**
  * ---------------------------------------
@@ -62,9 +62,14 @@
  * ---------------------------------------
  */
 
-static FILE *m_file = NULL;             /**< file that log writes to */
 static int m_opt = 0;                   /**< log options */
 static int m_fd = -1;			/**< log file descriptor */
+static void *m_context_log = NULL;      /**< log callback context */
+/**
+ *  log callback
+ */
+static void (*m_callback_log)(void *, const size_t, const char *);
+static int log_init_successful = 0;     /**< log init gatekeeper */
 /**
  * ---------------------------------------
  * Local functions
@@ -79,53 +84,97 @@ static int m_fd = -1;			/**< log file descriptor */
  */
 
 int
-log_init(int fd, int opt)
+log_init(int fd_log, void (*callback_log)(void *, const size_t, const char *),
+        void *context_log, int verbosity)
 {
-        int ret = LOG_RETVAL_OK;
+	/**
+         * Set log message verbosity
+         */
+        switch (verbosity) {
+        case LOG_VER_SILENT:
+                m_opt = LOG_OPT_SILENT;
+                log_init_successful = 1;
+		return LOG_RETVAL_OK;
+        case LOG_VER_DEFAULT:
+                m_opt = LOG_OPT_DEFAULT;
+                break;
+        case LOG_VER_VERBOSE:
+                m_opt = LOG_OPT_VERBOSE;
+                break;
+        case LOG_VER_SUPER_VERBOSE:
+                m_opt = LOG_OPT_SUPER_VERBOSE;
+                break;
+        default:
+                m_opt = LOG_OPT_SUPER_VERBOSE;
+                break;
+        }
 
-        if (m_file != NULL)
-                return LOG_RETVAL_ERROR;
-
-        m_file = fdopen(fd, "a");
-        if (m_file == NULL) {
-                fprintf(stderr, "%s: fdopen() failed: %s\n",
-                       __func__, strerror(errno));
+	if (fd_log < 0 && callback_log == NULL) {
+                fprintf(stderr, "%s: no LOG destination selected\n",
+                       __func__);
                 return LOG_RETVAL_ERROR;
         }
 
-        m_opt = opt;
-		m_fd = fd;
-        return ret;
+	m_fd = fd_log;
+	m_callback_log = callback_log;
+	m_context_log = context_log;
+	log_init_successful = 1;
+
+        return LOG_RETVAL_OK;
 }
 
 int log_fini(void)
 {
-        int ret = LOG_RETVAL_OK;
+	if (m_opt == LOG_OPT_SILENT) {
+                log_init_successful = 0;
+		return LOG_RETVAL_OK;
+        }
 
-        if (m_file == NULL)
-                return LOG_RETVAL_ERROR;
-
-        if ((m_fd != STDOUT_FILENO) && (m_fd != STDERR_FILENO))
-                close(m_fd);
-
-	m_file = NULL;
         m_opt = 0;
 	m_fd = -1;
+	m_callback_log = NULL;
+	m_context_log = NULL;
+	log_init_successful = 0;
 
-        return ret;
+        return LOG_RETVAL_OK;
 }
 
 void log_printf(int type, const char *str, ...)
 {
         va_list ap;
+	char ap_buffer[AP_BUFFER_SIZE];
+        int size;
 
-        if (m_file == NULL)
+	/* If log_init has not been successful then
+	 * log_printf should not work. */
+        ASSERT(log_init_successful == 1);
+	if (log_init_successful == 0)
+		return;
+
+	if (m_opt == LOG_OPT_SILENT)
+		return;
+
+        if ((m_opt & type) == 0)
                 return;
 
-        if ((m_opt&type) == 0)
+        ASSERT(str != NULL);
+        if (str == NULL)
                 return;
 
-        va_start(ap, str);
-        vfprintf(m_file, str, ap);
-        va_end(ap);
+	va_start(ap, str);
+	ap_buffer[AP_BUFFER_SIZE - 1] = '\0';
+	size = vsnprintf(ap_buffer, AP_BUFFER_SIZE - 1, str, ap);
+	va_end(ap);
+	ASSERT(size >= 0);
+	if (size < 0)
+		return;
+
+	if (m_callback_log != NULL)
+		m_callback_log(m_context_log, size, ap_buffer);
+
+	if (m_fd >= 0) {
+		if (write(m_fd, ap_buffer, size) < 0)
+			fprintf(stderr, "%s: printing to file failed\n",
+                                __func__);
+	}
 }

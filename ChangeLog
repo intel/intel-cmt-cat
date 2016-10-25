@@ -11,6 +11,7 @@ Contributors (alphabetical order):
 Summary:
 1. Library
 	- Perl interface extended to support L2 CAT and CMT
+        - Logging extended to allow callback and silence functionality
 2. SNMP
 	- Added CMT support to Net-SNMP sub-agent
 

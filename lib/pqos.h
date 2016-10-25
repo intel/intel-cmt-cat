@@ -89,10 +89,28 @@ enum pqos_cdp_config {
 
 /**
  * PQoS library configuration structure
+ *
+ * @param fd_log file descriptor to be used as library log
+ * @param callback_log pointer to an application callback function
+ *         void *       - An application context - it can point to a structure
+ *                        or an object that an application may find useful
+ *                        when receiving the callback
+ *         const size_t - the size of the log message
+ *         const char * - the log message
+ * @param context_log application specific data that is provided
+ *                    to the callback function. It can be NULL if application
+ *                    doesn't require it.
+ * @param verbose logging options
+ *         LOG_VER_SILENT         - no messages
+ *         LOG_VER_DEFAULT        - warning and error messages
+ *         LOG_VER_VERBOSE        - warning, error and info messages
+ *         LOG_VER_SUPER_VERBOSE  - warning, error, info and debug messages
  */
 struct pqos_config {
-        int fd_log;     /**< file descriptor for library log messages */
-        int verbose;    /**< if true increases library verbosity level */
+        int fd_log;
+        void (*callback_log)(void *, const size_t, const char *);
+        void *context_log;
+        int verbose;
 };
 
 /**
