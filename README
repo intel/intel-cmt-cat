@@ -149,23 +149,26 @@ As disappointing as it is, use of Linux perf for CMT & MBM and
 intel-cmt-cat for CAT & CDP is not allowed. This is because
 Linux perf overrides existing CAT configuration during its operations.
 
-There are only two options to choose from in order to make use of CAT:
+There are a number of options to choose from in order to make use of CAT:
 - intel-cmt-cat software for CMT/MBM/CAT and CDP (core granularity only)
+- use Linux resctrl for CAT and Linux perf for monitoring (kernel 4.10+)
 - patch kernel with an out of tree cgroup patch (CAT) and
   only use perf for monitoring (CMT kernels 4.1+, MBM kernels 4.6+)
 
 Table 2. Software interoperability matrix
-+---------------------------------------------------------------------------+
-|              | intel-cmt-cat | Intel(R) PCM |  Linux perf  | Linux cgroup |
-|--------------+---------------+--------------+--------------+--------------|
-|intel-cmt-cat | Yes(1)        | Yes(2)       | No           | No           |
-|--------------+---------------+--------------+--------------+--------------|
-|Intel(R) PCM  | Yes(2)        | Yes          | No           | No           |
-|--------------+---------------+--------------+--------------+--------------|
-|Linux perf    | No            | No           | Yes          | Yes(3)       |
-|--------------+---------------+--------------+--------------+--------------|
-|Linux cgroup  | No            | No           | Yes          | Yes(3)       |
-+---------------------------------------------------------------------------+
++-----------------------------------------------------------------------------------------------+
+|                  | intel-cmt-cat | Intel(R) PCM |  Linux perf  | Linux cgroup | Linux resctrl |
+|------------------+---------------+--------------+--------------+--------------|---------------|
+|intel-cmt-cat     | Yes(1)        | Yes(2)       | No           | No           | No            |
+|------------------+---------------+--------------+--------------+--------------|---------------|
+|Intel(R) PCM      | Yes(2)        | Yes          | No           | No           | No            |
+|------------------+---------------+--------------+--------------+--------------|---------------|
+|Linux perf        | No            | No           | Yes          | Yes(3)       | Yes           |
+|------------------+---------------+--------------+--------------+--------------|---------------|
+|Linux cgroup      | No            | No           | Yes          | Yes(3)       | No            |
+|------------------+---------------+--------------+--------------+--------------|---------------|
+|Linux resctrl (4) | No            | No           | Yes          | No           | Yes           |
++-----------------------------------------------------------------------------------------------+
 
 References:
 (1) pqos monitoring from intel-cmt-cat can detect other
@@ -182,22 +185,27 @@ References:
 (3) Linux cgroup is an out of tree patch
     https://github.com/vshiva1/linux/tree/catv15
 
+(4) A wiki for Intel resctrl is available at:
+    https://github.com/01org/intel-cmt-cat/wiki/resctrl
+
 Intel(R) PCM is available at
 https://software.intel.com/en-us/articles/intel-performance-counter-monitor
 
 
 Table 3. Intel(R) RDT software enabling status.
-+--------------------------------------------------------------+
-|              | Core  | Task  |  CMT  |  MBM  |  CAT  |  CDP  |
-|--------------+-------+-------+-------+-------+-------+-------|
-|intel-cmt-cat | Yes   | No    | Yes   | Yes   | Yes   | Yes   |
-|--------------+-------+-------+-------+-------+-------+-------|
-|Intel(R) PCM  | Yes   | No    | Yes   | Yes   | No    | No    |
-|--------------+-------+-------+-------+-------+-------+-------|
-|Linux perf    | Yes   | Yes   | Yes(1)| Yes(2)| No(3) | No(3) |
-|--------------+-------+-------+-------+-------+-------+-------|
-|Linux cgroup  | No    | Yes   | No    | No    | Yes(4)| No    |
-+--------------------------------------------------------------+
++------------------------------------------------------------------------------+
+|                  | Core  | Task  |  CMT  |  MBM  | L3 CAT | L3 CDP  | L2 CAT |
+|------------------+-------+-------+-------+-------+--------+---------+--------|
+|intel-cmt-cat     | Yes   | No    | Yes   | Yes   | Yes    | Yes     | Yes    |
+|------------------+-------+-------+-------+-------+--------+---------+--------|
+|Intel(R) PCM      | Yes   | No    | Yes   | Yes   | No     | No      | No     |
+|------------------+-------+-------+-------+-------+--------+---------+--------|
+|Linux perf        | Yes   | Yes   | Yes(1)| Yes(2)| No(3)  | No(3)   | No(3)  |
+|------------------+-------+-------+-------+-------+--------+---------+--------|
+|Linux cgroup      | No    | Yes   | No    | No    | Yes(4) | No      | No     |
+|------------------+-------+-------+-------+-------+--------+---------+--------|
+|Linux resctrl (5) | Yes   | Yes   | No    | No    | Yes    | Yes     | Yes    |
++---------------------------------------------------------------------+--------+
 
 Legend:
 Core  - use of technology with core granularity
@@ -209,6 +217,7 @@ References:
 (3) Linux perf corrupts CAT and CDP configuration even though
     it doesn't enable it
 (4) This is out of tree patch and relies on Linux perf enabling
+(5) Linux kernel version 4.10 and newer
 
 
 Legal Disclaimer
