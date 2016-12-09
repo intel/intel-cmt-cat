@@ -560,7 +560,10 @@ set_allocation_assoc(void)
                 ret = pqos_alloc_assoc_set(sel_cat_assoc_tab[i].core,
                                            sel_cat_assoc_tab[i].class_id);
                 ASSERT(ret == PQOS_RETVAL_OK);
-                if (ret != PQOS_RETVAL_OK) {
+                if (ret == PQOS_RETVAL_PARAM) {
+                        printf("Core number or class id is out of bounds!\n");
+                        return -1;
+                } else if (ret != PQOS_RETVAL_OK) {
                         printf("Setting allocation class of service "
                                "association failed!\n");
                         return -1;
