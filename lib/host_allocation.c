@@ -611,7 +611,7 @@ pqos_alloc_assoc_set(const unsigned lcore,
                 return ret;
         }
 
-        if (class_id > num_l3_cos && class_id > num_l2_cos) {
+        if (class_id >= num_l3_cos && class_id >= num_l2_cos) {
                 /* class_id is out of bounds */
                 _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
