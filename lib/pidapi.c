@@ -47,7 +47,7 @@
 #include <dirent.h>
 
 #include "perf.h"
-#include "host_pidapi.h"
+#include "pidapi.h"
 #include "pqos.h"
 #include "log.h"
 #include "types.h"

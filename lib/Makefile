@@ -87,7 +87,7 @@ endif
 # PID API build option
 ifneq ($(NO_PID_API), n)
 CFLAGS += -DPQOS_NO_PID_API
-OBJS := $(filter-out host_pidapi.o perf.o,$(OBJS))
+OBJS := $(filter-out pidapi.o perf.o,$(OBJS))
 endif
 
 HDR = pqos.h
@@ -173,10 +173,10 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,GLOBAL_INITIALISERS \
-	-f host_cap.c -f host_cap.h -f host_allocation.c -f perf.c -f perf.h \
-	-f host_allocation.h -f host_monitoring.c -f host_monitoring.h \
+	-f cap.c -f cap.h -f allocation.c -f perf.c -f perf.h \
+	-f allocation.h -f monitoring.c -f monitoring.h \
 	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
-	-f utils.c -f cpuinfo.h -f host_pidapi.c -f host_pidapi.h
+	-f utils.c -f cpuinfo.h -f pidapi.c -f pidapi.h
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE \
@@ -188,10 +188,10 @@ cppcheck:
 	$(CPPCHECK) \
 	--enable=warning,portability,performance,missingInclude \
 	--std=c99 --template=gcc \
-	host_cap.c host_cap.h host_allocation.c perf.c perf.h \
-	host_allocation.h host_monitoring.c host_monitoring.h \
+	cap.c cap.h allocation.c perf.c perf.h \
+	allocation.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \
-	utils.c cpuinfo.c cpuinfo.h host_pidapi.c host_pidapi.h
+	utils.c cpuinfo.c cpuinfo.h pidapi.c pidapi.h
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

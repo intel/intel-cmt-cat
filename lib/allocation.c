@@ -45,8 +45,8 @@
 
 #include "pqos.h"
 
-#include "host_cap.h"
-#include "host_allocation.h"
+#include "cap.h"
+#include "allocation.h"
 
 #include "machine.h"
 #include "types.h"

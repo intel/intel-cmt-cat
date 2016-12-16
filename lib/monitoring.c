@@ -44,9 +44,9 @@
 #include <dirent.h>
 
 #include "pqos.h"
-#include "host_pidapi.h"
-#include "host_cap.h"
-#include "host_monitoring.h"
+#include "pidapi.h"
+#include "cap.h"
+#include "monitoring.h"
 
 #include "machine.h"
 #include "types.h"
@@ -146,9 +146,9 @@
  * ---------------------------------------
  */
 static const struct pqos_cap *m_cap = NULL; /**< capabilities structure
-                                               passed from host_cap */
+                                               passed from cap */
 static const struct pqos_cpuinfo *m_cpu = NULL; /**< cpu topology passed
-                                                   from host_cap */
+                                                   from cap */
 static unsigned m_rmid_max = 0;         /**< max RMID */
 /**
  * ---------------------------------------

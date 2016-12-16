@@ -73,7 +73,7 @@ For instructions on package installation please see "Installation Steps"
 section.
 
 In case of compilation error such as:
-"host_pidapi.c:46:30: fatal error: linux/perf_event.h: No such file or directory compilation terminated."
+"pidapi.c:46:30: fatal error: linux/perf_event.h: No such file or directory compilation terminated."
 
 Please compile the code without PID monitoring support:
 $ make NO_PID_API=y

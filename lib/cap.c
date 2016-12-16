@@ -61,9 +61,9 @@
 
 #include "pqos.h"
 
-#include "host_cap.h"
-#include "host_allocation.h"
-#include "host_monitoring.h"
+#include "cap.h"
+#include "allocation.h"
+#include "monitoring.h"
 
 #include "cpuinfo.h"
 #include "machine.h"

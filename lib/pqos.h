@@ -36,7 +36,7 @@
  * @brief Platform QoS API and data structure definition
  *
  * API from this file is implemented by the following:
- * host_cap.c, host_allocation.c, host_monitoring.c and utils.c
+ * cap.c, allocation.c, monitoring.c and utils.c
  */
 
 #ifndef __PQOS_H__
