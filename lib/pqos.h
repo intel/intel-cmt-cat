@@ -683,6 +683,18 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
                    unsigned *count);
 
 /**
+ * @brief Retrieves core information from cpu info structure for \a lcore
+ *
+ * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] lcore logical core ID to retrieve information for
+ *
+ * @return Pointer to core information structure
+ * @retval NULL on error
+ */
+const struct pqos_coreinfo *
+pqos_cpu_get_core_info(const struct pqos_cpuinfo *cpu, unsigned lcore);
+
+ /**
  * @brief Retrieves one core id from cpu info structure for \a socket
  *
  * @param [in] cpu CPU information structure from cpu info module
