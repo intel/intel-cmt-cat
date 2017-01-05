@@ -457,7 +457,7 @@ static const char help_printf_long[] =
         "  -e CLASSDEF, --alloc-class=CLASSDEF\n"
         "          define allocation classes.\n"
         "          CLASSDEF format is 'TYPE:ID=DEFINITION;'.\n"
-        "          To specify sockets 'TYPE[@SOCK_LIST]:ID=DEFINITION;'.\n"
+        "          To specify specific resources 'TYPE[@RESOURCE_ID]:ID=DEFINITION;'.\n"
         "          Example: 'llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00',\n"
 	"                   'llc:0d=0xfff;llc:0c=0xfff00;l2:2=0x3f;l2@2:1=0xf'.\n"
         "  -a CLASS2CORE, --alloc-assoc=CLASS2CORE\n"

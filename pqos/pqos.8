@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH PQOS 8 "September 20, 2016"
+.TH PQOS 8 "January 5, 2017"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -60,13 +60,17 @@ load commands from selected configuration FILE
 .B \-e CLASSDEF, \-\-alloc\-class=CLASSDEF
 define the allocation classes on all CPU sockets. CLASSDEF format is "TYPE:ID=DEFINITION;...".
 .br
-define classes for selected CPU sockets. CLASSDEF format is "TYPE[@SOCK_LIST]:ID=DEFINITION;...".
+define classes for selected CPU resources. CLASSDEF format is "TYPE[@RESOURCE_ID]:ID=DEFINITION;...".
 .br
-For CAT, TYPE is "llc", ID is a CLOS number and DEFINITION is a bitmask.
+For CAT, TYPE is "llc" for the last level cache (aka l3) and "l2" for level 2 cache, ID is a CLOS number and DEFINITION is a bitmask.
 .br
-.B Note: When CDP is on, ID can be postfixed with 'D' for data or 'C' for code.
+RESOURCE_ID is a unique number that can represent a socket or l2/l3 cache identifier. The RESOURCE_ID for each logical CPU can be found using "pqos -s"
+.br
+.B Note: When CDP is on, ID can be postfixed with 'D' for data or 'C' for code. CDP is not available for l2.
 .br
 For example: "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00;l2:2=0x3f;l2@2:1=0xf", or for CDP: "\-e llc:0d=0xfff;llc:0c=0xfff00."
+.br
+Note: "\-e l2:2=0x3f" means that COS2 for all L2 cache clusters is changed to 0x3f. "\-e l2@2:1=0xf" means that COS1 for L2 cache cluster 2 is changed to 0xf.
 .TP
 .B \-a CLASS2CORE, \-\-alloc\-assoc=CLASS2CORE
 associate allocation classes with cores. CLASS2CORE format is "TYPE:ID=CORE_LIST;...".
