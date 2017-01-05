@@ -713,22 +713,32 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 }
         }
 
-        for (i = 0; (i < sock_count) && (cap_l2ca != NULL); i++) {
-                struct pqos_l2ca tab[PQOS_MAX_L2CA_COS];
-                unsigned num = 0;
-                unsigned n = 0;
+        if (cap_l2ca != NULL) {
+                unsigned *l2id, count = 0;
 
-                ret = pqos_l2ca_get(sockets[i], PQOS_MAX_L2CA_COS,
-                                    &num, tab);
-                if (ret != PQOS_RETVAL_OK)
-                        continue;
+                l2id = pqos_cpu_get_l2ids(cpu_info, &count);
+                if (l2id == NULL) {
+                        printf("Error retrieving information for L2\n");
+                        return;
+                }
 
-                printf("L2CA COS definitions for Socket %u:\n",
-                       sockets[i]);
-                for (n = 0; n < num; n++)
-                        printf("    L2CA COS%u => MASK 0x%llx\n",
-                               tab[n].class_id,
-                               (unsigned long long)tab[n].ways_mask);
+                for (i = 0; i < count; i++) {
+                        struct pqos_l2ca tab[PQOS_MAX_L2CA_COS];
+                        unsigned num = 0, n = 0;
+
+                        ret = pqos_l2ca_get(l2id[i], PQOS_MAX_L2CA_COS,
+                                            &num, tab);
+                        if (ret != PQOS_RETVAL_OK)
+                                continue;
+
+                        printf("L2CA COS definitions for L2ID %u:\n",
+                               l2id[i]);
+                        for (n = 0; n < num; n++)
+                                printf("    L2CA COS%u => MASK 0x%llx\n",
+                                       tab[n].class_id,
+                                       (unsigned long long)tab[n].ways_mask);
+                }
+                free(l2id);
         }
 
         for (i = 0; i < sock_count; i++) {
