@@ -177,6 +177,23 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
         return cores;
 }
 
+const struct pqos_coreinfo *
+pqos_cpu_get_core_info(const struct pqos_cpuinfo *cpu, unsigned lcore)
+{
+        unsigned i;
+
+        ASSERT(cpu != NULL);
+
+        if (cpu == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].lcore == lcore)
+                        return &cpu->cores[i];
+
+        return NULL;
+}
+
 int
 pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
                       const unsigned socket,

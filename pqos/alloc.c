@@ -744,13 +744,24 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                        sockets[i]);
                 for (n = 0; n < lcount; n++) {
                         unsigned class_id = 0;
+                        unsigned l2id, l3id;
                         pqos_rmid_t rmid = 0;
                         int ret = PQOS_RETVAL_OK;
                         const int is_mon = (cap_mon != NULL);
                         const int is_alloc = (cap_l3ca != NULL) ||
                                 (cap_l2ca != NULL);
+                        const struct pqos_coreinfo *core_info = NULL;
 
-			if (is_alloc)
+                        core_info = pqos_cpu_get_core_info(cpu_info, lcores[n]);
+                        if (core_info == NULL) {
+                                printf("Error retrieving information "
+                                       "for core %u!\n", lcores[n]);
+                                return;
+                        }
+                        l2id = core_info->l2_id;
+                        l3id = core_info->l3_id;
+
+                        if (is_alloc)
 				ret = pqos_alloc_assoc_get(lcores[n],
                                                            &class_id);
 			if (is_mon && ret == PQOS_RETVAL_OK)
@@ -762,14 +773,24 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         }
 
                         if (is_alloc && is_mon)
-                                printf("    Core %u => COS%u, RMID%u\n",
-                                       lcores[n], class_id, (unsigned)rmid);
-                        if (is_alloc && !is_mon)
-                                printf("    Core %u => COS%u\n", lcores[n],
-                                       class_id);
+                                printf("    Core %u, L2ID %u, L3ID %u "
+                                       "=> COS%u, RMID%u\n", lcores[n],
+                                       l2id, l3id, class_id, (unsigned)rmid);
+                        if (is_alloc && !is_mon) {
+                                if (cap_l3ca == NULL) {
+                                        printf("    Core %u, L2ID %u "
+                                               "=> COS%u\n", lcores[n], l2id,
+                                               class_id);
+                                } else {
+                                        printf("    Core %u, L2ID %u, L3ID %u "
+                                               "=> COS%u\n", lcores[n], l2id,
+                                               l3id, class_id);
+                                }
+                        }
                         if (!is_alloc && is_mon)
-                                printf("    Core %u => RMID%u\n", lcores[n],
-                                       (unsigned)rmid);
+                                printf("    Core %u, L2ID %u, L3ID %u "
+                                       "=> RMID%u\n", lcores[n], l2id,
+                                       l3id, (unsigned)rmid);
                 }
                 free(lcores);
         }
