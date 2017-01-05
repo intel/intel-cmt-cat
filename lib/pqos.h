@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -601,23 +601,23 @@ struct pqos_l2ca {
 };
 
 /**
- * @brief Sets classes of service defined by \a ca on \a socket
+ * @brief Sets classes of service defined by \a ca on \a l2id
  *
- * @param [in] socket CPU socket id
+ * @param [in] l2id unique L2 cache identifier
  * @param [in] num_cos number of classes of service at \a ca
  * @param [in] ca table with class of service definitions
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int pqos_l2ca_set(const unsigned socket,
+int pqos_l2ca_set(const unsigned l2id,
                   const unsigned num_cos,
                   const struct pqos_l2ca *ca);
 
 /**
- * @brief Reads classes of service from \a socket
+ * @brief Reads classes of service from \a l2id
  *
- * @param [in] socket CPU socket id
+ * @param [in] l2id unique L2 cache identifier
  * @param [in] max_num_ca maximum number of classes of service
  *             that can be accommodated at \a ca
  * @param [out] num_ca number of classes of service read into \a ca
@@ -626,7 +626,7 @@ int pqos_l2ca_set(const unsigned socket,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int pqos_l2ca_get(const unsigned socket,
+int pqos_l2ca_get(const unsigned l2id,
                   const unsigned max_num_ca,
                   unsigned *num_ca,
                   struct pqos_l2ca *ca);
@@ -651,12 +651,25 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
                      unsigned *count);
 
 /**
+ * @brief Retrieves L2 id's from cpu info structure
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [out] count place to store actual number of L2 id's returned
+ *
+ * @return Allocated array of size \a count populated with L2 id's
+ * @retval NULL on error
+ */
+unsigned *
+pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu,
+                   unsigned *count);
+
+/**
  * @brief Creates list of cores belonging to given L3 cluster
  *
  * Function allocates memory for the core list that needs to be freed by
  * the caller.
  *
- * @param [in] cpu CPU topology
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @param [in] l3_id L3 cluster ID
  * @param [out] count place to put number of cores found
  *
@@ -670,7 +683,7 @@ pqos_cpu_get_cores_l3id(const struct pqos_cpuinfo *cpu, const unsigned l3_id,
 /**
  * @brief Retrieves core id's from cpu info structure for \a socket
  *
- * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @param [in] socket CPU socket id to enumerate
  * @param [out] count place to store actual number of core id's returned
  *
@@ -685,7 +698,7 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
 /**
  * @brief Retrieves core information from cpu info structure for \a lcore
  *
- * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @param [in] lcore logical core ID to retrieve information for
  *
  * @return Pointer to core information structure
@@ -697,7 +710,7 @@ pqos_cpu_get_core_info(const struct pqos_cpuinfo *cpu, unsigned lcore);
  /**
  * @brief Retrieves one core id from cpu info structure for \a socket
  *
- * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @param [in] socket CPU socket id to enumerate
  * @param [out] lcore place to store returned core id
  *
@@ -710,9 +723,24 @@ pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
                       unsigned *lcore);
 
 /**
+ * @brief Retrieves one core id from cpu info structure for \a l2id
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [in] l2id unique L2 cache identifier
+ * @param [out] lcore place to store returned core id
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_cpu_get_one_by_l2id(const struct pqos_cpuinfo *cpu,
+                         const unsigned l2id,
+                         unsigned *lcore);
+
+/**
  * @brief Verifies if \a core is a valid logical core id
  *
- * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @param [in] lcore logical core id
  *
  * @return Operation status
@@ -725,7 +753,7 @@ pqos_cpu_check_core(const struct pqos_cpuinfo *cpu,
 /**
  * @brief Retrieves socket id for given logical core id
  *
- * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @param [in] lcore logical core id
  * @param [out] socket location to store socket id at
  *
@@ -740,7 +768,7 @@ pqos_cpu_get_socketid(const struct pqos_cpuinfo *cpu,
 /**
  * @brief Retrieves monitoring cluster id for given logical core id
  *
- * @param [in] cpu CPU information structure from cpu info module
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @param [in] lcore logical core id
  * @param [out] cluster location to store cluster id at
  *

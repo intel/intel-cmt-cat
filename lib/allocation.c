@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -383,7 +383,7 @@ pqos_l3ca_get(const unsigned socket,
 }
 
 int
-pqos_l2ca_set(const unsigned socket,
+pqos_l2ca_set(const unsigned l2id,
               const unsigned num_ca,
               const struct pqos_l2ca *ca)
 {
@@ -433,11 +433,11 @@ pqos_l2ca_set(const unsigned socket,
         }
 
         /**
-         * Pick one core from the socket and
-         * perform MSR writes to COS registers on the socket.
+         * Pick one core from the L2 cluster and
+         * perform MSR writes to COS registers on the cluster.
          */
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
+        ret = pqos_cpu_get_one_by_l2id(m_cpu, l2id, &core);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
@@ -460,7 +460,7 @@ pqos_l2ca_set(const unsigned socket,
 }
 
 int
-pqos_l2ca_get(const unsigned socket,
+pqos_l2ca_get(const unsigned l2id,
               const unsigned max_num_ca,
               unsigned *num_ca,
               struct pqos_l2ca *ca)
@@ -496,7 +496,7 @@ pqos_l2ca_get(const unsigned socket,
         }
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
+        ret = pqos_cpu_get_one_by_l2id(m_cpu, l2id, &core);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
@@ -972,6 +972,8 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 {
         unsigned *sockets = NULL;
         unsigned sockets_num = 0;
+        unsigned *l2ids = NULL;
+        unsigned l2id_num = 0;
         const struct pqos_capability *cat_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
@@ -1040,18 +1042,19 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         if (sockets == NULL || sockets_num == 0)
                 goto pqos_alloc_reset_exit;
 
-        /**
-         * Change COS definition on all sockets
-         * so that each COS allows for access to all cache ways
-         */
-        for (j = 0; j < sockets_num; j++) {
-                unsigned core = 0;
+        if (l3_cap != NULL) {
+                /**
+                 * Change L3 COS definition on all sockets
+                 * so that each COS allows for access to all cache ways
+                 */
 
-                ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
-                if (ret != PQOS_RETVAL_OK)
-                        goto pqos_alloc_reset_exit;
+                for (j = 0; j < sockets_num; j++) {
+                        unsigned core = 0;
 
-                if (l3_cap != NULL) {
+                        ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
+
                         const uint64_t ways_mask =
                                 (1ULL << l3_cap->num_ways) - 1ULL;
 
@@ -1060,10 +1063,25 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
                 }
+        }
 
-                if (l2_cap != NULL) {
+        if (l2_cap != NULL) {
+                /**
+                 * Get number & list of L2ids in the system
+                 * Then go through all L2 ids and reset L2 classes on them
+                 */
+                l2ids = pqos_cpu_get_l2ids(m_cpu, &l2id_num);
+                if (l2ids == NULL || l2id_num == 0)
+                        goto pqos_alloc_reset_exit;
+
+                for (j = 0; j < l2id_num; j++) {
                         const uint64_t ways_mask =
                                 (1ULL << l2_cap->num_ways) - 1ULL;
+                        unsigned core = 0;
+
+                        ret = pqos_cpu_get_one_by_l2id(m_cpu, l2ids[j], &core);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
 
                         ret = cat_cos_reset(PQOS_MSR_L2CA_MASK_START,
                                             l2_cap->num_classes, core,
@@ -1115,6 +1133,8 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
  pqos_alloc_reset_exit:
         if (sockets != NULL)
                 free(sockets);
+        if (l2ids != NULL)
+                free(l2ids);
         _pqos_api_unlock();
         return ret;
 }

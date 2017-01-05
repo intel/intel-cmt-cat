@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -87,6 +87,44 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
 
         *count = scount;
         return sockets;
+}
+
+unsigned *
+pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu,
+                   unsigned *count)
+{
+        unsigned l2count = 0, i = 0;
+        unsigned *l2ids = NULL;
+
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+        if (cpu == NULL || count == NULL)
+                return NULL;
+
+        l2ids = (unsigned *) malloc(sizeof(l2ids[0]) * cpu->num_cores);
+        if (l2ids == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++) {
+                unsigned j = 0;
+
+                /**
+                 * Check if this L2 id is already on the list
+                 */
+                for (j = 0; j < l2count && l2count > 0; j++)
+                        if (cpu->cores[i].l2_id == l2ids[j])
+                                break;
+
+                if (j >= l2count || l2count == 0) {
+                        /**
+                         * This l2id wasn't reported before
+                         */
+                        l2ids[l2count++] = cpu->cores[i].l2_id;
+                }
+        }
+
+        *count = l2count;
+        return l2ids;
 }
 
 /**
@@ -209,6 +247,28 @@ pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
 
         for (i = 0; i < cpu->num_cores; i++)
                 if (cpu->cores[i].socket == socket) {
+                        *lcore = cpu->cores[i].lcore;
+                        return PQOS_RETVAL_OK;
+                }
+
+        return PQOS_RETVAL_ERROR;
+}
+
+int
+pqos_cpu_get_one_by_l2id(const struct pqos_cpuinfo *cpu,
+                         const unsigned l2id,
+                         unsigned *lcore)
+{
+        unsigned i = 0;
+
+        ASSERT(cpu != NULL);
+        ASSERT(lcore != NULL);
+
+        if (cpu == NULL || lcore == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].l2_id == l2id) {
                         *lcore = cpu->cores[i].lcore;
                         return PQOS_RETVAL_OK;
                 }
