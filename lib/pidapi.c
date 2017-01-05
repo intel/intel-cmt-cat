@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2015 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -45,6 +45,7 @@
 #include <sys/syscall.h>
 #include <linux/perf_event.h>
 #include <dirent.h>
+#include <limits.h>
 
 #include "perf.h"
 #include "pidapi.h"
@@ -76,12 +77,12 @@ static struct pid_supported_event {
           .event = PQOS_MON_EVENT_L3_OCCUP,
           .supported = 0,
           .scale = 1 },
-        { .name = "local_bw",
+        { .name = "local_bytes",
           .desc = "Local Memory B/W",
           .event = PQOS_MON_EVENT_LMEM_BW,
           .supported = 0,
           .scale = 1 },
-        { .name = "total_bw",
+        { .name = "total_bytes",
           .desc = "Total Memory B/W",
           .event = PQOS_MON_EVENT_TMEM_BW,
           .supported = 0,
@@ -777,6 +778,23 @@ pqos_pid_stop(struct pqos_mon_data *group)
         return ret;
 }
 
+/**
+ * @brief Gives the difference between two values with regard to the possible
+ *        overrun
+ *
+ * @param old_value previous value
+ * @param new_value current value
+ * @return difference between the two values
+ */
+static uint64_t
+get_delta(const uint64_t old_value, const uint64_t new_value)
+{
+        if (old_value > new_value)
+                return (UINT64_MAX - old_value) + new_value;
+        else
+                return new_value - old_value;
+}
+
 int
 pqos_pid_poll(struct pqos_mon_data *group)
 {
@@ -798,24 +816,35 @@ pqos_pid_poll(struct pqos_mon_data *group)
         }
         if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
             (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = group->values.mbm_local;
+
                 ret = read_pqos_counters(group,
-                                         &group->values.mbm_local_delta,
+                                         &group->values.mbm_local,
                                          group->fds_mbl);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
+                group->values.mbm_local_delta =
+                        get_delta(old_value, group->values.mbm_local);
         }
         if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
             (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = group->values.mbm_total;
+
                 ret = read_pqos_counters(group,
-                                         &group->values.mbm_total_delta,
+                                         &group->values.mbm_total,
                                          group->fds_mbt);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
+                group->values.mbm_total_delta =
+                        get_delta(old_value, group->values.mbm_total);
         }
         if (group->event & PQOS_MON_EVENT_RMEM_BW) {
-                group->values.mbm_remote_delta =
-                        group->values.mbm_total_delta -
-                        group->values.mbm_local_delta;
+                group->values.mbm_remote_delta = 0;
+                if (group->values.mbm_total_delta >
+                    group->values.mbm_local_delta)
+                        group->values.mbm_remote_delta =
+                                group->values.mbm_total_delta -
+                                group->values.mbm_local_delta;
         }
         if (group->event & PQOS_PERF_EVENT_IPC) {
                 ret = read_ipc_counters(group);
@@ -1011,7 +1040,7 @@ pqos_pid_init(const struct pqos_cap *cap)
 	fd = fopen("/sys/devices/intel_cqm/type", "r");
 	if (fd == NULL) {
                 LOG_INFO("PID monitoring not supported. "
-                         "Kernel version 4.1 or higher required.\n");
+                         "Kernel version 4.6 or higher required.\n");
                 return PQOS_RETVAL_RESOURCE;
 	}
         if (fgets(evt, sizeof(evt), fd) == NULL) {
