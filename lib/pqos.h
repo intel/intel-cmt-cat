@@ -491,6 +491,10 @@ int pqos_alloc_assoc_get(const unsigned lcore,
  *
  * While searching for available COS take technologies it is intended to use
  * with into account.
+ * Note on \a technology and \a core_array selection:
+ * - if L2 CAT technology is requested then cores need to belong to
+ *   one L2 cluster (same L2ID)
+ * - if only L3 CAT is requested then cores need to belong to one socket
  *
  * @param [in] technology bit mask selecting technologies
  *             (1 << enum pqos_cap_type)

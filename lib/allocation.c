@@ -732,21 +732,24 @@ get_hi_cos_id(const unsigned technology,
 }
 
 /**
- * @brief Gets unused COS on \a socket
+ * @brief Gets unused COS on a socket or L2 cluster
  *
  * The lowest acceptable COS is 1, as 0 is a default one
  *
- * @param [in] socket Socket ID to search for unused COS on
+ * @param [in] id socket or L2 cache ID to search for unused COS on
+ * @param [in] technology selection of allocation technologies
  * @param [in] hi_class_id highest acceptable COS id
  * @param [out] class_id unused COS
  *
  * @return Operation status
  */
 static int
-get_unused_cos(const unsigned socket,
+get_unused_cos(const unsigned id,
+               const unsigned technology,
                const unsigned hi_class_id,
                unsigned *class_id)
 {
+        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         unsigned used_classes[hi_class_id + 1];
         unsigned i, cos;
         int ret;
@@ -756,10 +759,18 @@ get_unused_cos(const unsigned socket,
 
         memset(used_classes, 0, sizeof(used_classes));
 
-        /* Create a list of COS used on socket */
+        /* Create a list of COS used on socket/L2 cluster */
         for (i = 0; i < m_cpu->num_cores; i++) {
-                if (m_cpu->cores[i].socket != socket)
-                        continue;
+
+                if (l2_req) {
+                        /* L2 requested so looking in L2 cluster scope */
+                        if (m_cpu->cores[i].l2_id != id)
+                                continue;
+                } else {
+                        /* L2 not requested so looking at socket scope */
+                        if (m_cpu->cores[i].socket != id)
+                                continue;
+                }
 
                 ret = cos_assoc_get(m_cpu->cores[i].lcore, &cos);
                 if (ret != PQOS_RETVAL_OK)
@@ -788,14 +799,16 @@ int pqos_alloc_assign(const unsigned technology,
                       const unsigned core_num,
                       unsigned *class_id)
 {
-        unsigned socket = 0, i, hi_cos_id;
+        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+        unsigned i, hi_cos_id;
+        unsigned socket = 0, l2id = 0;
         int ret;
 
         ASSERT(core_num > 0 && core_array != NULL && class_id != NULL &&
-                technology != 0);
+               technology != 0);
 
         if (core_num == 0 || core_array == NULL || class_id == NULL ||
-                        technology == 0)
+            technology == 0)
                 return PQOS_RETVAL_PARAM;
 
         _pqos_api_lock();
@@ -804,34 +817,56 @@ int pqos_alloc_assign(const unsigned technology,
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
 
+        /* Check if core belongs to one resource entity */
         for (i = 0; i < core_num; i++) {
-                const unsigned prev_socket = socket;
+                const struct pqos_coreinfo *pi = NULL;
 
-                ret = pqos_cpu_get_socketid(m_cpu, core_array[i], &socket);
-                if (ret != PQOS_RETVAL_OK)
-                        goto pqos_alloc_assign_exit;
-
-                if (i != 0 && socket != prev_socket) {
+                pi = pqos_cpu_get_core_info(m_cpu, core_array[i]);
+                if (pi == NULL) {
                         ret = PQOS_RETVAL_PARAM;
                         goto pqos_alloc_assign_exit;
                 }
+
+                if (l2_req) {
+                        /* L2 is requested
+                         * The smallest managable entity is L2 cluster
+                         */
+                        if (i != 0 && l2id != pi->l2_id) {
+                                ret = PQOS_RETVAL_PARAM;
+                                goto pqos_alloc_assign_exit;
+                        }
+                        l2id = pi->l2_id;
+                } else {
+                        if (i != 0 && socket != pi->socket) {
+                                ret = PQOS_RETVAL_PARAM;
+                                goto pqos_alloc_assign_exit;
+                        }
+                        socket = pi->socket;
+                }
         }
 
+        /* obtain highest class id for all requested technologies */
         ret = get_hi_cos_id(technology, &hi_cos_id);
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
 
-        ret = get_unused_cos(socket, hi_cos_id, class_id);
+        /* find an unused class from highest down */
+        if (!l2_req)
+                ret = get_unused_cos(socket, technology, hi_cos_id, class_id);
+        else
+                ret = get_unused_cos(l2id, technology, hi_cos_id, class_id);
+
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
 
+        /* assign cores to the unused class */
         for (i = 0; i < core_num; i++) {
                 ret = cos_assoc_set(core_array[i], *class_id);
                 if (ret != PQOS_RETVAL_OK)
                         goto pqos_alloc_assign_exit;
         }
 
-pqos_alloc_assign_exit:
+ pqos_alloc_assign_exit:
         _pqos_api_unlock();
         return ret;
 }
