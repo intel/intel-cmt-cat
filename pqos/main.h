@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,6 +52,16 @@ extern "C" {
 #ifndef DIM
 #define DIM(x) (sizeof(x)/sizeof(x[0]))
 #endif
+#ifndef MAX
+/**
+ * Macro to return the maximum of two numbers
+ */
+#define MAX(a, b) ({ \
+        typeof(a) _a = (a); \
+        typeof(b) _b = (b); \
+        _a > _b ? _a : _b; \
+})
+#endif /* !MAX */
 
 #ifdef DEBUG
 #define ASSERT assert
@@ -62,6 +72,7 @@ extern "C" {
 #define UNUSED_ARG(_x) ((void)(_x))
 
 #define PQOS_MAX_SOCKETS      8
+#define PQOS_MAX_L2IDS        32
 #define PQOS_MAX_SOCKET_CORES 64
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
 

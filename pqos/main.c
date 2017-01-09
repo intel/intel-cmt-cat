@@ -748,7 +748,7 @@ int main(int argc, char **argv)
                 }
         }
 
-        switch (alloc_apply(cap_l3ca, cap_l2ca, sock_count, sockets)) {
+        switch (alloc_apply(cap_l3ca, cap_l2ca, p_cpu)) {
         case 0: /* nothing to apply */
                 break;
         case 1: /* new allocation config applied and all is good */

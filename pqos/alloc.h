@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -83,8 +83,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
  *
  * @param [in] cap_l3ca CAT capability structures
  * @param [in] cap_l2ca CAT capability structures
- * @param [in] sock_count number of detected CPU sockets
- * @param [in] sockets arrays with detected CPU socket id's
+ * @param [in] cpu cpu information structure
  *
  * @return Operation status
  * @retval 0 there was no new config to apply
@@ -93,7 +92,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
  */
 int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_capability *cap_l2ca,
-                unsigned sock_count, unsigned *sockets);
+                const struct pqos_cpuinfo *cpu);
 
 
 #ifdef __cplusplus
