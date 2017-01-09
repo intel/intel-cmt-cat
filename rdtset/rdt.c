@@ -1,7 +1,7 @@
 /*
  *   BSD LICENSE
  *
- *   Copyright(c) 2016 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2016-2017 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -61,7 +61,7 @@ static void
 rdt_ca_print(FILE *stream, const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
-			NULL == ca.u.generic_ptr)
+            NULL == ca.u.generic_ptr)
 		return;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
@@ -86,7 +86,7 @@ static const char *
 rdt_ca_get_type_str(const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
-			NULL == ca.u.generic_ptr)
+            NULL == ca.u.generic_ptr)
 		return "ERROR!";
 
 	return PQOS_CAP_TYPE_L2CA == ca.type ? "L2" : "L3";
@@ -105,7 +105,7 @@ static int
 rdt_ca_is_valid(const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
-			NULL == ca.u.generic_ptr)
+            NULL == ca.u.generic_ptr)
 		return 0;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
@@ -113,8 +113,8 @@ rdt_ca_is_valid(const struct rdt_ca ca)
 
 	return NULL != ca.u.l3 &&
 		((1 == ca.u.l3->cdp && 0 != ca.u.l3->u.s.code_mask &&
-		0 != ca.u.l3->u.s.data_mask) ||
-		(0 == ca.u.l3->cdp && 0 != ca.u.l3->u.ways_mask));
+                  0 != ca.u.l3->u.s.data_mask) ||
+                 (0 == ca.u.l3->cdp && 0 != ca.u.l3->u.ways_mask));
 }
 
 /**
@@ -199,7 +199,7 @@ xstr_to_uint(const char *xstr, uint64_t *value)
 	errno = 0;
 	*value = strtoul(xstr_start, &xstr_end, 16);
 	if (errno != 0 || xstr_end == NULL || xstr_end == xstr_start ||
-			*value == 0)
+            *value == 0)
 		return -EINVAL;
 
 	return xstr_end - xstr;
@@ -220,7 +220,7 @@ xstr_to_uint(const char *xstr, uint64_t *value)
  */
 static int
 parse_mask_set(const char *cbm, const int force_dual_mask, uint64_t *mask,
-		uint64_t *cmask)
+               uint64_t *cmask)
 {
 	int offset = 0;
 	const char *cbm_start = cbm;
@@ -251,7 +251,7 @@ parse_mask_set(const char *cbm, const int force_dual_mask, uint64_t *mask,
 
 	return cbm_start + offset - cbm;
 
-err:
+ err:
 	return -EINVAL;
 }
 
@@ -282,7 +282,7 @@ rdt_ca_str_to_cbm(const char *param, struct rdt_ca ca)
 	int ret, force_dual_mask;
 
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
-			NULL == ca.u.generic_ptr || NULL == param)
+            NULL == ca.u.generic_ptr || NULL == param)
 		return -EINVAL;
 
 	force_dual_mask = (NULL != strchr(param, ','));
@@ -312,14 +312,14 @@ rdt_ca_str_to_cbm(const char *param, struct rdt_ca ca)
 }
 
 /*
-* @brief Simplifies feature string
-*
-* @param [in] feature feature string
-*
-* @return simplified feature as char
-* @retval char representation of feature
-* @retval '?' on error
-*/
+ * @brief Simplifies feature string
+ *
+ * @param [in] feature feature string
+ *
+ * @return simplified feature as char
+ * @retval char representation of feature
+ * @retval '?' on error
+ */
 static char
 simplify_feature_str(const char *feature)
 {
@@ -415,7 +415,7 @@ parse_rdt(char *rdtstr)
 				return -EINVAL;
 
 			ret = str_to_cpuset(param, strlen(param),
-				&g_cfg.config[idx].cpumask);
+                                            &g_cfg.config[idx].cpumask);
 			if (ret <= 0)
 				return -EINVAL;
 
@@ -432,7 +432,7 @@ parse_rdt(char *rdtstr)
 	}
 
 	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0 ||
-			(!rdt_ca_is_valid(l2ca) && !rdt_ca_is_valid(l3ca)))
+            (!rdt_ca_is_valid(l2ca) && !rdt_ca_is_valid(l3ca)))
 		return -EINVAL;
 
 	g_cfg.config_count++;
@@ -466,7 +466,7 @@ check_cpus_overlapping(void)
 #endif
 #ifdef __FreeBSD__
 			overlapping = CPU_OVERLAP(&g_cfg.config[i].cpumask,
-				&g_cfg.config[j].cpumask);
+                                                  &g_cfg.config[j].cpumask);
 #endif
 			if (1 == overlapping) {
 				fprintf(stderr, "CAT: Requested CPUs sets are "
@@ -582,14 +582,14 @@ check_supported(void)
 
 	for (i = 0; i < g_cfg.config_count; i++) {
 		if (rdt_ca_is_valid(wrap_l3ca(&g_cfg.config[i].l3)) &&
-				NULL == m_cap_l3ca) {
+                    NULL == m_cap_l3ca) {
 			fprintf(stderr, "CAT: L3CA requested but not supported "
 				"by system!\n");
 			return -ENOTSUP;
 		}
 
 		if (rdt_ca_is_valid(wrap_l2ca(&g_cfg.config[i].l2)) &&
-				NULL == m_cap_l2ca) {
+                    NULL == m_cap_l2ca) {
 			fprintf(stderr, "CAT: L2CA requested but not supported "
 				"by system!\n");
 			return -ENOTSUP;
@@ -653,7 +653,7 @@ static uint64_t
 rdt_ca_get_cumulative_cbm(const struct rdt_ca ca)
 {
 	if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
-			NULL == ca.u.generic_ptr || 0 == rdt_ca_is_valid(ca))
+            NULL == ca.u.generic_ptr || 0 == rdt_ca_is_valid(ca))
 		return UINT64_MAX;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
@@ -716,7 +716,7 @@ check_cbm_len_and_contention(const enum pqos_cap_type type)
 		/* Just a note */
 		if ((mask & contention_cbm) != 0) {
 			printf("CAT: One or more of requested %s CBMs "
-				"(", rdt_ca_get_type_str(ca));
+                               "(", rdt_ca_get_type_str(ca));
 			rdt_ca_print(stdout, ca);
 			printf(") overlap contention mask.\n");
 		}
@@ -804,7 +804,7 @@ cat_validate(void)
  */
 static int
 get_socket_cores(const cpu_set_t *cores, const unsigned socket_id,
-		unsigned *core_num, unsigned core_array[CPU_SETSIZE])
+                 unsigned *core_num, unsigned core_array[CPU_SETSIZE])
 {
 	unsigned i;
 
@@ -821,7 +821,47 @@ get_socket_cores(const cpu_set_t *cores, const unsigned socket_id,
 
 	for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
 		if (m_cpu->cores[i].socket != socket_id ||
-				0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
+                    0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
+			continue;
+
+		core_array[(*core_num)++] = m_cpu->cores[i].lcore;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Gets cores from \a cores set which belong to \a l2_id
+ *
+ * @param [in] cores set of cores
+ * @param [in] l2_id L2 cluster ID to get cores from
+ * @param [out] core_num number of cores in \a core_array
+ * @param [out] core_array array of cores
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+get_l2id_cores(const cpu_set_t *cores, const unsigned l2_id,
+               unsigned *core_num, unsigned core_array[CPU_SETSIZE])
+{
+	unsigned i;
+
+	if (cores == NULL || core_num == NULL || core_array == NULL)
+		return -EINVAL;
+
+	if (m_cpu == NULL)
+		return -EFAULT;
+
+	if (CPU_COUNT(cores) == 0) {
+		*core_num = 0;
+		return 0;
+	}
+
+	for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
+		if (m_cpu->cores[i].l2_id != l2_id ||
+                    0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
 			continue;
 
 		core_array[(*core_num)++] = m_cpu->cores[i].lcore;
@@ -914,7 +954,7 @@ cat_get_default_cos(struct pqos_l2ca *l2_def, struct pqos_l3ca *l3_def)
  *
  * @param [in] l2ca L2 classes configuration
  * @param [in] l3ca L3 classes configuration
- * @param [in] socket_id socket to configure COS on
+ * @param [in] core_id core belonging to a socket/L2 cluster to configure COS on
  * @param [in] cos_id id of COS to be configured
  *
  * @return status
@@ -923,10 +963,11 @@ cat_get_default_cos(struct pqos_l2ca *l2_def, struct pqos_l3ca *l3_def)
  */
 static int
 cat_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
-		const unsigned socket_id, const unsigned cos_id)
+                  const unsigned core_id, const unsigned cos_id)
 {
 	struct pqos_l2ca l2_defs;
 	struct pqos_l3ca l3_defs;
+        const struct pqos_coreinfo *ci = NULL;
 	int ret;
 
 	if (NULL == l2ca || NULL == l3ca)
@@ -935,13 +976,22 @@ cat_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 	if (NULL == m_cap_l2ca && NULL == m_cap_l3ca)
 		return -EFAULT;
 
-	/* Get default COS values */
+
+        ci = pqos_cpu_get_core_info(m_cpu, core_id);
+        if (ci == NULL) {
+                fprintf(stderr, "Error getting information about core %u!\n",
+                        core_id);
+                return -EINVAL;
+        }
+
+        /* Get default COS values */
 	ret = cat_get_default_cos(&l2_defs, &l3_defs);
 	if (ret != 0)
 		return ret;
 
 	/* Configure COS */
 	if (m_cap_l3ca != NULL && m_cap_l3ca->u.l3ca->num_classes > cos_id) {
+                const unsigned socket_id = ci->socket;
 		struct pqos_l3ca ca = *l3ca;
 
 		/* if COS is not configured, set it to default */
@@ -953,13 +1003,15 @@ cat_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 
 		ret = pqos_l3ca_set(socket_id, 1, &ca);
 		if (ret != PQOS_RETVAL_OK) {
-			fprintf(stderr, "Error configuring L3 COS#%u on socket "
-				"%u!\n", cos_id, socket_id);
+			fprintf(stderr,
+                                "Error setting L3 CAT COS#%u on socket %u!\n",
+                                cos_id, socket_id);
 			return -EFAULT;
 		}
 	}
 
 	if (m_cap_l2ca != NULL  && m_cap_l2ca->u.l2ca->num_classes > cos_id) {
+                const unsigned l2_id = ci->l2_id;
 		struct pqos_l2ca ca = *l2ca;
 
 		/* if COS is not configured, set it to default */
@@ -969,10 +1021,10 @@ cat_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 		/* set proper COS id */
 		ca.class_id = cos_id;
 
-		ret = pqos_l2ca_set(socket_id, 1, &ca);
-		if (ret != PQOS_RETVAL_OK) {
-			fprintf(stderr, "Error configuring L2 COS#%u on socket "
-				"%u!\n", cos_id, socket_id);
+		if (pqos_l2ca_set(l2_id, 1, &ca) != PQOS_RETVAL_OK) {
+			fprintf(stderr,
+                                "Error setting L2 CAT COS#%u on L2ID %u!\n",
+                                cos_id, l2_id);
 			return -EFAULT;
 		}
 	}
@@ -981,80 +1033,117 @@ cat_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 }
 
 /**
- * @brief Sets L2/L3 configuration.
+ * @brief Sets L3 configuration.
  *
- * pqos_l*ca.class_id values are ignored, available/unused COS are used.
- *
- * @param [in] num number of configuration entries in \a l2ca , \a l3ca
- *             and \a cores
+ * @param [in] technology configured RDT allocation technologies
+ *             (programmed on socket basis)
+ * @param [in] cores cores configuration table
  * @param [in] l2ca L2 CAT configuration table
  * @param [in] l3ca L3 CAT configuration table
- * @param [in] cores cores configuration table
  *
- * @return status
+ * @return Operation status
  * @retval 0 on success
  * @retval negative on error (-errno)
  */
 static int
-cat_set(const unsigned num, struct pqos_l2ca l2ca[const],
-		struct pqos_l3ca l3ca[const], cpu_set_t cores[const])
+cat_set_l3(const unsigned technology, const cpu_set_t *cores,
+           const struct pqos_l2ca *pl2ca, const struct pqos_l3ca *pl3ca)
 {
-	int i, ret;
+	int ret;
+        unsigned j;
 
-	if (num == 0 || NULL == l2ca || NULL == l3ca || NULL == cores)
-		return -EINVAL;
+        for (j = 0; j < RDT_MAX_SOCKETS; j++) {
+                unsigned core_array[CPU_SETSIZE] = {0};
+                unsigned core_num, cos_id;
 
-	for (i = 0; (unsigned)i < num; i++) {
-		unsigned j, technology = 0;
+                /* Get cores on socket j */
+                ret = get_socket_cores(cores, j, &core_num, core_array);
+                if (ret != 0)
+                        return ret;
 
-		if (rdt_ca_is_valid(wrap_l2ca(&l2ca[i])))
-			technology |= (1 << PQOS_CAP_TYPE_L2CA);
+                if (core_num == 0)
+                        continue;
 
-		if (rdt_ca_is_valid(wrap_l3ca(&l3ca[i])))
-			technology |= (1 << PQOS_CAP_TYPE_L3CA);
+                /* Assign COS to those cores */
+                ret = pqos_alloc_assign(technology, core_array, core_num,
+                                        &cos_id);
+                switch (ret) {
+                case PQOS_RETVAL_OK:
+                        break;
+                case PQOS_RETVAL_RESOURCE:
+                        fprintf(stderr,
+                                "No free COS available on socket %u.\n", j);
+                        return -EBUSY;
+                default:
+                        fprintf(stderr,
+                                "Unable to assign COS on socket %u!\n", j);
+                        return -EFAULT;
+                }
 
-		for (j = 0; j < RDT_MAX_SOCKETS; j++) {
-			unsigned core_array[CPU_SETSIZE] = {0};
-			unsigned core_num, cos_id;
+                /* Configure COS on socket j */
+                ret = cat_configure_cos(pl2ca, pl3ca, core_array[0], cos_id);
+                if (ret != 0)
+                        return ret;
+        }
 
-			/* Get cores on socket j */
-			ret = get_socket_cores(&cores[i], j, &core_num,
-				core_array);
-			if (ret != 0)
-				goto err;
+        return 0;
+}
 
-			if (core_num == 0)
-				continue;
+/**
+ * @brief Sets L2 configuration (and L3 if available).
+ *
+ * @param [in] technology configured RDT allocation technologies
+ *             (programmed on L2 ID basis)
+ * @param [in] cores cores configuration table
+ * @param [in] l2ca L2 CAT configuration table
+ * @param [in] l3ca L3 CAT configuration table
+ *
+ * @return Operation status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+cat_set_l2(const unsigned technology, const cpu_set_t *cores,
+           const struct pqos_l2ca *pl2ca, const struct pqos_l3ca *pl3ca)
+{
+	int ret;
+        unsigned j;
 
-			/* Assign COS to those cores */
-			ret = pqos_alloc_assign(technology, core_array,
-				core_num, &cos_id);
-			if (ret != PQOS_RETVAL_OK) {
-				if (ret == PQOS_RETVAL_RESOURCE)
-					fprintf(stderr, "No free COS available "
-						"on socket %u.\n", j);
-				else
-					fprintf(stderr, "Unable to assign COS "
-						"on socket %u!\n", j);
+        for (j = 0; j < RDT_MAX_L2IDS; j++) {
+                unsigned core_array[CPU_SETSIZE] = {0};
+                unsigned core_num, cos_id;
 
-				goto err;
-			}
+                /* Get cores on L2 id j */
+                ret = get_l2id_cores(cores, j, &core_num, core_array);
+                if (ret != 0)
+                        return ret;
 
-			/* Configure COS on socket j */
-			ret = cat_configure_cos(&l2ca[i], &l3ca[i], j, cos_id);
-			if (ret != 0)
-				goto err;
-		}
-	}
+                if (core_num == 0)
+                        continue;
 
-	return 0;
+                /* Assign COS to those cores */
+                ret = pqos_alloc_assign(technology, core_array, core_num,
+                                        &cos_id);
+                switch (ret) {
+                case PQOS_RETVAL_OK:
+                        break;
+                case PQOS_RETVAL_RESOURCE:
+                        fprintf(stderr,
+                                "No free COS available on L2ID %u.\n", j);
+                        return -EBUSY;
+                default:
+                        fprintf(stderr,
+                                "Unable to assign COS on L2ID %u!\n", j);
+                        return -EFAULT;
+                }
 
-err:
-	printf("Reverting CAT configuration...\n");
-	for (; i >= 0; i--)
-		(void)alloc_release(&cores[i]);
+                /* Configure COS on L2ID j */
+                ret = cat_configure_cos(pl2ca, pl3ca, core_array[0], cos_id);
+                if (ret != 0)
+                        return ret;
+        }
 
-	return ret;
+        return 0;
 }
 
 int
@@ -1069,8 +1158,8 @@ cat_configure(void)
 	/* Validate cmd line configuration */
 	ret = cat_validate();
 	if (ret != 0) {
-		fprintf(stderr, "CAT: Requested CAT configuration is not valid!"
-			"\n");
+		fprintf(stderr,
+                        "CAT: Requested CAT configuration is not valid!\n");
 		return ret;
 	}
 
@@ -1080,11 +1169,34 @@ cat_configure(void)
 		cpu[i] = g_cfg.config[i].cpumask;
 	}
 
-	ret = cat_set(g_cfg.config_count, l2ca, l3ca, cpu);
-	if (ret != 0)
-		fprintf(stderr, "CAT: Failed to configure CAT!\n");
+	for (i = 0; i < g_cfg.config_count; i++) {
+		unsigned technology = 0;
 
-	return ret;
+		if (rdt_ca_is_valid(wrap_l2ca(&l2ca[i])))
+			technology |= (1 << PQOS_CAP_TYPE_L2CA);
+
+		if (rdt_ca_is_valid(wrap_l3ca(&l3ca[i])))
+			technology |= (1 << PQOS_CAP_TYPE_L3CA);
+
+                if (!(technology & (1 << PQOS_CAP_TYPE_L2CA)))
+                        ret = cat_set_l3(technology, &cpu[i], &l2ca[i],
+                                         &l3ca[i]);
+                else
+                        ret = cat_set_l2(technology, &cpu[i], &l2ca[i],
+                                         &l3ca[i]);
+
+                if (ret != 0) {
+                        int j = (int) i;
+
+                        fprintf(stderr, "CAT: Failed to configure CAT!\n");
+                        printf("Reverting CAT configuration...\n");
+                        for (; j >= 0; j--)
+                                (void) alloc_release(&cpu[j]);
+                        return ret;
+                }
+        }
+
+        return 0;
 }
 
 int
@@ -1158,7 +1270,7 @@ signal_handler(int signum)
 {
 	if (signum == SIGINT || signum == SIGTERM) {
 		printf("\nRDTSET: Signal %d received, preparing to exit...\n",
-			signum);
+                       signum);
 
 		cat_exit();
 
@@ -1227,7 +1339,7 @@ cat_init(void)
 
 	return 0;
 
-err:
+ err:
 	/* deallocate all the resources */
 	cat_fini();
 	return ret;
@@ -1260,7 +1372,7 @@ print_cmd_line_rdt_config(void)
 			if (!rdt_ca_is_valid(ca_array[j]))
 				continue;
 			printf("%s Allocation: CPUs: %s ",
-				rdt_ca_get_type_str(ca_array[j]), cpustr);
+                               rdt_ca_get_type_str(ca_array[j]), cpustr);
 			rdt_ca_print(stdout, ca_array[j]);
 			printf("\n");
 		}

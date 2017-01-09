@@ -1,7 +1,7 @@
 /*
  *   BSD LICENSE
  *
- *   Copyright(c) 2016 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2016-2017 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -45,6 +45,7 @@ extern "C" {
 #endif
 
 #define RDT_MAX_SOCKETS 8
+#define RDT_MAX_L2IDS   32
 
 #ifndef MIN
 /**
