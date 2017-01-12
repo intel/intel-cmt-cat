@@ -766,6 +766,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         if (core_info == NULL) {
                                 printf("Error retrieving information "
                                        "for core %u!\n", lcores[n]);
+                                free(lcores);
                                 return;
                         }
                         l2id = core_info->l2_id;
