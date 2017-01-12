@@ -36,6 +36,7 @@
 %include typemaps.i
 int pqos_alloc_assoc_get(const unsigned, unsigned *OUTPUT);
 unsigned *pqos_cpu_get_sockets(const struct pqos_cpuinfo *, unsigned *OUTPUT);
+unsigned *pqos_cpu_get_l2ids(const struct pqos_cpuinfo *, unsigned *OUTPUT);
 int pqos_cpu_get_socketid(const struct pqos_cpuinfo *, const unsigned, unsigned *OUTPUT);
 int pqos_mon_assoc_get(const unsigned lcore, pqos_rmid_t *OUTPUT);
 
@@ -124,13 +125,13 @@ const struct pqos_cpuinfo * get_cpuinfo(void)
 /**
  * @brief Helper function to get single L2 COS configuration
  *
- * @param [in] socket - CPU socket id
+ * @param [in] l2_id - L2 cache id
  * @param [in] cos_id - id of L2CA class of service to read
  * @param [out] l2ca - read class of service
  *
  * @return Operation status (0 on success)
  */
-int get_l2ca(struct pqos_l2ca *l2ca, unsigned int socket, unsigned int cos_id)
+int get_l2ca(struct pqos_l2ca *l2ca, unsigned int l2_id, unsigned int cos_id)
 {
 	unsigned num = 0;
 	unsigned i = 0;
@@ -149,7 +150,7 @@ int get_l2ca(struct pqos_l2ca *l2ca, unsigned int socket, unsigned int cos_id)
 
 	memset(temp_ca, 0, sizeof(*temp_ca) * max_cos_num);
 
-	if (pqos_l2ca_get(socket, max_cos_num, &num, temp_ca) !=
+	if (pqos_l2ca_get(l2_id, max_cos_num, &num, temp_ca) !=
 			PQOS_RETVAL_OK) {
 		printf("PQOS: Error retrieving L2 COS!\n");
 		goto exit;
