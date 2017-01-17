@@ -202,10 +202,12 @@ set_l3_cos(const unsigned class_id, const uint64_t mask,
                 if (ca.cdp)
                         printf("SOCKET %u L3CA COS%u => DATA 0x%lx,CODE "
                                "0x%lx\n", sock_ids[i], ca.class_id,
-                               ca.u.s.data_mask, ca.u.s.code_mask);
+                               (long) ca.u.s.data_mask,
+                               (long) ca.u.s.code_mask);
                 else
                         printf("SOCKET %u L3CA COS%u => MASK 0x%lx\n",
-                               sock_ids[i], ca.class_id, ca.u.ways_mask);
+                               sock_ids[i], ca.class_id,
+                               (long) ca.u.ways_mask);
                 set++;
         }
         sel_cat_alloc_mod += set;
@@ -279,19 +281,15 @@ set_allocation_cos(char *str, unsigned *res_ids,
                    const enum sel_cat_type type,
                    const struct pqos_cpuinfo *cpu)
 {
-        char *sp, *p = NULL;
+        char *p = NULL;
         uint64_t mask = 0;
         unsigned class_id = 0, n = res_num;
         unsigned *ids = res_ids;
         int ret = -1, update_scope = CAT_UPDATE_SCOPE_BOTH;
 
-        sp = strdup(str);
-        if (sp == NULL)
-                sp = str;
-
         p = strchr(str, '=');
         if (p == NULL) {
-                printf("Invalid class of service definition: %s\n", sp);
+                printf("Invalid class of service definition: %s\n", str);
                 return ret;
         }
         *p = '\0';
@@ -300,10 +298,9 @@ set_allocation_cos(char *str, unsigned *res_ids,
         mask = strtouint64(p+1);
 
         if (type == L2CA && update_scope != CAT_UPDATE_SCOPE_BOTH) {
-                parse_error(sp, "CDP not supported for L2 CAT!\n");
+                parse_error(str, "CDP not supported for L2 CAT!\n");
                 return ret;
         }
-        free(sp);
 
         /* if L2 CAT selected, set L2 classes */
         if (type == L2CA) {
@@ -347,19 +344,18 @@ static int
 set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
 {
         int ret = -1;
-        char *s, *q, *p = NULL;
-        char *saveptr = NULL;
+        char *q = NULL, *p = NULL;
+        char *s = NULL, *saveptr = NULL;
         enum sel_cat_type type;
         const unsigned max_res_sz = MAX(PQOS_MAX_SOCKETS, PQOS_MAX_L2IDS);
         unsigned res_ids[max_res_sz], *sp = NULL, i, n = 1;
 
-        s = strdup(str);
-        if (s == NULL)
-                s = str;
+        selfn_strdup(&s, str);
 
         p = strchr(str, ':');
         if (p == NULL) {
                 printf("Unrecognized allocation format: %s\n", str);
+                free(s);
                 return ret;
         }
         /**
@@ -376,12 +372,14 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                 n = strlisttotab(++q, ids, DIM(ids));
                 if (n == 0) {
                         printf("No socket ID specified: %s\n", s);
+                        free(s);
                         return ret;
                 }
                 /* check for invalid resource ID */
                 for (i = 0; i < n; i++) {
                         if (ids[i] >= max_res_sz) {
                                 printf("Resource ID out of range: %s\n", s);
+                                free(s);
                                 return ret;
                         }
                         res_ids[i] = (unsigned)ids[i];
@@ -398,6 +396,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                 type = L2CA;
 	else {
 		printf("Unrecognized allocation type: %s\n", s);
+                free(s);
                 return ret;
         }
         /**
