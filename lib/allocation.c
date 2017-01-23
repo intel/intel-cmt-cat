@@ -520,6 +520,21 @@ pqos_l2ca_get(const unsigned l2id,
         return ret;
 }
 
+int pqos_mba_set(const unsigned socket,
+                 const unsigned num_cos,
+                 const struct pqos_mba *requested,
+                 struct pqos_mba *actual)
+{
+        return PQOS_RETVAL_OK;
+}
+
+int pqos_mba_get(const unsigned socket,
+                 const unsigned max_num_cos,
+                 unsigned *num_cos,
+                 struct pqos_mba *mba_tab)
+{
+        return PQOS_RETVAL_OK;
+}
 /**
  * @brief Gets COS associated to \a lcore
  *

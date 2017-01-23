@@ -146,11 +146,13 @@ int pqos_fini(void);
  * - monitoring capability
  * - L3 cache allocation capability
  * - L2 cache allocation capability
+ * - Memory Bandwidth Allocation
  */
 enum pqos_cap_type {
         PQOS_CAP_TYPE_MON = 0,          /**< QoS monitoring */
         PQOS_CAP_TYPE_L3CA,             /**< L3/LLC cache allocation */
         PQOS_CAP_TYPE_L2CA,             /**< L2 cache allocation */
+        PQOS_CAP_TYPE_MBA,              /**< Memory Bandwidth Allocation */
         PQOS_CAP_TYPE_NUMOF
 };
 
@@ -178,6 +180,17 @@ struct pqos_cap_l2ca {
         unsigned num_ways;              /**< number of cache ways */
         unsigned way_size;              /**< way size in bytes */
         uint64_t way_contention;        /**< ways contention bit mask */
+};
+
+/**
+ * Memory Bandwidth Allocation capability structure
+ */
+struct pqos_cap_mba {
+        unsigned mem_size;              /**< byte size of the structure */
+        unsigned num_classes;           /**< number of classes of service */
+        unsigned throttle_max;          /**< the max MBA can be throttled */
+        unsigned throttle_step;         /**< MBA granularity */
+        int is_linear;                  /**< the type of MBA linear/nonlinear */
 };
 
 /**
@@ -233,6 +246,7 @@ struct pqos_capability {
                 struct pqos_cap_mon *mon;
                 struct pqos_cap_l3ca *l3ca;
                 struct pqos_cap_l2ca *l2ca;
+                struct pqos_cap_mba *mba;
                 void *generic_ptr;
         } u;
 };
@@ -634,6 +648,53 @@ int pqos_l2ca_get(const unsigned l2id,
                   const unsigned max_num_ca,
                   unsigned *num_ca,
                   struct pqos_l2ca *ca);
+
+/*
+ * =======================================
+ * Memory Bandwidth Allocation
+ * =======================================
+ */
+
+/**
+ * MBA class of service data structure
+ */
+struct pqos_mba {
+        unsigned class_id;      /**< class of service */
+        unsigned mb_rate;       /**< valve open rate (VOR) in percentage */
+};
+
+/**
+ * @brief Sets classes of service defined by \a mba on \a socket
+ *
+ * @param [in]  socket CPU socket id
+ * @param [in]  num_cos number of classes of service at \a ca
+ * @param [in]  requested table with class of service definitions
+ * @param [out] actual table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mba_set(const unsigned socket,
+                 const unsigned num_cos,
+                 const struct pqos_mba *requested,
+                 struct pqos_mba *actual);
+
+/**
+ * @brief Reads MBA from \a socket
+ *
+ * @param [in]  socket CPU socket id
+ * @param [in]  max_num_cos maximum number of classes of service
+ *              that can be accommodated at \a mba_tab
+ * @param [out] num_cos number of classes of service read into \a mba_tab
+ * @param [out] mba_tab table with read classes of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mba_get(const unsigned socket,
+                 const unsigned max_num_cos,
+                 unsigned *num_cos,
+                 struct pqos_mba *mba_tab);
 
 /*
  * =======================================
