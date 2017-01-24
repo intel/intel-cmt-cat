@@ -393,7 +393,7 @@ pqos_cap_get_event(const struct pqos_cap *cap,
 
 int
 pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
-                       unsigned *cos_num)
+                      unsigned *cos_num)
 {
         const struct pqos_capability *item = NULL;
         int ret = PQOS_RETVAL_OK;
@@ -413,7 +413,7 @@ pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
 
 int
 pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
-                       unsigned *cos_num)
+                      unsigned *cos_num)
 {
         const struct pqos_capability *item = NULL;
         int ret = PQOS_RETVAL_OK;
@@ -428,6 +428,26 @@ pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
 
         ASSERT(item != NULL);
         *cos_num = item->u.l2ca->num_classes;
+        return ret;
+}
+
+int
+pqos_mba_get_cos_num(const struct pqos_cap *cap,
+                      unsigned *cos_num)
+{
+        const struct pqos_capability *item = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cap != NULL && cos_num != NULL);
+        if (cap == NULL || cos_num == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &item);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;                           /**< no MBA capability */
+
+        ASSERT(item != NULL);
+        *cos_num = item->u.mba->num_classes;
         return ret;
 }
 

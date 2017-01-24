@@ -77,12 +77,15 @@
         (PQOS_MSR_L3CA_MASK_END - PQOS_MSR_L3CA_MASK_START + 1)
 
 #define PQOS_MSR_L2CA_MASK_START 0xD10
-#define PQOS_MSR_L2CA_MASK_END   0xD4F
-#define PQOS_MSR_L2CA_MASK_NUMOF \
-        (PQOS_MSR_L2CA_MASK_END - PQOS_MSR_L2CA_MASK_START + 1)
+#define PQOS_MSR_MBA_MASK_START  0xD50
 
 #define PQOS_MSR_L3_QOS_CFG          0xC81   /**< CAT config register */
 #define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< CDP enable bit */
+
+/**
+ * MBA linear max value
+ */
+#define PQOS_MBA_LINEAR_MAX 100
 
 /**
  * ---------------------------------------
@@ -525,7 +528,104 @@ int pqos_mba_set(const unsigned socket,
                  const struct pqos_mba *requested,
                  struct pqos_mba *actual)
 {
-        return PQOS_RETVAL_OK;
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0, count = 0, core = 0, step = 0;
+        const struct pqos_capability *mba_cap = NULL;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (requested == NULL || num_cos == 0) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_PARAM;
+        }
+
+        /**
+         * Check if MBA is supported
+         */
+        ASSERT(m_cap != NULL);
+        ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &mba_cap);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_RESOURCE; /* MBA not supported */
+        }
+        count = mba_cap->u.mba->num_classes;
+        step = mba_cap->u.mba->throttle_step;
+
+        /**
+         * Non-linear mode not currently supported
+         */
+        if (!mba_cap->u.mba->is_linear) {
+                LOG_ERROR("MBA non-linear mode not currently supported!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * Check if MBA rate and class
+         * id's are within allowed range.
+         */
+        for (i = 0; i < num_cos; i++) {
+                if (requested[i].mb_rate == 0 || requested[i].mb_rate > 100) {
+                        LOG_ERROR("MBA COS%u rate out of range (from 1-100)!\n",
+                                  requested[i].class_id);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+                if (requested[i].class_id >= count) {
+                        LOG_ERROR("MBA COS%u is out of range (COS%u is max)!\n",
+                                  requested[i].class_id, count - 1);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
+        ASSERT(m_cpu != NULL);
+        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        for (i = 0; i < num_cos; i++) {
+                const uint32_t reg =
+                        requested[i].class_id + PQOS_MSR_MBA_MASK_START;
+                uint64_t val = PQOS_MBA_LINEAR_MAX -
+                        (((requested[i].mb_rate + (step/2)) / step) * step);
+                int retval = MACHINE_RETVAL_OK;
+
+                if (val > mba_cap->u.mba->throttle_max)
+                        val = mba_cap->u.mba->throttle_max;
+
+                retval = msr_write(core, reg, val);
+                if (retval != MACHINE_RETVAL_OK) {
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_ERROR;
+                }
+
+                /**
+                 * If table to store actual values set is passed,
+                 * read MSR values and store in table
+                 */
+                if (actual == NULL)
+                        continue;
+
+                retval = msr_read(core, reg, &val);
+                if (retval != MACHINE_RETVAL_OK) {
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_ERROR;
+                }
+                actual[i] = requested[i];
+                actual[i].mb_rate = (PQOS_MBA_LINEAR_MAX - val);
+        }
+
+        _pqos_api_unlock();
+        return ret;
 }
 
 int pqos_mba_get(const unsigned socket,
@@ -737,7 +837,7 @@ get_hi_cos_id(const unsigned technology,
 
         if (l2_req && l3_req)
                 *hi_class_id = (num_l2_cos < num_l3_cos) ?
-                       num_l2_cos : num_l3_cos;
+                        num_l2_cos : num_l3_cos;
         else if (l2_req)
                 *hi_class_id = num_l2_cos;
         else

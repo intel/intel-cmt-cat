@@ -908,6 +908,21 @@ pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
                       unsigned *cos_num);
 
 /**
+ * @brief Retrieves number of memory B/W allocation classes of service from
+ *        \a cap structure.
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] cos_num place to store number of classes of service
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_mba_get_cos_num(const struct pqos_cap *cap,
+                     unsigned *cos_num);
+
+/**
  * @brief Retrieves CDP status
  *
  * @param [in] cap platform QoS capabilities structure
