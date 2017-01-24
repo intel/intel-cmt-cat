@@ -12,8 +12,15 @@ Summary:
 1. Library
 	- Perl interface extended to support L2 CAT and CMT
         - Logging extended to allow callback and silence functionality
+	- L2 CAT updated to operate on a per cluster/L2 ID basis
+	- Support for MBA
 2. SNMP
 	- Added CMT support to Net-SNMP sub-agent
+3. PQoS Utility
+	- L2 CAT updated to operate on a per cluster/L2 ID basis
+	- Support for MBA
+4. rdtset Utility
+	- L2 CAT updated to operate on a per cluster/L2 ID basis
 
 ======================================================================
 Release  v0.1.5  2016-09-20

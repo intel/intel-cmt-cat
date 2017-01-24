@@ -64,13 +64,34 @@ define classes for selected CPU resources. CLASSDEF format is "TYPE[@RESOURCE_ID
 .br
 For CAT, TYPE is "llc" for the last level cache (aka l3) and "l2" for level 2 cache, ID is a CLOS number and DEFINITION is a bitmask.
 .br
+For MBA, TYPE is "mba", ID is a CLOS number and DEFINITION is a value between 1 and 100 representing the percentage of available memory bandwidth.
+.br
 RESOURCE_ID is a unique number that can represent a socket or l2/l3 cache identifier. The RESOURCE_ID for each logical CPU can be found using "pqos -s"
 .br
 .B Note: When CDP is on, ID can be postfixed with 'D' for data or 'C' for code. CDP is not available for l2.
 .br
-For example: "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00;l2:2=0x3f;l2@2:1=0xf", or for CDP: "\-e llc:0d=0xfff;llc:0c=0xfff00."
+Some examples:
+.RS
+.RS
+"\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00;l2:2=0x3f;l2@2:1=0xf"
 .br
-Note: "\-e l2:2=0x3f" means that COS2 for all L2 cache clusters is changed to 0x3f. "\-e l2@2:1=0xf" means that COS1 for L2 cache cluster 2 is changed to 0xf.
+"\-e llc:0d=0xfff;llc:0c=0xfff00"
+.br
+"\-e mba:1=30;mba@1:3=80"
+.RE
+.RE
+.br
+.RS
+Note:
+.RS
+.br
+"\-e l2:2=0x3f" means that COS2 for all L2 cache clusters is changed to 0x3f.
+.br
+"\-e l2@2:1=0xf" means that COS1 for L2 cache cluster 2 is changed to 0xf.
+.br
+"\-e mba:1=30" means that COS1, on all sockets, can utilize up to 30% of available memory bandwidth.
+.RE
+.RE
 .TP
 .B \-a CLASS2CORE, \-\-alloc\-assoc=CLASS2CORE
 associate allocation classes with cores. CLASS2CORE format is "TYPE:ID=CORE_LIST;...".
