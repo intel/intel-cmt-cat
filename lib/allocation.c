@@ -633,7 +633,57 @@ int pqos_mba_get(const unsigned socket,
                  unsigned *num_cos,
                  struct pqos_mba *mba_tab)
 {
-        return PQOS_RETVAL_OK;
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0, count = 0, core = 0;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_PARAM;
+        }
+
+        ASSERT(m_cap != NULL);
+        ret = pqos_mba_get_cos_num(m_cap, &count);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;             /**< no MBA capability */
+        }
+
+        if (count > max_num_cos) {
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
+        }
+
+        ASSERT(m_cpu != NULL);
+        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        for (i = 0; i < count; i++) {
+                const uint32_t reg = PQOS_MSR_MBA_MASK_START + i;
+                uint64_t val = 0;
+                int retval = msr_read(core, reg, &val);
+
+                if (retval != MACHINE_RETVAL_OK) {
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_ERROR;
+                }
+                mba_tab[i].class_id = i;
+                mba_tab[i].mb_rate = (unsigned) PQOS_MBA_LINEAR_MAX - val;
+        }
+
+        *num_cos = count;
+        _pqos_api_unlock();
+        return ret;
 }
 /**
  * @brief Gets COS associated to \a lcore
