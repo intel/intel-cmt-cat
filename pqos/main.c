@@ -538,8 +538,8 @@ int main(int argc, char **argv)
         struct pqos_config cfg;
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
-        const struct pqos_capability *cap_mon = NULL,
-		*cap_l3ca = NULL, *cap_l2ca = NULL;
+        const struct pqos_capability *cap_mon = NULL, *cap_l3ca = NULL,
+                *cap_l2ca = NULL, *cap_mba = NULL;
         unsigned sock_count, *sockets = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
         int opt_index = 0;
@@ -712,6 +712,13 @@ int main(int argc, char **argv)
                 goto error_exit_2;
         }
 
+        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MBA, &cap_mba);
+        if (ret == PQOS_RETVAL_PARAM) {
+                printf("Error retrieving MB allocation capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_2;
+        }
+
         if (sel_mon_reset && cap_mon != NULL) {
                 if (pqos_mon_reset() != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
@@ -736,8 +743,8 @@ int main(int argc, char **argv)
                 /**
                  * Show info about allocation config and exit
                  */
-		alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, sock_count,
-                                   sockets, p_cpu);
+		alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
+                                   sock_count, sockets, p_cpu);
                 goto allocation_exit;
         }
 

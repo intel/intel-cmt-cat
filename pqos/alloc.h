@@ -66,6 +66,7 @@ void selfn_allocation_assoc(const char *arg);
  * @param [in] cap_mon monitoring capability structure
  * @param [in] cap_l3ca L3 CAT capability structures
  * @param [in] cap_l2ca L2 CAT capability structures
+ * @param [in] cap_mba MBA capability structures
  * @param [in] sock_count number of detected CPU sockets
  * @param [in] sockets arrays with detected CPU socket id's
  * @param [in] cpu_info cpu information structure
@@ -73,6 +74,7 @@ void selfn_allocation_assoc(const char *arg);
 void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_l2ca,
+                        const struct pqos_capability *cap_mba,
                         const unsigned sock_count,
                         const unsigned *sockets,
                         const struct pqos_cpuinfo *cpu_info);

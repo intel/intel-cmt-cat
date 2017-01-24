@@ -610,9 +610,149 @@ void selfn_allocation_assoc(const char *arg)
         free(cp);
 }
 
+/**
+ * @brief Prints L3 CAT class defnition
+ *
+ * @param [in] ca L3 CAT definition structure
+ * @param [in] is_error indicates error condition when reading L3 CAT class
+ */
+static void
+print_l3ca_config(const struct pqos_l3ca *ca, const int is_error)
+{
+        if (is_error) {
+                printf("    L3CA COS%u => ERROR\n", ca->class_id);
+                return;
+        }
+
+        if (ca->cdp) {
+                printf("    L3CA COS%u => DATA 0x%llx, CODE 0x%llx\n",
+                       ca->class_id,
+                       (unsigned long long)ca->u.s.data_mask,
+                       (unsigned long long)ca->u.s.code_mask);
+        } else {
+                printf("    L3CA COS%u => MASK 0x%llx\n",
+                       ca->class_id,
+                       (unsigned long long)ca->u.ways_mask);
+        }
+}
+
+/**
+ * @brief Per socket L3 CAT and MBA class definition printing
+ *
+ * If new per socket technologies appear they should be added here, too.
+ *
+ * @param [in] cap_l3ca pointer to L3 CAT capability structure
+ * @param [in] cap_mba pointer to MBA capability structure
+ * @param [in] sock_count number of socket id's in \a sockets
+ * @param [in] sockets arrays of socket id's
+ */
+static void
+print_per_socket_config(const struct pqos_capability *cap_l3ca,
+                        const struct pqos_capability *cap_mba,
+                        const unsigned sock_count,
+                        const unsigned *sockets)
+{
+        int ret;
+        unsigned i;
+
+        if (cap_l3ca == NULL && cap_mba == NULL)
+                return;
+
+        for (i = 0; i < sock_count; i++) {
+
+                printf("%s%s%s COS definitions for Socket %u:\n",
+                       cap_l3ca != NULL ? "L3CA" : "",
+                       (cap_l3ca != NULL && cap_mba != NULL) ? "/" : "",
+                       cap_mba != NULL ? "MBA" : "",
+                       sockets[i]);
+
+                if (cap_l3ca != NULL) {
+                        const struct pqos_cap_l3ca *l3ca = cap_l3ca->u.l3ca;
+                        struct pqos_l3ca tab[l3ca->num_classes];
+                        unsigned num = 0;
+                        unsigned n = 0;
+
+                        ret = pqos_l3ca_get(sockets[i], l3ca->num_classes,
+                                            &num, tab);
+                        if (ret != PQOS_RETVAL_OK)
+                                num = l3ca->num_classes;
+
+                        for (n = 0; n < num; n++)
+                                print_l3ca_config(&tab[n],
+                                                  (ret != PQOS_RETVAL_OK));
+                }
+
+                if (cap_mba != NULL) {
+                        const struct pqos_cap_mba *mba = cap_mba->u.mba;
+                        struct pqos_mba tab[mba->num_classes];
+                        unsigned num = 0;
+                        unsigned n = 0;
+
+                        ret = pqos_mba_get(sockets[i], mba->num_classes,
+                                           &num, tab);
+                        if (ret != PQOS_RETVAL_OK)
+                                num = mba->num_classes;
+
+                        for (n = 0; n < num; n++) {
+                                if (ret != PQOS_RETVAL_OK)
+                                        printf("    MBA COS%u => ERROR\n",
+                                               tab[n].class_id);
+                                else
+                                        printf("    MBA COS%u => %u%% "
+                                               "available\n",
+                                               tab[n].class_id, tab[n].mb_rate);
+                        }
+                }
+        }
+}
+
+/**
+ * @brief Retrieves and prints core association
+ *
+ * @param [in] is_alloc indicates if any allocation technology is present
+ * @param [in] is_l3cat indicates if L3 CAT is present
+ * @param [in] is_mon indicates if monitoring technology is present
+ * @param [in] ci core info structure with all topology details
+ */
+static void
+print_core_assoc(const int is_alloc, const int is_l3cat, const int is_mon,
+                 const struct pqos_coreinfo *ci)
+{
+        unsigned class_id = 0;
+        pqos_rmid_t rmid = 0;
+        int ret = PQOS_RETVAL_OK;
+
+        if (is_alloc)
+                ret = pqos_alloc_assoc_get(ci->lcore, &class_id);
+
+        if (is_mon && ret == PQOS_RETVAL_OK)
+                ret = pqos_mon_assoc_get(ci->lcore, &rmid);
+
+        if (ret != PQOS_RETVAL_OK) {
+                printf("    Core %u => ERROR\n", ci->lcore);
+                return;
+        }
+
+        if (is_l3cat || is_mon)
+                printf("    Core %u, L2ID %u, L3ID %u => ",
+                       ci->lcore, ci->l2_id, ci->l3_id);
+        else
+                printf("    Core %u, L2ID %u => ", ci->lcore, ci->l2_id);
+
+        if (is_alloc)
+                printf("COS%u", class_id);
+
+        if (is_mon)
+                printf("%sRMID%u\n", is_alloc ? ", " : "", (unsigned) rmid);
+        else
+                printf("\n");
+}
+
+
 void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_l2ca,
+                        const struct pqos_capability *cap_mba,
                         const unsigned sock_count,
                         const unsigned *sockets,
                         const struct pqos_cpuinfo *cpu_info)
@@ -620,35 +760,10 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
         int ret;
         unsigned i;
 
-        for (i = 0; (i < sock_count) && (cap_l3ca != NULL); i++) {
-                struct pqos_l3ca tab[PQOS_MAX_L3CA_COS];
-                unsigned num = 0;
-                unsigned n = 0;
-
-                ret = pqos_l3ca_get(sockets[i], PQOS_MAX_L3CA_COS,
-                                    &num, tab);
-                if (ret != PQOS_RETVAL_OK)
-                        continue;
-
-                printf("L3CA COS definitions for Socket %u:\n",
-                       sockets[i]);
-                for (n = 0; n < num; n++) {
-                        if (tab[n].cdp) {
-                                printf("    L3CA COS%u => DATA 0x%llx,"
-                                       "CODE 0x%llx\n",
-                                       tab[n].class_id,
-                                       (unsigned long long)tab[n].u.s.data_mask,
-                                       (unsigned long long)
-                                       tab[n].u.s.code_mask);
-                        } else {
-                                printf("    L3CA COS%u => MASK 0x%llx\n",
-                                       tab[n].class_id,
-                                       (unsigned long long)tab[n].u.ways_mask);
-                        }
-                }
-        }
+        print_per_socket_config(cap_l3ca, cap_mba, sock_count, sockets);
 
         if (cap_l2ca != NULL) {
+                /* Print L2 CAT class definitions per L2 cluster */
                 unsigned *l2id, count = 0;
 
                 l2id = pqos_cpu_get_l2ids(cpu_info, &count);
@@ -676,6 +791,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 free(l2id);
         }
 
+        /* Print core to class associations */
         for (i = 0; i < sock_count; i++) {
                 unsigned *lcores = NULL;
                 unsigned lcount = 0, n = 0;
@@ -688,13 +804,6 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 printf("Core information for socket %u:\n",
                        sockets[i]);
                 for (n = 0; n < lcount; n++) {
-                        unsigned class_id = 0;
-                        unsigned l2id, l3id;
-                        pqos_rmid_t rmid = 0;
-                        int ret = PQOS_RETVAL_OK;
-                        const int is_mon = (cap_mon != NULL);
-                        const int is_alloc = (cap_l3ca != NULL) ||
-                                (cap_l2ca != NULL);
                         const struct pqos_coreinfo *core_info = NULL;
 
                         core_info = pqos_cpu_get_core_info(cpu_info, lcores[n]);
@@ -704,39 +813,12 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                                 free(lcores);
                                 return;
                         }
-                        l2id = core_info->l2_id;
-                        l3id = core_info->l3_id;
 
-                        if (is_alloc)
-				ret = pqos_alloc_assoc_get(lcores[n],
-                                                           &class_id);
-			if (is_mon && ret == PQOS_RETVAL_OK)
-				ret = pqos_mon_assoc_get(lcores[n], &rmid);
-
-                        if (ret != PQOS_RETVAL_OK) {
-                                printf("    Core %u => ERROR\n", lcores[n]);
-                                continue;
-                        }
-
-                        if (is_alloc && is_mon)
-                                printf("    Core %u, L2ID %u, L3ID %u "
-                                       "=> COS%u, RMID%u\n", lcores[n],
-                                       l2id, l3id, class_id, (unsigned)rmid);
-                        if (is_alloc && !is_mon) {
-                                if (cap_l3ca == NULL) {
-                                        printf("    Core %u, L2ID %u "
-                                               "=> COS%u\n", lcores[n], l2id,
-                                               class_id);
-                                } else {
-                                        printf("    Core %u, L2ID %u, L3ID %u "
-                                               "=> COS%u\n", lcores[n], l2id,
-                                               l3id, class_id);
-                                }
-                        }
-                        if (!is_alloc && is_mon)
-                                printf("    Core %u, L2ID %u, L3ID %u "
-                                       "=> RMID%u\n", lcores[n], l2id,
-                                       l3id, (unsigned)rmid);
+                        print_core_assoc((cap_l3ca != NULL) ||
+                                         (cap_l2ca != NULL) /* is_alloc */,
+                                         (cap_l3ca != NULL) /* is_l3cat */,
+                                         (cap_mon != NULL) /* is_mon */,
+                                         core_info);
                 }
                 free(lcores);
         }
