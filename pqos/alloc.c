@@ -56,7 +56,8 @@
  */
 enum sel_cat_type {
 	L3CA,
-	L2CA
+	L2CA,
+        MBA
 };
 
 /**
@@ -262,6 +263,54 @@ set_l2_cos(const unsigned class_id, const uint64_t mask,
 }
 
 /**
+ * @brief Set MBA class definitions on selected sockets
+ *
+ * @param class_id MBA class ID to set
+ * @param delay_value to set
+ * @param sock_ids Array of socket ID's to set class definition
+ * @param sock_num Number of socket ID's in the array
+ *
+ * @return Number of classes set
+ * @retval -1 on error
+ */
+static int
+set_mba_cos(const unsigned class_id, const uint64_t available_bw,
+            const unsigned *sock_ids, const unsigned sock_num)
+{
+        unsigned i, set = 0;
+        struct pqos_mba mba, actual;
+
+        if (sock_ids == NULL || available_bw == 0) {
+                printf("Failed to set MBA configuration!\n");
+                return -1;
+        }
+        mba.class_id = class_id;
+        mba.mb_rate = available_bw;
+
+        /**
+         * Set all selected classes
+         */
+        for (i = 0; i < sock_num; i++) {
+                int ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
+
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("SOCKET %u MBA COS%u - FAILED!\n",
+                               sock_ids[i], mba.class_id);
+                        break;
+                }
+                printf("SOCKET %u MBA COS%u => %u%% requested, %u%% applied\n",
+                       sock_ids[i], actual.class_id,
+                       mba.mb_rate, actual.mb_rate);
+                set++;
+        }
+        sel_cat_alloc_mod += set;
+        if (set < sock_num)
+                return -1;
+
+        return (int)set;
+}
+
+/**
  * @brief Verifies and translates definition of single allocation
  *        class of service from text string into internal configuration
  *        for specified sockets and set selected classes.
@@ -296,6 +345,19 @@ set_allocation_cos(char *str, unsigned *res_ids,
 
         parse_cos_mask_type(str, &update_scope, &class_id);
         mask = strtouint64(p+1);
+
+        if (type == MBA) {
+                if (ids == NULL)
+                        ids = pqos_cpu_get_sockets(cpu, &n);
+                if (ids == NULL) {
+                        printf("Failed to retrieve socket info!\n");
+                        return -1;
+                }
+                ret = set_mba_cos(class_id, mask, ids, n);
+                if (res_ids == NULL && ids != NULL)
+                        free(ids);
+                return ret;
+        }
 
         if (type == L2CA && update_scope != CAT_UPDATE_SCOPE_BOTH) {
                 parse_error(str, "CDP not supported for L2 CAT!\n");
@@ -388,13 +450,15 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
 	} else
                 *p = '\0';
         /**
-	 * Determine selected CAT type (L3/L2)
+	 * Determine selected type (L3/L2/MBA)
 	 */
 	if (strcasecmp(str, "llc") == 0)
                 type = L3CA;
         else if (strcasecmp(str, "l2") == 0)
                 type = L2CA;
-	else {
+        else if (strcasecmp(str, "mba") == 0)
+                type = MBA;
+        else {
 		printf("Unrecognized allocation type: %s\n", s);
                 free(s);
                 return ret;
