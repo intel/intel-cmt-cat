@@ -1113,9 +1113,9 @@ cdp_enable(const unsigned sockets_num,
 }
 
 /**
- * @brief Writes range of CAT COS MSR's with \a msr_val value
+ * @brief Writes range of MBA/CAT COS MSR's with \a msr_val value
  *
- * Used as part of CAT reset process.
+ * Used as part of CAT/MBA reset process.
  *
  * @param [in] msr_start First MSR to be written
  * @param [in] msr_num Number of MSR's to be written
@@ -1127,10 +1127,10 @@ cdp_enable(const unsigned sockets_num,
  * @retval PQOS_RETVAL_ERROR on MSR write error
  */
 static int
-cat_cos_reset(const unsigned msr_start,
-              const unsigned msr_num,
-              const unsigned coreid,
-              const uint64_t msr_val)
+alloc_cos_reset(const unsigned msr_start,
+                const unsigned msr_num,
+                const unsigned coreid,
+                const uint64_t msr_val)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i;
@@ -1155,7 +1155,7 @@ cat_cos_reset(const unsigned msr_start,
  * @retval PQOS_RETVAL_ERROR on MSR write error
  */
 static int
-cat_assoc_reset(void)
+alloc_assoc_reset(void)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i;
@@ -1174,9 +1174,10 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         unsigned sockets_num = 0;
         unsigned *l2ids = NULL;
         unsigned l2id_num = 0;
-        const struct pqos_capability *cat_cap = NULL;
+        const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
+        const struct pqos_cap_mba *mba_cap = NULL;
         int ret = PQOS_RETVAL_OK;
         unsigned max_l3_cos = 0;
         unsigned j;
@@ -1198,19 +1199,25 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         }
 
         /* Get L3 CAT capabilities */
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &cat_cap);
-        if (cat_cap != NULL)
-                l3_cap = cat_cap->u.l3ca;
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                l3_cap = alloc_cap->u.l3ca;
 
         /* Get L2 CAT capabilities */
-        cat_cap = NULL;
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &cat_cap);
-        if (cat_cap != NULL)
-                l2_cap = cat_cap->u.l2ca;
+        alloc_cap = NULL;
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                l2_cap = alloc_cap->u.l2ca;
 
-        /* Check if either L2 or L3 CAT is supported */
-        if (l2_cap == NULL && l3_cap == NULL) {
-                LOG_ERROR("L2/L3 CAT not present!\n");
+        /* Get MBA capabilities */
+        alloc_cap = NULL;
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
+        if (alloc_cap != NULL)
+                mba_cap = alloc_cap->u.mba;
+
+        /* Check if either L2 CAT, L3 CAT or MBA is supported */
+        if (l2_cap == NULL && l3_cap == NULL && mba_cap == NULL) {
+                LOG_ERROR("L2 CAT/L3 CAT/MBA not present!\n");
                 ret = PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
                 goto pqos_alloc_reset_exit;
         }
@@ -1258,8 +1265,8 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                         const uint64_t ways_mask =
                                 (1ULL << l3_cap->num_ways) - 1ULL;
 
-                        ret = cat_cos_reset(PQOS_MSR_L3CA_MASK_START,
-                                            max_l3_cos, core, ways_mask);
+                        ret = alloc_cos_reset(PQOS_MSR_L3CA_MASK_START,
+                                              max_l3_cos, core, ways_mask);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
                 }
@@ -1283,9 +1290,29 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
-                        ret = cat_cos_reset(PQOS_MSR_L2CA_MASK_START,
-                                            l2_cap->num_classes, core,
+                        ret = alloc_cos_reset(PQOS_MSR_L2CA_MASK_START,
+                                              l2_cap->num_classes, core,
                                             ways_mask);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
+                }
+        }
+
+        if (mba_cap != NULL) {
+                /**
+                 * Go through all sockets and reset MBA class defintions
+                 * 0 is the default MBA COS value in linear mode.
+                 */
+
+                for (j = 0; j < sockets_num; j++) {
+                        unsigned core = 0;
+
+                        ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
+
+                        ret = alloc_cos_reset(PQOS_MSR_MBA_MASK_START,
+                                              mba_cap->num_classes, core, 0);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
                 }
@@ -1294,7 +1321,7 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         /**
          * Associate all cores with COS0
          */
-        ret = cat_assoc_reset();
+        ret = alloc_assoc_reset();
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_reset_exit;
 
