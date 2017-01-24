@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -82,6 +82,7 @@
  */
 #define PQOS_RES_ID_L3_ALLOCATION    1       /**< L3 cache allocation */
 #define PQOS_RES_ID_L2_ALLOCATION    2       /**< L2 cache allocation */
+#define PQOS_RES_ID_MB_ALLOCATION    3       /**< Memory BW allocation */
 
 #define PQOS_CPUID_CAT_CDP_BIT       2       /**< CDP supported bit */
 
@@ -891,6 +892,75 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap,
 }
 
 /**
+ * @brief Discovers MBA
+ *
+ * @param r_cap place to store MBA capabilities structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+discover_alloc_mba(struct pqos_cap_mba **r_cap)
+{
+        struct cpuid_out res;
+        struct pqos_cap_mba *cap = NULL;
+        const unsigned sz = sizeof(*cap);
+        int ret = PQOS_RETVAL_OK;
+
+        cap = (struct pqos_cap_mba *)malloc(sz);
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        ASSERT(cap != NULL);
+
+        memset(cap, 0, sz);
+        cap->mem_size = sz;
+
+        /**
+         * Run CPUID.0x7.0 to check
+         * for allocation capability (bit 15 of ebx)
+         */
+        lcpuid(0x7, 0x0, &res);
+        if (!(res.ebx & (1 << 15))) {
+                LOG_INFO("CPUID.0x7.0: MBA not supported\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+	}
+
+        /**
+         * We can go to CPUID.0x10.0 to obtain more info
+         */
+        lcpuid(0x10, 0x0, &res);
+        if (!(res.ebx & (1 << PQOS_RES_ID_MB_ALLOCATION))) {
+		LOG_INFO("CPUID 0x10.0: MBA not supported!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+	}
+
+	lcpuid(0x10, PQOS_RES_ID_MB_ALLOCATION, &res);
+
+	cap->num_classes = (res.edx & 0xffff) + 1;
+        cap->throttle_max = (res.eax & 0xfff) + 1;
+        cap->is_linear = (res.ecx >> 2) & 1;
+        if (cap->is_linear)
+                cap->throttle_step = 100 - cap->throttle_max;
+        else {
+                LOG_WARN("MBA non-linear mode not supported yet!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+	LOG_INFO("MBA details: "
+		 "#COS=%u, %slinear, max=%u, step=%u\n",
+		 cap->num_classes,
+                 cap->is_linear ? "" : "non-",
+                 cap->throttle_max, cap->throttle_step);
+
+	(*r_cap) = cap;
+        return ret;
+}
+
+/**
  * @brief Runs detection of platform monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
@@ -906,6 +976,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         struct pqos_cap_mon *det_mon = NULL;
         struct pqos_cap_l3ca *det_l3ca = NULL;
         struct pqos_cap_l2ca *det_l2ca = NULL;
+        struct pqos_cap_mba *det_mba = NULL;
         struct pqos_cap *_cap = NULL;
         struct pqos_capability *item = NULL;
         unsigned sz = 0;
@@ -965,6 +1036,24 @@ discover_capabilities(struct pqos_cap **p_cap,
                 goto error_exit;
         }
 
+        /**
+         * Memory bandwidth allocation init
+         */
+        ret = discover_alloc_mba(&det_mba);
+        switch (ret) {
+        case PQOS_RETVAL_OK:
+                LOG_INFO("MBA capability detected\n");
+                sz += sizeof(struct pqos_capability);
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                LOG_INFO("MBA capability not detected\n");
+                break;
+        default:
+                LOG_ERROR("Fatal error encounter in MBA discovery!\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto error_exit;
+        }
+
         if (sz == 0) {
                 LOG_ERROR("No Platform QoS capability discovered\n");
                 ret = PQOS_RETVAL_ERROR;
@@ -1008,6 +1097,14 @@ discover_capabilities(struct pqos_cap **p_cap,
                 ret = PQOS_RETVAL_OK;
         }
 
+        if (det_mba != NULL) {
+                _cap->num_cap++;
+                item->type = PQOS_CAP_TYPE_MBA;
+                item->u.mba = det_mba;
+                item++;
+                ret = PQOS_RETVAL_OK;
+        }
+
         (*p_cap) = _cap;
 
  error_exit:
@@ -1018,6 +1115,8 @@ discover_capabilities(struct pqos_cap **p_cap,
                         free(det_l3ca);
                 if (det_l2ca != NULL)
                         free(det_l2ca);
+                if (det_mba != NULL)
+                        free(det_mba);
         }
 
         return ret;
