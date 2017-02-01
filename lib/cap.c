@@ -397,9 +397,9 @@ discover_monitoring(struct pqos_cap_mon **r_mon,
         if (cpuid_0xf_1.edx & 1)
                 num_events++; /**< LLC occupancy */
         if (cpuid_0xf_1.edx & 2)
-                num_events++; /**< local memory bandwidth event */
-        if (cpuid_0xf_1.edx & 4)
                 num_events++; /**< total memory bandwidth event */
+        if (cpuid_0xf_1.edx & 4)
+                num_events++; /**< local memory bandwidth event */
         if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
                 num_events++; /**< remote memory bandwidth virtual event */
 
@@ -438,11 +438,11 @@ discover_monitoring(struct pqos_cap_mon **r_mon,
                                      cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
                                      num_events);
         if (cpuid_0xf_1.edx & 2)
-                add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_TMEM_BW,
                                      cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
                                      num_events);
         if (cpuid_0xf_1.edx & 4)
-                add_monitoring_event(mon, 1, PQOS_MON_EVENT_TMEM_BW,
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
                                      cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
                                      num_events);
 
