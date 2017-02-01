@@ -709,8 +709,7 @@ pqos_pid_start(struct pqos_mon_data *group)
                         return PQOS_RETVAL_ERROR;
                 started_evts |= PQOS_MON_EVENT_L3_OCCUP;
         }
-        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+        if (group->event & PQOS_MON_EVENT_LMEM_BW) {
                 if (!is_event_supported(PQOS_MON_EVENT_LMEM_BW))
                         return PQOS_RETVAL_ERROR;
                 pe = get_supported_event(PQOS_MON_EVENT_LMEM_BW);
@@ -719,8 +718,7 @@ pqos_pid_start(struct pqos_mon_data *group)
                         return PQOS_RETVAL_ERROR;
                 started_evts |= PQOS_MON_EVENT_LMEM_BW;
         }
-        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+        if (group->event & PQOS_MON_EVENT_TMEM_BW) {
                 if (!is_event_supported(PQOS_MON_EVENT_TMEM_BW))
                         return PQOS_RETVAL_ERROR;
                 pe = get_supported_event(PQOS_MON_EVENT_TMEM_BW);
@@ -730,6 +728,21 @@ pqos_pid_start(struct pqos_mon_data *group)
                 started_evts |= PQOS_MON_EVENT_TMEM_BW;
         }
         if (group->event & PQOS_MON_EVENT_RMEM_BW) {
+                if (!is_event_supported(PQOS_MON_EVENT_LMEM_BW) ||
+                    !is_event_supported(PQOS_MON_EVENT_TMEM_BW))
+                        return PQOS_RETVAL_ERROR;
+                if ((started_evts & PQOS_MON_EVENT_LMEM_BW) == 0) {
+                        pe = get_supported_event(PQOS_MON_EVENT_LMEM_BW);
+                        ret = start_pqos_counters(group, pe, &group->fds_mbl);
+                        if (ret != PQOS_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+                }
+                if ((started_evts & PQOS_MON_EVENT_TMEM_BW) == 0) {
+                        pe = get_supported_event(PQOS_MON_EVENT_TMEM_BW);
+                        ret = start_pqos_counters(group, pe, &group->fds_mbt);
+                        if (ret != PQOS_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+                }
                 group->values.mbm_remote = 0;
                 started_evts |= PQOS_MON_EVENT_RMEM_BW;
         }
@@ -754,7 +767,7 @@ pqos_pid_start(struct pqos_mon_data *group)
         /**
          * Check if all selected events were started
          */
-        if (group->event ^ started_evts) {
+        if (group->event != started_evts) {
                 stop_events(group, started_evts);
                 LOG_ERROR("Failed to start all selected "
                           "PID monitoring events\n");
