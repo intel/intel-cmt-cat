@@ -45,6 +45,37 @@
 #define PROFILES_MIN_COS 4
 
 /**
+ * 11-cache ways
+ */
+static const char * const classes_way11_overlapN_equalY[] = {
+        "0=0x007",
+        "1=0x038",
+        "2=0x1C0",
+        "3=0x600"
+};
+
+static const char * const classes_way11_overlapN_equalN[] = {
+        "0=0x01F",
+        "1=0x060",
+        "2=0x180",
+        "3=0x600"
+};
+
+static const char * const classes_way11_overlapP0_equalN[] = {
+        "0=0x7FF",
+        "1=0x060",
+        "2=0x180",
+        "3=0x600"
+};
+
+static const char * const classes_way11_overlapY_equalN[] = {
+        "0=0x7FF",
+        "1=0x7F0",
+        "2=0x700",
+        "3=0x600"
+};
+
+/**
  * 12-cache ways
  */
 static const char * const classes_way12_overlapN_equalY[] = {
@@ -147,6 +178,10 @@ struct llc_allocation_config {
 };
 
 static const struct llc_allocation_config config_cfg0[] = {
+        { .num_ways = 11,
+          .num_classes = 4,
+          .tab = classes_way11_overlapN_equalY,
+        },
         { .num_ways = 12,
           .num_classes = 4,
           .tab = classes_way12_overlapN_equalY,
@@ -162,6 +197,10 @@ static const struct llc_allocation_config config_cfg0[] = {
 };
 
 static const struct llc_allocation_config config_cfg1[] = {
+        { .num_ways = 11,
+          .num_classes = 4,
+          .tab = classes_way11_overlapN_equalN,
+        },
         { .num_ways = 12,
           .num_classes = 4,
           .tab = classes_way12_overlapN_equalN,
@@ -177,6 +216,10 @@ static const struct llc_allocation_config config_cfg1[] = {
 };
 
 static const struct llc_allocation_config config_cfg2[] = {
+        { .num_ways = 11,
+          .num_classes = 4,
+          .tab = classes_way11_overlapP0_equalN,
+        },
         { .num_ways = 12,
           .num_classes = 4,
           .tab = classes_way12_overlapP0_equalN,
@@ -192,6 +235,10 @@ static const struct llc_allocation_config config_cfg2[] = {
 };
 
 static const struct llc_allocation_config config_cfg3[] = {
+        { .num_ways = 11,
+          .num_classes = 4,
+          .tab = classes_way11_overlapY_equalN,
+        },
         { .num_ways = 12,
           .num_classes = 4,
           .tab = classes_way12_overlapY_equalN,
