@@ -433,7 +433,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
 		*q = '\0';
                 n = strlisttotab(++q, ids, DIM(ids));
                 if (n == 0) {
-                        printf("No socket ID specified: %s\n", s);
+                        printf("No resource ID specified: %s\n", s);
                         free(s);
                         return ret;
                 }
