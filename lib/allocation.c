@@ -855,10 +855,11 @@ get_hi_cos_id(const unsigned technology,
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
-        unsigned num_l2_cos = 0, num_l3_cos = 0;
+        const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+        unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0, num_cos = 0;
         int ret;
 
-        if ((!l2_req && !l3_req) || hi_class_id == NULL)
+        if ((!l2_req && !l3_req && !mba_req) || hi_class_id == NULL)
                 return PQOS_RETVAL_PARAM;
 
         ASSERT(m_cap != NULL);
@@ -868,30 +869,37 @@ get_hi_cos_id(const unsigned technology,
                 if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                         return ret;
 
-                if (num_l3_cos > 0)
-                        num_l3_cos--;
-                else
+                if (num_l3_cos == 0)
                         return PQOS_RETVAL_ERROR;
+
+                if (num_cos == 0 || num_l3_cos < num_cos)
+                        num_cos = num_l3_cos;
         }
 
         if (l2_req) {
                 ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
                 if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                         return ret;
-
-                if (num_l2_cos > 0)
-                        num_l2_cos--;
-                else
+                if (num_l2_cos == 0)
                         return PQOS_RETVAL_ERROR;
+
+                if (num_cos == 0 || num_l2_cos < num_cos)
+                        num_cos = num_l2_cos;
         }
 
-        if (l2_req && l3_req)
-                *hi_class_id = (num_l2_cos < num_l3_cos) ?
-                        num_l2_cos : num_l3_cos;
-        else if (l2_req)
-                *hi_class_id = num_l2_cos;
-        else
-                *hi_class_id = num_l3_cos;
+        if (mba_req) {
+                ret = pqos_mba_get_cos_num(m_cap, &num_mba_cos);
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
+
+                if (num_mba_cos == 0)
+                        return PQOS_RETVAL_ERROR;
+
+                if (num_cos == 0 || num_mba_cos < num_cos)
+                        num_cos = num_mba_cos;
+        }
+
+        *hi_class_id = num_cos - 1;
 
         return PQOS_RETVAL_OK;
 }

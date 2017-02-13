@@ -509,6 +509,7 @@ int pqos_alloc_assoc_get(const unsigned lcore,
  * - if L2 CAT technology is requested then cores need to belong to
  *   one L2 cluster (same L2ID)
  * - if only L3 CAT is requested then cores need to belong to one socket
+ * - if only MBA is selected then cores need to belong to one socket
  *
  * @param [in] technology bit mask selecting technologies
  *             (1 << enum pqos_cap_type)
