@@ -5,6 +5,7 @@ Not Released
 Contributors (alphabetical order):
 	Aaron Hetherington <aaron.hetherington@intel.com>
 	Marcel Cornu <marcel.d.cornu@intel.com>
+	Michal Aleksinski <michalx.aleksinski@intel.com>
 	Tomasz Kantecki <tomasz.kantecki@intel.com>
 	Wojciech Andralojc <wojciechx.andralojc@intel.com>
 
@@ -21,6 +22,7 @@ Summary:
 	- Support for MBA
 4. rdtset Utility
 	- L2 CAT updated to operate on a per cluster/L2 ID basis
+	- Support of MBA
 
 ======================================================================
 Release  v0.1.5  2016-09-20

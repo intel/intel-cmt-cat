@@ -80,25 +80,26 @@ extern "C" {
 #endif /* !__bitcountl(x) */
 #endif /* __FreeBSD__ */
 
-struct rdt_ca {
+struct rdt_cfg {
 	enum pqos_cap_type type;
 	union {
 		struct pqos_l2ca *l2;
 		struct pqos_l3ca *l3;
+		struct pqos_mba *mba;
 		void *generic_ptr;
 	} u;
 };
 
 /**
- * @brief Creates \a rdt_ca struct from \a pqos_l2ca struct
+ * @brief Creates \a rdt_cfg struct from \a pqos_l2ca struct
  *
  * @param [in] l2 L2 CAT class configuration
  *
- * @return rdt_ca struct
+ * @return rdt_cfg struct
  */
-static inline struct rdt_ca wrap_l2ca(struct pqos_l2ca *l2)
+static inline struct rdt_cfg wrap_l2ca(struct pqos_l2ca *l2)
 {
-	struct rdt_ca result;
+	struct rdt_cfg result;
 
 	result.type = PQOS_CAP_TYPE_L2CA;
 	result.u.l2 = l2;
@@ -106,18 +107,34 @@ static inline struct rdt_ca wrap_l2ca(struct pqos_l2ca *l2)
 }
 
 /**
- * @brief Creates \a rdt_ca struct from \a pqos_l3ca struct
+ * @brief Creates \a rdt_cfg struct from \a pqos_l3ca struct
  *
  * @param [in] l3 L3 CAT class configuration
  *
- * @return rdt_ca struct
+ * @return rdt_cfg struct
  */
-static inline struct rdt_ca wrap_l3ca(struct pqos_l3ca *l3)
+static inline struct rdt_cfg wrap_l3ca(struct pqos_l3ca *l3)
 {
-	struct rdt_ca result;
+	struct rdt_cfg result;
 
 	result.type = PQOS_CAP_TYPE_L3CA;
 	result.u.l3 = l3;
+	return result;
+}
+
+/**
+ * @brief Creates \a rdt_cfg struct from \a pqos_mba struct
+ *
+ * @param [in] mba MBA class configuration
+ *
+ * @return rdt_cfg struct
+ */
+static inline struct rdt_cfg wrap_mba(struct pqos_mba *mba)
+{
+	struct rdt_cfg result;
+
+	result.type = PQOS_CAP_TYPE_MBA;
+	result.u.mba = mba;
 	return result;
 }
 
@@ -125,6 +142,7 @@ struct rdt_config {
 	cpu_set_t cpumask;	/**< CPUs bitmask */
 	struct pqos_l3ca l3;	/**< L3 configuration */
 	struct pqos_l2ca l2;	/**< L2 configuration */
+	struct pqos_mba mba;	/**< MBA configuretion */
 };
 
 /* rdtset command line configuration structure */

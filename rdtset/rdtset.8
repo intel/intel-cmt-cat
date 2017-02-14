@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH RDTSET 8 "September 20, 2016"
+.TH RDTSET 8 "February 21, 2017"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -37,12 +37,12 @@ http://www.intel.com/content/www/us/en/architecture-and-technology/resource-dire
 .br
 or https://github.com/01org/intel-cmt-cat/wiki
 .PP
-The rdtset tool provides support to set up the CAT (Cache Allocation Technology) capabilities
-for a task and set its CPU affinity. Current RDT/CAT operations of the utility are based on controlling
-MSR registers (via libpqos library). Class of service 0 (CLOS0) is assumed as default one.
-In command mode, rdtset forks and one process executes the command. Another process waits
-for the task to terminate and restores default CAT state by assigning cpu's back to CLOS0. This
-behavior is not in place in PID mode.
+The rdtset tool provides support to set up the CAT (Cache Allocation Technology) and MBA (Memory
+Bandwidth Allocation) capabilities for a task and set its CPU affinity. Current Intel(R) RDT allocation
+operations of the utility are based on controlling MSR registers (via libpqos library). Class of service 0 (CLOS0)
+is assumed as default one. In command mode, rdtset forks and one process executes the command. Another
+process waits for the task to terminate and restores default allocation state by assigning cpu's back to CLOS0.
+This behavior is not in place in PID mode.
 .SH OPTIONS
 rdtset options are as follow:
 .TP
@@ -53,13 +53,15 @@ Show help
 Verbose mode
 .TP
 .B \-t\ , \-\-rdt\ feature=value;...cpu=cpulist
-Specify RDT configuration, single class configuration per -t, multiple -t options allowed.
+Specify Intel(R) RDT configuration, single class configuration per -t, multiple -t options allowed.
 .br
 Accepted values for features:
 .br
 .B 2, l2   for level 2 cache
 .br
 .B 3, l3   for level 3 cache
+.br
+.B m, mba  for MBA
 
 For example:
 
@@ -82,6 +84,15 @@ CPUs 0-2 share four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
 On CDP enabled system, CPU 1 uses four cache-ways for code (mask 0xf)
 and four cache-ways for data (mask 0xf0),
 data and code cache-ways are non-overlapping
+
+.B \-t\ 'mba=70;cpu=0-2'
+.br
+CPUs 0-2 can utilize up to 70% of available memory bandwidth
+
+.B \-t\ 'mba=50;l3=0xf;cpu=1'
+.br
+CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize up to 50% of available memory bandwidth
+
 .TP
 .B \-c <cpulist>, \-\-cpu <cpulist>
 Specify CPU affinity configuration, a numerical list of processors. The numbers
@@ -92,26 +103,26 @@ are separated by commas and may include ranges. For example:
 Operate on existing, given pid
 .TP
 .B \-r <cpulist>, \-\-reset <cpulist>
-Reset CAT for CPUs (assign COS#0 to listed CPUs)
+Reset allocation for CPUs (assign COS#0 to listed CPUs)
 .br
 For example:
 
 .B \-r 0-5
 .br
-Reset CAT configuration of CPUs 0-5
+Reset allocation for CPUs 0-5
 
 .B \-r 0-5 \-t\ 'l3=0xf0;cpu=0-5' \-c 0-5 \-p $BASHPID
 .br
-Reconfigure CAT for CPUs 0-5
+Reconfigure allocation for CPUs 0-5
 .br
-In order to reconfigure CAT, it is needed to reset current CAT configuration
+In order to reconfigure allocation, it is needed to reset current configuration
 
 .TP
 .B \-k, \-\-sudokeep
 Do not drop sudo elevated privileges
 .SH NOTES
 .PP
-CAT is configured using Model Specific Registers (MSRs)
+CAT and MBA are configured using Model Specific Registers (MSRs)
 to set up the class of service masks and manage
 the association of the cores/logical threads to a class of service.
 The rdtset software executes in user space, and access to the MSRs is
@@ -132,7 +143,8 @@ sudo kldload cpuctl
 .SH SEE ALSO
 .BR msr (4)
 .SH AUTHOR
-rdtset was written by Wojciech Andralojc <wojciechx.andralojc@intel.com>, Tomasz Kantecki <tomasz.kantecki@intel.com>
+rdtset was written by Wojciech Andralojc <wojciechx.andralojc@intel.com>,
+Tomasz Kantecki <tomasz.kantecki@intel.com>, Michal Aleksinski <michalx.aleksinski@intel.com>
 .P
-This is free software; see the source for copying conditions.  There is NO
+This is free software; see the source for copying conditions. There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

@@ -41,23 +41,23 @@ extern "C" {
 #endif
 
 /**
- * @brief Initializes libpqos and configures CAT
+ * @brief Initializes libpqos and configures allocation
  *
  * @return status
  * @retval 0 on success
  * @retval negative on error (-errno)
  */
-int cat_init(void);
+int alloc_init(void);
 
 /**
  * @brief deinitializes libpqos
  */
-void cat_fini(void);
+void alloc_fini(void);
 
 /**
- * @brief Reverts CAT configuration and deinitializes libpqos
+ * @brief Reverts allocation configuration and deinitializes libpqos
  */
-void cat_exit(void);
+void alloc_exit(void);
 
 /**
  * @brief Parses -r/--reset params
@@ -99,14 +99,14 @@ int parse_reset(const char *cpu);
 int parse_rdt(char *rdtstr);
 
 /*
- * @brief Checks if it's possible to fulfill requested CAT configuration
+ * @brief Checks if it's possible to fulfill requested COS configuration
  *        and then configures system.
  *
  * @return status
  * @retval 0 on success
  * @retval negative on error (-errno)
  */
-int cat_configure(void);
+int alloc_configure(void);
 
 /*
  * @brief Resets COS association (assign COS#0) on listed CPUs
@@ -115,7 +115,7 @@ int cat_configure(void);
  * @retval 0 on success
  * @retval negative on error (-errno)
  */
-int cat_reset(void);
+int alloc_reset(void);
 
 /**
  * @brief This function dumps internal config structures

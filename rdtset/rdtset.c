@@ -196,12 +196,13 @@ print_usage(char *prgname, unsigned short_usage)
 		"  Features:\n"
 		"   2, l2\n"
 		"   3, l3\n"
+		"   m, mba\n"
 		" -c <cpulist>, --cpu <cpulist>         "
 		"specify CPUs (affinity)\n"
 		" -p <pid>, --pid <pid>                 "
 		"operate on existing given pid\n"
 		" -r <cpulist>, --reset <cpulist>       "
-		"reset CAT for CPUs\n"
+		"reset allocation for CPUs\n"
 		" -k, --sudokeep                        "
 		"do not drop sudo elevated privileges\n"
 		" -v, --verbose                         "
@@ -218,7 +219,7 @@ print_usage(char *prgname, unsigned short_usage)
 		",\nkeeping sudo elevated privileges:\n"
 		"    -t 'l3=0xf;cpu=1' -c 1 -k id\n\n");
 
-	printf("Examples CAT configuration strings:\n"
+	printf("Examples CAT/MBA configuration strings:\n"
 		"    -t 'l3=0xf;cpu=1'\n"
 		"        CPU 1 uses four L3 cache-ways (mask 0xf)\n\n"
 
@@ -249,7 +250,12 @@ print_usage(char *prgname, unsigned short_usage)
 		"        On CDP enabled system, CPU 1 uses four L3 cache-ways "
 		"for code (mask 0xf)\n"
 		"        and four L3 cache-ways for data (mask 0xf0),\n"
-		"        data and code L3 cache-ways are non-overlapping\n\n");
+		"        data and code L3 cache-ways are non-overlapping\n\n"
+
+		"    -t 'mba=50;l3=0xf;cpu=1'\n"
+		"        CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize"
+		"        up to 50%% of available memory bandwidth"
+	);
 
 	printf("Example CPUs configuration string:\n"
 		"    -c 0-3,4,5\n"
@@ -257,16 +263,16 @@ print_usage(char *prgname, unsigned short_usage)
 
 	printf("Example RESET configuration string:\n"
 		"    -r 0-3,4,5\n"
-		"        reset CAT for CPUs 0,1,2,3,4,5\n\n");
+		"        reset allocation for CPUs 0,1,2,3,4,5\n\n");
 
 	printf("Example usage of RESET option:\n"
 		"    -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-5 -p $BASHPID\n"
-		"        Configure CAT and CPU affinity for BASH process\n\n"
+		"        Configure allocation and CPU affinity for BASH process\n\n"
 		"    -r 0-5 -t 'l3=0xff;cpu=0-5' -c 0-5 -p $BASHPID\n"
-		"        Change CAT configuration of CPUs used by BASH "
+		"        Change allocation configuration of CPUs used by BASH "
 		"process\n\n"
 		"    -r 0-5 -p $BASHPID\n"
-		"        Reset CAT configuration of CPUs used by BASH "
+		"        Reset allocation configuration of CPUs used by BASH "
 		"process\n\n");
 }
 /**
@@ -370,9 +376,9 @@ exit:
  * @brief main function for rdtset
  *
  * Parses cmd line args and validates them,
- * initializes PQoS lib and configures CAT,
+ * initializes PQoS lib and configures CAT/MBA,
  * sets core affinity for executed command process or provided PID,
- * when running command, resets CAT configuration on exit.
+ * when running command, resets allocation configuration on exit.
  *
  * @param [in] argc number of args
  * @param [in] argv args
@@ -417,36 +423,38 @@ main(int argc, char **argv)
 		print_cmd_line_cpu_config();
 	}
 
-	/* Initialize the PQoS library and configure CAT */
-	ret = cat_init();
+	/* Initialize the PQoS library and configure allocation */
+	ret = alloc_init();
 	if (ret < 0) {
-		fprintf(stderr, "%s,%s:%d CAT init failed!\n",
-				__FILE__, __func__, __LINE__);
+		fprintf(stderr, "%s,%s:%d allocation init failed!\n",
+			__FILE__, __func__, __LINE__);
 		exit(EXIT_FAILURE);
 	}
 
 	/* reset COS association */
 	if (0 != CPU_COUNT(&g_cfg.reset_cpuset)) {
 		if (g_cfg.verbose)
-			printf("CAT: Resetting CAT configuration...\n");
+			printf("Allocation: Resetting allocation "
+				"configuration...\n");
 
-		ret = cat_reset();
+		ret = alloc_reset();
 		if (ret != 0) {
-			fprintf(stderr, "CAT: Failed to reset COS association!"
-				"\n");
+			fprintf(stderr, "Allocation: Failed to reset COS "
+				"association!\n");
 			exit(EXIT_FAILURE);
 		}
 	}
 
-	/* configure CAT */
+	/* configure CAT/MBA */
 	if (0 != g_cfg.config_count) {
 		if (g_cfg.verbose)
-			printf("CAT: Configuring CAT...\n");
+			printf("Allocation: Configuring allocation...\n");
 
-		ret = cat_configure();
+		ret = alloc_configure();
 		if (ret != 0) {
-			fprintf(stderr, "CAT: Failed to configure CAT!\n");
-			cat_fini();
+			fprintf(stderr, "Allocation: Failed to configure "
+				"allocation!\n");
+			alloc_fini();
 			_Exit(EXIT_FAILURE);
 		}
 	}
@@ -485,7 +493,7 @@ main(int argc, char **argv)
 		 * If we were doing operation on PID or RESET,
 		 * just deinit libpqos
 		 **/
-		cat_fini();
+		alloc_fini();
 		_Exit(EXIT_SUCCESS);
 	}
 }

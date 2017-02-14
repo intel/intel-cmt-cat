@@ -1,13 +1,14 @@
 ================================================================================
 README for rdtset
 
-June 2016
+February 2017
 ================================================================================
 
 CONTENTS
 ========
 
 - Overview
+- Features
 - Compilation
 - Usage
 - Legal Disclaimer
@@ -17,7 +18,17 @@ OVERVIEW
 ========
 
 rdtset is a taskset like tool allowing the user to launch a new command with
-a given CPU affinity and L2/L3 cache configuration. Supports Linux and FreeBSD.
+a given CPU affinity and Intel(R) Resource Director Technology allocation.
+
+
+FEATURES
+========
+The following Intel(R) RDT features are supported:
+ - L2 CAT (Cache Allocation Technology)
+ - L3 CAT (Cache Allocation Technology)
+ - MBA (Memory Bandwitch Allocation)
+
+Supports Linux and FreeBSD.
 
 
 COMPILATION
@@ -44,9 +55,10 @@ Options:
   Features:
    2, l2
    3, l3
+   m, mba
  -c <cpulist>, --cpu <cpulist>         specify CPUs (affinity)
  -p <pid>, --pid <pid>                 operate on existing given pid
- -r <cpulist>, --reset <cpulist>       reset CAT for CPUs
+ -r <cpulist>, --reset <cpulist>       reset allocation for CPUs
  -k, --sudokeep                        do not drop sudo elevated privileges
  -v, --verbose                         prints out additional logging information
  -h, --help                            display help
@@ -55,7 +67,7 @@ Run "id" command on CPU 1 using four L3 cache-ways (mask 0xf),
 keeping sudo elevated privileges:
     -t 'l3=0xf;cpu=1' -c 1 -k id
 
-Examples CAT configuration strings:
+Example allocation configuration strings:
     -t 'l3=0xf;cpu=1'
         CPU 1 uses four L3 cache-ways (mask 0xf)
 
@@ -80,23 +92,29 @@ Examples CAT configuration strings:
         and four L3 cache-ways for data (mask 0xf0),
         data and code L3 cache-ways are non-overlapping
 
+    -t 'mba=70;cpu=0-2'
+        CPUs 0-2 can utilize up to 70% of available memory bandwidth
+
+    -t 'mba=50;l3=0xf;cpu=1'
+        CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize up to 50% of available memory bandwidth
+
 Example CPUs configuration string:
     -c 0-3,4,5
         CPUs 0,1,2,3,4,5
 
 Example RESET configuration string:
     -r 0-3,4,5
-        reset CAT for CPUs 0,1,2,3,4,5
+        reset allocation for CPUs 0,1,2,3,4,5
 
 Example usage of RESET option:
     -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-5 -p $BASHPID
-        Configure CAT and CPU affinity for BASH process
+        Configure L3 CAT and CPU affinity for BASH process
 
     -r 0-5 -t 'l3=0xff;cpu=0-5' -c 0-5 -p $BASHPID
-        Change CAT configuration of CPUs used by BASH process
+        Change L3 CAT configuration of CPUs used by BASH process
 
     -r 0-5 -p $BASHPID
-        Reset CAT configuration of CPUs used by BASH process
+        Reset allocation configuration of CPUs used by BASH process
 
 1. Run "id" command to test privilege drop:
  $ sudo rdtset -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 id
@@ -125,7 +143,7 @@ Example usage of RESET option:
  $ taskset -pc $BASHPID
  $ sudo pqos -s
 
- In order to reconfigure CAT, it is needed to reset current CAT configuration:
+ In order to reconfigure allocation, it is needed to reset current configuration:
  $ sudo rdtset -r 0-5 -t 'l3=0xff;cpu=0-5' -c 0-5 -p $BASHPID
 
  $ sudo pqos -s
@@ -138,7 +156,7 @@ Example usage of RESET option:
  $ cpuset -g -p $BASHPID
  $ sudo pqos -s
 
- In order to reconfigure CAT, it is needed to reset current CAT configuration:
+ In order to reconfigure allocation, it is needed to reset current configuration:
  $ sudo rdtset -r 0-5 -t 'l3=0xff;cpu=0-5' -c 0-5 -p $BASHPID
 
  $ sudo pqos -s
