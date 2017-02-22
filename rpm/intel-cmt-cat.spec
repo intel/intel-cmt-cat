@@ -23,9 +23,18 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+%global ver014      0.1.4
+%global ver015      0.1.5
+%global ver0151     0.1.5
 %global githubname  intel-cmt-cat
-%global githubver   0.1.4
+%global githubver   %{ver0151}
+
+%if "%{githubver}" == "%{ver0151}"
+%global githubfull  %{githubname}-%{githubver}-1
+%else
 %global githubfull  %{githubname}-%{githubver}
+%endif
+
 %global pkgname     intel-cmt-cat
 %if 0%{!?_licensedir}
 %global _licensedir %{_docdir}
@@ -34,11 +43,22 @@
 Summary:            Provides command line interface to CMT, MBM, CAT and CDP technologies
 Name:               %{pkgname}
 Version:            %{githubver}
+
+%if "%{githubver}" == "%{ver015}"
+Release:            1%{?dist}
+%endif
+%if "%{githubver}" == "%{ver014}"
 Release:            3%{?dist}
+%endif
+
 License:            BSD
 Group:              Development/Tools
 ExclusiveArch:      x86_64 i686 i586
+%if "%{githubver}" == "%{ver0151}"
+Source0:            https://github.com/01org/%{githubname}/archive/v%{githubver}-1.tar.gz
+%else
 Source0:            https://github.com/01org/%{githubname}/archive/v%{githubver}.tar.gz
+%endif
 URL:                https://github.com/01org/%{githubname}
 
 %description
@@ -55,7 +75,12 @@ provides an interface to read and write the MSR registers but
 it requires root privileges.
 
 %prep
+
 %autosetup -n %{githubfull}
+
+%if "%{githubver}" == "%{ver015}"
+%post -p /sbin/ldconfig
+%endif
 
 %build
 make %{?_smp_mflags}
@@ -63,6 +88,31 @@ make %{?_smp_mflags}
 %install
 # Not doing make install as it strips the symbols.
 # Using files from the build directory.
+%if "%{githubver}" == "%{ver015}" || "%{githubver}" == "%{ver0151}"
+install -d %{buildroot}/%{_bindir}
+install %{_builddir}/%{githubfull}/pqos/pqos %{buildroot}/%{_bindir}
+
+install -d %{buildroot}/%{_mandir}/man8
+install -m 0644 %{_builddir}/%{githubfull}/pqos/pqos.8  %{buildroot}/%{_mandir}/man8
+
+install -d %{buildroot}/%{_bindir}
+install %{_builddir}/%{githubfull}/rdtset/rdtset %{buildroot}/%{_bindir}
+
+install -d %{buildroot}/%{_mandir}/man8
+install -m 0644 %{_builddir}/%{githubfull}/rdtset/rdtset.8  %{buildroot}/%{_mandir}/man8
+
+install -d %{buildroot}/%{_licensedir}/%{name}-%{version}
+install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%{name}-%{version}
+
+install -d %{buildroot}/%{_libdir}
+%if "%{githubver}" == "%{ver0151}"
+install %{_builddir}/%{githubfull}/lib/libpqos-0.1.6.so %{buildroot}/%{_libdir}
+%else
+install %{_builddir}/%{githubfull}/lib/libpqos-0.1.5.so %{buildroot}/%{_libdir}
+%endif
+%endif
+
+%if "%{githubver}" == "%{ver014}"
 install -d %{buildroot}/%{_bindir}
 install %{_builddir}/%{githubfull}/pqos %{buildroot}/%{_bindir}
 
@@ -71,14 +121,33 @@ install -m 0644 %{_builddir}/%{githubfull}/pqos.8 %{buildroot}/%{_mandir}/man8
 
 install -d %{buildroot}/%{_licensedir}/%{name}-%{version}
 install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%{name}-%{version}
+%endif
 
 %files
 %{_bindir}/pqos
 %{_mandir}/man8/pqos.8.gz
+
+%if "%{githubver}" == "%{ver015}" || "%{githubver}" == "%{ver0151}"
+%{_bindir}/rdtset
+%{_mandir}/man8/rdtset.8.gz
+%if "%{githubver}" == "%{ver0151}"
+%{_libdir}/libpqos-0.1.6.so
+%else
+%{_libdir}/libpqos-0.1.5.so
+%endif
+%endif
+
 %{!?_licensedir:%global license %%doc}
 %license %{_licensedir}/%{name}-%{version}/LICENSE
+%doc ChangeLog README
 
 %changelog
+* Tue Feb 14 2017 Aaron Hetherington <aaron.hetherington@intel.com> 0.1.5-1
+- new release
+
+* Mon Oct 17 2016 Aaron Hetherington <aaron.hetherington@intel.com> 0.1.5
+- new release
+
 * Tue Apr 19 2016 Tomasz Kantecki <tomasz.kantecki@intel.com> 0.1.4-3
 - global typo fix
 - small edits in the description
