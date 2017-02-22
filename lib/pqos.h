@@ -536,13 +536,13 @@ int pqos_alloc_release(const unsigned *core_array,
                        const unsigned core_num);
 
 /**
- * @brief Resets configuration of cache allocation technology
+ * @brief Resets configuration of allocation technologies
  *
- * Reverts CAT state to the one after reset:
+* Reverts CAT/MBA state to the one after reset:
  * - all cores associated with COS0
- * - all COS are set to give access to all cache ways
+ * - all COS are set to give access to entire resource
  *
- * As part of CAT reset CDP reconfiguration can be performed.
+ * As part of allocation reset CDP reconfiguration can be performed.
  * This can be requested via \a l3_cdp_cfg.
  *
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
@@ -593,7 +593,7 @@ int pqos_l3ca_set(const unsigned socket,
  *
  * @param [in] socket CPU socket id
  * @param [in] max_num_ca maximum number of classes of service
- *            that can be accommodated at \a ca
+ *             that can be accommodated at \a ca
  * @param [out] num_ca number of classes of service read into \a ca
  * @param [out] ca table with read classes of service
  *

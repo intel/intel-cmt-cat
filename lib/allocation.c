@@ -73,7 +73,7 @@
  */
 #define PQOS_MSR_L3CA_MASK_START 0xC90
 #define PQOS_MSR_L3CA_MASK_END   0xD0F
-#define PQOS_MSR_L3CA_MASK_NUMOF \
+#define PQOS_MSR_L3CA_MASK_NUMOF                                \
         (PQOS_MSR_L3CA_MASK_END - PQOS_MSR_L3CA_MASK_START + 1)
 
 #define PQOS_MSR_L2CA_MASK_START 0xD10
@@ -175,9 +175,9 @@ static int is_contiguous(uint64_t bitmask)
 }
 
 int
-pqos_l3ca_set(const unsigned socket,
-              const unsigned num_ca,
-              const struct pqos_l3ca *ca)
+hw_l3ca_set(const unsigned socket,
+            const unsigned num_ca,
+            const struct pqos_l3ca *ca)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
@@ -295,10 +295,10 @@ pqos_l3ca_set(const unsigned socket,
 }
 
 int
-pqos_l3ca_get(const unsigned socket,
-              const unsigned max_num_ca,
-              unsigned *num_ca,
-              struct pqos_l3ca *ca)
+hw_l3ca_get(const unsigned socket,
+            const unsigned max_num_ca,
+            unsigned *num_ca,
+            struct pqos_l3ca *ca)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
@@ -386,9 +386,9 @@ pqos_l3ca_get(const unsigned socket,
 }
 
 int
-pqos_l2ca_set(const unsigned l2id,
-              const unsigned num_ca,
-              const struct pqos_l2ca *ca)
+hw_l2ca_set(const unsigned l2id,
+            const unsigned num_ca,
+            const struct pqos_l2ca *ca)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
@@ -463,10 +463,10 @@ pqos_l2ca_set(const unsigned l2id,
 }
 
 int
-pqos_l2ca_get(const unsigned l2id,
-              const unsigned max_num_ca,
-              unsigned *num_ca,
-              struct pqos_l2ca *ca)
+hw_l2ca_get(const unsigned l2id,
+            const unsigned max_num_ca,
+            unsigned *num_ca,
+            struct pqos_l2ca *ca)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0;
@@ -523,10 +523,10 @@ pqos_l2ca_get(const unsigned l2id,
         return ret;
 }
 
-int pqos_mba_set(const unsigned socket,
-                 const unsigned num_cos,
-                 const struct pqos_mba *requested,
-                 struct pqos_mba *actual)
+int hw_mba_set(const unsigned socket,
+               const unsigned num_cos,
+               const struct pqos_mba *requested,
+               struct pqos_mba *actual)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0, step = 0;
@@ -628,10 +628,10 @@ int pqos_mba_set(const unsigned socket,
         return ret;
 }
 
-int pqos_mba_get(const unsigned socket,
-                 const unsigned max_num_cos,
-                 unsigned *num_cos,
-                 struct pqos_mba *mba_tab)
+int hw_mba_get(const unsigned socket,
+               const unsigned max_num_cos,
+               unsigned *num_cos,
+               struct pqos_mba *mba_tab)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
@@ -742,8 +742,8 @@ cos_assoc_set(const unsigned lcore, const unsigned class_id)
 }
 
 int
-pqos_alloc_assoc_set(const unsigned lcore,
-                     const unsigned class_id)
+hw_alloc_assoc_set(const unsigned lcore,
+                   const unsigned class_id)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned num_l2_cos = 0, num_l3_cos = 0;
@@ -789,8 +789,8 @@ pqos_alloc_assoc_set(const unsigned lcore,
 }
 
 int
-pqos_alloc_assoc_get(const unsigned lcore,
-                     unsigned *class_id)
+hw_alloc_assoc_get(const unsigned lcore,
+                   unsigned *class_id)
 {
         const struct pqos_capability *l3_cap = NULL;
         const struct pqos_capability *l2_cap = NULL;
@@ -967,10 +967,10 @@ get_unused_cos(const unsigned id,
         return PQOS_RETVAL_RESOURCE;
 }
 
-int pqos_alloc_assign(const unsigned technology,
-                      const unsigned *core_array,
-                      const unsigned core_num,
-                      unsigned *class_id)
+int hw_alloc_assign(const unsigned technology,
+                    const unsigned *core_array,
+                    const unsigned core_num,
+                    unsigned *class_id)
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         unsigned i, hi_cos_id;
@@ -1044,8 +1044,8 @@ int pqos_alloc_assign(const unsigned technology,
         return ret;
 }
 
-int pqos_alloc_release(const unsigned *core_array,
-                       const unsigned core_num)
+int hw_alloc_release(const unsigned *core_array,
+                     const unsigned core_num)
 {
         unsigned i;
         int ret = PQOS_RETVAL_OK;
@@ -1176,7 +1176,7 @@ alloc_assoc_reset(void)
 }
 
 int
-pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
+hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 {
         unsigned *sockets = NULL;
         unsigned sockets_num = 0;
@@ -1300,7 +1300,7 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 
                         ret = alloc_cos_reset(PQOS_MSR_L2CA_MASK_START,
                                               l2_cap->num_classes, core,
-                                            ways_mask);
+                                              ways_mask);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
                 }

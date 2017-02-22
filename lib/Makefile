@@ -173,7 +173,7 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,GLOBAL_INITIALISERS \
-	-f cap.c -f cap.h -f allocation.c -f perf.c -f perf.h \
+	-f api.c cap.c -f cap.h -f allocation.c -f perf.c -f perf.h \
 	-f allocation.h -f monitoring.c -f monitoring.h \
 	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
 	-f utils.c -f cpuinfo.h -f pidapi.c -f pidapi.h
@@ -188,7 +188,7 @@ cppcheck:
 	$(CPPCHECK) \
 	--enable=warning,portability,performance,missingInclude \
 	--std=c99 --template=gcc \
-	cap.c cap.h allocation.c perf.c perf.h \
+	api.c cap.c cap.h allocation.c perf.c perf.h \
 	allocation.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \
 	utils.c cpuinfo.c cpuinfo.h pidapi.c pidapi.h
