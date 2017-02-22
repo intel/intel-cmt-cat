@@ -52,9 +52,9 @@
 #define CAT_UPDATE_SCOPE_CODE 2    /**< update COS code mask */
 
 /**
- * L3/L2 CAT selected
+ * Allocation type selected
  */
-enum sel_cat_type {
+enum sel_alloc_type {
 	L3CA,
 	L2CA,
         MBA
@@ -73,12 +73,12 @@ static unsigned sel_alloc_opt_num = 0;
 /**
  * Number of allocation settings successfully modified
  */
-static unsigned sel_cat_alloc_mod = 0;
+static unsigned sel_alloc_mod = 0;
 
 /**
  * Number of core to COS associations to be done
  */
-static int sel_cat_assoc_num = 0;
+static int sel_assoc_num = 0;
 
 /**
  * Core to COS associations details
@@ -86,10 +86,10 @@ static int sel_cat_assoc_num = 0;
 static struct {
         unsigned core;
         unsigned class_id;
-} sel_cat_assoc_tab[PQOS_MAX_CORES];
+} sel_assoc_tab[PQOS_MAX_CORES];
 
 /**
- * @brief Converts string describing CAT COS into ID and mask scope
+ * @brief Converts string describing allocation COS into ID and mask scope
  *
  * Current string format is: <ID>[CcDd]
  *
@@ -98,7 +98,7 @@ static struct {
  *  5C  - class 5, code mask
  *  0   - class 0, common mask for code & data
  *
- * @param [in] str string describing CAT COS. Function may modify
+ * @param [in] str string describing allocation COS. Function may modify
  *             the last character of the string in some conditions.
  * @param [out] scope indicates if string \a str refers to both COS masks
  *              or just one of them
@@ -211,7 +211,7 @@ set_l3_cos(const unsigned class_id, const uint64_t mask,
                                (long) ca.u.ways_mask);
                 set++;
         }
-        sel_cat_alloc_mod += set;
+        sel_alloc_mod += set;
         if (set < sock_num)
                 return -1;
 
@@ -255,7 +255,7 @@ set_l2_cos(const unsigned class_id, const uint64_t mask,
                        l2_ids[i], ca.class_id, ca.ways_mask);
                 set++;
         }
-        sel_cat_alloc_mod += set;
+        sel_alloc_mod += set;
         if (set < id_num)
                 return -1;
 
@@ -303,7 +303,7 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
                        mba.mb_rate, actual.mb_rate);
                 set++;
         }
-        sel_cat_alloc_mod += set;
+        sel_alloc_mod += set;
         if (set < sock_num)
                 return -1;
 
@@ -318,7 +318,7 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
  * @param str fragment of string passed to -e command line option
  * @param res_ids array of resource ID's to set COS definition
  * @param res_num number of resource ID's in array
- * @param type CAT type (L2/L3)
+ * @param type allocation type (L2/L3/MBA)
  *
  * @return Number of classes set
  * @retval Positive on success
@@ -327,7 +327,7 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
 static int
 set_allocation_cos(char *str, unsigned *res_ids,
                    const unsigned res_num,
-                   const enum sel_cat_type type,
+                   const enum sel_alloc_type type,
                    const struct pqos_cpuinfo *cpu)
 {
         char *p = NULL;
@@ -346,6 +346,7 @@ set_allocation_cos(char *str, unsigned *res_ids,
         parse_cos_mask_type(str, &update_scope, &class_id);
         mask = strtouint64(p+1);
 
+	/* if MBA selected, set MBA classes */
         if (type == MBA) {
                 if (ids == NULL)
                         ids = pqos_cpu_get_sockets(cpu, &n);
@@ -408,7 +409,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
         int ret = -1;
         char *q = NULL, *p = NULL;
         char *s = NULL, *saveptr = NULL;
-        enum sel_cat_type type;
+        enum sel_alloc_type type;
         const unsigned max_res_sz = MAX(PQOS_MAX_SOCKETS, PQOS_MAX_L2IDS);
         unsigned res_ids[max_res_sz], *sp = NULL, i, n = 1;
 
@@ -513,7 +514,7 @@ set_alloc(const struct pqos_cpuinfo *cpu)
         if (ret <= 0)
                 return -1;
 
-        return (int)sel_cat_alloc_mod;
+        return (int)sel_alloc_mod;
 }
 
 void selfn_allocation_class(const char *arg)
@@ -555,9 +556,9 @@ set_allocation_assoc(void)
         int i;
         int ret;
 
-        for (i = 0; i < sel_cat_assoc_num; i++) {
-                ret = pqos_alloc_assoc_set(sel_cat_assoc_tab[i].core,
-                                           sel_cat_assoc_tab[i].class_id);
+        for (i = 0; i < sel_assoc_num; i++) {
+                ret = pqos_alloc_assoc_set(sel_assoc_tab[i].core,
+                                           sel_assoc_tab[i].class_id);
                 ASSERT(ret == PQOS_RETVAL_OK);
                 if (ret == PQOS_RETVAL_PARAM) {
                         printf("Core number or class id is out of bounds!\n");
@@ -569,7 +570,7 @@ set_allocation_assoc(void)
                 }
         }
 
-        return sel_cat_assoc_num;
+        return sel_assoc_num;
 }
 
 /**
@@ -602,49 +603,49 @@ parse_allocation_assoc(char *str)
         if (n == 0)
                 return;
 
-        if (sel_cat_assoc_num <= 0) {
+        if (sel_assoc_num <= 0) {
                 for (i = 0; i < n; i++) {
-                        if (i >= DIM(sel_cat_assoc_tab))
+                        if (i >= DIM(sel_assoc_tab))
                                 parse_error(str,
                                             "too many cores selected for "
                                             "allocation association");
-                        sel_cat_assoc_tab[i].core = (unsigned) cores[i];
-                        sel_cat_assoc_tab[i].class_id = cos;
+                        sel_assoc_tab[i].core = (unsigned) cores[i];
+                        sel_assoc_tab[i].class_id = cos;
                 }
-                sel_cat_assoc_num = (int) n;
+                sel_assoc_num = (int) n;
                 return;
         }
 
         for (i = 0; i < n; i++) {
                 int j;
 
-                for (j = 0; j < sel_cat_assoc_num; j++)
-                        if (sel_cat_assoc_tab[j].core == (unsigned) cores[i])
+                for (j = 0; j < sel_assoc_num; j++)
+                        if (sel_assoc_tab[j].core == (unsigned) cores[i])
                                 break;
 
-                if (j < sel_cat_assoc_num) {
+                if (j < sel_assoc_num) {
                         /**
                          * this core is already on the list
                          * - update COS but warn about it
                          */
                         printf("warn: updating COS for core %u from %u to %u\n",
                                (unsigned) cores[i],
-                               sel_cat_assoc_tab[j].class_id, cos);
-                        sel_cat_assoc_tab[j].class_id = cos;
+                               sel_assoc_tab[j].class_id, cos);
+                        sel_assoc_tab[j].class_id = cos;
                 } else {
                         /**
                          * New core is selected - extend the list
                          */
-                        unsigned k = (unsigned) sel_cat_assoc_num;
+                        unsigned k = (unsigned) sel_assoc_num;
 
-                        if (k >= DIM(sel_cat_assoc_tab))
+                        if (k >= DIM(sel_assoc_tab))
                                 parse_error(str,
                                             "too many cores selected for "
                                             "allocation association");
 
-                        sel_cat_assoc_tab[k].core = (unsigned) cores[i];
-                        sel_cat_assoc_tab[k].class_id = cos;
-                        sel_cat_assoc_num++;
+                        sel_assoc_tab[k].core = (unsigned) cores[i];
+                        sel_assoc_tab[k].class_id = cos;
+                        sel_assoc_num++;
                 }
         }
 }
@@ -675,7 +676,7 @@ void selfn_allocation_assoc(const char *arg)
 }
 
 /**
- * @brief Prints L3 CAT class defnition
+ * @brief Prints L3 CAT class definition
  *
  * @param [in] ca L3 CAT definition structure
  * @param [in] is_error indicates error condition when reading L3 CAT class
@@ -890,9 +891,10 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
 
 int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_capability *cap_l2ca,
+		const struct pqos_capability *cap_mba,
                 const struct pqos_cpuinfo *cpu)
 {
-        if (cap_l3ca != NULL || cap_l2ca != NULL) {
+        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL) {
                 /**
                  * If allocation config changed then exit.
                  * For monitoring, start the program again unless
@@ -907,7 +909,7 @@ int alloc_apply(const struct pqos_capability *cap_l3ca,
                 }
                 ret_assoc = set_allocation_assoc();
                 if (ret_assoc < 0) {
-                        printf("CAT association error!\n");
+                        printf("Allocation association error!\n");
                         return -1;
                 }
                 /**
@@ -918,7 +920,7 @@ int alloc_apply(const struct pqos_capability *cap_l3ca,
                         return 1;
                 }
         } else {
-                if (sel_cat_assoc_num > 0 || sel_alloc_opt_num > 0) {
+                if (sel_assoc_num > 0 || sel_alloc_opt_num > 0) {
                         printf("Allocation capability not detected!\n");
                         return -1;
                 }

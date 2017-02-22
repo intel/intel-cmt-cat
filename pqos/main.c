@@ -83,9 +83,9 @@ static char *sel_allocation_profile = NULL;
 static int sel_verbose_mode = 0;
 
 /**
- * Reset CAT configuration
+ * Reset allocation configuration
  */
-static int sel_reset_CAT = 0;
+static int sel_reset_alloc = 0;
 
 /**
  * Enable showing cache allocation settings
@@ -280,12 +280,12 @@ selfn_super_verbose_mode(const char *arg)
 }
 
 /**
- * @brief Sets CAT reset flag
+ * @brief Sets allocation reset flag
  *
  * @param [in] arg optional configuration string
  *             if NULL or zero length  then configuration check is skipped
  */
-static void selfn_reset_cat(const char *arg)
+static void selfn_reset_alloc(const char *arg)
 {
         if (arg != NULL && (strlen(arg) > 0)) {
                 const struct {
@@ -303,12 +303,13 @@ static void selfn_reset_cat(const char *arg)
                                 break;
 
                 if (i >= DIM(patterns)) {
-                        printf("Unrecognized '%s' CAT reset option!\n", arg);
+                        printf("Unrecognized '%s' allocation "
+                               "reset option!\n", arg);
                         exit(EXIT_FAILURE);
                 }
                 selfn_l3cdp_config = patterns[i].cdp;
         }
-        sel_reset_CAT = 1;
+        sel_reset_alloc = 1;
 }
 
 /**
@@ -362,7 +363,7 @@ parse_config_file(const char *fname)
                 {"monitor-file:",       selfn_monitor_file },      /**< -o */
                 {"monitor-file-type:",  selfn_monitor_file_type }, /**< -u */
                 {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
-                {"reset-cat:",          selfn_reset_cat },         /**< -R */
+                {"reset-cat:",          selfn_reset_alloc },         /**< -R */
         };
         FILE *fp = NULL;
         char cb[256];
@@ -467,7 +468,7 @@ static const char help_printf_long[] =
         "          CLASS2CORE format is 'TYPE:ID=CORE_LIST'.\n"
         "          Example 'llc:0=0,2,4,6-10;llc:1=1'.\n"
         "  -R [CONFIG], --alloc-reset[=CONFIG]\n"
-        "          reset allocation configuration (L2/L3 CAT)\n"
+        "          reset allocation configuration (L2/L3 CAT & MBA)\n"
         "          CONFIG can be: l3cdp-on, l3cdp-off or l3cdp-any (default).\n"
         "  -m EVTCORES, --mon-core=EVTCORES\n"
         "          select cores and events for monitoring.\n"
@@ -606,10 +607,10 @@ int main(int argc, char **argv)
                                  * Pass NULL as argument to '-R' function and
                                  * rewind \a optind.
                                  */
-                                selfn_reset_cat(NULL);
+                                selfn_reset_alloc(NULL);
                                 optind--;
                         } else {
-                                selfn_reset_cat(optarg);
+                                selfn_reset_alloc(optarg);
                         }
                         break;
                 case ':':
@@ -624,7 +625,7 @@ int main(int argc, char **argv)
                                        "argument\n", optopt);
                                 return EXIT_FAILURE;
                         } else {
-                                selfn_reset_cat(NULL);
+                                selfn_reset_alloc(NULL);
                         }
                         break;
                 case 'a':
@@ -730,15 +731,15 @@ int main(int argc, char **argv)
                 }
         }
 
-        if (sel_reset_CAT) {
+        if (sel_reset_alloc) {
                 /**
-                 * Reset CAT configuration to after-reset state and exit
+                 * Reset allocation configuration to after-reset state and exit
                  */
                 if (pqos_alloc_reset(selfn_l3cdp_config) != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
-                        printf("CAT reset failed!\n");
+                        printf("Allocation reset failed!\n");
                 } else
-                        printf("CAT reset successful\n");
+                        printf("Allocation reset successful\n");
         }
 
         if (sel_show_allocation_config) {
@@ -757,7 +758,7 @@ int main(int argc, char **argv)
                 }
         }
 
-        switch (alloc_apply(cap_l3ca, cap_l2ca, p_cpu)) {
+        switch (alloc_apply(cap_l3ca, cap_l2ca, cap_mba, p_cpu)) {
         case 0: /* nothing to apply */
                 break;
         case 1: /* new allocation config applied and all is good */
@@ -773,7 +774,7 @@ int main(int argc, char **argv)
         /**
          * If -R was present ignore all monitoring related options
          */
-        if (sel_reset_CAT)
+        if (sel_reset_alloc)
                 goto allocation_exit;
 
         /**
