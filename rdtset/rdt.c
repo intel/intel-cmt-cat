@@ -81,7 +81,7 @@ rdt_cfg_print(FILE *stream, const struct rdt_cfg cfg)
 		break;
 
 	case PQOS_CAP_TYPE_MBA:
-		fprintf(stream, "RATE: %u", (int) cfg.u.mba->mb_rate);
+		fprintf(stream, "RATE: %u", cfg.u.mba->mb_rate);
 		break;
 
 	default:
