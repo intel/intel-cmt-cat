@@ -1122,6 +1122,130 @@ discover_capabilities(struct pqos_cap **p_cap,
         return ret;
 }
 
+
+/**
+ * @brief Checks file fname to detect str and set a flag
+ *
+ * @param fname name of the file to be searched
+ * @param str string being searched for
+ * @param supported pointer to os_supported flag
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+detect_os_support(const char *fname, const char *str, int *supported)
+{
+        FILE *fd;
+        char temp[1024];
+
+        if (fname == NULL || str == NULL || supported == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        fd = fopen(fname, "r");
+        if (fd == NULL) {
+                LOG_DEBUG("%s not found.\n", fname);
+                return PQOS_RETVAL_OK;
+        }
+
+        while (fgets(temp, sizeof(temp), fd) != NULL) {
+                if (strstr(temp, str) != NULL) {
+                        *supported = 1;
+                        fclose(fd);
+                        return PQOS_RETVAL_OK;
+                }
+        }
+
+        fclose(fd);
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Runs detection of OS monitoring and allocation capabilities
+ *
+ * @param p_cap place to store allocated capabilities structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+discover_os_capabilities(struct pqos_cap *p_cap)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0;
+        unsigned num_cap = p_cap->num_cap;
+        int res_flag = 0;
+        /**
+         * This table is used to assist the discovery of OS CAT capabilities
+         */
+        static struct os_caps {
+                const char *fname;
+                const char *str;
+                int *cap_type_ptr;
+        } tab[PQOS_CAP_TYPE_NUMOF] = {
+                { NULL, NULL, NULL },
+                { "/proc/cpuinfo", "cat_l3", NULL },
+                { "/proc/cpuinfo", "cat_l2", NULL },
+        };
+
+        /**
+         * resctrl detection
+         */
+        ret = detect_os_support("/proc/filesystems", "resctrl", &res_flag);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Fatal error encountered in resctrl detection!\n");
+                return ret;
+        }
+
+        LOG_INFO("%s\n", res_flag ?
+                 "resctrl detected" :
+                 "resctrl not detected. "
+                 "Kernel version 4.10 or higher required");
+
+        if (!res_flag)
+                return PQOS_RETVAL_RESOURCE;
+
+        /**
+         * Check if resctrl is mounted
+         */
+        if (access("/sys/fs/resctrl/cpus", 0) != 0) {
+                LOG_INFO("resctrl not mounted\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+        p_cap->os_enabled = 1;
+
+        /**
+         * Set resctrl flags and search
+         */
+        for (i = 0; i < num_cap; i++) {
+                if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                        tab[PQOS_CAP_TYPE_L3CA].cap_type_ptr =
+                                &p_cap->capabilities[i].os_support;
+
+                if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
+                        tab[PQOS_CAP_TYPE_L2CA].cap_type_ptr =
+                                &p_cap->capabilities[i].os_support;
+        }
+
+        for (i = 0; i < PQOS_CAP_TYPE_NUMOF; i++) {
+                if (tab[i].fname == NULL || tab[i].cap_type_ptr == NULL)
+                        continue;
+
+                ret = detect_os_support(tab[i].fname,
+                                        tab[i].str,
+                                        tab[i].cap_type_ptr);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Fatal error encountered in"
+                                  " resctrl detection!\n");
+                        return ret;
+                }
+                LOG_INFO("%s %s\n", tab[i].str, tab[i].cap_type_ptr ?
+                         "detected" : "not detected");
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
 /*
  * =======================================
  * =======================================
@@ -1194,6 +1318,12 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
         ASSERT(m_cap != NULL);
+
+        ret = discover_os_capabilities(m_cap);
+        if (ret == PQOS_RETVAL_ERROR) {
+                LOG_ERROR("discover_os_capabilities() error %d\n", ret);
+                goto machine_init_error;
+        }
 
         /**
          * If monitoring capability has been discovered

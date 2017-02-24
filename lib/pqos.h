@@ -242,6 +242,7 @@ struct pqos_cap_mon {
  */
 struct pqos_capability {
         enum pqos_cap_type type;
+        int os_support;                 /**< resctrl feature presence */
         union {
                 struct pqos_cap_mon *mon;
                 struct pqos_cap_l3ca *l3ca;
@@ -258,6 +259,7 @@ struct pqos_cap {
         unsigned mem_size;              /**< byte size of the structure */
         unsigned version;               /**< version of PQoS library */
         unsigned num_cap;               /**< number of capabilities */
+        unsigned os_enabled;            /**< resctrl has been mounted */
         struct pqos_capability capabilities[0];
 };
 
