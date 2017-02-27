@@ -872,8 +872,7 @@ get_hi_cos_id(const unsigned technology,
                 if (num_l3_cos == 0)
                         return PQOS_RETVAL_ERROR;
 
-                if (num_cos == 0 || num_l3_cos < num_cos)
-                        num_cos = num_l3_cos;
+		num_cos = num_l3_cos;
         }
 
         if (l2_req) {
