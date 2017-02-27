@@ -183,20 +183,9 @@ hw_l3ca_set(const unsigned socket,
         unsigned i = 0, count = 0, core = 0;
         int cdp_enabled = 0;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (ca == NULL || num_ca == 0) {
-                _pqos_api_unlock();
+        if (ca == NULL || num_ca == 0)
                 return PQOS_RETVAL_PARAM;
-        }
-
-        /**
+	/**
          * Check if class bitmasks are contiguous.
          */
         for (i = 0; i < num_ca; i++) {
@@ -211,35 +200,26 @@ hw_l3ca_set(const unsigned socket,
                 if (!is_contig) {
                         LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
                                   ca[i].class_id);
-                        _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
         }
 
         ASSERT(m_cap != NULL);
         ret = pqos_l3ca_get_cos_num(m_cap, &count);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;             /**< perhaps no L3CA capability */
-        }
 
-        if (num_ca > count) {
-                _pqos_api_unlock();
+        if (num_ca > count)
                 return PQOS_RETVAL_ERROR;
-        }
 
         ret = pqos_l3ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
         if (cdp_enabled) {
                 for (i = 0; i < num_ca; i++) {
@@ -257,16 +237,12 @@ hw_l3ca_set(const unsigned socket,
                         }
 
                         retval = msr_write(core, reg, dmask);
-                        if (retval != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
+                        if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
-                        }
 
                         retval = msr_write(core, reg+1, cmask);
-                        if (retval != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
+                        if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
-                        }
                 }
         } else {
                 for (i = 0; i < num_ca; i++) {
@@ -278,19 +254,14 @@ hw_l3ca_set(const unsigned socket,
                         if (ca[i].cdp) {
                                 LOG_ERROR("Attempting to set CDP COS "
                                           "while CDP is disabled!\n");
-                                _pqos_api_unlock();
                                 return PQOS_RETVAL_ERROR;
                         }
 
                         retval = msr_write(core, reg, val);
-                        if (retval != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
+                        if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
-                        }
                 }
         }
-
-        _pqos_api_unlock();
         return ret;
 }
 
@@ -307,43 +278,25 @@ hw_l3ca_get(const unsigned socket,
         int retval = MACHINE_RETVAL_OK;
         int cdp_enabled = 0;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (num_ca == NULL || ca == NULL || max_num_ca == 0) {
-                _pqos_api_unlock();
+        if (num_ca == NULL || ca == NULL || max_num_ca == 0)
                 return PQOS_RETVAL_PARAM;
-        }
 
         ASSERT(m_cap != NULL);
         ret = pqos_l3ca_get_cos_num(m_cap, &count);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;             /**< perhaps no L3CA capability */
-        }
 
         ret = pqos_l3ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
-        if (count > max_num_ca) {
-                _pqos_api_unlock();
+        if (count > max_num_ca)
                 return PQOS_RETVAL_ERROR;
-        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
         if (cdp_enabled) {
                 for (i = 0, reg = PQOS_MSR_L3CA_MASK_START;
@@ -352,36 +305,31 @@ hw_l3ca_get(const unsigned socket,
                         ca[i].class_id = i;
 
                         retval = msr_read(core, reg, &val);
-                        if (retval != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
+                        if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
-                        }
+
                         ca[i].u.s.data_mask = val;
 
                         retval = msr_read(core, reg+1, &val);
-                        if (retval != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
+                        if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
-                        }
+
                         ca[i].u.s.code_mask = val;
                 }
         } else {
                 for (i = 0, reg = PQOS_MSR_L3CA_MASK_START;
                      i < count; i++, reg++) {
                         retval = msr_read(core, reg, &val);
-                        if (retval != MACHINE_RETVAL_OK) {
-                                _pqos_api_unlock();
+                        if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
-                        }
+
                         ca[i].cdp = 0;
                         ca[i].class_id = i;
                         ca[i].u.ways_mask = val;
                 }
         }
-
         *num_ca = count;
 
-        _pqos_api_unlock();
         return ret;
 }
 
@@ -393,28 +341,16 @@ hw_l2ca_set(const unsigned l2id,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (ca == NULL || num_ca == 0) {
-                _pqos_api_unlock();
+        if (ca == NULL || num_ca == 0)
                 return PQOS_RETVAL_PARAM;
-        }
 
         /**
          * Check if L2 CAT is supported
          */
         ASSERT(m_cap != NULL);
         ret = pqos_l2ca_get_cos_num(m_cap, &count);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
-        }
 
         /**
          * Check if class bitmasks are contiguous and
@@ -424,13 +360,11 @@ hw_l2ca_set(const unsigned l2id,
                 if (!is_contiguous(ca[i].ways_mask)) {
                         LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
                                   ca[i].class_id);
-                        _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
                 if (ca[i].class_id >= count) {
                         LOG_ERROR("L2 COS%u is out of range (COS%u is max)!\n",
                                   ca[i].class_id, count - 1);
-                        _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
         }
@@ -441,10 +375,8 @@ hw_l2ca_set(const unsigned l2id,
          */
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_by_l2id(m_cpu, l2id, &core);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
         for (i = 0; i < num_ca; i++) {
                 uint32_t reg = ca[i].class_id + PQOS_MSR_L2CA_MASK_START;
@@ -452,13 +384,9 @@ hw_l2ca_set(const unsigned l2id,
                 int retval = MACHINE_RETVAL_OK;
 
                 retval = msr_write(core, reg, val);
-                if (retval != MACHINE_RETVAL_OK) {
-                        _pqos_api_unlock();
+                if (retval != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
-                }
         }
-
-        _pqos_api_unlock();
         return ret;
 }
 
@@ -472,55 +400,37 @@ hw_l2ca_get(const unsigned l2id,
         unsigned i = 0, count = 0;
         unsigned core = 0;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (num_ca == NULL || ca == NULL || max_num_ca == 0) {
-                _pqos_api_unlock();
+        if (num_ca == NULL || ca == NULL || max_num_ca == 0)
                 return PQOS_RETVAL_PARAM;
-        }
 
         ASSERT(m_cap != NULL);
         ret = pqos_l2ca_get_cos_num(m_cap, &count);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
-        }
 
-        if (max_num_ca < count) {
+        if (max_num_ca < count)
                 /* Not enough space to store the classes */
-                _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
-        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_by_l2id(m_cpu, l2id, &core);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
         for (i = 0; i < count; i++) {
                 const uint32_t reg = PQOS_MSR_L2CA_MASK_START + i;
                 uint64_t val = 0;
                 int retval = msr_read(core, reg, &val);
 
-                if (retval != MACHINE_RETVAL_OK) {
-                        _pqos_api_unlock();
+                if (retval != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
-                }
+
                 ca[i].class_id = i;
                 ca[i].ways_mask = val;
         }
-
         *num_ca = count;
-        _pqos_api_unlock();
-        return ret;
+
+	return ret;
 }
 
 int hw_mba_set(const unsigned socket,
@@ -532,28 +442,17 @@ int hw_mba_set(const unsigned socket,
         unsigned i = 0, count = 0, core = 0, step = 0;
         const struct pqos_capability *mba_cap = NULL;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (requested == NULL || num_cos == 0) {
-                _pqos_api_unlock();
+        if (requested == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
-        }
 
         /**
          * Check if MBA is supported
          */
         ASSERT(m_cap != NULL);
         ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &mba_cap);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_RESOURCE; /* MBA not supported */
-        }
+
         count = mba_cap->u.mba->num_classes;
         step = mba_cap->u.mba->throttle_step;
 
@@ -562,10 +461,8 @@ int hw_mba_set(const unsigned socket,
          */
         if (!mba_cap->u.mba->is_linear) {
                 LOG_ERROR("MBA non-linear mode not currently supported!\n");
-                _pqos_api_unlock();
                 return PQOS_RETVAL_RESOURCE;
         }
-
         /**
          * Check if MBA rate and class
          * id's are within allowed range.
@@ -574,23 +471,19 @@ int hw_mba_set(const unsigned socket,
                 if (requested[i].mb_rate == 0 || requested[i].mb_rate > 100) {
                         LOG_ERROR("MBA COS%u rate out of range (from 1-100)!\n",
                                   requested[i].class_id);
-                        _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
                 if (requested[i].class_id >= count) {
                         LOG_ERROR("MBA COS%u is out of range (COS%u is max)!\n",
                                   requested[i].class_id, count - 1);
-                        _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
         }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
         for (i = 0; i < num_cos; i++) {
                 const uint32_t reg =
@@ -603,10 +496,8 @@ int hw_mba_set(const unsigned socket,
                         val = mba_cap->u.mba->throttle_max;
 
                 retval = msr_write(core, reg, val);
-                if (retval != MACHINE_RETVAL_OK) {
-                        _pqos_api_unlock();
+                if (retval != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
-                }
 
                 /**
                  * If table to store actual values set is passed,
@@ -616,15 +507,13 @@ int hw_mba_set(const unsigned socket,
                         continue;
 
                 retval = msr_read(core, reg, &val);
-                if (retval != MACHINE_RETVAL_OK) {
-                        _pqos_api_unlock();
+                if (retval != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
-                }
+
                 actual[i] = requested[i];
                 actual[i].mb_rate = (PQOS_MBA_LINEAR_MAX - val);
         }
 
-        _pqos_api_unlock();
         return ret;
 }
 
@@ -636,53 +525,35 @@ int hw_mba_get(const unsigned socket,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0) {
-                _pqos_api_unlock();
+        if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
                 return PQOS_RETVAL_PARAM;
-        }
 
         ASSERT(m_cap != NULL);
         ret = pqos_mba_get_cos_num(m_cap, &count);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;             /**< no MBA capability */
-        }
 
-        if (count > max_num_cos) {
-                _pqos_api_unlock();
+        if (count > max_num_cos)
                 return PQOS_RETVAL_ERROR;
-        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return ret;
-        }
 
         for (i = 0; i < count; i++) {
                 const uint32_t reg = PQOS_MSR_MBA_MASK_START + i;
                 uint64_t val = 0;
                 int retval = msr_read(core, reg, &val);
 
-                if (retval != MACHINE_RETVAL_OK) {
-                        _pqos_api_unlock();
+                if (retval != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
-                }
-                mba_tab[i].class_id = i;
+
+		mba_tab[i].class_id = i;
                 mba_tab[i].mb_rate = (unsigned) PQOS_MBA_LINEAR_MAX - val;
         }
-
         *num_cos = count;
-        _pqos_api_unlock();
+
         return ret;
 }
 /**
@@ -748,43 +619,26 @@ hw_alloc_assoc_set(const unsigned lcore,
         int ret = PQOS_RETVAL_OK;
         unsigned num_l2_cos = 0, num_l3_cos = 0;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_check_core(m_cpu, lcore);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_PARAM;
-        }
 
         ASSERT(m_cap != NULL);
         ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
-        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 return ret;
-        }
 
         ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
-        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 return ret;
-        }
 
-        if (class_id >= num_l3_cos && class_id >= num_l2_cos) {
+        if (class_id >= num_l3_cos && class_id >= num_l2_cos)
                 /* class_id is out of bounds */
-                _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
-        }
 
         ret = cos_assoc_set(lcore, class_id);
 
-        _pqos_api_unlock();
         return ret;
 }
 
@@ -796,49 +650,30 @@ hw_alloc_assoc_get(const unsigned lcore,
         const struct pqos_capability *l2_cap = NULL;
         int ret = PQOS_RETVAL_OK;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (class_id == NULL) {
-                _pqos_api_unlock();
+        if (class_id == NULL)
                 return PQOS_RETVAL_PARAM;
-        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_check_core(m_cpu, lcore);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_PARAM;
-        }
 
         ASSERT(m_cap != NULL);
         ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &l3_cap);
-        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 return ret;
-        }
 
         ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
-        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
-                _pqos_api_unlock();
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 return ret;
-        }
 
-        if (l2_cap == NULL && l3_cap == NULL) {
+        if (l2_cap == NULL && l3_cap == NULL)
                 /* no L2/L3 CAT detected */
-                _pqos_api_unlock();
                 return PQOS_RETVAL_RESOURCE;
-        }
 
         ret = cos_assoc_get(lcore, class_id);
 
-        _pqos_api_unlock();
-        return ret;
+	return ret;
 }
 
 /**
@@ -983,12 +818,6 @@ int hw_alloc_assign(const unsigned technology,
             technology == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK)
-                goto pqos_alloc_assign_exit;
-
         /* Check if core belongs to one resource entity */
         for (i = 0; i < core_num; i++) {
                 const struct pqos_coreinfo *pi = NULL;
@@ -1039,7 +868,6 @@ int hw_alloc_assign(const unsigned technology,
         }
 
  pqos_alloc_assign_exit:
-        _pqos_api_unlock();
         return ret;
 }
 
@@ -1053,19 +881,9 @@ int hw_alloc_release(const unsigned *core_array,
         if (core_num == 0 || core_array == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
         for (i = 0; i < core_num; i++)
                 if (cos_assoc_set(core_array[i], 0) != PQOS_RETVAL_OK)
                         ret = PQOS_RETVAL_ERROR;
-
-        _pqos_api_unlock();
 
         return ret;
 }
@@ -1195,14 +1013,6 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                 LOG_ERROR("Unrecognized L3 CDP configuration setting %d!\n",
                           l3_cdp_cfg);
                 return PQOS_RETVAL_PARAM;
-        }
-
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
         }
 
         /* Get L3 CAT capabilities */
@@ -1369,6 +1179,5 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                 free(sockets);
         if (l2ids != NULL)
                 free(l2ids);
-        _pqos_api_unlock();
         return ret;
 }

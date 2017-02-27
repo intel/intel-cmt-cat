@@ -34,6 +34,7 @@
 
 #include <pqos.h>
 #include "allocation.h"
+#include "cap.h"
 
 /*
  * =======================================
@@ -44,13 +45,41 @@
 int pqos_alloc_assoc_set(const unsigned lcore,
                          const unsigned class_id)
 {
-	return hw_alloc_assoc_set(lcore, class_id);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_alloc_assoc_set(lcore, class_id);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 int pqos_alloc_assoc_get(const unsigned lcore,
                          unsigned *class_id)
 {
-	return hw_alloc_assoc_get(lcore, class_id);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_alloc_assoc_get(lcore, class_id);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 int pqos_alloc_assign(const unsigned technology,
@@ -58,18 +87,60 @@ int pqos_alloc_assign(const unsigned technology,
                       const unsigned core_num,
                       unsigned *class_id)
 {
-	return hw_alloc_assign(technology, core_array, core_num, class_id);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_alloc_assign(technology, core_array, core_num, class_id);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 int pqos_alloc_release(const unsigned *core_array,
                        const unsigned core_num)
 {
-	return hw_alloc_release(core_array, core_num);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_alloc_release(core_array, core_num);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 {
-	return hw_alloc_reset(l3_cdp_cfg);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_alloc_reset(l3_cdp_cfg);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 /*
@@ -82,7 +153,21 @@ int pqos_l3ca_set(const unsigned socket,
                   const unsigned num_cos,
 		  const struct pqos_l3ca *ca)
 {
-	return hw_l3ca_set(socket, num_cos, ca);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_l3ca_set(socket, num_cos, ca);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 int pqos_l3ca_get(const unsigned socket,
@@ -90,7 +175,21 @@ int pqos_l3ca_get(const unsigned socket,
                   unsigned *num_ca,
                   struct pqos_l3ca *ca)
 {
-	return hw_l3ca_get(socket, max_num_ca, num_ca, ca);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_l3ca_get(socket, max_num_ca, num_ca, ca);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 /*
@@ -103,7 +202,21 @@ int pqos_l2ca_set(const unsigned l2id,
                   const unsigned num_cos,
                   const struct pqos_l2ca *ca)
 {
-	return hw_l2ca_set(l2id, num_cos, ca);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_l2ca_set(l2id, num_cos, ca);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 int pqos_l2ca_get(const unsigned l2id,
@@ -111,7 +224,21 @@ int pqos_l2ca_get(const unsigned l2id,
                   unsigned *num_ca,
                   struct pqos_l2ca *ca)
 {
-	return hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
 
 /*
@@ -125,7 +252,22 @@ int pqos_mba_set(const unsigned socket,
                  const struct pqos_mba *requested,
                  struct pqos_mba *actual)
 {
-	return hw_mba_set(socket, num_cos, requested, actual);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_mba_set(socket, num_cos, requested, actual);
+
+	_pqos_api_unlock();
+
+	return ret;
+
 }
 
 int pqos_mba_get(const unsigned socket,
@@ -133,5 +275,19 @@ int pqos_mba_get(const unsigned socket,
                  unsigned *num_cos,
                  struct pqos_mba *mba_tab)
 {
-	return hw_mba_get(socket, max_num_cos, num_cos, mba_tab);
+	int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+	ret = hw_mba_get(socket, max_num_cos, num_cos, mba_tab);
+
+	_pqos_api_unlock();
+
+	return ret;
 }
