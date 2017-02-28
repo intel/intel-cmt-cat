@@ -146,6 +146,11 @@ static int m_apilock = -1;
 static pthread_mutex_t m_apilock_mutex;
 
 /**
+ * Flag used to determine what interface to use (MSR or OS).
+ */
+static int m_use_msr = 0;
+
+/**
  * ---------------------------------------
  * Functions for safe multi-threading
  * ---------------------------------------
@@ -1507,4 +1512,10 @@ void _pqos_cap_l3cdp_change(const int prev, const int next)
                 l3_cap->cdp_on = 0;
                 l3_cap->num_classes = l3_cap->num_classes * 2;
         }
+}
+
+int
+pqos_cap_use_msr(void)
+{
+        return m_use_msr;
 }

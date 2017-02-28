@@ -313,6 +313,16 @@ struct pqos_cpuinfo {
 int pqos_cap_get(const struct pqos_cap **cap,
                  const struct pqos_cpuinfo **cpu);
 
+
+/**
+ * @brief Retrieves PQoS MSR flag status
+ *
+ * @return Flag status
+ * @retval 1 use MSR
+ * @retval 0 use OS
+ */
+int pqos_cap_use_msr(void);
+
 /*
  * =======================================
  * Monitoring
