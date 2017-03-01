@@ -76,6 +76,15 @@ extern "C" {
 
 /*
  * =======================================
+ * Interface values
+ * =======================================
+ */
+#define PQOS_INTER_DEFAULT        0      /**< Smart decision */
+#define PQOS_INTER_OS             1      /**< OS or nothing */
+#define PQOS_INTER_MSR            2      /**< MSR or nothing */
+
+/*
+ * =======================================
  * Init and fini
  * =======================================
  */
@@ -105,12 +114,19 @@ enum pqos_cdp_config {
  *         LOG_VER_DEFAULT        - warning and error messages
  *         LOG_VER_VERBOSE        - warning, error and info messages
  *         LOG_VER_SUPER_VERBOSE  - warning, error, info and debug messages
+ *
+ * @param interface preference
+ *         PQOS_INTER_DEFAULT  - Smart decision, library decides which
+ *                               option to use
+ *         PQOS_INTER_OS       - OS interface or nothing
+ *         PQOS_INTER_MSR      - MSR interface or nothing
  */
 struct pqos_config {
         int fd_log;
         void (*callback_log)(void *, const size_t, const char *);
         void *context_log;
         int verbose;
+        int interface;
 };
 
 /**

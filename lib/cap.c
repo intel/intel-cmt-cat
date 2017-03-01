@@ -1331,6 +1331,28 @@ pqos_init(const struct pqos_config *config)
         }
 
         /**
+         * Compare preference to what is capable and set m_use_msr
+         * Default is to pick OS if enabled else use MSR
+         */
+        if (config->interface == PQOS_INTER_OS) {
+                if (!m_cap->os_enabled) {
+                        ret = PQOS_RETVAL_ERROR;
+                        LOG_ERROR("OS interface requested but not enabled\n");
+                        goto machine_init_error;
+                }
+                m_use_msr = 0;
+        } else if (config->interface == PQOS_INTER_MSR) {
+                if (m_cap->os_enabled) {
+                        ret = PQOS_RETVAL_ERROR;
+                        LOG_ERROR("MSR interface requested but"
+                                  " OS interface mounted\n");
+                        goto machine_init_error;
+                }
+                m_use_msr = 1;
+        } else
+                m_use_msr = !m_cap->os_enabled;
+
+        /**
          * If monitoring capability has been discovered
          * then get max RMID supported by a CPU socket
          * and allocate memory for RMID table
