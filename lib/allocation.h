@@ -58,6 +58,16 @@ int pqos_alloc_init(const struct pqos_cpuinfo *cpu,
                     const struct pqos_config *cfg);
 
 /**
+ * Initializes resctrl file system used for OS allocation interface
+ *
+ * @param cap capabilities structure
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+int os_alloc_init(const struct pqos_cap *cap);
+
+/**
  * @brief Shuts down allocation sub-module of PQoS library
  *
  * @return Operation status
