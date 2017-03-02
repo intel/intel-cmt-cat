@@ -1373,11 +1373,17 @@ pqos_init(const struct pqos_config *config)
         }
 
         ret = pqos_alloc_init(m_cpu, m_cap, config);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("allocation init error %d\n", ret);
-        } else {
+        switch (ret) {
+        case PQOS_RETVAL_BUSY:
+                LOG_ERROR("OS allocation init error!\n");
+                goto machine_init_error;
+        case PQOS_RETVAL_OK:
                 LOG_DEBUG("allocation init OK\n");
                 cat_init = 1;
+                break;
+        default:
+                LOG_ERROR("allocation init error %d\n", ret);
+                break;
         }
 
         if (cat_init == 0 && mon_init == 0) {

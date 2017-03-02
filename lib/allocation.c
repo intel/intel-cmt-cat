@@ -128,12 +128,9 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu,
         m_cap = cap;
         m_cpu = cpu;
 
-	if (cap->os_enabled)  {
+	if (cap->os_enabled)
 		ret = os_alloc_init(cap);
-		if (ret != PQOS_RETVAL_OK)
-			LOG_ERROR("Failed to initialize OS "
-				  "allocation interface!\n");
-	}
+
         return ret;
 }
 
