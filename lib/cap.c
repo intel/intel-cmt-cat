@@ -1244,7 +1244,7 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                                   " resctrl detection!\n");
                         return ret;
                 }
-                LOG_INFO("%s %s\n", tab[i].str, tab[i].cap_type_ptr ?
+                LOG_INFO("%s %s\n", tab[i].str, *tab[i].cap_type_ptr ?
                          "detected" : "not detected");
         }
 
