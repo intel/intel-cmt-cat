@@ -119,7 +119,7 @@ int os_alloc_init(const struct pqos_cap *cap)
          */
 	for (i = 1; i < num_grps; i++) {
 		char buf[128];
-		struct stat st = {0};
+		struct stat st;
 
 		memset(buf, 0, sizeof(buf));
 		if (snprintf(buf, sizeof(buf) - 1,
