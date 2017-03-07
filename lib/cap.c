@@ -148,8 +148,11 @@ static pthread_mutex_t m_apilock_mutex;
 /**
  * Flag used to determine what interface to use (MSR or OS).
  */
-static int m_use_msr = 0;
-
+#ifdef USE_OS
+static unsigned m_use_msr = 0;
+#else
+static unsigned m_use_msr = 1; /**< Set to MSR until OS support implemented */
+#endif
 /**
  * ---------------------------------------
  * Functions for safe multi-threading
@@ -1330,28 +1333,11 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
-        /**
-         * Compare preference to what is capable and set m_use_msr
-         * Default is to pick OS if enabled else use MSR
-         */
-        if (config->interface == PQOS_INTER_OS) {
-                if (!m_cap->os_enabled) {
-                        ret = PQOS_RETVAL_ERROR;
-                        LOG_ERROR("OS interface requested but not enabled\n");
-                        goto machine_init_error;
-                }
-                m_use_msr = 0;
-        } else if (config->interface == PQOS_INTER_MSR) {
-                if (m_cap->os_enabled) {
-                        ret = PQOS_RETVAL_ERROR;
-                        LOG_ERROR("MSR interface requested but"
-                                  " OS interface mounted\n");
-                        goto machine_init_error;
-                }
-                m_use_msr = 1;
-        } else
-                m_use_msr = !m_cap->os_enabled;
-
+        if (m_cap->os_enabled == m_use_msr) {
+                ret = PQOS_RETVAL_ERROR;
+                LOG_ERROR("Interface compatibility error %d\n", ret);
+                goto machine_init_error;
+        }
         /**
          * If monitoring capability has been discovered
          * then get max RMID supported by a CPU socket

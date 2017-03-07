@@ -74,6 +74,11 @@ else
 CFLAGS += -g -O2
 endif
 
+# USE_OS build
+ifeq ($(USE_OS),y)
+CFLAGS += -DUSE_OS
+endif
+
 # Build targets and dependencies
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
