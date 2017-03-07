@@ -58,31 +58,12 @@ int pqos_alloc_init(const struct pqos_cpuinfo *cpu,
                     const struct pqos_config *cfg);
 
 /**
- * @brief Initializes resctrl file system used for OS allocation interface
- *
- * @param cpu cpu topology structure
- * @param cap capabilities structure
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK success
- */
-int os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
-
-/**
  * @brief Shuts down allocation sub-module of PQoS library
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
 int pqos_alloc_fini(void);
-
-/**
- * @brief Shuts down allocation sub-module for OS allocation
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-int os_alloc_fini(void);
 
 /**
  * @brief Hardware interface to associate \a lcore

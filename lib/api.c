@@ -34,6 +34,7 @@
 
 #include <pqos.h>
 #include "allocation.h"
+#include "os_allocation.h"
 #include "monitoring.h"
 #include "cap.h"
 
@@ -63,7 +64,10 @@ int pqos_alloc_assoc_set(const unsigned lcore,
                 return ret;
         }
 
-	ret = hw_alloc_assoc_set(lcore, class_id);
+	if (pqos_cap_use_msr())
+		ret = hw_alloc_assoc_set(lcore, class_id);
+	else
+		ret = os_alloc_assoc_set(lcore, class_id);
 
 	_pqos_api_unlock();
 
@@ -83,7 +87,10 @@ int pqos_alloc_assoc_get(const unsigned lcore,
                 return ret;
         }
 
-	ret = hw_alloc_assoc_get(lcore, class_id);
+	if (pqos_cap_use_msr())
+		ret = hw_alloc_assoc_get(lcore, class_id);
+	else
+		ret = os_alloc_assoc_get(lcore, class_id);
 
 	_pqos_api_unlock();
 

@@ -47,6 +47,7 @@
 
 #include "cap.h"
 #include "allocation.h"
+#include "os_allocation.h"
 
 #include "machine.h"
 #include "types.h"
