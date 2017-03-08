@@ -132,7 +132,7 @@ int os_alloc_init(const struct pqos_cap *cap)
 			continue;
 		}
 
-		if (mkdir(buf, 0700) == -1) {
+		if (mkdir(buf, 0755) == -1) {
 			LOG_DEBUG("Failed to create resctrl group %s!\n", buf);
 			return PQOS_RETVAL_BUSY;
 		}
