@@ -98,8 +98,8 @@
  * Local data structures
  * ---------------------------------------
  */
-const struct pqos_cap *m_cap = NULL;
-const struct pqos_cpuinfo *m_cpu = NULL;
+static const struct pqos_cap *m_cap = NULL;
+static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /**
  * ---------------------------------------
@@ -129,7 +129,7 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu,
         m_cpu = cpu;
 
 	if (!pqos_cap_use_msr())
-		ret = os_alloc_init(cap);
+		ret = os_alloc_init(cpu, cap);
 
         return ret;
 }

@@ -47,6 +47,15 @@
  */
 static const char *rctl_path = "/sys/fs/resctrl/";
 
+
+/**
+ * ---------------------------------------
+ * Local data structures
+ * ---------------------------------------
+ */
+static const struct pqos_cap *m_cap = NULL;
+static const struct pqos_cpuinfo *m_cpu = NULL;
+
 /**
  * @brief Function to find the maximum number of resctrl groups allowed
  *
@@ -103,13 +112,16 @@ os_get_max_rctl_grps(const struct pqos_cap *cap,
 	return PQOS_RETVAL_OK;
 }
 
-int os_alloc_init(const struct pqos_cap *cap)
+int os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
 	unsigned i, num_grps = 0;
 	int ret;
 
-	if (cap == NULL)
+	if (cpu == NULL || cap == NULL)
 		return PQOS_RETVAL_PARAM;
+
+	m_cap = cap;
+	m_cpu = cpu;
 
 	ret = os_get_max_rctl_grps(cap, &num_grps);
 	if (ret != PQOS_RETVAL_OK)
