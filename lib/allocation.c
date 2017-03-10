@@ -141,6 +141,10 @@ pqos_alloc_fini(void)
 
         m_cap = NULL;
         m_cpu = NULL;
+
+        if (!pqos_cap_use_msr())
+                ret = os_alloc_fini();
+
         return ret;
 }
 

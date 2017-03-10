@@ -152,3 +152,12 @@ int os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 	}
 	return PQOS_RETVAL_OK;
 }
+
+int os_alloc_fini(void)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        m_cap = NULL;
+        m_cpu = NULL;
+        return ret;
+}
