@@ -34,6 +34,7 @@
 
 #include <pqos.h>
 #include "allocation.h"
+#include "monitoring.h"
 #include "cap.h"
 
 /*
@@ -291,3 +292,105 @@ int pqos_mba_get(const unsigned socket,
 
 	return ret;
 }
+
+int pqos_mon_reset(void)
+{
+        int ret;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        ret = hw_mon_reset();
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
+int pqos_mon_assoc_get(const unsigned lcore,
+                       pqos_rmid_t *rmid)
+{
+        int ret;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        ret = hw_mon_assoc_get(lcore, rmid);
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
+int pqos_mon_start(const unsigned num_cores,
+                   const unsigned *cores,
+                   const enum pqos_mon_event event,
+                   void *context,
+                   struct pqos_mon_data *group)
+{
+        int ret;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        ret = hw_mon_start(num_cores, cores, event, context, group);
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
+int pqos_mon_stop(struct pqos_mon_data *group)
+{
+        int ret;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        ret = hw_mon_stop(group);
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
+int pqos_mon_poll(struct pqos_mon_data **groups,
+                  const unsigned num_groups)
+{
+        int ret;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        ret = hw_mon_poll(groups, num_groups);
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
