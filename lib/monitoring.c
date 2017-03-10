@@ -903,12 +903,10 @@ hw_mon_start(const unsigned num_cores,
         int ret = PQOS_RETVAL_OK;
         int retval = PQOS_RETVAL_OK;
 
-        if (group == NULL || cores == NULL || num_cores == 0 || event == 0)
-                return PQOS_RETVAL_PARAM;
-
-        if (group->valid == GROUP_VALID_MARKER)
-                return PQOS_RETVAL_PARAM;
-
+        ASSERT(group != NULL);
+        ASSERT(cores != NULL);
+        ASSERT(num_cores > 0);
+        ASSERT(event > 0);
         memset(group, 0, sizeof(*group));
 
         ret = _pqos_check_init(1);
@@ -1116,6 +1114,14 @@ pqos_mon_start_pid(const pid_t pid,
 
         memset(group, 0, sizeof(*group));
 
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
         /**
          * Validate event parameter
          * - only combinations of events allowed
@@ -1124,11 +1130,13 @@ pqos_mon_start_pid(const pid_t pid,
         if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                        PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
                        PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS))) {
+                _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
         }
         if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
             (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) != 0) {
+                _pqos_api_unlock();
                 return PQOS_RETVAL_PARAM;
         }
 	group->event = event;
@@ -1140,6 +1148,7 @@ pqos_mon_start_pid(const pid_t pid,
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
 
+        _pqos_api_unlock();
         return ret;
 #endif /* PQOS_NO_PID_API */
 }
@@ -1151,12 +1160,7 @@ hw_mon_stop(struct pqos_mon_data *group)
         int retval = PQOS_RETVAL_OK;
         unsigned i = 0;
 
-        if (group == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        if (group->valid != GROUP_VALID_MARKER)
-                return PQOS_RETVAL_PARAM;
-
+        ASSERT(group != NULL)
         /**
          * If monitoring PID's then stop
          * counters and return
@@ -1236,15 +1240,6 @@ hw_mon_poll(struct pqos_mon_data **groups,
 
         ASSERT(groups != NULL);
         ASSERT(num_groups > 0);
-        if (groups == NULL || num_groups == 0 || *groups == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        for (i = 0; i < num_groups; i++) {
-                if (groups[i] == NULL)
-                        return PQOS_RETVAL_PARAM;
-                if (groups[i]->valid != GROUP_VALID_MARKER)
-                        return PQOS_RETVAL_PARAM;
-        }
 
         for (i = 0; i < num_groups; i++) {
 	        /**

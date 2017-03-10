@@ -37,6 +37,13 @@
 #include "monitoring.h"
 #include "cap.h"
 
+/**
+ * Value marking monitoring group structure as "valid".
+ * Group becomes "valid" after successful pqos_mon_start() or
+ * pqos_mon_start_pid() call.
+ */
+#define GROUP_VALID_MARKER (0x00DEAD00)
+
 /*
  * =======================================
  * Allocation Technology
@@ -340,6 +347,12 @@ int pqos_mon_start(const unsigned num_cores,
 {
         int ret;
 
+        if (group == NULL || cores == NULL || num_cores == 0 || event == 0)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid == GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
         _pqos_api_lock();
 
         ret = _pqos_check_init(1);
@@ -358,6 +371,12 @@ int pqos_mon_start(const unsigned num_cores,
 int pqos_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
+
+        if (group == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid != GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
 
         _pqos_api_lock();
 
@@ -378,6 +397,17 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
                   const unsigned num_groups)
 {
         int ret;
+        unsigned i;
+
+        if (groups == NULL || num_groups == 0 || *groups == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < num_groups; i++) {
+                if (groups[i] == NULL)
+                        return PQOS_RETVAL_PARAM;
+                if (groups[i]->valid != GROUP_VALID_MARKER)
+                        return PQOS_RETVAL_PARAM;
+        }
 
         _pqos_api_lock();
 
