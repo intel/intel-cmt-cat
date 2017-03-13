@@ -1160,7 +1160,7 @@ hw_mon_stop(struct pqos_mon_data *group)
         int retval = PQOS_RETVAL_OK;
         unsigned i = 0;
 
-        ASSERT(group != NULL)
+        ASSERT(group != NULL);
         /**
          * If monitoring PID's then stop
          * counters and return
