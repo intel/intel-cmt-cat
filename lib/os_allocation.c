@@ -310,19 +310,20 @@ os_get_max_rctl_grps(const struct pqos_cap *cap,
 	return PQOS_RETVAL_OK;
 }
 
-int
-os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
+/**
+ * @brief Prepares and authenticates resctrl file system
+ *        used for OS allocation interface
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int os_alloc_prep(void)
 {
-	unsigned i, num_grps = 0;
-	int ret;
+        unsigned i, num_grps = 0;
+        int ret;
 
-	if (cpu == NULL || cap == NULL)
-		return PQOS_RETVAL_PARAM;
-
-	m_cap = cap;
-	m_cpu = cpu;
-
-	ret = os_get_max_rctl_grps(cap, &num_grps);
+        ASSERT(m_cap != NULL);
+        ret = os_get_max_rctl_grps(m_cap, &num_grps);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
         /*
@@ -350,6 +351,18 @@ os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 		LOG_DEBUG("resctrl group COS%d created\n", i);
 	}
 	return PQOS_RETVAL_OK;
+}
+
+int
+os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
+{
+	if (cpu == NULL || cap == NULL)
+		return PQOS_RETVAL_PARAM;
+
+	m_cap = cap;
+	m_cpu = cpu;
+
+        return os_alloc_prep();
 }
 
 int
