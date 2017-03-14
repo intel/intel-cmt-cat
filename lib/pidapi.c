@@ -980,6 +980,7 @@ set_attrs(const int idx, const char *fname)
 static int
 init_pqos_events(void)
 {
+	int ret = PQOS_RETVAL_OK;
 	int files, i;
         enum pqos_mon_event events = 0;
         struct dirent **namelist = NULL;
@@ -1013,12 +1014,15 @@ init_pqos_events(void)
                                 continue;
 
                         if (set_attrs(j, namelist[i]->d_name)
-                            != PQOS_RETVAL_OK)
-                                return PQOS_RETVAL_ERROR;
+                            != PQOS_RETVAL_OK) {
+                                ret = PQOS_RETVAL_ERROR;
+                                goto init_pqos_events_exit;
+                        }
 
                         events |= events_tab[j].event;
 		}
 	}
+
         /**
          * If both local and total mbm are supported
          * then remote mbm is also supported
@@ -1030,12 +1034,20 @@ init_pqos_events(void)
         }
         if (events == 0) {
                 LOG_ERROR("Failed to find PID monitoring events\n");
-                return PQOS_RETVAL_RESOURCE;
+                ret = PQOS_RETVAL_RESOURCE;
+                goto init_pqos_events_exit;
         }
 
         all_evt_mask |= events;
 
-        return PQOS_RETVAL_OK;
+ init_pqos_events_exit:
+        if (files > 0) {
+                for (i = 0; i < files; i++)
+                        free(namelist[i]);
+                free(namelist);
+        }
+
+        return ret;
 }
 
 int
