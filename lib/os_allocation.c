@@ -577,6 +577,81 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 
 	return ret;
 }
+
+/**
+ * @brief Write resctrl schemata to file
+ *
+ * @param [in] class_id COS id
+ * @param [in] schemata Schemata to write
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+schemata_write(const unsigned class_id, const struct schemata *schemata)
+{
+	int ret = PQOS_RETVAL_OK;
+	unsigned i;
+	FILE *fd;
+	char buf[16 * 1024];
+
+	ASSERT(schemata != NULL);
+
+	fd = rctl_fopen(class_id, rctl_schemata, "w");
+	if (fd == NULL)
+		return PQOS_RETVAL_ERROR;
+
+	/* Enable fully buffered output. File won't be flushed until 16kB
+	 * buffer is full */
+	if (setvbuf(fd, buf, _IOFBF, sizeof(buf)) != 0) {
+		fclose(fd);
+		return PQOS_RETVAL_ERROR;
+	}
+
+	/* L2 */
+	if (schemata->l2ca_num > 0) {
+		fprintf(fd, "L2:");
+		for (i = 0; i < schemata->l2ca_num; i++) {
+			if (i > 0)
+				fprintf(fd, ";");
+			fprintf(fd, "%u=%x", i, schemata->l2ca[i].ways_mask);
+		}
+		fprintf(fd, "\n");
+	}
+
+	/* L3 without CDP */
+	if (schemata->l3ca_num > 0 && !schemata->l3ca[0].cdp) {
+		fprintf(fd, "L3:");
+		for (i = 0; i < schemata->l3ca_num; i++) {
+			if (i > 0)
+				fprintf(fd, ";");
+			fprintf(fd, "%u=%lx", i, schemata->l3ca[i].u.ways_mask);
+		}
+		fprintf(fd, "\n");
+	}
+
+	/* L3 with CDP */
+	if (schemata->l3ca_num > 0 && schemata->l3ca[0].cdp) {
+		fprintf(fd, "L3CODE:");
+		for (i = 0; i < schemata->l3ca_num; i++) {
+			if (i > 0)
+				fprintf(fd, ";");
+			fprintf(fd, "%u=%lx", i,
+				schemata->l3ca[i].u.s.code_mask);
+		}
+		fprintf(fd, "\nL3DATA:");
+		for (i = 0; i < schemata->l3ca_num; i++) {
+			if (i > 0)
+				fprintf(fd, ";");
+			fprintf(fd, "%u=%lx", i,
+				schemata->l3ca[i].u.s.data_mask);
+		}
+		fprintf(fd, "\n");
+	}
+	fclose(fd);
+
+	return ret;
+}
 #endif
 
 /**
