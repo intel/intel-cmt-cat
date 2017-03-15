@@ -37,6 +37,7 @@
 #include "os_allocation.h"
 #include "monitoring.h"
 #include "cap.h"
+#include "log.h"
 
 /**
  * Value marking monitoring group structure as "valid".
@@ -164,11 +165,44 @@ int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
  * =======================================
  */
 
+/**
+ * @brief Tests if \a bitmask is contiguous
+ *
+ * Zero bit mask is regarded as not contiguous.
+ *
+ * The function shifts out first group of contiguous 1's in the bit mask.
+ * Next it checks remaining bitmask content to make a decision.
+ *
+ * @param bitmask bit mask to be validated for contiguity
+ *
+ * @return Bit mask contiguity check result
+ * @retval 0 not contiguous
+ * @retval 1 contiguous
+ */
+static int
+is_contiguous(uint64_t bitmask)
+{
+        if (bitmask == 0)
+                return 0;
+
+        while ((bitmask & 1) == 0) /**< Shift until 1 found at position 0 */
+                bitmask >>= 1;
+
+        while ((bitmask & 1) != 0) /**< Shift until 0 found at position 0 */
+                bitmask >>= 1;
+
+        return (bitmask) ? 0 : 1;  /**< non-zero bitmask is not contiguous */
+}
+
 int pqos_l3ca_set(const unsigned socket,
                   const unsigned num_cos,
 		  const struct pqos_l3ca *ca)
 {
 	int ret;
+	unsigned i;
+
+	if (ca == NULL || num_cos == 0)
+		return PQOS_RETVAL_PARAM;
 
 	_pqos_api_lock();
 
@@ -177,6 +211,27 @@ int pqos_l3ca_set(const unsigned socket,
                 _pqos_api_unlock();
                 return ret;
         }
+
+	/**
+	 * Check if class bitmasks are contiguous.
+	 */
+	for (i = 0; i < num_cos; i++) {
+		int is_contig = 0;
+
+		if (ca[i].cdp) {
+			is_contig = is_contiguous(ca[i].u.s.data_mask) &&
+				is_contiguous(ca[i].u.s.code_mask);
+		} else
+			is_contig = is_contiguous(ca[i].u.ways_mask);
+
+		if (!is_contig) {
+			LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
+			          ca[i].class_id);
+			_pqos_api_unlock();
+			return PQOS_RETVAL_PARAM;
+		}
+	}
+
 
 	ret = hw_l3ca_set(socket, num_cos, ca);
 
@@ -191,6 +246,9 @@ int pqos_l3ca_get(const unsigned socket,
                   struct pqos_l3ca *ca)
 {
 	int ret;
+
+	if (num_ca == NULL || ca == NULL || max_num_ca == 0)
+		return PQOS_RETVAL_PARAM;
 
 	_pqos_api_lock();
 
@@ -218,6 +276,10 @@ int pqos_l2ca_set(const unsigned l2id,
                   const struct pqos_l2ca *ca)
 {
 	int ret;
+	unsigned i;
+
+	if (ca == NULL || num_cos == 0)
+		return PQOS_RETVAL_PARAM;
 
 	_pqos_api_lock();
 
@@ -226,6 +288,18 @@ int pqos_l2ca_set(const unsigned l2id,
                 _pqos_api_unlock();
                 return ret;
         }
+
+	/**
+	 * Check if class bitmasks are contiguous
+	 */
+	for (i = 0; i < num_cos; i++) {
+		if (!is_contiguous(ca[i].ways_mask)) {
+			LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
+			          ca[i].class_id);
+			_pqos_api_unlock();
+			return PQOS_RETVAL_PARAM;
+		}
+	}
 
 	ret = hw_l2ca_set(l2id, num_cos, ca);
 
@@ -241,13 +315,17 @@ int pqos_l2ca_get(const unsigned l2id,
 {
 	int ret;
 
+	if (num_ca == NULL || ca == NULL || max_num_ca == 0)
+		return PQOS_RETVAL_PARAM;
+
+
 	_pqos_api_lock();
 
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
+	ret = _pqos_check_init(1);
+	if (ret != PQOS_RETVAL_OK) {
+		_pqos_api_unlock();
+		return ret;
+	}
 
 	ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
 

@@ -155,34 +155,6 @@ pqos_alloc_fini(void)
  * =======================================
  */
 
-/**
- * @brief Tests if \a bitmask is contiguous
- *
- * Zero bit mask is regarded as not contiguous.
- *
- * The function shifts out first group of contiguous 1's in the bit mask.
- * Next it checks remaining bitmask content to make a decision.
- *
- * @param bitmask bit mask to be validated for contiguity
- *
- * @return Bit mask contiguity check result
- * @retval 0 not contiguous
- * @retval 1 contiguous
- */
-static int is_contiguous(uint64_t bitmask)
-{
-        if (bitmask == 0)
-                return 0;
-
-        while ((bitmask & 1) == 0) /**< Shift until 1 found at position 0 */
-                bitmask >>= 1;
-
-        while ((bitmask & 1) != 0) /**< Shift until 0 found at position 0 */
-                bitmask >>= 1;
-
-        return (bitmask) ? 0 : 1;  /**< non-zero bitmask is not contiguous */
-}
-
 int
 hw_l3ca_set(const unsigned socket,
             const unsigned num_ca,
@@ -192,28 +164,10 @@ hw_l3ca_set(const unsigned socket,
         unsigned i = 0, count = 0, core = 0;
         int cdp_enabled = 0;
 
-        if (ca == NULL || num_ca == 0)
-                return PQOS_RETVAL_PARAM;
-	/**
-         * Check if class bitmasks are contiguous.
-         */
-        for (i = 0; i < num_ca; i++) {
-                int is_contig = 0;
-
-                if (ca[i].cdp) {
-                        is_contig = is_contiguous(ca[i].u.s.data_mask) &&
-                                is_contiguous(ca[i].u.s.code_mask);
-                } else {
-                        is_contig = is_contiguous(ca[i].u.ways_mask);
-                }
-                if (!is_contig) {
-                        LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
-                                  ca[i].class_id);
-                        return PQOS_RETVAL_PARAM;
-                }
-        }
-
+        ASSERT(ca != NULL);
+        ASSERT(num_ca != 0);
         ASSERT(m_cap != NULL);
+
         ret = pqos_l3ca_get_cos_num(m_cap, &count);
         if (ret != PQOS_RETVAL_OK)
                 return ret;             /**< perhaps no L3CA capability */
@@ -287,9 +241,9 @@ hw_l3ca_get(const unsigned socket,
         int retval = MACHINE_RETVAL_OK;
         int cdp_enabled = 0;
 
-        if (num_ca == NULL || ca == NULL || max_num_ca == 0)
-                return PQOS_RETVAL_PARAM;
-
+        ASSERT(num_ca != NULL);
+        ASSERT(ca != NULL);
+        ASSERT(max_num_ca != 0);
         ASSERT(m_cap != NULL);
         ret = pqos_l3ca_get_cos_num(m_cap, &count);
         if (ret != PQOS_RETVAL_OK)
@@ -350,10 +304,10 @@ hw_l2ca_set(const unsigned l2id,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
 
-        if (ca == NULL || num_ca == 0)
-                return PQOS_RETVAL_PARAM;
+        ASSERT(ca != NULL);
+        ASSERT(num_ca != NULL);
 
-        /**
+        /*
          * Check if L2 CAT is supported
          */
         ASSERT(m_cap != NULL);
@@ -362,15 +316,9 @@ hw_l2ca_set(const unsigned l2id,
                 return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
         /**
-         * Check if class bitmasks are contiguous and
-         * if class id's are within allowed range.
+         * Check if class id's are within allowed range.
          */
         for (i = 0; i < num_ca; i++) {
-                if (!is_contiguous(ca[i].ways_mask)) {
-                        LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
-                                  ca[i].class_id);
-                        return PQOS_RETVAL_PARAM;
-                }
                 if (ca[i].class_id >= count) {
                         LOG_ERROR("L2 COS%u is out of range (COS%u is max)!\n",
                                   ca[i].class_id, count - 1);
@@ -409,17 +357,17 @@ hw_l2ca_get(const unsigned l2id,
         unsigned i = 0, count = 0;
         unsigned core = 0;
 
-        if (num_ca == NULL || ca == NULL || max_num_ca == 0)
-                return PQOS_RETVAL_PARAM;
+	ASSERT(num_ca != NULL);
+	ASSERT(ca != NULL);
+	ASSERT(max_num_ca != 0);
+	ASSERT(m_cap != NULL);
+	ret = pqos_l2ca_get_cos_num(m_cap, &count);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
-        ASSERT(m_cap != NULL);
-        ret = pqos_l2ca_get_cos_num(m_cap, &count);
-        if (ret != PQOS_RETVAL_OK)
-                return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
-
-        if (max_num_ca < count)
-                /* Not enough space to store the classes */
-                return PQOS_RETVAL_PARAM;
+	if (max_num_ca < count)
+		/* Not enough space to store the classes */
+		return PQOS_RETVAL_PARAM;
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_by_l2id(m_cpu, l2id, &core);
