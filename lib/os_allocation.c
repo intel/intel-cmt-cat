@@ -36,6 +36,9 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
+#include <malloc.h>
+#include <stdlib.h>
 
 #include <pqos.h>
 #include "os_allocation.h"
@@ -47,6 +50,10 @@
  * Path to resctrl file system
  */
 static const char *rctl_path = "/sys/fs/resctrl/";
+static const char *rctl_cpus = "cpus";
+#ifdef USE_OS
+static const char *rctl_schemata = "schemata";
+#endif
 
 /**
  * ---------------------------------------
@@ -61,6 +68,72 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
  */
 #define MAX_CPUS 4096
 
+/**
+ * @brief Opens COS file in resctl filesystem
+ *
+ * @param [in] class_id COS id
+ * @param [in] name File name
+ * @param [in] mode fopen mode
+ *
+ * @return Pointer to the stream
+ * @retval Pointer on success
+ * @retval NULL on error
+ */
+static FILE *
+rctl_fopen(const unsigned class_id, const char *name, const char *mode)
+{
+	FILE *fd;
+	char buf[128];
+	int result;
+
+	memset(buf, 0, sizeof(buf));
+	if (class_id == 0)
+		result = snprintf(buf, sizeof(buf) - 1,
+		                  "%s%s", rctl_path, name);
+	else
+		result = snprintf(buf, sizeof(buf) - 1,
+			          "%sCOS%u/%s", rctl_path, class_id, name);
+
+	if (result < 0)
+		return NULL;
+
+	fd = fopen(buf, mode);
+	if (fd == NULL)
+		LOG_ERROR("Could not open %s file %s for COS %u\n",
+		          name, buf, class_id);
+
+	return fd;
+}
+
+/**
+ * @brief Converts string into 64-bit unsigned number.
+ *
+ * Numbers can be in decimal or hexadecimal format.
+ *
+ * @param [in] s string to be converted into 64-bit unsigned number
+ * @param [in] base Numerical base
+ * @param [out] Numeric value of the string representing the number
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+strtouint64(const char *s, int base, uint64_t *value)
+{
+	char *endptr = NULL;
+
+	ASSERT(s != NULL);
+	if (strncasecmp(s, "0x", 2) == 0) {
+		base = 16;
+		s += 2;
+	}
+
+	*value = strtoull(s, &endptr, base);
+	if (!(*s != '\0' && (*endptr == '\0' || *endptr == '\n')))
+		return PQOS_RETVAL_ERROR;
+
+	return PQOS_RETVAL_OK;
+}
 
 /**
  * ---------------------------------------
@@ -120,7 +193,7 @@ cpumask_set(const unsigned lcore, struct cpumask *mask)
  * @param [in] cpumask Cpu mask
  *
  * @return Returns 1 when bit corresponding to lcore is set in mask
- * @retval 1 if cpu bit is set im mask
+ * @retval 1 if cpu bit is set in mask
  * @retval 0 if cpu bit is not set in mask
  */
 static int
@@ -138,38 +211,6 @@ cpumask_get(const unsigned lcore, const struct cpumask *mask)
 }
 
 /**
- * @brief Opens COS cpu file
- *
- * @param [in] class_is COS id
- * @param [in] mode fopen mode
- *
- * @return Pointer to the stream
- */
-static FILE *
-cpumask_fopen(const unsigned class_id, const char *mode)
-{
-	FILE *fd;
-	char buf[128];
-	int result;
-
-	memset(buf, 0, sizeof(buf));
-	if (class_id == 0) {
-		result = snprintf(buf, sizeof(buf) - 1, "%scpus", rctl_path);
-	} else
-		result = snprintf(buf, sizeof(buf) - 1,
-			          "%sCOS%u/cpus", rctl_path, class_id);
-
-	if (result < 0)
-		return NULL;
-
-	fd = fopen(buf, mode);
-	if (fd == NULL)
-		LOG_ERROR("Could not open cpu file %s\n", buf);
-
-	return fd;
-}
-
-/**
  * @brief Write CPU mask to file
  *
  * @param [in] class_id COS id
@@ -179,12 +220,13 @@ cpumask_fopen(const unsigned class_id, const char *mode)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-cpumask_write(const unsigned class_id, const struct cpumask *mask) {
+cpumask_write(const unsigned class_id, const struct cpumask *mask)
+{
 	int ret = PQOS_RETVAL_OK;
 	FILE *fd;
 	unsigned  i;
 
-	fd = cpumask_fopen(class_id, "w");
+	fd = rctl_fopen(class_id, rctl_cpus, "w");
 	if (fd == NULL)
 		return PQOS_RETVAL_ERROR;
 
@@ -222,12 +264,13 @@ cpumask_write(const unsigned class_id, const struct cpumask *mask) {
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-cpumask_read(const unsigned class_id, struct cpumask *mask) {
+cpumask_read(const unsigned class_id, struct cpumask *mask)
+{
 	int ret = PQOS_RETVAL_OK;
 	FILE *fd;
 	unsigned character;
 
-	fd = cpumask_fopen(class_id, "r");
+	fd = rctl_fopen(class_id, rctl_cpus, "r");
 	if (fd == NULL)
 		return PQOS_RETVAL_ERROR;
 
@@ -253,6 +296,288 @@ cpumask_read(const unsigned class_id, struct cpumask *mask) {
 
 	return ret;
 }
+
+#ifdef USE_OS
+/**
+ * ---------------------------------------
+ * Schemata structures and utility functions
+ * ---------------------------------------
+ */
+
+/*
+ * @brief Structure to hold parsed schemata
+ */
+struct schemata {
+	unsigned l3ca_num;      /**< Number of L3 COS held in struct */
+	struct pqos_l3ca *l3ca; /**< L3 COS definitions */
+	unsigned l2ca_num;      /**< Number of L2 COS held in struct */
+	struct pqos_l2ca *l2ca; /**< L2 COS definitions */
+};
+
+/*
+ * @brief Deallocate memory of schemata struct
+ *
+ * @param[in] schemata Schemata structure
+ */
+static void
+schemata_fini(struct schemata *schemata) {
+	if (schemata->l2ca != NULL)
+		free(schemata->l2ca);
+	if (schemata->l3ca != NULL)
+		free(schemata->l3ca);
+}
+
+/**
+ * @brief Allocates memory of schemata struct
+ *
+ * @param[in] class_id COS id
+ * @param[out] schemata Schemata structure
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+schemata_init(const unsigned class_id, struct schemata *schemata) {
+	int ret = PQOS_RETVAL_OK;
+	int retval;
+	unsigned num_cos, num_ids, i;
+
+	ASSERT(schemata != NULL);
+
+	memset(schemata, 0, sizeof(struct schemata));
+
+	/* L2 */
+	retval = pqos_l2ca_get_cos_num(m_cap, &num_cos);
+	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
+		unsigned *l2ids = NULL;
+
+		l2ids = pqos_cpu_get_l2ids(m_cpu, &num_ids);
+		if (l2ids == NULL) {
+			ret = PQOS_RETVAL_ERROR;
+			goto schemata_init_exit;
+		}
+
+		free(l2ids);
+
+		schemata->l2ca_num = num_ids;
+		schemata->l2ca = calloc(num_ids, sizeof(struct pqos_l2ca));
+		if (schemata->l2ca == NULL) {
+			ret = PQOS_RETVAL_ERROR;
+			goto schemata_init_exit;
+		}
+
+		/* fill class_id */
+		for (i = 0; i < num_ids; i++)
+			schemata->l2ca[i].class_id = class_id;
+	}
+
+	/* L3 */
+	retval = pqos_l3ca_get_cos_num(m_cap, &num_cos);
+	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
+		unsigned *sockets = NULL;
+		int cdp_enabled;
+
+		sockets = pqos_cpu_get_sockets(m_cpu, &num_ids);
+		if (sockets == NULL) {
+			ret = PQOS_RETVAL_ERROR;
+			goto schemata_init_exit;
+		}
+
+		free(sockets);
+
+		schemata->l3ca_num = num_ids;
+		schemata->l3ca = calloc(num_ids, sizeof(struct pqos_l3ca));
+		if (schemata->l3ca == NULL) {
+			ret = PQOS_RETVAL_ERROR;
+			goto schemata_init_exit;
+		}
+
+		ret = pqos_l3ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
+		if (ret != PQOS_RETVAL_OK)
+			goto schemata_init_exit;
+
+		/* fill class_id and cdp values */
+		for (i = 0; i < num_ids; i++) {
+			schemata->l3ca[i].class_id = class_id;
+			schemata->l3ca[i].cdp = cdp_enabled;
+		}
+	}
+
+ schemata_init_exit:
+	/* Deallocate memory in case of error */
+	if (ret != PQOS_RETVAL_OK)
+		schemata_fini(schemata);
+
+	return ret;
+}
+
+/**
+ * @brief Schemata type
+ */
+enum schemata_type {
+	SCHEMATA_TYPE_NONE,   /**< unknown */
+	SCHEMATA_TYPE_L2,     /**< L2 CAT */
+	SCHEMATA_TYPE_L3,     /**< L3 CAT without CDP */
+	SCHEMATA_TYPE_L3CODE, /**< L3 CAT code */
+	SCHEMATA_TYPE_L3DATA, /**< L3 CAT data */
+};
+
+
+/**
+ * @brief Determine allocation type
+ *
+ * @param [in] str resctrl label
+ *
+ * @return Allocation type
+ */
+static int
+schemata_type_get(const char *str)
+{
+	enum schemata_type type = SCHEMATA_TYPE_NONE;
+
+	if (strcasecmp(str, "L2") == 0)
+		type = SCHEMATA_TYPE_L2;
+	else if (strcasecmp(str, "L3") == 0)
+		type = SCHEMATA_TYPE_L3;
+	else if (strcasecmp(str, "L3CODE") == 0)
+		type = SCHEMATA_TYPE_L3CODE;
+	else if (strcasecmp(str, "L3DATA") == 0)
+		type = SCHEMATA_TYPE_L3DATA;
+
+	return type;
+}
+
+/**
+ * @brief Fill schemata structure
+ *
+ * @param [in] class_is COS id
+ * @param [in] res_id Resource id
+ * @param [in] mask Ways mask
+ * @param [in] type Schemata type
+ * @param [out] schemata Schemata structure
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+schemata_set(const unsigned class_id,
+             const unsigned res_id,
+	     const uint64_t mask,
+	     const int type,
+	     struct schemata *schemata)
+{
+	if (type == SCHEMATA_TYPE_L2) {
+		if (schemata->l2ca_num <= res_id)
+			return PQOS_RETVAL_ERROR;
+		schemata->l2ca[res_id].class_id = class_id;
+		schemata->l2ca[res_id].ways_mask = mask;
+
+	} else if (type == SCHEMATA_TYPE_L3) {
+		if (schemata->l3ca_num <= res_id || schemata->l3ca[res_id].cdp)
+			return PQOS_RETVAL_ERROR;
+		schemata->l3ca[res_id].class_id = class_id;
+		schemata->l3ca[res_id].u.ways_mask = mask;
+
+	} else if (type == SCHEMATA_TYPE_L3CODE) {
+		if (schemata->l3ca_num <= res_id || !schemata->l3ca[res_id].cdp)
+			return PQOS_RETVAL_ERROR;
+		schemata->l3ca[res_id].class_id = class_id;
+		schemata->l3ca[res_id].u.s.code_mask = mask;
+
+	} else if (type == SCHEMATA_TYPE_L3DATA) {
+		if (schemata->l3ca_num <= res_id || !schemata->l3ca[res_id].cdp)
+			return PQOS_RETVAL_ERROR;
+		schemata->l3ca[res_id].class_id = class_id;
+		schemata->l3ca[res_id].u.s.data_mask = mask;
+	}
+
+	return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Read resctrl schemata from file
+ *
+ * @param [in] class_is COS id
+ * @param [out] schemata Parsed schemata
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+schemata_read(const unsigned class_id, struct schemata *schemata)
+{
+	int ret = PQOS_RETVAL_OK;
+	FILE *fd;
+	enum schemata_type type = SCHEMATA_TYPE_NONE;
+	char buf[16 * 1024];
+	char *p = NULL, *q = NULL, *saveptr = NULL;
+
+	ASSERT(schemata != NULL);
+
+	fd = rctl_fopen(class_id, rctl_schemata, "r");
+	if (fd == NULL)
+		return PQOS_RETVAL_ERROR;
+
+	if ((schemata->l3ca_num > 0 && schemata->l3ca == NULL)
+	    || (schemata->l2ca_num > 0 && schemata->l2ca == NULL))
+		return PQOS_RETVAL_ERROR;
+
+	memset(buf, 0, sizeof(buf));
+	while (fgets(buf, sizeof(buf), fd) != NULL) {
+		/**
+		 * Determine allocation type
+		 */
+		p =  strchr(buf, ':');
+		if (p == NULL) {
+			ret = PQOS_RETVAL_ERROR;
+			break;
+		}
+		*p = '\0';
+		type = schemata_type_get(buf);
+
+		/* Skip unknown label */
+		if (type == SCHEMATA_TYPE_NONE)
+			continue;
+
+		/**
+		 * Parse COS masks
+		 */
+		for (++p; ; p = NULL) {
+			char *token = NULL;
+			uint64_t id = 0;
+			uint64_t mask = 0;
+
+			token = strtok_r(p, ";", &saveptr);
+			if (token == NULL)
+				break;
+
+			q = strchr(token, '=');
+			if (q == NULL) {
+				ret = PQOS_RETVAL_ERROR;
+				goto schemata_read_exit;
+			}
+			*q = '\0';
+
+			ret = strtouint64(token, 10, &id);
+			if (ret != PQOS_RETVAL_OK)
+				goto schemata_read_exit;
+
+			ret = strtouint64(q + 1, 16, &mask);
+			if (ret != PQOS_RETVAL_OK)
+				goto schemata_read_exit;
+
+			ret = schemata_set(class_id, id, mask, type, schemata);
+			if (ret != PQOS_RETVAL_OK)
+				goto schemata_read_exit;
+		}
+	}
+
+ schemata_read_exit:
+	fclose(fd);
+
+	return ret;
+}
+#endif
 
 /**
  * @brief Function to find the maximum number of resctrl groups allowed
@@ -350,6 +675,7 @@ static int os_alloc_prep(void)
 		}
 		LOG_DEBUG("resctrl group COS%d created\n", i);
 	}
+
 	return PQOS_RETVAL_OK;
 }
 
