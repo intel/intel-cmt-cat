@@ -152,7 +152,10 @@ int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                 return ret;
         }
 
-	ret = hw_alloc_reset(l3_cdp_cfg);
+	if (pqos_cap_use_msr())
+                ret = hw_alloc_reset(l3_cdp_cfg);
+        else
+                ret = os_alloc_reset(l3_cdp_cfg);
 
 	_pqos_api_unlock();
 

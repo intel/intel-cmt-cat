@@ -172,8 +172,8 @@ cpumask_fopen(const unsigned class_id, const char *mode)
 /**
  * @brief Write CPU mask to file
  *
- * @param [in] class_is COS id
- * @param [in] maks CPU mask to write
+ * @param [in] class_id COS id
+ * @param [in] mask CPU mask to write
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
@@ -215,8 +215,8 @@ cpumask_write(const unsigned class_id, const struct cpumask *mask) {
 /**
  * @brief Read CPU mask from file
  *
- * @param [in] class_is COS id
- * @param [out] maks CPU mask to write
+ * @param [in] class_id COS id
+ * @param [out] mask CPU mask to write
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
@@ -444,4 +444,66 @@ os_alloc_assoc_get(const unsigned lcore,
 	}
 
 	return PQOS_RETVAL_ERROR;
+}
+
+int
+os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
+{
+        const struct pqos_capability *alloc_cap = NULL;
+        const struct pqos_cap_l3ca *l3_cap = NULL;
+        const struct pqos_cap_l2ca *l2_cap = NULL;
+        int ret = PQOS_RETVAL_OK;
+        unsigned i, cos0 = 0;
+        struct cpumask mask;
+
+        /* Get L3 CAT capabilities */
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                l3_cap = alloc_cap->u.l3ca;
+
+        /* Get L2 CAT capabilities */
+        alloc_cap = NULL;
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                l2_cap = alloc_cap->u.l2ca;
+
+        /* Check if either L2 CAT or L3 CAT is supported */
+        if (l2_cap == NULL && l3_cap == NULL) {
+                LOG_ERROR("L2 CAT/L3 CAT not present!\n");
+                ret = PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
+                goto os_alloc_reset_exit;
+        }
+        /* Check L3 CDP requested while not present */
+        if (l3_cap == NULL && l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
+                LOG_ERROR("L3 CDP setting requested but no L3 CAT present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_alloc_reset_exit;
+        }
+        if (l3_cap != NULL) {
+                /* Check against erroneous CDP request */
+                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
+                        LOG_ERROR("CAT/CDP requested but not supported by the "
+                                  "platform!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto os_alloc_reset_exit;
+                }
+        }
+
+        /**
+         * Set the CPU assoc back to COS0
+         */
+        ret = cpumask_read(cos0, &mask);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+        for (i = 0; i < m_cpu->num_cores; i++)
+                cpumask_set(i, &mask);
+
+        ret = cpumask_write(cos0, &mask);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("CPU assoc reset failed\n");
+                return ret;
+        }
+
+ os_alloc_reset_exit:
+        return ret;
 }
