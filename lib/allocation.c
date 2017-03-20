@@ -305,7 +305,7 @@ hw_l2ca_set(const unsigned l2id,
         unsigned i = 0, count = 0, core = 0;
 
         ASSERT(ca != NULL);
-        ASSERT(num_ca != NULL);
+        ASSERT(num_ca != 0);
 
         /*
          * Check if L2 CAT is supported
