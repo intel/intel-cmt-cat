@@ -39,6 +39,8 @@
 #include <ctype.h>
 #include <malloc.h>
 #include <stdlib.h>
+#include <sys/mount.h>
+
 
 #include <pqos.h>
 #include "os_allocation.h"
@@ -104,7 +106,7 @@ rctl_fopen(const unsigned class_id, const char *name, const char *mode)
 
 	return fd;
 }
-
+#ifdef USE_OS
 /**
  * @brief Converts string into 64-bit unsigned number.
  *
@@ -134,7 +136,7 @@ strtouint64(const char *s, int base, uint64_t *value)
 
 	return PQOS_RETVAL_OK;
 }
-
+#endif
 /**
  * ---------------------------------------
  * CPU mask structures and utility functions
@@ -709,7 +711,43 @@ os_get_max_rctl_grps(const struct pqos_cap *cap,
 	*num_rctl_grps = max_rctl_grps;
 	return PQOS_RETVAL_OK;
 }
+#ifdef USE_OS
+static int
+os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
+{
+        const struct pqos_cap_l3ca *l3_cap = NULL;
+        const struct pqos_capability *alloc_cap = NULL;
+        const char *cdp_option = NULL; /**< cdp_off default */
 
+        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF) {
+                LOG_ERROR("Invalid CDP mounting setting %d!\n",
+                          l3_cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF)
+                goto mount;
+
+        /* Get L3 CAT capabilities */
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                l3_cap = alloc_cap->u.l3ca;
+
+        if (l3_cap != NULL && !l3_cap->cdp) {
+                /* Check against erroneous CDP request */
+                LOG_ERROR("CDP requested but not supported by the platform!\n");
+                return PQOS_RETVAL_PARAM;
+        }
+        cdp_option = "cdp";  /**< cdp_on */
+
+ mount:
+        if (mount("resctrl", "/sys/fs/resctrl", "resctrl", 0, cdp_option) != 0)
+                return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+#endif
 /**
  * @brief Prepares and authenticates resctrl file system
  *        used for OS allocation interface
@@ -960,4 +998,3 @@ os_l2ca_get(const unsigned l2id,
 
 	return PQOS_RETVAL_ERROR;
 }
-
