@@ -260,8 +260,10 @@ int pqos_l3ca_get(const unsigned socket,
                 _pqos_api_unlock();
                 return ret;
         }
-
-	ret = hw_l3ca_get(socket, max_num_ca, num_ca, ca);
+	if (pqos_cap_use_msr())
+		ret = hw_l3ca_get(socket, max_num_ca, num_ca, ca);
+	else
+		ret = os_l3ca_get(socket, max_num_ca, num_ca, ca);
 
 	_pqos_api_unlock();
 

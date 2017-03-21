@@ -53,9 +53,7 @@
  */
 static const char *rctl_path = "/sys/fs/resctrl/";
 static const char *rctl_cpus = "cpus";
-#ifdef USE_OS
 static const char *rctl_schemata = "schemata";
-#endif
 
 /**
  * ---------------------------------------
@@ -106,7 +104,7 @@ rctl_fopen(const unsigned class_id, const char *name, const char *mode)
 
 	return fd;
 }
-#ifdef USE_OS
+
 /**
  * @brief Converts string into 64-bit unsigned number.
  *
@@ -136,7 +134,7 @@ strtouint64(const char *s, int base, uint64_t *value)
 
 	return PQOS_RETVAL_OK;
 }
-#endif
+
 /**
  * ---------------------------------------
  * CPU mask structures and utility functions
@@ -299,7 +297,6 @@ cpumask_read(const unsigned class_id, struct cpumask *mask)
 	return ret;
 }
 
-#ifdef USE_OS
 /**
  * ---------------------------------------
  * Schemata structures and utility functions
@@ -654,7 +651,6 @@ schemata_write(const unsigned class_id, const struct schemata *schemata)
 
 	return ret;
 }
-#endif
 
 /**
  * @brief Function to find the maximum number of resctrl groups allowed
@@ -965,12 +961,58 @@ os_l3ca_get(const unsigned socket,
             unsigned *num_ca,
             struct pqos_l3ca *ca)
 {
-	UNUSED_PARAM(socket);
-	UNUSED_PARAM(max_num_ca);
-	UNUSED_PARAM(num_ca);
-	UNUSED_PARAM(ca);
+	int ret = PQOS_RETVAL_OK;
+	unsigned class_id;
+	unsigned count = 0;
+	unsigned sockets_num = 0;
+	unsigned *sockets = NULL;
 
-	return PQOS_RETVAL_ERROR;
+	ASSERT(num_ca != NULL);
+	ASSERT(ca != NULL);
+	ASSERT(max_num_ca != 0);
+	ASSERT(m_cap != NULL);
+	ASSERT(m_cpu != NULL);
+
+	ret = pqos_l3ca_get_cos_num(m_cap, &count);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	if (count > max_num_ca)
+		return PQOS_RETVAL_ERROR;
+
+	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	if (sockets == NULL || sockets_num == 0) {
+		ret = PQOS_RETVAL_ERROR;
+		goto os_l3ca_get_exit;
+	}
+
+	if (socket >= sockets_num) {
+		ret = PQOS_RETVAL_PARAM;
+		goto os_l3ca_get_exit;
+	}
+
+	for (class_id = 0; class_id < count; class_id++) {
+		struct schemata schmt;
+
+		ret = schemata_init(class_id, &schmt);
+		if (ret == PQOS_RETVAL_OK)
+			ret = schemata_read(class_id, &schmt);
+
+		if (ret == PQOS_RETVAL_OK)
+			ca[class_id] = schmt.l3ca[socket];
+
+		schemata_fini(&schmt);
+
+		if (ret != PQOS_RETVAL_OK)
+			goto os_l3ca_get_exit;
+	}
+	*num_ca = count;
+
+ os_l3ca_get_exit:
+	if (sockets != NULL)
+		free(sockets);
+
+	return ret;
 }
 
 int
