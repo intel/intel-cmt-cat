@@ -507,3 +507,56 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
  os_alloc_reset_exit:
         return ret;
 }
+
+int
+os_l3ca_set(const unsigned socket,
+            const unsigned num_cos,
+            const struct pqos_l3ca *ca)
+{
+	UNUSED_PARAM(socket);
+	UNUSED_PARAM(num_cos);
+	UNUSED_PARAM(ca);
+
+	return PQOS_RETVAL_ERROR;
+}
+
+int
+os_l3ca_get(const unsigned socket,
+            const unsigned max_num_ca,
+            unsigned *num_ca,
+            struct pqos_l3ca *ca)
+{
+	UNUSED_PARAM(socket);
+	UNUSED_PARAM(max_num_ca);
+	UNUSED_PARAM(num_ca);
+	UNUSED_PARAM(ca);
+
+	return PQOS_RETVAL_ERROR;
+}
+
+int
+os_l2ca_set(const unsigned l2id,
+            const unsigned num_cos,
+            const struct pqos_l2ca *ca)
+{
+	UNUSED_PARAM(l2id);
+	UNUSED_PARAM(num_cos);
+	UNUSED_PARAM(ca);
+
+	return PQOS_RETVAL_ERROR;
+}
+
+int
+os_l2ca_get(const unsigned l2id,
+            const unsigned max_num_ca,
+            unsigned *num_ca,
+            struct pqos_l2ca *ca)
+{
+	UNUSED_PARAM(l2id);
+	UNUSED_PARAM(max_num_ca);
+	UNUSED_PARAM(num_ca);
+	UNUSED_PARAM(ca);
+
+	return PQOS_RETVAL_ERROR;
+}
+
