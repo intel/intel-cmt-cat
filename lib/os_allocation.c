@@ -1033,10 +1033,57 @@ os_l2ca_get(const unsigned l2id,
             unsigned *num_ca,
             struct pqos_l2ca *ca)
 {
-	UNUSED_PARAM(l2id);
-	UNUSED_PARAM(max_num_ca);
-	UNUSED_PARAM(num_ca);
-	UNUSED_PARAM(ca);
+	int ret;
+	unsigned class_id;
+	unsigned count = 0;
+	unsigned l2ids_num = 0;
+	unsigned *l2ids = NULL;
 
-	return PQOS_RETVAL_ERROR;
+	ASSERT(num_ca != NULL);
+	ASSERT(ca != NULL);
+	ASSERT(max_num_ca != 0);
+	ASSERT(m_cap != NULL);
+	ASSERT(m_cpu != NULL);
+
+	ret = pqos_l2ca_get_cos_num(m_cap, &count);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
+
+	if (count > max_num_ca)
+		/* Not enough space to store the classes */
+		return PQOS_RETVAL_PARAM;
+
+	l2ids = pqos_cpu_get_l2ids(m_cpu, &l2ids_num);
+	if (l2ids == NULL || l2ids_num == 0) {
+		ret = PQOS_RETVAL_ERROR;
+		goto os_l2ca_get_exit;
+	}
+
+	if (l2id >= l2ids_num) {
+		ret = PQOS_RETVAL_PARAM;
+		goto os_l2ca_get_exit;
+	}
+
+	for (class_id = 0; class_id < count; class_id++) {
+		struct schemata schmt;
+
+		ret = schemata_init(class_id, &schmt);
+		if (ret == PQOS_RETVAL_OK)
+			ret = schemata_read(class_id, &schmt);
+
+		if (ret == PQOS_RETVAL_OK)
+			ca[class_id] = schmt.l2ca[l2id];
+
+		schemata_fini(&schmt);
+
+		if (ret != PQOS_RETVAL_OK)
+			goto os_l2ca_get_exit;
+	}
+	*num_ca = count;
+
+ os_l2ca_get_exit:
+	if (l2ids != NULL)
+		free(l2ids);
+
+	return ret;
 }

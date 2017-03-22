@@ -323,7 +323,6 @@ int pqos_l2ca_get(const unsigned l2id,
 	if (num_ca == NULL || ca == NULL || max_num_ca == 0)
 		return PQOS_RETVAL_PARAM;
 
-
 	_pqos_api_lock();
 
 	ret = _pqos_check_init(1);
@@ -332,7 +331,10 @@ int pqos_l2ca_get(const unsigned l2id,
 		return ret;
 	}
 
-	ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
+	if (pqos_cap_use_msr())
+		ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
+	else
+		ret = os_l2ca_get(l2id, max_num_ca, num_ca, ca);
 
 	_pqos_api_unlock();
 
