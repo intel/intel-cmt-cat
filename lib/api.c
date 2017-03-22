@@ -133,7 +133,10 @@ int pqos_alloc_release(const unsigned *core_array,
                 return ret;
         }
 
-	ret = hw_alloc_release(core_array, core_num);
+        if (pqos_cap_use_msr())
+                ret = hw_alloc_release(core_array, core_num);
+        else
+                ret = os_alloc_release(core_array, core_num);
 
 	_pqos_api_unlock();
 

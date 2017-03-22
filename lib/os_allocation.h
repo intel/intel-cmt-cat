@@ -64,6 +64,17 @@ int os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
 int os_alloc_fini(void);
 
 /**
+ * @brief OS interface to reassign cores
+ *        in \a core_array to default COS#0
+ *
+ * @param [in] core_array list of core ids
+ * @param [in] core_num number of core ids in the \a core_array
+ *
+ * @return Operations status
+ */
+int os_alloc_release(const unsigned *core_array,
+                     const unsigned core_num);
+/**
  * @brief OS interface to reset configuration of allocation technologies
  *
  * Reverts allocation state to the one after reset:

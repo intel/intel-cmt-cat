@@ -880,12 +880,39 @@ os_alloc_assoc_get(const unsigned lcore,
 }
 
 int
+os_alloc_release(const unsigned *core_array, const unsigned core_num)
+{
+        int ret;
+        unsigned i, cos0 = 0;
+        struct cpumask mask;
+
+        ASSERT(core_num > 0 && core_array != NULL);
+        if (core_num == 0 || core_array == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Set the CPU assoc back to COS0
+         */
+        ret = cpumask_read(cos0, &mask);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        for (i = 0; i < core_num; i++)
+                cpumask_set(core_array[i], &mask);
+
+        ret = cpumask_write(cos0, &mask);
+        if (ret != PQOS_RETVAL_OK)
+                LOG_ERROR("CPU assoc reset failed\n");
+
+        return ret;
+}
+
+int
 os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 {
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
-        int ret = PQOS_RETVAL_OK;
+        int ret;
         unsigned i, cos0 = 0;
         struct cpumask mask;
 
