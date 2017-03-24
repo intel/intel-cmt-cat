@@ -1153,6 +1153,7 @@ detect_os_support(const char *fname, const char *str, int *supported)
         fd = fopen(fname, "r");
         if (fd == NULL) {
                 LOG_DEBUG("%s not found.\n", fname);
+                *supported = 0;
                 return PQOS_RETVAL_OK;
         }
 
@@ -1180,20 +1181,18 @@ static int
 discover_os_capabilities(struct pqos_cap *p_cap)
 {
         int ret = PQOS_RETVAL_OK;
-        unsigned i = 0;
-        unsigned num_cap = p_cap->num_cap;
         int res_flag = 0;
+        unsigned i = 0;
         /**
-         * This table is used to assist the discovery of OS CAT capabilities
+         * This table is used to assist the discovery of OS capabilities
          */
         static struct os_caps {
                 const char *fname;
                 const char *str;
-                int *cap_type_ptr;
         } tab[PQOS_CAP_TYPE_NUMOF] = {
-                { NULL, NULL, NULL },
-                { "/proc/cpuinfo", "cat_l3", NULL },
-                { "/proc/cpuinfo", "cat_l2", NULL },
+                { "/proc/cpuinfo", "cqm"},
+                { "/proc/cpuinfo", "cat_l3"},
+                { "/proc/cpuinfo", "cat_l2"},
         };
 
         /**
@@ -1204,15 +1203,29 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                 LOG_ERROR("Fatal error encountered in resctrl detection!\n");
                 return ret;
         }
-
         LOG_INFO("%s\n", res_flag ?
                  "resctrl detected" :
                  "resctrl not detected. "
                  "Kernel version 4.10 or higher required");
-
         if (!res_flag)
                 return PQOS_RETVAL_RESOURCE;
 
+        /**
+         * Detect OS support for all HW capabilities
+         */
+        for (i = 0; i < p_cap->num_cap; i++) {
+                int type = p_cap->capabilities[i].type;
+                int *os_ptr = &p_cap->capabilities[i].os_support;
+
+                ret = detect_os_support(tab[type].fname, tab[type].str, os_ptr);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Fatal error encountered in"
+                                  " OS detection!\n");
+                        return ret;
+                }
+                LOG_INFO("%s %s\n", tab[type].str, *os_ptr ?
+                         "detected" : "not detected");
+        }
         /**
          * Check if resctrl is mounted
          */
@@ -1221,35 +1234,6 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                 return PQOS_RETVAL_RESOURCE;
         }
         p_cap->os_enabled = 1;
-
-        /**
-         * Set resctrl flags and search
-         */
-        for (i = 0; i < num_cap; i++) {
-                if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
-                        tab[PQOS_CAP_TYPE_L3CA].cap_type_ptr =
-                                &p_cap->capabilities[i].os_support;
-
-                if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
-                        tab[PQOS_CAP_TYPE_L2CA].cap_type_ptr =
-                                &p_cap->capabilities[i].os_support;
-        }
-
-        for (i = 0; i < PQOS_CAP_TYPE_NUMOF; i++) {
-                if (tab[i].fname == NULL || tab[i].cap_type_ptr == NULL)
-                        continue;
-
-                ret = detect_os_support(tab[i].fname,
-                                        tab[i].str,
-                                        tab[i].cap_type_ptr);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Fatal error encountered in"
-                                  " resctrl detection!\n");
-                        return ret;
-                }
-                LOG_INFO("%s %s\n", tab[i].str, *tab[i].cap_type_ptr ?
-                         "detected" : "not detected");
-        }
 
         return PQOS_RETVAL_OK;
 }
