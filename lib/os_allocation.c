@@ -708,7 +708,7 @@ os_get_max_rctl_grps(const struct pqos_cap *cap,
 	*num_rctl_grps = max_rctl_grps;
 	return PQOS_RETVAL_OK;
 }
-#ifdef USE_OS
+
 static int
 os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
 {
@@ -739,12 +739,12 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
         cdp_option = "cdp";  /**< cdp_on */
 
  mount:
-        if (mount("resctrl", "/sys/fs/resctrl", "resctrl", 0, cdp_option) != 0)
+        if (mount("resctrl", rctl_path, "resctrl", 0, cdp_option) != 0)
                 return PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;
 }
-#endif
+
 /**
  * @brief Prepares and authenticates resctrl file system
  *        used for OS allocation interface
@@ -815,7 +815,7 @@ int
 os_alloc_assoc_set(const unsigned lcore,
                    const unsigned class_id)
 {
-	int ret = PQOS_RETVAL_OK;
+	int ret;
 	unsigned num_l2_cos = 0, num_l3_cos = 0;
 	struct cpumask mask;
 
@@ -912,7 +912,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
-        int ret;
+        int ret, cdp_mount;
         unsigned i, cos0 = 0;
         struct cpumask mask;
 
@@ -939,14 +939,12 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                 ret = PQOS_RETVAL_RESOURCE;
                 goto os_alloc_reset_exit;
         }
-        if (l3_cap != NULL) {
-                /* Check against erroneous CDP request */
-                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
-                        LOG_ERROR("CAT/CDP requested but not supported by the "
-                                  "platform!\n");
-                        ret = PQOS_RETVAL_PARAM;
-                        goto os_alloc_reset_exit;
-                }
+        /* Check against erroneous CDP request */
+        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
+                LOG_ERROR("CAT/CDP requested but not supported by the "
+                          "platform!\n");
+                ret = PQOS_RETVAL_PARAM;
+                goto os_alloc_reset_exit;
         }
 
         /**
@@ -963,6 +961,41 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                 LOG_ERROR("CPU assoc reset failed\n");
                 return ret;
         }
+
+        /**
+         * Umount resctrl to reset schemata
+         */
+        ret = umount2(rctl_path, 0);
+        if (ret != 0) {
+                LOG_ERROR("Umount OS interface error!\n");
+                goto os_alloc_reset_exit;
+        }
+        /**
+         * Turn L3 CDP ON or OFF
+         */
+        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON)
+                cdp_mount = 1;
+        else if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY)
+                cdp_mount = l3_cap->cdp_on;
+        else
+                cdp_mount = 0;
+
+        /**
+         * Mount now with CDP option.
+         */
+        ret = os_interface_mount(cdp_mount);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Mount OS interface error!\n");
+                goto os_alloc_reset_exit;
+        }
+        if (cdp_mount != l3_cap->cdp_on)
+                _pqos_cap_l3cdp_change(l3_cap->cdp_on, cdp_mount);
+        /**
+         * Create the COS dir's in resctrl.
+         */
+        ret = os_alloc_prep();
+        if (ret != PQOS_RETVAL_OK)
+                LOG_ERROR("OS alloc prep error!\n");
 
  os_alloc_reset_exit:
         return ret;
@@ -1049,7 +1082,7 @@ os_l3ca_get(const unsigned socket,
             unsigned *num_ca,
             struct pqos_l3ca *ca)
 {
-	int ret = PQOS_RETVAL_OK;
+	int ret;
 	unsigned class_id;
 	unsigned count = 0;
 	unsigned sockets_num = 0;
@@ -1235,4 +1268,3 @@ os_l2ca_get(const unsigned l2id,
 
 	return ret;
 }
-
