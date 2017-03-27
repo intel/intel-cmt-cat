@@ -92,6 +92,7 @@ print_allocation_config(const struct pqos_capability *cap_l3ca,
 		lcores = pqos_cpu_get_cores(cpu_info, sockets[i], &lcount);
 		if (lcores == NULL || lcount == 0) {
 			printf("Error retrieving core information!\n");
+                        free(lcores);
 			return;
 		}
 		printf("Core information for socket %u:\n",

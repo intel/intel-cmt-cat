@@ -516,8 +516,10 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 		return PQOS_RETVAL_ERROR;
 
 	if ((schemata->l3ca_num > 0 && schemata->l3ca == NULL)
-	    || (schemata->l2ca_num > 0 && schemata->l2ca == NULL))
-		return PQOS_RETVAL_ERROR;
+	    || (schemata->l2ca_num > 0 && schemata->l2ca == NULL)) {
+		ret = PQOS_RETVAL_ERROR;
+		goto schemata_read_exit;
+	}
 
 	memset(buf, 0, sizeof(buf));
 	while (fgets(buf, sizeof(buf), fd) != NULL) {
