@@ -235,8 +235,10 @@ int pqos_l3ca_set(const unsigned socket,
 		}
 	}
 
-
-	ret = hw_l3ca_set(socket, num_cos, ca);
+	if (pqos_cap_use_msr())
+		ret = hw_l3ca_set(socket, num_cos, ca);
+	else
+		ret = os_l3ca_set(socket, num_cos, ca);
 
 	_pqos_api_unlock();
 

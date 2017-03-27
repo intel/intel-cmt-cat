@@ -946,11 +946,74 @@ os_l3ca_set(const unsigned socket,
             const unsigned num_cos,
             const struct pqos_l3ca *ca)
 {
-	UNUSED_PARAM(socket);
-	UNUSED_PARAM(num_cos);
-	UNUSED_PARAM(ca);
+	int ret;
+	unsigned sockets_num = 0;
+	unsigned *sockets = NULL;
+	unsigned i;
+	unsigned l3ca_num = 0;
+	int cdp_enabled = 0;
 
-	return PQOS_RETVAL_ERROR;
+	ASSERT(ca != NULL);
+	ASSERT(num_cos != 0);
+	ASSERT(m_cap != NULL);
+	ASSERT(m_cpu != NULL);
+
+	ret = pqos_l3ca_get_cos_num(m_cap, &l3ca_num);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	if (num_cos > l3ca_num)
+		return PQOS_RETVAL_ERROR;
+
+	/* Get number of sockets in the system */
+	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	if (sockets == NULL || sockets_num == 0) {
+		ret = PQOS_RETVAL_ERROR;
+		goto os_l3ca_set_exit;
+	}
+
+	if (socket >= sockets_num) {
+		ret = PQOS_RETVAL_PARAM;
+		goto os_l3ca_set_exit;
+	}
+
+	ret = pqos_l3ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
+	if (ret != PQOS_RETVAL_OK)
+		goto os_l3ca_set_exit;
+
+	for (i = 0; i < num_cos; i++) {
+		struct schemata schmt;
+
+		if (ca[i].cdp == 1 && cdp_enabled == 0) {
+			LOG_ERROR("Attempting to set CDP COS while CDP "
+			          "is disabled!\n");
+			ret = PQOS_RETVAL_ERROR;
+			goto os_l3ca_set_exit;
+		}
+
+		ret = schemata_init(ca[i].class_id, &schmt);
+
+		/* read schemata file */
+		if (ret == PQOS_RETVAL_OK)
+			ret = schemata_read(ca[i].class_id, &schmt);
+
+		/* update and write schemata */
+		if (ret == PQOS_RETVAL_OK) {
+			schmt.l3ca[socket] = ca[i];
+			ret = schemata_write(ca[i].class_id, &schmt);
+		}
+
+		schemata_fini(&schmt);
+
+		if (ret != PQOS_RETVAL_OK)
+			goto os_l3ca_set_exit;
+	}
+
+ os_l3ca_set_exit:
+	if (sockets != NULL)
+		free(sockets);
+
+	return ret;
 }
 
 int
@@ -1085,3 +1148,4 @@ os_l2ca_get(const unsigned l2id,
 
 	return ret;
 }
+
