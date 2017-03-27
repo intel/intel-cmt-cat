@@ -1081,11 +1081,71 @@ os_l2ca_set(const unsigned l2id,
             const unsigned num_cos,
             const struct pqos_l2ca *ca)
 {
-	UNUSED_PARAM(l2id);
-	UNUSED_PARAM(num_cos);
-	UNUSED_PARAM(ca);
+	int ret;
+	unsigned i;
+	unsigned l2ids_num = 0;
+	unsigned *l2ids = NULL;
+	unsigned l2ca_num;
 
-	return PQOS_RETVAL_ERROR;
+	ASSERT(m_cap != NULL);
+	ASSERT(ca != NULL);
+	ASSERT(num_cos != 0);
+
+	ret = pqos_l2ca_get_cos_num(m_cap, &l2ca_num);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	if (num_cos > l2ca_num)
+		return PQOS_RETVAL_PARAM;
+
+	/*
+	 * Check if class id's are within allowed range.
+	 */
+	for (i = 0; i < num_cos; i++) {
+		if (ca[i].class_id >= l2ca_num) {
+			LOG_ERROR("L2 COS%u is out of range (COS%u is max)!\n",
+			          ca[i].class_id, l2ca_num - 1);
+			return PQOS_RETVAL_PARAM;
+		}
+	}
+
+	/* Get number of L2 ids in the system */
+	l2ids = pqos_cpu_get_l2ids(m_cpu, &l2ids_num);
+	if (l2ids == NULL || l2ids_num == 0) {
+		ret = PQOS_RETVAL_ERROR;
+		goto os_l2ca_set_exit;
+	}
+
+	if (l2id >= l2ids_num) {
+		ret = PQOS_RETVAL_PARAM;
+		goto os_l2ca_set_exit;
+	}
+
+	for (i = 0; i < num_cos; i++) {
+		struct schemata schmt;
+
+		ret = schemata_init(ca[i].class_id, &schmt);
+
+		/* read schemata file */
+		if (ret == PQOS_RETVAL_OK)
+			ret = schemata_read(ca[i].class_id, &schmt);
+
+		if (ret == PQOS_RETVAL_OK) {
+			schmt.l2ca[l2id] = ca[i];
+			ret = schemata_write(ca[i].class_id, &schmt);
+		}
+
+		schemata_fini(&schmt);
+
+		if (ret != PQOS_RETVAL_OK)
+			goto os_l2ca_set_exit;
+	}
+
+ os_l2ca_set_exit:
+	if (l2ids != NULL)
+		free(l2ids);
+
+	return ret;
 }
 
 int

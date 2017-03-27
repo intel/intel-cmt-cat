@@ -307,8 +307,10 @@ int pqos_l2ca_set(const unsigned l2id,
 			return PQOS_RETVAL_PARAM;
 		}
 	}
-
-	ret = hw_l2ca_set(l2id, num_cos, ca);
+	if (pqos_cap_use_msr())
+		ret = hw_l2ca_set(l2id, num_cos, ca);
+	else
+		ret = os_l2ca_set(l2id, num_cos, ca);
 
 	_pqos_api_unlock();
 
