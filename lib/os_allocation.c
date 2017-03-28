@@ -37,10 +37,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
-#include <malloc.h>
 #include <stdlib.h>
 #include <sys/mount.h>
-
 
 #include <pqos.h>
 #include "os_allocation.h"
