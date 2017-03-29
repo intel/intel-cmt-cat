@@ -624,7 +624,8 @@ schemata_write(const unsigned class_id, const struct schemata *schemata)
 		for (i = 0; i < schemata->l3ca_num; i++) {
 			if (i > 0)
 				fprintf(fd, ";");
-			fprintf(fd, "%u=%lx", i, schemata->l3ca[i].u.ways_mask);
+			fprintf(fd, "%u=%llx", i, (unsigned long long)
+			        schemata->l3ca[i].u.ways_mask);
 		}
 		fprintf(fd, "\n");
 	}
@@ -635,15 +636,15 @@ schemata_write(const unsigned class_id, const struct schemata *schemata)
 		for (i = 0; i < schemata->l3ca_num; i++) {
 			if (i > 0)
 				fprintf(fd, ";");
-			fprintf(fd, "%u=%lx", i,
+			fprintf(fd, "%u=%llx", i, (unsigned long long)
 				schemata->l3ca[i].u.s.code_mask);
 		}
 		fprintf(fd, "\nL3DATA:");
 		for (i = 0; i < schemata->l3ca_num; i++) {
 			if (i > 0)
 				fprintf(fd, ";");
-			fprintf(fd, "%u=%lx", i,
-				schemata->l3ca[i].u.s.data_mask);
+			fprintf(fd, "%u=%llx", i, (unsigned long long)
+			        schemata->l3ca[i].u.s.data_mask);
 		}
 		fprintf(fd, "\n");
 	}
