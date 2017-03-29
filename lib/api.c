@@ -125,6 +125,9 @@ int pqos_alloc_release(const unsigned *core_array,
 {
 	int ret;
 
+        if (core_num == 0 || core_array == NULL)
+                return PQOS_RETVAL_PARAM;
+
 	_pqos_api_lock();
 
         ret = _pqos_check_init(1);

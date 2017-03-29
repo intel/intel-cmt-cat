@@ -835,8 +835,6 @@ int hw_alloc_release(const unsigned *core_array,
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(core_num > 0 && core_array != NULL);
-        if (core_num == 0 || core_array == NULL)
-                return PQOS_RETVAL_PARAM;
 
         for (i = 0; i < core_num; i++)
                 if (cos_assoc_set(core_array[i], 0) != PQOS_RETVAL_OK)

@@ -890,9 +890,6 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
         struct cpumask mask;
 
         ASSERT(core_num > 0 && core_array != NULL);
-        if (core_num == 0 || core_array == NULL)
-                return PQOS_RETVAL_PARAM;
-
         /**
          * Set the CPU assoc back to COS0
          */
