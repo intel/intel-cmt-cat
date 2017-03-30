@@ -105,6 +105,10 @@ int pqos_alloc_assign(const unsigned technology,
 {
 	int ret;
 
+        if (core_num == 0 || core_array == NULL || class_id == NULL ||
+            technology == 0)
+                return PQOS_RETVAL_PARAM;
+
 	_pqos_api_lock();
 
         ret = _pqos_check_init(1);
@@ -112,12 +116,16 @@ int pqos_alloc_assign(const unsigned technology,
                 _pqos_api_unlock();
                 return ret;
         }
-
-	ret = hw_alloc_assign(technology, core_array, core_num, class_id);
+        if (pqos_cap_use_msr())
+                ret = hw_alloc_assign(technology, core_array,
+                        core_num, class_id);
+        else
+                ret = os_alloc_assign(technology, core_array,
+                        core_num, class_id);
 
 	_pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int pqos_alloc_release(const unsigned *core_array,

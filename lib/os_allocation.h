@@ -64,6 +64,30 @@ int os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
 int os_alloc_fini(void);
 
 /**
+ * @brief OS interface to assign first available
+ *        COS to cores in \a core_array
+ *
+ * While searching for available COS take technologies it is intended to use
+ * with into account.
+ * Note on \a technology and \a core_array selection:
+ * - if L2 CAT technology is requested then cores need to belong to
+ *   one L2 cluster (same L2ID)
+ * - if only L3 CAT is requested then cores need to belong to one socket
+ *
+ * @param [in] technology bit mask selecting technologies
+ *             (1 << enum pqos_cap_type)
+ * @param [in] core_array list of core ids
+ * @param [in] core_num number of core ids in the \a core_array
+ * @param [out] class_id place to store reserved COS id
+ *
+ * @return Operations status
+ */
+int os_alloc_assign(const unsigned technology,
+                    const unsigned *core_array,
+                    const unsigned core_num,
+                    unsigned *class_id);
+
+/**
  * @brief OS interface to reassign cores
  *        in \a core_array to default COS#0
  *
