@@ -912,14 +912,16 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
-        int ret, cdp_mount;
+        int ret, cdp_mount, cdp_current = 0;
         unsigned i, cos0 = 0;
         struct cpumask mask;
 
         /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
-        if (alloc_cap != NULL)
+        if (alloc_cap != NULL) {
                 l3_cap = alloc_cap->u.l3ca;
+                cdp_current = l3_cap->cdp_on;
+        }
 
         /* Get L2 CAT capabilities */
         alloc_cap = NULL;
@@ -976,7 +978,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON)
                 cdp_mount = 1;
         else if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY)
-                cdp_mount = l3_cap->cdp_on;
+                cdp_mount = cdp_current;
         else
                 cdp_mount = 0;
 
@@ -988,8 +990,8 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                 LOG_ERROR("Mount OS interface error!\n");
                 goto os_alloc_reset_exit;
         }
-        if (cdp_mount != l3_cap->cdp_on)
-                _pqos_cap_l3cdp_change(l3_cap->cdp_on, cdp_mount);
+        if (cdp_mount != cdp_current)
+                _pqos_cap_l3cdp_change(cdp_current, cdp_mount);
         /**
          * Create the COS dir's in resctrl.
          */
