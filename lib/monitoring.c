@@ -47,6 +47,7 @@
 #include "pidapi.h"
 #include "cap.h"
 #include "monitoring.h"
+#include "os_monitoring.h"
 
 #include "machine.h"
 #include "types.h"
@@ -200,36 +201,19 @@ scale_event(const enum pqos_mon_event event, const uint64_t val);
 
 int
 pqos_mon_init(const struct pqos_cpuinfo *cpu,
-              const struct pqos_cap *cap,
-              const struct pqos_config *cfg)
-{
-        return hw_mon_init(cpu, cap, cfg);
-}
-
-int
-pqos_mon_fini(void)
-{
-        return hw_mon_fini();
-}
-
-int
-hw_mon_init(const struct pqos_cpuinfo *cpu,
-              const struct pqos_cap *cap,
-              const struct pqos_config *cfg)
+            const struct pqos_cap *cap,
+            const struct pqos_config *cfg)
 {
         const struct pqos_capability *item = NULL;
-        int ret = PQOS_RETVAL_OK;
+        int ret;
 
         UNUSED_PARAM(cfg);
-
-        m_cpu = cpu;
-        m_cap = cap;
 
 #ifndef PQOS_NO_PID_API
         /**
          * Init monitoring processes
          */
-        ret = pqos_pid_init(m_cap);
+        ret = pqos_pid_init(cap);
         if (ret == PQOS_RETVAL_ERROR)
                 return ret;
 #endif /* PQOS_NO_PID_API */
@@ -251,13 +235,22 @@ hw_mon_init(const struct pqos_cpuinfo *cpu,
         }
 
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
-        return PQOS_RETVAL_OK;
+
+        if (!pqos_cap_use_msr())
+                ret = os_mon_init(cpu, cap);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        m_cpu = cpu;
+        m_cap = cap;
+
+        return ret;
 }
 
 int
-hw_mon_fini(void)
+pqos_mon_fini(void)
 {
-        int retval = PQOS_RETVAL_OK;
+        int ret = PQOS_RETVAL_OK;
 
 #ifndef PQOS_NO_PID_API
         /**
@@ -269,9 +262,13 @@ hw_mon_fini(void)
 
         m_rmid_max = 0;
 
+        if (!pqos_cap_use_msr())
+                ret = os_mon_fini();
+
         m_cpu = NULL;
         m_cap = NULL;
-        return retval;
+
+        return ret;
 }
 
 /*

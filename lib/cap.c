@@ -333,7 +333,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
         mon->events[mon->num_events].type = (enum pqos_mon_event) event_type;
         mon->events[mon->num_events].max_rmid = max_rmid;
         mon->events[mon->num_events].scale_factor = scale_factor;
-        mon->events[mon->num_events].pid_support = 0;
+        mon->events[mon->num_events].os_support = 0;
         mon->num_events++;
 }
 

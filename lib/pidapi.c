@@ -1106,7 +1106,7 @@ pqos_pid_init(const struct pqos_cap *cap)
 
                         if (events_tab[i].event != mon->type)
                                 continue;
-                        mon->pid_support = 1;
+                        mon->os_support = 1;
                         LOG_INFO("Detected PID API (perf) support"
                                  " for %s\n", events_tab[j].desc);
                         break;

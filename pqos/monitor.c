@@ -539,7 +539,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
 
                 all_core_evts |= mon->type;
-                if (mon->pid_support)
+                if (mon->os_support)
                         all_pid_evts |= mon->type;
         }
         /**
