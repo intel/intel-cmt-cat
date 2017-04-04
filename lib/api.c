@@ -37,6 +37,7 @@
 #include "os_allocation.h"
 #include "os_monitoring.h"
 #include "monitoring.h"
+#include "os_monitoring.h"
 #include "cap.h"
 #include "log.h"
 
@@ -507,7 +508,10 @@ int pqos_mon_stop(struct pqos_mon_data *group)
                 return ret;
         }
 
-        ret = hw_mon_stop(group);
+        if (pqos_cap_use_msr())
+                ret = hw_mon_stop(group);
+        else
+                ret = os_mon_stop(group);
 
         _pqos_api_unlock();
 

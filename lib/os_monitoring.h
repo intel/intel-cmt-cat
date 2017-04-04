@@ -61,6 +61,20 @@ int os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
  */
 int os_mon_fini(void);
 
+/*
+ * @brief This function stops all perf counters
+ *
+ * Stops all counters and frees associated data structures
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+int
+os_mon_stop(struct pqos_mon_data *group);
+
 /**
  * @brief OS interface to start resource monitoring on selected
  * group of cores

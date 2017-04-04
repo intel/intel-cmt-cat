@@ -611,7 +611,8 @@ stop_events(struct pqos_mon_data *group,
                 if (ret == PQOS_RETVAL_OK && ret2 == PQOS_RETVAL_OK)
                         stopped_evts |= PQOS_MON_EVENT_RMEM_BW;
         }
-        if (events ^ stopped_evts) {
+        if (events ^ (stopped_evts | /* workaround */
+                PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) {
                 LOG_ERROR("Failed to stop all events\n");
                 return PQOS_RETVAL_ERROR;
         }
@@ -656,6 +657,22 @@ os_mon_fini(void)
         return PQOS_RETVAL_OK;
 }
 
+int
+os_mon_stop(struct pqos_mon_data *group)
+{
+        int ret;
+
+        ASSERT(group != NULL);
+        /**
+         * Stop all started events
+         */
+        ret = stop_events(group, group->event);
+        free(group->cores);
+        group->cores = NULL;
+        memset(group, 0, sizeof(*group));
+
+        return ret;
+}
 
 int
 os_mon_start(const unsigned num_cores,
