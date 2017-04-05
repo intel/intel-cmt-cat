@@ -158,7 +158,15 @@ int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 {
 	int ret;
 
-	_pqos_api_lock();
+        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
+            l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
+                LOG_ERROR("Unrecognized L3 CDP configuration setting %d!\n",
+                          l3_cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {

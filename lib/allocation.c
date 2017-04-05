@@ -962,13 +962,9 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         unsigned max_l3_cos = 0;
         unsigned j;
 
-        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
-            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
-            l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
-                LOG_ERROR("Unrecognized L3 CDP configuration setting %d!\n",
-                          l3_cdp_cfg);
-                return PQOS_RETVAL_PARAM;
-        }
+        ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
+               l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
+               l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
 
         /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);

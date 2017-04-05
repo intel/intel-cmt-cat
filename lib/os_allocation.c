@@ -990,6 +990,10 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         unsigned i, cos0 = 0;
         struct cpumask mask;
 
+        ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
+               l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
+               l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+
         /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL) {
