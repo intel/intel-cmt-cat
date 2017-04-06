@@ -224,8 +224,10 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
          * and allocate memory for RMID table
          */
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &item);
-        if (ret != PQOS_RETVAL_OK)
-                return PQOS_RETVAL_RESOURCE;
+        if (ret != PQOS_RETVAL_OK) {
+                ret = PQOS_RETVAL_RESOURCE;
+		goto pqos_mon_init_exit;
+	}
 
         ASSERT(item != NULL);
         m_rmid_max = item->u.mon->max_rmid;
@@ -241,6 +243,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
+ pqos_mon_init_exit:
         m_cpu = cpu;
         m_cap = cap;
 
