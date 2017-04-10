@@ -787,7 +787,7 @@ int hw_alloc_assign(const unsigned technology,
 
                 if (l2_req) {
                         /* L2 is requested
-                         * The smallest managable entity is L2 cluster
+                         * The smallest manageable entity is L2 cluster
                          */
                         if (i != 0 && l2id != pi->l2_id) {
                                 ret = PQOS_RETVAL_PARAM;
