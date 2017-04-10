@@ -61,10 +61,34 @@ int os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
  */
 int os_mon_fini(void);
 
+/**
+ * @brief OS interface to start resource monitoring on selected
+ * group of cores
+ *
+ * The function sets up content of the \a group structure.
+ *
+ * Note that \a event cannot select PQOS_PERF_EVENT_IPC or
+ * PQOS_PERF_EVENT_L3_MISS events without any PQoS event
+ * selected at the same time.
+ *
+ * @param [in] num_cores number of cores in \a cores array
+ * @param [in] cores array of logical core id's
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [in,out] group a pointer to monitoring structure
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int os_mon_start(const unsigned num_cores,
+                 const unsigned *cores,
+                 const enum pqos_mon_event event,
+                 void *context,
+                 struct pqos_mon_data *group);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* __PQOS_OS_MON_H__ */
-

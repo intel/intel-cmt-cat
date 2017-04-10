@@ -35,6 +35,7 @@
 #include <pqos.h>
 #include "allocation.h"
 #include "os_allocation.h"
+#include "os_monitoring.h"
 #include "monitoring.h"
 #include "cap.h"
 #include "log.h"
@@ -478,8 +479,10 @@ int pqos_mon_start(const unsigned num_cores,
                 _pqos_api_unlock();
                 return ret;
         }
-
-        ret = hw_mon_start(num_cores, cores, event, context, group);
+        if (pqos_cap_use_msr())
+                ret = hw_mon_start(num_cores, cores, event, context, group);
+        else
+                ret = os_mon_start(num_cores, cores, event, context, group);
 
         _pqos_api_unlock();
 
@@ -541,4 +544,3 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
 
         return ret;
 }
-

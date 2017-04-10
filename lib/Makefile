@@ -92,7 +92,7 @@ endif
 # PID API build option
 ifneq ($(NO_PID_API), n)
 CFLAGS += -DPQOS_NO_PID_API
-OBJS := $(filter-out pidapi.o perf.o,$(OBJS))
+OBJS := $(filter-out pidapi.o,$(OBJS))
 endif
 
 HDR = pqos.h
@@ -182,7 +182,7 @@ style:
 	-f allocation.h -f monitoring.c -f monitoring.h \
 	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
 	-f utils.c -f cpuinfo.h -f pidapi.c -f pidapi.h \
-	-f os_allocation.h -f os_allocation.c
+	-f os_allocation.h -f os_allocation.c -f os_monitoring.h os_monitoring.c
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE \
@@ -198,7 +198,7 @@ cppcheck:
 	allocation.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \
 	utils.c cpuinfo.c cpuinfo.h pidapi.c pidapi.h \
-	os_allocation.h os_allocation.c
+	os_allocation.h os_allocation.c os_monitoring.h os_monitoring.c
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

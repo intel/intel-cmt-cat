@@ -909,10 +909,6 @@ hw_mon_start(const unsigned num_cores,
         ASSERT(event > 0);
         memset(group, 0, sizeof(*group));
 
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
         ASSERT(m_cpu != NULL);
 
         /**
