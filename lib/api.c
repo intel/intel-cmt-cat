@@ -542,7 +542,10 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
                 return ret;
         }
 
-        ret = hw_mon_poll(groups, num_groups);
+        if (pqos_cap_use_msr())
+                ret = hw_mon_poll(groups, num_groups);
+        else
+                ret = os_mon_poll(groups, num_groups);
 
         _pqos_api_unlock();
 

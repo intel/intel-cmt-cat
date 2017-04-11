@@ -101,6 +101,19 @@ int os_mon_start(const unsigned num_cores,
                  void *context,
                  struct pqos_mon_data *group);
 
+/**
+ * @brief OS interface to poll monitoring data from requested groups
+ *
+ * @param [in] groups table of monitoring group pointers to be be updated
+ * @param [in] num_groups number of monitoring groups in the table
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+os_mon_poll(struct pqos_mon_data **groups,
+            const unsigned num_groups);
+
 #ifdef __cplusplus
 }
 #endif
