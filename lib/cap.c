@@ -1193,6 +1193,7 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                 { "/proc/cpuinfo", "cqm"},
                 { "/proc/cpuinfo", "cat_l3"},
                 { "/proc/cpuinfo", "cat_l2"},
+                { "/proc/cpuinfo", "mba"},
         };
 
         /**
@@ -1207,8 +1208,6 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                  "resctrl detected" :
                  "resctrl not detected. "
                  "Kernel version 4.10 or higher required");
-        if (!res_flag)
-                return PQOS_RETVAL_RESOURCE;
 
         /**
          * Detect OS support for all HW capabilities
@@ -1233,7 +1232,73 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                 LOG_INFO("resctrl not mounted\n");
                 return PQOS_RETVAL_RESOURCE;
         }
-        p_cap->os_enabled = 1;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Removes capabilities that are not supported by the OS
+ *
+ * @param p_cap place to store allocated capabilities structure
+ *
+ * @return Operational status
+ */
+static int
+remove_hw_caps(struct pqos_cap *p_cap)
+{
+        unsigned i, removed = 0;
+
+        /**
+         * Free capabilities not supported by the OS
+         */
+        for (i = 0; i < p_cap->num_cap; i++) {
+                if (p_cap->capabilities[i].os_support == 0) {
+                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_MON)
+                                LOG_INFO("Monitoring available in HW but not"
+                                         " supported by OS. Disabling this"
+                                         " capability.\n");
+                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                                LOG_INFO("L3 CAT available in HW but not"
+                                         " supported by OS. Disabling this"
+                                         " capability.\n");
+                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
+                                LOG_INFO("L2 CAT available in HW but not"
+                                         " supported by OS. Disabling this"
+                                         " capability.\n");
+                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
+                                LOG_INFO("MBA available in HW but not"
+                                         " supported by OS. Disabling this"
+                                         " capability.\n");
+                        free(p_cap->capabilities[i].u.generic_ptr);
+                        p_cap->capabilities[i].u.generic_ptr = NULL;
+                        if (p_cap->capabilities[i].u.generic_ptr != NULL)
+                                return PQOS_RETVAL_ERROR;
+                        removed++;
+                }
+        }
+        /**
+         * Return if no caps supported
+         */
+        if (removed == p_cap->num_cap)
+                p_cap->num_cap = 0;
+
+        /**
+         * Reorganize the list of caps, removing the NULL entries
+         */
+        for (i = 0; i < p_cap->num_cap; ) {
+                if (p_cap->capabilities[i].u.generic_ptr == NULL) {
+                        unsigned j;
+
+                        for (j = i; j < p_cap->num_cap - 1; j++)
+                                p_cap->capabilities[j] =
+                                        p_cap->capabilities[j + 1];
+                        p_cap->num_cap--;
+                } else
+                        /**
+                         * Only increment i when an OS cap has been detected.
+                         */
+                        i++;
+        }
 
         return PQOS_RETVAL_OK;
 }
@@ -1324,11 +1389,13 @@ pqos_init(const struct pqos_config *config)
         else if (config->interface == PQOS_INTER_MSR)
                 m_use_msr = 1;
 
-        if (m_cap->os_enabled == m_use_msr) {
-                ret = PQOS_RETVAL_ERROR;
-                LOG_ERROR("Interface compatibility error %d\n", ret);
+        if (!m_use_msr)
+                ret = remove_hw_caps(m_cap);
+        if (ret == PQOS_RETVAL_ERROR) {
+                LOG_ERROR("remove_hw_caps() error %d\n", ret);
                 goto machine_init_error;
         }
+
         /**
          * If monitoring capability has been discovered
          * then get max RMID supported by a CPU socket

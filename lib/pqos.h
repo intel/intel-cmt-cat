@@ -276,7 +276,6 @@ struct pqos_cap {
         unsigned mem_size;              /**< byte size of the structure */
         unsigned version;               /**< version of PQoS library */
         unsigned num_cap;               /**< number of capabilities */
-        unsigned os_enabled;            /**< resctrl has been mounted */
         struct pqos_capability capabilities[0];
 };
 

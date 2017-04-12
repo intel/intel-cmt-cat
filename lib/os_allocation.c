@@ -708,7 +708,13 @@ os_get_max_rctl_grps(const struct pqos_cap *cap,
 	*num_rctl_grps = max_rctl_grps;
 	return PQOS_RETVAL_OK;
 }
-
+/**
+ * @brief Function to mount the resctrl file system with CDP option
+ *
+ * @param l3_cdp_cfg CDP option
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
 static int
 os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
 {
@@ -741,6 +747,55 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
  mount:
         if (mount("resctrl", rctl_path, "resctrl", 0, cdp_option) != 0)
                 return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Check to see if resctrl is supported.
+ *        If it is attempt to mount the file system.
+ *
+ * @return Operational status
+ */
+static int
+os_alloc_check(void)
+{
+        int ret;
+        unsigned i, supported = 0;
+
+        /**
+         * Check if resctrl is supported
+         */
+        for (i = 0; i < m_cap->num_cap; i++) {
+                if (m_cap->capabilities[i].os_support == 1) {
+                        if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                                supported = 1;
+                        if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
+                                supported = 1;
+                        if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
+                                supported = 1;
+                }
+        }
+
+        if (!supported)
+                return PQOS_RETVAL_OK;
+        /**
+         * Check if resctrl is mounted
+         */
+        if (access("/sys/fs/resctrl/cpus", 0) != 0) {
+                const struct pqos_capability *alloc_cap = NULL;
+                int cdp_mount = PQOS_REQUIRE_CDP_OFF;
+                /* Get L3 CAT capabilities */
+                (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
+                if (alloc_cap != NULL)
+                        cdp_mount = alloc_cap->u.l3ca->cdp_on;
+
+                ret = os_interface_mount(cdp_mount);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_INFO("Unable to mount resctrl\n");
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        }
 
         return PQOS_RETVAL_OK;
 }
@@ -792,13 +847,21 @@ static int os_alloc_prep(void)
 int
 os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
-	if (cpu == NULL || cap == NULL)
+	int ret;
+
+        if (cpu == NULL || cap == NULL)
 		return PQOS_RETVAL_PARAM;
 
 	m_cap = cap;
 	m_cpu = cpu;
 
-        return os_alloc_prep();
+        ret = os_alloc_check();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = os_alloc_prep();
+
+        return ret;
 }
 
 int
