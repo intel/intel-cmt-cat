@@ -1289,7 +1289,6 @@ pqos_init(const struct pqos_config *config)
                 ret = PQOS_RETVAL_ERROR;
                 goto log_init_error;
         }
-        ret = PQOS_RETVAL_OK;
 
         /**
          * Find max core id in the topology
