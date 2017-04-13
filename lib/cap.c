@@ -1317,6 +1317,14 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
+        /**
+         * check interface selection
+         */
+        if (config->interface == PQOS_INTER_OS)
+                m_use_msr = 0;
+        else if (config->interface == PQOS_INTER_MSR)
+                m_use_msr = 1;
+
         if (m_cap->os_enabled == m_use_msr) {
                 ret = PQOS_RETVAL_ERROR;
                 LOG_ERROR("Interface compatibility error %d\n", ret);
