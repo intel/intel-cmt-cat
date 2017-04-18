@@ -619,6 +619,63 @@ stop_events(struct pqos_mon_data *group,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Function to read perf pqos event counters
+ *
+ * Reads pqos counters and stores values for a specified event
+ *
+ * @param group monitoring structure
+ * @param value destination to store value
+ * @param fds array of fd's
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+read_pqos_counters(struct pqos_mon_data *group,
+                   uint64_t *value, int *fds)
+{
+        unsigned i;
+        uint64_t total_value = 0;
+
+        ASSERT(group != NULL);
+        ASSERT(value != NULL);
+        ASSERT(fds != NULL);
+
+        /**
+         * For each core/TID read counter and
+         * return sum of all counter values
+         */
+        for (i = 0; i < group->num_cores; i++) {
+                uint64_t counter_value;
+                int ret = perf_read_counter(fds[i], &counter_value);
+
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                total_value += counter_value;
+        }
+        *value = total_value;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Gives the difference between two values with regard to the possible
+ *        overrun
+ *
+ * @param old_value previous value
+ * @param new_value current value
+ * @return difference between the two values
+ */
+static uint64_t
+get_delta(const uint64_t old_value, const uint64_t new_value)
+{
+        if (old_value > new_value)
+                return (UINT64_MAX - old_value) + new_value;
+        else
+                return new_value - old_value;
+}
+
 int
 os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
@@ -832,4 +889,93 @@ pqos_mon_start_error:
                 group->valid = GROUP_VALID_MARKER;
 
         return retval;
+}
+
+/**
+ * @brief This function reads all perf counters
+ *
+ * Reads counters for all events and stores values
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+static int
+os_mon_perf_poll(struct pqos_mon_data *group)
+{
+        int ret;
+
+        /**
+         * Read and store counter values
+         * for each event
+         */
+        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
+                ret = read_pqos_counters(group,
+                                         &group->values.llc,
+                                         group->fds_llc);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                group->values.llc = group->values.llc *
+                        events_tab[OS_MON_EVT_IDX_LLC].scale;
+        }
+        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = group->values.mbm_local;
+
+                ret = read_pqos_counters(group,
+                                         &group->values.mbm_local,
+                                         group->fds_mbl);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                group->values.mbm_local_delta =
+                        get_delta(old_value, group->values.mbm_local);
+        }
+        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
+            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
+                uint64_t old_value = group->values.mbm_total;
+
+                ret = read_pqos_counters(group,
+                                         &group->values.mbm_total,
+                                         group->fds_mbt);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                group->values.mbm_total_delta =
+                        get_delta(old_value, group->values.mbm_total);
+        }
+        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
+                group->values.mbm_remote_delta = 0;
+                if (group->values.mbm_total_delta >
+                    group->values.mbm_local_delta)
+                        group->values.mbm_remote_delta =
+                                group->values.mbm_total_delta -
+                                group->values.mbm_local_delta;
+        }
+        return PQOS_RETVAL_OK;
+}
+
+int
+os_mon_poll(struct pqos_mon_data **groups,
+              const unsigned num_groups)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0;
+
+        ASSERT(groups != NULL);
+        ASSERT(num_groups > 0);
+
+        for (i = 0; i < num_groups; i++) {
+                /**
+                 * If monitoring core/PID then read
+                 * counter values
+                 */
+                ret = os_mon_perf_poll(groups[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        LOG_WARN("Failed to read event on "
+                                 "group number %u\n", i);
+        }
+
+        return PQOS_RETVAL_OK;
 }
