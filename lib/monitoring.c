@@ -907,25 +907,8 @@ hw_mon_start(const unsigned num_cores,
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
-        memset(group, 0, sizeof(*group));
 
         ASSERT(m_cpu != NULL);
-
-        /**
-         * Validate event parameter
-         * - only combinations of events allowed
-         * - do not allow non-PQoS events to be monitored on its own
-         */
-        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS))) {
-                return PQOS_RETVAL_PARAM;
-        }
-        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) != 0) {
-                return PQOS_RETVAL_PARAM;
-        }
 
         /**
          * Validate if event is listed in capabilities
@@ -1015,6 +998,7 @@ hw_mon_start(const unsigned num_cores,
         /**
          * Fill in the monitoring group structure
          */
+        memset(group, 0, sizeof(*group));
         group->cores = (unsigned *) malloc(sizeof(group->cores[0]) * num_cores);
         if (group->cores == NULL) {
                 retval = PQOS_RETVAL_RESOURCE;
@@ -1084,69 +1068,6 @@ hw_mon_start(const unsigned num_cores,
                 group->valid = GROUP_VALID_MARKER;
 
         return retval;
-}
-
-int
-pqos_mon_start_pid(const pid_t pid,
-                   const enum pqos_mon_event event,
-                   void *context,
-                   struct pqos_mon_data *group)
-{
-#ifdef PQOS_NO_PID_API
-        UNUSED_PARAM(pid);
-        UNUSED_PARAM(event);
-        UNUSED_PARAM(context);
-        UNUSED_PARAM(group);
-        LOG_ERROR("PID monitoring API not built\n");
-        return PQOS_RETVAL_ERROR;
-#else
-        if (group == NULL || event == 0 || pid < 0)
-                return PQOS_RETVAL_PARAM;
-
-        if (group->valid == GROUP_VALID_MARKER)
-                return PQOS_RETVAL_PARAM;
-
-        int ret = PQOS_RETVAL_OK;
-
-        memset(group, 0, sizeof(*group));
-
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        /**
-         * Validate event parameter
-         * - only combinations of events allowed
-         * - do not allow non-PQoS events to be monitored on its own
-         */
-        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS))) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_PARAM;
-        }
-        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) != 0) {
-                _pqos_api_unlock();
-                return PQOS_RETVAL_PARAM;
-        }
-	group->event = event;
-        group->pid = pid;
-        group->context = context;
-
-        ret = pqos_pid_start(group);
-
-        if (ret == PQOS_RETVAL_OK)
-                group->valid = GROUP_VALID_MARKER;
-
-        _pqos_api_unlock();
-        return ret;
-#endif /* PQOS_NO_PID_API */
 }
 
 int

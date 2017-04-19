@@ -656,6 +656,8 @@ pqos_pid_start(struct pqos_mon_data *group)
         struct dirent **namelist = NULL;
         enum pqos_mon_event started_evts = 0;
 
+        ASSERT(group != NULL);
+
         /**
          * Check PID exists
          */

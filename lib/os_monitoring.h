@@ -114,6 +114,17 @@ int
 os_mon_poll(struct pqos_mon_data **groups,
             const unsigned num_groups);
 
+/**
+ * @brief This function starts all perf counters for a task
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+os_mon_start_pid(struct pqos_mon_data *group);
+
 #ifdef __cplusplus
 }
 #endif
