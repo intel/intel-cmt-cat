@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -151,6 +151,7 @@ static const struct pqos_cap *m_cap = NULL; /**< capabilities structure
 static const struct pqos_cpuinfo *m_cpu = NULL; /**< cpu topology passed
                                                    from cap */
 static unsigned m_rmid_max = 0;         /**< max RMID */
+static int m_interface = PQOS_INTER_MSR;
 /**
  * ---------------------------------------
  * Local Functions
@@ -207,8 +208,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         const struct pqos_capability *item = NULL;
         int ret;
 
-        UNUSED_PARAM(cfg);
-
+	ASSERT(cfg != NULL);
 #ifndef PQOS_NO_PID_API
         /**
          * Init monitoring processes
@@ -238,7 +238,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
 
-        if (!pqos_cap_use_msr())
+        if (cfg->interface == PQOS_INTER_OS)
                 ret = os_mon_init(cpu, cap);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
@@ -246,6 +246,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
  pqos_mon_init_exit:
         m_cpu = cpu;
         m_cap = cap;
+        m_interface = cfg->interface;
 
         return ret;
 }
@@ -264,10 +265,8 @@ pqos_mon_fini(void)
 #endif /* PQOS_NO_PID_API */
 
         m_rmid_max = 0;
-
-        if (!pqos_cap_use_msr())
+        if (m_interface == PQOS_INTER_OS)
                 ret = os_mon_fini();
-
         m_cpu = NULL;
         m_cap = NULL;
 

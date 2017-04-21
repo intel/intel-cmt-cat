@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,57 +29,29 @@
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
  */
 
-/**
- * @brief Internal header file to share PQoS API lock mechanism
- * and library initialization status.
- */
-
-#ifndef __PQOS_HOSTCAP_H__
-#define __PQOS_HOSTCAP_H__
+#ifndef API_H
+#define API_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @brief Modifies L3 CAT capability structure upon CDP config change
+ * @brief Initializes api module
  *
- * Limited error checks done in this function and no errors reported.
- * It is up to caller to check for L3 CAT & CDP support.
+ * @param interface option, MSR or OS
  *
- * @param [in] prev old CDP setting
- * @param [in] next new CDP setting
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
  */
-void _pqos_cap_l3cdp_change(const int prev, const int next);
-
-/**
- * @brief Aquires lock for PQoS API use
- *
- * Only one thread at a time is allowed to use the API.
- * Each PQoS API need to use api_lock and api_unlock functions.
- */
-void _pqos_api_lock(void);
-
-/**
- * @brief Symmetric operation to \a _pqos_api_lock to release the lock
- */
-void _pqos_api_unlock(void);
-
-/**
- * @brief Checks library initialization state
- *
- * @param expect expected stated of library initialization state
- *
- * @return Check status
- * @retval PQOS_RETVAL_OK state as expected
- * @retval PQOS_RETVA_ERROR state different than expected
- */
-int _pqos_check_init(const int expect);
+int api_init(int interface);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __PQOS_HOSTCAP_H__ */
+#endif /* API_H */
+

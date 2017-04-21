@@ -80,9 +80,8 @@ extern "C" {
  * Interface values
  * =======================================
  */
-#define PQOS_INTER_DEFAULT        0      /**< Smart decision */
-#define PQOS_INTER_OS             1      /**< OS or nothing */
-#define PQOS_INTER_MSR            2      /**< MSR or nothing */
+#define PQOS_INTER_MSR            0      /**< MSR */
+#define PQOS_INTER_OS             1      /**< OS */
 
 /*
  * =======================================
@@ -117,10 +116,8 @@ enum pqos_cdp_config {
  *         LOG_VER_SUPER_VERBOSE  - warning, error, info and debug messages
  *
  * @param interface preference
- *         PQOS_INTER_DEFAULT  - Smart decision, library decides which
- *                               option to use
- *         PQOS_INTER_OS       - OS interface or nothing
  *         PQOS_INTER_MSR      - MSR interface or nothing
+ *         PQOS_INTER_OS       - OS interface or nothing
  */
 struct pqos_config {
         int fd_log;
@@ -328,16 +325,6 @@ struct pqos_cpuinfo {
  */
 int pqos_cap_get(const struct pqos_cap **cap,
                  const struct pqos_cpuinfo **cpu);
-
-
-/**
- * @brief Retrieves PQoS MSR flag status
- *
- * @return Flag status
- * @retval 1 use MSR
- * @retval 0 use OS
- */
-int pqos_cap_use_msr(void);
 
 /*
  * =======================================

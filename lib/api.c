@@ -28,13 +28,14 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
 #include <string.h>
 
 #include "pqos.h"
+#include "api.h"
 #include "allocation.h"
 #include "os_allocation.h"
 #include "os_monitoring.h"
@@ -51,6 +52,28 @@
  * pqos_mon_start_pid() call.
  */
 #define GROUP_VALID_MARKER (0x00DEAD00)
+
+/**
+ * Flag used to determine what interface to use:
+ *      - MSR is 0
+ *      - OS is 1
+ */
+static int m_interface = PQOS_INTER_MSR;
+
+/*
+ * =======================================
+ * Init module
+ * =======================================
+ */
+int api_init(int interface)
+{
+        if (interface != PQOS_INTER_MSR && interface != PQOS_INTER_OS)
+                return PQOS_RETVAL_PARAM;
+
+        m_interface = interface;
+
+        return PQOS_RETVAL_OK;
+}
 
 /*
  * =======================================
@@ -71,7 +94,7 @@ int pqos_alloc_assoc_set(const unsigned lcore,
                 return ret;
         }
 
-	if (pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_alloc_assoc_set(lcore, class_id);
 	else
 		ret = os_alloc_assoc_set(lcore, class_id);
@@ -94,7 +117,7 @@ int pqos_alloc_assoc_get(const unsigned lcore,
                 return ret;
         }
 
-	if (pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_alloc_assoc_get(lcore, class_id);
 	else
 		ret = os_alloc_assoc_get(lcore, class_id);
@@ -125,9 +148,9 @@ int pqos_alloc_assign(const unsigned technology,
                 _pqos_api_unlock();
                 return ret;
         }
-        if (pqos_cap_use_msr())
-                ret = hw_alloc_assign(technology, core_array, core_num,
-		                      class_id);
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_alloc_assign(technology, core_array,
+                        core_num, class_id);
         else
                 ret = os_alloc_assign(technology, core_array, core_num,
 		                      class_id);
@@ -153,7 +176,7 @@ int pqos_alloc_release(const unsigned *core_array,
                 return ret;
         }
 
-        if (pqos_cap_use_msr())
+        if (m_interface == PQOS_INTER_MSR)
                 ret = hw_alloc_release(core_array, core_num);
         else
                 ret = os_alloc_release(core_array, core_num);
@@ -183,7 +206,7 @@ int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
                 return ret;
         }
 
-	if (pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_MSR)
                 ret = hw_alloc_reset(l3_cdp_cfg);
         else
                 ret = os_alloc_reset(l3_cdp_cfg);
@@ -266,7 +289,7 @@ int pqos_l3ca_set(const unsigned socket,
 		}
 	}
 
-	if (pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l3ca_set(socket, num_cos, ca);
 	else
 		ret = os_l3ca_set(socket, num_cos, ca);
@@ -293,7 +316,7 @@ int pqos_l3ca_get(const unsigned socket,
                 _pqos_api_unlock();
                 return ret;
         }
-	if (pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l3ca_get(socket, max_num_ca, num_ca, ca);
 	else
 		ret = os_l3ca_get(socket, max_num_ca, num_ca, ca);
@@ -338,7 +361,7 @@ int pqos_l2ca_set(const unsigned l2id,
 			return PQOS_RETVAL_PARAM;
 		}
 	}
-	if (pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l2ca_set(l2id, num_cos, ca);
 	else
 		ret = os_l2ca_set(l2id, num_cos, ca);
@@ -366,7 +389,7 @@ int pqos_l2ca_get(const unsigned l2id,
 		return ret;
 	}
 
-	if (pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
 	else
 		ret = os_l2ca_get(l2id, max_num_ca, num_ca, ca);
@@ -426,6 +449,12 @@ int pqos_mba_get(const unsigned socket,
 
 	return ret;
 }
+
+/*
+ * =======================================
+ * Monitoring
+ * =======================================
+ */
 
 int pqos_mon_reset(void)
 {
@@ -503,7 +532,7 @@ int pqos_mon_start(const unsigned num_cores,
                 return ret;
         }
 
-        if (pqos_cap_use_msr())
+        if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_start(num_cores, cores, event, context, group);
         else
                 ret = os_mon_start(num_cores, cores, event, context, group);
@@ -531,7 +560,7 @@ int pqos_mon_stop(struct pqos_mon_data *group)
                 return ret;
         }
 
-        if (pqos_cap_use_msr())
+        if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_stop(group);
         else
                 ret = os_mon_stop(group);
@@ -565,7 +594,7 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
                 return ret;
         }
 
-        if (pqos_cap_use_msr())
+        if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_poll(groups, num_groups);
         else
                 ret = os_mon_poll(groups, num_groups);
@@ -616,7 +645,7 @@ int pqos_mon_start_pid(const pid_t pid,
         group->pid = pid;
         group->context = context;
 
-        if (pqos_cap_use_msr()) {
+        if (m_interface == PQOS_INTER_MSR) {
 #ifdef PQOS_NO_PID_API
                 UNUSED_PARAM(pid);
                 UNUSED_PARAM(event);

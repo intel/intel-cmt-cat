@@ -74,11 +74,6 @@ else
 CFLAGS += -g -O2
 endif
 
-# USE_OS build
-ifeq ($(USE_OS),y)
-CFLAGS += -DUSE_OS
-endif
-
 # Build targets and dependencies
 SRCS = $(wildcard *.c)
 OBJS = $(SRCS:.c=.o)
@@ -178,8 +173,8 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,GLOBAL_INITIALISERS \
-	-f api.c cap.c -f cap.h -f allocation.c -f perf.c -f perf.h \
-	-f allocation.h -f monitoring.c -f monitoring.h \
+	-f api.c -f api.h -f cap.c -f cap.h -f allocation.c -f perf.c \
+	-f perf.h -f allocation.h -f monitoring.c -f monitoring.h \
 	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
 	-f utils.c -f cpuinfo.h -f pidapi.c -f pidapi.h \
 	-f os_allocation.h -f os_allocation.c -f os_monitoring.h os_monitoring.c
@@ -194,7 +189,7 @@ cppcheck:
 	$(CPPCHECK) \
 	--enable=warning,portability,performance,missingInclude \
 	--std=c99 --template=gcc \
-	api.c cap.c cap.h allocation.c perf.c perf.h \
+	api.c api.h cap.c cap.h allocation.c perf.c perf.h \
 	allocation.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \
 	utils.c cpuinfo.c cpuinfo.h pidapi.c pidapi.h \

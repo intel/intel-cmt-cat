@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -430,7 +430,7 @@ parse_config_file(const char *fname)
 static const char *m_cmd_name = "pqos";                     /**< command name */
 static const char help_printf_short[] =
         "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
-        "          [-l FILE] [--log-file=FILE]\n"
+        "          [-l FILE] [--log-file=FILE] [-I] [--iface-os]\n"
         "       %s [-s] [--show]\n"
         "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p EVTPIDS] "
         "[--mon-pid=EVTPIDS]\n"
@@ -496,7 +496,11 @@ static const char help_printf_long[] =
         "  -H, --profile-list          list supported allocation profiles\n"
         "  -c PROFILE, --profile-set=PROFILE\n"
         "          select a PROFILE of predefined allocation classes.\n"
-        "          Use -H to list available profiles.\n";
+        "          Use -H to list available profiles.\n"
+        "  -I, --iface-os          set the library interface to use the"
+        "                          kernel implementation. If not set the"
+        "                          default implementation is to program the"
+        "                          MSR's directly.\n";
 
 /**
  * @brief Displays help information
@@ -533,6 +537,7 @@ static struct option long_cmd_opts[] = {
         {"alloc-assoc",   required_argument, 0, 'a'},
         {"verbose",       no_argument,       0, 'v'},
         {"super-verbose", no_argument,       0, 'V'},
+        {"iface-os",      no_argument,       0, 'I'},
         {0, 0, 0, 0} /* end */
 };
 
@@ -550,8 +555,10 @@ int main(int argc, char **argv)
         m_cmd_name = argv[0];
         print_warning();
 
+        memset(&cfg, 0, sizeof(cfg));
+
         while ((cmd = getopt_long(argc, argv,
-                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:srvVR:",
+                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:srvVIR:",
                                   long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
@@ -643,6 +650,9 @@ int main(int argc, char **argv)
                 case 'V':
                         selfn_super_verbose_mode(NULL);
                         break;
+                case 'I':
+                        cfg.interface = PQOS_INTER_OS;
+                        break;
                 default:
                         printf("Unsupported option: -%c. "
                                "See option -h for help.\n", optopt);
@@ -655,9 +665,7 @@ int main(int argc, char **argv)
                 }
         }
 
-        memset(&cfg, 0, sizeof(cfg));
         cfg.verbose = sel_verbose_mode;
-
         /**
          * Set up file descriptor for message log
          */

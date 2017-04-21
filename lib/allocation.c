@@ -28,7 +28,7 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
  */
 
@@ -101,7 +101,7 @@
  */
 static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
-
+static int m_interface = PQOS_INTER_MSR;
 /**
  * ---------------------------------------
  * External data
@@ -125,11 +125,14 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu,
 {
         int ret = PQOS_RETVAL_OK;
 
-        UNUSED_PARAM(cfg);
         m_cap = cap;
         m_cpu = cpu;
+        if (cfg != NULL)
+                m_interface = cfg->interface;
+        else
+                m_interface = PQOS_INTER_MSR;
 
-	if (!pqos_cap_use_msr())
+	if (m_interface == PQOS_INTER_OS)
 		ret = os_alloc_init(cpu, cap);
 
         return ret;
@@ -143,9 +146,8 @@ pqos_alloc_fini(void)
         m_cap = NULL;
         m_cpu = NULL;
 
-        if (!pqos_cap_use_msr())
+        if (m_interface == PQOS_INTER_OS)
                 ret = os_alloc_fini();
-
         return ret;
 }
 

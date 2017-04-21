@@ -69,6 +69,7 @@
 #include "machine.h"
 #include "types.h"
 #include "log.h"
+#include "api.h"
 
 /**
  * ---------------------------------------
@@ -146,13 +147,11 @@ static int m_apilock = -1;
 static pthread_mutex_t m_apilock_mutex;
 
 /**
- * Flag used to determine what interface to use (MSR or OS).
+ * Interface status
+ *   0  PQOS_INTER_MSR
+ *   1  PQOS_INTER_OS
  */
-#ifdef USE_OS
-static unsigned m_use_msr = 0;
-#else
-static unsigned m_use_msr = 1; /**< Set to MSR until OS support implemented */
-#endif
+static int m_interface = PQOS_INTER_MSR;
 /**
  * ---------------------------------------
  * Functions for safe multi-threading
@@ -1381,20 +1380,18 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
-        /**
-         * check interface selection
-         */
         if (config->interface == PQOS_INTER_OS)
-                m_use_msr = 0;
-        else if (config->interface == PQOS_INTER_MSR)
-                m_use_msr = 1;
-
-        if (!m_use_msr)
                 ret = remove_hw_caps(m_cap);
         if (ret == PQOS_RETVAL_ERROR) {
                 LOG_ERROR("remove_hw_caps() error %d\n", ret);
                 goto machine_init_error;
         }
+        ret = api_init(config->interface);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("api_init() error %d\n", ret);
+                goto machine_init_error;
+        }
+        m_interface = config->interface;
 
         /**
          * If monitoring capability has been discovered
@@ -1584,10 +1581,4 @@ void _pqos_cap_l3cdp_change(const int prev, const int next)
                 l3_cap->cdp_on = 0;
                 l3_cap->num_classes = l3_cap->num_classes * 2;
         }
-}
-
-int
-pqos_cap_use_msr(void)
-{
-        return m_use_msr;
 }
