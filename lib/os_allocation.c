@@ -1022,6 +1022,7 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
         unsigned i, cos0 = 0;
         struct cpumask mask;
 
+	ASSERT(m_cpu != NULL);
         ASSERT(core_num > 0 && core_array != NULL);
         /**
          * Set the CPU assoc back to COS0
@@ -1029,8 +1030,11 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
         ret = cpumask_read(cos0, &mask);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-        for (i = 0; i < core_num; i++)
+        for (i = 0; i < core_num; i++) {
+		if (core_array[i] >= m_cpu->num_cores)
+			return PQOS_RETVAL_ERROR;
                 cpumask_set(core_array[i], &mask);
+	}
 
         ret = cpumask_write(cos0, &mask);
         if (ret != PQOS_RETVAL_OK)
