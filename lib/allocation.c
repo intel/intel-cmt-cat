@@ -651,7 +651,8 @@ get_hi_cos_id(const unsigned technology,
         unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0, num_cos = 0;
         int ret;
 
-        if ((!l2_req && !l3_req && !mba_req) || hi_class_id == NULL)
+	ASSERT(l2_req || l3_req || mba_req);
+        if (hi_class_id == NULL)
                 return PQOS_RETVAL_PARAM;
 
         ASSERT(m_cap != NULL);
@@ -768,12 +769,10 @@ int hw_alloc_assign(const unsigned technology,
         unsigned socket = 0, l2id = 0;
         int ret;
 
-        ASSERT(core_num > 0 && core_array != NULL && class_id != NULL &&
-               technology != 0);
-
-        if (core_num == 0 || core_array == NULL || class_id == NULL ||
-            technology == 0)
-                return PQOS_RETVAL_PARAM;
+        ASSERT(core_num > 0);
+	ASSERT(core_array != NULL);
+	ASSERT(class_id != NULL);
+	ASSERT(technology != 0);
 
         /* Check if core belongs to one resource entity */
         for (i = 0; i < core_num; i++) {
