@@ -651,7 +651,7 @@ stop_events(struct pqos_mon_data *group,
 static int
 start_events(struct pqos_mon_data *group)
 {
-        int ret;
+        int ret = PQOS_RETVAL_OK;
         struct os_supported_event *se;
         enum pqos_mon_event started_evts = 0;
 
