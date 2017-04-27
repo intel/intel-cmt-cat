@@ -110,9 +110,12 @@ int pqos_alloc_assign(const unsigned technology,
                       unsigned *class_id)
 {
 	int ret;
+	const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+	const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
+	const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
 
         if (core_num == 0 || core_array == NULL || class_id == NULL ||
-            technology == 0)
+            !(l2_req || l3_req || mba_req))
                 return PQOS_RETVAL_PARAM;
 
 	_pqos_api_lock();
@@ -123,11 +126,11 @@ int pqos_alloc_assign(const unsigned technology,
                 return ret;
         }
         if (pqos_cap_use_msr())
-                ret = hw_alloc_assign(technology, core_array,
-                        core_num, class_id);
+                ret = hw_alloc_assign(technology, core_array, core_num,
+		                      class_id);
         else
-                ret = os_alloc_assign(technology, core_array,
-                        core_num, class_id);
+                ret = os_alloc_assign(technology, core_array, core_num,
+		                      class_id);
 
 	_pqos_api_unlock();
 
