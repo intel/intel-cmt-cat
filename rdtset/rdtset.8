@@ -20,7 +20,7 @@ rtdset \- Task CPU affinity and Intel(R) Resource Director Technology control to
 .br
 .SH SYNOPSIS
 .B rdtset
-.RI "<-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
+.RI "<-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-I] [-k] cmd [<args>...])"
 .br
 .B rdtset
 .RI "-r <cpulist> <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
@@ -29,7 +29,7 @@ rtdset \- Task CPU affinity and Intel(R) Resource Director Technology control to
 .RI "-r <cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
 .br
 .B rdtset
-.RI "-r <cpulist> <-t feature=value;...cpu=cpulist>... -p <pid>"
+.RI "-r <cpulist> <-t feature=value;...cpu=cpulist>... [-I] -p <pid>"
 .SH DESCRIPTION
 For more details on Intel(R) Resource Director Technology see
 .br
@@ -52,7 +52,10 @@ Show help
 .B \-v, \-\-verbose
 Verbose mode
 .TP
-.B \-t\ , \-\-rdt\ feature=value;...cpu=cpulist
+.B \-I, \-\-iface-os
+Set the library to use the kernel implementation. If not set the default implementation is to program the MSR's directly.
+.TP
+.B \-t\, \-\-rdt\ feature=value;...cpu=cpulist
 Specify Intel(R) RDT configuration, single class configuration per -t, multiple -t options allowed.
 .br
 Accepted values for features:

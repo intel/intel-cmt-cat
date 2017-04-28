@@ -1428,6 +1428,7 @@ alloc_init(void)
 	memset(&cfg, 0, sizeof(cfg));
 	cfg.fd_log = STDOUT_FILENO;
 	cfg.verbose = 0;
+	cfg.interface = g_cfg.interface;
 	ret = pqos_init(&cfg);
 	if (ret != PQOS_RETVAL_OK) {
 		fprintf(stderr, "Allocation: Error initializing PQoS "

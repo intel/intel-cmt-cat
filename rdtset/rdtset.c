@@ -181,13 +181,13 @@ static void
 print_usage(char *prgname, unsigned short_usage)
 {
 	printf("Usage: %s <-t feature=value;...cpu=cpulist>... -c <cpulist> "
-		"(-p <pid> | [-k] cmd [<args>...])\n"
+		"(-p <pid> | [-I] [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> <-t feature=value;...cpu=cpulist>... "
 		"-c <cpulist> (-p <pid> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -c <cpulist> "
 		"(-p <pid> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> <-t feature=value;...cpu=cpulist>... "
-		"-p <pid>\n\n",
+		"[-I] -p <pid>\n\n",
 		prgname, prgname, prgname, prgname);
 
 	printf("Options:\n"
@@ -207,6 +207,10 @@ print_usage(char *prgname, unsigned short_usage)
 		"do not drop sudo elevated privileges\n"
 		" -v, --verbose                         "
 		"prints out additional logging information\n"
+		" -I, --iface-os                        "
+		"set the library interface to use the kernel implementation. "
+		"If not set the default implementation is to program the "
+		"MSR's directly\n"
 		" -h, --help                            "
 		"display help\n\n");
 
@@ -313,6 +317,7 @@ parse_args(int argc, char **argv)
 	int opt = 0;
 	int retval = 0;
 	char **argvopt = argv;
+        char *tailp = NULL;
 
 	static const struct option lgopts[] = {
 		{ "cpu",	required_argument,	0, 'c' },
@@ -321,48 +326,57 @@ parse_args(int argc, char **argv)
 		{ "rdt",	required_argument,	0, 't' },
 		{ "sudokeep",	no_argument,		0, 'k' },
 		{ "verbose",	no_argument,		0, 'v' },
+		{ "iface-os",   no_argument,            0, 'I' },
 		{ "help",	no_argument,		0, 'h' },
 		{ NULL, 0, 0, 0 } };
 
 	while ((opt = getopt_long(argc, argvopt,
-                                  "+c:p:r:t:kvh", lgopts, NULL)) != -1) {
-		if (opt == 'c') {
+                                  "+c:p:r:t:kvIh", lgopts, NULL)) != -1) {
+		switch (opt) {
+		case 'c':
 			retval = parse_cpu(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid CPU parameters!\n");
 				goto exit;
 			}
-		} else if (opt == 'p') {
-			char *tailp = NULL;
-
+			break;
+		case 'p':
 			errno = 0;
-			g_cfg.pid = (pid_t) strtol(optarg, &tailp, 10);
-			if (NULL == tailp || *tailp != '\0' || errno != 0 ||
-					optarg == tailp || 0 == g_cfg.pid) {
-				fprintf(stderr, "Invalid PID parameter!\n");
-				retval = -EINVAL;
-				goto exit;
-			}
-		} else if (opt == 'r') {
+                        g_cfg.pid = (pid_t) strtol(optarg, &tailp, 10);
+                        if (NULL == tailp || *tailp != '\0' ||
+                            errno != 0 || optarg == tailp || 0 == g_cfg.pid) {
+                                fprintf(stderr, "Invalid PID parameter!\n");
+                                retval = -EINVAL;
+                                goto exit;
+                        }
+			break;
+		case 'r':
 			retval = parse_reset(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid RESET parameters!\n");
 				goto exit;
 			}
-		} else if (opt == 't') {
+			break;
+		case 't':
 			retval = parse_rdt(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid RDT parameters!\n");
 				goto exit;
 			}
-		} else if (opt == 'k') {
+			break;
+		case 'k':
 			g_cfg.sudo_keep = 1;
-		} else if (opt == 'v') {
+			break;
+		case 'v':
 			g_cfg.verbose = 1;
-		} else if (opt == '?') {
+			break;
+		case '?':
 			retval = -EINVAL;
 			goto exit;
-		} else if (opt == 'h') {
+		case 'I':
+			g_cfg.interface = PQOS_INTER_OS;
+			break;
+		case 'h':
 			retval = -EAGAIN;
 			goto exit;
 		}

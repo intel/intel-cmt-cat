@@ -45,10 +45,10 @@ Run "make clean" to clean the build files.
 USAGE
 =====
 
-Usage: rdtset <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+Usage: rdtset <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-I] [-k] cmd [<args>...])
        rdtset -r <cpulist> <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
        rdtset -r <cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
-       rdtset -r <cpulist> <-t feature=value;...cpu=cpulist>... -p <pid>
+       rdtset -r <cpulist> <-t feature=value;...cpu=cpulist>... [-I] -p <pid>
 
 Options:
  -t/--rdt feature=value;...cpu=cpulist specify RDT configuration
@@ -61,6 +61,9 @@ Options:
  -r <cpulist>, --reset <cpulist>       reset allocation for CPUs
  -k, --sudokeep                        do not drop sudo elevated privileges
  -v, --verbose                         prints out additional logging information
+ -I, --iface-os                        set the library interface to use the kernel
+                                       implementation. If not set the default
+				       implementation is to program the MSR's directly
  -h, --help                            display help
 
 Run "id" command on CPU 1 using four L3 cache-ways (mask 0xf),
