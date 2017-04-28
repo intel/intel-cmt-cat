@@ -217,6 +217,8 @@ enum pqos_mon_event {
         PQOS_MON_EVENT_TMEM_BW = 4,     /**< Total memory bandwidth */
         PQOS_MON_EVENT_RMEM_BW = 8,     /**< Remote memory bandwidth
                                            (virtual event) */
+        RESERVED1 = 0x1000,
+        RESERVED2 = 0x2000,
         PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC misses */
         PQOS_PERF_EVENT_IPC    = 0x8000, /**< instructions per clock */
 };
@@ -389,6 +391,9 @@ struct pqos_mon_data {
         int *fds_llc;
         int *fds_mbl;
         int *fds_mbt;
+        int *fds_inst;
+        int *fds_cyc;
+        int *fds_llc_misses;
         int **fds_ipc;
         int **fds_misses;
 
