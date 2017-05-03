@@ -82,6 +82,7 @@ CLEAN_OBJS = $(SRCS:.c=.o)
 # On FreeBSD build with NO_PID_API option
 ifeq ($(shell uname), FreeBSD)
 NO_PID_API=y
+OBJS := $(filter-out perf.o os_allocation.o os_monitoring.o,$(OBJS))
 endif
 
 # PID API build option

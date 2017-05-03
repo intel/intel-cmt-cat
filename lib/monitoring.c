@@ -151,7 +151,9 @@ static const struct pqos_cap *m_cap = NULL; /**< capabilities structure
 static const struct pqos_cpuinfo *m_cpu = NULL; /**< cpu topology passed
                                                    from cap */
 static unsigned m_rmid_max = 0;         /**< max RMID */
+#ifndef __FreeBSD__
 static int m_interface = PQOS_INTER_MSR;
+#endif
 /**
  * ---------------------------------------
  * Local Functions
@@ -237,17 +239,20 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         }
 
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
-
+#ifndef __FreeBSD__
         if (cfg->interface == PQOS_INTER_OS)
                 ret = os_mon_init(cpu, cap);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-
+#endif
  pqos_mon_init_exit:
         m_cpu = cpu;
         m_cap = cap;
+#ifndef __FreeBSD__
         m_interface = cfg->interface;
-
+#else
+        UNUSED_PARAM(cfg);
+#endif
         return ret;
 }
 
@@ -265,8 +270,10 @@ pqos_mon_fini(void)
 #endif /* PQOS_NO_PID_API */
 
         m_rmid_max = 0;
+#ifndef __FreeBSD__
         if (m_interface == PQOS_INTER_OS)
                 ret = os_mon_fini();
+#endif
         m_cpu = NULL;
         m_cap = NULL;
 
