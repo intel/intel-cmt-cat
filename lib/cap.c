@@ -1401,8 +1401,9 @@ pqos_init(const struct pqos_config *config)
                 LOG_ERROR("api_init() error %d\n", ret);
                 goto machine_init_error;
         }
+#ifndef __FreeBSD__
         m_interface = config->interface;
-
+#endif
         /**
          * If monitoring capability has been discovered
          * then get max RMID supported by a CPU socket
