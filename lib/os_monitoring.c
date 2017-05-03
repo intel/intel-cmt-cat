@@ -52,8 +52,10 @@
 #define OS_MON_EVT_IDX_LMBM      1
 #define OS_MON_EVT_IDX_TMBM      2
 #define OS_MON_EVT_IDX_RMBM      3
-#define OS_MON_EVT_IDX_IPC       4
-#define OS_MON_EVT_IDX_LLC_MISS  5
+#define OS_MON_EVT_IDX_INST      4
+#define OS_MON_EVT_IDX_CYC       5
+#define OS_MON_EVT_IDX_IPC       6
+#define OS_MON_EVT_IDX_LLC_MISS  7
 
 /**
  * Value marking monitoring group structure as "valid".
@@ -68,6 +70,14 @@
  */
 static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
+
+/**
+ * Local monitor event types
+ */
+enum perf_mon_event {
+        PQOS_PERF_EVENT_INSTRUCTIONS = 0x1000, /**< Retired CPU Instructions */
+        PQOS_PERF_EVENT_CYCLES = 0x2000,       /**< Unhalted CPU Clock Cycles */
+};
 
 /**
  * Monitoring event type
@@ -119,11 +129,19 @@ static struct os_supported_event {
           .event = PQOS_MON_EVENT_RMEM_BW,
           .supported = 0,
           .scale = 1 },
-        { .name = "IPC",
+        { .name = "",
+          .desc = "Retired CPU Instructions",
+          .event = PQOS_PERF_EVENT_INSTRUCTIONS,
+          .supported = 1 }, /**< assumed support */
+        { .name = "",
+          .desc = "Unhalted CPU Cycles",
+          .event = PQOS_PERF_EVENT_CYCLES,
+          .supported = 1 }, /**< assumed support */
+        { .name = "",
           .desc = "Instructions/Cycle",
           .event = PQOS_PERF_EVENT_IPC,
           .supported = 1 }, /**< assumed support */
-        { .name = "Cache Misses",
+        { .name = "",
           .desc = "LLC Misses",
           .event = PQOS_PERF_EVENT_LLC_MISS,
           .supported = 1 }, /**< assumed support */
@@ -149,6 +167,10 @@ get_supported_event(const enum pqos_mon_event event)
                 return &events_tab[OS_MON_EVT_IDX_TMBM];
         case PQOS_MON_EVENT_RMEM_BW:
                 return &events_tab[OS_MON_EVT_IDX_RMBM];
+        case PQOS_PERF_EVENT_INSTRUCTIONS:
+                return &events_tab[OS_MON_EVT_IDX_INST];
+        case PQOS_PERF_EVENT_CYCLES:
+                return &events_tab[OS_MON_EVT_IDX_CYC];
         case PQOS_PERF_EVENT_IPC:
                 return &events_tab[OS_MON_EVT_IDX_IPC];
         case PQOS_PERF_EVENT_LLC_MISS:
@@ -250,27 +272,26 @@ set_arch_event_attrs(enum pqos_mon_event *events)
          * Set event attributes
          */
         memset(&attr, 0, sizeof(attr));
-        attr.disabled = 1;
         attr.type = PERF_TYPE_HARDWARE;
+        attr.size = sizeof(struct perf_event_attr);
 
-        /**
-         * Set LLC misses event attributes
-         */
+        /* Set LLC misses event attributes */
         events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs = attr;
         events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs.config =
                 PERF_COUNT_HW_CACHE_MISSES;
-
         *events |= PQOS_PERF_EVENT_LLC_MISS;
 
-        /**
-         * Set IPC event attributes
-         * Note: Set to cycles first
-         *       Structure can be reused later to
-         *       start instructions event counter
-         */
-        events_tab[OS_MON_EVT_IDX_IPC].attrs = attr;
-        events_tab[OS_MON_EVT_IDX_IPC].attrs.config =
+        /* Set retired instructions event attributes */
+        events_tab[OS_MON_EVT_IDX_INST].attrs = attr;
+        events_tab[OS_MON_EVT_IDX_INST].attrs.config =
+                PERF_COUNT_HW_INSTRUCTIONS;
+        *events |= PQOS_PERF_EVENT_INSTRUCTIONS;
+
+        /* Set unhalted cycles event attributes */
+        events_tab[OS_MON_EVT_IDX_CYC].attrs = attr;
+        events_tab[OS_MON_EVT_IDX_CYC].attrs.config =
                 PERF_COUNT_HW_CPU_CYCLES;
+        *events |= PQOS_PERF_EVENT_CYCLES;
 
         *events |= PQOS_PERF_EVENT_IPC;
 
@@ -347,8 +368,6 @@ set_rdt_event_attrs(const int idx, const char *fname)
         events_tab[idx].attrs.config = config;
         events_tab[idx].attrs.size = sizeof(struct perf_event_attr);
         events_tab[idx].attrs.inherit = 1;
-        events_tab[idx].attrs.disabled = 0;
-        events_tab[idx].attrs.enable_on_exec = 0;
 
         return PQOS_RETVAL_OK;
 }
@@ -485,7 +504,7 @@ set_mon_caps(const struct pqos_cap *cap)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-start_pqos_counters(const struct pqos_mon_data *group,
+start_perf_counters(const struct pqos_mon_data *group,
                     struct os_supported_event *se,
                     int **fds)
 {
@@ -527,7 +546,7 @@ start_pqos_counters(const struct pqos_mon_data *group,
                                                  -1, -1, 0, &ctr_fds[i]);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("Failed to start perf "
-                                  "counters for %s\n", se->name);
+                                  "counters for %s\n", se->desc);
                         free(ctr_fds);
                         return PQOS_RETVAL_ERROR;
                 }
@@ -547,7 +566,7 @@ start_pqos_counters(const struct pqos_mon_data *group,
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-stop_pqos_counters(struct pqos_mon_data *group, int **fds)
+stop_perf_counters(struct pqos_mon_data *group, int **fds)
 {
         int i, num_ctrs, *fd;
 
@@ -601,17 +620,17 @@ stop_events(struct pqos_mon_data *group,
          * fd's and free associated memory
          */
         if (events & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = stop_pqos_counters(group, &group->fds_llc);
+                ret = stop_perf_counters(group, &group->fds_llc);
                 if (ret == PQOS_RETVAL_OK)
                         stopped_evts |= PQOS_MON_EVENT_L3_OCCUP;
         }
         if  (events & PQOS_MON_EVENT_LMEM_BW) {
-                ret = stop_pqos_counters(group, &group->fds_mbl);
+                ret = stop_perf_counters(group, &group->fds_mbl);
                 if (ret == PQOS_RETVAL_OK)
                         stopped_evts |= PQOS_MON_EVENT_LMEM_BW;
         }
         if  (events & PQOS_MON_EVENT_TMEM_BW) {
-                ret = stop_pqos_counters(group, &group->fds_mbt);
+                ret = stop_perf_counters(group, &group->fds_mbt);
                 if (ret == PQOS_RETVAL_OK)
                         stopped_evts |= PQOS_MON_EVENT_TMEM_BW;
         }
@@ -619,20 +638,34 @@ stop_events(struct pqos_mon_data *group,
                 int ret2;
 
                 if (!(events & PQOS_MON_EVENT_LMEM_BW))
-                        ret = stop_pqos_counters(group, &group->fds_mbl);
+                        ret = stop_perf_counters(group, &group->fds_mbl);
                 else
                         ret = PQOS_RETVAL_OK;
 
                 if (!(events & PQOS_MON_EVENT_TMEM_BW))
-                        ret2 = stop_pqos_counters(group, &group->fds_mbt);
+                        ret2 = stop_perf_counters(group, &group->fds_mbt);
                 else
                         ret2 = PQOS_RETVAL_OK;
 
                 if (ret == PQOS_RETVAL_OK && ret2 == PQOS_RETVAL_OK)
                         stopped_evts |= PQOS_MON_EVENT_RMEM_BW;
         }
-        if (events ^ (stopped_evts | /* workaround */
-                PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) {
+        if (events & PQOS_PERF_EVENT_IPC) {
+                int ret2;
+                /* stop instructions counter */
+                ret = stop_perf_counters(group, &group->fds_inst);
+                /* stop cycle counter */
+                ret2 = stop_perf_counters(group, &group->fds_cyc);
+
+                if (ret == PQOS_RETVAL_OK && ret2 == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_PERF_EVENT_IPC;
+        }
+        if  (events & PQOS_PERF_EVENT_LLC_MISS) {
+                ret = stop_perf_counters(group, &group->fds_llc_misses);
+                if (ret == PQOS_RETVAL_OK)
+                        stopped_evts |= PQOS_PERF_EVENT_LLC_MISS;
+        }
+        if (events != stopped_evts) {
                 LOG_ERROR("Failed to stop all events\n");
                 return PQOS_RETVAL_ERROR;
         }
@@ -663,7 +696,7 @@ start_events(struct pqos_mon_data *group)
                 if (!is_event_supported(PQOS_MON_EVENT_L3_OCCUP))
                         return PQOS_RETVAL_ERROR;
                 se = get_supported_event(PQOS_MON_EVENT_L3_OCCUP);
-                ret = start_pqos_counters(group, se, &group->fds_llc);
+                ret = start_perf_counters(group, se, &group->fds_llc);
                 if (ret != PQOS_RETVAL_OK)
                         goto start_event_error;
 
@@ -673,7 +706,7 @@ start_events(struct pqos_mon_data *group)
                 if (!is_event_supported(PQOS_MON_EVENT_LMEM_BW))
                         return PQOS_RETVAL_ERROR;
                 se = get_supported_event(PQOS_MON_EVENT_LMEM_BW);
-                ret = start_pqos_counters(group, se, &group->fds_mbl);
+                ret = start_perf_counters(group, se, &group->fds_mbl);
                 if (ret != PQOS_RETVAL_OK)
                         goto start_event_error;
 
@@ -683,7 +716,7 @@ start_events(struct pqos_mon_data *group)
                 if (!is_event_supported(PQOS_MON_EVENT_TMEM_BW))
                         return PQOS_RETVAL_ERROR;
                 se = get_supported_event(PQOS_MON_EVENT_TMEM_BW);
-                ret = start_pqos_counters(group, se, &group->fds_mbt);
+                ret = start_perf_counters(group, se, &group->fds_mbt);
                 if (ret != PQOS_RETVAL_OK)
                         goto start_event_error;
 
@@ -697,27 +730,52 @@ start_events(struct pqos_mon_data *group)
                 }
                 if ((started_evts & PQOS_MON_EVENT_LMEM_BW) == 0) {
                         se = get_supported_event(PQOS_MON_EVENT_LMEM_BW);
-                        ret = start_pqos_counters(group, se, &group->fds_mbl);
+                        ret = start_perf_counters(group, se, &group->fds_mbl);
                         if (ret != PQOS_RETVAL_OK)
                                 goto start_event_error;
                 }
                 if ((started_evts & PQOS_MON_EVENT_TMEM_BW) == 0) {
                         se = get_supported_event(PQOS_MON_EVENT_TMEM_BW);
-                        ret = start_pqos_counters(group, se, &group->fds_mbt);
+                        ret = start_perf_counters(group, se, &group->fds_mbt);
                         if (ret != PQOS_RETVAL_OK)
                                 goto start_event_error;
                 }
                 group->values.mbm_remote = 0;
                 started_evts |= PQOS_MON_EVENT_RMEM_BW;
         }
+        if (group->event & PQOS_PERF_EVENT_IPC) {
+                if (!is_event_supported(PQOS_PERF_EVENT_INSTRUCTIONS) ||
+                    !is_event_supported(PQOS_PERF_EVENT_CYCLES)) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto start_event_error;
+                }
+
+                se = get_supported_event(PQOS_PERF_EVENT_INSTRUCTIONS);
+                ret = start_perf_counters(group, se, &group->fds_inst);
+                if (ret != PQOS_RETVAL_OK)
+                        goto start_event_error;
+
+                se = get_supported_event(PQOS_PERF_EVENT_CYCLES);
+                ret = start_perf_counters(group, se, &group->fds_cyc);
+                if (ret != PQOS_RETVAL_OK)
+                        goto start_event_error;
+
+                group->values.ipc = 0;
+                started_evts |= PQOS_PERF_EVENT_IPC;
+        }
+        if (group->event & PQOS_PERF_EVENT_LLC_MISS) {
+                if (!is_event_supported(PQOS_PERF_EVENT_LLC_MISS))
+                        return PQOS_RETVAL_ERROR;
+                se = get_supported_event(PQOS_PERF_EVENT_LLC_MISS);
+                ret = start_perf_counters(group, se, &group->fds_llc_misses);
+                if (ret != PQOS_RETVAL_OK)
+                        goto start_event_error;
+
+                started_evts |= PQOS_PERF_EVENT_LLC_MISS;
+        }
  start_event_error:
-        /**
-         * Check if all selected events were started
-         * Note: Temporary workaround needed here to avoid
-         *       checking Non-RDT events
-         */
-        if ((group->event != (started_evts | /* workaround */
-                PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS))) {
+        /*  Check if all selected events were started */
+        if (group->event != started_evts) {
                 stop_events(group, started_evts);
                 LOG_ERROR("Failed to start all selected "
                           "OS monitoring events\n");
@@ -738,7 +796,7 @@ start_events(struct pqos_mon_data *group)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-read_pqos_counters(struct pqos_mon_data *group,
+read_perf_counters(struct pqos_mon_data *group,
                    uint64_t *value, int *fds)
 {
         int i, num_ctrs;
@@ -834,27 +892,24 @@ int
 os_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
-        void *p = NULL;
 
         ASSERT(group != NULL);
 
-        /**
-         * Check if monitoring cores/tasks
-         */
-        if (group->num_cores > 0) {
-                p = (void *) group->cores;
-                group->cores = NULL;
-        } else if (group->tid_nr > 0) {
-                p = (void *) group->tid_map;
-                group->tid_map = NULL;
-        } else
-                return PQOS_RETVAL_ERROR;
+        if (group->num_cores == 0 && group->tid_nr == 0)
+                return PQOS_RETVAL_PARAM;
 
-        /**
-         * Stop all started events
-         */
+        /* stop all started events */
         ret = stop_events(group, group->event);
-        free(p);
+
+        /* free memory */
+        if (group->num_cores > 0) {
+                free(group->cores);
+                group->cores = NULL;
+        }
+        if (group->tid_nr > 0) {
+                free(group->tid_map);
+                group->tid_map = NULL;
+        }
         memset(group, 0, sizeof(*group));
 
         return ret;
@@ -992,7 +1047,7 @@ os_mon_start_pid(struct pqos_mon_data *group)
 }
 
 /**
- * @brief This function reads all perf counters
+ * @brief This function polls all perf counters
  *
  * Reads counters for all events and stores values
  *
@@ -1003,7 +1058,7 @@ os_mon_start_pid(struct pqos_mon_data *group)
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
 static int
-os_mon_perf_poll(struct pqos_mon_data *group)
+poll_perf_counters(struct pqos_mon_data *group)
 {
         int ret;
 
@@ -1012,7 +1067,7 @@ os_mon_perf_poll(struct pqos_mon_data *group)
          * for each event
          */
         if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = read_pqos_counters(group,
+                ret = read_perf_counters(group,
                                          &group->values.llc,
                                          group->fds_llc);
                 if (ret != PQOS_RETVAL_OK)
@@ -1025,7 +1080,7 @@ os_mon_perf_poll(struct pqos_mon_data *group)
             (group->event & PQOS_MON_EVENT_RMEM_BW)) {
                 uint64_t old_value = group->values.mbm_local;
 
-                ret = read_pqos_counters(group,
+                ret = read_perf_counters(group,
                                          &group->values.mbm_local,
                                          group->fds_mbl);
                 if (ret != PQOS_RETVAL_OK)
@@ -1037,7 +1092,7 @@ os_mon_perf_poll(struct pqos_mon_data *group)
             (group->event & PQOS_MON_EVENT_RMEM_BW)) {
                 uint64_t old_value = group->values.mbm_total;
 
-                ret = read_pqos_counters(group,
+                ret = read_perf_counters(group,
                                          &group->values.mbm_total,
                                          group->fds_mbt);
                 if (ret != PQOS_RETVAL_OK)
@@ -1053,6 +1108,50 @@ os_mon_perf_poll(struct pqos_mon_data *group)
                                 group->values.mbm_total_delta -
                                 group->values.mbm_local_delta;
         }
+        if ((group->event & PQOS_PERF_EVENT_INSTRUCTIONS) ||
+            (group->event & PQOS_PERF_EVENT_IPC)) {
+                uint64_t old_value = group->values.ipc_retired;
+
+                ret = read_perf_counters(group,
+                                         &group->values.ipc_retired,
+                                         group->fds_inst);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                group->values.ipc_retired_delta =
+                        get_delta(old_value, group->values.ipc_retired);
+        }
+        if ((group->event & PQOS_PERF_EVENT_CYCLES) ||
+            (group->event & PQOS_PERF_EVENT_IPC)) {
+                uint64_t old_value = group->values.ipc_unhalted;
+
+                ret = read_perf_counters(group,
+                                         &group->values.ipc_unhalted,
+                                         group->fds_cyc);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                group->values.ipc_unhalted_delta =
+                        get_delta(old_value, group->values.ipc_unhalted);
+        }
+        if (group->event & PQOS_PERF_EVENT_IPC) {
+                if (group->values.ipc_unhalted > 0)
+                        group->values.ipc =
+                                (double)group->values.ipc_retired_delta /
+                                (double)group->values.ipc_unhalted_delta;
+        else
+                group->values.ipc = 0;
+        }
+        if (group->event & PQOS_PERF_EVENT_LLC_MISS) {
+                uint64_t old_value = group->values.llc_misses;
+
+                ret = read_perf_counters(group,
+                                         &group->values.llc_misses,
+                                         group->fds_llc_misses);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                group->values.llc_misses_delta =
+                        get_delta(old_value, group->values.llc_misses);
+        }
+
         return PQOS_RETVAL_OK;
 }
 
@@ -1071,7 +1170,7 @@ os_mon_poll(struct pqos_mon_data **groups,
                  * If monitoring core/PID then read
                  * counter values
                  */
-                ret = os_mon_perf_poll(groups[i]);
+                ret = poll_perf_counters(groups[i]);
                 if (ret != PQOS_RETVAL_OK)
                         LOG_WARN("Failed to read event on "
                                  "group number %u\n", i);
