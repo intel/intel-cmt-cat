@@ -1190,11 +1190,12 @@ discover_os_capabilities(struct pqos_cap *p_cap)
         static struct os_caps {
                 const char *fname;
                 const char *str;
+                const char *desc;
         } tab[PQOS_CAP_TYPE_NUMOF] = {
-                { "/proc/cpuinfo", "cqm"},
-                { "/proc/cpuinfo", "cat_l3"},
-                { "/proc/cpuinfo", "cat_l2"},
-                { "/proc/cpuinfo", "mba"},
+                { "/proc/cpuinfo", "cqm", "CMT"},
+                { "/proc/cpuinfo", "cat_l3", "L3 CAT"},
+                { "/proc/cpuinfo", "cat_l2", "L2 CAT"},
+                { "/proc/cpuinfo", "mba", "MBA"},
         };
 
         /**
@@ -1223,7 +1224,7 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                                   " OS detection!\n");
                         return ret;
                 }
-                LOG_INFO("%s %s\n", tab[type].str, *os_ptr ?
+                LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
                          "detected" : "not detected");
         }
         /**
