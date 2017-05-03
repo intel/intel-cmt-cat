@@ -151,7 +151,9 @@ static pthread_mutex_t m_apilock_mutex;
  *   0  PQOS_INTER_MSR
  *   1  PQOS_INTER_OS
  */
+#ifndef __FreeBSD__
 static int m_interface = PQOS_INTER_MSR;
+#endif
 /**
  * ---------------------------------------
  * Functions for safe multi-threading
@@ -1242,6 +1244,7 @@ discover_os_capabilities(struct pqos_cap *p_cap)
  *
  * @return Operational status
  */
+#ifndef __FreeBSD__
 static int
 remove_hw_caps(struct pqos_cap *p_cap)
 {
@@ -1301,7 +1304,7 @@ remove_hw_caps(struct pqos_cap *p_cap)
 
         return PQOS_RETVAL_OK;
 }
-
+#endif /* __FreeBSD__ */
 /*
  * =======================================
  * =======================================
@@ -1380,8 +1383,15 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
-        if (config->interface == PQOS_INTER_OS)
+        if (config->interface == PQOS_INTER_OS) {
+#ifndef __FreeBSD__
                 ret = remove_hw_caps(m_cap);
+#else
+                LOG_ERROR("OS interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto machine_init_error;
+#endif
+        }
         if (ret == PQOS_RETVAL_ERROR) {
                 LOG_ERROR("remove_hw_caps() error %d\n", ret);
                 goto machine_init_error;
