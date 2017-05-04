@@ -1226,6 +1226,13 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                                   " OS detection!\n");
                         return ret;
                 }
+                /**
+                 * If resctrl is supported and L3 CAT is detected in HW then
+                 * resctrl supports L3 CAT
+                 */
+                if (type == PQOS_CAP_TYPE_L3CA && *os_ptr == 0 && res_flag)
+                        *os_ptr = 1;
+
                 LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
                          "detected" : "not detected");
         }
