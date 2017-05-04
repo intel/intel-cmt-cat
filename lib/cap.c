@@ -1142,6 +1142,7 @@ discover_capabilities(struct pqos_cap **p_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
+#ifndef __FreeBSD__
 static int
 detect_os_support(const char *fname, const char *str, int *supported)
 {
@@ -1169,7 +1170,7 @@ detect_os_support(const char *fname, const char *str, int *supported)
         fclose(fd);
         return PQOS_RETVAL_OK;
 }
-
+#endif /* __FreeBSD__ */
 /**
  * @brief Runs detection of OS monitoring and allocation capabilities
  *
@@ -1178,6 +1179,7 @@ detect_os_support(const char *fname, const char *str, int *supported)
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
+#ifndef __FreeBSD__
 static int
 discover_os_capabilities(struct pqos_cap *p_cap)
 {
@@ -1237,7 +1239,7 @@ discover_os_capabilities(struct pqos_cap *p_cap)
 
         return PQOS_RETVAL_OK;
 }
-
+#endif /* __FreeBSD__ */
 /**
  * @brief Removes capabilities that are not supported by the OS
  *
@@ -1377,12 +1379,13 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
         ASSERT(m_cap != NULL);
-
+#ifndef __FreeBSD__
         ret = discover_os_capabilities(m_cap);
         if (ret == PQOS_RETVAL_ERROR) {
                 LOG_ERROR("discover_os_capabilities() error %d\n", ret);
                 goto machine_init_error;
         }
+#endif
 
         if (config->interface == PQOS_INTER_OS) {
 #ifndef __FreeBSD__
