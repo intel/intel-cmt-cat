@@ -96,13 +96,14 @@ int pqos_alloc_assoc_set(const unsigned lcore,
 
 	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_alloc_assoc_set(lcore, class_id);
-	else
+	else {
 #ifndef __FreeBSD__
 		ret = os_alloc_assoc_set(lcore, class_id);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -123,13 +124,14 @@ int pqos_alloc_assoc_get(const unsigned lcore,
 
 	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_alloc_assoc_get(lcore, class_id);
-	else
+	else {
 #ifndef __FreeBSD__
 		ret = os_alloc_assoc_get(lcore, class_id);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -159,7 +161,7 @@ int pqos_alloc_assign(const unsigned technology,
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_alloc_assign(technology, core_array,
                         core_num, class_id);
-        else
+        else {
 #ifndef __FreeBSD__
                 ret = os_alloc_assign(technology, core_array, core_num,
 		                      class_id);
@@ -167,6 +169,7 @@ int pqos_alloc_assign(const unsigned technology,
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
         return ret;
@@ -190,13 +193,14 @@ int pqos_alloc_release(const unsigned *core_array,
 
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_alloc_release(core_array, core_num);
-        else
+        else {
 #ifndef __FreeBSD__
                 ret = os_alloc_release(core_array, core_num);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -224,13 +228,14 @@ int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 
 	if (m_interface == PQOS_INTER_MSR)
                 ret = hw_alloc_reset(l3_cdp_cfg);
-        else
+        else {
 #ifndef __FreeBSD__
                 ret = os_alloc_reset(l3_cdp_cfg);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -311,13 +316,14 @@ int pqos_l3ca_set(const unsigned socket,
 
 	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l3ca_set(socket, num_cos, ca);
-	else
+	else {
 #ifndef __FreeBSD__
 		ret = os_l3ca_set(socket, num_cos, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -342,13 +348,14 @@ int pqos_l3ca_get(const unsigned socket,
         }
 	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l3ca_get(socket, max_num_ca, num_ca, ca);
-	else
+	else {
 #ifndef __FreeBSD__
 		ret = os_l3ca_get(socket, max_num_ca, num_ca, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -391,13 +398,14 @@ int pqos_l2ca_set(const unsigned l2id,
 	}
 	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l2ca_set(l2id, num_cos, ca);
-	else
+	else {
 #ifndef __FreeBSD__
 		ret = os_l2ca_set(l2id, num_cos, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -423,13 +431,14 @@ int pqos_l2ca_get(const unsigned l2id,
 
 	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
-	else
+	else {
 #ifndef __FreeBSD__
 		ret = os_l2ca_get(l2id, max_num_ca, num_ca, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
 	_pqos_api_unlock();
 
 	return ret;
@@ -570,13 +579,14 @@ int pqos_mon_start(const unsigned num_cores,
 
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_start(num_cores, cores, event, context, group);
-        else
+        else {
 #ifndef __FreeBSD__
                 ret = os_mon_start(num_cores, cores, event, context, group);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
         _pqos_api_unlock();
 
         return ret;
@@ -602,13 +612,14 @@ int pqos_mon_stop(struct pqos_mon_data *group)
 
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_stop(group);
-        else
+        else {
 #ifndef __FreeBSD__
                 ret = os_mon_stop(group);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
         _pqos_api_unlock();
 
         return ret;
@@ -640,13 +651,14 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
 
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_poll(groups, num_groups);
-        else
+        else {
 #ifndef __FreeBSD__
                 ret = os_mon_poll(groups, num_groups);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
         _pqos_api_unlock();
 
         return ret;
@@ -704,13 +716,14 @@ int pqos_mon_start_pid(const pid_t pid,
 #else
                 ret = pqos_pid_start(group);
 #endif /* PQOS_NO_PID_API */
-        } else
+        } else {
 #ifndef __FreeBSD__
                 ret = os_mon_start_pid(group);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
+        }
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
 

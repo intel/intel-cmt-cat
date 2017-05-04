@@ -105,7 +105,7 @@
 #define LOCKFILE "/var/lock/libpqos"
 #endif
 #ifdef __FreeBSD__
-#define LOCKFILE "/var/lib/libpqos.lockfile"
+#define LOCKFILE "/var/tmp/libpqos.lockfile"
 #endif
 #endif /*!LOCKFILE*/
 
