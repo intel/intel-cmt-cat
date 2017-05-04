@@ -92,15 +92,27 @@ ifeq ($(shell uname), FreeBSD)
 	install -d $(BIN_DIR)
 	install -d $(MAN_DIR)
 	install -s $(APP) $(BIN_DIR)
+	install $(APP)-msr $(BIN_DIR)
 	install -m 0444 $(MAN) $(MAN_DIR)
+	ln -f -s $(MAN_DIR)/$(MAN) $(MAN_DIR)/$(APP)-msr.8
 else
 	install -D -s $(APP) $(BIN_DIR)/$(APP)
+	install -D $(APP)-msr $(BIN_DIR)/$(APP)-msr
+	install -D $(APP)-os $(BIN_DIR)/$(APP)-os
 	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
+	ln -f -s $(MAN_DIR)/$(MAN) $(MAN_DIR)/$(APP)-msr.8
+	ln -f -s $(MAN_DIR)/$(MAN) $(MAN_DIR)/$(APP)-os.8
 endif
 
 uninstall:
 	-rm $(BIN_DIR)/$(APP)
 	-rm $(MAN_DIR)/$(MAN)
+	-rm $(BIN_DIR)/$(APP)-msr
+	-rm $(MAN_DIR)/$(APP)-msr.8
+ifneq ($(shell uname), FreeBSD)
+	-rm $(BIN_DIR)/$(APP)-os
+	-rm $(MAN_DIR)/$(APP)-os.8
+endif
 
 clean:
 	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~

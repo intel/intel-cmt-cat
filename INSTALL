@@ -26,6 +26,8 @@ below instructions. As the results the following components will be built and
 installed:
 - PQoS DSO and its header file (libpqos.so and pqos.h)
 - PQoS utility executable (pqos)
+- PQoS utility MSR wrapper script
+- PQoS utility OS/Kernel wrapper script
 - PQoS man page (pqos.8)
 - rdtset tool executable (rdtset)
 - rdtset man page (rdtset.8)

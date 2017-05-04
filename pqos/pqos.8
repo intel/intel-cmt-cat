@@ -16,7 +16,7 @@
 .\" .sp <n>    insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-pqos \- Intel(R) Resource Director Technology monitoring and control tool
+pqos, pqos-msr, pqos-os \- Intel(R) Resource Director Technology monitoring and control tool
 .br
 .SH SYNOPSIS
 .B pqos
@@ -33,6 +33,11 @@ Prioritization).
 .PP
 pqos supports CMT and MBM on a per core or hardware thread basis. MBM supports
 two types of events reporting local and remote memory bandwidth.
+.br
+pqos-msr and pqos-os are simple pqos wrapper scripts that automatically select
+the MSR or OS/Kernel library interface to program the technologies.
+.br
+Please see the -I option below for more information.
 .PP
 For hardware information please refer to the README located on:
 https://github.com/01org/intel-cmt-cat/blob/master/README
