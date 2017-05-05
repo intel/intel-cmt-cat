@@ -160,6 +160,9 @@ list supported allocation profiles
 .TP
 .B \-c PROFILE, \-\-profile\-set=PROFILE
 select a PROFILE from predefined allocation classes, use \-H to list available profiles
+.TP
+.B \-I, \-\-iface\-os
+set the library interface to use the kernel implementation. If not set the default implementation is to program the MSR's directly.
 .SH NOTES
 .PP
 CMT, MBM and CAT are configured using Model Specific Registers (MSRs). The pqos software

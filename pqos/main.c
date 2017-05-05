@@ -497,10 +497,10 @@ static const char help_printf_long[] =
         "  -c PROFILE, --profile-set=PROFILE\n"
         "          select a PROFILE of predefined allocation classes.\n"
         "          Use -H to list available profiles.\n"
-        "  -I, --iface-os          set the library interface to use the"
-        "                          kernel implementation. If not set the"
-        "                          default implementation is to program the"
-        "                          MSR's directly.\n";
+        "  -I, --iface-os\n"
+        "          set the library interface to use the kernel\n"
+        "          implementation. If not set the default implementation is\n"
+        "          to program the MSR's directly.\n";
 
 /**
  * @brief Displays help information
