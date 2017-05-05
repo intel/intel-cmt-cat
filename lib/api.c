@@ -41,7 +41,6 @@
 #include "os_monitoring.h"
 #include "monitoring.h"
 #include "os_monitoring.h"
-#include "pidapi.h"
 #include "cap.h"
 #include "log.h"
 #include "types.h"
@@ -677,6 +676,11 @@ int pqos_mon_start_pid(const pid_t pid,
         if (group->valid == GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task monitoring!\n");
+                return PQOS_RETVAL_ERROR;
+        }
         /**
          * Validate event parameter
          * - only combinations of events allowed
@@ -705,25 +709,12 @@ int pqos_mon_start_pid(const pid_t pid,
         group->pid = pid;
         group->context = context;
 
-        if (m_interface == PQOS_INTER_MSR) {
-#ifdef PQOS_NO_PID_API
-                UNUSED_PARAM(pid);
-                UNUSED_PARAM(event);
-                UNUSED_PARAM(context);
-                UNUSED_PARAM(group);
-                LOG_ERROR("PID monitoring API not built\n");
-                return PQOS_RETVAL_ERROR;
-#else
-                ret = pqos_pid_start(group);
-#endif /* PQOS_NO_PID_API */
-        } else {
 #ifndef __FreeBSD__
-                ret = os_mon_start_pid(group);
+        ret = os_mon_start_pid(group);
 #else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
+        LOG_INFO("OS interface not supported!\n");
+        ret = PQOS_RETVAL_RESOURCE;
 #endif
-        }
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
 

@@ -44,7 +44,6 @@
 #include <dirent.h>
 
 #include "pqos.h"
-#include "pidapi.h"
 #include "cap.h"
 #include "monitoring.h"
 #include "os_monitoring.h"
@@ -211,15 +210,6 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         int ret;
 
 	ASSERT(cfg != NULL);
-#ifndef PQOS_NO_PID_API
-        /**
-         * Init monitoring processes
-         */
-        ret = pqos_pid_init(cap);
-        if (ret == PQOS_RETVAL_ERROR)
-                return ret;
-#endif /* PQOS_NO_PID_API */
-
         /**
          * If monitoring capability has been discovered
          * then get max RMID supported by a CPU socket
@@ -260,14 +250,6 @@ int
 pqos_mon_fini(void)
 {
         int ret = PQOS_RETVAL_OK;
-
-#ifndef PQOS_NO_PID_API
-        /**
-         * Shut down monitoring processes
-         */
-        if (pqos_pid_fini() != PQOS_RETVAL_OK)
-                LOG_ERROR("Failed to finalize PID monitoring API\n");
-#endif /* PQOS_NO_PID_API */
 
         m_rmid_max = 0;
 #ifndef __FreeBSD__
@@ -1084,23 +1066,6 @@ hw_mon_stop(struct pqos_mon_data *group)
         unsigned i = 0;
 
         ASSERT(group != NULL);
-        /**
-         * If monitoring PID's then stop
-         * counters and return
-         */
-        if (group->pid > 0) {
-#ifdef PQOS_NO_PID_API
-                LOG_ERROR("PID monitoring API not built\n");
-                return PQOS_RETVAL_ERROR;
-#else
-                /**
-                 * Stop perf counters
-                 */
-                ret = pqos_pid_stop(group);
-                group->valid = 0;
-                return ret;
-#endif /* PQOS_NO_PID_API */
-        }
 
         if (group->num_cores == 0 || group->cores == NULL ||
             group->num_poll_ctx == 0 || group->poll_ctx == NULL) {
@@ -1165,28 +1130,11 @@ hw_mon_poll(struct pqos_mon_data **groups,
         ASSERT(num_groups > 0);
 
         for (i = 0; i < num_groups; i++) {
-	        /**
-                 * If monitoring PID then read
-                 * counter values
-                 */
-                if (groups[i]->pid > 0) {
-#ifdef PQOS_NO_PID_API
-                        LOG_ERROR("PID monitoring API not built\n");
-                        return PQOS_RETVAL_ERROR;
-#else
-                        ret = pqos_pid_poll(groups[i]);
-			if (ret != PQOS_RETVAL_OK)
-			        LOG_WARN("Failed to read event values "
-					 "for PID %u!\n", groups[i]->pid);
-#endif /* PQOS_NO_PID_API */
-                } else {
-                        ret = pqos_core_poll(groups[i]);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_WARN("Failed to read event on "
-                                         "core %u\n", groups[i]->cores[0]);
-                }
+                ret = pqos_core_poll(groups[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        LOG_WARN("Failed to read event on "
+                                 "core %u\n", groups[i]->cores[0]);
 	}
-
         return PQOS_RETVAL_OK;
 }
 /*
