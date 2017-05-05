@@ -1175,13 +1175,14 @@ detect_os_support(const char *fname, const char *str, int *supported)
  * @brief Runs detection of OS monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
+ * @param interface flag, stores the selected interface
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
 #ifndef __FreeBSD__
 static int
-discover_os_capabilities(struct pqos_cap *p_cap)
+discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 {
         int ret = PQOS_RETVAL_OK;
         int res_flag = 0;
@@ -1213,6 +1214,10 @@ discover_os_capabilities(struct pqos_cap *p_cap)
                  "resctrl not detected. "
                  "Kernel version 4.10 or higher required");
 
+        if (interface == PQOS_INTER_OS && res_flag == 0) {
+                LOG_ERROR("OS interface selected but not supported\n");
+                return PQOS_RETVAL_ERROR;
+        }
         /**
          * Detect OS support for all HW capabilities
          */
@@ -1387,7 +1392,7 @@ pqos_init(const struct pqos_config *config)
         }
         ASSERT(m_cap != NULL);
 #ifndef __FreeBSD__
-        ret = discover_os_capabilities(m_cap);
+        ret = discover_os_capabilities(m_cap, config->interface);
         if (ret == PQOS_RETVAL_ERROR) {
                 LOG_ERROR("discover_os_capabilities() error %d\n", ret);
                 goto machine_init_error;
