@@ -167,9 +167,9 @@ get_supported_event(const enum pqos_mon_event event)
                 return &events_tab[OS_MON_EVT_IDX_TMBM];
         case PQOS_MON_EVENT_RMEM_BW:
                 return &events_tab[OS_MON_EVT_IDX_RMBM];
-        case PQOS_PERF_EVENT_INSTRUCTIONS:
+        case (enum pqos_mon_event) PQOS_PERF_EVENT_INSTRUCTIONS:
                 return &events_tab[OS_MON_EVT_IDX_INST];
-        case PQOS_PERF_EVENT_CYCLES:
+        case (enum pqos_mon_event) PQOS_PERF_EVENT_CYCLES:
                 return &events_tab[OS_MON_EVT_IDX_CYC];
         case PQOS_PERF_EVENT_IPC:
                 return &events_tab[OS_MON_EVT_IDX_IPC];
