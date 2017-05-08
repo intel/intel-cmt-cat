@@ -265,32 +265,65 @@ static int
 cpumask_read(const unsigned class_id, struct cpumask *mask)
 {
 	int ret = PQOS_RETVAL_OK;
+        int i, buffer_index = 0, hex_index = 0;
 	FILE *fd;
-	unsigned character;
+        size_t num_chars = 0;
+        char cpus[4096];
+        uint8_t hex_pair = 0;
 
+        memset(mask, 0, sizeof(struct cpumask));
+        memset(cpus, 0, sizeof(cpus));
 	fd = rctl_fopen(class_id, rctl_cpus, "r");
 	if (fd == NULL)
-		return PQOS_RETVAL_ERROR;
+                return PQOS_RETVAL_ERROR;
 
-	memset(mask, 0, sizeof(struct cpumask));
-	while (fscanf(fd, "%1x", &character) == 1) {
-		const unsigned index = mask->length / CPUMASK_CHARS_PER_ITEM;
-		uint8_t *item = &(mask->tab[index]);
+        /** Read the entire file into memory. */
+        num_chars = fread(cpus, sizeof(char), sizeof(cpus), fd);
 
-		/* Determine where in the hex pairing the value is to be read
-		 * into e.g 0xfe, are you reading in pos f or pos e */
-		character <<= CPUMASK_BITS_PER_CHAR
-			* ((mask->length + 1) % CPUMASK_CHARS_PER_ITEM);
-		/* Ensure you dont loose any hex values read in already,
-		 * e.g 0xf0 should become 0xfe when e is read in */
-		*item |= (uint8_t) character;
-		mask->length++;
-	}
+        if (ferror(fd) != 0) {
+                LOG_ERROR("Error reading CPU file\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        cpus[sizeof(cpus) - 1] = '\0'; /** Just to be safe. */
+        fclose(fd);
 
-	if (!feof(fd))
-		ret = PQOS_RETVAL_ERROR;
+        /** Convert the cpus array into hex, skip any non hex chars */
+        for (i = 0; i < (int) num_chars; i++) {
+                const char c = cpus[i];
+                int hex_num;
 
-	fclose(fd);
+                if ('0' <= c && c <= '9')
+                        hex_num = c - '0';
+                else if ('a' <= c && c <= 'f')
+                        hex_num = 10 + c - 'a';
+                else if ('A' <= c && c <= 'F')
+                        hex_num = 10 + c - 'A';
+                else
+                        continue;
+
+                cpus[buffer_index] = hex_num;
+                buffer_index++;
+        }
+
+        /** Create and store the hex pairings read in */
+        for (i = 0; i <= buffer_index; i++) {
+                if (i % 2 == 0)
+                        hex_pair = cpus[i];
+                if (i % 2 == 1) {
+                        hex_pair <<= 4;
+                        hex_pair |= cpus[i];
+                        mask->tab[hex_index] = hex_pair;
+                        hex_index++;
+                }
+                if (i == buffer_index && buffer_index % 2 == 0) {
+                        hex_pair = cpus[i];
+                        hex_pair <<= 4;
+                        mask->tab[hex_index] = hex_pair;
+                        hex_index++;
+                }
+        }
+        /** Store the number of hex chars discovered in the cpus file */
+        mask->length = buffer_index;
 
 	return ret;
 }
