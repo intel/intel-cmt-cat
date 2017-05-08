@@ -580,6 +580,8 @@ int pqos_mon_start(const unsigned num_cores,
                 ret = hw_mon_start(num_cores, cores, event, context, group);
         else {
 #ifndef __FreeBSD__
+                LOG_WARN("As of Kernel 4.10, Intel(R) RDT perf results per core"
+                         " are found to be incorrect.\n");
                 ret = os_mon_start(num_cores, cores, event, context, group);
 #else
                 LOG_INFO("OS interface not supported!\n");
