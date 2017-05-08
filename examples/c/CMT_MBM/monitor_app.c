@@ -90,6 +90,11 @@ static struct {
  */
 static int sel_process_num = 0;
 
+/**
+ * Flag to determine which library interface to use
+ */
+static int interface = PQOS_INTER_MSR;
+
 static void stop_monitoring(void);
 
 /**
@@ -152,29 +157,42 @@ static inline int process_mode(void)
 static void
 monitoring_get_input(int argc, char *argv[])
 {
-	int num_args = 0, i = 0, sel_pid = 0;
+	int num_args, num_opts = 1, i = 0, sel_pid = 0, help = 0;
 
-        if (argc > 1) {
-                if (!strcmp(argv[1], "-p")) {
+        for (i = 0; i < argc; i++) {
+                if (!strcmp(argv[i], "-p")) {
                         sel_pid = 1;
-                        num_args = argc-2;
-                } else
-                        num_args = argc-1;
+                        num_opts++;
+                } else if (!strcmp(argv[i], "-I")) {
+                        interface = PQOS_INTER_OS;
+                        num_opts++;
+                } else if (!strcmp(argv[i], "-H") || !strcmp(argv[i], "-h")) {
+                        help = 1;
+                        num_opts++;
+                }
         }
-	if (num_args == 0)
-		sel_monitor_num = 0;
-	else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H")) {
+        /* Ensure OS interface selected if monitoring tasks */
+        if (sel_pid && interface == PQOS_INTER_MSR) {
+                printf("Error: PID monitoring requires OS interface "
+                        "selection!\nPlease use the -I option.\n");
+                help = 1;
+        }
+        num_args = (argc - num_opts);
+        if (help) {
 		printf("Usage:  %s [<core1> <core2> <core3> ...]\n"
-                       "        %s -p [<pid1> <pid2> <pid3> ...]\n",
+                       "        %s -I -p [<pid1> <pid2> <pid3> ...]\n",
                        argv[0], argv[0]);
 		printf("Eg   :  %s 1 2 6\n        "
-                       "%s -p 3564 7638 356\n"
+                       "%s -I -p 3564 7638 356\n"
                        "Notes:\n        "
                        "-h      help\n        "
-                       "-p      select process ids to monitor LLC occupancy"
+                       "-I      select library OS interface\n        "
+                       "-p      select process ID's to monitor LLC occupancy"
                        "\n\n", argv[0], argv[0]);
+		exit(EXIT_SUCCESS);
+        } else if (num_args == 0) {
 		sel_monitor_num = 0;
-	} else {
+        } else {
                 if (sel_pid) {
                         if (num_args > PQOS_MAX_PIDS)
                                 num_args = PQOS_MAX_PIDS;
@@ -182,7 +200,7 @@ monitoring_get_input(int argc, char *argv[])
                                 m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
                                 sel_monitor_pid_tab[i].pgrp = m_mon_grps[i];
                                 sel_monitor_pid_tab[i].pid =
-                                        (unsigned) atoi(argv[i+2]);
+                                        (unsigned) atoi(argv[num_opts + i]);
                         }
                         sel_process_num = (int) num_args;
                 } else {
@@ -192,7 +210,7 @@ monitoring_get_input(int argc, char *argv[])
                                 m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
                                 sel_monitor_core_tab[i].pgrp = m_mon_grps[i];
                                 sel_monitor_core_tab[i].core =
-                                        (unsigned) atoi(argv[i+1]);
+                                        (unsigned) atoi(argv[num_opts + i]);
                         }
                         sel_monitor_num = (int) num_args;
                 }
@@ -325,10 +343,15 @@ static void monitoring_loop(void)
                                 double mbr = bytes_to_mb(pv->mbm_remote_delta);
                                 double mbl = bytes_to_mb(pv->mbm_local_delta);
 
-                                printf("%8u %8u %10.1f %10.1f %10.1f\n",
-                                       m_mon_grps[i]->cores[0],
-                                       m_mon_grps[i]->poll_ctx[0].rmid,
-                                       llc, mbl, mbr);
+                                if (interface == PQOS_INTER_OS)
+                                        printf("%8u %s %10.1f %10.1f %10.1f\n",
+                                               m_mon_grps[i]->cores[0],
+                                               "     N/A", llc, mbl, mbr);
+                                else
+                                        printf("%8u %8u %10.1f %10.1f %10.1f\n",
+                                               m_mon_grps[i]->cores[0],
+                                               m_mon_grps[i]->poll_ctx[0].rmid,
+                                               llc, mbl, mbr);
                         }
                 } else {
                         printf("PID       LLC[KB]\n");
@@ -356,9 +379,14 @@ int main(int argc, char *argv[])
 	int ret, exit_val = EXIT_SUCCESS;
 	const struct pqos_capability *cap_mon = NULL;
 
-	memset(&config, 0, sizeof(config));
+        /* Get input from user */
+	monitoring_get_input(argc, argv);
+
+        memset(&config, 0, sizeof(config));
         config.fd_log = STDOUT_FILENO;
         config.verbose = 0;
+        config.interface = interface;
+
 	/* PQoS Initialization - Check and initialize CAT and CMT capability */
 	ret = pqos_init(&config);
 	if (ret != PQOS_RETVAL_OK) {
@@ -373,8 +401,6 @@ int main(int argc, char *argv[])
 		exit_val = EXIT_FAILURE;
 		goto error_exit;
 	}
-	/* Get input from user */
-	monitoring_get_input(argc, argv);
 	(void) pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
 	/* Setup the monitoring resources */
 	ret = setup_monitoring(p_cpu, cap_mon);
