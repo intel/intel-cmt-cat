@@ -550,7 +550,7 @@ int main(int argc, char **argv)
                 *cap_l2ca = NULL, *cap_mba = NULL;
         unsigned sock_count, *sockets = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
-        int opt_index = 0;
+        int opt_index = 0, pid_flag = 0;
 
         m_cmd_name = argv[0];
         print_warning();
@@ -581,6 +581,7 @@ int main(int argc, char **argv)
                         break;
                 case 'p':
 		        selfn_monitor_pids(optarg);
+                        pid_flag = 1;
                         break;
                 case 'm':
                         selfn_monitor_cores(optarg);
@@ -665,6 +666,12 @@ int main(int argc, char **argv)
                 }
         }
 
+        if (pid_flag == 1 && cfg.interface == PQOS_INTER_MSR) {
+                printf("Error! OS interface option [-I] needed for PID"
+                       " monitoring. Please re-run with the -I option.\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_1;
+        }
         cfg.verbose = sel_verbose_mode;
         /**
          * Set up file descriptor for message log
@@ -677,7 +684,7 @@ int main(int argc, char **argv)
                 if (cfg.fd_log == -1) {
                         printf("Error opening %s log file!\n", sel_log_file);
                         exit_val = EXIT_FAILURE;
-                        goto error_exit_2;
+                        goto error_exit_1;
                 }
         }
 
