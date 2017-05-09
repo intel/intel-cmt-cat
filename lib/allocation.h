@@ -150,14 +150,14 @@ int hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg);
  *        defined by \a ca on \a socket
  *
  * @param [in] socket CPU socket id
- * @param [in] num_cos number of classes of service at \a ca
+ * @param [in] num_ca number of classes of service at \a ca
  * @param [in] ca table with class of service definitions
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
 int hw_l3ca_set(const unsigned socket,
-                const unsigned num_cos,
+                const unsigned num_ca,
                 const struct pqos_l3ca *ca);
 
 /**
