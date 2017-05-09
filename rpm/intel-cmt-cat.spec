@@ -1,8 +1,8 @@
-# Copyright (c) 2016, Intel Corporation
-# 
+# Copyright (c) 2016-2017, Intel Corporation
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
-# 
+#
 #     * Redistributions of source code must retain the above copyright notice,
 #       this list of conditions and the following disclaimer.
 #     * Redistributions in binary form must reproduce the above copyright
@@ -11,7 +11,7 @@
 #     * Neither the name of Intel Corporation nor the names of its contributors
 #       may be used to endorse or promote products derived from this software
 #       without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 # IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
@@ -23,39 +23,28 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-%global ver014      0.1.4
-%global ver015      0.1.5
-%global ver0151     0.1.5
-%global githubname  intel-cmt-cat
-%global githubver   %{ver0151}
+%global githubname   intel-cmt-cat
+%global githubver    1.0.0
 
-%if "%{githubver}" == "%{ver0151}"
-%global githubfull  %{githubname}-%{githubver}-1
+%if %{defined githubsubver}
+%global githubfull   %{githubname}-%{githubver}.%{githubsubver}
 %else
-%global githubfull  %{githubname}-%{githubver}
+%global githubfull   %{githubname}-%{githubver}
 %endif
 
-%global pkgname     intel-cmt-cat
-%if 0%{!?_licensedir}
-%global _licensedir %{_docdir}
-%endif
+# disable producing debuginfo for this package
+%global debug_package %{nil}
+
 
 Summary:            Provides command line interface to CMT, MBM, CAT and CDP technologies
-Name:               %{pkgname}
-Version:            %{githubver}
-
-%if "%{githubver}" == "%{ver015}"
+Name:               %{githubname}
 Release:            1%{?dist}
-%endif
-%if "%{githubver}" == "%{ver014}"
-Release:            3%{?dist}
-%endif
-
+Version:            %{githubver}
 License:            BSD
 Group:              Development/Tools
 ExclusiveArch:      x86_64 i686 i586
-%if "%{githubver}" == "%{ver0151}"
-Source0:            https://github.com/01org/%{githubname}/archive/v%{githubver}-1.tar.gz
+%if %{defined githubsubver}
+Source0:            https://github.com/01org/%{githubname}/archive/v%{githubver}.%{githubsubver}.tar.gz
 %else
 Source0:            https://github.com/01org/%{githubname}/archive/v%{githubver}.tar.gz
 %endif
@@ -64,7 +53,8 @@ URL:                https://github.com/01org/%{githubname}
 %description
 This software package provides basic support for
 Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
-Cache Allocation Technology (CAT) and Code Data Prioratization (CDP).
+Cache Allocation Technology (CAT), Memory Bandwidth Allocation (MBA),
+and Code Data Prioratization (CDP).
 
 CMT, MBM and CAT are configured using Model Specific Registers (MSRs)
 to measure last level cache occupancy, set up the class of service masks and
@@ -74,13 +64,27 @@ obtained through a standard Linux* interface. The virtual file system
 provides an interface to read and write the MSR registers but
 it requires root privileges.
 
-%prep
+%package -n intel-cmt-cat-devel
+Summary:            Library and sample code to use CMT, MBM, CAT and CDP technologies
+License:            BSD
+Requires:           intel-cmt-cat == %{version}
+Group:              Development/Tools
+ExclusiveArch:      x86_64 i686 i586
 
+%description -n intel-cmt-cat-devel
+This software package provides basic support for
+Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
+Cache Allocation Technology (CAT), Memory Bandwidth Allocation (MBA),
+and Code Data Prioratization (CDP).
+The package includes library, header file and sample code.
+
+For additional information please refer to:
+https://github.com/01org/%{githubname}
+
+%prep
 %autosetup -n %{githubfull}
 
-%if "%{githubver}" == "%{ver015}"
 %post -p /sbin/ldconfig
-%endif
 
 %build
 make %{?_smp_mflags}
@@ -88,9 +92,10 @@ make %{?_smp_mflags}
 %install
 # Not doing make install as it strips the symbols.
 # Using files from the build directory.
-%if "%{githubver}" == "%{ver015}" || "%{githubver}" == "%{ver0151}"
 install -d %{buildroot}/%{_bindir}
 install %{_builddir}/%{githubfull}/pqos/pqos %{buildroot}/%{_bindir}
+install %{_builddir}/%{githubfull}/pqos/pqos-os %{buildroot}/%{_bindir}
+install %{_builddir}/%{githubfull}/pqos/pqos-msr %{buildroot}/%{_bindir}
 
 install -d %{buildroot}/%{_mandir}/man8
 install -m 0644 %{_builddir}/%{githubfull}/pqos/pqos.8  %{buildroot}/%{_mandir}/man8
@@ -104,44 +109,61 @@ install -m 0644 %{_builddir}/%{githubfull}/rdtset/rdtset.8  %{buildroot}/%{_mand
 install -d %{buildroot}/%{_licensedir}/%{name}-%{version}
 install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%{name}-%{version}
 
+# Install the library
 install -d %{buildroot}/%{_libdir}
-%if "%{githubver}" == "%{ver0151}"
-install %{_builddir}/%{githubfull}/lib/libpqos-0.1.6.so %{buildroot}/%{_libdir}
-%else
-install %{_builddir}/%{githubfull}/lib/libpqos-0.1.5.so %{buildroot}/%{_libdir}
-%endif
-%endif
+install %{_builddir}/%{githubfull}/lib/libpqos-*.so %{buildroot}/%{_libdir}
+cp -a %{_builddir}/%{githubfull}/lib/libpqos.so %{buildroot}/%{_libdir}
+cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.0 %{buildroot}/%{_libdir}
 
-%if "%{githubver}" == "%{ver014}"
-install -d %{buildroot}/%{_bindir}
-install %{_builddir}/%{githubfull}/pqos %{buildroot}/%{_bindir}
+# Install the header file
+install -d %{buildroot}/%{_includedir}
+install -m 0644 %{_builddir}/%{githubfull}/lib/pqos.h %{buildroot}/%{_includedir}
 
-install -d %{buildroot}/%{_mandir}/man8
-install -m 0644 %{_builddir}/%{githubfull}/pqos.8 %{buildroot}/%{_mandir}/man8
+# Install license and sample code
+install -d %{buildroot}/%{_usrsrc}/%{githubfull}
+install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_usrsrc}/%{githubfull}
 
-install -d %{buildroot}/%{_licensedir}/%{name}-%{version}
-install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%{name}-%{version}
-%endif
+install -d %{buildroot}/%{_usrsrc}/%{githubfull}/c
+
+install -d %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/Makefile          %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/reset_app.c       %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/allocation_app.c  %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/association_app.c %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
+
+install -d %{buildroot}/%{_usrsrc}/%{githubfull}/c/CMT_MBM
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/Makefile      %{buildroot}/%{_usrsrc}/%{githubfull}/c/CMT_MBM
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{buildroot}/%{_usrsrc}/%{githubfull}/c/CMT_MBM
 
 %files
 %{_bindir}/pqos
+%{_bindir}/pqos-os
+%{_bindir}/pqos-msr
 %{_mandir}/man8/pqos.8.gz
-
-%if "%{githubver}" == "%{ver015}" || "%{githubver}" == "%{ver0151}"
 %{_bindir}/rdtset
 %{_mandir}/man8/rdtset.8.gz
-%if "%{githubver}" == "%{ver0151}"
-%{_libdir}/libpqos-0.1.6.so
-%else
-%{_libdir}/libpqos-0.1.5.so
-%endif
-%endif
+%{_libdir}/libpqos-*.so
 
 %{!?_licensedir:%global license %%doc}
 %license %{_licensedir}/%{name}-%{version}/LICENSE
 %doc ChangeLog README
 
+%files -n intel-cmt-cat-devel
+%{_libdir}/libpqos.so
+%{_libdir}/libpqos.so.0
+%{_includedir}/pqos.h
+%{_usrsrc}/%{githubfull}/c/CAT/Makefile
+%{_usrsrc}/%{githubfull}/c/CAT/reset_app.c
+%{_usrsrc}/%{githubfull}/c/CAT/association_app.c
+%{_usrsrc}/%{githubfull}/c/CAT/allocation_app.c
+%{_usrsrc}/%{githubfull}/c/CMT_MBM/Makefile
+%{_usrsrc}/%{githubfull}/c/CMT_MBM/monitor_app.c
+%doc %{_usrsrc}/%{githubfull}/LICENSE
+
 %changelog
+* Fri May 19 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Michal Aleksinski <michalx.aleksinski@intel.com> 1.0.0-1
+- new release
+
 * Tue Feb 14 2017 Aaron Hetherington <aaron.hetherington@intel.com> 0.1.5-1
 - new release
 
