@@ -282,6 +282,7 @@ cpumask_read(const unsigned class_id, struct cpumask *mask)
 
         if (ferror(fd) != 0) {
                 LOG_ERROR("Error reading CPU file\n");
+                fclose(fd);
                 return PQOS_RETVAL_ERROR;
         }
         cpus[sizeof(cpus) - 1] = '\0'; /** Just to be safe. */
