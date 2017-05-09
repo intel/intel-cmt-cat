@@ -1,7 +1,7 @@
 ========================================================================
 README for Intel(R) RDT Software Package
 
-April 2017
+May 2017
 
 ========================================================================
 
@@ -39,9 +39,19 @@ of known-supported SKUs. If needed, a final check is to probe the
 specific MSR’s to discover hardware capabilities, however it is
 recommended that CPUID enumeration should be used wherever possible.
 
-If compiled with PID API the software detects presence of Linux perf extensions for
-the monitoring technologies. In such case it enables library API's for
-monitoring processes. PID API is not complied by default.
+From software version v1.0 the library adds option to use Intel(R) RDT via
+available OS interfaces (perf and resctrl on Linux). The library detects
+presence of these interfaces and allows to select the preferred one through
+a configuration option.
+As the result, existing tools like 'pqos' or 'rdtset' can also be used
+to manage Intel(R) RDT in an OS compatible way. MSR interface remains
+the default option for now. 'pqos' tool wrappers have been added to help with
+the interface selection. 'pqos-os' and 'pqos-msr' for OS and MSR interface
+operations respectively.
+
+PID API compile time option has been removed and the APIs are always available.
+Note that proper operation of these APIs depends on availability and
+selection of OS interface.
 
 This software package is maintained, updated and developed on
 https://github.com/01org/intel-cmt-cat
@@ -164,15 +174,15 @@ Table 2. Software interoperability matrix
 +-----------------------------------------------------------------------------------------------+
 |                  | intel-cmt-cat | Intel(R) PCM |  Linux perf  | Linux cgroup | Linux resctrl |
 |------------------+---------------+--------------+--------------+--------------|---------------|
-|intel-cmt-cat     | Yes(1)        | Yes(2)       | No           | No           | No            |
+|intel-cmt-cat     | Yes(1)        | Yes(2)       | Yes(5)       | No           | Yes(5)        |
 |------------------+---------------+--------------+--------------+--------------|---------------|
 |Intel(R) PCM      | Yes(2)        | Yes          | No           | No           | No            |
 |------------------+---------------+--------------+--------------+--------------|---------------|
-|Linux perf        | No            | No           | Yes          | Yes(3)       | Yes           |
+|Linux perf        | Yes(5)        | No           | Yes          | Yes(3)       | Yes           |
 |------------------+---------------+--------------+--------------+--------------|---------------|
 |Linux cgroup      | No            | No           | Yes          | Yes(3)       | No            |
 |------------------+---------------+--------------+--------------+--------------|---------------|
-|Linux resctrl (4) | No            | No           | Yes          | No           | Yes           |
+|Linux resctrl (4) | Yes(5)        | No           | Yes          | No           | Yes           |
 +-----------------------------------------------------------------------------------------------+
 
 References:
@@ -190,8 +200,13 @@ References:
 (3) Linux cgroup is an out of tree patch
     https://github.com/vshiva1/linux/tree/catv15
 
-(4) A wiki for Intel resctrl is available at:
+(4) Linux kernel version 4.10 and newer.
+    A wiki for Intel resctrl is available at:
     https://github.com/01org/intel-cmt-cat/wiki/resctrl
+
+(5) Only with Linux kernel version 4.10 (and newer),
+    intel-cmt-cat version 1.0 (and newer) with selected OS interface
+    See '-I' option in 'man pqos' or 'pqos-os'.
 
 Intel(R) PCM is available at
 https://software.intel.com/en-us/articles/intel-performance-counter-monitor
@@ -201,11 +216,11 @@ Table 3. Intel(R) RDT software enabling status.
 +---------------------------------------------------------------------------------------+
 |                  | Core  | Task  |  CMT  |  MBM  | L3 CAT | L3 CDP  | L2 CAT |  MBA   |
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
-|intel-cmt-cat     | Yes   | No    | Yes   | Yes   | Yes    | Yes     | Yes    | Yes    |
+|intel-cmt-cat     | Yes   | Yes(7)| Yes   | Yes   | Yes    | Yes     | Yes    | Yes    |
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
 |Intel(R) PCM      | Yes   | No    | Yes   | Yes   | No     | No      | No     | No     |
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
-|Linux perf        | Yes   | Yes   | Yes(1)| Yes(2)| No(3)  | No(3)   | No(3)  | No     |
+|Linux perf        | Yes(6)| Yes   | Yes(1)| Yes(2)| No(3)  | No(3)   | No(3)  | No     |
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
 |Linux cgroup      | No    | Yes   | No    | No    | Yes(4) | No      | No     | No     |
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
@@ -223,7 +238,8 @@ References:
     it doesn't enable it
 (4) This is out of tree patch and relies on Linux perf enabling
 (5) Linux kernel version 4.10 and newer
-
+(6) perf API allows for CMT/MBM core monitoring but returned values are incorrect
+(7) intel-cmt-cat version 1.0 monitoring only and depends on kernel support
 
 Legal Disclaimer
 ================
