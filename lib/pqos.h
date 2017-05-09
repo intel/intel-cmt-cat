@@ -445,6 +445,9 @@ int pqos_mon_assoc_get(const unsigned lcore,
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ *
+ * @note As of Kernel 4.10, Intel(R) RDT perf results per core are found to
+ *       be incorrect.
  */
 int pqos_mon_start(const unsigned num_cores,
                    const unsigned *cores,
