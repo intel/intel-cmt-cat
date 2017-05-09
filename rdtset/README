@@ -123,6 +123,9 @@ Example usage of RESET option:
  $ sudo rdtset -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 id
  $ sudo rdtset -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 -k id
 
+1.1 OS interface:
+ $ sudo rdtset -I -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 -k id
+
 2. Show current proc status to verify CPU affinity:
 2.1 Linux:
  $ sudo rdtset -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 cat /proc/self/status

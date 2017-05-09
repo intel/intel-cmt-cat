@@ -4,6 +4,30 @@ Not Released
 
 Contributors (alphabetical order):
 	Aaron Hetherington <aaron.hetherington@intel.com>
+        Colin Ian King <colin.king@canonical.com>
+	Marcel Cornu <marcel.d.cornu@intel.com>
+	Michal Aleksinski <michalx.aleksinski@intel.com>
+	Tomasz Kantecki <tomasz.kantecki@intel.com>
+
+Summary:
+1. Library
+        - Removed NO_PID_API compile time option
+        - Added OS interface to support L3/L2 CAT & CDP
+        - Updated support for CMT per PID
+2. PQoS Utility
+        - Added pqos-os & pqos-msr wrapper scripts
+        - Added option to select OS or MSR interface
+3. rdtset Utility
+        - Added option to select OS or MSR interface
+4. Examples
+        - Support for new OS/MSR interface added to CMT/MBM examples
+
+======================================================================
+Release  v0.1.5-1  2017-02-09
+======================================================================
+
+Contributors (alphabetical order):
+	Aaron Hetherington <aaron.hetherington@intel.com>
 	Marcel Cornu <marcel.d.cornu@intel.com>
 	Michal Aleksinski <michalx.aleksinski@intel.com>
 	Tomasz Kantecki <tomasz.kantecki@intel.com>
