@@ -39,7 +39,7 @@ of known-supported SKUs. If needed, a final check is to probe the
 specific MSR’s to discover hardware capabilities, however it is
 recommended that CPUID enumeration should be used wherever possible.
 
-From software version v1.0 the library adds option to use Intel(R) RDT via
+From software version v1.0.0 the library adds option to use Intel(R) RDT via
 available OS interfaces (perf and resctrl on Linux). The library detects
 presence of these interfaces and allows to select the preferred one through
 a configuration option.
@@ -205,7 +205,7 @@ References:
     https://github.com/01org/intel-cmt-cat/wiki/resctrl
 
 (5) Only with Linux kernel version 4.10 (and newer),
-    intel-cmt-cat version 1.0 (and newer) with selected OS interface
+    intel-cmt-cat version 1.0.0 (and newer) with selected OS interface
     See '-I' option in 'man pqos' or 'pqos-os'.
 
 Intel(R) PCM is available at
@@ -239,7 +239,7 @@ References:
 (4) This is out of tree patch and relies on Linux perf enabling
 (5) Linux kernel version 4.10 and newer
 (6) perf API allows for CMT/MBM core monitoring but returned values are incorrect
-(7) intel-cmt-cat version 1.0 monitoring only and depends on kernel support
+(7) intel-cmt-cat version 1.0.0 monitoring only and depends on kernel support
 
 Legal Disclaimer
 ================

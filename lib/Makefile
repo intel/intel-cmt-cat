@@ -35,7 +35,7 @@
 ###############################################################################
 
 LIB = libpqos
-VERSION = 1.0
+VERSION = 1.0.0
 SHARED ?= y
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ -D_GNU_SOURCE \
