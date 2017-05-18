@@ -316,7 +316,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
         FILE *fd;
         int config, ret;
         double sf = 0;
-        char file[128], buf[32], *p = buf;
+        char file[512], buf[32], *p = buf;
 
         /**
          * Read event type from file system

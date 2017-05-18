@@ -993,9 +993,9 @@ print_text_row(FILE *fp,
                                      mon_data->event & PQOS_MON_EVENT_LMEM_BW,
                                      sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        offset += fillin_text_column(mbr, data + offset, sz_data - offset,
-                                     mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                                     sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+        fillin_text_column(mbr, data + offset, sz_data - offset,
+                           mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                           sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
                 fprintf(fp, "\n%8.8s %5.2f %7uk%s",
@@ -1046,10 +1046,10 @@ print_xml_row(FILE *fp, char *time,
                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW,
                                     "mbm_local_MB");
 
-        offset += fillin_xml_column(mbr, data + offset, sz_data - offset,
-                                    mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                                    sel_events_max & PQOS_MON_EVENT_RMEM_BW,
-                                    "mbm_remote_MB");
+        fillin_xml_column(mbr, data + offset, sz_data - offset,
+                          mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                          sel_events_max & PQOS_MON_EVENT_RMEM_BW,
+                          "mbm_remote_MB");
 
         if (!process_mode())
                 fprintf(fp,
@@ -1122,9 +1122,9 @@ print_csv_row(FILE *fp, char *time,
                                     mon_data->event & PQOS_MON_EVENT_LMEM_BW,
                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        offset += fillin_csv_column(mbr, data + offset, sz_data - offset,
-                                    mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                                    sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+        fillin_csv_column(mbr, data + offset, sz_data - offset,
+                          mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                          sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
                 fprintf(fp,

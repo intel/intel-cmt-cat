@@ -718,7 +718,7 @@ get_unused_cos(const unsigned id,
                unsigned *class_id)
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-        unsigned used_classes[hi_class_id + 1];
+        unsigned used_classes[PQOS_MAX_L3CA_COS];
         unsigned i, cos;
         int ret;
 

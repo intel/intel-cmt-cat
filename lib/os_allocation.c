@@ -352,10 +352,14 @@ struct schemata {
  */
 static void
 schemata_fini(struct schemata *schemata) {
-	if (schemata->l2ca != NULL)
+	if (schemata->l2ca != NULL) {
 		free(schemata->l2ca);
-	if (schemata->l3ca != NULL)
+                schemata->l2ca = NULL;
+        }
+	if (schemata->l3ca != NULL) {
 		free(schemata->l3ca);
+                schemata->l3ca = NULL;
+        }
 }
 
 /**
