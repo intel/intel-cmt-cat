@@ -1244,7 +1244,7 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
         /**
          * Check if resctrl is mounted
          */
-        if (access("/sys/fs/resctrl/cpus", 0) != 0) {
+        if (access("/sys/fs/resctrl/cpus", F_OK) != 0) {
                 LOG_INFO("resctrl not mounted\n");
                 return PQOS_RETVAL_RESOURCE;
         } else if (interface == PQOS_INTER_MSR)

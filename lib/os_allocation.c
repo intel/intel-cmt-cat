@@ -84,6 +84,9 @@ rctl_fopen(const unsigned class_id, const char *name, const char *mode)
 	char buf[128];
 	int result;
 
+        ASSERT(name != NULL);
+        ASSERT(mode != NULL);
+
 	memset(buf, 0, sizeof(buf));
 	if (class_id == 0)
 		result = snprintf(buf, sizeof(buf) - 1,
@@ -351,7 +354,8 @@ struct schemata {
  * @param[in] schemata Schemata structure
  */
 static void
-schemata_fini(struct schemata *schemata) {
+schemata_fini(struct schemata *schemata)
+{
 	if (schemata->l2ca != NULL) {
 		free(schemata->l2ca);
                 schemata->l2ca = NULL;
@@ -372,7 +376,8 @@ schemata_fini(struct schemata *schemata) {
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-schemata_init(const unsigned class_id, struct schemata *schemata) {
+schemata_init(const unsigned class_id, struct schemata *schemata)
+{
 	int ret = PQOS_RETVAL_OK;
 	int retval;
 	unsigned num_cos, num_ids, i;
@@ -564,7 +569,7 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 		/**
 		 * Determine allocation type
 		 */
-		p =  strchr(buf, ':');
+		p = strchr(buf, ':');
 		if (p == NULL) {
 			ret = PQOS_RETVAL_ERROR;
 			break;
@@ -820,7 +825,7 @@ os_alloc_check(void)
         /**
          * Check if resctrl is mounted
          */
-        if (access("/sys/fs/resctrl/cpus", 0) != 0) {
+        if (access("/sys/fs/resctrl/cpus", F_OK) != 0) {
                 const struct pqos_capability *alloc_cap = NULL;
                 int cdp_mount = PQOS_REQUIRE_CDP_OFF;
                 /* Get L3 CAT capabilities */
