@@ -39,6 +39,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <sys/mount.h>
+#include <limits.h>                     /**< CHAR_BIT*/
 
 #include <pqos.h>
 #include "os_allocation.h"
@@ -142,29 +143,18 @@ strtouint64(const char *s, int base, uint64_t *value)
  * ---------------------------------------
  */
 
-#define CPUMASK_BITS_PER_CHAR 4
-#define CPUMASK_BITS_PER_ITEM 8
-#define CPUMASK_CHARS_PER_ITEM (CPUMASK_BITS_PER_ITEM / CPUMASK_BITS_PER_CHAR)
-#define CPUMASK_GET_TAB_INDEX(mask, lcore) \
-	((mask->length * CPUMASK_BITS_PER_CHAR - lcore - 1) \
-	/ CPUMASK_BITS_PER_ITEM)
-#define CPUMASK_GET_BIT_INDEX(mask, lcore) \
-	((mask->length * CPUMASK_BITS_PER_CHAR + lcore) % 8)
-
 /**
  * @brief Structure to hold parsed cpu mask
  *
  * Structure contains table with cpu bit mask. Each table item holds
- * information about 8 bit in mask. Items in table are held in reverse order.
+ * information about 8 bit in mask.
  *
  * Example bitmask tables:
- *  - cpus file contains 'ABC' mask = [ 0xAB, 0xC0, ... ]
- *  - cpus file containd 'ABCD' mask = [ 0xAB, 0xCD, ... ]
+ *  - cpus file contains 'ABC' mask = [ ..., 0x0A, 0xBC ]
+ *  - cpus file contains 'ABCD' mask = [ ..., 0xAB, 0xCD ]
  */
 struct cpumask {
-	unsigned length;	                        /**< Length of mask
-							string in cpus file */
-	uint8_t tab[MAX_CPUS / CPUMASK_BITS_PER_ITEM];  /**< bit mask table */
+	uint8_t tab[MAX_CPUS / CHAR_BIT];  /**< bit mask table */
 };
 
 /**
@@ -177,14 +167,11 @@ static void
 cpumask_set(const unsigned lcore, struct cpumask *mask)
 {
 	/* index in mask table */
-	const unsigned item = CPUMASK_GET_TAB_INDEX(mask, lcore);
-	const unsigned bit = CPUMASK_GET_BIT_INDEX(mask, lcore);
-
-	/* get pointer to table item containing information about lcore */
-	uint8_t *m = &(mask->tab[item]);
+	const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
+	const unsigned bit = lcore % CHAR_BIT;
 
 	/* Set lcore bit in mask table item */
-	*m = *m | (1 << bit);
+	mask->tab[item] = mask->tab[item] | (1 << bit);
 }
 
 /**
@@ -201,14 +188,11 @@ static int
 cpumask_get(const unsigned lcore, const struct cpumask *mask)
 {
 	/* index in mask table */
-	const unsigned item = CPUMASK_GET_TAB_INDEX(mask, lcore);
-	const unsigned bit = CPUMASK_GET_BIT_INDEX(mask, lcore);
-
-	/* get pointer to table item containing information about lcore */
-	const uint8_t *m = &(mask->tab[item]);
+	const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
+	const unsigned bit = lcore % CHAR_BIT;
 
 	/* Check if lcore bit is set in mask table item */
-	return ((*m >> bit) & 0x1) == 0x1;
+	return (mask->tab[item] >> bit) & 0x1;
 }
 
 /**
@@ -231,23 +215,20 @@ cpumask_write(const unsigned class_id, const struct cpumask *mask)
 	if (fd == NULL)
 		return PQOS_RETVAL_ERROR;
 
-	for (i = 0; i < mask->length; i++) {
-		const uint8_t *item = &(mask->tab[i / CPUMASK_CHARS_PER_ITEM]);
-		unsigned value = *item;
+	for (i = 0; i < sizeof(mask->tab); i++) {
+		const unsigned value = (unsigned) mask->tab[i];
 
-		/* Determine which hex value of the hex pairing is to be
-		 * written. e.g 0xfe, are you writing f or e */
-		value >>= ((i + 1) % CPUMASK_CHARS_PER_ITEM)
-			* CPUMASK_BITS_PER_CHAR;
-		/* Remove the hex value you are not going to write from
-		 * the hex pairing */
-		value &= (1 << CPUMASK_BITS_PER_CHAR) - 1;
-
-		if (fprintf(fd, "%01x", value) < 0) {
+		if (fprintf(fd, "%02x", value) < 0) {
 			LOG_ERROR("Failed to write cpu mask\n");
-			fclose(fd);
-			return PQOS_RETVAL_ERROR;
+			ret = PQOS_RETVAL_ERROR;
+                        break;
 		}
+                if ((i + 1) % 4 == 0)
+                        if (fprintf(fd, ",") < 0) {
+                                LOG_ERROR("Failed to write cpu mask\n");
+                                ret = PQOS_RETVAL_ERROR;
+                                break;
+                        }
 	}
 
 	fclose(fd);
@@ -268,11 +249,10 @@ static int
 cpumask_read(const unsigned class_id, struct cpumask *mask)
 {
 	int ret = PQOS_RETVAL_OK;
-        int i, buffer_index = 0, hex_index = 0;
+        int i, buffer_index = 0, hex_index, idx;
 	FILE *fd;
         size_t num_chars = 0;
-        char cpus[4096];
-        uint8_t hex_pair = 0;
+        char cpus[MAX_CPUS / CHAR_BIT];
 
         memset(mask, 0, sizeof(struct cpumask));
         memset(cpus, 0, sizeof(cpus));
@@ -305,29 +285,21 @@ cpumask_read(const unsigned class_id, struct cpumask *mask)
                 else
                         continue;
 
-                cpus[buffer_index] = hex_num;
+                cpus[buffer_index] = (char) hex_num;
                 buffer_index++;
         }
 
         /** Create and store the hex pairings read in */
-        for (i = 0; i <= buffer_index; i++) {
-                if (i % 2 == 0)
-                        hex_pair = cpus[i];
-                if (i % 2 == 1) {
-                        hex_pair <<= 4;
-                        hex_pair |= cpus[i];
-                        mask->tab[hex_index] = hex_pair;
-                        hex_index++;
+        for (i = buffer_index - 1, hex_index = 0, idx = sizeof(mask->tab) - 1;
+             i >= 0; i--) {
+                if (!hex_index)
+                        mask->tab[idx] = (uint8_t) cpus[i];
+                else {
+                        mask->tab[idx] |= (uint8_t) (cpus[i] << 4);
+                        idx--;
                 }
-                if (i == buffer_index && buffer_index % 2 == 0) {
-                        hex_pair = cpus[i];
-                        hex_pair <<= 4;
-                        mask->tab[hex_index] = hex_pair;
-                        hex_index++;
-                }
+                hex_index ^= 1;
         }
-        /** Store the number of hex chars discovered in the cpus file */
-        mask->length = buffer_index;
 
 	return ret;
 }
