@@ -75,7 +75,7 @@ CFLAGS += -g -O2
 endif
 
 # Build targets and dependencies
-SRCS = $(wildcard *.c)
+SRCS = $(sort $(wildcard *.c))
 OBJS = $(SRCS:.c=.o)
 CLEAN_OBJS = $(SRCS:.c=.o)
 
