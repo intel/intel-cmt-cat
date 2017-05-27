@@ -70,7 +70,7 @@ PREFIX ?= /usr/local
 BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
 
-SRCS = $(wildcard *.c)
+SRCS = $(sort $(wildcard *.c))
 OBJS = $(SRCS:.c=.o)
 DEPFILES = $(SRCS:.c=.d)
 
