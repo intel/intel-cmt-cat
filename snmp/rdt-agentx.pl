@@ -173,7 +173,15 @@ sub pqos_init {
 	$cfg->{verbose} = 2;                # SUPER_VERBOSE
 	$cfg->{fd_log}  = fileno(STDOUT);
 
-	if (0 != pqos::pqos_init($cfg)) {
+	my $interface_id = $ARGV[0];
+
+        if ($interface_id eq '-I' || $interface_id eq '--iface-os') {
+                $cfg->{interface} = 1;
+        } else {
+                $cfg->{interface} = 0;
+        }
+
+        if (0 != pqos::pqos_init($cfg)) {
 		print __LINE__, " pqos::pqos_init FAILED!\n";
 		return -1;
 	}

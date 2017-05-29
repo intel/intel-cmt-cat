@@ -83,8 +83,12 @@ Or run snmpd from command line (e.g. for debugging purposes):
 
         sudo snmpd -f -Dagentx -Lo -C --rwcommunity=pqos --master=agentx
 
-And then run the rdt-agentx.pl script:
-        "sudo ./rdt-agentx.pl"
+And then run the rdt-agentx.pl script followed by the interface argument
+    -I [--iface-os] for OS interface 
+     No argument needed for MSR interface:
+        "sudo ./rdt-agentx.pl -I"
+        "sudo ./rdt-agentx.pl --iface-os"
+	"sudo ./rdt-agentx.pl"
 
 Note:
 "rdt-agentx" needs to be restarted when CDP config changes.
