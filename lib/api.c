@@ -546,6 +546,7 @@ int pqos_mon_start(const unsigned num_cores,
                    struct pqos_mon_data *group)
 {
         int ret;
+        static int warn = 1;
 
         if (group == NULL || cores == NULL || num_cores == 0 || event == 0)
                 return PQOS_RETVAL_PARAM;
@@ -580,8 +581,12 @@ int pqos_mon_start(const unsigned num_cores,
                 ret = hw_mon_start(num_cores, cores, event, context, group);
         else {
 #ifndef __FreeBSD__
-                LOG_WARN("As of Kernel 4.10, Intel(R) RDT perf results per core"
-                         " are found to be incorrect.\n");
+                /* Only log warning for first call */
+                if (warn) {
+                        LOG_WARN("As of Kernel 4.10, Intel(R) RDT perf results"
+                                 " per core are found to be incorrect.\n");
+                        warn = 0;
+                }
                 ret = os_mon_start(num_cores, cores, event, context, group);
 #else
                 LOG_INFO("OS interface not supported!\n");
