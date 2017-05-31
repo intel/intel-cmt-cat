@@ -113,6 +113,9 @@ int pqos_alloc_assoc_get(const unsigned lcore,
 {
 	int ret;
 
+	if (class_id == NULL)
+		return PQOS_RETVAL_PARAM;
+
 	_pqos_api_lock();
 
         ret = _pqos_check_init(1);

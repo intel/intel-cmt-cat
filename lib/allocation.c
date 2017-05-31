@@ -603,9 +603,7 @@ hw_alloc_assoc_get(const unsigned lcore,
         const struct pqos_capability *l2_cap = NULL;
         int ret = PQOS_RETVAL_OK;
 
-        if (class_id == NULL)
-                return PQOS_RETVAL_PARAM;
-
+        ASSERT(class_id != NULL);
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_check_core(m_cpu, lcore);
         if (ret != PQOS_RETVAL_OK)

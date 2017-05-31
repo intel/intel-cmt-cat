@@ -962,9 +962,7 @@ os_alloc_assoc_get(const unsigned lcore,
 	unsigned grps, i;
 	struct cpumask mask;
 
-	if (class_id == NULL)
-		return PQOS_RETVAL_PARAM;
-
+	ASSERT(class_id != NULL);
 	ASSERT(m_cpu != NULL);
 	ret = pqos_cpu_check_core(m_cpu, lcore);
 	if (ret != PQOS_RETVAL_OK)
