@@ -402,8 +402,8 @@ int hw_mba_set(const unsigned socket,
         unsigned i = 0, count = 0, core = 0, step = 0;
         const struct pqos_capability *mba_cap = NULL;
 
-        if (requested == NULL || num_cos == 0)
-                return PQOS_RETVAL_PARAM;
+        ASSERT(requested != NULL);
+	ASSERT(num_cos != 0);
 
         /**
          * Check if MBA is supported
@@ -424,21 +424,14 @@ int hw_mba_set(const unsigned socket,
                 return PQOS_RETVAL_RESOURCE;
         }
         /**
-         * Check if MBA rate and class
-         * id's are within allowed range.
+         * Check if class id's are within allowed range.
          */
-        for (i = 0; i < num_cos; i++) {
-                if (requested[i].mb_rate == 0 || requested[i].mb_rate > 100) {
-                        LOG_ERROR("MBA COS%u rate out of range (from 1-100)!\n",
-                                  requested[i].class_id);
-                        return PQOS_RETVAL_PARAM;
-                }
+        for (i = 0; i < num_cos; i++)
                 if (requested[i].class_id >= count) {
                         LOG_ERROR("MBA COS%u is out of range (COS%u is max)!\n",
                                   requested[i].class_id, count - 1);
                         return PQOS_RETVAL_PARAM;
                 }
-        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
@@ -485,9 +478,9 @@ int hw_mba_get(const unsigned socket,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
 
-        if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
-                return PQOS_RETVAL_PARAM;
-
+        ASSERT(num_cos != NULL);
+	ASSERT(mba_tab != NULL);
+	ASSERT(max_num_cos != 0);
         ASSERT(m_cap != NULL);
         ret = pqos_mba_get_cos_num(m_cap, &count);
         if (ret != PQOS_RETVAL_OK)

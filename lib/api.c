@@ -455,6 +455,20 @@ int pqos_mba_set(const unsigned socket,
                  struct pqos_mba *actual)
 {
 	int ret;
+	unsigned i;
+
+	if (requested == NULL || num_cos == 0)
+		return PQOS_RETVAL_PARAM;
+
+	/**
+	 * Check if MBA rate is within allowed range
+	 */
+	for (i = 0; i < num_cos; i++)
+		if (requested[i].mb_rate == 0 || requested[i].mb_rate > 100) {
+			LOG_ERROR("MBA COS%u rate out of range (from 1-100)!\n",
+			          requested[i].class_id);
+			return PQOS_RETVAL_PARAM;
+		}
 
 	_pqos_api_lock();
 
@@ -478,6 +492,9 @@ int pqos_mba_get(const unsigned socket,
                  struct pqos_mba *mba_tab)
 {
 	int ret;
+
+	if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
+		return PQOS_RETVAL_PARAM;
 
 	_pqos_api_lock();
 
