@@ -53,6 +53,9 @@
 static const char *rctl_path = "/sys/fs/resctrl/";
 static const char *rctl_cpus = "cpus";
 static const char *rctl_schemata = "schemata";
+#ifdef RCTRL_TASKS /* to be used later */
+static const char *rctl_tasks = "tasks";
+#endif
 
 /**
  * ---------------------------------------
@@ -1487,3 +1490,127 @@ os_l2ca_get(const unsigned l2id,
 
 	return ret;
 }
+
+/**
+ * ---------------------------------------
+ * Task utility functions
+ * ---------------------------------------
+ */
+#ifdef RCTRL_TASKS /* to be used later */
+/**
+ * @brief Function to validate if \a task is a valid task ID
+ *
+ * @param task task ID to validate
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+task_validate(const pid_t task)
+{
+        char buf[128];
+
+        memset(buf, 0, sizeof(buf));
+        snprintf(buf, sizeof(buf)-1, "/proc/%d", (int)task);
+        if (access(buf, F_OK) != 0) {
+                LOG_ERROR("Task %d does not exist!\n", (int)task);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Function to write task ID to resctrl COS tasks file
+ *        Used to associate a task with COS
+ *
+ * @param class_id COS tasks file to write to
+ * @param task task ID to write to tasks file
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+task_write(const unsigned class_id, const pid_t task)
+{
+        FILE *fd;
+        int ret;
+
+        /* Check if task exists */
+        ret = task_validate(task);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_PARAM;
+
+        /* Open resctrl tasks file */
+        fd = rctl_fopen(class_id, rctl_tasks, "w");
+	if (fd == NULL)
+		return PQOS_RETVAL_ERROR;
+
+        /* Write task ID to file */
+        if (fprintf(fd, "%d\n", task) < 0) {
+                LOG_ERROR("Failed to write to task %d to file!\n", (int) task);
+                ret = PQOS_RETVAL_ERROR;
+        }
+        fclose(fd);
+
+        return ret;
+}
+
+/**
+ * @brief Function to search a COS tasks file for a task ID
+ *
+ * @param [out] class_id COS containing task ID
+ * @param [in] task task ID to search for
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+task_search(unsigned *class_id, const pid_t task)
+{
+        FILE *fd;
+        unsigned i, max_cos = 0;
+        int ret;
+
+        /* Check if task exists */
+        ret = task_validate(task);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_PARAM;
+
+        /* Get number of COS */
+        ret = os_get_max_rctl_grps(m_cap, &max_cos);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+        /**
+         * Starting at highest COS - search all COS tasks files for task ID
+         */
+        for (i = (max_cos - 1); (int)i >= 0; i--) {
+                uint64_t tid = 0;
+                char buf[128];
+
+                /* Open resctrl tasks file */
+                fd = rctl_fopen(i, rctl_tasks, "r");
+                if (fd == NULL)
+                        return PQOS_RETVAL_ERROR;
+
+                /* Search tasks file for specified task ID */
+                memset(buf, 0, sizeof(buf));
+                while (fgets(buf, sizeof(buf), fd) != NULL) {
+                        ret = strtouint64(buf, 10, &tid);
+                        if (ret != PQOS_RETVAL_OK)
+                                continue;
+
+                        if (task == (pid_t)tid) {
+                                *class_id = i;
+                                fclose(fd);
+                                return PQOS_RETVAL_OK;
+                        }
+                }
+                fclose(fd);
+        }
+        /* If not found in any COS group - return error */
+        LOG_ERROR("Failed to get association for task %d!\n", (int)task);
+        return PQOS_RETVAL_ERROR;
+}
+#endif /* RCTRL_TASKS */
