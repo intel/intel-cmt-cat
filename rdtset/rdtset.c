@@ -208,9 +208,10 @@ print_usage(char *prgname, unsigned short_usage)
 		" -v, --verbose                         "
 		"prints out additional logging information\n"
 		" -I, --iface-os                        "
-		"set the library interface to use the kernel implementation. "
-		"If not set the default implementation is to program the "
-		"MSR's directly\n"
+		"set the library interface to use the kernel implementation\n"
+		"                                       "
+	        "If not set the default implementation"
+	        " is to program the MSR's directly\n"
 		" -h, --help                            "
 		"display help\n\n");
 
@@ -257,8 +258,8 @@ print_usage(char *prgname, unsigned short_usage)
 		"        data and code L3 cache-ways are non-overlapping\n\n"
 
 		"    -t 'mba=50;l3=0xf;cpu=1'\n"
-		"        CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize"
-		"        up to 50%% of available memory bandwidth"
+		"        CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize\n"
+		"        up to 50%% of available memory bandwidth\n\n"
 	);
 
 	printf("Example CPUs configuration string:\n"
