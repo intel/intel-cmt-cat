@@ -93,6 +93,11 @@ static int sel_reset_alloc = 0;
 static int sel_show_allocation_config = 0;
 
 /**
+ * Selected library interface
+ */
+static int sel_interface = PQOS_INTER_MSR;
+
+/**
  * @brief Function to check if a value is already contained in a table
  *
  * @param tab table of values to check
@@ -335,6 +340,18 @@ selfn_allocation_select(const char *arg)
 }
 
 /**
+ * @brief Selects library OS interface
+ *
+ * @param arg not used
+ */
+static void
+selfn_iface_os(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_interface = PQOS_INTER_OS;
+}
+
+/**
  * @brief Opens configuration file and parses its contents
  *
  * @param fname Name of the file with configuration parameters
@@ -363,7 +380,8 @@ parse_config_file(const char *fname)
                 {"monitor-file:",       selfn_monitor_file },      /**< -o */
                 {"monitor-file-type:",  selfn_monitor_file_type }, /**< -u */
                 {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
-                {"reset-cat:",          selfn_reset_alloc },         /**< -R */
+                {"reset-cat:",          selfn_reset_alloc },       /**< -R */
+                {"iface-os:",           selfn_iface_os },          /**< -I */
         };
         FILE *fp = NULL;
         char cb[256];
@@ -652,7 +670,7 @@ int main(int argc, char **argv)
                         selfn_super_verbose_mode(NULL);
                         break;
                 case 'I':
-                        cfg.interface = PQOS_INTER_OS;
+                        selfn_iface_os(NULL);
                         break;
                 default:
                         printf("Unsupported option: -%c. "
@@ -666,13 +684,14 @@ int main(int argc, char **argv)
                 }
         }
 
-        if (pid_flag == 1 && cfg.interface == PQOS_INTER_MSR) {
+        if (pid_flag == 1 && sel_interface == PQOS_INTER_MSR) {
                 printf("Error! OS interface option [-I] needed for PID"
                        " monitoring. Please re-run with the -I option.\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_1;
         }
         cfg.verbose = sel_verbose_mode;
+        cfg.interface = sel_interface;
         /**
          * Set up file descriptor for message log
          */
