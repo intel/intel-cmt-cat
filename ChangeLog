@@ -1,4 +1,22 @@
 ======================================================================
+Release  v1.0.1  2017-06-06
+======================================================================
+
+Contributors (alphabetical order):
+	Aaron Hetherington <aaron.hetherington@intel.com>
+        Bernhard M. Wiedemann <bernhard@zq1.de>
+        Brian Dooley <brian.dooley@intel.com>
+	Marcel Cornu <marcel.d.cornu@intel.com>
+	Michal Aleksinski <michalx.aleksinski@intel.com>
+
+Summary:
+1. snmp
+        - Added OS interface support to Net-SNMP sub-agent
+2. General
+	- Build improvements
+	- Bug fixes
+
+======================================================================
 Release  v1.0.0  2017-05-16
 ======================================================================
 
