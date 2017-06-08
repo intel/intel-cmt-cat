@@ -524,6 +524,32 @@ int pqos_alloc_assoc_get(const unsigned lcore,
                          unsigned *class_id);
 
 /**
+ * @brief OS interface to associate \a task
+ *        with given class of service
+ *
+ * @param [in] task task ID to be associated
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_alloc_assoc_set_pid(const pid_t task,
+                             const unsigned class_id);
+
+/**
+ * @brief OS interface to read association
+ *        of \a task with class of service
+ *
+ * @param [in] task ID to find association
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_alloc_assoc_get_pid(const pid_t task,
+                             unsigned *class_id);
+
+/**
  * @brief Assign first available COS to cores in \a core_array
  *
  * While searching for available COS take technologies it is intended to use
@@ -559,9 +585,46 @@ int pqos_alloc_release(const unsigned *core_array,
                        const unsigned core_num);
 
 /**
+ * @brief Assign first available COS to tasks in \a task_array
+ *        Searches all COS directories from highest to lowest
+ *
+ * While searching for available COS take technologies it is intended to use
+ * with into account.
+ * Note on \a technology parameter:
+ * - this parameter is currently reserved for future use
+ * - resctrl (Linux interface) will only provide the highest class id common
+ *   to all supported technologies
+ *
+ * @param [in] technology bit mask selecting technologies
+ *             (1 << enum pqos_cap_type)
+ * @param [in] task_array list of task ids
+ * @param [in] task_num number of task ids in the \a task_array
+ * @param [out] class_id place to store reserved COS id
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_alloc_assign_pid(const unsigned technology,
+                          const pid_t *task_array,
+                          const unsigned task_num,
+                          unsigned *class_id);
+
+/**
+ * @brief Reassign tasks in \a task_array to default COS#0
+ *
+ * @param [in] task_array list of task ids
+ * @param [in] task_num number of task ids in the \a task_array
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_alloc_release_pid(const pid_t *task_array,
+                           const unsigned task_num);
+
+/**
  * @brief Resets configuration of allocation technologies
  *
-* Reverts CAT/MBA state to the one after reset:
+ * Reverts CAT/MBA state to the one after reset:
  * - all cores associated with COS0
  * - all COS are set to give access to entire resource
  *

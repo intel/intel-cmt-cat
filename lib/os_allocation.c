@@ -1614,3 +1614,64 @@ task_search(unsigned *class_id, const pid_t task)
         return PQOS_RETVAL_ERROR;
 }
 #endif /* RCTRL_TASKS */
+int
+os_alloc_assoc_set_pid(const pid_t task,
+                       const unsigned class_id)
+{
+        ASSERT(m_cap != NULL);
+
+        UNUSED_PARAM(task);
+        UNUSED_PARAM(class_id);
+
+        LOG_ERROR("Task association currently unavailable!\n");
+
+        return PQOS_RETVAL_ERROR;
+}
+
+int
+os_alloc_assoc_get_pid(const pid_t task,
+                       unsigned *class_id)
+{
+       ASSERT(class_id != NULL);
+
+       UNUSED_PARAM(task);
+       UNUSED_PARAM(class_id);
+
+       LOG_ERROR("Task association currently unavailable!\n");
+
+       return PQOS_RETVAL_ERROR;
+}
+
+int
+os_alloc_assign_pid(const unsigned technology,
+                    const pid_t *task_array,
+                    const unsigned task_num,
+                    unsigned *class_id)
+{
+        ASSERT(task_array != NULL);
+        ASSERT(task_num != 0);
+        ASSERT(class_id != NULL);
+
+        UNUSED_PARAM(technology);
+        UNUSED_PARAM(task_array);
+        UNUSED_PARAM(task_num);
+        UNUSED_PARAM(class_id);
+
+        LOG_ERROR("Task association currently unavailable!\n");
+
+        return PQOS_RETVAL_ERROR;
+}
+
+int os_alloc_release_pid(const pid_t *task_array,
+                         const unsigned task_num)
+{
+        ASSERT(task_array != NULL);
+        ASSERT(task_num != 0);
+
+        UNUSED_PARAM(task_array);
+        UNUSED_PARAM(task_num);
+
+        LOG_ERROR("Task association currently unavailable!\n");
+
+        return PQOS_RETVAL_ERROR;
+}
