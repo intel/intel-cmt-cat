@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    1.0.0
+%global githubver    1.0.1
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -36,7 +36,7 @@
 %global debug_package %{nil}
 
 
-Summary:            Provides command line interface to CMT, MBM, CAT and CDP technologies
+Summary:            Provides command line interface to CMT, MBM, CAT, CDP and MBA technologies
 Name:               %{githubname}
 Release:            1%{?dist}
 Version:            %{githubver}
@@ -65,7 +65,7 @@ provides an interface to read and write the MSR registers but
 it requires root privileges.
 
 %package -n intel-cmt-cat-devel
-Summary:            Library and sample code to use CMT, MBM, CAT and CDP technologies
+Summary:            Library and sample code to use CMT, MBM, CAT, CDP and MBA technologies
 License:            BSD
 Requires:           intel-cmt-cat == %{version}
 Group:              Development/Tools
@@ -161,6 +161,10 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Wed Jun 07 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Marcel Cornu <marcel.d.cornu@intel.com> 1.0.1-1
+- new release
+- bug fixes
+
 * Fri May 19 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Michal Aleksinski <michalx.aleksinski@intel.com> 1.0.0-1
 - new release
 
