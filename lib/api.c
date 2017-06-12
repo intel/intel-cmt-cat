@@ -139,6 +139,76 @@ int pqos_alloc_assoc_get(const unsigned lcore,
 	return ret;
 }
 
+int pqos_alloc_assoc_set_pid(const pid_t task,
+                             const unsigned class_id)
+{
+        int ret;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task association!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
+        }
+
+#ifdef __linux__
+        ret = os_alloc_assoc_set_pid(task, class_id);
+#else
+        UNUSED_PARAM(task);
+        UNUSED_PARAM(class_id);
+        LOG_INFO("OS interface not supported!\n");
+        ret = PQOS_RETVAL_RESOURCE;
+#endif
+	_pqos_api_unlock();
+
+	return ret;
+
+}
+
+int pqos_alloc_assoc_get_pid(const pid_t task,
+                             unsigned *class_id)
+{
+	int ret;
+
+	if (class_id == NULL)
+		return PQOS_RETVAL_PARAM;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task association!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
+        }
+
+#ifdef __linux__
+        ret = os_alloc_assoc_get_pid(task, class_id);
+#else
+        UNUSED_PARAM(task);
+        UNUSED_PARAM(class_id);
+        LOG_INFO("OS interface not supported!\n");
+        ret = PQOS_RETVAL_RESOURCE;
+#endif
+	_pqos_api_unlock();
+
+	return ret;
+}
+
 int pqos_alloc_assign(const unsigned technology,
                       const unsigned *core_array,
                       const unsigned core_num,
@@ -203,6 +273,77 @@ int pqos_alloc_release(const unsigned *core_array,
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
+	_pqos_api_unlock();
+
+	return ret;
+}
+
+int pqos_alloc_assign_pid(const unsigned technology,
+                          const pid_t *task_array,
+                          const unsigned task_num,
+                          unsigned *class_id)
+{
+        int ret;
+
+        if (task_array == NULL || task_num == 0 || class_id == NULL)
+                return PQOS_RETVAL_PARAM;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task association!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
+        }
+
+#ifdef __linux__
+        ret = os_alloc_assign_pid(technology, task_array, task_num, class_id);
+#else
+        UNUSED_PARAM(technology);
+        LOG_INFO("OS interface not supported!\n");
+        ret = PQOS_RETVAL_RESOURCE;
+#endif
+	_pqos_api_unlock();
+
+	return ret;
+}
+
+int pqos_alloc_release_pid(const pid_t *task_array,
+                           const unsigned task_num)
+{
+        int ret;
+
+        if (task_array == NULL || task_num == 0)
+                return PQOS_RETVAL_PARAM;
+
+	_pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task association!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
+        }
+
+#ifdef __linux__
+        ret = os_alloc_release_pid(task_array, task_num);
+#else
+        LOG_INFO("OS interface not supported!\n");
+        ret = PQOS_RETVAL_RESOURCE;
+#endif
 	_pqos_api_unlock();
 
 	return ret;
