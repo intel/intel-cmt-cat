@@ -53,9 +53,7 @@
 static const char *rctl_path = "/sys/fs/resctrl/";
 static const char *rctl_cpus = "cpus";
 static const char *rctl_schemata = "schemata";
-#ifdef RCTRL_TASKS /* to be used later */
 static const char *rctl_tasks = "tasks";
-#endif
 
 /**
  * ---------------------------------------
@@ -1496,7 +1494,7 @@ os_l2ca_get(const unsigned l2id,
  * Task utility functions
  * ---------------------------------------
  */
-#ifdef RCTRL_TASKS /* to be used later */
+
 /**
  * @brief Function to validate if \a task is a valid task ID
  *
@@ -1613,33 +1611,38 @@ task_search(unsigned *class_id, const pid_t task)
         LOG_ERROR("Failed to get association for task %d!\n", (int)task);
         return PQOS_RETVAL_ERROR;
 }
-#endif /* RCTRL_TASKS */
+
 int
 os_alloc_assoc_set_pid(const pid_t task,
                        const unsigned class_id)
 {
+        int ret;
+	unsigned max_cos = 0;
+
         ASSERT(m_cap != NULL);
 
-        UNUSED_PARAM(task);
-        UNUSED_PARAM(class_id);
+	/* Get number of COS */
+        ret = os_get_max_rctl_grps(m_cap, &max_cos);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
 
-        LOG_ERROR("Task association currently unavailable!\n");
+        if (class_id >= max_cos) {
+                LOG_ERROR("COS out of bounds for task %d\n", (int)task);
+                return PQOS_RETVAL_PARAM;
+        }
 
-        return PQOS_RETVAL_ERROR;
+        /* Write to tasks file */
+	return task_write(class_id, task);
 }
 
 int
 os_alloc_assoc_get_pid(const pid_t task,
                        unsigned *class_id)
 {
-       ASSERT(class_id != NULL);
+        ASSERT(class_id != NULL);
 
-       UNUSED_PARAM(task);
-       UNUSED_PARAM(class_id);
-
-       LOG_ERROR("Task association currently unavailable!\n");
-
-       return PQOS_RETVAL_ERROR;
+        /* Search tasks files */
+        return task_search(class_id, task);
 }
 
 int
