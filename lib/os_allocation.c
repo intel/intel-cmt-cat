@@ -960,24 +960,49 @@ os_alloc_assoc_get(const unsigned lcore,
 }
 
 /**
- * @brief Gets unused COS on a socket or L2 cluster
+ * @brief Function to search a COS tasks file and check if this file is blank
+ *
+ * @param [in] class_id COS containing task ID
+ * @param [out] found flag
+ *                    0 if no Task ID is found
+ *                    1 if a Task ID is found
+ *
+ * @return Operation status
+ */
+static int
+task_file_check(const unsigned class_id, unsigned *found)
+{
+        FILE *fd;
+        char buf[128];
+
+        /* Open resctrl tasks file */
+        fd = rctl_fopen(class_id, rctl_tasks, "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        /* Search tasks file for any task ID */
+        memset(buf, 0, sizeof(buf));
+        if (fgets(buf, sizeof(buf), fd) != NULL)
+                *found = 1;
+
+        fclose(fd);
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Gets unused COS
  *
  * The lowest acceptable COS is 1, as 0 is a default one
  *
- * @param [in] id socket or L2 cache ID to search for unused COS on
- * @param [in] technology selection of allocation technologies
  * @param [in] hi_class_id highest acceptable COS id
  * @param [out] class_id unused COS
  *
  * @return Operation status
  */
 static int
-get_unused_cos(const unsigned id,
-               const unsigned technology,
-               const unsigned hi_class_id,
+get_unused_cos(const unsigned hi_class_id,
                unsigned *class_id)
 {
-        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         unsigned used_classes[hi_class_id + 1];
         unsigned i, cos;
         int ret;
@@ -987,28 +1012,26 @@ get_unused_cos(const unsigned id,
 
         memset(used_classes, 0, sizeof(used_classes));
 
-        /* Create a list of COS used on socket/L2 cluster */
-        for (i = 0; i < m_cpu->num_cores; i++) {
+        for (i = hi_class_id; i != 0; i--) {
+                struct cpumask mask;
+                unsigned j;
 
-                if (l2_req) {
-                        /* L2 requested so looking in L2 cluster scope */
-                        if (m_cpu->cores[i].l2_id != id)
-                                continue;
-                } else {
-                        /* L2 not requested so looking at socket scope */
-                        if (m_cpu->cores[i].socket != id)
-                                continue;
-                }
-
-                ret = os_alloc_assoc_get(m_cpu->cores[i].lcore, &cos);
+                ret = cpumask_read(i, &mask);
                 if (ret != PQOS_RETVAL_OK)
-                        return ret;
+			return ret;
 
-                if (cos > hi_class_id)
+                for (j = 0; j < sizeof(mask.tab); j++)
+                        if (mask.tab[j] > 0) {
+                                used_classes[i] = 1;
+                                break;
+                        }
+
+                if (used_classes[i] == 1)
                         continue;
 
-                /* Mark as used */
-                used_classes[cos] = 1;
+                ret = task_file_check(i, &used_classes[i]);
+                if (ret != PQOS_RETVAL_OK)
+			return ret;
         }
 
         /* Find unused COS */
@@ -1072,12 +1095,7 @@ os_alloc_assign(const unsigned technology,
                 goto os_alloc_assign_exit;
 
         /* find an unused class from highest down */
-        if (!l2_req)
-                ret = get_unused_cos(socket, technology,
-                                     hi_cos_id - 1, class_id);
-        else
-                ret = get_unused_cos(l2id, technology, hi_cos_id - 1, class_id);
-
+        ret = get_unused_cos(hi_cos_id - 1, class_id);
         if (ret != PQOS_RETVAL_OK)
                 goto os_alloc_assign_exit;
 
