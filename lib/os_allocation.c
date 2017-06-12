@@ -1665,16 +1665,23 @@ os_alloc_assign_pid(const unsigned technology,
         return PQOS_RETVAL_ERROR;
 }
 
-int os_alloc_release_pid(const pid_t *task_array,
-                         const unsigned task_num)
+int
+os_alloc_release_pid(const pid_t *task_array,
+                     const unsigned task_num)
 {
+        unsigned i;
+
         ASSERT(task_array != NULL);
         ASSERT(task_num != 0);
 
-        UNUSED_PARAM(task_array);
-        UNUSED_PARAM(task_num);
+        /**
+         * Write all tasks to default COS#0 tasks file
+         * - return on error
+         * - otherwise try next task in array
+         */
+        for (i = 0; i < task_num; i++)
+                if (task_write(0, task_array[i]) == PQOS_RETVAL_ERROR)
+                        return PQOS_RETVAL_ERROR;
 
-        LOG_ERROR("Task association currently unavailable!\n");
-
-        return PQOS_RETVAL_ERROR;
+        return PQOS_RETVAL_OK;
 }
