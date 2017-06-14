@@ -249,8 +249,7 @@ cpumask_write(const unsigned class_id, const struct cpumask *mask)
 static int
 cpumask_read(const unsigned class_id, struct cpumask *mask)
 {
-	int ret = PQOS_RETVAL_OK;
-        int i, buffer_index = 0, hex_index, idx;
+        int i, hex_offset, idx;
 	FILE *fd;
         size_t num_chars = 0;
         char cpus[MAX_CPUS / CHAR_BIT];
@@ -272,8 +271,12 @@ cpumask_read(const unsigned class_id, struct cpumask *mask)
         cpus[sizeof(cpus) - 1] = '\0'; /** Just to be safe. */
         fclose(fd);
 
-        /** Convert the cpus array into hex, skip any non hex chars */
-        for (i = 0; i < (int) num_chars; i++) {
+        /**
+         *  Convert the cpus array into hex, skip any non hex chars.
+         *  Store the hex values in the mask tab.
+         */
+        for (i = num_chars - 1, hex_offset = 0, idx = sizeof(mask->tab) - 1;
+             i >= 0; i--) {
                 const char c = cpus[i];
                 int hex_num;
 
@@ -286,23 +289,16 @@ cpumask_read(const unsigned class_id, struct cpumask *mask)
                 else
                         continue;
 
-                cpus[buffer_index] = (char) hex_num;
-                buffer_index++;
-        }
-
-        /** Create and store the hex pairings read in */
-        for (i = buffer_index - 1, hex_index = 0, idx = sizeof(mask->tab) - 1;
-             i >= 0; i--) {
-                if (!hex_index)
-                        mask->tab[idx] = (uint8_t) cpus[i];
+                if (!hex_offset)
+                        mask->tab[idx] = (uint8_t) hex_num;
                 else {
-                        mask->tab[idx] |= (uint8_t) (cpus[i] << 4);
+                        mask->tab[idx] |= (uint8_t) (hex_num << 4);
                         idx--;
                 }
-                hex_index ^= 1;
+                hex_offset ^= 1;
         }
 
-	return ret;
+        return PQOS_RETVAL_OK;
 }
 
 /**
