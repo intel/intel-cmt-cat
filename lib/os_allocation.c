@@ -1665,18 +1665,33 @@ os_alloc_assign_pid(const unsigned technology,
                     const unsigned task_num,
                     unsigned *class_id)
 {
+        unsigned i, hi_cos_id;
+        int ret;
+
+        ASSERT(task_num > 0);
         ASSERT(task_array != NULL);
-        ASSERT(task_num != 0);
         ASSERT(class_id != NULL);
-
+        ASSERT(m_cap != NULL);
         UNUSED_PARAM(technology);
-        UNUSED_PARAM(task_array);
-        UNUSED_PARAM(task_num);
-        UNUSED_PARAM(class_id);
 
-        LOG_ERROR("Task association currently unavailable!\n");
+        /* obtain highest class id for all requested technologies */
+        ret = os_get_max_rctl_grps(m_cap, &hi_cos_id);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
-        return PQOS_RETVAL_ERROR;
+        /* find an unused class from highest down */
+        ret = get_unused_cos(hi_cos_id - 1, class_id);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /* assign cores to the unused class */
+        for (i = 0; i < task_num; i++) {
+                ret = task_write(*class_id, task_array[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        return ret;
 }
 
 int
