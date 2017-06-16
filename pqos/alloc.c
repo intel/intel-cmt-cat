@@ -38,6 +38,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
 
 #include "pqos.h"
 
@@ -78,7 +79,7 @@ static unsigned sel_alloc_mod = 0;
 /**
  * Number of core to COS associations to be done
  */
-static int sel_assoc_num = 0;
+static int sel_assoc_core_num = 0;
 
 /**
  * Core to COS associations details
@@ -87,6 +88,25 @@ static struct {
         unsigned core;
         unsigned class_id;
 } sel_assoc_tab[PQOS_MAX_CORES];
+
+/**
+ * Number of Task ID to COS associations to be done
+ */
+static int sel_assoc_pid_num = 0;
+
+/**
+ * Task ID to COS associations details
+ */
+static struct {
+        pid_t task_id;
+        unsigned class_id;
+} sel_assoc_pid_tab[128];
+
+
+/**
+ * Maintains alloc option - allocate cores or task id's
+ */
+int alloc_pid_flag;
 
 /**
  * @brief Converts string describing allocation COS into ID and mask scope
@@ -543,7 +563,8 @@ void selfn_allocation_class(const char *arg)
 }
 
 /**
- * @brief Sets up association between cores and allocation classes of service
+ * @brief Sets up association between cores/tasks and allocation
+ *        classes of service
  *
  * @return Number of associations made
  * @retval 0 no association made (nor requested)
@@ -556,7 +577,7 @@ set_allocation_assoc(void)
         int i;
         int ret;
 
-        for (i = 0; i < sel_assoc_num; i++) {
+        for (i = 0; i < sel_assoc_core_num; i++) {
                 ret = pqos_alloc_assoc_set(sel_assoc_tab[i].core,
                                            sel_assoc_tab[i].class_id);
                 ASSERT(ret == PQOS_RETVAL_OK);
@@ -570,26 +591,42 @@ set_allocation_assoc(void)
                 }
         }
 
-        return sel_assoc_num;
+        for (i = 0; i < sel_assoc_pid_num; i++) {
+                ret = pqos_alloc_assoc_set_pid(sel_assoc_pid_tab[i].task_id,
+                                               sel_assoc_pid_tab[i].class_id);
+                ASSERT(ret == PQOS_RETVAL_OK);
+                if (ret == PQOS_RETVAL_PARAM) {
+                        printf("Task ID number or class id is out of "
+                               "bounds!\n");
+                        return -1;
+                } else if (ret != PQOS_RETVAL_OK) {
+                        printf("Setting allocation class of service "
+                               "association failed!\n");
+                        return -1;
+                }
+        }
+
+        return sel_assoc_core_num | sel_assoc_pid_num;
 }
 
 /**
  * @brief Verifies and translates allocation association config string into
- *        internal configuration.
+ *        internal core table.
  *
  * @param str string passed to -a command line option
  */
 static void
-parse_allocation_assoc(char *str)
+fill_core_tab(char *str)
 {
         uint64_t cores[PQOS_MAX_CORES];
         unsigned i = 0, n = 0, cos = 0;
         char *p = NULL;
 
-        if (strncasecmp(str, "llc:", 4) != 0)
-                parse_error(str, "Unrecognized allocation type");
+        if (strncasecmp(str, "llc:", 4) == 0)
+                str += strlen("llc:");
+        else
+                str += strlen("core:");
 
-        str += strlen("llc:");
         p = strchr(str, '=');
         if (p == NULL)
                 parse_error(str,
@@ -603,7 +640,7 @@ parse_allocation_assoc(char *str)
         if (n == 0)
                 return;
 
-        if (sel_assoc_num <= 0) {
+        if (sel_assoc_core_num <= 0) {
                 for (i = 0; i < n; i++) {
                         if (i >= DIM(sel_assoc_tab))
                                 parse_error(str,
@@ -612,18 +649,18 @@ parse_allocation_assoc(char *str)
                         sel_assoc_tab[i].core = (unsigned) cores[i];
                         sel_assoc_tab[i].class_id = cos;
                 }
-                sel_assoc_num = (int) n;
+                sel_assoc_core_num = (int) n;
                 return;
         }
 
         for (i = 0; i < n; i++) {
                 int j;
 
-                for (j = 0; j < sel_assoc_num; j++)
+                for (j = 0; j < sel_assoc_core_num; j++)
                         if (sel_assoc_tab[j].core == (unsigned) cores[i])
                                 break;
 
-                if (j < sel_assoc_num) {
+                if (j < sel_assoc_core_num) {
                         /**
                          * this core is already on the list
                          * - update COS but warn about it
@@ -636,7 +673,7 @@ parse_allocation_assoc(char *str)
                         /**
                          * New core is selected - extend the list
                          */
-                        unsigned k = (unsigned) sel_assoc_num;
+                        unsigned k = (unsigned) sel_assoc_core_num;
 
                         if (k >= DIM(sel_assoc_tab))
                                 parse_error(str,
@@ -645,9 +682,103 @@ parse_allocation_assoc(char *str)
 
                         sel_assoc_tab[k].core = (unsigned) cores[i];
                         sel_assoc_tab[k].class_id = cos;
-                        sel_assoc_num++;
+                        sel_assoc_core_num++;
                 }
         }
+}
+
+/**
+ * @brief Verifies and translates allocation association config string into
+ *        internal task ID table.
+ *
+ * @param str string passed to -a command line option
+ */
+static void
+fill_pid_tab(char *str)
+{
+        uint64_t tasks[128];
+        unsigned i = 0, n = 0, cos = 0;
+        char *p = NULL;
+
+        str += strlen("pid:");
+        p = strchr(str, '=');
+        if (p == NULL)
+                parse_error(str,
+                            "Invalid allocation class of service "
+                            "association format");
+        *p = '\0';
+
+        cos = (unsigned) strtouint64(str);
+
+        n = strlisttotab(p+1, tasks, DIM(tasks));
+        if (n == 0)
+                return;
+
+        if (sel_assoc_pid_num <= 0) {
+                for (i = 0; i < n; i++) {
+                        if (i >= DIM(sel_assoc_pid_tab))
+                                parse_error(str,
+                                            "too many tasks selected for "
+                                            "allocation association");
+                        sel_assoc_pid_tab[i].task_id = (pid_t) tasks[i];
+                        sel_assoc_pid_tab[i].class_id = cos;
+                }
+                sel_assoc_pid_num = (int) n;
+                return;
+        }
+
+        for (i = 0; i < n; i++) {
+                int j;
+
+                for (j = 0; j < sel_assoc_pid_num; j++)
+                        if (sel_assoc_pid_tab[j].task_id == (pid_t) tasks[i])
+                                break;
+
+                if (j < sel_assoc_pid_num) {
+                        /**
+                         * this task is already on the list
+                         * - update COS but warn about it
+                         */
+                        printf("warn: updating COS for task %u from %u to %u\n",
+                               (unsigned) tasks[i],
+                               sel_assoc_pid_tab[j].class_id, cos);
+                        sel_assoc_pid_tab[j].class_id = cos;
+                } else {
+                        /**
+                         * New task is selected - extend the list
+                         */
+                        unsigned k = (unsigned) sel_assoc_pid_num;
+
+                        if (k >= DIM(sel_assoc_pid_tab))
+                                parse_error(str,
+                                            "too many tasks selected for "
+                                            "allocation association");
+
+                        sel_assoc_pid_tab[k].task_id = (pid_t) tasks[i];
+                        sel_assoc_pid_tab[k].class_id = cos;
+                        sel_assoc_pid_num++;
+                }
+        }
+}
+
+/**
+ * @brief Verifies allocation association config string.
+ *
+ * @param str string passed to -a command line option
+ */
+static void
+parse_allocation_assoc(char *str)
+{
+        if ((strncasecmp(str, "llc:", 4) == 0) ||
+             (strncasecmp(str, "core:", 5) == 0)) {
+                alloc_pid_flag = 0;
+                fill_core_tab(str);
+        } else if (strncasecmp(str, "pid:", 4) == 0) {
+                alloc_pid_flag = 1;
+                fill_pid_tab(str);
+        } else
+                parse_error(str, "Unrecognized allocation type");
+
 }
 
 void selfn_allocation_assoc(const char *arg)
@@ -920,7 +1051,8 @@ int alloc_apply(const struct pqos_capability *cap_l3ca,
                         return 1;
                 }
         } else {
-                if (sel_assoc_num > 0 || sel_alloc_opt_num > 0) {
+                if (sel_assoc_core_num > 0 || sel_alloc_opt_num > 0 ||
+                    sel_assoc_pid_num > 0) {
                         printf("Allocation capability not detected!\n");
                         return -1;
                 }
