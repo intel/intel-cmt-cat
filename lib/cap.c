@@ -151,7 +151,7 @@ static pthread_mutex_t m_apilock_mutex;
  *   0  PQOS_INTER_MSR
  *   1  PQOS_INTER_OS
  */
-#ifndef __FreeBSD__
+#ifdef __linux__
 static int m_interface = PQOS_INTER_MSR;
 #endif
 /**
@@ -1142,7 +1142,7 @@ discover_capabilities(struct pqos_cap **p_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-#ifndef __FreeBSD__
+#ifdef __linux__
 static int
 detect_os_support(const char *fname, const char *str, int *supported)
 {
@@ -1180,7 +1180,7 @@ detect_os_support(const char *fname, const char *str, int *supported)
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-#ifndef __FreeBSD__
+#ifdef __linux__
 static int
 discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 {
@@ -1262,7 +1262,7 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
  *
  * @return Operational status
  */
-#ifndef __FreeBSD__
+#ifdef __linux__
 static int
 remove_hw_caps(struct pqos_cap *p_cap)
 {
@@ -1394,7 +1394,7 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
         ASSERT(m_cap != NULL);
-#ifndef __FreeBSD__
+#ifdef __linux__
         ret = discover_os_capabilities(m_cap, config->interface);
         if (ret == PQOS_RETVAL_ERROR) {
                 LOG_ERROR("discover_os_capabilities() error %d\n", ret);
@@ -1403,7 +1403,7 @@ pqos_init(const struct pqos_config *config)
 #endif
 
         if (config->interface == PQOS_INTER_OS) {
-#ifndef __FreeBSD__
+#ifdef __linux__
                 ret = remove_hw_caps(m_cap);
 #else
                 LOG_ERROR("OS interface not supported!\n");
@@ -1420,7 +1420,7 @@ pqos_init(const struct pqos_config *config)
                 LOG_ERROR("api_init() error %d\n", ret);
                 goto machine_init_error;
         }
-#ifndef __FreeBSD__
+#ifdef __linux__
         m_interface = config->interface;
 #endif
         /**

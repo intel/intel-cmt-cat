@@ -131,7 +131,7 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu,
                 m_interface = cfg->interface;
         else
                 m_interface = PQOS_INTER_MSR;
-#ifndef __FreeBSD__
+#ifdef __linux__
 	if (m_interface == PQOS_INTER_OS)
 		ret = os_alloc_init(cpu, cap);
 #endif
@@ -145,7 +145,7 @@ pqos_alloc_fini(void)
 
         m_cap = NULL;
         m_cpu = NULL;
-#ifndef __FreeBSD__
+#ifdef __linux__
         if (m_interface == PQOS_INTER_OS)
                 ret = os_alloc_fini();
 #endif
