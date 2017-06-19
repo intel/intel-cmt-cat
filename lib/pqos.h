@@ -136,6 +136,8 @@ struct pqos_config {
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @note   If you require system wide interface enforcement you can do so by
+ *         setting the "RDT_IFACE" environment variable.
  */
 int pqos_init(const struct pqos_config *config);
 

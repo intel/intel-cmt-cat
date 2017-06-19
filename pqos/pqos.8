@@ -199,11 +199,16 @@ sudo modprobe msr
 For FreeBSD:
 .br
 sudo kldload cpuctl
+.PP
+.PP
+Interface enforcement:
+.br
+If you require system wide interface enforcement you can do so by setting the "RDT_IFACE" environment variable.
 .SH SEE ALSO
 .BR msr (4)
 .SH AUTHOR
 pqos was written by Tomasz Kantecki <tomasz.kantecki@intel.com>,
-Marcel Cornu <marcel.d.cornu@intel.com>
+Marcel Cornu <marcel.d.cornu@intel.com>, Aaron Hetherington <aaron.hetherington@intel.com>
 .P
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

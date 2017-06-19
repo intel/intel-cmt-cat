@@ -1338,10 +1338,35 @@ pqos_init(const struct pqos_config *config)
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, max_core = 0;
         int cat_init = 0, mon_init = 0;
+        char *environment = NULL;
 
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
 
+        environment = getenv("RDT_IFACE");
+        if (environment != NULL) {
+                if (strncasecmp(environment, "OS", 2) == 0) {
+                        if (config->interface != PQOS_INTER_OS) {
+                                fprintf(stderr, "Interface initialization "
+                                        "error!\nYour system has been "
+                                        "restricted to use the OS interface "
+                                        "only!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+                } else if (strncasecmp(environment, "MSR", 3) == 0) {
+                        if (config->interface != PQOS_INTER_MSR) {
+                                fprintf(stderr, "Interface initialization "
+                                        "error!\nYour system has been "
+                                        "restricted to use the MSR interface "
+                                        "only!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+                } else {
+                        fprintf(stderr, "Interface initialization error!\n"
+                                "Invalid interface enforcement selection.\n");
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
         if (_pqos_api_init() != 0) {
                 fprintf(stderr, "API lock initialization error!\n");
                 return PQOS_RETVAL_ERROR;

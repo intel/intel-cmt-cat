@@ -55,6 +55,9 @@ $ sudo make uninstall PREFIX=/some/where
 
 Software package files can be cleaned with "make clean" command.
 
+NOTE
+If you require system wide interface enforcement you can do so by setting the
+"RDT_IFACE" environment variable.
 
 Linux
 =====
