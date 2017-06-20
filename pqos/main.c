@@ -459,7 +459,7 @@ static const char help_printf_short[] =
         "          [-u TYPE] [--mon-file-type=TYPE]\n"
         "          [-r] [--mon-reset]\n"
         "       %s [-e CLASSDEF] [--alloc-class=CLASSDEF]\n"
-        "          [-a CLASS2CORE] [--alloc-assoc=CLASS2CORE]\n"
+        "          [-a CLASS2ID] [--alloc-assoc=CLASS2ID]\n"
         "       %s [-R] [--alloc-reset]\n"
         "       %s [-H] [--profile-list] | [-c PROFILE] "
         "[--profile-set=PROFILE]\n"
@@ -481,10 +481,12 @@ static const char help_printf_long[] =
 	"                    'llc:0d=0xfff;llc:0c=0xfff00',\n"
         "                    'l2:2=0x3f;l2@2:1=0xf',\n"
         "                    'mba:1=30;mba@1:3=80'.\n"
-        "  -a CLASS2CORE, --alloc-assoc=CLASS2CORE\n"
-        "          associate cores with an allocation class.\n"
-        "          CLASS2CORE format is 'TYPE:ID=CORE_LIST'.\n"
+        "  -a CLASS2ID, --alloc-assoc=CLASS2ID\n"
+        "          associate cores/tasks with an allocation class.\n"
+        "          CLASS2ID format is 'TYPE:ID=CORE_LIST/TASK_LIST'.\n"
         "          Example 'llc:0=0,2,4,6-10;llc:1=1'.\n"
+        "          Example 'core:0=0,2,4,6-10;core:1=1'.\n"
+        "          Example 'pid:0=3543,7643,4556;pid:1=7644'.\n"
         "  -R [CONFIG], --alloc-reset[=CONFIG]\n"
         "          reset allocation configuration (L2/L3 CAT & MBA)\n"
         "          CONFIG can be: l3cdp-on, l3cdp-off or l3cdp-any (default).\n"
@@ -656,6 +658,7 @@ int main(int argc, char **argv)
                         break;
                 case 'a':
                         selfn_allocation_assoc(optarg);
+                        pid_flag |= alloc_pid_flag;
                         break;
                 case 'c':
                         selfn_allocation_select(optarg);
@@ -686,7 +689,7 @@ int main(int argc, char **argv)
 
         if (pid_flag == 1 && sel_interface == PQOS_INTER_MSR) {
                 printf("Error! OS interface option [-I] needed for PID"
-                       " monitoring. Please re-run with the -I option.\n");
+                       " operations. Please re-run with the -I option.\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_1;
         }

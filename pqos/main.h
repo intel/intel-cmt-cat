@@ -77,6 +77,11 @@ extern "C" {
 #define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES*PQOS_MAX_SOCKETS)
 
 /**
+ * Maintains alloc option - allocate cores or task id's
+ */
+extern int alloc_pid_flag;
+
+/**
  * @brief Converts string into 64-bit unsigned number.
  *
  * Numbers can be in decimal or hexadecimal format.
