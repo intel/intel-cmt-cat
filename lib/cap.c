@@ -1131,7 +1131,6 @@ discover_capabilities(struct pqos_cap **p_cap,
         return ret;
 }
 
-
 /**
  * @brief Checks file fname to detect str and set a flag
  *
@@ -1170,7 +1169,7 @@ detect_os_support(const char *fname, const char *str, int *supported)
         fclose(fd);
         return PQOS_RETVAL_OK;
 }
-#endif /* __FreeBSD__ */
+
 /**
  * @brief Runs detection of OS monitoring and allocation capabilities
  *
@@ -1180,7 +1179,6 @@ detect_os_support(const char *fname, const char *str, int *supported)
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-#ifdef __linux__
 static int
 discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 {
@@ -1254,7 +1252,7 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 
         return PQOS_RETVAL_OK;
 }
-#endif /* __FreeBSD__ */
+
 /**
  * @brief Removes capabilities that are not supported by the OS
  *
@@ -1262,7 +1260,6 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
  *
  * @return Operational status
  */
-#ifdef __linux__
 static int
 remove_hw_caps(struct pqos_cap *p_cap)
 {
@@ -1322,7 +1319,8 @@ remove_hw_caps(struct pqos_cap *p_cap)
 
         return PQOS_RETVAL_OK;
 }
-#endif /* __FreeBSD__ */
+#endif /* __linux__ */
+
 /*
  * =======================================
  * =======================================
