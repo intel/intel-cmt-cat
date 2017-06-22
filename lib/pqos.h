@@ -260,7 +260,7 @@ struct pqos_cap_mon {
  */
 struct pqos_capability {
         enum pqos_cap_type type;
-        int os_support;                 /**< resctrl feature presence */
+        int os_support;                 /**< OS support presence */
         union {
                 struct pqos_cap_mon *mon;
                 struct pqos_cap_l3ca *l3ca;
