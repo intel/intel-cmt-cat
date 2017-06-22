@@ -622,7 +622,12 @@ int pqos_mba_set(const unsigned socket,
                 return ret;
         }
 
-	ret = hw_mba_set(socket, num_cos, requested, actual);
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_mba_set(socket, num_cos, requested, actual);
+        else {
+                LOG_INFO("OS interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
 
 	_pqos_api_unlock();
 
@@ -648,7 +653,12 @@ int pqos_mba_get(const unsigned socket,
                 return ret;
         }
 
-	ret = hw_mba_get(socket, max_num_cos, num_cos, mba_tab);
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_mba_get(socket, max_num_cos, num_cos, mba_tab);
+        else {
+                LOG_INFO("OS interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
 
 	_pqos_api_unlock();
 
@@ -673,7 +683,12 @@ int pqos_mon_reset(void)
                 return ret;
         }
 
-        ret = hw_mon_reset();
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_mon_reset();
+        else {
+                LOG_INFO("OS interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
 
         _pqos_api_unlock();
 
@@ -693,7 +708,12 @@ int pqos_mon_assoc_get(const unsigned lcore,
                 return ret;
         }
 
-        ret = hw_mon_assoc_get(lcore, rmid);
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_mon_assoc_get(lcore, rmid);
+        else {
+                LOG_INFO("OS interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
 
         _pqos_api_unlock();
 

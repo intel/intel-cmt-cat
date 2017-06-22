@@ -921,7 +921,7 @@ print_core_assoc(const int is_alloc, const int is_l3cat, const int is_mon,
         if (is_alloc)
                 ret = pqos_alloc_assoc_get(ci->lcore, &class_id);
 
-        if (is_mon && ret == PQOS_RETVAL_OK)
+        if (is_mon && ret == PQOS_RETVAL_OK && sel_interface == PQOS_INTER_MSR)
                 ret = pqos_mon_assoc_get(ci->lcore, &rmid);
 
         if (ret != PQOS_RETVAL_OK) {
@@ -938,7 +938,7 @@ print_core_assoc(const int is_alloc, const int is_l3cat, const int is_mon,
         if (is_alloc)
                 printf("COS%u", class_id);
 
-        if (is_mon)
+        if (is_mon && sel_interface == PQOS_INTER_MSR)
                 printf("%sRMID%u\n", is_alloc ? ", " : "", (unsigned) rmid);
         else
                 printf("\n");

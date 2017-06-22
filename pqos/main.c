@@ -95,7 +95,7 @@ static int sel_show_allocation_config = 0;
 /**
  * Selected library interface
  */
-static int sel_interface = PQOS_INTER_MSR;
+int sel_interface = PQOS_INTER_MSR;
 
 /**
  * @brief Function to check if a value is already contained in a table
