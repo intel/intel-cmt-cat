@@ -86,6 +86,8 @@ https://github.com/01org/%{githubname}
 
 %post -p /sbin/ldconfig
 
+%postun -p /sbin/ldconfig
+
 %build
 make %{?_smp_mflags}
 
@@ -93,15 +95,18 @@ make %{?_smp_mflags}
 # Not doing make install as it strips the symbols.
 # Using files from the build directory.
 install -d %{buildroot}/%{_bindir}
-install %{_builddir}/%{githubfull}/pqos/pqos %{buildroot}/%{_bindir}
+install -s %{_builddir}/%{githubfull}/pqos/pqos %{buildroot}/%{_bindir}
 install %{_builddir}/%{githubfull}/pqos/pqos-os %{buildroot}/%{_bindir}
 install %{_builddir}/%{githubfull}/pqos/pqos-msr %{buildroot}/%{_bindir}
+sed -i "1s/.*/\#!\/usr\/bin\/bash/" %{buildroot}/%{_bindir}/pqos-*
 
 install -d %{buildroot}/%{_mandir}/man8
 install -m 0644 %{_builddir}/%{githubfull}/pqos/pqos.8  %{buildroot}/%{_mandir}/man8
+ln -sf %{_mandir}/man8/pqos.8 %{buildroot}/%{_mandir}/man8/pqos-os.8
+ln -sf %{_mandir}/man8/pqos.8 %{buildroot}/%{_mandir}/man8/pqos-msr.8
 
 install -d %{buildroot}/%{_bindir}
-install %{_builddir}/%{githubfull}/rdtset/rdtset %{buildroot}/%{_bindir}
+install -s %{_builddir}/%{githubfull}/rdtset/rdtset %{buildroot}/%{_bindir}
 
 install -d %{buildroot}/%{_mandir}/man8
 install -m 0644 %{_builddir}/%{githubfull}/rdtset/rdtset.8  %{buildroot}/%{_mandir}/man8
@@ -111,7 +116,7 @@ install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%
 
 # Install the library
 install -d %{buildroot}/%{_libdir}
-install %{_builddir}/%{githubfull}/lib/libpqos-*.so %{buildroot}/%{_libdir}
+install -s %{_builddir}/%{githubfull}/lib/libpqos-*.so %{buildroot}/%{_libdir}
 cp -a %{_builddir}/%{githubfull}/lib/libpqos.so %{buildroot}/%{_libdir}
 cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.0 %{buildroot}/%{_libdir}
 
@@ -140,6 +145,8 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %{_bindir}/pqos-os
 %{_bindir}/pqos-msr
 %{_mandir}/man8/pqos.8.gz
+%{_mandir}/man8/pqos-os.8.gz
+%{_mandir}/man8/pqos-msr.8.gz
 %{_bindir}/rdtset
 %{_mandir}/man8/rdtset.8.gz
 %{_libdir}/libpqos-*.so
@@ -161,6 +168,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Wed Jun 21 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Marcel Cornu <marcel.d.cornu@intel.com> 1.0.1-1
+- Spec file bug fixes
+
 * Wed Jun 07 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Marcel Cornu <marcel.d.cornu@intel.com> 1.0.1-1
 - new release
 - bug fixes
