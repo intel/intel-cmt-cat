@@ -123,7 +123,8 @@ log_init(int fd_log, void (*callback_log)(void *, const size_t, const char *),
         return LOG_RETVAL_OK;
 }
 
-int log_fini(void)
+int
+log_fini(void)
 {
 	if (m_opt == LOG_OPT_SILENT) {
                 log_init_successful = 0;
@@ -139,7 +140,8 @@ int log_fini(void)
         return LOG_RETVAL_OK;
 }
 
-void log_printf(int type, const char *str, ...)
+void
+log_printf(int type, const char *str, ...)
 {
         va_list ap;
 	char ap_buffer[AP_BUFFER_SIZE];

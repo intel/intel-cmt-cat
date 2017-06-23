@@ -115,7 +115,6 @@
  * ---------------------------------------
  */
 
-
 /**
  * ---------------------------------------
  * Local data structures
@@ -167,7 +166,8 @@ static int m_interface = PQOS_INTER_MSR;
  * @retval 0 success
  * @retval -1 error
  */
-static int _pqos_api_init(void)
+static int
+_pqos_api_init(void)
 {
 
         const char *lock_filename = LOCKFILE;
@@ -196,7 +196,8 @@ static int _pqos_api_init(void)
  * @retval 0 success
  * @retval -1 error
  */
-static int _pqos_api_exit(void)
+static int
+_pqos_api_exit(void)
 {
         int ret = 0;
 
@@ -211,7 +212,8 @@ static int _pqos_api_exit(void)
         return ret;
 }
 
-void _pqos_api_lock(void)
+void
+_pqos_api_lock(void)
 {
         int err = 0;
 
@@ -225,7 +227,8 @@ void _pqos_api_lock(void)
                 LOG_ERROR("API lock error!\n");
 }
 
-void _pqos_api_unlock(void)
+void
+_pqos_api_unlock(void)
 {
         int err = 0;
 
@@ -245,7 +248,8 @@ void _pqos_api_unlock(void)
  * ---------------------------------------
  */
 
-int _pqos_check_init(const int expect)
+int
+_pqos_check_init(const int expect)
 {
         if (m_init_done && (!expect)) {
                 LOG_ERROR("PQoS library already initialized\n");
@@ -1607,7 +1611,8 @@ pqos_cap_get(const struct pqos_cap **cap,
         return PQOS_RETVAL_OK;
 }
 
-void _pqos_cap_l3cdp_change(const int prev, const int next)
+void
+_pqos_cap_l3cdp_change(const int prev, const int next)
 {
         struct pqos_cap_l3ca *l3_cap = NULL;
         unsigned i;

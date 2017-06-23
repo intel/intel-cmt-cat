@@ -720,6 +720,7 @@ os_get_max_rctl_grps(const struct pqos_cap *cap,
 	*num_rctl_grps = max_rctl_grps;
 	return PQOS_RETVAL_OK;
 }
+
 /**
  * @brief Function to mount the resctrl file system with CDP option
  *
@@ -819,7 +820,8 @@ os_alloc_check(void)
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-static int os_alloc_prep(void)
+static int
+os_alloc_prep(void)
 {
         unsigned i, num_grps = 0;
         int ret;

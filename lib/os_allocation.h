@@ -43,7 +43,6 @@
 extern "C" {
 #endif
 
-
 /**
  * @brief Initializes resctrl file system used for OS allocation interface
  *

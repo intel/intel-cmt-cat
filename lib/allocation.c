@@ -393,10 +393,11 @@ hw_l2ca_get(const unsigned l2id,
 	return ret;
 }
 
-int hw_mba_set(const unsigned socket,
-               const unsigned num_cos,
-               const struct pqos_mba *requested,
-               struct pqos_mba *actual)
+int
+hw_mba_set(const unsigned socket,
+           const unsigned num_cos,
+           const struct pqos_mba *requested,
+           struct pqos_mba *actual)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0, step = 0;
@@ -470,10 +471,11 @@ int hw_mba_set(const unsigned socket,
         return ret;
 }
 
-int hw_mba_get(const unsigned socket,
-               const unsigned max_num_cos,
-               unsigned *num_cos,
-               struct pqos_mba *mba_tab)
+int
+hw_mba_get(const unsigned socket,
+           const unsigned max_num_cos,
+           unsigned *num_cos,
+           struct pqos_mba *mba_tab)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
@@ -509,6 +511,7 @@ int hw_mba_get(const unsigned socket,
 
         return ret;
 }
+
 /**
  * @brief Gets COS associated to \a lcore
  *
@@ -753,10 +756,11 @@ get_unused_cos(const unsigned id,
         return PQOS_RETVAL_RESOURCE;
 }
 
-int hw_alloc_assign(const unsigned technology,
-                    const unsigned *core_array,
-                    const unsigned core_num,
-                    unsigned *class_id)
+int
+hw_alloc_assign(const unsigned technology,
+                const unsigned *core_array,
+                const unsigned core_num,
+                unsigned *class_id)
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         unsigned i, hi_cos_id;
@@ -821,8 +825,9 @@ int hw_alloc_assign(const unsigned technology,
         return ret;
 }
 
-int hw_alloc_release(const unsigned *core_array,
-                     const unsigned core_num)
+int
+hw_alloc_release(const unsigned *core_array,
+                 const unsigned core_num)
 {
         unsigned i;
         int ret = PQOS_RETVAL_OK;

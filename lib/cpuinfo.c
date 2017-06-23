@@ -95,7 +95,8 @@ typedef cpuset_t cpu_set_t; /* stick with Linux typedef */
  * @return Operation status
  * @retval 0 OK
  */
-static int set_affinity_mask(const cpu_set_t *p_set)
+static int
+set_affinity_mask(const cpu_set_t *p_set)
 {
         if (p_set == NULL)
                 return -EFAULT;
@@ -116,7 +117,8 @@ static int set_affinity_mask(const cpu_set_t *p_set)
  * @return Operation status
  * @retval 0 OK
  */
-static int set_affinity(const int id)
+static int
+set_affinity(const int id)
 {
         cpu_set_t cpuset;
 
@@ -133,7 +135,8 @@ static int set_affinity(const int id)
  * @return Operation status
  * @retval 0 OK
  */
-static int get_affinity(cpu_set_t *p_set)
+static int
+get_affinity(cpu_set_t *p_set)
 {
         if (p_set == NULL)
                 return -EFAULT;
@@ -159,7 +162,8 @@ static int get_affinity(cpu_set_t *p_set)
  * @retval 0 OK
  * @retval -1 error
  */
-static int detect_apic_core_masks(struct apic_info *apic)
+static int
+detect_apic_core_masks(struct apic_info *apic)
 {
         int core_reported = 0;
         int thread_reported = 0;
@@ -219,7 +223,8 @@ static int detect_apic_core_masks(struct apic_info *apic)
  *
  * @return Nearest power of 2 not smaller than \a n
  */
-static unsigned nearest_pow2(const unsigned n)
+static unsigned
+nearest_pow2(const unsigned n)
 {
         unsigned r, p;
 
@@ -249,7 +254,8 @@ static unsigned nearest_pow2(const unsigned n)
  * @retval 0 OK
  * @retval -1 error
  */
-static int detect_apic_cache_masks(struct apic_info *apic)
+static int
+detect_apic_cache_masks(struct apic_info *apic)
 {
         unsigned cache_level_shift[4] = {0, 0, 0, 0};
         unsigned subleaf = 0;
@@ -326,7 +332,8 @@ static int detect_apic_cache_masks(struct apic_info *apic)
  * @retval -2 error detecting APIC masks for cores & packages
  * @retval -3 error detecting APIC masks for cache levels
  */
-static int detect_apic_masks(struct apic_info *apic)
+static int
+detect_apic_masks(struct apic_info *apic)
 {
         if (apic == NULL)
                 return -1;
@@ -402,7 +409,8 @@ detect_cpu(const int cpu,
  * @return Pointer to CPU topology structure
  * @retval NULL on error
  */
-static struct pqos_cpuinfo *cpuinfo_build_topo(void)
+static struct pqos_cpuinfo *
+cpuinfo_build_topo(void)
 {
         unsigned i, max_core_count, core_count = 0;
         struct pqos_cpuinfo *l_cpu = NULL;

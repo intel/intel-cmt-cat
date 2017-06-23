@@ -64,7 +64,8 @@ static int m_interface = PQOS_INTER_MSR;
  * Init module
  * =======================================
  */
-int api_init(int interface)
+int
+api_init(int interface)
 {
         if (interface != PQOS_INTER_MSR && interface != PQOS_INTER_OS)
                 return PQOS_RETVAL_PARAM;
@@ -79,9 +80,9 @@ int api_init(int interface)
  * Allocation Technology
  * =======================================
  */
-
-int pqos_alloc_assoc_set(const unsigned lcore,
-                         const unsigned class_id)
+int
+pqos_alloc_assoc_set(const unsigned lcore,
+                     const unsigned class_id)
 {
 	int ret;
 
@@ -108,8 +109,9 @@ int pqos_alloc_assoc_set(const unsigned lcore,
 	return ret;
 }
 
-int pqos_alloc_assoc_get(const unsigned lcore,
-                         unsigned *class_id)
+int
+pqos_alloc_assoc_get(const unsigned lcore,
+                     unsigned *class_id)
 {
 	int ret;
 
@@ -139,8 +141,9 @@ int pqos_alloc_assoc_get(const unsigned lcore,
 	return ret;
 }
 
-int pqos_alloc_assoc_set_pid(const pid_t task,
-                             const unsigned class_id)
+int
+pqos_alloc_assoc_set_pid(const pid_t task,
+                         const unsigned class_id)
 {
         int ret;
 
@@ -173,8 +176,9 @@ int pqos_alloc_assoc_set_pid(const pid_t task,
 
 }
 
-int pqos_alloc_assoc_get_pid(const pid_t task,
-                             unsigned *class_id)
+int
+pqos_alloc_assoc_get_pid(const pid_t task,
+                         unsigned *class_id)
 {
 	int ret;
 
@@ -209,10 +213,11 @@ int pqos_alloc_assoc_get_pid(const pid_t task,
 	return ret;
 }
 
-int pqos_alloc_assign(const unsigned technology,
-                      const unsigned *core_array,
-                      const unsigned core_num,
-                      unsigned *class_id)
+int
+pqos_alloc_assign(const unsigned technology,
+                  const unsigned *core_array,
+                  const unsigned core_num,
+                  unsigned *class_id)
 {
 	int ret;
 	const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
@@ -247,8 +252,9 @@ int pqos_alloc_assign(const unsigned technology,
         return ret;
 }
 
-int pqos_alloc_release(const unsigned *core_array,
-                       const unsigned core_num)
+int
+pqos_alloc_release(const unsigned *core_array,
+                   const unsigned core_num)
 {
 	int ret;
 
@@ -278,10 +284,11 @@ int pqos_alloc_release(const unsigned *core_array,
 	return ret;
 }
 
-int pqos_alloc_assign_pid(const unsigned technology,
-                          const pid_t *task_array,
-                          const unsigned task_num,
-                          unsigned *class_id)
+int
+pqos_alloc_assign_pid(const unsigned technology,
+                      const pid_t *task_array,
+                      const unsigned task_num,
+                      unsigned *class_id)
 {
         int ret;
 
@@ -315,8 +322,9 @@ int pqos_alloc_assign_pid(const unsigned technology,
 	return ret;
 }
 
-int pqos_alloc_release_pid(const pid_t *task_array,
-                           const unsigned task_num)
+int
+pqos_alloc_release_pid(const pid_t *task_array,
+                       const unsigned task_num)
 {
         int ret;
 
@@ -349,7 +357,8 @@ int pqos_alloc_release_pid(const pid_t *task_array,
 	return ret;
 }
 
-int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
+int
+pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 {
 	int ret;
 
@@ -419,9 +428,10 @@ is_contiguous(uint64_t bitmask)
         return (bitmask) ? 0 : 1;  /**< non-zero bitmask is not contiguous */
 }
 
-int pqos_l3ca_set(const unsigned socket,
-                  const unsigned num_cos,
-		  const struct pqos_l3ca *ca)
+int
+pqos_l3ca_set(const unsigned socket,
+              const unsigned num_cos,
+              const struct pqos_l3ca *ca)
 {
 	int ret;
 	unsigned i;
@@ -472,10 +482,11 @@ int pqos_l3ca_set(const unsigned socket,
 	return ret;
 }
 
-int pqos_l3ca_get(const unsigned socket,
-                  const unsigned max_num_ca,
-                  unsigned *num_ca,
-                  struct pqos_l3ca *ca)
+int
+pqos_l3ca_get(const unsigned socket,
+              const unsigned max_num_ca,
+              unsigned *num_ca,
+              struct pqos_l3ca *ca)
 {
 	int ret;
 
@@ -510,9 +521,10 @@ int pqos_l3ca_get(const unsigned socket,
  * =======================================
  */
 
-int pqos_l2ca_set(const unsigned l2id,
-                  const unsigned num_cos,
-                  const struct pqos_l2ca *ca)
+int
+pqos_l2ca_set(const unsigned l2id,
+              const unsigned num_cos,
+              const struct pqos_l2ca *ca)
 {
 	int ret;
 	unsigned i;
@@ -554,10 +566,11 @@ int pqos_l2ca_set(const unsigned l2id,
 	return ret;
 }
 
-int pqos_l2ca_get(const unsigned l2id,
-                  const unsigned max_num_ca,
-                  unsigned *num_ca,
-                  struct pqos_l2ca *ca)
+int
+pqos_l2ca_get(const unsigned l2id,
+              const unsigned max_num_ca,
+              unsigned *num_ca,
+              struct pqos_l2ca *ca)
 {
 	int ret;
 
@@ -593,10 +606,11 @@ int pqos_l2ca_get(const unsigned l2id,
  * =======================================
  */
 
-int pqos_mba_set(const unsigned socket,
-                 const unsigned num_cos,
-                 const struct pqos_mba *requested,
-                 struct pqos_mba *actual)
+int
+pqos_mba_set(const unsigned socket,
+             const unsigned num_cos,
+             const struct pqos_mba *requested,
+             struct pqos_mba *actual)
 {
 	int ret;
 	unsigned i;
@@ -635,10 +649,11 @@ int pqos_mba_set(const unsigned socket,
 
 }
 
-int pqos_mba_get(const unsigned socket,
-                 const unsigned max_num_cos,
-                 unsigned *num_cos,
-                 struct pqos_mba *mba_tab)
+int
+pqos_mba_get(const unsigned socket,
+             const unsigned max_num_cos,
+             unsigned *num_cos,
+             struct pqos_mba *mba_tab)
 {
 	int ret;
 
@@ -671,7 +686,8 @@ int pqos_mba_get(const unsigned socket,
  * =======================================
  */
 
-int pqos_mon_reset(void)
+int
+pqos_mon_reset(void)
 {
         int ret;
 
@@ -695,8 +711,9 @@ int pqos_mon_reset(void)
         return ret;
 }
 
-int pqos_mon_assoc_get(const unsigned lcore,
-                       pqos_rmid_t *rmid)
+int
+pqos_mon_assoc_get(const unsigned lcore,
+                   pqos_rmid_t *rmid)
 {
         int ret;
 
@@ -720,11 +737,12 @@ int pqos_mon_assoc_get(const unsigned lcore,
         return ret;
 }
 
-int pqos_mon_start(const unsigned num_cores,
-                   const unsigned *cores,
-                   const enum pqos_mon_event event,
-                   void *context,
-                   struct pqos_mon_data *group)
+int
+pqos_mon_start(const unsigned num_cores,
+               const unsigned *cores,
+               const enum pqos_mon_event event,
+               void *context,
+               struct pqos_mon_data *group)
 {
         int ret;
 
@@ -779,7 +797,8 @@ int pqos_mon_start(const unsigned num_cores,
         return ret;
 }
 
-int pqos_mon_stop(struct pqos_mon_data *group)
+int
+pqos_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
 
@@ -812,8 +831,9 @@ int pqos_mon_stop(struct pqos_mon_data *group)
         return ret;
 }
 
-int pqos_mon_poll(struct pqos_mon_data **groups,
-                  const unsigned num_groups)
+int
+pqos_mon_poll(struct pqos_mon_data **groups,
+              const unsigned num_groups)
 {
         int ret;
         unsigned i;
@@ -851,10 +871,11 @@ int pqos_mon_poll(struct pqos_mon_data **groups,
         return ret;
 }
 
-int pqos_mon_start_pid(const pid_t pid,
-                       const enum pqos_mon_event event,
-                       void *context,
-                       struct pqos_mon_data *group)
+int
+pqos_mon_start_pid(const pid_t pid,
+                   const enum pqos_mon_event event,
+                   void *context,
+                   struct pqos_mon_data *group)
 {
         int ret;
 
