@@ -396,8 +396,6 @@ struct pqos_mon_data {
         int *fds_inst;
         int *fds_cyc;
         int *fds_llc_misses;
-        int **fds_ipc;
-        int **fds_misses;
 
         /**
          * Core specific section
