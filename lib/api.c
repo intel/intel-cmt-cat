@@ -792,6 +792,9 @@ pqos_mon_start(const unsigned num_cores,
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
+        if (ret == PQOS_RETVAL_OK)
+                group->valid = GROUP_VALID_MARKER;
+
         _pqos_api_unlock();
 
         return ret;

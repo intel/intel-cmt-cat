@@ -128,13 +128,6 @@
 #define MBM_MAX_VALUE (1 << 24)
 
 /**
- * Value marking monitoring group structure as "valid".
- * Group becomes "valid" after successful pqos_mon_start() or
- * pqos_mon_start_pid() call.
- */
-#define GROUP_VALID_MARKER (0x00DEAD00)
-
-/**
  * ---------------------------------------
  * Local data types
  * ---------------------------------------
@@ -1052,8 +1045,6 @@ hw_mon_start(const unsigned num_cores,
                         free(group->cores);
         }
  pqos_mon_start_error1:
-        if (retval == PQOS_RETVAL_OK)
-                group->valid = GROUP_VALID_MARKER;
 
         return retval;
 }

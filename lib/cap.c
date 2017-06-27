@@ -1272,7 +1272,7 @@ remove_hw_caps(struct pqos_cap *p_cap)
         /**
          * Free capabilities not supported by the OS
          */
-        for (i = 0; i < p_cap->num_cap; i++) {
+        for (i = 0; i < p_cap->num_cap; i++)
                 if (p_cap->capabilities[i].os_support == 0) {
                         if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_MON)
                                 LOG_INFO("Monitoring available in HW but not"
@@ -1296,7 +1296,6 @@ remove_hw_caps(struct pqos_cap *p_cap)
                                 return PQOS_RETVAL_ERROR;
                         removed++;
                 }
-        }
         /**
          * Return if no caps supported
          */

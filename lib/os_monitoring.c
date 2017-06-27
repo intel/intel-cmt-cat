@@ -58,12 +58,6 @@
 #define OS_MON_EVT_IDX_LLC_MISS  7
 
 /**
- * Value marking monitoring group structure as "valid".
- * Group becomes "valid" after successful os_mon_start() call.
- */
-#define GROUP_VALID_MARKER (0x00DEAD00)
-
-/**
  * ---------------------------------------
  * Local data structures
  * ---------------------------------------
@@ -973,11 +967,8 @@ os_mon_start(const unsigned num_cores,
                 group->cores[i] = cores[i];
 
         ret = start_events(group);
-        if (ret != PQOS_RETVAL_OK) {
-                if (group->cores != NULL)
-                        free(group->cores);
-        } else
-                group->valid = GROUP_VALID_MARKER;
+        if (ret != PQOS_RETVAL_OK && group->cores != NULL)
+                free(group->cores);
 
         return ret;
 }
@@ -1037,11 +1028,8 @@ os_mon_start_pid(struct pqos_mon_data *group)
         }
 
         ret = start_events(group);
-        if (ret != PQOS_RETVAL_OK) {
-                if (group->tid_map != NULL)
-                        free(group->tid_map);
-        } else
-                group->valid = GROUP_VALID_MARKER;
+        if (ret != PQOS_RETVAL_OK && group->tid_map != NULL)
+                free(group->tid_map);
 
         return ret;
 }
