@@ -55,9 +55,9 @@ extern "C" {
  *
  * @return Operation status
  * @retval 0 success
- * @retval EINVAL invalid argument
- * @retval EPERM cpuinfo already initialized
- * @retval EFAULT error building & discovering the topology
+ * @retval -EINVAL invalid argument
+ * @retval -EPERM cpuinfo already initialized
+ * @retval -EFAULT error building & discovering the topology
  */
 int cpuinfo_init(const struct pqos_cpuinfo **topology);
 
@@ -66,7 +66,7 @@ int cpuinfo_init(const struct pqos_cpuinfo **topology);
  *
  * @return Operation status
  * @retval 0 success
- * @retval EPERM cpuinfo not initialized
+ * @retval -EPERM cpuinfo not initialized
  */
 int cpuinfo_fini(void);
 
