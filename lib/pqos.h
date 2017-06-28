@@ -848,6 +848,18 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
                    unsigned *count);
 
 /**
+ * @brief Retrieves task id's from resctrl task file for a given COS
+ *
+ * @param [in] class_id Class of Service ID
+ * @param [out] count place to store actual number of task id's returned
+ *
+ * @return Allocated task id array
+ * @retval NULL on error
+ */
+unsigned *
+pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
+
+/**
  * @brief Retrieves core information from cpu info structure for \a lcore
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get

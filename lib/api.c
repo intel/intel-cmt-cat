@@ -393,6 +393,41 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
 	return ret;
 }
 
+unsigned *
+pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
+{
+        unsigned *tasks = NULL;
+        int ret;
+
+        if (count == NULL)
+                return NULL;
+
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task association!\n");
+                return NULL;
+        }
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return NULL;
+        }
+
+#ifdef __linux__
+        tasks = os_pid_get_pid_assoc(class_id, count);
+        if (tasks == NULL)
+                LOG_ERROR("Error retrieving task information!\n");
+#else
+        LOG_INFO("OS interface not supported!\n");
+#endif
+
+        _pqos_api_unlock();
+
+        return tasks;
+}
+
 /*
  * =======================================
  * L3 cache allocation

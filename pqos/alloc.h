@@ -70,6 +70,7 @@ void selfn_allocation_assoc(const char *arg);
  * @param [in] sock_count number of detected CPU sockets
  * @param [in] sockets arrays with detected CPU socket id's
  * @param [in] cpu_info cpu information structure
+ * @param [in] verbose verbose mode flag
  */
 void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
@@ -77,7 +78,8 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_mba,
                         const unsigned sock_count,
                         const unsigned *sockets,
-                        const struct pqos_cpuinfo *cpu_info);
+                        const struct pqos_cpuinfo *cpu_info,
+                        const int verbose);
 
 /**
  * @brief Applies allocation settings previously selected via

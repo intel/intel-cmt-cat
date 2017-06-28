@@ -989,6 +989,82 @@ os_alloc_assoc_get(const unsigned lcore,
 	return PQOS_RETVAL_ERROR;
 }
 
+unsigned *
+os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
+{
+        FILE *fd;
+        unsigned *tasks = NULL, idx = 0, num_l2_cos = 0, num_l3_cos = 0;
+        int ret;
+        char buf[128];
+        struct linked_list {
+                uint64_t task_id;
+                struct linked_list *next;
+        } head, *current = NULL;
+
+	ASSERT(m_cap != NULL);
+        ASSERT(count != NULL);
+	ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
+	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+		return NULL;
+
+	ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
+	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+		return NULL;
+
+	if (class_id >= num_l3_cos && class_id >= num_l2_cos)
+		/* class_id is out of bounds */
+		return NULL;
+
+        /* Open resctrl tasks file */
+        fd = rctl_fopen(class_id, rctl_tasks, "r");
+        if (fd == NULL)
+                return NULL;
+
+        head.next = NULL;
+        current = &head;
+        memset(buf, 0, sizeof(buf));
+        while (fgets(buf, sizeof(buf), fd) != NULL) {
+                uint64_t tmp;
+                struct linked_list *p = NULL;
+
+                ret = strtouint64(buf, 10, &tmp);
+                if (ret != PQOS_RETVAL_OK)
+                        goto exit_clean;
+                p = malloc(sizeof(head));
+                if (p == NULL)
+                        goto exit_clean;
+                p->task_id = tmp;
+                p->next = NULL;
+                current->next = p;
+                current = p;
+                idx++;
+        }
+        if (rctl_fclose(fd) != PQOS_RETVAL_OK)
+                goto exit_clean;
+
+        tasks = (unsigned *) malloc(idx * sizeof(tasks[0]));
+        if (tasks == NULL)
+                goto exit_clean;
+
+        *count = idx;
+        current = head.next;
+        idx = 0;
+        while (current != NULL) {
+                tasks[idx++] = current->task_id;
+                current = current->next;
+        }
+
+ exit_clean:
+        current = head.next;
+        while (current != NULL) {
+                struct linked_list *tmp = current->next;
+
+                free(current);
+                current = tmp;
+        }
+        return tasks;
+}
+
 /**
  * @brief Function to search a COS tasks file and check if this file is blank
  *

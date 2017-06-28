@@ -241,6 +241,18 @@ int os_alloc_assoc_get(const unsigned lcore,
                        unsigned *class_id);
 
 /**
+ * @brief Retrieves task id's from resctrl task file for a given COS
+ *
+ * @param [in] class_id Class of Service ID
+ * @param [out] count place to store actual number of task id's returned
+ *
+ * @return Allocated task id array
+ * @retval NULL on error
+ */
+unsigned *
+os_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
+
+/**
  * @brief OS interface to associate \a task
  *        with given class of service
  *

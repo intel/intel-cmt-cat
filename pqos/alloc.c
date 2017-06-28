@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <limits.h>
 
 #include "pqos.h"
 
@@ -951,7 +952,8 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_mba,
                         const unsigned sock_count,
                         const unsigned *sockets,
-                        const struct pqos_cpuinfo *cpu_info)
+                        const struct pqos_cpuinfo *cpu_info,
+                        const int verbose)
 {
         int ret;
         unsigned i;
@@ -1017,6 +1019,45 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                                          core_info);
                 }
                 free(lcores);
+        }
+        if (sel_interface == PQOS_INTER_OS) {
+                unsigned max_cos = UINT_MAX;
+
+                if (cap_l2ca != NULL)
+                        max_cos = max_cos < cap_l2ca->u.l2ca->num_classes ?
+                                  max_cos : cap_l2ca->u.l2ca->num_classes;
+                if (cap_l3ca != NULL)
+                        max_cos = max_cos < cap_l3ca->u.l3ca->num_classes ?
+                                  max_cos : cap_l3ca->u.l3ca->num_classes;
+                if (cap_mba != NULL)
+                        max_cos = max_cos < cap_mba->u.mba->num_classes ?
+                                  max_cos : cap_mba->u.mba->num_classes;
+
+                ASSERT(max_cos < UINT_MAX);
+
+                printf("PID association information:\n");
+
+                for (i = !verbose; i < max_cos; i++) {
+                        unsigned *tasks = NULL;
+                        unsigned tcount = 0, j;
+
+                        tasks = pqos_pid_get_pid_assoc(i, &tcount);
+                        if (tasks == NULL) {
+                                printf("Error retrieving PID information!\n");
+                                return;
+                        }
+                        printf("    COS%u => ", i);
+                        if (tcount == 0)
+                                printf("(none)");
+                        for (j = 0; j < tcount; j++)
+                                if (j == 0)
+                                        printf("%u", tasks[j]);
+                                else
+                                        printf(", %u", tasks[j]);
+
+                        printf("\n");
+                        free(tasks);
+                }
         }
 }
 
