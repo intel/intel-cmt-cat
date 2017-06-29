@@ -56,6 +56,7 @@ my $sockets_a;
 my $l2_ids_a;
 my $num_l2_ids;
 
+# Function to read the msr for a selected cpu
 sub read_msr {
 	my ($cpu_id, $msr) = @_;
 
@@ -85,6 +86,7 @@ sub __func__ {
 	return (caller(1))[3];
 }
 
+# Function to determine if msr tools are available
 sub check_msr_tools {
 
 	if ($^O eq "freebsd") {
@@ -367,6 +369,7 @@ sub test_assoc {
 	if (!defined $cpuinfo_p ||
 		!defined $num_cores ||
 		(!defined $num_l2_cos && !defined $num_l3_cos)) {
+		print __LINE__, " No variables defined in test_assoc FAILED!\n";
 		goto EXIT;
 	}
 
@@ -460,11 +463,16 @@ sub test_way_masks {
 	if (!defined $num_sockets ||
 		!defined $sockets_a ||
 		(!defined $num_l2_cos && !defined $num_l3_cos)) {
+		print __LINE__, " No variables defined in test_way_masks, FAILED!\n";
 		goto EXIT;
 	}
 
 	for (my $l2_idx = 0; $l2_idx < $num_l2_ids; $l2_idx++) {
 		my $l2_id = pqos::uint_a_getitem($l2_ids_a, $l2_idx);
+		if (!defined $l2_id) {
+			print __LINE__, " pqos::uint_a_getitem FAILED!\n";
+			goto EXIT;
+		}
 
 		for (
 			my $cos_id = 0;
@@ -492,6 +500,10 @@ sub test_way_masks {
 
 	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
 		my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
+		if (!defined $socket_id) {
+			print __LINE__, " pqos::uint_a_getitem FAILED!\n";
+			goto EXIT;
+		}
 
 		for (
 			my $cos_id = 0;
@@ -520,6 +532,10 @@ sub test_way_masks {
 
 	for (my $socket_idx = 0; $socket_idx < $num_sockets; $socket_idx++) {
 		my $socket_id = pqos::uint_a_getitem($sockets_a, $socket_idx);
+		if (!defined $socket_id) {
+			print __LINE__, " pqos::uint_a_getitem FAILED!\n";
+			goto EXIT;
+		}
 
 		for (
 			my $cos_id = 0;
@@ -714,6 +730,7 @@ sub reset_cfg {
 		!defined $num_sockets ||
 		!defined $sockets_a   ||
 		(!defined $num_l2_cos && !defined $num_l3_cos)) {
+		print __LINE__, " No variables defined in reset_cfg, FAILED!\n";
 		goto EXIT;
 	}
 
