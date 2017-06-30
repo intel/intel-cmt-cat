@@ -1049,62 +1049,32 @@ os_alloc_assign(const unsigned technology,
                 const unsigned core_num,
                 unsigned *class_id)
 {
-        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         unsigned i, hi_cos_id;
-        unsigned socket = 0, l2id = 0;
         int ret;
 
         ASSERT(core_num > 0);
         ASSERT(core_array != NULL);
         ASSERT(class_id != NULL);
-        ASSERT(technology != 0);
-
-        /* Check if core belongs to one resource entity */
-        for (i = 0; i < core_num; i++) {
-                const struct pqos_coreinfo *pi = NULL;
-
-                pi = pqos_cpu_get_core_info(m_cpu, core_array[i]);
-                if (pi == NULL) {
-                        ret = PQOS_RETVAL_PARAM;
-                        goto os_alloc_assign_exit;
-                }
-
-                if (l2_req) {
-                        /* L2 is requested
-                         * The smallest manageable entity is L2 cluster
-                         */
-                        if (i != 0 && l2id != pi->l2_id) {
-                                ret = PQOS_RETVAL_PARAM;
-                                goto os_alloc_assign_exit;
-                        }
-                        l2id = pi->l2_id;
-                } else {
-                        if (i != 0 && socket != pi->socket) {
-                                ret = PQOS_RETVAL_PARAM;
-                                goto os_alloc_assign_exit;
-                        }
-                        socket = pi->socket;
-                }
-        }
+        ASSERT(m_cap != NULL);
+        UNUSED_PARAM(technology);
 
         /* obtain highest class id for all requested technologies */
         ret = os_get_max_rctl_grps(m_cap, &hi_cos_id);
         if (ret != PQOS_RETVAL_OK)
-                goto os_alloc_assign_exit;
+                return ret;
 
         /* find an unused class from highest down */
         ret = get_unused_cos(hi_cos_id - 1, class_id);
         if (ret != PQOS_RETVAL_OK)
-                goto os_alloc_assign_exit;
+                return ret;
 
         /* assign cores to the unused class */
         for (i = 0; i < core_num; i++) {
                 ret = os_alloc_assoc_set(core_array[i], *class_id);
                 if (ret != PQOS_RETVAL_OK)
-                        goto os_alloc_assign_exit;
+                        return ret;
         }
 
- os_alloc_assign_exit:
         return ret;
 }
 
@@ -1686,7 +1656,7 @@ os_alloc_assign_pid(const unsigned technology,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        /* assign cores to the unused class */
+        /* assign tasks to the unused class */
         for (i = 0; i < task_num; i++) {
                 ret = task_write(*class_id, task_array[i]);
                 if (ret != PQOS_RETVAL_OK)
