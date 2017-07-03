@@ -143,6 +143,7 @@ struct rdt_config {
 	struct pqos_l3ca l3;	/**< L3 configuration */
 	struct pqos_l2ca l2;	/**< L2 configuration */
 	struct pqos_mba mba;	/**< MBA configuretion */
+        int pid_cfg;            /**< associate PIDs to this cfg */
 };
 
 /* rdtset command line configuration structure */

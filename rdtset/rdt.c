@@ -212,6 +212,45 @@ is_contiguous(const char *cat_type, const uint64_t bitmask)
 }
 
 /**
+ * @brief Function to get the highest resource ID (socket/cluster)
+ *
+ * @param technology used to determine if res ID should be socket or cluster
+ *
+ * @return highest resource ID
+ * @retval positive on success
+ * @retval 0 on error
+ */
+static int
+get_max_res_id(unsigned technology)
+{
+        unsigned num_ids, max = 0, *ids = NULL;
+
+        if (m_cpu == NULL || technology == 0)
+                return 0;
+
+        /* get number of L2IDs */
+        if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
+                ids = pqos_cpu_get_l2ids(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return 0;
+
+                max = num_ids > max ? num_ids : max;
+                free(ids);
+        }
+        /* get number of sockets */
+        if (technology & (1 << PQOS_CAP_TYPE_L3CA) ||
+            technology & (1 << PQOS_CAP_TYPE_MBA)) {
+                ids = pqos_cpu_get_sockets(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return 0;
+
+                max = num_ids > max ? num_ids : max;
+                free(ids);
+        }
+        return max;
+}
+
+/**
  * @brief Converts string \a str to UINT
  *
  * @param [in] str string
@@ -434,20 +473,14 @@ parse_rdt(char *rdtstr)
 	const struct rdt_cfg l2ca = wrap_l2ca(&g_cfg.config[idx].l2);
 	const struct rdt_cfg l3ca = wrap_l3ca(&g_cfg.config[idx].l3);
 	const struct rdt_cfg mba = wrap_mba(&g_cfg.config[idx].mba);
-	const unsigned min_len_arg = strlen("3=f;c=0");
 	const unsigned min_len_group = strlen("3=f");
 	int ret;
 
 	if (rdtstr == NULL)
 		return -EINVAL;
 
-	/* Min len check, 1 feature + 1 CPU e.g. "3=f;c=0" */
-	if (strlen(rdtstr) < min_len_arg) {
-		fprintf(stderr, "Invalid argument: \"%s\"\n", rdtstr);
-		return -EINVAL;
-	}
-
 	group = strtok_r(rdtstr, ";", &rdtstr_saveptr);
+
 	while (group != NULL) {
 		char *group_saveptr = NULL;
 
@@ -509,14 +542,17 @@ parse_rdt(char *rdtstr)
 		default:
 			fprintf(stderr, "Invalid option: \"%s\"\n", feature);
 			return -EINVAL;
-		}
+                }
 
 		group = strtok_r(NULL, ";", &rdtstr_saveptr);
 	}
 
-	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0 ||
-	    !(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
-	    rdt_cfg_is_valid(mba)))
+        /* if no cpus specified then set pid flag */
+	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0)
+                g_cfg.config[idx].pid_cfg = 1;
+
+        if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
+              rdt_cfg_is_valid(mba)))
 		return -EINVAL;
 
 	g_cfg.config_count++;
@@ -1155,10 +1191,10 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 }
 
 /**
- * @brief Sets socket configuration.
+ * @brief Sets socket/cluster definitions for selected cores (OS interface)
+ *        Note: Assigns COS on a system wide basis
  *
  * @param [in] technology configured RDT allocation technologies
- *             (programmed on socket basis)
  * @param [in] cores cores configuration table
  * @param [in] l2ca L2 CAT configuration table
  * @param [in] l3ca L3 CAT configuration table
@@ -1169,44 +1205,57 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
  * @retval negative on error (-errno)
  */
 static int
-cfg_set_socket(const unsigned technology, const cpu_set_t *cores,
-               const struct pqos_l2ca *pl2ca, const struct pqos_l3ca *pl3ca,
-               const struct pqos_mba *mba)
+cfg_set_cores_os(const unsigned technology, const cpu_set_t *cores,
+                 const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
+                 const struct pqos_mba *mba)
 {
 	int ret;
-        unsigned j;
+        unsigned i, max_id, core_num, cos_id;
+        unsigned core_array[CPU_SETSIZE] = {0};
 
-        for (j = 0; j < RDT_MAX_SOCKETS; j++) {
-                unsigned core_array[CPU_SETSIZE] = {0};
-                unsigned core_num, cos_id;
+        /* Convert cpu set to core array */
+        for (i = 0, core_num = 0; i < m_cpu->num_cores; i++) {
+		if (0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
+			continue;
+		core_array[core_num++] = m_cpu->cores[i].lcore;
+	}
+        if (core_num == 0)
+                return -EFAULT;
 
-                /* Get cores on socket j */
-                ret = get_socket_cores(cores, j, &core_num, core_array);
+        /* Assign all cores to single COS */
+        ret = pqos_alloc_assign(technology, core_array, core_num, &cos_id);
+        switch (ret) {
+        case PQOS_RETVAL_OK:
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                fprintf(stderr, "No free COS available!\n");
+                return -EBUSY;
+        default:
+                fprintf(stderr, "Unable to assign COS!\n");
+                return -EFAULT;
+        }
+
+        max_id = get_max_res_id(technology);
+        if (!max_id)
+                return -EFAULT;
+
+        /* Set COS definition on necessary sockets/clusters */
+        for (i = 0; i < max_id; i++) {
+                memset(core_array, 0, sizeof(core_array));
+
+                /* Get cores on res id i */
+                if (technology & (1 << PQOS_CAP_TYPE_L2CA))
+                        ret = get_l2id_cores(cores, i, &core_num, core_array);
+                else
+                        ret = get_socket_cores(cores, i, &core_num, core_array);
                 if (ret != 0)
                         return ret;
 
                 if (core_num == 0)
                         continue;
 
-                /* Assign COS to those cores */
-                ret = pqos_alloc_assign(technology, core_array, core_num,
-                                        &cos_id);
-                switch (ret) {
-                case PQOS_RETVAL_OK:
-                        break;
-                case PQOS_RETVAL_RESOURCE:
-                        fprintf(stderr,
-                                "No free COS available on socket %u.\n", j);
-                        return -EBUSY;
-                default:
-                        fprintf(stderr,
-                                "Unable to assign COS on socket %u!\n", j);
-                        return -EFAULT;
-                }
-
-                /* Configure COS on socket j */
-                ret = cfg_configure_cos(pl2ca, pl3ca, mba, core_array[0],
-                        cos_id);
+                /* Configure COS on res ID i */
+                ret = cfg_configure_cos(l2ca, l3ca, mba, core_array[0], cos_id);
                 if (ret != 0)
                         return ret;
         }
@@ -1215,10 +1264,10 @@ cfg_set_socket(const unsigned technology, const cpu_set_t *cores,
 }
 
 /**
- * @brief Sets L2 cluster configuration (L3/MBA if available).
+ * @brief Sets socket/cluster definitions for selected cores (MSR interface)
+ *        Note: Assigns COS on a res ID basis
  *
  * @param [in] technology configured RDT allocation technologies
- *             (programmed on L2 ID basis)
  * @param [in] cores cores configuration table
  * @param [in] l2ca L2 CAT configuration table
  * @param [in] l3ca L3 CAT configuration table
@@ -1229,19 +1278,27 @@ cfg_set_socket(const unsigned technology, const cpu_set_t *cores,
  * @retval negative on error (-errno)
  */
 static int
-cfg_set_cluster(const unsigned technology, const cpu_set_t *cores,
-                const struct pqos_l2ca *pl2ca, const struct pqos_l3ca *pl3ca,
-                const struct pqos_mba *mba)
+cfg_set_cores_msr(const unsigned technology, const cpu_set_t *cores,
+                  const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
+                  const struct pqos_mba *mba)
 {
 	int ret;
-        unsigned j;
+        unsigned i, max_id;
 
-        for (j = 0; j < RDT_MAX_L2IDS; j++) {
+        max_id = get_max_res_id(technology);
+        if (!max_id)
+                return -EFAULT;
+
+        /* Assign new COS for all applicable res ids */
+        for (i = 0; i < max_id; i++) {
                 unsigned core_array[CPU_SETSIZE] = {0};
                 unsigned core_num, cos_id;
 
-                /* Get cores on L2 id j */
-                ret = get_l2id_cores(cores, j, &core_num, core_array);
+                /* Get cores on res id i */
+                if (technology & (1 << PQOS_CAP_TYPE_L2CA))
+                        ret = get_l2id_cores(cores, i, &core_num, core_array);
+                else
+                        ret = get_socket_cores(cores, i, &core_num, core_array);
                 if (ret != 0)
                         return ret;
 
@@ -1255,23 +1312,86 @@ cfg_set_cluster(const unsigned technology, const cpu_set_t *cores,
                 case PQOS_RETVAL_OK:
                         break;
                 case PQOS_RETVAL_RESOURCE:
-                        fprintf(stderr,
-                                "No free COS available on L2ID %u.\n", j);
+                        fprintf(stderr, "No free COS available!\n");
                         return -EBUSY;
                 default:
-                        fprintf(stderr,
-                                "Unable to assign COS on L2ID %u!\n", j);
+                        fprintf(stderr, "Unable to assign COS!\n");
                         return -EFAULT;
                 }
 
-                /* Configure COS on L2ID j */
-                ret = cfg_configure_cos(pl2ca, pl3ca, mba, core_array[0],
-                        cos_id);
+                /* Configure COS on res ID i */
+                ret = cfg_configure_cos(l2ca, l3ca, mba, core_array[0], cos_id);
                 if (ret != 0)
                         return ret;
         }
 
         return 0;
+}
+
+/**
+ * @brief Sets socket/cluster definitions for selected PIDs
+ *
+ * @param [in] technology configured RDT allocation technologies
+ * @param [in] l2ca L2 CAT configuration table
+ * @param [in] l3ca L3 CAT configuration table
+ * @param [in] mba MBA configuration table
+ *
+ * @return Operation status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+cfg_set_pids(const unsigned technology, const struct pqos_l3ca *l3ca,
+             const struct pqos_l2ca *l2ca, const struct pqos_mba *mba)
+{
+        int ret = 0;
+	unsigned i, cos_id, max_id;
+        pid_t p = g_cfg.pid;
+
+        /* Assign COS to selected pid otherwise assign to this pid */
+        if (!g_cfg.pid)
+                p = getpid();
+
+        ret = pqos_alloc_assign_pid(technology, &p, 1, &cos_id);
+        switch (ret) {
+        case PQOS_RETVAL_OK:
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                fprintf(stderr,
+                        "No free COS available!.\n");
+                return -EBUSY;
+        default:
+                fprintf(stderr,
+                        "Unable to assign task to COS!\n");
+                return -EFAULT;
+        }
+
+        max_id = get_max_res_id(technology);
+        if (!max_id)
+                return -EFAULT;
+
+        /* Set COS definitions across all res IDs */
+        for (i = 0; i < max_id; i++) {
+                unsigned core;
+
+                /* Get cores on res ID i */
+                if (technology & (1 << PQOS_CAP_TYPE_L2CA))
+                        ret = pqos_cpu_get_one_by_l2id(m_cpu, i, &core);
+                else
+                        ret = pqos_cpu_get_one_core(m_cpu, i, &core);
+                if (ret != 0)
+                        break;
+
+                /* Configure COS on res ID i */
+                ret = cfg_configure_cos(l2ca, l3ca, mba, core, cos_id);
+                if (ret != 0)
+                        break;
+        }
+
+        if (ret != 0)
+                (void) pqos_alloc_release_pid(&p, 1);
+
+        return ret;
 }
 
 int
@@ -1280,15 +1400,15 @@ alloc_configure(void)
 	struct pqos_l3ca l3ca[g_cfg.config_count];
 	struct pqos_l2ca l2ca[g_cfg.config_count];
 	struct pqos_mba mba[g_cfg.config_count];
-	cpu_set_t cpu[g_cfg.config_count];
+        cpu_set_t cpu[g_cfg.config_count];
+        int pid_cfg[g_cfg.config_count];
 	unsigned i = 0;
 	int ret = 0;
 
 	/* Validate cmd line configuration */
 	ret = alloc_validate();
 	if (ret != 0) {
-		fprintf(stderr,
-			"Requested configuration is not valid!\n");
+		fprintf(stderr, "Requested configuration is not valid!\n");
 		return ret;
 	}
 
@@ -1296,11 +1416,12 @@ alloc_configure(void)
 		l3ca[i] = g_cfg.config[i].l3;
 		l2ca[i] = g_cfg.config[i].l2;
 		mba[i] = g_cfg.config[i].mba;
-		cpu[i] = g_cfg.config[i].cpumask;
-	}
+                cpu[i] = g_cfg.config[i].cpumask;
+                pid_cfg[i] = g_cfg.config[i].pid_cfg;
+        }
 
 	for (i = 0; i < g_cfg.config_count; i++) {
-		unsigned technology = 0;
+                unsigned technology = 0;
 
 		if (rdt_cfg_is_valid(wrap_l2ca(&l2ca[i])))
 			technology |= (1 << PQOS_CAP_TYPE_L2CA);
@@ -1311,20 +1432,29 @@ alloc_configure(void)
 		if (rdt_cfg_is_valid(wrap_mba(&mba[i])))
 			technology |= (1 << PQOS_CAP_TYPE_MBA);
 
-		if (!(technology & (1 << PQOS_CAP_TYPE_L2CA)))
-			ret = cfg_set_socket(technology, &cpu[i], &l2ca[i],
-				&l3ca[i], &mba[i]);
-		else
-			ret = cfg_set_cluster(technology, &cpu[i], &l2ca[i],
-				&l3ca[i], &mba[i]);
+                /* If pid config selected then assign tasks otherwise cores */
+                if (pid_cfg[i])
+                        ret = cfg_set_pids(technology, &l3ca[i], &l2ca[i],
+                                           &mba[i]);
+                else
+                        if (g_cfg.interface == PQOS_INTER_MSR)
+                                ret = cfg_set_cores_msr(technology, &cpu[i],
+                                                        &l2ca[i], &l3ca[i],
+                                                        &mba[i]);
+                        else
+                                ret = cfg_set_cores_os(technology, &cpu[i],
+                                                       &l2ca[i], &l3ca[i],
+                                                       &mba[i]);
 
+                /* If assign fails then free already assigned cpus */
                 if (ret != 0) {
-                        int j = (int) i;
-
-                        fprintf(stderr, "Failed to configure allocation!\n");
+                        fprintf(stderr, "Allocation failed!\n");
                         printf("Reverting configuration of allocation...\n");
-                        for (; j >= 0; j--)
-                                (void) alloc_release(&cpu[j]);
+                        for (i--; (int)i >= 0; i--) {
+                                if (pid_cfg[i])
+                                        continue;
+                                (void)alloc_release(&cpu[i]);
+                        }
                         return ret;
                 }
         }
@@ -1386,10 +1516,13 @@ alloc_exit(void)
 	if (g_cfg.verbose)
 		printf("CAT: Reverting CAT configuration...\n");
 
-	for (i = 0; i < g_cfg.config_count; i++)
-		if (alloc_release(&g_cfg.config[i].cpumask) != 0)
-			fprintf(stderr, "Failed to release COS!\n");
+	for (i = 0; i < g_cfg.config_count; i++) {
+                if (g_cfg.config[i].pid_cfg)
+                        continue;
 
+                if (alloc_release(&g_cfg.config[i].cpumask) != 0)
+                        fprintf(stderr, "Failed to release COS!\n");
+        }
 	alloc_fini();
 }
 

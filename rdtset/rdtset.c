@@ -145,13 +145,14 @@ execute_cmd(int argc, char **argv)
 		if (EXIT_SUCCESS != status)
 			return -1;
 	} else {
-		/* set cpu affinity */
-		if (0 != set_affinity(0)) {
-			fprintf(stderr, "%s,%s:%d Failed to set core "
-				"affinity!\n", __FILE__, __func__,
-				__LINE__);
-			_Exit(EXIT_FAILURE);
-		}
+                if (0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset))
+                        /* set cpu affinity */
+                        if (0 != set_affinity(0)) {
+                                fprintf(stderr, "%s,%s:%d Failed to set core "
+                                        "affinity!\n", __FILE__, __func__,
+                                        __LINE__);
+                                _Exit(EXIT_FAILURE);
+                        }
 
 		/* drop elevated root privileges */
 		if (0 == g_cfg.sudo_keep && 0 != sudo_drop())
@@ -287,6 +288,7 @@ print_usage(char *prgname, unsigned short_usage)
  * @param [in] f_t flag for -t arguments
  * @param [in] f_c flag for -c argument
  * @param [in] f_p flag for -p argument
+ * @param [in] f_i flag for -I argument
  * @param [in] cmd flag for command to be executed
  *
  * @return Operation status
@@ -295,11 +297,25 @@ print_usage(char *prgname, unsigned short_usage)
  */
 static int
 validate_args(const int f_r, __attribute__((unused)) const int f_t,
-		const int f_c, const int f_p, const int cmd)
+              const int f_c, const int f_p, const int f_i, const int cmd)
 {
-	return (f_c && !f_p && cmd) ||
-		(f_c && f_p && !cmd) ||
-		(f_r && f_p && !cmd);
+        unsigned i;
+        int f_n = 0; /**< non cpu (pid) config flag */
+
+        /* Validate that only 1 pid config selected */
+        for (i = 0; i < g_cfg.config_count; i++) {
+                if (g_cfg.config[i].pid_cfg)
+                        f_n++;
+                if (f_n > 1) {
+                        fprintf(stderr, "Only 1 PID config allowed!\n");
+                        return 0;
+                }
+        }
+	return (f_c && !f_p && cmd && !f_n) ||
+		(f_c && f_p && !cmd && !f_n) ||
+		(f_r && f_p && !cmd) ||
+                (f_i && f_n && !f_p && cmd) ||
+                (f_i && f_n && f_p && !cmd);
 }
 
 /**
@@ -426,6 +442,7 @@ main(int argc, char **argv)
 			0 != g_cfg.config_count,
 			0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset),
 			0 != g_cfg.pid,
+                        0 != g_cfg.interface,
 			0 != g_cfg.command)) {
 		fprintf(stderr, "Incorrect invocation!\n");
 		print_usage(argv[0], 1);
@@ -465,7 +482,7 @@ main(int argc, char **argv)
 		if (g_cfg.verbose)
 			printf("Allocation: Configuring allocation...\n");
 
-		ret = alloc_configure();
+                ret = alloc_configure();
 		if (ret != 0) {
 			fprintf(stderr, "Allocation: Failed to configure "
 				"allocation!\n");
@@ -485,16 +502,16 @@ main(int argc, char **argv)
 
 	/* set core affinity */
 	if (0 != g_cfg.pid && 0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset)) {
-		if (g_cfg.verbose)
-			printf("PID: Setting CPU affinity...\n");
+                if (g_cfg.verbose)
+                        printf("PID: Setting CPU affinity...\n");
 
-		if (0 != set_affinity(g_cfg.pid)) {
-			fprintf(stderr, "%s,%s:%d Failed to set core "
-				"affinity!\n", __FILE__, __func__,
-				__LINE__);
-			exit(EXIT_FAILURE);
-		}
-	}
+                if (0 != set_affinity(g_cfg.pid)) {
+                        fprintf(stderr, "%s,%s:%d Failed to set core "
+                                "affinity!\n", __FILE__, __func__,
+                                __LINE__);
+                        exit(EXIT_FAILURE);
+                }
+        }
 
 	if (0 != g_cfg.command)
 		/*
