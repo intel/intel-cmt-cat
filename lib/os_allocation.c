@@ -40,6 +40,7 @@
 #include <stdlib.h>
 #include <sys/mount.h>
 #include <limits.h>                     /**< CHAR_BIT*/
+#include <errno.h>
 
 #include <pqos.h>
 #include "os_allocation.h"
@@ -106,6 +107,37 @@ rctl_fopen(const unsigned class_id, const char *name, const char *mode)
 		          name, buf, class_id);
 
 	return fd;
+}
+
+/**
+ * @brief Closes COS file in resctl filesystem
+ *
+ * @param[in] fd File descriptor
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+rctl_fclose(FILE *fd)
+{
+        if (fd == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (fclose(fd) == 0)
+                return PQOS_RETVAL_OK;
+
+        switch (errno) {
+        case EBADF:
+                LOG_ERROR("Invalid file descriptor!\n");
+                break;
+        case EINVAL:
+                LOG_ERROR("Invalid file arguments!\n");
+                break;
+        default:
+                LOG_ERROR("Error closing file!\n");
+        }
+
+        return PQOS_RETVAL_ERROR;
 }
 
 /**
@@ -231,8 +263,7 @@ cpumask_write(const unsigned class_id, const struct cpumask *mask)
                                 break;
                         }
 	}
-
-	fclose(fd);
+	ret = rctl_fclose(fd);
 
 	return ret;
 }
@@ -265,11 +296,12 @@ cpumask_read(const unsigned class_id, struct cpumask *mask)
 
         if (ferror(fd) != 0) {
                 LOG_ERROR("Error reading CPU file\n");
-                fclose(fd);
+                rctl_fclose(fd);
                 return PQOS_RETVAL_ERROR;
         }
         cpus[sizeof(cpus) - 1] = '\0'; /** Just to be safe. */
-        fclose(fd);
+        if (rctl_fclose(fd) != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
 
         /**
          *  Convert the cpus array into hex, skip any non hex chars.
@@ -584,7 +616,7 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 	}
 
  schemata_read_exit:
-	fclose(fd);
+	ret = rctl_fclose(fd);
 
 	return ret;
 }
@@ -615,7 +647,7 @@ schemata_write(const unsigned class_id, const struct schemata *schemata)
 	/* Enable fully buffered output. File won't be flushed until 16kB
 	 * buffer is full */
 	if (setvbuf(fd, buf, _IOFBF, sizeof(buf)) != 0) {
-		fclose(fd);
+		rctl_fclose(fd);
 		return PQOS_RETVAL_ERROR;
 	}
 
@@ -660,7 +692,7 @@ schemata_write(const unsigned class_id, const struct schemata *schemata)
 		}
 		fprintf(fd, "\n");
 	}
-	fclose(fd);
+	ret = rctl_fclose(fd);
 
 	return ret;
 }
@@ -983,7 +1015,9 @@ task_file_check(const unsigned class_id, unsigned *found)
         if (fgets(buf, sizeof(buf), fd) != NULL)
                 *found = 1;
 
-        fclose(fd);
+        if (rctl_fclose(fd) != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
         return PQOS_RETVAL_OK;
 }
 
@@ -1535,7 +1569,7 @@ task_write(const unsigned class_id, const pid_t task)
                 LOG_ERROR("Failed to write to task %d to file!\n", (int) task);
                 ret = PQOS_RETVAL_ERROR;
         }
-        fclose(fd);
+        ret = rctl_fclose(fd);
 
         return ret;
 }
@@ -1587,11 +1621,14 @@ task_search(unsigned *class_id, const pid_t task)
 
                         if (task == (pid_t)tid) {
                                 *class_id = i;
-                                fclose(fd);
+                                if (rctl_fclose(fd) != PQOS_RETVAL_OK)
+                                        return PQOS_RETVAL_ERROR;
+
                                 return PQOS_RETVAL_OK;
                         }
                 }
-                fclose(fd);
+                if (rctl_fclose(fd) != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
         }
         /* If not found in any COS group - return error */
         LOG_ERROR("Failed to get association for task %d!\n", (int)task);
