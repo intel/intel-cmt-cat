@@ -253,19 +253,21 @@ cpumask_write(const unsigned class_id, const struct cpumask *mask)
 
 		if (fprintf(fd, "%02x", value) < 0) {
 			LOG_ERROR("Failed to write cpu mask\n");
-			ret = PQOS_RETVAL_ERROR;
                         break;
 		}
                 if ((i + 1) % 4 == 0)
                         if (fprintf(fd, ",") < 0) {
                                 LOG_ERROR("Failed to write cpu mask\n");
-                                ret = PQOS_RETVAL_ERROR;
                                 break;
                         }
 	}
 	ret = rctl_fclose(fd);
 
-	return ret;
+        /* check if error occured in loop */
+        if (i < sizeof(mask->tab))
+                return PQOS_RETVAL_ERROR;
+
+        return ret;
 }
 
 /**
@@ -616,7 +618,11 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 	}
 
  schemata_read_exit:
-	ret = rctl_fclose(fd);
+        /* check if error occured */
+        if (ret != PQOS_RETVAL_OK)
+                rctl_fclose(fd);
+        else
+                ret = rctl_fclose(fd);
 
 	return ret;
 }
@@ -1643,7 +1649,8 @@ task_write(const unsigned class_id, const pid_t task)
         /* Write task ID to file */
         if (fprintf(fd, "%d\n", task) < 0) {
                 LOG_ERROR("Failed to write to task %d to file!\n", (int) task);
-                ret = PQOS_RETVAL_ERROR;
+                rctl_fclose(fd);
+                return PQOS_RETVAL_ERROR;
         }
         ret = rctl_fclose(fd);
 
