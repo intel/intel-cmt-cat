@@ -420,6 +420,7 @@ pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         if (tasks == NULL)
                 LOG_ERROR("Error retrieving task information!\n");
 #else
+        UNUSED_PARAM(class_id);
         LOG_INFO("OS interface not supported!\n");
 #endif
 
