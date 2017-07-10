@@ -1045,8 +1045,6 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
                 current = p;
                 idx++;
         }
-        if (rctl_fclose(fd) != PQOS_RETVAL_OK)
-                goto exit_clean;
 
         tasks = (unsigned *) malloc(idx * sizeof(tasks[0]));
         if (tasks == NULL)
@@ -1061,6 +1059,7 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         }
 
  exit_clean:
+        rctl_fclose(fd);
         current = head.next;
         while (current != NULL) {
                 struct linked_list *tmp = current->next;
