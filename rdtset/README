@@ -29,6 +29,8 @@ The following Intel(R) RDT features are supported:
  - MBA (Memory Bandwitch Allocation)
 
 Supports Linux and FreeBSD.
+ - Linux supports allocation on a per core or PID basis (kernel 4.10+ required for PID support)
+ - FreeBSD supports allocation on a per core basis only
 
 
 COMPILATION
@@ -45,10 +47,11 @@ Run "make clean" to clean the build files.
 USAGE
 =====
 
-Usage: rdtset <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-I] [-k] cmd [<args>...])
-       rdtset -r <cpulist> <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
+Usage: rdtset -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I] (-p <pid> | [-k] cmd [<args>...])
+       rdtset -r <cpulist> -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I] (-p <pid> | [-k] cmd [<args>...])
        rdtset -r <cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])
-       rdtset -r <cpulist> <-t feature=value;...cpu=cpulist>... [-I] -p <pid>
+       rdtset -r <cpulist> -t <feature=value;...cpu=cpulist>... [-I] -p <pid>
+       rdtset -t <feature=value> -I [-c <cpulist>] (-p <pid> | [-k] cmd [<args>...])
 
 Options:
  -t/--rdt feature=value;...cpu=cpulist specify RDT configuration
@@ -100,6 +103,14 @@ Example allocation configuration strings:
 
     -t 'mba=50;l3=0xf;cpu=1'
         CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize up to 50% of available memory bandwidth
+
+Example PID type allocation configuration string (requires -I option):
+    -t 'l3=0xf'
+        Allocate four L3 (mask 0xf) cache-ways to specified PID (-p option) or command
+
+    -t 'l3=0xf;cpu=1;l3=0x1'
+        CPU 1 uses four L3 (mask 0xf) cache-ways
+	Specified PID (-p option) or command uses one L3 (mask 0x1) cache-way
 
 Example CPUs configuration string:
     -c 0-3,4,5
@@ -166,6 +177,14 @@ Example usage of RESET option:
  $ sudo rdtset -r 0-5 -t 'l3=0xff;cpu=0-5' -c 0-5 -p $BASHPID
 
  $ sudo pqos -s
+
+5. Configuring allocation on a PID basis (Linux kernel 4.10+ required)
+ $ sudo rdtset -I -t 'l3=0xf' -p $BASHPID
+ Allocate 4 cache-ways for BASH process
+
+ $ sudo rdtset -I -t 'mba=50' -k memtester 10M
+ Restrict memory B/W availability to 50% for the memtester application (using PID allocation)
+
 
 LEGAL DISCLAIMER
 ================

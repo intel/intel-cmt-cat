@@ -20,16 +20,19 @@ rtdset \- Task CPU affinity and Intel(R) Resource Director Technology control to
 .br
 .SH SYNOPSIS
 .B rdtset
-.RI "<-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-I] [-k] cmd [<args>...])"
+.RI "-t <feature=value;...cpu=cpulist>... -c <cpulist> [-I] (-p <pid> | [-k] cmd [<args>...])"
 .br
 .B rdtset
-.RI "-r <cpulist> <-t feature=value;...cpu=cpulist>... -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
+.RI "-r <cpulist> -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I] (-p <pid> | [-k] cmd [<args>...])"
 .br
 .B rdtset
 .RI "-r <cpulist> -c <cpulist> (-p <pid> | [-k] cmd [<args>...])"
 .br
 .B rdtset
-.RI "-r <cpulist> <-t feature=value;...cpu=cpulist>... [-I] -p <pid>"
+.RI "-r <cpulist> -t <feature=value;...cpu=cpulist>... [-I] -p <pid>"
+.br
+.B rdtset
+.RI "-t <feature=value> -I [-c <cpulist>] (-p <pid> | [-k] cmd [<args>...])"
 .SH DESCRIPTION
 For more details on Intel(R) Resource Director Technology see
 .br
@@ -95,6 +98,18 @@ CPUs 0-2 can utilize up to 70% of available memory bandwidth
 .B \-t\ 'mba=50;l3=0xf;cpu=1'
 .br
 CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize up to 50% of available memory bandwidth
+
+Example PID type allocation configuration (requires -I option):
+
+.B \-t\ 'l3=0xf'
+.br
+Allocate four L3 (mask 0xf) cache-ways to specified PID (-p option) or command
+
+.B \-t\ 'l3=0xf;cpu=1;l3=0x1'
+.br
+CPU 1 uses four L3 (mask 0xf) cache-ways
+.br
+Specified PID (-p option) or command uses one L3 (mask 0x1) cache-way
 
 .TP
 .B \-c <cpulist>, \-\-cpu <cpulist>

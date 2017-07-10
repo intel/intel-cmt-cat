@@ -181,15 +181,17 @@ execute_cmd(int argc, char **argv)
 static void
 print_usage(char *prgname, unsigned short_usage)
 {
-	printf("Usage: %s <-t feature=value;...cpu=cpulist>... -c <cpulist> "
-		"(-p <pid> | [-I] [-k] cmd [<args>...])\n"
-		"       %s -r <cpulist> <-t feature=value;...cpu=cpulist>... "
-		"-c <cpulist> (-p <pid> | [-k] cmd [<args>...])\n"
+	printf("Usage: %s -t <feature=value;...cpu=cpulist>... -c <cpulist> "
+		"[-I] (-p <pid> | [-k] cmd [<args>...])\n"
+		"       %s -r <cpulist> -t <feature=value;...cpu=cpulist>... "
+		"-c <cpulist> [-I] (-p <pid> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -c <cpulist> "
 		"(-p <pid> | [-k] cmd [<args>...])\n"
-		"       %s -r <cpulist> <-t feature=value;...cpu=cpulist>... "
-		"[-I] -p <pid>\n\n",
-		prgname, prgname, prgname, prgname);
+		"       %s -r <cpulist> -t <feature=value;...cpu=cpulist>... "
+		"[-I] -p <pid>\n"
+                "       %s -t <feature=value> -I [-c <cpulist>] "
+                "(-p <pid> | [-k] cmd [<args>...])\n\n",
+                prgname, prgname, prgname, prgname, prgname);
 
 	printf("Options:\n"
 		" -t/--rdt feature=value;...cpu=cpulist "
@@ -262,6 +264,14 @@ print_usage(char *prgname, unsigned short_usage)
 		"        CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize\n"
 		"        up to 50%% of available memory bandwidth\n\n"
 	);
+
+        printf("Example PID configuration strings:\n"
+               "    -I -t 'l3=0xf' -p $BASHPID\n"
+               "        Bash process uses four L3 cache-ways (mask 0xf)\n"
+               "    -I -t 'mba=50' -k memtester 10M\n"
+               "        Restrict memory B/W availability to 50%% for the "
+               "memtester application (using PID allocation)\n\n");
+
 
 	printf("Example CPUs configuration string:\n"
 		"    -c 0-3,4,5\n"
