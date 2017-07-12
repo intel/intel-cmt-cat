@@ -46,6 +46,7 @@ extern "C" {
 
 #define RDT_MAX_SOCKETS 8
 #define RDT_MAX_L2IDS   32
+#define RDT_MAX_PIDS    128
 
 #ifndef MIN
 /**
@@ -148,7 +149,8 @@ struct rdt_config {
 
 /* rdtset command line configuration structure */
 struct rdtset {
-	pid_t pid;			/**< process PID */
+	pid_t pids[RDT_MAX_PIDS];	/**< process ID table */
+        unsigned pid_count;             /**< Num of PIDs selected */
 	struct rdt_config config[CPU_SETSIZE];	/**< RDT configuration */
 	unsigned config_count;		/**< Num of RDT config entries */
 	cpu_set_t cpu_aff_cpuset;	/**< CPU affinity configuration */
@@ -190,6 +192,28 @@ int str_to_cpuset(const char *cpustr, const unsigned cpustr_len,
  */
 void cpuset_to_str(char *cpustr, const unsigned cpustr_len,
 		const cpu_set_t *cpumask);
+
+/**
+ * @brief Converts string of characters representing list of
+ *        numbers into table of numbers.
+ *
+ * Allowed formats are:
+ *     0,1,2,3
+ *     0-10,20-18
+ *     1,3,5-8,10,0x10-12
+ *
+ * Numbers can be in decimal or hexadecimal format.
+ *
+ * On error, this functions causes process to exit with FAILURE code.
+ *
+ * @param s string representing list of unsigned numbers.
+ * @param tab table to put converted numeric values into
+ * @param max maximum number of elements that \a tab can accommodate
+ *
+ * @return Number of elements placed into \a tab
+ */
+unsigned
+strlisttotab(char *s, uint64_t *tab, const unsigned max);
 
 #ifdef __cplusplus
 }

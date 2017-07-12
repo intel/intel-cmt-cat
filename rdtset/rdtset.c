@@ -182,15 +182,15 @@ static void
 print_usage(char *prgname, unsigned short_usage)
 {
 	printf("Usage: %s -t <feature=value;...cpu=cpulist>... -c <cpulist> "
-		"[-I] (-p <pid> | [-k] cmd [<args>...])\n"
+		"[-I] (-p <pidlist> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -t <feature=value;...cpu=cpulist>... "
-		"-c <cpulist> [-I] (-p <pid> | [-k] cmd [<args>...])\n"
+		"-c <cpulist> [-I] (-p <pidlist> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -c <cpulist> "
-		"(-p <pid> | [-k] cmd [<args>...])\n"
+		"(-p <pidlist> | [-k] cmd [<args>...])\n"
 		"       %s -r <cpulist> -t <feature=value;...cpu=cpulist>... "
-		"[-I] -p <pid>\n"
+		"[-I] -p <pidlist>\n"
                 "       %s -t <feature=value> -I [-c <cpulist>] "
-                "(-p <pid> | [-k] cmd [<args>...])\n\n",
+                "(-p <pidlist> | [-k] cmd [<args>...])\n\n",
                 prgname, prgname, prgname, prgname, prgname);
 
 	printf("Options:\n"
@@ -202,7 +202,7 @@ print_usage(char *prgname, unsigned short_usage)
 		"   m, mba\n"
 		" -c <cpulist>, --cpu <cpulist>         "
 		"specify CPUs (affinity)\n"
-		" -p <pid>, --pid <pid>                 "
+		" -p <pidlist>, --pid <pidlist>                 "
 		"operate on existing given pid\n"
 		" -r <cpulist>, --reset <cpulist>       "
 		"reset allocation for CPUs\n"
@@ -266,8 +266,8 @@ print_usage(char *prgname, unsigned short_usage)
 	);
 
         printf("Example PID configuration strings:\n"
-               "    -I -t 'l3=0xf' -p $BASHPID\n"
-               "        Bash process uses four L3 cache-ways (mask 0xf)\n"
+               "    -I -t 'l3=0xf' -p 23187,567-570\n"
+               "        Specified processes use four L3 cache-ways (mask 0xf)\n"
                "    -I -t 'mba=50' -k memtester 10M\n"
                "        Restrict memory B/W availability to 50%% for the "
                "memtester application (using PID allocation)\n\n");
@@ -329,6 +329,41 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
 }
 
 /**
+ * @brief Parse selected PIDs and add to PID table
+ *
+ * @param pidstr string containing list of PIDs to parse
+ *
+ * @return Operation status
+ * @retval 0 on success
+ * @retval negative on error
+ */
+static int
+parse_pids(char *pidstr)
+{
+	unsigned i, n = 0;
+        uint64_t pids[RDT_MAX_PIDS];
+
+        if (pidstr == NULL)
+                return -EINVAL;
+
+        n = strlisttotab(pidstr, pids, DIM(pids));
+        if (n == 0)
+                return -EINVAL;
+
+        if (n > (RDT_MAX_PIDS - g_cfg.pid_count)) {
+                fprintf(stderr, "Too many PIDs selected!"
+                        "Max is %d...\n", (int)RDT_MAX_PIDS);
+                return -EINVAL;
+        }
+
+        /* Add selected PID's to config PID table */
+        for (i = 0; i < n; i++)
+                g_cfg.pids[g_cfg.pid_count++] = (pid_t) pids[i];
+
+        return 0;
+}
+
+/**
  * @brief Parses the arguments given in the command line of the application
  *
  * @param [in] argc number of args
@@ -344,7 +379,6 @@ parse_args(int argc, char **argv)
 	int opt = 0;
 	int retval = 0;
 	char **argvopt = argv;
-        char *tailp = NULL;
 
 	static const struct option lgopts[] = {
 		{ "cpu",	required_argument,	0, 'c' },
@@ -368,14 +402,11 @@ parse_args(int argc, char **argv)
 			}
 			break;
 		case 'p':
-			errno = 0;
-                        g_cfg.pid = (pid_t) strtol(optarg, &tailp, 10);
-                        if (NULL == tailp || *tailp != '\0' ||
-                            errno != 0 || optarg == tailp || 0 == g_cfg.pid) {
-                                fprintf(stderr, "Invalid PID parameter!\n");
-                                retval = -EINVAL;
-                                goto exit;
-                        }
+                        retval = parse_pids(optarg);
+			if (retval != 0) {
+				fprintf(stderr, "Invalid PID parameters!\n");
+				goto exit;
+			}
 			break;
 		case 'r':
 			retval = parse_reset(optarg);
@@ -451,7 +482,7 @@ main(int argc, char **argv)
 	if (!validate_args(0 != CPU_COUNT(&g_cfg.reset_cpuset),
 			0 != g_cfg.config_count,
 			0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset),
-			0 != g_cfg.pid,
+			0 != g_cfg.pid_count,
                         0 != g_cfg.interface,
 			0 != g_cfg.command)) {
 		fprintf(stderr, "Incorrect invocation!\n");
@@ -511,16 +542,20 @@ main(int argc, char **argv)
 	}
 
 	/* set core affinity */
-	if (0 != g_cfg.pid && 0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset)) {
+	if (0 != g_cfg.pid_count && 0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset)) {
+                unsigned i;
+
                 if (g_cfg.verbose)
                         printf("PID: Setting CPU affinity...\n");
 
-                if (0 != set_affinity(g_cfg.pid)) {
-                        fprintf(stderr, "%s,%s:%d Failed to set core "
-                                "affinity!\n", __FILE__, __func__,
-                                __LINE__);
-                        exit(EXIT_FAILURE);
-                }
+                for (i = 0; i < g_cfg.pid_count; i++)
+                        if (0 != set_affinity(g_cfg.pids[i])) {
+                                fprintf(stderr, "%s,%s:%d Failed to set core "
+                                        "affinity for pid %d!\n", __FILE__,
+                                        __func__, __LINE__, (int)g_cfg.pids[i]);
+                                alloc_exit();
+                                exit(EXIT_FAILURE);
+                        }
         }
 
 	if (0 != g_cfg.command)

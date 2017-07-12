@@ -1028,9 +1028,10 @@ alloc_release(const cpu_set_t *cores)
 	}
 
 	ret = pqos_alloc_release(core_array, core_num);
-	if (ret != PQOS_RETVAL_OK)
-		return -EFAULT;
-
+	if (ret != PQOS_RETVAL_OK) {
+                fprintf(stderr, "Failed to release COS!\n");
+                return -EFAULT;
+        }
 	return 0;
 }
 
@@ -1345,25 +1346,27 @@ cfg_set_pids(const unsigned technology, const struct pqos_l3ca *l3ca,
              const struct pqos_l2ca *l2ca, const struct pqos_mba *mba)
 {
         int ret = 0;
-	unsigned i, cos_id, max_id;
-        pid_t p = g_cfg.pid;
+	unsigned i, cos_id, max_id, num_pids = 1;
+        pid_t pid = getpid(), *p = &pid;
 
-        /* Assign COS to selected pid otherwise assign to this pid */
-        if (!g_cfg.pid)
-                p = getpid();
+        /* Assign COS to selected pids otherwise assign to this pid */
+        if (g_cfg.pid_count) {
+                p = g_cfg.pids;
+                num_pids = g_cfg.pid_count;
+        }
 
-        ret = pqos_alloc_assign_pid(technology, &p, 1, &cos_id);
+        ret = pqos_alloc_assign_pid(technology, p, num_pids, &cos_id);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 break;
         case PQOS_RETVAL_RESOURCE:
-                fprintf(stderr,
-                        "No free COS available!.\n");
-                return -EBUSY;
+                fprintf(stderr, "No free COS available!.\n");
+                ret = -EBUSY;
+                goto set_pids_exit;
         default:
-                fprintf(stderr,
-                        "Unable to assign task to COS!\n");
-                return -EFAULT;
+                fprintf(stderr, "Unable to assign task to COS!\n");
+                ret = -EFAULT;
+                goto set_pids_exit;
         }
 
         max_id = get_max_res_id(technology);
@@ -1387,9 +1390,9 @@ cfg_set_pids(const unsigned technology, const struct pqos_l3ca *l3ca,
                 if (ret != 0)
                         break;
         }
-
+set_pids_exit:
         if (ret != 0)
-                (void) pqos_alloc_release_pid(&p, 1);
+                (void) pqos_alloc_release_pid(p, num_pids);
 
         return ret;
 }
@@ -1450,7 +1453,7 @@ alloc_configure(void)
                 if (ret != 0) {
                         fprintf(stderr, "Allocation failed!\n");
                         printf("Reverting configuration of allocation...\n");
-                        for (i--; (int)i >= 0; i--) {
+                        for (; (int)i >= 0; i--) {
                                 if (pid_cfg[i])
                                         continue;
                                 (void)alloc_release(&cpu[i]);
@@ -1516,12 +1519,17 @@ alloc_exit(void)
 	if (g_cfg.verbose)
 		printf("CAT: Reverting CAT configuration...\n");
 
+        /* release resources */
 	for (i = 0; i < g_cfg.config_count; i++) {
-                if (g_cfg.config[i].pid_cfg)
+                /* release pids if selected */
+                if (g_cfg.config[i].pid_cfg && g_cfg.pid_count != 0) {
+                        if (pqos_alloc_release_pid(g_cfg.pids, g_cfg.pid_count))
+                                fprintf(stderr, "Failed to release PID COS!\n");
                         continue;
-
+                }
+                /* release cores */
                 if (alloc_release(&g_cfg.config[i].cpumask) != 0)
-                        fprintf(stderr, "Failed to release COS!\n");
+                        fprintf(stderr, "Failed to release cores COS!\n");
         }
 	alloc_fini();
 }

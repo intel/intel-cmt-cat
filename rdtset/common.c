@@ -141,3 +141,131 @@ cpuset_to_str(char *cpustr, const unsigned cpustr_len,
 	/* Remove trailing separator */
 	cpustr[len-1] = 0;
 }
+
+/**
+ * @brief Function to check if a value is already contained in a table
+ *
+ * @param tab table of values to check
+ * @param size size of the table
+ * @param val value to search for
+ *
+ * @return If the value is already in the table
+ * @retval 1 if value if found
+ * @retval 0 if value is not found
+ */
+static int
+isdup(const uint64_t *tab, const unsigned size, const uint64_t val)
+{
+        unsigned i;
+
+        for (i = 0; i < size; i++)
+                if (tab[i] == val)
+                        return 1;
+        return 0;
+}
+
+/**
+ * @brief Converts string into 64-bit unsigned number.
+ *
+ * Numbers can be in decimal or hexadecimal format.
+ * On error, this functions causes process to exit with FAILURE code.
+ *
+ * @param s string to be converted into 64-bit unsigned number
+ *
+ * @return Numeric value of the string representing the number
+ */
+static uint64_t
+strtouint64(const char *s)
+{
+        const char *str = s;
+        int base = 10;
+        uint64_t n = 0;
+        char *endptr = NULL;
+
+        if (s == NULL)
+                exit(EXIT_FAILURE);
+
+        if (strncasecmp(s, "0x", 2) == 0) {
+                base = 16;
+                s += 2;
+        }
+
+        n = strtoull(s, &endptr, base);
+
+        if (!(*s != '\0' && *endptr == '\0')) {
+                printf("Error converting '%s' to unsigned number!\n", str);
+                exit(EXIT_FAILURE);
+        }
+
+        return n;
+}
+
+unsigned
+strlisttotab(char *s, uint64_t *tab, const unsigned max)
+{
+        unsigned index = 0;
+        char *saveptr = NULL;
+
+        if (s == NULL || tab == NULL || max == 0)
+                return index;
+
+        for (;;) {
+                char *p = NULL;
+                char *token = NULL;
+
+                token = strtok_r(s, ",", &saveptr);
+                if (token == NULL)
+                        break;
+
+                s = NULL;
+
+                /* get rid of leading spaces & skip empty tokens */
+                while (isspace(*token))
+                        token++;
+                if (*token == '\0')
+                        continue;
+
+                p = strchr(token, '-');
+                if (p != NULL) {
+                        /**
+                         * range of numbers provided
+                         * example: 1-5 or 12-9
+                         */
+                        uint64_t n, start, end;
+                        *p = '\0';
+                        start = strtouint64(token);
+                        end = strtouint64(p+1);
+                        if (start > end) {
+                                /**
+                                 * no big deal just swap start with end
+                                 */
+                                n = start;
+                                start = end;
+                                end = n;
+                        }
+                        for (n = start; n <= end; n++) {
+                                if (!(isdup(tab, index, n))) {
+                                        tab[index] = n;
+                                        index++;
+                                }
+                                if (index >= max)
+                                        return index;
+                        }
+                } else {
+                        /**
+                         * single number provided here
+                         * remove duplicates if necessary
+                         */
+                        uint64_t val = strtouint64(token);
+
+                        if (!(isdup(tab, index, val))) {
+                                tab[index] = val;
+                                index++;
+                        }
+                        if (index >= max)
+                                return index;
+                }
+        }
+
+        return index;
+}
