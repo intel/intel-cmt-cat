@@ -94,14 +94,14 @@ ifeq ($(shell uname), FreeBSD)
 	install -s $(APP) $(BIN_DIR)
 	install $(APP)-msr $(BIN_DIR)
 	install -m 0444 $(MAN) $(MAN_DIR)
-	ln -f -s $(MAN_DIR)/$(MAN) $(MAN_DIR)/$(APP)-msr.8
+	ln -f -s $(MAN) $(MAN_DIR)/$(APP)-msr.8
 else
 	install -D -s $(APP) $(BIN_DIR)/$(APP)
 	install -D $(APP)-msr $(BIN_DIR)/$(APP)-msr
 	install -D $(APP)-os $(BIN_DIR)/$(APP)-os
 	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
-	ln -f -s $(MAN_DIR)/$(MAN) $(MAN_DIR)/$(APP)-msr.8
-	ln -f -s $(MAN_DIR)/$(MAN) $(MAN_DIR)/$(APP)-os.8
+	ln -f -s $(MAN) $(MAN_DIR)/$(APP)-msr.8
+	ln -f -s $(MAN) $(MAN_DIR)/$(APP)-os.8
 endif
 
 uninstall:
