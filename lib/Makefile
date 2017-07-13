@@ -36,6 +36,7 @@
 
 LIB = libpqos
 VERSION = 1.0.1
+SO_VERSION = 0
 SHARED ?= y
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ -D_GNU_SOURCE \
@@ -59,7 +60,7 @@ endif
 # so or static build
 ifeq ($(SHARED),y)
 CFLAGS += -fPIC
-LIBNAME = $(LIB)-$(VERSION).so
+LIBNAME = $(LIB).so.$(VERSION)
 LIBPERM = 0755
 else
 CFLAGS += -fPIE
@@ -86,7 +87,7 @@ endif
 
 HDR = pqos.h
 PREFIX ?= /usr/local
-LIBDIR ?= $(PREFIX)/lib
+LIB_INSTALL_DIR ?= $(PREFIX)/lib
 HDR_DIR ?= $(PREFIX)/include
 DEPFILE = $(LIB).dep
 
@@ -94,9 +95,9 @@ all: $(LIBNAME)
 
 $(LIBNAME): $(OBJS)
 ifeq ($(SHARED),y)
-	$(CC) -shared -Wl,-soname,$(LIBNAME) -o $(LIBNAME) $^ -lc
-	ln -f -s $(LIB).so.0 $(LIB).so
-	ln -f -s $(LIBNAME) $(LIB).so.0
+	$(CC) -shared -Wl,-soname,$(LIB).so.$(SO_VERSION) -o $(LIBNAME) $^ -lc
+	ln -f -s $(LIBNAME) $(LIB).so.$(SO_VERSION)
+	ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
 else
 	$(AR) crvsD $@ $^
 endif
@@ -104,19 +105,18 @@ endif
 install: $(LIBNAME)
 # Install on FreeBSD
 ifeq ($(shell uname), FreeBSD)
-	install -d $(LIBDIR)
-	install -m $(LIBPERM) $(LIBNAME) $(LIBDIR)
+	install -d $(LIB_INSTALL_DIR)
+	install -m $(LIBPERM) $(LIBNAME) $(LIB_INSTALL_DIR)
 	install -m 0644 $(HDR) $(HDR_DIR)
 # Install on Linux
 else
-	install -m $(LIBPERM) $(LIBNAME) -D $(LIBDIR)/$(LIBNAME)
+	install -m $(LIBPERM) $(LIBNAME) -D $(LIB_INSTALL_DIR)/$(LIBNAME)
 	install -m 0644 $(HDR) -D $(HDR_DIR)/$(HDR)
 endif
 
 # Create symlinks to DSO
 ifeq ($(SHARED),y)
-	ln -f -s $(LIBDIR)/$(LIB).so.0 $(LIBDIR)/$(LIB).so
-	ln -f -s $(LIBDIR)/$(LIBNAME) $(LIBDIR)/$(LIB).so.0
+	cd $(LIB_INSTALL_DIR); ln -f -s $(LIB).so.$(VERSION) $(LIB).so.$(SO_VERSION); ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
 	ldconfig
 endif
 
