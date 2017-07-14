@@ -35,7 +35,7 @@
 ###############################################################################
 
 LIB = libpqos
-VERSION = 1.0.1
+VERSION = 1.1.0
 SHARED ?= y
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ -D_GNU_SOURCE \
@@ -95,8 +95,8 @@ all: $(LIBNAME)
 $(LIBNAME): $(OBJS)
 ifeq ($(SHARED),y)
 	$(CC) -shared -Wl,-soname,$(LIBNAME) -o $(LIBNAME) $^ -lc
-	ln -f -s $(LIB).so.0 $(LIB).so
-	ln -f -s $(LIBNAME) $(LIB).so.0
+	ln -f -s $(LIB).so.1 $(LIB).so
+	ln -f -s $(LIBNAME) $(LIB).so.1
 else
 	$(AR) crvsD $@ $^
 endif
