@@ -1380,7 +1380,15 @@ os_l3ca_set(const unsigned socket,
 
 		/* update and write schemata */
 		if (ret == PQOS_RETVAL_OK) {
-			schmt.l3ca[socket] = ca[i];
+			struct pqos_l3ca *l3ca = &(schmt.l3ca[socket]);
+
+			if (cdp_enabled == 1 && ca[i].cdp == 0) {
+				l3ca->cdp = 1;
+				l3ca->u.s.data_mask = ca[i].u.ways_mask;
+				l3ca->u.s.code_mask = ca[i].u.ways_mask;
+			} else
+				*l3ca = ca[i];
+
 			ret = schemata_write(ca[i].class_id, &schmt);
 		}
 
