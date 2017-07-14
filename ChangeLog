@@ -1,4 +1,28 @@
 ======================================================================
+Release  v1.1  2017-07-14
+======================================================================
+
+Contributors (alphabetical order):
+	Aaron Hetherington <aaron.hetherington@intel.com>
+        Bernhard M. Wiedemann <bernhard@zq1.de>
+        Brian Dooley <brian.dooley@intel.com>
+        Jessica Bizimungu <jessica.bizimungu@intel.com>
+	Marcel Cornu <marcel.d.cornu@intel.com>
+	Michal Aleksinski <michalx.aleksinski@intel.com>
+
+Summary:
+1. Library
+        - Added PID support to the library
+2. PQoS Utility
+        - Added PID support to PQoS
+3. rdtset Utility
+        - Added PID support to rdtset
+4. General
+        - Bug fixes
+        - Added check for global RDT interface enforcement
+        - Fix for unused param warning on FreeBSD
+
+======================================================================
 Release  v1.0.1  2017-06-06
 ======================================================================
 
