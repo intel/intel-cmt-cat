@@ -999,7 +999,7 @@ unsigned *
 os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
 {
         FILE *fd;
-        unsigned *tasks = NULL, idx = 0, num_l2_cos = 0, num_l3_cos = 0;
+        unsigned *tasks = NULL, idx = 0, grps;
         int ret;
         char buf[128];
         struct linked_list {
@@ -1009,15 +1009,11 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
 
 	ASSERT(m_cap != NULL);
         ASSERT(count != NULL);
-	ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
-	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+        ret = os_get_max_rctl_grps(m_cap, &grps);
+	if (ret != PQOS_RETVAL_OK)
 		return NULL;
 
-	ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
-	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-		return NULL;
-
-	if (class_id >= num_l3_cos && class_id >= num_l2_cos)
+	if (class_id >= grps)
 		/* class_id is out of bounds */
 		return NULL;
 
