@@ -1020,6 +1020,10 @@ alloc_release(const cpu_set_t *cores)
 	if (m_cpu == NULL)
 		return -EFAULT;
 
+        /* if no cores in set then return success */
+        if (CPU_COUNT(cores) == 0)
+                return 0;
+
 	for (i = 0, core_num = 0; i < m_cpu->num_cores; i++) {
 		if (0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
 			continue;
