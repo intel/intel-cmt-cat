@@ -1042,7 +1042,11 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
                 idx++;
         }
 
-        tasks = (unsigned *) malloc(idx * sizeof(tasks[0]));
+        /* if no pids found then allocate empty buffer to be returned */
+        if (idx == 0)
+                tasks = (unsigned *) calloc(1, sizeof(tasks[0]));
+        else
+                tasks = (unsigned *) malloc(idx * sizeof(tasks[0]));
         if (tasks == NULL)
                 goto exit_clean;
 
@@ -1160,7 +1164,7 @@ os_alloc_assign(const unsigned technology,
                 const unsigned core_num,
                 unsigned *class_id)
 {
-        unsigned i, hi_cos_id;
+        unsigned i, num_rctl_grps = 0;
         int ret;
 
         ASSERT(core_num > 0);
@@ -1170,12 +1174,15 @@ os_alloc_assign(const unsigned technology,
         UNUSED_PARAM(technology);
 
         /* obtain highest class id for all requested technologies */
-        ret = os_get_max_rctl_grps(m_cap, &hi_cos_id);
+        ret = os_get_max_rctl_grps(m_cap, &num_rctl_grps);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
+        if (num_rctl_grps == 0)
+                return PQOS_RETVAL_ERROR;
+
         /* find an unused class from highest down */
-        ret = get_unused_cos(hi_cos_id - 1, class_id);
+        ret = get_unused_cos(num_rctl_grps - 1, class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1760,7 +1767,7 @@ os_alloc_assign_pid(const unsigned technology,
                     const unsigned task_num,
                     unsigned *class_id)
 {
-        unsigned i, hi_cos_id;
+        unsigned i, num_rctl_grps = 0;
         int ret;
 
         ASSERT(task_num > 0);
@@ -1770,12 +1777,15 @@ os_alloc_assign_pid(const unsigned technology,
         UNUSED_PARAM(technology);
 
         /* obtain highest class id for all requested technologies */
-        ret = os_get_max_rctl_grps(m_cap, &hi_cos_id);
+        ret = os_get_max_rctl_grps(m_cap, &num_rctl_grps);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
+        if (num_rctl_grps == 0)
+                return PQOS_RETVAL_ERROR;
+
         /* find an unused class from highest down */
-        ret = get_unused_cos(hi_cos_id - 1, class_id);
+        ret = get_unused_cos(num_rctl_grps - 1, class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 

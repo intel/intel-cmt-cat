@@ -1412,6 +1412,8 @@ alloc_configure(void)
 	unsigned i = 0;
 	int ret = 0;
 
+        memset(pid_cfg, 0, g_cfg.config_count * sizeof(pid_cfg[0]));
+
 	/* Validate cmd line configuration */
 	ret = alloc_validate();
 	if (ret != 0) {
