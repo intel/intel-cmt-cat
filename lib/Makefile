@@ -116,8 +116,9 @@ endif
 
 # Create symlinks to DSO
 ifeq ($(SHARED),y)
-	cd $(LIB_INSTALL_DIR); ln -f -s $(LIB).so.$(VERSION) $(LIB).so.$(SO_VERSION)
-	ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
+	cd $(LIB_INSTALL_DIR); \
+		ln -f -s $(LIB).so.$(VERSION) $(LIB).so.$(SO_VERSION); \
+		ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
 	ldconfig
 endif
 
