@@ -1,5 +1,5 @@
 ======================================================================
-Release  v1.1  2017-07-14
+Release  v1.1  2017-07-19
 ======================================================================
 
 Contributors (alphabetical order):
@@ -12,15 +12,15 @@ Contributors (alphabetical order):
 
 Summary:
 1. Library
-        - Added PID support to the library
+        - Added PID support for L2CAT, L3CAT and CDP
+        - Added global RDT interface enforcement.
 2. PQoS Utility
-        - Added PID support to PQoS
+        - Added PID support for L2CAT, L3CAT and CDP
 3. rdtset Utility
-        - Added PID support to rdtset
+        - Added PID support for L2CAT, L3CAT and CDP
+        - Updated to work with multiple PID's
 4. General
         - Bug fixes
-        - Added check for global RDT interface enforcement
-        - Fix for unused param warning on FreeBSD
 
 ======================================================================
 Release  v1.0.1  2017-06-06
