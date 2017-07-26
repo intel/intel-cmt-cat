@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    1.0.1
+%global githubver    1.1.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -116,9 +116,9 @@ install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%
 
 # Install the library
 install -d %{buildroot}/%{_libdir}
-install -s %{_builddir}/%{githubfull}/lib/libpqos-*.so %{buildroot}/%{_libdir}
+install -s %{_builddir}/%{githubfull}/lib/libpqos.so.* %{buildroot}/%{_libdir}
 cp -a %{_builddir}/%{githubfull}/lib/libpqos.so %{buildroot}/%{_libdir}
-cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.0 %{buildroot}/%{_libdir}
+cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.1 %{buildroot}/%{_libdir}
 
 # Install the header file
 install -d %{buildroot}/%{_includedir}
@@ -149,7 +149,7 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %{_mandir}/man8/pqos-msr.8.gz
 %{_bindir}/rdtset
 %{_mandir}/man8/rdtset.8.gz
-%{_libdir}/libpqos-*.so
+%{_libdir}/libpqos.so.*
 
 %{!?_licensedir:%global license %%doc}
 %license %{_licensedir}/%{name}-%{version}/LICENSE
@@ -157,7 +157,7 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 
 %files -n intel-cmt-cat-devel
 %{_libdir}/libpqos.so
-%{_libdir}/libpqos.so.0
+%{_libdir}/libpqos.so.1
 %{_includedir}/pqos.h
 %{_usrsrc}/%{githubfull}/c/CAT/Makefile
 %{_usrsrc}/%{githubfull}/c/CAT/reset_app.c
@@ -168,6 +168,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Thu Aug 3 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Marcel Cornu <marcel.d.cornu@intel.com> 1.1.0-1
+- New release 1.1.0
+
 * Wed Jun 21 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Marcel Cornu <marcel.d.cornu@intel.com> 1.0.1-1
 - Spec file bug fixes
 
