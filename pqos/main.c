@@ -628,18 +628,20 @@ int main(int argc, char **argv)
                         sel_mon_reset = 1;
                         break;
                 case 'R':
-                        if (optarg != NULL && *optarg == '-') {
-                                /**
-                                 * Next switch option wrongly assumed to be
-                                 * argument to '-R'.
-                                 * Pass NULL as argument to '-R' function and
-                                 * rewind \a optind.
-                                 */
+                        if (optarg != NULL) {
+                                if (*optarg == '-') {
+                                        /**
+                                        * Next switch option wrongly assumed
+                                        * to be argument to '-R'.
+                                        * Pass NULL as argument to '-R' function
+                                        * and rewind \a optind.
+                                        */
+                                        selfn_reset_alloc(NULL);
+                                        optind--;
+                                } else
+                                        selfn_reset_alloc(optarg);
+                        } else
                                 selfn_reset_alloc(NULL);
-                                optind--;
-                        } else {
-                                selfn_reset_alloc(optarg);
-                        }
                         break;
                 case ':':
                         /**
