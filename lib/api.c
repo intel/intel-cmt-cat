@@ -570,9 +570,14 @@ pqos_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	if (m_interface == PQOS_INTER_MSR)
 		ret = hw_l3ca_get_min_cbm_bits(min_cbm_bits);
 	else {
-		LOG_INFO("OS interface not supported!\n");
-		ret = PQOS_RETVAL_RESOURCE;
+#ifdef __linux__
+		ret = os_l3ca_get_min_cbm_bits(min_cbm_bits);
+#else
+                LOG_INFO("OS interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+#endif
 	}
+
 	_pqos_api_unlock();
 
 	return ret;

@@ -1469,6 +1469,39 @@ os_l3ca_get(const unsigned socket,
 }
 
 int
+os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
+{
+	int ret = PQOS_RETVAL_OK;
+	char buf[128];
+	const struct pqos_capability *l3_cap = NULL;
+	FILE *fd;
+
+	ASSERT(m_cap != NULL);
+	ASSERT(min_cbm_bits != NULL);
+
+	/**
+	 * Get L3 CAT capabilities
+	 */
+	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &l3_cap);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
+
+	memset(buf, 0, sizeof(buf));
+	snprintf(buf, sizeof(buf) - 1, "%sinfo/L3/min_cbm_bits", rctl_path);
+
+	fd = fopen(buf, "r");
+	if (fd == NULL)
+		return PQOS_RETVAL_ERROR;
+
+	if (fscanf(fd, "%u", min_cbm_bits) != 1)
+		ret = PQOS_RETVAL_ERROR;
+
+	fclose(fd);
+
+	return ret;
+}
+
+int
 os_l2ca_set(const unsigned l2id,
             const unsigned num_cos,
             const struct pqos_l2ca *ca)
