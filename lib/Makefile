@@ -171,7 +171,8 @@ style:
 	-f api.c -f api.h -f cap.c -f cap.h -f allocation.c -f perf.c \
 	-f perf.h -f allocation.h -f monitoring.c -f monitoring.h \
 	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
-	-f utils.c -f cpuinfo.h -f os_allocation.h -f os_allocation.c \
+	-f utils.c -f utils.h \
+	-f cpuinfo.h -f os_allocation.h -f os_allocation.c \
 	-f os_monitoring.h os_monitoring.c
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
@@ -187,7 +188,8 @@ cppcheck:
 	api.c api.h cap.c cap.h allocation.c perf.c perf.h \
 	allocation.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \
-	utils.c cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
+	utils.c utils.h \
+	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
 	os_monitoring.h os_monitoring.c
 
 # if target not clean or rinse then make dependencies

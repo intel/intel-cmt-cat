@@ -70,6 +70,7 @@
 #include "types.h"
 #include "log.h"
 #include "api.h"
+#include "utils.h"
 
 /**
  * ---------------------------------------
@@ -1175,6 +1176,94 @@ detect_os_support(const char *fname, const char *str, int *supported)
 }
 
 /**
+ * @brief Get event name string to search in cpuinfo
+ *
+ * @param [in] event monitoring event type to look for
+ *
+ * @return cpuinfo flag representing monitoring event
+ */
+static const char *
+get_os_event_name(int event)
+{
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                return "cqm_occup_llc";
+        case PQOS_MON_EVENT_LMEM_BW:
+                return "cqm_mbm_local";
+        case PQOS_MON_EVENT_TMEM_BW:
+                return "cqm_mbm_total";
+        default:
+                return NULL;
+        }
+}
+
+/**
+ * @brief Runs detection of OS monitoring events
+ *
+ * @param mon Monitoring capability structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+discover_os_monitoring(struct pqos_cap_mon *mon) {
+	int ret = PQOS_RETVAL_OK;
+	unsigned i;
+	int lmem_support = 0, tmem_support = 0;
+
+	ASSERT(mon != NULL);
+
+	for (i = 0; i < mon->num_events; i++) {
+		struct pqos_monitor *event = &(mon->events[i]);
+		const char *str = NULL;
+
+		/**
+		 * Assume support of perf events
+		 */
+		if (event->type == PQOS_PERF_EVENT_LLC_MISS ||
+		    event->type == PQOS_PERF_EVENT_IPC) {
+			event->os_support = 1;
+			continue;
+		}
+
+		str = get_os_event_name(event->type);
+		if (str == NULL)
+			continue;
+
+		ret = detect_os_support("/proc/cpuinfo", str,
+		                        &(event->os_support));
+		if (ret != PQOS_RETVAL_OK) {
+			LOG_ERROR("Fatal error encountered in OS monitoring"
+			          " event detection!\n");
+			return ret;
+		}
+
+		if (event->os_support) {
+			if (event->type == PQOS_MON_EVENT_TMEM_BW)
+				tmem_support = 1;
+			if (event->type == PQOS_MON_EVENT_LMEM_BW)
+				lmem_support = 1;
+		}
+	}
+
+	/**
+	* RMEM is supported when both LMEM and TMEM are
+	* supported
+	*/
+	for (i = 0; i < mon->num_events; i++) {
+		struct pqos_monitor *event = &(mon->events[i]);
+
+		if (event->type == PQOS_MON_EVENT_RMEM_BW) {
+			event->os_support = lmem_support &&
+			                    tmem_support;
+			break;
+		}
+	}
+
+	return ret;
+}
+
+/**
  * @brief Runs detection of OS monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
@@ -1224,8 +1313,9 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
          * Detect OS support for all HW capabilities
          */
         for (i = 0; i < p_cap->num_cap; i++) {
-                int type = p_cap->capabilities[i].type;
-                int *os_ptr = &p_cap->capabilities[i].os_support;
+                struct pqos_capability *capability = &(p_cap->capabilities[i]);
+                int type = capability->type;
+                int *os_ptr = &(capability->os_support);
 
                 ret = detect_os_support(tab[type].fname, tab[type].str, os_ptr);
                 if (ret != PQOS_RETVAL_OK) {
@@ -1233,6 +1323,16 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
                                   " OS detection!\n");
                         return ret;
                 }
+
+		/**
+		 * Discover available monitoring events
+		 */
+		if (type == PQOS_CAP_TYPE_MON && res_flag) {
+			ret = discover_os_monitoring(capability->u.mon);
+			if (ret != PQOS_RETVAL_OK)
+				return ret;
+		}
+
                 /**
                  * If resctrl is supported and L3 CAT is detected in HW then
                  * resctrl supports L3 CAT
@@ -1258,19 +1358,19 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 }
 
 /**
- * @brief Removes capabilities that are not supported by the OS
+ * @brief Print information about capabilities that are not supported by the OS
  *
  * @param p_cap place to store allocated capabilities structure
  *
  * @return Operational status
  */
 static int
-remove_hw_caps(struct pqos_cap *p_cap)
+log_hw_caps(struct pqos_cap *p_cap)
 {
-        unsigned i, removed = 0;
+        unsigned i;
 
         /**
-         * Free capabilities not supported by the OS
+         * Log capabilities not supported by the OS
          */
         for (i = 0; i < p_cap->num_cap; i++)
                 if (p_cap->capabilities[i].os_support == 0) {
@@ -1290,35 +1390,7 @@ remove_hw_caps(struct pqos_cap *p_cap)
                                 LOG_INFO("MBA available in HW but not"
                                          " supported by OS. Disabling this"
                                          " capability.\n");
-                        free(p_cap->capabilities[i].u.generic_ptr);
-                        p_cap->capabilities[i].u.generic_ptr = NULL;
-                        if (p_cap->capabilities[i].u.generic_ptr != NULL)
-                                return PQOS_RETVAL_ERROR;
-                        removed++;
                 }
-        /**
-         * Return if no caps supported
-         */
-        if (removed == p_cap->num_cap)
-                p_cap->num_cap = 0;
-
-        /**
-         * Reorganize the list of caps, removing the NULL entries
-         */
-        for (i = 0; i < p_cap->num_cap; ) {
-                if (p_cap->capabilities[i].u.generic_ptr == NULL) {
-                        unsigned j;
-
-                        for (j = i; j < p_cap->num_cap - 1; j++)
-                                p_cap->capabilities[j] =
-                                        p_cap->capabilities[j + 1];
-                        p_cap->num_cap--;
-                } else
-                        /**
-                         * Only increment i when an OS cap has been detected.
-                         */
-                        i++;
-        }
 
         return PQOS_RETVAL_OK;
 }
@@ -1368,6 +1440,7 @@ pqos_init(const struct pqos_config *config)
                         return PQOS_RETVAL_ERROR;
                 }
         }
+
         if (_pqos_api_init() != 0) {
                 fprintf(stderr, "API lock initialization error!\n");
                 return PQOS_RETVAL_ERROR;
@@ -1430,7 +1503,7 @@ pqos_init(const struct pqos_config *config)
 
         if (config->interface == PQOS_INTER_OS) {
 #ifdef __linux__
-                ret = remove_hw_caps(m_cap);
+                ret = log_hw_caps(m_cap);
 #else
                 LOG_ERROR("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
@@ -1438,9 +1511,16 @@ pqos_init(const struct pqos_config *config)
 #endif
         }
         if (ret == PQOS_RETVAL_ERROR) {
-                LOG_ERROR("remove_hw_caps() error %d\n", ret);
+                LOG_ERROR("log_hw_caps() error %d\n", ret);
                 goto machine_init_error;
         }
+
+        ret = _pqos_utils_init(config->interface);
+        if (ret != PQOS_RETVAL_OK) {
+                fprintf(stderr, "Utils initialization error!\n");
+                goto machine_init_error;
+        }
+
         ret = api_init(config->interface);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("api_init() error %d\n", ret);

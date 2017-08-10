@@ -242,7 +242,7 @@ struct pqos_monitor {
                                            this event */
         uint32_t scale_factor;          /**< factor to scale RMID value
                                            to bytes */
-        unsigned os_support;            /**< flag to show if OS monitoring
+        int os_support;                 /**< flag to show if OS monitoring
                                            is supported */
 };
 

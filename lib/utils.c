@@ -46,10 +46,23 @@
 
 #include "pqos.h"
 #include "types.h"
+#include "utils.h"
 
 #define TOPO_OBJ_SOCKET     0
 #define TOPO_OBJ_L2_CLUSTER 2
 #define TOPO_OBJ_L3_CLUSTER 3
+
+static int m_interface = PQOS_INTER_MSR;
+
+
+int
+_pqos_utils_init(int interface)
+{
+    m_interface = interface;
+
+    return PQOS_RETVAL_OK;
+}
+
 
 unsigned *
 pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
@@ -350,6 +363,12 @@ pqos_cap_get_type(const struct pqos_cap *cap,
         for (i = 0; i < cap->num_cap; i++) {
                 if (cap->capabilities[i].type != type)
                         continue;
+                /**
+                 * Feature not supported for OS interface
+                 */
+                if (m_interface == PQOS_INTER_OS &&
+                    !cap->capabilities[i].os_support)
+                        continue;
                 *cap_item = &cap->capabilities[i];
                 ret = PQOS_RETVAL_OK;
                 break;
@@ -381,11 +400,17 @@ pqos_cap_get_event(const struct pqos_cap *cap,
         ret = PQOS_RETVAL_ERROR;
 
         for (i = 0; i < mon->num_events; i++) {
-                if (mon->events[i].type == event) {
-                        *p_mon = &mon->events[i];
-                        ret = PQOS_RETVAL_OK;
-                        break;
-                }
+                if (mon->events[i].type != event)
+                        continue;
+                /**
+                 * Feature not supported for OS interface
+                 */
+                if (m_interface == PQOS_INTER_OS && !mon->events[i].os_support)
+                        continue;
+
+                *p_mon = &mon->events[i];
+                ret = PQOS_RETVAL_OK;
+                break;
         }
 
         return ret;
