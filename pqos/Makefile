@@ -122,14 +122,16 @@ CHECKPATCH?=checkpatch.pl
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE \
-	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h
+	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h \
+	 -f cap.h -f cap.c
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
-	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h
+	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h \
+	cap.h cap.c
 
 # if target not clean then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

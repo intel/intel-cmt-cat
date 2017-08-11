@@ -51,6 +51,7 @@
 #include "profiles.h"
 #include "monitor.h"
 #include "alloc.h"
+#include "cap.h"
 
 /**
  * Default CDP configuration option - don't enforce on or off
@@ -91,6 +92,16 @@ static int sel_reset_alloc = 0;
  * Enable showing cache allocation settings
  */
 static int sel_show_allocation_config = 0;
+
+/**
+ * Enable displaying supported RDT capabilities
+ */
+static int sel_display = 0;
+
+/**
+ * Enable displaying supported RDT capabilities in verbose mode
+ */
+static int sel_display_verbose = 0;
 
 /**
  * Selected library interface
@@ -329,6 +340,28 @@ static void selfn_show_allocation(const char *arg)
 }
 
 /**
+ * @brief Selects displaying supported capabilities
+ *
+ * @param arg not used
+ */
+static void selfn_display(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_display = 1;
+}
+
+/**
+ * @brief Selects displaying supported capabilities in verbose mode
+ *
+ * @param arg not used
+ */
+static void selfn_display_verbose(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_display_verbose = 1;
+}
+
+/**
  * @brief Selects allocation profile from internal DB
  *
  * @param arg string passed to -c command line option
@@ -367,6 +400,8 @@ parse_config_file(const char *fname)
                 void (*fn)(const char *);
         } optab[] = {
                 {"show-alloc:",         selfn_show_allocation },   /**< -s */
+                {"display:",            selfn_display },           /**< -d */
+                {"display-verbose:",    selfn_display_verbose },   /**< -D */
                 {"log-file:",           selfn_log_file },          /**< -l */
                 {"verbose-mode:",       selfn_verbose_mode },      /**< -v */
                 {"super-verbose-mode:", selfn_super_verbose_mode },/**< -V */
@@ -450,6 +485,7 @@ static const char help_printf_short[] =
         "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
         "          [-l FILE] [--log-file=FILE] [-I] [--iface-os]\n"
         "       %s [-s] [--show]\n"
+        "       %s [-d] [--display] [-D] [--display-verbose]\n"
         "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p EVTPIDS] "
         "[--mon-pid=EVTPIDS]\n"
         "          [-t SECONDS] [--mon-time=SECONDS]\n"
@@ -531,33 +567,35 @@ static const char help_printf_long[] =
 static void print_help(const int is_long)
 {
         printf(help_printf_short,
-               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
+               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
                m_cmd_name, m_cmd_name, m_cmd_name);
         if (is_long)
                 printf(help_printf_long);
 }
 
 static struct option long_cmd_opts[] = {
-        {"help",          no_argument,       0, 'h'},
-        {"log-file",      required_argument, 0, 'l'},
-        {"config-file",   required_argument, 0, 'f'},
-        {"show",          no_argument,       0, 's'},
-        {"profile-list",  no_argument,       0, 'H'},
-        {"profile-set",   required_argument, 0, 'c'},
-        {"mon-interval",  required_argument, 0, 'i'},
-        {"mon-pid",       required_argument, 0, 'p'},
-        {"mon-core",      required_argument, 0, 'm'},
-        {"mon-time",      required_argument, 0, 't'},
-        {"mon-top",       no_argument,       0, 'T'},
-        {"mon-file",      required_argument, 0, 'o'},
-        {"mon-file-type", required_argument, 0, 'u'},
-        {"mon-reset",     no_argument,       0, 'r'},
-        {"alloc-class",   required_argument, 0, 'e'},
-        {"alloc-reset",   required_argument, 0, 'R'},
-        {"alloc-assoc",   required_argument, 0, 'a'},
-        {"verbose",       no_argument,       0, 'v'},
-        {"super-verbose", no_argument,       0, 'V'},
-        {"iface-os",      no_argument,       0, 'I'},
+        {"help",            no_argument,       0, 'h'},
+        {"log-file",        required_argument, 0, 'l'},
+        {"config-file",     required_argument, 0, 'f'},
+        {"show",            no_argument,       0, 's'},
+        {"display",         no_argument,       0, 'd'},
+        {"display-verbose", no_argument,       0, 'D'},
+        {"profile-list",    no_argument,       0, 'H'},
+        {"profile-set",     required_argument, 0, 'c'},
+        {"mon-interval",    required_argument, 0, 'i'},
+        {"mon-pid",         required_argument, 0, 'p'},
+        {"mon-core",        required_argument, 0, 'm'},
+        {"mon-time",        required_argument, 0, 't'},
+        {"mon-top",         no_argument,       0, 'T'},
+        {"mon-file",        required_argument, 0, 'o'},
+        {"mon-file-type",   required_argument, 0, 'u'},
+        {"mon-reset",       no_argument,       0, 'r'},
+        {"alloc-class",     required_argument, 0, 'e'},
+        {"alloc-reset",     required_argument, 0, 'R'},
+        {"alloc-assoc",     required_argument, 0, 'a'},
+        {"verbose",         no_argument,       0, 'v'},
+        {"super-verbose",   no_argument,       0, 'V'},
+        {"iface-os",        no_argument,       0, 'I'},
         {0, 0, 0, 0} /* end */
 };
 
@@ -578,7 +616,7 @@ int main(int argc, char **argv)
         memset(&cfg, 0, sizeof(cfg));
 
         while ((cmd = getopt_long(argc, argv,
-                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:srvVIR:",
+                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIR:",
                                   long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
@@ -667,6 +705,12 @@ int main(int argc, char **argv)
                         break;
                 case 's':
                         selfn_show_allocation(NULL);
+                        break;
+                case 'd':
+                        selfn_display(NULL);
+                        break;
+                case 'D':
+                        selfn_display_verbose(NULL);
                         break;
                 case 'v':
                         selfn_verbose_mode(NULL);
@@ -788,6 +832,14 @@ int main(int argc, char **argv)
 		alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
                                    sock_count, sockets, p_cpu,
                                    sel_verbose_mode);
+                goto allocation_exit;
+        }
+
+        if (sel_display || sel_display_verbose) {
+                /**
+                 * Display info about supported capabilities
+                 */
+                cap_print_features(p_cap, p_cpu, sel_display_verbose);
                 goto allocation_exit;
         }
 
