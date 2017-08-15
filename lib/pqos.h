@@ -691,6 +691,19 @@ int pqos_l3ca_get(const unsigned socket,
                   unsigned *num_ca,
                   struct pqos_l3ca *ca);
 
+/**
+ * @brief Get minimum number of bits which must be set in \ca way mask when
+ *        updating a class of service
+ *
+ * @param [out] min_cbm_bits minimum number of bits that must be set
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if unable to determine
+ */
+int pqos_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
+
+
 /*
  * =======================================
  * L2 cache allocation

@@ -178,6 +178,20 @@ int hw_l3ca_get(const unsigned socket,
                 struct pqos_l3ca *ca);
 
 /**
+ * @brief Probe hardware for minimum number of bits that must be set
+ *
+ * @note Uses free COS to determine lowest number of bits accepted
+ * @note If no free COS is available PQOS_RETVAL_RESOURCE will be returned
+ *
+ * @param [out] min_cbm_bits minimum number of bits that must be set
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE when no free COS found
+ */
+int hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
+
+/**
  * @brief Hardware interface to set classes of
  *        service defined by \a ca on \a l2id
  *

@@ -109,6 +109,168 @@ static int m_interface = PQOS_INTER_MSR;
  */
 
 /**
+ * ---------------------------------------
+ * Internal functions
+ * ---------------------------------------
+ */
+
+/**
+ * @brief Gets highest COS id which could be used to configure set technologies
+ *
+ * @param [in] technology technologies bitmask to get highest common COS id for
+ * @param [out] hi_class_id highest common COS id
+ *
+ * @return Operation status
+ */
+static int
+get_hi_cos_id(const unsigned technology,
+              unsigned *hi_class_id)
+{
+        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+        const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
+        const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+        unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0, num_cos = 0;
+        int ret;
+
+	ASSERT(l2_req || l3_req || mba_req);
+        if (hi_class_id == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        ASSERT(m_cap != NULL);
+
+        if (l3_req) {
+                ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
+
+                if (num_l3_cos == 0)
+                        return PQOS_RETVAL_ERROR;
+
+		num_cos = num_l3_cos;
+        }
+
+        if (l2_req) {
+                ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
+                if (num_l2_cos == 0)
+                        return PQOS_RETVAL_ERROR;
+
+                if (num_cos == 0 || num_l2_cos < num_cos)
+                        num_cos = num_l2_cos;
+        }
+
+        if (mba_req) {
+                ret = pqos_mba_get_cos_num(m_cap, &num_mba_cos);
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
+
+                if (num_mba_cos == 0)
+                        return PQOS_RETVAL_ERROR;
+
+                if (num_cos == 0 || num_mba_cos < num_cos)
+                        num_cos = num_mba_cos;
+        }
+
+        *hi_class_id = num_cos - 1;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Gets COS associated to \a lcore
+ *
+ * @param [in] lcore lcore to read COS association from
+ * @param [out] class_id associated COS
+ *
+ * @return Operation status
+ */
+static int
+cos_assoc_get(const unsigned lcore, unsigned *class_id)
+{
+        const uint32_t reg = PQOS_MSR_ASSOC;
+        uint64_t val = 0;
+
+        if (class_id == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
+        val >>= PQOS_MSR_ASSOC_QECOS_SHIFT;
+        *class_id = (unsigned) val;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Gets unused COS on a socket or L2 cluster
+ *
+ * The lowest acceptable COS is 1, as 0 is a default one
+ *
+ * @param [in] id socket or L2 cache ID to search for unused COS on
+ * @param [in] technology selection of allocation technologies
+ * @param [out] class_id unused COS
+ *
+ * @return Operation status
+ */
+static int
+get_unused_cos(const unsigned id,
+               const unsigned technology,
+               unsigned *class_id)
+{
+        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+        unsigned used_classes[PQOS_MAX_L3CA_COS];
+        unsigned i, cos;
+	unsigned hi_class_id;
+        int ret;
+
+        if (class_id == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        /* obtain highest class id for all requested technologies */
+	ret = get_hi_cos_id(technology, &hi_class_id);
+	if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        memset(used_classes, 0, sizeof(used_classes));
+
+        /* Create a list of COS used on socket/L2 cluster */
+        for (i = 0; i < m_cpu->num_cores; i++) {
+
+                if (l2_req) {
+                        /* L2 requested so looking in L2 cluster scope */
+                        if (m_cpu->cores[i].l2_id != id)
+                                continue;
+                } else {
+                        /* L2 not requested so looking at socket scope */
+                        if (m_cpu->cores[i].socket != id)
+                                continue;
+                }
+
+                ret = cos_assoc_get(m_cpu->cores[i].lcore, &cos);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                if (cos > hi_class_id)
+                        continue;
+
+                /* Mark as used */
+                used_classes[cos] = 1;
+        }
+
+        /* Find unused COS */
+        for (cos = hi_class_id; cos != 0; cos--) {
+                if (used_classes[cos] == 0) {
+                        *class_id = cos;
+                        return PQOS_RETVAL_OK;
+                }
+        }
+
+        return PQOS_RETVAL_RESOURCE;
+}
+
+/**
  * =======================================
  * =======================================
  *
@@ -297,6 +459,127 @@ hw_l3ca_get(const unsigned socket,
         *num_ca = count;
 
         return ret;
+}
+
+int
+hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
+{
+	int ret;
+	unsigned *sockets, socket_id, sockets_num;
+	unsigned class_id, l3ca_num, ways, i;
+	int technology = 1 << PQOS_CAP_TYPE_L3CA;
+	const struct pqos_capability *l3_cap = NULL;
+	struct pqos_l3ca l3ca_config[PQOS_MAX_L3CA_COS];
+
+	ASSERT(m_cap != NULL);
+	ASSERT(m_cpu != NULL);
+	ASSERT(min_cbm_bits != NULL);
+
+	/**
+	 * Get L3 CAT capabilities
+	 */
+	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &l3_cap);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
+
+	/**
+	 * Get number & list of sockets in the system
+	 */
+	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	if (sockets == NULL || sockets_num == 0) {
+		ret = PQOS_RETVAL_ERROR;
+		goto pqos_l3ca_get_min_cbm_bits_exit;
+	}
+
+	/**
+	 * Find free COS
+	 */
+	for (socket_id = 0; socket_id < sockets_num; socket_id++) {
+		ret = get_unused_cos(socket_id, technology, &class_id);
+		if (ret == PQOS_RETVAL_OK)
+			break;
+
+		if (ret != PQOS_RETVAL_RESOURCE) {
+			LOG_ERROR("No free COS available\n");
+			goto pqos_l3ca_get_min_cbm_bits_exit;
+		}
+	}
+
+	/**
+	 * Get current configuration
+	 */
+	ret = hw_l3ca_get(socket_id, PQOS_MAX_L3CA_COS, &l3ca_num, l3ca_config);
+	if (ret != PQOS_RETVAL_OK)
+		goto pqos_l3ca_get_min_cbm_bits_exit;
+
+	/**
+	 * Probe for min cbm bits
+	 */
+	for (ways = 1; ways <= l3_cap->u.l3ca->num_ways; ways++) {
+		struct pqos_l3ca l3ca_tab[PQOS_MAX_L3CA_COS];
+		unsigned num_ca;
+		uint64_t mask = (1 << ways) - 1;
+
+		memset(l3ca_tab, 0, sizeof(struct pqos_l3ca));
+		l3ca_tab[0].class_id = class_id;
+		l3ca_tab[0].u.ways_mask = mask;
+
+		/**
+		 * Try to set mask
+		 */
+		ret = hw_l3ca_set(socket_id, 1, l3ca_tab);
+		if (ret != PQOS_RETVAL_OK)
+			continue;
+
+		/**
+		 * Validate if mask was correctly set
+		 */
+		ret = hw_l3ca_get(socket_id, PQOS_MAX_L3CA_COS, &num_ca,
+		                  l3ca_tab);
+		if (ret != PQOS_RETVAL_OK)
+			goto pqos_l3ca_get_min_cbm_bits_restore;
+
+		for (i = 0; i < num_ca; i++) {
+			struct pqos_l3ca *l3ca = &(l3ca_tab[i]);
+
+			if (l3ca->class_id != class_id)
+				continue;
+
+			if ((l3ca->cdp &&
+				l3ca->u.s.data_mask == mask &&
+				l3ca->u.s.code_mask == mask) ||
+			    (!l3ca->cdp && l3ca->u.ways_mask == mask)) {
+				*min_cbm_bits = ways;
+				ret = PQOS_RETVAL_OK;
+				goto pqos_l3ca_get_min_cbm_bits_restore;
+			}
+		}
+	}
+
+	/**
+	 * Restore old settings
+	 */
+ pqos_l3ca_get_min_cbm_bits_restore:
+	for (i = 0; i < l3ca_num; i++) {
+		int ret_val;
+
+		if (l3ca_config[i].class_id != class_id)
+			continue;
+
+		ret_val = hw_l3ca_set(socket_id, 1, &(l3ca_config[i]));
+		if (ret_val != PQOS_RETVAL_OK) {
+			LOG_ERROR("Failed to restore CAT configuration. CAT"
+			          " configuration has been altered!\n");
+			ret = ret_val;
+			break;
+		}
+	}
+
+ pqos_l3ca_get_min_cbm_bits_exit:
+	if (sockets != NULL)
+		free(sockets);
+
+	return ret;
 }
 
 int
@@ -513,32 +796,6 @@ hw_mba_get(const unsigned socket,
 }
 
 /**
- * @brief Gets COS associated to \a lcore
- *
- * @param [in] lcore lcore to read COS association from
- * @param [out] class_id associated COS
- *
- * @return Operation status
- */
-static int
-cos_assoc_get(const unsigned lcore, unsigned *class_id)
-{
-        const uint32_t reg = PQOS_MSR_ASSOC;
-        uint64_t val = 0;
-
-        if (class_id == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
-
-        val >>= PQOS_MSR_ASSOC_QECOS_SHIFT;
-        *class_id = (unsigned) val;
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Sets COS associated to \a lcore
  *
  * @param [in] lcore lcore to set COS association
@@ -546,7 +803,6 @@ cos_assoc_get(const unsigned lcore, unsigned *class_id)
  *
  * @return Operation status
  */
-
 static int
 cos_assoc_set(const unsigned lcore, const unsigned class_id)
 {
@@ -630,131 +886,6 @@ hw_alloc_assoc_get(const unsigned lcore,
 	return ret;
 }
 
-/**
- * @brief Gets highest COS id which could be used to configure set technologies
- *
- * @param [in] technology technologies bitmask to get highest common COS id for
- * @param [out] hi_class_id highest common COS id
- *
- * @return Operation status
- */
-static int
-get_hi_cos_id(const unsigned technology,
-              unsigned *hi_class_id)
-{
-        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-        const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
-        const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
-        unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0, num_cos = 0;
-        int ret;
-
-	ASSERT(l2_req || l3_req || mba_req);
-        if (hi_class_id == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        ASSERT(m_cap != NULL);
-
-        if (l3_req) {
-                ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
-                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-                        return ret;
-
-                if (num_l3_cos == 0)
-                        return PQOS_RETVAL_ERROR;
-
-		num_cos = num_l3_cos;
-        }
-
-        if (l2_req) {
-                ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
-                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-                        return ret;
-                if (num_l2_cos == 0)
-                        return PQOS_RETVAL_ERROR;
-
-                if (num_cos == 0 || num_l2_cos < num_cos)
-                        num_cos = num_l2_cos;
-        }
-
-        if (mba_req) {
-                ret = pqos_mba_get_cos_num(m_cap, &num_mba_cos);
-                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-                        return ret;
-
-                if (num_mba_cos == 0)
-                        return PQOS_RETVAL_ERROR;
-
-                if (num_cos == 0 || num_mba_cos < num_cos)
-                        num_cos = num_mba_cos;
-        }
-
-        *hi_class_id = num_cos - 1;
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Gets unused COS on a socket or L2 cluster
- *
- * The lowest acceptable COS is 1, as 0 is a default one
- *
- * @param [in] id socket or L2 cache ID to search for unused COS on
- * @param [in] technology selection of allocation technologies
- * @param [in] hi_class_id highest acceptable COS id
- * @param [out] class_id unused COS
- *
- * @return Operation status
- */
-static int
-get_unused_cos(const unsigned id,
-               const unsigned technology,
-               const unsigned hi_class_id,
-               unsigned *class_id)
-{
-        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-        unsigned used_classes[PQOS_MAX_L3CA_COS];
-        unsigned i, cos;
-        int ret;
-
-        if (class_id == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        memset(used_classes, 0, sizeof(used_classes));
-
-        /* Create a list of COS used on socket/L2 cluster */
-        for (i = 0; i < m_cpu->num_cores; i++) {
-
-                if (l2_req) {
-                        /* L2 requested so looking in L2 cluster scope */
-                        if (m_cpu->cores[i].l2_id != id)
-                                continue;
-                } else {
-                        /* L2 not requested so looking at socket scope */
-                        if (m_cpu->cores[i].socket != id)
-                                continue;
-                }
-
-                ret = cos_assoc_get(m_cpu->cores[i].lcore, &cos);
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
-
-                if (cos > hi_class_id)
-                        continue;
-
-                /* Mark as used */
-                used_classes[cos] = 1;
-        }
-
-        /* Find unused COS */
-        for (cos = hi_class_id; cos != 0; cos--) {
-                if (used_classes[cos] == 0) {
-                        *class_id = cos;
-                        return PQOS_RETVAL_OK;
-                }
-        }
-
-        return PQOS_RETVAL_RESOURCE;
-}
 
 int
 hw_alloc_assign(const unsigned technology,
@@ -763,7 +894,7 @@ hw_alloc_assign(const unsigned technology,
                 unsigned *class_id)
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-        unsigned i, hi_cos_id;
+        unsigned i;
         unsigned socket = 0, l2id = 0;
         int ret;
 
@@ -800,16 +931,11 @@ hw_alloc_assign(const unsigned technology,
                 }
         }
 
-        /* obtain highest class id for all requested technologies */
-        ret = get_hi_cos_id(technology, &hi_cos_id);
-        if (ret != PQOS_RETVAL_OK)
-                goto pqos_alloc_assign_exit;
-
         /* find an unused class from highest down */
         if (!l2_req)
-                ret = get_unused_cos(socket, technology, hi_cos_id, class_id);
+                ret = get_unused_cos(socket, technology, class_id);
         else
-                ret = get_unused_cos(l2id, technology, hi_cos_id, class_id);
+                ret = get_unused_cos(l2id, technology, class_id);
 
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
