@@ -1669,6 +1669,38 @@ os_l2ca_get(const unsigned l2id,
 	return ret;
 }
 
+int
+os_mba_set(const unsigned socket,
+           const unsigned num_cos,
+           const struct pqos_mba *requested,
+           struct pqos_mba *actual)
+{
+	UNUSED_PARAM(socket);
+	UNUSED_PARAM(num_cos);
+	UNUSED_PARAM(requested);
+	UNUSED_PARAM(actual);
+
+	LOG_INFO("OS interface not supported!\n");
+
+	return PQOS_RETVAL_RESOURCE;
+}
+
+int
+os_mba_get(const unsigned socket,
+           const unsigned max_num_cos,
+           unsigned *num_cos,
+           struct pqos_mba *mba_tab)
+{
+	UNUSED_PARAM(socket);
+	UNUSED_PARAM(max_num_cos);
+	UNUSED_PARAM(num_cos);
+	UNUSED_PARAM(mba_tab);
+
+	LOG_INFO("OS interface not supported!\n");
+
+	return PQOS_RETVAL_RESOURCE;
+}
+
 /**
  * ---------------------------------------
  * Task utility functions

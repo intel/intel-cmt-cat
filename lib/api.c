@@ -707,8 +707,12 @@ pqos_mba_set(const unsigned socket,
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mba_set(socket, num_cos, requested, actual);
         else {
+#ifdef __linux__
+                ret = os_mba_set(socket, num_cos, requested, actual);
+#else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
+#endif
         }
 
 	_pqos_api_unlock();
@@ -739,8 +743,12 @@ pqos_mba_get(const unsigned socket,
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mba_get(socket, max_num_cos, num_cos, mba_tab);
         else {
+#ifdef __linux__
+                ret = os_mba_get(socket, max_num_cos, num_cos, mba_tab);
+#else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
+#endif
         }
 
 	_pqos_api_unlock();
