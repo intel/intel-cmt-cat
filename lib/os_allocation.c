@@ -569,16 +569,23 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 
 	memset(buf, 0, sizeof(buf));
 	while (fgets(buf, sizeof(buf), fd) != NULL) {
+		q = buf;
+		/**
+		 * Trim white spaces
+		 */
+		while (isspace(*q))
+			q++;
+
 		/**
 		 * Determine allocation type
 		 */
-		p = strchr(buf, ':');
+		p = strchr(q, ':');
 		if (p == NULL) {
 			ret = PQOS_RETVAL_ERROR;
 			break;
 		}
 		*p = '\0';
-		type = schemata_type_get(buf);
+		type = schemata_type_get(q);
 
 		/* Skip unknown label */
 		if (type == SCHEMATA_TYPE_NONE)
@@ -746,6 +753,17 @@ os_get_max_rctl_grps(const struct pqos_cap *cap,
 		/* get L2 CAT COS num */
 		if (p_cap->type == PQOS_CAP_TYPE_L2CA) {
 			ret = pqos_l2ca_get_cos_num(cap, &num_cos);
+			if (ret != PQOS_RETVAL_OK)
+				return ret;
+
+			if (max_rctl_grps == 0)
+				max_rctl_grps = num_cos;
+			else if (num_cos < max_rctl_grps)
+				max_rctl_grps = num_cos;
+		}
+		/* get MBA COS num */
+		if (p_cap->type == PQOS_CAP_TYPE_MBA) {
+			ret = pqos_mba_get_cos_num(cap, &num_cos);
 			if (ret != PQOS_RETVAL_OK)
 				return ret;
 
@@ -1334,7 +1352,7 @@ os_l3ca_set(const unsigned socket,
 	unsigned sockets_num = 0;
 	unsigned *sockets = NULL;
 	unsigned i;
-	unsigned l3ca_num = 0;
+	unsigned num_grps = 0, l3ca_num;
 	int cdp_enabled = 0;
 
 	ASSERT(ca != NULL);
@@ -1344,9 +1362,13 @@ os_l3ca_set(const unsigned socket,
 
 	ret = pqos_l3ca_get_cos_num(m_cap, &l3ca_num);
 	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
+
+	ret = os_get_max_rctl_grps(m_cap, &num_grps);
+	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
-	if (num_cos > l3ca_num)
+	if (num_cos > num_grps)
 		return PQOS_RETVAL_ERROR;
 
 	/* Get number of sockets in the system */
@@ -1427,6 +1449,10 @@ os_l3ca_get(const unsigned socket,
 	ASSERT(m_cpu != NULL);
 
 	ret = pqos_l3ca_get_cos_num(m_cap, &count);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
+
+	ret = os_get_max_rctl_grps(m_cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
@@ -1511,7 +1537,7 @@ os_l2ca_set(const unsigned l2id,
 	unsigned i;
 	unsigned l2ids_num = 0;
 	unsigned *l2ids = NULL;
-	unsigned l2ca_num;
+	unsigned num_grps = 0, l2ca_num;
 
 	ASSERT(m_cap != NULL);
 	ASSERT(ca != NULL);
@@ -1519,9 +1545,13 @@ os_l2ca_set(const unsigned l2id,
 
 	ret = pqos_l2ca_get_cos_num(m_cap, &l2ca_num);
 	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
+
+	ret = os_get_max_rctl_grps(m_cap, &num_grps);
+	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
-	if (num_cos > l2ca_num)
+	if (num_cos > num_grps)
 		return PQOS_RETVAL_PARAM;
 
 	/*
@@ -1595,6 +1625,10 @@ os_l2ca_get(const unsigned l2id,
 	ret = pqos_l2ca_get_cos_num(m_cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
+
+	ret = os_get_max_rctl_grps(m_cap, &count);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
 
 	if (count > max_num_ca)
 		/* Not enough space to store the classes */
