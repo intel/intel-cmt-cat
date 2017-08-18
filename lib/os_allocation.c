@@ -349,6 +349,8 @@ struct schemata {
 	struct pqos_l3ca *l3ca; /**< L3 COS definitions */
 	unsigned l2ca_num;      /**< Number of L2 COS held in struct */
 	struct pqos_l2ca *l2ca; /**< L2 COS definitions */
+	unsigned mba_num;       /**< Number of MBA COS held in struct */
+	struct pqos_mba *mba;   /**< MBA COS definitions */
 };
 
 /*
@@ -361,12 +363,16 @@ schemata_fini(struct schemata *schemata)
 {
 	if (schemata->l2ca != NULL) {
 		free(schemata->l2ca);
-                schemata->l2ca = NULL;
-        }
+		schemata->l2ca = NULL;
+	}
 	if (schemata->l3ca != NULL) {
 		free(schemata->l3ca);
-                schemata->l3ca = NULL;
-        }
+		schemata->l3ca = NULL;
+	}
+	if (schemata->mba != NULL) {
+		free(schemata->mba);
+		schemata->mba = NULL;
+	}
 }
 
 /**
@@ -446,6 +452,33 @@ schemata_init(const unsigned class_id, struct schemata *schemata)
 		}
 	}
 
+	/* MBA */
+	retval = pqos_mba_get_cos_num(m_cap, &num_cos);
+	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
+		unsigned *sockets = NULL;
+
+		sockets = pqos_cpu_get_sockets(m_cpu, &num_ids);
+		if (sockets == NULL) {
+			ret = PQOS_RETVAL_ERROR;
+			goto schemata_init_exit;
+		}
+
+		free(sockets);
+
+		schemata->mba_num = num_ids;
+		schemata->mba = calloc(num_ids, sizeof(struct pqos_mba));
+		if (schemata->mba == NULL) {
+			ret = PQOS_RETVAL_ERROR;
+			goto schemata_init_exit;
+		}
+
+		/* fill class_id */
+		for (i = 0; i < num_ids; i++) {
+			schemata->mba[i].class_id = class_id;
+			schemata->mba[i].mb_rate = 100;
+		}
+	}
+
  schemata_init_exit:
 	/* Deallocate memory in case of error */
 	if (ret != PQOS_RETVAL_OK)
@@ -463,6 +496,7 @@ enum schemata_type {
 	SCHEMATA_TYPE_L3,     /**< L3 CAT without CDP */
 	SCHEMATA_TYPE_L3CODE, /**< L3 CAT code */
 	SCHEMATA_TYPE_L3DATA, /**< L3 CAT data */
+	SCHEMATA_TYPE_MB,     /**< MBA data */
 };
 
 
@@ -486,6 +520,8 @@ schemata_type_get(const char *str)
 		type = SCHEMATA_TYPE_L3CODE;
 	else if (strcasecmp(str, "L3DATA") == 0)
 		type = SCHEMATA_TYPE_L3DATA;
+	else if (strcasecmp(str, "MB") == 0)
+		type = SCHEMATA_TYPE_MB;
 
 	return type;
 }
@@ -493,9 +529,8 @@ schemata_type_get(const char *str)
 /**
  * @brief Fill schemata structure
  *
- * @param [in] class_is COS id
  * @param [in] res_id Resource id
- * @param [in] mask Ways mask
+ * @param [in] value Ways mask/Memory B/W rate
  * @param [in] type Schemata type
  * @param [out] schemata Schemata structure
  *
@@ -503,35 +538,35 @@ schemata_type_get(const char *str)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-schemata_set(const unsigned class_id,
-             const unsigned res_id,
-	     const uint64_t mask,
-	     const int type,
-	     struct schemata *schemata)
+schemata_set(const unsigned res_id,
+             const uint64_t value,
+             const int type,
+             struct schemata *schemata)
 {
 	if (type == SCHEMATA_TYPE_L2) {
 		if (schemata->l2ca_num <= res_id)
 			return PQOS_RETVAL_ERROR;
-		schemata->l2ca[res_id].class_id = class_id;
-		schemata->l2ca[res_id].ways_mask = mask;
+		schemata->l2ca[res_id].ways_mask = value;
 
 	} else if (type == SCHEMATA_TYPE_L3) {
 		if (schemata->l3ca_num <= res_id || schemata->l3ca[res_id].cdp)
 			return PQOS_RETVAL_ERROR;
-		schemata->l3ca[res_id].class_id = class_id;
-		schemata->l3ca[res_id].u.ways_mask = mask;
+		schemata->l3ca[res_id].u.ways_mask = value;
 
 	} else if (type == SCHEMATA_TYPE_L3CODE) {
 		if (schemata->l3ca_num <= res_id || !schemata->l3ca[res_id].cdp)
 			return PQOS_RETVAL_ERROR;
-		schemata->l3ca[res_id].class_id = class_id;
-		schemata->l3ca[res_id].u.s.code_mask = mask;
+		schemata->l3ca[res_id].u.s.code_mask = value;
 
 	} else if (type == SCHEMATA_TYPE_L3DATA) {
 		if (schemata->l3ca_num <= res_id || !schemata->l3ca[res_id].cdp)
 			return PQOS_RETVAL_ERROR;
-		schemata->l3ca[res_id].class_id = class_id;
-		schemata->l3ca[res_id].u.s.data_mask = mask;
+		schemata->l3ca[res_id].u.s.data_mask = value;
+
+	} else if (type == SCHEMATA_TYPE_MB) {
+		if (schemata->mba_num <= res_id)
+			return PQOS_RETVAL_ERROR;
+		schemata->mba[res_id].mb_rate = value;
 	}
 
 	return PQOS_RETVAL_OK;
@@ -597,7 +632,8 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 		for (++p; ; p = NULL) {
 			char *token = NULL;
 			uint64_t id = 0;
-			uint64_t mask = 0;
+			uint64_t value = 0;
+			unsigned base = (type == SCHEMATA_TYPE_MB ? 10 : 16);
 
 			token = strtok_r(p, ";", &saveptr);
 			if (token == NULL)
@@ -614,11 +650,11 @@ schemata_read(const unsigned class_id, struct schemata *schemata)
 			if (ret != PQOS_RETVAL_OK)
 				goto schemata_read_exit;
 
-			ret = strtouint64(q + 1, 16, &mask);
+			ret = strtouint64(q + 1, base, &value);
 			if (ret != PQOS_RETVAL_OK)
 				goto schemata_read_exit;
 
-			ret = schemata_set(class_id, id, mask, type, schemata);
+			ret = schemata_set(id, value, type, schemata);
 			if (ret != PQOS_RETVAL_OK)
 				goto schemata_read_exit;
 		}
@@ -705,6 +741,18 @@ schemata_write(const unsigned class_id, const struct schemata *schemata)
 		}
 		fprintf(fd, "\n");
 	}
+
+	/* MBA */
+	if (schemata->mba_num > 0) {
+		fprintf(fd, "MB:");
+		for (i = 0; i < schemata->mba_num; i++) {
+			if (i > 0)
+				fprintf(fd, ";");
+			fprintf(fd, "%u=%u", i, schemata->mba[i].mb_rate);
+		}
+		fprintf(fd, "\n");
+	}
+
 	ret = rctl_fclose(fd);
 
 	return ret;
