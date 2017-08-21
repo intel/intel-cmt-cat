@@ -1723,14 +1723,94 @@ os_mba_set(const unsigned socket,
            const struct pqos_mba *requested,
            struct pqos_mba *actual)
 {
-	UNUSED_PARAM(socket);
-	UNUSED_PARAM(num_cos);
-	UNUSED_PARAM(requested);
-	UNUSED_PARAM(actual);
+	int ret;
+	unsigned sockets_num = 0;
+	unsigned *sockets = NULL;
+	unsigned i, step = 0;
+	unsigned num_grps = 0;
+	const struct pqos_capability *mba_cap = NULL;
 
-	LOG_INFO("OS interface not supported!\n");
+	ASSERT(requested != NULL);
+	ASSERT(num_cos != 0);
+	ASSERT(m_cap != NULL);
+	ASSERT(m_cpu != NULL);
 
-	return PQOS_RETVAL_RESOURCE;
+	/**
+	 * Check if MBA is supported
+	 */
+	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &mba_cap);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* MBA not supported */
+
+	ret = os_get_max_rctl_grps(m_cap, &num_grps);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	if (num_cos > num_grps)
+		return PQOS_RETVAL_PARAM;
+
+        step = mba_cap->u.mba->throttle_step;
+
+        /**
+	 * Check if class id's are within allowed range.
+	 */
+	for (i = 0; i < num_cos; i++)
+		if (requested[i].class_id >= num_grps) {
+			LOG_ERROR("MBA COS%u is out of range (COS%u is max)!\n",
+			          requested[i].class_id, num_grps - 1);
+			return PQOS_RETVAL_PARAM;
+		}
+
+	/* Get number of sockets in the system */
+	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	if (sockets == NULL || sockets_num == 0 || socket >= sockets_num) {
+		ret = PQOS_RETVAL_ERROR;
+		goto os_l3ca_set_exit;
+	}
+
+	for (i = 0; i < num_cos; i++) {
+		struct schemata schmt;
+
+		ret = schemata_init(requested[i].class_id, &schmt);
+
+		/* read schemata file */
+		if (ret == PQOS_RETVAL_OK)
+			ret = schemata_read(requested[i].class_id, &schmt);
+
+		/* update and write schemata */
+		if (ret == PQOS_RETVAL_OK) {
+			struct pqos_mba *mba = &(schmt.mba[socket]);
+
+			*mba = requested[i];
+                        mba->mb_rate = (((requested[i].mb_rate
+                                          + (step/2)) / step) * step);
+			if (mba->mb_rate == 0)
+				mba->mb_rate = step;
+
+			ret = schemata_write(requested[i].class_id, &schmt);
+		}
+
+		if (actual != NULL) {
+			/* read actual schemata */
+			if (ret == PQOS_RETVAL_OK)
+				ret = schemata_read(requested[i].class_id,
+					            &schmt);
+
+			/* update actual schemata */
+			if (ret == PQOS_RETVAL_OK)
+				actual[i] = schmt.mba[socket];
+		}
+		schemata_fini(&schmt);
+
+		if (ret != PQOS_RETVAL_OK)
+			goto os_l3ca_set_exit;
+	}
+
+ os_l3ca_set_exit:
+	if (sockets != NULL)
+		free(sockets);
+
+	return ret;
 }
 
 int
@@ -1739,14 +1819,61 @@ os_mba_get(const unsigned socket,
            unsigned *num_cos,
            struct pqos_mba *mba_tab)
 {
-	UNUSED_PARAM(socket);
-	UNUSED_PARAM(max_num_cos);
-	UNUSED_PARAM(num_cos);
-	UNUSED_PARAM(mba_tab);
+	int ret;
+	unsigned class_id;
+	unsigned count = 0;
+	unsigned sockets_num = 0;
+	unsigned *sockets = NULL;
+	const struct pqos_capability *mba_cap = NULL;
 
-	LOG_INFO("OS interface not supported!\n");
+	ASSERT(num_cos != NULL);
+	ASSERT(max_num_cos != 0);
+	ASSERT(mba_tab != NULL);
+	ASSERT(m_cap != NULL);
+	ASSERT(m_cpu != NULL);
 
-	return PQOS_RETVAL_RESOURCE;
+	/**
+	 * Check if MBA is supported
+	 */
+	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &mba_cap);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* MBA not supported */
+
+	ret = os_get_max_rctl_grps(m_cap, &count);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	if (count > max_num_cos)
+		return PQOS_RETVAL_ERROR;
+
+	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	if (sockets == NULL || sockets_num == 0 || socket >= sockets_num) {
+		ret = PQOS_RETVAL_ERROR;
+		goto os_mba_get_exit;
+	}
+
+	for (class_id = 0; class_id < count; class_id++) {
+		struct schemata schmt;
+
+		ret = schemata_init(class_id, &schmt);
+		if (ret == PQOS_RETVAL_OK)
+			ret = schemata_read(class_id, &schmt);
+
+		if (ret == PQOS_RETVAL_OK)
+			mba_tab[class_id] = schmt.mba[socket];
+
+		schemata_fini(&schmt);
+
+		if (ret != PQOS_RETVAL_OK)
+			goto os_mba_get_exit;
+	}
+	*num_cos = count;
+
+ os_mba_get_exit:
+	if (sockets != NULL)
+		free(sockets);
+
+	return ret;
 }
 
 /**
