@@ -47,11 +47,11 @@
 #include "cap.h"
 #include "log.h"
 #include "types.h"
+#include "resctrl_alloc.h"
 
 /*
  * Path to resctrl file system
  */
-static const char *rctl_path = "/sys/fs/resctrl/";
 static const char *rctl_cpus = "cpus";
 static const char *rctl_schemata = "schemata";
 static const char *rctl_tasks = "tasks";
@@ -93,10 +93,10 @@ rctl_fopen(const unsigned class_id, const char *name, const char *mode)
 	memset(buf, 0, sizeof(buf));
 	if (class_id == 0)
 		result = snprintf(buf, sizeof(buf) - 1,
-		                  "%s%s", rctl_path, name);
+		                  "%s/%s", RESCTRL_ALLOC_PATH, name);
 	else
-		result = snprintf(buf, sizeof(buf) - 1,
-			          "%sCOS%u/%s", rctl_path, class_id, name);
+		result = snprintf(buf, sizeof(buf) - 1, "%s/COS%u/%s",
+		                  RESCTRL_ALLOC_PATH, class_id, name);
 
 	if (result < 0)
 		return NULL;
@@ -796,7 +796,7 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
         cdp_option = "cdp";  /**< cdp_on */
 
  mount:
-        if (mount("resctrl", rctl_path, "resctrl", 0, cdp_option) != 0)
+        if (mount("resctrl", RESCTRL_ALLOC_PATH, "resctrl", 0, cdp_option) != 0)
                 return PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;
@@ -833,7 +833,7 @@ os_alloc_check(void)
         /**
          * Check if resctrl is mounted
          */
-        if (access("/sys/fs/resctrl/cpus", F_OK) != 0) {
+        if (access(RESCTRL_ALLOC_PATH"/cpus", F_OK) != 0) {
                 const struct pqos_capability *alloc_cap = NULL;
                 int cdp_mount = PQOS_REQUIRE_CDP_OFF;
                 /* Get L3 CAT capabilities */
@@ -877,7 +877,7 @@ os_alloc_prep(void)
 
 		memset(buf, 0, sizeof(buf));
 		if (snprintf(buf, sizeof(buf) - 1,
-                             "%sCOS%d", rctl_path, (int) i) < 0)
+                             "%s/COS%d", RESCTRL_ALLOC_PATH, (int) i) < 0)
 			return PQOS_RETVAL_ERROR;
 
 		/* if resctrl group doesn't exist - create it */
@@ -1289,7 +1289,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         /**
          * Umount resctrl to reset schemata
          */
-        ret = umount2(rctl_path, 0);
+        ret = umount2(RESCTRL_ALLOC_PATH, 0);
         if (ret != 0) {
                 LOG_ERROR("Umount OS interface error!\n");
                 goto os_alloc_reset_exit;
@@ -1487,7 +1487,8 @@ os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
 
 	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf) - 1, "%sinfo/L3/min_cbm_bits", rctl_path);
+	snprintf(buf, sizeof(buf) - 1, "%s/info/L3/min_cbm_bits",
+	         RESCTRL_ALLOC_PATH);
 
 	fd = fopen(buf, "r");
 	if (fd == NULL)

@@ -173,7 +173,8 @@ style:
 	-f log.c -f log.h -f types.h -f machine.c -f machine.h \
 	-f utils.c -f utils.h \
 	-f cpuinfo.h -f os_allocation.h -f os_allocation.c \
-	-f os_monitoring.h os_monitoring.c
+	-f os_monitoring.h os_monitoring.c \
+	-f resctrl_alloc.h
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE \
@@ -190,7 +191,8 @@ cppcheck:
 	log.c log.h types.h machine.c machine.h \
 	utils.c utils.h \
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
-	os_monitoring.h os_monitoring.c
+	os_monitoring.h os_monitoring.c \
+	resctrl_alloc.h
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

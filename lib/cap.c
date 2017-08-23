@@ -71,6 +71,7 @@
 #include "log.h"
 #include "api.h"
 #include "utils.h"
+#include "resctrl_alloc.h"
 
 /**
  * ---------------------------------------
@@ -1346,7 +1347,7 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
         /**
          * Check if resctrl is mounted
          */
-        if (access("/sys/fs/resctrl/cpus", F_OK) != 0) {
+        if (access(RESCTRL_ALLOC_PATH"/cpus", F_OK) != 0) {
                 LOG_INFO("resctrl not mounted\n");
                 return PQOS_RETVAL_RESOURCE;
         } else if (interface == PQOS_INTER_MSR)
