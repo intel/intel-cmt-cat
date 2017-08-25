@@ -668,6 +668,38 @@ pqos_l2ca_get(const unsigned l2id,
 	return ret;
 }
 
+int
+pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
+{
+	int ret;
+
+	if (min_cbm_bits == NULL)
+		return PQOS_RETVAL_PARAM;
+
+	_pqos_api_lock();
+
+	ret = _pqos_check_init(1);
+	if (ret != PQOS_RETVAL_OK) {
+		_pqos_api_unlock();
+		return ret;
+	}
+
+	if (m_interface == PQOS_INTER_MSR)
+                ret = hw_l2ca_get_min_cbm_bits(min_cbm_bits);
+	else {
+#ifdef __linux__
+		ret = os_l2ca_get_min_cbm_bits(min_cbm_bits);
+#else
+                LOG_INFO("OS interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+#endif
+	}
+
+	_pqos_api_unlock();
+
+	return ret;
+}
+
 /*
  * =======================================
  * Memory Bandwidth Allocation

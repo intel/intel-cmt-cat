@@ -499,11 +499,15 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		if (ret == PQOS_RETVAL_OK)
 			break;
 
-		if (ret != PQOS_RETVAL_RESOURCE) {
-			LOG_ERROR("No free COS available\n");
-			goto pqos_l3ca_get_min_cbm_bits_exit;
-		}
+                if (ret != PQOS_RETVAL_RESOURCE)
+                        goto pqos_l3ca_get_min_cbm_bits_exit;
 	}
+
+        if (ret == PQOS_RETVAL_RESOURCE) {
+                LOG_INFO("No free L3 COS available. "
+                         "Unable to determine minimum L3 CBM bits\n");
+                goto pqos_l3ca_get_min_cbm_bits_exit;
+        }
 
 	/**
 	 * Get current configuration
@@ -672,6 +676,126 @@ hw_l2ca_get(const unsigned l2id,
                 ca[i].ways_mask = val;
         }
         *num_ca = count;
+
+	return ret;
+}
+
+int
+hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
+{
+	int ret;
+        unsigned *l2ids = NULL, l2id_num = 0, l2id;
+	unsigned class_id, l2ca_num, ways, i;
+	int technology = 1 << PQOS_CAP_TYPE_L2CA;
+	const struct pqos_capability *l2_cap = NULL;
+	struct pqos_l2ca l2ca_config[PQOS_MAX_L2CA_COS];
+
+	ASSERT(m_cap != NULL);
+	ASSERT(m_cpu != NULL);
+	ASSERT(min_cbm_bits != NULL);
+
+	/**
+	 * Get L2 CAT capabilities
+	 */
+	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
+
+        /**
+        * Get number & list of L2ids in the system
+        */
+        l2ids = pqos_cpu_get_l2ids(m_cpu, &l2id_num);
+        if (l2ids == NULL || l2id_num == 0) {
+		ret = PQOS_RETVAL_ERROR;
+		goto pqos_l2ca_get_min_cbm_bits_exit;
+	}
+
+	/**
+	 * Find free COS
+	 */
+	for (l2id = 0; l2id < l2id_num; l2id++) {
+		ret = get_unused_cos(l2id, technology, &class_id);
+		if (ret == PQOS_RETVAL_OK)
+			break;
+                if (ret != PQOS_RETVAL_RESOURCE)
+                        goto pqos_l2ca_get_min_cbm_bits_exit;
+	}
+
+        if (ret == PQOS_RETVAL_RESOURCE) {
+                LOG_INFO("No free L2 COS available. "
+                         "Unable to determine minimum L2 CBM bits\n");
+                goto pqos_l2ca_get_min_cbm_bits_exit;
+        }
+
+	/**
+	 * Get current configuration
+	 */
+	ret = hw_l2ca_get(l2id, PQOS_MAX_L2CA_COS, &l2ca_num, l2ca_config);
+	if (ret != PQOS_RETVAL_OK)
+		goto pqos_l2ca_get_min_cbm_bits_exit;
+
+	/**
+	 * Probe for min cbm bits
+	 */
+	for (ways = 1; ways <= l2_cap->u.l2ca->num_ways; ways++) {
+		struct pqos_l2ca l2ca_tab[PQOS_MAX_L2CA_COS];
+		unsigned num_ca;
+		uint64_t mask = (1 << ways) - 1;
+
+		memset(l2ca_tab, 0, sizeof(struct pqos_l2ca));
+		l2ca_tab[0].class_id = class_id;
+		l2ca_tab[0].ways_mask = mask;
+
+		/**
+		 * Try to set mask
+		 */
+		ret = hw_l2ca_set(l2id, 1, l2ca_tab);
+		if (ret != PQOS_RETVAL_OK)
+			continue;
+
+		/**
+		 * Validate if mask was correctly set
+		 */
+		ret = hw_l2ca_get(l2id, PQOS_MAX_L2CA_COS, &num_ca, l2ca_tab);
+		if (ret != PQOS_RETVAL_OK)
+			goto pqos_l2ca_get_min_cbm_bits_restore;
+
+		for (i = 0; i < num_ca; i++) {
+			struct pqos_l2ca *l2ca = &(l2ca_tab[i]);
+
+			if (l2ca->class_id != class_id)
+				continue;
+
+                        if (l2ca->ways_mask == mask) {
+                                *min_cbm_bits = ways;
+				ret = PQOS_RETVAL_OK;
+				goto pqos_l2ca_get_min_cbm_bits_restore;
+                        }
+		}
+	}
+
+	/**
+	 * Restore old settings
+	 */
+pqos_l2ca_get_min_cbm_bits_restore:
+	for (i = 0; i < l2ca_num; i++) {
+		int ret_val;
+
+		if (l2ca_config[i].class_id != class_id)
+			continue;
+
+		ret_val = hw_l2ca_set(l2id, 1, &(l2ca_config[i]));
+		if (ret_val != PQOS_RETVAL_OK) {
+			LOG_ERROR("Failed to restore CAT configuration. CAT"
+			          " configuration has been altered!\n");
+			ret = ret_val;
+			break;
+		}
+	}
+
+pqos_l2ca_get_min_cbm_bits_exit:
+        if (l2ids != NULL)
+                free(l2ids);
 
 	return ret;
 }

@@ -226,6 +226,16 @@ int os_l2ca_get(const unsigned l2id,
                 struct pqos_l2ca *ca);
 
 /**
+ * @brief Check minimum cbm bits accepted by OS interface for L2 CAT
+ *
+ * @param [out] min_cbm_bits minimum number of bits that must be set
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
+
+/**
  * @brief OS interface to set classes of service
  *        defined by \a mba on \a socket
  *

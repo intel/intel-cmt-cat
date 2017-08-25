@@ -1718,6 +1718,40 @@ os_l2ca_get(const unsigned l2id,
 }
 
 int
+os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
+{
+	int ret;
+	char buf[128];
+	const struct pqos_capability *l2_cap = NULL;
+	FILE *fd;
+
+	ASSERT(m_cap != NULL);
+	ASSERT(min_cbm_bits != NULL);
+
+	/**
+	 * Get L2 CAT capabilities
+	 */
+	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
+	if (ret != PQOS_RETVAL_OK)
+		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
+
+	memset(buf, 0, sizeof(buf));
+	snprintf(buf, sizeof(buf) - 1, "%s/info/L2/min_cbm_bits",
+	         RESCTRL_ALLOC_PATH);
+
+	fd = fopen(buf, "r");
+	if (fd == NULL)
+		return PQOS_RETVAL_ERROR;
+
+	if (fscanf(fd, "%u", min_cbm_bits) != 1)
+		ret = PQOS_RETVAL_ERROR;
+
+	fclose(fd);
+
+	return ret;
+}
+
+int
 os_mba_set(const unsigned socket,
            const unsigned num_cos,
            const struct pqos_mba *requested,
