@@ -108,19 +108,21 @@ Hardware Support
 ================
 
 Table 1. Intel(R) RDT hardware support
-+-----------------------------------------------------------------------------------+
-|                                            | CMT | MBM | L3 CAT | L3 CDP | L2 CAT |
-|--------------------------------------------+-----+-----+--------+--------+--------|
-|Intel(R) Xeon(R) processor E5 v3            | Yes | No  | Yes (1)| No     | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------|
-|Intel(R) Xeon(R) processor D                | Yes | Yes | Yes (2)| No     | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------|
-|Intel(R) Xeon(R) processor E3 v4            | No  | No  | Yes (3)| No     | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------|
-|Intel(R) Xeon(R) processor E5 v4            | Yes | Yes | Yes (2)| Yes    | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------|
-|Intel(R) Atom(R) processor for Server C3000 | No  | No  | No     | No     | Yes (4)|
-+-----------------------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------+
+|                                            | CMT | MBM | L3 CAT | L3 CDP | L2 CAT | MBA    |
+|--------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor E5 v3            | Yes | No  | Yes (1)| No     | No     | No     |
+|--------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor D                | Yes | Yes | Yes (2)| No     | No     | No     |
+|--------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor E3 v4            | No  | No  | Yes (3)| No     | No     | No     |
+|--------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor E5 v4            | Yes | Yes | Yes (2)| Yes    | No     | No     |
+|--------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) Scalable Processors (6)    | Yes | Yes | Yes (2)| Yes    | No     | Yes (5)|
+|--------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Atom(R) processor for Server C3000 | No  | No  | No     | No     | Yes (4)| No     |
++--------------------------------------------------------------------------------------------+
 
 References:
 (1) Selected SKU's only:
@@ -145,16 +147,21 @@ References:
     should not be changed at run time.
     L3 CAT CLOS to hardware thread association can be changed at run time.
 
-(4) Four L2 CAT classes of services (CLOS) per L2 cluster.
+(4) Four L2 CAT classes of service (CLOS) per L2 cluster.
     L2 CAT CLOS to hardware thread association can be changed at run time.
+
+(5) Eight MBA classes of service (CLOS). There are no pre-defined
+    classes of service and they can be changed at run time.
+    MBA CLOS to hardware thread association can be changed at run time.
+
+(6) Please find errata for Intel(R) Xeon(R) Processor Scalable Family at:
+    https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/xeon-scalable-spec-update.pdf?asset=14615
+
 
 For additional Intel(R) RDT details please refer to the Intel(R)
 Architecture Software Development Manuals available at:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
 Specific information can be found in volume 3, Chapters 17.16 and 17.17 (revision 059).
-
-Please find errata for Intel(R) Xeon(R) Processor Scalable Family at:
-https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/xeon-scalable-spec-update.pdf?asset=14615
 
 Software Compatibility
 ======================
