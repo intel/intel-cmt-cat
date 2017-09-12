@@ -394,6 +394,7 @@ parse_monitor_event(char *str)
         enum pqos_mon_event evt = 0;
         struct core_group cgrp_tab[PQOS_MAX_CORES];
 
+        memset(cgrp_tab, 0, sizeof(cgrp_tab));
         parse_event(str, &evt);
 
         n = strtocgrps(strchr(str, ':') + 1,
