@@ -638,7 +638,20 @@ int main(int argc, char **argv)
                         selfn_monitor_interval(optarg);
                         break;
                 case 'p':
-		        selfn_monitor_pids(optarg);
+                        if (optarg != NULL && *optarg == '-') {
+                                /**
+                                 * Next switch option wrongly assumed to be
+                                 * argument to '-p'.
+                                 * In order to fix it, we are handling this as
+                                 * '-p' without parameters (as it should be)
+                                 * to start top-pids monitoring mode.
+                                 * Have to rewind \a optind as well.
+                                 */
+                                selfn_monitor_top_pids();
+                                optind--;
+                                break;
+                        }
+                        selfn_monitor_pids(optarg);
                         pid_flag = 1;
                         break;
                 case 'm':
@@ -685,15 +698,23 @@ int main(int argc, char **argv)
                         /**
                          * This is handler for missing mandatory argument
                          * (enabled by leading ':' in getopt() argument).
-                         * -R is only allowed switch for optional argument.
+                         * -R and -p are only allowed switch for optional args.
                          * Other switches need to report error.
                          */
-                        if (optopt != 'R') {
+                        if (optopt == 'R') {
+                                selfn_reset_alloc(NULL);
+                        } else if (optopt == 'p') {
+                                /**
+                                 * Top pids mode - in case of '-I -p' top N
+                                 * pids (by CPU usage) will be displayed and
+                                 * monitored for cache/mbm/misses
+                                 */
+                                selfn_monitor_top_pids();
+                                pid_flag = 1;
+                        } else {
                                 printf("Option -%c is missing required "
                                        "argument\n", optopt);
                                 return EXIT_FAILURE;
-                        } else {
-                                selfn_reset_alloc(NULL);
                         }
                         break;
                 case 'a':

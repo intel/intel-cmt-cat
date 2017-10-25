@@ -47,6 +47,7 @@
 #include <sys/time.h>                                   /**< gettimeofday() */
 #include <time.h>                                       /**< localtime() */
 #include <fcntl.h>
+#include <dirent.h>                                     /**< for dir list*/
 
 #include "pqos.h"
 #include "main.h"
@@ -54,6 +55,10 @@
 
 #define PQOS_MAX_PIDS         128
 #define PQOS_MON_EVENT_ALL    -1
+#define PID_COL_UTIME (14) /**< col for cpu-user time in /proc/pid/stat*/
+#define PID_COL_STIME (15) /**< col for cpu-kernel time in /proc/pid/stat*/
+#define PID_CPU_TIME_DELAY_USEC (1200000) /**< delay for cpu stats */
+#define TOP_PROC_MAX (10) /**< maximum number of top-pids to be handled*/
 
 /**
  * Local data structures
@@ -63,6 +68,11 @@ static const char *xml_root_open = "<records>";
 static const char *xml_root_close = "</records>";
 static const char *xml_child_open = "<record>";
 static const char *xml_child_close = "</record>";
+
+/**
+ * Location of directory with PID's in the system
+ */
+static const char *proc_pids_dir = "/proc";
 
 /**
  * Number of cores that are selected in config string
@@ -139,6 +149,24 @@ static int stop_monitoring_loop = 0;
  * File descriptor for writing monitored data into
  */
 static FILE *fp_monitor = NULL;
+
+/**
+ * Mantains process statistics. It is used for getting N pids to be displayed
+ * in top-pid monitoring mode.
+ */
+struct proc_stats {
+        pid_t pid; /**< process pid */
+        unsigned long ticks_delta; /**< current cpu_time - previous ticks */
+        double cpu_avg_ratio; /**< cpu usage/running time ratio*/
+};
+
+/**
+ * Mantains single linked list implementation
+ */
+struct slist {
+        void *data; /**< abstract data that is hold by a list element */
+        struct slist *next; /**< ptr to next list element */
+};
 
 /**
  * @brief Scale byte value up to KB
@@ -698,6 +726,40 @@ void selfn_monitor_top_like(const char *arg)
 }
 
 /**
+ * @brief Adds pid for monitoring in pid monitoring mode
+ *
+ * @param pid pid number to be added
+ * @param evt indicator of what events to be monitored
+ */
+static void
+add_pid_for_monitoring(const pid_t pid, const enum pqos_mon_event evt)
+{
+        int i, found = 0;
+
+        for (i = 0; i < sel_process_num &&
+             i < (int) DIM(sel_monitor_pid_tab); i++) {
+                if (sel_monitor_pid_tab[i].pid == pid) {
+                        sel_monitor_pid_tab[i].events |= evt;
+                        found = 1;
+                        break;
+                }
+        }
+
+        if (!found && sel_process_num < (int) DIM(sel_monitor_pid_tab)) {
+                struct pid_group *pg =
+                                &sel_monitor_pid_tab[sel_process_num];
+                pg->pid = pid;
+                pg->events = evt;
+                pg->pgrp = malloc(sizeof(*pg->pgrp));
+                if (pg->pgrp == NULL) {
+                        printf("Error with memory allocation");
+                        exit(EXIT_FAILURE);
+                }
+                ++sel_process_num;
+        }
+}
+
+/**
  * @brief Stores the process id's given in a table for future use
  *
  * @param str string of process id's
@@ -709,7 +771,7 @@ sel_store_process_id(char *str)
         unsigned i = 0, n = 0;
         enum pqos_mon_event evt = 0;
 
-	parse_event(str, &evt);
+        parse_event(str, &evt);
 
         n = strlisttotab(strchr(str, ':') + 1, processes, DIM(processes));
 
@@ -727,31 +789,9 @@ sel_store_process_id(char *str)
          *  - update the entry
          *  - else - add it to the sel_monitor_pid_tab
          */
-        for (i = 0; i < n; i++) {
-                int j, found = 0;
+        for (i = 0; i < n; i++)
+                add_pid_for_monitoring(processes[i], evt);
 
-                for (j = 0; j < sel_process_num &&
-                             j < (int) DIM(sel_monitor_pid_tab); j++) {
-                        if (sel_monitor_pid_tab[j].pid == (pid_t)processes[i]) {
-                                sel_monitor_pid_tab[j].events |= evt;
-                                found = 1;
-                                break;
-                        }
-                }
-		if (!found &&
-                    sel_process_num < (int) DIM(sel_monitor_pid_tab)) {
-                        struct pid_group *pg =
-                                &sel_monitor_pid_tab[sel_process_num];
-		        pg->pid = (pid_t)processes[i];
-			pg->events = evt;
-			pg->pgrp = malloc(sizeof(*pg->pgrp));
-			if (pg->pgrp == NULL) {
-			        printf("Error with memory allocation");
-			        exit(EXIT_FAILURE);
-			}
-			++sel_process_num;
-		}
-        }
 }
 
 /**
@@ -784,6 +824,578 @@ selfn_monitor_pids(const char *arg)
         }
 
         free(cp);
+}
+
+/**
+ * @brief Opens /proc/[pid]/stat file for reading and returns pointer to
+ *        associated FILE handle
+ *
+ * @param proc_pid_dir_name name of target PID directory e.g, "1234"
+ * @return ptr to FILE handle for /proc/[pid]/stat file opened for reading
+ */
+static FILE *
+open_proc_stat_file(const char *proc_pid_dir_name)
+{
+        char path_buf[128];
+        const char *proc_stat_path_fmt = "%s/%s/stat";
+
+        ASSERT(proc_pid_dir_name != NULL);
+
+        snprintf(path_buf, sizeof(path_buf) - 1, proc_stat_path_fmt,
+                 proc_pids_dir, proc_pid_dir_name);
+
+        return fopen(path_buf, "r");
+}
+
+/**
+ * @brief Helper function for checking remainder-string filled out by
+ *        strtoul function - checks if conversion succeeded or failed
+ *
+ * @param str_remainder remainder string from strtoul function
+ * @return boolean status of conversion
+ * @retval 0 false, conversion failed
+ * @retval 1 conversion succeeded
+ */
+static int
+is_str_conversion_ok(const char *str_remainder)
+{
+        if (str_remainder == NULL)
+                /* invalid remainder, cannot tell if content is OK or not*/
+                return 0;
+
+        if (*str_remainder == '\0')
+                /* if nothing left for parsing, conversion succeeded*/
+                return 1;
+        else
+                /* conversion failed*/
+                return 0;
+}
+
+/**
+ * @brief Returns combined ticks that process spent by using cpu both in
+ *        userspace and kernel mode
+ *
+ * @param proc_pid_dir_name name of target PID directory e.g, "1234"
+ * @param cputicks[out] cputicks value for given PID, it is filled as 'out'
+ *        value and has to be != NULL
+ * @return operation status
+ * @retval 0 in case of success
+ * @retval -1 in case of error
+ */
+static unsigned long
+get_pid_cputicks(const char *proc_pid_dir_name, unsigned long *cputicks)
+{
+        FILE *fproc_pid_stats;
+        char buf[512];/* line in /proc/PID/stat is quite lengthy*/
+        const char *delim = " ";
+        size_t n_read;
+        char *token, *saveptr;
+        int col_idx = 1;/* starts from '1' like indexes on 'stat' man-page*/
+
+        if (cputicks == NULL)
+                return -1;
+
+        /* it is safer to reset val for cputicks now*/
+        *cputicks = 0;
+
+        fproc_pid_stats = open_proc_stat_file(proc_pid_dir_name);
+        if (fproc_pid_stats == NULL)
+                /* file I/O error, can't continue */
+                return -1;
+
+        /* zeroing entire buffer to make sure that all cases when buf is not
+         * entirely filled (e.g. missing \0 at end) will be handled properly
+         */
+        memset(buf, 0, sizeof(buf));
+        n_read = fread(buf, sizeof(char), sizeof(buf) - 1, fproc_pid_stats);
+
+        /* file no longer needed after read operation finished*/
+        fclose(fproc_pid_stats);
+
+        if (n_read == 0)
+                /* nothing read from stat file - some error occured */
+                return -1;
+
+        token = strtok_r(buf, delim, &saveptr);
+        do {
+                if (col_idx > PID_COL_STIME)
+                        /* we are only interested in 2 columns, so if we have
+                         * our values for cputicks, then we can safely ignore
+                         * the rest
+                         */
+                        break;
+
+                /* adding userspace time and kernel mode time to cpu */
+                if (col_idx == PID_COL_UTIME || col_idx == PID_COL_STIME) {
+                        char *tmp;
+                        long sutime = strtoul(token, &tmp, 10);
+
+                        if (is_str_conversion_ok(tmp))
+                                /* if strtoul parsed entire string, conversion
+                                 * succeded and we can rely on parsed value
+                                 */
+                                *cputicks += sutime;
+                }
+
+                col_idx++;
+        } while ((token = strtok_r(NULL, delim, &saveptr)) != NULL);
+
+        /* valid cputime can be read from *cputicks param*/
+        return 0;
+}
+
+/**
+ * @brief Allocates memory and initializes new list element and returns ptr
+ *        to newly created list-element with given data
+ *
+ * @param data pointer to data that will be stored in list element
+ * @return pointer to allocated and initialized struct slist element. It has to
+ *         be freed when no longer needed
+ */
+static struct slist *
+slist_create_elem(void *data)
+{
+        struct slist *node = (struct slist *)
+                malloc(sizeof(struct slist));
+
+        if (node == NULL) {
+                printf("Error with memory allocation for slist element!");
+                exit(EXIT_FAILURE);
+        }
+
+        node->data = data;
+        node->next = NULL;
+
+        return node;
+}
+
+/**
+ * @brief Looks for an element with given pid in slist of proc_stats elements
+ *
+ * @param pslist pointer to beginning of a slist
+ * @param pid pid to be searched in the slist
+ * @return ptr to found struct proc_stats or NULL in case element with that PID
+ *         has not been found in the slist
+ */
+static struct proc_stats *
+find_proc_stats_by_pid(const struct slist *pslist, const pid_t pid)
+{
+        const struct slist *it = NULL;
+
+        for (it = pslist; it != NULL; it = it->next) {
+                ASSERT(it->data != NULL);
+                struct proc_stats *pstats = (struct proc_stats *)it->data;
+
+                if (pstats->pid == pid)
+                        return pstats;
+
+        }
+
+        return NULL;
+}
+
+/**
+ * @brief Counts cpu_avg_ratio for PID and fills it into proc_stats
+ *
+ * @param pstat[out] proc_stats structure representing stats for process, it
+ *        will be filled with processed cpu_avg_ratio and has to be != NULL
+ * @param proc_start_time time when process has been started (time from
+ *        beginning of epoch in seconds)
+ */
+static void
+fill_cpu_avg_ratio(struct proc_stats *pstat, const time_t proc_start_time)
+{
+        time_t curr_time, run_time;
+
+        ASSERT(pstat != NULL);
+
+        curr_time = time(0);
+        run_time = curr_time - proc_start_time;
+        if (run_time != 0)
+                pstat->cpu_avg_ratio = (double)pstat->ticks_delta / run_time;
+        else
+                pstat->cpu_avg_ratio = 0.0;
+}
+
+/**
+ * @brief Add statistics for given pid in form of proc_stats struct to slist.
+ *        New element-node is allocated and added on beginning of the list.
+ *
+ * @param pslist pointer to single linked list of proc_stats. It will be
+ *        filled with new proc_stats entry. If it equals NULL, new list will
+ *        be started with given element
+ * @param pid process pid to be added
+ * @param cputicks cputicks spent by this process
+ * @param proc_start_time time of process creation(seconds since the Epoch)
+ * @return pointer to beginning of process statistics slist
+ */
+static struct slist *
+add_proc_cpu_stat(struct slist *pslist, const pid_t pid,
+                  const unsigned long cputicks, const time_t proc_start_time)
+{
+        /* have to allocate new proc_stats struct */
+        struct proc_stats *pstat = malloc(sizeof(struct proc_stats));
+
+        if (pstat == NULL) {
+                printf("Error with memory allocation for pstat!");
+                exit(EXIT_FAILURE);
+        }
+
+        pstat->pid = pid;
+        pstat->ticks_delta = cputicks;
+        fill_cpu_avg_ratio(pstat, proc_start_time);
+        struct slist *elem = slist_create_elem(pstat);
+
+        if (pslist == NULL)
+                /* starting new list of proc_stats elements*/
+                pslist = elem;
+        else {
+                /* prepending */
+                elem->next = pslist;
+                pslist = elem;
+        }
+
+        return pslist;
+}
+
+/**
+ * @brief Updates statistics for given pid in in slist
+ *
+ * @param pslist pointer to slist of proc_stats. Only internal data
+ *        will be updated, no new list entries will be created or removed.
+ * @param pid pid number of a process to be updated
+ * @param cputicks cputicks spent by this process
+ */
+static void
+update_proc_cpu_stat(const struct slist *pslist, const pid_t pid,
+                     const unsigned long cputicks)
+{
+        /* at first we have to look for previous stats for a given PID*/
+        struct proc_stats *ps_updt = find_proc_stats_by_pid(pslist, pid);
+
+        if (ps_updt == NULL)
+                /* PID not found, probably new process, can't to fill
+                 * ticks_delta so silently returning unmodified list
+                 */
+                return;
+
+        /* checking if cputicks diff will be valid e.g. won't generate
+         * negative diff number in a result
+         */
+        if (cputicks > ps_updt->ticks_delta)
+                ps_updt->ticks_delta = cputicks - ps_updt->ticks_delta;
+        else {
+                /* Process was sleeping during measurement interval or
+                 * in case of smaller value probably different process
+                 * went into previously used PID. Resetting delta.
+                 */
+                ps_updt->ticks_delta = 0;
+        }
+}
+
+/**
+ * @brief Gets start_time value for given PID directory - this can be used as
+ * information for how long process lives (we can get time of process creation
+ * by checking st_mtime field of /proc/[pid] directory statistics)
+ *
+ * @param proc_dir DIR structure for '/proc' directory
+ * @param pid_dir_name name of PID directory in /proc, e.g. "1234"
+ * @param start_time[out] time when process has been started (time from
+ *        beginning of epoch in seconds)
+ * @return operation status
+ * @retval 0 in case of success
+ * @retval -1 in case of error
+ */
+static int
+get_proc_start_time(DIR *proc_dir, const char *pid_dir_name, time_t *start_time)
+{
+        struct stat p_dir_stat;
+
+        if (start_time == NULL || pid_dir_name == NULL)
+                return -1;
+
+        if (fstatat(dirfd(proc_dir), pid_dir_name, &p_dir_stat, 0) != 0)
+                return -1;
+
+        *start_time = p_dir_stat.st_mtime;
+
+        return 0;
+}
+
+/**
+ * @brief Gets pid number for given /proc/pid directory or returns error if
+ *        given directory does not hold PID information. It can be used to
+ *        filter out non-pid directories in /proc
+ *
+ * @param proc_dir DIR structure for '/proc' directory
+ * @param pid_dir_name name of PID directory in /proc, e.g. "1234"
+ * @param pid[out] pid number to be filled
+ * @return operation status
+ * @retval 0 in case of success
+ * @retval -1 in case of error
+ */
+static int
+get_pid_num_from_dir(DIR *proc_dir, const char *pid_dir_name, pid_t *pid)
+{
+        struct stat p_dir_stat;
+        char *tmp_end;/* used for strtoul error check*/
+        int ret;
+
+        if (pid == NULL || pid_dir_name == NULL)
+                return -1;
+
+        /* trying to get pid number from directory name*/
+        *pid = strtoul(pid_dir_name, &tmp_end, 10);
+        if (!is_str_conversion_ok(tmp_end))
+                return -1; /* conversion failed, not proc-pid */
+
+        ret = fstatat(dirfd(proc_dir), pid_dir_name, &p_dir_stat, 0);
+        if (ret) {
+                /* couldn't get valid stat, can't check pid */
+                perror(pid_dir_name);
+                return -1;
+        }
+
+        if (!S_ISDIR(p_dir_stat.st_mode))
+                return -1; /* ignoring not-directories */
+
+        /* all checks passed, marking as success */
+        return 0;
+}
+
+/**
+ * @brief Fills slist of proc_stats with process cpu usage stats
+ *
+ * @param pslist[out] pointer to pointer to slist of proc_stats to be filled
+ *        with new proc_stats entries or entries that will be updated.
+ *        If pslist points to a NULL, then new slist will be created and thus
+ *        memory has to be freed when list (and list content) won't be needed
+ *        anymore.
+ *        If pslist poinsts to not-NULL slist, then content will be updated
+ *        and no additional memory will be mallocated.
+ * @return 0 in case of success, -1 if failed
+ */
+static int
+get_proc_pids_stats(struct slist **pslist)
+{
+        int initialized = 0;
+        struct dirent *file;
+        DIR *proc_dir = opendir(proc_pids_dir);
+
+        ASSERT(pslist != NULL);
+        if (*pslist != NULL)
+                /* updating existing entries in list of process stats*/
+                initialized = 1;
+
+        if (proc_dir == NULL) {
+                perror("Could not open /proc directory:");
+                return -1;
+        }
+
+        while ((file = readdir(proc_dir)) != NULL) {
+                unsigned long cputicks = 0;
+                time_t start_time = 0;
+                pid_t pid = 0;
+                int err;
+
+                err = get_pid_num_from_dir(proc_dir, file->d_name, &pid);
+                if (err)
+                        continue; /* not a PID directory */
+
+                err = get_pid_cputicks(file->d_name, &cputicks);
+                if (err)
+                        /* couln't get cputicks, ignoring this PID-dir*/
+                        continue;
+
+                if (!initialized) {
+                        err = get_proc_start_time(proc_dir, file->d_name,
+                                                  &start_time);
+                        if (err)
+                        /* start time for given pid is needed for correct CPU
+                         * usage statistics - without that we have to ignore
+                         * problematic pid entry and move on
+                         */
+                                continue;
+
+                        *pslist = add_proc_cpu_stat(*pslist, pid, cputicks,
+                                                    start_time);
+                } else
+                        /* only updating proc_stats entries*/
+                        update_proc_cpu_stat(*pslist, pid, cputicks);
+        }
+
+        closedir(proc_dir);
+        return 0;
+}
+
+/**
+ * @brief Comparator for proc_stats structure - needed for qsort
+ *
+ * @return Comparision status
+ * @retval negative number when (a < b)
+ * @retval 0 when (a == b)
+ * @retval positive number when (a > b)
+ */
+static int
+proc_stats_cmp(const void *a, const void *b)
+{
+        const struct proc_stats *pa = (const struct proc_stats *)a;
+        const struct proc_stats *pb = (const struct proc_stats *)b;
+
+        if (pa->ticks_delta == pb->ticks_delta) {
+                /* when tick deltas are equal then comparing cpu_avg*/
+                /* NOTE: both ratios are double numbers therefore
+                 * comparing here manually to get correct
+                 * integer compare-result (during substracting, if
+                 * difference would be between 0 and 1.0, then it would be
+                 * wrongly returned as '0' int value (a == b))
+                 */
+                if (pa->cpu_avg_ratio < pb->cpu_avg_ratio)
+                        return -1;
+                else if (pa->cpu_avg_ratio > pb->cpu_avg_ratio)
+                        return 1;
+                else
+                        return 0;
+        } else
+                return (pa->ticks_delta - pb->ticks_delta);
+}
+
+/**
+ * @brief Fills top processes array - based on CPU usage of all processes
+ *        statistics in the system stored in given slist.
+ *        From all processes in the system we are choosing 'max_size' amount
+ *        of resulting proc stats with highest CPU usage
+ *
+ * @param pslist list with all processes statistics (holds proc_stats)
+ * @param top_procs[out] array to be filled with top-processes data
+ * @param max_size max number of elements that top_procs can hold
+ *
+ * @return number of valid top processes in top_procs filled array (usually
+ *         this will equal to max_size)
+ */
+static int
+fill_top_procs(const struct slist *pslist, struct proc_stats *top_procs,
+               const int max_size)
+{
+        const struct slist *it = NULL;
+        int current_size = 0;
+
+        ASSERT(top_procs != NULL);
+
+        memset(top_procs, 0, sizeof(top_procs[0]) * max_size);
+
+        /* Iterating on CPU usage stats for all of the stored processes in
+         * pslist in order to get max_size of 'survivors' - processes
+         * with highest CPU usage in the system
+         */
+        for (it = pslist; it != NULL; it = it->next) {
+                struct proc_stats *ps = (struct proc_stats *)it->data;
+
+                ASSERT(ps != NULL);
+
+                /* If we have free slots in top_procs array, then things are
+                 * simple. We have only to add proc_stats into free slot and
+                 * sort entire array afterwards (sorting is done below)
+                 */
+                if (current_size < max_size) {
+                        top_procs[current_size] = *ps;
+                        current_size++;
+                } else {
+                        /* Handling more pids than can be saved in the top-pids
+                         * array. At first we have to check if one of the slots
+                         * can be consumed for current proc stats.
+                         * Only have to compare smallest element in array,
+                         * (list is stored in ascending manner so if it is
+                         * smaller from first element, it will smaller than
+                         * next element as well)
+                         */
+                        if (proc_stats_cmp(ps, &top_procs[0]) <= 0)
+                                /* if it is smaller/equal than smallest
+                                 * element, ignoring and moving on
+                                 */
+                                continue;
+
+                        /* adding at place of the smallest element and array
+                         * will be sorted below
+                         */
+                        top_procs[0] = *ps;
+                }
+
+                /* Some change has been made, we have to sort entire array to
+                 * make sure that array is always sorted before next element
+                 * will be added
+                 */
+                qsort(top_procs, current_size, sizeof(top_procs[0]),
+                      proc_stats_cmp);
+        }
+
+        return current_size;
+}
+
+/**
+ * @brief Looks for processes with highest CPU usage on the system and
+ *        starts monitoring for them. Processes are displayed and sorted
+ *        afterwards by LLC occupancy
+ */
+void
+selfn_monitor_top_pids(void)
+{
+        int res = 0, top_size = 0, i;
+        struct slist *pslist = NULL, *it = NULL;
+        struct proc_stats top_procs[TOP_PROC_MAX];
+
+        printf("Monitoring top-pids enabled\n");
+        sel_mon_top_like = 1;
+
+        /* getting initial values for CPU usage for processes */
+        res = get_proc_pids_stats(&pslist);
+        if (res) {
+                printf("Getting processor usage statistic failed!");
+                goto cleanup_pslist;
+        }
+
+        /* Giving here some time for processess for generating cpu activity.
+         * In general, there are two ways of calculating CPU usage:
+         * -the instantaneous one (checking ticks during last interval)
+         * -average one (reported ps)
+         *
+         * We are using a hybrid approach, at first looking for processes that
+         * did some work in last interval (and this is the reason for sleep
+         * here) but in case that there is not enough processes which reported
+         * cpu ticks, we are checking average ticks ratio for process lifetime.
+         * So the more time time we are sleeping here, the more processes will
+         * report ticks during this sleep interval and less processes will be
+         * found by checking average ticks ratio(it is less accurate method)
+         */
+        usleep(PID_CPU_TIME_DELAY_USEC);
+
+        /* Getting updated CPU usage statistics*/
+        res = get_proc_pids_stats(&pslist);
+        if (res) {
+                printf("Getting updated processor usage statistic failed!");
+                goto cleanup_pslist;
+        }
+
+        top_size = fill_top_procs(pslist, top_procs, TOP_PROC_MAX);
+
+        /* finally we can add list of top-pids for LLC/MBM monitoring
+         * NOTE: list was sorted in ascending order, so in order to have
+         * initially top-cpu processes on top, we are adding in reverse
+         * order
+         */
+        for (i = (top_size - 1); i >= 0; --i)
+                add_pid_for_monitoring(top_procs[i].pid, PQOS_MON_EVENT_ALL);
+
+cleanup_pslist:
+        /* cleaning list of all processes stats */
+        it = pslist;
+        while (it != NULL) {
+                struct slist *tmp = it;
+
+                it = it->next;
+                free(tmp->data);
+                free(tmp);
+        }
 }
 
 /**

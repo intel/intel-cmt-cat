@@ -55,6 +55,13 @@ extern "C" {
 void selfn_monitor_pids(const char *arg);
 
 /**
+ * @brief Looks for processes with highest CPU usage on the system and
+ *        starts monitoring for them. Processes are displayed and sorted
+ *        afterwards by LLC occupancy
+ */
+void selfn_monitor_top_pids(void);
+
+/**
  * @brief Selects top-like monitoring format
  *
  * @param arg not used
