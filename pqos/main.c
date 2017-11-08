@@ -507,6 +507,8 @@ static const char help_printf_long[] =
         "  -v, --verbose               verbose mode\n"
         "  -V, --super-verbose         super-verbose mode\n"
         "  -s, --show                  show current PQoS configuration\n"
+        "  -d, --display               display supported capabilities\n"
+        "  -D, --display-verbose       display supported capabilities in verbose mode\n"
         "  -f FILE, --config-file=FILE load commands from selected file\n"
         "  -l FILE, --log-file=FILE    log messages into selected file\n"
         "  -e CLASSDEF, --alloc-class=CLASSDEF\n"

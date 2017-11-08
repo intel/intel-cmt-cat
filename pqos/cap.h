@@ -32,7 +32,7 @@
  */
 
 /**
- * Capability module
+ * @brief Capability module
  */
 
 #include <stdint.h>

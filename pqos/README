@@ -95,7 +95,8 @@ occupancy as well as memory bandwidth.
 Usage: For pqos utility:
         "./pqos -h"    This option will display extensive help page.
                        Please refer to "-h" option for usage details.
-        "./pqos -s"    Shows current CAT, CMT and MBM configuration.
+        "./pqos -s"    Shows current Intel(R) RDT configuration.
+        "./pqos -d"    Shows detected Intel(R) RDT capabilities (-D for verbose mode).
         "./pqos -T"    Starts CMT and MBM monitoring on all detected
                        cores (depends of hardware feature availability).
         Note: It may be necessary to set "LD_LIBRARY_PATH=path/to/libpqos.so"

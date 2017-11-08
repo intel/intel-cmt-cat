@@ -54,7 +54,7 @@
  *
  * @param [in] indent indentation level
  * @param [in] format format to produce output according to,
- *             variable number of arguments
+ *                    variable number of arguments
  */
 static void
 printf_indent(const unsigned indent, const char *format, ...)
@@ -115,7 +115,7 @@ get_mon_event_name(int event)
 }
 
 /**
- * @brief Print MON capabilities
+ * @brief Print Monitoring capabilities
  *
  * @param [in] indent indentation level
  * @param [in] mon monitoring capability structure
