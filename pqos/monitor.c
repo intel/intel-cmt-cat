@@ -151,7 +151,7 @@ static int stop_monitoring_loop = 0;
 static FILE *fp_monitor = NULL;
 
 /**
- * Mantains process statistics. It is used for getting N pids to be displayed
+ * Maintains process statistics. It is used for getting N pids to be displayed
  * in top-pid monitoring mode.
  */
 struct proc_stats {
@@ -729,7 +729,7 @@ void selfn_monitor_top_like(const char *arg)
  * @brief Adds pid for monitoring in pid monitoring mode
  *
  * @param pid pid number to be added
- * @param evt indicator of what events to be monitored
+ * @param evt events to be monitored
  */
 static void
 add_pid_for_monitoring(const pid_t pid, const enum pqos_mon_event evt)
@@ -831,6 +831,7 @@ selfn_monitor_pids(const char *arg)
  *        associated FILE handle
  *
  * @param proc_pid_dir_name name of target PID directory e.g, "1234"
+ *
  * @return ptr to FILE handle for /proc/[pid]/stat file opened for reading
  */
 static FILE *
@@ -852,8 +853,9 @@ open_proc_stat_file(const char *proc_pid_dir_name)
  *        strtoul function - checks if conversion succeeded or failed
  *
  * @param str_remainder remainder string from strtoul function
+ *
  * @return boolean status of conversion
- * @retval 0 false, conversion failed
+ * @retval 0 conversion failed
  * @retval 1 conversion succeeded
  */
 static int
@@ -873,11 +875,12 @@ is_str_conversion_ok(const char *str_remainder)
 
 /**
  * @brief Returns combined ticks that process spent by using cpu both in
- *        userspace and kernel mode
+ *        user mode and kernel mode
  *
  * @param proc_pid_dir_name name of target PID directory e.g, "1234"
  * @param cputicks[out] cputicks value for given PID, it is filled as 'out'
- *        value and has to be != NULL
+ *                      value and has to be != NULL
+ *
  * @return operation status
  * @retval 0 in case of success
  * @retval -1 in case of error
@@ -913,7 +916,7 @@ get_pid_cputicks(const char *proc_pid_dir_name, unsigned long *cputicks)
         fclose(fproc_pid_stats);
 
         if (n_read == 0)
-                /* nothing read from stat file - some error occured */
+                /* nothing read from stat file - some error occurred */
                 return -1;
 
         token = strtok_r(buf, delim, &saveptr);
@@ -925,14 +928,14 @@ get_pid_cputicks(const char *proc_pid_dir_name, unsigned long *cputicks)
                          */
                         break;
 
-                /* adding userspace time and kernel mode time to cpu */
+                /* store sum of user mode and kernel mode times in cputicks */
                 if (col_idx == PID_COL_UTIME || col_idx == PID_COL_STIME) {
                         char *tmp;
                         long sutime = strtoul(token, &tmp, 10);
 
                         if (is_str_conversion_ok(tmp))
                                 /* if strtoul parsed entire string, conversion
-                                 * succeded and we can rely on parsed value
+                                 * succeeded and we can rely on parsed value
                                  */
                                 *cputicks += sutime;
                 }
@@ -949,6 +952,7 @@ get_pid_cputicks(const char *proc_pid_dir_name, unsigned long *cputicks)
  *        to newly created list-element with given data
  *
  * @param data pointer to data that will be stored in list element
+ *
  * @return pointer to allocated and initialized struct slist element. It has to
  *         be freed when no longer needed
  */
@@ -974,7 +978,8 @@ slist_create_elem(void *data)
  *
  * @param pslist pointer to beginning of a slist
  * @param pid pid to be searched in the slist
- * @return ptr to found struct proc_stats or NULL in case element with that PID
+ *
+ * @return ptr to found struct proc_stats or NULL in case element with given PID
  *         has not been found in the slist
  */
 static struct proc_stats *
@@ -998,9 +1003,10 @@ find_proc_stats_by_pid(const struct slist *pslist, const pid_t pid)
  * @brief Counts cpu_avg_ratio for PID and fills it into proc_stats
  *
  * @param pstat[out] proc_stats structure representing stats for process, it
- *        will be filled with processed cpu_avg_ratio and has to be != NULL
+ *                   will be filled with processed cpu_avg_ratio
+ *                   and has to be != NULL
  * @param proc_start_time time when process has been started (time from
- *        beginning of epoch in seconds)
+ *                        beginning of epoch in seconds)
  */
 static void
 fill_cpu_avg_ratio(struct proc_stats *pstat, const time_t proc_start_time)
@@ -1022,11 +1028,12 @@ fill_cpu_avg_ratio(struct proc_stats *pstat, const time_t proc_start_time)
  *        New element-node is allocated and added on beginning of the list.
  *
  * @param pslist pointer to single linked list of proc_stats. It will be
- *        filled with new proc_stats entry. If it equals NULL, new list will
- *        be started with given element
+ *               filled with new proc_stats entry. If it equals NULL,
+ *               new list will be started with given element
  * @param pid process pid to be added
  * @param cputicks cputicks spent by this process
  * @param proc_start_time time of process creation(seconds since the Epoch)
+ *
  * @return pointer to beginning of process statistics slist
  */
 static struct slist *
@@ -1062,7 +1069,8 @@ add_proc_cpu_stat(struct slist *pslist, const pid_t pid,
  * @brief Updates statistics for given pid in in slist
  *
  * @param pslist pointer to slist of proc_stats. Only internal data
- *        will be updated, no new list entries will be created or removed.
+ *               will be updated, no new list entries will be created
+ *               or removed.
  * @param pid pid number of a process to be updated
  * @param cputicks cputicks spent by this process
  */
@@ -1101,7 +1109,8 @@ update_proc_cpu_stat(const struct slist *pslist, const pid_t pid,
  * @param proc_dir DIR structure for '/proc' directory
  * @param pid_dir_name name of PID directory in /proc, e.g. "1234"
  * @param start_time[out] time when process has been started (time from
- *        beginning of epoch in seconds)
+ *                        beginning of epoch in seconds)
+ *
  * @return operation status
  * @retval 0 in case of success
  * @retval -1 in case of error
@@ -1130,6 +1139,7 @@ get_proc_start_time(DIR *proc_dir, const char *pid_dir_name, time_t *start_time)
  * @param proc_dir DIR structure for '/proc' directory
  * @param pid_dir_name name of PID directory in /proc, e.g. "1234"
  * @param pid[out] pid number to be filled
+ *
  * @return operation status
  * @retval 0 in case of success
  * @retval -1 in case of error
@@ -1167,13 +1177,16 @@ get_pid_num_from_dir(DIR *proc_dir, const char *pid_dir_name, pid_t *pid)
  * @brief Fills slist of proc_stats with process cpu usage stats
  *
  * @param pslist[out] pointer to pointer to slist of proc_stats to be filled
- *        with new proc_stats entries or entries that will be updated.
- *        If pslist points to a NULL, then new slist will be created and thus
- *        memory has to be freed when list (and list content) won't be needed
- *        anymore.
- *        If pslist poinsts to not-NULL slist, then content will be updated
- *        and no additional memory will be mallocated.
- * @return 0 in case of success, -1 if failed
+ *                    with new proc_stats entries or entries that will be
+ *                    updated. If pslist points to a NULL, then new slist will
+ *                    be created and thus memory has to be freed when list
+ *                    (and list content) won't be needed anymore.
+ *                    If pslist points to not-NULL slist, then content will be
+ *                    updated and no additional memory will be mallocated.
+ *
+ * @return operation status
+ * @retval 0 in case of success
+ * @retval -1 in case of error
  */
 static int
 get_proc_pids_stats(struct slist **pslist)
@@ -1204,7 +1217,7 @@ get_proc_pids_stats(struct slist **pslist)
 
                 err = get_pid_cputicks(file->d_name, &cputicks);
                 if (err)
-                        /* couln't get cputicks, ignoring this PID-dir*/
+                        /* couldn't get cputicks, ignoring this PID-dir*/
                         continue;
 
                 if (!initialized) {
@@ -1231,7 +1244,10 @@ get_proc_pids_stats(struct slist **pslist)
 /**
  * @brief Comparator for proc_stats structure - needed for qsort
  *
- * @return Comparision status
+ * @param a proc_stat data A
+ * @param b proc_stat data B
+ *
+ * @return Comparison status
  * @retval negative number when (a < b)
  * @retval 0 when (a == b)
  * @retval positive number when (a > b)
@@ -1246,7 +1262,7 @@ proc_stats_cmp(const void *a, const void *b)
                 /* when tick deltas are equal then comparing cpu_avg*/
                 /* NOTE: both ratios are double numbers therefore
                  * comparing here manually to get correct
-                 * integer compare-result (during substracting, if
+                 * integer compare-result (during subtracting, if
                  * difference would be between 0 and 1.0, then it would be
                  * wrongly returned as '0' int value (a == b))
                  */
@@ -1306,7 +1322,7 @@ fill_top_procs(const struct slist *pslist, struct proc_stats *top_procs,
                          * can be consumed for current proc stats.
                          * Only have to compare smallest element in array,
                          * (list is stored in ascending manner so if it is
-                         * smaller from first element, it will smaller than
+                         * smaller from first element, it is smaller than
                          * next element as well)
                          */
                         if (proc_stats_cmp(ps, &top_procs[0]) <= 0)
@@ -1354,7 +1370,7 @@ selfn_monitor_top_pids(void)
                 goto cleanup_pslist;
         }
 
-        /* Giving here some time for processess for generating cpu activity.
+        /* Giving here some time for processes for generating cpu activity.
          * In general, there are two ways of calculating CPU usage:
          * -the instantaneous one (checking ticks during last interval)
          * -average one (reported ps)

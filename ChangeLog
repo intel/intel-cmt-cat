@@ -1,4 +1,22 @@
 ======================================================================
+Release  v1.2  ....-..-..
+======================================================================
+
+Contributors (alphabetical order):
+        Aaron Hetherington <aaron.hetherington@intel.com>
+        Brian Dooley <brian.dooley@intel.com>
+        Jessica Bizimungu <jessica.bizimungu@intel.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Radoslaw Jablonski <radoslawx.jablonski@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+Summary:
+1. PQoS Utility
+        - Added better feature enumeration functionality
+        - Added top-pids monitoring functionality
+
+======================================================================
 Release  v1.1  2017-07-19
 ======================================================================
 

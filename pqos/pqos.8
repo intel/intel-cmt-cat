@@ -155,14 +155,26 @@ Core statistics can be grouped by enclosing the core list in square brackets.
 .br
 Example "-m llc:[0-3];all:[4,5,6];mbr:[0-3],7,8".
 .TP
-.B \-p EVTPIDS, \-\-mon-pid=EVTPIDS
-select the process ids and events to monitor, EVTPIDS format is "EVENT:PID_LIST". See \-m option for valid EVENT settings. PID_LIST is comma separated list of process ids.
+.B \-p [EVTPIDS], \-\-mon-pid[=EVTPIDS]
+select top 10 most active (CPU utilizing) process ids to monitor
+.br
+or select the process ids and events to monitor, EVTPIDS format is "EVENT:PID_LIST".
+.br
+See \-m option for valid EVENT settings. PID_LIST is comma separated list of process ids.
 .br
 Examples "-p llc:22,25673" or "-p all:892,4588-4592".
 .br
-.B Note: it is not possible to track both processes and cores at the same time.
+Note:
+.RS
+.RS
 .br
-.B Note: Process tracking depends on the library to be built with PID API.
+Requires Linux and kernel versions 4.1 and newer.
+.br
+The \-I option must be used for PID monitoring.
+.br
+It is not possible to track both processes and cores at the same time.
+.RE
+.RE
 .TP
 .B \-T, \-\-mon-top
 enable top like monitoring output sorted by highest LLC occupancy
