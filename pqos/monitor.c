@@ -158,6 +158,7 @@ struct proc_stats {
         pid_t pid; /**< process pid */
         unsigned long ticks_delta; /**< current cpu_time - previous ticks */
         double cpu_avg_ratio; /**< cpu usage/running time ratio*/
+        int valid; /**< marks if statisctics are fully processed */
 };
 
 /**
@@ -1050,6 +1051,7 @@ add_proc_cpu_stat(struct slist *pslist, const pid_t pid,
 
         pstat->pid = pid;
         pstat->ticks_delta = cputicks;
+        pstat->valid = 0;
         fill_cpu_avg_ratio(pstat, proc_start_time);
         struct slist *elem = slist_create_elem(pstat);
 
@@ -1090,14 +1092,25 @@ update_proc_cpu_stat(const struct slist *pslist, const pid_t pid,
         /* checking if cputicks diff will be valid e.g. won't generate
          * negative diff number in a result
          */
-        if (cputicks > ps_updt->ticks_delta)
+        if (cputicks >= ps_updt->ticks_delta) {
                 ps_updt->ticks_delta = cputicks - ps_updt->ticks_delta;
-        else {
-                /* Process was sleeping during measurement interval or
-                 * in case of smaller value probably different process
-                 * went into previously used PID. Resetting delta.
+
+                /* Marking PID statistics as valid - ticks_delta and
+                 * cpu_avg_ratio can be used safely during top-pids
+                 * selection. This kind of checking is needed to get
+                 * rid of dead-pids - processes that existed during
+                 * getting first part of statistics and before updated
+                 * ticks delta was computed.
+                 */
+                ps_updt->valid = 1;
+        } else {
+                /* Probably different process went into previously used PID
+                 * number. Zeroing fields for safety and leaving marked as
+                 * invalid.
                  */
                 ps_updt->ticks_delta = 0;
+                ps_updt->cpu_avg_ratio = 0;
+                ps_updt->valid = 0;
         }
 }
 
@@ -1160,11 +1173,9 @@ get_pid_num_from_dir(DIR *proc_dir, const char *pid_dir_name, pid_t *pid)
                 return -1; /* conversion failed, not proc-pid */
 
         ret = fstatat(dirfd(proc_dir), pid_dir_name, &p_dir_stat, 0);
-        if (ret) {
+        if (ret)
                 /* couldn't get valid stat, can't check pid */
-                perror(pid_dir_name);
                 return -1;
-        }
 
         if (!S_ISDIR(p_dir_stat.st_mode))
                 return -1; /* ignoring not-directories */
@@ -1308,6 +1319,12 @@ fill_top_procs(const struct slist *pslist, struct proc_stats *top_procs,
                 struct proc_stats *ps = (struct proc_stats *)it->data;
 
                 ASSERT(ps != NULL);
+
+                if (ps->valid == 0)
+                        /* ignore not-fully filled entries (e.g. dead PIDs
+                         * or abandoned statistics because of some error)
+                         */
+                        continue;
 
                 /* If we have free slots in top_procs array, then things are
                  * simple. We have only to add proc_stats into free slot and
