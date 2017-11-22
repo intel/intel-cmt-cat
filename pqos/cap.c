@@ -39,7 +39,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#ifdef __linux__
+#include <sys/utsname.h>
+#endif
 #include "pqos.h"
 
 #include "main.h"
@@ -104,7 +106,7 @@ get_mon_event_name(int event)
         case PQOS_MON_EVENT_TMEM_BW:
                 return "Total Memory Bandwidth (TMEM)";
         case PQOS_MON_EVENT_RMEM_BW:
-                return "Remote Memory Bandwidth (RMEM)";
+                return "Remote Memory Bandwidth (RMEM) (calculated)";
         case PQOS_PERF_EVENT_LLC_MISS:
                 return "LLC misses";
         case PQOS_PERF_EVENT_IPC:
@@ -205,7 +207,7 @@ cap_print_features_mon(const unsigned indent,
         }
 
         if (strlen(buffer_other) > 0) {
-                printf_indent(indent + 4, "Other events:\n");
+                printf_indent(indent + 4, "PMU events:\n");
                 printf("%s", buffer_other);
         }
 }
@@ -327,7 +329,7 @@ cap_print_features_hw(const struct pqos_capability *cap_mon,
         /**
          * Print out supported capabilities information
          */
-        printf("RDT Hardware capabilities\n");
+        printf("Hardware capabilities\n");
 
         /**
          * Monitoring capabilities
@@ -373,11 +375,25 @@ cap_print_features_os(const struct pqos_capability *cap_mon,
                       const struct pqos_capability *cap_mba,
                       const int verbose)
 {
+	unsigned i;
         unsigned cat_l2_support = cap_l2ca != NULL && cap_l2ca->os_support;
         unsigned cat_l3_support = cap_l3ca != NULL && cap_l3ca->os_support;
         unsigned mba_support = cap_mba != NULL && cap_mba->os_support;
-        unsigned mon_support = cap_mon != NULL && cap_mon->os_support;
+        unsigned mon_support = 0;
         unsigned min_num_cos = 0;
+#ifdef __linux__
+	struct utsname name;
+#endif
+
+	/**
+	 * Check if at least one event is supported
+	 */
+	if (cap_mon != NULL && cap_mon->os_support)
+		for (i = 0; i < cap_mon->u.mon->num_events; i++)
+			if (cap_mon->u.mon->events[i].os_support) {
+				mon_support = 1;
+				break;
+			}
 
         if (!(cat_l2_support || cat_l3_support || mba_support || mon_support))
                 return;
@@ -398,7 +414,12 @@ cap_print_features_os(const struct pqos_capability *cap_mon,
                     min_num_cos > cap_mba->u.mba->num_classes)
                         min_num_cos = cap_mba->u.mba->num_classes;
 
-        printf("RDT OS capabilities\n");
+        printf("OS capabilities");
+#ifdef __linux__
+	if (uname(&name) >= 0)
+		printf(" (%s kernel %s)", name.sysname, name.release);
+#endif
+	printf("\n");
 
         if (mon_support)
                 cap_print_features_mon(4, cap_mon->u.mon, 1, verbose);
