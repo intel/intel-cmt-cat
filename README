@@ -1,7 +1,7 @@
 ========================================================================
 README for Intel(R) RDT Software Package
 
-November 2017
+March 2018
 
 ========================================================================
 
@@ -12,6 +12,7 @@ Contents
 - Overview
 - Package Content
 - Hardware Support
+- OS Support
 - Software Compatibility
 - Legal Disclaimer
 
@@ -164,10 +165,100 @@ Architecture Software Development Manuals available at:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
 Specific information can be found in volume 3, Chapters 17.18 and 17.19 (revision 064).
 
+
+OS Support
+==========
+
+1. Overview
+Linux is the primary supported operating system at the moment. There is a
+FreeBSD port of the software but due to limited validation scope it is rather
+experimental at this stage. Although most modern Linux kernels include support
+for Intel(R) RDT, the intel-cmt-cat software package predates these extensions
+and can operate with and without kernel support. The intel-cmt-cat software can
+detect and leverage these kernel extensions when available to add functionality,
+but is also compatible with legacy kernels.
+
+2. OS Frameworks
+Linux kernel support for Intel(R) RDT was originally introduced with Linux perf
+system call extensions for CMT and MBM. More recently, the Resctrl interface
+added support for CAT, CDP and MBA. On modern Linux kernels, it is advised to
+use the kernel/OS interface when available. Details about these interfaces can
+be found in intel_rdt_ui.txt. This software package, intel-cmt-cat, remains to
+work seamlessly in all Linux kernel versions.
+
+3. Interfaces
+The intel-cmt-cat software library and utilities offer two interfaces to program
+Intel(R) RDT technologies, these are the MSR & OS interfaces.
+
+The MSR interface is used to configure the platform by programming the hardware
+(MSR's) directly. This is the legacy interface and requires no kernel support
+for Intel(R) RDT but is limited to monitoring and managing resources on a per
+core basis.
+
+The OS interface was later added to the package and when selected, the library
+will leverage Linux kernel extensions to program these technologies. This allows
+monitoring and managing resources on a per core/process basis and should be used
+when available.
+
+Please see the tables below for more information on when Intel(R) RDT feature
+(MSR & OS) support was added to the package.
+
+Table 2. MSR interface feature support
++---------------+-------------------+----------------+
+| intel-cmt-cat |    RDT feature    | Kernel version |
+|    version    |      enabled      |    required    |
++---------------+-------------------+----------------+
+| 0.1.3         | L3 CAT, CMT, MBM  | Any            |
++---------------+-------------------+----------------+
+| 0.1.4         | L3 CDP            | Any            |
++---------------+-------------------+----------------+
+| 0.1.5         | L2 CAT            | Any            |
++---------------+-------------------+----------------+
+| 1.2.0         | MBA               | Any            |
++---------------+-------------------+----------------+
+| 2.0.0         | L2 CDP            | Any            |
++---------------+-------------------+----------------+
+
+Table 3. OS interface feature support
++---------------+-------------------+----------------+----------------------------------------------------+
+| intel-cmt-cat |    RDT feature    | Kernel version | Recommended interface                              |
+|    version    |      enabled      |    required    |                                                    |
++---------------+-------------------+----------------+----------------------------------------------------+
+| 0.1.4         | CMT (Perf)        | 4.1            | MSR (1)                                            |
++---------------+-------------------+----------------+----------------------------------------------------+
+| 1.0.0         | MBM (Perf)        | 4.7            | MSR (1)                                            |
++---------------+-------------------+----------------+----------------------------------------------------+
+| 1.1.0         | L3 CAT, L3 CDP,   | 4.1            | OS for allocation only (with the exception of MBA) |
+|               | L2 CAT (Resctrl)  |                | MSR for allocation + monitoring (2)                |
++---------------+-------------------+----------------+----------------------------------------------------+
+| 1.2.0         | MBA (Resctrl)     | 4.12           | OS for allocation only                             |
+|               |                   |                | MSR for allocation + monitoring (2)                |
++---------------+-------------------+----------------+----------------------------------------------------+
+| 2.0.0         | CMT, MBM (Resctrl)| 4.14           | OS                                                 |
++---------------+-------------------+----------------+----------------------------------------------------+
+| 2.0.0         | L2 CDP            | 4.16           | OS                                                 |
++---------------+-------------------+----------------+----------------------------------------------------+
+
+References:
+(1) Monitoring with Perf on a per core basis is not supported and returns invalid results.
+(2) The MSR and OS interfaces are not compatible. MSR interface is recommended if monitoring and allocation is to be used.
+
+4. Software dependencies
+The only dependencies of intel-cmt-cat is access to C and pthreads libraries and:
+- without kernel extensions - 'msr' kernel module
+- with kernel extensions - Intel(R) RDT extended Perf system call and Resctrl filesystem
+
+Enable Intel(R) RDT support in:
+- kernel v4.10 - v4.13 with kernel configuration option CONFIG_INTEL_RDT_A
+- kernel v4.14+ with kernel configuration option CONFIG_INTEL_RDT
+
+Note: No kernel configuration options required before v4.10.
+
+
 Software Compatibility
 ======================
 
-In short, use intel-cmt-cat or Intel(R) PCM software together with
+In short, using intel-cmt-cat or Intel(R) PCM software together with
 Linux perf and cgroup frameworks is not allowed at the moment.
 
 As disappointing as it is, use of Linux perf for CMT & MBM and
@@ -180,7 +271,7 @@ There are a number of options to choose from in order to make use of CAT:
 - patch kernel with an out of tree cgroup patch (CAT) and
   only use perf for monitoring (CMT kernels 4.1+, MBM kernels 4.6+)
 
-Table 2. Software interoperability matrix
+Table 3. Software interoperability matrix
 +-----------------------------------------------------------------------------------------------+
 |                  | intel-cmt-cat | Intel(R) PCM |  Linux perf  | Linux cgroup | Linux resctrl |
 |------------------+---------------+--------------+--------------+--------------|---------------|
@@ -222,7 +313,7 @@ Intel(R) PCM is available at
 https://software.intel.com/en-us/articles/intel-performance-counter-monitor
 
 
-Table 3. Intel(R) RDT software enabling status.
+Table 4. Intel(R) RDT software enabling status.
 +---------------------------------------------------------------------------------------+
 |                  | Core  | Task  |  CMT  |  MBM  | L3 CAT | L3 CDP  | L2 CAT |  MBA   |
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
