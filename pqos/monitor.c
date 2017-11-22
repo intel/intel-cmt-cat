@@ -55,6 +55,7 @@
 
 #define PQOS_MAX_PIDS         128
 #define PQOS_MON_EVENT_ALL    -1
+#define PID_COL_STATUS (3) /**< col for process status letter*/
 #define PID_COL_UTIME (14) /**< col for cpu-user time in /proc/pid/stat*/
 #define PID_COL_STIME (15) /**< col for cpu-kernel time in /proc/pid/stat*/
 #define PID_CPU_TIME_DELAY_USEC (1200000) /**< delay for cpu stats */
@@ -73,6 +74,11 @@ static const char *xml_child_close = "</record>";
  * Location of directory with PID's in the system
  */
 static const char *proc_pids_dir = "/proc";
+
+/**
+ * White-list of process status fields that can go into top-pids list
+ */
+static const char *proc_stat_whitelist = "RSD";
 
 /**
  * Number of cores that are selected in config string
@@ -928,6 +934,16 @@ get_pid_cputicks(const char *proc_pid_dir_name, unsigned long *cputicks)
                          * the rest
                          */
                         break;
+
+                if (col_idx == PID_COL_STATUS)
+                        /* Searching status column in order to find valid
+                         * status for top-pid mode processes and eliminate
+                         * processes that are zombies, stopped etc.
+                         */
+                        if (token != NULL &&
+                            strpbrk(token, proc_stat_whitelist) == NULL)
+                                /* not valid status, ignoring entry*/
+                                return -1;
 
                 /* store sum of user mode and kernel mode times in cputicks */
                 if (col_idx == PID_COL_UTIME || col_idx == PID_COL_STIME) {
