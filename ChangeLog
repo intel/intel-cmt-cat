@@ -12,7 +12,9 @@ Contributors (alphabetical order):
         Wojciech Andralojc <wojciechx.andralojc@intel.com>
 
 Summary:
-1. PQoS Utility
+1. Library
+        - Added support for MBA configuration via OS interface
+2. PQoS Utility
         - Added better feature enumeration functionality
         - Added top-pids monitoring functionality
 
