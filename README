@@ -1,7 +1,7 @@
 ========================================================================
 README for Intel(R) RDT Software Package
 
-May 2017
+November 2017
 
 ========================================================================
 
@@ -22,7 +22,8 @@ Overview
 This software package provides basic support for
 Intel(R) Resource Director Technology (Intel(R) RDT) including:
 Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
-Cache Allocation Technology (CAT) and Code and Data Prioritization (CDP).
+Cache Allocation Technology (CAT), Code and Data Prioritization (CDP)
+and Memory Bandwidth Allocation (MBA).
 
 In principle, the software programs the technologies via
 Model Specific Registers (MSR) on a hardware thread basis.
@@ -161,7 +162,7 @@ References:
 For additional Intel(R) RDT details please refer to the Intel(R)
 Architecture Software Development Manuals available at:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
-Specific information can be found in volume 3, Chapters 17.16 and 17.17 (revision 059).
+Specific information can be found in volume 3, Chapters 17.18 and 17.19 (revision 064).
 
 Software Compatibility
 ======================

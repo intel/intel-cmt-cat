@@ -35,7 +35,7 @@
 ###############################################################################
 
 LIB = libpqos
-VERSION = 1.1.0
+VERSION = 1.2.0
 SO_VERSION = 1
 SHARED ?= y
 LDFLAGS = -L. -lpthread -fPIE -z noexecstack -z relro -z now
