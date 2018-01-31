@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -434,7 +434,8 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
 }
 
 int
-os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
+os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+               const enum pqos_cdp_config l2_cdp_cfg)
 {
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
@@ -446,6 +447,15 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
                l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+
+        ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
+               l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
+               l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+
+	if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
+		LOG_ERROR("L2 CDP is not supported by OS interfacei\n");
+		return PQOS_RETVAL_ERROR;
+	}
 
         /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);

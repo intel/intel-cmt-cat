@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,7 +57,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION       10200        /**< version 1.2.0 */
+#define PQOS_VERSION       20000        /**< version 2.0.0 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16 x COS */
 #define PQOS_MAX_L2CA_COS  16           /**< 16 x COS */
 
@@ -184,7 +184,9 @@ struct pqos_cap_l3ca {
         int cdp;                        /**< code data prioritization feature
                                            presence */
         int cdp_on;                     /**< code data prioritization on or
-                                           off*/
+                                           off */
+        int os_cdp;                     /**< flag to show if CDP is supported
+                                        by OS interface */
 };
 
 /**
@@ -196,6 +198,12 @@ struct pqos_cap_l2ca {
         unsigned num_ways;              /**< number of cache ways */
         unsigned way_size;              /**< way size in bytes */
         uint64_t way_contention;        /**< ways contention bit mask */
+        int cdp;                        /**< code data prioritization feature
+                                           presence */
+        int cdp_on;                     /**< code data prioritization on or
+                                           off */
+        int os_cdp;                     /**< flag to show if CDP is supported
+                                           by OS interface */
 };
 
 /**
@@ -629,15 +637,17 @@ int pqos_alloc_release_pid(const pid_t *task_array,
  * - all COS are set to give access to entire resource
  *
  * As part of allocation reset CDP reconfiguration can be performed.
- * This can be requested via \a l3_cdp_cfg.
+ * This can be requested via \a l3_cdp_cfg and \a l2_cdp_cfg.
  *
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
+ * @param [in] l2_cdp_cfg requested L2 CAT CDP config
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 int
-pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg);
+pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+                 const enum pqos_cdp_config l2_cdp_cfg);
 
 /*
  * =======================================
@@ -714,8 +724,15 @@ int pqos_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  * L2 cache allocation class of service data structure
  */
 struct pqos_l2ca {
-        unsigned class_id;      /**< class of service */
-        uint32_t ways_mask;     /**< bit mask for L2 cache ways */
+        unsigned class_id;              /**< class of service */
+        int cdp;                        /**< data & code masks used if true */
+        union {
+                uint64_t ways_mask;     /**< bit mask for L2 cache ways */
+                struct {
+                        uint64_t data_mask;
+                        uint64_t code_mask;
+                } s;
+        } u;
 };
 
 /**

@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2016-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -282,7 +282,7 @@ static int init_pqos(void)
 	}
 
         /* Reset CAT */
-	ret = pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY);
+	ret = pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY);
 	if (ret != PQOS_RETVAL_OK) {
                 pqos_fini();
 		printf("Error resetting CAT!\n");

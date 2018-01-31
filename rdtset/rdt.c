@@ -1,7 +1,7 @@
 /*
  *   BSD LICENSE
  *
- *   Copyright(c) 2016-2017 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2016-2018 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -67,7 +67,7 @@ rdt_cfg_print(FILE *stream, const struct rdt_cfg cfg)
 	switch (cfg.type) {
 	case PQOS_CAP_TYPE_L2CA:
 		fprintf(stream, "MASK: 0x%llx",
-			(unsigned long long) cfg.u.l2->ways_mask);
+			(unsigned long long) cfg.u.l2->u.ways_mask);
 		break;
 
 	case PQOS_CAP_TYPE_L3CA:
@@ -133,7 +133,7 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
 
 	switch (cfg.type) {
 	case PQOS_CAP_TYPE_L2CA:
-		return cfg.u.l2 != NULL && cfg.u.l2->ways_mask != 0;
+		return cfg.u.l2 != NULL && cfg.u.l2->u.ways_mask != 0;
 
 	case PQOS_CAP_TYPE_L3CA:
 		/* Validate L3 CAT configuration.
@@ -378,7 +378,7 @@ rdt_ca_str_to_cbm(const char *param, struct rdt_cfg ca)
 	if (PQOS_CAP_TYPE_L2CA == ca.type) {
 		if (mask2 != 0)
 			return -EINVAL;
-		ca.u.l2->ways_mask = mask;
+		ca.u.l2->u.ways_mask = mask;
 	} else {
 		if (mask2 != 0 && is_contiguous("L3", mask2) == 0)
 			return -EINVAL;
@@ -785,7 +785,7 @@ rdt_ca_get_cumulative_cbm(const struct rdt_cfg ca)
 		return UINT64_MAX;
 
 	if (PQOS_CAP_TYPE_L2CA == ca.type)
-		return ca.u.l2->ways_mask;
+		return ca.u.l2->u.ways_mask;
 	if (ca.u.l3->cdp == 1)
 		return ca.u.l3->u.s.code_mask | ca.u.l3->u.s.data_mask;
 
@@ -1062,7 +1062,7 @@ alloc_get_default_cos(struct pqos_l2ca *l2_def, struct pqos_l3ca *l3_def,
 
 	if (m_cap_l2ca != NULL && l2_def != NULL) {
 		memset(l2_def, 0, sizeof(*l2_def));
-		l2_def->ways_mask =
+		l2_def->u.ways_mask =
 			(1ULL << m_cap_l2ca->u.l2ca->num_ways) - 1ULL;
 	}
 

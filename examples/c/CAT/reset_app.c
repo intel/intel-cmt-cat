@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -146,7 +146,8 @@ int main(int argc, char *argv[])
 		goto error_exit;
 	}
 	/* Reset Api */
-	if (pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY) != PQOS_RETVAL_OK)
+	ret = pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY);
+	if (ret != PQOS_RETVAL_OK)
 		printf("CAT reset failed!\n");
 	else
 		printf("CAT reset successful\n");

@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -387,8 +387,10 @@ resctrl_alloc_schemata_init(const unsigned class_id,
 		}
 
 		/* fill class_id */
-		for (i = 0; i < num_ids; i++)
+		for (i = 0; i < num_ids; i++) {
 			schemata->l2ca[i].class_id = class_id;
+			schemata->l2ca[i].cdp = 0;
+		}
 	}
 
 	/* L3 */
@@ -516,7 +518,7 @@ resctrl_alloc_schemata_set(const unsigned res_id,
 	if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L2) {
 		if (schemata->l2ca_num <= res_id)
 			return PQOS_RETVAL_ERROR;
-		schemata->l2ca[res_id].ways_mask = value;
+		schemata->l2ca[res_id].u.ways_mask = value;
 
 	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L3) {
 		if (schemata->l3ca_num <= res_id || schemata->l3ca[res_id].cdp)
@@ -664,7 +666,7 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 		for (i = 0; i < schemata->l2ca_num; i++) {
 			if (i > 0)
 				fprintf(fd, ";");
-			fprintf(fd, "%u=%x", i, schemata->l2ca[i].ways_mask);
+			fprintf(fd, "%u=%lx", i, schemata->l2ca[i].u.ways_mask);
 		}
 		fprintf(fd, "\n");
 	}

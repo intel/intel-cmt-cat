@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -261,7 +261,8 @@ set_l2_cos(const unsigned class_id, const uint64_t mask,
                 return -1;
         }
         ca.class_id = class_id;
-        ca.ways_mask = mask;
+        ca.cdp = 0;
+        ca.u.ways_mask = mask;
 
         /* Set all selected classes */
         for (i = 0; i < id_num; i++) {
@@ -272,8 +273,8 @@ set_l2_cos(const unsigned class_id, const uint64_t mask,
                                l2_ids[i], ca.class_id);
                         break;
                 }
-                printf("L2ID %u L2CA COS%u => MASK 0x%x\n",
-                       l2_ids[i], ca.class_id, ca.ways_mask);
+                printf("L2ID %u L2CA COS%u => MASK 0x%lx\n",
+                       l2_ids[i], ca.class_id, ca.u.ways_mask);
                 set++;
         }
         sel_alloc_mod += set;
@@ -984,7 +985,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         for (n = 0; n < num; n++)
                                 printf("    L2CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
-                                       (unsigned long long)tab[n].ways_mask);
+                                       (unsigned long long)tab[n].u.ways_mask);
                 }
                 free(l2id);
         }

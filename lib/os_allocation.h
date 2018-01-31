@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -142,14 +142,16 @@ int os_alloc_release_pid(const pid_t *task_array,
  * - all cores associated with COS0
  *
  * As part of allocation reset CDP reconfiguration can be performed.
- * This can be requested via \a l3_cdp_cfg.
+ * This can be requested via \a l3_cdp_cfg or \a l2_cdp_cfg.
  *
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
+ * @param [in] l2_cdp_cfg requested L2 CAT CDP config
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg);
+int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+                   const enum pqos_cdp_config l2_cdp_cfg);
 
 /**
  * @brief OS interface to set classes of service

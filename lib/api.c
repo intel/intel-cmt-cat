@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -358,7 +358,8 @@ pqos_alloc_release_pid(const pid_t *task_array,
 }
 
 int
-pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
+pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+                 const enum pqos_cdp_config l2_cdp_cfg)
 {
 	int ret;
 
@@ -367,6 +368,14 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
             l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
                 LOG_ERROR("Unrecognized L3 CDP configuration setting %d!\n",
                           l3_cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (l2_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l2_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
+            l2_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
+                LOG_ERROR("Unrecognized L2 CDP configuration setting %d!\n",
+                          l2_cdp_cfg);
                 return PQOS_RETVAL_PARAM;
         }
 
@@ -379,10 +388,10 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg)
         }
 
 	if (m_interface == PQOS_INTER_MSR)
-                ret = hw_alloc_reset(l3_cdp_cfg);
+                ret = hw_alloc_reset(l3_cdp_cfg, l2_cdp_cfg);
         else {
 #ifdef __linux__
-                ret = os_alloc_reset(l3_cdp_cfg);
+                ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
@@ -612,7 +621,13 @@ pqos_l2ca_set(const unsigned l2id,
 	 * Check if class bitmasks are contiguous
 	 */
 	for (i = 0; i < num_cos; i++) {
-		if (!is_contiguous(ca[i].ways_mask)) {
+                if (ca[i].cdp) {
+                        LOG_ERROR("L2 CDP is not supported");
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+
+		if (!is_contiguous(ca[i].u.ways_mask)) {
 			LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
 			          ca[i].class_id);
 			_pqos_api_unlock();

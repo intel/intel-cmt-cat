@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -842,7 +842,9 @@ int main(int argc, char **argv)
                 /**
                  * Reset allocation configuration to after-reset state and exit
                  */
-                if (pqos_alloc_reset(selfn_l3cdp_config) != PQOS_RETVAL_OK) {
+                ret = pqos_alloc_reset(selfn_l3cdp_config,
+                                       PQOS_REQUIRE_CDP_ANY);
+                if (ret != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("Allocation reset failed!\n");
                 } else
