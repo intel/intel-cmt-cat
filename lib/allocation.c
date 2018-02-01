@@ -80,8 +80,11 @@
 #define PQOS_MSR_L2CA_MASK_START 0xD10
 #define PQOS_MSR_MBA_MASK_START  0xD50
 
-#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< CAT config register */
-#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< CDP enable bit */
+#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< L3 CAT config register */
+#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< L3 CDP enable bit */
+
+#define PQOS_MSR_L2_QOS_CFG          0xC82   /**< L2 CAT config register */
+#define PQOS_MSR_L2_QOS_CFG_CDP_EN   1ULL    /**< L2 CDP enable bit */
 
 /**
  * MBA linear max value
@@ -1109,7 +1112,7 @@ hw_alloc_release(const unsigned *core_array,
  * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
  */
 static int
-cdp_enable(const unsigned sockets_num,
+l3cdp_enable(const unsigned sockets_num,
            const unsigned *sockets,
            const int enable)
 {
@@ -1117,7 +1120,7 @@ cdp_enable(const unsigned sockets_num,
 
         ASSERT(sockets_num > 0 && sockets != NULL);
 
-        LOG_INFO("%s CDP across sockets...\n",
+        LOG_INFO("%s L3 CDP across sockets...\n",
                  (enable) ? "Enabling" : "Disabling");
 
         for (j = 0; j < sockets_num; j++) {
@@ -1139,6 +1142,55 @@ cdp_enable(const unsigned sockets_num,
                         reg &= ~PQOS_MSR_L3_QOS_CFG_CDP_EN;
 
                 ret = msr_write(core, PQOS_MSR_L3_QOS_CFG, reg);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Enables or disables CDP across selected CPU clusters
+ *
+ * @param [in] l2id_num dimension of \a l2ids array
+ * @param [in] l2ids array with clusters ids to change CDP config on
+ * @param [in] enable CDP enable/disable flag, 1 - enable, 0 - disable
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ */
+static int
+l2cdp_enable(const unsigned l2id_num,
+           const unsigned *l2ids,
+           const int enable)
+{
+        unsigned i = 0;
+        int ret;
+
+        ASSERT(l2id_num > 0 && l2ids != NULL);
+
+        LOG_INFO("%s L2 CDP across clusters...\n",
+                 (enable) ? "Enabling" : "Disabling");
+
+        for (i = 0; i < l2id_num; i++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_l2id(m_cpu, l2ids[i], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                ret = msr_read(core, PQOS_MSR_L2_QOS_CFG, &reg);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                if (enable)
+                        reg |= PQOS_MSR_L2_QOS_CFG_CDP_EN;
+                else
+                        reg &= ~PQOS_MSR_L2_QOS_CFG_CDP_EN;
+
+                ret = msr_write(core, PQOS_MSR_L2_QOS_CFG, reg);
                 if (ret != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
         }
@@ -1215,7 +1267,9 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_cap_mba *mba_cap = NULL;
         int ret = PQOS_RETVAL_OK;
         unsigned max_l3_cos = 0;
+        unsigned max_l2_cos = 0;
         unsigned j;
+        int cdp_supported;
 
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
@@ -1225,12 +1279,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
 
-	if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
-		LOG_ERROR("L2 CDP is not supported by MSR interfacei\n");
-                return PQOS_RETVAL_ERROR;
-        }
-
-	/* Get L3 CAT capabilities */
+        /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
@@ -1259,11 +1308,21 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 ret = PQOS_RETVAL_RESOURCE;
                 goto pqos_alloc_reset_exit;
         }
+        /* Check L2 CDP requested while not present */
+        if (l2_cap == NULL && l2_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
+                LOG_ERROR("L2 CDP setting requested but no L2 CAT present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_alloc_reset_exit;
+        }
         if (l3_cap != NULL) {
-                /* Check against erroneous CDP request */
-                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
-                        LOG_ERROR("CAT/CDP requested but not supported by the "
-                                  "platform!\n");
+                ret = pqos_l3ca_cdp_enabled(m_cap, &cdp_supported, NULL);
+                if (ret != PQOS_RETVAL_OK)
+                        goto pqos_alloc_reset_exit;
+
+                /* Check against erroneous L3 CDP request */
+                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !cdp_supported) {
+                        LOG_ERROR("L3 CAT/CDP requested but not supported by "
+                                  "the platform!\n");
                         ret = PQOS_RETVAL_PARAM;
                         goto pqos_alloc_reset_exit;
                 }
@@ -1272,6 +1331,24 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 max_l3_cos = l3_cap->num_classes;
                 if (l3_cap->cdp && l3_cap->cdp_on)
                         max_l3_cos = max_l3_cos * 2;
+        }
+        if (l2_cap != NULL) {
+                ret = pqos_l2ca_cdp_enabled(m_cap, &cdp_supported, NULL);
+                if (ret != PQOS_RETVAL_OK)
+                        goto pqos_alloc_reset_exit;
+
+                /* Check against erroneous L2 CDP request */
+                if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON && !cdp_supported) {
+                        LOG_ERROR("L2 CAT/CDP requested but not supported by "
+                                  "the platform!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto pqos_alloc_reset_exit;
+                }
+
+                /* Get maximum number of L2 CAT classes */
+                max_l2_cos = l2_cap->num_classes;
+                if (l2_cap->cdp && l2_cap->cdp_on)
+                        max_l2_cos = max_l2_cos * 2;
         }
 
         /**
@@ -1286,7 +1363,6 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                  * Change L3 COS definition on all sockets
                  * so that each COS allows for access to all cache ways
                  */
-
                 for (j = 0; j < sockets_num; j++) {
                         unsigned core = 0;
 
@@ -1323,8 +1399,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                                 goto pqos_alloc_reset_exit;
 
                         ret = alloc_cos_reset(PQOS_MSR_L2CA_MASK_START,
-                                              l2_cap->num_classes, core,
-                                              ways_mask);
+                                              max_l2_cos, core, ways_mask);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
                 }
@@ -1335,7 +1410,6 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                  * Go through all sockets and reset MBA class defintions
                  * 0 is the default MBA COS value in linear mode.
                  */
-
                 for (j = 0; j < sockets_num; j++) {
                         unsigned core = 0;
 
@@ -1363,29 +1437,59 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         if (l3_cap != NULL) {
                 if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp_on) {
                         /**
-                         * Turn on CDP
+                         * Turn on L3 CDP
                          */
-                        LOG_INFO("Turning CDP ON ...\n");
-                        ret = cdp_enable(sockets_num, sockets, 1);
+                        LOG_INFO("Turning L3 CDP ON ...\n");
+                        ret = l3cdp_enable(sockets_num, sockets, 1);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("CDP enable error!\n");
+                                LOG_ERROR("L3 CDP enable error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
                         _pqos_cap_l3cdp_change(l3_cap->cdp_on, 1);
                 }
 
-                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF &&
-                    l3_cap->cdp_on && l3_cap->cdp) {
+                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF && l3_cap->cdp_on) {
                         /**
-                         * Turn off CDP
+                         * Turn off L3 CDP
                          */
-                        LOG_INFO("Turning CDP OFF ...\n");
-                        ret = cdp_enable(sockets_num, sockets, 0);
+                        LOG_INFO("Turning L3 CDP OFF ...\n");
+                        ret = l3cdp_enable(sockets_num, sockets, 0);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("CDP disable error!\n");
+                                LOG_ERROR("L3 CDP disable error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
                         _pqos_cap_l3cdp_change(l3_cap->cdp_on, 0);
+                }
+        }
+
+        /**
+         * Turn L2 CDP ON or OFF upon the request
+         */
+        if (l2_cap != NULL) {
+                if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l2_cap->cdp_on) {
+                        /**
+                         * Turn on L2 CDP
+                         */
+                        LOG_INFO("Turning L2 CDP ON ...\n");
+                        ret = l2cdp_enable(l2id_num, l2ids, 1);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("L2 CDP enable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+                        _pqos_cap_l2cdp_change(1);
+                }
+
+                if (l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF && l2_cap->cdp_on) {
+                        /**
+                         * Turn off L2 CDP
+                         */
+                        LOG_INFO("Turning L2 CDP OFF ...\n");
+                        ret = l2cdp_enable(l2id_num, l2ids, 0);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("L2 CDP disable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+                        _pqos_cap_l2cdp_change(0);
                 }
         }
 

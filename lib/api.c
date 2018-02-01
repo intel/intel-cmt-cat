@@ -387,7 +387,7 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 return ret;
         }
 
-	if (m_interface == PQOS_INTER_MSR)
+        if (m_interface == PQOS_INTER_MSR)
                 ret = hw_alloc_reset(l3_cdp_cfg, l2_cdp_cfg);
         else {
 #ifdef __linux__

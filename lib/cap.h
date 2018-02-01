@@ -55,6 +55,16 @@ extern "C" {
 void _pqos_cap_l3cdp_change(const int prev, const int next);
 
 /**
+ * @brief Modifies L2 CAT capability structure upon CDP config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for L2 CAT & CDP support.
+ *
+ * @param [in] cdp_on new L2 CDP setting
+ */
+void _pqos_cap_l2cdp_change(const int cdp_on);
+
+/**
  * @brief Aquires lock for PQoS API use
  *
  * Only one thread at a time is allowed to use the API.

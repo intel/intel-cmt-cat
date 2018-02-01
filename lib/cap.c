@@ -975,7 +975,7 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap,
                 ret = l2cdp_is_enabled(cpu, &cdp_on);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("L2 CDP detection error!\n");
-			free(cap);
+                        free(cap);
                         return ret;
                 }
                 cap->cdp_on = cdp_on;
@@ -1829,5 +1829,36 @@ _pqos_cap_l3cdp_change(const int prev, const int next)
                 /* turn off */
                 l3_cap->cdp_on = 0;
                 l3_cap->num_classes = l3_cap->num_classes * 2;
+        }
+}
+
+void
+_pqos_cap_l2cdp_change(const int cdp_on)
+{
+        struct pqos_cap_l2ca *l2_cap = NULL;
+        unsigned i;
+
+        ASSERT(m_cap != NULL);
+        if (m_cap == NULL)
+                return;
+
+        for (i = 0; i < m_cap->num_cap && l2_cap == NULL; i++)
+                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
+                        l2_cap = m_cap->capabilities[i].u.l2ca;
+
+        if (l2_cap == NULL)
+                return;
+
+        if (l2_cap->cdp_on == cdp_on)
+                return;
+
+        if (cdp_on) {
+                /* turn on */
+                l2_cap->cdp_on = 1;
+                l2_cap->num_classes = l2_cap->num_classes / 2;
+        } else {
+                /* turn off */
+                l2_cap->cdp_on = 0;
+                l2_cap->num_classes = l2_cap->num_classes * 2;
         }
 }
