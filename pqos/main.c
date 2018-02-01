@@ -54,9 +54,14 @@
 #include "cap.h"
 
 /**
- * Default CDP configuration option - don't enforce on or off
+ * Default L3 CDP configuration option - don't enforce on or off
  */
 static enum pqos_cdp_config selfn_l3cdp_config = PQOS_REQUIRE_CDP_ANY;
+
+/**
+ * Default L2 CDP configuration option - don't enforce on or off
+ */
+static enum pqos_cdp_config selfn_l2cdp_config = PQOS_REQUIRE_CDP_ANY;
 
 /**
  * Monitoring reset
@@ -304,26 +309,55 @@ selfn_super_verbose_mode(const char *arg)
 static void selfn_reset_alloc(const char *arg)
 {
         if (arg != NULL && (strlen(arg) > 0)) {
+                unsigned i;
+                char *tok = NULL;
+                char *saveptr = NULL;
+                char *s = NULL;
+
+                selfn_strdup(&s, arg);
+
                 const struct {
                         const char *name;
                         enum pqos_cdp_config cdp;
-                } patterns[] = {
+                } patternsl3[] = {
                         {"l3cdp-on",  PQOS_REQUIRE_CDP_ON},
                         {"l3cdp-off", PQOS_REQUIRE_CDP_OFF},
                         {"l3cdp-any", PQOS_REQUIRE_CDP_ANY},
+                }, patternsl2[] = {
+                        {"l2cdp-on",  PQOS_REQUIRE_CDP_ON},
+                        {"l2cdp-off", PQOS_REQUIRE_CDP_OFF},
+                        {"l2cdp-any", PQOS_REQUIRE_CDP_ANY},
                 };
-                unsigned i;
 
-                for (i = 0; i < DIM(patterns); i++)
-                        if (strcasecmp(arg, patterns[i].name) == 0)
-                                break;
+                tok = s;
+                while ((tok = strtok_r(tok, ",", &saveptr)) != NULL) {
+                        unsigned valid = 0;
 
-                if (i >= DIM(patterns)) {
-                        printf("Unrecognized '%s' allocation "
-                               "reset option!\n", arg);
-                        exit(EXIT_FAILURE);
+                        for (i = 0; i < DIM(patternsl3); i++)
+                                if (strcasecmp(tok, patternsl3[i].name) == 0) {
+                                        selfn_l3cdp_config = patternsl3[i].cdp;
+                                        valid = 1;
+                                        break;
+                                }
+
+                        for (i = 0; i < DIM(patternsl2); i++)
+                                if (strcasecmp(tok, patternsl2[i].name) == 0) {
+                                        selfn_l2cdp_config = patternsl2[i].cdp;
+                                        valid = 1;
+                                        break;
+                                }
+
+                        if (!valid) {
+                                printf("Unrecognized '%s' allocation "
+                                       "reset option!\n", tok);
+                                free(s);
+                                exit(EXIT_FAILURE);
+                        }
+
+                        tok = NULL;
                 }
-                selfn_l3cdp_config = patterns[i].cdp;
+
+                free(s);
         }
         sel_reset_alloc = 1;
 }
@@ -843,7 +877,7 @@ int main(int argc, char **argv)
                  * Reset allocation configuration to after-reset state and exit
                  */
                 ret = pqos_alloc_reset(selfn_l3cdp_config,
-                                       PQOS_REQUIRE_CDP_ANY);
+                                       selfn_l2cdp_config);
                 if (ret != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("Allocation reset failed!\n");
