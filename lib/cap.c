@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -89,8 +89,8 @@
 
 #define PQOS_CPUID_CAT_CDP_BIT       2       /**< CDP supported bit */
 
-#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< CAT config register */
-#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< CDP enable bit */
+#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< L3 CAT config register */
+#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< L3 CDP enable bit */
 
 #define PQOS_MSR_L3CA_MASK_START     0xC90   /**< L3 CAT class 0 register */
 #define PQOS_MSR_L3CA_MASK_END       0xD0F   /**< L3 CAT class 127 register */
@@ -98,6 +98,9 @@
                                                 register */
 #define PQOS_MSR_ASSOC_QECOS_SHIFT   32
 #define PQOS_MSR_ASSOC_QECOS_MASK    0xffffffff00000000ULL
+
+#define PQOS_MSR_L2_QOS_CFG          0xC82   /**< L2 CAT config register */
+#define PQOS_MSR_L2_QOS_CFG_CDP_EN   1ULL    /**< L2 CDP enable bit */
 
 #define PQOS_MSR_L2CA_MASK_START     0xC10   /**< L2 CAT class 0 register */
 #define PQOS_MSR_L2CA_MASK_END       0xD8F   /**< L2 CAT class 127 register */
@@ -479,21 +482,21 @@ discover_monitoring(struct pqos_cap_mon **r_mon,
 }
 
 /**
- * @brief Checks CDP enable status across all CPU sockets
+ * @brief Checks L3 CDP enable status across all CPU sockets
  *
- * It also validates if CDP enabling is consistent across
+ * It also validates if L3 CDP enabling is consistent across
  * CPU sockets.
  * At the moment, such scenario is considered as error
  * that requires CAT reset.
  *
  * @param cpu detected CPU topology
- * @param enabled place to store CDP enabling status
+ * @param enabled place to store L3 CDP enabling status
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-cdp_is_enabled(const struct pqos_cpuinfo *cpu,
+l3cdp_is_enabled(const struct pqos_cpuinfo *cpu,
                int *enabled)
 {
         unsigned *sockets = NULL;
@@ -520,13 +523,13 @@ cdp_is_enabled(const struct pqos_cpuinfo *cpu,
 
                 ret = pqos_cpu_get_one_core(cpu, sockets[j], &core);
                 if (ret != PQOS_RETVAL_OK)
-			goto cdp_is_enabled_exit;
+                        goto l3cdp_is_enabled_exit;
 
                 if (msr_read(core, PQOS_MSR_L3_QOS_CFG, &reg) !=
                     MACHINE_RETVAL_OK) {
-			ret = PQOS_RETVAL_ERROR;
-			goto cdp_is_enabled_exit;
-		}
+                        ret = PQOS_RETVAL_ERROR;
+                        goto l3cdp_is_enabled_exit;
+                }
 
                 if (reg & PQOS_MSR_L3_QOS_CFG_CDP_EN)
                         enabled_num++;
@@ -535,20 +538,92 @@ cdp_is_enabled(const struct pqos_cpuinfo *cpu,
         }
 
         if (disabled_num > 0 && enabled_num > 0) {
-                LOG_ERROR("Inconsistent CDP settings across sockets."
+                LOG_ERROR("Inconsistent L3 CDP settings across sockets."
                           "Please reset CAT or reboot your system!\n");
                 ret = PQOS_RETVAL_ERROR;
-		goto cdp_is_enabled_exit;
+                goto l3cdp_is_enabled_exit;
         }
 
         if (enabled_num > 0)
                 *enabled = 1;
 
-        LOG_INFO("CDP is %s\n",
-                 (*enabled) ? "enabled" : "disabled");
+        LOG_INFO("L3 CDP is %s\n", (*enabled) ? "enabled" : "disabled");
 
- cdp_is_enabled_exit:
-	free(sockets);
+ l3cdp_is_enabled_exit:
+        if (sockets != NULL)
+                free(sockets);
+
+        return ret;
+}
+
+/**
+ * @brief Checks L2 CDP enable status across all CPU clusters
+ *
+ * It also validates if L2 CDP enabling is consistent across
+ * CPU clusters.
+ * At the moment, such scenario is considered as error
+ * that requires CAT reset.
+ *
+ * @param cpu detected CPU topology
+ * @param enabled place to store L2 CDP enabling status
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+l2cdp_is_enabled(const struct pqos_cpuinfo *cpu, int *enabled)
+{
+        unsigned *l2ids = NULL;
+        unsigned l2id_num = 0;
+        unsigned enabled_num = 0, disabled_num = 0;
+        unsigned i;
+        int ret = PQOS_RETVAL_OK;
+
+        /**
+         * Get list of L2 clusters id's
+         */
+        l2ids = pqos_cpu_get_l2ids(cpu, &l2id_num);
+        if (l2ids == NULL || l2id_num == 0) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto l2cdp_is_enabled_exit;
+        }
+
+        for (i = 0; i < l2id_num; i++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_l2id(cpu, l2ids[i], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        goto l2cdp_is_enabled_exit;
+
+                if (msr_read(core, PQOS_MSR_L2_QOS_CFG, &reg) !=
+                    MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto l2cdp_is_enabled_exit;
+                }
+
+                if (reg & PQOS_MSR_L2_QOS_CFG_CDP_EN)
+                        enabled_num++;
+                else
+                        disabled_num++;
+        }
+
+        if (disabled_num > 0 && enabled_num > 0) {
+                LOG_ERROR("Inconsistent L2 CDP settings across clusters."
+                          "Please reset CAT or reboot your system!\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto l2cdp_is_enabled_exit;
+        }
+
+        if (enabled_num > 0)
+                *enabled = 1;
+
+        LOG_INFO("L2 CDP is %s\n", (*enabled) ? "enabled" : "disabled");
+
+ l2cdp_is_enabled_exit:
+        if (l2ids != NULL)
+                free(l2ids);
+
         return ret;
 }
 
@@ -725,6 +800,7 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
         cap->num_ways = res.eax + 1;
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
         cap->cdp_on = 0;
+	cap->os_cdp = 0;
         cap->way_contention = (uint64_t) res.ebx;
 
         if (cap->cdp) {
@@ -733,9 +809,9 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
                  */
                 int cdp_on = 0;
 
-                ret = cdp_is_enabled(cpu, &cdp_on);
+                ret = l3cdp_is_enabled(cpu, &cdp_on);
                 if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("CDP detection error!\n");
+                        LOG_ERROR("L3 CDP detection error!\n");
                         return ret;
                 }
                 cap->cdp_on = cdp_on;
@@ -885,7 +961,27 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap,
 
 	cap->num_classes = res.edx+1;
 	cap->num_ways = res.eax+1;
+        cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
+        cap->cdp_on = 0;
+	cap->os_cdp = 0;
 	cap->way_contention = (uint64_t) res.ebx;
+
+        if (cap->cdp) {
+                int cdp_on = 0;
+
+                /*
+                 * Check if L2 CDP is enabled
+                 */
+                ret = l2cdp_is_enabled(cpu, &cdp_on);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("L2 CDP detection error!\n");
+			free(cap);
+                        return ret;
+                }
+                cap->cdp_on = cdp_on;
+                if (cdp_on)
+                        cap->num_classes = cap->num_classes / 2;
+        }
 
 	ret = get_cache_info(&cpu->l2, NULL, &l2_size);
 	if (ret != PQOS_RETVAL_OK) {
@@ -896,9 +992,10 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap,
 	if (cap->num_ways > 0)
 		cap->way_size = l2_size / cap->num_ways;
 
-	LOG_INFO("L2 CAT details: "
+	LOG_INFO("L2 CAT details: CDP support=%d, CDP on=%d, "
 		 "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
-		 cap->num_classes, cap->num_ways, cap->way_contention);
+		 cap->cdp, cap->cdp_on, cap->num_classes, cap->num_ways,
+                 cap->way_contention);
 	LOG_INFO("L2 CAT details: cache size %u bytes, way size %u bytes\n",
 		 l2_size, cap->way_size);
 
@@ -1340,6 +1437,20 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
                  */
                 if (type == PQOS_CAP_TYPE_L3CA && *os_ptr == 0 && res_flag)
                         *os_ptr = 1;
+
+		/**
+		 * Discover L3 CDP support
+		 */
+		if (type == PQOS_CAP_TYPE_L3CA && *os_ptr) {
+			ret = detect_os_support("/proc/cpuinfo", "cdp_l3",
+			                        &capability->u.l3ca->os_cdp);
+			if (ret != PQOS_RETVAL_OK) {
+				LOG_ERROR("Fatal error encountered in L3 CDP "
+				          "detection!\n");
+				return ret;
+			}
+		}
+
 
                 LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
                          "detected" : "not detected");
