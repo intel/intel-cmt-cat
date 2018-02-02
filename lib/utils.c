@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -493,9 +493,43 @@ pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
                 return ret;                           /**< no L3CA capability */
 
         ASSERT(item != NULL);
-        if (cdp_supported != NULL)
-                *cdp_supported = item->u.l3ca->cdp;
+        if (cdp_supported != NULL) {
+                if (m_interface == PQOS_INTER_MSR)
+                        *cdp_supported = item->u.l3ca->cdp;
+                else if (m_interface == PQOS_INTER_OS)
+                        *cdp_supported = item->u.l3ca->os_cdp;
+        }
         if (cdp_enabled != NULL)
                 *cdp_enabled = item->u.l3ca->cdp_on;
+
+        return ret;
+}
+
+int
+pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
+                      int *cdp_supported,
+                      int *cdp_enabled)
+{
+        const struct pqos_capability *l2ca = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cap != NULL && (cdp_enabled != NULL || cdp_supported != NULL));
+        if (cap == NULL || (cdp_enabled == NULL && cdp_supported == NULL))
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &l2ca);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;                           /**< no L2CA capability */
+
+        ASSERT(l2ca != NULL);
+        if (cdp_supported != NULL) {
+                if (m_interface == PQOS_INTER_MSR)
+                        *cdp_supported = l2ca->u.l2ca->cdp;
+                else if (m_interface == PQOS_INTER_OS)
+                        *cdp_supported = l2ca->u.l2ca->os_cdp;
+        }
+        if (cdp_enabled != NULL)
+                *cdp_enabled = l2ca->u.l2ca->cdp_on;
+
         return ret;
 }

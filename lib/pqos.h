@@ -1064,18 +1064,34 @@ pqos_mba_get_cos_num(const struct pqos_cap *cap,
                      unsigned *cos_num);
 
 /**
- * @brief Retrieves CDP status
+ * @brief Retrieves L3 CDP status
  *
  * @param [in] cap platform QoS capabilities structure
  *                 returned by \a pqos_cap_get
- * @param [out] cdp_supported place to store CDP support status
- * @param [out] cdp_enabled place to store CDP enable status
+ * @param [out] cdp_supported place to store L3 CDP support status
+ * @param [out] cdp_enabled place to store L3 CDP enable status
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 int
 pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
+                      int *cdp_supported,
+                      int *cdp_enabled);
+
+/**
+ * @brief Retrieves L2 CDP status
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] cdp_supported place to store L2 CDP support status
+ * @param [out] cdp_enabled place to store L2 CDP enable status
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
                       int *cdp_supported,
                       int *cdp_enabled);
 
