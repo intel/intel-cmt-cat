@@ -441,7 +441,7 @@ hw_l3ca_get(const unsigned socket,
 
                         ca[i].u.s.data_mask = val;
 
-                        retval = msr_read(core, reg+1, &val);
+                        retval = msr_read(core, reg + 1, &val);
                         if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
 
@@ -654,6 +654,7 @@ hw_l2ca_get(const unsigned l2id,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0;
         unsigned core = 0;
+        int cdp_enabled = 0;
 
 	ASSERT(num_ca != NULL);
 	ASSERT(ca != NULL);
@@ -662,6 +663,10 @@ hw_l2ca_get(const unsigned l2id,
 	ret = pqos_l2ca_get_cos_num(m_cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
+
+        ret = pqos_l2ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
 	if (max_num_ca < count)
 		/* Not enough space to store the classes */
@@ -673,16 +678,36 @@ hw_l2ca_get(const unsigned l2id,
                 return ret;
 
         for (i = 0; i < count; i++) {
-                const uint32_t reg = PQOS_MSR_L2CA_MASK_START + i;
-                uint64_t val = 0;
-                int retval = msr_read(core, reg, &val);
+                int retval;
+                uint64_t val;
 
-                if (retval != MACHINE_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-
-                ca[i].cdp = 0;
                 ca[i].class_id = i;
-                ca[i].u.ways_mask = val;
+                ca[i].cdp = cdp_enabled;
+
+                if (cdp_enabled) {
+                        const uint32_t reg = PQOS_MSR_L2CA_MASK_START + i * 2;
+
+                        retval = msr_read(core, reg, &val);
+                        if (retval != MACHINE_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+
+                        ca[i].u.s.data_mask = val;
+
+                        retval = msr_read(core, reg + 1, &val);
+                        if (retval != MACHINE_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+
+                        ca[i].u.s.code_mask = val;
+
+                } else {
+                        const uint32_t reg = PQOS_MSR_L2CA_MASK_START + i;
+
+                        retval = msr_read(core, reg, &val);
+                        if (retval != MACHINE_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+
+                        ca[i].u.ways_mask = val;
+                }
         }
         *num_ca = count;
 
