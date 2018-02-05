@@ -1451,7 +1451,6 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 			}
 		}
 
-
                 LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
                          "detected" : "not detected");
         }

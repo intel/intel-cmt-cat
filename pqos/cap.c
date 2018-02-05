@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -217,20 +217,25 @@ cap_print_features_mon(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] l3ca L3 CAT capability structure
+ * @param [in] iface PQoS interface
  * @param [in] verbose verbose mode
  */
 static void
 cap_print_features_l3ca(const unsigned indent,
                         const struct pqos_cap_l3ca *l3ca,
+                        const int iface,
                         const int verbose)
 {
         unsigned min_cbm_bits;
+        int cdp_supported;
 
         ASSERT(l3ca != NULL);
 
+        cdp_supported = (iface == PQOS_INTER_OS) ? l3ca->os_cdp : l3ca->cdp;
+
         printf_indent(indent, "L3 CAT\n");
         printf_indent(indent + 4, "CDP: %s\n",
-                l3ca->cdp ? (l3ca->cdp_on ? "enabled" : "disabled") :
+                cdp_supported ? (l3ca->cdp_on ? "enabled" : "disabled") :
                 "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l3ca->num_classes);
 
@@ -252,18 +257,26 @@ cap_print_features_l3ca(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] l2ca L2 CAT capability structure
+ * @param [in] iface PQoS interface
  * @param [in] verbose verbose mode
  */
 static void
 cap_print_features_l2ca(const unsigned indent,
                         const struct pqos_cap_l2ca *l2ca,
+                        const int iface,
                         const int verbose)
 {
         unsigned min_cbm_bits;
+        int cdp_supported;
 
         ASSERT(l2ca != NULL);
 
+        cdp_supported = (iface == PQOS_INTER_OS) ? l2ca->os_cdp : l2ca->cdp;
+
         printf_indent(indent, "L2 CAT\n");
+        printf_indent(indent + 4, "CDP: %s\n",
+                cdp_supported ? (l2ca->cdp_on ? "enabled" : "disabled") :
+                "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l2ca->num_classes);
 
         if (!verbose)
@@ -347,10 +360,12 @@ cap_print_features_hw(const struct pqos_capability *cap_mon,
                 printf_indent(8, "Cache Allocation Technology (CAT)\n");
 
         if (cap_l3ca != NULL)
-                cap_print_features_l3ca(12, cap_l3ca->u.l3ca, verbose);
+                cap_print_features_l3ca(12, cap_l3ca->u.l3ca, PQOS_INTER_MSR,
+                                        verbose);
 
         if (cap_l2ca != NULL)
-                cap_print_features_l2ca(12, cap_l2ca->u.l2ca, verbose);
+                cap_print_features_l2ca(12, cap_l2ca->u.l2ca, PQOS_INTER_MSR,
+                                        verbose);
 
         /**
          * Memory Bandwidth Allocation capabilities
@@ -435,7 +450,7 @@ cap_print_features_os(const struct pqos_capability *cap_mon,
 
                 l3ca.num_classes = min_num_cos;
 
-                cap_print_features_l3ca(12, &l3ca, NON_VERBOSE);
+                cap_print_features_l3ca(12, &l3ca, PQOS_INTER_OS, NON_VERBOSE);
         }
 
         if (cat_l2_support) {
@@ -443,7 +458,7 @@ cap_print_features_os(const struct pqos_capability *cap_mon,
 
                 l2ca.num_classes = min_num_cos;
 
-                cap_print_features_l2ca(12, &l2ca, NON_VERBOSE);
+                cap_print_features_l2ca(12, &l2ca, PQOS_INTER_OS, NON_VERBOSE);
         }
 
         if (mba_support) {
