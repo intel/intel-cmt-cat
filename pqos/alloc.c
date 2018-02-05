@@ -153,7 +153,7 @@ parse_cos_mask_type(char *str, int *scope, unsigned *id)
  * @param mask class bitmask to set
  * @param sock_ids Array of socket ID's to set class definition
  * @param sock_num Number of socket ID's in the array
- * @scope scope L3 CAT update scope i.e. CDP Code/Data
+ * @param scope L3 CAT update scope i.e. CDP Code/Data
  *
  * @return Number of classes set
  * @retval -1 on error
@@ -245,37 +245,85 @@ set_l3_cos(const unsigned class_id, const uint64_t mask,
  * @param mask class bitmask to set
  * @param l2_ids Array of L2 ID's to set class definition
  * @param id_num Number of L2 ID's in the array
+ * @param scope L2 CAT update scope i.e. CDP Code/Data
  *
  * @return Number of classes set
  * @retval -1 on error
  */
 static int
-set_l2_cos(const unsigned class_id, const uint64_t mask,
-           const unsigned *l2_ids, const unsigned id_num)
+set_l2_cos(const unsigned class_id,
+           const uint64_t mask,
+           const unsigned *l2_ids,
+           const unsigned id_num,
+           const unsigned scope)
 {
         unsigned i, set = 0;
-        struct pqos_l2ca ca;
 
         if (l2_ids == NULL || mask == 0) {
                 printf("Failed to set L2 CAT configuration!\n");
                 return -1;
         }
-        ca.class_id = class_id;
-        ca.cdp = 0;
-        ca.u.ways_mask = mask;
 
-        /* Set all selected classes */
+        /**
+         * Loop through each cluster and set selected classes
+         */
         for (i = 0; i < id_num; i++) {
-                int ret = pqos_l2ca_set(l2_ids[i], 1, &ca);
+                int ret;
+                unsigned j, num_ca;
+                struct pqos_l2ca ca, cluster_l2ca[PQOS_MAX_L2CA_COS];
 
+                /* get current L2 definitions for this cluster */
+                ret = pqos_l2ca_get(l2_ids[i], DIM(cluster_l2ca),
+                                    &num_ca, cluster_l2ca);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Failed to retrieve cluster %u L2 classes!\n",
+                               l2_ids[i]);
+                        break;
+                }
+                /* find selected class in array */
+                for (j = 0; j < num_ca; j++)
+                        if (cluster_l2ca[j].class_id == class_id) {
+                                ca = cluster_l2ca[j];
+                                break;
+                        }
+                if (j == num_ca) {
+                        printf("Invalid class ID: %u!\n", class_id);
+                        break;
+                }
+                /* check if CDP is selected but disabled */
+                if (!ca.cdp && scope != CAT_UPDATE_SCOPE_BOTH) {
+                        printf("Failed to set L2 class on cluster %u, "
+                               "CDP not enabled!\n", l2_ids[i]);
+                        break;
+                }
+                /* if CDP is enabled */
+                if (ca.cdp) {
+                        if (scope == CAT_UPDATE_SCOPE_BOTH) {
+                                ca.u.s.code_mask = mask;
+                                ca.u.s.data_mask = mask;
+                        } else if (scope == CAT_UPDATE_SCOPE_CODE)
+                                ca.u.s.code_mask = mask;
+                        else if (scope == CAT_UPDATE_SCOPE_DATA)
+                                ca.u.s.data_mask = mask;
+                } else
+                        ca.u.ways_mask = mask;
+
+                /* set new L2 class definition */
+                ret = pqos_l2ca_set(l2_ids[i], 1, &ca);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("L2ID %u L2CA COS%u - FAILED!\n",
                                l2_ids[i], ca.class_id);
                         break;
                 }
-                printf("L2ID %u L2CA COS%u => MASK 0x%llx\n",
-                       l2_ids[i], ca.class_id, (unsigned long long)
-		       ca.u.ways_mask);
+                if (ca.cdp)
+                        printf("L2ID %u L2CA COS%u => DATA 0x%lx,CODE 0x%lx\n",
+                               l2_ids[i], ca.class_id,
+                               (long) ca.u.s.data_mask,
+                               (long) ca.u.s.code_mask);
+                else
+                        printf("L2ID %u L2CA COS%u => MASK 0x%lx\n",
+                               l2_ids[i], ca.class_id,
+                               (long) ca.u.ways_mask);
                 set++;
         }
         sel_alloc_mod += set;
@@ -383,11 +431,6 @@ set_allocation_cos(char *str, unsigned *res_ids,
                 return ret;
         }
 
-        if (type == L2CA && update_scope != CAT_UPDATE_SCOPE_BOTH) {
-                parse_error(str, "CDP not supported for L2 CAT!\n");
-                return ret;
-        }
-
         /* if L2 CAT selected, set L2 classes */
         if (type == L2CA) {
                 if (ids == NULL)
@@ -396,7 +439,7 @@ set_allocation_cos(char *str, unsigned *res_ids,
                         printf("Failed to retrieve L2 cluster info!\n");
                         return -1;
                 }
-                ret = set_l2_cos(class_id, mask, ids, n);
+                ret = set_l2_cos(class_id, mask, ids, n, update_scope);
                 if (res_ids == NULL && ids != NULL)
                         free(ids);
                 return ret;
