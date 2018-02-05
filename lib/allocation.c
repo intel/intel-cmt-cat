@@ -772,7 +772,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         l2ids = pqos_cpu_get_l2ids(m_cpu, &l2id_num);
         if (l2ids == NULL || l2id_num == 0) {
 		ret = PQOS_RETVAL_ERROR;
-		goto pqos_l2ca_get_min_cbm_bits_exit;
+		goto hw_l2ca_get_min_cbm_bits_exit;
 	}
 
 	/**
@@ -783,13 +783,13 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		if (ret == PQOS_RETVAL_OK)
 			break;
                 if (ret != PQOS_RETVAL_RESOURCE)
-                        goto pqos_l2ca_get_min_cbm_bits_exit;
+                        goto hw_l2ca_get_min_cbm_bits_exit;
 	}
 
         if (ret == PQOS_RETVAL_RESOURCE) {
                 LOG_INFO("No free L2 COS available. "
                          "Unable to determine minimum L2 CBM bits\n");
-                goto pqos_l2ca_get_min_cbm_bits_exit;
+                goto hw_l2ca_get_min_cbm_bits_exit;
         }
 
 	/**
@@ -797,7 +797,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	 */
 	ret = hw_l2ca_get(l2id, PQOS_MAX_L2CA_COS, &l2ca_num, l2ca_config);
 	if (ret != PQOS_RETVAL_OK)
-		goto pqos_l2ca_get_min_cbm_bits_exit;
+		goto hw_l2ca_get_min_cbm_bits_exit;
 
 	/**
 	 * Probe for min cbm bits
@@ -823,7 +823,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		 */
 		ret = hw_l2ca_get(l2id, PQOS_MAX_L2CA_COS, &num_ca, l2ca_tab);
 		if (ret != PQOS_RETVAL_OK)
-			goto pqos_l2ca_get_min_cbm_bits_restore;
+			goto hw_l2ca_get_min_cbm_bits_restore;
 
 		for (i = 0; i < num_ca; i++) {
 			struct pqos_l2ca *l2ca = &(l2ca_tab[i]);
@@ -831,10 +831,13 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 			if (l2ca->class_id != class_id)
 				continue;
 
-                        if (l2ca->u.ways_mask == mask) {
+                        if ((l2ca->cdp &&
+                                l2ca->u.s.data_mask == mask &&
+                                l2ca->u.s.code_mask == mask) ||
+                            (!l2ca->cdp && l2ca->u.ways_mask == mask)) {
                                 *min_cbm_bits = ways;
-				ret = PQOS_RETVAL_OK;
-				goto pqos_l2ca_get_min_cbm_bits_restore;
+                                ret = PQOS_RETVAL_OK;
+                                goto hw_l2ca_get_min_cbm_bits_restore;
                         }
 		}
 	}
@@ -842,7 +845,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	/**
 	 * Restore old settings
 	 */
-pqos_l2ca_get_min_cbm_bits_restore:
+ hw_l2ca_get_min_cbm_bits_restore:
 	for (i = 0; i < l2ca_num; i++) {
 		int ret_val;
 
@@ -858,7 +861,7 @@ pqos_l2ca_get_min_cbm_bits_restore:
 		}
 	}
 
-pqos_l2ca_get_min_cbm_bits_exit:
+ hw_l2ca_get_min_cbm_bits_exit:
         if (l2ids != NULL)
                 free(l2ids);
 
