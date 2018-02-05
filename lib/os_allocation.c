@@ -592,7 +592,7 @@ os_l3ca_set(const unsigned socket,
 		struct resctrl_alloc_schemata schmt;
 
 		if (ca[i].cdp == 1 && cdp_enabled == 0) {
-			LOG_ERROR("Attempting to set CDP COS while CDP "
+			LOG_ERROR("Attempting to set CDP COS while L3 CDP "
 			          "is disabled!\n");
 			ret = PQOS_RETVAL_ERROR;
 			goto os_l3ca_set_exit;
@@ -743,6 +743,7 @@ os_l2ca_set(const unsigned l2id,
 	unsigned l2ids_num = 0;
 	unsigned *l2ids = NULL;
 	unsigned num_grps = 0, l2ca_num;
+        int cdp_enabled;
 
 	ASSERT(m_cap != NULL);
 	ASSERT(ca != NULL);
@@ -758,6 +759,10 @@ os_l2ca_set(const unsigned l2id,
 
 	if (num_cos > num_grps)
 		return PQOS_RETVAL_PARAM;
+
+        ret = pqos_l2ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l2ca_set_exit;
 
 	/*
 	 * Check if class id's are within allowed range.
@@ -784,6 +789,13 @@ os_l2ca_set(const unsigned l2id,
 
 	for (i = 0; i < num_cos; i++) {
 		struct resctrl_alloc_schemata schmt;
+
+                if (ca[i].cdp == 1 && cdp_enabled == 0) {
+                        LOG_ERROR("Attempting to set CDP COS while L2 CDP "
+                                  "is disabled!\n");
+                        ret = PQOS_RETVAL_ERROR;
+                        goto os_l2ca_set_exit;
+                }
 
 		ret = resctrl_alloc_schemata_init(ca[i].class_id, m_cap, m_cpu,
 		                                  &schmt);

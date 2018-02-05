@@ -621,13 +621,15 @@ pqos_l2ca_set(const unsigned l2id,
 	 * Check if class bitmasks are contiguous
 	 */
 	for (i = 0; i < num_cos; i++) {
-                if (ca[i].cdp) {
-                        LOG_ERROR("L2 CDP is not supported");
-                        _pqos_api_unlock();
-                        return PQOS_RETVAL_PARAM;
-                }
+                int is_contig = 0;
 
-		if (!is_contiguous(ca[i].u.ways_mask)) {
+                if (ca[i].cdp) {
+                        is_contig = is_contiguous(ca[i].u.s.data_mask) &&
+                                is_contiguous(ca[i].u.s.code_mask);
+                } else
+                        is_contig = is_contiguous(ca[i].u.ways_mask);
+
+                if (!is_contig) {
 			LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
 			          ca[i].class_id);
 			_pqos_api_unlock();

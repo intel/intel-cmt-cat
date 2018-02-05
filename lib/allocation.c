@@ -384,7 +384,7 @@ hw_l3ca_set(const unsigned socket,
 
                         if (ca[i].cdp) {
                                 LOG_ERROR("Attempting to set CDP COS "
-                                          "while CDP is disabled!\n");
+                                          "while L3 CDP is disabled!\n");
                                 return PQOS_RETVAL_ERROR;
                         }
 
@@ -596,14 +596,16 @@ hw_l2ca_set(const unsigned l2id,
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
+        int cdp_enabled = 0;
 
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
+        ASSERT(m_cap != NULL);
+        ASSERT(m_cpu != NULL);
 
         /*
          * Check if L2 CAT is supported
          */
-        ASSERT(m_cap != NULL);
         ret = pqos_l2ca_get_cos_num(m_cap, &count);
         if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
@@ -619,29 +621,58 @@ hw_l2ca_set(const unsigned l2id,
                 }
         }
 
+        ret = pqos_l2ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
         /**
          * Pick one core from the L2 cluster and
          * perform MSR writes to COS registers on the cluster.
          */
-        ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_by_l2id(m_cpu, l2id, &core);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
         for (i = 0; i < num_ca; i++) {
-                uint32_t reg = ca[i].class_id + PQOS_MSR_L2CA_MASK_START;
-                uint64_t val = ca[i].u.ways_mask;
-                int retval = MACHINE_RETVAL_OK;
+                if (cdp_enabled) {
+                        uint32_t reg =
+                                (ca[i].class_id * 2) + PQOS_MSR_L2CA_MASK_START;
+                        int retval = MACHINE_RETVAL_OK;
+                        uint64_t cmask = 0, dmask = 0;
 
-                if (ca[i].cdp) {
-                        LOG_ERROR("L2 CDP is not supported");
-                        return PQOS_RETVAL_ERROR;
+                        if (ca[i].cdp) {
+                                dmask = ca[i].u.s.data_mask;
+                                cmask = ca[i].u.s.code_mask;
+                        } else {
+                                dmask = ca[i].u.ways_mask;
+                                cmask = ca[i].u.ways_mask;
+                        }
+
+                        retval = msr_write(core, reg, dmask);
+                        if (retval != MACHINE_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+
+                        retval = msr_write(core, reg + 1, cmask);
+                        if (retval != MACHINE_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
+                } else {
+                        uint32_t reg =
+                                ca[i].class_id + PQOS_MSR_L2CA_MASK_START;
+                        uint64_t val = ca[i].u.ways_mask;
+                        int retval;
+
+                        if (ca[i].cdp) {
+                                LOG_ERROR("Attempting to set CDP COS "
+                                          "while L2 CDP is disabled!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        retval = msr_write(core, reg, val);
+                        if (retval != MACHINE_RETVAL_OK)
+                                return PQOS_RETVAL_ERROR;
                 }
-
-                retval = msr_write(core, reg, val);
-                if (retval != MACHINE_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
         }
+
         return ret;
 }
 
