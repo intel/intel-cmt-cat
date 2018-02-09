@@ -273,8 +273,9 @@ set_l2_cos(const unsigned class_id, const uint64_t mask,
                                l2_ids[i], ca.class_id);
                         break;
                 }
-                printf("L2ID %u L2CA COS%u => MASK 0x%lx\n",
-                       l2_ids[i], ca.class_id, ca.u.ways_mask);
+                printf("L2ID %u L2CA COS%u => MASK 0x%llx\n",
+                       l2_ids[i], ca.class_id, (unsigned long long)
+		       ca.u.ways_mask);
                 set++;
         }
         sel_alloc_mod += set;

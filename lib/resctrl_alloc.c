@@ -666,7 +666,8 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 		for (i = 0; i < schemata->l2ca_num; i++) {
 			if (i > 0)
 				fprintf(fd, ";");
-			fprintf(fd, "%u=%lx", i, schemata->l2ca[i].u.ways_mask);
+			fprintf(fd, "%u=%llx", i, (unsigned long long)
+			        schemata->l2ca[i].u.ways_mask);
 		}
 		fprintf(fd, "\n");
 	}
