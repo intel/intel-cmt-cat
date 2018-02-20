@@ -79,7 +79,9 @@ For MBA, TYPE is "mba", ID is a CLOS number and DEFINITION is a value between 1 
 .br
 RESOURCE_ID is a unique number that can represent a socket or l2/l3 cache identifier. The RESOURCE_ID for each logical CPU can be found using "pqos -s"
 .br
-.B Note: When CDP is on, ID can be postfixed with 'D' for data or 'C' for code. CDP is not available for l2.
+.B Note: When L2/L3 CDP is on, ID can be postfixed with 'D' for data or 'C' for code.
+.br
+.B Note: L2/L3 CDP is available on selected CPUs only.
 .br
 Some examples:
 .RS
@@ -87,6 +89,8 @@ Some examples:
 "\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00;l2:2=0x3f;l2@2:1=0xf"
 .br
 "\-e llc:0d=0xfff;llc:0c=0xfff00"
+.br
+"\-e l2:0d=0xf;l2:0c=0xc"
 .br
 "\-e mba:1=30;mba@1:3=80"
 .RE
@@ -127,7 +131,7 @@ The \-I option must be used for PID association.
 .RE
 .RE
 .TP
-.B \-R [CONFIG], \-\-alloc\-reset[=CONFIG]
+.B \-R [CONFIG[,CONFIG]], \-\-alloc\-reset[=CONFIG[,CONFIG]]
 reset allocation setting (L3 CAT, L2 CAT) and reconfigure L3 CDP. CONFIG is one of the following options:
 .br
 l3cdp-on	sets L3 CDP on
@@ -135,6 +139,12 @@ l3cdp-on	sets L3 CDP on
 l3cdp-off	sets L3 CDP off
 .br
 l3cdp-any	keep current L3 CDP setting (default)
+.br
+l2cdp-on	sets L2 CDP on
+.br
+l2cdp-off	sets L2 CDP off
+.br
+l2cdp-any	keep current L2 CDP setting (default)
 .TP
 .B \-m EVTCORES, \-\-mon\-core=EVTCORES
 select the cores and events for monitoring, EVTCORES format is "EVENT:CORE_LIST". Valid EVENT settings are:
