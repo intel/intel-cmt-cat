@@ -879,6 +879,32 @@ print_l3ca_config(const struct pqos_l3ca *ca, const int is_error)
 }
 
 /**
+ * @brief Prints L2 CAT class definition
+ *
+ * @param [in] ca L2 CAT definition structure
+ * @param [in] is_error indicates error condition when reading L2 CAT class
+ */
+static void
+print_l2ca_config(const struct pqos_l2ca *ca, const int is_error)
+{
+        if (is_error) {
+                printf("    L2CA COS%u => ERROR\n", ca->class_id);
+                return;
+        }
+
+        if (ca->cdp) {
+                printf("    L2CA COS%u => DATA 0x%llx, CODE 0x%llx\n",
+                       ca->class_id,
+                       (unsigned long long)ca->u.s.data_mask,
+                       (unsigned long long)ca->u.s.code_mask);
+        } else {
+                printf("    L2CA COS%u => MASK 0x%llx\n",
+                       ca->class_id,
+                       (unsigned long long)ca->u.ways_mask);
+        }
+}
+
+/**
  * @brief Per socket L3 CAT and MBA class definition printing
  *
  * If new per socket technologies appear they should be added here, too.
@@ -1027,9 +1053,8 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         printf("L2CA COS definitions for L2ID %u:\n",
                                l2id[i]);
                         for (n = 0; n < num; n++)
-                                printf("    L2CA COS%u => MASK 0x%llx\n",
-                                       tab[n].class_id,
-                                       (unsigned long long)tab[n].u.ways_mask);
+                                print_l2ca_config(&tab[n],
+                                                  (ret != PQOS_RETVAL_OK));
                 }
                 free(l2id);
         }
