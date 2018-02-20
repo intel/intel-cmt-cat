@@ -59,25 +59,31 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 /**
  * @brief Function to mount the resctrl file system with CDP option
  *
- * @param l3_cdp_cfg CDP option
+ * @param l3_cdp_cfg L3 CDP option
+ * @param l2_cdp_cfg L2 CDP option
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
+os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
+                   const enum pqos_cdp_config l2_cdp_cfg)
 {
         const struct pqos_cap_l3ca *l3_cap = NULL;
+        const struct pqos_cap_l2ca *l2_cap = NULL;
         const struct pqos_capability *alloc_cap = NULL;
         const char *cdp_option = NULL; /**< cdp_off default */
 
-        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
-            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF) {
+        if ((l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF) || (
+            l2_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l2_cdp_cfg != PQOS_REQUIRE_CDP_OFF)) {
                 LOG_ERROR("Invalid CDP mounting setting %d!\n",
                           l3_cdp_cfg);
                 return PQOS_RETVAL_PARAM;
         }
 
-        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF)
+        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF &&
+                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF)
                 goto mount;
 
         /* Get L3 CAT capabilities */
@@ -85,12 +91,33 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg)
         if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
 
-        if (l3_cap != NULL && !l3_cap->cdp) {
+        /* Get L2 CAT capabilities */
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        if (alloc_cap != NULL)
+                l2_cap = alloc_cap->u.l2ca;
+
+        if (l3_cap != NULL && !l3_cap->os_cdp &&
+                l3_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
                 /* Check against erroneous CDP request */
-                LOG_ERROR("CDP requested but not supported by the platform!\n");
+                LOG_ERROR("L3 CDP requested but not supported by the "
+                          "platform!\n");
                 return PQOS_RETVAL_PARAM;
         }
-        cdp_option = "cdp";  /**< cdp_on */
+        if (l2_cap != NULL && !l2_cap->os_cdp &&
+                l2_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
+                /* Check against erroneous CDP request */
+                LOG_ERROR("L2 CDP requested but not supported by the "
+                          "platform!\n");
+                return PQOS_RETVAL_PARAM;
+        }
+        /* cdp mount options */
+        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
+                l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
+                cdp_option = "cdp,cdpl2"; /**< both L3 CDP and L2 CDP on */
+        else if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON)
+                cdp_option = "cdp";  /**< L3 CDP on */
+        else if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
+                cdp_option = "cdpl2";  /**< L2 CDP on */
 
  mount:
         if (mount("resctrl", RESCTRL_ALLOC_PATH, "resctrl", 0, cdp_option) != 0)
@@ -132,13 +159,20 @@ os_alloc_check(void)
          */
         if (access(RESCTRL_ALLOC_PATH"/cpus", F_OK) != 0) {
                 const struct pqos_capability *alloc_cap = NULL;
-                int cdp_mount = PQOS_REQUIRE_CDP_OFF;
+                int l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
+                int l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
+
                 /* Get L3 CAT capabilities */
                 (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
                 if (alloc_cap != NULL)
-                        cdp_mount = alloc_cap->u.l3ca->cdp_on;
+                        l3_cdp_mount = alloc_cap->u.l3ca->cdp_on;
 
-                ret = os_interface_mount(cdp_mount);
+                /* Get L2 CAT capabilities */
+                (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
+                if (alloc_cap != NULL)
+                        l2_cdp_mount = alloc_cap->u.l2ca->cdp_on;
+
+                ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_INFO("Unable to mount resctrl\n");
                         return PQOS_RETVAL_RESOURCE;
@@ -440,7 +474,9 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
-        int ret, cdp_mount, cdp_current = 0;
+        int ret;
+        int l3_cdp = 0;
+	int l2_cdp = 0;
         unsigned i, cos0 = 0;
         struct resctrl_alloc_cpumask mask;
 
@@ -452,17 +488,10 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
 
-	if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
-		LOG_ERROR("L2 CDP is not supported by OS interfacei\n");
-		return PQOS_RETVAL_ERROR;
-	}
-
         /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
-        if (alloc_cap != NULL) {
+        if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
-                cdp_current = l3_cap->cdp_on;
-        }
 
         /* Get L2 CAT capabilities */
         alloc_cap = NULL;
@@ -483,8 +512,23 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 goto os_alloc_reset_exit;
         }
         /* Check against erroneous CDP request */
-        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
-                LOG_ERROR("CAT/CDP requested but not supported by the "
+        if (l3_cap != NULL && l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
+                !l3_cap->os_cdp) {
+                LOG_ERROR("L3 CAT/CDP requested but not supported by the "
+                          "platform!\n");
+                ret = PQOS_RETVAL_PARAM;
+                goto os_alloc_reset_exit;
+        }
+        /* Check L2 CDP requested while not present */
+        if (l2_cap == NULL && l2_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
+                LOG_ERROR("L2 CDP setting requested but no L2 CAT present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_alloc_reset_exit;
+        }
+        /* Check against erroneous L2 CDP request */
+        if (l2_cap != NULL && l2_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
+                !l2_cap->os_cdp) {
+                LOG_ERROR("L2 CAT/CDP requested but not supported by the "
                           "platform!\n");
                 ret = PQOS_RETVAL_PARAM;
                 goto os_alloc_reset_exit;
@@ -516,23 +560,46 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         /**
          * Turn L3 CDP ON or OFF
          */
-        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON)
-                cdp_mount = 1;
-        else if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY)
-                cdp_mount = cdp_current;
-        else
-                cdp_mount = 0;
+        if (l3_cap != NULL)
+                switch (l3_cdp_cfg) {
+                case PQOS_REQUIRE_CDP_ON:
+                        l3_cdp = 1;
+                        break;
+                case PQOS_REQUIRE_CDP_ANY:
+                        l3_cdp = l3_cap->cdp_on;
+                        break;
+                case PQOS_REQUIRE_CDP_OFF:
+                        l3_cdp = 0;
+                        break;
+                }
+        /**
+         * Turn L2 CDP ON or OFF
+         */
+        if (l2_cap != NULL)
+                switch (l2_cdp_cfg) {
+                case PQOS_REQUIRE_CDP_ON:
+                        l2_cdp = 1;
+                        break;
+                case PQOS_REQUIRE_CDP_ANY:
+                        l2_cdp = l2_cap->cdp_on;
+                        break;
+                case PQOS_REQUIRE_CDP_OFF:
+                        l2_cdp = 0;
+                        break;
+                }
 
         /**
          * Mount now with CDP option.
          */
-        ret = os_interface_mount(cdp_mount);
+        ret = os_interface_mount(l3_cdp, l2_cdp);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Mount OS interface error!\n");
                 goto os_alloc_reset_exit;
         }
-        if (cdp_mount != cdp_current)
-                _pqos_cap_l3cdp_change(cdp_current, cdp_mount);
+        if (l3_cap != NULL && l3_cap->cdp_on != l3_cdp)
+                _pqos_cap_l3cdp_change(l3_cap->cdp_on, l3_cdp);
+        if (l2_cap != NULL && l2_cap->cdp_on != l2_cdp)
+                _pqos_cap_l2cdp_change(l2_cdp);
         /**
          * Create the COS dir's in resctrl.
          */
