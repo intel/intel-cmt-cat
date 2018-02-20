@@ -1451,6 +1451,19 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 			}
 		}
 
+                /**
+                 * Discover L2 CDP support
+                 */
+                if (type == PQOS_CAP_TYPE_L2CA && *os_ptr) {
+                        ret = detect_os_support("/proc/cpuinfo", "cdp_l2",
+                                                &capability->u.l2ca->os_cdp);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Fatal error encountered in L2 CDP "
+                                          "detection!\n");
+                                return ret;
+                        }
+                }
+
                 LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
                          "detected" : "not detected");
         }
