@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    1.2.0
+%global githubver    2.0.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -119,7 +119,7 @@ install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%
 install -d %{buildroot}/%{_libdir}
 install -s %{_builddir}/%{githubfull}/lib/libpqos.so.* %{buildroot}/%{_libdir}
 cp -a %{_builddir}/%{githubfull}/lib/libpqos.so %{buildroot}/%{_libdir}
-cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.1 %{buildroot}/%{_libdir}
+cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.2 %{buildroot}/%{_libdir}
 
 # Install the header file
 install -d %{buildroot}/%{_includedir}
@@ -158,7 +158,7 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 
 %files -n intel-cmt-cat-devel
 %{_libdir}/libpqos.so
-%{_libdir}/libpqos.so.1
+%{_libdir}/libpqos.so.2
 %{_includedir}/pqos.h
 %{_usrsrc}/%{githubfull}/c/CAT/Makefile
 %{_usrsrc}/%{githubfull}/c/CAT/reset_app.c
@@ -169,6 +169,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Mon Jun 18 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 2.0.0-1
+- New release 2.0.0
+
 * Wed Mar 7 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 1.2.0-2
 - Updated package build requirements
 
