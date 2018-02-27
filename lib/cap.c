@@ -1626,6 +1626,23 @@ pqos_init(const struct pqos_config *config)
 #endif
 
         if (config->interface == PQOS_INTER_OS) {
+                const struct pqos_capability *l2_cap = NULL;
+
+                ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
+                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                        goto machine_init_error;
+
+                /* L2 CDP enabled but not supported by OS interface */
+                if (l2_cap != NULL && l2_cap->u.l2ca->cdp &&
+                        !l2_cap->u.l2ca->os_cdp) {
+                        LOG_ERROR("Detected L2 CDP feature enabled but not "
+                                  "supported by the current OS version!\n"
+                                  "Please disable L2 CDP through the HW "
+                                  "interface and perform a CAT reset.\n");
+                        ret = PQOS_RETVAL_ERROR;
+                        goto machine_init_error;
+                }
+
 #ifdef __linux__
                 ret = log_hw_caps(m_cap);
 #else
