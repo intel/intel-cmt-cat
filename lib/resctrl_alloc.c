@@ -370,6 +370,7 @@ resctrl_alloc_schemata_init(const unsigned class_id,
 	retval = pqos_l2ca_get_cos_num(cap, &num_cos);
 	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
 		unsigned *l2ids = NULL;
+		int cdp_enabled;
 
 		l2ids = pqos_cpu_get_l2ids(cpu, &num_ids);
 		if (l2ids == NULL) {
@@ -386,10 +387,14 @@ resctrl_alloc_schemata_init(const unsigned class_id,
 			goto resctrl_alloc_schemata_init_exit;
 		}
 
+		ret = pqos_l2ca_cdp_enabled(cap, NULL, &cdp_enabled);
+		if (ret != PQOS_RETVAL_OK)
+			goto resctrl_alloc_schemata_init_exit;
+
 		/* fill class_id */
 		for (i = 0; i < num_ids; i++) {
 			schemata->l2ca[i].class_id = class_id;
-			schemata->l2ca[i].cdp = 0;
+			schemata->l2ca[i].cdp = cdp_enabled;
 		}
 	}
 
@@ -465,7 +470,9 @@ resctrl_alloc_schemata_init(const unsigned class_id,
  */
 enum resctrl_alloc_schemata_type {
 	RESCTRL_ALLOC_SCHEMATA_TYPE_NONE,   /**< unknown */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_L2,     /**< L2 CAT */
+	RESCTRL_ALLOC_SCHEMATA_TYPE_L2,     /**< L2 CAT without CDP */
+	RESCTRL_ALLOC_SCHEMATA_TYPE_L2CODE, /**< L2 CAT code */
+	RESCTRL_ALLOC_SCHEMATA_TYPE_L2DATA, /**< L2 CAT data */
 	RESCTRL_ALLOC_SCHEMATA_TYPE_L3,     /**< L3 CAT without CDP */
 	RESCTRL_ALLOC_SCHEMATA_TYPE_L3CODE, /**< L3 CAT code */
 	RESCTRL_ALLOC_SCHEMATA_TYPE_L3DATA, /**< L3 CAT data */
@@ -486,6 +493,10 @@ resctrl_alloc_schemata_type_get(const char *str)
 
 	if (strcasecmp(str, "L2") == 0)
 		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L2;
+	else if (strcasecmp(str, "L2CODE") == 0)
+		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L2CODE;
+	else if (strcasecmp(str, "L2DATA") == 0)
+		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L2DATA;
 	else if (strcasecmp(str, "L3") == 0)
 		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L3;
 	else if (strcasecmp(str, "L3CODE") == 0)
@@ -519,6 +530,16 @@ resctrl_alloc_schemata_set(const unsigned res_id,
 		if (schemata->l2ca_num <= res_id)
 			return PQOS_RETVAL_ERROR;
 		schemata->l2ca[res_id].u.ways_mask = value;
+
+	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L2CODE) {
+		if (schemata->l2ca_num <= res_id || !schemata->l2ca[res_id].cdp)
+			return PQOS_RETVAL_ERROR;
+		schemata->l2ca[res_id].u.s.code_mask = value;
+
+	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L2DATA) {
+		if (schemata->l2ca_num <= res_id || !schemata->l2ca[res_id].cdp)
+			return PQOS_RETVAL_ERROR;
+		schemata->l2ca[res_id].u.s.data_mask = value;
 
 	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L3) {
 		if (schemata->l3ca_num <= res_id || schemata->l3ca[res_id].cdp)
@@ -660,14 +681,33 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 		return PQOS_RETVAL_ERROR;
 	}
 
-	/* L2 */
-	if (schemata->l2ca_num > 0) {
+	/* L2 without CDP */
+	if (schemata->l2ca_num > 0 && !schemata->l2ca[0].cdp) {
 		fprintf(fd, "L2:");
 		for (i = 0; i < schemata->l2ca_num; i++) {
 			if (i > 0)
 				fprintf(fd, ";");
 			fprintf(fd, "%u=%llx", i, (unsigned long long)
 			        schemata->l2ca[i].u.ways_mask);
+		}
+		fprintf(fd, "\n");
+	}
+
+	/* L2 with CDP */
+	if (schemata->l2ca_num > 0 && schemata->l2ca[0].cdp) {
+		fprintf(fd, "L2CODE:");
+		for (i = 0; i < schemata->l2ca_num; i++) {
+			if (i > 0)
+				fprintf(fd, ";");
+			fprintf(fd, "%u=%llx", i, (unsigned long long)
+				schemata->l2ca[i].u.s.code_mask);
+		}
+		fprintf(fd, "\nL2DATA:");
+		for (i = 0; i < schemata->l2ca_num; i++) {
+			if (i > 0)
+				fprintf(fd, ";");
+			fprintf(fd, "%u=%llx", i, (unsigned long long)
+				schemata->l2ca[i].u.s.data_mask);
 		}
 		fprintf(fd, "\n");
 	}
