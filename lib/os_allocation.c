@@ -872,11 +872,20 @@ os_l2ca_set(const unsigned l2id,
 			ret = resctrl_alloc_schemata_read(ca[i].class_id,
 			                                  &schmt);
 
-		if (ret == PQOS_RETVAL_OK) {
-			schmt.l2ca[l2id] = ca[i];
-			ret = resctrl_alloc_schemata_write(ca[i].class_id,
-			                                   &schmt);
-		}
+                /* update and write schemata */
+                if (ret == PQOS_RETVAL_OK) {
+                        struct pqos_l2ca *l2ca = &(schmt.l2ca[l2id]);
+
+                        if (cdp_enabled == 1 && ca[i].cdp == 0) {
+                                l2ca->cdp = 1;
+                                l2ca->u.s.data_mask = ca[i].u.ways_mask;
+                                l2ca->u.s.code_mask = ca[i].u.ways_mask;
+                        } else
+                                *l2ca = ca[i];
+
+                        ret = resctrl_alloc_schemata_write(ca[i].class_id,
+                                                           &schmt);
+                }
 
 		resctrl_alloc_schemata_fini(&schmt);
 
