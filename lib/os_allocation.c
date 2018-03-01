@@ -271,13 +271,20 @@ os_alloc_assoc_set(const unsigned lcore,
 		/* class_id is out of bounds */
 		return PQOS_RETVAL_PARAM;
 
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
 	ret = resctrl_alloc_cpumask_read(class_id, &mask);
 	if (ret != PQOS_RETVAL_OK)
-		return ret;
+		goto os_alloc_assoc_set_unlock;
 
 	resctrl_alloc_cpumask_set(lcore, &mask);
 
 	ret = resctrl_alloc_cpumask_write(class_id, &mask);
+
+ os_alloc_assoc_set_unlock:
+        resctrl_lock_release();
 
 	return ret;
 }
@@ -300,18 +307,25 @@ os_alloc_assoc_get(const unsigned lcore,
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
 	for (i = 0; i < grps; i++) {
 		ret = resctrl_alloc_cpumask_read(i, &mask);
 		if (ret != PQOS_RETVAL_OK)
-			return ret;
+			goto os_alloc_assoc_get_unlock;
 
 		if (resctrl_alloc_cpumask_get(lcore, &mask)) {
 			*class_id = i;
-			return PQOS_RETVAL_OK;
+                        goto os_alloc_assoc_get_unlock;
 		}
 	}
 
-	return PQOS_RETVAL_ERROR;
+ os_alloc_assoc_get_unlock:
+        resctrl_lock_release();
+
+	return ret;
 }
 
 unsigned *
@@ -319,6 +333,7 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
 {
         unsigned grps;
         int ret;
+        unsigned *tasks;
 
 	ASSERT(m_cap != NULL);
         ASSERT(count != NULL);
@@ -330,7 +345,15 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
 		/* class_id is out of bounds */
 		return NULL;
 
-	return resctrl_alloc_task_read(class_id, count);
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                return NULL;
+
+	tasks = resctrl_alloc_task_read(class_id, count);
+
+        resctrl_lock_release();
+
+        return tasks;
 }
 
 /**
@@ -436,21 +459,31 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
 
 	ASSERT(m_cpu != NULL);
         ASSERT(core_num > 0 && core_array != NULL);
+
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
         /**
          * Set the CPU assoc back to COS0
          */
         ret = resctrl_alloc_cpumask_read(cos0, &mask);
         if (ret != PQOS_RETVAL_OK)
-                return ret;
+                goto os_alloc_release_unlock;
         for (i = 0; i < core_num; i++) {
-		if (core_array[i] >= m_cpu->num_cores)
-			return PQOS_RETVAL_ERROR;
+		if (core_array[i] >= m_cpu->num_cores) {
+			ret = PQOS_RETVAL_ERROR;
+                        goto os_alloc_release_unlock;
+                }
                 resctrl_alloc_cpumask_set(core_array[i], &mask);
 	}
 
         ret = resctrl_alloc_cpumask_write(cos0, &mask);
         if (ret != PQOS_RETVAL_OK)
                 LOG_ERROR("CPU assoc reset failed\n");
+
+ os_alloc_release_unlock:
+        resctrl_lock_release();
 
         return ret;
 }
@@ -522,19 +555,25 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 goto os_alloc_reset_exit;
         }
 
+        /** Check if resctrl is in use */
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_alloc_reset_exit;
+        resctrl_lock_release();
+
         /**
          * Set the CPU assoc back to COS0
          */
         ret = resctrl_alloc_cpumask_read(cos0, &mask);
 	if (ret != PQOS_RETVAL_OK)
-		return ret;
+		goto os_alloc_reset_exit;
         for (i = 0; i < m_cpu->num_cores; i++)
                 resctrl_alloc_cpumask_set(i, &mask);
 
         ret = resctrl_alloc_cpumask_write(cos0, &mask);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("CPU assoc reset failed\n");
-                return ret;
+                goto os_alloc_reset_exit;
         }
 
         /**
@@ -642,6 +681,10 @@ os_l3ca_set(const unsigned socket,
 	if (ret != PQOS_RETVAL_OK)
 		goto os_l3ca_set_exit;
 
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l3ca_set_exit;
+
 	for (i = 0; i < num_cos; i++) {
 		struct resctrl_alloc_schemata schmt;
 
@@ -649,7 +692,7 @@ os_l3ca_set(const unsigned socket,
 			LOG_ERROR("Attempting to set CDP COS while L3 CDP "
 			          "is disabled!\n");
 			ret = PQOS_RETVAL_ERROR;
-			goto os_l3ca_set_exit;
+			goto os_l3ca_set_unlock;
 		}
 
 		ret = resctrl_alloc_schemata_init(ca[i].class_id, m_cap, m_cpu,
@@ -678,8 +721,11 @@ os_l3ca_set(const unsigned socket,
 		resctrl_alloc_schemata_fini(&schmt);
 
 		if (ret != PQOS_RETVAL_OK)
-			goto os_l3ca_set_exit;
+			goto os_l3ca_set_unlock;
 	}
+
+ os_l3ca_set_unlock:
+        resctrl_lock_release();
 
  os_l3ca_set_exit:
 	if (sockets != NULL)
@@ -728,6 +774,10 @@ os_l3ca_get(const unsigned socket,
 		goto os_l3ca_get_exit;
 	}
 
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l3ca_get_exit;
+
 	for (class_id = 0; class_id < count; class_id++) {
 		struct resctrl_alloc_schemata schmt;
 
@@ -742,9 +792,12 @@ os_l3ca_get(const unsigned socket,
 		resctrl_alloc_schemata_fini(&schmt);
 
 		if (ret != PQOS_RETVAL_OK)
-			goto os_l3ca_get_exit;
+			goto os_l3ca_get_unlock;
 	}
 	*num_ca = count;
+
+ os_l3ca_get_unlock:
+        resctrl_lock_release();
 
  os_l3ca_get_exit:
 	if (sockets != NULL)
@@ -841,6 +894,10 @@ os_l2ca_set(const unsigned l2id,
 		goto os_l2ca_set_exit;
 	}
 
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l2ca_set_exit;
+
 	for (i = 0; i < num_cos; i++) {
 		struct resctrl_alloc_schemata schmt;
 
@@ -848,7 +905,7 @@ os_l2ca_set(const unsigned l2id,
                         LOG_ERROR("Attempting to set CDP COS while L2 CDP "
                                   "is disabled!\n");
                         ret = PQOS_RETVAL_ERROR;
-                        goto os_l2ca_set_exit;
+                        goto os_l2ca_set_unlock;
                 }
 
 		ret = resctrl_alloc_schemata_init(ca[i].class_id, m_cap, m_cpu,
@@ -877,8 +934,11 @@ os_l2ca_set(const unsigned l2id,
 		resctrl_alloc_schemata_fini(&schmt);
 
 		if (ret != PQOS_RETVAL_OK)
-			goto os_l2ca_set_exit;
+			goto os_l2ca_set_unlock;
 	}
+
+ os_l2ca_set_unlock:
+        resctrl_lock_release();
 
  os_l2ca_set_exit:
 	if (l2ids != NULL)
@@ -928,6 +988,11 @@ os_l2ca_get(const unsigned l2id,
 		goto os_l2ca_get_exit;
 	}
 
+
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l2ca_get_exit;
+
 	for (class_id = 0; class_id < count; class_id++) {
 		struct resctrl_alloc_schemata schmt;
 
@@ -942,9 +1007,12 @@ os_l2ca_get(const unsigned l2id,
 		resctrl_alloc_schemata_fini(&schmt);
 
 		if (ret != PQOS_RETVAL_OK)
-			goto os_l2ca_get_exit;
+			goto os_l2ca_get_unlock;
 	}
 	*num_ca = count;
+
+ os_l2ca_get_unlock:
+        resctrl_lock_release();
 
  os_l2ca_get_exit:
 	if (l2ids != NULL)
@@ -1038,6 +1106,10 @@ os_mba_set(const unsigned socket,
 		goto os_l3ca_set_exit;
 	}
 
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l3ca_set_exit;
+
 	for (i = 0; i < num_cos; i++) {
 		struct resctrl_alloc_schemata schmt;
 
@@ -1076,8 +1148,11 @@ os_mba_set(const unsigned socket,
 		resctrl_alloc_schemata_fini(&schmt);
 
 		if (ret != PQOS_RETVAL_OK)
-			goto os_l3ca_set_exit;
+			goto os_l3ca_set_unlock;
 	}
+
+ os_l3ca_set_unlock:
+        resctrl_lock_release();
 
  os_l3ca_set_exit:
 	if (sockets != NULL)
@@ -1125,6 +1200,10 @@ os_mba_get(const unsigned socket,
 		goto os_mba_get_exit;
 	}
 
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_get_exit;
+
 	for (class_id = 0; class_id < count; class_id++) {
 		struct resctrl_alloc_schemata schmt;
 
@@ -1139,9 +1218,12 @@ os_mba_get(const unsigned socket,
 		resctrl_alloc_schemata_fini(&schmt);
 
 		if (ret != PQOS_RETVAL_OK)
-			goto os_mba_get_exit;
+			goto os_mba_get_unlock;
 	}
 	*num_cos = count;
+
+ os_mba_get_unlock:
+        resctrl_lock_release();
 
  os_mba_get_exit:
 	if (sockets != NULL)
@@ -1169,18 +1251,36 @@ os_alloc_assoc_set_pid(const pid_t task,
                 return PQOS_RETVAL_PARAM;
         }
 
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
         /* Write to tasks file */
-	return resctrl_alloc_task_write(class_id, task);
+	ret = resctrl_alloc_task_write(class_id, task);
+
+        resctrl_lock_release();
+
+        return ret;
 }
 
 int
 os_alloc_assoc_get_pid(const pid_t task,
                        unsigned *class_id)
 {
+        int ret;
+
         ASSERT(class_id != NULL);
 
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
         /* Search tasks files */
-        return resctrl_alloc_task_search(class_id, m_cap, task);
+        ret = resctrl_alloc_task_search(class_id, m_cap, task);
+
+        resctrl_lock_release();
+
+        return ret;
 }
 
 int
@@ -1206,17 +1306,24 @@ os_alloc_assign_pid(const unsigned technology,
         if (num_rctl_grps == 0)
                 return PQOS_RETVAL_ERROR;
 
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
         /* find an unused class from highest down */
         ret = get_unused_cos(num_rctl_grps - 1, class_id);
         if (ret != PQOS_RETVAL_OK)
-                return ret;
+                goto os_alloc_assign_pid_unlock;
 
         /* assign tasks to the unused class */
         for (i = 0; i < task_num; i++) {
                 ret = resctrl_alloc_task_write(*class_id, task_array[i]);
                 if (ret != PQOS_RETVAL_OK)
-                        return ret;
+                        goto os_alloc_assign_pid_unlock;
         }
+
+ os_alloc_assign_pid_unlock:
+        resctrl_lock_release();
 
         return ret;
 }
@@ -1231,6 +1338,10 @@ os_alloc_release_pid(const pid_t *task_array,
         ASSERT(task_array != NULL);
         ASSERT(task_num != 0);
 
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
         /**
          * Write all tasks to default COS#0 tasks file
          * - return on error
@@ -1238,9 +1349,12 @@ os_alloc_release_pid(const pid_t *task_array,
          */
         for (i = 0; i < task_num; i++) {
                 ret = resctrl_alloc_task_write(0, task_array[i]);
-		if (ret == PQOS_RETVAL_ERROR)
-                        return PQOS_RETVAL_ERROR;
+		if (ret != PQOS_RETVAL_OK)
+                        goto os_alloc_release_pid_unlock;
 	}
 
-        return PQOS_RETVAL_OK;
+ os_alloc_release_pid_unlock:
+        resctrl_lock_release();
+
+        return ret;
 }
