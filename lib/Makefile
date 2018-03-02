@@ -82,7 +82,7 @@ CLEAN_OBJS = $(SRCS:.c=.o)
 
 # On FreeBSD build with no OS support
 ifeq ($(shell uname), FreeBSD)
-OBJS := $(filter-out perf.o os_allocation.o os_monitoring.o resctrl.o,$(OBJS))
+OBJS := $(filter-out perf.o os_allocation.o os_monitoring.o resctrl.o perf_monitoring.o,$(OBJS))
 endif
 
 HDR = pqos.h
@@ -179,6 +179,7 @@ style:
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE \
 	-f pqos.h -f cpuinfo.c \
+	-f perf_monitoring.h -f perf_monitoring.c \
 	-f resctrl.h -f resctrl.c
 
 CPPCHECK?=cppcheck
@@ -193,6 +194,7 @@ cppcheck:
 	utils.c utils.h \
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
 	os_monitoring.h os_monitoring.c \
+	perf_monitoring.h perf_monitoring.c \
 	resctrl_alloc.h resctrl_alloc.c \
 	resctrl.h resctrl.c
 

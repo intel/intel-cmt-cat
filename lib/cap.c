@@ -73,6 +73,7 @@
 #include "utils.h"
 #include "resctrl.h"
 #include "resctrl_alloc.h"
+#include "perf_monitoring.h"
 
 /**
  * ---------------------------------------
@@ -1320,7 +1321,7 @@ detect_resctrl_support(const enum pqos_mon_event event, int *supported) {
          */
         if (stat(buf, &st) != 0) {
                 /* perf is not present, assume that resctrl is supported*/
-                if (stat("/sys/devices/intel_cqm", &st) != 0)
+                if (stat(PERF_MON_PATH, &st) != 0)
                         *supported = 1;
                 return PQOS_RETVAL_OK;
         }
