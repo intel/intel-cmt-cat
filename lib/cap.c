@@ -1670,26 +1670,6 @@ pqos_init(const struct pqos_config *config)
 #ifdef __linux__
         m_interface = config->interface;
 #endif
-        /**
-         * If monitoring capability has been discovered
-         * then get max RMID supported by a CPU socket
-         * and allocate memory for RMID table
-         */
-        ret = pqos_mon_init(m_cpu, m_cap, config);
-        switch (ret) {
-        case PQOS_RETVAL_RESOURCE:
-                LOG_DEBUG("monitoring init aborted: feature not present\n");
-                break;
-        case PQOS_RETVAL_OK:
-                LOG_DEBUG("monitoring init OK\n");
-                mon_init = 1;
-                break;
-        case PQOS_RETVAL_ERROR:
-        default:
-                LOG_ERROR("monitoring init error %d\n", ret);
-                break;
-        }
-
         ret = pqos_alloc_init(m_cpu, m_cap, config);
         switch (ret) {
         case PQOS_RETVAL_BUSY:
@@ -1701,6 +1681,27 @@ pqos_init(const struct pqos_config *config)
                 break;
         default:
                 LOG_ERROR("allocation init error %d\n", ret);
+                break;
+        }
+
+        /**
+         * If monitoring capability has been discovered
+         * then get max RMID supported by a CPU socket
+         * and allocate memory for RMID table
+         */
+        ret = pqos_mon_init(m_cpu, m_cap, config);
+        switch (ret) {
+        case PQOS_RETVAL_RESOURCE:
+                LOG_DEBUG("monitoring init aborted: feature not present\n");
+                ret = PQOS_RETVAL_OK;
+                break;
+        case PQOS_RETVAL_OK:
+                LOG_DEBUG("monitoring init OK\n");
+                mon_init = 1;
+                break;
+        case PQOS_RETVAL_ERROR:
+        default:
+                LOG_ERROR("monitoring init error %d\n", ret);
                 break;
         }
 
