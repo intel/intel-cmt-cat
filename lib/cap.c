@@ -71,6 +71,7 @@
 #include "log.h"
 #include "api.h"
 #include "utils.h"
+#include "resctrl.h"
 #include "resctrl_alloc.h"
 
 /**
@@ -113,6 +114,8 @@
 #define LOCKFILE "/var/tmp/libpqos.lockfile"
 #endif
 #endif /*!LOCKFILE*/
+
+#define PROC_CPUINFO "/proc/cpuinfo"
 
 /**
  * ---------------------------------------
@@ -1234,6 +1237,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         return ret;
 }
 
+#ifdef __linux__
 /**
  * @brief Checks file fname to detect str and set a flag
  *
@@ -1244,7 +1248,6 @@ discover_capabilities(struct pqos_cap **p_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-#ifdef __linux__
 static int
 detect_os_support(const char *fname, const char *str, int *supported)
 {
@@ -1274,6 +1277,70 @@ detect_os_support(const char *fname, const char *str, int *supported)
 }
 
 /**
+ * @brief Check if event is supported by resctrl monitoring
+ *
+ * @param [in] event monitoring event type
+ * @param [out] supported set to 1 if resctrl support is present
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+detect_resctrl_support(const enum pqos_mon_event event, int *supported) {
+        char buf[128];
+        struct stat st;
+        const char *event_name = NULL;
+
+        ASSERT(supported != NULL);
+
+        *supported = 0;
+
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                event_name = "llc_occupancy";
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
+                event_name = "mbm_total_bytes";
+                break;
+        case PQOS_MON_EVENT_TMEM_BW:
+                event_name = "mbm_local_bytes";
+                break;
+        default:
+                return PQOS_RETVAL_OK;
+                break;
+        }
+
+        /** Check if resctrl is mounted */
+        memset(buf, 0, sizeof(buf));
+        if (snprintf(buf, sizeof(buf) - 1, "%s/info", RESCTRL_PATH) < 0)
+                return PQOS_RETVAL_ERROR;
+
+        /**
+         * If resctrl is not mounted perform negative check for perf support
+         */
+        if (stat(buf, &st) != 0) {
+                /* perf is not present, assume that resctrl is supported*/
+                if (stat("/sys/devices/intel_cqm", &st) != 0)
+                        *supported = 1;
+                return PQOS_RETVAL_OK;
+        }
+
+        /**
+         * Resctrl is mounted check if L3 monitoring is supported in resctrl
+         * info dir
+         */
+        memset(buf, 0, sizeof(buf));
+        if (snprintf(buf, sizeof(buf) - 1, "%s/info/L3_MON/mon_features",
+                RESCTRL_PATH) < 0)
+                return PQOS_RETVAL_ERROR;
+
+        if (stat(buf, &st) == 0)
+                return detect_os_support(buf, event_name, supported);
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Get event name string to search in cpuinfo
  *
  * @param [in] event monitoring event type to look for
@@ -1296,6 +1363,28 @@ get_os_event_name(int event)
 }
 
 /**
+ * @brief Get event disable flag to seartch in kernel cmdline
+ *
+ * @param [in] event monitoring event type to look for
+ *
+ * @return cmdline flag
+ */
+static const char *
+get_os_event_disabled(int event)
+{
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                return "!cmt";
+        case PQOS_MON_EVENT_LMEM_BW:
+                return "!mbmlocal";
+        case PQOS_MON_EVENT_TMEM_BW:
+                return "!mbmtotal";
+        default:
+                return NULL;
+        }
+}
+
+/**
  * @brief Runs detection of OS monitoring events
  *
  * @param mon Monitoring capability structure
@@ -1307,20 +1396,24 @@ static int
 discover_os_monitoring(struct pqos_cap_mon *mon) {
 	int ret = PQOS_RETVAL_OK;
 	unsigned i;
-	int lmem_support = 0, tmem_support = 0;
+        enum pqos_os_mon lmem_support = PQOS_OS_MON_UNSUPPORTED;
+	enum pqos_os_mon tmem_support = PQOS_OS_MON_UNSUPPORTED;
 
-	ASSERT(mon != NULL);
+        ASSERT(mon != NULL);
 
-	for (i = 0; i < mon->num_events; i++) {
-		struct pqos_monitor *event = &(mon->events[i]);
-		const char *str = NULL;
+        for (i = 0; i < mon->num_events; i++) {
+                struct pqos_monitor *event = &(mon->events[i]);
+                const char *str = NULL;
+                int os_support;
+                int os_disabled = 0;
+                int os_resctrl;
 
 		/**
 		 * Assume support of perf events
 		 */
 		if (event->type == PQOS_PERF_EVENT_LLC_MISS ||
 		    event->type == PQOS_PERF_EVENT_IPC) {
-			event->os_support = 1;
+			event->os_support = PQOS_OS_MON_PERF;
 			continue;
 		}
 
@@ -1328,32 +1421,74 @@ discover_os_monitoring(struct pqos_cap_mon *mon) {
 		if (str == NULL)
 			continue;
 
-		ret = detect_os_support("/proc/cpuinfo", str,
-		                        &(event->os_support));
+                /**
+                 * Check if event is supported by kernel
+                 */
+		ret = detect_os_support(PROC_CPUINFO, str, &os_support);
 		if (ret != PQOS_RETVAL_OK) {
-			LOG_ERROR("Fatal error encountered in OS monitoring"
-			          " event detection!\n");
-			return ret;
-		}
+                        LOG_ERROR("Fatal error encountered in OS monitoring"
+                                  " event detection!\n");
+                        return ret;
+                }
 
-		if (event->os_support) {
-			if (event->type == PQOS_MON_EVENT_TMEM_BW)
-				tmem_support = 1;
-			if (event->type == PQOS_MON_EVENT_LMEM_BW)
-				lmem_support = 1;
-		}
+                /** Event not supported - continue*/
+                if (!os_support) {
+                        event->os_support = PQOS_OS_MON_UNSUPPORTED;
+                        continue;
+                }
+
+                /**
+                 * Check if feature is not disabled
+                 */
+                str = get_os_event_disabled(event->type);
+                if (str != NULL) {
+                        ret = detect_os_support("/proc/cmdline", str,
+                                &os_disabled);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Fatal error encountered while "
+                                          "checking for disabled events\n");
+                                return ret;
+                        }
+                }
+
+                /** Event disabled - continue */
+                if (os_disabled) {
+                        event->os_support = PQOS_OS_MON_UNSUPPORTED;
+                        continue;
+                }
+
+                /**
+                 * Check for resctrl support
+                 */
+                ret = detect_resctrl_support(event->type, &os_resctrl);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Fatal error encountered while checking for "
+                                  "resctrl monitoring support\n");
+                        return ret;
+                }
+
+                if (os_resctrl)
+                        event->os_support = PQOS_OS_MON_RESCTRL;
+                else
+                        event->os_support = PQOS_OS_MON_PERF;
+
+		if (event->type == PQOS_MON_EVENT_TMEM_BW)
+			tmem_support = event->os_support;
+		if (event->type == PQOS_MON_EVENT_LMEM_BW)
+			lmem_support = event->os_support;
 	}
 
 	/**
-	* RMEM is supported when both LMEM and TMEM are
-	* supported
+	* RMEM is supported when both LMEM and TMEM are supported
 	*/
 	for (i = 0; i < mon->num_events; i++) {
 		struct pqos_monitor *event = &(mon->events[i]);
 
 		if (event->type == PQOS_MON_EVENT_RMEM_BW) {
-			event->os_support = lmem_support &&
-			                    tmem_support;
+			if (lmem_support == tmem_support)
+				event->os_support = lmem_support;
+			else
+				event->os_support = PQOS_OS_MON_UNSUPPORTED;
 			break;
 		}
 	}
@@ -1384,10 +1519,10 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
                 const char *str;
                 const char *desc;
         } tab[PQOS_CAP_TYPE_NUMOF] = {
-                { "/proc/cpuinfo", "cqm", "CMT"},
-                { "/proc/cpuinfo", "cat_l3", "L3 CAT"},
-                { "/proc/cpuinfo", "cat_l2", "L2 CAT"},
-                { "/proc/cpuinfo", "mba", "MBA"},
+                { PROC_CPUINFO, "cqm", "CMT"},
+                { PROC_CPUINFO, "cat_l3", "L3 CAT"},
+                { PROC_CPUINFO, "cat_l2", "L2 CAT"},
+                { PROC_CPUINFO, "mba", "MBA"},
         };
 
         /**
@@ -1442,7 +1577,7 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 		 * Discover L3 CDP support
 		 */
 		if (type == PQOS_CAP_TYPE_L3CA && *os_ptr) {
-			ret = detect_os_support("/proc/cpuinfo", "cdp_l3",
+			ret = detect_os_support(PROC_CPUINFO, "cdp_l3",
 			                        &capability->u.l3ca->os_cdp);
 			if (ret != PQOS_RETVAL_OK) {
 				LOG_ERROR("Fatal error encountered in L3 CDP "
@@ -1455,7 +1590,7 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
                  * Discover L2 CDP support
                  */
                 if (type == PQOS_CAP_TYPE_L2CA && *os_ptr) {
-                        ret = detect_os_support("/proc/cpuinfo", "cdp_l2",
+                        ret = detect_os_support(PROC_CPUINFO, "cdp_l2",
                                                 &capability->u.l2ca->os_cdp);
                         if (ret != PQOS_RETVAL_OK) {
                                 LOG_ERROR("Fatal error encountered in L2 CDP "

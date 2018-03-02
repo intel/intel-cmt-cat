@@ -234,6 +234,15 @@ enum pqos_mon_event {
 };
 
 /**
+ * OS monitoring status
+ */
+enum pqos_os_mon {
+        PQOS_OS_MON_UNSUPPORTED = 0,    /**< OS monitoring is not supported */
+        PQOS_OS_MON_PERF        = 1,    /**< Perf monitoring is supported */
+        PQOS_OS_MON_RESCTRL     = 2     /**< Resctrl monitoring is supported */
+};
+
+/**
  * Monitoring capabilities structure
  *
  * Few assumptions here:
@@ -250,8 +259,8 @@ struct pqos_monitor {
                                            this event */
         uint32_t scale_factor;          /**< factor to scale RMID value
                                            to bytes */
-        int os_support;                 /**< flag to show if OS monitoring
-                                           is supported */
+        enum pqos_os_mon os_support;    /**< flag to show if OS monitoring
+                                           supported */
 };
 
 struct pqos_cap_mon {
