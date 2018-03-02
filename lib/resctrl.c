@@ -36,12 +36,13 @@
 #include <unistd.h>
 #include <sys/file.h>
 #include <signal.h>
+#include <sys/mount.h>
 #include <errno.h>
 
+#include "pqos.h"
 #include "log.h"
 #include "types.h"
 #include "resctrl.h"
-#include "pqos.h"
 
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
@@ -137,4 +138,41 @@ resctrl_lock_release(void)
 	resctrl_lock_fd = -1;
 
 	return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
+              const enum pqos_cdp_config l2_cdp_cfg)
+{
+	const char *cdp_option = NULL; /**< cdp_off default */
+
+	ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
+	       l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF);
+	ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
+	       l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF);
+
+        /* cdp mount options */
+        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
+                l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
+                cdp_option = "cdp,cdpl2"; /**< both L3 CDP and L2 CDP on */
+        else if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON)
+                cdp_option = "cdp";  /**< L3 CDP on */
+        else if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
+                cdp_option = "cdpl2";  /**< L2 CDP on */
+
+        if (mount("resctrl", RESCTRL_PATH, "resctrl", 0, cdp_option) != 0)
+                return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_umount(void)
+{
+        if (umount2(RESCTRL_PATH, 0) != 0) {
+                LOG_ERROR("Could not umount resctrl filesystem!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
 }

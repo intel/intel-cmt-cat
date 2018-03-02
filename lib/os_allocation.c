@@ -38,7 +38,6 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <stdlib.h>
-#include <sys/mount.h>
 #include <errno.h>
 
 #include "pqos.h"
@@ -46,6 +45,7 @@
 #include "cap.h"
 #include "log.h"
 #include "types.h"
+#include "resctrl.h"
 #include "resctrl_alloc.h"
 
 /**
@@ -71,7 +71,6 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
         const struct pqos_capability *alloc_cap = NULL;
-        const char *cdp_option = NULL; /**< cdp_off default */
 
         if ((l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
             l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF) || (
@@ -110,20 +109,9 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
                           "platform!\n");
                 return PQOS_RETVAL_PARAM;
         }
-        /* cdp mount options */
-        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
-                l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
-                cdp_option = "cdp,cdpl2"; /**< both L3 CDP and L2 CDP on */
-        else if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON)
-                cdp_option = "cdp";  /**< L3 CDP on */
-        else if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
-                cdp_option = "cdpl2";  /**< L2 CDP on */
 
  mount:
-        if (mount("resctrl", RESCTRL_ALLOC_PATH, "resctrl", 0, cdp_option) != 0)
-                return PQOS_RETVAL_ERROR;
-
-        return PQOS_RETVAL_OK;
+        return resctrl_mount(l3_cdp_cfg, l2_cdp_cfg);
 }
 
 /**
@@ -552,11 +540,10 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         /**
          * Umount resctrl to reset schemata
          */
-        ret = umount2(RESCTRL_ALLOC_PATH, 0);
-        if (ret != 0) {
-                LOG_ERROR("Umount OS interface error!\n");
+        ret = resctrl_umount();
+        if (ret != PQOS_RETVAL_OK)
                 goto os_alloc_reset_exit;
-        }
+
         /**
          * Turn L3 CDP ON or OFF
          */

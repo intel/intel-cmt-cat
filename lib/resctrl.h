@@ -72,6 +72,26 @@ int resctrl_lock_exclusive(void);
  */
 int resctrl_lock_release(void);
 
+/**
+ * @brief Mount the resctrl file system with given CDP option
+ *
+ * @param l3_cdp_cfg L3 CDP option
+ * @param l2_cdp_cfg L2 CDP option
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
+                  const enum pqos_cdp_config l2_cdp_cfg);
+
+/**
+ * @brief Unmount the resctrl file system
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_umount(void);
+
 
 #ifdef __cplusplus
 }
