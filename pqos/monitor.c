@@ -502,7 +502,7 @@ parse_event(char *str, enum pqos_mon_event *evt)
          * what events to display (out of all possible)
          */
         if (strncasecmp(str, "llc:", 4) == 0) {
-		*evt = PQOS_MON_EVENT_L3_OCCUP;
+                *evt = PQOS_MON_EVENT_L3_OCCUP;
                 sel_events_max |= *evt;
         } else if (strncasecmp(str, "mbr:", 4) == 0) {
                 *evt = PQOS_MON_EVENT_RMEM_BW;
@@ -686,7 +686,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
          * by default let's monitor all cores
          */
         if (sel_monitor_num == 0 && sel_process_num == 0) {
-	        sel_events_max = all_core_evts;
+                sel_events_max = all_core_evts;
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore  = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
@@ -698,26 +698,24 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 break;
                         ret = set_cgrp(pg, uinttostr(lcore), &core, 1);
                         if (ret != 0) {
-			        printf("Core group setup error!\n");
-				exit(EXIT_FAILURE);
+                                printf("Core group setup error!\n");
+                                exit(EXIT_FAILURE);
                         }
                         pg->events = sel_events_max;
                         pg->pgrp = malloc(sizeof(*pg->pgrp));
-			if (pg->pgrp == NULL) {
-			        printf("Error with memory allocation!\n");
-				exit(EXIT_FAILURE);
-			}
+                        if (pg->pgrp == NULL) {
+                                printf("Error with memory allocation!\n");
+                                exit(EXIT_FAILURE);
+                        }
                         sel_monitor_num++;
                 }
         }
-
-	if (sel_process_num > 0 && sel_monitor_num > 0) {
-		printf("Monitoring start error, process and core"
-		       " tracking can not be done simultaneously\n");
-		return -1;
-	}
-
-	if (!process_mode()) {
+        if (sel_process_num > 0 && sel_monitor_num > 0) {
+                printf("Monitoring start error, process and core"
+                       " tracking can not be done simultaneously\n");
+                return -1;
+        }
+        if (!process_mode()) {
                 /**
                  * Make calls to pqos_mon_start - track cores
                  */
@@ -753,7 +751,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 return -1;
                         }
                 }
-	} else {
+        } else {
                 /**
                  * Make calls to pqos_mon_start_pid - track PIDs
                  */
@@ -784,7 +782,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 return -1;
                         }
                 }
-	}
+        }
         return 0;
 }
 
@@ -792,7 +790,7 @@ void monitor_stop(void)
 {
         int i;
 
-	if (!process_mode())
+        if (!process_mode())
                 for (i = 0; i < sel_monitor_num; i++) {
                         int ret = pqos_mon_stop(sel_monitor_core_tab[i].pgrp);
 
@@ -802,7 +800,7 @@ void monitor_stop(void)
                         free(sel_monitor_core_tab[i].cores);
                         free(sel_monitor_core_tab[i].pgrp);
                 }
-	else
+        else
                 for (i = 0; i < sel_process_num; i++) {
                         int ret = pqos_mon_stop(sel_monitor_pid_tab[i].pgrp);
 
@@ -929,7 +927,7 @@ void
 selfn_monitor_pids(const char *arg)
 {
         char *cp = NULL, *str = NULL;
-	char *saveptr = NULL;
+        char *saveptr = NULL;
 
         if (arg == NULL)
                 parse_error(arg, "NULL pointer!");
@@ -963,7 +961,7 @@ selfn_monitor_pids(const char *arg)
 static FILE *
 open_proc_stat_file(const char *proc_pid_dir_name)
 {
-        char path_buf[128];
+        char path_buf[256];
         const char *proc_stat_path_fmt = "%s/%s/stat";
 
         ASSERT(proc_pid_dir_name != NULL);
@@ -1000,6 +998,76 @@ is_str_conversion_ok(const char *str_remainder)
 }
 
 /**
+ * @brief Returns value in /proc/<pid>/stat file at user defined column
+ *
+ * @param proc_pid_dir_name name of target PID directory e.g, "1234"
+ * @param column value of the requested column number in
+ *        the /proc/<pid>/stat file
+ * @param len_val length of buffer user is going to pass the value into
+ * @param val[out] value in column of the /proc/<pid>/stat file
+ *
+ * @return operation status
+ * @retval 0 in case of success
+ * @retval -1 in case of error
+ */
+static int
+get_pid_stat_val(const char *proc_pid_dir_name, const int column,
+                 const unsigned len_val, char *val)
+{
+        FILE *fproc_pid_stats;
+        char buf[512];/* line in /proc/PID/stat is quite lengthy*/
+        const char *delim = " ";
+        size_t n_read;
+        char *token, *saveptr;
+        int col_idx = 1;/*starts from '1' like indexes on 'stat' man-page*/
+
+        if (proc_pid_dir_name == NULL || val == NULL)
+                return -1;
+
+        /*open /proc/<pid>/stat file for reading*/
+        fproc_pid_stats = open_proc_stat_file(proc_pid_dir_name);
+        if (fproc_pid_stats == NULL)/*failure in reading if file is empty*/
+                return -1;
+
+        memset(buf, 0, sizeof(buf));
+
+        /*put file into buffer to parse values from*/
+        n_read = fread(buf, sizeof(char), sizeof(buf) - 1, fproc_pid_stats);
+
+        /*close file as its not needed*/
+        fclose(fproc_pid_stats);
+
+        /*if buffer is empty, error*/
+        if (n_read == 0)
+                return -1;
+
+        /*split buffer*/
+        token = strtok_r(buf, delim, &saveptr);
+
+        if (token == NULL)
+                return -1;
+
+        /*check each value from the split and disregard if not needed*/
+        do {
+                if (col_idx == column) {
+                        /*check to see if value will fit in users buffer*/
+                        if (len_val <= (strlen(token)+1)) {
+                                return -1;
+                        } else {
+                                strncpy(val, token, len_val);
+                                return 0;/*value can be read from *val param*/
+                        }
+                }
+                col_idx++;
+        /* Loop continues until value is found
+         * or until there is nothing left in the buffer
+         */
+        } while ((token = strtok_r(NULL, delim, &saveptr)) != NULL);
+
+        return -1; /*error if while loop finishes and nothing left in buffer*/
+}
+
+/**
  * @brief Returns combined ticks that process spent by using cpu both in
  *        user mode and kernel mode
  *
@@ -1011,75 +1079,55 @@ is_str_conversion_ok(const char *str_remainder)
  * @retval 0 in case of success
  * @retval -1 in case of error
  */
-static unsigned long
-get_pid_cputicks(const char *proc_pid_dir_name, unsigned long *cputicks)
+static int
+get_pid_cputicks(const char *proc_pid_dir_name, uint64_t *cputicks)
 {
-        FILE *fproc_pid_stats;
-        char buf[512];/* line in /proc/PID/stat is quite lengthy*/
-        const char *delim = " ";
-        size_t n_read;
-        char *token, *saveptr;
-        int col_idx = 1;/* starts from '1' like indexes on 'stat' man-page*/
+        unsigned i;
+        const int col_val[3] = {PID_COL_STATUS, PID_COL_UTIME, PID_COL_STIME};
 
-        if (cputicks == NULL)
+        if (proc_pid_dir_name == NULL || cputicks == NULL)
                 return -1;
 
-        /* it is safer to reset val for cputicks now*/
-        *cputicks = 0;
-
-        fproc_pid_stats = open_proc_stat_file(proc_pid_dir_name);
-        if (fproc_pid_stats == NULL)
-                /* file I/O error, can't continue */
-                return -1;
-
-        /* zeroing entire buffer to make sure that all cases when buf is not
-         * entirely filled (e.g. missing \0 at end) will be handled properly
+        /* Loops through the /proc/<pid>/stat file three times to get values
+         * for pid status, user time, and kernel time
          */
-        memset(buf, 0, sizeof(buf));
-        n_read = fread(buf, sizeof(char), sizeof(buf) - 1, fproc_pid_stats);
+        for (i = 0; i < DIM(col_val); i++) {
+                char time_str[64];
+                char *tmp;
+                uint64_t time_int = 0;
+                int time_success = 0;
 
-        /* file no longer needed after read operation finished*/
-        fclose(fproc_pid_stats);
+                memset(time_str, 0, sizeof(time_str));/*set time buffer to 0*/
 
-        if (n_read == 0)
-                /* nothing read from stat file - some error occurred */
-                return -1;
+                time_success = get_pid_stat_val(proc_pid_dir_name,
+                                                col_val[i], sizeof(time_str),
+                                                time_str);
+                if (time_success != 0)
+                        return -1;
 
-        token = strtok_r(buf, delim, &saveptr);
-        do {
-                if (col_idx > PID_COL_STIME)
-                        /* we are only interested in 2 columns, so if we have
-                         * our values for cputicks, then we can safely ignore
-                         * the rest
-                         */
-                        break;
-
-                if (col_idx == PID_COL_STATUS)
-                        /* Searching status column in order to find valid
+                if (col_val[i] == PID_COL_STATUS) {
+                        /* Checking status column in order to find valid
                          * status for top-pid mode processes and eliminate
                          * processes that are zombies, stopped etc.
                          */
-                        if (token != NULL &&
-                            strpbrk(token, proc_stat_whitelist) == NULL)
-                                /* not valid status, ignoring entry*/
+                        if (strpbrk(time_str, proc_stat_whitelist) == NULL)
+                                /* Not valid status,ignoring entry*/
                                 return -1;
-
-                /* store sum of user mode and kernel mode times in cputicks */
-                if (col_idx == PID_COL_UTIME || col_idx == PID_COL_STIME) {
-                        char *tmp;
-                        long sutime = strtoul(token, &tmp, 10);
-
-                        if (is_str_conversion_ok(tmp))
-                                /* if strtoul parsed entire string, conversion
-                                 * succeeded and we can rely on parsed value
-                                 */
-                                *cputicks += sutime;
+                        else
+                                continue;
                 }
 
-                col_idx++;
-        } while ((token = strtok_r(NULL, delim, &saveptr)) != NULL);
+                time_int = (uint64_t)strtoull(time_str, &tmp, 10);
+                /* Check to make sure string converted
+                 * to int correctly
+                 */
+                if (is_str_conversion_ok(tmp))
+                        *cputicks += time_int;
+                else
+                        return -1;
+        }
 
-        /* valid cputime can be read from *cputicks param*/
+        /* Value for cputicks can be read from *cputicks param*/
         return 0;
 }
 
@@ -1352,7 +1400,7 @@ get_proc_pids_stats(struct slist **pslist)
         }
 
         while ((file = readdir(proc_dir)) != NULL) {
-                unsigned long cputicks = 0;
+                uint64_t cputicks = 0;
                 time_t start_time = 0;
                 pid_t pid = 0;
                 int err;
@@ -2010,22 +2058,20 @@ get_mon_arrays(struct pqos_mon_data ***parray1,
         struct pqos_mon_data **p1, **p2;
 
         ASSERT(parray1 != NULL && parray2 != NULL);
-
-	if (!process_mode())
-	        mon_number = (unsigned) sel_monitor_num;
-	else
-	        mon_number = (unsigned) sel_process_num;
-
-	p1 = malloc(sizeof(p1[0]) * mon_number);
-	p2 = malloc(sizeof(p2[0]) * mon_number);
-	if (p1 == NULL || p2 == NULL) {
+        if (!process_mode())
+                mon_number = (unsigned) sel_monitor_num;
+        else
+                mon_number = (unsigned) sel_process_num;
+        p1 = malloc(sizeof(p1[0]) * mon_number);
+        p2 = malloc(sizeof(p2[0]) * mon_number);
+        if (p1 == NULL || p2 == NULL) {
                 if (p1)
                         free(p1);
                 if (p2)
                         free(p2);
-	        printf("Error with memory allocation");
-		exit(EXIT_FAILURE);
-	}
+                printf("Error with memory allocation");
+                exit(EXIT_FAILURE);
+        }
 
         for (i = 0; i < mon_number; i++) {
                 if (!process_mode())
@@ -2078,8 +2124,8 @@ void monitor_loop(void)
         const int iscsv = !strcasecmp(sel_output_type, "csv");
         const size_t sz_header = 128;
         char header[sz_header];
-	unsigned mon_number = 0, display_num = 0;
-	struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
+        unsigned mon_number = 0, display_num = 0;
+        struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
 
         if ((!istext)  && (!isxml) && (!iscsv)) {
                 printf("Invalid selection of output file type '%s'!\n",
@@ -2129,28 +2175,27 @@ void monitor_loop(void)
         tv_s = tv_start;
 
         while (!stop_monitoring_loop) {
-		struct timeval tv_e;
+                struct timeval tv_e;
                 struct tm *ptm = NULL;
                 unsigned i = 0;
                 long usec_start = 0, usec_end = 0, usec_diff = 0;
                 char cb_time[64];
 
-		ret = pqos_mon_poll(mon_grps, mon_number);
-		if (ret != PQOS_RETVAL_OK) {
-		        printf("Failed to poll monitoring data!\n");
-			free(mon_grps);
-			free(mon_data);
-			return;
-		}
-
-		memcpy(mon_data, mon_grps, mon_number * sizeof(mon_grps[0]));
+                ret = pqos_mon_poll(mon_grps, mon_number);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Failed to poll monitoring data!\n");
+                        free(mon_grps);
+                        free(mon_data);
+                        return;
+                }
+                memcpy(mon_data, mon_grps, mon_number * sizeof(mon_grps[0]));
 
                 if (sel_mon_top_like)
-		        qsort(mon_data, mon_number, sizeof(mon_data[0]),
-			      mon_qsort_llc_cmp_desc);
+                        qsort(mon_data, mon_number, sizeof(mon_data[0]),
+                              mon_qsort_llc_cmp_desc);
                 else if (!process_mode())
-		        qsort(mon_data, mon_number, sizeof(mon_data[0]),
-			      mon_qsort_coreid_cmp_asc);
+                        qsort(mon_data, mon_number, sizeof(mon_data[0]),
+                              mon_qsort_coreid_cmp_asc);
 
                 /**
                  * Get time string
@@ -2172,13 +2217,13 @@ void monitor_loop(void)
 
                 for (i = 0; i < display_num; i++) {
                         const struct pqos_event_values *pv =
-                                &mon_data[i]->values;
+                                 &mon_data[i]->values;
                         double llc = bytes_to_kb(pv->llc);
-			double mbr = bytes_to_mb(pv->mbm_remote_delta) * coeff;
-			double mbl = bytes_to_mb(pv->mbm_local_delta) * coeff;
+                        double mbr = bytes_to_mb(pv->mbm_remote_delta) * coeff;
+                        double mbl = bytes_to_mb(pv->mbm_local_delta) * coeff;
 
                         if (istext)
-			        print_text_row(fp_monitor, mon_data[i],
+                                print_text_row(fp_monitor, mon_data[i],
                                                llc, mbr, mbl);
                         if (isxml)
                                 print_xml_row(fp_monitor, cb_time, mon_data[i],
@@ -2240,8 +2285,8 @@ void monitor_loop(void)
         if (istty)
                 fputs("\n\n", fp_monitor);
 
-	free(mon_grps);
-	free(mon_data);
+        free(mon_grps);
+        free(mon_data);
 }
 
 void monitor_cleanup(void)
