@@ -223,7 +223,8 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
 #ifdef __linux__
-        if (cfg->interface == PQOS_INTER_OS)
+        if (cfg->interface == PQOS_INTER_OS ||
+                cfg->interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_mon_init(cpu, cap);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
@@ -246,7 +247,8 @@ pqos_mon_fini(void)
 
         m_rmid_max = 0;
 #ifdef __linux__
-        if (m_interface == PQOS_INTER_OS)
+        if (m_interface == PQOS_INTER_OS ||
+                m_interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_mon_fini();
 #endif
         m_cpu = NULL;

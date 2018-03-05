@@ -58,9 +58,12 @@ static int m_interface = PQOS_INTER_MSR;
 int
 _pqos_utils_init(int interface)
 {
-    m_interface = interface;
+        if (interface == PQOS_INTER_OS_RESCTRL_MON)
+                m_interface = PQOS_INTER_OS;
+        else
+                m_interface = interface;
 
-    return PQOS_RETVAL_OK;
+        return PQOS_RETVAL_OK;
 }
 
 
