@@ -274,9 +274,10 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         pid_t pid = sel_monitor_pid_tab[i].pid;
                         int ret;
 
-                        ret = pqos_mon_start_pid(pid, PQOS_MON_EVENT_L3_OCCUP,
-                                                 NULL,
-                                                 sel_monitor_pid_tab[i].pgrp);
+                        ret = pqos_mon_start_pids(1, &pid,
+			                          PQOS_MON_EVENT_L3_OCCUP,
+                                                  NULL,
+                                                  sel_monitor_pid_tab[i].pgrp);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Monitoring start error on pid %u,"
                                        "status %d\n", pid, ret);

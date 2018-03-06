@@ -667,10 +667,11 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 if (all_pid_evts & PQOS_PERF_EVENT_LLC_MISS)
                                         pg->events |= PQOS_PERF_EVENT_LLC_MISS;
                         }
-                        ret = pqos_mon_start_pid(sel_monitor_pid_tab[i].pid,
-                                                 sel_monitor_pid_tab[i].events,
-                                                 NULL,
-                                                 sel_monitor_pid_tab[i].pgrp);
+                        ret = pqos_mon_start_pids(1,
+			                          &sel_monitor_pid_tab[i].pid,
+                                                  sel_monitor_pid_tab[i].events,
+                                                  NULL,
+                                                  sel_monitor_pid_tab[i].pgrp);
                         ASSERT(ret == PQOS_RETVAL_OK);
                         /**
                          * Any problem with monitoring the process?

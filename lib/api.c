@@ -1005,9 +1005,19 @@ pqos_mon_start_pid(const pid_t pid,
                    void *context,
                    struct pqos_mon_data *group)
 {
+        return pqos_mon_start_pids(1, &pid, event, context, group);
+}
+
+int
+pqos_mon_start_pids(const unsigned num_pids,
+                    const pid_t *pids,
+                    const enum pqos_mon_event event,
+                    void *context,
+                    struct pqos_mon_data *group)
+{
         int ret;
 
-        if (group == NULL || event == 0 || pid < 0)
+        if (num_pids == 0 || pids == NULL || group == NULL || event == 0)
                 return PQOS_RETVAL_PARAM;
 
         if (group->valid == GROUP_VALID_MARKER)
@@ -1018,6 +1028,7 @@ pqos_mon_start_pid(const pid_t pid,
                           "selected for task monitoring!\n");
                 return PQOS_RETVAL_ERROR;
         }
+
         /**
          * Validate event parameter
          * - only combinations of events allowed
@@ -1041,22 +1052,93 @@ pqos_mon_start_pid(const pid_t pid,
                 return ret;
         }
 
-        memset(group, 0, sizeof(*group));
-        group->event = event;
-        group->pid = pid;
-        group->context = context;
-
 #ifdef __linux__
-        ret = os_mon_start_pid(group);
+        ret = os_mon_start_pids(num_pids, pids, event, context, group);
 #else
         LOG_INFO("OS interface not supported!\n");
         ret = PQOS_RETVAL_RESOURCE;
 #endif
+
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
 
         _pqos_api_unlock();
 
         return ret;
+}
 
+int pqos_mon_add_pids(const unsigned num_pids,
+                      const pid_t *pids,
+                      struct pqos_mon_data *group)
+{
+        int ret;
+
+        if (num_pids == 0 || pids == NULL || group == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid != GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task monitoring!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+#ifdef __linux__
+        ret = os_mon_add_pids(num_pids, pids, group);
+#else
+        LOG_INFO("OS interface not supported!\n");
+        ret = PQOS_RETVAL_RESOURCE;
+#endif
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
+int pqos_mon_remove_pids(const unsigned num_pids,
+                         const pid_t *pids,
+                         struct pqos_mon_data *group)
+{
+        int ret;
+
+        if (num_pids == 0 || pids == NULL || group == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid != GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
+        if (m_interface != PQOS_INTER_OS) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task monitoring!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+#ifdef __linux__
+        ret = os_mon_remove_pids(num_pids, pids, group);
+#else
+        LOG_INFO("OS interface not supported!\n");
+        ret = PQOS_RETVAL_RESOURCE;
+#endif
+
+        _pqos_api_unlock();
+
+        return ret;
 }

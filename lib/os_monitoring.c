@@ -1034,6 +1034,51 @@ os_mon_start_pid(struct pqos_mon_data *group)
         return ret;
 }
 
+int
+os_mon_start_pids(const unsigned num_pids,
+                  const pid_t *pids,
+                  const enum pqos_mon_event event,
+                  void *context,
+                  struct pqos_mon_data *group)
+{
+        if (num_pids == 1) {
+                memset(group, 0, sizeof(*group));
+                group->event = event;
+                group->pid = *pids;
+                group->context = context;
+                return os_mon_start_pid(group);
+        }
+
+        LOG_ERROR("Pid group monitoring is not implemented\n");
+        return PQOS_RETVAL_ERROR;
+}
+
+int
+os_mon_add_pids(const unsigned num_pids,
+                const pid_t *pids,
+                struct pqos_mon_data *group)
+{
+        UNUSED_PARAM(num_pids);
+        UNUSED_PARAM(pids);
+        UNUSED_PARAM(group);
+
+        LOG_ERROR("Pid group monitoring is not implemented\n");
+        return PQOS_RETVAL_ERROR;
+}
+
+int
+os_mon_remove_pids(const unsigned num_pids,
+                   const pid_t *pids,
+                   struct pqos_mon_data *group)
+{
+        UNUSED_PARAM(num_pids);
+        UNUSED_PARAM(pids);
+        UNUSED_PARAM(group);
+
+        LOG_ERROR("Pid group monitoring is not implemented\n");
+        return PQOS_RETVAL_ERROR;
+}
+
 /**
  * @brief This function polls all perf counters
  *
