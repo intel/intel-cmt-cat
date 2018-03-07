@@ -38,17 +38,18 @@
 
 Summary:            Provides command line interface to CMT, MBM, CAT, CDP and MBA technologies
 Name:               %{githubname}
-Release:            1%{?dist}
+Release:            2%{?dist}
 Version:            %{githubver}
 License:            BSD
 Group:              Development/Tools
 ExclusiveArch:      x86_64 i686 i586
 %if %{defined githubsubver}
-Source0:            https://github.com/01org/%{githubname}/archive/v%{githubver}.%{githubsubver}.tar.gz
+Source:             https://github.com/01org/%{githubname}/archive/v%{githubver}.%{githubsubver}.tar.gz
 %else
-Source0:            https://github.com/01org/%{githubname}/archive/v%{githubver}.tar.gz
+Source:             https://github.com/01org/%{githubname}/archive/v%{githubver}.tar.gz
 %endif
 URL:                https://github.com/01org/%{githubname}
+BuildRequires:      gcc, make
 
 %description
 This software package provides basic support for
@@ -168,7 +169,10 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
-* Thu Nov 29 2017 Marcel Cornu <marcel.d.cornu@intel.com>, Wojciech Andralojc <wojciechx.andralojc@intel.com> 1.2.0-1
+* Wed Mar 7 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 1.2.0-2
+- Updated package build requirements
+
+* Wed Nov 29 2017 Marcel Cornu <marcel.d.cornu@intel.com>, Wojciech Andralojc <wojciechx.andralojc@intel.com> 1.2.0-1
 - New release 1.2.0
 
 * Thu Aug 3 2017 Aaron Hetherington <aaron.hetherington@intel.com>, Marcel Cornu <marcel.d.cornu@intel.com> 1.1.0-1
