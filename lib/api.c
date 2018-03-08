@@ -1055,6 +1055,7 @@ pqos_mon_start_pids(const unsigned num_pids,
 #ifdef __linux__
         ret = os_mon_start_pids(num_pids, pids, event, context, group);
 #else
+        UNUSED_PARAM(context);
         LOG_INFO("OS interface not supported!\n");
         ret = PQOS_RETVAL_RESOURCE;
 #endif
