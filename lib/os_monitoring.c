@@ -701,12 +701,100 @@ os_mon_remove_pids(const unsigned num_pids,
                    const pid_t *pids,
                    struct pqos_mon_data *group)
 {
-        UNUSED_PARAM(num_pids);
-        UNUSED_PARAM(pids);
-        UNUSED_PARAM(group);
 
-        LOG_ERROR("Pid group monitoring is not implemented\n");
-        return PQOS_RETVAL_ERROR;
+        int ret;
+        unsigned i;
+        pid_t *keep_tid_map = NULL; /* List of not removed TIDs */
+        unsigned keep_tid_nr = 0;
+        struct pqos_mon_data remove;
+        unsigned removed;
+
+        ASSERT(num_pids != NULL);
+        ASSERT(pids != NULL);
+        ASSERT(group != NULL);
+
+        /**
+         * Find TID's for not removed tasks
+         */
+        for (i = 0; i < group->num_pids; i++) {
+                /* skip PIDs on removed list */
+                if (tid_exists(group->pids[i], num_pids, pids))
+                        continue;
+
+                /* pid no longer exists */
+                if (!tid_verify(group->pids[i]))
+                        continue;
+
+                ret = tid_find(group->pids[i], &keep_tid_nr, &keep_tid_map);
+                if (ret != PQOS_RETVAL_OK)
+                        goto os_mon_remove_pids_exit;
+        }
+
+        memset(&remove, 0, sizeof(remove));
+        remove.pids = NULL;
+        remove.num_pids = num_pids;
+        remove.tid_map = malloc(sizeof(remove.tid_map[0]) * group->tid_nr);
+        if (remove.tid_map == NULL)
+                goto os_mon_remove_pids_exit;
+        remove.perf = malloc(sizeof(remove.perf[0]) * group->tid_nr);
+        if (remove.perf == NULL) {
+                free(remove.tid_map);
+                goto os_mon_remove_pids_exit;
+        }
+
+        /* Add tid's for removal */
+        for (i = 0; i < group->tid_nr; i++) {
+                /* TID is not removed */
+                if (tid_exists(group->tid_map[i], keep_tid_nr, keep_tid_map))
+                        continue;
+
+                remove.tid_map[remove.tid_nr] = group->tid_map[i];
+                remove.perf[remove.tid_nr] = group->perf[i];
+                remove.tid_nr++;
+        }
+
+        ret = stop_events(&remove);
+        free(remove.perf);
+        free(remove.tid_map);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mon_remove_pids_exit;
+
+        /**
+         * Update mon group
+         */
+        removed = 0;
+        for (i = 0; i < group->tid_nr; i++) {
+                /* TID does not exists on the not keep list */
+                if (!tid_exists(group->tid_map[i], keep_tid_nr, keep_tid_map)) {
+                        removed++;
+                        continue;
+                }
+
+                group->tid_map[i - removed] = group->tid_map[i];
+                group->perf[i - removed] = group->perf[i];
+        }
+        group->tid_nr -= removed;
+        group->tid_map = realloc(group->tid_map,
+                                 sizeof(group->tid_map[0]) * group->tid_nr);
+        group->perf = realloc(group->perf,
+                              sizeof(group->perf[0]) * group->tid_nr);
+        removed = 0;
+        for (i = 0; i < group->num_pids; i++) {
+                if (tid_exists(group->pids[i], num_pids, pids)) {
+                        removed++;
+                        continue;
+                }
+
+                group->pids[i - removed] = group->pids[i];
+        }
+        group->num_pids -= removed;
+        group->pids = realloc(group->pids,
+                sizeof(group->pids[0]) * group->num_pids);
+
+ os_mon_remove_pids_exit:
+        if (keep_tid_map != NULL)
+                free(keep_tid_map);
+        return ret;
 }
 
 int
