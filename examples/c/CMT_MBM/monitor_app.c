@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -275,9 +275,9 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         int ret;
 
                         ret = pqos_mon_start_pids(1, &pid,
-			                          PQOS_MON_EVENT_L3_OCCUP,
-                                                  NULL,
-                                                  sel_monitor_pid_tab[i].pgrp);
+                                                 PQOS_MON_EVENT_L3_OCCUP,
+                                                 NULL,
+                                                 sel_monitor_pid_tab[i].pgrp);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Monitoring start error on pid %u,"
                                        "status %d\n", pid, ret);
@@ -362,7 +362,7 @@ static void monitoring_loop(void)
                                 double llc = bytes_to_kb(pv->llc);
 
                                 printf("%6d %10.1f\n",
-                                       m_mon_grps[i]->pid, llc);
+                                       m_mon_grps[i]->pids[0], llc);
                         }
                 }
 		printf("\nPress Enter to continue or Ctrl+c to exit");

@@ -394,6 +394,18 @@ struct pqos_mon_poll_ctx {
 };
 
 /**
+ * Perf monitoring poll context
+ */
+struct pqos_mon_perf_ctx {
+        int fd_llc;
+        int fd_mbl;
+        int fd_mbt;
+        int fd_inst;
+        int fd_cyc;
+        int fd_llc_misses;
+};
+
+/**
  * Monitoring group data structure
  */
 struct pqos_mon_data {
@@ -406,19 +418,20 @@ struct pqos_mon_data {
                                            pointer */
         struct pqos_event_values values; /**< RMID events value */
 
-        pid_t pid; /**< if not zero then this group tracks a process */
-
         /**
          * Task specific section
          */
-        int tid_nr;
+        unsigned num_pids;              /**< number of pids in the group */
+        pid_t *pids;                    /**< list of pids in the group */
+        unsigned tid_nr;
         pid_t *tid_map;
-        int *fds_llc;
-        int *fds_mbl;
-        int *fds_mbt;
-        int *fds_inst;
-        int *fds_cyc;
-        int *fds_llc_misses;
+
+        /**
+         * Perf specific section
+         */
+        struct pqos_mon_perf_ctx *perf; /**< Perf poll context for each
+                                           core/tid */
+        enum pqos_mon_event perf_event; /**< Started perf events */
 
         /**
          * Core specific section

@@ -4,3 +4,5 @@
 *.xml
 *.log
 *.d
+pqos/pqos
+rdtset/rdtset

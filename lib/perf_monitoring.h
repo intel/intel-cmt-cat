@@ -80,25 +80,23 @@ int perf_mon_fini(void);
  *
  * @param group monitoring structure
  * @param event PQoS event type
- * @param fds array to store fd's
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_mon_start(const struct pqos_mon_data *group,
-                   enum pqos_mon_event event,
-                   int **fds);
+int perf_mon_start(struct pqos_mon_data *group,
+	           const enum pqos_mon_event event);
 
 /**
  * @brief Function to stop Perf event counters
  *
  * @param group monitoring structure
- * @param fds array of fd's
+ * @param event PQoS event type
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_mon_stop(struct pqos_mon_data *group, int **fds);
+int perf_mon_stop(struct pqos_mon_data *group, const enum pqos_mon_event event);
 
 /**
  * @brief This function polls all perf counters
@@ -106,12 +104,13 @@ int perf_mon_stop(struct pqos_mon_data *group, int **fds);
  * Reads counters for all events and stores values
  *
  * @param group monitoring structure
+ * @param event PQoS event type
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int perf_mon_poll(struct pqos_mon_data *group);
+int perf_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event);
 
 /**
  * @brief Check if event is supported by perf

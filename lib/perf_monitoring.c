@@ -493,16 +493,35 @@ perf_mon_fini(void)
         return PQOS_RETVAL_OK;
 }
 
-int
-perf_mon_start(const struct pqos_mon_data *group,
-               enum pqos_mon_event event,
-               int **fds)
+static int *
+perf_mon_get_fd(struct pqos_mon_perf_ctx *ctx, const enum pqos_mon_event event)
 {
-        int i, num_ctrs, *ctr_fds;
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                return &ctx->fd_llc;
+        case PQOS_MON_EVENT_LMEM_BW:
+                return &ctx->fd_mbl;
+        case PQOS_MON_EVENT_TMEM_BW:
+                return &ctx->fd_mbt;
+        case PQOS_PERF_EVENT_LLC_MISS:
+                return &ctx->fd_llc_misses;
+        case PQOS_PERF_EVENT_CYCLES:
+                return &ctx->fd_cyc;
+        case PQOS_PERF_EVENT_INSTRUCTIONS:
+                return &ctx->fd_inst;
+        default:
+                return NULL;
+        }
+}
+
+int
+perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
+{
+        int i, num_ctrs;
         struct perf_mon_supported_event *se;
 
         ASSERT(group != NULL);
-        ASSERT(fds != NULL);
+        ASSERT(group->perf != NULL);
 
         /**
          * Check if monitoring cores/tasks
@@ -518,47 +537,47 @@ perf_mon_start(const struct pqos_mon_data *group,
         if (se == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        ctr_fds = malloc(sizeof(ctr_fds[0])*num_ctrs);
-        if (ctr_fds == NULL)
-                return PQOS_RETVAL_ERROR;
         /**
          * For each core/task assign fd to read counter
          */
         for (i = 0; i < num_ctrs; i++) {
                 int ret;
-                /**
+                struct pqos_mon_perf_ctx *ctx = &group->perf[i];
+                int *fd;
+                int core = -1;
+                pid_t tid = -1;
+
+                if (group->num_cores > 0)
+                        core = group->cores[i];
+                else
+                        tid = group->tid_map[i];
+
+                fd = perf_mon_get_fd(ctx, event);
+                if (fd == NULL)
+                        return PQOS_RETVAL_ERROR;
+                /*
                  * If monitoring cores, pass core list
                  * Otherwise, pass list of TID's
                  */
-                if (group->num_cores > 0)
-                        ret = perf_setup_counter(&se->attrs, -1,
-                                                 group->cores[i],
-                                                 -1, 0, &ctr_fds[i]);
-                else
-                        ret = perf_setup_counter(&se->attrs,
-                                                 group->tid_map[i],
-                                                 -1, -1, 0, &ctr_fds[i]);
+                ret = perf_setup_counter(&se->attrs, tid, core, -1, 0, fd);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("Failed to start perf "
                                   "counters for %s\n", se->desc);
-                        free(ctr_fds);
                         return PQOS_RETVAL_ERROR;
                 }
         }
-        *fds = ctr_fds;
 
         return PQOS_RETVAL_OK;
 }
 
 int
-perf_mon_stop(struct pqos_mon_data *group, int **fds)
+perf_mon_stop(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
-        int i, num_ctrs, *fd;
+        int i, num_ctrs;
 
         ASSERT(group != NULL);
-        ASSERT(fds != NULL);
+        ASSERT(group->perf != NULL);
 
-        fd = *fds;
         /**
          * Check if monitoring cores/tasks
          */
@@ -572,61 +591,15 @@ perf_mon_stop(struct pqos_mon_data *group, int **fds)
         /**
          * For each counter, close associated file descriptor
          */
-        for (i = 0; i < num_ctrs; i++)
-                perf_shutdown_counter(fd[i]);
-
-        free(fd);
-        *fds = NULL;
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Function to read perf pqos event counters
- *
- * Reads pqos counters and stores values for a specified event
- *
- * @param group monitoring structure
- * @param value destination to store value
- * @param fds array of fd's
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-read_perf_counters(struct pqos_mon_data *group,
-                   uint64_t *value, int *fds)
-{
-        int i, num_ctrs;
-        uint64_t total_value = 0;
-
-        ASSERT(group != NULL);
-        ASSERT(value != NULL);
-        ASSERT(fds != NULL);
-
-        /**
-         * Check if monitoring cores/tasks
-         */
-        if (group->num_cores > 0)
-                num_ctrs = group->num_cores;
-        else if (group->tid_nr > 0)
-                num_ctrs = group->tid_nr;
-        else
-                return PQOS_RETVAL_ERROR;
-
-        /**
-         * For each task read counter and
-         * return sum of all counter values
-         */
         for (i = 0; i < num_ctrs; i++) {
-                uint64_t counter_value;
-                int ret = perf_read_counter(fds[i], &counter_value);
+                struct pqos_mon_perf_ctx *ctx = &group->perf[i];
+                int *fd = perf_mon_get_fd(ctx, event);
 
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
-                total_value += counter_value;
+                if (fd == NULL)
+                        return PQOS_RETVAL_ERROR;
+
+                perf_shutdown_counter(*fd);
         }
-        *value = total_value;
 
         return PQOS_RETVAL_OK;
 }
@@ -649,98 +622,82 @@ get_delta(const uint64_t old_value, const uint64_t new_value)
 }
 
 int
-perf_mon_poll(struct pqos_mon_data *group)
+perf_mon_poll(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
         int ret;
+        int i, num_ctrs;
+        uint64_t value = 0;
+        uint64_t old_value;
+
+        ASSERT(group != NULL);
+        ASSERT(group->perf != NULL);
 
         /**
-         * Read and store counter values
-         * for each event
+         * Check if monitoring cores/tasks
          */
-        if (group->event & PQOS_MON_EVENT_L3_OCCUP) {
-                ret = read_perf_counters(group,
-                                         &group->values.llc,
-                                         group->fds_llc);
-                if (ret != PQOS_RETVAL_OK)
+        if (group->num_cores > 0)
+                num_ctrs = group->num_cores;
+        else if (group->tid_nr > 0)
+                num_ctrs = group->tid_nr;
+        else
+                return PQOS_RETVAL_ERROR;
+
+        /**
+         * For each task read counter and sum of all counter values
+         */
+        for (i = 0; i < num_ctrs; i++) {
+                struct pqos_mon_perf_ctx *ctx = &group->perf[i];
+                uint64_t counter_value;
+                int *fd = perf_mon_get_fd(ctx, event);
+
+                if (fd == NULL)
                         return PQOS_RETVAL_ERROR;
 
-                group->values.llc = group->values.llc *
-                        events_tab[OS_MON_EVT_IDX_LLC].scale;
+                ret = perf_read_counter(*fd, &counter_value);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                value += counter_value;
         }
-        if ((group->event & PQOS_MON_EVENT_LMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t old_value = group->values.mbm_local;
 
-                ret = read_perf_counters(group,
-                                         &group->values.mbm_local,
-                                         group->fds_mbl);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
+        /**
+         * Set value
+         */
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                group->values.llc = value;
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
+                old_value = group->values.mbm_local;
+                group->values.mbm_local = value;
                 group->values.mbm_local_delta =
                         get_delta(old_value, group->values.mbm_local);
-        }
-        if ((group->event & PQOS_MON_EVENT_TMEM_BW) ||
-            (group->event & PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t old_value = group->values.mbm_total;
-
-                ret = read_perf_counters(group,
-                                         &group->values.mbm_total,
-                                         group->fds_mbt);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
+                break;
+        case PQOS_MON_EVENT_TMEM_BW:
+                old_value = group->values.mbm_total;
+                group->values.mbm_total = value;
                 group->values.mbm_total_delta =
                         get_delta(old_value, group->values.mbm_total);
-        }
-        if (group->event & PQOS_MON_EVENT_RMEM_BW) {
-                group->values.mbm_remote_delta = 0;
-                if (group->values.mbm_total_delta >
-                    group->values.mbm_local_delta)
-                        group->values.mbm_remote_delta =
-                                group->values.mbm_total_delta -
-                                group->values.mbm_local_delta;
-        }
-        if ((group->event & PQOS_PERF_EVENT_INSTRUCTIONS) ||
-            (group->event & PQOS_PERF_EVENT_IPC)) {
-                uint64_t old_value = group->values.ipc_retired;
-
-                ret = read_perf_counters(group,
-                                         &group->values.ipc_retired,
-                                         group->fds_inst);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                group->values.ipc_retired_delta =
-                        get_delta(old_value, group->values.ipc_retired);
-        }
-        if ((group->event & PQOS_PERF_EVENT_CYCLES) ||
-            (group->event & PQOS_PERF_EVENT_IPC)) {
-                uint64_t old_value = group->values.ipc_unhalted;
-
-                ret = read_perf_counters(group,
-                                         &group->values.ipc_unhalted,
-                                         group->fds_cyc);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
-                group->values.ipc_unhalted_delta =
-                        get_delta(old_value, group->values.ipc_unhalted);
-        }
-        if (group->event & PQOS_PERF_EVENT_IPC) {
-                if (group->values.ipc_unhalted > 0)
-                        group->values.ipc =
-                                (double)group->values.ipc_retired_delta /
-                                (double)group->values.ipc_unhalted_delta;
-        else
-                group->values.ipc = 0;
-        }
-        if (group->event & PQOS_PERF_EVENT_LLC_MISS) {
-                uint64_t old_value = group->values.llc_misses;
-
-                ret = read_perf_counters(group,
-                                         &group->values.llc_misses,
-                                         group->fds_llc_misses);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS:
+                old_value = group->values.llc_misses;
+                group->values.llc_misses = value;
                 group->values.llc_misses_delta =
                         get_delta(old_value, group->values.llc_misses);
+                break;
+        case PQOS_PERF_EVENT_CYCLES:
+                old_value = group->values.ipc_unhalted;
+                group->values.ipc_unhalted = value;
+                group->values.ipc_unhalted_delta =
+                        get_delta(old_value, group->values.ipc_unhalted);
+                break;
+        case PQOS_PERF_EVENT_INSTRUCTIONS:
+                old_value = group->values.ipc_retired;
+                group->values.ipc_retired = value;
+                group->values.ipc_retired_delta =
+                        get_delta(old_value, group->values.ipc_retired);
+                break;
+        default:
+                return PQOS_RETVAL_ERROR;
         }
 
         return PQOS_RETVAL_OK;
