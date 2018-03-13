@@ -67,7 +67,8 @@ static int m_interface = PQOS_INTER_MSR;
 int
 api_init(int interface)
 {
-        if (interface != PQOS_INTER_MSR && interface != PQOS_INTER_OS)
+        if (interface != PQOS_INTER_MSR && interface != PQOS_INTER_OS &&
+                interface != PQOS_INTER_OS_RESCTRL_MON)
                 return PQOS_RETVAL_PARAM;
 
         m_interface = interface;
@@ -155,7 +156,8 @@ pqos_alloc_assoc_set_pid(const pid_t task,
                 return ret;
         }
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task association!\n");
                 _pqos_api_unlock();
@@ -193,7 +195,8 @@ pqos_alloc_assoc_get_pid(const pid_t task,
                 return ret;
         }
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task association!\n");
                 _pqos_api_unlock();
@@ -303,7 +306,8 @@ pqos_alloc_assign_pid(const unsigned technology,
                 return ret;
         }
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task association!\n");
                 _pqos_api_unlock();
@@ -339,7 +343,8 @@ pqos_alloc_release_pid(const pid_t *task_array,
                 return ret;
         }
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task association!\n");
                 _pqos_api_unlock();
@@ -411,7 +416,8 @@ pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         if (count == NULL)
                 return NULL;
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task association!\n");
                 return NULL;
@@ -1023,7 +1029,8 @@ pqos_mon_start_pids(const unsigned num_pids,
         if (group->valid == GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task monitoring!\n");
                 return PQOS_RETVAL_ERROR;

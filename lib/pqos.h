@@ -74,14 +74,18 @@ extern "C" {
 #define PQOS_RETVAL_TRANSPORT    5      /**< transport error */
 #define PQOS_RETVAL_PERF_CTR     6      /**< performance counter error */
 #define PQOS_RETVAL_BUSY         7      /**< resource busy error */
+#define PQOS_RETVAL_INTER        8      /**< Interface not supported */
 
 /*
  * =======================================
  * Interface values
  * =======================================
  */
-#define PQOS_INTER_MSR            0      /**< MSR */
-#define PQOS_INTER_OS             1      /**< OS */
+enum pqos_interface {
+        PQOS_INTER_MSR            = 0,  /**< MSR */
+        PQOS_INTER_OS             = 1,  /**< OS */
+        PQOS_INTER_OS_RESCTRL_MON = 2   /**< OS with resctrl monitoring */
+};
 
 /*
  * =======================================
@@ -116,15 +120,17 @@ enum pqos_cdp_config {
  *         LOG_VER_SUPER_VERBOSE  - warning, error, info and debug messages
  *
  * @param interface preference
- *         PQOS_INTER_MSR      - MSR interface or nothing
- *         PQOS_INTER_OS       - OS interface or nothing
+ *         PQOS_INTER_MSR            - MSR interface or nothing
+ *         PQOS_INTER_OS             - OS interface or nothing
+ *         PQOS_INTER_OS_RESCTRL_MON - OS interface with resctrl monitoring
+ *                                     or nothing
  */
 struct pqos_config {
         int fd_log;
         void (*callback_log)(void *, const size_t, const char *);
         void *context_log;
         int verbose;
-        int interface;
+        enum pqos_interface interface;
 };
 
 /**

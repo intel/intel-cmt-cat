@@ -158,6 +158,7 @@ static pthread_mutex_t m_apilock_mutex;
  * Interface status
  *   0  PQOS_INTER_MSR
  *   1  PQOS_INTER_OS
+ *   2  PQOS_INTER_OS_RESCTRL_MON
  */
 #ifdef __linux__
 static int m_interface = PQOS_INTER_MSR;
@@ -1394,11 +1395,14 @@ get_os_event_disabled(int event)
  * @retval PQOS_RETVAL_OK success
  */
 static int
-discover_os_monitoring(struct pqos_cap_mon *mon) {
+discover_os_monitoring(struct pqos_cap_mon *mon,
+                       enum pqos_interface interface)
+{
 	int ret = PQOS_RETVAL_OK;
 	unsigned i;
         enum pqos_os_mon lmem_support = PQOS_OS_MON_UNSUPPORTED;
 	enum pqos_os_mon tmem_support = PQOS_OS_MON_UNSUPPORTED;
+        int resctrl_support = 0;
 
         ASSERT(mon != NULL);
 
@@ -1468,9 +1472,10 @@ discover_os_monitoring(struct pqos_cap_mon *mon) {
                         return ret;
                 }
 
-                if (os_resctrl)
+                if (os_resctrl) {
                         event->os_support = PQOS_OS_MON_RESCTRL;
-                else
+                        resctrl_support = 1;
+                } else
                         event->os_support = PQOS_OS_MON_PERF;
 
 		if (event->type == PQOS_MON_EVENT_TMEM_BW)
@@ -1494,6 +1499,11 @@ discover_os_monitoring(struct pqos_cap_mon *mon) {
 		}
 	}
 
+        if (interface == PQOS_INTER_OS_RESCTRL_MON && !resctrl_support) {
+                LOG_ERROR("Resctrl monitoring selected but not supported\n");
+                return PQOS_RETVAL_INTER;
+        }
+
 	return ret;
 }
 
@@ -1507,7 +1517,7 @@ discover_os_monitoring(struct pqos_cap_mon *mon) {
  * @retval PQOS_RETVAL_OK success
  */
 static int
-discover_os_capabilities(struct pqos_cap *p_cap, int interface)
+discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
 {
         int ret = PQOS_RETVAL_OK;
         int res_flag = 0;
@@ -1539,7 +1549,8 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
                  "resctrl not detected. "
                  "Kernel version 4.10 or higher required");
 
-        if (interface == PQOS_INTER_OS && res_flag == 0) {
+        if ((interface == PQOS_INTER_OS ||
+                interface == PQOS_INTER_OS_RESCTRL_MON) && res_flag == 0) {
                 LOG_ERROR("OS interface selected but not supported\n");
                 return PQOS_RETVAL_ERROR;
         }
@@ -1562,7 +1573,8 @@ discover_os_capabilities(struct pqos_cap *p_cap, int interface)
 		 * Discover available monitoring events
 		 */
 		if (type == PQOS_CAP_TYPE_MON && res_flag) {
-			ret = discover_os_monitoring(capability->u.mon);
+			ret = discover_os_monitoring(capability->u.mon,
+                                                     interface);
 			if (ret != PQOS_RETVAL_OK)
 				return ret;
 		}
@@ -1761,7 +1773,8 @@ pqos_init(const struct pqos_config *config)
         }
 #endif
 
-        if (config->interface == PQOS_INTER_OS) {
+        if (config->interface == PQOS_INTER_OS ||
+                config->interface == PQOS_INTER_OS_RESCTRL_MON) {
                 const struct pqos_capability *l2_cap = NULL;
 
                 ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
@@ -1800,7 +1813,7 @@ pqos_init(const struct pqos_config *config)
 
         ret = api_init(config->interface);
         if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("api_init() error %d\n", ret);
+                LOG_ERROR("_pqos_api_init() error %d\n", ret);
                 goto machine_init_error;
         }
 #ifdef __linux__

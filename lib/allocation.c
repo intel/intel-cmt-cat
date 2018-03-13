@@ -292,10 +292,12 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu,
 
         m_cap = cap;
         m_cpu = cpu;
-        if (cfg != NULL)
-                m_interface = cfg->interface;
-        else
+        if (cfg == NULL)
                 m_interface = PQOS_INTER_MSR;
+        else if (cfg->interface == PQOS_INTER_OS_RESCTRL_MON)
+                m_interface = PQOS_INTER_OS;
+        else
+                m_interface = cfg->interface;
 #ifdef __linux__
 	if (m_interface == PQOS_INTER_OS)
 		ret = os_alloc_init(cpu, cap);
