@@ -583,12 +583,117 @@ os_mon_add_pids(const unsigned num_pids,
                 const pid_t *pids,
                 struct pqos_mon_data *group)
 {
-        UNUSED_PARAM(num_pids);
-        UNUSED_PARAM(pids);
-        UNUSED_PARAM(group);
+        int ret;
+        unsigned i;
+        pid_t *tid_map = NULL;
+        pid_t *ptr;
+        unsigned tid_nr = 0;
+        struct pqos_mon_data added;
+        struct pqos_mon_perf_ctx *ctx;
+        unsigned num_duplicated = 0;
 
-        LOG_ERROR("Pid group monitoring is not implemented\n");
-        return PQOS_RETVAL_ERROR;
+        ASSERT(group != NULL);
+        ASSERT(num_pids > 0);
+        ASSERT(pids != NULL);
+
+        /**
+         * Check if all PIDs exists
+         */
+        for (i = 0; i < num_pids; i++) {
+                pid_t pid = pids[i];
+
+                if (!tid_verify(pid)) {
+                        LOG_ERROR("Task %d does not exist!\n", (int)pid);
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
+        /**
+         * Get TID's for added tasks
+         */
+        for (i = 0; i < num_pids; i++) {
+                ret = tid_find(pids[i], &tid_nr, &tid_map);
+                if (ret != PQOS_RETVAL_OK)
+                        goto os_mon_add_pids_exit;
+        }
+
+        /**
+         * Find duplicated tids
+         */
+        for (i = 0; i < tid_nr; i++) {
+                if (tid_exists(tid_map[i], group->tid_nr, group->tid_map)) {
+                        num_duplicated++;
+                        continue;
+                }
+
+                tid_map[i - num_duplicated] = tid_map[i];
+        }
+        tid_nr -= num_duplicated;
+        if (tid_nr == 0) {
+                LOG_INFO("No new TIDs to be added\n");
+                ret = PQOS_RETVAL_OK;
+                goto os_mon_add_pids_exit;
+        }
+
+        /**
+         * Start monitoring for the new TIDs
+         */
+        memset(&added, 0, sizeof(added));
+        added.tid_nr = tid_nr;
+        added.tid_map = tid_map;
+        added.event = group->event;
+        added.num_pids = num_pids;
+
+        ret = start_events(&added);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mon_add_pids_exit;
+
+        /**
+         * Update mon group
+         */
+        ptr = realloc(group->tid_map,
+                sizeof(group->tid_map[0]) * (group->tid_nr + added.tid_nr));
+        if (ptr == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_mon_add_pids_exit;
+        }
+        group->tid_map = ptr;
+
+        ctx = realloc(group->perf,
+                sizeof(group->perf[0]) * (group->tid_nr + added.tid_nr));
+        if (ctx == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_mon_add_pids_exit;
+        }
+        group->perf = ctx;
+
+        ptr = realloc(group->pids,
+                sizeof(group->pids[0]) * (group->num_pids + num_pids));
+        if (ptr == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_mon_add_pids_exit;
+        }
+        group->pids = ptr;
+
+        for (i = 0; i < added.tid_nr; i++) {
+                group->tid_map[group->tid_nr] = added.tid_map[i];
+                group->perf[group->tid_nr] = added.perf[i];
+                group->tid_nr++;
+        }
+        for (i = 0; i < num_pids; i++) {
+                group->pids[group->num_pids] = pids[i];
+                group->num_pids++;
+        }
+
+ os_mon_add_pids_exit:
+        if (ret == PQOS_RETVAL_RESOURCE) {
+                LOG_ERROR("Memory allocation error!\n");
+                stop_events(&added);
+        }
+
+        if (tid_map != NULL)
+                free(tid_map);
+        return ret;
 }
 
 int
