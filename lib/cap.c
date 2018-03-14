@@ -1767,7 +1767,7 @@ pqos_init(const struct pqos_config *config)
         ASSERT(m_cap != NULL);
 #ifdef __linux__
         ret = discover_os_capabilities(m_cap, config->interface);
-        if (ret == PQOS_RETVAL_ERROR) {
+        if (ret == PQOS_RETVAL_ERROR || ret == PQOS_RETVAL_INTER) {
                 LOG_ERROR("discover_os_capabilities() error %d\n", ret);
                 goto machine_init_error;
         }
