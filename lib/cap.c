@@ -1552,6 +1552,8 @@ discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
         if ((interface == PQOS_INTER_OS ||
                 interface == PQOS_INTER_OS_RESCTRL_MON) && res_flag == 0) {
                 LOG_ERROR("OS interface selected but not supported\n");
+                if (interface == PQOS_INTER_OS_RESCTRL_MON)
+                        return PQOS_RETVAL_INTER;
                 return PQOS_RETVAL_ERROR;
         }
         /**
