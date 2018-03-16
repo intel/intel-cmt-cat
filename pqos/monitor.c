@@ -108,7 +108,9 @@ static struct core_group {
  * in config string for monitoring
  */
 static struct pid_group {
-        pid_t pid;
+        char *desc;
+        int num_pids;
+        pid_t *pids;
         struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
 } sel_monitor_pid_tab[PQOS_MAX_PIDS];
@@ -269,26 +271,71 @@ set_cgrp(struct core_group *cg, char *desc,
 }
 
 /**
- * @brief Function to set the descriptions and cores for each core group
+ * @brief Function to set pid group values
  *
- * Takes a string containing individual cores and groups of cores and
- * breaks it into substrings which are used to set core group values
+ * @param pg pointer to pid_group structure
+ * @param desc string containing pid group description
+ * @param pids pointer to table of pid values
+ * @param num_pids number of pids contained in the table
  *
- * @param s string containing cores to be divided into substrings
- * @param tab table of core groups to set values in
- * @param max maximum number of core groups allowed
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+static int
+set_pgrp(struct pid_group *pg, char *desc,
+         const uint64_t *pids, const int num_pids)
+{
+        int i;
+
+        ASSERT(pg != NULL);
+        ASSERT(desc != NULL);
+        ASSERT(pids != NULL);
+        ASSERT(num_pids > 0);
+
+        pg->desc = desc;
+        pg->pids = malloc(sizeof(pid_t) * num_pids);
+        if (pg->pids == NULL) {
+                printf("Error allocating pid group table\n");
+                return -1;
+        }
+        pg->num_pids = num_pids;
+
+        /**
+         * Transfer pids from buffer to table
+         */
+        for (i = 0; i < num_pids; i++)
+                pg->pids[i] = (pid_t)pids[i];
+
+        return 0;
+}
+
+/**
+ * @brief Function to set the descriptions and cores/pids for each monitoring
+ * group
+ *
+ * Takes a string containing individual cores/pids and groups of cores/pids and
+ * breaks it into substrings which are used to set group values
+ *
+ * @param s string containing cores/pids to be divided into substrings
+ * @param ctab table of core groups to set values in
+ * @param ptab table of pids groups to set values in
+ * @param max maximum number of groups allowed
  *
  * @return Number of core groups set up
  * @retval -1 on error
  */
 static int
-strtocgrps(char *s, struct core_group *tab, const unsigned max)
+strtogrps(char *s,
+          struct core_group *ctab,
+          struct pid_group *ptab,
+          const unsigned max)
 {
         unsigned i, n, index = 0;
         uint64_t cbuf[PQOS_MAX_CORES];
         char *non_grp = NULL;
 
-        ASSERT(tab != NULL);
+        ASSERT(ctab != NULL ^ ptab != NULL);
         ASSERT(max > 0);
 
         if (s == NULL)
@@ -297,24 +344,31 @@ strtocgrps(char *s, struct core_group *tab, const unsigned max)
         while ((non_grp = strsep(&s, "[")) != NULL) {
                 int ret;
                 /**
-                 * If group contains single core
+                 * If group contains single core/pid
                  */
                 if ((strlen(non_grp)) > 0) {
                         n = strlisttotab(non_grp, cbuf, (max-index));
                         if ((index+n) > max)
                                 return -1;
-                        /* set core group info */
+                        /* set group info */
                         for (i = 0; i < n; i++) {
                                 char *desc = uinttostr((unsigned)cbuf[i]);
 
-                                ret = set_cgrp(&tab[index], desc, &cbuf[i], 1);
-                                if (ret < 0)
+                                if (ctab != NULL)
+                                        ret = set_cgrp(&ctab[index], desc,
+                                                       &cbuf[i], 1);
+                                else
+                                        ret = set_pgrp(&ptab[index], desc,
+                                                       &cbuf[i], 1);
+                                if (ret < 0) {
+                                        free(desc);
                                         return -1;
+                                }
                                 index++;
                         }
                 }
                 /**
-                 * If group contains multiple cores
+                 * If group contains multiple cores/pids
                  */
                 char *grp = strsep(&s, "]");
 
@@ -327,8 +381,11 @@ strtocgrps(char *s, struct core_group *tab, const unsigned max)
                                 free(desc);
                                 return -1;
                         }
-                        /* set core group info */
-                        ret = set_cgrp(&tab[index], desc, cbuf, n);
+                        /* set group info */
+                        if (ctab != NULL)
+                                ret = set_cgrp(&ctab[index], desc, cbuf, n);
+                        else
+                                ret = set_pgrp(&ptab[index], desc, cbuf, n);
                         if (ret < 0) {
                                 free(desc);
                                 return -1;
@@ -385,6 +442,50 @@ cmp_cgrps(const struct core_group *cg_a,
 }
 
 /**
+ * @brief Function to compare pids in 2 pid groups
+ *
+ * This function takes 2 pid groups and compares their pid values
+ *
+ * @param pg_a pointer to pid group a
+ * @param pg_b pointer to pid group b
+ *
+ * @return Whether both groups contain some/none/all of the same pids
+ * @retval 1 if both groups contain the same pids
+ * @retval 0 if none of their pids match
+ * @retval -1 if some but not all pids match
+ */
+static int
+cmp_pgrps(const struct pid_group *pg_a,
+          const struct pid_group *pg_b)
+{
+        int i, found = 0;
+
+        ASSERT(pg_a != NULL);
+        ASSERT(pg_b != NULL);
+
+        const int sz_a = pg_a->num_pids;
+        const int sz_b = pg_b->num_pids;
+        const pid_t *tab_a = pg_a->pids;
+        const pid_t *tab_b = pg_b->pids;
+
+        for (i = 0; i < sz_a; i++) {
+                int j;
+
+                for (j = 0; j < sz_b; j++)
+                        if (tab_a[i] == tab_b[j])
+                                found++;
+        }
+        /* if no pids are the same */
+        if (!found)
+                return 0;
+        /* if group contains same pids */
+        if (sz_a == sz_b && sz_b == found)
+                return 1;
+        /* if not all pids are the same */
+        return -1;
+}
+
+/**
  * @brief Common function to parse selected events
  *
  * @param str string of the event
@@ -423,7 +524,7 @@ parse_event(char *str, enum pqos_mon_event *evt)
  * @param str string passed to -m command line option
  */
 static void
-parse_monitor_event(char *str)
+parse_monitor_cores(char *str)
 {
         int i = 0, n = 0;
         enum pqos_mon_event evt = 0;
@@ -432,8 +533,7 @@ parse_monitor_event(char *str)
         memset(cgrp_tab, 0, sizeof(cgrp_tab));
         parse_event(str, &evt);
 
-        n = strtocgrps(strchr(str, ':') + 1,
-                       cgrp_tab, PQOS_MAX_CORES);
+        n = strtogrps(strchr(str, ':') + 1, cgrp_tab, NULL, PQOS_MAX_CORES);
         if (n < 0) {
                 printf("Error: Too many cores selected\n");
                 exit(EXIT_FAILURE);
@@ -464,16 +564,19 @@ parse_monitor_event(char *str)
                 }
                 if (!found &&
                     sel_monitor_num < (int) DIM(sel_monitor_core_tab)) {
-                        struct core_group *pg =
+                        struct core_group *cg =
                                 &sel_monitor_core_tab[sel_monitor_num];
-                        *pg = cgrp_tab[i];
-                        pg->events = evt;
-                        pg->pgrp = malloc(sizeof(struct pqos_mon_data));
-                        if (pg->pgrp == NULL) {
+                        *cg = cgrp_tab[i];
+                        cg->events = evt;
+                        cg->pgrp = malloc(sizeof(struct pqos_mon_data));
+                        if (cg->pgrp == NULL) {
                                 printf("Error with memory allocation");
                                 exit(EXIT_FAILURE);
                         }
                         ++sel_monitor_num;
+                } else {
+                        free(cgrp_tab[i].cores);
+                        free(cgrp_tab[i].desc);
                 }
         }
         return;
@@ -508,7 +611,7 @@ void selfn_monitor_cores(const char *arg)
                 token = strtok_r(str, ";", &saveptr);
                 if (token == NULL)
                         break;
-                parse_monitor_event(token);
+                parse_monitor_cores(token);
         }
 
         free(cp);
@@ -667,19 +770,17 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 if (all_pid_evts & PQOS_PERF_EVENT_LLC_MISS)
                                         pg->events |= PQOS_PERF_EVENT_LLC_MISS;
                         }
-                        ret = pqos_mon_start_pids(1,
-			                          &sel_monitor_pid_tab[i].pid,
-                                                  sel_monitor_pid_tab[i].events,
-                                                  NULL,
-                                                  sel_monitor_pid_tab[i].pgrp);
+                        ret = pqos_mon_start_pids(pg->num_pids, pg->pids,
+                                                  pg->events, (void *)pg->desc,
+                                                  pg->pgrp);
                         ASSERT(ret == PQOS_RETVAL_OK);
                         /**
                          * Any problem with monitoring the process?
                          */
                         if (ret != PQOS_RETVAL_OK) {
-                                printf("PID %d monitoring start error,"
+                                printf("PID %s monitoring start error,"
                                        "status %d\n",
-                                       sel_monitor_pid_tab[i].pid, ret);
+                                       sel_monitor_pid_tab[i].desc, ret);
                                 return -1;
                         }
                 }
@@ -707,6 +808,8 @@ void monitor_stop(void)
 
                         if (ret != PQOS_RETVAL_OK)
                                 printf("Monitoring stop error!\n");
+                        free(sel_monitor_pid_tab[i].desc);
+                        free(sel_monitor_pid_tab[i].pids);
                         free(sel_monitor_pid_tab[i].pgrp);
                 }
 }
@@ -733,63 +836,21 @@ void selfn_monitor_top_like(const char *arg)
         sel_mon_top_like = 1;
 }
 
-/**
- * @brief Adds pid for monitoring in pid monitoring mode
- *
- * @param pid pid number to be added
- * @param evt events to be monitored
- */
-static void
-add_pid_for_monitoring(const pid_t pid, const enum pqos_mon_event evt)
-{
-        int i, found = 0;
-
-        for (i = 0; i < sel_process_num &&
-             i < (int) DIM(sel_monitor_pid_tab); i++) {
-                if (sel_monitor_pid_tab[i].pid == pid) {
-                        sel_monitor_pid_tab[i].events |= evt;
-                        found = 1;
-                        break;
-                }
-        }
-
-        if (!found && sel_process_num < (int) DIM(sel_monitor_pid_tab)) {
-                struct pid_group *pg =
-                                &sel_monitor_pid_tab[sel_process_num];
-                pg->pid = pid;
-                pg->events = evt;
-                pg->pgrp = malloc(sizeof(*pg->pgrp));
-                if (pg->pgrp == NULL) {
-                        printf("Error with memory allocation");
-                        exit(EXIT_FAILURE);
-                }
-                ++sel_process_num;
-        }
-}
 
 /**
- * @brief Stores the process id's given in a table for future use
+ * @brief Adds pids for monitoring in pids monitoring mode
  *
- * @param str string of process id's
+ * @param[in] pgrp pid group
+ * @param[in] evt events to be monitored
+ *
+ * @retval 1 when group is added
+ * @retval 0 when group was not added
  */
-static void
-sel_store_process_id(char *str)
+static int
+add_pids_for_monitoring(const struct pid_group *pgrp,
+                        const enum pqos_mon_event evt)
 {
-        uint64_t processes[PQOS_MAX_PIDS];
-        unsigned i = 0, n = 0;
-        enum pqos_mon_event evt = 0;
-
-        parse_event(str, &evt);
-
-        n = strlisttotab(strchr(str, ':') + 1, processes, DIM(processes));
-
-        if (n == 0)
-                parse_error(str, "No process id selected for monitoring");
-
-        if (n >= DIM(sel_monitor_pid_tab))
-                parse_error(str,
-                            "too many processes selected "
-                            "for monitoring");
+        int j, found = 0;
 
         /**
          *  For each process:
@@ -797,9 +858,65 @@ sel_store_process_id(char *str)
          *  - update the entry
          *  - else - add it to the sel_monitor_pid_tab
          */
-        for (i = 0; i < n; i++)
-                add_pid_for_monitoring(processes[i], evt);
+        for (j = 0; j < sel_process_num &&
+                     j < (int)DIM(sel_monitor_pid_tab); j++) {
+                found = cmp_pgrps(&sel_monitor_pid_tab[j], pgrp);
+                if (found < 0) {
+                        printf("Error: cannot monitor same "
+                               "pids in different groups\n");
+                        exit(EXIT_FAILURE);
+                }
+                if (found) {
+                        sel_monitor_pid_tab[j].events |= evt;
+                        break;
+                }
+        }
+        if (!found &&
+            sel_process_num < (int) DIM(sel_monitor_pid_tab)) {
+                struct pid_group *pg = &sel_monitor_pid_tab[sel_process_num];
+                *pg = *pgrp;
+                pg->events = evt;
+                pg->pgrp = malloc(sizeof(struct pqos_mon_data));
+                if (pg->pgrp == NULL) {
+                        printf("Error with memory allocation");
+                        exit(EXIT_FAILURE);
+                }
+                ++sel_process_num;
 
+                return 1;
+        }
+
+        return 0;
+}
+
+
+/**
+ * @brief Verifies and translates monitoring config string into
+ *        internal monitoring configuration.
+ *
+ * @param str string passed to -m command line option
+ */
+static void
+parse_monitor_pids(char *str)
+{
+        int i = 0, n = 0;
+        enum pqos_mon_event evt = 0;
+        struct pid_group pgrp_tab[PQOS_MAX_PIDS];
+
+        memset(pgrp_tab, 0, sizeof(pgrp_tab));
+        parse_event(str, &evt);
+
+        n = strtogrps(strchr(str, ':') + 1, NULL, pgrp_tab, PQOS_MAX_PIDS);
+        if (n < 0) {
+                printf("Error: Too many pids selected\n");
+                exit(EXIT_FAILURE);
+        }
+
+        for (i = 0; i < n; i++)
+                if (!add_pids_for_monitoring(&pgrp_tab[i], evt)) {
+                        free(pgrp_tab[i].pids);
+                        free(pgrp_tab[i].desc);
+                }
 }
 
 /**
@@ -828,7 +945,8 @@ selfn_monitor_pids(const char *arg)
                 token = strtok_r(str, ";", &saveptr);
                 if (token == NULL)
                         break;
-                sel_store_process_id(token);
+
+                parse_monitor_pids(token);
         }
 
         free(cp);
@@ -1318,15 +1436,19 @@ proc_stats_cmp(const void *a, const void *b)
  *         this will equal to max_size)
  */
 static int
-fill_top_procs(const struct slist *pslist, struct proc_stats *top_procs,
+fill_top_procs(const struct slist *pslist, struct pid_group *top_procs,
                const int max_size)
 {
         const struct slist *it = NULL;
         int current_size = 0;
+        int i;
+        struct proc_stats stats[TOP_PROC_MAX];
 
+        ASSERT(max_size <= TOP_PROC_MAX);
         ASSERT(top_procs != NULL);
 
         memset(top_procs, 0, sizeof(top_procs[0]) * max_size);
+        memset(stats, 0, sizeof(stats[0]) * max_size);
 
         /* Iterating on CPU usage stats for all of the stored processes in
          * pslist in order to get max_size of 'survivors' - processes
@@ -1343,12 +1465,12 @@ fill_top_procs(const struct slist *pslist, struct proc_stats *top_procs,
                          */
                         continue;
 
-                /* If we have free slots in top_procs array, then things are
+                /* If we have free slots in stats array, then things are
                  * simple. We have only to add proc_stats into free slot and
                  * sort entire array afterwards (sorting is done below)
                  */
                 if (current_size < max_size) {
-                        top_procs[current_size] = *ps;
+                        stats[current_size] = *ps;
                         current_size++;
                 } else {
                         /* Handling more pids than can be saved in the top-pids
@@ -1359,7 +1481,7 @@ fill_top_procs(const struct slist *pslist, struct proc_stats *top_procs,
                          * smaller from first element, it is smaller than
                          * next element as well)
                          */
-                        if (proc_stats_cmp(ps, &top_procs[0]) <= 0)
+                        if (proc_stats_cmp(ps, &stats[0]) <= 0)
                                 /* if it is smaller/equal than smallest
                                  * element, ignoring and moving on
                                  */
@@ -1368,15 +1490,24 @@ fill_top_procs(const struct slist *pslist, struct proc_stats *top_procs,
                         /* adding at place of the smallest element and array
                          * will be sorted below
                          */
-                        top_procs[0] = *ps;
+                        stats[0] = *ps;
                 }
 
                 /* Some change has been made, we have to sort entire array to
                  * make sure that array is always sorted before next element
                  * will be added
                  */
-                qsort(top_procs, current_size, sizeof(top_procs[0]),
-                      proc_stats_cmp);
+                qsort(stats, current_size, sizeof(stats[0]), proc_stats_cmp);
+        }
+
+        /**
+         * Fill top_proc table
+         */
+        for (i = 0; i < current_size; i++) {
+                char *desc = uinttostr((unsigned)stats[i].pid);
+                uint64_t pid = (uint64_t)stats[i].pid;
+
+                set_pgrp(&top_procs[i], desc, &pid, 1);
         }
 
         return current_size;
@@ -1392,7 +1523,7 @@ selfn_monitor_top_pids(void)
 {
         int res = 0, top_size = 0, i;
         struct slist *pslist = NULL, *it = NULL;
-        struct proc_stats top_procs[TOP_PROC_MAX];
+        struct pid_group top_procs[TOP_PROC_MAX];
 
         printf("Monitoring top-pids enabled\n");
         sel_mon_top_like = 1;
@@ -1434,7 +1565,7 @@ selfn_monitor_top_pids(void)
          * order
          */
         for (i = (top_size - 1); i >= 0; --i)
-                add_pid_for_monitoring(top_procs[i].pid, PQOS_MON_EVENT_ALL);
+                add_pids_for_monitoring(&top_procs[i], PQOS_MON_EVENT_ALL);
 
 cleanup_pslist:
         /* cleaning list of all processes stats */
@@ -1667,8 +1798,8 @@ print_text_row(FILE *fp,
                         (unsigned)mon_data->values.llc_misses_delta/1000,
                         data);
         else
-                fprintf(fp, "\n%6u %6s %6.2f %7uk%s",
-                        mon_data->pid, "N/A",
+                fprintf(fp, "\n%8.8s %6s %6.2f %7uk%s",
+                        (char *)mon_data->context, "N/A",
                         mon_data->values.ipc,
                         (unsigned)mon_data->values.llc_misses_delta/1000,
                         data);
@@ -1734,7 +1865,7 @@ print_xml_row(FILE *fp, char *time,
                 fprintf(fp,
                         "%s\n"
                         "\t<time>%s</time>\n"
-                        "\t<pid>%u</pid>\n"
+                        "\t<pid>%s</pid>\n"
                         "\t<core>%s</core>\n"
                         "\t<ipc>%.2f</ipc>\n"
                         "\t<llc_misses>%llu</llc_misses>\n"
@@ -1742,7 +1873,7 @@ print_xml_row(FILE *fp, char *time,
                         "%s\n",
                         xml_child_open,
                         time,
-                        mon_data->pid,
+                        (char *)mon_data->context,
                         "N/A",
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
@@ -1798,8 +1929,8 @@ print_csv_row(FILE *fp, char *time,
                         data);
         else
                 fprintf(fp,
-                        "%s,%u,%s,%.2f,%llu%s\n",
-                        time, mon_data->pid, "N/A",
+                        "%s,\"%s\",%s,%.2f,%llu%s\n",
+                        time, (char *)mon_data->context, "N/A",
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
                         data);
