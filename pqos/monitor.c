@@ -2009,7 +2009,7 @@ build_header_row(char *hdr, const size_t sz_hdr,
                 if (!process_mode())
                         strncpy(hdr, "    CORE   IPC   MISSES", sz_hdr - 1);
                 else
-                        strncpy(hdr, "   PID   CORE    IPC   MISSES",
+                        strncpy(hdr, "     PID   CORE    IPC   MISSES",
                                 sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
                         strncat(hdr, "    LLC[KB]", sz_hdr - strlen(hdr) - 1);
