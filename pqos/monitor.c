@@ -335,7 +335,7 @@ strtogrps(char *s,
         uint64_t cbuf[PQOS_MAX_CORES];
         char *non_grp = NULL;
 
-        ASSERT(ctab != NULL ^ ptab != NULL);
+        ASSERT((ctab != NULL) ^ (ptab != NULL));
         ASSERT(max > 0);
 
         if (s == NULL)
