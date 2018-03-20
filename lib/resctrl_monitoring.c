@@ -171,3 +171,9 @@ resctrl_mon_fini(void)
 
         return PQOS_RETVAL_OK;
 }
+
+int
+resctrl_mon_is_event_supported(const enum pqos_mon_event event)
+{
+        return (supported_events & event) == event;
+}

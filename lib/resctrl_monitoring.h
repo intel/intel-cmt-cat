@@ -64,7 +64,14 @@ int resctrl_mon_init(const struct pqos_cpuinfo *cpu,
  */
 int resctrl_mon_fini(void);
 
-
+/**
+ * @brief Check if event is supported by resctrl
+ *
+ * @param event PQoS event to check
+ *
+ * @retval 0 if not supported
+ */
+int resctrl_mon_is_event_supported(const enum pqos_mon_event event);
 
 #ifdef __cplusplus
 }
