@@ -43,7 +43,7 @@
 #include "types.h"
 #include "os_monitoring.h"
 #include "perf_monitoring.h"
-#include "perf.h"
+#include "resctrl_monitoring.h"
 
 /**
  * ---------------------------------------
@@ -281,6 +281,9 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 		return PQOS_RETVAL_PARAM;
 
         ret = perf_mon_init(cpu, cap);
+        if (ret == PQOS_RETVAL_RESOURCE)
+                ret = resctrl_mon_init(cpu, cap);
+
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -297,6 +300,7 @@ os_mon_fini(void)
         m_cpu = NULL;
 
         perf_mon_fini();
+        resctrl_mon_fini();
 
         return PQOS_RETVAL_OK;
 }
@@ -715,7 +719,7 @@ os_mon_remove_pids(const unsigned num_pids,
         struct pqos_mon_data remove;
         unsigned removed;
 
-        ASSERT(num_pids != NULL);
+        ASSERT(num_pids > 0);
         ASSERT(pids != NULL);
         ASSERT(group != NULL);
 

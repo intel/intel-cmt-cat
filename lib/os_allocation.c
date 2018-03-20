@@ -145,7 +145,7 @@ os_alloc_check(void)
         /**
          * Check if resctrl is mounted
          */
-        if (access(RESCTRL_ALLOC_PATH"/cpus", F_OK) != 0) {
+        if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
                 const struct pqos_capability *alloc_cap = NULL;
                 int l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
                 int l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
@@ -196,7 +196,7 @@ os_alloc_prep(void)
 
 		memset(buf, 0, sizeof(buf));
 		if (snprintf(buf, sizeof(buf) - 1,
-                             "%s/COS%d", RESCTRL_ALLOC_PATH, (int) i) < 0)
+                             "%s/COS%d", RESCTRL_PATH, (int) i) < 0)
 			return PQOS_RETVAL_ERROR;
 
 		/* if resctrl group doesn't exist - create it */
@@ -825,8 +825,7 @@ os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
 
 	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf) - 1, "%s/info/L3/min_cbm_bits",
-	         RESCTRL_ALLOC_PATH);
+	snprintf(buf, sizeof(buf) - 1, "%s/info/L3/min_cbm_bits", RESCTRL_PATH);
 
 	fd = fopen(buf, "r");
 	if (fd == NULL)
@@ -1040,8 +1039,7 @@ os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
 	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf) - 1, "%s/info/L2/min_cbm_bits",
-	         RESCTRL_ALLOC_PATH);
+	snprintf(buf, sizeof(buf) - 1, "%s/info/L2/min_cbm_bits", RESCTRL_PATH);
 
 	fd = fopen(buf, "r");
 	if (fd == NULL)

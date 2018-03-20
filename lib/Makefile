@@ -82,7 +82,7 @@ CLEAN_OBJS = $(SRCS:.c=.o)
 
 # On FreeBSD build with no OS support
 ifeq ($(shell uname), FreeBSD)
-OBJS := $(filter-out perf.o os_allocation.o os_monitoring.o resctrl.o perf_monitoring.o,$(OBJS))
+OBJS := $(filter-out perf.o os_allocation.o os_monitoring.o resctrl.o resctrl_monitoring.o perf_monitoring.o,$(OBJS))
 endif
 
 HDR = pqos.h
@@ -180,7 +180,8 @@ style:
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE \
 	-f pqos.h -f cpuinfo.c \
 	-f perf_monitoring.h -f perf_monitoring.c \
-	-f resctrl.h -f resctrl.c
+	-f resctrl.h -f resctrl.c \
+	-f resctrl_monitoring.h -f resctrl_monitoring.c
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
@@ -196,7 +197,8 @@ cppcheck:
 	os_monitoring.h os_monitoring.c \
 	perf_monitoring.h perf_monitoring.c \
 	resctrl_alloc.h resctrl_alloc.c \
-	resctrl.h resctrl.c
+	resctrl.h resctrl.c \
+	resctrl_monitoring.h resctrl_monitoring.c
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

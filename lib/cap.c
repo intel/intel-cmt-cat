@@ -1623,7 +1623,7 @@ discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
         /**
          * Check if resctrl is mounted
          */
-        if (access(RESCTRL_ALLOC_PATH"/cpus", F_OK) != 0) {
+        if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
                 LOG_INFO("resctrl not mounted\n");
                 return PQOS_RETVAL_RESOURCE;
         } else if (interface == PQOS_INTER_MSR)

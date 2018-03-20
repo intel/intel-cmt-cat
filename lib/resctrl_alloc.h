@@ -47,10 +47,6 @@
 extern "C" {
 #endif
 
-#ifndef RESCTRL_ALLOC_PATH
-#define RESCTRL_ALLOC_PATH "/sys/fs/resctrl"
-#endif
-
 /**
  * Max supported number of CPU's
  */

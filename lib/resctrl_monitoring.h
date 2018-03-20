@@ -33,65 +33,37 @@
  */
 
 /**
- * @brief Internal header file for resctrl common functions
+ * @brief Internal header file for resctrl minitoring functions
  */
 
-#ifndef __PQOS_RESCTRL_H__
-#define __PQOS_RESCTRL_H__
+
+#ifndef __PQOS_RESCTRL_MON_H__
+#define __PQOS_RESCTRL_MON_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#ifndef RESCTRL_PATH
-#define RESCTRL_PATH "/sys/fs/resctrl"
-#endif
-#define RESCTRL_PATH_INFO RESCTRL_PATH"/info"
-
-
 /**
- * @brief Obtain shared lock on resctrl filesystem
+ * @brief Initializes resctrl structures used for OS monitoring interface
+ *
+ * @param cpu cpu topology structure
+ * @param cap capabilities structure
  *
  * @return Operational status
- * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_OK success
  */
-int resctrl_lock_shared(void);
+int resctrl_mon_init(const struct pqos_cpuinfo *cpu,
+                     const struct pqos_cap *cap);
 
 /**
- * @brief Obtain exclusive lock on resctrl filesystem
+ * @brief Shuts down monitoring sub-module for resctrl monitoring
  *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
  */
-int resctrl_lock_exclusive(void);
+int resctrl_mon_fini(void);
 
-/**
- * @brief Release lock on resctrl filesystem
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-int resctrl_lock_release(void);
-
-/**
- * @brief Mount the resctrl file system with given CDP option
- *
- * @param l3_cdp_cfg L3 CDP option
- * @param l2_cdp_cfg L2 CDP option
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
-                  const enum pqos_cdp_config l2_cdp_cfg);
-
-/**
- * @brief Unmount the resctrl file system
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-int resctrl_umount(void);
 
 
 #ifdef __cplusplus

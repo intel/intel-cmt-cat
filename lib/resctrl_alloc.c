@@ -37,8 +37,10 @@
 #include <ctype.h>
 #include <errno.h>
 
+#include "pqos.h"
 #include "log.h"
 #include "types.h"
+#include "resctrl.h"
 #include "resctrl_alloc.h"
 
 /*
@@ -161,10 +163,10 @@ resctrl_alloc_fopen(const unsigned class_id, const char *name, const char *mode)
 	memset(buf, 0, sizeof(buf));
 	if (class_id == 0)
 		result = snprintf(buf, sizeof(buf) - 1,
-				  "%s/%s", RESCTRL_ALLOC_PATH, name);
+				  "%s/%s", RESCTRL_PATH, name);
 	else
 		result = snprintf(buf, sizeof(buf) - 1, "%s/COS%u/%s",
-				  RESCTRL_ALLOC_PATH, class_id, name);
+				  RESCTRL_PATH, class_id, name);
 
 	if (result < 0)
 		return NULL;

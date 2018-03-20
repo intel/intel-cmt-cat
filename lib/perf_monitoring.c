@@ -399,8 +399,6 @@ set_mon_events(void)
                 goto init_pqos_events_exit;
         }
 
-        (void) set_arch_event_attrs(&events);
-
         all_evt_mask |= events;
 
  init_pqos_events_exit:
@@ -420,20 +418,19 @@ set_mon_events(void)
  * @return Operational Status
  * @retval PQOS_RETVAL_OK on success
  */
-static int
+static void
 set_mon_caps(const struct pqos_cap *cap)
 {
         int ret;
         unsigned i;
         const struct pqos_capability *p_cap = NULL;
 
-        if (cap == NULL)
-                return PQOS_RETVAL_PARAM;
+        ASSERT(cap != NULL);
 
         /* find monitoring capability */
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &p_cap);
         if (ret != PQOS_RETVAL_OK)
-                return PQOS_RETVAL_OK;
+                return;
 
         /* update capabilities structure */
         for (i = 0; i < DIM(events_tab); i++) {
@@ -453,30 +450,32 @@ set_mon_caps(const struct pqos_cap *cap)
                         break;
                 }
         }
-        return ret;
 }
 
 int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
-        unsigned ret;
+        int ret;
 
-	ASSERT(cpu != NULL);
-	ASSERT(cap != NULL);
+        ASSERT(cpu != NULL);
+        ASSERT(cap != NULL);
+
+        ret = set_arch_event_attrs(&all_evt_mask);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         /* Set RDT perf attribute type */
         ret = set_mon_type();
         if (ret != PQOS_RETVAL_OK)
-                return ret;
+                goto perf_mon_init_exit;
 
         /* Detect and set events */
         ret = set_mon_events();
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
+ perf_mon_init_exit:
         /* Update capabilities structure with perf supported events */
-        ret = set_mon_caps(cap);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
+        set_mon_caps(cap);
 
         m_cap = cap;
         m_cpu = cpu;
