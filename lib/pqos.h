@@ -1184,8 +1184,8 @@ pqos_mon_get_event_value(void * const value,
                          const enum pqos_mon_event event_id,
                          const struct pqos_mon_data * const group)
 {
-        uint64_t * const p_64 = value;
-        double * const p_dbl = value;
+        uint64_t * const p_64 = (uint64_t * const)value;
+        double * const p_dbl = (double * const)value;
 
 	if (group == NULL || value == NULL)
 		return PQOS_RETVAL_PARAM;
