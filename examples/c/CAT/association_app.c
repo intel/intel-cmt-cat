@@ -127,6 +127,7 @@ print_allocation_config(void)
 		lcores = pqos_cpu_get_cores(p_cpu, sockets[i], &lcount);
 		if (lcores == NULL || lcount == 0) {
 			printf("Error retrieving core information!\n");
+                        free(lcores);
                         free(sockets);
 			return;
 		}
