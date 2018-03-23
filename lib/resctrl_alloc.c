@@ -570,16 +570,24 @@ resctrl_alloc_schemata_read(const unsigned class_id,
 			    struct resctrl_alloc_schemata *schemata)
 {
 	int ret = PQOS_RETVAL_OK;
-	FILE *fd;
+	FILE *fd = NULL;
 	int type = RESCTRL_ALLOC_SCHEMATA_TYPE_NONE;
-	char buf[16 * 1024];
 	char *p = NULL, *q = NULL, *saveptr = NULL;
+	const size_t buf_size = 16 * 1024;
+	char *buf = calloc(buf_size, sizeof(*buf));
+
+	if (buf == NULL) {
+		ret = PQOS_RETVAL_ERROR;
+		goto resctrl_alloc_schemata_read_exit;
+	}
 
 	ASSERT(schemata != NULL);
 
 	fd = resctrl_alloc_fopen(class_id, rctl_schemata, "r");
-	if (fd == NULL)
-		return PQOS_RETVAL_ERROR;
+	if (fd == NULL) {
+		ret = PQOS_RETVAL_ERROR;
+		goto resctrl_alloc_schemata_read_exit;
+	}
 
 	if ((schemata->l3ca_num > 0 && schemata->l3ca == NULL)
 	    || (schemata->l2ca_num > 0 && schemata->l2ca == NULL)) {
@@ -587,8 +595,7 @@ resctrl_alloc_schemata_read(const unsigned class_id,
 		goto resctrl_alloc_schemata_read_exit;
 	}
 
-	memset(buf, 0, sizeof(buf));
-	while (fgets(buf, sizeof(buf), fd) != NULL) {
+	while (fgets(buf, buf_size, fd) != NULL) {
 		q = buf;
 		/**
 		 * Trim white spaces
@@ -649,12 +656,17 @@ resctrl_alloc_schemata_read(const unsigned class_id,
 		}
 	}
 
+
  resctrl_alloc_schemata_read_exit:
+
+	if (buf != NULL)
+		free(buf);
+
 	/* check if error occured */
-	if (ret != PQOS_RETVAL_OK)
-		resctrl_alloc_fclose(fd);
-	else
+	if (ret == PQOS_RETVAL_OK)
 		ret = resctrl_alloc_fclose(fd);
+	else if (fd)
+		resctrl_alloc_fclose(fd);
 
 	return ret;
 }
@@ -665,20 +677,28 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 {
 	int ret = PQOS_RETVAL_OK;
 	unsigned i;
-	FILE *fd;
-	char buf[16 * 1024];
+	FILE *fd = NULL;
+	const size_t buf_size = 16 * 1024;
+	char *buf = calloc(buf_size, sizeof(*buf));
+
+	if (buf == NULL) {
+		ret = PQOS_RETVAL_ERROR;
+		goto resctrl_alloc_schemata_write_exit;
+	}
 
 	ASSERT(schemata != NULL);
 
 	fd = resctrl_alloc_fopen(class_id, rctl_schemata, "w");
-	if (fd == NULL)
-		return PQOS_RETVAL_ERROR;
+	if (fd == NULL) {
+		ret = PQOS_RETVAL_ERROR;
+		goto resctrl_alloc_schemata_write_exit;
+	}
 
 	/* Enable fully buffered output. File won't be flushed until 16kB
 	 * buffer is full */
-	if (setvbuf(fd, buf, _IOFBF, sizeof(buf)) != 0) {
-		resctrl_alloc_fclose(fd);
-		return PQOS_RETVAL_ERROR;
+	if (setvbuf(fd, buf, _IOFBF, buf_size) != 0) {
+		ret = PQOS_RETVAL_ERROR;
+		goto resctrl_alloc_schemata_write_exit;
 	}
 
 	/* L2 without CDP */
@@ -754,7 +774,17 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 		fprintf(fd, "\n");
 	}
 
-	ret = resctrl_alloc_fclose(fd);
+
+resctrl_alloc_schemata_write_exit:
+
+	if (buf != NULL)
+		free(buf);
+
+	/* check if error occured */
+	if (ret == PQOS_RETVAL_OK)
+		ret = resctrl_alloc_fclose(fd);
+	else if (fd)
+		resctrl_alloc_fclose(fd);
 
 	return ret;
 }

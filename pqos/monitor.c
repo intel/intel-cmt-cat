@@ -528,15 +528,19 @@ parse_monitor_cores(char *str)
 {
         int i = 0, n = 0;
         enum pqos_mon_event evt = 0;
-        struct core_group cgrp_tab[PQOS_MAX_CORES];
+        struct core_group *cgrp_tab = calloc(PQOS_MAX_CORES, sizeof(*cgrp_tab));
 
-        memset(cgrp_tab, 0, sizeof(cgrp_tab));
+        if (cgrp_tab == NULL) {
+                printf("Error with memory allocation!\n");
+                exit(EXIT_FAILURE);
+        }
+
         parse_event(str, &evt);
 
         n = strtogrps(strchr(str, ':') + 1, cgrp_tab, NULL, PQOS_MAX_CORES);
         if (n < 0) {
                 printf("Error: Too many cores selected\n");
-                exit(EXIT_FAILURE);
+                goto error_exit;
         }
         /**
          *  For each core group we are processing:
@@ -555,7 +559,7 @@ parse_monitor_cores(char *str)
                         if (found < 0) {
                                 printf("Error: cannot monitor same "
                                        "cores in different groups\n");
-                                exit(EXIT_FAILURE);
+                                goto error_exit;
                         }
                         if (found) {
                                 sel_monitor_core_tab[j].events |= evt;
@@ -571,7 +575,7 @@ parse_monitor_cores(char *str)
                         cg->pgrp = malloc(sizeof(struct pqos_mon_data));
                         if (cg->pgrp == NULL) {
                                 printf("Error with memory allocation");
-                                exit(EXIT_FAILURE);
+                                goto error_exit;
                         }
                         ++sel_monitor_num;
                 } else {
@@ -579,7 +583,13 @@ parse_monitor_cores(char *str)
                         free(cgrp_tab[i].desc);
                 }
         }
+
+        free(cgrp_tab);
         return;
+
+error_exit:
+        free(cgrp_tab);
+        exit(EXIT_FAILURE);
 }
 
 void selfn_monitor_file_type(const char *arg)
