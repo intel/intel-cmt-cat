@@ -180,6 +180,9 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         unsigned *sockets = NULL;
         unsigned socket_count = 0, i = 0;
         int ret = 0, res = 0;
+        size_t num_cache_ways = 0;
+        unsigned clos_save = 0;
+
 #ifdef __linux__
         cpu_set_t cpuset_save, cpuset;
 #endif
@@ -283,8 +286,6 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         /**
          * Compute number of cache ways required for the data
          */
-        size_t num_cache_ways = 0;
-
         res = bytes_to_cache_ways(p_l3ca_cap, size, &num_cache_ways);
         if (res != 0) {
 		ret = -8;
@@ -369,8 +370,6 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         /**
          * Read current cpuid CLOS association and set the new one
          */
-        unsigned clos_save = 0;
-
         res = pqos_alloc_assoc_get(cpuid, &clos_save);
         if (res != PQOS_RETVAL_OK) {
                 printf("pqos_alloc_assoc_get() error!\n");
