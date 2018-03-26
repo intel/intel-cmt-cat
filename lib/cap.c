@@ -1873,8 +1873,11 @@ pqos_init(const struct pqos_config *config)
                 (void) log_fini();
  init_error:
         if (ret != PQOS_RETVAL_OK) {
-                if (m_cap != NULL)
+                if (m_cap != NULL) {
+                        for (i = 0; i < m_cap->num_cap; i++)
+                                free(m_cap->capabilities[i].u.generic_ptr);
                         free(m_cap);
+                }
                 m_cpu = NULL;
                 m_cap = NULL;
         }
