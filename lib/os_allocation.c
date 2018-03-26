@@ -39,6 +39,7 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <dirent.h>             /**< scandir() */
 
 #include "pqos.h"
 #include "os_allocation.h"
@@ -47,6 +48,7 @@
 #include "types.h"
 #include "resctrl.h"
 #include "resctrl_alloc.h"
+#include "resctrl_monitoring.h"
 
 /**
  * ---------------------------------------
@@ -488,6 +490,372 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
         return ret;
 }
 
+/**
+ * @brief Moves all cores to COS0 (default)
+ *
+ * @return Operation status
+ */
+static int
+os_alloc_reset_cores(void)
+{
+	const unsigned default_cos = 0;
+	struct resctrl_cpumask mask;
+	unsigned i;
+	int ret;
+
+	LOG_INFO("OS alloc reset - core assoc\n");
+
+	ret = resctrl_alloc_cpumask_read(default_cos, &mask);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	for (i = 0; i < m_cpu->num_cores; i++)
+		resctrl_cpumask_set(m_cpu->cores[i].lcore, &mask);
+
+	ret = resctrl_alloc_cpumask_write(default_cos, &mask);
+	if (ret != PQOS_RETVAL_OK)
+		LOG_ERROR("Core assoc reset failed\n");
+
+	return ret;
+}
+
+/**
+ * @brief Resets L3, L2 and MBA schematas to default value
+ *
+ * @param [in] l3_cap l3 cache capability
+ * @param [in] l2_cap l2 cache capability
+ *
+ * @return Operation status
+ */
+static int
+os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
+		     const struct pqos_cap_l2ca *l2_cap){
+
+	const unsigned default_mba = 100;
+	uint64_t default_l3ca = 0;
+	uint64_t default_l2ca = 0;
+	unsigned grps;
+	unsigned i, j;
+	int ret;
+
+	LOG_INFO("OS alloc reset - schematas\n");
+
+	ret = resctrl_lock_exclusive();
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+	if (ret != PQOS_RETVAL_OK)
+		goto os_alloc_reset_light_schematas_exit;
+
+	/**
+	 * Obtain default L2/L3 CAT mask
+	 */
+	if (l3_cap != NULL)
+		default_l3ca = ((uint64_t)1 << l3_cap->num_ways) - 1;
+
+	if (l2_cap != NULL)
+		default_l2ca = ((uint64_t)1 << l2_cap->num_ways) - 1;
+
+	/**
+	 * Reset schematas
+	 */
+	for (i = 0; i < grps; i++) {
+		struct resctrl_alloc_schemata schmt;
+
+		ret = resctrl_alloc_schemata_init(i, m_cap, m_cpu, &schmt);
+		if (ret != PQOS_RETVAL_OK) {
+			LOG_ERROR("Error on schemata init "
+				  "for resctrl group %u\n", i);
+			goto os_alloc_reset_light_schematas_exit;
+		}
+
+		for (j = 0; j < schmt.l3ca_num; j++) {
+			 /* l3ca_num should be greater
+			  * than 0 if l3_cap is provided */
+			ASSERT(l3_cap != NULL);
+			if (schmt.l3ca[j].cdp) {
+				schmt.l3ca[j].u.s.code_mask = default_l3ca;
+				schmt.l3ca[j].u.s.data_mask = default_l3ca;
+			} else
+				schmt.l3ca[j].u.ways_mask = default_l3ca;
+		}
+
+		for (j = 0; j < schmt.l2ca_num; j++) {
+			/* l2ca_num should be greater
+			 * than 0 if l2_cap is provided */
+			ASSERT(l2_cap != NULL);
+			if (schmt.l2ca[j].cdp) {
+				schmt.l2ca[j].u.s.code_mask = default_l2ca;
+				schmt.l2ca[j].u.s.data_mask = default_l2ca;
+			} else
+				schmt.l2ca[j].u.ways_mask = default_l2ca;
+		}
+
+		for (j = 0; j < schmt.mba_num; j++)
+			schmt.mba[j].mb_rate = default_mba;
+
+		ret = resctrl_alloc_schemata_write(i, &schmt);
+
+		resctrl_alloc_schemata_fini(&schmt);
+
+		if (ret != PQOS_RETVAL_OK) {
+			LOG_ERROR("Error on schemata write "
+				  "for resctrl group %u\n", i);
+			goto os_alloc_reset_light_schematas_exit;
+		}
+	}
+
+ os_alloc_reset_light_schematas_exit:
+	if (ret != PQOS_RETVAL_OK)
+		resctrl_lock_release();
+	else
+		ret = resctrl_lock_release();
+
+	return ret;
+}
+
+/**
+ * @brief filter for scandir.
+ *
+ * Skips entries starting with "."
+ * Skips non-numeric entries
+ *
+ * @param[in] dir scandir dirent entry
+ *
+ * @retval 0 for entires to be skipped
+ * @retval 1 otherwise
+ */
+static int
+filter_pids(const struct dirent *dir)
+{
+	size_t char_idx;
+
+	if (dir->d_name[0] == '.')
+		return 0;
+
+        for (char_idx = 0; char_idx < strlen(dir->d_name); ++char_idx) {
+		if (!isdigit(dir->d_name[char_idx]))
+			return 0;
+        }
+
+        return 1;
+}
+
+/**
+ * @brief Move all tasks to COS0 (default)
+ *
+ * @return Operation status
+ */
+static int
+os_alloc_reset_tasks(void)
+{
+	struct dirent **pids_list = NULL;
+	int pid_count;
+	int pid_idx;
+	int alloc_result;
+	pid_t pid;
+	const int cos0 = 0;
+
+	LOG_INFO("OS alloc reset - tasks\n");
+
+	pid_count = scandir("/proc", &pids_list, filter_pids, NULL);
+
+	for (pid_idx = 0; pid_idx < pid_count; ++pid_idx) {
+		pid = atoi(pids_list[pid_idx]->d_name);
+		alloc_result = os_alloc_assoc_set_pid(pid, cos0);
+		if (alloc_result != PQOS_RETVAL_OK) {
+			LOG_ERROR("Error allocating task %lu to COS%u\n",
+				   pid, cos0);
+			return alloc_result;
+		}
+	}
+
+	return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Performs "light reset" of CAT.
+ *
+ * Moves all cores to default COS
+ * Resets all l3 schematas to default value
+ * Resets all l2 schematas to default value
+ * Resets all mba schematas to default value
+ * Moves all tasks to default COS
+ *
+ * @param [in] l3_cap id of default COS
+ * @param [in] l2_cap id of default COS
+ *
+ * @return Operation status
+ */
+static int
+os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
+		     const struct pqos_cap_l2ca *l2_cap)
+{
+	int ret = PQOS_RETVAL_OK;
+	int step_result;
+
+	LOG_INFO("OS alloc reset - LIGHT\n");
+
+	step_result = os_alloc_reset_cores();
+	if (step_result != PQOS_RETVAL_OK)
+		ret = step_result;
+
+	step_result = os_alloc_reset_schematas(l3_cap, l2_cap);
+	if (step_result != PQOS_RETVAL_OK)
+		ret = step_result;
+
+	step_result = os_alloc_reset_tasks();
+	if (step_result != PQOS_RETVAL_OK)
+		ret = step_result;
+
+	return ret;
+}
+
+/**
+ * @brief updates CDP for l2 cache capability
+ *
+ * @param [in] l2_cdp_cfg requsted l2 cdp configuration
+ * @param [in] l2_cap l2 capability
+ * @param [out] l2_cdp id of default COS
+ *
+ * @retval > 0 on l2_cdp change
+ * @retval 0 on no change
+ */
+static int
+l2_cdp_update(const enum pqos_cdp_config l2_cdp_cfg,
+	       const struct pqos_cap_l2ca *l2_cap,
+	       int *l2_cdp)
+{
+
+	if (l2_cap == NULL)
+		return 0;
+
+	switch (l2_cdp_cfg) {
+	case PQOS_REQUIRE_CDP_ON:
+		*l2_cdp = 1;
+		break;
+	case PQOS_REQUIRE_CDP_ANY:
+		*l2_cdp = l2_cap->cdp_on;
+		break;
+	case PQOS_REQUIRE_CDP_OFF:
+		*l2_cdp = 0;
+		break;
+	}
+
+	return l2_cap->cdp_on != *l2_cdp;
+}
+
+/**
+ * @brief updates CDP for l3 cache capability
+ *
+ * @param [in] l3_cdp_cfg requsted l3 cdp configuration
+ * @param [in] l3_cap l3 capability
+ * @param [out] l3_cdp id of default COS
+ *
+ * @retval > 0 on l3_cdp change
+ * @retval 0 on no change
+ */
+static int
+l3_cdp_update(const enum pqos_cdp_config l3_cdp_cfg,
+	       const struct pqos_cap_l3ca *l3_cap,
+	       int *l3_cdp) {
+
+	if (l3_cap == NULL)
+		return 0;
+
+	switch (l3_cdp_cfg) {
+	case PQOS_REQUIRE_CDP_ON:
+		*l3_cdp = 1;
+		break;
+	case PQOS_REQUIRE_CDP_ANY:
+		*l3_cdp = l3_cap->cdp_on;
+		break;
+	case PQOS_REQUIRE_CDP_OFF:
+		*l3_cdp = 0;
+		break;
+	}
+
+	return l3_cap->cdp_on != *l3_cdp;
+}
+
+/**
+ * @brief Performs "full reset" of CAT.
+ *
+ * Allocs all cores to default COS
+ * Remounts resctrl file system with new CDP configuration
+ *
+ * @param [in] l3_cdp_cfg requested L3 CAT CDP config
+ * @param [in] l2_cdp_cfg requested L2 CAT CDP config
+ * @param [in] l3_cap l3 capability
+ * @param [in] l2_cap l2 capability
+ *
+ * @return Operation status
+ */
+static int
+os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
+		    const enum pqos_cdp_config l2_cdp_cfg,
+	            const struct pqos_cap_l3ca *l3_cap,
+	            const struct pqos_cap_l2ca *l2_cap)
+{
+	int ret;
+        int l3_cdp = 0;
+	int l2_cdp = 0;
+	int l3_cdp_changed = 0;
+	int l2_cdp_changed = 0;
+
+        LOG_INFO("OS alloc reset - FULL\n");
+
+        /**
+         * Set the CPU assoc back to COS0
+         */
+        ret = os_alloc_reset_cores();
+	if (ret != PQOS_RETVAL_OK)
+		goto os_alloc_reset_full_exit;
+
+        /**
+         * Umount resctrl to reset schemata
+         */
+
+	LOG_INFO("OS alloc reset - unmount resctrl\n");
+        ret = resctrl_umount();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_alloc_reset_full_exit;
+
+        l3_cdp_changed = l3_cdp_update(l3_cdp_cfg, l3_cap, &l3_cdp);
+        l2_cdp_changed = l2_cdp_update(l2_cdp_cfg, l2_cap, &l2_cdp);
+
+        /**
+         * Mount now with CDP option.
+         */
+	LOG_INFO("OS alloc reset - mount resctrl with "
+		"l3_cdp %s and l2_cdp %s\n",
+		l3_cdp ? "on" : "off",
+		l2_cdp ? "on" : "off");
+
+        ret = os_interface_mount(l3_cdp, l2_cdp);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Mount OS interface error!\n");
+                goto os_alloc_reset_full_exit;
+        }
+        if (l3_cdp_changed) {
+                ASSERT(l3_cap);
+                _pqos_cap_l3cdp_change(l3_cap->cdp_on, l3_cdp);
+        }
+        if (l2_cdp_changed)
+                _pqos_cap_l2cdp_change(l2_cdp);
+        /**
+         * Create the COS dir's in resctrl.
+         */
+        LOG_INFO("OS alloc reset - prepare resctrl fs\n");
+        ret = os_alloc_prep();
+        if (ret != PQOS_RETVAL_OK)
+                LOG_ERROR("OS alloc prep error!\n");
+
+ os_alloc_reset_full_exit:
+        return ret;
+}
+
 int
 os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                const enum pqos_cdp_config l2_cdp_cfg)
@@ -495,15 +863,11 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
-        int ret;
-        int l3_cdp = 0;
+	int l3_cdp = 0;
 	int l2_cdp = 0;
-        unsigned i, cos0 = 0;
-        struct resctrl_cpumask mask;
-
-        ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
-               l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
-               l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+	int l3_cdp_changed = 0;
+	int l2_cdp_changed = 0;
+        int ret;
 
         ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
@@ -522,23 +886,23 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 
         /* Check if either L2 CAT or L3 CAT is supported */
         if (l2_cap == NULL && l3_cap == NULL) {
-                LOG_ERROR("L2 CAT/L3 CAT not present!\n");
-                ret = PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
-                goto os_alloc_reset_exit;
+		LOG_ERROR("L2 CAT/L3 CAT not present!\n");
+		ret = PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
+		goto os_alloc_reset_exit;
         }
         /* Check L3 CDP requested while not present */
         if (l3_cap == NULL && l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
-                LOG_ERROR("L3 CDP setting requested but no L3 CAT present!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-                goto os_alloc_reset_exit;
+		LOG_ERROR("L3 CDP setting requested but no L3 CAT present!\n");
+		ret = PQOS_RETVAL_RESOURCE;
+		goto os_alloc_reset_exit;
         }
         /* Check against erroneous CDP request */
         if (l3_cap != NULL && l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
-                !l3_cap->os_cdp) {
-                LOG_ERROR("L3 CAT/CDP requested but not supported by the "
+		!l3_cap->os_cdp) {
+		LOG_ERROR("L3 CAT/CDP requested but not supported by the "
                           "platform!\n");
-                ret = PQOS_RETVAL_PARAM;
-                goto os_alloc_reset_exit;
+		ret = PQOS_RETVAL_PARAM;
+		goto os_alloc_reset_exit;
         }
         /* Check L2 CDP requested while not present */
         if (l2_cap == NULL && l2_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
@@ -561,77 +925,31 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 goto os_alloc_reset_exit;
         resctrl_lock_release();
 
-        /**
-         * Set the CPU assoc back to COS0
-         */
-        ret = resctrl_alloc_cpumask_read(cos0, &mask);
-	if (ret != PQOS_RETVAL_OK)
-		goto os_alloc_reset_exit;
-        for (i = 0; i < m_cpu->num_cores; i++)
-                resctrl_cpumask_set(i, &mask);
+        l3_cdp_changed = l3_cdp_update(l3_cdp_cfg, l3_cap, &l3_cdp);
+        l2_cdp_changed = l2_cdp_update(l2_cdp_cfg, l2_cap, &l2_cdp);
 
-        ret = resctrl_alloc_cpumask_write(cos0, &mask);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("CPU assoc reset failed\n");
-                goto os_alloc_reset_exit;
-        }
+        if (l3_cdp_changed || l2_cdp_changed) {
 
-        /**
-         * Umount resctrl to reset schemata
-         */
-        ret = resctrl_umount();
-        if (ret != PQOS_RETVAL_OK)
-                goto os_alloc_reset_exit;
+		unsigned monitoring_active = 0;
 
-        /**
-         * Turn L3 CDP ON or OFF
-         */
-        if (l3_cap != NULL)
-                switch (l3_cdp_cfg) {
-                case PQOS_REQUIRE_CDP_ON:
-                        l3_cdp = 1;
-                        break;
-                case PQOS_REQUIRE_CDP_ANY:
-                        l3_cdp = l3_cap->cdp_on;
-                        break;
-                case PQOS_REQUIRE_CDP_OFF:
-                        l3_cdp = 0;
-                        break;
-                }
-        /**
-         * Turn L2 CDP ON or OFF
-         */
-        if (l2_cap != NULL)
-                switch (l2_cdp_cfg) {
-                case PQOS_REQUIRE_CDP_ON:
-                        l2_cdp = 1;
-                        break;
-                case PQOS_REQUIRE_CDP_ANY:
-                        l2_cdp = l2_cap->cdp_on;
-                        break;
-                case PQOS_REQUIRE_CDP_OFF:
-                        l2_cdp = 0;
-                        break;
-                }
+		ret = resctrl_mon_active(&monitoring_active);
 
-        /**
-         * Mount now with CDP option.
-         */
-        ret = os_interface_mount(l3_cdp, l2_cdp);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("Mount OS interface error!\n");
-                goto os_alloc_reset_exit;
-        }
-        if (l3_cap != NULL && l3_cap->cdp_on != l3_cdp)
-                _pqos_cap_l3cdp_change(l3_cap->cdp_on, l3_cdp);
-        if (l2_cap != NULL && l2_cap->cdp_on != l2_cdp)
-                _pqos_cap_l2cdp_change(l2_cdp);
-        /**
-         * Create the COS dir's in resctrl.
-         */
-        ret = os_alloc_prep();
-        if (ret != PQOS_RETVAL_OK)
-                LOG_ERROR("OS alloc prep error!\n");
+		if (ret != PQOS_RETVAL_OK) {
+			LOG_ERROR("Failed to check resctrl "
+				  "monitoring activity\n");
+			goto os_alloc_reset_exit;
+		}
+
+		if (monitoring_active > 0) {
+			LOG_ERROR("Failed to reset allocation. Please stop "
+				  "monitoring in order to change CDP settings\n");
+			ret = PQOS_RETVAL_ERROR;
+		} else
+			ret = os_alloc_reset_full(l3_cdp_cfg, l2_cdp_cfg,
+				l3_cap, l2_cap);
+        } else
+		ret = os_alloc_reset_light(l3_cap, l2_cap);
+
 
  os_alloc_reset_exit:
         return ret;
