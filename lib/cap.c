@@ -1562,6 +1562,9 @@ discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
         for (i = 0; i < p_cap->num_cap; i++) {
                 struct pqos_capability *capability = &(p_cap->capabilities[i]);
                 int type = capability->type;
+
+                ASSERT(type < PQOS_CAP_TYPE_NUMOF);
+
                 int *os_ptr = &(capability->os_support);
 
                 ret = detect_os_support(tab[type].fname, tab[type].str, os_ptr);

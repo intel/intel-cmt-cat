@@ -509,9 +509,10 @@ tid_verify(const pid_t pid)
 
         snprintf(buf, sizeof(buf) - 1, "/proc/%d", (int)pid);
         dir = opendir(buf);
-        if (dir != NULL)
+        if (dir != NULL) {
                 found = 1;
-        closedir(dir);
+                closedir(dir);
+        }
 
         return found;
 }
@@ -596,6 +597,8 @@ os_mon_add_pids(const unsigned num_pids,
         ASSERT(num_pids > 0);
         ASSERT(pids != NULL);
 
+         memset(&added, 0, sizeof(added));
+
         /**
          * Check if all PIDs exists
          */
@@ -638,7 +641,6 @@ os_mon_add_pids(const unsigned num_pids,
         /**
          * Start monitoring for the new TIDs
          */
-        memset(&added, 0, sizeof(added));
         added.tid_nr = tid_nr;
         added.tid_map = tid_map;
         added.event = group->event;
@@ -691,6 +693,9 @@ os_mon_add_pids(const unsigned num_pids,
                 stop_events(&added);
         }
 
+        if (added.perf != NULL)
+                free(added.perf);
+
         if (tid_map != NULL)
                 free(tid_map);
         return ret;
@@ -702,7 +707,7 @@ os_mon_remove_pids(const unsigned num_pids,
                    struct pqos_mon_data *group)
 {
 
-        int ret;
+        int ret = PQOS_RETVAL_OK;
         unsigned i;
         pid_t *keep_tid_map = NULL; /* List of not removed TIDs */
         unsigned keep_tid_nr = 0;
