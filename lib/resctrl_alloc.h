@@ -39,18 +39,12 @@
 #ifndef __PQOS_RESCTRL_ALLOC_H__
 #define __PQOS_RESCTRL_ALLOC_H__
 
-#include <limits.h>                     /**< CHAR_BIT*/
-
 #include "pqos.h"
+#include "resctrl.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-/**
- * Max supported number of CPU's
- */
-#define RESCTRL_ALLOC_MAX_CPUS 4096
 
 /**
  * @brief Retrieves number of resctrl groups allowed
@@ -64,42 +58,6 @@ extern "C" {
 int resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num);
 
 /**
- * @brief Structure to hold parsed cpu mask
- *
- * Structure contains table with cpu bit mask. Each table item holds
- * information about 8 bit in mask.
- *
- * Example bitmask tables:
- *  - cpus file contains 'ABC' mask = [ ..., 0x0A, 0xBC ]
- *  - cpus file contains 'ABCD' mask = [ ..., 0xAB, 0xCD ]
- */
-struct resctrl_alloc_cpumask {
-	uint8_t tab[RESCTRL_ALLOC_MAX_CPUS / CHAR_BIT];  /**< bit mask table */
-};
-
-/**
- * @brief Set lcore bit in cpu mask
- *
- * @param [in] lcore Core number
- * @param [in] cpumask Modified cpu mask
- */
-void resctrl_alloc_cpumask_set(const unsigned lcore,
-                               struct resctrl_alloc_cpumask *mask);
-
-/**
- * @brief Check if lcore is set in cpu mask
- *
- * @param [in] lcore Core number
- * @param [in] cpumask Cpu mask
- *
- * @return Returns 1 when bit corresponding to lcore is set in mask
- * @retval 1 if cpu bit is set in mask
- * @retval 0 if cpu bit is not set in mask
- */
-int resctrl_alloc_cpumask_get(const unsigned lcore,
-	                      const struct resctrl_alloc_cpumask *mask);
-
-/**
  * @brief Write CPU mask to file
  *
  * @param [in] class_id COS id
@@ -109,7 +67,7 @@ int resctrl_alloc_cpumask_get(const unsigned lcore,
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_cpumask_write(const unsigned class_id,
-                                const struct resctrl_alloc_cpumask *mask);
+                                const struct resctrl_cpumask *mask);
 
 /**
  * @brief Read CPU mask from file
@@ -121,7 +79,7 @@ int resctrl_alloc_cpumask_write(const unsigned class_id,
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_cpumask_read(const unsigned class_id,
-	                       struct resctrl_alloc_cpumask *mask);
+	                       struct resctrl_cpumask *mask);
 
 /*
  * @brief Structure to hold parsed schemata

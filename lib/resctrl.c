@@ -38,6 +38,7 @@
 #include <signal.h>
 #include <sys/mount.h>
 #include <errno.h>
+#include <string.h>
 
 #include "pqos.h"
 #include "log.h"
@@ -200,4 +201,112 @@ resctrl_umount(void)
         }
 
         return PQOS_RETVAL_OK;
+}
+
+
+/*
+ * ---------------------------------------
+ * CPU mask structures and utility functions
+ * ---------------------------------------
+ */
+
+void
+resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask)
+{
+	/* index in mask table */
+	const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
+	const unsigned bit = lcore % CHAR_BIT;
+
+	/* Set lcore bit in mask table item */
+	mask->tab[item] = mask->tab[item] | (1 << bit);
+}
+
+int
+resctrl_cpumask_get(const unsigned lcore, const struct resctrl_cpumask *mask)
+{
+	/* index in mask table */
+	const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
+	const unsigned bit = lcore % CHAR_BIT;
+
+	/* Check if lcore bit is set in mask table item */
+	return (mask->tab[item] >> bit) & 0x1;
+}
+
+int
+resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
+{
+	unsigned  i;
+
+	ASSERT(fd != NULL);
+
+	for (i = 0; i < sizeof(mask->tab); i++) {
+		const unsigned value = (unsigned) mask->tab[i];
+
+		if (fprintf(fd, "%02x", value) < 0) {
+			LOG_ERROR("Failed to write cpu mask\n");
+			break;
+		}
+		if ((i + 1) % 4 == 0)
+			if (fprintf(fd, ",") < 0) {
+				LOG_ERROR("Failed to write cpu mask\n");
+				break;
+			}
+	}
+
+	/* check if error occured in loop */
+	if (i < sizeof(mask->tab))
+		return PQOS_RETVAL_ERROR;
+
+	return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
+{
+	int i, hex_offset, idx;
+	size_t num_chars = 0;
+	char cpus[RESCTRL_MAX_CPUS / CHAR_BIT];
+
+	ASSERT(fd != NULL);
+
+	memset(mask, 0, sizeof(struct resctrl_cpumask));
+	memset(cpus, 0, sizeof(cpus));
+
+	/** Read the entire file into memory. */
+	num_chars = fread(cpus, sizeof(char), sizeof(cpus), fd);
+
+	if (ferror(fd) != 0) {
+		LOG_ERROR("Error reading CPU file\n");
+		return PQOS_RETVAL_ERROR;
+	}
+	cpus[sizeof(cpus) - 1] = '\0'; /** Just to be safe. */
+
+	/**
+	 *  Convert the cpus array into hex, skip any non hex chars.
+	 *  Store the hex values in the mask tab.
+	 */
+	for (i = num_chars - 1, hex_offset = 0, idx = sizeof(mask->tab) - 1;
+	     i >= 0; i--) {
+		const char c = cpus[i];
+		int hex_num;
+
+		if ('0' <= c && c <= '9')
+			hex_num = c - '0';
+		else if ('a' <= c && c <= 'f')
+			hex_num = 10 + c - 'a';
+		else if ('A' <= c && c <= 'F')
+			hex_num = 10 + c - 'A';
+		else
+			continue;
+
+		if (!hex_offset)
+			mask->tab[idx] = (uint8_t) hex_num;
+		else {
+			mask->tab[idx] |= (uint8_t) (hex_num << 4);
+			idx--;
+		}
+		hex_offset ^= 1;
+	}
+
+	return PQOS_RETVAL_OK;
 }

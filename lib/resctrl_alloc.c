@@ -37,10 +37,8 @@
 #include <ctype.h>
 #include <errno.h>
 
-#include "pqos.h"
 #include "log.h"
 #include "types.h"
-#include "resctrl.h"
 #include "resctrl_alloc.h"
 
 /*
@@ -216,119 +214,44 @@ resctrl_alloc_fclose(FILE *fd)
  * ---------------------------------------
  */
 
-void
-resctrl_alloc_cpumask_set(const unsigned lcore,
-                          struct resctrl_alloc_cpumask *mask)
-{
-	/* index in mask table */
-	const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
-	const unsigned bit = lcore % CHAR_BIT;
-
-	/* Set lcore bit in mask table item */
-	mask->tab[item] = mask->tab[item] | (1 << bit);
-}
-
-int
-resctrl_alloc_cpumask_get(const unsigned lcore,
-                          const struct resctrl_alloc_cpumask *mask)
-{
-	/* index in mask table */
-	const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
-	const unsigned bit = lcore % CHAR_BIT;
-
-	/* Check if lcore bit is set in mask table item */
-	return (mask->tab[item] >> bit) & 0x1;
-}
 
 int
 resctrl_alloc_cpumask_write(const unsigned class_id,
-	                    const struct resctrl_alloc_cpumask *mask)
+	                    const struct resctrl_cpumask *mask)
 {
 	int ret = PQOS_RETVAL_OK;
 	FILE *fd;
-	unsigned  i;
 
 	fd = resctrl_alloc_fopen(class_id, rctl_cpus, "w");
 	if (fd == NULL)
 		return PQOS_RETVAL_ERROR;
 
-	for (i = 0; i < sizeof(mask->tab); i++) {
-		const unsigned value = (unsigned) mask->tab[i];
-
-		if (fprintf(fd, "%02x", value) < 0) {
-			LOG_ERROR("Failed to write cpu mask\n");
-			break;
-		}
-		if ((i + 1) % 4 == 0)
-			if (fprintf(fd, ",") < 0) {
-				LOG_ERROR("Failed to write cpu mask\n");
-				break;
-			}
-	}
-	ret = resctrl_alloc_fclose(fd);
-
-	/* check if error occured in loop */
-	if (i < sizeof(mask->tab))
-		return PQOS_RETVAL_ERROR;
+	ret = resctrl_cpumask_write(fd, mask);
+	if (ret == PQOS_RETVAL_OK)
+		ret = resctrl_alloc_fclose(fd);
+	else
+		resctrl_alloc_fclose(fd);
 
 	return ret;
 }
 
 int
 resctrl_alloc_cpumask_read(const unsigned class_id,
-			   struct resctrl_alloc_cpumask *mask)
+			   struct resctrl_cpumask *mask)
 {
-	int i, hex_offset, idx;
+	int ret;
 	FILE *fd;
-	size_t num_chars = 0;
-	char cpus[RESCTRL_ALLOC_MAX_CPUS / CHAR_BIT];
 
-	memset(mask, 0, sizeof(struct resctrl_alloc_cpumask));
-	memset(cpus, 0, sizeof(cpus));
 	fd = resctrl_alloc_fopen(class_id, rctl_cpus, "r");
 	if (fd == NULL)
 		return PQOS_RETVAL_ERROR;
 
-	/** Read the entire file into memory. */
-	num_chars = fread(cpus, sizeof(char), sizeof(cpus), fd);
+	ret = resctrl_cpumask_read(fd, mask);
 
-	if (ferror(fd) != 0) {
-		LOG_ERROR("Error reading CPU file\n");
-		resctrl_alloc_fclose(fd);
-		return PQOS_RETVAL_ERROR;
-	}
-	cpus[sizeof(cpus) - 1] = '\0'; /** Just to be safe. */
 	if (resctrl_alloc_fclose(fd) != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_ERROR;
 
-	/**
-	 *  Convert the cpus array into hex, skip any non hex chars.
-	 *  Store the hex values in the mask tab.
-	 */
-	for (i = num_chars - 1, hex_offset = 0, idx = sizeof(mask->tab) - 1;
-	     i >= 0; i--) {
-		const char c = cpus[i];
-		int hex_num;
-
-		if ('0' <= c && c <= '9')
-			hex_num = c - '0';
-		else if ('a' <= c && c <= 'f')
-			hex_num = 10 + c - 'a';
-		else if ('A' <= c && c <= 'F')
-			hex_num = 10 + c - 'A';
-		else
-			continue;
-
-		if (!hex_offset)
-			mask->tab[idx] = (uint8_t) hex_num;
-		else {
-			mask->tab[idx] |= (uint8_t) (hex_num << 4);
-			idx--;
-		}
-		hex_offset ^= 1;
-	}
-
-	return PQOS_RETVAL_OK;
+	return ret;
 }
 
 /*

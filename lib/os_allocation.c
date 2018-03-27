@@ -251,7 +251,7 @@ os_alloc_assoc_set(const unsigned lcore,
 {
 	int ret;
 	unsigned num_l2_cos = 0, num_l3_cos = 0;
-	struct resctrl_alloc_cpumask mask;
+	struct resctrl_cpumask mask;
 
 	ASSERT(m_cpu != NULL);
 	ret = pqos_cpu_check_core(m_cpu, lcore);
@@ -279,7 +279,7 @@ os_alloc_assoc_set(const unsigned lcore,
 	if (ret != PQOS_RETVAL_OK)
 		goto os_alloc_assoc_set_unlock;
 
-	resctrl_alloc_cpumask_set(lcore, &mask);
+	resctrl_cpumask_set(lcore, &mask);
 
 	ret = resctrl_alloc_cpumask_write(class_id, &mask);
 
@@ -295,7 +295,7 @@ os_alloc_assoc_get(const unsigned lcore,
 {
 	int ret;
 	unsigned grps, i;
-	struct resctrl_alloc_cpumask mask;
+	struct resctrl_cpumask mask;
 
 	ASSERT(class_id != NULL);
 	ASSERT(m_cpu != NULL);
@@ -316,7 +316,7 @@ os_alloc_assoc_get(const unsigned lcore,
 		if (ret != PQOS_RETVAL_OK)
 			goto os_alloc_assoc_get_unlock;
 
-		if (resctrl_alloc_cpumask_get(lcore, &mask)) {
+		if (resctrl_cpumask_get(lcore, &mask)) {
 			*class_id = i;
                         goto os_alloc_assoc_get_unlock;
 		}
@@ -380,7 +380,7 @@ get_unused_cos(const unsigned hi_class_id,
         memset(used_classes, 0, sizeof(used_classes));
 
         for (i = hi_class_id; i != 0; i--) {
-                struct resctrl_alloc_cpumask mask;
+                struct resctrl_cpumask mask;
                 unsigned j;
 
                 ret = resctrl_alloc_cpumask_read(i, &mask);
@@ -455,7 +455,7 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
 {
         int ret;
         unsigned i, cos0 = 0;
-        struct resctrl_alloc_cpumask mask;
+        struct resctrl_cpumask mask;
 
 	ASSERT(m_cpu != NULL);
         ASSERT(core_num > 0 && core_array != NULL);
@@ -475,7 +475,7 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
 			ret = PQOS_RETVAL_ERROR;
                         goto os_alloc_release_unlock;
                 }
-                resctrl_alloc_cpumask_set(core_array[i], &mask);
+                resctrl_cpumask_set(core_array[i], &mask);
 	}
 
         ret = resctrl_alloc_cpumask_write(cos0, &mask);
@@ -499,7 +499,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         int l3_cdp = 0;
 	int l2_cdp = 0;
         unsigned i, cos0 = 0;
-        struct resctrl_alloc_cpumask mask;
+        struct resctrl_cpumask mask;
 
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
@@ -568,7 +568,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 	if (ret != PQOS_RETVAL_OK)
 		goto os_alloc_reset_exit;
         for (i = 0; i < m_cpu->num_cores; i++)
-                resctrl_alloc_cpumask_set(i, &mask);
+                resctrl_cpumask_set(i, &mask);
 
         ret = resctrl_alloc_cpumask_write(cos0, &mask);
         if (ret != PQOS_RETVAL_OK) {
