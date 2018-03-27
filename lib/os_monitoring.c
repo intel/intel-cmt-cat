@@ -110,6 +110,12 @@ stop_events(struct pqos_mon_data *group)
                 }
         }
 
+        if (group->resctrl_event) {
+                ret = resctrl_mon_stop(group);
+                if (ret == PQOS_RETVAL_OK)
+                        stopped_evts |= group->resctrl_event;
+        }
+
         if ((stopped_evts & PQOS_MON_EVENT_LMEM_BW) &&
                 (stopped_evts & PQOS_MON_EVENT_TMEM_BW))
                 stopped_evts |= PQOS_MON_EVENT_RMEM_BW;
@@ -121,13 +127,19 @@ stop_events(struct pqos_mon_data *group)
         if (group->perf != NULL) {
                 free(group->perf);
                 group->perf = NULL;
-                group->perf_event = 0;
         }
 
         if ((group->perf_event & stopped_evts) != group->perf_event) {
                 LOG_ERROR("Failed to stop all perf events\n");
                 return PQOS_RETVAL_ERROR;
         }
+        group->perf_event = 0;
+
+        if ((group->resctrl_event & stopped_evts) != group->resctrl_event) {
+                LOG_ERROR("Failed to stop resctrl events\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        group->resctrl_event = 0;
 
         return PQOS_RETVAL_OK;
 }
@@ -179,19 +191,34 @@ start_events(struct pqos_mon_data *group)
                 enum pqos_mon_event evt = os_mon_event[i];
 
                 if (events & evt) {
-                        if (!perf_mon_is_event_supported(evt)) {
-                                ret = PQOS_RETVAL_ERROR;
-                                goto start_event_error;
+                        if (perf_mon_is_event_supported(evt)) {
+                                ret = perf_mon_start(group, evt);
+                                if (ret != PQOS_RETVAL_OK)
+                                        goto start_event_error;
+                                group->perf_event |= evt;
+                                continue;
                         }
 
-                        ret = perf_mon_start(group, evt);
-                        if (ret != PQOS_RETVAL_OK)
-                                goto start_event_error;
+                        if (resctrl_mon_is_event_supported(evt)) {
+                                group->resctrl_event |= evt;
+                                continue;
+                        }
 
-                        group->perf_event |= evt;
+                        /**
+                         * Event is not supported
+                         */
+                        ret = PQOS_RETVAL_ERROR;
+                        goto start_event_error;
                 }
         }
         started_evts |= group->perf_event;
+
+        if (group->resctrl_event != 0) {
+                ret = resctrl_mon_start(group);
+                if (ret != PQOS_RETVAL_OK)
+                        goto start_event_error;
+        }
+        started_evts |= group->resctrl_event;
 
         /**
          * All events required by RMEM has been started
@@ -244,6 +271,15 @@ poll_events(struct pqos_mon_data *group) {
                  */
                 if (group->perf_event & evt) {
                         ret = perf_mon_poll(group, evt);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+                }
+
+                /**
+                 * poll resctrl event
+                 */
+                if (group->resctrl_event & evt) {
+                        ret = resctrl_mon_poll(group, evt);
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
                 }
@@ -602,7 +638,7 @@ os_mon_add_pids(const unsigned num_pids,
         ASSERT(num_pids > 0);
         ASSERT(pids != NULL);
 
-         memset(&added, 0, sizeof(added));
+        memset(&added, 0, sizeof(added));
 
         /**
          * Check if all PIDs exists
@@ -650,6 +686,13 @@ os_mon_add_pids(const unsigned num_pids,
         added.tid_map = tid_map;
         added.event = group->event;
         added.num_pids = num_pids;
+        if (group->resctrl_group != NULL) {
+                added.resctrl_group = strdup(group->resctrl_group);
+                if (added.resctrl_group == NULL) {
+                        ret = PQOS_RETVAL_RESOURCE;
+                        goto os_mon_add_pids_exit;
+                }
+        }
 
         ret = start_events(&added);
         if (ret != PQOS_RETVAL_OK)
@@ -693,14 +736,16 @@ os_mon_add_pids(const unsigned num_pids,
         }
 
  os_mon_add_pids_exit:
+        if (added.resctrl_group != NULL) {
+                free(added.resctrl_group);
+                added.resctrl_group = NULL;
+        }
         if (ret == PQOS_RETVAL_RESOURCE) {
                 LOG_ERROR("Memory allocation error!\n");
                 stop_events(&added);
         }
-
         if (added.perf != NULL)
                 free(added.perf);
-
         if (tid_map != NULL)
                 free(tid_map);
         return ret;
@@ -741,6 +786,8 @@ os_mon_remove_pids(const unsigned num_pids,
         }
 
         memset(&remove, 0, sizeof(remove));
+        remove.perf_event = group->perf_event;
+        remove.resctrl_event = group->resctrl_event;
         remove.pids = NULL;
         remove.num_pids = num_pids;
         remove.tid_map = malloc(sizeof(remove.tid_map[0]) * group->tid_nr);

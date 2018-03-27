@@ -65,6 +65,40 @@ int resctrl_mon_init(const struct pqos_cpuinfo *cpu,
 int resctrl_mon_fini(void);
 
 /**
+ * @brief This function starts resctrl event counters
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_start(struct pqos_mon_data *group);
+
+/**
+ * @brief Function to stop resctrl event counters
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_stop(struct pqos_mon_data *group);
+
+/**
+ * @brief This function polls all resctrl counters
+ *
+ * Reads counters for all events and stores values
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+int resctrl_mon_poll(struct pqos_mon_data *group,
+                     const enum pqos_mon_event event);
+
+/**
  * @brief Check if event is supported by resctrl
  *
  * @param event PQoS event to check

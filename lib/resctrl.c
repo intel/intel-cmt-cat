@@ -238,6 +238,7 @@ resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
 	unsigned  i;
 
 	ASSERT(fd != NULL);
+	ASSERT(mask != NULL);
 
 	for (i = 0; i < sizeof(mask->tab); i++) {
 		const unsigned value = (unsigned) mask->tab[i];
@@ -268,6 +269,7 @@ resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
 	char cpus[RESCTRL_MAX_CPUS / CHAR_BIT];
 
 	ASSERT(fd != NULL);
+	ASSERT(mask != NULL);
 
 	memset(mask, 0, sizeof(struct resctrl_cpumask));
 	memset(cpus, 0, sizeof(cpus));

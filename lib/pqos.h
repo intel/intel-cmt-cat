@@ -434,6 +434,12 @@ struct pqos_mon_data {
         enum pqos_mon_event perf_event; /**< Started perf events */
 
         /**
+         * Resctrl specific section
+         */
+        enum pqos_mon_event resctrl_event;
+        char *resctrl_group;
+
+        /**
          * Core specific section
          */
         struct pqos_mon_poll_ctx *poll_ctx; /**< core, cluster & RMID */
