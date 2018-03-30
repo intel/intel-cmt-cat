@@ -35,6 +35,7 @@
 #include <stdint.h>   /* uint64_t etc. */
 #include <stdlib.h>   /* malloc() */
 #include <string.h>   /* memcpy() */
+#include <types.h>    /* ASSERT() */
 #include <pqos.h>
 #ifdef __linux__
 #include <sched.h>    /* sched_setaffinity() */
@@ -305,6 +306,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                  * definitions coherent across sockets.
                  */
                 const uint64_t dlock_mask = (1ULL << num_cache_ways) - 1ULL;
+
+                ASSERT(m_num_clos > 0);
                 struct pqos_l3ca cos[m_num_clos];
                 unsigned num = 0, j;
 
