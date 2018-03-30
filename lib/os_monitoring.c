@@ -555,6 +555,7 @@ os_mon_start_pids(const unsigned num_pids,
                         goto os_mon_start_pids_exit;
         }
 
+        memset(group, 0, sizeof(*group));
         group->pids = (pid_t *) malloc(sizeof(pid_t) * num_pids);
         if (group->pids == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
