@@ -75,7 +75,7 @@ resctrl_lock(const int type)
 
 	resctrl_lock_fd = open(RESCTRL_PATH, O_DIRECTORY);
 	if (resctrl_lock_fd < 0) {
-		LOG_ERROR("Could not open %s direcotry\n", RESCTRL_PATH);
+		LOG_ERROR("Could not open %s directory\n", RESCTRL_PATH);
 		return PQOS_RETVAL_ERROR;
 	}
 
