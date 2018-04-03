@@ -228,7 +228,7 @@ Table 3. OS interface feature support
 +---------------+-------------------+----------------+----------------------------------------------------+
 | 1.0.0         | MBM (Perf)        | 4.7            | MSR (1)                                            |
 +---------------+-------------------+----------------+----------------------------------------------------+
-| 1.1.0         | L3 CAT, L3 CDP,   | 4.1            | OS for allocation only (with the exception of MBA) |
+| 1.1.0         | L3 CAT, L3 CDP,   | 4.10           | OS for allocation only (with the exception of MBA) |
 |               | L2 CAT (Resctrl)  |                | MSR for allocation + monitoring (2)                |
 +---------------+-------------------+----------------+----------------------------------------------------+
 | 1.2.0         | MBA (Resctrl)     | 4.12           | OS for allocation only                             |
