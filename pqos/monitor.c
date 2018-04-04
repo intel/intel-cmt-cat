@@ -1243,6 +1243,31 @@ get_pid_core_num(const pid_t pid, unsigned *core)
 }
 
 /**
+ * @brief Comparator for unsigned - needed for qsort
+ *
+ * @param a unsigned value to be compared
+ * @param b unsigned value to be compared
+ *
+ * @return Comparison status
+ * @retval negative number when (a < b)
+ * @retval 0 when (a == b)
+ * @retval positive number when (a > b)
+ */
+static int
+unsigned_cmp(const void *a, const void *b)
+{
+        const unsigned *pa = (const unsigned *)a;
+        const unsigned *pb = (const unsigned *)b;
+
+        if (*pa < *pb)
+                return -1;
+        else if (*pa > *pb)
+                return 1;
+        else
+                return 0;
+}
+
+/**
  * @brief Function to return a comma seperated list of all cores that PIDs
  *        in \a mon_data last ran on.
  *
@@ -1253,13 +1278,14 @@ get_pid_core_num(const pid_t pid, unsigned *core)
  * @param retval 0 in case of success, -1 for error
  */
 static int
-get_pid_cores(const struct pqos_mon_data *mon_data,
-              char *cores_s, const int len)
+get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
+              const int len)
 {
         char core[16];
         unsigned i;
-        int buf_remaining;
         int str_len = 0;
+        int cores_s_len = 0;
+        int comma_len = 1;
         unsigned *cores;
 
         ASSERT(mon_data != NULL);
@@ -1278,31 +1304,29 @@ get_pid_cores(const struct pqos_mon_data *mon_data,
                         return -1;
                 }
 
-        buf_remaining = len - 1;
+        qsort(cores, mon_data->num_pids, sizeof(*cores), unsigned_cmp);
 
         for (i = 0; i < mon_data->num_pids; i++) {
+
+                /* check for duplicate cores and skips them*/
+                if (i != 0 && cores[i] == cores[i-1])
+                        continue;
 
                 uinttostr_noalloc(core, sizeof(core), cores[i]);
 
                 str_len = strlen(core);
+                cores_s_len = strlen(cores_s);
 
-                /* check there is enough space in buffer */
-                if (str_len >= buf_remaining) {
+                if (i != 0 && (cores_s_len + str_len + comma_len) < len) {
+                        strcat(cores_s, ",");
+                        strcat(cores_s, core);
+                } else if (i == 0 && (cores_s_len + str_len) < len)
+                        strcat(cores_s, core);
+                else {
                         free(cores);
                         return -1;
                 }
-
-                strcat(cores_s, core);
-                if (i != mon_data->num_pids - 1) {
-                        strcat(cores_s, ",");
-                        str_len++;
-                }
-
-                buf_remaining -= str_len;
         }
-
-        if (cores_s[str_len - 1] == ',')
-                cores_s[str_len] = '\0';
 
         free(cores);
         return 0;
