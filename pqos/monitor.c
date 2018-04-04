@@ -58,6 +58,7 @@
 #define PID_COL_STATUS (3) /**< col for process status letter*/
 #define PID_COL_UTIME (14) /**< col for cpu-user time in /proc/pid/stat*/
 #define PID_COL_STIME (15) /**< col for cpu-kernel time in /proc/pid/stat*/
+#define PID_COL_CORE  (39) /**< col for core number in /proc/pid/stat*/
 #define PID_CPU_TIME_DELAY_USEC (1200000) /**< delay for cpu stats */
 #define TOP_PROC_MAX (10) /**< maximum number of top-pids to be handled*/
 
@@ -213,6 +214,23 @@ static inline int process_mode(void)
 
 /**
  * @brief Function to safely translate an unsigned int
+ *        value to a string without memory allocation
+ *
+ * @param buf buffer string will be copied into
+ * @param buf_len length of buffer
+ * @param val value to be translated
+ */
+static void
+uinttostr_noalloc(char *buf, const int buf_len, const unsigned val)
+{
+        ASSERT(buf != NULL);
+
+        memset(buf, 0, buf_len);
+        snprintf(buf, buf_len, "%u", val);
+}
+
+/**
+ * @brief Function to safely translate an unsigned int
  *        value to a string
  *
  * @param val value to be translated
@@ -223,8 +241,7 @@ static char *uinttostr(const unsigned val)
 {
         char buf[16], *str = NULL;
 
-        memset(buf, 0, sizeof(buf));
-        snprintf(buf, sizeof(buf), "%u", val);
+        uinttostr_noalloc(buf, sizeof(buf), val);
         selfn_strdup(&str, buf);
 
         return str;
@@ -1190,6 +1207,108 @@ get_pid_cputicks(const char *proc_pid_dir_name, uint64_t *cputicks)
 }
 
 /**
+ * @brief Returns core number \a pid last ran on
+ *
+ * @param pid process ID of target PID e.g. "1234"
+ * @param core[out] core number that \a pid last ran on
+ *
+ * @return operation status
+ * @retval 0 in case of success
+ * @retval -1 in case of error
+ */
+static int
+get_pid_core_num(const pid_t pid, unsigned *core)
+{
+        char core_s[64];
+        char pid_s[64];
+        char *tmp;
+        int ret;
+
+        if (core == NULL || pid < 0)
+                return -1;
+
+        memset(core_s, 0, sizeof(core_s));
+        uinttostr_noalloc(pid_s, sizeof(pid_s), pid);
+
+        ret = get_pid_stat_val(pid_s, PID_COL_CORE, sizeof(core_s), core_s);
+        if (ret != 0)
+                return -1;
+
+        *core = strtoul(core_s, &tmp, 10);
+
+        if (is_str_conversion_ok(tmp) == 0)
+                return -1;
+
+        return 0;
+}
+
+/**
+ * @brief Function to return a comma seperated list of all cores that PIDs
+ *        in \a mon_data last ran on.
+ *
+ * @param mon_data struct with info on the group of pids to be monitored
+ * @param cores_s[out] char pointer to hold string of cores the PIDs last ran on
+ * @param len length of cores_s
+ *
+ * @param retval 0 in case of success, -1 for error
+ */
+static int
+get_pid_cores(const struct pqos_mon_data *mon_data,
+              char *cores_s, const int len)
+{
+        char core[16];
+        unsigned i;
+        int buf_remaining;
+        int str_len = 0;
+        unsigned *cores;
+
+        ASSERT(mon_data != NULL);
+        ASSERT(cores_s != NULL);
+
+        cores = calloc(mon_data->num_pids, sizeof(*cores));
+
+        if (cores == NULL) {
+                printf("Error allocating memory\n");
+                return -1;
+        }
+
+        for (i = 0; i < mon_data->num_pids; i++)
+                if (get_pid_core_num(mon_data->pids[i], &cores[i]) == -1) {
+                        free(cores);
+                        return -1;
+                }
+
+        buf_remaining = len - 1;
+
+        for (i = 0; i < mon_data->num_pids; i++) {
+
+                uinttostr_noalloc(core, sizeof(core), cores[i]);
+
+                str_len = strlen(core);
+
+                /* check there is enough space in buffer */
+                if (str_len >= buf_remaining) {
+                        free(cores);
+                        return -1;
+                }
+
+                strcat(cores_s, core);
+                if (i != mon_data->num_pids - 1) {
+                        strcat(cores_s, ",");
+                        str_len++;
+                }
+
+                buf_remaining -= str_len;
+        }
+
+        if (cores_s[str_len - 1] == ',')
+                cores_s[str_len] = '\0';
+
+        free(cores);
+        return 0;
+}
+
+/**
  * @brief Allocates memory and initializes new list element and returns ptr
  *        to newly created list-element with given data
  *
@@ -1766,7 +1885,7 @@ static size_t
 fillin_text_column(const double val, char data[], const size_t sz_data,
                    const int is_monitored, const int is_column_present)
 {
-        const char blank_column[] = "           ";
+        const char blank_column[] = "            ";
         size_t offset = 0;
 
         if (sz_data <= sizeof(blank_column))
@@ -1776,7 +1895,7 @@ fillin_text_column(const double val, char data[], const size_t sz_data,
                 /**
                  * This is monitored and we have the data
                  */
-                snprintf(data, sz_data - 1, "%11.1f", val);
+                snprintf(data, sz_data - 1, " %11.1f", val);
                 offset = strlen(data);
         } else if (is_column_present) {
                 /**
@@ -1880,6 +1999,7 @@ print_text_row(FILE *fp,
         const size_t sz_data = 128;
         char data[sz_data];
         size_t offset = 0;
+        char core_list[PQOS_MAX_CORES * 4];
 
         ASSERT(fp != NULL);
         ASSERT(mon_data != NULL);
@@ -1904,12 +2024,21 @@ print_text_row(FILE *fp,
                         mon_data->values.ipc,
                         (unsigned)mon_data->values.llc_misses_delta/1000,
                         data);
-        else
-                fprintf(fp, "\n%8.8s %6s %6.2f %7uk%s",
-                        (char *)mon_data->context, "N/A",
+        else {
+                memset(core_list, 0, sizeof(core_list));
+
+                if (get_pid_cores(mon_data, core_list,
+                                  sizeof(core_list)) == -1) {
+                        memset(core_list, 0, sizeof(core_list));
+                        strcat(core_list, "err");
+                }
+
+                fprintf(fp, "\n%8.8s %8.8s %6.2f %7uk%s",
+                        (char *)mon_data->context, core_list,
                         mon_data->values.ipc,
                         (unsigned)mon_data->values.llc_misses_delta/1000,
                         data);
+        }
 }
 
 /**
@@ -1931,6 +2060,7 @@ print_xml_row(FILE *fp, char *time,
 {
         const size_t sz_data = 128;
         char data[sz_data];
+        char core_list[PQOS_MAX_CORES * 4];
         size_t offset = 0;
 
         ASSERT(fp != NULL);
@@ -1968,7 +2098,15 @@ print_xml_row(FILE *fp, char *time,
                         (unsigned long long)mon_data->values.llc_misses_delta,
                         data,
                         xml_child_close);
-        else
+        else {
+                memset(core_list, 0, sizeof(core_list));
+
+                if (get_pid_cores(mon_data, core_list,
+                                  sizeof(core_list)) == -1) {
+                        memset(core_list, 0, sizeof(core_list));
+                        strcat(core_list, "err");
+                }
+
                 fprintf(fp,
                         "%s\n"
                         "\t<time>%s</time>\n"
@@ -1981,11 +2119,12 @@ print_xml_row(FILE *fp, char *time,
                         xml_child_open,
                         time,
                         (char *)mon_data->context,
-                        "N/A",
+                        core_list,
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
                         data,
                         xml_child_close);
+        }
 }
 
 /**
@@ -2007,6 +2146,7 @@ print_csv_row(FILE *fp, char *time,
 {
         const size_t sz_data = 128;
         char data[sz_data];
+        char core_list[PQOS_MAX_CORES];
         size_t offset = 0;
 
         ASSERT(fp != NULL);
@@ -2034,13 +2174,22 @@ print_csv_row(FILE *fp, char *time,
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
                         data);
-        else
+        else {
+                memset(core_list, 0, sizeof(core_list));
+
+                if (get_pid_cores(mon_data, core_list,
+                                  sizeof(core_list)) == -1) {
+                        memset(core_list, 0, sizeof(core_list));
+                        strcat(core_list, "err");
+                }
+
                 fprintf(fp,
                         "%s,\"%s\",%s,%.2f,%llu%s\n",
-                        time, (char *)mon_data->context, "N/A",
+                        time, (char *)mon_data->context, core_list,
                         mon_data->values.ipc,
                         (unsigned long long)mon_data->values.llc_misses_delta,
                         data);
+        }
 }
 
 /**
@@ -2068,14 +2217,14 @@ build_header_row(char *hdr, const size_t sz_hdr,
                 if (!process_mode())
                         strncpy(hdr, "    CORE   IPC   MISSES", sz_hdr - 1);
                 else
-                        strncpy(hdr, "     PID   CORE    IPC   MISSES",
+                        strncpy(hdr, "     PID     CORE    IPC   MISSES",
                                 sz_hdr - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
-                        strncat(hdr, "    LLC[KB]", sz_hdr - strlen(hdr) - 1);
+                        strncat(hdr, "     LLC[KB]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
-                        strncat(hdr, "  MBL[MB/s]", sz_hdr - strlen(hdr) - 1);
+                        strncat(hdr, "   MBL[MB/s]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
-                        strncat(hdr, "  MBR[MB/s]", sz_hdr - strlen(hdr) - 1);
+                        strncat(hdr, "   MBR[MB/s]", sz_hdr - strlen(hdr) - 1);
         }
 
         if (iscsv) {
@@ -2367,3 +2516,4 @@ void monitor_cleanup(void)
                 free(sel_output_type);
         sel_output_type = NULL;
 }
+
