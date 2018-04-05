@@ -32,10 +32,13 @@
  *
  */
 
+#include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <stdlib.h>
+#include <dirent.h>
+#include <string.h>
+#include <malloc.h>
 #include <time.h>
 #include <errno.h>
 
@@ -730,4 +733,64 @@ int
 resctrl_mon_is_event_supported(const enum pqos_mon_event event)
 {
         return (supported_events & event) == event;
+}
+
+/**
+ * @brief filter for scandir.
+ *
+ * Skips entries starting with "."
+ *
+ * @param[in] dir scandir dirent entry
+ *
+ * @retval 0 for entires to be skipped
+ * @retval 1 otherwise
+ */
+static int
+mon_group_dir_filter(const struct dirent *dir)
+{
+	return dir->d_name[0] == '.' ? 0 : 1;
+}
+
+int
+resctrl_mon_active(unsigned *monitoring_status)
+{
+	unsigned group_idx = 0;
+	unsigned resctrl_group_count = 0;
+	int ret;
+
+	if (supported_events == 0) {
+		*monitoring_status = 0;
+		return PQOS_RETVAL_OK;
+	}
+
+	ret = resctrl_alloc_get_grps_num(m_cap, &resctrl_group_count);
+	if (ret != PQOS_RETVAL_OK) {
+		LOG_ERROR("Failed to count resctrl groups");
+		return ret;
+	}
+
+	do {
+		int files_count;
+		char path[256];
+		struct dirent **mon_group_files = NULL;
+
+		resctrl_mon_group_path(group_idx, "", NULL, path, DIM(path));
+
+		/* check content of mon_groups directory */
+		files_count = scandir(path, &mon_group_files,
+				      mon_group_dir_filter, NULL);
+		free(mon_group_files);
+
+		if (files_count < 0) {
+			LOG_ERROR("Could not scan %s directory!\n", path);
+			return PQOS_RETVAL_ERROR;
+		} else if (files_count > 0) {
+			/* directory is not empty - monitoring is active */
+			*monitoring_status = 1;
+			return PQOS_RETVAL_OK;
+		}
+	} while (++group_idx < resctrl_group_count);
+
+	*monitoring_status = 0;
+	return PQOS_RETVAL_OK;
 }

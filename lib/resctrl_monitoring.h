@@ -107,6 +107,16 @@ int resctrl_mon_poll(struct pqos_mon_data *group,
  */
 int resctrl_mon_is_event_supported(const enum pqos_mon_event event);
 
+/**
+ * @brief Check if resctrl monitoring is active
+ *
+ * @param monitoring_status 1 if resctrl monitoring is active, 0 otherwise
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_active(unsigned *monitoring_status);
+
 #ifdef __cplusplus
 }
 #endif
