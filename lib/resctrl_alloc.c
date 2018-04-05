@@ -779,14 +779,15 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 
 resctrl_alloc_schemata_write_exit:
 
-	if (buf != NULL)
-		free(buf);
-
 	/* check if error occured */
 	if (ret == PQOS_RETVAL_OK)
 		ret = resctrl_alloc_fclose(fd);
 	else if (fd)
 		resctrl_alloc_fclose(fd);
+
+	/* setvbuf buffer should be freed after fclose */
+	if (buf != NULL)
+		free(buf);
 
 	return ret;
 }
