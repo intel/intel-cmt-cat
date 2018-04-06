@@ -63,6 +63,24 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 static int supported_events = 0;
 
 /**
+ * @brief Filter directory filenames
+ *
+ * This function is used by the scandir function
+ * to filter hidden (dot) files
+ *
+ * @param dir dirent structure containing directory info
+ *
+ * @return if directory entry should be included in scandir() output list
+ * @retval 0 means don't include the entry  ("." in our case)
+ * @retval 1 means include the entry
+ */
+static int
+filter(const struct dirent *dir)
+{
+        return (dir->d_name[0] == '.') ? 0 : 1;
+}
+
+/**
  * @brief Update monitoring capability structure with supported events
  *
  * @param cap pqos capability structure
@@ -179,7 +197,7 @@ resctrl_mon_fini(void)
 }
 
 /**
- * @brief Get core association
+ * @brief Get core association with ctrl group
  *
  * @param [in] lcore core id
  * @param [out] class_id COS id
@@ -188,10 +206,12 @@ resctrl_mon_fini(void)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-resctrl_mon_assoc_get(const unsigned lcore, unsigned *class_id)
+alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
         int ret;
         unsigned max_cos;
+
+        ASSERT(class_id != NULL);
 
         ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -210,7 +230,7 @@ resctrl_mon_assoc_get(const unsigned lcore, unsigned *class_id)
 }
 
 /**
- * @brief Get task association
+ * @brief Get task association with ctrl group
  *
  * @param [in] tid task id
  * @param [out] class_id COS id
@@ -219,10 +239,12 @@ resctrl_mon_assoc_get(const unsigned lcore, unsigned *class_id)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-resctrl_mon_assoc_get_pid(const pid_t tid, unsigned *class_id)
+alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
 {
         int ret;
         unsigned max_cos;
+
+        ASSERT(class_id != NULL);
 
         ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -256,11 +278,13 @@ resctrl_mon_group_path(const unsigned class_id,
                        char *buf,
                        const unsigned buf_size)
 {
+        ASSERT(buf != NULL);
+
         if (resctrl_group == NULL) {
                 if (class_id == 0)
-                        snprintf(buf, buf_size, RESCTRL_PATH);
+                        snprintf(buf, buf_size, RESCTRL_PATH"/mon_groups");
                 else
-                        snprintf(buf, buf_size, RESCTRL_PATH"/COS%u",
+                        snprintf(buf, buf_size, RESCTRL_PATH"/COS%u/mon_groups",
                                  class_id);
         } else if (class_id == 0)
                 snprintf(buf, buf_size, RESCTRL_PATH"/mon_groups/%s",
@@ -291,6 +315,8 @@ resctrl_mon_cpumask_write(const unsigned class_id,
         FILE *fd;
         char path[128];
         int ret;
+
+        ASSERT(mask != NULL);
 
         resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
                                sizeof(path));
@@ -325,6 +351,8 @@ resctrl_mon_cpumask_read(const unsigned class_id,
         FILE *fd;
         char path[128];
         int ret;
+
+        ASSERT(mask != NULL);
 
         resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
                                sizeof(path));
@@ -378,25 +406,70 @@ resctrl_mon_rmdir(const char *path)
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Assign core to monitoring group
- *
- * @param[in] name Monitoring group name
- * @param[in] lcore core id
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- * @retval PQOS_RETVAL_ERROR if error occurs
- */
-static int
-resctrl_mon_core_assign(const char *name, const unsigned lcore)
+int
+resctrl_mon_assoc_get(const unsigned lcore,
+                      char *name,
+                      const unsigned name_size)
+{
+        int ret;
+        unsigned class_id;
+        char dir[256];
+        struct dirent **namelist = NULL;
+        int num_groups;
+        int i;
+
+        ASSERT(name != NULL);
+
+        if (supported_events == 0)
+                return PQOS_RETVAL_RESOURCE;
+
+        ret = alloc_assoc_get(lcore, &class_id);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        resctrl_mon_group_path(class_id, NULL, NULL, dir, sizeof(dir));
+        num_groups = scandir(dir, &namelist, filter, NULL);
+        if (num_groups < 0) {
+                LOG_ERROR("Failed to read monitoring groups for COS %u\n",
+                          class_id);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        for (i = 0; i < num_groups; i++) {
+                struct resctrl_cpumask mask;
+
+                ret = resctrl_mon_cpumask_read(class_id, namelist[i]->d_name,
+                                               &mask);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_assoc_get_exit;
+
+                if (resctrl_cpumask_get(lcore, &mask)) {
+                        strncpy(name, namelist[i]->d_name, name_size);
+                        ret = PQOS_RETVAL_OK;
+                        goto resctrl_mon_assoc_get_exit;
+                }
+        }
+
+        /* Core not associated with mon group */
+        ret = PQOS_RETVAL_RESOURCE;
+
+ resctrl_mon_assoc_get_exit:
+        free(namelist);
+
+        return ret;
+}
+
+int
+resctrl_mon_assoc_set(const unsigned lcore, const char *name)
 {
         unsigned class_id = 0;
         int ret;
         char path[128];
         struct resctrl_cpumask cpumask;
 
-        ret = resctrl_mon_assoc_get(lcore, &class_id);
+        ASSERT(name != NULL);
+
+        ret = alloc_assoc_get(lcore, &class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -419,25 +492,89 @@ resctrl_mon_core_assign(const char *name, const unsigned lcore)
         return ret;
 }
 
-/**
- * @brief Assign pid to monitoring group
- *
- * @param[in] name Monitoring group name
- * @param[in] tid task id
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- * @retval PQOS_RETVAL_ERROR if error occurs
- */
-static int
-resctrl_mon_task_assign(const char *name, const pid_t tid)
+int
+resctrl_mon_assoc_get_pid(const pid_t task,
+                          char *name,
+                          const unsigned name_size)
+{
+        int ret;
+        unsigned class_id;
+        char dir[256];
+        struct dirent **namelist = NULL;
+        int num_groups;
+        int i;
+
+        ASSERT(name != NULL);
+
+        if (supported_events == 0)
+                return PQOS_RETVAL_RESOURCE;
+
+        ret = alloc_assoc_get_pid(task, &class_id);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        resctrl_mon_group_path(class_id, NULL, NULL, dir, sizeof(dir));
+        num_groups = scandir(dir, &namelist, filter, NULL);
+        if (num_groups < 0) {
+                LOG_ERROR("Failed to read monitoring groups for COS %u\n",
+                          class_id);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        for (i = 0; i < num_groups; i++) {
+                char path[256];
+                char buf[128];
+                FILE *fd;
+
+                resctrl_mon_group_path(class_id, namelist[i]->d_name, "/tasks",
+                                       path, sizeof(path));
+
+                fd = fopen(path, "r");
+                if (fd == NULL)
+                        goto resctrl_mon_assoc_get_pid_exit;
+
+                while (fgets(buf, sizeof(buf), fd) != NULL) {
+                        char *endptr = NULL;
+                        pid_t value = strtol(buf, &endptr, 10);
+
+                        if (!(*buf != '\0' &&
+                                (*endptr == '\0' || *endptr == '\n'))) {
+                                ret = PQOS_RETVAL_ERROR;
+                                fclose(fd);
+                                goto resctrl_mon_assoc_get_pid_exit;
+                        }
+
+                        if (value == task) {
+                                strncpy(name, namelist[i]->d_name, name_size);
+                                ret = PQOS_RETVAL_OK;
+                                fclose(fd);
+                                goto resctrl_mon_assoc_get_pid_exit;
+                        }
+                }
+
+                fclose(fd);
+        }
+
+        /* Task not associated with mon group */
+        ret = PQOS_RETVAL_RESOURCE;
+
+ resctrl_mon_assoc_get_pid_exit:
+        free(namelist);
+
+        return ret;
+}
+
+int
+resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
 {
         unsigned class_id;
         int ret;
         char path[128];
         FILE *fd;
 
-        ret = resctrl_mon_assoc_get_pid(tid, &class_id);
+        ASSERT(name != NULL);
+
+        ret = alloc_assoc_get_pid(task, &class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -453,12 +590,11 @@ resctrl_mon_task_assign(const char *name, const pid_t tid)
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        fprintf(fd, "%d\n", tid);
+        fprintf(fd, "%d\n", task);
 
         if (fclose(fd) != 0) {
                 LOG_ERROR("Could not assign TID %d to resctrl monitoring "
-                          "group\n", tid);
-
+                          "group\n", task);
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -505,7 +641,8 @@ resctrl_mon_start(struct pqos_mon_data *group)
          * Add pids to the resctrl group
          */
         for (i = 0; i < group->tid_nr; i++) {
-                ret = resctrl_mon_task_assign(resctrl_group, group->tid_map[i]);
+                ret = resctrl_mon_assoc_set_pid(group->tid_map[i],
+                                                resctrl_group);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_start_exit;
         }
@@ -514,7 +651,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
          * Add cores to the resctrl group
          */
         for (i = 0; i < group->num_cores; i++) {
-                ret = resctrl_mon_core_assign(resctrl_group, group->cores[i]);
+                ret = resctrl_mon_assoc_set(group->cores[i], resctrl_group);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_start_exit;
         }
@@ -582,7 +719,8 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                  * Add pids to the default group
                  */
                 for (i = 0; i < group->tid_nr; i++) {
-                        ret = resctrl_mon_task_assign(NULL, group->tid_map[i]);
+                        ret = resctrl_mon_assoc_set_pid(group->tid_map[i],
+                                                        NULL);
                         if (ret != PQOS_RETVAL_OK)
                                 goto resctrl_mon_stop_exit;
                 }
@@ -734,22 +872,6 @@ resctrl_mon_is_event_supported(const enum pqos_mon_event event)
         return (supported_events & event) == event;
 }
 
-/**
- * @brief filter for scandir.
- *
- * Skips entries starting with "."
- *
- * @param[in] dir scandir dirent entry
- *
- * @retval 0 for entires to be skipped
- * @retval 1 otherwise
- */
-static int
-mon_group_dir_filter(const struct dirent *dir)
-{
-	return dir->d_name[0] == '.' ? 0 : 1;
-}
-
 int
 resctrl_mon_active(unsigned *monitoring_status)
 {
@@ -776,8 +898,7 @@ resctrl_mon_active(unsigned *monitoring_status)
 		resctrl_mon_group_path(group_idx, "", NULL, path, DIM(path));
 
 		/* check content of mon_groups directory */
-		files_count = scandir(path, &mon_group_files,
-				      mon_group_dir_filter, NULL);
+		files_count = scandir(path, &mon_group_files, filter, NULL);
 		free(mon_group_files);
 
 		if (files_count < 0) {

@@ -108,6 +108,62 @@ int resctrl_mon_poll(struct pqos_mon_data *group,
 int resctrl_mon_is_event_supported(const enum pqos_mon_event event);
 
 /**
+ * @brief Read association of \a lcore with monitoring group
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [out] name name of monitoring group
+ * @param [in] name_size length of \a name buffer
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_RESOURCE when \a lcore is not assigned to monitoring
+ *         group
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_assoc_get(const unsigned lcore,
+                          char *name,
+                          const unsigned name_size);
+
+/**
+ * @brief Set association of \a lcore to monitoring group
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [in] name name of monitoring group
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_RESOURCE when \a lcore is not assigned to monitoring
+ *         group or monitoring is not supported
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_assoc_set(const unsigned lcore, const char *name);
+
+/**
+ * @brief Read association of \a task with monitoring group
+ *
+ * @param [in] task task id to find association
+ * @param [out] name name of monitoring group
+ * @param [in] name_size length of \a name buffer
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_RESOURCE when \a task is not assigned to monitoring
+ *         group or monitoring is not supported
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_assoc_get_pid(const pid_t task,
+                              char *name,
+                              const unsigned name_size);
+
+/**
+ * @brief Set association of \a task to monitoring group
+ *
+ * @param [in] task task id to be associated
+ * @param [in] name name of monitoring group
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
+
+/**
  * @brief Check if resctrl monitoring is active
  *
  * @param monitoring_status 1 if resctrl monitoring is active, 0 otherwise
