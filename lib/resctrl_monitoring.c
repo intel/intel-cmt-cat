@@ -339,6 +339,44 @@ resctrl_mon_cpumask_read(const unsigned class_id,
 }
 
 /**
+ * @brief Create directory if not exists
+ *
+ * @param[in] path directory path
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_mkdir(const char *path)
+{
+        ASSERT(path != NULL);
+
+        if (mkdir(path, 0755) == -1 && errno != EEXIST)
+                return PQOS_RETVAL_BUSY;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Remove directory if exists
+ *
+ * @param[in] path directory path
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_rmdir(const char *path)
+{
+        ASSERT(path != NULL);
+
+        if (rmdir(path) == -1 && errno != ENOENT)
+                return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Assign core to monitoring group
  *
  * @param[in] name Monitoring group name
@@ -354,7 +392,6 @@ resctrl_mon_core_assign(const char *name, const unsigned lcore)
         unsigned class_id = 0;
         int ret;
         char path[128];
-        struct stat st;
         struct resctrl_cpumask cpumask;
 
         ret = resctrl_mon_assoc_get(lcore, &class_id);
@@ -362,11 +399,9 @@ resctrl_mon_core_assign(const char *name, const unsigned lcore)
                 return ret;
 
         resctrl_mon_group_path(class_id, name, NULL, path, sizeof(path));
-        if (stat(path, &st) != 0 && mkdir(path, 0755) == -1) {
-                LOG_DEBUG("Failed to create resctrl monitoring group %s!\n",
-                          path);
-                return PQOS_RETVAL_BUSY;
-        }
+        ret = resctrl_mon_mkdir(path);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         ret = resctrl_mon_cpumask_read(class_id, name, &cpumask);
         if (ret != PQOS_RETVAL_OK)
@@ -399,17 +434,16 @@ resctrl_mon_task_assign(const char *name, const pid_t tid)
         int ret;
         char path[128];
         FILE *fd;
-        struct stat st;
 
         ret = resctrl_mon_assoc_get_pid(tid, &class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
         resctrl_mon_group_path(class_id, name, NULL, path, sizeof(path));
-        if (stat(path, &st) != 0 && mkdir(path, 0755) == -1) {
-                LOG_DEBUG("Failed to create resctrl monitoring group %s!\n",
-                          path);
-                return PQOS_RETVAL_BUSY;
+        ret = resctrl_mon_mkdir(path);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Failed to create resctrl monitoring group!\n");
+                return ret;
         }
 
         strncat(path, "/tasks", sizeof(path) - strlen(path));
@@ -524,12 +558,14 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 cos = 0;
                 do {
                         char buf[128];
-                        struct stat st;
 
                         resctrl_mon_group_path(cos, group->resctrl_group, NULL,
                                                buf, sizeof(buf));
-                        if (stat(buf, &st) == 0 && rmdir(buf) != 0) {
-                                ret = PQOS_RETVAL_ERROR;
+
+                        ret = resctrl_mon_rmdir(buf);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Failed to remove resctrl "
+                                          "monitoring group\n");
                                 goto resctrl_mon_stop_exit;
                         }
 
