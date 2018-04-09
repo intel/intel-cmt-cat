@@ -496,6 +496,45 @@ resctrl_mon_assoc_set(const unsigned lcore, const char *name)
         return ret;
 }
 
+/* @brief Restore association of \a lcore to monitoring group
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [in] name name of monitoring group
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
+{
+        int ret;
+        char buf[128];
+        unsigned class_id;
+        struct stat st;
+
+        ASSERT(name != NULL);
+
+        ret = resctrl_mon_assoc_get(lcore, buf, sizeof(buf));
+        /* core already associated with mon group */
+        if (ret == PQOS_RETVAL_OK)
+                return PQOS_RETVAL_OK;
+
+        ret = alloc_assoc_get(lcore, &class_id);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
+        if (stat(buf, &st) != 0) {
+                LOG_WARN("Could not restore core association with mon "
+                         "group %s does not exists\n", buf);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        ret = resctrl_mon_assoc_set(lcore, name);
+
+        return ret;
+}
+
 int
 resctrl_mon_assoc_get_pid(const pid_t task,
                           char *name,
@@ -762,6 +801,7 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         unsigned *sockets = NULL;
         unsigned sockets_num;
         unsigned cos, sock;
+        unsigned i;
         uint64_t old_value;
 
         ASSERT(group != NULL);
@@ -792,6 +832,17 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         if (sockets == NULL || sockets_num == 0) {
                 ret = PQOS_RETVAL_ERROR;
                 goto resctrl_mon_poll_exit;
+        }
+
+        /*
+         * When core COS assoc changes then kernel resets monitoring group
+         * assoc. We need to restore monitoring assoc for cores
+         */
+        for (i = 0; i < group->num_cores; i++) {
+                ret = resctrl_mon_assoc_restore(group->cores[i],
+                                                group->resctrl_group);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_poll_exit;
         }
 
         /**
