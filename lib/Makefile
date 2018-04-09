@@ -82,7 +82,13 @@ CLEAN_OBJS = $(SRCS:.c=.o)
 
 # On FreeBSD build with no OS support
 ifeq ($(shell uname), FreeBSD)
-OBJS := $(filter-out perf.o os_allocation.o os_monitoring.o resctrl.o resctrl_monitoring.o perf_monitoring.o,$(OBJS))
+OBJS := $(filter-out perf.o \
+	os_allocation.o \
+	os_monitoring.o \
+	resctrl.o \
+	resctrl_alloc.o \
+	resctrl_monitoring.o \
+	perf_monitoring.o,$(OBJS))
 endif
 
 HDR = pqos.h

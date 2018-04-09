@@ -35,7 +35,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <malloc.h>
+#include <stdlib.h>
 #include <time.h>
 #include <errno.h>
 
