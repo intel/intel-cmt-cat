@@ -44,7 +44,7 @@ CFLAGS = -pthread -I./ -D_GNU_SOURCE \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -D_FORTIFY_SOURCE=2\
-	-Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -54,7 +54,9 @@ DOXY_DIRS = doc_api doc_lib
 # ICC and GCC options
 ifeq ($(CC),icc)
 else
-CFLAGS += -Wcast-align -Wnested-externs
+CFLAGS += -Wcast-align \
+    -Wnested-externs \
+    -Wmissing-noreturn
 endif
 
 # so or static build

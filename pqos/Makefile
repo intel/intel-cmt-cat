@@ -43,7 +43,7 @@ CFLAGS = -I$(LIBDIR) \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
-	-Wunreachable-code -Wmissing-noreturn -Wsign-compare -Wno-endif-labels
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -51,7 +51,9 @@ endif
 # ICC and GCC options
 ifeq ($(CC),icc)
 else
-CFLAGS += -Wcast-align -Wnested-externs
+CFLAGS += -Wcast-align \
+    -Wnested-externs \
+    -Wmissing-noreturn
 endif
 
 # DEBUG build
