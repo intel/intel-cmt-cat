@@ -1087,7 +1087,8 @@ int pqos_mon_add_pids(const unsigned num_pids,
         if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task monitoring!\n");
                 return PQOS_RETVAL_ERROR;
@@ -1125,7 +1126,8 @@ int pqos_mon_remove_pids(const unsigned num_pids,
         if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        if (m_interface != PQOS_INTER_OS) {
+        if (m_interface != PQOS_INTER_OS &&
+                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task monitoring!\n");
                 return PQOS_RETVAL_ERROR;
