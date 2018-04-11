@@ -576,6 +576,8 @@ static const char help_printf_long[] =
         "          or select process ids and events to monitor.\n"
         "          EVTPIDS format is 'EVENT:PID_LIST'.\n"
         "          Example 'llc:22,25673' or 'all:892,4588-4592'.\n"
+        "          Process' IDs can be grouped by enclosing them in square brackets,\n"
+        "          example 'llc:[22,25673]' or 'all:892,[4588-4592]'.\n"
         "          Note: processes and cores cannot be monitored together.\n"
         "                Requires Linux and kernel versions 4.1 and newer.\n"
         "  -o FILE, --mon-file=FILE    output monitored data in a FILE\n"
