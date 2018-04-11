@@ -158,7 +158,7 @@ struct rdtset {
 	unsigned sudo_keep:1,		/**< don't drop elevated privileges */
 		 verbose:1,		/**< be verbose */
 		 command:1;		/**< command to be executed detected */
-	int interface;                  /**< pqos interface to use */
+	enum pqos_interface interface;  /**< pqos interface to use */
 };
 
 struct rdtset g_cfg;

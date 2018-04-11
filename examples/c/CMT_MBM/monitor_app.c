@@ -62,7 +62,7 @@ static int sel_monitor_num = 0;
 /**
  * The mask to tell which events to display
  */
-static enum pqos_mon_event sel_events_max = 0;
+static enum pqos_mon_event sel_events_max = (enum pqos_mon_event)0;
 
 /**
  * Maintains a table of core, event, number of events that are
@@ -93,7 +93,7 @@ static int sel_process_num = 0;
 /**
  * Flag to determine which library interface to use
  */
-static int interface = PQOS_INTER_MSR;
+static enum pqos_interface interface = PQOS_INTER_MSR;
 
 static void stop_monitoring(void);
 
@@ -102,7 +102,7 @@ static void stop_monitoring(void);
  *
  * @param [in] signo signal number
  */
-static void monitoring_ctrlc(int signo)
+static void __attribute__((noreturn)) monitoring_ctrlc(int signo)
 {
 	printf("\nExiting[%d]...\n", signo);
         stop_monitoring();
@@ -232,8 +232,8 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                  const struct pqos_capability * const cap_mon)
 {
 	unsigned i;
-        const enum pqos_mon_event perf_events =
-                PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS;
+        const enum pqos_mon_event perf_events = (enum pqos_mon_event)
+            (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS);
 
         for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
                 sel_events_max |= (cap_mon->u.mon->events[i].type);

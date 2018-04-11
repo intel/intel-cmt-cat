@@ -77,7 +77,7 @@ static int os_mon_type = 0;
 /**
  * All supported events mask
  */
-static enum pqos_mon_event all_evt_mask = 0;
+static enum pqos_mon_event all_evt_mask = (enum pqos_mon_event)0;
 
 /**
  * Table of structures used to store data about
@@ -114,11 +114,11 @@ static struct perf_mon_supported_event {
           .scale = 1 },
         { .name = "",
           .desc = "Retired CPU Instructions",
-          .event = PQOS_PERF_EVENT_INSTRUCTIONS,
+          .event = (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS,
           .supported = 1 }, /**< assumed support */
         { .name = "",
           .desc = "Unhalted CPU Cycles",
-          .event = PQOS_PERF_EVENT_CYCLES,
+          .event = (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
           .supported = 1 }, /**< assumed support */
         { .name = "",
           .desc = "Instructions/Cycle",
@@ -243,21 +243,21 @@ set_arch_event_attrs(enum pqos_mon_event *events)
         events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs = attr;
         events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs.config =
                 PERF_COUNT_HW_CACHE_MISSES;
-        *events |= PQOS_PERF_EVENT_LLC_MISS;
+        *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_LLC_MISS;
 
         /* Set retired instructions event attributes */
         events_tab[OS_MON_EVT_IDX_INST].attrs = attr;
         events_tab[OS_MON_EVT_IDX_INST].attrs.config =
                 PERF_COUNT_HW_INSTRUCTIONS;
-        *events |= PQOS_PERF_EVENT_INSTRUCTIONS;
+        *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS;
 
         /* Set unhalted cycles event attributes */
         events_tab[OS_MON_EVT_IDX_CYC].attrs = attr;
         events_tab[OS_MON_EVT_IDX_CYC].attrs.config =
                 PERF_COUNT_HW_CPU_CYCLES;
-        *events |= PQOS_PERF_EVENT_CYCLES;
+        *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES;
 
-        *events |= PQOS_PERF_EVENT_IPC;
+        *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
 
         return PQOS_RETVAL_OK;
 }
@@ -350,7 +350,7 @@ set_mon_events(void)
 {
         char dir[64];
         int files, i, ret = PQOS_RETVAL_OK;
-        enum pqos_mon_event events = 0;
+        enum pqos_mon_event events = (enum pqos_mon_event)0;
         struct dirent **namelist = NULL;
 
         /**
@@ -504,9 +504,9 @@ perf_mon_get_fd(struct pqos_mon_perf_ctx *ctx, const enum pqos_mon_event event)
                 return &ctx->fd_mbt;
         case PQOS_PERF_EVENT_LLC_MISS:
                 return &ctx->fd_llc_misses;
-        case PQOS_PERF_EVENT_CYCLES:
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 return &ctx->fd_cyc;
-        case PQOS_PERF_EVENT_INSTRUCTIONS:
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
                 return &ctx->fd_inst;
         default:
                 return NULL;
@@ -683,13 +683,13 @@ perf_mon_poll(struct pqos_mon_data *group, enum pqos_mon_event event)
                 group->values.llc_misses_delta =
                         get_delta(old_value, group->values.llc_misses);
                 break;
-        case PQOS_PERF_EVENT_CYCLES:
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 old_value = group->values.ipc_unhalted;
                 group->values.ipc_unhalted = value;
                 group->values.ipc_unhalted_delta =
                         get_delta(old_value, group->values.ipc_unhalted);
                 break;
-        case PQOS_PERF_EVENT_INSTRUCTIONS:
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
                 old_value = group->values.ipc_retired;
                 group->values.ipc_retired = value;
                 group->values.ipc_retired_delta =

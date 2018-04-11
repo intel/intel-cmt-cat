@@ -1506,7 +1506,6 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                                 LOG_ERROR("L3 CDP enable error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
-                        _pqos_cap_l3cdp_change(l3_cap->cdp_on, 1);
                 }
 
                 if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF && l3_cap->cdp_on) {
@@ -1519,8 +1518,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                                 LOG_ERROR("L3 CDP disable error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
-                        _pqos_cap_l3cdp_change(l3_cap->cdp_on, 0);
                 }
+                _pqos_cap_l3cdp_change(l3_cdp_cfg);
         }
 
         /**
@@ -1537,7 +1536,6 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                                 LOG_ERROR("L2 CDP enable error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
-                        _pqos_cap_l2cdp_change(1);
                 }
 
                 if (l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF && l2_cap->cdp_on) {
@@ -1550,8 +1548,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                                 LOG_ERROR("L2 CDP disable error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
-                        _pqos_cap_l2cdp_change(0);
                 }
+                _pqos_cap_l2cdp_change(l2_cdp_cfg);
         }
 
  pqos_alloc_reset_exit:

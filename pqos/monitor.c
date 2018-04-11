@@ -89,7 +89,7 @@ static int sel_monitor_num = 0;
 /**
  * The mask to tell which events to display
  */
-static enum pqos_mon_event sel_events_max = 0;
+static enum pqos_mon_event sel_events_max = (enum pqos_mon_event)0;
 
 /**
  * Maintains a table of core, event, number of events that are selected in
@@ -512,7 +512,7 @@ parse_event(char *str, enum pqos_mon_event *evt)
                 sel_events_max |= *evt;
         } else if (strncasecmp(str, "all:", 4) == 0 ||
                    strncasecmp(str, ":", 1) == 0)
-                *evt = PQOS_MON_EVENT_ALL;
+                *evt = (enum pqos_mon_event) PQOS_MON_EVENT_ALL;
         else
                 parse_error(str, "Unrecognized monitoring event type");
 }
@@ -527,7 +527,7 @@ static void
 parse_monitor_cores(char *str)
 {
         int i = 0, n = 0;
-        enum pqos_mon_event evt = 0;
+        enum pqos_mon_event evt = (enum pqos_mon_event)0;
         struct core_group *cgrp_tab = calloc(PQOS_MAX_CORES, sizeof(*cgrp_tab));
 
         if (cgrp_tab == NULL) {
@@ -632,7 +632,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
 {
         unsigned i;
         int ret;
-        enum pqos_mon_event all_core_evts = 0, all_pid_evts = 0;
+        enum pqos_mon_event all_core_evts = (enum pqos_mon_event)0;
+        enum pqos_mon_event all_pid_evts = (enum pqos_mon_event)0;
         const enum pqos_mon_event evt_all =
                 (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
 
@@ -739,9 +740,11 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 sel_events_max |= all_core_evts;
                         } else {
                                 if (all_core_evts & PQOS_PERF_EVENT_IPC)
-                                        cg->events |= PQOS_PERF_EVENT_IPC;
+                                        cg->events |= (enum pqos_mon_event)
+                                                PQOS_PERF_EVENT_IPC;
                                 if (all_core_evts & PQOS_PERF_EVENT_LLC_MISS)
-                                        cg->events |= PQOS_PERF_EVENT_LLC_MISS;
+                                        cg->events |= (enum pqos_mon_event)
+                                                PQOS_PERF_EVENT_LLC_MISS;
                         }
 
                         ret = pqos_mon_start(cg->num_cores, cg->cores,
@@ -775,9 +778,11 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 sel_events_max |= all_pid_evts;
                         } else {
                                 if (all_pid_evts & PQOS_PERF_EVENT_IPC)
-                                        pg->events |= PQOS_PERF_EVENT_IPC;
+                                        pg->events |= (enum pqos_mon_event)
+                                                PQOS_PERF_EVENT_IPC;
                                 if (all_pid_evts & PQOS_PERF_EVENT_LLC_MISS)
-                                        pg->events |= PQOS_PERF_EVENT_LLC_MISS;
+                                        pg->events |= (enum pqos_mon_event)
+                                                PQOS_PERF_EVENT_LLC_MISS;
                         }
                         ret = pqos_mon_start_pids(pg->num_pids, pg->pids,
                                                   pg->events, (void *)pg->desc,
@@ -909,7 +914,7 @@ static void
 parse_monitor_pids(char *str)
 {
         int i = 0, n = 0;
-        enum pqos_mon_event evt = 0;
+        enum pqos_mon_event evt = (enum pqos_mon_event)0;
         struct pid_group pgrp_tab[PQOS_MAX_PIDS];
 
         memset(pgrp_tab, 0, sizeof(pgrp_tab));
@@ -1624,7 +1629,8 @@ selfn_monitor_top_pids(void)
          * order
          */
         for (i = (top_size - 1); i >= 0; --i)
-                add_pids_for_monitoring(&top_procs[i], PQOS_MON_EVENT_ALL);
+                add_pids_for_monitoring(&top_procs[i],
+                        (enum pqos_mon_event)PQOS_MON_EVENT_ALL);
 
 cleanup_pslist:
         /* cleaning list of all processes stats */

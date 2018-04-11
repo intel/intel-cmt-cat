@@ -149,18 +149,18 @@ os_alloc_check(void)
          */
         if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
                 const struct pqos_capability *alloc_cap = NULL;
-                int l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
-                int l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
+                enum pqos_cdp_config l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
+                enum pqos_cdp_config l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
 
                 /* Get L3 CAT capabilities */
                 (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
-                if (alloc_cap != NULL)
-                        l3_cdp_mount = alloc_cap->u.l3ca->cdp_on;
+                if (alloc_cap != NULL && alloc_cap->u.l3ca->cdp_on)
+                        l3_cdp_mount = PQOS_REQUIRE_CDP_ON;
 
                 /* Get L2 CAT capabilities */
                 (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
-                if (alloc_cap != NULL)
-                        l2_cdp_mount = alloc_cap->u.l2ca->cdp_on;
+                if (alloc_cap != NULL && alloc_cap->u.l2ca->cdp_on)
+                        l2_cdp_mount = PQOS_REQUIRE_CDP_ON;
 
                 ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount);
                 if (ret != PQOS_RETVAL_OK) {
@@ -732,26 +732,31 @@ os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
  */
 static int
 l2_cdp_update(const enum pqos_cdp_config l2_cdp_cfg,
-	       const struct pqos_cap_l2ca *l2_cap,
-	       int *l2_cdp)
+	      const struct pqos_cap_l2ca *l2_cap,
+	      enum pqos_cdp_config *l2_cdp)
 {
+        int ret = 0;
 
 	if (l2_cap == NULL)
 		return 0;
-
 	switch (l2_cdp_cfg) {
 	case PQOS_REQUIRE_CDP_ON:
-		*l2_cdp = 1;
+		*l2_cdp = l2_cdp_cfg;
+                ret = !l2_cap->cdp_on;
 		break;
 	case PQOS_REQUIRE_CDP_ANY:
-		*l2_cdp = l2_cap->cdp_on;
+                if (l2_cap->cdp_on)
+                        *l2_cdp = PQOS_REQUIRE_CDP_ON;
+                else
+                        *l2_cdp = PQOS_REQUIRE_CDP_OFF;
 		break;
 	case PQOS_REQUIRE_CDP_OFF:
-		*l2_cdp = 0;
+		*l2_cdp = l2_cdp_cfg;
+                ret = l2_cap->cdp_on;
 		break;
 	}
 
-	return l2_cap->cdp_on != *l2_cdp;
+	return ret;
 }
 
 /**
@@ -766,25 +771,32 @@ l2_cdp_update(const enum pqos_cdp_config l2_cdp_cfg,
  */
 static int
 l3_cdp_update(const enum pqos_cdp_config l3_cdp_cfg,
-	       const struct pqos_cap_l3ca *l3_cap,
-	       int *l3_cdp) {
+	      const struct pqos_cap_l3ca *l3_cap,
+	      enum pqos_cdp_config *l3_cdp)
+{
+        int ret = 0;
 
 	if (l3_cap == NULL)
 		return 0;
 
 	switch (l3_cdp_cfg) {
 	case PQOS_REQUIRE_CDP_ON:
-		*l3_cdp = 1;
+		*l3_cdp = l3_cdp_cfg;
+                ret = !l3_cap->cdp_on;
 		break;
 	case PQOS_REQUIRE_CDP_ANY:
-		*l3_cdp = l3_cap->cdp_on;
+                if (l3_cap->cdp_on)
+                        *l3_cdp = PQOS_REQUIRE_CDP_ON;
+                else
+                        *l3_cdp = PQOS_REQUIRE_CDP_OFF;
 		break;
 	case PQOS_REQUIRE_CDP_OFF:
-		*l3_cdp = 0;
+		*l3_cdp = l3_cdp_cfg;
+                ret = l3_cap->cdp_on;
 		break;
 	}
 
-	return l3_cap->cdp_on != *l3_cdp;
+	return ret;
 }
 
 /**
@@ -807,10 +819,6 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
 	            const struct pqos_cap_l2ca *l2_cap)
 {
 	int ret;
-        int l3_cdp = 0;
-	int l2_cdp = 0;
-	int l3_cdp_changed = 0;
-	int l2_cdp_changed = 0;
 
         LOG_INFO("OS alloc reset - FULL\n");
 
@@ -830,28 +838,23 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
         if (ret != PQOS_RETVAL_OK)
                 goto os_alloc_reset_full_exit;
 
-        l3_cdp_changed = l3_cdp_update(l3_cdp_cfg, l3_cap, &l3_cdp);
-        l2_cdp_changed = l2_cdp_update(l2_cdp_cfg, l2_cap, &l2_cdp);
-
         /**
          * Mount now with CDP option.
          */
 	LOG_INFO("OS alloc reset - mount resctrl with "
 		"l3_cdp %s and l2_cdp %s\n",
-		l3_cdp ? "on" : "off",
-		l2_cdp ? "on" : "off");
+		l3_cdp_cfg ? "on" : "off",
+		l2_cdp_cfg ? "on" : "off");
 
-        ret = os_interface_mount(l3_cdp, l2_cdp);
+        ret = os_interface_mount(l3_cdp_cfg, l2_cdp_cfg);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Mount OS interface error!\n");
                 goto os_alloc_reset_full_exit;
         }
-        if (l3_cdp_changed) {
-                ASSERT(l3_cap);
-                _pqos_cap_l3cdp_change(l3_cap->cdp_on, l3_cdp);
-        }
-        if (l2_cdp_changed)
-                _pqos_cap_l2cdp_change(l2_cdp);
+        if (l3_cap != NULL)
+                _pqos_cap_l3cdp_change(l3_cdp_cfg);
+        if (l2_cap != NULL)
+                _pqos_cap_l2cdp_change(l2_cdp_cfg);
         /**
          * Create the COS dir's in resctrl.
          */
@@ -871,11 +874,15 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
-	int l3_cdp = 0;
-	int l2_cdp = 0;
+        enum pqos_cdp_config l3_cdp = PQOS_REQUIRE_CDP_OFF;
+	enum pqos_cdp_config l2_cdp = PQOS_REQUIRE_CDP_OFF;
 	int l3_cdp_changed = 0;
 	int l2_cdp_changed = 0;
         int ret;
+
+        ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
+               l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
+               l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
 
         ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
@@ -941,7 +948,6 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 		unsigned monitoring_active = 0;
 
 		ret = resctrl_mon_active(&monitoring_active);
-
 		if (ret != PQOS_RETVAL_OK) {
 			LOG_ERROR("Failed to check resctrl "
 				  "monitoring activity\n");
@@ -953,11 +959,10 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 				  "monitoring in order to change CDP settings\n");
 			ret = PQOS_RETVAL_ERROR;
 		} else
-			ret = os_alloc_reset_full(l3_cdp_cfg, l2_cdp_cfg,
-				l3_cap, l2_cap);
+			ret = os_alloc_reset_full(l3_cdp, l2_cdp, l3_cap,
+                                                  l2_cap);
         } else
 		ret = os_alloc_reset_light(l3_cap, l2_cap);
-
 
  os_alloc_reset_exit:
         return ret;

@@ -54,13 +54,14 @@
 static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
-/** List of non firtual events */
-const enum pqos_mon_event os_mon_event[] = {PQOS_MON_EVENT_L3_OCCUP,
-                                            PQOS_MON_EVENT_LMEM_BW,
-                                            PQOS_MON_EVENT_TMEM_BW,
-                                            PQOS_PERF_EVENT_LLC_MISS,
-                                            PQOS_PERF_EVENT_CYCLES,
-                                            PQOS_PERF_EVENT_INSTRUCTIONS};
+/** List of non virtual events */
+const enum pqos_mon_event os_mon_event[] = {
+        PQOS_MON_EVENT_L3_OCCUP,
+        PQOS_MON_EVENT_LMEM_BW,
+        PQOS_MON_EVENT_TMEM_BW,
+        PQOS_PERF_EVENT_LLC_MISS,
+        (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
+        (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
 
 /**
  * @brief Filter directory filenames
@@ -93,7 +94,7 @@ static int
 stop_events(struct pqos_mon_data *group)
 {
         int ret;
-        enum pqos_mon_event stopped_evts = 0;
+        enum pqos_mon_event stopped_evts = (enum pqos_mon_event)0;
         unsigned i;
 
         ASSERT(group != NULL);
@@ -126,11 +127,11 @@ stop_events(struct pqos_mon_data *group)
  stop_event_error:
         if ((stopped_evts & PQOS_MON_EVENT_LMEM_BW) &&
                 (stopped_evts & PQOS_MON_EVENT_TMEM_BW))
-                stopped_evts |= PQOS_MON_EVENT_RMEM_BW;
+                stopped_evts |= (enum pqos_mon_event)PQOS_MON_EVENT_RMEM_BW;
 
         if ((stopped_evts & PQOS_PERF_EVENT_CYCLES) &&
                 (stopped_evts & PQOS_PERF_EVENT_INSTRUCTIONS))
-                stopped_evts |= PQOS_PERF_EVENT_IPC;
+                stopped_evts |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
 
         if (group->perf != NULL) {
                 free(group->perf);
@@ -141,13 +142,13 @@ stop_events(struct pqos_mon_data *group)
                 LOG_ERROR("Failed to stop all perf events\n");
                 return PQOS_RETVAL_ERROR;
         }
-        group->perf_event = 0;
+        group->perf_event = (enum pqos_mon_event)0;
 
         if ((group->resctrl_event & stopped_evts) != group->resctrl_event) {
                 LOG_ERROR("Failed to stop resctrl events\n");
                 return PQOS_RETVAL_ERROR;
         }
-        group->resctrl_event = 0;
+        group->resctrl_event = (enum pqos_mon_event)0;
 
         return PQOS_RETVAL_OK;
 }
@@ -167,7 +168,7 @@ start_events(struct pqos_mon_data *group)
         int ret = PQOS_RETVAL_OK;
         unsigned num_ctrs, i;
         enum pqos_mon_event events;
-        enum pqos_mon_event started_evts = 0;
+        enum pqos_mon_event started_evts = (enum pqos_mon_event)0;
 
         ASSERT(group != NULL);
 
@@ -179,7 +180,7 @@ start_events(struct pqos_mon_data *group)
                 return PQOS_RETVAL_ERROR;
 
         events = group->event;
-        group->perf_event = 0;
+        group->perf_event = (enum pqos_mon_event)0;
         group->perf = malloc(sizeof(group->perf[0]) * num_ctrs);
         if (group->perf == NULL) {
                 LOG_ERROR("Memory allocation failed\n");
@@ -187,9 +188,10 @@ start_events(struct pqos_mon_data *group)
         }
 
         if (events & PQOS_MON_EVENT_RMEM_BW)
-                events |= (PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_TMEM_BW);
+                events |= (enum pqos_mon_event)(PQOS_MON_EVENT_LMEM_BW |
+                           PQOS_MON_EVENT_TMEM_BW);
         if (events & PQOS_PERF_EVENT_IPC)
-                events |= (PQOS_PERF_EVENT_CYCLES |
+                events |= (enum pqos_mon_event)(PQOS_PERF_EVENT_CYCLES |
                            PQOS_PERF_EVENT_INSTRUCTIONS);
 
         /**
@@ -239,7 +241,7 @@ start_events(struct pqos_mon_data *group)
         if ((started_evts & PQOS_MON_EVENT_LMEM_BW) &&
                 (started_evts & PQOS_MON_EVENT_TMEM_BW)) {
                 group->values.mbm_remote = 0;
-                started_evts |= PQOS_MON_EVENT_RMEM_BW;
+                started_evts |= (enum pqos_mon_event)PQOS_MON_EVENT_RMEM_BW;
         }
         /**
          * All events required by IPC has been started
@@ -247,7 +249,7 @@ start_events(struct pqos_mon_data *group)
         if ((started_evts & PQOS_PERF_EVENT_CYCLES) &&
                 (started_evts & PQOS_PERF_EVENT_INSTRUCTIONS)) {
                 group->values.ipc = 0;
-                started_evts |= PQOS_PERF_EVENT_IPC;
+                started_evts |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
         }
 
  start_event_error:
@@ -417,7 +419,8 @@ os_mon_start(const unsigned num_cores,
          * Validate if event is listed in capabilities
          */
         for (i = 0; i < (sizeof(event) * 8); i++) {
-                const enum pqos_mon_event evt_mask = (1 << i);
+                const enum pqos_mon_event evt_mask =
+                        (enum pqos_mon_event)(1 << i);
                 const struct pqos_monitor *ptr = NULL;
 
                 if (!(evt_mask & event))

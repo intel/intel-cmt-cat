@@ -534,7 +534,7 @@ int hw_mon_reset(void)
 static int
 mon_read(const unsigned lcore,
          const pqos_rmid_t rmid,
-         const enum pqos_mon_event event,
+         const unsigned event,
          uint64_t *value)
 {
         int retries = 3, retval = PQOS_RETVAL_OK;
@@ -577,7 +577,7 @@ mon_read(const unsigned lcore,
                 *value = (val & PQOS_MSR_MON_QMC_DATA_MASK);
         else
                 LOG_WARN("Error reading event %u on core %u (RMID%u)!\n",
-                         (unsigned) event, lcore, (unsigned) rmid);
+                         event, lcore, (unsigned) rmid);
 
         return retval;
 }
@@ -890,14 +890,16 @@ hw_mon_start(const unsigned num_cores,
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
-
         ASSERT(m_cpu != NULL);
+
+        memset(ctxs, 0, sizeof(ctxs));
 
         /**
          * Validate if event is listed in capabilities
          */
         for (i = 0; i < (sizeof(event) * 8); i++) {
-                const enum pqos_mon_event evt_mask = (1 << i);
+                const enum pqos_mon_event evt_mask =
+                        (enum pqos_mon_event)(1 << i);
                 const struct pqos_monitor *ptr = NULL;
 
                 if (!(evt_mask & event))
@@ -966,8 +968,9 @@ hw_mon_start(const unsigned num_cores,
                         ctxs[num_ctxs].cluster = cluster;
 
                         ret = rmid_alloc(cluster,
-                                         event & (~(PQOS_PERF_EVENT_IPC |
-                                                    PQOS_PERF_EVENT_LLC_MISS)),
+                                         (enum pqos_mon_event)(event &
+                                         (~(PQOS_PERF_EVENT_IPC |
+                                         PQOS_PERF_EVENT_LLC_MISS))),
                                          &ctxs[num_ctxs].rmid);
                         if (ret != PQOS_RETVAL_OK) {
                                 retval = ret;

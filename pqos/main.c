@@ -111,7 +111,7 @@ static int sel_display_verbose = 0;
 /**
  * Selected library interface
  */
-int sel_interface = PQOS_INTER_MSR;
+enum pqos_interface sel_interface = PQOS_INTER_MSR;
 
 /**
  * @brief Function to check if a value is already contained in a table
@@ -614,7 +614,7 @@ static void print_help(const int is_long)
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
                m_cmd_name, m_cmd_name, m_cmd_name);
         if (is_long)
-                printf(help_printf_long);
+                printf("%s", help_printf_long);
 }
 
 static struct option long_cmd_opts[] = {

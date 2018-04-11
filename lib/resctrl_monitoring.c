@@ -628,7 +628,7 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
                 return ret;
         }
 
-        strncat(path, "/tasks", sizeof(path) - strlen(path));
+        strncat(path, "/tasks", sizeof(path) - strlen(path) - 1);
         fd = fopen(path, "w");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;

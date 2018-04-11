@@ -84,7 +84,7 @@ extern int alloc_pid_flag;
 /**
  * Selected library interface
  */
-extern int sel_interface;
+extern enum pqos_interface sel_interface;
 
 /**
  * @brief Converts string into 64-bit unsigned number.

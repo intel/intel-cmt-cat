@@ -348,7 +348,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
         mon->events[mon->num_events].type = (enum pqos_mon_event) event_type;
         mon->events[mon->num_events].max_rmid = max_rmid;
         mon->events[mon->num_events].scale_factor = scale_factor;
-        mon->events[mon->num_events].os_support = 0;
+        mon->events[mon->num_events].os_support = PQOS_OS_MON_UNSUPPORTED;
         mon->num_events++;
 }
 
@@ -714,8 +714,9 @@ discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap)
         struct cpuid_out res;
         int ret = PQOS_RETVAL_OK,
                 match_found = 0;
-        char brand_str[MAX_BRAND_STRING_LEN+1];
-        uint32_t *brand_u32 = (uint32_t *)brand_str;
+        uint32_t brand[MAX_BRAND_STRING_LEN / 4 + 1];
+        char *brand_str = (char *)brand;
+        uint32_t *brand_u32 = brand;
         unsigned i = 0;
 
         /**
@@ -731,7 +732,7 @@ discover_alloc_l3_brandstr(struct pqos_cap_l3ca *cap)
                 return PQOS_RETVAL_ERROR;
         }
 
-        memset(brand_str, 0, sizeof(brand_str));
+        memset(brand, 0, sizeof(brand));
 
         for (i = 0; i < CPUID_LEAF_BRAND_NUM; i++) {
                 lcpuid((unsigned)CPUID_LEAF_BRAND_START + i, 0, &res);
@@ -1990,12 +1991,14 @@ pqos_cap_get(const struct pqos_cap **cap,
 }
 
 void
-_pqos_cap_l3cdp_change(const int prev, const int next)
+_pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 {
         struct pqos_cap_l3ca *l3_cap = NULL;
         unsigned i;
 
+        ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF);
         ASSERT(m_cap != NULL);
+
         if (m_cap == NULL)
                 return;
 
@@ -2006,13 +2009,13 @@ _pqos_cap_l3cdp_change(const int prev, const int next)
         if (l3_cap == NULL)
                 return;
 
-        if (!prev && next) {
+        if (cdp == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp_on) {
                 /* turn on */
                 l3_cap->cdp_on = 1;
                 l3_cap->num_classes = l3_cap->num_classes / 2;
         }
 
-        if (prev && !next) {
+        if (cdp == PQOS_REQUIRE_CDP_OFF && l3_cap->cdp_on) {
                 /* turn off */
                 l3_cap->cdp_on = 0;
                 l3_cap->num_classes = l3_cap->num_classes * 2;
@@ -2020,12 +2023,14 @@ _pqos_cap_l3cdp_change(const int prev, const int next)
 }
 
 void
-_pqos_cap_l2cdp_change(const int cdp_on)
+_pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
 {
         struct pqos_cap_l2ca *l2_cap = NULL;
         unsigned i;
 
+        ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF);
         ASSERT(m_cap != NULL);
+
         if (m_cap == NULL)
                 return;
 
@@ -2036,14 +2041,13 @@ _pqos_cap_l2cdp_change(const int cdp_on)
         if (l2_cap == NULL)
                 return;
 
-        if (l2_cap->cdp_on == cdp_on)
-                return;
-
-        if (cdp_on) {
+        if (cdp == PQOS_REQUIRE_CDP_ON && !l2_cap->cdp_on) {
                 /* turn on */
                 l2_cap->cdp_on = 1;
                 l2_cap->num_classes = l2_cap->num_classes / 2;
-        } else {
+        }
+
+        if (cdp == PQOS_REQUIRE_CDP_OFF && l2_cap->cdp_on) {
                 /* turn off */
                 l2_cap->cdp_on = 0;
                 l2_cap->num_classes = l2_cap->num_classes * 2;

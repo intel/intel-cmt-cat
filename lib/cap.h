@@ -49,10 +49,9 @@ extern "C" {
  * Limited error checks done in this function and no errors reported.
  * It is up to caller to check for L3 CAT & CDP support.
  *
- * @param [in] prev old CDP setting
- * @param [in] next new CDP setting
+ * @param [in] cdp L3 cdp configuration
  */
-void _pqos_cap_l3cdp_change(const int prev, const int next);
+void _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
 
 /**
  * @brief Modifies L2 CAT capability structure upon CDP config change
@@ -60,9 +59,9 @@ void _pqos_cap_l3cdp_change(const int prev, const int next);
  * Limited error checks done in this function and no errors reported.
  * It is up to caller to check for L2 CAT & CDP support.
  *
- * @param [in] cdp_on new L2 CDP setting
+ * @param [in] cdp L2 cdp configuration
  */
-void _pqos_cap_l2cdp_change(const int cdp_on);
+void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 
 /**
  * @brief Aquires lock for PQoS API use
