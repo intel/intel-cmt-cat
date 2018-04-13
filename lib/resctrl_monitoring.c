@@ -38,7 +38,6 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <string.h>
-#include <malloc.h>
 #include <time.h>
 #include <errno.h>
 
