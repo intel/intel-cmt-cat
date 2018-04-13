@@ -232,6 +232,10 @@ os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
+        ret = resctrl_alloc_init(cpu, cap);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
         ret = os_alloc_prep();
 
         return ret;
@@ -248,28 +252,23 @@ os_alloc_fini(void)
 }
 
 int
-os_alloc_assoc_set(const unsigned lcore,
-                   const unsigned class_id)
+os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 {
 	int ret;
-	unsigned num_l2_cos = 0, num_l3_cos = 0;
-	struct resctrl_cpumask mask;
+	unsigned grps;
 
-	ASSERT(m_cpu != NULL);
-	ret = pqos_cpu_check_core(m_cpu, lcore);
-	if (ret != PQOS_RETVAL_OK)
-		return PQOS_RETVAL_PARAM;
-
+        ASSERT(m_cpu != NULL);
 	ASSERT(m_cap != NULL);
-	ret = pqos_l3ca_get_cos_num(m_cap, &num_l3_cos);
-	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-		return ret;
 
-	ret = pqos_l2ca_get_cos_num(m_cap, &num_l2_cos);
-	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-		return ret;
+        ret = pqos_cpu_check_core(m_cpu, lcore);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_PARAM;
 
-	if (class_id >= num_l3_cos && class_id >= num_l2_cos)
+        ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+	if (class_id >= grps)
 		/* class_id is out of bounds */
 		return PQOS_RETVAL_PARAM;
 
@@ -277,54 +276,31 @@ os_alloc_assoc_set(const unsigned lcore,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-	ret = resctrl_alloc_cpumask_read(class_id, &mask);
-	if (ret != PQOS_RETVAL_OK)
-		goto os_alloc_assoc_set_unlock;
+	ret = resctrl_alloc_assoc_set(lcore, class_id);
 
-	resctrl_cpumask_set(lcore, &mask);
-
-	ret = resctrl_alloc_cpumask_write(class_id, &mask);
-
- os_alloc_assoc_set_unlock:
         resctrl_lock_release();
 
 	return ret;
 }
 
 int
-os_alloc_assoc_get(const unsigned lcore,
-                   unsigned *class_id)
+os_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
-	int ret;
-	unsigned grps, i;
-	struct resctrl_cpumask mask;
+        int ret;
 
-	ASSERT(class_id != NULL);
-	ASSERT(m_cpu != NULL);
-	ret = pqos_cpu_check_core(m_cpu, lcore);
+        ASSERT(class_id != NULL);
+        ASSERT(m_cpu != NULL);
+
+        ret = pqos_cpu_check_core(m_cpu, lcore);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_PARAM;
-
-	ret = resctrl_alloc_get_grps_num(m_cap, &grps);
-	if (ret != PQOS_RETVAL_OK)
-		return ret;
 
         ret = resctrl_lock_shared();
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-	for (i = 0; i < grps; i++) {
-		ret = resctrl_alloc_cpumask_read(i, &mask);
-		if (ret != PQOS_RETVAL_OK)
-			goto os_alloc_assoc_get_unlock;
+        ret = resctrl_alloc_assoc_get(lcore, class_id);
 
-		if (resctrl_cpumask_get(lcore, &mask)) {
-			*class_id = i;
-                        goto os_alloc_assoc_get_unlock;
-		}
-	}
-
- os_alloc_assoc_get_unlock:
         resctrl_lock_release();
 
 	return ret;
@@ -1572,7 +1548,7 @@ os_alloc_assoc_set_pid(const pid_t task,
                 return ret;
 
         /* Write to tasks file */
-	ret = resctrl_alloc_task_write(class_id, task);
+	ret = resctrl_alloc_assoc_set_pid(task, class_id);
 
         resctrl_lock_release();
 
@@ -1592,7 +1568,7 @@ os_alloc_assoc_get_pid(const pid_t task,
                 return ret;
 
         /* Search tasks files */
-        ret = resctrl_alloc_task_search(class_id, m_cap, task);
+        ret = resctrl_alloc_assoc_get_pid(task, class_id);
 
         resctrl_lock_release();
 
