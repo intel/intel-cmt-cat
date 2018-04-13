@@ -47,6 +47,26 @@ extern "C" {
 #endif
 
 /**
+ * @brief Initializes resctrl allocation sub-module
+ *
+ * @param cpu cpu topology structure
+ * @param cap capabilities structure
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+int resctrl_alloc_init(const struct pqos_cpuinfo *cpu,
+	               const struct pqos_cap *cap);
+
+/**
+ * @brief Shuts down resctrl allocation sub-module for OS allocation
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+int resctrl_alloc_fini(void);
+
+/**
  * @brief Retrieves number of resctrl groups allowed
  *
  * @param [in] cap platform QoS capabilities structure
@@ -200,6 +220,54 @@ int resctrl_alloc_task_search(unsigned *class_id,
  * @return Operation status
  */
 int resctrl_alloc_task_file_check(const unsigned class_id, unsigned *found);
+
+
+/**
+ * @brief Resctrl interface to associate \a lcore
+ *        with given class of service
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ */
+int resctrl_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
+
+/**
+ * @brief Resctrl interface to read association
+ *        of \a lcore with class of service
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
+
+/**
+ * @brief Resctrl interface to associate \a task
+ *        with given class of service
+ *
+ * @param [in] task task id to be associated
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);
+
+/**
+ * @brief Resctrl interface to read association
+ *        of \a task with class of service
+ *
+ * @param [in] task task id to find association
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
 
 #ifdef __cplusplus
 }

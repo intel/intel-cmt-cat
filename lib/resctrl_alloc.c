@@ -41,12 +41,40 @@
 #include "types.h"
 #include "resctrl_alloc.h"
 
+/**
+ * ---------------------------------------
+ * Local data structures
+ * ---------------------------------------
+ */
+static const struct pqos_cap *m_cap = NULL;
+static const struct pqos_cpuinfo *m_cpu = NULL;
+
 /*
  * COS file names on resctrl file system
  */
 static const char *rctl_cpus = "cpus";
 static const char *rctl_schemata = "schemata";
 static const char *rctl_tasks = "tasks";
+
+int
+resctrl_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
+{
+        if (cpu == NULL || cap == NULL)
+		return PQOS_RETVAL_PARAM;
+
+	m_cap = cap;
+	m_cpu = cpu;
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_alloc_fini(void)
+{
+        m_cap = NULL;
+        m_cpu = NULL;
+        return PQOS_RETVAL_OK;
+}
 
 int
 resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num)
@@ -904,3 +932,61 @@ resctrl_alloc_task_file_check(const unsigned class_id, unsigned *found)
 	return PQOS_RETVAL_OK;
 }
 
+int
+resctrl_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
+{
+	int ret;
+	struct resctrl_cpumask mask;
+
+	ret = resctrl_alloc_cpumask_read(class_id, &mask);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	resctrl_cpumask_set(lcore, &mask);
+
+	ret = resctrl_alloc_cpumask_write(class_id, &mask);
+
+	return ret;
+}
+
+int
+resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
+{
+	int ret;
+	unsigned grps;
+	unsigned i;
+	struct resctrl_cpumask mask;
+
+	ASSERT(m_cap != NULL);
+
+	ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+	if (ret != PQOS_RETVAL_OK)
+		return ret;
+
+	for (i = 0; i < grps; i++) {
+		ret = resctrl_alloc_cpumask_read(i, &mask);
+		if (ret != PQOS_RETVAL_OK)
+			return ret;
+
+		if (resctrl_cpumask_get(lcore, &mask)) {
+			*class_id = i;
+                        return PQOS_RETVAL_OK;
+		}
+	}
+
+	return ret;
+}
+
+int
+resctrl_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
+{
+	/* Write to tasks file */
+	return resctrl_alloc_task_write(class_id, task);
+}
+
+int
+resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id)
+{
+	/* Search tasks files */
+	return resctrl_alloc_task_search(class_id, m_cap, task);
+}
