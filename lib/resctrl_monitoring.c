@@ -615,10 +615,6 @@ resctrl_mon_start(struct pqos_mon_data *group)
         ASSERT(group->tid_nr == 0 || group->tid_map != NULL);
         ASSERT(group->num_cores == 0 || group->cores != NULL);
 
-        ret = resctrl_lock_exclusive();
-        if (ret != PQOS_RETVAL_OK)
-                goto resctrl_mon_start_exit;
-
         /**
          * Create new monitoring gorup
          */
@@ -661,8 +657,6 @@ resctrl_mon_start(struct pqos_mon_data *group)
         group->resctrl_group = resctrl_group;
 
  resctrl_mon_start_exit:
-        resctrl_lock_release();
-
         if (ret != PQOS_RETVAL_OK && group->resctrl_group != resctrl_group)
                 free(resctrl_group);
 
@@ -690,10 +684,6 @@ resctrl_mon_stop(struct pqos_mon_data *group)
         ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-
-        ret = resctrl_lock_exclusive();
-        if (ret != PQOS_RETVAL_OK)
-                goto resctrl_mon_stop_exit;
 
         if (group->resctrl_group != NULL) {
                 cos = 0;
@@ -731,8 +721,6 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 return PQOS_RETVAL_PARAM;
 
  resctrl_mon_stop_exit:
-        resctrl_lock_release();
-
         return ret;
 }
 

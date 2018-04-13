@@ -43,6 +43,7 @@
 #include "types.h"
 #include "os_monitoring.h"
 #include "perf_monitoring.h"
+#include "resctrl.h"
 #include "resctrl_monitoring.h"
 
 /**
@@ -111,11 +112,18 @@ stop_events(struct pqos_mon_data *group)
         }
 
         if (group->resctrl_event) {
+                ret = resctrl_lock_exclusive();
+                if (ret != PQOS_RETVAL_OK)
+                        goto stop_event_error;
+
                 ret = resctrl_mon_stop(group);
                 if (ret == PQOS_RETVAL_OK)
                         stopped_evts |= group->resctrl_event;
+
+                resctrl_lock_release();
         }
 
+ stop_event_error:
         if ((stopped_evts & PQOS_MON_EVENT_LMEM_BW) &&
                 (stopped_evts & PQOS_MON_EVENT_TMEM_BW))
                 stopped_evts |= PQOS_MON_EVENT_RMEM_BW;
@@ -214,7 +222,12 @@ start_events(struct pqos_mon_data *group)
         started_evts |= group->perf_event;
 
         if (group->resctrl_event != 0) {
+                ret = resctrl_lock_exclusive();
+                if (ret != PQOS_RETVAL_OK)
+                        goto start_event_error;
+
                 ret = resctrl_mon_start(group);
+                resctrl_lock_release();
                 if (ret != PQOS_RETVAL_OK)
                         goto start_event_error;
         }
@@ -261,7 +274,13 @@ start_events(struct pqos_mon_data *group)
 static int
 poll_events(struct pqos_mon_data *group) {
         unsigned i;
-        int ret;
+        int ret = PQOS_RETVAL_OK;
+
+        if (group->resctrl_event != 0) {
+                ret = resctrl_lock_shared();
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
 
         for (i = 0; i < DIM(os_mon_event); i++) {
                 enum pqos_mon_event evt = os_mon_event[i];
@@ -272,7 +291,7 @@ poll_events(struct pqos_mon_data *group) {
                 if (group->perf_event & evt) {
                         ret = perf_mon_poll(group, evt);
                         if (ret != PQOS_RETVAL_OK)
-                                return ret;
+                                goto poll_events_exit;
                 }
 
                 /**
@@ -281,7 +300,7 @@ poll_events(struct pqos_mon_data *group) {
                 if (group->resctrl_event & evt) {
                         ret = resctrl_mon_poll(group, evt);
                         if (ret != PQOS_RETVAL_OK)
-                                return ret;
+                                goto poll_events_exit;
                 }
         }
 
@@ -305,7 +324,11 @@ poll_events(struct pqos_mon_data *group) {
                         group->values.ipc = 0;
         }
 
-        return PQOS_RETVAL_OK;
+ poll_events_exit:
+        if (group->resctrl_event != 0)
+                resctrl_lock_release();
+
+        return ret;
 }
 
 int
