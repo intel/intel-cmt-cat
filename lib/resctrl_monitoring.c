@@ -47,8 +47,6 @@
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
 #include "resctrl_alloc.h"
-#include "os_allocation.h"
-
 
 #define RESCTRL_PATH_INFO_L3_MON RESCTRL_PATH_INFO"/L3_MON"
 
@@ -222,9 +220,9 @@ alloc_assoc_get(const unsigned lcore, unsigned *class_id)
                 return PQOS_RETVAL_OK;
         }
 
-        ret = os_alloc_assoc_get(lcore, class_id);
+        ret = resctrl_alloc_assoc_get(lcore, class_id);
         if (ret != PQOS_RETVAL_OK)
-                LOG_ERROR("Failed to retrieve core %u assotiation\n", lcore);
+                LOG_ERROR("Failed to retrieve core %u association\n", lcore);
 
         return ret;
 }
@@ -255,9 +253,9 @@ alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
                 return PQOS_RETVAL_OK;
         }
 
-        ret = os_alloc_assoc_get_pid(tid, class_id);
+        ret = resctrl_alloc_assoc_get_pid(tid, class_id);
         if (ret != PQOS_RETVAL_OK)
-                LOG_ERROR("Failed to retrieve task %d assotiation\n", tid);
+                LOG_ERROR("Failed to retrieve task %d association\n", tid);
 
         return ret;
 }
@@ -280,19 +278,23 @@ resctrl_mon_group_path(const unsigned class_id,
 {
         ASSERT(buf != NULL);
 
+        /* Group name not set - get path to mon_groups directory */
         if (resctrl_group == NULL) {
                 if (class_id == 0)
                         snprintf(buf, buf_size, RESCTRL_PATH"/mon_groups");
                 else
                         snprintf(buf, buf_size, RESCTRL_PATH"/COS%u/mon_groups",
                                  class_id);
+        /* mon group for COS 0 */
         } else if (class_id == 0)
                 snprintf(buf, buf_size, RESCTRL_PATH"/mon_groups/%s",
                          resctrl_group);
+        /* mon group for the other classes */
         else
                 snprintf(buf, buf_size, RESCTRL_PATH"/COS%u/mon_groups/%s",
                          class_id, resctrl_group);
 
+        /* Append file name */
         if (file != NULL)
                 strncat(buf, file, buf_size - strlen(buf));
 }
