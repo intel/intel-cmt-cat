@@ -47,8 +47,7 @@
 
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
-static int shared = 0;
-static int exclusive = 0;
+
 /**
  * @brief Handle SIGALRM
  */
@@ -116,42 +115,18 @@ resctrl_lock(const int type)
 int
 resctrl_lock_shared(void)
 {
-	int ret = PQOS_RETVAL_OK;
-
-	if (exclusive == 0 && shared == 0)
-		ret = resctrl_lock(LOCK_SH);
-
-	if (ret == PQOS_RETVAL_OK)
-		shared++;
-
-	return ret;
+	return resctrl_lock(LOCK_SH);
 }
 
 int
 resctrl_lock_exclusive(void)
 {
-	int ret = PQOS_RETVAL_OK;
-
-	if (exclusive == 0)
-		ret = resctrl_lock(LOCK_EX);
-
-	if (ret == PQOS_RETVAL_OK)
-		exclusive++;
-
-	return ret;
+	return resctrl_lock(LOCK_EX);
 }
 
 int
 resctrl_lock_release(void)
 {
-	if (shared > 0)
-		shared--;
-	else if (exclusive > 0)
-		exclusive--;
-
-	if (shared > 0 || exclusive > 0)
-		return PQOS_RETVAL_OK;
-
 	if (resctrl_lock_fd < 0) {
 		LOG_ERROR("Resctrl filesystem not locked\n");
 		return PQOS_RETVAL_ERROR;
