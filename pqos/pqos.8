@@ -172,13 +172,26 @@ or select the process ids and events to monitor, EVTPIDS format is "EVENT:PID_LI
 .br
 See \-m option for valid EVENT settings. PID_LIST is comma separated list of process ids.
 .br
-Examples "-p llc:22,25673" or "-p all:892,4588-4592".
+Examples:
+.RS
+.RS
+"-p llc:22,25673"
 .br
+"-p all:892,4588-4592"
+.RE
+.PP
+Process' IDs can be grouped by enclosing them in square brackets.
+.br
+Examples:
+.RS
+"-p llc:[22,25673]"
+.br
+"-p all:892,[4588-4592]"
+.RE
+.PP
 Note:
 .RS
-.RS
-.br
-Requires Linux and kernel versions 4.1 and newer.
+Requires Linux and kernel versions 4.10 and newer.
 .br
 The \-I option must be used for PID monitoring.
 .br
