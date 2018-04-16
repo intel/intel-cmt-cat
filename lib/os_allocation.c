@@ -256,9 +256,11 @@ os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 {
 	int ret;
 	unsigned grps;
+        int ret_mon;
+        char mon_group[256];
 
         ASSERT(m_cpu != NULL);
-	ASSERT(m_cap != NULL);
+        ASSERT(m_cap != NULL);
 
         ret = pqos_cpu_check_core(m_cpu, lcore);
         if (ret != PQOS_RETVAL_OK)
@@ -276,8 +278,28 @@ os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-	ret = resctrl_alloc_assoc_set(lcore, class_id);
+        /*
+         * When core is moved to different COS we need to update monitoring
+         * groups. Obtain monitoring group name
+         */
+        ret_mon = resctrl_mon_assoc_get(lcore, mon_group, sizeof(mon_group));
+        if (ret_mon != PQOS_RETVAL_OK && ret_mon != PQOS_RETVAL_RESOURCE)
+                LOG_WARN("Failed to obtain monitoring group assigment for "
+                         "core %u\n", lcore);
 
+        ret = resctrl_alloc_assoc_set(lcore, class_id);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_alloc_assoc_set_exit;
+
+        /* Core monitoring was started assign it back to monitoring group */
+        if (ret_mon == PQOS_RETVAL_OK) {
+                ret_mon = resctrl_mon_assoc_set(lcore, mon_group);
+                if (ret_mon != PQOS_RETVAL_OK)
+                        LOG_WARN("Could not assign core %d back to monitoring "
+                                 "group\n", lcore);
+        }
+
+ os_alloc_assoc_set_exit:
         resctrl_lock_release();
 
 	return ret;
@@ -1540,6 +1562,8 @@ os_alloc_assoc_set_pid(const pid_t task,
 {
         int ret;
 	unsigned max_cos = 0;
+        int ret_mon;
+        char mon_group[256];
 
         ASSERT(m_cap != NULL);
 
@@ -1557,9 +1581,29 @@ os_alloc_assoc_set_pid(const pid_t task,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        /* Write to tasks file */
-	ret = resctrl_alloc_assoc_set_pid(task, class_id);
+        /*
+         * When task is moved to different COS we need to update monitoring
+         * groups. Obtain monitoring group name
+         */
+        ret_mon = resctrl_mon_assoc_get_pid(task, mon_group, sizeof(mon_group));
+        if (ret_mon != PQOS_RETVAL_OK && ret_mon != PQOS_RETVAL_RESOURCE)
+                LOG_WARN("Failed to obtain monitoring group assigment for "
+                         "task %d\n", task);
 
+        /* Write to tasks file */
+        ret = resctrl_alloc_assoc_set_pid(task, class_id);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_alloc_assoc_set_pid_exit;
+
+        /* Task monitoring was started assign it back to monitoring group */
+        if (ret_mon == PQOS_RETVAL_OK) {
+                ret_mon = resctrl_mon_assoc_set_pid(task, mon_group);
+                if (ret_mon != PQOS_RETVAL_OK)
+                        LOG_WARN("Could not assign task %d back to monitoring "
+                                 "group\n", task);
+        }
+
+ os_alloc_assoc_set_pid_exit:
         resctrl_lock_release();
 
         return ret;
