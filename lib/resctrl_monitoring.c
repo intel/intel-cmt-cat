@@ -281,9 +281,9 @@ resctrl_mon_group_path(const unsigned class_id,
         /* Group name not set - get path to mon_groups directory */
         if (resctrl_group == NULL) {
                 if (class_id == 0)
-                        snprintf(buf, buf_size, RESCTRL_PATH"/mon_groups");
+                        snprintf(buf, buf_size, RESCTRL_PATH);
                 else
-                        snprintf(buf, buf_size, RESCTRL_PATH"/COS%u/mon_groups",
+                        snprintf(buf, buf_size, RESCTRL_PATH"/COS%u",
                                  class_id);
         /* mon group for COS 0 */
         } else if (class_id == 0)
@@ -429,7 +429,7 @@ resctrl_mon_assoc_get(const unsigned lcore,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        resctrl_mon_group_path(class_id, NULL, NULL, dir, sizeof(dir));
+        resctrl_mon_group_path(class_id, "", NULL, dir, sizeof(dir));
         num_groups = scandir(dir, &namelist, filter, NULL);
         if (num_groups < 0) {
                 LOG_ERROR("Failed to read monitoring groups for COS %u\n",
@@ -515,7 +515,7 @@ resctrl_mon_assoc_get_pid(const pid_t task,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        resctrl_mon_group_path(class_id, NULL, NULL, dir, sizeof(dir));
+        resctrl_mon_group_path(class_id, "", NULL, dir, sizeof(dir));
         num_groups = scandir(dir, &namelist, filter, NULL);
         if (num_groups < 0) {
                 LOG_ERROR("Failed to read monitoring groups for COS %u\n",
@@ -699,9 +699,7 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                                           "monitoring group\n");
                                 goto resctrl_mon_stop_exit;
                         }
-
-                        cos++;
-                } while (cos < max_cos);
+                } while (++cos < max_cos);
 
                 free(group->resctrl_group);
                 group->resctrl_group = NULL;
@@ -711,8 +709,9 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                  * Add pids to the default group
                  */
                 for (i = 0; i < group->tid_nr; i++) {
-                        ret = resctrl_mon_assoc_set_pid(group->tid_map[i],
-                                                        NULL);
+                        const pid_t tid = group->tid_map[i];
+
+                        ret = resctrl_mon_assoc_set_pid(tid, NULL);
                         if (ret != PQOS_RETVAL_OK)
                                 goto resctrl_mon_stop_exit;
                 }
