@@ -641,7 +641,17 @@ os_alloc_reset_tasks(void)
 		pid = atoi(pids_list[pid_idx]->d_name);
 		alloc_result = os_alloc_assoc_set_pid(pid, cos0);
 		if (alloc_result != PQOS_RETVAL_OK) {
-			LOG_ERROR("Error allocating task %lu to COS%u\n",
+                        struct stat st;
+                        char path[128];
+
+                        snprintf(path, sizeof(path), "/proc/%d", pid);
+                        if (stat(path, &st) != 0) {
+                                LOG_DEBUG("Task %d no longer exists\n", pid);
+                                alloc_result = PQOS_RETVAL_OK;
+                                continue;
+                        }
+
+			LOG_ERROR("Error allocating task %d to COS%u\n",
 				   pid, cos0);
 			return alloc_result;
 		}
