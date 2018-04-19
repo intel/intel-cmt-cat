@@ -687,7 +687,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         for (i = 0; i < cap_mon->u.mon->num_events; i++) {
                 struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
 
-                all_core_evts |= mon->type;
+                if (sel_interface == PQOS_INTER_MSR || mon->os_support)
+                        all_core_evts |= mon->type;
                 if (mon->os_support)
                         all_pid_evts |= mon->type;
         }
