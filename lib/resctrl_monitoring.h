@@ -99,6 +99,15 @@ int resctrl_mon_poll(struct pqos_mon_data *group,
                      const enum pqos_mon_event event);
 
 /**
+ * @brief Reset of resctrl monitoring
+ *
+ * @return Operations status
+ * @return PQOS_RETVAL_RESOURCE when resctrl monitoring is not supported
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_mon_reset(void);
+
+/**
  * @brief Check if event is supported by resctrl
  *
  * @param event PQoS event to check

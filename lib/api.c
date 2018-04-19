@@ -833,8 +833,12 @@ pqos_mon_reset(void)
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_reset();
         else {
+#ifdef __linux__
+                ret = os_mon_reset();
+#else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
+#endif
         }
 
         _pqos_api_unlock();

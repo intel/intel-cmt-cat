@@ -61,6 +61,14 @@ int os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
  */
 int os_mon_fini(void);
 
+/**
+ * @brief OS interface to reset monitoring
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int os_mon_reset(void);
+
 /*
  * @brief This function stops all perf counters
  *

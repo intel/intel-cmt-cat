@@ -365,6 +365,11 @@ os_mon_fini(void)
 }
 
 int
+os_mon_reset(void) {
+        return resctrl_mon_reset();
+}
+
+int
 os_mon_stop(struct pqos_mon_data *group)
 {
         int ret;

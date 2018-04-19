@@ -908,6 +908,53 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
 }
 
 int
+resctrl_mon_reset(void)
+{
+        int ret;
+        unsigned grps;
+        int num_groups;
+        unsigned cos = 0;
+
+        if (supported_events == 0)
+                return PQOS_RETVAL_RESOURCE;
+
+        ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        do {
+                struct dirent **namelist = NULL;
+                char dir[256];
+                int i;
+
+                resctrl_mon_group_path(cos, "", NULL, dir, sizeof(dir));
+                num_groups = scandir(dir, &namelist, filter, NULL);
+                if (num_groups < 0) {
+                        LOG_ERROR("Failed to read monitoring groups for "
+                                  "COS %u\n", cos);
+                        return PQOS_RETVAL_ERROR;
+                }
+
+                for (i = 0; i < num_groups; i++) {
+                        char path[256];
+
+                        resctrl_mon_group_path(cos, namelist[i]->d_name, NULL,
+                                               path, sizeof(path));
+
+                        ret = resctrl_mon_rmdir(path);
+                        if (ret != PQOS_RETVAL_OK) {
+                                free(namelist);
+                                return ret;
+                        }
+                }
+
+                free(namelist);
+        } while (++cos < grps);
+
+        return ret;
+}
+
+int
 resctrl_mon_is_event_supported(const enum pqos_mon_event event)
 {
         return (supported_events & event) == event;
