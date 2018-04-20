@@ -60,6 +60,8 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 
 static int supported_events = 0;
 
+static unsigned resctrl_mon_counter = 0;
+
 /**
  * @brief Filter directory filenames
  *
@@ -619,9 +621,8 @@ resctrl_mon_start(struct pqos_mon_data *group)
          * Create new monitoring gorup
          */
         if (group->resctrl_group == NULL) {
-                snprintf(buf, sizeof(buf), "%s-%p-%ld",
-                        group->num_pids > 0 ? "pid" : "core", group,
-                        (long int) time(NULL));
+                snprintf(buf, sizeof(buf), "%d-%u",
+                        (int)getpid(), resctrl_mon_counter++);
 
                 resctrl_group = strdup(buf);
                 if (resctrl_group == NULL) {
