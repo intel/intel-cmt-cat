@@ -98,6 +98,7 @@ PREFIX ?= /usr/local
 LIB_INSTALL_DIR ?= $(PREFIX)/lib
 HDR_DIR ?= $(PREFIX)/include
 DEPFILE = $(LIB).dep
+NOLDCONFIG ?= n
 
 all: $(LIBNAME)
 
@@ -127,13 +128,17 @@ ifeq ($(SHARED),y)
 	cd $(LIB_INSTALL_DIR); \
 		ln -f -s $(LIB).so.$(VERSION) $(LIB).so.$(SO_VERSION); \
 		ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
+ifneq ($(NOLDCONFIG),y)
 	ldconfig
+endif
 endif
 
 uninstall:
 	-rm $(LIB_INSTALL_DIR)/libpqos*
 ifeq ($(SHARED),y)
+ifneq ($(NOLDCONFIG),y)
 	ldconfig
+endif
 endif
 
 DEPFILES = $(SRCS:.c=.d)
