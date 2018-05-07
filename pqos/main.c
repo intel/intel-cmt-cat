@@ -871,7 +871,14 @@ int main(int argc, char **argv)
         }
 
         if (sel_mon_reset && cap_mon != NULL) {
-                if (pqos_mon_reset() != PQOS_RETVAL_OK) {
+                ret = pqos_mon_reset();
+                if (sel_interface != PQOS_INTER_MSR &&
+                    ret == PQOS_RETVAL_RESOURCE) {
+                        exit_val = EXIT_FAILURE;
+                        printf("Monitoring cannot be reset on systems "
+                               "without resctrl monitoring capability. "
+                               "Required kernel version 4.14 or newer.\n");
+                } else if (ret != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("CMT/MBM reset failed!\n");
                 } else {
