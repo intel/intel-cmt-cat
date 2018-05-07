@@ -373,6 +373,165 @@ resctrl_mon_cpumask_read(const unsigned class_id,
 }
 
 /**
+ * @brief Read counter value
+ *
+ * @param [in] class_id COS id
+ * @param [in] resctrl_group mon group name
+ * @param [in] event resctrl mon event
+ * @param [out] value counter value
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_read_counters(const unsigned class_id,
+                 const char *resctrl_group,
+                 const enum pqos_mon_event event,
+                 uint64_t *value)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned *sockets = NULL;
+        unsigned sockets_num;
+        unsigned socket;
+        char buf[128];
+        const char *name;
+
+        ASSERT(resctrl_group != NULL);
+        ASSERT(value != NULL);
+
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                name = "llc_occupancy";
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
+                name = "mbm_local_bytes";
+                break;
+        case PQOS_MON_EVENT_TMEM_BW:
+                name = "mbm_total_bytes";
+                break;
+        default:
+                LOG_ERROR("Unknown resctrl event\n");
+                return PQOS_RETVAL_PARAM;
+                break;
+        }
+
+        *value = 0;
+
+        resctrl_mon_group_path(class_id, resctrl_group, NULL, buf, sizeof(buf));
+
+        sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+        if (sockets == NULL) {
+                ret = PQOS_RETVAL_ERROR;
+                goto resctrl_mon_read_exit;
+        }
+
+        for (socket = 0; socket < sockets_num; socket++) {
+                char path[128];
+                FILE *fd;
+                unsigned long long counter;
+
+                snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf,
+                         sockets[socket], name);
+                fd = fopen(path, "r");
+                if (fd == NULL) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto resctrl_mon_read_exit;
+                }
+                if (fscanf(fd, "%llu", &counter) == 1)
+                        *value += counter;
+                fclose(fd);
+        }
+
+ resctrl_mon_read_exit:
+        if (sockets != NULL)
+                free(sockets);
+
+        return ret;
+}
+
+/**
+ * @brief Check if mon group is empty (no cores/tasks assigned)
+ *
+ * @param [in] class_id COS id
+ * @param [in] resctrl_group mon group name
+ * @param [out] empty 1 when group is empty
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_empty(const unsigned class_id,
+                  const char *resctrl_group,
+                  int *empty)
+{
+        int ret;
+        FILE *fd;
+        char path[128];
+        char buf[128];
+        struct resctrl_cpumask mask;
+        unsigned i;
+        unsigned max_threshold_occupancy;
+        uint64_t value;
+
+        ASSERT(resctrl_group != NULL);
+        ASSERT(empty != NULL);
+
+        *empty = 1;
+
+        /*
+         * Some cores are assigned to group?
+         */
+        ret = resctrl_mon_cpumask_read(class_id, resctrl_group, &mask);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        for (i = 0; i < sizeof(mask.tab); i++)
+                if (mask.tab[i] > 0) {
+                        *empty = 0;
+                        return PQOS_RETVAL_OK;
+                }
+
+        /*
+         *Some tasks are assigned to group?
+         */
+        resctrl_mon_group_path(class_id, resctrl_group, "/tasks", path,
+                               sizeof(path));
+        fd = fopen(path, "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        /* Search tasks file for any task ID */
+        memset(buf, 0, sizeof(buf));
+        if (fgets(buf, sizeof(buf), fd) != NULL) {
+                *empty = 0;
+                fclose(fd);
+                return PQOS_RETVAL_OK;
+        }
+        fclose(fd);
+
+        /*
+         * Check if llc occupancy is lower than max_occupancy_threshold
+         */
+        if ((supported_events & PQOS_MON_EVENT_L3_OCCUP) == 0)
+                return PQOS_RETVAL_OK;
+
+        ret = resctrl_mon_read_counters(class_id, resctrl_group,
+                                        PQOS_MON_EVENT_L3_OCCUP, &value);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        fd = fopen(RESCTRL_PATH"/info/L3_MON/max_threshold_occupancy", "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        if (fscanf(fd, "%u", &max_threshold_occupancy) != 1)
+                ret = PQOS_RETVAL_ERROR;
+        else if (value > max_threshold_occupancy)
+                *empty = 0;
+        fclose(fd);
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Create directory if not exists
  *
  * @param[in] path directory path
@@ -659,7 +818,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
         /**
          * Create new monitoring gorup
          */
-        if (group->resctrl_group == NULL) {
+        if (group->resctrl_mon_group == NULL) {
                 snprintf(buf, sizeof(buf), "%d-%u",
                         (int)getpid(), resctrl_mon_counter++);
 
@@ -673,7 +832,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
          * Reuse group
          */
         } else
-                resctrl_group = group->resctrl_group;
+                resctrl_group = group->resctrl_mon_group;
 
         /**
          * Add pids to the resctrl group
@@ -694,10 +853,10 @@ resctrl_mon_start(struct pqos_mon_data *group)
                         goto resctrl_mon_start_exit;
         }
 
-        group->resctrl_group = resctrl_group;
+        group->resctrl_mon_group = resctrl_group;
 
  resctrl_mon_start_exit:
-        if (ret != PQOS_RETVAL_OK && group->resctrl_group != resctrl_group)
+        if (ret != PQOS_RETVAL_OK && group->resctrl_mon_group != resctrl_group)
                 free(resctrl_group);
 
         return ret;
@@ -725,13 +884,13 @@ resctrl_mon_stop(struct pqos_mon_data *group)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        if (group->resctrl_group != NULL) {
+        if (group->resctrl_mon_group != NULL) {
                 cos = 0;
                 do {
                         char buf[128];
 
-                        resctrl_mon_group_path(cos, group->resctrl_group, NULL,
-                                               buf, sizeof(buf));
+                        resctrl_mon_group_path(cos, group->resctrl_mon_group,
+                                               NULL, buf, sizeof(buf));
 
                         ret = resctrl_mon_rmdir(buf);
                         if (ret != PQOS_RETVAL_OK) {
@@ -741,8 +900,8 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                         }
                 } while (++cos < max_cos);
 
-                free(group->resctrl_group);
-                group->resctrl_group = NULL;
+                free(group->resctrl_mon_group);
+                group->resctrl_mon_group = NULL;
 
         } else if (group->num_pids > 0) {
                 /**
@@ -781,6 +940,82 @@ get_delta(const uint64_t old_value, const uint64_t new_value)
 }
 
 /**
+ * @brief This function removes all empty monitoring
+ *        groups associated with \a group
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+static int
+resctrl_mon_purge(struct pqos_mon_data *group)
+{
+        unsigned max_cos;
+        unsigned cos;
+        int ret;
+
+        ASSERT(group != NULL);
+        ASSERT(m_cap != NULL);
+
+        ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        cos = 0;
+        do {
+                int empty;
+                struct stat st;
+                uint64_t value;
+                char buf[128];
+
+                resctrl_mon_group_path(cos, group->resctrl_mon_group, NULL, buf,
+                                       sizeof(buf));
+                if (stat(buf, &st) != 0)
+                        continue;
+
+                ret = resctrl_mon_empty(cos, group->resctrl_mon_group, &empty);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                if (!empty)
+                        continue;
+
+                /* store counter values */
+                if (supported_events & PQOS_MON_EVENT_LMEM_BW) {
+                        ret = resctrl_mon_read_counters(cos,
+                                group->resctrl_mon_group,
+                                PQOS_MON_EVENT_LMEM_BW, &value);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+                        group->resctrl_values_storage.mbm_local += value;
+                }
+                if (supported_events & PQOS_MON_EVENT_TMEM_BW) {
+                        ret = resctrl_mon_read_counters(cos,
+                                group->resctrl_mon_group,
+                                PQOS_MON_EVENT_TMEM_BW, &value);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+
+                        group->resctrl_values_storage.mbm_total += value;
+                }
+
+                ret = resctrl_mon_rmdir(buf);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_WARN("Failed to remove empty mon group %s: %m\n",
+                                 buf);
+                        return ret;
+                }
+
+                LOG_INFO("Deleted empty mon group %s\n", buf);
+
+        } while (++cos < max_cos);
+
+        return ret;
+}
+
+/**
  * @brief This function polls all resctrl counters
  *
  * Reads counters for all events and stores values
@@ -795,44 +1030,18 @@ int
 resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
 {
         int ret;
-        const char *name;
         uint64_t value = 0;
         unsigned max_cos;
-        unsigned *sockets = NULL;
-        unsigned sockets_num;
-        unsigned cos, sock;
+        unsigned cos;
         unsigned i;
         uint64_t old_value;
 
         ASSERT(group != NULL);
         ASSERT(m_cap != NULL);
-        ASSERT(m_cpu != NULL);
-
-        switch (event) {
-        case PQOS_MON_EVENT_L3_OCCUP:
-                name = "llc_occupancy";
-                break;
-        case PQOS_MON_EVENT_LMEM_BW:
-                name = "mbm_local_bytes";
-                break;
-        case PQOS_MON_EVENT_TMEM_BW:
-                name = "mbm_total_bytes";
-                break;
-        default:
-                LOG_ERROR("Unknown resctrl event\n");
-                return PQOS_RETVAL_PARAM;
-                break;
-        }
 
         ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-
-        sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
-        if (sockets == NULL || sockets_num == 0) {
-                ret = PQOS_RETVAL_ERROR;
-                goto resctrl_mon_poll_exit;
-        }
 
         /*
          * When core COS assoc changes then kernel resets monitoring group
@@ -840,43 +1049,31 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
          */
         for (i = 0; i < group->num_cores; i++) {
                 ret = resctrl_mon_assoc_restore(group->cores[i],
-                                                group->resctrl_group);
+                                                group->resctrl_mon_group);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_poll_exit;
         }
 
-        /**
-         * Read counters for each COS group and socket
-         */
+        /* Search COSes for given resctrl mon group */
         cos = 0;
         do {
-                char buf[128];
+                uint64_t val;
                 struct stat st;
+                char buf[128];
 
-                resctrl_mon_group_path(cos, group->resctrl_group, NULL, buf,
+                resctrl_mon_group_path(cos, group->resctrl_mon_group, NULL, buf,
                                        sizeof(buf));
-                cos++;
                 if (stat(buf, &st) != 0)
                         continue;
 
-                for (sock = 0; sock < sockets_num; sock++) {
-                        char path[128];
-                        FILE *fd;
-                        unsigned long long counter;
+                ret = resctrl_mon_read_counters(cos, group->resctrl_mon_group,
+                                event, &val);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_poll_exit;
 
-                        snprintf(path, sizeof(path),
-                                 "%s/mon_data/mon_L3_%02u/%s", buf, sock, name);
-                        fd = fopen(path, "r");
-                        if (fd == NULL) {
-                                ret = PQOS_RETVAL_ERROR;
-                                goto resctrl_mon_poll_exit;
-                        }
-                        if (fscanf(fd, "%llu", &counter) == 1)
-                                value += counter;
-                        fclose(fd);
-                }
+                value += val;
 
-        } while (cos < max_cos);
+        } while (++cos < max_cos);
 
         /**
          * Set value
@@ -887,13 +1084,15 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                 break;
         case PQOS_MON_EVENT_LMEM_BW:
                 old_value = group->values.mbm_local;
-                group->values.mbm_local = value;
+                group->values.mbm_local =
+                        value + group->resctrl_values_storage.mbm_local;
                 group->values.mbm_local_delta =
                         get_delta(old_value, group->values.mbm_local);
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
                 old_value = group->values.mbm_total;
-                group->values.mbm_total = value;
+                group->values.mbm_total =
+                        value + group->resctrl_values_storage.mbm_total;
                 group->values.mbm_total_delta =
                         get_delta(old_value, group->values.mbm_total);
                 break;
@@ -901,9 +1100,15 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                 return PQOS_RETVAL_ERROR;
         }
 
- resctrl_mon_poll_exit:
-        free(sockets);
+        /*
+         * If this group is empty, save the values for
+         * next poll and clear the group.
+         */
+        ret = resctrl_mon_purge(group);
+        if (ret != PQOS_RETVAL_OK)
+                goto resctrl_mon_poll_exit;
 
+ resctrl_mon_poll_exit:
         return ret;
 }
 

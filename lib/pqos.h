@@ -437,7 +437,11 @@ struct pqos_mon_data {
          * Resctrl specific section
          */
         enum pqos_mon_event resctrl_event;
-        char *resctrl_group;
+        char *resctrl_mon_group;
+        struct pqos_event_values resctrl_values_storage; /**< stores values
+                                                         of monitoring group
+                                                         that was moved to
+                                                         another COS */
 
         /**
          * Core specific section

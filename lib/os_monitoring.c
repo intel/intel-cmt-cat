@@ -746,9 +746,9 @@ os_mon_add_pids(const unsigned num_pids,
         added.tid_map = tid_map;
         added.event = group->event;
         added.num_pids = num_pids;
-        if (group->resctrl_group != NULL) {
-                added.resctrl_group = strdup(group->resctrl_group);
-                if (added.resctrl_group == NULL) {
+        if (group->resctrl_mon_group != NULL) {
+                added.resctrl_mon_group = strdup(group->resctrl_mon_group);
+                if (added.resctrl_mon_group == NULL) {
                         ret = PQOS_RETVAL_RESOURCE;
                         goto os_mon_add_pids_exit;
                 }
@@ -796,9 +796,9 @@ os_mon_add_pids(const unsigned num_pids,
         }
 
  os_mon_add_pids_exit:
-        if (added.resctrl_group != NULL) {
-                free(added.resctrl_group);
-                added.resctrl_group = NULL;
+        if (added.resctrl_mon_group != NULL) {
+                free(added.resctrl_mon_group);
+                added.resctrl_mon_group = NULL;
         }
         if (ret == PQOS_RETVAL_RESOURCE) {
                 LOG_ERROR("Memory allocation error!\n");
