@@ -756,12 +756,24 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                          * attempt to use the same core id.
                          */
                         if (ret != PQOS_RETVAL_OK) {
+                                unsigned j;
+
                                 if (ret == PQOS_RETVAL_PERF_CTR)
                                         printf("Use -r option to start "
                                                "monitoring anyway.\n");
                                 printf("Monitoring start error on core(s) "
                                        "%s, status %d\n",
                                        cg->desc, ret);
+
+                                /**
+                                 * Stop mon groups that are already started
+                                 */
+                                for (j = 0; j < i; j++) {
+                                        struct core_group *cg =
+                                                &sel_monitor_core_tab[j];
+
+                                        pqos_mon_stop(cg->pgrp);
+                                }
                                 return -1;
                         }
                 }
@@ -792,9 +804,21 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                          * Any problem with monitoring the process?
                          */
                         if (ret != PQOS_RETVAL_OK) {
+                                unsigned j;
+
                                 printf("PID %s monitoring start error,"
                                        "status %d\n",
                                        sel_monitor_pid_tab[i].desc, ret);
+
+                                /**
+                                 * Stop mon groups that are already started
+                                 */
+                                for (j = 0; j < i; j++) {
+                                        struct pid_group *pg =
+                                                &sel_monitor_pid_tab[j];
+
+                                        pqos_mon_stop(pg->pgrp);
+                                }
                                 return -1;
                         }
                 }
