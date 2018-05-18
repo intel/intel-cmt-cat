@@ -53,7 +53,7 @@
 #include "main.h"
 #include "monitor.h"
 
-#define PQOS_MAX_PIDS         128
+#define PQOS_MAX_PID_MON_GROUPS         128
 #define PQOS_MON_EVENT_ALL    -1
 #define PID_COL_STATUS (3) /**< col for process status letter*/
 #define PID_COL_UTIME (14) /**< col for cpu-user time in /proc/pid/stat*/
@@ -113,7 +113,7 @@ static struct pid_group {
         pid_t *pids;
         struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
-} sel_monitor_pid_tab[PQOS_MAX_PIDS];
+} sel_monitor_pid_tab[PQOS_MAX_PID_MON_GROUPS];
 
 /**
  * Maintains the number of process id's you want to track
@@ -331,7 +331,7 @@ strtogrps(char *s,
           struct pid_group *ptab,
           const unsigned max)
 {
-        unsigned i, n, index = 0;
+        unsigned i, group_count = 0;
         uint64_t cbuf[PQOS_MAX_CORES];
         char *non_grp = NULL;
 
@@ -339,32 +339,40 @@ strtogrps(char *s,
         ASSERT(max > 0);
 
         if (s == NULL)
-                return index;
+                return group_count;
 
         while ((non_grp = strsep(&s, "[")) != NULL) {
+
                 int ret;
                 /**
-                 * If group contains single core/pid
+                 * Ungrouped cores/pids
                  */
                 if ((strlen(non_grp)) > 0) {
-                        n = strlisttotab(non_grp, cbuf, (max-index));
-                        if ((index+n) > max)
+                        /* for seperate cores/pids - each will get his own
+                         * group so strlisttotab result is treated as the
+                         * number of new groups
+                         */
+                        unsigned new_groups_count = strlisttotab(
+                                        non_grp, cbuf, DIM(cbuf));
+
+                        if (group_count + new_groups_count > max)
                                 return -1;
+
                         /* set group info */
-                        for (i = 0; i < n; i++) {
+                        for (i = 0; i < new_groups_count; i++) {
                                 char *desc = uinttostr((unsigned)cbuf[i]);
 
                                 if (ctab != NULL)
-                                        ret = set_cgrp(&ctab[index], desc,
-                                                       &cbuf[i], 1);
+                                        ret = set_cgrp(&ctab[group_count],
+                                                       desc, &cbuf[i], 1);
                                 else
-                                        ret = set_pgrp(&ptab[index], desc,
-                                                       &cbuf[i], 1);
+                                        ret = set_pgrp(&ptab[group_count],
+                                                       desc, &cbuf[i], 1);
                                 if (ret < 0) {
                                         free(desc);
                                         return -1;
                                 }
-                                index++;
+                                group_count++;
                         }
                 }
                 /**
@@ -374,27 +382,35 @@ strtogrps(char *s,
 
                 if (grp != NULL) {
                         char *desc = NULL;
+                        unsigned element_count;
+
+                        if (group_count >= max)
+                                return -1;
 
                         selfn_strdup(&desc, grp);
-                        n = strlisttotab(grp, cbuf, (max-index));
-                        if (index+n > max) {
-                                free(desc);
-                                return -1;
-                        }
+
+                        /* for grouped pids/cores, all elements are in
+                         * one group so strlisttotab result is the number
+                         * of elements in that one group
+                         */
+                        element_count = strlisttotab(grp, cbuf, DIM(cbuf));
+
                         /* set group info */
                         if (ctab != NULL)
-                                ret = set_cgrp(&ctab[index], desc, cbuf, n);
+                                ret = set_cgrp(&ctab[group_count], desc, cbuf,
+                                               element_count);
                         else
-                                ret = set_pgrp(&ptab[index], desc, cbuf, n);
+                                ret = set_pgrp(&ptab[group_count], desc, cbuf,
+                                               element_count);
                         if (ret < 0) {
                                 free(desc);
                                 return -1;
                         }
-                        index++;
+                        group_count++;
                 }
         }
 
-        return index;
+        return group_count;
 }
 
 /**
@@ -539,7 +555,7 @@ parse_monitor_cores(char *str)
 
         n = strtogrps(strchr(str, ':') + 1, cgrp_tab, NULL, PQOS_MAX_CORES);
         if (n < 0) {
-                printf("Error: Too many cores selected\n");
+                printf("Error: Too many cores/groups selected\n");
                 goto error_exit;
         }
         /**
@@ -939,14 +955,15 @@ parse_monitor_pids(char *str)
 {
         int i = 0, n = 0;
         enum pqos_mon_event evt = (enum pqos_mon_event)0;
-        struct pid_group pgrp_tab[PQOS_MAX_PIDS];
+        struct pid_group pgrp_tab[PQOS_MAX_PID_MON_GROUPS];
 
         memset(pgrp_tab, 0, sizeof(pgrp_tab));
         parse_event(str, &evt);
 
-        n = strtogrps(strchr(str, ':') + 1, NULL, pgrp_tab, PQOS_MAX_PIDS);
+        n = strtogrps(strchr(str, ':') + 1, NULL, pgrp_tab,
+                      PQOS_MAX_PID_MON_GROUPS);
         if (n < 0) {
-                printf("Error: Too many pids selected\n");
+                printf("Error: Too many pids/groups selected\n");
                 exit(EXIT_FAILURE);
         }
 
