@@ -965,7 +965,8 @@ parse_monitor_pids(char *str)
         if (n < 0) {
                 printf("Error: Too many pids/groups selected\n");
                 exit(EXIT_FAILURE);
-        }
+        } else if (n == 0)
+                parse_error(str, "No process id selected for monitoring");
 
         for (i = 0; i < n; i++)
                 if (!add_pids_for_monitoring(&pgrp_tab[i], evt)) {
