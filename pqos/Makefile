@@ -36,7 +36,7 @@
 ###############################################################################
 
 LIBDIR ?= ../lib
-LDFLAGS = -L$(LIBDIR) -fPIE -z noexecstack -z relro -z now
+LDFLAGS = -L$(LIBDIR) -pie -z noexecstack -z relro -z now
 LDLIBS = -lpqos -lpthread
 CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
@@ -60,7 +60,7 @@ endif
 ifeq ($(DEBUG),y)
 CFLAGS += -g -ggdb -O0 -DDEBUG
 else
-CFLAGS += -g -O3
+CFLAGS += -g -O2
 endif
 
 # Build targets and dependencies

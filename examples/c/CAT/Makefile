@@ -40,13 +40,13 @@ CFLAGS =-I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings  \
-        -Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
-        -Wunreachable-code -Wsign-compare -Wno-endif-labels \
+	-Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
 	-g -O2
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
-LDFLAGS=-L$(LIBDIR)
+LDFLAGS=-L$(LIBDIR) -pie -z noexecstack -z relro -z now
 LDLIBS=-lpqos -lpthread
 
 # ICC and GCC options
