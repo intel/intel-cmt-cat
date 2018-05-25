@@ -808,7 +808,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
 {
         char *resctrl_group = NULL;
         char buf[128];
-        int ret;
+        int ret = PQOS_RETVAL_OK;
         unsigned i;
 
         ASSERT(group != NULL);
