@@ -41,9 +41,6 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
-#ifdef __linux__
-#include <error.h>
-#endif /* __linux__ */
 #include <errno.h>
 
 #include "types.h"
