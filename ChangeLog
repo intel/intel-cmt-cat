@@ -1,3 +1,28 @@
+=======================================================================
+Release  v2.0  ...
+=======================================================================
+
+Contributors (alphabetical order):
+        Colin Ian King <colin.king@canonical.com>
+        David Williams <david.williams@intel.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Mateusz Starzyk <mateuszx.starzyk@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+Summary:
+1. Library
+        - Added support for resctrl monitoring via OS interface
+        - Added support for PID group monitoring
+        - Added support for L2 CDP
+        - New API added for adding/removing pids to mon groups
+2. PQoS Utility
+        - Added support for PID group monitoring
+        - Added support for L2 CDP
+        - Print core values in PID monitoring output
+3. rdtset Utility
+        - Added support for L2 CDP
+
 ======================================================================
 Release  v1.2  2017-11-29
 ======================================================================
