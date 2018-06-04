@@ -910,6 +910,12 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 for (i = 0; i < group->tid_nr; i++) {
                         const pid_t tid = group->tid_map[i];
 
+                        if (resctrl_alloc_task_validate(tid) !=
+                            PQOS_RETVAL_OK) {
+                                LOG_DEBUG("resctrl_mon_stop: Skipping "
+                                          "non-existant PID: %d\n", tid);
+                                continue;
+                        }
                         ret = resctrl_mon_assoc_set_pid(tid, NULL);
                         if (ret != PQOS_RETVAL_OK)
                                 goto resctrl_mon_stop_exit;

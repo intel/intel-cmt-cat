@@ -756,10 +756,8 @@ resctrl_alloc_task_validate(const pid_t task)
 
 	memset(buf, 0, sizeof(buf));
 	snprintf(buf, sizeof(buf)-1, "/proc/%d", (int)task);
-	if (access(buf, F_OK) != 0) {
-		LOG_ERROR("Task %d does not exist!\n", (int)task);
+	if (access(buf, F_OK) != 0)
 		return PQOS_RETVAL_ERROR;
-	}
 
 	return PQOS_RETVAL_OK;
 }
@@ -772,8 +770,10 @@ resctrl_alloc_task_write(const unsigned class_id, const pid_t task)
 
 	/* Check if task exists */
 	ret = resctrl_alloc_task_validate(task);
-	if (ret != PQOS_RETVAL_OK)
+	if (ret != PQOS_RETVAL_OK) {
+		LOG_ERROR("Task %d does not exist!\n", (int)task);
 		return PQOS_RETVAL_PARAM;
+	}
 
 	/* Open resctrl tasks file */
 	fd = resctrl_alloc_fopen(class_id, rctl_tasks, "w");
@@ -867,8 +867,10 @@ resctrl_alloc_task_search(unsigned *class_id,
 
 	/* Check if task exists */
 	ret = resctrl_alloc_task_validate(task);
-	if (ret != PQOS_RETVAL_OK)
+	if (ret != PQOS_RETVAL_OK) {
+		LOG_ERROR("Task %d does not exist!\n", (int)task);
 		return PQOS_RETVAL_PARAM;
+	}
 
 	/* Get number of COS */
 	ret = resctrl_alloc_get_grps_num(cap, &max_cos);
