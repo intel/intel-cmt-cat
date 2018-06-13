@@ -663,11 +663,10 @@ os_alloc_reset_tasks(void)
 		pid = atoi(pids_list[pid_idx]->d_name);
 		alloc_result = os_alloc_assoc_set_pid(pid, cos0);
 		if (alloc_result != PQOS_RETVAL_OK) {
-                        struct stat st;
-                        char path[128];
+                        int result;
 
-                        snprintf(path, sizeof(path), "/proc/%d", pid);
-                        if (stat(path, &st) != 0) {
+                        result = resctrl_alloc_task_validate(pid);
+                        if (result != PQOS_RETVAL_OK) {
                                 LOG_DEBUG("Task %d no longer exists\n", pid);
                                 alloc_result = PQOS_RETVAL_OK;
                                 continue;

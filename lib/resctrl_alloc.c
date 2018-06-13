@@ -36,6 +36,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <dirent.h>
 
 #include "log.h"
 #include "types.h"
@@ -752,10 +753,17 @@ resctrl_alloc_schemata_write_exit:
 int
 resctrl_alloc_task_validate(const pid_t task)
 {
-	char buf[128];
+	DIR *dir;
+	char buf[64];
 
 	memset(buf, 0, sizeof(buf));
 	snprintf(buf, sizeof(buf)-1, "/proc/%d", (int)task);
+
+	dir = opendir(buf);
+	if (dir == NULL)
+		return PQOS_RETVAL_ERROR;
+	closedir(dir);
+
 	if (access(buf, F_OK) != 0)
 		return PQOS_RETVAL_ERROR;
 
