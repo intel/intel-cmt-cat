@@ -38,7 +38,7 @@
 
 Summary:            Provides command line interface to CMT, MBM, CAT, CDP and MBA technologies
 Name:               %{githubname}
-Release:            2%{?dist}
+Release:            1%{?dist}
 Version:            %{githubver}
 License:            BSD
 Group:              Development/Tools
