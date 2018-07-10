@@ -1996,7 +1996,8 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
         struct pqos_cap_l3ca *l3_cap = NULL;
         unsigned i;
 
-        ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF);
+        ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
+               cdp == PQOS_REQUIRE_CDP_ANY);
         ASSERT(m_cap != NULL);
 
         if (m_cap == NULL)
@@ -2028,7 +2029,8 @@ _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
         struct pqos_cap_l2ca *l2_cap = NULL;
         unsigned i;
 
-        ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF);
+        ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
+               cdp == PQOS_REQUIRE_CDP_ANY);
         ASSERT(m_cap != NULL);
 
         if (m_cap == NULL)
