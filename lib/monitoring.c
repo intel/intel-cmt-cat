@@ -537,39 +537,49 @@ mon_read(const unsigned lcore,
          const unsigned event,
          uint64_t *value)
 {
-        int retries = 3, retval = PQOS_RETVAL_OK;
-        uint32_t reg = 0;
+        int retries = 0, retval = PQOS_RETVAL_ERROR;
         uint64_t val = 0;
+        uint64_t val_evtsel = 0;
+        int flag_wrt = 1;
 
         /**
          * Set event selection register (RMID + event id)
          */
-        reg = PQOS_MSR_MON_EVTSEL;
-        val = ((uint64_t)rmid) & PQOS_MSR_MON_EVTSEL_RMID_MASK;
-        val <<= PQOS_MSR_MON_EVTSEL_RMID_SHIFT;
-        val |= ((uint64_t)event) & PQOS_MSR_MON_EVTSEL_EVTID_MASK;
-        if (msr_write(lcore, reg, val) != MACHINE_RETVAL_OK)
-                return PQOS_RETVAL_ERROR;
+        val_evtsel = ((uint64_t)rmid) & PQOS_MSR_MON_EVTSEL_RMID_MASK;
+        val_evtsel <<= PQOS_MSR_MON_EVTSEL_RMID_SHIFT;
+        val_evtsel |= ((uint64_t)event) & PQOS_MSR_MON_EVTSEL_EVTID_MASK;
 
-        /**
-         * read selected data associated with previously selected RMID+event
-         */
-        reg = PQOS_MSR_MON_QMC;
-        do {
-                if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK) {
-                        retval = PQOS_RETVAL_ERROR;
+        for (retries = 0; retries < 4; retries++) {
+                if (flag_wrt) {
+                        if (msr_write(lcore, PQOS_MSR_MON_EVTSEL,
+                              val_evtsel) != MACHINE_RETVAL_OK)
                         break;
                 }
-                if ((val&(PQOS_MSR_MON_QMC_ERROR)) != 0ULL) {
-                        /**
-                         * Unsupported event id or RMID selected
+                if (msr_read(lcore, PQOS_MSR_MON_QMC,
+                             &val) != MACHINE_RETVAL_OK)
+                        break;
+                if ((val & PQOS_MSR_MON_QMC_ERROR) != 0ULL) {
+                        /* Read back IA32_QM_EVTSEL register
+                         * to check for content change.
                          */
-                        retval = PQOS_RETVAL_ERROR;
-                        break;
+                        if (msr_read(lcore, PQOS_MSR_MON_EVTSEL,
+                                     &val) != MACHINE_RETVAL_OK)
+                                break;
+                        if (val != val_evtsel) {
+                                flag_wrt = 1;
+                                continue;
+                        }
                 }
-                retries--;
-        } while ((val&PQOS_MSR_MON_QMC_UNAVAILABLE) != 0ULL && retries > 0);
-
+                if ((val & PQOS_MSR_MON_QMC_UNAVAILABLE) != 0ULL) {
+                        /**
+                         * Waiting for monitoring data
+                         */
+                        flag_wrt = 0;
+                        continue;
+                }
+                retval = PQOS_RETVAL_OK;
+                break;
+        }
         /**
          * Store event value
          */
