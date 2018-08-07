@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+ * Copyright(c) 2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,8 +33,8 @@
  */
 
 /**
- * @brief Platform QoS sample COS allocation application
- *
+ * @brief Platform QoS/RDT sample application
+ * to demonstrate setting MBA COS definitions
  */
 
 #include <stdio.h>
@@ -48,14 +48,24 @@
 #include "pqos.h"
 
 /**
- * Maintains number of Class of Services supported by socket for
- * L3 cache allocation
+ * MBA struct type
  */
-static int sel_l3ca_cos_num = 0;
+enum mba_type {
+        REQUESTED = 0,
+        ACTUAL,
+        MAX_MBA_TYPES
+};
 /**
- * Maintains table for L3 cache allocation class of service data structure
+ * Maintains number of MBA COS to be set
  */
-static struct pqos_l3ca sel_l3ca_cos_tab[PQOS_MAX_L3CA_COS];
+static int sel_mba_cos_num = 0;
+/**
+ * Table containing  MBA requested and actual COS definitions
+ * Requested is set by the user
+ * Actual is set by the library
+ */
+static struct pqos_mba mba[MAX_MBA_TYPES];
+
 /**
  * @brief Converts string into 64-bit unsigned number.
  *
@@ -97,20 +107,17 @@ strtouint64(const char *s)
 static void
 allocation_get_input(int argc, char *argv[])
 {
-	uint64_t mask = 0;
-
 	if (argc < 2)
-		sel_l3ca_cos_num = 0;
+		sel_mba_cos_num = 0;
 	else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H")) {
-		printf("Usage: %s [<COS#> <COS bitmask>]\n", argv[0]);
-		printf("Example: %s 1 0xff\n\n", argv[0]);
-		sel_l3ca_cos_num = 0;
+		printf("Usage: %s [<COS#> <Available BW>]\n", argv[0]);
+		printf("Example: %s 1 80\n\n", argv[0]);
+		sel_mba_cos_num = 0;
 	} else {
-		sel_l3ca_cos_tab[0].class_id = (unsigned)atoi(argv[1]);
-		mask = strtouint64(argv[2]);
-		sel_l3ca_cos_tab[0].u.ways_mask = mask;
-		sel_l3ca_cos_num = 1;
-	}
+                mba[REQUESTED].class_id = (unsigned)atoi(argv[1]);
+                mba[REQUESTED].mb_rate = strtouint64(argv[2]);
+                sel_mba_cos_num = 1;
+        }
 }
 /**
  * @brief Sets up allocation classes of service on selected CPU sockets
@@ -129,19 +136,24 @@ set_allocation_class(unsigned sock_count,
 {
 	int ret;
 
-	while (sock_count > 0 && sel_l3ca_cos_num > 0) {
-		ret = pqos_l3ca_set(*sockets,
-                                    sel_l3ca_cos_num,
-                                    sel_l3ca_cos_tab);
+	while (sock_count > 0 && sel_mba_cos_num > 0) {
+		ret = pqos_mba_set(*sockets,
+                                    sel_mba_cos_num,
+                                    &mba[REQUESTED],
+                                    &mba[ACTUAL]);
 		if  (ret != PQOS_RETVAL_OK) {
-			printf("Setting up cache allocation class of "
-                               "service failed!\n");
+                        printf("Failed to set MBA!\n");
 			return -1;
 		}
+                printf("SKT%u: MBA COS%u => %u%% requested, %u%% applied\n",
+                       *sockets, mba[REQUESTED].class_id,
+                       mba[REQUESTED].mb_rate, mba[ACTUAL].mb_rate);
+
 		sock_count--;
 		sockets++;
 	}
-	return sel_l3ca_cos_num;
+
+	return sel_mba_cos_num;
 }
 /**
  * @brief Prints allocation configuration
@@ -152,27 +164,36 @@ set_allocation_class(unsigned sock_count,
  * @return error value on failure
  */
 static int
-print_allocation_config(const unsigned sock_count,
+print_allocation_config(const struct pqos_cap *p_cap,
+                        const unsigned sock_count,
                         const unsigned *sockets)
 {
-	int ret = PQOS_RETVAL_OK;
+        const struct pqos_capability *cap = NULL;
+        const struct pqos_cap_mba *mba_cap = NULL;
+
+        int ret = PQOS_RETVAL_OK;
 	unsigned i;
 
-	for (i = 0; i < sock_count; i++) {
-		struct pqos_l3ca tab[PQOS_MAX_L3CA_COS];
-		unsigned num = 0;
+        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MBA, &cap);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        mba_cap = cap->u.mba;
 
-		ret = pqos_l3ca_get(sockets[i], PQOS_MAX_L3CA_COS,
-                                    &num, tab);
+	for (i = 0; i < sock_count; i++) {
+                struct pqos_mba tab[mba_cap->num_classes];
+	        unsigned num = 0;
+
+		ret = pqos_mba_get(sockets[i], mba_cap->num_classes,
+                                   &num, tab);
 		if (ret == PQOS_RETVAL_OK) {
 			unsigned n = 0;
 
-			printf("L3CA COS definitions for Socket %u:\n",
+                        printf("MBA COS definitions for Socket %u:\n",
                                sockets[i]);
 			for (n = 0; n < num; n++) {
-				printf("    L3CA COS%u => MASK 0x%llx\n",
+				printf("    MBA COS%u => %u%% available\n",
                                        tab[n].class_id,
-                                       (unsigned long long)tab[n].u.ways_mask);
+                                       tab[n].mb_rate);
 			}
 		} else {
 			printf("Error:%d", ret);
@@ -192,14 +213,14 @@ int main(int argc, char *argv[])
 	memset(&cfg, 0, sizeof(cfg));
         cfg.fd_log = STDOUT_FILENO;
         cfg.verbose = 0;
-	/* PQoS Initialization - Check and initialize CAT and CMT capability */
+	/* PQoS Initialization - Check and initialize MBA capability */
 	ret = pqos_init(&cfg);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Error initializing PQoS library!\n");
 		exit_val = EXIT_FAILURE;
 		goto error_exit;
 	}
-	/* Get CMT capability and CPU info pointer */
+	/* Get capability and CPU info pointers */
 	ret = pqos_cap_get(&p_cap, &p_cpu);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Error retrieving PQoS capabilities!\n");
@@ -215,8 +236,8 @@ int main(int argc, char *argv[])
 	}
 	/* Get input from user	*/
 	allocation_get_input(argc, argv);
-	if (sel_l3ca_cos_num != 0) {
-		/* Set bit mask for COS allocation */
+	if (sel_mba_cos_num != 0) {
+		/* Set delay value for MBA COS allocation */
 		ret = set_allocation_class(sock_count, p_sockets);
 		if (ret < 0) {
 			printf("Allocation configuration error!\n");
@@ -224,8 +245,8 @@ int main(int argc, char *argv[])
 		}
 		printf("Allocation configuration altered.\n");
 	}
-	/* Print COS and associated bit mask */
-	ret = print_allocation_config(sock_count, p_sockets);
+	/* Print COS definition */
+	ret = print_allocation_config(p_cap, sock_count, p_sockets);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Allocation capability not detected!\n");
 		exit_val = EXIT_FAILURE;
