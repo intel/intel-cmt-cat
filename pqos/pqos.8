@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH PQOS 8 "November 16, 2017"
+.TH PQOS 8 "July 30, 2018"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -86,7 +86,10 @@ RESOURCE_ID is a unique number that can represent a socket or l2/l3 cache identi
 Some examples:
 .RS
 .RS
-"\-e llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00;l2:2=0x3f;l2@2:1=0xf"
+.br
+"\-e llc:0=0xffff;llc:1=0x00ff"
+.br
+"\-e llc@0-1:2=0xff00;l2:2=0x3f;l2@2:1=0xf"
 .br
 "\-e llc:0d=0xfff;llc:0c=0xfff00"
 .br
@@ -167,7 +170,6 @@ Example "-m llc:[0-3];all:[4,5,6];mbr:[0-3],7,8".
 .TP
 .B \-p [EVTPIDS], \-\-mon-pid[=EVTPIDS]
 select top 10 most active (CPU utilizing) process ids to monitor
-.br
 or select the process ids and events to monitor, EVTPIDS format is "EVENT:PID_LIST".
 .br
 See \-m option for valid EVENT settings. PID_LIST is comma separated list of process ids.
