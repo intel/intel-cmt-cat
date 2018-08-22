@@ -4,7 +4,7 @@
 # @par
 # BSD LICENSE
 #
-# Copyright(c) 2014-2016 Intel Corporation. All rights reserved.
+# Copyright(c) 2018 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -58,13 +58,15 @@ CFLAGS += -Wcast-align \
 endif
 
 # Build targets and dependencies
+ALLOCAPP_L2CAT = allocation_app_l2cat
 ALLOCAPP_L3CAT = allocation_app_l3cat
 ALLOCAPP_MBA = allocation_app_mba
 ASSOCAPP = association_app
 RESETAPP = reset_app
 
-all: $(ALLOCAPP_L3CAT) $(ALLOCAPP_MBA) $(ASSOCAPP) $(RESETAPP)
+all: $(ALLOCAPP_L2CAT) $(ALLOCAPP_L3CAT) $(ALLOCAPP_MBA) $(ASSOCAPP) $(RESETAPP)
 
+$(ALLOCAPP_L2CAT): $(ALLOCAPP_L2CAT).o
 $(ALLOCAPP_L3CAT): $(ALLOCAPP_L3CAT).o
 $(ALLOCAPP_MBA): $(ALLOCAPP_MBA).o
 $(ASSOCAPP): $(ASSOCAPP).o
@@ -72,18 +74,20 @@ $(RESETAPP): $(RESETAPP).o
 
 .PHONY: clean
 clean:
-	-rm -f $(ALLOCAPP_L3CAT) $(ALLOCAPP_MBA) $(ASSOCAPP) $(RESETAPP) *.o
+	-rm -f $(ALLOCAPP_L2CAT) $(ALLOCAPP_L3CAT) $(ALLOCAPP_MBA) $(ASSOCAPP) $(RESETAPP) *.o
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT \
-	-f allocation_app_l3cat.c -f allocation_app_mba.c -f association_app.c -f reset_app.c
+	-f allocation_app_l2cat.c allocation_app_l3cat.c -f allocation_app_mba.c \
+        -f association_app.c -f reset_app.c
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
-	allocation_app_l3cat.c allocation_app_mba.c association_app.c reset_app.c
+	allocation_app_l2cat.c allocation_app_l3cat.c allocation_app_mba.c association_app.c \
+        reset_app.c

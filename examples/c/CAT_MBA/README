@@ -21,17 +21,20 @@ Technology (Intel(R) RDT) library APIs to manage Cache Allocation Technology
 (CAT) and Memory Bandwidth Allocation (MBA).
 Refer to https://github.com/01org/intel-cmt-cat/blob/master/README table 1
 for a list of processors supporting CAT and MBA. Each sample application
-build will create four targets as follows:
-1. allocation_app_l3cat - Demonstrates usage of PQoS/Intel(R) RDT library APIs
-related to set bit mask for class of service (CLOS) and displaying
+build will create five targets as follows:
+1. allocation_app_l2cat - Demonstrates usage of PQoS/Intel(R) RDT library APIs
+related to setting bit masks for L2 CAT classes of service (CLOS) and displaying
 classes of service (CLOS) and associated bit masks.
-2. allocation_app_mba - Demonstrates usage of PQoS/Intel(R) RDT library APIs
+2. allocation_app_l3cat - Demonstrates usage of PQoS/Intel(R) RDT library APIs
+related to setting bit mask for L3 CAT classes of service (CLOS) and displaying
+classes of service (CLOS) and associated bit masks.
+3. allocation_app_mba - Demonstrates usage of PQoS/Intel(R) RDT library APIs
 related to setting MBA delay values for classes of service (CLOS) and displaying
 classes of service (CLOS) and associated delay values.
-3. association_app - Demonstrates usage of PQoS/Intel(R) RDT library APIs
+4. association_app - Demonstrates usage of PQoS/Intel(R) RDT library APIs
 related to association of class of service (CLOS) to cores and displaying
 class of service (CLOS) and core association.
-4. reset_app - Demonstrates usage of PQoS/Intel(R) RDT library APIs related to
+5. reset_app - Demonstrates usage of PQoS/Intel(R) RDT library APIs related to
 resetting all classes of service to system default bit masks (CAT) and delay
 values (MBA).
 All apps operate in user space and use PQoS/Intel(R) RDT and C libraries only.
@@ -43,8 +46,8 @@ COMPILATION
 Note: The PQoS/Intel(R) RDT library should be installed before compilation.
 
 Run "make all" or "make" to compile the programs. If compilation is successful
-"allocation_app_l3cat", "allocation_app_mba", "association_app" and "reset_app"
-binaries should be present in the directory.
+"allocation_app_l2cat", "allocation_app_l3cat", "allocation_app_mba",
+"association_app" and "reset_app" binaries should be present in the directory.
 
 Run "make clean" to clean the build files.
 
@@ -53,7 +56,7 @@ USAGE
 =====
 
 To run:
-$ sudo ./allocation_app_<l3cat/mba>
+$ sudo ./allocation_app_<l2cat/l3cat/mba>
 $ sudo ./association_app
 $ sudo ./reset_app
 
