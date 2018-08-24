@@ -458,6 +458,7 @@ simplify_feature_str(const char *feature)
 		{"l2", '2'},
 		{"l3", '3'},
 		{"mba", 'm'},
+		{"mba_max", 'b'},
 		{NULL, 0}
 	};
 
@@ -555,6 +556,16 @@ parse_rdt(char *rdtstr)
 				return ret;
 			break;
 
+		case 'b':
+			if (g_cfg.config[idx].mba_max > 0)
+				return -EINVAL;
+
+			ret = str_to_uint64(param, 10,
+				            &g_cfg.config[idx].mba_max);
+			if (ret < 0 || g_cfg.config[idx].mba_max == 0)
+				return -EINVAL;
+			break;
+
 		default:
 			fprintf(stderr, "Invalid option: \"%s\"\n", feature);
 			return -EINVAL;
@@ -563,12 +574,16 @@ parse_rdt(char *rdtstr)
 		group = strtok_r(NULL, ";", &rdtstr_saveptr);
 	}
 
-        /* if no cpus specified then set pid flag */
+	/* if no cpus specified then set pid flag */
 	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0)
-                g_cfg.config[idx].pid_cfg = 1;
+		g_cfg.config[idx].pid_cfg = 1;
 
-        if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
-              rdt_cfg_is_valid(mba)))
+	/* set default MBA value if software controller is used */
+	if (g_cfg.config[idx].mba_max > 0 && !rdt_cfg_is_valid(mba))
+		g_cfg.config[idx].mba.mb_rate = 100;
+
+	if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
+	      rdt_cfg_is_valid(mba) || g_cfg.config[idx].mba_max > 0))
 		return -EINVAL;
 
 	g_cfg.config_count++;
