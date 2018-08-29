@@ -1,0 +1,62 @@
+========================================================================
+README for Membw tool
+
+July 2018
+
+========================================================================
+
+Contents
+========
+
+- Overview
+- Requirements and Installation
+- Usage
+- Legal Disclaimer
+
+
+Overview
+========
+
+The membw software tool provides a way to stress local and remote memory
+bandwidth using a variety of memory operations. The tool allows the user
+to choose an operation to generate a specified amount of memory bandwidth
+on a selected core.
+
+Requirements and Installation
+=============================
+
+For installation of the Intel(R) Membw tool follow below instructions:
+
+To compile:
+        "make" for building tool
+        "make clean" for clearing all object files
+
+Usage
+=====
+
+Usage: For Membw:
+        "./membw"   This option will display usage and operation types
+
+        "./membw <cpuid> <BW [MB/s]> <operation type>"
+
+            <t_cpuid> Select CPU ID to generate bandwidth
+
+            <BW [MB/s]> Select amount of bandwidth to generate
+
+            <operation type> Select operation type from the following list
+                -w        write - x86 stores
+                -r        read - x86 loads
+                -m        read-mod-write - load XOR write
+
+
+Legal Disclaimer
+================
+
+THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
+IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
+ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
+CONDITIONS OF SALE, INTEL ASSUMES NO LIABILITY WHATSOEVER AND INTEL
+DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY, RELATING TO SALE AND/OR
+USE OF INTEL PRODUCTS INCLUDING LIABILITY OR WARRANTIES RELATING TO
+FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR INFRINGEMENT
+OF ANY PATENT, COPYRIGHT OR OTHER INTELLECTUAL PROPERTY RIGHT.

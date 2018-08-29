@@ -96,6 +96,8 @@ Package Content
     Includes Net-SNMP AgentX subagent written in Perl to demonstrate the use of
     the PQoS library Perl wrapper API.
     Please refer to README file for more details "snmp/README".
+"tools" directory:
+    Includes membw tool for stressing memory bandwidth with different operations
 "srpm" directory:
     Includes *.src.rpm and *.spec files for the software package.
 "ChangeLog" file:
