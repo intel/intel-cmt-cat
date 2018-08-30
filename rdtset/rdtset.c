@@ -1,7 +1,7 @@
 /*
  *   BSD LICENSE
  *
- *   Copyright(c) 2016 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2016-2018 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -46,6 +46,9 @@
 #include "rdt.h"
 #include "common.h"
 #include "cpu.h"
+#include "mba_sc.h"
+
+static pid_t child = -1;
 
 /**
  * @brief Detect if sudo was used to elevate privileges and drop them
@@ -130,20 +133,22 @@ execute_cmd(int argc, char **argv)
 		printf("\n");
 	}
 
-	pid_t pid = fork();
+	child = fork();
 
-	if (-1 == pid) {
+	if (-1 == child) {
 		fprintf(stderr, "%s,%s:%d Failed to execute %s !"
 				" fork failed\n", __FILE__, __func__, __LINE__,
 				argv[0]);
 		return -1;
-	} else if (0 < pid) {
+	} else if (0 < child) {
 		int status = EXIT_FAILURE;
 		/* Wait for child */
-		waitpid(pid, &status, 0);
-
-		if (EXIT_SUCCESS != status)
-			return -1;
+		int ret = waitpid(child, &status, WNOHANG);
+                if (ret < -1)
+                        return -1;
+                if (ret == child &&
+                    (!WIFEXITED(status) && WEXITSTATUS(status) != EXIT_SUCCESS))
+                        return -1;
 	} else {
                 if (0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset))
                         /* set cpu affinity */
@@ -311,7 +316,7 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
 {
         unsigned i;
         int f_n = 0; /**< non cpu (pid) config flag */
-        int f_sc = 0;
+        int f_sc = 0; /**< mba_max config flag */
 
         for (i = 0; i < g_cfg.config_count; i++) {
                 if (g_cfg.config[i].pid_cfg)
@@ -455,6 +460,97 @@ exit:
 }
 
 /**
+ * @brief Shut down all submodules
+ */
+static void
+rdtset_fini(void)
+{
+        mba_sc_fini();
+        alloc_fini();
+}
+
+/**
+ * @brief Reverts settings deinitializes submodules
+ */
+static void
+rdtset_exit(void)
+{
+        mba_sc_exit();
+        alloc_exit();
+
+        rdtset_fini();
+}
+
+/**
+ * @brief Signal handler to do clean-up on exit on signal
+ *
+ * @param [in] signum signal
+ */
+static void
+signal_handler(int signum)
+{
+        if (signum == SIGINT || signum == SIGTERM) {
+                printf("\nRDTSET: Signal %d received, preparing to exit...\n",
+                       signum);
+
+                rdtset_exit();
+
+                /* exit with the expected status */
+                signal(signum, SIG_DFL);
+                kill(getpid(), signum);
+        }
+}
+
+/**
+ * @brief Initialize rdtset submodules
+ *
+ * @return Operation status
+ * @retval EXIT_SUCCESS on success
+ * @retval EXIT_FAILURE on error
+ */
+static int
+rdtset_init(void)
+{
+        int ret;
+
+        /* Initialize the PQoS library and configure allocation */
+        ret = alloc_init();
+        if (ret < 0) {
+                fprintf(stderr, "%s,%s:%d RDTSET: allocation init failed!\n",
+                        __FILE__, __func__, __LINE__);
+                ret = -EFAULT;
+                goto err;
+        }
+
+        /* Initialize MBA SW controller */
+        if (mba_sc_mode()) {
+                ret = mba_sc_init();
+                if (ret < 0) {
+                        fprintf(stderr, "%s,%s:%d MBA SC init failed!\n",
+                                __FILE__, __func__, __LINE__);
+                        ret = -EFAULT;
+                        goto err;
+                }
+        }
+
+        signal(SIGINT, signal_handler);
+        signal(SIGTERM, signal_handler);
+
+        ret = atexit(rdtset_exit);
+        if (ret != 0) {
+                ret = -EFAULT;
+                fprintf(stderr, "%s,%s:%d Cannot set exit function\n",
+                        __FILE__, __func__, __LINE__);
+                goto err;
+        }
+
+        return 0;
+ err:
+        rdtset_fini();
+        return ret;
+}
+
+/**
  * @brief main function for rdtset
  *
  * Parses cmd line args and validates them,
@@ -506,13 +602,9 @@ main(int argc, char **argv)
 		print_cmd_line_cpu_config();
 	}
 
-	/* Initialize the PQoS library and configure allocation */
-	ret = alloc_init();
-	if (ret < 0) {
-		fprintf(stderr, "%s,%s:%d allocation init failed!\n",
-			__FILE__, __func__, __LINE__);
-		exit(EXIT_FAILURE);
-	}
+        ret = rdtset_init();
+        if (ret < 0)
+                exit(EXIT_FAILURE);
 
 	/* reset COS association */
 	if (0 != CPU_COUNT(&g_cfg.reset_cpuset)) {
@@ -563,9 +655,20 @@ main(int argc, char **argv)
                                 fprintf(stderr, "%s,%s:%d Failed to set core "
                                         "affinity for pid %d!\n", __FILE__,
                                         __func__, __LINE__, (int)g_cfg.pids[i]);
-                                alloc_exit();
+                                rdtset_exit();
                                 exit(EXIT_FAILURE);
                         }
+        }
+
+        if (mba_sc_mode()) {
+                mba_sc_main(child);
+
+        } else if (0 != g_cfg.command) {
+                int status = EXIT_FAILURE;
+                /* Wait for child */
+                waitpid(child, &status, 0);
+                if (EXIT_SUCCESS != status)
+                        exit(EXIT_FAILURE);
         }
 
 	if (0 != g_cfg.command)
@@ -580,7 +683,7 @@ main(int argc, char **argv)
 		 * If we were doing operation on PID or RESET,
 		 * just deinit libpqos
 		 **/
-		alloc_fini();
+		rdtset_fini();
 		_Exit(EXIT_SUCCESS);
 	}
 }

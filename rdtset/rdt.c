@@ -747,7 +747,8 @@ check_supported(void)
 			return -ENOTSUP;
 		}
 
-		if (rdt_cfg_is_valid(wrap_mba(&g_cfg.config[i].mba)) &&
+		if ((rdt_cfg_is_valid(wrap_mba(&g_cfg.config[i].mba)) ||
+		     g_cfg.config[i].mba_max > 0) &&
                     NULL == m_cap_mba) {
 			fprintf(stderr, "Allocation: MBA requested but not "
 				"supported by system!\n");
@@ -1581,27 +1582,6 @@ alloc_exit(void)
                 if (alloc_release(&g_cfg.config[i].cpumask) != 0)
                         fprintf(stderr, "Failed to release cores COS!\n");
         }
-	alloc_fini();
-}
-
-/**
- * @brief Signal handler to do clean-up on exit on signal
- *
- * @param [in] signum signal
- */
-static void
-signal_handler(int signum)
-{
-	if (signum == SIGINT || signum == SIGTERM) {
-		printf("\nRDTSET: Signal %d received, preparing to exit...\n",
-                       signum);
-
-		alloc_exit();
-
-		/* exit with the expected status */
-		signal(signum, SIG_DFL);
-		kill(getpid(), signum);
-	}
 }
 
 int
@@ -1618,7 +1598,7 @@ alloc_init(void)
 	/* PQoS Initialization - Check and initialize allocation capabilities */
 	memset(&cfg, 0, sizeof(cfg));
 	cfg.fd_log = STDOUT_FILENO;
-	cfg.verbose = 0;
+	cfg.verbose = g_cfg.verbose;
 	cfg.interface = g_cfg.interface;
 	ret = pqos_init(&cfg);
 	if (ret != PQOS_RETVAL_OK) {
@@ -1656,16 +1636,6 @@ alloc_init(void)
 	if (m_cap_l3ca == NULL && m_cap_l2ca == NULL && m_cap_mba == NULL) {
 		fprintf(stderr, "Allocation capabilities not supported!\n");
 		ret = -EFAULT;
-		goto err;
-	}
-
-	signal(SIGINT, signal_handler);
-	signal(SIGTERM, signal_handler);
-
-	ret = atexit(alloc_exit);
-	if (ret != 0) {
-		ret = -EFAULT;
-		fprintf(stderr, "Allocation: Cannot set exit function\n");
 		goto err;
 	}
 

@@ -119,14 +119,17 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,NEW_TYPEDEFS,\
 	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,CONSTANT_COMPARISON \
-	-f rdtset.c -f rdt.c -f rdt.h -f cpu.c -f cpu.h -f common.c -f common.h
+	-f rdtset.c -f rdt.c -f rdt.h -f cpu.c -f cpu.h \
+	-f common.c -f common.h \
+	-f mba_sc.h -f mba_sc.c
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc --suppress=uninitvar \
-	rdtset.c rdt.c rdt.h cpu.c cpu.h common.c common.h
+	rdtset.c rdt.c rdt.h cpu.c cpu.h common.c common.h \
+	mba_sc.h mba_sc.c
 
 # if target not clean then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

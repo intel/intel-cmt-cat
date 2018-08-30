@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/time.h>                                   /**< gettimeofday() */
 
 #include "common.h"
 #include "rdt.h"
@@ -268,4 +269,14 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
         }
 
         return index;
+}
+
+uint64_t
+get_time_usec(void)
+{
+        struct timeval tv;
+
+        gettimeofday(&tv, NULL);
+
+        return ((uint64_t)tv.tv_usec) + ((uint64_t)tv.tv_sec * 1000000L);
 }

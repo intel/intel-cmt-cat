@@ -1,7 +1,7 @@
 /*
  *   BSD LICENSE
  *
- *   Copyright(c) 2016-2017 Intel Corporation. All rights reserved.
+ *   Copyright(c) 2016-2018 Intel Corporation. All rights reserved.
  *   All rights reserved.
  *
  *   Redistribution and use in source and binary forms, with or without
@@ -164,6 +164,11 @@ struct rdtset {
 
 struct rdtset g_cfg;
 
+#define DBG(...) do { \
+	if (g_cfg.verbose) \
+		fprintf(stderr, __VA_ARGS__); \
+	} while (0)
+
 /**
  * @brief Parse CPU set string
  *
@@ -215,6 +220,17 @@ void cpuset_to_str(char *cpustr, const unsigned cpustr_len,
  */
 unsigned
 strlisttotab(char *s, uint64_t *tab, const unsigned max);
+
+/**
+ * @brief Get time in microseconds
+ *
+ * @param tv pointer to timeval structure to be converted
+ *
+ * @return Time un mocroseconds
+ */
+uint64_t
+get_time_usec(void);
+
 
 #ifdef __cplusplus
 }
