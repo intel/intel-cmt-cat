@@ -167,8 +167,8 @@ void *malloc_and_init_memory(size_t s)
         ret = posix_memalign(&p, PAGE_SIZE, s - s % PAGE_SIZE);
 
         if (ret != 0 || p == NULL) {
-                printf("ERROR: Failed to allocate %ld bytes\n",
-                        s - s % PAGE_SIZE);
+                printf("ERROR: Failed to allocate %lu bytes\n",
+                       (unsigned long) s - s % PAGE_SIZE);
                 stop_loop = 1;
                 return NULL;
         }
@@ -221,6 +221,7 @@ cl_read_mod_write(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write(void *p, const uint64_t v)
 {
+#ifdef __x86_64__
         asm volatile("movq %0, (%1)\n\t"
                      "movq %0, 8(%1)\n\t"
                      "movq %0, 16(%1)\n\t"
@@ -232,6 +233,27 @@ cl_write(void *p, const uint64_t v)
                      :
                      : "r"(v), "r"(p)
                      : "memory");
+#else
+        asm volatile("movl %0, (%1)\n\t"
+                     "movl %0, 4(%1)\n\t"
+                     "movl %0, 8(%1)\n\t"
+                     "movl %0, 12(%1)\n\t"
+                     "movl %0, 16(%1)\n\t"
+                     "movl %0, 20(%1)\n\t"
+                     "movl %0, 24(%1)\n\t"
+                     "movl %0, 28(%1)\n\t"
+                     "movl %0, 32(%1)\n\t"
+                     "movl %0, 36(%1)\n\t"
+                     "movl %0, 40(%1)\n\t"
+                     "movl %0, 44(%1)\n\t"
+                     "movl %0, 48(%1)\n\t"
+                     "movl %0, 52(%1)\n\t"
+                     "movl %0, 56(%1)\n\t"
+                     "movl %0, 64(%1)\n\t"
+                     :
+                     : "r"(v), "r"(p)
+                     : "memory");
+#endif
 }
 
 /**
@@ -243,7 +265,7 @@ ALWAYS_INLINE void
 cl_read(void *p)
 {
         register uint64_t v = 0;
-
+#ifdef __x86_64__
         asm volatile("movq (%1), %0\n\t"
                      "movq 8(%1), %0\n\t"
                      "movq 16(%1), %0\n\t"
@@ -255,6 +277,27 @@ cl_read(void *p)
                      :
                      : "r"(v), "r"(p)
                      : "memory");
+#else
+        asm volatile("movl (%1), %0\n\t"
+                     "movl 4(%1), %0\n\t"
+                     "movl 8(%1), %0\n\t"
+                     "movl 12(%1), %0\n\t"
+                     "movl 16(%1), %0\n\t"
+                     "movl 20(%1), %0\n\t"
+                     "movl 24(%1), %0\n\t"
+                     "movl 28(%1), %0\n\t"
+                     "movl 32(%1), %0\n\t"
+                     "movl 36(%1), %0\n\t"
+                     "movl 40(%1), %0\n\t"
+                     "movl 44(%1), %0\n\t"
+                     "movl 48(%1), %0\n\t"
+                     "movl 52(%1), %0\n\t"
+                     "movl 56(%1), %0\n\t"
+                     "movl 64(%1), %0\n\t"
+                     :
+                     : "r"(v), "r"(p)
+                     : "memory");
+#endif
 }
 
 /**
