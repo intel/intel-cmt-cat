@@ -231,6 +231,27 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max);
 uint64_t
 get_time_usec(void);
 
+/**
+ * @brief Scale MB value to bytes
+ *
+ * @param [in] MB value to be scaled
+ * @return scaled up value in bytes
+ */
+static inline uint64_t mb_to_bytes(const uint64_t mb)
+{
+        return mb * 1024 * 1024;
+}
+
+/**
+ * @brief Scale bytes value to MB
+ *
+ * @param [in] bytes value to be scaled up
+ * @return scaled value in MB
+ */
+static inline uint64_t bytes_to_mb(const uint64_t bytes)
+{
+        return bytes / (1024 * 1024);
+}
 
 #ifdef __cplusplus
 }

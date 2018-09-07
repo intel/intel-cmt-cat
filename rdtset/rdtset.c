@@ -672,16 +672,16 @@ main(int argc, char **argv)
                         exit(EXIT_FAILURE);
         }
 
-	if (0 != g_cfg.command)
+	if (0 != g_cfg.command || mba_sc_mode())
 		/*
-		 * If we were running some command, do clean-up.
-		 * Clean-up function is executed on process exit.
-		 * (cat_exit() registered with atexit(...))
+		 * If we were running some command or doing MBA SW control,
+		 * do clean-up. Clean-up function is executed on process exit.
+		 * (rdtset_exit() registered with atexit(...))
 		 **/
 		exit(EXIT_SUCCESS);
 	else {
 		/*
-		 * If we were doing operation on PID or RESET,
+		 * If we were doing allocation only operation on PID or RESET,
 		 * just deinit libpqos
 		 **/
 		rdtset_fini();

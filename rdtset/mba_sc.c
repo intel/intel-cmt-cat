@@ -47,7 +47,17 @@ static const struct pqos_cpuinfo *m_cpu;
 static const struct pqos_capability *m_cap_mba;
 static const struct pqos_capability *m_cap_mon;
 
-static struct pqos_mon_data group;
+struct mba_sc_state {
+        struct pqos_mon_data group;
+        cpu_set_t cpumask;
+        unsigned prev_rate;
+        uint64_t max_bw;
+        uint64_t prev_bw;
+        unsigned delta_comp;
+        uint64_t delta_bw;
+};
+
+static struct mba_sc_state state;
 static int supported = 0;
 
 
@@ -160,8 +170,8 @@ mba_sc_init(void)
 
         /* Get MBA capabilities */
         ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &m_cap_mba);
-        if (ret != PQOS_RETVAL_OK) {
-                DBG("MBA SC: MBA not supported.\n");
+        if (ret != PQOS_RETVAL_OK || !m_cap_mba->u.mba->is_linear) {
+                DBG("MBA SC: MBA not supported or not linear.\n");
                 ret = -EFAULT;
                 goto err;
         }
@@ -185,7 +195,7 @@ mba_sc_init(void)
         }
 
 
-        memset(&group, 0, sizeof(group));
+        memset(&state, 0, sizeof(state));
         supported = 1;
 
         return 0;
@@ -209,7 +219,7 @@ mba_sc_fini(void)
 void
 mba_sc_exit(void)
 {
-        mba_sc_mon_stop(&group);
+        mba_sc_mon_stop(&state.group);
 }
 
 /**
@@ -259,51 +269,160 @@ mba_sc_mode(void)
         return 0;
 }
 
+/**
+ * @brief Sets MBA class of service defined by \a mba_cfg on cores in \a cpumask
+ *
+ * @param [in] cpumask set of lcores
+ * @param [in] mba_cfg mba configuration to be set
+ *
+ * @return status
+ */
+static int
+mba_sc_mba_set(const cpu_set_t cpumask, struct pqos_mba *mba_cfg)
+{
+        int ret;
+        int lcore;
+        unsigned cluster_id = 0;
+        unsigned cluster_array[CPU_SETSIZE] = {0};
+
+        for (lcore = 0; lcore < CPU_SETSIZE; lcore++) {
+                if (CPU_ISSET(lcore, &cpumask) != 1)
+                        continue;
+
+                ret = pqos_cpu_get_clusterid(m_cpu, lcore, &cluster_id);
+                if (ret != PQOS_RETVAL_OK) {
+                        DBG("MBA SC: error while reading cluster id "
+                            "for lcore %d\n", lcore);
+                        return -EFAULT;
+                }
+
+                if (cluster_array[cluster_id])
+                        continue;
+
+                ret = pqos_alloc_assoc_get(lcore, &mba_cfg->class_id);
+                if (ret != PQOS_RETVAL_OK) {
+                        DBG("MBA SC: error while reading assoc for lcore %d\n",
+                            lcore);
+                        return -EFAULT;
+                }
+
+                ret = pqos_mba_set(cluster_id, 1, mba_cfg, NULL);
+                if (ret != PQOS_RETVAL_OK) {
+                        DBG("MBA SC: error while setting mba for cluster %u\n",
+                            cluster_id);
+                        return -EFAULT;
+                }
+
+                cluster_array[cluster_id]++;
+        }
+
+        return 0;
+}
+
 int
 mba_sc_main(pid_t pid)
 {
         int ret;
-        uint64_t start_time;
+        uint64_t prev_time;
+        uint64_t reg_start_time = 0;
         unsigned i;
 
         if (!supported)
                 return PQOS_RETVAL_RESOURCE;
 
+        const unsigned min_rate = m_cap_mba->u.mba->throttle_step;
+        const unsigned step_rate = m_cap_mba->u.mba->throttle_step;
+        const unsigned max_rate = 100;
+
         for (i = 0; i < g_cfg.config_count; i++) {
                 const struct rdt_config *config = &g_cfg.config[i];
 
                 if (config->mba_max > 0) {
-                        ret = mba_sc_mon_start(config->cpumask, &group);
-                        if (ret != PQOS_RETVAL_OK) {
+                        ret = mba_sc_mon_start(config->cpumask, &state.group);
+                        if (ret != 0) {
                                 DBG("MBA SC: failed to start monitoring\n");
-                                return ret;
+                                goto err;
                         }
+
+                        state.max_bw = mb_to_bytes(config->mba_max);
+                        state.prev_rate = config->mba.mb_rate;
+                        state.cpumask = config->cpumask;
 
                         break;
                 }
         }
 
-        start_time = get_time_usec();
+        prev_time = get_time_usec();
 
         while (mba_sc_running(pid)) {
-                uint64_t current_time;
-                const struct pqos_event_values *pv = &group.values;
+                uint64_t cur_time;
+                uint64_t delta_time;
+                struct pqos_mba mba_cfg;
+                uint64_t prev_bw = state.prev_bw;
+                uint64_t cur_bw;
+                const struct pqos_event_values *pv = &state.group.values;
 
-                ret = mba_sc_mon_poll(&group);
-                if (ret == PQOS_RETVAL_OK) {
-                        current_time = get_time_usec();
+                usleep(MBA_SC_SAMPLING_INTERVAL * 1000);
 
-                        DBG("time=%10lu interval=%10lu LMBM=%lu\n",
-                            current_time,
-                            current_time - start_time, pv->mbm_local_delta);
+                ret = mba_sc_mon_poll(&state.group);
+                if (ret != 0)
+                        continue;
 
-                        start_time = current_time;
+                cur_time = get_time_usec();
+                delta_time = cur_time - prev_time;
+                prev_time = cur_time;
+
+                cur_bw = pv->mbm_local_delta * 1000000 / delta_time;
+                state.prev_bw = cur_bw;
+
+                if (state.delta_comp) {
+                        state.delta_comp = 0;
+                        if (cur_bw >= prev_bw)
+                                state.delta_bw = cur_bw - prev_bw;
+                        else
+                                state.delta_bw = prev_bw - cur_bw;
                 }
 
-                sleep(1);
+                DBG("MBA SC: Current BW %lluMBps",
+                    (unsigned long long)bytes_to_mb(cur_bw));
+                if (state.prev_rate > min_rate &&
+                    cur_bw > state.max_bw) {
+                        DBG(" > %lluMBps",
+                            (unsigned long long)bytes_to_mb(state.max_bw));
+                        mba_cfg.mb_rate = state.prev_rate - step_rate;
+                } else if (state.prev_rate < max_rate &&
+                           (cur_bw + state.delta_bw) < state.max_bw) {
+                        DBG(" < %lluMBps",
+                            (unsigned long long)bytes_to_mb(state.max_bw));
+                        mba_cfg.mb_rate = state.prev_rate + step_rate;
+                } else {
+                        if (reg_start_time) {
+                                DBG(" Max BW %lluMBps, regulation took %.1fs\n",
+                                    (unsigned long long)
+                                    bytes_to_mb(state.max_bw),
+                                    (cur_time - reg_start_time) / 1000000.0);
+                                reg_start_time = 0;
+                        } else
+                                DBG("\n");
+                        continue;
+                }
+
+                DBG(", setting MBA to %u%%\n", mba_cfg.mb_rate);
+                ret = mba_sc_mba_set(state.cpumask, &mba_cfg);
+                if (ret != 0) {
+                        DBG(" Failed to update mba rate!\n");
+                        continue;
+                }
+
+                state.prev_rate = mba_cfg.mb_rate;
+                state.delta_comp = 1;
+
+                if (!reg_start_time)
+                        reg_start_time = get_time_usec();
         }
 
-        ret = mba_sc_mon_stop(&group);
+ err:
+        ret = mba_sc_mon_stop(&state.group);
 
         return ret;
 }
