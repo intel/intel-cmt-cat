@@ -1,7 +1,7 @@
 ================================================================================
 README for rdtset
 
-February 2017
+September 2018
 ================================================================================
 
 CONTENTS
@@ -20,6 +20,15 @@ OVERVIEW
 rdtset is a taskset like tool allowing the user to launch a new command with
 a given CPU affinity and Intel(R) Resource Director Technology allocation.
 
+The rdtset tool provides support to set up the CAT (Cache Allocation Technology)
+and MBA (Memory Bandwidth Allocation) capabilities for a task and set its CPU affinity.
+For MBA, rdtset offers two modes of operation, fixed MBA rate
+or closed-loop one monitoring local memory B/W usage and adjust MBA accordingly.
+Intel(R) RDT allocation operations of the utility are done via libpqos library).
+Class of service 0 (CLOS0) is assumed as default one.
+In command mode, rdtset forks and one process executes the command. Another
+process waits for the task to terminate and restores default allocation state
+by assigning cpu's back to CLOS0. This behaviour is not in place in PID mode.
 
 FEATURES
 ========
@@ -56,9 +65,10 @@ Usage: rdtset -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I] (-p <pidlis
 Options:
  -t/--rdt feature=value;...cpu=cpulist specify RDT configuration
   Features:
-   2, l2
-   3, l3
-   m, mba
+   2, l2 for level 2 cache
+   3, l3 for level 3 cache
+   m, mba for MBA
+   b, mba_max for max allowable local memory bandwidth
  -c <cpulist>, --cpu <cpulist>         specify CPUs (affinity)
  -p <pid>, --pid <pid>                 operate on existing PIDs
  -r <cpulist>, --reset <cpulist>       reset allocation for CPUs
@@ -87,7 +97,7 @@ Example allocation configuration strings:
 
     -t 'l3=0xf;cpu=2' -t 'l3=0xf0;cpu=3,4,5'
         CPU 2 uses four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
-        (mask 0xf0), L3 cache-ways used by CPU 2 and 3-4 are non-overlapping
+        (mask 0xf0), L3 cache-ways used by CPU 2 and 3-5 are non-overlapping
 
     -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5'
         CPUs 0-2 share four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
@@ -103,6 +113,9 @@ Example allocation configuration strings:
 
     -t 'mba=50;l3=0xf;cpu=1'
         CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize up to 50% of available memory bandwidth
+
+    -t 'mba_max=2000;cpu=1'
+        Use SW controller to limit local memory B/W to 2000MBps on core 1
 
 Example PID type allocation configuration string (requires -I option):
     -t 'l3=0xf'
@@ -129,6 +142,10 @@ Example usage of RESET option:
 
     -r 0-5 -p $BASHPID
         Reset allocation configuration of CPUs used by BASH process
+
+Example usage of MBA SW controller:
+    -t 'mba_max=1000;cpu=2-3' -c 2-3 memtester 100M
+        Configure CPU affinity for memtester command and limit local memory B/W to 1000MBps
 
 1. Run "id" command to test privilege drop:
  $ sudo rdtset -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 id

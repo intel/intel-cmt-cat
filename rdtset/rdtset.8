@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH RDTSET 8 "February 21, 2017"
+.TH RDTSET 8 "September 13, 2018"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -44,8 +44,9 @@ architecture-and-technology/resource-director-technology.html
 or https://github.com/01org/intel-cmt-cat/wiki
 .PP
 The rdtset tool provides support to set up the CAT (Cache Allocation Technology) and MBA (Memory
-Bandwidth Allocation) capabilities for a task and set its CPU affinity. Current Intel(R) RDT allocation
-operations of the utility are based on controlling MSR registers (via libpqos library). Class of service 0 (CLOS0)
+Bandwidth Allocation) capabilities for a task and set its CPU affinity. For MBA, rdtset offers two modes of operation, fixed MBA rate
+or closed-loop one monitoring local memory B/W usage and adjust MBA accordingly.
+Intel(R) RDT allocation operations of the utility are done via libpqos library). Class of service 0 (CLOS0)
 is assumed as default one. In command mode, rdtset forks and one process executes the command. Another
 process waits for the task to terminate and restores default allocation state by assigning cpu's back to CLOS0.
 This behavior is not in place in PID mode.
@@ -71,6 +72,8 @@ Accepted values for features:
 .B 3, l3   for level 3 cache
 .br
 .B m, mba  for MBA
+.br
+.B b, mba_max for max allowable local memory bandwidth
 
 For example:
 
@@ -101,6 +104,9 @@ CPUs 0-2 can utilize up to 70% of available memory bandwidth
 .B \-t\ 'mba=50;l3=0xf;cpu=1'
 .br
 CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize up to 50% of available memory bandwidth
+
+.B \-t 'mba_max=2000;cpu=1-2'
+Use SW controller to limit local memory B/W on cores 1-2 to 2000MBps (SW controller uses MBL monitoring and adjust MBA rate).
 
 Example PID type allocation configuration (requires -I option):
 

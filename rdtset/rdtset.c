@@ -206,6 +206,7 @@ print_usage(char *prgname, unsigned short_usage)
 		"   2, l2\n"
 		"   3, l3\n"
 		"   m, mba\n"
+                "   b, mba_max\n"
 		" -c <cpulist>, --cpu <cpulist>         "
 		"specify CPUs (affinity)\n"
 		" -p <pidlist>, --pid <pidlist>                 "
@@ -269,6 +270,9 @@ print_usage(char *prgname, unsigned short_usage)
 		"    -t 'mba=50;l3=0xf;cpu=1'\n"
 		"        CPU 1 uses four L3 (mask 0xf) cache-ways and can utilize\n"
 		"        up to 50%% of available memory bandwidth\n\n"
+
+                "    -t 'mba_max=1200;cpu=1'\n"
+                "        Use SW controller to limit local memory B/W to 1200MBps on core 1\n\n"
 	);
 
         printf("Example PID configuration strings:\n"
