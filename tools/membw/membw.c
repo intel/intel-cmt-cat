@@ -40,6 +40,7 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <pthread.h>
+#include <getopt.h>
 
 #ifdef __linux__
 #include <sched.h>
@@ -367,9 +368,9 @@ static void usage(char **argv)
         printf("Usage: %s [-c <cpuid>] [-b <BW [MB/s]>]"
                " -[<operation type>]\n"
                "Operation types:\n"
-               "  -w        write - x86 stores\n"
-               "  -r        read - x86 loads\n"
-               "  -m        read-mod-write - load XOR write\n",
+               "  -w, --write          write - x86 stores\n"
+               "  -r, --read           read - x86 loads\n"
+               "  -m, --read-mod-write read-mod-write - load XOR write\n",
                argv[0]);
 }
 
@@ -419,6 +420,16 @@ int main(int argc, char **argv)
         unsigned mem_bw = 0;
         int cpuid = 0;
         void *private = NULL;
+        int option_index;
+
+        struct option options[] = {
+            {"cpuid",          required_argument, 0, 'c'},
+            {"bandwidth",      required_argument, 0, 'b'},
+            {"write",          no_argument,       0, 'w'},
+            {"read",           no_argument,       0, 'r'},
+            {"read-mod-write", no_argument,       0, 'm'},
+            {0, 0, 0, 0}
+        };
 
         /* Check if user has supplied correct amount of arguments */
         if (argc != 6) {
@@ -427,18 +438,23 @@ int main(int argc, char **argv)
         }
 
         /* Process command line arguments */
-        while ((cmd = getopt(argc, argv, ":c:b:wrm")) != -1) {
+        while ((cmd = getopt_long(argc, argv, ":c:b:wrm", options,
+                &option_index)) != -1) {
                 switch (cmd) {
                 case 'c':
                         cpuid = atoi(optarg);
                         break;
                 case 'b':
-                        if (atoi(optarg) > 0) {
-                                mem_bw = atoi(optarg);
-                                break;
+                        {
+                                int bw = atoi(optarg);
+
+                                if (bw < 0) {
+                                        printf("Invalid B/W specified!\n");
+                                        return EXIT_FAILURE;
+                                }
+                                mem_bw = (unsigned)bw;
                         }
-                        printf("Invalid B/W specified!\n");
-                        return EXIT_FAILURE;
+                        break;
                 case 'w':
                         type = CL_WRITE_TYPE_WB;
                         break;
