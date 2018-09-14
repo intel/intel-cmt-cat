@@ -37,13 +37,16 @@
 #include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
-#include <sched.h>
 #include <signal.h>
 #include <sys/time.h>
 #include <pthread.h>
 
+#ifdef __linux__
+#include <sched.h>
+#endif
+
 #ifdef __FreeBSD__
-#include <malloc.h>
+#include <sys/param.h>
 #include <sys/cpuset.h>
 #endif
 
@@ -51,7 +54,10 @@
  * MACROS
  */
 
+#ifdef __linux__
 #define PAGE_SIZE       (4 * 1024)
+#endif
+
 #define MEMCHUNK_SIZE   (PAGE_SIZE * 32 * 1024) /* 128MB chunk */
 #define CL_SIZE         (64)
 
@@ -93,17 +99,23 @@ static int stop_loop = 0;
  */
 static void set_thread_affinity(const int cpuid)
 {
+#ifdef __linux__
         cpu_set_t cpuset;
+#endif
+#ifdef __FreeBSD__
+        cpuset_t cpuset;
+#endif
         int res = -1;
 
         CPU_ZERO(&cpuset);
         CPU_SET(cpuid, &cpuset);
 
+#ifdef __linux__
         res = sched_setaffinity(0, sizeof(cpuset), &cpuset);
-
+#endif
 #ifdef __FreeBSD__
-    res = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
-                             sizeof(cpuset), &cpuset);
+        res = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
+                                 sizeof(cpuset), &cpuset);
 #endif
         if (res != 0)
                 perror("Error setting core affinity ");
