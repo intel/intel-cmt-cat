@@ -343,9 +343,10 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
 	return (f_c && !f_p && cmd && !f_n) ||
 		(f_c && f_p && !cmd && !f_n) ||
 		(f_r && f_p && !cmd) ||
-                (f_i && f_n && !f_p && cmd) ||
-                (f_i && f_n && f_p && !cmd) ||
-                (!f_i && f_sc);
+		(f_i && f_n && !f_p && cmd) ||
+		(f_i && f_n && f_p && !cmd) ||
+		(!f_i && f_sc && !f_p && cmd) ||
+		(!f_i && f_sc && f_p && !cmd);
 }
 
 /**

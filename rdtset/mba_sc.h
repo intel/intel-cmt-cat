@@ -34,6 +34,7 @@
 #include <unistd.h>
 
 #define MBA_SC_SAMPLING_INTERVAL    100 /**< Sampling interval in ms */
+#define MBA_SC_DEF_INIT_MBA         100 /**< Default, inital MBA value, 100% */
 
 /**
  * @brief Initializes SW controller module

@@ -43,6 +43,7 @@
 
 #include <pqos.h>
 
+#include "mba_sc.h"
 #include "rdt.h"
 #include "cpu.h"
 
@@ -561,8 +562,10 @@ parse_rdt(char *rdtstr)
 				return -EINVAL;
 
 			ret = str_to_uint64(param, 10,
-				            &g_cfg.config[idx].mba_max);
-			if (ret < 0 || g_cfg.config[idx].mba_max == 0)
+				&g_cfg.config[idx].mba_max);
+
+			if (ret != (int)strlen(param) ||
+					g_cfg.config[idx].mba_max == 0)
 				return -EINVAL;
 			break;
 
@@ -578,12 +581,18 @@ parse_rdt(char *rdtstr)
 	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0)
 		g_cfg.config[idx].pid_cfg = 1;
 
-	/* set default MBA value if software controller is used */
-	if (g_cfg.config[idx].mba_max > 0 && !rdt_cfg_is_valid(mba))
-		g_cfg.config[idx].mba.mb_rate = 100;
+	/* if software controller is used ...*/
+	if (g_cfg.config[idx].mba_max > 0) {
+		/* check if "core=" is configured */
+		if (!CPU_COUNT(&g_cfg.config[idx].cpumask))
+			return -EINVAL;
+		/* if initial MBA value is not set, set default (100%) */
+		if (!rdt_cfg_is_valid(mba))
+			g_cfg.config[idx].mba.mb_rate = MBA_SC_DEF_INIT_MBA;
+	}
 
 	if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
-	      rdt_cfg_is_valid(mba) || g_cfg.config[idx].mba_max > 0))
+			rdt_cfg_is_valid(mba)))
 		return -EINVAL;
 
 	g_cfg.config_count++;
