@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2017 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -347,16 +347,15 @@ rmid_alloc(const unsigned cluster,
         }
 
         ret = PQOS_RETVAL_ERROR;
-        for (i = max_rmid; i > 0; i--) {
-                const unsigned tmp_rmid = i - 1;
+        for (i = 0; i < max_rmid; i++) {
                 unsigned j = 0;
 
                 for (j = 0; j < core_count; j++)
-                        if (tmp_rmid == rmid_list[j])
+                        if (i == rmid_list[j])
                                 break;
                 if (j >= core_count) {
                         ret = PQOS_RETVAL_OK;
-                        *rmid = tmp_rmid;
+                        *rmid = i;
                         break;
                 }
         }
