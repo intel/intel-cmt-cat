@@ -274,7 +274,8 @@ start_events(struct pqos_mon_data *group)
  * @retval PQOS_RETVAL_ERROR on error
  */
 static int
-poll_events(struct pqos_mon_data *group) {
+poll_events(struct pqos_mon_data *group)
+{
         unsigned i;
         int ret = PQOS_RETVAL_OK;
 
@@ -367,7 +368,8 @@ os_mon_fini(void)
 }
 
 int
-os_mon_reset(void) {
+os_mon_reset(void)
+{
         return resctrl_mon_reset();
 }
 
@@ -527,7 +529,8 @@ tid_exists(const pid_t tid, const unsigned tid_nr, const pid_t *tid_map)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-tid_add(const pid_t tid, unsigned *tid_nr, pid_t **tid_map) {
+tid_add(const pid_t tid, unsigned *tid_nr, pid_t **tid_map)
+{
         pid_t *tids;
 
         if (tid_exists(tid, *tid_nr, *tid_map))

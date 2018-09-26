@@ -527,8 +527,8 @@ os_alloc_reset_cores(void)
  */
 static int
 os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
-		     const struct pqos_cap_l2ca *l2_cap){
-
+                         const struct pqos_cap_l2ca *l2_cap)
+{
 	const unsigned default_mba = 100;
 	uint64_t default_l3ca = 0;
 	uint64_t default_l2ca = 0;

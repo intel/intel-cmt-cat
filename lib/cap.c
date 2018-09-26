@@ -1289,7 +1289,8 @@ detect_os_support(const char *fname, const char *str, int *supported)
  * @retval PQOS_RETVAL_OK success
  */
 static int
-detect_resctrl_support(const enum pqos_mon_event event, int *supported) {
+detect_resctrl_support(const enum pqos_mon_event event, int *supported)
+{
         char buf[128];
         struct stat st;
         const char *event_name = NULL;

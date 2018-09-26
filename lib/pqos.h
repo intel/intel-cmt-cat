@@ -127,7 +127,8 @@ enum pqos_cdp_config {
  */
 struct pqos_config {
         int fd_log;
-        void (*callback_log)(void *, const size_t, const char *);
+        void (*callback_log)(void *context, const size_t size,
+                             const char *message);
         void *context_log;
         int verbose;
         enum pqos_interface interface;

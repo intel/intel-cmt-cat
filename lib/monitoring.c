@@ -549,8 +549,8 @@ mon_read(const unsigned lcore,
         for (retries = 0; retries < 4; retries++) {
                 if (flag_wrt) {
                         if (msr_write(lcore, PQOS_MSR_MON_EVTSEL,
-                              val_evtsel) != MACHINE_RETVAL_OK)
-                        break;
+                                      val_evtsel) != MACHINE_RETVAL_OK)
+                                break;
                 }
                 if (msr_read(lcore, PQOS_MSR_MON_QMC,
                              &val) != MACHINE_RETVAL_OK)

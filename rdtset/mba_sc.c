@@ -132,7 +132,8 @@ mba_sc_mon_stop(struct pqos_mon_data *group)
  * @retval negative on error (-errno)
  */
 static int
-mba_sc_mon_poll(struct pqos_mon_data *group) {
+mba_sc_mon_poll(struct pqos_mon_data *group)
+{
         int ret;
 
         ret = pqos_mon_poll(&group, 1);

@@ -432,7 +432,7 @@ pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                           /**< no L3CA capability */
+                return ret;                          /**< no L3CA capability */
 
         ASSERT(item != NULL);
         *cos_num = item->u.l3ca->num_classes;
@@ -452,7 +452,7 @@ pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                           /**< no L2CA capability */
+                return ret;                          /**< no L2CA capability */
 
         ASSERT(item != NULL);
         *cos_num = item->u.l2ca->num_classes;
@@ -472,7 +472,7 @@ pqos_mba_get_cos_num(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                           /**< no MBA capability */
+                return ret;                          /**< no MBA capability */
 
         ASSERT(item != NULL);
         *cos_num = item->u.mba->num_classes;
@@ -493,7 +493,7 @@ pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                           /**< no L3CA capability */
+                return ret;                          /**< no L3CA capability */
 
         ASSERT(item != NULL);
         if (cdp_supported != NULL) {
@@ -522,7 +522,7 @@ pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &l2ca);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                           /**< no L2CA capability */
+                return ret;                          /**< no L2CA capability */
 
         ASSERT(l2ca != NULL);
         if (cdp_supported != NULL) {
