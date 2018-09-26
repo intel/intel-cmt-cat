@@ -53,7 +53,8 @@ parse_cpu(const char *cpustr)
 int
 set_affinity(pid_t pid)
 {
-	int ret = 0;
+	int ret;
+	cpu_set_t cpumask;
 
 	/* Set affinity */
 #ifdef __linux__
@@ -70,8 +71,27 @@ set_affinity(pid_t pid)
 		ret = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, pid,
 			sizeof(g_cfg.cpu_aff_cpuset), &g_cfg.cpu_aff_cpuset);
 #endif
+	if (ret != 0)
+		return ret;
 
-	return ret;
+	/* Verify affinity settings */
+#ifdef __linux__
+	ret = sched_getaffinity(pid, sizeof(cpumask), &cpumask);
+	if (ret != 0 || !CPU_EQUAL(&cpumask, &g_cfg.cpu_aff_cpuset))
+		return -1;
+#endif
+#ifdef __FreeBSD__
+	if (pid == 0)
+		ret = cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
+			sizeof(cpumask), &cpumask);
+	else
+		ret = cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_PID, pid,
+			sizeof(cpumask), &cpumask);
+	if (ret != 0 || CPU_CMP(&cpumask, &g_cfg.cpu_aff_cpuset))
+		return -1;
+#endif
+
+	return 0;
 }
 
 void
