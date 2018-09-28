@@ -327,8 +327,6 @@ rmid_alloc(const unsigned cluster,
 
         /**
          * Check for free RMID in the cluster by reading current associations.
-         * Do it backwards (from max to 0) in order to preserve low RMID values
-         * for overlapping RMID ranges for future events.
          */
         core_list = pqos_cpu_get_cores_l3id(m_cpu, cluster, &core_count);
         if (core_list == NULL)
@@ -347,7 +345,7 @@ rmid_alloc(const unsigned cluster,
         }
 
         ret = PQOS_RETVAL_ERROR;
-        for (i = 0; i < max_rmid; i++) {
+        for (i = 1; i < max_rmid; i++) {
                 unsigned j = 0;
 
                 for (j = 0; j < core_count; j++)
