@@ -31,6 +31,9 @@
  */
 
 #define _GNU_SOURCE
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -78,6 +81,7 @@
  * Define read and write types
  */
 enum cl_type {
+        CL_WRITE_TYPE_INVALID,
         CL_WRITE_TYPE_WB,
         CL_WRITE_TYPE_READ_MOD_WRITE,
         CL_READ_TYPE_WB,
@@ -98,7 +102,7 @@ static int stop_loop = 0;
  *
  * @param cpuid cpu to bind thread to
  */
-static void set_thread_affinity(const int cpuid)
+static void set_thread_affinity(const unsigned cpuid)
 {
 #ifdef __linux__
         cpu_set_t cpuset;
@@ -109,7 +113,7 @@ static void set_thread_affinity(const int cpuid)
         int res = -1;
 
         CPU_ZERO(&cpuset);
-        CPU_SET(cpuid, &cpuset);
+        CPU_SET((int)cpuid, &cpuset);
 
 #ifdef __linux__
         res = sched_setaffinity(0, sizeof(cpuset), &cpuset);
@@ -365,8 +369,8 @@ mem_execute(void *p, size_t s, const unsigned bw, const enum cl_type type)
  */
 static void usage(char **argv)
 {
-        printf("Usage: %s [-c <cpuid>] [-b <BW [MB/s]>]"
-               " -[<operation type>]\n"
+        printf("Usage: %s -c <cpuid> -b <BW [MB/s]>"
+               " (-w | -r | -m)\n"
                "Operation types:\n"
                "  -w, --write          write - x86 stores\n"
                "  -r, --read           read - x86 loads\n"
@@ -413,14 +417,52 @@ static void nano_sleep(const long interval, long usec_diff)
         }
 }
 
+/**
+ * @brief Converts string str to UINT
+ *
+ * @param [in] str string
+ * @param [in] base numerical base
+ * @param [out] value UINT value
+ *
+ * @return number of parsed characters
+ * @retval positive on success
+ * @retval negative on error (-errno)
+ */
+static int
+str_to_uint(const char *str, const unsigned base, unsigned *value)
+{
+        const char *str_start = str;
+        char *str_end = NULL;
+
+        if (NULL == str || NULL == value)
+                return -EINVAL;
+
+        while (isblank(*str_start))
+                str_start++;
+
+        if (base == 10 && !isdigit(*str_start))
+                return -EINVAL;
+
+        if (base == 16 && !isxdigit(*str_start))
+                return -EINVAL;
+
+        errno = 0;
+        *value = strtoul(str_start, &str_end, base);
+        if (errno != 0 || str_end == NULL || str_end == str_start)
+                return -EINVAL;
+
+        return str_end - str;
+}
+
 int main(int argc, char **argv)
 {
         int cmd = EXIT_SUCCESS;
-        enum cl_type type = 0;
+        enum cl_type type = CL_WRITE_TYPE_INVALID;
         unsigned mem_bw = 0;
-        int cpuid = 0;
+        unsigned cpuid = UINT_MAX;
         void *private = NULL;
         int option_index;
+        int ret;
 
         struct option options[] = {
             {"cpuid",          required_argument, 0, 'c'},
@@ -431,28 +473,22 @@ int main(int argc, char **argv)
             {0, 0, 0, 0}
         };
 
-        /* Check if user has supplied correct amount of arguments */
-        if (argc != 6) {
-                usage(argv);
-                return EXIT_FAILURE;
-        }
-
         /* Process command line arguments */
         while ((cmd = getopt_long(argc, argv, ":c:b:wrm", options,
                 &option_index)) != -1) {
                 switch (cmd) {
                 case 'c':
-                        cpuid = atoi(optarg);
+                        ret = str_to_uint(optarg, 10, &cpuid);
+                        if (ret != (int)strlen(optarg)) {
+                                printf("Invalid cpuid specified!\n");
+                                return EXIT_FAILURE;
+                        }
                         break;
                 case 'b':
-                        {
-                                int bw = atoi(optarg);
-
-                                if (bw < 0) {
-                                        printf("Invalid B/W specified!\n");
-                                        return EXIT_FAILURE;
-                                }
-                                mem_bw = (unsigned)bw;
+                        ret = str_to_uint(optarg, 10, &mem_bw);
+                        if (ret != (int)strlen(optarg) || !mem_bw) {
+                                printf("Invalid B/W specified!\n");
+                                return EXIT_FAILURE;
                         }
                         break;
                 case 'w':
@@ -471,7 +507,14 @@ int main(int argc, char **argv)
                 }
         }
 
-        printf("- THREAD logical core id: %d, "
+        /* Check if user has supplied all required arguments */
+        if (type == CL_WRITE_TYPE_INVALID || cpuid == UINT_MAX || !mem_bw
+                        || optind < argc) {
+                usage(argv);
+                return EXIT_FAILURE;
+        }
+
+        printf("- THREAD logical core id: %u, "
                " memory bandwidth [MB]: %u, starting...\n",
                cpuid, mem_bw);
 
