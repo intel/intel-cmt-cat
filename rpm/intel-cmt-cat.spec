@@ -1,4 +1,4 @@
-# Copyright (c) 2016-2017, Intel Corporation
+# Copyright (c) 2016-2018, Intel Corporation
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are met:
@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    2.0.0
+%global githubver    2.1.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -57,7 +57,7 @@ Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
 Cache Allocation Technology (CAT), Memory Bandwidth Allocation (MBA),
 and Code Data Prioratization (CDP).
 
-CMT, MBM and CAT are configured using Model Specific Registers (MSRs)
+CMT, MBM, CAT and MBA are configured using Model Specific Registers (MSRs)
 to measure last level cache occupancy, set up the class of service masks and
 manage the association of the cores/logical threads to a class of service.
 The software executes in user space, and access to the MSRs is
@@ -131,11 +131,13 @@ install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_usrsrc}/%{git
 
 install -d %{buildroot}/%{_usrsrc}/%{githubfull}/c
 
-install -d %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
-install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/Makefile          %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
-install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/reset_app.c       %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
-install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/allocation_app.c  %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
-install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT/association_app.c %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT
+install -d %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT_MBA
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT_MBA/Makefile          %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT_MBA
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT_MBA/reset_app.c       %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT_MBA
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT_MBA/allocation_app_l2cat.c  %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT_MBA
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT_MBA/allocation_app_l3cat.c  %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT_MBA
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT_MBA/allocation_app_mba.c  %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT_MBA
+install -m 0644 %{_builddir}/%{githubfull}/examples/c/CAT_MBA/association_app.c %{buildroot}/%{_usrsrc}/%{githubfull}/c/CAT_MBA
 
 install -d %{buildroot}/%{_usrsrc}/%{githubfull}/c/CMT_MBM
 install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/Makefile      %{buildroot}/%{_usrsrc}/%{githubfull}/c/CMT_MBM
@@ -160,15 +162,20 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %{_libdir}/libpqos.so
 %{_libdir}/libpqos.so.2
 %{_includedir}/pqos.h
-%{_usrsrc}/%{githubfull}/c/CAT/Makefile
-%{_usrsrc}/%{githubfull}/c/CAT/reset_app.c
-%{_usrsrc}/%{githubfull}/c/CAT/association_app.c
-%{_usrsrc}/%{githubfull}/c/CAT/allocation_app.c
+%{_usrsrc}/%{githubfull}/c/CAT_MBA/Makefile
+%{_usrsrc}/%{githubfull}/c/CAT_MBA/reset_app.c
+%{_usrsrc}/%{githubfull}/c/CAT_MBA/association_app.c
+%{_usrsrc}/%{githubfull}/c/CAT_MBA/allocation_app_l2cat.c
+%{_usrsrc}/%{githubfull}/c/CAT_MBA/allocation_app_l3cat.c
+%{_usrsrc}/%{githubfull}/c/CAT_MBA/allocation_app_mba.c
 %{_usrsrc}/%{githubfull}/c/CMT_MBM/Makefile
 %{_usrsrc}/%{githubfull}/c/CMT_MBM/monitor_app.c
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Fri Oct 11 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 2.1.0-1
+- New release 2.1.0
+
 * Mon Jun 18 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 2.0.0-1
 - New release 2.0.0
 
