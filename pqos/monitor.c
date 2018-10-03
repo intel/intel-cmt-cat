@@ -53,7 +53,7 @@
 #include "main.h"
 #include "monitor.h"
 
-#define PQOS_MAX_PID_MON_GROUPS         128
+#define PQOS_MAX_PID_MON_GROUPS         256
 #define PQOS_MON_EVENT_ALL    -1
 #define PID_COL_STATUS (3) /**< col for process status letter*/
 #define PID_COL_UTIME (14) /**< col for cpu-user time in /proc/pid/stat*/
@@ -972,16 +972,21 @@ parse_monitor_pids(char *str)
 {
         int i = 0, n = 0;
         enum pqos_mon_event evt = (enum pqos_mon_event)0;
-        struct pid_group pgrp_tab[PQOS_MAX_PID_MON_GROUPS];
+        struct pid_group *pgrp_tab = calloc(PQOS_MAX_PID_MON_GROUPS,
+                                            sizeof(*pgrp_tab));
 
-        memset(pgrp_tab, 0, sizeof(pgrp_tab));
+        if (pgrp_tab == NULL) {
+                printf("Error with memory allocation!\n");
+                exit(EXIT_FAILURE);
+        }
+
         parse_event(str, &evt);
 
         n = strtogrps(strchr(str, ':') + 1, NULL, pgrp_tab,
                       PQOS_MAX_PID_MON_GROUPS);
         if (n < 0) {
                 printf("Error: Too many pids/groups selected\n");
-                exit(EXIT_FAILURE);
+                goto error_exit;
         } else if (n == 0)
                 parse_error(str, "No process id selected for monitoring");
 
@@ -990,6 +995,13 @@ parse_monitor_pids(char *str)
                         free(pgrp_tab[i].pids);
                         free(pgrp_tab[i].desc);
                 }
+
+        free(pgrp_tab);
+        return;
+
+ error_exit:
+        free(pgrp_tab);
+        exit(EXIT_FAILURE);
 }
 
 /**
