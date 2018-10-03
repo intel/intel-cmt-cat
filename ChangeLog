@@ -1,4 +1,29 @@
 =======================================================================
+Release  v2.1  2018-..-..
+=======================================================================
+
+Contributors (alphabetical order):
+        Khawar Abbasi <khawar.abbasi@intel.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Markus Lehtonen <markus.lehtonen@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+        Veronika Karpenko <veronika.karpenko@intel.com>
+
+Summary:
+1. Library
+        - Reversed RMID allocation
+2. rdtset Utility
+        - Added support for MSR based MBA software controller
+3. Examples
+        - Added MBA example application
+        - Added L2CAT example application
+4. membw
+        - Added tool for generation of memory bandwidth
+5. General
+        - Bug fixes
+
+=======================================================================
 Release  v2.0  2018-06-26
 =======================================================================
 
