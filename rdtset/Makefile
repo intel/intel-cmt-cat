@@ -48,6 +48,9 @@ CFLAGS = -I$(LIBDIR) \
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
+ifneq ($(EXTRA_LDFLAGS),)
+LDFLAGS += $(EXTRA_LDFLAGS)
+endif
 
 # ICC and GCC options
 ifeq ($(CC),icc)
