@@ -569,8 +569,8 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 		}
 
 		for (j = 0; j < schmt.l3ca_num; j++) {
-			 /* l3ca_num should be greater
-			  * than 0 if l3_cap is provided */
+			/* l3ca_num should be greater
+			 * than 0 if l3_cap is provided */
 			ASSERT(l3_cap != NULL);
 			if (schmt.l3ca[j].cdp) {
 				schmt.l3ca[j].u.s.code_mask = default_l3ca;
@@ -651,7 +651,7 @@ os_alloc_reset_tasks(void)
 	struct dirent **pids_list = NULL;
 	int pid_count;
 	int pid_idx;
-	int alloc_result;
+	int alloc_result = PQOS_RETVAL_ERROR;
 	pid_t pid;
 	const int cos0 = 0;
 
@@ -662,23 +662,23 @@ os_alloc_reset_tasks(void)
 	for (pid_idx = 0; pid_idx < pid_count; ++pid_idx) {
 		pid = atoi(pids_list[pid_idx]->d_name);
 		alloc_result = os_alloc_assoc_set_pid(pid, cos0);
-		if (alloc_result != PQOS_RETVAL_OK) {
-                        int result;
-
-                        result = resctrl_alloc_task_validate(pid);
-                        if (result != PQOS_RETVAL_OK) {
-                                LOG_DEBUG("Task %d no longer exists\n", pid);
-                                alloc_result = PQOS_RETVAL_OK;
-                                continue;
-                        }
-
+		if (alloc_result == PQOS_RETVAL_PARAM) {
+			LOG_DEBUG("Task %d no longer exists\n", pid);
+			alloc_result = PQOS_RETVAL_OK;
+		} else if (alloc_result != PQOS_RETVAL_OK) {
 			LOG_ERROR("Error allocating task %d to COS%u\n",
-				   pid, cos0);
-			return alloc_result;
+			          pid, cos0);
+			break;
 		}
 	}
 
-	return PQOS_RETVAL_OK;
+	if (pid_count > 0 && pids_list) {
+		while (pid_count--)
+			free(pids_list[pid_count]);
+		free(pids_list);
+	}
+
+	return alloc_result;
 }
 
 /**

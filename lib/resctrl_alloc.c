@@ -32,6 +32,7 @@
  *
  */
 
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -753,21 +754,10 @@ resctrl_alloc_schemata_write_exit:
 int
 resctrl_alloc_task_validate(const pid_t task)
 {
-	DIR *dir;
-	char buf[64];
+	if (kill(task, 0) == 0)
+		return PQOS_RETVAL_OK;
 
-	memset(buf, 0, sizeof(buf));
-	snprintf(buf, sizeof(buf)-1, "/proc/%d", (int)task);
-
-	dir = opendir(buf);
-	if (dir == NULL)
-		return PQOS_RETVAL_ERROR;
-	closedir(dir);
-
-	if (access(buf, F_OK) != 0)
-		return PQOS_RETVAL_ERROR;
-
-	return PQOS_RETVAL_OK;
+	return PQOS_RETVAL_ERROR;
 }
 
 int
@@ -794,7 +784,13 @@ resctrl_alloc_task_write(const unsigned class_id, const pid_t task)
 		resctrl_alloc_fclose(fd);
 		return PQOS_RETVAL_ERROR;
 	}
+
+	errno = 0;
 	ret = resctrl_alloc_fclose(fd);
+	if (ret != PQOS_RETVAL_OK && errno == ESRCH) {
+		LOG_ERROR("Task %d does not exist! fclose\n", (int)task);
+		ret = PQOS_RETVAL_PARAM;
+	}
 
 	return ret;
 }
