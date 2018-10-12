@@ -426,7 +426,7 @@ resctrl_mon_read_counters(const unsigned class_id,
         }
 
         for (socket = 0; socket < sockets_num; socket++) {
-                char path[128];
+                char path[PATH_MAX];
                 FILE *fd;
                 unsigned long long counter;
 
