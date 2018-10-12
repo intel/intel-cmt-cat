@@ -54,11 +54,17 @@
 #define CAT_UPDATE_SCOPE_CODE 2    /**< update COS code mask */
 
 /**
+ * Length of max unit64_t value in DEC string
+ * + single char for code or data + '\0'
+ */
+#define MAX_COS_MASK_STR_LEN  22
+
+/**
  * Allocation type selected
  */
 enum sel_alloc_type {
-	L3CA,
-	L2CA,
+        L3CA,
+        L2CA,
         MBA
 };
 
@@ -133,7 +139,13 @@ parse_cos_mask_type(char *str, int *scope, unsigned *id)
         ASSERT(str != NULL);
         ASSERT(scope != NULL);
         ASSERT(id != NULL);
-        len = strlen(str);
+
+        len = strnlen(str, (size_t)MAX_COS_MASK_STR_LEN);
+        if (len == MAX_COS_MASK_STR_LEN) {
+                printf("Error converting allocation COS string!\n");
+                exit(EXIT_FAILURE);
+        }
+
         if (len > 1 && (str[len - 1] == 'c' || str[len - 1] == 'C')) {
                 *scope = CAT_UPDATE_SCOPE_CODE;
                 str[len - 1] = '\0';
@@ -591,7 +603,7 @@ void selfn_allocation_class(const char *arg)
         if (arg == NULL)
                 parse_error(arg, "NULL pointer!");
 
-        if (strlen(arg) <= 0)
+        if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
         selfn_strdup(&cp, arg);
@@ -835,7 +847,7 @@ void selfn_allocation_assoc(const char *arg)
         if (arg == NULL)
                 parse_error(arg, "NULL pointer!");
 
-        if (strlen(arg) <= 0)
+        if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
         selfn_strdup(&cp, arg);

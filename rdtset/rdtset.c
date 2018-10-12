@@ -413,7 +413,7 @@ parse_args(int argc, char **argv)
 		{ NULL, 0, 0, 0 } };
 
 	while ((opt = getopt_long(argc, argvopt,
-                                  "+c:p:r:t:kvIh", lgopts, NULL)) != -1) {
+	                          "+c:p:r:t:kvIh", lgopts, NULL)) != -1) {
 		switch (opt) {
 		case 'c':
 			retval = parse_cpu(optarg);
@@ -423,7 +423,7 @@ parse_args(int argc, char **argv)
 			}
 			break;
 		case 'p':
-                        retval = parse_pids(optarg);
+			retval = parse_pids(optarg);
 			if (retval != 0) {
 				fprintf(stderr, "Invalid PID parameters!\n");
 				goto exit;

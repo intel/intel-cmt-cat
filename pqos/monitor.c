@@ -219,14 +219,24 @@ static inline int process_mode(void)
  * @param buf buffer string will be copied into
  * @param buf_len length of buffer
  * @param val value to be translated
+ *
+ * @return length of generated string
+ * @retval < 0 on error
  */
-static void
+static int
 uinttostr_noalloc(char *buf, const int buf_len, const unsigned val)
 {
         ASSERT(buf != NULL);
+        int ret;
 
         memset(buf, 0, buf_len);
-        snprintf(buf, buf_len, "%u", val);
+        ret = snprintf(buf, buf_len, "%u", val);
+
+        /* Return -1 when output was truncated */
+        if (ret >= buf_len)
+                ret = -1;
+
+        return ret;
 }
 
 /**
@@ -241,7 +251,7 @@ static char *uinttostr(const unsigned val)
 {
         char buf[16], *str = NULL;
 
-        uinttostr_noalloc(buf, sizeof(buf), val);
+        (void)uinttostr_noalloc(buf, sizeof(buf), val);
         selfn_strdup(&str, buf);
 
         return str;
@@ -359,12 +369,10 @@ strtogrps(char *s,
                 return group_count;
 
         while ((non_grp = strsep(&s, "[")) != NULL) {
-
-                int ret;
                 /**
                  * Ungrouped cores/pids
                  */
-                if ((strlen(non_grp)) > 0) {
+                if (*non_grp != '\0') {
                         /* for seperate cores/pids - each will get his own
                          * group so strlisttotab result is treated as the
                          * number of new groups
@@ -378,6 +386,7 @@ strtogrps(char *s,
                         /* set group info */
                         for (i = 0; i < new_groups_count; i++) {
                                 char *desc = uinttostr((unsigned)cbuf[i]);
+                                int ret;
 
                                 if (ctab != NULL)
                                         ret = set_cgrp(&ctab[group_count],
@@ -400,6 +409,7 @@ strtogrps(char *s,
                 if (grp != NULL) {
                         char *desc = NULL;
                         unsigned element_count;
+                        int ret;
 
                         if (group_count >= max)
                                 return -1;
@@ -643,7 +653,7 @@ void selfn_monitor_cores(const char *arg)
         if (arg == NULL)
                 parse_error(arg, "NULL pointer!");
 
-        if (strlen(arg) <= 0)
+        if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
         selfn_strdup(&cp, arg);
@@ -1019,7 +1029,7 @@ selfn_monitor_pids(const char *arg)
         if (arg == NULL)
                 parse_error(arg, "NULL pointer!");
 
-        if (strlen(arg) <= 0)
+        if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
         selfn_strdup(&cp, arg);
@@ -1240,7 +1250,9 @@ get_pid_core_num(const pid_t pid, unsigned *core)
                 return -1;
 
         memset(core_s, 0, sizeof(core_s));
-        uinttostr_noalloc(pid_s, sizeof(pid_s), pid);
+        ret = uinttostr_noalloc(pid_s, sizeof(pid_s), pid);
+        if (ret < 0)
+                return -1;
 
         ret = get_pid_stat_val(pid_s, PID_COL_CORE, sizeof(core_s), core_s);
         if (ret != 0)
@@ -1324,9 +1336,12 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
                 if (i != 0 && cores[i] == cores[i-1])
                         continue;
 
-                uinttostr_noalloc(core, sizeof(core), cores[i]);
+                str_len = uinttostr_noalloc(core, sizeof(core), cores[i]);
+                if (str_len < 0) {
+                        free(cores);
+                        return -1;
+                }
 
-                str_len = strlen(core);
                 cores_s_len = strlen(cores_s);
 
                 if (i != 0 && (cores_s_len + str_len + comma_len) < len) {
@@ -2066,7 +2081,7 @@ print_text_row(FILE *fp,
                 if (get_pid_cores(mon_data, core_list,
                                   sizeof(core_list)) == -1) {
                         memset(core_list, 0, sizeof(core_list));
-                        strcat(core_list, "err");
+                        strncat(core_list, "err", sizeof(core_list) - 1);
                 }
 
                 fprintf(fp, "\n%8.8s %8.8s %6.2f %7uk%s",
@@ -2140,7 +2155,7 @@ print_xml_row(FILE *fp, char *time,
                 if (get_pid_cores(mon_data, core_list,
                                   sizeof(core_list)) == -1) {
                         memset(core_list, 0, sizeof(core_list));
-                        strcat(core_list, "err");
+                        strncat(core_list, "err", sizeof(core_list) - 1);
                 }
 
                 fprintf(fp,
@@ -2216,7 +2231,7 @@ print_csv_row(FILE *fp, char *time,
                 if (get_pid_cores(mon_data, core_list,
                                   sizeof(core_list)) == -1) {
                         memset(core_list, 0, sizeof(core_list));
-                        strcat(core_list, "err");
+                        strncat(core_list, "err", sizeof(core_list) - 1);
                 }
 
                 fprintf(fp,

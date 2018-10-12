@@ -73,6 +73,8 @@
 #define ALWAYS_INLINE inline __attribute__((always_inline))
 #endif
 
+#define MAX_OPTARG_LEN  64
+
 /**
  * DATA STRUCTURES
  */
@@ -479,14 +481,15 @@ int main(int argc, char **argv)
                 switch (cmd) {
                 case 'c':
                         ret = str_to_uint(optarg, 10, &cpuid);
-                        if (ret != (int)strlen(optarg)) {
+                        if (ret != (int)strnlen(optarg, MAX_OPTARG_LEN)) {
                                 printf("Invalid cpuid specified!\n");
                                 return EXIT_FAILURE;
                         }
                         break;
                 case 'b':
                         ret = str_to_uint(optarg, 10, &mem_bw);
-                        if (ret != (int)strlen(optarg) || !mem_bw) {
+                        if (ret != (int)strnlen(optarg, MAX_OPTARG_LEN)
+                                        || !mem_bw) {
                                 printf("Invalid B/W specified!\n");
                                 return EXIT_FAILURE;
                         }

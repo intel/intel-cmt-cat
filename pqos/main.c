@@ -308,7 +308,7 @@ selfn_super_verbose_mode(const char *arg)
  */
 static void selfn_reset_alloc(const char *arg)
 {
-        if (arg != NULL && (strlen(arg) > 0)) {
+        if (arg != NULL && *arg != '\0') {
                 unsigned i;
                 char *tok = NULL;
                 char *saveptr = NULL;

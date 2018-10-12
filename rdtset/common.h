@@ -44,9 +44,8 @@
 extern "C" {
 #endif
 
-#define RDT_MAX_SOCKETS 8
-#define RDT_MAX_L2IDS   32
 #define RDT_MAX_PIDS    128
+#define MAX_OPTARG_LEN  64
 
 #ifndef MIN
 /**

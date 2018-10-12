@@ -353,8 +353,11 @@ parse_mask_set(const char *cbm, const int force_dual_mask, uint64_t *mask,
 int
 parse_reset(const char *cpustr)
 {
-	unsigned cpustr_len = strlen(cpustr);
 	int ret = 0;
+	const unsigned cpustr_len = strnlen(cpustr, MAX_OPTARG_LEN);
+
+	if (cpustr_len == MAX_OPTARG_LEN)
+		return -EINVAL;
 
 	ret = str_to_cpuset(cpustr, cpustr_len, &g_cfg.reset_cpuset);
 	return ret > 0 ? 0 : ret;
