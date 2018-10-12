@@ -812,9 +812,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                  * Stop mon groups that are already started
                                  */
                                 for (j = 0; j < i; j++) {
-                                        struct core_group *cg =
-                                                &sel_monitor_core_tab[j];
-
+                                        cg = &sel_monitor_core_tab[j];
                                         pqos_mon_stop(cg->pgrp);
                                 }
                                 return -1;
@@ -857,9 +855,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                  * Stop mon groups that are already started
                                  */
                                 for (j = 0; j < i; j++) {
-                                        struct pid_group *pg =
-                                                &sel_monitor_pid_tab[j];
-
+                                        pg = &sel_monitor_pid_tab[j];
                                         pqos_mon_stop(pg->pgrp);
                                 }
                                 return -1;
