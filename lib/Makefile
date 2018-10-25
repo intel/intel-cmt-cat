@@ -104,7 +104,7 @@ all: $(LIBNAME)
 
 $(LIBNAME): $(OBJS)
 ifeq ($(SHARED),y)
-	$(CC) -shared -Wl,-soname,$(LIB).so.$(SO_VERSION) -o $(LIBNAME) $^ -lc
+	$(CC) $(LDFLAGS) -shared -Wl,-soname,$(LIB).so.$(SO_VERSION) -o $(LIBNAME) $^ -lc
 	ln -f -s $(LIBNAME) $(LIB).so.$(SO_VERSION)
 	ln -f -s $(LIB).so.$(SO_VERSION) $(LIB).so
 else
