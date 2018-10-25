@@ -48,6 +48,9 @@ CFLAGS = -pthread -I./ -D_GNU_SOURCE \
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
+ifneq ($(EXTRA_LDFLAGS),)
+LDFLAGS += $(EXTRA_LDFLAGS)
+endif
 
 DOXY_DIRS = doc_api doc_lib
 
