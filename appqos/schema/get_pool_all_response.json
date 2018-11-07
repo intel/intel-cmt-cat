@@ -1,0 +1,9 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get pool",
+  "description": "GET all POOLs results, URI /pools",
+  "type": "array",
+
+  "items": { "$ref": "definitions.json#/pool_api_get"}
+}

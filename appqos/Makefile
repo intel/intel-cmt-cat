@@ -1,10 +1,10 @@
 ###############################################################################
-# Makefile script for PQoS sample application
+# Makefile script for AppQoS POC
 #
 # @par
 # BSD LICENSE
 #
-# Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
+# Copyright(c) 2019 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,74 +32,68 @@
 # THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
 ###############################################################################
 
-# XXX: modify as desired
-PREFIX ?= /usr/local
-export PREFIX
+PYTHON_INCLUDES?=$(shell python2.7-config --includes)
+INCLUDES=$(PYTHON_INCLUDES)
+LIBS=-lpython2.7
+CCFLAGS=-shared -fPIC
 
-ifdef DEBUG
-export DEBUG
-endif
+KERNEL_VER = $(shell uname -r | cut -f1,2 -d'.')
+KERNEL_MIN_VER_REQ = $(shell echo $(KERNEL_VER)\>=3.9 | bc )
 
-ifdef SHARED
-export SHARED
-endif
-
-.PHONY: all clean TAGS install uninstall style cppcheck
-
+ifeq ($(KERNEL_MIN_VER_REQ),0)
 all:
-	$(MAKE) -C lib
-	$(MAKE) -C pqos
-	$(MAKE) -C rdtset
-	$(MAKE) -C tools/membw
-	$(MAKE) -C examples/c/CAT_MBA
-	$(MAKE) -C examples/c/CMT_MBM
-	$(MAKE) -C examples/c/PSEUDO_LOCK
-ifeq ($(shell uname), Linux)
-	$(MAKE) -C appqos
+	@echo "Kernel 3.9 or newer required, skipping"
+else
+all: perf_api kernel_module
 endif
+
+perf_api:
+	$(CC) $(CCFLAGS) $(INCLUDES) $(LIBS) -o perfapi.so perfapi.c
+
+kernel_module:
+	$(MAKE) -C pid_cache_flush
 
 clean:
-	$(MAKE) -C lib clean
-	$(MAKE) -C pqos clean
-	$(MAKE) -C rdtset clean
-	$(MAKE) -C tools/membw clean
-	$(MAKE) -C examples/c/CAT_MBA clean
-	$(MAKE) -C examples/c/CMT_MBM clean
-	$(MAKE) -C examples/c/PSEUDO_LOCK clean
-	$(MAKE) -C appqos clean
+	-rm -f perfapi.so
+	$(MAKE) -C pid_cache_flush clean
 
-style:
-	$(MAKE) -C lib style
-	$(MAKE) -C pqos style
-	$(MAKE) -C rdtset style
-	$(MAKE) -C tools/membw style
-	$(MAKE) -C examples/c/CAT_MBA style
-	$(MAKE) -C examples/c/CMT_MBM style
-	$(MAKE) -C examples/c/PSEUDO_LOCK style
-	$(MAKE) -C appqos style
+.PHONY: test cov style pylint_style kernel_module_style perf_api_style virtual_env
+.PHONY: cppcheck kernel_module_cppcheck perf_api_cppcheck
 
-cppcheck:
-	$(MAKE) -C lib cppcheck
-	$(MAKE) -C pqos cppcheck
-	$(MAKE) -C rdtset cppcheck
-	$(MAKE) -C tools/membw cppcheck
-	$(MAKE) -C examples/c/CAT_MBA cppcheck
-	$(MAKE) -C examples/c/CMT_MBM cppcheck
-	$(MAKE) -C examples/c/PSEUDO_LOCK cppcheck
-	$(MAKE) -C appqos cppcheck
+test: perf_api
+	PYTHONPATH=. pytest tests/
 
-install:
-	$(MAKE) -C lib install
-	$(MAKE) -C pqos install
-	$(MAKE) -C rdtset install
+cov: perf_api
+	PYTHONPATH=. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/
 
-uninstall:
-	$(MAKE) -C lib uninstall
-	$(MAKE) -C pqos uninstall
-	$(MAKE) -C rdtset uninstall
+style: kernel_module_style perf_api_style pylint_style
 
-TAGS:
-	find ./ -name "*.[ch]" -print | etags -
+virtual_env:
+	@bash -c "virtualenv $(CURDIR)/virtual_env"
+	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+		python -m pip install -r $(CURDIR)/requirements.txt && \
+		deactivate"
+
+pylint_style: virtual_env
+	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+		pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
+		deactivate"
+
+kernel_module_style:
+	$(MAKE) -C pid_cache_flush style
+
+CHECKPATCH?=checkpatch.pl
+perf_api_style:
+	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	--ignore CODE_INDENT,LEADING_SPACE -f perfapi.c
+
+CPPCHECK?=cppcheck
+cppcheck: kernel_module_cppcheck perf_api_cppcheck
+
+kernel_module_cppcheck:
+	$(MAKE) -C pid_cache_flush cppcheck
+
+perf_api_cppcheck:
+	$(CPPCHECK) --enable=all --std=c99 --template=gcc --suppress=unusedFunction perfapi.c

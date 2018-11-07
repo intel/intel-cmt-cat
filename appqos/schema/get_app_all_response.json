@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get app",
+  "description": "GET all APPs result, URI /apps",
+  "type": "array",
+  "items": { "$ref": "definitions.json#/app_api_get"}
+}

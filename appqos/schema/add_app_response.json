@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API add app",
+  "description": "POST command response, URI /apps",
+  "type": "object",
+
+  "properties": {
+    "id": {
+      "description": "APP ID",
+      "$ref": "definitions.json#/uint"
+    }
+  },
+
+  "required": ["id"]
+}

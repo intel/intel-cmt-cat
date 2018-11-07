@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API add app",
+  "description": "POST command, URI /apps",
+
+  "$ref": "definitions.json#/app_api_post"
+}

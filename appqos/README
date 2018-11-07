@@ -1,0 +1,31 @@
+========================================================================
+README for AppQoS
+
+January 2019
+========================================================================
+
+
+Contents
+========
+
+- Overview
+- Legal Disclaimer
+
+
+Overview
+========
+AppQoS is a proof-of-concept software created to demonstrate the use of
+Intel(R) Resource Director Technology (Intel(R) RDT) (currently CAT and CMT)
+to improve QoS for applications via partitioning system resources.
+
+Legal Disclaimer
+================
+
+THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
+IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
+ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
+CONDITIONS OF SALE, INTEL ASSUMES NO LIABILITY WHATSOEVER AND INTEL
+DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY, RELATING TO SALE AND/OR
+USE OF INTEL PRODUCTS INCLUDING LIABILITY OR WARRANTIES RELATING TO
+FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR INFRINGEMENT
+OF ANY PATENT, COPYRIGHT OR OTHER INTELLECTUAL PROPERTY RIGHT.

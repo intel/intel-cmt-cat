@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get stats",
+  "description": "GET stats result, URI /stats",
+
+  "type": "object",
+
+  "properties": {
+    "num_flushes": {
+      "description": "Number of cache flush operations",
+      "$ref": "definitions.json#/uint"
+    },
+    "num_apps_moves": {
+      "description": "Number of APP move operations",
+      "$ref": "definitions.json#/uint"
+    },
+    "num_err": {
+      "description": "Number of errors",
+      "$ref": "definitions.json#/uint"
+    }
+  },
+  "required": ["num_flushes", "num_apps_moves", "num_err"]
+}

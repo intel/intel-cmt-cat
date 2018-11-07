@@ -1,0 +1,170 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "Common definitions",
+
+  "uint": {
+    "description": "Unsigned Integer",
+    "type": "number",
+    "multipleOf": 1.0,
+    "minimum": 0
+  },
+
+  "uint_nonzero": {
+    "description": "Unsigned Integer > 0",
+    "type": "number",
+    "multipleOf": 1.0,
+    "minimum": 0,
+    "exclusiveMinimum": true
+  },
+
+  "uint_uniq_array": {
+    "description": "Non-empty array of unique Unsigned Integers",
+    "type": "array",
+    "items": { "$ref": "#uint" },
+    "uniqueItems": true,
+    "minItems": 1
+  },
+
+  "string_nonempty": {
+    "type": "string",
+    "minLength": 1,
+    "maxLength": 64
+  },
+
+  "app": {
+    "description": "APP definition",
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "APP's name",
+        "$ref": "#string_nonempty"
+      },
+      "cores": {
+        "description": "Cores APP's VCPUs are pinned to",
+        "$ref": "#uint_uniq_array"
+      },
+      "pids": {
+        "description": "PIDs of APP's VCPUs",
+        "$ref": "#uint_uniq_array"
+      }
+    },
+    "required": ["name", "cores"]
+  },
+
+  "app_api_get": {
+    "allOf": [
+      { "$ref": "#app" },
+      { "properties": {
+          "llc_occup": {
+            "description": "Actual LLC occupation [KB]",
+            "$ref": "#uint"
+          },
+          "id": {
+            "description": "APP ID",
+            "$ref": "#uint"
+          }
+        },
+        "required": ["id"],
+        "dependencies": {
+          "pids": ["llc_occup"],
+          "llc_occup": ["pids"]
+        }
+      }
+    ]
+  },
+
+  "app_api_post": {
+    "allOf": [
+      { "$ref": "#app" },
+      { "properties": {
+          "pool_id": {
+            "description": "Destination Pool ID",
+            "$ref": "#uint"
+          },
+          "name": {},
+          "cores": {},
+          "pids": {}
+        },
+        "required": ["pool_id"],
+        "additionalProperties": false
+      }
+    ]
+  },
+
+  "pool": {
+    "description": "Definition of Pool of APPs",
+    "type": "object",
+    "properties": {
+      "id": {
+        "description": "Pool ID",
+        "$ref": "#uint"
+      },
+      "priority": {
+        "description": "Priority of the Pool of APPs",
+        "type": "string",
+        "enum": ["prod", "preprod", "besteff"]
+      },
+      "name": {
+        "description": "Pool's name",
+        "$ref": "#string_nonempty"
+      },
+      "min_cws": {
+        "description": "Number of guaranteed CWs, for static - number of CWs assigned to the pool",
+        "$ref": "#uint_nonzero"
+      },
+      "apps": {
+        "description": "APPs assigned to that pool",
+        "type": "array",
+        "items": { "$ref": "#uint" },
+        "uniqueItems": true,
+        "minItems": 0
+      }
+    },
+    "required": ["id", "priority", "name", "min_cws", "apps"]
+  },
+
+  "pool_api_get": {
+    "allOf": [
+      { "$ref": "#pool" },
+      { "properties": {
+          "llc_alloc": {
+            "description": "Cache allocated [KB]",
+            "$ref": "#uint_nonzero"
+          },
+          "llc_occup": {
+            "description": "Actual LLC occupation [KB]",
+            "$ref": "#uint"
+          }
+        }
+      }
+    ]
+  },
+
+  "group": {
+    "description": "Definition of Group of APPs' Pools",
+    "type": "object",
+    "properties": {
+      "id": {
+        "description": "Group ID",
+        "$ref": "#uint"
+      },
+      "type": {
+        "description": "Type of the group of Pools",
+        "type": "string",
+        "enum": ["static", "dynamic"]
+      },
+      "pools": {
+        "description": "Pools assigned to that Group",
+        "$ref": "#uint_uniq_array"
+      },
+      "cbm": {
+        "description": "Cache area/CWs used by that Group, in form of CBM, hex string",
+        "type": "string",
+        "pattern": "0[xX][0-9a-fA-F]+"
+      }
+    },
+    "required": ["id", "type", "pools", "cbm"],
+    "additionalProperties": false
+  }
+}

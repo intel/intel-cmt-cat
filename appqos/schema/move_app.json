@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API move app",
+  "description": "PUT command, URI /apps",
+
+  "type": "object",
+
+  "properties": {
+    "pool_id": {
+      "description": "Destination Pool ID",
+      "$ref": "definitions.json#/uint"
+    }
+  },
+
+  "required": ["pool_id"]
+}

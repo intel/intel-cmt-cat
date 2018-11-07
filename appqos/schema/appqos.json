@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "Config file",
+  "description": "Config file to store configuration, e.g.: definition of groups and pools",
+
+  "type": "object",
+
+  "properties": {
+
+    "auth": {
+      "description": "Authentication data for REST API",
+      "type": "object",
+      "properties": {
+        "username": {
+          "description": "Username",
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 64
+        },
+        "password": {
+          "description": "Password",
+          "minLength": 8,
+          "maxLength": 64
+        }
+      },
+      "required": ["username", "password"],
+      "additionalProperties": false
+    },
+
+    "apps": {
+      "description": "APP definitions",
+      "type": "array",
+      "items": {
+        "allOf": [
+          { "$ref": "definitions.json#/app" },
+          { "properties": {
+              "id": {
+                "description": "APP ID",
+                "$ref": "definitions.json#/uint"
+              }
+            },
+            "required": ["id"]
+          }
+        ]
+      },
+      "uniqueItems": true
+    },
+
+    "pools": {
+      "description": "Pools of APPs definitions",
+      "type": "array",
+      "items": { "$ref": "definitions.json#/pool" },
+      "uniqueItems": true,
+      "minItems": 1
+    },
+
+    "groups": {
+      "description": "Groups of Pools definitions",
+      "type": "array",
+      "items": { "$ref": "definitions.json#/group" },
+      "uniqueItems": true,
+      "minItems": 1
+    }
+  },
+
+  "required": ["auth", "pools", "groups"]
+}

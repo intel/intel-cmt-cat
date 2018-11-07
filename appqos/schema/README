@@ -1,0 +1,56 @@
+========================================================================
+README for AppQoS JSON schema files
+
+January 2019
+========================================================================
+
+
+Contents
+========
+
+- Overview
+- Files
+- Legal Disclaimer
+
+
+Overview
+========
+This directory contains JSON schema files which are used for both, config file
+and REST API commands and responses validation.
+
+Files
+=====
+
+Common:
+definitions.json - common definitions
+
+Config file:
+appqos.json - config file schema (appqos.conf)
+
+REST API:
+add_app.json - ADD APP call schema
+add_app_response.json - ADD APP call response schema
+
+get_pool_response.json - GET single POOL response schema
+get_pool_all_response.json - GET all POOLs response schema
+
+get_app_response.json - GET single APP response schema
+get_app_all_response.json - GET all APP response schema
+move_app.json - MOVE APP call schema
+
+get_group_response.json - GET single GROUP response schema
+get_group_all_response.json - GET all GROUPs response schema
+
+get_stats_response.json - GET STATS response schema
+
+Legal Disclaimer
+================
+
+THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
+IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
+ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
+CONDITIONS OF SALE, INTEL ASSUMES NO LIABILITY WHATSOEVER AND INTEL
+DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY, RELATING TO SALE AND/OR
+USE OF INTEL PRODUCTS INCLUDING LIABILITY OR WARRANTIES RELATING TO
+FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR INFRINGEMENT
+OF ANY PATENT, COPYRIGHT OR OTHER INTELLECTUAL PROPERTY RIGHT.
