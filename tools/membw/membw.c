@@ -64,13 +64,14 @@
 
 #define MEMCHUNK_SIZE   (PAGE_SIZE * 32 * 1024) /* 128MB chunk */
 #define CL_SIZE         (64)
+#define CHUNKS          (128)
 
 #ifdef DEBUG
 #include <assert.h>
-#define ALWAYS_INLINE inline
+#define ALWAYS_INLINE static inline
 #else
 #define assert(x)
-#define ALWAYS_INLINE inline __attribute__((always_inline))
+#define ALWAYS_INLINE static inline __attribute__((always_inline))
 #endif
 
 #define MAX_OPTARG_LEN  64
@@ -95,6 +96,8 @@ enum cl_type {
  */
 
 static int stop_loop = 0;
+static void *memchunk = NULL;
+static unsigned memchunk_offset = 0;
 
 /**
  * UTILS
@@ -135,7 +138,8 @@ static void set_thread_affinity(const unsigned cpuid)
  *
  * @param p line of cache to flush
  */
-ALWAYS_INLINE void cl_flush(void *p)
+ALWAYS_INLINE void
+cl_flush(void *p)
 {
         asm volatile("clflush (%0)\n\t"
                      :
@@ -146,7 +150,8 @@ ALWAYS_INLINE void cl_flush(void *p)
 /**
  * @brief Serialize store operations, prevent reordering of writes
  */
-ALWAYS_INLINE void sb(void)
+ALWAYS_INLINE void
+sb(void)
 {
         asm volatile("sfence\n\t"
                      :
@@ -369,23 +374,21 @@ cl_read(void *p)
 /**
  * @brief Function to find selected operation and execute it
  *
- * @param p memory allocated
- * @param s size of memory
  * @param bw amount of bandwidth
  * @param type operation type to perform on core
  */
 ALWAYS_INLINE void
-mem_execute(void *p, size_t s, const unsigned bw, const enum cl_type type)
+mem_execute(const unsigned bw, const enum cl_type type)
 {
         const uint64_t val = (uint64_t) rand();
-        char *cp = (char *)p;
+        char *cp = (char *)memchunk;
         unsigned i = 0;
-        size_t n = 0;
+        const size_t s = MEMCHUNK_SIZE / CL_SIZE; /* mem size in cache lines */
 
-        s = s / CL_SIZE; /* mem size in cache lines */
+        assert(memchunk != NULL);
 
-        for (n = 0, i = 0; i < bw; i++) {
-                char *ptr = &cp[n * CL_SIZE];
+        for (i = 0; i < bw; i++) {
+                char *ptr = cp + (memchunk_offset * CL_SIZE);
 
                 switch (type) {
                 case CL_WRITE_TYPE_WB:
@@ -404,8 +407,8 @@ mem_execute(void *p, size_t s, const unsigned bw, const enum cl_type type)
                         assert(0);
                         break;
                 }
-                if (++n >= s)
-                        n = 0;
+                if (++memchunk_offset >= s)
+                        memchunk_offset = 0;
         }
         sb();
 }
@@ -441,7 +444,8 @@ static void usage(char **argv)
  *
  * @retval long time taken to execute operation
  */
-static long get_usec_diff(struct timeval *tv_s, struct timeval *tv_e)
+ALWAYS_INLINE
+long get_usec_diff(struct timeval *tv_s, struct timeval *tv_e)
 {
         long usec_start, usec_end = 0;
 
@@ -457,7 +461,8 @@ static long get_usec_diff(struct timeval *tv_s, struct timeval *tv_e)
  * @param usec_diff time taken to execute operation
  * @param interval maximum time operation should take
  */
-static void nano_sleep(const long interval, long usec_diff)
+ALWAYS_INLINE
+void nano_sleep(const long interval, long usec_diff)
 {
         struct timespec req, rem;
 
@@ -515,7 +520,6 @@ int main(int argc, char **argv)
         enum cl_type type = CL_WRITE_TYPE_INVALID;
         unsigned mem_bw = 0;
         unsigned cpu = UINT_MAX;
-        void *private = NULL;
         int option_index;
         int ret;
 
@@ -583,27 +587,26 @@ int main(int argc, char **argv)
         set_thread_affinity(cpu);
 
         /* Allocate memory */
-        private = malloc_and_init_memory(MEMCHUNK_SIZE);
-        if (private == NULL) {
+        memchunk = malloc_and_init_memory(MEMCHUNK_SIZE);
+        if (memchunk == NULL) {
                 printf("Failed to allocate memory!\n");
                 return EXIT_FAILURE;
         }
 
         /* Calculate memory bandwidth to use */
-        mem_bw *= (((1024 * 1024) / CL_SIZE));
+        mem_bw *= (((1024 * 1024) / CL_SIZE)) / CHUNKS;
 
         /* Stress memory bandwidth */
         while (stop_loop == 0) {
-
                 struct timeval tv_s, tv_e;
-                long usec_diff = 0;
-                const long interval = 1000000L; /* 1s interval in [us] */
+                long usec_diff;
+                const long interval = 1000000L / CHUNKS; /* interval in [us] */
 
                 /* Get time before executing operation in loop */
                 gettimeofday(&tv_s, NULL);
 
                 /* Execute operation */
-                mem_execute(private, MEMCHUNK_SIZE, mem_bw, type);
+                mem_execute(mem_bw, type);
 
                 /* Get time after executing operation */
                 gettimeofday(&tv_e, NULL);
@@ -614,11 +617,10 @@ int main(int argc, char **argv)
                         /* Sleep before executing operation again */
                         nano_sleep(interval, usec_diff);
                 }
-
         }
 
         /* Terminate thread */
-        free(private);
+        free(memchunk);
         printf("\nexiting...\n");
 
         return 0;
