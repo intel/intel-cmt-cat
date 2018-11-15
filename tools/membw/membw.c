@@ -93,7 +93,8 @@ enum cl_type {
         CL_TYPE_WRITE_WB,
         CL_TYPE_WRITE_WB_CLWB,
         CL_TYPE_WRITE_NTI,
-        CL_TYPE_WRITE_NTI_CLWB
+        CL_TYPE_WRITE_NTI_CLWB,
+        CL_TYPE_WRITE_NTDQ
 };
 
 /**
@@ -262,7 +263,7 @@ cl_read_mod_write(void *p, const uint64_t v)
 }
 
 /**
- * @brief Perform SSE write
+ * @brief WB vector version
  *
  * @param p pointer to memory location to be written
  * @param v value to overwrite memory location
@@ -398,6 +399,25 @@ cl_write_nti_clwb(void *p, const uint64_t v)
 }
 
 /**
+ * @brief Non temporal store vector version
+ *
+ * @param p pointer to memory location to be written
+ * @param v value to overwrite memory location
+ */
+ALWAYS_INLINE void
+cl_write_ntdq(void *p, const uint64_t v)
+{
+        asm volatile("movq   %0, %%xmm1\n\t"
+                     "movntdq %%xmm1, (%1)\n\t"
+                     "movntdq %%xmm1, 16(%1)\n\t"
+                     "movntdq %%xmm1, 32(%1)\n\t"
+                     "movntdq %%xmm1, 48(%1)\n\t"
+                     :
+                     : "r"(v), "r"(p)
+                     : "%xmm1", "memory");
+}
+
+/**
  * @brief Function to perform read operation to specified memory location
  *
  * @param p pointer to memory location to read from
@@ -482,6 +502,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_WRITE_NTI_CLWB:
                         cl_write_nti_clwb(ptr, val);
                         break;
+                case CL_TYPE_WRITE_NTDQ:
+                        cl_write_ntdq(ptr, val);
+                        break;
                 default:
                         assert(0);
                         break;
@@ -514,7 +537,8 @@ static void usage(char **argv)
                "  --write-clwb       x86 stores + clwb\n"
                "  --write-sse        SSE stores\n"
                "  --nt-write         x86 NT stores\n"
-               "  --nt-write-clwb    x86 NT stores + clwb\n",
+               "  --nt-write-clwb    x86 NT stores + clwb\n"
+               "  --nt-write-sse     SSE NT stores\n",
                argv[0]);
 }
 
@@ -617,6 +641,7 @@ int main(int argc, char **argv)
             {"write-clwb",     no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
             {"nt-write",       no_argument, 0, CL_TYPE_WRITE_NTI},
             {"nt-write-clwb",  no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
+            {"nt-write-sse",   no_argument, 0, CL_TYPE_WRITE_NTDQ},
             {0, 0, 0, 0}
         };
 
@@ -646,6 +671,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_WRITE_WB_CLWB:
                 case CL_TYPE_WRITE_NTI:
                 case CL_TYPE_WRITE_NTI_CLWB:
+                case CL_TYPE_WRITE_NTDQ:
                         type = cmd;
                         break;
                 default:
