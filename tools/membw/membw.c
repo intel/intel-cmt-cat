@@ -89,6 +89,7 @@ enum cl_type {
         CL_TYPE_INVALID,
         CL_TYPE_READ_WB,
         CL_TYPE_READ_MOD_WRITE,
+        CL_TYPE_WRITE_DQA,
         CL_TYPE_WRITE_WB,
         CL_TYPE_WRITE_WB_CLWB,
         CL_TYPE_WRITE_NTI,
@@ -258,6 +259,25 @@ cl_read_mod_write(void *p, const uint64_t v)
                      :
                      : "r"(v), "r"(p)
                      : "memory");
+}
+
+/**
+ * @brief Perform SSE write
+ *
+ * @param p pointer to memory location to be written
+ * @param v value to overwrite memory location
+ */
+ALWAYS_INLINE void
+cl_write_dqa(void *p, const uint64_t v)
+{
+        asm volatile("movq   %0, %%xmm1\n\t"
+                     "movdqa %%xmm1, (%1)\n\t"
+                     "movdqa %%xmm1, 16(%1)\n\t"
+                     "movdqa %%xmm1, 32(%1)\n\t"
+                     "movdqa %%xmm1, 48(%1)\n\t"
+                     :
+                     : "r"(v), "r"(p)
+                     : "%xmm1", "memory");
 }
 
 /**
@@ -447,6 +467,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_READ_MOD_WRITE:
                         cl_read_mod_write(ptr, val);
                         break;
+                case CL_TYPE_WRITE_DQA:
+                        cl_write_dqa(ptr, val);
+                        break;
                 case CL_TYPE_WRITE_WB:
                         cl_write(ptr, val);
                         break;
@@ -489,6 +512,7 @@ static void usage(char **argv)
                "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
                "  --write-clwb       x86 stores + clwb\n"
+               "  --write-sse        SSE stores\n"
                "  --nt-write         x86 NT stores\n"
                "  --nt-write-clwb    x86 NT stores + clwb\n",
                argv[0]);
@@ -588,6 +612,7 @@ int main(int argc, char **argv)
             {"cpu",            required_argument, 0, 'c'},
             {"read",           no_argument, 0, CL_TYPE_READ_WB},
             {"read-mod-write", no_argument, 0, CL_TYPE_READ_MOD_WRITE},
+            {"write-sse",      no_argument, 0, CL_TYPE_WRITE_DQA},
             {"write",          no_argument, 0, CL_TYPE_WRITE_WB},
             {"write-clwb",     no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
             {"nt-write",       no_argument, 0, CL_TYPE_WRITE_NTI},
@@ -616,6 +641,7 @@ int main(int argc, char **argv)
                         break;
                 case CL_TYPE_READ_WB:
                 case CL_TYPE_READ_MOD_WRITE:
+                case CL_TYPE_WRITE_DQA:
                 case CL_TYPE_WRITE_WB:
                 case CL_TYPE_WRITE_WB_CLWB:
                 case CL_TYPE_WRITE_NTI:
