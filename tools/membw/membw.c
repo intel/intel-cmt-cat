@@ -90,6 +90,7 @@ enum cl_type {
         CL_TYPE_READ_WB,
         CL_TYPE_READ_MOD_WRITE,
         CL_TYPE_WRITE_WB,
+        CL_TYPE_WRITE_WB_CLWB,
         CL_TYPE_WRITE_NTI,
         CL_TYPE_WRITE_NTI_CLWB
 };
@@ -304,6 +305,19 @@ cl_write(void *p, const uint64_t v)
 }
 
 /**
+ * @brief Perform write operation to specified cache line with clwb
+ *
+ * @param p pointer to memory location to be written
+ * @param v value to overwrite memory location
+ */
+ALWAYS_INLINE void
+cl_write_clwb(void *p, const uint64_t v)
+{
+        cl_write(p, v);
+        cl_wb(p);
+}
+
+/**
  * @brief Perform write operation to memory giving non-temporal hint
  *
  * @param p pointer to memory location to be written
@@ -436,6 +450,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_WRITE_WB:
                         cl_write(ptr, val);
                         break;
+                case CL_TYPE_WRITE_WB_CLWB:
+                        cl_write_clwb(ptr, val);
+                        break;
                 case CL_TYPE_WRITE_NTI:
                         cl_write_nti(ptr, val);
                         break;
@@ -471,6 +488,7 @@ static void usage(char **argv)
                "  --read             x86 loads\n"
                "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
+               "  --write-clwb       x86 stores + clwb\n"
                "  --nt-write         x86 NT stores\n"
                "  --nt-write-clwb    x86 NT stores + clwb\n",
                argv[0]);
@@ -571,6 +589,7 @@ int main(int argc, char **argv)
             {"read",           no_argument, 0, CL_TYPE_READ_WB},
             {"read-mod-write", no_argument, 0, CL_TYPE_READ_MOD_WRITE},
             {"write",          no_argument, 0, CL_TYPE_WRITE_WB},
+            {"write-clwb",     no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
             {"nt-write",       no_argument, 0, CL_TYPE_WRITE_NTI},
             {"nt-write-clwb",  no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
             {0, 0, 0, 0}
@@ -598,6 +617,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_READ_WB:
                 case CL_TYPE_READ_MOD_WRITE:
                 case CL_TYPE_WRITE_WB:
+                case CL_TYPE_WRITE_WB_CLWB:
                 case CL_TYPE_WRITE_NTI:
                 case CL_TYPE_WRITE_NTI_CLWB:
                         type = cmd;
