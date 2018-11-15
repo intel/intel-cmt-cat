@@ -47,6 +47,7 @@
 
 #ifdef __linux__
 #include <sched.h>
+#include <cpuid.h>
 #endif
 
 #ifdef __FreeBSD__
@@ -84,11 +85,12 @@
  * Define read and write types
  */
 enum cl_type {
-        CL_WRITE_TYPE_INVALID,
-        CL_WRITE_TYPE_WB,
-        CL_WRITE_TYPE_READ_MOD_WRITE,
-        CL_READ_TYPE_WB,
-        CL_WRITE_TYPE_NTI
+        CL_TYPE_INVALID,
+        CL_TYPE_READ_WB,
+        CL_TYPE_READ_MOD_WRITE,
+        CL_TYPE_WRITE_WB,
+        CL_TYPE_WRITE_NTI,
+        CL_TYPE_WRITE_NTI_CLWB
 };
 
 /**
@@ -157,6 +159,25 @@ sb(void)
                      :
                      :
                      : "memory");
+}
+
+/**
+ * @brief Cache line write back
+ *
+ * @param p line of cache
+ */
+ALWAYS_INLINE void
+cl_wb(void *p)
+{
+#ifdef bit_CLWB
+        asm volatile("clwb (%0)\n\t"
+                     :
+                     : "r"(p)
+                     : "memory");
+#else
+        printf("clwb instruction is not suported\n");
+        exit(EXIT_FAILURE);
+#endif
 }
 
 /**
@@ -328,6 +349,20 @@ cl_write_nti(void *p, const uint64_t v)
 }
 
 /**
+ * @brief Perform write operation to memory giving non-temporal hint with cache
+ * line write back
+ *
+ * @param p pointer to memory location to be written
+ * @param v value to overwrite memory location
+ */
+ALWAYS_INLINE void
+cl_write_nti_clwb(void *p, const uint64_t v)
+{
+        cl_write_nti(p, v);
+        cl_wb(p);
+}
+
+/**
  * @brief Function to perform read operation to specified memory location
  *
  * @param p pointer to memory location to read from
@@ -391,17 +426,20 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 char *ptr = cp + (memchunk_offset * CL_SIZE);
 
                 switch (type) {
-                case CL_WRITE_TYPE_WB:
-                        cl_write(ptr, val);
+                case CL_TYPE_READ_WB:
+                        cl_read(ptr);
                         break;
-                case CL_WRITE_TYPE_NTI:
-                        cl_write_nti(ptr, val);
-                        break;
-                case CL_WRITE_TYPE_READ_MOD_WRITE:
+                case CL_TYPE_READ_MOD_WRITE:
                         cl_read_mod_write(ptr, val);
                         break;
-                case CL_READ_TYPE_WB:
-                        cl_read(ptr);
+                case CL_TYPE_WRITE_WB:
+                        cl_write(ptr, val);
+                        break;
+                case CL_TYPE_WRITE_NTI:
+                        cl_write_nti(ptr, val);
+                        break;
+                case CL_TYPE_WRITE_NTI_CLWB:
+                        cl_write_nti_clwb(ptr, val);
                         break;
                 default:
                         assert(0);
@@ -429,10 +467,11 @@ static void usage(char **argv)
                "  -c, --cpu          cpu to generate B/W\n"
                "  -b, --bandwidth    memory B/W specified in MBps\n"
                "Operation types:\n"
+               "  --read             x86 loads\n"
+               "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
                "  --nt-write         x86 NT stores\n"
-               "  --read             x86 loads\n"
-               "  --read-mod-write   x86 load XOR write\n",
+               "  --nt-write-clwb    x86 NT stores + clwb\n",
                argv[0]);
 }
 
@@ -519,7 +558,7 @@ str_to_uint(const char *str, const unsigned base, unsigned *value)
 int main(int argc, char **argv)
 {
         int cmd = EXIT_SUCCESS;
-        enum cl_type type = CL_WRITE_TYPE_INVALID;
+        enum cl_type type = CL_TYPE_INVALID;
         unsigned mem_bw = 0;
         unsigned cpu = UINT_MAX;
         int option_index;
@@ -528,10 +567,11 @@ int main(int argc, char **argv)
         struct option options[] = {
             {"bandwidth",      required_argument, 0, 'b'},
             {"cpu",            required_argument, 0, 'c'},
-            {"write",          no_argument, 0, CL_WRITE_TYPE_WB},
-            {"nt-write",       no_argument, 0, CL_WRITE_TYPE_NTI},
-            {"read",           no_argument, 0, CL_READ_TYPE_WB},
-            {"read-mod-write", no_argument, 0, CL_WRITE_TYPE_READ_MOD_WRITE},
+            {"read",           no_argument, 0, CL_TYPE_READ_WB},
+            {"read-mod-write", no_argument, 0, CL_TYPE_READ_MOD_WRITE},
+            {"write",          no_argument, 0, CL_TYPE_WRITE_WB},
+            {"nt-write",       no_argument, 0, CL_TYPE_WRITE_NTI},
+            {"nt-write-clwb",  no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
             {0, 0, 0, 0}
         };
 
@@ -555,17 +595,12 @@ int main(int argc, char **argv)
                                 return EXIT_FAILURE;
                         }
                         break;
-                case CL_WRITE_TYPE_WB:
-                        type = CL_WRITE_TYPE_WB;
-                        break;
-                case CL_WRITE_TYPE_NTI:
-                        type = CL_WRITE_TYPE_NTI;
-                        break;
-                case CL_READ_TYPE_WB:
-                        type = CL_READ_TYPE_WB;
-                        break;
-                case CL_WRITE_TYPE_READ_MOD_WRITE:
-                        type = CL_WRITE_TYPE_READ_MOD_WRITE;
+                case CL_TYPE_READ_WB:
+                case CL_TYPE_READ_MOD_WRITE:
+                case CL_TYPE_WRITE_WB:
+                case CL_TYPE_WRITE_NTI:
+                case CL_TYPE_WRITE_NTI_CLWB:
+                        type = cmd;
                         break;
                 default:
                         usage(argv);
@@ -575,7 +610,7 @@ int main(int argc, char **argv)
         }
 
         /* Check if user has supplied all required arguments */
-        if (type == CL_WRITE_TYPE_INVALID || cpu == UINT_MAX || !mem_bw
+        if (type == CL_TYPE_INVALID || cpu == UINT_MAX || !mem_bw
                         || optind < argc) {
                 usage(argv);
                 return EXIT_FAILURE;
