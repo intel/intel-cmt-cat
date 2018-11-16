@@ -100,6 +100,7 @@ enum cl_type {
         CL_TYPE_WRITE_WB_CLWB,
         CL_TYPE_WRITE_NTI,
         CL_TYPE_WRITE_NTI_CLWB,
+        CL_TYPE_WRITE_NT512,
         CL_TYPE_WRITE_NTDQ
 };
 
@@ -487,6 +488,27 @@ cl_write_nti(void *p, const uint64_t v)
 }
 
 /**
+ * @brief non-temporal store vector version
+ *
+ * @param p pointer to memory location to be written
+ * @param v value to overwrite memory location
+ */
+ALWAYS_INLINE void
+cl_write_nt512(void *p, const uint64_t v)
+{
+#if defined(__x86_64__) && defined(bit_AVX512F)
+       asm volatile("vmovq   %0, %%xmm1\n\t"
+                     "vmovntpd %%zmm1, (%1)\n\t"
+                     :
+                     : "r"(v), "r"(p)
+                     : "%zmm1", "memory");
+#else
+        printf("Instruction is not suported\n");
+        exit(EXIT_FAILURE);
+#endif
+}
+
+/**
  * @brief Perform write operation to memory giving non-temporal hint with cache
  * line write back
  *
@@ -624,6 +646,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_WRITE_NTI:
                         cl_write_nti(ptr, val);
                         break;
+                case CL_TYPE_WRITE_NT512:
+                        cl_write_nt512(ptr, val);
+                        break;
                 case CL_TYPE_WRITE_NTI_CLWB:
                         cl_write_nti_clwb(ptr, val);
                         break;
@@ -668,6 +693,7 @@ static void usage(char **argv)
                "  --write-clwb       x86 stores + clwb\n"
                "  --write-sse        SSE stores\n"
                "  --nt-write         x86 NT stores\n"
+               "  --nt-write-avx512  AVX512 NT stores\n"
                "  --nt-write-clwb    x86 NT stores + clwb\n"
                "  --nt-write-sse     SSE NT stores\n",
                argv[0]);
@@ -763,22 +789,23 @@ int main(int argc, char **argv)
         int ret;
 
         struct option options[] = {
-            {"bandwidth",      required_argument, 0, 'b'},
-            {"cpu",            required_argument, 0, 'c'},
-            {"prefetch-t0",    no_argument, 0, CL_TYPE_PREFETCH_T0},
-            {"prefetch-t1",    no_argument, 0, CL_TYPE_PREFETCH_T1},
-            {"prefetch-t2",    no_argument, 0, CL_TYPE_PREFETCH_T2},
-            {"prefetch-nta",   no_argument, 0, CL_TYPE_PREFETCH_NTA},
-            {"prefetch-w",     no_argument, 0, CL_TYPE_PREFETCH_W},
-            {"read",           no_argument, 0, CL_TYPE_READ_WB},
-            {"read-mod-write", no_argument, 0, CL_TYPE_READ_MOD_WRITE},
-            {"write",          no_argument, 0, CL_TYPE_WRITE_WB},
-            {"write-avx512",   no_argument, 0, CL_TYPE_WRITE_WB_AVX512},
-            {"write-clwb",     no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
-            {"write-sse",      no_argument, 0, CL_TYPE_WRITE_DQA},
-            {"nt-write",       no_argument, 0, CL_TYPE_WRITE_NTI},
-            {"nt-write-clwb",  no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
-            {"nt-write-sse",   no_argument, 0, CL_TYPE_WRITE_NTDQ},
+            {"bandwidth",       required_argument, 0, 'b'},
+            {"cpu",             required_argument, 0, 'c'},
+            {"prefetch-t0",     no_argument, 0, CL_TYPE_PREFETCH_T0},
+            {"prefetch-t1",     no_argument, 0, CL_TYPE_PREFETCH_T1},
+            {"prefetch-t2",     no_argument, 0, CL_TYPE_PREFETCH_T2},
+            {"prefetch-nta",    no_argument, 0, CL_TYPE_PREFETCH_NTA},
+            {"prefetch-w",      no_argument, 0, CL_TYPE_PREFETCH_W},
+            {"read",            no_argument, 0, CL_TYPE_READ_WB},
+            {"read-mod-write",  no_argument, 0, CL_TYPE_READ_MOD_WRITE},
+            {"write",           no_argument, 0, CL_TYPE_WRITE_WB},
+            {"write-avx512",    no_argument, 0, CL_TYPE_WRITE_WB_AVX512},
+            {"write-clwb",      no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
+            {"write-sse",       no_argument, 0, CL_TYPE_WRITE_DQA},
+            {"nt-write",        no_argument, 0, CL_TYPE_WRITE_NTI},
+            {"nt-write-avx512", no_argument, 0, CL_TYPE_WRITE_NT512},
+            {"nt-write-clwb",   no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
+            {"nt-write-sse",    no_argument, 0, CL_TYPE_WRITE_NTDQ},
             {0, 0, 0, 0}
         };
 
@@ -813,6 +840,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_WRITE_WB:
                 case CL_TYPE_WRITE_WB_CLWB:
                 case CL_TYPE_WRITE_NTI:
+                case CL_TYPE_WRITE_NT512:
                 case CL_TYPE_WRITE_NTI_CLWB:
                 case CL_TYPE_WRITE_NTDQ:
                         type = cmd;
