@@ -96,6 +96,7 @@ enum cl_type {
         CL_TYPE_READ_MOD_WRITE,
         CL_TYPE_WRITE_DQA,
         CL_TYPE_WRITE_WB,
+        CL_TYPE_WRITE_WB_AVX512,
         CL_TYPE_WRITE_WB_CLWB,
         CL_TYPE_WRITE_NTI,
         CL_TYPE_WRITE_NTI_CLWB,
@@ -335,6 +336,27 @@ cl_read_mod_write(void *p, const uint64_t v)
                      :
                      : "r"(v), "r"(p)
                      : "memory");
+}
+
+/**
+ * @brief WB store vector version
+ *
+ * @param p pointer to memory location to be written
+ * @param v value to overwrite memory location
+ */
+ALWAYS_INLINE void
+cl_write_avx512(void *p, const uint64_t v)
+{
+#if defined(__x86_64__) && defined(bit_AVX512F)
+        asm volatile("vmovq   %0, %%xmm1\n\t"
+                     "vmovdqa64 %%zmm1, (%1)\n\t"
+                     :
+                     : "r"(v), "r"(p)
+                     : "%zmm1", "memory");
+#else
+        printf("Instruction is not suported\n");
+        exit(EXIT_FAILURE);
+#endif
 }
 
 /**
@@ -593,6 +615,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_WRITE_WB:
                         cl_write(ptr, val);
                         break;
+                case CL_TYPE_WRITE_WB_AVX512:
+                        cl_write_avx512(ptr, val);
+                        break;
                 case CL_TYPE_WRITE_WB_CLWB:
                         cl_write_clwb(ptr, val);
                         break;
@@ -639,6 +664,7 @@ static void usage(char **argv)
                "  --read             x86 loads\n"
                "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
+               "  --write-avx512     AVX512 stores\n"
                "  --write-clwb       x86 stores + clwb\n"
                "  --write-sse        SSE stores\n"
                "  --nt-write         x86 NT stores\n"
@@ -746,9 +772,10 @@ int main(int argc, char **argv)
             {"prefetch-w",     no_argument, 0, CL_TYPE_PREFETCH_W},
             {"read",           no_argument, 0, CL_TYPE_READ_WB},
             {"read-mod-write", no_argument, 0, CL_TYPE_READ_MOD_WRITE},
-            {"write-sse",      no_argument, 0, CL_TYPE_WRITE_DQA},
             {"write",          no_argument, 0, CL_TYPE_WRITE_WB},
+            {"write-avx512",   no_argument, 0, CL_TYPE_WRITE_WB_AVX512},
             {"write-clwb",     no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
+            {"write-sse",      no_argument, 0, CL_TYPE_WRITE_DQA},
             {"nt-write",       no_argument, 0, CL_TYPE_WRITE_NTI},
             {"nt-write-clwb",  no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
             {"nt-write-sse",   no_argument, 0, CL_TYPE_WRITE_NTDQ},
@@ -781,6 +808,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_PREFETCH_W:
                 case CL_TYPE_READ_WB:
                 case CL_TYPE_READ_MOD_WRITE:
+                case CL_TYPE_WRITE_WB_AVX512:
                 case CL_TYPE_WRITE_DQA:
                 case CL_TYPE_WRITE_WB:
                 case CL_TYPE_WRITE_WB_CLWB:
