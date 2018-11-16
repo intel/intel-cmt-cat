@@ -87,6 +87,11 @@
  */
 enum cl_type {
         CL_TYPE_INVALID,
+        CL_TYPE_PREFETCH_T0,
+        CL_TYPE_PREFETCH_T1,
+        CL_TYPE_PREFETCH_T2,
+        CL_TYPE_PREFETCH_NTA,
+        CL_TYPE_PREFETCH_W,
         CL_TYPE_READ_WB,
         CL_TYPE_READ_MOD_WRITE,
         CL_TYPE_WRITE_DQA,
@@ -239,6 +244,76 @@ void *malloc_and_init_memory(size_t s)
 /**
  * MEMORY OPERATIONS
  */
+
+/**
+ * @brief Perform prefetcht0
+ *
+ * @param p pointer to memory location
+ */
+ALWAYS_INLINE void
+cl_prefetch_t0(void *p)
+{
+        asm volatile("prefetcht0 (%0)\n\t"
+                     :
+                     : "r"(p)
+                     : "memory");
+}
+
+/**
+ * @brief Perform prefetcht1
+ *
+ * @param p pointer to memory location
+ */
+ALWAYS_INLINE void
+cl_prefetch_t1(void *p)
+{
+        asm volatile("prefetcht1 (%0)\n\t"
+                     :
+                     : "r"(p)
+                     : "memory");
+}
+
+/**
+ * @brief Perform prefetcht2
+ *
+ * @param p pointer to memory location
+ */
+ALWAYS_INLINE void
+cl_prefetch_t2(void *p)
+{
+        asm volatile("prefetcht2 (%0)\n\t"
+                     :
+                     : "r"(p)
+                     : "memory");
+}
+
+/**
+ * @brief Perform prefetchnta
+ *
+ * @param p pointer to memory location
+ */
+ALWAYS_INLINE void
+cl_prefetch_nta(void *p)
+{
+        asm volatile("prefetchnta (%0)\n\t"
+                     :
+                     : "r"(p)
+                     : "memory");
+}
+
+/**
+ * @brief Perform prefetchw
+ *
+ * @param p pointer to memory location
+ */
+ALWAYS_INLINE void
+cl_prefetch_w(void *p)
+{
+        asm volatile("prefetchw (%0)\n\t"
+                     :
+                     : "r"(p)
+                     : "memory");
+}
 
 /**
  * @brief Load XOR writes
@@ -481,6 +556,21 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 char *ptr = cp + (memchunk_offset * CL_SIZE);
 
                 switch (type) {
+                case CL_TYPE_PREFETCH_T0:
+                        cl_prefetch_t0(ptr);
+                        break;
+                case CL_TYPE_PREFETCH_T1:
+                        cl_prefetch_t1(ptr);
+                        break;
+                case CL_TYPE_PREFETCH_T2:
+                        cl_prefetch_t2(ptr);
+                        break;
+                case CL_TYPE_PREFETCH_NTA:
+                        cl_prefetch_nta(ptr);
+                        break;
+                case CL_TYPE_PREFETCH_W:
+                        cl_prefetch_w(ptr);
+                        break;
                 case CL_TYPE_READ_WB:
                         cl_read(ptr);
                         break;
@@ -531,6 +621,11 @@ static void usage(char **argv)
                "  -c, --cpu          cpu to generate B/W\n"
                "  -b, --bandwidth    memory B/W specified in MBps\n"
                "Operation types:\n"
+               "  --prefetch-t0      prefetcht0\n"
+               "  --prefetc-t1       prefetcht1\n"
+               "  --prefetc-t2       prefetcht2\n"
+               "  --prefetc-nta      prefetchtnta\n"
+               "  --prefetc-w        prefetchw\n"
                "  --read             x86 loads\n"
                "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
@@ -634,6 +729,11 @@ int main(int argc, char **argv)
         struct option options[] = {
             {"bandwidth",      required_argument, 0, 'b'},
             {"cpu",            required_argument, 0, 'c'},
+            {"prefetch-t0",    no_argument, 0, CL_TYPE_PREFETCH_T0},
+            {"prefetch-t1",    no_argument, 0, CL_TYPE_PREFETCH_T1},
+            {"prefetch-t2",    no_argument, 0, CL_TYPE_PREFETCH_T2},
+            {"prefetch-nta",   no_argument, 0, CL_TYPE_PREFETCH_NTA},
+            {"prefetch-w",     no_argument, 0, CL_TYPE_PREFETCH_W},
             {"read",           no_argument, 0, CL_TYPE_READ_WB},
             {"read-mod-write", no_argument, 0, CL_TYPE_READ_MOD_WRITE},
             {"write-sse",      no_argument, 0, CL_TYPE_WRITE_DQA},
@@ -664,6 +764,11 @@ int main(int argc, char **argv)
                                 return EXIT_FAILURE;
                         }
                         break;
+                case CL_TYPE_PREFETCH_T0:
+                case CL_TYPE_PREFETCH_T1:
+                case CL_TYPE_PREFETCH_T2:
+                case CL_TYPE_PREFETCH_NTA:
+                case CL_TYPE_PREFETCH_W:
                 case CL_TYPE_READ_WB:
                 case CL_TYPE_READ_MOD_WRITE:
                 case CL_TYPE_WRITE_DQA:
