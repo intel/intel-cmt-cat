@@ -92,6 +92,7 @@ enum cl_type {
         CL_TYPE_PREFETCH_T2,
         CL_TYPE_PREFETCH_NTA,
         CL_TYPE_PREFETCH_W,
+        CL_TYPE_READ_NTQ,
         CL_TYPE_READ_WB,
         CL_TYPE_READ_WB_DQA,
         CL_TYPE_READ_MOD_WRITE,
@@ -563,7 +564,25 @@ cl_write_ntdq(void *p, const uint64_t v)
 }
 
 /**
- * @brief Function to perform read operation to specified memory location
+ * @brief Function to perform non-temporal read operation
+ *        from specified memory location, vector version
+ *
+ * @param p pointer to memory location to read from
+ */
+ALWAYS_INLINE void
+cl_read_ntq(void *p)
+{
+        asm volatile("movntdqa (%0), %%xmm1\n\t"
+                     "movntdqa 16(%0), %%xmm1\n\t"
+                     "movntdqa 32(%0), %%xmm1\n\t"
+                     "movntdqa 48(%0), %%xmm1\n\t"
+                     :
+                     : "r"(p)
+                     : "%xmm1", "memory");
+}
+
+/**
+ * @brief Function to perform read operation from specified memory location
  *
  * @param p pointer to memory location to read from
  */
@@ -607,7 +626,8 @@ cl_read(void *p)
 }
 
 /**
- * @brief Function to perform read operation to specified memory location
+ * @brief Function to perform read operation from specified memory location,
+ *        vector version
  *
  * @param p pointer to memory location to read from
  */
@@ -657,6 +677,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                         break;
                 case CL_TYPE_PREFETCH_W:
                         cl_prefetch_w(ptr);
+                        break;
+                case CL_TYPE_READ_NTQ:
+                        cl_read_ntq(ptr);
                         break;
                 case CL_TYPE_READ_WB:
                         cl_read(ptr);
@@ -727,6 +750,7 @@ static void usage(char **argv)
                "  --prefetc-w        prefetchw\n"
                "  --read             x86 loads\n"
                "  --read-sse         SSE loads\n"
+               "  --nt-read-sse      SSE NT loads\n"
                "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
                "  --write-avx512     AVX512 stores\n"
@@ -840,6 +864,7 @@ int main(int argc, char **argv)
             {"prefetch-w",      no_argument, 0, CL_TYPE_PREFETCH_W},
             {"read",            no_argument, 0, CL_TYPE_READ_WB},
             {"read-sse",        no_argument, 0, CL_TYPE_READ_WB_DQA},
+            {"nt-read-sse",     no_argument, 0, CL_TYPE_READ_NTQ},
             {"read-mod-write",  no_argument, 0, CL_TYPE_READ_MOD_WRITE},
             {"write",           no_argument, 0, CL_TYPE_WRITE_WB},
             {"write-avx512",    no_argument, 0, CL_TYPE_WRITE_WB_AVX512},
@@ -877,6 +902,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_PREFETCH_T2:
                 case CL_TYPE_PREFETCH_NTA:
                 case CL_TYPE_PREFETCH_W:
+                case CL_TYPE_READ_NTQ:
                 case CL_TYPE_READ_WB:
                 case CL_TYPE_READ_WB_DQA:
                 case CL_TYPE_READ_MOD_WRITE:
