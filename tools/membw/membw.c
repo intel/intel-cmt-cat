@@ -97,6 +97,7 @@ enum cl_type {
         CL_TYPE_READ_WB_DQA,
         CL_TYPE_READ_MOD_WRITE,
         CL_TYPE_WRITE_DQA,
+        CL_TYPE_WRITE_DQA_FLUSH,
         CL_TYPE_WRITE_WB,
         CL_TYPE_WRITE_WB_AVX512,
         CL_TYPE_WRITE_WB_CLWB,
@@ -385,6 +386,19 @@ cl_write_dqa(void *p, const uint64_t v)
         printf("Instruction is not suported\n");
         exit(EXIT_FAILURE);
 #endif
+}
+
+/**
+ * @brief Perform SSE write operation to specified cache line with flush
+ *
+ * @param p pointer to memory location to be written
+ * @param v value to overwrite memory location
+ */
+ALWAYS_INLINE void
+cl_write_dqa_flush(void *p, const uint64_t v)
+{
+        cl_write_dqa(p, v);
+        cl_flush(p);
 }
 
 /**
@@ -693,6 +707,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_WRITE_DQA:
                         cl_write_dqa(ptr, val);
                         break;
+                case CL_TYPE_WRITE_DQA_FLUSH:
+                        cl_write_dqa_flush(ptr, val);
+                        break;
                 case CL_TYPE_WRITE_WB:
                         cl_write(ptr, val);
                         break;
@@ -758,6 +775,8 @@ static void usage(char **argv)
                "  --write-flush      x86 stores & clflush (naturally generates"
                                     " loads & stores)\n"
                "  --write-sse        SSE stores\n"
+               "  --write-sse-flush  SSE stores & clflush (naturally generates "
+                                    "loads & stores)\n"
                "  --nt-write         x86 NT stores\n"
                "  --nt-write-avx512  AVX512 NT stores\n"
                "  --nt-write-clwb    x86 NT stores + clwb\n"
@@ -871,6 +890,7 @@ int main(int argc, char **argv)
             {"write-clwb",      no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
             {"write-flush",     no_argument, 0, CL_TYPE_WRITE_WB_FLUSH},
             {"write-sse",       no_argument, 0, CL_TYPE_WRITE_DQA},
+            {"write-sse-flush", no_argument, 0, CL_TYPE_WRITE_DQA_FLUSH},
             {"nt-write",        no_argument, 0, CL_TYPE_WRITE_NTI},
             {"nt-write-avx512", no_argument, 0, CL_TYPE_WRITE_NT512},
             {"nt-write-clwb",   no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
@@ -907,6 +927,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_READ_WB_DQA:
                 case CL_TYPE_READ_MOD_WRITE:
                 case CL_TYPE_WRITE_DQA:
+                case CL_TYPE_WRITE_DQA_FLUSH:
                 case CL_TYPE_WRITE_WB:
                 case CL_TYPE_WRITE_WB_AVX512:
                 case CL_TYPE_WRITE_WB_CLWB:
