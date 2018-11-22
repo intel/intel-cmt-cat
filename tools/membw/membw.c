@@ -93,6 +93,7 @@ enum cl_type {
         CL_TYPE_PREFETCH_NTA,
         CL_TYPE_PREFETCH_W,
         CL_TYPE_READ_WB,
+        CL_TYPE_READ_WB_DQA,
         CL_TYPE_READ_MOD_WRITE,
         CL_TYPE_WRITE_DQA,
         CL_TYPE_WRITE_WB,
@@ -606,6 +607,23 @@ cl_read(void *p)
 }
 
 /**
+ * @brief Function to perform read operation to specified memory location
+ *
+ * @param p pointer to memory location to read from
+ */
+ALWAYS_INLINE void
+cl_read_dqa(void *p)
+{
+        asm volatile("movdqa (%0), %%xmm1\n\t"
+                     "movdqa 16(%0), %%xmm1\n\t"
+                     "movdqa 32(%0), %%xmm1\n\t"
+                     "movdqa 48(%0), %%xmm1\n\t"
+                     :
+                     : "r"(p)
+                     : "%xmm1", "memory");
+}
+
+/**
  * @brief Function to find selected operation and execute it
  *
  * @param bw amount of bandwidth
@@ -642,6 +660,9 @@ mem_execute(const unsigned bw, const enum cl_type type)
                         break;
                 case CL_TYPE_READ_WB:
                         cl_read(ptr);
+                        break;
+                case CL_TYPE_READ_WB_DQA:
+                        cl_read_dqa(ptr);
                         break;
                 case CL_TYPE_READ_MOD_WRITE:
                         cl_read_mod_write(ptr, val);
@@ -705,6 +726,7 @@ static void usage(char **argv)
                "  --prefetc-nta      prefetchtnta\n"
                "  --prefetc-w        prefetchw\n"
                "  --read             x86 loads\n"
+               "  --read-sse         SSE loads\n"
                "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
                "  --write-avx512     AVX512 stores\n"
@@ -817,6 +839,7 @@ int main(int argc, char **argv)
             {"prefetch-nta",    no_argument, 0, CL_TYPE_PREFETCH_NTA},
             {"prefetch-w",      no_argument, 0, CL_TYPE_PREFETCH_W},
             {"read",            no_argument, 0, CL_TYPE_READ_WB},
+            {"read-sse",        no_argument, 0, CL_TYPE_READ_WB_DQA},
             {"read-mod-write",  no_argument, 0, CL_TYPE_READ_MOD_WRITE},
             {"write",           no_argument, 0, CL_TYPE_WRITE_WB},
             {"write-avx512",    no_argument, 0, CL_TYPE_WRITE_WB_AVX512},
@@ -855,6 +878,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_PREFETCH_NTA:
                 case CL_TYPE_PREFETCH_W:
                 case CL_TYPE_READ_WB:
+                case CL_TYPE_READ_WB_DQA:
                 case CL_TYPE_READ_MOD_WRITE:
                 case CL_TYPE_WRITE_DQA:
                 case CL_TYPE_WRITE_WB:
