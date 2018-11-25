@@ -617,7 +617,7 @@ resctrl_alloc_schemata_read(const unsigned class_id,
 	if (buf != NULL)
 		free(buf);
 
-	/* check if error occured */
+	/* check if error occurred */
 	if (ret == PQOS_RETVAL_OK)
 		ret = resctrl_alloc_fclose(fd);
 	else if (fd)
@@ -732,7 +732,7 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 
 resctrl_alloc_schemata_write_exit:
 
-	/* check if error occured */
+	/* check if error occurred */
 	if (ret == PQOS_RETVAL_OK)
 		ret = resctrl_alloc_fclose(fd);
 	else if (fd)

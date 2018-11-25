@@ -284,7 +284,7 @@ os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
          */
         ret_mon = resctrl_mon_assoc_get(lcore, mon_group, sizeof(mon_group));
         if (ret_mon != PQOS_RETVAL_OK && ret_mon != PQOS_RETVAL_RESOURCE)
-                LOG_WARN("Failed to obtain monitoring group assigment for "
+                LOG_WARN("Failed to obtain monitoring group assignment for "
                          "core %u\n", lcore);
 
         ret = resctrl_alloc_assoc_set(lcore, class_id);
@@ -1591,7 +1591,7 @@ os_alloc_assoc_set_pid(const pid_t task,
          */
         ret_mon = resctrl_mon_assoc_get_pid(task, mon_group, sizeof(mon_group));
         if (ret_mon != PQOS_RETVAL_OK && ret_mon != PQOS_RETVAL_RESOURCE)
-                LOG_WARN("Failed to obtain monitoring group assigment for "
+                LOG_WARN("Failed to obtain monitoring group assignment for "
                          "task %d\n", task);
 
         /* Write to tasks file */
