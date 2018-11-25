@@ -913,7 +913,7 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                         if (resctrl_alloc_task_validate(tid) !=
                             PQOS_RETVAL_OK) {
                                 LOG_DEBUG("resctrl_mon_stop: Skipping "
-                                          "non-existant PID: %d\n", tid);
+                                          "non-existent PID: %d\n", tid);
                                 continue;
                         }
                         ret = resctrl_mon_assoc_set_pid(tid, NULL);

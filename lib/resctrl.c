@@ -96,7 +96,7 @@ resctrl_lock(const int type)
 
 	if (errno ==  EINTR)
 		LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
-			  "timeout occured\n");
+			  "timeout occurred\n");
 	else
 		LOG_ERROR("Failed to acquire lock on resctrl filesystem - "
 			  "%m\n");
@@ -229,7 +229,7 @@ resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
 			}
 	}
 
-	/* check if error occured in loop */
+	/* check if error occurred in loop */
 	if (i < sizeof(mask->tab))
 		return PQOS_RETVAL_ERROR;
 
