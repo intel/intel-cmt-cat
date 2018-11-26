@@ -77,6 +77,7 @@
 
 #define MAX_OPTARG_LEN  64
 
+#define MAX_MEM_BW      100 * 1000 /* 100GBps */
 /**
  * DATA STRUCTURES
  */
@@ -548,11 +549,11 @@ str_to_uint(const char *str, const unsigned base, unsigned *value)
 
         errno = 0;
         tmp = strtoul(str_start, &str_end, base);
-        if (errno != 0 || str_end == NULL || str_end == str_start)
+        if (errno != 0 || !(*str_start != '\0' && *str_end == '\0'))
                 return -EINVAL;
 
         *value = tmp;
-        return str_end - str;
+        return 0;
 }
 
 int main(int argc, char **argv)
@@ -582,15 +583,14 @@ int main(int argc, char **argv)
                 switch (cmd) {
                 case 'c':
                         ret = str_to_uint(optarg, 10, &cpu);
-                        if (ret != (int)strnlen(optarg, MAX_OPTARG_LEN)) {
+                        if (ret != 0) {
                                 printf("Invalid CPU specified!\n");
                                 return EXIT_FAILURE;
                         }
                         break;
                 case 'b':
                         ret = str_to_uint(optarg, 10, &mem_bw);
-                        if (ret != (int)strnlen(optarg, MAX_OPTARG_LEN)
-                                        || !mem_bw) {
+                        if (ret != 0 || mem_bw == 0 || mem_bw > MAX_MEM_BW) {
                                 printf("Invalid B/W specified!\n");
                                 return EXIT_FAILURE;
                         }
