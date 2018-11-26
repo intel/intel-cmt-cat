@@ -493,6 +493,7 @@ str_to_uint(const char *str, const unsigned base, unsigned *value)
 {
         const char *str_start = str;
         char *str_end = NULL;
+        unsigned tmp = 0;
 
         if (NULL == str || NULL == value)
                 return -EINVAL;
@@ -507,10 +508,11 @@ str_to_uint(const char *str, const unsigned base, unsigned *value)
                 return -EINVAL;
 
         errno = 0;
-        *value = strtoul(str_start, &str_end, base);
+        tmp = strtoul(str_start, &str_end, base);
         if (errno != 0 || str_end == NULL || str_end == str_start)
                 return -EINVAL;
 
+        *value = tmp;
         return str_end - str;
 }
 
