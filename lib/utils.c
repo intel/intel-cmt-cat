@@ -536,3 +536,11 @@ pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
 
         return ret;
 }
+
+int
+pqos_mba_ctrl_enabled(const struct pqos_cap *cap __attribute__((unused)),
+                      int *ctrl_supported, int *ctrl_enabled) {
+	*ctrl_supported = 0;
+	*ctrl_enabled = 0;
+	return PQOS_RETVAL_OK;
+}

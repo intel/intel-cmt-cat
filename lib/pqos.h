@@ -57,7 +57,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION       20100        /**< version 2.1.0 */
+#define PQOS_VERSION       30000        /**< version 3.0.0 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16 x COS */
 #define PQOS_MAX_L2CA_COS  16           /**< 16 x COS */
 
@@ -214,6 +214,17 @@ struct pqos_cap_l2ca {
 };
 
 /**
+ * Memory Bandwidth Allocation configuration enumeration
+ */
+enum pqos_mba_config {
+        PQOS_MBA_ANY,                   /**< currently enabled configuration */
+        PQOS_MBA_DEFAULT,               /**< direct MBA hardware
+                                           configuration (percentage) */
+        PQOS_MBA_CTRL                   /**< MBA controller configuration
+                                           (MBps) */
+};
+
+/**
  * Memory Bandwidth Allocation capability structure
  */
 struct pqos_cap_mba {
@@ -222,6 +233,8 @@ struct pqos_cap_mba {
         unsigned throttle_max;          /**< the max MBA can be throttled */
         unsigned throttle_step;         /**< MBA granularity */
         int is_linear;                  /**< the type of MBA linear/nonlinear */
+        int os_ctrl;                    /**< MBA controller support */
+        int ctrl_on;                    /**< MBA controller enabled */
 };
 
 /**
@@ -723,17 +736,19 @@ int pqos_alloc_release_pid(const pid_t *task_array,
  * - all COS are set to give access to entire resource
  *
  * As part of allocation reset CDP reconfiguration can be performed.
- * This can be requested via \a l3_cdp_cfg and \a l2_cdp_cfg.
+ * This can be requested via \a l3_cdp_cfg, \a l2_cdp_cfg and \a mba_cfg.
  *
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
  * @param [in] l2_cdp_cfg requested L2 CAT CDP config
+ * @param [in] mba_cfg requested MBA config
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 int
 pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                 const enum pqos_cdp_config l2_cdp_cfg);
+                 const enum pqos_cdp_config l2_cdp_cfg,
+                 const enum pqos_mba_config mba_cfg);
 
 /*
  * =======================================
@@ -875,7 +890,11 @@ int pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  */
 struct pqos_mba {
         unsigned class_id;      /**< class of service */
-        unsigned mb_rate;       /**< valve open rate (VOR) in percentage */
+        unsigned mb_max;        /**< maximum available bandwidth in percentage
+                                   (without MBA controller) or in MBps
+                                   (with MBA controller), depending on ctrl
+                                   flag */
+        int ctrl;               /**< MBA controller flag */
 };
 
 /**
@@ -1180,6 +1199,18 @@ int
 pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
                       int *cdp_supported,
                       int *cdp_enabled);
+
+/**
+ * @brief Retrieves MBA controller configuration status
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] ctrl_supported place to store MBA controller support status
+ * @param [out] ctrl_enabled place to store MBA controller enable status
+ *
+ */
+int pqos_mba_ctrl_enabled(const struct pqos_cap *cap, int *ctrl_supported,
+                          int *ctrl_enabled);
 
 /**
  * @brief Retrieves a monitoring value from a group for a specific event.

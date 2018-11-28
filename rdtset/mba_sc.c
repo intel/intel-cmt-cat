@@ -346,7 +346,7 @@ mba_sc_main(pid_t pid)
                         }
 
                         state.max_bw = mb_to_bytes(config->mba_max);
-                        state.prev_rate = config->mba.mb_rate;
+                        state.prev_rate = config->mba.mb_max;
                         state.cpumask = config->cpumask;
 
                         break;
@@ -362,6 +362,8 @@ mba_sc_main(pid_t pid)
                 uint64_t prev_bw = state.prev_bw;
                 uint64_t cur_bw;
                 const struct pqos_event_values *pv = &state.group.values;
+
+		mba_cfg.ctrl = 0;
 
                 usleep(MBA_SC_SAMPLING_INTERVAL * 1000);
 
@@ -390,12 +392,12 @@ mba_sc_main(pid_t pid)
                     cur_bw > state.max_bw) {
                         DBG(" > %lluMBps",
                             (unsigned long long)bytes_to_mb(state.max_bw));
-                        mba_cfg.mb_rate = state.prev_rate - step_rate;
+                        mba_cfg.mb_max = state.prev_rate - step_rate;
                 } else if (state.prev_rate < max_rate &&
                            (cur_bw + state.delta_bw) < state.max_bw) {
                         DBG(" < %lluMBps",
                             (unsigned long long)bytes_to_mb(state.max_bw));
-                        mba_cfg.mb_rate = state.prev_rate + step_rate;
+                        mba_cfg.mb_max = state.prev_rate + step_rate;
                 } else {
                         if (reg_start_time) {
                                 DBG(" Max BW %lluMBps, regulation took %.1fs\n",
@@ -408,14 +410,14 @@ mba_sc_main(pid_t pid)
                         continue;
                 }
 
-                DBG(", setting MBA to %u%%\n", mba_cfg.mb_rate);
+                DBG(", setting MBA to %u%%\n", mba_cfg.mb_max);
                 ret = mba_sc_mba_set(state.cpumask, &mba_cfg);
                 if (ret != 0) {
                         DBG(" Failed to update mba rate!\n");
                         continue;
                 }
 
-                state.prev_rate = mba_cfg.mb_rate;
+                state.prev_rate = mba_cfg.mb_max;
                 state.delta_comp = 1;
 
                 if (!reg_start_time)

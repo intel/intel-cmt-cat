@@ -891,7 +891,8 @@ int main(int argc, char **argv)
                  * Reset allocation configuration to after-reset state and exit
                  */
                 ret = pqos_alloc_reset(selfn_l3cdp_config,
-                                       selfn_l2cdp_config);
+                                       selfn_l2cdp_config,
+				       PQOS_MBA_DEFAULT);
                 if (ret != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("Allocation reset failed!\n");

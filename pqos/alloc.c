@@ -367,8 +367,9 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
                 printf("Failed to set MBA configuration!\n");
                 return -1;
         }
+        mba.ctrl = 0;
         mba.class_id = class_id;
-        mba.mb_rate = available_bw;
+        mba.mb_max = available_bw;
 
         /**
          * Set all selected classes
@@ -383,7 +384,7 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
                 }
                 printf("SOCKET %u MBA COS%u => %u%% requested, %u%% applied\n",
                        sock_ids[i], actual.class_id,
-                       mba.mb_rate, actual.mb_rate);
+                       mba.mb_max, actual.mb_max);
                 set++;
         }
         sel_alloc_mod += set;
@@ -980,7 +981,7 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                 else
                                         printf("    MBA COS%u => %u%% "
                                                "available\n",
-                                               tab[n].class_id, tab[n].mb_rate);
+                                               tab[n].class_id, tab[n].mb_max);
                         }
                 }
         }

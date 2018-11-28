@@ -87,7 +87,7 @@ rdt_cfg_print(FILE *stream, const struct rdt_cfg cfg)
 		break;
 
 	case PQOS_CAP_TYPE_MBA:
-		fprintf(stream, "RATE: %u", cfg.u.mba->mb_rate);
+		fprintf(stream, "RATE: %u", cfg.u.mba->mb_max);
 		break;
 
 	default:
@@ -159,8 +159,8 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
 			(cfg.u.l3->cdp == 0 && cfg.u.l3->u.ways_mask != 0));
 
 	case PQOS_CAP_TYPE_MBA:
-		return cfg.u.mba != NULL && cfg.u.mba->mb_rate > 0 &&
-			cfg.u.mba->mb_rate <= 100;
+		return cfg.u.mba != NULL && cfg.u.mba->mb_max > 0 &&
+			cfg.u.mba->mb_max <= 100;
 
 	default:
 		break;
@@ -437,7 +437,7 @@ rdt_mba_str_to_rate(const char *param, struct rdt_cfg mba)
 	if (ret < 0 || rate == 0 || rate > 100)
 		return -EINVAL;
 
-	mba.u.mba->mb_rate = rate;
+	mba.u.mba->mb_max = rate;
 
 	return 0;
 }
@@ -590,8 +590,10 @@ parse_rdt(char *rdtstr)
 		if (!CPU_COUNT(&g_cfg.config[idx].cpumask))
 			return -EINVAL;
 		/* if initial MBA value is not set, set default (100%) */
-		if (!rdt_cfg_is_valid(mba))
-			g_cfg.config[idx].mba.mb_rate = MBA_SC_DEF_INIT_MBA;
+		if (!rdt_cfg_is_valid(mba)) {
+			g_cfg.config[idx].mba.ctrl = 0;
+			g_cfg.config[idx].mba.mb_max = MBA_SC_DEF_INIT_MBA;
+		}
 	}
 
 	if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
@@ -1139,7 +1141,7 @@ alloc_get_default_cos(struct pqos_l2ca *l2_def, struct pqos_l3ca *l3_def,
 
 	if (m_cap_mba != NULL && mba_def != NULL) {
 		memset(mba_def, 0, sizeof(*mba_def));
-		mba_def->mb_rate = 100;
+		mba_def->mb_max = 100;
 	}
 
 	return 0;

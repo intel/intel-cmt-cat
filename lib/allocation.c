@@ -902,14 +902,21 @@ hw_mba_set(const unsigned socket,
                 return PQOS_RETVAL_RESOURCE;
         }
         /**
-         * Check if class id's are within allowed range.
+         * Check if class id's are within allowed range
+	 * and if a controller is not requested.
          */
-        for (i = 0; i < num_cos; i++)
+        for (i = 0; i < num_cos; i++) {
                 if (requested[i].class_id >= count) {
                         LOG_ERROR("MBA COS%u is out of range (COS%u is max)!\n",
                                   requested[i].class_id, count - 1);
                         return PQOS_RETVAL_PARAM;
                 }
+
+                if (requested[i].ctrl != 0) {
+                        LOG_ERROR("MBA controller not supported!\n");
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
 
         ASSERT(m_cpu != NULL);
         ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
@@ -920,7 +927,7 @@ hw_mba_set(const unsigned socket,
                 const uint32_t reg =
                         requested[i].class_id + PQOS_MSR_MBA_MASK_START;
                 uint64_t val = PQOS_MBA_LINEAR_MAX -
-                        (((requested[i].mb_rate + (step/2)) / step) * step);
+                        (((requested[i].mb_max + (step/2)) / step) * step);
                 int retval = MACHINE_RETVAL_OK;
 
                 if (val > mba_cap->u.mba->throttle_max)
@@ -942,7 +949,7 @@ hw_mba_set(const unsigned socket,
                         return PQOS_RETVAL_ERROR;
 
                 actual[i] = requested[i];
-                actual[i].mb_rate = (PQOS_MBA_LINEAR_MAX - val);
+                actual[i].mb_max = (PQOS_MBA_LINEAR_MAX - val);
         }
 
         return ret;
@@ -981,8 +988,9 @@ hw_mba_get(const unsigned socket,
                 if (retval != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
 
-		mba_tab[i].class_id = i;
-                mba_tab[i].mb_rate = (unsigned) PQOS_MBA_LINEAR_MAX - val;
+                mba_tab[i].ctrl = 0;
+                mba_tab[i].class_id = i;
+                mba_tab[i].mb_max = (unsigned) PQOS_MBA_LINEAR_MAX - val;
         }
         *num_cos = count;
 
