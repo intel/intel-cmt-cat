@@ -346,6 +346,7 @@ cl_read_mod_write(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write_dqa(void *p, const uint64_t v)
 {
+#ifdef __x86_64__
         asm volatile("movq   %0, %%xmm1\n\t"
                      "movdqa %%xmm1, (%1)\n\t"
                      "movdqa %%xmm1, 16(%1)\n\t"
@@ -354,6 +355,10 @@ cl_write_dqa(void *p, const uint64_t v)
                      :
                      : "r"(v), "r"(p)
                      : "%xmm1", "memory");
+#else
+        printf("Instruction is not suported\n");
+        exit(EXIT_FAILURE);
+#endif
 }
 
 /**
@@ -482,6 +487,7 @@ cl_write_nti_clwb(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write_ntdq(void *p, const uint64_t v)
 {
+#ifdef __x86_64__
         asm volatile("movq   %0, %%xmm1\n\t"
                      "movntdq %%xmm1, (%1)\n\t"
                      "movntdq %%xmm1, 16(%1)\n\t"
@@ -490,6 +496,10 @@ cl_write_ntdq(void *p, const uint64_t v)
                      :
                      : "r"(v), "r"(p)
                      : "%xmm1", "memory");
+#else
+        printf("Instruction is not suported\n");
+        exit(EXIT_FAILURE);
+#endif
 }
 
 /**
