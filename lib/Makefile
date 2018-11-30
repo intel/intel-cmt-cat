@@ -43,7 +43,7 @@ CFLAGS = -pthread -I./ -D_GNU_SOURCE \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
-	-Wformat -Wformat-security -fstack-protector -D_FORTIFY_SOURCE=2\
+	-Wformat -Wformat-security -fstack-protector \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
@@ -77,7 +77,7 @@ endif
 ifeq ($(DEBUG),y)
 CFLAGS += -g -ggdb -O0 -DDEBUG
 else
-CFLAGS += -g -O2
+CFLAGS += -g -O2 -D_FORTIFY_SOURCE=2
 endif
 
 # Build targets and dependencies
