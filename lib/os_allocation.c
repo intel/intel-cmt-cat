@@ -591,7 +591,7 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 		}
 
 		for (j = 0; j < schmt.mba_num; j++)
-			schmt.mba[j].mb_rate = default_mba;
+			schmt.mba[j].mb_max = default_mba;
 
 		ret = resctrl_alloc_schemata_write(i, &schmt);
 
@@ -1454,13 +1454,16 @@ os_mba_set(const unsigned socket,
 			struct pqos_mba *mba = &(schmt.mba[socket]);
 
 			*mba = requested[i];
-                        mba->mb_rate = (((requested[i].mb_rate
-                                          + (step/2)) / step) * step);
-			if (mba->mb_rate == 0)
-				mba->mb_rate = step;
 
-			ret = resctrl_alloc_schemata_write(
-				requested[i].class_id, &schmt);
+			if (mba->ctrl == 0) {
+                                mba->mb_max = (((requested[i].mb_max
+                                                  + (step/2)) / step) * step);
+                                if (mba->mb_max == 0)
+                                        mba->mb_max = step;
+			}
+
+                        ret = resctrl_alloc_schemata_write(
+                                requested[i].class_id, &schmt);
 		}
 
 		if (actual != NULL) {

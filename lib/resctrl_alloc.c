@@ -407,8 +407,9 @@ resctrl_alloc_schemata_init(const unsigned class_id,
 
 		/* fill class_id */
 		for (i = 0; i < num_ids; i++) {
+			schemata->mba[i].ctrl = 0;
 			schemata->mba[i].class_id = class_id;
-			schemata->mba[i].mb_rate = 100;
+			schemata->mba[i].mb_max = 100;
 		}
 	}
 
@@ -514,7 +515,7 @@ resctrl_alloc_schemata_set(const unsigned res_id,
 	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_MB) {
 		if (schemata->mba_num <= res_id)
 			return PQOS_RETVAL_ERROR;
-		schemata->mba[res_id].mb_rate = value;
+		schemata->mba[res_id].mb_max = value;
 	}
 
 	return PQOS_RETVAL_OK;
@@ -724,7 +725,7 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 		for (i = 0; i < schemata->mba_num; i++) {
 			if (i > 0)
 				fprintf(fd, ";");
-			fprintf(fd, "%u=%u", i, schemata->mba[i].mb_rate);
+			fprintf(fd, "%u=%u", i, schemata->mba[i].mb_max);
 		}
 		fprintf(fd, "\n");
 	}

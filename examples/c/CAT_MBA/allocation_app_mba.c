@@ -115,7 +115,8 @@ allocation_get_input(int argc, char *argv[])
 		sel_mba_cos_num = 0;
 	} else {
                 mba[REQUESTED].class_id = (unsigned)atoi(argv[1]);
-                mba[REQUESTED].mb_rate = strtouint64(argv[2]);
+                mba[REQUESTED].mb_max = strtouint64(argv[2]);
+		mba[REQUESTED].ctrl = 0;
                 sel_mba_cos_num = 1;
         }
 }
@@ -147,7 +148,7 @@ set_allocation_class(unsigned sock_count,
 		}
                 printf("SKT%u: MBA COS%u => %u%% requested, %u%% applied\n",
                        *sockets, mba[REQUESTED].class_id,
-                       mba[REQUESTED].mb_rate, mba[ACTUAL].mb_rate);
+                       mba[REQUESTED].mb_max, mba[ACTUAL].mb_max);
 
 		sock_count--;
 		sockets++;
@@ -193,7 +194,7 @@ print_allocation_config(const struct pqos_cap *p_cap,
 			for (n = 0; n < num; n++) {
 				printf("    MBA COS%u => %u%% available\n",
                                        tab[n].class_id,
-                                       tab[n].mb_rate);
+                                       tab[n].mb_max);
 			}
 		} else {
 			printf("Error:%d", ret);

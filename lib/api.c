@@ -364,8 +364,8 @@ pqos_alloc_release_pid(const pid_t *task_array,
 
 int
 pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                 const enum pqos_cdp_config l2_cdp_cfg)
-{
+                 const enum pqos_cdp_config l2_cdp_cfg,
+                 const enum pqos_mba_config mba_cfg) {
 	int ret;
 
         if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
@@ -383,6 +383,13 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                           l2_cdp_cfg);
                 return PQOS_RETVAL_PARAM;
         }
+
+	if (mba_cfg != PQOS_MBA_ANY &&
+	    mba_cfg != PQOS_MBA_DEFAULT) {
+		LOG_ERROR("Only default MBA mode is supported,"
+			  " requested %d!\n", mba_cfg);
+		return PQOS_RETVAL_PARAM;
+	}
 
         _pqos_api_lock();
 
@@ -745,7 +752,8 @@ pqos_mba_set(const unsigned socket,
 	 * Check if MBA rate is within allowed range
 	 */
 	for (i = 0; i < num_cos; i++)
-		if (requested[i].mb_rate == 0 || requested[i].mb_rate > 100) {
+		if (requested[i].ctrl == 0 &&
+		    (requested[i].mb_max == 0 || requested[i].mb_max > 100)) {
 			LOG_ERROR("MBA COS%u rate out of range (from 1-100)!\n",
 			          requested[i].class_id);
 			return PQOS_RETVAL_PARAM;
