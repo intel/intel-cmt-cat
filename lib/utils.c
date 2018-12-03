@@ -538,9 +538,31 @@ pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
 }
 
 int
-pqos_mba_ctrl_enabled(const struct pqos_cap *cap __attribute__((unused)),
-                      int *ctrl_supported, int *ctrl_enabled) {
-	*ctrl_supported = 0;
-	*ctrl_enabled = 0;
-	return PQOS_RETVAL_OK;
+pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
+                      int *ctrl_supported,
+                      int *ctrl_enabled)
+{
+        const struct pqos_capability *mba_cap = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cap != NULL && (ctrl_supported != NULL || ctrl_enabled != NULL));
+        if (cap == NULL || (ctrl_supported == NULL && ctrl_enabled == NULL))
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &mba_cap);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;                           /**< no MBA capability */
+
+        ASSERT(mba_cap != NULL);
+        if (ctrl_supported != NULL) {
+                if (m_interface == PQOS_INTER_MSR)
+                        *ctrl_supported = 0;
+                else
+                        *ctrl_supported = mba_cap->u.mba->os_ctrl;
+        }
+
+        if (ctrl_enabled != NULL)
+                *ctrl_enabled = mba_cap->u.mba->ctrl_on;
+
+        return PQOS_RETVAL_OK;
 }
