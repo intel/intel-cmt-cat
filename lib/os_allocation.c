@@ -113,7 +113,7 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
         }
 
  mount:
-        return resctrl_mount(l3_cdp_cfg, l2_cdp_cfg);
+        return resctrl_mount(l3_cdp_cfg, l2_cdp_cfg, PQOS_MBA_DEFAULT);
 }
 
 /**

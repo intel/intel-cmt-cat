@@ -85,12 +85,14 @@ int resctrl_lock_release(void);
  *
  * @param l3_cdp_cfg L3 CDP option
  * @param l2_cdp_cfg L2 CDP option
+ * @param mba_cfg requested MBA config
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
-                  const enum pqos_cdp_config l2_cdp_cfg);
+                  const enum pqos_cdp_config l2_cdp_cfg,
+                  const enum pqos_mba_config mba_cfg);
 
 /**
  * @brief Unmount the resctrl file system

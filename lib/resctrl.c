@@ -143,25 +143,42 @@ resctrl_lock_release(void)
 
 int
 resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
-              const enum pqos_cdp_config l2_cdp_cfg)
+              const enum pqos_cdp_config l2_cdp_cfg,
+              const enum pqos_mba_config mba_cfg)
 {
-	const char *cdp_option = NULL; /**< cdp_off default */
+	const char *options = NULL;
+	char buf[32] = "";
 
 	ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
 	       l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF);
 	ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
 	       l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF);
+	ASSERT(mba_cfg == PQOS_MBA_DEFAULT ||
+	       mba_cfg == PQOS_MBA_CTRL);
 
-        /* cdp mount options */
-        if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
-                l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
-                cdp_option = "cdp,cdpl2"; /**< both L3 CDP and L2 CDP on */
-        else if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON)
-                cdp_option = "cdp";  /**< L3 CDP on */
-        else if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON)
-                cdp_option = "cdpl2";  /**< L2 CDP on */
+	/* l3 cdp mount option */
+	if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
+		strcat(buf, "cdp");
+		options = buf;
+	}
 
-        if (mount("resctrl", RESCTRL_PATH, "resctrl", 0, cdp_option) != 0)
+	/* l2 cdp mount option */
+	if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
+		if (options != NULL)
+			strcat(buf, ",");
+		strcat(buf, "cdpl2");
+		options = buf;
+	}
+
+	/* mba mount option */
+	if (mba_cfg == PQOS_MBA_CTRL) {
+		if (options != NULL)
+			strcat(buf, ",");
+		strcat(buf, "mba_MBps");
+		options = buf;
+	}
+
+        if (mount("resctrl", RESCTRL_PATH, "resctrl", 0, options) != 0)
                 return PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;

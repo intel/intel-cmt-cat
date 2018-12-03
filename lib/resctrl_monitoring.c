@@ -126,7 +126,8 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
          * Check if resctrl is mounted
          */
         if (stat(RESCTRL_PATH_INFO, &st) != 0) {
-                ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF);
+                ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                                    PQOS_MBA_DEFAULT);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_INFO("Unable to mount resctrl\n");
                         return PQOS_RETVAL_RESOURCE;
