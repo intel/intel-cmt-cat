@@ -64,6 +64,16 @@ void _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
 void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 
 /**
+ * @brief Modifies MBA capability structure upon MBA CTRL config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for MBA & CTRL support.
+ *
+ * @param [in] cfg MBA CTRL configuration
+ */
+void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
+
+/**
  * @brief Aquires lock for PQoS API use
  *
  * Only one thread at a time is allowed to use the API.

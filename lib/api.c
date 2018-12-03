@@ -365,8 +365,9 @@ pqos_alloc_release_pid(const pid_t *task_array,
 int
 pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                  const enum pqos_cdp_config l2_cdp_cfg,
-                 const enum pqos_mba_config mba_cfg) {
-	int ret;
+                 const enum pqos_mba_config mba_cfg)
+{
+        int ret;
 
         if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
             l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
@@ -384,12 +385,13 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 return PQOS_RETVAL_PARAM;
         }
 
-	if (mba_cfg != PQOS_MBA_ANY &&
-	    mba_cfg != PQOS_MBA_DEFAULT) {
-		LOG_ERROR("Only default MBA mode is supported,"
-			  " requested %d!\n", mba_cfg);
-		return PQOS_RETVAL_PARAM;
-	}
+        if (mba_cfg != PQOS_MBA_ANY &&
+            mba_cfg != PQOS_MBA_DEFAULT &&
+            mba_cfg != PQOS_MBA_CTRL) {
+                LOG_ERROR("Unrecognized MBA configuration setting %d!\n",
+                          mba_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
 
         _pqos_api_lock();
 
@@ -400,10 +402,10 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         }
 
         if (m_interface == PQOS_INTER_MSR)
-                ret = hw_alloc_reset(l3_cdp_cfg, l2_cdp_cfg);
+                ret = hw_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
         else {
 #ifdef __linux__
-                ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg);
+                ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;

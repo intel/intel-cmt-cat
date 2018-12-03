@@ -63,28 +63,42 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
  *
  * @param l3_cdp_cfg L3 CDP option
  * @param l2_cdp_cfg L2 CDP option
+ * @param mba_cfg requested MBA config
+ *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
 os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
-                   const enum pqos_cdp_config l2_cdp_cfg)
+                   const enum pqos_cdp_config l2_cdp_cfg,
+                   const enum pqos_mba_config mba_cfg)
 {
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
+        const struct pqos_cap_mba *mba_cap = NULL;
         const struct pqos_capability *alloc_cap = NULL;
 
-        if ((l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
-            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF) || (
-            l2_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
-            l2_cdp_cfg != PQOS_REQUIRE_CDP_OFF)) {
-                LOG_ERROR("Invalid CDP mounting setting %d!\n",
-                          l3_cdp_cfg);
+        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF) {
+                LOG_ERROR("Invalid L3 CDP mounting setting %d!\n", l3_cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (l2_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
+            l2_cdp_cfg != PQOS_REQUIRE_CDP_OFF) {
+                LOG_ERROR("Invalid L2 CDP mounting setting %d!\n", l2_cdp_cfg);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (mba_cfg != PQOS_MBA_DEFAULT &&
+            mba_cfg != PQOS_MBA_CTRL) {
+                LOG_ERROR("Invalid MBA mounting setting %d!\n", mba_cfg);
                 return PQOS_RETVAL_PARAM;
         }
 
         if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF &&
-                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF)
+            l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF &&
+            mba_cfg == PQOS_MBA_DEFAULT)
                 goto mount;
 
         /* Get L3 CAT capabilities */
@@ -96,6 +110,11 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l2_cap = alloc_cap->u.l2ca;
+
+        /* Get MBA capabilities */
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
+        if (alloc_cap != NULL)
+                mba_cap = alloc_cap->u.mba;
 
         if (l3_cap != NULL && !l3_cap->os_cdp &&
                 l3_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
@@ -111,9 +130,15 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
                           "platform!\n");
                 return PQOS_RETVAL_PARAM;
         }
+        if (mba_cap != NULL && mba_cap->os_ctrl == 0 &&
+                mba_cfg == PQOS_MBA_CTRL) {
+                /* Check against erroneous MBA request */
+                LOG_ERROR("MBA CTRL requested but not supported!\n");
+                return PQOS_RETVAL_PARAM;
+        }
 
  mount:
-        return resctrl_mount(l3_cdp_cfg, l2_cdp_cfg, PQOS_MBA_DEFAULT);
+        return resctrl_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 }
 
 /**
@@ -151,6 +176,7 @@ os_alloc_check(void)
                 const struct pqos_capability *alloc_cap = NULL;
                 enum pqos_cdp_config l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
                 enum pqos_cdp_config l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
+                enum pqos_mba_config mba_mount = PQOS_MBA_DEFAULT;
 
                 /* Get L3 CAT capabilities */
                 (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
@@ -162,7 +188,12 @@ os_alloc_check(void)
                 if (alloc_cap != NULL && alloc_cap->u.l2ca->cdp_on)
                         l2_cdp_mount = PQOS_REQUIRE_CDP_ON;
 
-                ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount);
+                /* Get MBA capabilities */
+                (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
+                if (alloc_cap != NULL && alloc_cap->u.mba->ctrl_on)
+                        mba_mount = PQOS_MBA_CTRL;
+
+                ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount, mba_mount);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_INFO("Unable to mount resctrl\n");
                         return PQOS_RETVAL_RESOURCE;
@@ -522,14 +553,16 @@ os_alloc_reset_cores(void)
  *
  * @param [in] l3_cap l3 cache capability
  * @param [in] l2_cap l2 cache capability
+ * @param [in] mba_cap mba capability
  *
  * @return Operation status
  */
 static int
 os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
-                         const struct pqos_cap_l2ca *l2_cap)
+                         const struct pqos_cap_l2ca *l2_cap,
+                         const struct pqos_cap_mba *mba_cap)
 {
-	const unsigned default_mba = 100;
+	uint32_t default_mba = 100;
 	uint64_t default_l3ca = 0;
 	uint64_t default_l2ca = 0;
 	unsigned grps;
@@ -554,6 +587,9 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 
 	if (l2_cap != NULL)
 		default_l2ca = ((uint64_t)1 << l2_cap->num_ways) - 1;
+
+        if (mba_cap != NULL && mba_cap->ctrl_on)
+                default_mba = UINT32_MAX;
 
 	/**
 	 * Reset schematas
@@ -690,14 +726,16 @@ os_alloc_reset_tasks(void)
  * Resets all mba schematas to default value
  * Moves all tasks to default COS
  *
- * @param [in] l3_cap id of default COS
- * @param [in] l2_cap id of default COS
+ * @param [in] l3_cap L3 CAT capability
+ * @param [in] l2_cap L2 CAT capability
+ * @param [in] mba_cap MBA capability
  *
  * @return Operation status
  */
 static int
 os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
-		     const struct pqos_cap_l2ca *l2_cap)
+		     const struct pqos_cap_l2ca *l2_cap,
+                     const struct pqos_cap_mba *mba_cap)
 {
 	int ret = PQOS_RETVAL_OK;
 	int step_result;
@@ -708,7 +746,7 @@ os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
 	if (step_result != PQOS_RETVAL_OK)
 		ret = step_result;
 
-	step_result = os_alloc_reset_schematas(l3_cap, l2_cap);
+	step_result = os_alloc_reset_schematas(l3_cap, l2_cap, mba_cap);
 	if (step_result != PQOS_RETVAL_OK)
 		ret = step_result;
 
@@ -770,32 +808,71 @@ l2_cdp_update(const enum pqos_cdp_config l2_cdp_cfg,
  */
 static int
 l3_cdp_update(const enum pqos_cdp_config l3_cdp_cfg,
-	      const struct pqos_cap_l3ca *l3_cap,
-	      enum pqos_cdp_config *l3_cdp)
+              const struct pqos_cap_l3ca *l3_cap,
+              enum pqos_cdp_config *l3_cdp)
 {
         int ret = 0;
 
-	if (l3_cap == NULL)
-		return 0;
-
-	switch (l3_cdp_cfg) {
-	case PQOS_REQUIRE_CDP_ON:
-		*l3_cdp = l3_cdp_cfg;
+        if (l3_cap == NULL)
+                return 0;
+        switch (l3_cdp_cfg) {
+        case PQOS_REQUIRE_CDP_ON:
+                *l3_cdp = l3_cdp_cfg;
                 ret = !l3_cap->cdp_on;
-		break;
-	case PQOS_REQUIRE_CDP_ANY:
+                break;
+        case PQOS_REQUIRE_CDP_ANY:
                 if (l3_cap->cdp_on)
                         *l3_cdp = PQOS_REQUIRE_CDP_ON;
                 else
                         *l3_cdp = PQOS_REQUIRE_CDP_OFF;
-		break;
-	case PQOS_REQUIRE_CDP_OFF:
-		*l3_cdp = l3_cdp_cfg;
+                break;
+        case PQOS_REQUIRE_CDP_OFF:
+                *l3_cdp = l3_cdp_cfg;
                 ret = l3_cap->cdp_on;
-		break;
-	}
+                break;
+        }
 
-	return ret;
+        return ret;
+}
+
+/**
+ * @brief updates MBA configuration for MBA capability
+ *
+ * @param [in] mba_cfg requsted MBA configuration
+ * @param [in] mba_cap MBA capability
+ * @param [out] mba_ctrl updated MBA config
+ *
+ * @retval > 0 mba_ctrl change
+ * @retval 0 no change
+ */
+static int
+mba_cfg_update(const enum pqos_mba_config mba_cfg,
+                const struct pqos_cap_mba *mba_cap,
+                enum pqos_mba_config *mba_ctrl)
+{
+        int ret = 0;
+
+        if (mba_cap == NULL)
+                return 0;
+
+        switch (mba_cfg) {
+        case PQOS_MBA_CTRL:
+                *mba_ctrl = mba_cfg;
+                ret = (mba_cap->ctrl_on != 1);
+                break;
+        case PQOS_MBA_ANY:
+                if (mba_cap->ctrl_on == 1)
+                        *mba_ctrl = PQOS_MBA_CTRL;
+                else
+                        *mba_ctrl = PQOS_MBA_DEFAULT;
+                break;
+        case PQOS_MBA_DEFAULT:
+                *mba_ctrl = mba_cfg;
+                ret = (mba_cap->ctrl_on != 0);
+                break;
+        }
+
+        return ret;
 }
 
 /**
@@ -806,16 +883,20 @@ l3_cdp_update(const enum pqos_cdp_config l3_cdp_cfg,
  *
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
  * @param [in] l2_cdp_cfg requested L2 CAT CDP config
+ * @param [in] mba_cfg requested MBA config
  * @param [in] l3_cap l3 capability
  * @param [in] l2_cap l2 capability
+ * @param [in] mba_cap mba capability
  *
  * @return Operation status
  */
 static int
 os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
 		    const enum pqos_cdp_config l2_cdp_cfg,
+                    const enum pqos_mba_config mba_cfg,
 	            const struct pqos_cap_l3ca *l3_cap,
-	            const struct pqos_cap_l2ca *l2_cap)
+	            const struct pqos_cap_l2ca *l2_cap,
+                    const struct pqos_cap_mba *mba_cap)
 {
 	int ret;
 
@@ -840,12 +921,13 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
         /**
          * Mount now with CDP option.
          */
-	LOG_INFO("OS alloc reset - mount resctrl with "
-		"l3_cdp %s and l2_cdp %s\n",
-		l3_cdp_cfg ? "on" : "off",
-		l2_cdp_cfg ? "on" : "off");
+        LOG_INFO("OS alloc reset - mount resctrl with "
+                 "l3_cdp %s, l2_cdp %s, mba ctrl %s\n",
+                 l3_cdp_cfg ? "on" : "off",
+                 l2_cdp_cfg ? "on" : "off",
+                 mba_cfg ? "on" : "off");
 
-        ret = os_interface_mount(l3_cdp_cfg, l2_cdp_cfg);
+        ret = os_interface_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Mount OS interface error!\n");
                 goto os_alloc_reset_full_exit;
@@ -854,6 +936,8 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
                 _pqos_cap_l3cdp_change(l3_cdp_cfg);
         if (l2_cap != NULL)
                 _pqos_cap_l2cdp_change(l2_cdp_cfg);
+        if (mba_cap != NULL)
+                _pqos_cap_mba_change(mba_cfg);
         /**
          * Create the COS dir's in resctrl.
          */
@@ -868,15 +952,19 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
 
 int
 os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-               const enum pqos_cdp_config l2_cdp_cfg)
+               const enum pqos_cdp_config l2_cdp_cfg,
+               const enum pqos_mba_config mba_cfg)
 {
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
+        const struct pqos_cap_mba *mba_cap = NULL;
         enum pqos_cdp_config l3_cdp = PQOS_REQUIRE_CDP_OFF;
-	enum pqos_cdp_config l2_cdp = PQOS_REQUIRE_CDP_OFF;
-	int l3_cdp_changed = 0;
-	int l2_cdp_changed = 0;
+        enum pqos_cdp_config l2_cdp = PQOS_REQUIRE_CDP_OFF;
+        enum pqos_mba_config mba_ctrl = PQOS_MBA_DEFAULT;
+        int l3_cdp_changed = 0;
+        int l2_cdp_changed = 0;
+        int mba_changed = 0;
         int ret;
 
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
@@ -886,6 +974,10 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+
+        ASSERT(mba_cfg == PQOS_MBA_DEFAULT ||
+               mba_cfg == PQOS_MBA_CTRL ||
+               mba_cfg == PQOS_MBA_ANY);
 
         /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
@@ -898,10 +990,16 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         if (alloc_cap != NULL)
                 l2_cap = alloc_cap->u.l2ca;
 
+        /* Get MBA capabilities */
+        alloc_cap = NULL;
+        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
+        if (alloc_cap != NULL)
+                mba_cap = alloc_cap->u.mba;
+
         /* Check if either L2 CAT or L3 CAT is supported */
-        if (l2_cap == NULL && l3_cap == NULL) {
-		LOG_ERROR("L2 CAT/L3 CAT not present!\n");
-		ret = PQOS_RETVAL_RESOURCE; /* no L2/L3 CAT present */
+        if (l2_cap == NULL && l3_cap == NULL && mba_cap == NULL) {
+		LOG_ERROR("L2 CAT/L3 CAT/MBA not present!\n");
+		ret = PQOS_RETVAL_RESOURCE; /* no L2 CAT/L3 CAT/MBA present */
 		goto os_alloc_reset_exit;
         }
         /* Check L3 CDP requested while not present */
@@ -932,6 +1030,19 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 ret = PQOS_RETVAL_PARAM;
                 goto os_alloc_reset_exit;
         }
+        /* Check MBA CTRL requested while not present */
+        if (mba_cap == NULL && mba_cfg != PQOS_MBA_ANY) {
+                LOG_ERROR("MBA CTRL setting requested but no MBA present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_alloc_reset_exit;
+        }
+        /* Check against erroneous MBA CTRL request */
+        if (mba_cap != NULL && mba_cfg == PQOS_MBA_CTRL &&
+                mba_cap->os_ctrl == 0) {
+                LOG_ERROR("MBA CTRL requested but not supported!\n");
+                ret = PQOS_RETVAL_PARAM;
+                goto os_alloc_reset_exit;
+        }
 
         /** Check if resctrl is in use */
         ret = resctrl_lock_exclusive();
@@ -941,8 +1052,9 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 
         l3_cdp_changed = l3_cdp_update(l3_cdp_cfg, l3_cap, &l3_cdp);
         l2_cdp_changed = l2_cdp_update(l2_cdp_cfg, l2_cap, &l2_cdp);
+        mba_changed = mba_cfg_update(mba_cfg, mba_cap, &mba_ctrl);
 
-        if (l3_cdp_changed || l2_cdp_changed) {
+        if (l3_cdp_changed || l2_cdp_changed || mba_changed) {
 
 		unsigned monitoring_active = 0;
 
@@ -955,13 +1067,14 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 
 		if (monitoring_active > 0) {
 			LOG_ERROR("Failed to reset allocation. Please stop "
-				  "monitoring in order to change CDP settings\n");
+				  "monitoring in order to change CDP/MBA "
+                                  "settings\n");
 			ret = PQOS_RETVAL_ERROR;
 		} else
-			ret = os_alloc_reset_full(l3_cdp, l2_cdp, l3_cap,
-                                                  l2_cap);
+			ret = os_alloc_reset_full(l3_cdp, l2_cdp, mba_ctrl,
+                                                  l3_cap, l2_cap, mba_cap);
         } else
-		ret = os_alloc_reset_light(l3_cap, l2_cap);
+		ret = os_alloc_reset_light(l3_cap, l2_cap, mba_cap);
 
  os_alloc_reset_exit:
         return ret;

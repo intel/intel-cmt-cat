@@ -2064,3 +2064,30 @@ _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
                 l2_cap->num_classes = l2_cap->num_classes * 2;
         }
 }
+
+void
+_pqos_cap_mba_change(const enum pqos_mba_config cfg)
+{
+        struct pqos_cap_mba *mba_cap = NULL;
+        unsigned i;
+
+        ASSERT(cfg == PQOS_MBA_DEFAULT || cfg == PQOS_MBA_CTRL ||
+               cfg == PQOS_MBA_ANY);
+        ASSERT(m_cap == NULL);
+
+        if (m_cap == NULL)
+                return;
+
+        for (i = 0; i < m_cap->num_cap && mba_cap == NULL; i++)
+                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
+                        mba_cap = m_cap->capabilities[i].u.mba;
+
+        if (mba_cap == NULL)
+                return;
+
+        if (cfg == PQOS_MBA_DEFAULT)
+                mba_cap->ctrl_on = 0;
+        else if (cfg == PQOS_MBA_CTRL)
+                mba_cap->ctrl_on = 1;
+}
+

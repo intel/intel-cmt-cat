@@ -1324,7 +1324,8 @@ alloc_assoc_reset(void)
 
 int
 hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-               const enum pqos_cdp_config l2_cdp_cfg)
+               const enum pqos_cdp_config l2_cdp_cfg,
+               const enum pqos_mba_config mba_cfg)
 {
         unsigned *sockets = NULL;
         unsigned sockets_num = 0;
@@ -1347,6 +1348,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+
+        ASSERT(mba_cfg == PQOS_MBA_DEFAULT || mba_cfg == PQOS_MBA_CTRL);
 
         /* Get L3 CAT capabilities */
         (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
@@ -1418,6 +1421,10 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 max_l2_cos = l2_cap->num_classes;
                 if (l2_cap->cdp && l2_cap->cdp_on)
                         max_l2_cos = max_l2_cos * 2;
+        }
+        if (mba_cap != NULL && mba_cfg == PQOS_MBA_CTRL) {
+                LOG_ERROR("MBA CTRL requested but not supported by the "
+                          "platform!\n");
         }
 
         /**
