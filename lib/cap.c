@@ -1619,6 +1619,14 @@ discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
                         }
                 }
 
+                /**
+                 * Discover MBA CTRL support
+                 */
+                if (type == PQOS_CAP_TYPE_MBA && *os_ptr) {
+                        capability->u.mba->os_ctrl = -1;
+                        capability->u.mba->ctrl_on = -1;
+                }
+
                 LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
                          "detected" : "not detected");
         }
