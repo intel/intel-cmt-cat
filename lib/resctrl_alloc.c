@@ -389,6 +389,7 @@ resctrl_alloc_schemata_init(const unsigned class_id,
 	retval = pqos_mba_get_cos_num(cap, &num_cos);
 	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
 		unsigned *sockets = NULL;
+		int ctrl_enabled;
 
 		sockets = pqos_cpu_get_sockets(cpu, &num_ids);
 		if (sockets == NULL) {
@@ -405,11 +406,14 @@ resctrl_alloc_schemata_init(const unsigned class_id,
 			goto resctrl_alloc_schemata_init_exit;
 		}
 
-		/* fill class_id */
+		ret = pqos_mba_ctrl_enabled(cap, NULL, &ctrl_enabled);
+		if (ret != PQOS_RETVAL_OK)
+			goto resctrl_alloc_schemata_init_exit;
+
+		/* fill ctrl and class_id */
 		for (i = 0; i < num_ids; i++) {
-			schemata->mba[i].ctrl = 0;
+			schemata->mba[i].ctrl = ctrl_enabled;
 			schemata->mba[i].class_id = class_id;
-			schemata->mba[i].mb_max = 100;
 		}
 	}
 
@@ -546,7 +550,8 @@ resctrl_alloc_schemata_read(const unsigned class_id,
 	}
 
 	if ((schemata->l3ca_num > 0 && schemata->l3ca == NULL)
-	    || (schemata->l2ca_num > 0 && schemata->l2ca == NULL)) {
+	    || (schemata->l2ca_num > 0 && schemata->l2ca == NULL)
+	    || (schemata->mba_num > 0 && schemata->mba == NULL)) {
 		ret = PQOS_RETVAL_ERROR;
 		goto resctrl_alloc_schemata_read_exit;
 	}

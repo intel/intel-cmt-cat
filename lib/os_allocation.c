@@ -1488,15 +1488,29 @@ os_mba_set(const unsigned socket,
 	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
 	if (sockets == NULL || sockets_num == 0 || socket >= sockets_num) {
 		ret = PQOS_RETVAL_ERROR;
-		goto os_l3ca_set_exit;
+		goto os_mba_set_exit;
 	}
 
         ret = resctrl_lock_exclusive();
         if (ret != PQOS_RETVAL_OK)
-                goto os_l3ca_set_exit;
+                goto os_mba_set_exit;
 
 	for (i = 0; i < num_cos; i++) {
 		struct resctrl_alloc_schemata schmt;
+
+                if (!mba_cap->u.mba->ctrl_on && requested[i].ctrl) {
+			LOG_ERROR("MBA controller requested but"
+			          " not enabled!\n");
+			ret = PQOS_RETVAL_PARAM;
+			goto os_mba_set_unlock;
+		}
+
+		if (mba_cap->u.mba->ctrl_on && !requested[i].ctrl) {
+			LOG_ERROR("Expected MBA controller but"
+			          " not requested!\n");
+			ret = PQOS_RETVAL_PARAM;
+			goto os_mba_set_unlock;
+		}
 
 		ret = resctrl_alloc_schemata_init(requested[i].class_id,
 		                                  m_cap, m_cpu, &schmt);
@@ -1536,13 +1550,13 @@ os_mba_set(const unsigned socket,
 		resctrl_alloc_schemata_fini(&schmt);
 
 		if (ret != PQOS_RETVAL_OK)
-			goto os_l3ca_set_unlock;
+			goto os_mba_set_unlock;
 	}
 
- os_l3ca_set_unlock:
+ os_mba_set_unlock:
         resctrl_lock_release();
 
- os_l3ca_set_exit:
+ os_mba_set_exit:
 	if (sockets != NULL)
 		free(sockets);
 
