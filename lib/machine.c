@@ -64,9 +64,6 @@ machine_init(const unsigned max_core_id)
 {
         unsigned i;
 
-        if (max_core_id == 0)
-                return MACHINE_RETVAL_PARAM;
-
         m_maxcores = max_core_id + 1;
 
         /**
