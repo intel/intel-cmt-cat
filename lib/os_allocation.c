@@ -387,62 +387,6 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         return tasks;
 }
 
-/**
- * @brief Gets unused COS
- *
- * The lowest acceptable COS is 1, as 0 is a default one
- *
- * @param [in] hi_class_id highest acceptable COS id
- * @param [out] class_id unused COS
- *
- * @return Operation status
- */
-static int
-get_unused_cos(const unsigned hi_class_id,
-               unsigned *class_id)
-{
-        unsigned used_classes[hi_class_id + 1];
-        unsigned i, cos;
-        int ret;
-
-        if (class_id == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        memset(used_classes, 0, sizeof(used_classes));
-
-        for (i = hi_class_id; i != 0; i--) {
-                struct resctrl_cpumask mask;
-                unsigned j;
-
-                ret = resctrl_alloc_cpumask_read(i, &mask);
-                if (ret != PQOS_RETVAL_OK)
-			return ret;
-
-                for (j = 0; j < sizeof(mask.tab); j++)
-                        if (mask.tab[j] > 0) {
-                                used_classes[i] = 1;
-                                break;
-                        }
-
-                if (used_classes[i] == 1)
-                        continue;
-
-                ret = resctrl_alloc_task_file_check(i, &used_classes[i]);
-                if (ret != PQOS_RETVAL_OK)
-			return ret;
-        }
-
-        /* Find unused COS */
-        for (cos = hi_class_id; cos != 0; cos--) {
-                if (used_classes[cos] == 0) {
-                        *class_id = cos;
-                        return PQOS_RETVAL_OK;
-                }
-        }
-
-        return PQOS_RETVAL_RESOURCE;
-}
-
 int
 os_alloc_assign(const unsigned technology,
                 const unsigned *core_array,
@@ -467,7 +411,7 @@ os_alloc_assign(const unsigned technology,
                 return PQOS_RETVAL_ERROR;
 
         /* find an unused class from highest down */
-        ret = get_unused_cos(num_rctl_grps - 1, class_id);
+        ret = resctrl_alloc_get_unused_group(num_rctl_grps, class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1777,7 +1721,7 @@ os_alloc_assign_pid(const unsigned technology,
                 return ret;
 
         /* find an unused class from highest down */
-        ret = get_unused_cos(num_rctl_grps - 1, class_id);
+        ret = resctrl_alloc_get_unused_group(num_rctl_grps, class_id);
         if (ret != PQOS_RETVAL_OK)
                 goto os_alloc_assign_pid_unlock;
 

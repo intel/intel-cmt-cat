@@ -997,3 +997,48 @@ resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id)
 	/* Search tasks files */
 	return resctrl_alloc_task_search(class_id, m_cap, task);
 }
+
+int
+resctrl_alloc_get_unused_group(const unsigned grps_num, unsigned *group_id)
+{
+        unsigned used_groups[grps_num];
+        unsigned i;
+        int ret;
+
+        if (group_id == NULL || grps_num == 0)
+                return PQOS_RETVAL_PARAM;
+
+        memset(used_groups, 0, sizeof(used_groups));
+
+        for (i = grps_num - 1; i > 0; i--) {
+                struct resctrl_cpumask mask;
+                unsigned j;
+
+                ret = resctrl_alloc_cpumask_read(i, &mask);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                for (j = 0; j < sizeof(mask.tab); j++)
+                        if (mask.tab[j] > 0) {
+                                used_groups[i] = 1;
+                                break;
+                        }
+
+                if (used_groups[i] == 1)
+                        continue;
+
+                ret = resctrl_alloc_task_file_check(i, &used_groups[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        /* Find unused COS */
+        for (i = grps_num - 1; i > 0; i--) {
+                if (used_groups[i] == 0) {
+                        *group_id = i;
+                        return PQOS_RETVAL_OK;
+                }
+        }
+
+        return PQOS_RETVAL_RESOURCE;
+}
