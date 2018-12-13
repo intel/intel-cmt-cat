@@ -2227,8 +2227,10 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
         if (cfg == PQOS_MBA_DEFAULT)
                 mba_cap->ctrl_on = 0;
         else if (cfg == PQOS_MBA_CTRL) {
+#ifdef __linux__
                 if (m_interface != PQOS_INTER_MSR)
                         mba_cap->os_ctrl = 1;
+#endif
                 mba_cap->ctrl_on = 1;
         }
 }
