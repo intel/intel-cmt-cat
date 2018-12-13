@@ -269,6 +269,18 @@ int resctrl_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);
  */
 int resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
 
+/**
+ * @brief Gets unused resctrl group
+ *
+ * The lowest acceptable group is 1, as 0 is a default one
+ *
+ * @param [in] grps_num number of resctrl groups
+ * @param [out] group_id unused group
+ *
+ * @return Operation status
+ */
+int resctrl_alloc_get_unused_group(const unsigned grps_num, unsigned *group_id);
+
 #ifdef __cplusplus
 }
 #endif

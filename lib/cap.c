@@ -1033,6 +1033,8 @@ discover_alloc_mba(struct pqos_cap_mba **r_cap)
 
         memset(cap, 0, sz);
         cap->mem_size = sz;
+        cap->os_ctrl = -1;
+        cap->ctrl_on = -1;
 
         /**
          * Run CPUID.0x7.0 to check
@@ -1510,6 +1512,138 @@ discover_os_monitoring(struct pqos_cap_mon *mon,
 }
 
 /**
+ * @brief Runs detection of OS MBA CTRL capabilities
+ *
+ * @param mba_cap place to store detected capabilities
+ * @param interface flag, stores the selected interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+discover_os_mba_ctrl(struct pqos_cap_mba *mba_cap,
+                     enum pqos_interface interface)
+{
+        int ret;
+
+        if (access(RESCTRL_PATH"/cpus", F_OK) != 0)
+                mba_cap->ctrl_on = 0;
+
+        /* check mount flags */
+        if (mba_cap->ctrl_on == -1) {
+                ret = detect_os_support("/proc/mounts", "mba_MBps",
+                                        &(mba_cap->ctrl_on));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        /* check for values above 100 */
+        if (mba_cap->ctrl_on == -1) {
+                unsigned grp;
+                unsigned count = 0;
+                unsigned i;
+
+                ret = resctrl_alloc_get_grps_num(m_cap, &count);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                for (grp = 0; grp < count && mba_cap->ctrl_on == -1; grp++) {
+                        struct resctrl_alloc_schemata schmt;
+
+                        ret = resctrl_alloc_schemata_init(grp, m_cap, m_cpu,
+                                                          &schmt);
+                        if (ret == PQOS_RETVAL_OK)
+                                ret = resctrl_alloc_schemata_read(grp, &schmt);
+
+                        if (ret == PQOS_RETVAL_OK)
+                                for (i = 0; i < schmt.mba_num; i++)
+                                        if (schmt.mba[i].mb_max > 100) {
+                                                mba_cap->ctrl_on = 1;
+                                                break;
+                                        }
+
+                        resctrl_alloc_schemata_fini(&schmt);
+                }
+        }
+
+        /* get free COS and try to write value above 100 */
+        if (mba_cap->ctrl_on == -1) {
+                unsigned grp;
+                unsigned count = 0;
+                struct resctrl_alloc_schemata schmt;
+                uint32_t mb_max;
+
+                ret = resctrl_alloc_get_grps_num(m_cap, &count);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                ret = resctrl_alloc_get_unused_group(count, &grp);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_WARN("Unable to check if MBA CTRL is enabled - "
+                                 "No free group\n");
+                        goto ctrl_support;
+                }
+
+                ret = resctrl_alloc_schemata_init(grp, m_cap, m_cpu, &schmt);
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_read(grp, &schmt);
+
+                mb_max = schmt.mba[0].mb_max;
+                schmt.mba[0].mb_max = UINT32_MAX;
+
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_write(grp, &schmt);
+
+                if (ret == PQOS_RETVAL_OK) {
+                        /* restore MBA configuration */
+                        schmt.mba[0].mb_max = mb_max;
+                        ret = resctrl_alloc_schemata_write(grp, &schmt);
+                        if (ret != PQOS_RETVAL_OK)
+                                LOG_WARN("Unable to restore MBA "
+                                         "configuration\n");
+
+                        mba_cap->ctrl_on = 1;
+                } else
+                        mba_cap->ctrl_on = 0;
+
+                resctrl_alloc_schemata_fini(&schmt);
+        }
+
+ctrl_support:
+        if (mba_cap->ctrl_on == 1)
+                mba_cap->os_ctrl = 1;
+        /* Check if it is possible to mount resctrl with mba_MBps enabled */
+        else if (access(RESCTRL_PATH"/cpus", F_OK) != 0 && (
+                        interface == PQOS_INTER_OS ||
+                        interface == PQOS_INTER_OS_RESCTRL_MON)) {
+
+                ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
+                                    PQOS_MBA_CTRL);
+                if (ret == PQOS_RETVAL_OK)
+                        mba_cap->os_ctrl = 1;
+                else {
+                        ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF,
+                                            PQOS_REQUIRE_CDP_OFF,
+                                            PQOS_MBA_DEFAULT);
+                        if (ret == PQOS_RETVAL_OK)
+                                mba_cap->os_ctrl = 0;
+                }
+
+                if (ret == PQOS_RETVAL_OK)
+                        resctrl_umount();
+        }
+
+        if (mba_cap->os_ctrl == 1)
+                LOG_INFO("OS support for MBA CTRL detected\n");
+        else if (mba_cap->os_ctrl == 0)
+                LOG_INFO("OS support for MBA CTRL not detected\n");
+        else
+                LOG_INFO("OS support for MBA CTRL unknown\n");
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Runs detection of OS monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
@@ -1576,15 +1710,15 @@ discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
                         return ret;
                 }
 
-		/**
-		 * Discover available monitoring events
-		 */
-		if (type == PQOS_CAP_TYPE_MON && res_flag) {
-			ret = discover_os_monitoring(capability->u.mon,
+                /**
+                 * Discover available monitoring events
+                 */
+                if (type == PQOS_CAP_TYPE_MON && res_flag) {
+                        ret = discover_os_monitoring(capability->u.mon,
                                                      interface);
-			if (ret != PQOS_RETVAL_OK)
-				return ret;
-		}
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+                }
 
                 /**
                  * If resctrl is supported and L3 CAT is detected in HW then
@@ -1593,18 +1727,21 @@ discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
                 if (type == PQOS_CAP_TYPE_L3CA && *os_ptr == 0 && res_flag)
                         *os_ptr = 1;
 
-		/**
-		 * Discover L3 CDP support
-		 */
-		if (type == PQOS_CAP_TYPE_L3CA && *os_ptr) {
-			ret = detect_os_support(PROC_CPUINFO, "cdp_l3",
-			                        &capability->u.l3ca->os_cdp);
-			if (ret != PQOS_RETVAL_OK) {
-				LOG_ERROR("Fatal error encountered in L3 CDP "
-				          "detection!\n");
-				return ret;
-			}
-		}
+                LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
+                         "detected" : "not detected");
+
+                /**
+                 * Discover L3 CDP support
+                 */
+                if (type == PQOS_CAP_TYPE_L3CA && *os_ptr) {
+                        ret = detect_os_support(PROC_CPUINFO, "cdp_l3",
+                                                &capability->u.l3ca->os_cdp);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Fatal error encountered in L3 CDP "
+                                          "detection!\n");
+                                return ret;
+                        }
+                }
 
                 /**
                  * Discover L2 CDP support
@@ -1623,12 +1760,14 @@ discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
                  * Discover MBA CTRL support
                  */
                 if (type == PQOS_CAP_TYPE_MBA && *os_ptr) {
-                        capability->u.mba->os_ctrl = -1;
-                        capability->u.mba->ctrl_on = -1;
+                        ret = discover_os_mba_ctrl(capability->u.mba,
+                                                   interface);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Fatal error encountered in MBA CTRL "
+                                          "detection!\n");
+                                return ret;
+                        }
                 }
-
-                LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
-                         "detected" : "not detected");
         }
         /**
          * Check if resctrl is mounted
@@ -2087,7 +2226,10 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 
         if (cfg == PQOS_MBA_DEFAULT)
                 mba_cap->ctrl_on = 0;
-        else if (cfg == PQOS_MBA_CTRL)
+        else if (cfg == PQOS_MBA_CTRL) {
+                if (m_interface != PQOS_INTER_MSR)
+                        mba_cap->os_ctrl = 1;
                 mba_cap->ctrl_on = 1;
+        }
 }
 
