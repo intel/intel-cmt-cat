@@ -65,7 +65,8 @@
 enum sel_alloc_type {
         L3CA,
         L2CA,
-        MBA
+        MBA,
+        MBA_CTRL
 };
 
 /**
@@ -349,16 +350,17 @@ set_l2_cos(const unsigned class_id,
  * @brief Set MBA class definitions on selected sockets
  *
  * @param class_id MBA class ID to set
- * @param delay_value to set
+ * @param available_bw to set
  * @param sock_ids Array of socket ID's to set class definition
  * @param sock_num Number of socket ID's in the array
+ * @param ctrl Flag indicating a use of MBA controller
  *
  * @return Number of classes set
  * @retval -1 on error
  */
 static int
 set_mba_cos(const unsigned class_id, const uint64_t available_bw,
-            const unsigned *sock_ids, const unsigned sock_num)
+            const unsigned *sock_ids, const unsigned sock_num, int ctrl)
 {
         unsigned i, set = 0;
         struct pqos_mba mba, actual;
@@ -367,7 +369,7 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
                 printf("Failed to set MBA configuration!\n");
                 return -1;
         }
-        mba.ctrl = 0;
+        mba.ctrl = ctrl;
         mba.class_id = class_id;
         mba.mb_max = available_bw;
 
@@ -382,9 +384,15 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
                                sock_ids[i], mba.class_id);
                         break;
                 }
-                printf("SOCKET %u MBA COS%u => %u%% requested, %u%% applied\n",
-                       sock_ids[i], actual.class_id,
-                       mba.mb_max, actual.mb_max);
+
+                printf("SOCKET %u MBA COS%u => ", sock_ids[i], actual.class_id);
+
+                if (ctrl == 1)
+                        printf("%u MBps\n", mba.mb_max);
+                else
+                        printf("%u%% requested, %u%% applied\n",
+                               mba.mb_max, actual.mb_max);
+
                 set++;
         }
         sel_alloc_mod += set;
@@ -402,7 +410,8 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
  * @param str fragment of string passed to -e command line option
  * @param res_ids array of resource ID's to set COS definition
  * @param res_num number of resource ID's in array
- * @param type allocation type (L2/L3/MBA)
+ * @param type allocation type (L2/L3/MBA/MBA CTRL)
+ * @param cpu pointer to cpu topology structure
  *
  * @return Number of classes set
  * @retval Positive on success
@@ -431,14 +440,16 @@ set_allocation_cos(char *str, unsigned *res_ids,
         mask = strtouint64(p+1);
 
 	/* if MBA selected, set MBA classes */
-        if (type == MBA) {
+        if (type == MBA || type == MBA_CTRL) {
+                int ctrl = (type == MBA_CTRL) ? 1 : 0;
+
                 if (ids == NULL)
                         ids = pqos_cpu_get_sockets(cpu, &n);
                 if (ids == NULL) {
                         printf("Failed to retrieve socket info!\n");
                         return -1;
                 }
-                ret = set_mba_cos(class_id, mask, ids, n);
+                ret = set_mba_cos(class_id, mask, ids, n, ctrl);
                 if (res_ids == NULL && ids != NULL)
                         free(ids);
                 return ret;
@@ -530,7 +541,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
 	} else
                 *p = '\0';
         /**
-	 * Determine selected type (L3/L2/MBA)
+	 * Determine selected type (L3/L2/MBA/MBA CTRL)
 	 */
 	if (strcasecmp(str, "llc") == 0)
                 type = L3CA;
@@ -538,6 +549,8 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                 type = L2CA;
         else if (strcasecmp(str, "mba") == 0)
                 type = MBA;
+        else if (strcasecmp(str, "mba_max") == 0)
+                type = MBA_CTRL;
         else {
 		printf("Unrecognized allocation type: %s\n", s);
                 free(s);
@@ -968,6 +981,10 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                         struct pqos_mba tab[mba->num_classes];
                         unsigned num = 0;
                         unsigned n = 0;
+                        int ctrl_on = sel_interface != PQOS_INTER_MSR &&
+                                      mba->ctrl_on == 1;
+                        const char *unit = ctrl_on ? " MBps" : "%";
+                        const char *available = ctrl_on ? "" : " available";
 
                         ret = pqos_mba_get(sockets[i], mba->num_classes,
                                            &num, tab);
@@ -979,9 +996,9 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                         printf("    MBA COS%u => ERROR\n",
                                                tab[n].class_id);
                                 else
-                                        printf("    MBA COS%u => %u%% "
-                                               "available\n",
-                                               tab[n].class_id, tab[n].mb_max);
+                                        printf("    MBA COS%u => %u%s%s\n",
+                                               tab[n].class_id, tab[n].mb_max,
+                                               unit, available);
                         }
                 }
         }

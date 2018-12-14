@@ -867,9 +867,9 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
          */
         LOG_INFO("OS alloc reset - mount resctrl with "
                  "l3_cdp %s, l2_cdp %s, mba ctrl %s\n",
-                 l3_cdp_cfg ? "on" : "off",
-                 l2_cdp_cfg ? "on" : "off",
-                 mba_cfg ? "on" : "off");
+                 l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ? "on" : "off",
+                 l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ? "on" : "off",
+                 mba_cfg == PQOS_MBA_CTRL ? "on" : "off");
 
         ret = os_interface_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
         if (ret != PQOS_RETVAL_OK) {
@@ -1498,7 +1498,7 @@ os_mba_set(const unsigned socket,
 	for (i = 0; i < num_cos; i++) {
 		struct resctrl_alloc_schemata schmt;
 
-                if (!mba_cap->u.mba->ctrl_on && requested[i].ctrl) {
+		if (!mba_cap->u.mba->ctrl_on && requested[i].ctrl) {
 			LOG_ERROR("MBA controller requested but"
 			          " not enabled!\n");
 			ret = PQOS_RETVAL_PARAM;
