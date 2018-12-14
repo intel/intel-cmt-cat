@@ -298,17 +298,33 @@ cap_print_features_l2ca(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] mba MBA capability structure
+ * @param [in] iface PQoS interface
  * @param [in] verbose verbose mode
  */
 static void
 cap_print_features_mba(const unsigned indent,
                        const struct pqos_cap_mba *mba,
+                       const int iface,
                        const int verbose)
 {
         ASSERT(mba != NULL);
 
         printf_indent(indent, "Memory Bandwidth Allocation (MBA)\n");
         printf_indent(indent + 4, "Num COS: %u\n", mba->num_classes);
+
+        if (iface != PQOS_INTER_MSR && mba->os_ctrl != -1) {
+                const char *ctrl_status = NULL;
+
+                if (!mba->os_ctrl)
+                        ctrl_status = "unsupported";
+                else if (!mba->ctrl_on)
+                        ctrl_status = "disabled";
+                else if (mba->ctrl_on == 1)
+                        ctrl_status = "enabled";
+
+                if (ctrl_status)
+                        printf_indent(indent + 4, "CTRL: %s\n", ctrl_status);
+        }
 
         if (!verbose)
                 return;
@@ -371,7 +387,8 @@ cap_print_features_hw(const struct pqos_capability *cap_mon,
          * Memory Bandwidth Allocation capabilities
          */
         if (cap_mba != NULL)
-                cap_print_features_mba(8, cap_mba->u.mba, verbose);
+                cap_print_features_mba(8, cap_mba->u.mba, PQOS_INTER_MSR,
+                                       verbose);
 }
 
 /**
@@ -466,7 +483,7 @@ cap_print_features_os(const struct pqos_capability *cap_mon,
 
                 mba.num_classes = min_num_cos;
 
-                cap_print_features_mba(8, &mba, NON_VERBOSE);
+                cap_print_features_mba(8, &mba, PQOS_INTER_OS, NON_VERBOSE);
         }
 }
 
