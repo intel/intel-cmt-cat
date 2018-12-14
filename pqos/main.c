@@ -64,6 +64,11 @@ static enum pqos_cdp_config selfn_l3cdp_config = PQOS_REQUIRE_CDP_ANY;
 static enum pqos_cdp_config selfn_l2cdp_config = PQOS_REQUIRE_CDP_ANY;
 
 /**
+ * Default MBA configuration option - don't enforce on or off
+ */
+static enum pqos_mba_config selfn_mba_config = PQOS_MBA_ANY;
+
+/**
  * Monitoring reset
  */
 static int sel_mon_reset = 0;
@@ -329,6 +334,15 @@ static void selfn_reset_alloc(const char *arg)
                         {"l2cdp-any", PQOS_REQUIRE_CDP_ANY},
                 };
 
+                const struct {
+                        const char *name;
+                        enum pqos_mba_config mba;
+                } patternsmb[] = {
+                        {"mbaCtrl-on", PQOS_MBA_CTRL},
+                        {"mbaCtrl-off", PQOS_MBA_DEFAULT},
+                        {"mbaCtrl-any", PQOS_MBA_ANY},
+                };
+
                 tok = s;
                 while ((tok = strtok_r(tok, ",", &saveptr)) != NULL) {
                         unsigned valid = 0;
@@ -343,6 +357,13 @@ static void selfn_reset_alloc(const char *arg)
                         for (i = 0; i < DIM(patternsl2); i++)
                                 if (strcasecmp(tok, patternsl2[i].name) == 0) {
                                         selfn_l2cdp_config = patternsl2[i].cdp;
+                                        valid = 1;
+                                        break;
+                                }
+
+                        for (i = 0; i < DIM(patternsmb); i++)
+                                if (strcasecmp(tok, patternsmb[i].name) == 0) {
+                                        selfn_mba_config = patternsmb[i].mba;
                                         valid = 1;
                                         break;
                                 }
@@ -552,7 +573,7 @@ static const char help_printf_long[] =
         "          Examples: 'llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00',\n"
 	"                    'llc:0d=0xfff;llc:0c=0xfff00',\n"
         "                    'l2:2=0x3f;l2@2:1=0xf',\n"
-        "                    'l2:2d=0xf;l2:2c=0xc,\n"
+        "                    'l2:2d=0xf;l2:2c=0xc',\n"
         "                    'mba:1=30;mba@1:3=80'.\n"
         "  -a CLASS2ID, --alloc-assoc=CLASS2ID\n"
         "          associate cores/tasks with an allocation class.\n"
@@ -563,8 +584,9 @@ static const char help_printf_long[] =
         "  -R [CONFIG[,CONFIG]], --alloc-reset[=CONFIG[,CONFIG]]\n"
         "          reset allocation configuration (L2/L3 CAT & MBA)\n"
         "          CONFIG can be: l3cdp-on, l3cdp-off, l3cdp-any,\n"
-        "                         l2cdp-on, l2cdp-off, l2cdp-any\n"
-        "          (default l3cdp-any,l2cdp-any).\n"
+        "                         l2cdp-on, l2cdp-off, l2cdp-any,\n"
+        "                         mbaCtrl-on, mbaCtrl-off, mbaCtrl-any\n"
+        "          (default l3cdp-any,l2cdp-any,mbaCtrl-any).\n"
         "  -m EVTCORES, --mon-core=EVTCORES\n"
         "          select cores and events for monitoring.\n"
         "          EVTCORES format is 'EVENT:CORE_LIST'.\n"
@@ -892,7 +914,7 @@ int main(int argc, char **argv)
                  */
                 ret = pqos_alloc_reset(selfn_l3cdp_config,
                                        selfn_l2cdp_config,
-				       PQOS_MBA_DEFAULT);
+                                       selfn_mba_config);
                 if (ret != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("Allocation reset failed!\n");
