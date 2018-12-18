@@ -263,8 +263,11 @@ mba_sc_mode(void)
 {
         unsigned i;
 
+        if (g_cfg.interface != PQOS_INTER_MSR)
+                return 0;
+
         for (i = 0; i < g_cfg.config_count; i++)
-                if (g_cfg.config[i].mba_max > 0)
+                if (g_cfg.config[i].mba.ctrl == 1)
                         return 1;
 
         return 0;
@@ -338,15 +341,15 @@ mba_sc_main(pid_t pid)
         for (i = 0; i < g_cfg.config_count; i++) {
                 const struct rdt_config *config = &g_cfg.config[i];
 
-                if (config->mba_max > 0) {
+                if (config->mba.ctrl == 1) {
                         ret = mba_sc_mon_start(config->cpumask, &state.group);
                         if (ret != 0) {
                                 DBG("MBA SC: failed to start monitoring\n");
                                 goto err;
                         }
 
-                        state.max_bw = mb_to_bytes(config->mba_max);
-                        state.prev_rate = config->mba.mb_max;
+                        state.max_bw = mb_to_bytes(config->mba.mb_max);
+                        state.prev_rate = MBA_SC_DEF_INIT_MBA;
                         state.cpumask = config->cpumask;
 
                         break;

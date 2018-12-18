@@ -144,7 +144,6 @@ struct rdt_config {
 	struct pqos_l2ca l2;	/**< L2 configuration */
 	struct pqos_mba mba;	/**< MBA configuretion */
         int pid_cfg;            /**< associate PIDs to this cfg */
-        uint64_t mba_max;       /**< max bandwidth in MBps */
 };
 
 /* rdtset command line configuration structure */

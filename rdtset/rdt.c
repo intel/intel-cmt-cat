@@ -160,7 +160,8 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
 
 	case PQOS_CAP_TYPE_MBA:
 		return cfg.u.mba != NULL && cfg.u.mba->mb_max > 0 &&
-			cfg.u.mba->mb_max <= 100;
+			((cfg.u.mba->ctrl == 0 && cfg.u.mba->mb_max <= 100) ||
+			cfg.u.mba->ctrl == 1);
 
 	default:
 		break;
@@ -437,7 +438,38 @@ rdt_mba_str_to_rate(const char *param, struct rdt_cfg mba)
 	if (ret < 0 || rate == 0 || rate > 100)
 		return -EINVAL;
 
+	mba.u.mba->ctrl = 0;
 	mba.u.mba->mb_max = rate;
+
+	return 0;
+}
+
+/**
+ * @brief Parses mbps string \a param and stores in \a mba
+ *
+ * @param [in] param mbps string
+ * @param [out] mba to store result
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+rdt_mba_str_to_mbps(const char *param, struct rdt_cfg mba)
+{
+	uint64_t mbps;
+	int ret;
+
+	if (PQOS_CAP_TYPE_MBA != mba.type || NULL == mba.u.generic_ptr ||
+			NULL == param)
+		return -EINVAL;
+
+	ret = str_to_uint64(param, 10, &mbps);
+	if (ret < 0 || mbps == 0)
+		return -EINVAL;
+
+	mba.u.mba->ctrl = 1;
+	mba.u.mba->mb_max = mbps;
 
 	return 0;
 }
@@ -561,15 +593,12 @@ parse_rdt(char *rdtstr)
 			break;
 
 		case 'b':
-			if (g_cfg.config[idx].mba_max > 0)
+			if (rdt_cfg_is_valid(mba))
 				return -EINVAL;
 
-			ret = str_to_uint64(param, 10,
-				&g_cfg.config[idx].mba_max);
-
-			if (ret != (int)strlen(param) ||
-					g_cfg.config[idx].mba_max == 0)
-				return -EINVAL;
+			ret = rdt_mba_str_to_mbps(param, mba);
+			if (ret < 0)
+				return ret;
 			break;
 
 		default:
@@ -583,18 +612,6 @@ parse_rdt(char *rdtstr)
 	/* if no cpus specified then set pid flag */
 	if (CPU_COUNT(&g_cfg.config[idx].cpumask) == 0)
 		g_cfg.config[idx].pid_cfg = 1;
-
-	/* if software controller is used ...*/
-	if (g_cfg.config[idx].mba_max > 0) {
-		/* check if "core=" is configured */
-		if (!CPU_COUNT(&g_cfg.config[idx].cpumask))
-			return -EINVAL;
-		/* if initial MBA value is not set, set default (100%) */
-		if (!rdt_cfg_is_valid(mba)) {
-			g_cfg.config[idx].mba.ctrl = 0;
-			g_cfg.config[idx].mba.mb_max = MBA_SC_DEF_INIT_MBA;
-		}
-	}
 
 	if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
 			rdt_cfg_is_valid(mba)))
@@ -698,34 +715,120 @@ check_cpus(void)
 }
 
 /**
- * @brief Checks if CPU supports requested CDP configuration
+ * @brief Checks if CPU supports requested L3 CDP configuration
  *
  * @return status
  * @retval 0 on success
  * @retval negative on error (-errno)
  */
 static int
-check_cdp_support(void)
+check_l3cdp_support(void)
 {
 	unsigned i = 0;
-	const int cdp_supported = m_cap_l3ca != NULL &&
-		m_cap_l3ca->u.l3ca->cdp == 1;
-	const int cdp_enabled = cdp_supported &&
-		m_cap_l3ca->u.l3ca->cdp_on == 1;
+	int ret;
+	int l3cdp_supported = 0;
+	int l3cdp_enabled = 0;
 
-	if (cdp_enabled)
+	ret = pqos_l3ca_cdp_enabled(m_cap, &l3cdp_supported, &l3cdp_enabled);
+	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+		return -1;
+
+	if (l3cdp_enabled)
 		return 0;
 
 	for (i = 0; i < g_cfg.config_count; i++) {
 		if (0 == g_cfg.config[i].l3.cdp)
 			continue;
 
-		if (!cdp_supported)
-			fprintf(stderr, "Allocation: CDP requested but not "
+		if (!l3cdp_supported)
+			fprintf(stderr, "Allocation: L3 CDP requested but not "
 				"supported.\n");
 		else
-			fprintf(stderr, "Allocation: CDP requested but not "
-				"enabled. Please enable CDP.\n");
+			fprintf(stderr, "Allocation: L3 CDP requested but not "
+				"enabled. Please enable L3 CDP.\n");
+
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Checks if CPU supports requested L2 CDP configuration
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+check_l2cdp_support(void)
+{
+	unsigned i = 0;
+	int ret;
+
+	int l2cdp_supported = 0;
+	int l2cdp_enabled = 0;
+
+	ret = pqos_l2ca_cdp_enabled(m_cap, &l2cdp_supported, &l2cdp_enabled);
+	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+		return -1;
+
+	if (l2cdp_enabled)
+		return 0;
+
+	for (i = 0; i < g_cfg.config_count; i++) {
+		if (0 == g_cfg.config[i].l2.cdp)
+			continue;
+
+		if (!l2cdp_supported)
+			fprintf(stderr, "Allocation: L2 CDP requested but not "
+				"supported.\n");
+		else
+			fprintf(stderr, "Allocation: L2 CDP requested but not "
+				"enabled. Please enable L2 CDP.\n");
+
+		return -ENOTSUP;
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Checks if CPU supports requested MBA CTRL configuration
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+check_mba_ctrl_support(void)
+{
+	unsigned i = 0;
+	int ret;
+	int ctrl_supported = 0;
+	int ctrl_enabled = 0;
+
+	/* MBA Software controller is available */
+	if (g_cfg.interface == PQOS_INTER_MSR)
+		return 0;
+
+	ret = pqos_mba_ctrl_enabled(m_cap, &ctrl_supported, &ctrl_enabled);
+	if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+		return -1;
+
+	if (ctrl_enabled != 0)
+		return 0;
+
+	for (i = 0; i < g_cfg.config_count; i++) {
+		if (0 == g_cfg.config[i].mba.ctrl)
+			continue;
+
+		if (ctrl_supported == 0)
+			fprintf(stderr, "Allocation: MBA CTRL requested but "
+			        "not supported.\n");
+		else
+			fprintf(stderr, "Allocation: MBA CTRL requested but "
+				"not enabled. Please enable MBA CTRL.\n");
 
 		return -ENOTSUP;
 	}
@@ -761,8 +864,7 @@ check_supported(void)
 			return -ENOTSUP;
 		}
 
-		if ((rdt_cfg_is_valid(wrap_mba(&g_cfg.config[i].mba)) ||
-		     g_cfg.config[i].mba_max > 0) &&
+		if (rdt_cfg_is_valid(wrap_mba(&g_cfg.config[i].mba)) &&
                     NULL == m_cap_mba) {
 			fprintf(stderr, "Allocation: MBA requested but not "
 				"supported by system!\n");
@@ -954,7 +1056,15 @@ alloc_validate(void)
 	if (ret != 0)
 		return ret;
 
-	ret = check_cdp_support();
+	ret = check_l3cdp_support();
+	if (ret != 0)
+		return ret;
+
+	ret = check_l2cdp_support();
+	if (ret != 0)
+		return ret;
+
+	ret = check_mba_ctrl_support();
 	if (ret != 0)
 		return ret;
 
@@ -1141,7 +1251,11 @@ alloc_get_default_cos(struct pqos_l2ca *l2_def, struct pqos_l3ca *l3_def,
 
 	if (m_cap_mba != NULL && mba_def != NULL) {
 		memset(mba_def, 0, sizeof(*mba_def));
-		mba_def->mb_max = 100;
+		if (m_cap_mba->u.mba->ctrl_on == 1) {
+			mba_def->ctrl = 1;
+			mba_def->mb_max = UINT32_MAX;
+		} else
+			mba_def->mb_max = 100;
 	}
 
 	return 0;
@@ -1238,6 +1352,10 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 		/* if COS is not configured, set it to default */
 		if (!rdt_cfg_is_valid(wrap_mba(&mba_requested)))
 			mba_requested = mba_defs;
+		else if (mba_sc_mode()) {
+			mba_requested.mb_max = MBA_SC_DEF_INIT_MBA;
+			mba_requested.ctrl = 0;
+		}
 
 		/* set proper COS id */
 		mba_requested.class_id = cos_id;

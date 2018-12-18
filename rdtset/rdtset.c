@@ -326,7 +326,7 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
         for (i = 0; i < g_cfg.config_count; i++) {
                 if (g_cfg.config[i].pid_cfg)
                         f_n++;
-                if (g_cfg.config[i].mba_max > 0)
+                if (g_cfg.config[i].mba.ctrl)
                         f_sc++;
                 /* Validate that only 1 pid config selected */
                 if (f_n > 1) {
@@ -334,7 +334,7 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
                         return 0;
                 }
                 /* Validate that only 1 MBA SC configured */
-                if (f_sc > 1) {
+                if (f_sc > 1 && !f_i) {
                         fprintf(stderr, "Only 1 MBA SC config allowed!\n");
                         return 0;
                 }
@@ -344,9 +344,7 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
 		(f_c && f_p && !cmd && !f_n) ||
 		(f_r && f_p && !cmd) ||
 		(f_i && f_n && !f_p && cmd) ||
-		(f_i && f_n && f_p && !cmd) ||
-		(!f_i && f_sc && !f_p && cmd) ||
-		(!f_i && f_sc && f_p && !cmd);
+		(f_i && f_n && f_p && !cmd);
 }
 
 /**

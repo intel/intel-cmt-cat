@@ -126,7 +126,8 @@ CHECKPATCH?=checkpatch.pl
 .PHONY: style
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
-	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE \
+	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE,\
+	SPDX_LICENSE_TAG \
 	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h \
 	 -f cap.h -f cap.c
 
