@@ -1571,7 +1571,7 @@ discover_os_mba_ctrl(struct pqos_cap_mba *mba_cap,
                 unsigned grp;
                 unsigned count = 0;
                 struct resctrl_alloc_schemata schmt;
-                uint32_t mb_max;
+                FILE *fd;
 
                 ret = resctrl_alloc_get_grps_num(m_cap, &count);
                 if (ret != PQOS_RETVAL_OK)
@@ -1584,27 +1584,30 @@ discover_os_mba_ctrl(struct pqos_cap_mba *mba_cap,
                         goto ctrl_support;
                 }
 
-                ret = resctrl_alloc_schemata_init(grp, m_cap, m_cpu, &schmt);
-                if (ret == PQOS_RETVAL_OK)
-                        ret = resctrl_alloc_schemata_read(grp, &schmt);
+                ret = resctrl_alloc_schemata_init(grp, m_cap, m_cpu,
+                                                  &schmt);
+                if (ret != PQOS_RETVAL_OK)
+                        goto ctrl_support;
 
-                mb_max = schmt.mba[0].mb_max;
-                schmt.mba[0].mb_max = UINT32_MAX;
-
-                if (ret == PQOS_RETVAL_OK)
-                        ret = resctrl_alloc_schemata_write(grp, &schmt);
-
+                ret = resctrl_alloc_schemata_read(grp, &schmt);
                 if (ret == PQOS_RETVAL_OK) {
+                        fd = resctrl_alloc_fopen(grp, "schemata", "w");
+                        if (fd != NULL) {
+                                fprintf(fd, "MB:0=%u", (uint32_t)UINT32_MAX);
+                                if (fclose(fd) == 0)
+                                        mba_cap->ctrl_on = 1;
+                                else
+                                        mba_cap->ctrl_on = 0;
+                        }
                         /* restore MBA configuration */
-                        schmt.mba[0].mb_max = mb_max;
-                        ret = resctrl_alloc_schemata_write(grp, &schmt);
-                        if (ret != PQOS_RETVAL_OK)
-                                LOG_WARN("Unable to restore MBA "
-                                         "configuration\n");
-
-                        mba_cap->ctrl_on = 1;
-                } else
-                        mba_cap->ctrl_on = 0;
+                        if (mba_cap->ctrl_on == 1) {
+                                ret = resctrl_alloc_schemata_write(grp,
+                                                                   &schmt);
+                                if (ret != PQOS_RETVAL_OK)
+                                        LOG_WARN("Unable to restore MBA "
+                                                 "settings\n");
+                        }
+                }
 
                 resctrl_alloc_schemata_fini(&schmt);
         }

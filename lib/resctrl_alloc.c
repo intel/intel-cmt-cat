@@ -167,18 +167,7 @@ strtouint64(const char *s, int base, uint64_t *value)
 	return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Opens COS file in resctl filesystem
- *
- * @param [in] class_id COS id
- * @param [in] name File name
- * @param [in] mode fopen mode
- *
- * @return Pointer to the stream
- * @retval Pointer on success
- * @retval NULL on error
- */
-static FILE *
+FILE *
 resctrl_alloc_fopen(const unsigned class_id, const char *name, const char *mode)
 {
 	FILE *fd;

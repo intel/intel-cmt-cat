@@ -78,6 +78,20 @@ int resctrl_alloc_fini(void);
 int resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num);
 
 /**
+ * @brief Opens COS file in resctl filesystem
+ *
+ * @param [in] class_id COS id
+ * @param [in] name File name
+ * @param [in] mode fopen mode
+ *
+ * @return Pointer to the stream
+ * @retval Pointer on success
+ * @retval NULL on error
+ */
+FILE *resctrl_alloc_fopen(const unsigned class_id, const char *name,
+	                  const char *mode);
+
+/**
  * @brief Write CPU mask to file
  *
  * @param [in] class_id COS id
