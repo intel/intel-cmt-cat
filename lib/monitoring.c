@@ -1126,14 +1126,14 @@ int
 hw_mon_poll(struct pqos_mon_data **groups,
               const unsigned num_groups)
 {
-        int ret = PQOS_RETVAL_OK;
         unsigned i = 0;
 
         ASSERT(groups != NULL);
         ASSERT(num_groups > 0);
 
         for (i = 0; i < num_groups; i++) {
-                ret = pqos_core_poll(groups[i]);
+                int ret = pqos_core_poll(groups[i]);
+
                 if (ret != PQOS_RETVAL_OK)
                         LOG_WARN("Failed to read event on "
                                  "core %u\n", groups[i]->cores[0]);
