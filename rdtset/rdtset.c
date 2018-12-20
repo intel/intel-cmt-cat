@@ -121,12 +121,12 @@ err:
 static int
 execute_cmd(int argc, char **argv)
 {
-	int i = 0;
-
 	if (0 >= argc || NULL == argv)
 		return -1;
 
 	if (g_cfg.verbose) {
+		int i;
+
 		printf("Trying to execute ");
 		for (i = 0; i < argc; i++)
 			printf("%s ", argv[i]);
