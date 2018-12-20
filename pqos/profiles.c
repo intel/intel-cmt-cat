@@ -287,7 +287,7 @@ static const struct llc_allocation allocation_tab[] = {
 
 void profile_l3ca_list(FILE *fp)
 {
-        unsigned i = 0, j = 0;
+        unsigned i = 0;
 
         ASSERT(fp != NULL);
         if (fp == NULL)
@@ -295,6 +295,7 @@ void profile_l3ca_list(FILE *fp)
 
         for (i = 0; i < DIM(allocation_tab); i++) {
                 const struct llc_allocation *ap = &allocation_tab[i];
+                unsigned j;
 
                 fprintf(fp,
                         "%u)\n"
