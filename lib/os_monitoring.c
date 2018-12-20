@@ -921,20 +921,16 @@ int
 os_mon_poll(struct pqos_mon_data **groups,
               const unsigned num_groups)
 {
-        int ret = PQOS_RETVAL_OK;
         unsigned i = 0;
 
         ASSERT(groups != NULL);
         ASSERT(num_groups > 0);
 
         for (i = 0; i < num_groups; i++) {
-                /**
-                 * If monitoring core/PID then read
-                 * counter values
-                 */
-                ret = poll_events(groups[i]);
+                int ret = poll_events(groups[i]);
+
                 if (ret != PQOS_RETVAL_OK)
-                        LOG_WARN("Failed to read event on "
+                        LOG_WARN("Failed to poll event on "
                                  "group number %u\n", i);
         }
 
