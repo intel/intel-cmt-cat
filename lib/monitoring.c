@@ -906,7 +906,7 @@ hw_mon_start(const unsigned num_cores,
          */
         for (i = 0; i < (sizeof(event) * 8); i++) {
                 const enum pqos_mon_event evt_mask =
-                        (enum pqos_mon_event)(1 << i);
+                        (enum pqos_mon_event)(1U << i);
                 const struct pqos_monitor *ptr = NULL;
 
                 if (!(evt_mask & event))
