@@ -529,7 +529,7 @@ resctrl_mon_empty(const unsigned class_id,
                 *empty = 0;
         fclose(fd);
 
-        return PQOS_RETVAL_OK;
+        return ret;
 }
 
 /**
