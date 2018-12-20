@@ -2372,7 +2372,6 @@ void monitor_loop(void)
         const long interval =
                 (long)sel_mon_interval * 100000LL; /* interval in [us] units */
         struct timeval tv_start, tv_s;
-        int ret = PQOS_RETVAL_OK;
         const int istty = isatty(fileno(fp_monitor));
         const int istext = !strcasecmp(sel_output_type, "text");
         const int isxml = !strcasecmp(sel_output_type, "xml");
@@ -2435,6 +2434,7 @@ void monitor_loop(void)
                 unsigned i = 0;
                 long usec_start = 0, usec_end = 0, usec_diff = 0;
                 char cb_time[64];
+                int ret;
 
                 ret = pqos_mon_poll(mon_grps, mon_number);
                 if (ret != PQOS_RETVAL_OK) {
