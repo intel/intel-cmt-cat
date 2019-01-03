@@ -293,15 +293,15 @@ class TestCacheOps(object):
         assert Pool.pools[Pool.Cos.SYS]['cores'] == [2]
 
 
-    @mock.patch('cache_ops.Pqos.assign')
-    def test_cores_set_enabled(self, mock_apply):
+    @mock.patch('cache_ops.PQOS_API.alloc_assoc_set')
+    def test_cores_set_enabled(self, mock_alloc_assoc_set):
         Pool.pools[Pool.Cos.SYS] = {}
         Pool.pools[Pool.Cos.SYS]['enabled'] = True
         Pool.pools[Pool.Cos.SYS]['cores'] = []
 
         Pool(Pool.Cos.SYS).cores_set([1])
         assert Pool.pools[Pool.Cos.SYS]['cores'] == [1]
-        mock_apply.assert_called_once_with(Pool.Cos.SYS, [1])
+        mock_alloc_assoc_set.assert_called_once_with([1], Pool.Cos.SYS)
 
 
     @mock.patch('flusher.FlusherProcess.flush')
@@ -352,13 +352,20 @@ class TestCacheOps(object):
         mock_flush.assert_called_once_with([11])
 
 
-    def test_apply_not_configured(self, caplog):
-        Pool.apply(Pool.Cos.SYS)
-        assert 'Nothing to configure!' in caplog.text
+    @mock.patch('cache_ops.PQOS_API.l3ca_set')
+    @mock.patch('cache_ops.PQOS_API.alloc_assoc_set')
+    def test_apply_not_configured(self, mock_l3ca_set, mock_alloc_assoc_set):
+        result = Pool.apply(Pool.Cos.SYS)
+
+        assert result == 0
+
+        mock_l3ca_set.assert_not_called()
+        mock_alloc_assoc_set.assert_not_called()
 
 
-    @mock.patch('cache_ops.Pqos.run')
-    def test_apply(self, mock_pqos):
+    @mock.patch('cache_ops.PQOS_API.l3ca_set')
+    @mock.patch('cache_ops.PQOS_API.alloc_assoc_set')
+    def test_apply(self, mock_alloc_assoc_set, mock_l3ca_set):
         Pool.pools[Pool.Cos.SYS] = {}
         Pool.pools[Pool.Cos.SYS]['enabled'] = True
         Pool.pools[Pool.Cos.SYS]['cores'] = [1]
@@ -366,13 +373,36 @@ class TestCacheOps(object):
 
         Pool.pools[Pool.Cos.P] = {}
         Pool.pools[Pool.Cos.P]['enabled'] = False
-        Pool.pools[Pool.Cos.P]['cores'] = [2]
+        Pool.pools[Pool.Cos.P]['cores'] = [2, 3]
         Pool.pools[Pool.Cos.P]['cbm'] = 0x300
 
-        mock_pqos.return_value = 0, "", ""
+        mock_alloc_assoc_set.return_value = 0
+        mock_l3ca_set.return_value = 0
 
-        Pool.apply([Pool.Cos.SYS, Pool.Cos.P])
-        mock_pqos.assert_called_once_with(" -a 'llc:3=1;llc:0=2;' -e 'llc:3=0xc00;'")
+        result = Pool.apply([Pool.Cos.SYS, Pool.Cos.P])
+
+        assert result == 0
+
+        mock_l3ca_set.assert_called_once_with(0, Pool.Cos.SYS, 0xc00)
+        mock_alloc_assoc_set.assert_any_call([1], Pool.Cos.SYS)
+
+        mock_alloc_assoc_set.assert_any_call([2, 3], 0)
+
+        # libpqos fails
+        mock_alloc_assoc_set.return_value = -1
+        mock_l3ca_set.return_value = 0
+        result = Pool.apply([Pool.Cos.SYS, Pool.Cos.P])
+        assert result != 0
+
+        mock_alloc_assoc_set.return_value = 0
+        mock_l3ca_set.return_value = -1
+        result = Pool.apply([Pool.Cos.SYS, Pool.Cos.P])
+        assert result != 0
+
+        mock_alloc_assoc_set.return_value = -1
+        mock_l3ca_set.return_value = -1
+        result = Pool.apply([Pool.Cos.SYS, Pool.Cos.P])
+        assert result != 0
 
 
     def test_reset(self):
@@ -385,8 +415,9 @@ class TestCacheOps(object):
         assert Pool.Cos.SYS not in Pool.pools
 
 
-    @mock.patch('cache_ops.Pqos.run')
-    def test_configure_cat(self, mock_pqos):
+    @mock.patch('cache_ops.PQOS_API.l3ca_set')
+    @mock.patch('cache_ops.PQOS_API.alloc_assoc_set')
+    def test_configure_cat(self, mock_alloc_assoc_set, mock_l3ca_set):
         def config(field, group, pool):
             if field == 'min_cws':
                 return 2
@@ -408,11 +439,14 @@ class TestCacheOps(object):
                 if group == common.TYPE_DYNAMIC:
                     return '0x3ff'
 
-        mock_pqos.return_value = 0, "", ""
+        mock_alloc_assoc_set.return_value = 0
+        mock_l3ca_set.return_value = 0
 
+        result = -1
         with mock.patch('common.CONFIG_STORE.get_attr_list', new=config):
-            configure_cat()
+            result = configure_cat()
 
+        assert result == 0
         assert Pool.pools[Pool.Cos.SYS]['enabled'] == True
         assert Pool.pools[Pool.Cos.P]['enabled'] == True
         assert Pool.pools[Pool.Cos.PP]['enabled'] == True

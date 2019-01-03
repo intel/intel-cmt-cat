@@ -34,10 +34,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
+LIBDIR ?= ../lib
 PYTHON_INCLUDES?=$(shell python2.7-config --includes)
 INCLUDES=$(PYTHON_INCLUDES)
 LIBS=-lpython2.7
-CCFLAGS=-shared -fPIC
+CCFLAGS=-shared -fPIC -I$(LIBDIR)
+LDFLAGS=-L$(LIBDIR)
 
 KERNEL_VER = $(shell uname -r | cut -f1,2 -d'.')
 KERNEL_MIN_VER_REQ = $(shell echo $(KERNEL_VER)\>=3.9 | bc )
@@ -46,29 +48,33 @@ ifeq ($(KERNEL_MIN_VER_REQ),0)
 all:
 	@echo "Kernel 3.9 or newer required, skipping"
 else
-all: perf_api kernel_module
+all: perf_api pqos_api kernel_module
 endif
 
 perf_api:
 	$(CC) $(CCFLAGS) $(INCLUDES) $(LIBS) -o perfapi.so perfapi.c
 
+pqos_api:
+	$(CC) $(CCFLAGS) $(LDFLAGS) $(INCLUDES) $(LIBS) -lpqos -o pqosapi.so pqosapi.c
+
 kernel_module:
 	$(MAKE) -C pid_cache_flush
 
 clean:
-	-rm -f perfapi.so
+	-$(RM) -f perfapi.so
+	-$(RM) -f pqosapi.so
 	$(MAKE) -C pid_cache_flush clean
 
-.PHONY: test cov style pylint_style kernel_module_style perf_api_style virtual_env
-.PHONY: cppcheck kernel_module_cppcheck perf_api_cppcheck
+.PHONY: test cov style pylint_style kernel_module_style perf_api_style pqos_api_style virtual_env
+.PHONY: cppcheck kernel_module_cppcheck perf_api_cppcheck pqos_api_cppcheck
 
-test: perf_api
+test: perf_api pqos_api
 	PYTHONPATH=. pytest tests/
 
-cov: perf_api
+cov: perf_api pqos_api
 	PYTHONPATH=. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/
 
-style: kernel_module_style perf_api_style pylint_style
+style: kernel_module_style perf_api_style pqos_api_style pylint_style
 
 virtual_env:
 	@bash -c "virtualenv $(CURDIR)/virtual_env"
@@ -89,11 +95,18 @@ perf_api_style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,LEADING_SPACE -f perfapi.c
 
+pqos_api_style:
+	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	--ignore CODE_INDENT,LEADING_SPACE -f pqosapi.c
+
 CPPCHECK?=cppcheck
-cppcheck: kernel_module_cppcheck perf_api_cppcheck
+cppcheck: kernel_module_cppcheck perf_api_cppcheck pqos_api_cppcheck
 
 kernel_module_cppcheck:
 	$(MAKE) -C pid_cache_flush cppcheck
 
 perf_api_cppcheck:
 	$(CPPCHECK) --enable=all --std=c99 --template=gcc --suppress=unusedFunction perfapi.c
+
+pqos_api_cppcheck:
+	$(CPPCHECK) --enable=all --std=c99 --template=gcc --suppress=unusedFunction pqosapi.c

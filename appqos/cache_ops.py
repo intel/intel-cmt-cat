@@ -42,37 +42,46 @@ import pexpect
 import common
 import flusher
 import log
-
+from pqosapi import pqos_init, pqos_fini # pylint: disable=import-error,no-name-in-module
+from pqosapi import pqos_alloc_assoc_set, pqos_l3ca_set, pqos_mba_set # pylint: disable=import-error,no-name-in-module
 
 __CW_SIZE__ = None
 
 
 class Pqos(object):
     """
-    Wrapper for "pqos" tool.
-    Uses "pqos" tool to assign Cores to COS
+    Wrapper for "libpqos".
+    Uses "libpqos" to configure Intel(R) RDT
     """
 
-
     @staticmethod
-    def run(params):
+    def init():
         """
-        Executes "pqos" tool
-
-        Parameters:
-            params: "pqos" tool params
+        Initializes libpqos
 
         Returns:
-            exitstatus: exit status/code
-            output: command output
-            cmd: executed command
-         """
-        cmd = "pqos-os %s" % (params)
-        (output, exitstatus) = pexpect.run(cmd, withexitstatus=True)
-        return exitstatus, output, cmd
+            0 on success
+            -1 otherwise
+        """
+        try:
+            pqos_init()
+        except Exception as ex:
+            log.error(str(ex))
+            return -1
 
+        return 0
 
-    def assign(self, cos, cores):
+    @staticmethod
+    def fini():
+        """
+        De-initializes libpqos
+        """
+        pqos_fini()
+
+        return 0
+
+    @staticmethod
+    def alloc_assoc_set(cores, cos):
         """
         Assigns cores to CoS
 
@@ -81,13 +90,69 @@ class Pqos(object):
             cores: list of cores to be assigned to cos
 
         Returns:
-            Value returned by run(...) method
-         """
+            0 on success
+            -1 otherwise
+        """
         if not cores:
             return 0
 
-        cmd = "-a llc:{}={};".format(cos, ",".join(str(core) for core in cores))
-        return self.run(cmd)
+        try:
+            for core in cores:
+                pqos_alloc_assoc_set(core, cos)
+        except Exception as ex:
+            log.error(str(ex))
+            return -1
+
+        return 0
+
+
+    @staticmethod
+    def l3ca_set(socket, cos, ways_mask):
+        """
+        Configures L3 CAT for CoS
+
+        Parameters:
+            socket: socket on which to configure L3 CAT
+            cos: Class of Service
+            ways_mask: L3 CAT CBM to set
+
+        Returns:
+            0 on success
+            -1 otherwise
+        """
+
+        try:
+            pqos_l3ca_set(socket, cos, ways_mask)
+        except Exception as ex:
+            log.error(str(ex))
+            return -1
+
+        return 0
+
+    @staticmethod
+    def mba_set(socket, cos, mb_max):
+        """
+        Configures MBA for CoS
+
+        Parameters:
+            socket: socket on which to configure L3 CAT
+            cos: Class of Service
+            mb_max: MBA to set
+
+        Returns:
+            0 on success
+            -1 otherwise
+        """
+        try:
+            pqos_mba_set(socket, cos, mb_max)
+        except Exception as ex:
+            log.error(str(ex))
+            return -1
+
+        return 0
+
+
+PQOS_API = Pqos()
 
 
 class Pool(object):
@@ -606,9 +671,9 @@ class Pool(object):
 
             # Assign unasigned removed cores back to COS0
             if removed_cores:
-                Pqos().assign(0, removed_cores)
+                PQOS_API.alloc_assoc_set(removed_cores, 0)
 
-        Pqos().assign(self.pool if self.enabled_get() else 0, cores)
+        PQOS_API.alloc_assoc_set(cores, self.pool if self.enabled_get() else 0)
 
 
     @staticmethod
@@ -621,17 +686,16 @@ class Pool(object):
 
         Returns:
             0 on success
+            -1 otherwise
         """
         if isinstance(pools, list):
             _pools = pools
         else:
             _pools = [pools]
 
-        classdef = ""
-        class2id = ""
         cat = common.STATS_STORE.get_pool_cat()
 
-        # generate command line params for pqos tool
+        # configure CAT
         for item in _pools:
             if item not in Pool.pools:
                 continue
@@ -646,10 +710,12 @@ class Pool(object):
                 bits = Pool(Pool.Cos.BE).cbm_get_bits()
 
             if cbm > 0:
-                classdef += "llc:{}={};".format(item, hex(cbm))
+                if PQOS_API.l3ca_set(0, cos, cbm) != 0:
+                    return -1
+
             if 'cores' in Pool.pools[item] and Pool.pools[item]['cores']:
-                class2id += "llc:{}={};".format(
-                    cos, ",".join(str(core) for core in Pool.pools[item]['cores']))
+                if PQOS_API.alloc_assoc_set(Pool.pools[item]['cores'], cos) != 0:
+                    return -1
 
             pool_id = pool.get_pool_id()
             if pool_id:
@@ -657,25 +723,9 @@ class Pool(object):
                     cat[pool_id] = {}
                 cat[pool_id]['cws'] = bits
 
-        common.STATS_STORE.set_pool_cat(cat)
+            common.STATS_STORE.set_pool_cat(cat)
 
-        # generate command to be executed
-        pqos_args = ""
-        if class2id:
-            pqos_args += " -a '{}'".format(class2id)
-        if classdef:
-            pqos_args += " -e '{}'".format(classdef)
-
-        # execute command/pqos
-        if class2id or classdef:
-            result, output, cmd = Pqos().run(pqos_args)
-            if result != 0:
-                log.error("{} failed!\n{}".format(cmd, output))
-
-            return result
-        else:
-            log.info("Nothing to configure!")
-            return 0
+        return 0
 
 
     @staticmethod
@@ -717,7 +767,8 @@ def detect_cw_size():
     global __CW_SIZE__
     __CW_SIZE__ = None
 
-    result, output, cmd = Pqos().run("-D")
+    cmd = "pqos-os -D"
+    (output, result) = pexpect.run(cmd, withexitstatus=True)
 
     if result != 0:
         log.error("{} failed!\n{}".format(cmd, output))

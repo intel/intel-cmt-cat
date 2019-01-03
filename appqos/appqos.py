@@ -308,6 +308,11 @@ def main():
         log.error("Required perf events not supported, Terminating...")
         return
 
+    result = cache_ops.PQOS_API.init()
+    if result != 0:
+        log.error("libpqos initialization failed, Terminating...")
+        return
+
     # initialize main logic
     app_qos = AppQoS()
 
@@ -323,6 +328,9 @@ def main():
 
     # stop REST API server
     server.terminate()
+
+    # de-initialize libpqos
+    cache_ops.PQOS_API.fini()
 
 
 if __name__ == '__main__':
