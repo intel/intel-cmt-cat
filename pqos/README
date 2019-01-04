@@ -3,7 +3,7 @@
 ========================================================================
 README for PQoS/Intel(R) RDT utility
 
-February 2018
+January 2019
 
 ========================================================================
 
@@ -21,8 +21,8 @@ Overview
 ========
 
 This software package provides basic support for
-Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM)
-and Cache Allocation Technology (CAT).
+Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
+Cache Allocation Technology (CAT) and Memory Bandwidth Allocation (MBA).
 This release supports last level cache occupancy monitoring and
 memory bandwidth monitoring on a per core or logical thread basis.
 MBM supports two types of events reporting local and remote
@@ -48,14 +48,18 @@ up the CAT capabilities. The software provides flags to configure the
 class of service (CLOS) and associate cores / logical threads with a
 class of service.
 
+MBA controller allows to specify memory bandwidth in MBps instead of percentage.
+It is supported only on OS interface and requires Linux kernel since
+4.18 and above.
+
 Use of concurrent monitoring instances is possible as long as each
 instance monitors exclusive set of cores. Library APIs are also thread safe.
 
-For additional CMT, MBM and CAT details please see refer to the Intel(R)
+For additional CMT, MBM, CAT and MBA details please see refer to the Intel(R)
 Architecture Software Development Manuals available at:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
-Specific information with regard to CMT, MBM and CAT can be found in
-Chapter 17.18 and 17.19 (SDM version 065).
+Specific information with regard to CMT, MBM, CAT and MBA can be found in
+Chapter 17.18 and 17.19 (SDM volume 3, version 065).
 
 
 Requirements and Installation
