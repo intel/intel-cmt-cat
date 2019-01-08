@@ -1425,6 +1425,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         if (mba_cap != NULL && mba_cfg == PQOS_MBA_CTRL) {
                 LOG_ERROR("MBA CTRL requested but not supported by the "
                           "platform!\n");
+                ret = PQOS_RETVAL_PARAM;
+                goto pqos_alloc_reset_exit;
         }
 
         /**
