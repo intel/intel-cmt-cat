@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -62,6 +62,7 @@
 #include "pqos.h"
 
 #include "cap.h"
+#include "os_cap.h"
 #include "allocation.h"
 #include "monitoring.h"
 
@@ -72,7 +73,6 @@
 #include "api.h"
 #include "utils.h"
 #include "resctrl.h"
-#include "resctrl_alloc.h"
 #include "perf_monitoring.h"
 
 /**
@@ -348,7 +348,6 @@ add_monitoring_event(struct pqos_cap_mon *mon,
         mon->events[mon->num_events].type = (enum pqos_mon_event) event_type;
         mon->events[mon->num_events].max_rmid = max_rmid;
         mon->events[mon->num_events].scale_factor = scale_factor;
-        mon->events[mon->num_events].os_support = PQOS_OS_MON_UNSUPPORTED;
         mon->num_events++;
 }
 
@@ -806,7 +805,6 @@ discover_alloc_l3_cpuid(struct pqos_cap_l3ca *cap,
         cap->num_ways = res.eax + 1;
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
         cap->cdp_on = 0;
-	cap->os_cdp = 0;
         cap->way_contention = (uint64_t) res.ebx;
 
         if (cap->cdp) {
@@ -893,16 +891,8 @@ discover_alloc_l3(struct pqos_cap_l3ca **r_cap,
                                              &l3_size);
         }
 
-        if (ret == PQOS_RETVAL_OK) {
-                if (cap->num_ways > 0)
-                        cap->way_size = l3_size / cap->num_ways;
-                LOG_INFO("L3 CAT details: CDP support=%d, CDP on=%d, "
-                         "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
-                         cap->cdp, cap->cdp_on, cap->num_classes,
-                         cap->num_ways, cap->way_contention);
-                LOG_INFO("L3 CAT details: cache size %u bytes, "
-                         "way size %u bytes\n", l3_size, cap->way_size);
-        }
+        if (cap->num_ways > 0)
+                cap->way_size = l3_size / cap->num_ways;
 
         if (ret == PQOS_RETVAL_OK)
                 (*r_cap) = cap;
@@ -969,7 +959,6 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap,
 	cap->num_ways = res.eax+1;
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
         cap->cdp_on = 0;
-	cap->os_cdp = 0;
 	cap->way_contention = (uint64_t) res.ebx;
 
         if (cap->cdp) {
@@ -997,13 +986,6 @@ discover_alloc_l2(struct pqos_cap_l2ca **r_cap,
 	}
 	if (cap->num_ways > 0)
 		cap->way_size = l2_size / cap->num_ways;
-
-	LOG_INFO("L2 CAT details: CDP support=%d, CDP on=%d, "
-		 "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
-		 cap->cdp, cap->cdp_on, cap->num_classes, cap->num_ways,
-                 cap->way_contention);
-	LOG_INFO("L2 CAT details: cache size %u bytes, way size %u bytes\n",
-		 l2_size, cap->way_size);
 
 	(*r_cap) = cap;
         return ret;
@@ -1033,8 +1015,8 @@ discover_alloc_mba(struct pqos_cap_mba **r_cap)
 
         memset(cap, 0, sz);
         cap->mem_size = sz;
-        cap->os_ctrl = -1;
-        cap->ctrl_on = -1;
+        cap->ctrl = -1;
+        cap->ctrl_on = 0;
 
         /**
          * Run CPUID.0x7.0 to check
@@ -1070,12 +1052,6 @@ discover_alloc_mba(struct pqos_cap_mba **r_cap)
                 return PQOS_RETVAL_RESOURCE;
         }
 
-	LOG_INFO("MBA details: "
-		 "#COS=%u, %slinear, max=%u, step=%u\n",
-		 cap->num_classes,
-                 cap->is_linear ? "" : "non-",
-                 cap->throttle_max, cap->throttle_step);
-
 	(*r_cap) = cap;
         return ret;
 }
@@ -1085,27 +1061,51 @@ discover_alloc_mba(struct pqos_cap_mba **r_cap)
  *
  * @param p_cap place to store allocated capabilities structure
  * @param cpu detected cpu topology
+ * @param inter selected pqos interface
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
 static int
 discover_capabilities(struct pqos_cap **p_cap,
-                      const struct pqos_cpuinfo *cpu)
+                      const struct pqos_cpuinfo *cpu,
+                      enum pqos_interface inter)
 {
         struct pqos_cap_mon *det_mon = NULL;
         struct pqos_cap_l3ca *det_l3ca = NULL;
         struct pqos_cap_l2ca *det_l2ca = NULL;
         struct pqos_cap_mba *det_mba = NULL;
         struct pqos_cap *_cap = NULL;
-        struct pqos_capability *item = NULL;
         unsigned sz = 0;
         int ret = PQOS_RETVAL_OK;
+
+        if (inter != PQOS_INTER_MSR && inter != PQOS_INTER_OS &&
+            inter != PQOS_INTER_OS_RESCTRL_MON)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Check if resctrl is mounted
+         */
+        if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
+                if (inter == PQOS_INTER_OS ||
+                    inter == PQOS_INTER_OS_RESCTRL_MON) {
+                        LOG_INFO("resctrl not mounted\n");
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        } else if (inter == PQOS_INTER_MSR)
+                LOG_WARN("resctl filesystem mounted! Using MSR "
+                         "interface may corrupt resctrl filesystem "
+                         "and cause unexpected behaviour\n");
 
         /**
          * Monitoring init
          */
-        ret = discover_monitoring(&det_mon, cpu);
+        if (inter == PQOS_INTER_MSR)
+                ret = discover_monitoring(&det_mon, cpu);
+#ifdef __linux__
+        else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
+                ret = os_cap_mon_discover(&det_mon, cpu);
+#endif
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("Monitoring capability detected\n");
@@ -1123,10 +1123,23 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * L3 Cache allocation init
          */
-        ret = discover_alloc_l3(&det_l3ca, cpu);
+        if (inter == PQOS_INTER_MSR)
+                ret = discover_alloc_l3(&det_l3ca, cpu);
+#ifdef __linux__
+        else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
+                ret = os_cap_l3ca_discover(&det_l3ca, cpu);
+#endif
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("L3CA capability detected\n");
+                LOG_INFO("L3 CAT details: CDP support=%d, CDP on=%d, "
+                         "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
+                         det_l3ca->cdp, det_l3ca->cdp_on, det_l3ca->num_classes,
+                         det_l3ca->num_ways, det_l3ca->way_contention);
+                LOG_INFO("L3 CAT details: cache size %u bytes, "
+                         "way size %u bytes\n",
+                         det_l3ca->way_size * det_l3ca->num_ways,
+                         det_l3ca->way_size);
                 sz += sizeof(struct pqos_capability);
                 break;
         case PQOS_RETVAL_RESOURCE:
@@ -1141,10 +1154,22 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * L2 Cache allocation init
          */
-        ret = discover_alloc_l2(&det_l2ca, cpu);
+        if (inter == PQOS_INTER_MSR)
+                ret = discover_alloc_l2(&det_l2ca, cpu);
+#ifdef __linux__
+        else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
+                ret = os_cap_l2ca_discover(&det_l2ca, cpu);
+#endif
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("L2CA capability detected\n");
+                LOG_INFO("L2 CAT details: CDP support=%d, CDP on=%d, "
+                         "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
+                         det_l2ca->cdp, det_l2ca->cdp_on, det_l2ca->num_classes,
+                         det_l2ca->num_ways, det_l2ca->way_contention);
+                LOG_INFO("L2 CAT details: cache size %u bytes, way size %u "
+                         "bytes\n", det_l2ca->way_size * det_l2ca->num_ways,
+                         det_l2ca->way_size);
                 sz += sizeof(struct pqos_capability);
                 break;
         case PQOS_RETVAL_RESOURCE:
@@ -1159,10 +1184,20 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * Memory bandwidth allocation init
          */
-        ret = discover_alloc_mba(&det_mba);
+        if (inter == PQOS_INTER_MSR)
+                ret = discover_alloc_mba(&det_mba);
+#ifdef __linux__
+        else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
+                ret = os_cap_mba_discover(&det_mba, cpu);
+#endif
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("MBA capability detected\n");
+                LOG_INFO("MBA details: "
+                         "#COS=%u, %slinear, max=%u, step=%u\n",
+                         det_mba->num_classes,
+                         det_mba->is_linear ? "" : "non-",
+                         det_mba->throttle_max, det_mba->throttle_step);
                 sz += sizeof(struct pqos_capability);
                 break;
         case PQOS_RETVAL_RESOURCE:
@@ -1191,39 +1226,46 @@ discover_capabilities(struct pqos_cap **p_cap,
         memset(_cap, 0, sz);
         _cap->mem_size = sz;
         _cap->version = PQOS_VERSION;
-        item = &_cap->capabilities[0];
 
         if (det_mon != NULL) {
+                _cap->capabilities[_cap->num_cap].type = PQOS_CAP_TYPE_MON;
+                _cap->capabilities[_cap->num_cap].u.mon = det_mon;
                 _cap->num_cap++;
-                item->type = PQOS_CAP_TYPE_MON;
-                item->u.mon = det_mon;
-                item++;
                 ret = PQOS_RETVAL_OK;
         }
 
         if (det_l3ca != NULL) {
+                _cap->capabilities[_cap->num_cap].type = PQOS_CAP_TYPE_L3CA;
+                _cap->capabilities[_cap->num_cap].u.l3ca = det_l3ca;
                 _cap->num_cap++;
-                item->type = PQOS_CAP_TYPE_L3CA;
-                item->u.l3ca = det_l3ca;
-                item++;
                 ret = PQOS_RETVAL_OK;
         }
 
         if (det_l2ca != NULL) {
+                _cap->capabilities[_cap->num_cap].type = PQOS_CAP_TYPE_L2CA;
+                _cap->capabilities[_cap->num_cap].u.l2ca = det_l2ca;
                 _cap->num_cap++;
-                item->type = PQOS_CAP_TYPE_L2CA;
-                item->u.l2ca = det_l2ca;
-                item++;
                 ret = PQOS_RETVAL_OK;
         }
 
         if (det_mba != NULL) {
+                _cap->capabilities[_cap->num_cap].type = PQOS_CAP_TYPE_MBA;
+                _cap->capabilities[_cap->num_cap].u.mba = det_mba;
                 _cap->num_cap++;
-                item->type = PQOS_CAP_TYPE_MBA;
-                item->u.mba = det_mba;
-                item++;
                 ret = PQOS_RETVAL_OK;
+#ifdef __linux__
+                /**
+                 * Check status of MBA CTRL
+                 */
+                if (inter == PQOS_INTER_OS && det_mba->ctrl == -1) {
+                        ret = os_cap_get_mba_ctrl(_cap, cpu, &det_mba->ctrl,
+                                                  &det_mba->ctrl_on);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto error_exit;
+                }
+#endif
         }
+
 
         (*p_cap) = _cap;
 
@@ -1237,593 +1279,12 @@ discover_capabilities(struct pqos_cap **p_cap,
                         free(det_l2ca);
                 if (det_mba != NULL)
                         free(det_mba);
+                if (_cap != NULL)
+                        free(_cap);
         }
 
         return ret;
 }
-
-#ifdef __linux__
-/**
- * @brief Checks file fname to detect str and set a flag
- *
- * @param fname name of the file to be searched
- * @param str string being searched for
- * @param supported pointer to os_supported flag
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-detect_os_support(const char *fname, const char *str, int *supported)
-{
-        FILE *fd;
-        char temp[1024];
-
-        if (fname == NULL || str == NULL || supported == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        fd = fopen(fname, "r");
-        if (fd == NULL) {
-                LOG_DEBUG("%s not found.\n", fname);
-                *supported = 0;
-                return PQOS_RETVAL_OK;
-        }
-
-        while (fgets(temp, sizeof(temp), fd) != NULL) {
-                if (strstr(temp, str) != NULL) {
-                        *supported = 1;
-                        fclose(fd);
-                        return PQOS_RETVAL_OK;
-                }
-        }
-
-        fclose(fd);
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Check if event is supported by resctrl monitoring
- *
- * @param [in] event monitoring event type
- * @param [out] supported set to 1 if resctrl support is present
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-detect_resctrl_support(const enum pqos_mon_event event, int *supported)
-{
-        char buf[128];
-        struct stat st;
-        const char *event_name = NULL;
-
-        ASSERT(supported != NULL);
-
-        *supported = 0;
-
-        switch (event) {
-        case PQOS_MON_EVENT_L3_OCCUP:
-                event_name = "llc_occupancy";
-                break;
-        case PQOS_MON_EVENT_LMEM_BW:
-                event_name = "mbm_total_bytes";
-                break;
-        case PQOS_MON_EVENT_TMEM_BW:
-                event_name = "mbm_local_bytes";
-                break;
-        default:
-                return PQOS_RETVAL_OK;
-                break;
-        }
-
-        /** Check if resctrl is mounted */
-        memset(buf, 0, sizeof(buf));
-        if (snprintf(buf, sizeof(buf) - 1, "%s/info", RESCTRL_PATH) < 0)
-                return PQOS_RETVAL_ERROR;
-
-        /**
-         * If resctrl is not mounted perform negative check for perf support
-         */
-        if (stat(buf, &st) != 0) {
-                /* perf is not present, assume that resctrl is supported*/
-                if (stat(PERF_MON_PATH, &st) != 0)
-                        *supported = 1;
-                return PQOS_RETVAL_OK;
-        }
-
-        /**
-         * Resctrl is mounted check if L3 monitoring is supported in resctrl
-         * info dir
-         */
-        memset(buf, 0, sizeof(buf));
-        if (snprintf(buf, sizeof(buf) - 1, "%s/info/L3_MON/mon_features",
-                RESCTRL_PATH) < 0)
-                return PQOS_RETVAL_ERROR;
-
-        if (stat(buf, &st) == 0)
-                return detect_os_support(buf, event_name, supported);
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Get event name string to search in cpuinfo
- *
- * @param [in] event monitoring event type to look for
- *
- * @return cpuinfo flag representing monitoring event
- */
-static const char *
-get_os_event_name(int event)
-{
-        switch (event) {
-        case PQOS_MON_EVENT_L3_OCCUP:
-                return "cqm_occup_llc";
-        case PQOS_MON_EVENT_LMEM_BW:
-                return "cqm_mbm_local";
-        case PQOS_MON_EVENT_TMEM_BW:
-                return "cqm_mbm_total";
-        default:
-                return NULL;
-        }
-}
-
-/**
- * @brief Get event disable flag to seartch in kernel cmdline
- *
- * @param [in] event monitoring event type to look for
- *
- * @return cmdline flag
- */
-static const char *
-get_os_event_disabled(int event)
-{
-        switch (event) {
-        case PQOS_MON_EVENT_L3_OCCUP:
-                return "!cmt";
-        case PQOS_MON_EVENT_LMEM_BW:
-                return "!mbmlocal";
-        case PQOS_MON_EVENT_TMEM_BW:
-                return "!mbmtotal";
-        default:
-                return NULL;
-        }
-}
-
-/**
- * @brief Runs detection of OS monitoring events
- *
- * @param mon Monitoring capability structure
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-discover_os_monitoring(struct pqos_cap_mon *mon,
-                       enum pqos_interface interface)
-{
-	int ret = PQOS_RETVAL_OK;
-	unsigned i;
-        enum pqos_os_mon lmem_support = PQOS_OS_MON_UNSUPPORTED;
-	enum pqos_os_mon tmem_support = PQOS_OS_MON_UNSUPPORTED;
-        int resctrl_support = 0;
-
-        ASSERT(mon != NULL);
-
-        for (i = 0; i < mon->num_events; i++) {
-                struct pqos_monitor *event = &(mon->events[i]);
-                const char *str = NULL;
-                int os_support;
-                int os_disabled = 0;
-                int os_resctrl;
-
-		/**
-		 * Assume support of perf events
-		 */
-		if (event->type == PQOS_PERF_EVENT_LLC_MISS ||
-		    event->type == PQOS_PERF_EVENT_IPC) {
-			event->os_support = PQOS_OS_MON_PERF;
-			continue;
-		}
-
-		str = get_os_event_name(event->type);
-		if (str == NULL)
-			continue;
-
-                /**
-                 * Check if event is supported by kernel
-                 */
-		ret = detect_os_support(PROC_CPUINFO, str, &os_support);
-		if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Fatal error encountered in OS monitoring"
-                                  " event detection!\n");
-                        return ret;
-                }
-
-                /** Event not supported - continue*/
-                if (!os_support) {
-                        event->os_support = PQOS_OS_MON_UNSUPPORTED;
-                        continue;
-                }
-
-                /**
-                 * Check if feature is not disabled
-                 */
-                str = get_os_event_disabled(event->type);
-                if (str != NULL) {
-                        ret = detect_os_support("/proc/cmdline", str,
-                                &os_disabled);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Fatal error encountered while "
-                                          "checking for disabled events\n");
-                                return ret;
-                        }
-                }
-
-                /** Event disabled - continue */
-                if (os_disabled) {
-                        event->os_support = PQOS_OS_MON_UNSUPPORTED;
-                        continue;
-                }
-
-                /**
-                 * Check for resctrl support
-                 */
-                ret = detect_resctrl_support(event->type, &os_resctrl);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Fatal error encountered while checking for "
-                                  "resctrl monitoring support\n");
-                        return ret;
-                }
-
-                if (os_resctrl) {
-                        event->os_support = PQOS_OS_MON_RESCTRL;
-                        resctrl_support = 1;
-                } else
-                        event->os_support = PQOS_OS_MON_PERF;
-
-		if (event->type == PQOS_MON_EVENT_TMEM_BW)
-			tmem_support = event->os_support;
-		if (event->type == PQOS_MON_EVENT_LMEM_BW)
-			lmem_support = event->os_support;
-	}
-
-	/**
-	* RMEM is supported when both LMEM and TMEM are supported
-	*/
-	for (i = 0; i < mon->num_events; i++) {
-		struct pqos_monitor *event = &(mon->events[i]);
-
-		if (event->type == PQOS_MON_EVENT_RMEM_BW) {
-			if (lmem_support == tmem_support)
-				event->os_support = lmem_support;
-			else
-				event->os_support = PQOS_OS_MON_UNSUPPORTED;
-			break;
-		}
-	}
-
-        if (interface == PQOS_INTER_OS_RESCTRL_MON && !resctrl_support) {
-                LOG_ERROR("Resctrl monitoring selected but not supported\n");
-                return PQOS_RETVAL_INTER;
-        }
-
-	return ret;
-}
-
-/**
- * @brief Runs detection of OS MBA CTRL capabilities
- *
- * @param mba_cap place to store detected capabilities
- * @param interface flag, stores the selected interface
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-discover_os_mba_ctrl(struct pqos_cap_mba *mba_cap,
-                     enum pqos_interface interface)
-{
-        int ret;
-
-        if (access(RESCTRL_PATH"/cpus", F_OK) != 0)
-                mba_cap->ctrl_on = 0;
-
-        /* check mount flags */
-        if (mba_cap->ctrl_on == -1) {
-                ret = detect_os_support("/proc/mounts", "mba_MBps",
-                                        &(mba_cap->ctrl_on));
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
-        }
-
-        /* check for values above 100 */
-        if (mba_cap->ctrl_on == -1) {
-                unsigned grp;
-                unsigned count = 0;
-                unsigned i;
-
-                ret = resctrl_alloc_get_grps_num(m_cap, &count);
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
-
-                for (grp = 0; grp < count && mba_cap->ctrl_on == -1; grp++) {
-                        struct resctrl_alloc_schemata schmt;
-
-                        ret = resctrl_alloc_schemata_init(grp, m_cap, m_cpu,
-                                                          &schmt);
-                        if (ret == PQOS_RETVAL_OK)
-                                ret = resctrl_alloc_schemata_read(grp, &schmt);
-
-                        if (ret == PQOS_RETVAL_OK)
-                                for (i = 0; i < schmt.mba_num; i++)
-                                        if (schmt.mba[i].mb_max > 100) {
-                                                mba_cap->ctrl_on = 1;
-                                                break;
-                                        }
-
-                        resctrl_alloc_schemata_fini(&schmt);
-                }
-        }
-
-        /* get free COS and try to write value above 100 */
-        if (mba_cap->ctrl_on == -1) {
-                unsigned grp;
-                unsigned count = 0;
-                struct resctrl_alloc_schemata schmt;
-                FILE *fd;
-
-                ret = resctrl_alloc_get_grps_num(m_cap, &count);
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
-
-                ret = resctrl_alloc_get_unused_group(count, &grp);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_WARN("Unable to check if MBA CTRL is enabled - "
-                                 "No free group\n");
-                        goto ctrl_support;
-                }
-
-                ret = resctrl_alloc_schemata_init(grp, m_cap, m_cpu,
-                                                  &schmt);
-                if (ret != PQOS_RETVAL_OK)
-                        goto ctrl_support;
-
-                ret = resctrl_alloc_schemata_read(grp, &schmt);
-                if (ret == PQOS_RETVAL_OK) {
-                        fd = resctrl_alloc_fopen(grp, "schemata", "w");
-                        if (fd != NULL) {
-                                fprintf(fd, "MB:0=%u", (uint32_t)UINT32_MAX);
-                                if (fclose(fd) == 0)
-                                        mba_cap->ctrl_on = 1;
-                                else
-                                        mba_cap->ctrl_on = 0;
-                        }
-                        /* restore MBA configuration */
-                        if (mba_cap->ctrl_on == 1) {
-                                ret = resctrl_alloc_schemata_write(grp,
-                                                                   &schmt);
-                                if (ret != PQOS_RETVAL_OK)
-                                        LOG_WARN("Unable to restore MBA "
-                                                 "settings\n");
-                        }
-                }
-
-                resctrl_alloc_schemata_fini(&schmt);
-        }
-
-ctrl_support:
-        if (mba_cap->ctrl_on == 1)
-                mba_cap->os_ctrl = 1;
-        /* Check if it is possible to mount resctrl with mba_MBps enabled */
-        else if (access(RESCTRL_PATH"/cpus", F_OK) != 0 && (
-                        interface == PQOS_INTER_OS ||
-                        interface == PQOS_INTER_OS_RESCTRL_MON)) {
-
-                ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
-                                    PQOS_MBA_CTRL);
-                if (ret == PQOS_RETVAL_OK)
-                        mba_cap->os_ctrl = 1;
-                else {
-                        ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF,
-                                            PQOS_REQUIRE_CDP_OFF,
-                                            PQOS_MBA_DEFAULT);
-                        if (ret == PQOS_RETVAL_OK)
-                                mba_cap->os_ctrl = 0;
-                }
-
-                if (ret == PQOS_RETVAL_OK)
-                        resctrl_umount();
-        }
-
-        if (mba_cap->os_ctrl == 1)
-                LOG_INFO("OS support for MBA CTRL detected\n");
-        else if (mba_cap->os_ctrl == 0)
-                LOG_INFO("OS support for MBA CTRL not detected\n");
-        else
-                LOG_INFO("OS support for MBA CTRL unknown\n");
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Runs detection of OS monitoring and allocation capabilities
- *
- * @param p_cap place to store allocated capabilities structure
- * @param interface flag, stores the selected interface
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-discover_os_capabilities(struct pqos_cap *p_cap, enum pqos_interface interface)
-{
-        int ret = PQOS_RETVAL_OK;
-        int res_flag = 0;
-        unsigned i = 0;
-        /**
-         * This table is used to assist the discovery of OS capabilities
-         */
-        static struct os_caps {
-                const char *fname;
-                const char *str;
-                const char *desc;
-        } tab[PQOS_CAP_TYPE_NUMOF] = {
-                { PROC_CPUINFO, "cqm", "CMT"},
-                { PROC_CPUINFO, "cat_l3", "L3 CAT"},
-                { PROC_CPUINFO, "cat_l2", "L2 CAT"},
-                { PROC_CPUINFO, "mba", "MBA"},
-        };
-
-        /**
-         * resctrl detection
-         */
-        ret = detect_os_support("/proc/filesystems", "resctrl", &res_flag);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("Fatal error encountered in resctrl detection!\n");
-                return ret;
-        }
-        LOG_INFO("%s\n", res_flag ?
-                 "resctrl detected" :
-                 "resctrl not detected. "
-                 "Kernel version 4.10 or higher required");
-
-        if ((interface == PQOS_INTER_OS ||
-                interface == PQOS_INTER_OS_RESCTRL_MON) && res_flag == 0) {
-                LOG_ERROR("OS interface selected but not supported\n");
-                if (interface == PQOS_INTER_OS_RESCTRL_MON)
-                        return PQOS_RETVAL_INTER;
-                return PQOS_RETVAL_ERROR;
-        }
-        /**
-         * Detect OS support for all HW capabilities
-         */
-        for (i = 0; i < p_cap->num_cap; i++) {
-                struct pqos_capability *capability = &(p_cap->capabilities[i]);
-                int type = capability->type;
-
-                ASSERT(type < PQOS_CAP_TYPE_NUMOF);
-
-                int *os_ptr = &(capability->os_support);
-
-                ret = detect_os_support(tab[type].fname, tab[type].str, os_ptr);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_ERROR("Fatal error encountered in"
-                                  " OS detection!\n");
-                        return ret;
-                }
-
-                /**
-                 * Discover available monitoring events
-                 */
-                if (type == PQOS_CAP_TYPE_MON && res_flag) {
-                        ret = discover_os_monitoring(capability->u.mon,
-                                                     interface);
-                        if (ret != PQOS_RETVAL_OK)
-                                return ret;
-                }
-
-                /**
-                 * If resctrl is supported and L3 CAT is detected in HW then
-                 * resctrl supports L3 CAT
-                 */
-                if (type == PQOS_CAP_TYPE_L3CA && *os_ptr == 0 && res_flag)
-                        *os_ptr = 1;
-
-                LOG_INFO("OS support for %s %s\n", tab[type].desc, *os_ptr ?
-                         "detected" : "not detected");
-
-                /**
-                 * Discover L3 CDP support
-                 */
-                if (type == PQOS_CAP_TYPE_L3CA && *os_ptr) {
-                        ret = detect_os_support(PROC_CPUINFO, "cdp_l3",
-                                                &capability->u.l3ca->os_cdp);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Fatal error encountered in L3 CDP "
-                                          "detection!\n");
-                                return ret;
-                        }
-                }
-
-                /**
-                 * Discover L2 CDP support
-                 */
-                if (type == PQOS_CAP_TYPE_L2CA && *os_ptr) {
-                        ret = detect_os_support(PROC_CPUINFO, "cdp_l2",
-                                                &capability->u.l2ca->os_cdp);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Fatal error encountered in L2 CDP "
-                                          "detection!\n");
-                                return ret;
-                        }
-                }
-
-                /**
-                 * Discover MBA CTRL support
-                 */
-                if (type == PQOS_CAP_TYPE_MBA && *os_ptr) {
-                        ret = discover_os_mba_ctrl(capability->u.mba,
-                                                   interface);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Fatal error encountered in MBA CTRL "
-                                          "detection!\n");
-                                return ret;
-                        }
-                }
-        }
-        /**
-         * Check if resctrl is mounted
-         */
-        if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
-                LOG_INFO("resctrl not mounted\n");
-                return PQOS_RETVAL_RESOURCE;
-        } else if (interface == PQOS_INTER_MSR)
-                LOG_WARN("resctl filesystem mounted! Using MSR "
-                         "interface may corrupt resctrl filesystem "
-                         "and cause unexpected behaviour\n");
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Print information about capabilities that are not supported by the OS
- *
- * @param p_cap place to store allocated capabilities structure
- *
- * @return Operational status
- */
-static int
-log_hw_caps(struct pqos_cap *p_cap)
-{
-        unsigned i;
-
-        /**
-         * Log capabilities not supported by the OS
-         */
-        for (i = 0; i < p_cap->num_cap; i++)
-                if (p_cap->capabilities[i].os_support == 0) {
-                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_MON)
-                                LOG_INFO("Monitoring available in HW but not"
-                                         " supported by OS. Disabling this"
-                                         " capability.\n");
-                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
-                                LOG_INFO("L3 CAT available in HW but not"
-                                         " supported by OS. Disabling this"
-                                         " capability.\n");
-                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
-                                LOG_INFO("L2 CAT available in HW but not"
-                                         " supported by OS. Disabling this"
-                                         " capability.\n");
-                        if (p_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
-                                LOG_INFO("MBA available in HW but not"
-                                         " supported by OS. Disabling this"
-                                         " capability.\n");
-                }
-
-        return PQOS_RETVAL_OK;
-}
-#endif /* __linux__ */
 
 /*
  * =======================================
@@ -1916,49 +1377,20 @@ pqos_init(const struct pqos_config *config)
                 goto cpuinfo_init_error;
         }
 
-        ret = discover_capabilities(&m_cap, m_cpu);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("discover_capabilities() error %d\n", ret);
-                goto machine_init_error;
-        }
-        ASSERT(m_cap != NULL);
 #ifdef __linux__
-        ret = discover_os_capabilities(m_cap, config->interface);
-        if (ret == PQOS_RETVAL_ERROR || ret == PQOS_RETVAL_INTER) {
-                LOG_ERROR("discover_os_capabilities() error %d\n", ret);
-                goto machine_init_error;
-        }
-#endif
-
         if (config->interface == PQOS_INTER_OS ||
                 config->interface == PQOS_INTER_OS_RESCTRL_MON) {
-                const struct pqos_capability *l2_cap = NULL;
-
-                ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
-                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-                        goto machine_init_error;
-
-                /* L2 CDP enabled but not supported by OS interface */
-                if (l2_cap != NULL && l2_cap->u.l2ca->cdp &&
-                        !l2_cap->u.l2ca->os_cdp) {
-                        LOG_ERROR("Detected L2 CDP feature enabled but not "
-                                  "supported by the current OS version!\n"
-                                  "Please disable L2 CDP through the HW "
-                                  "interface and perform a CAT reset.\n");
-                        ret = PQOS_RETVAL_ERROR;
+                ret = os_cap_init(config->interface);
+                if (ret == PQOS_RETVAL_ERROR) {
+                        LOG_ERROR("os_cap_init() error %d\n", ret);
                         goto machine_init_error;
                 }
-
-#ifdef __linux__
-                ret = log_hw_caps(m_cap);
-#else
-                LOG_ERROR("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-                goto machine_init_error;
-#endif
         }
-        if (ret == PQOS_RETVAL_ERROR) {
-                LOG_ERROR("log_hw_caps() error %d\n", ret);
+#endif
+
+        ret = discover_capabilities(&m_cap, m_cpu, config->interface);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("discover_capabilities() error %d\n", ret);
                 goto machine_init_error;
         }
 
@@ -2232,7 +1664,7 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
         else if (cfg == PQOS_MBA_CTRL) {
 #ifdef __linux__
                 if (m_interface != PQOS_INTER_MSR)
-                        mba_cap->os_ctrl = 1;
+                        mba_cap->ctrl = 1;
 #endif
                 mba_cap->ctrl_on = 1;
         }

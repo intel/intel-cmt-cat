@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -731,9 +731,9 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         for (i = 0; i < cap_mon->u.mon->num_events; i++) {
                 struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
 
-                if (sel_interface == PQOS_INTER_MSR || mon->os_support)
-                        all_core_evts |= mon->type;
-                if (mon->os_support)
+                all_core_evts |= mon->type;
+                if (sel_interface == PQOS_INTER_OS ||
+                    sel_interface == PQOS_INTER_OS_RESCTRL_MON)
                         all_pid_evts |= mon->type;
         }
         /**

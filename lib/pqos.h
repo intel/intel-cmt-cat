@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -189,11 +189,9 @@ struct pqos_cap_l3ca {
         unsigned way_size;              /**< way size in bytes */
         uint64_t way_contention;        /**< ways contention bit mask */
         int cdp;                        /**< code data prioritization feature
-                                           presence */
+                                           support */
         int cdp_on;                     /**< code data prioritization on or
                                            off */
-        int os_cdp;                     /**< flag to show if CDP is supported
-                                        by OS interface */
 };
 
 /**
@@ -206,11 +204,9 @@ struct pqos_cap_l2ca {
         unsigned way_size;              /**< way size in bytes */
         uint64_t way_contention;        /**< ways contention bit mask */
         int cdp;                        /**< code data prioritization feature
-                                           presence */
+                                           support */
         int cdp_on;                     /**< code data prioritization on or
                                            off */
-        int os_cdp;                     /**< flag to show if CDP is supported
-                                           by OS interface */
 };
 
 /**
@@ -233,7 +229,7 @@ struct pqos_cap_mba {
         unsigned throttle_max;          /**< the max MBA can be throttled */
         unsigned throttle_step;         /**< MBA granularity */
         int is_linear;                  /**< the type of MBA linear/nonlinear */
-        int os_ctrl;                    /**< MBA controller support */
+        int ctrl;                       /**< MBA controller support */
         int ctrl_on;                    /**< MBA controller enabled */
 };
 
@@ -254,15 +250,6 @@ enum pqos_mon_event {
 };
 
 /**
- * OS monitoring status
- */
-enum pqos_os_mon {
-        PQOS_OS_MON_UNSUPPORTED = 0,    /**< OS monitoring is not supported */
-        PQOS_OS_MON_PERF        = 1,    /**< Perf monitoring is supported */
-        PQOS_OS_MON_RESCTRL     = 2     /**< Resctrl monitoring is supported */
-};
-
-/**
  * Monitoring capabilities structure
  *
  * Few assumptions here:
@@ -279,8 +266,6 @@ struct pqos_monitor {
                                            this event */
         uint32_t scale_factor;          /**< factor to scale RMID value
                                            to bytes */
-        enum pqos_os_mon os_support;    /**< flag to show if OS monitoring
-                                           supported */
 };
 
 struct pqos_cap_mon {
@@ -297,7 +282,6 @@ struct pqos_cap_mon {
  */
 struct pqos_capability {
         enum pqos_cap_type type;
-        int os_support;                 /**< OS support presence */
         union {
                 struct pqos_cap_mon *mon;
                 struct pqos_cap_l3ca *l3ca;

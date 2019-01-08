@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -121,17 +121,14 @@ get_mon_event_name(int event)
  *
  * @param [in] indent indentation level
  * @param [in] mon monitoring capability structure
- * @param [in] os show only events supported by OS monitoring
  * @param [in] verbose verbose mode
  */
 static void
 cap_print_features_mon(const unsigned indent,
                        const struct pqos_cap_mon *mon,
-                       const int os,
                        const int verbose)
 {
         unsigned i;
-        unsigned os_mon_support = 0;
         char buffer_cache[BUFFER_SIZE] = "\0";
         char buffer_memory[BUFFER_SIZE] = "\0";
         char buffer_other[BUFFER_SIZE] = "\0";
@@ -145,12 +142,6 @@ cap_print_features_mon(const unsigned indent,
         for (i = 0; i < mon->num_events; i++) {
                 const struct pqos_monitor *monitor = &(mon->events[i]);
                 char *buffer = NULL;
-
-                if (os) {
-                        if (!monitor->os_support)
-                                continue;
-                        os_mon_support = 1;
-                }
 
                 switch (monitor->type) {
                 case PQOS_MON_EVENT_L3_OCCUP:
@@ -191,8 +182,7 @@ cap_print_features_mon(const unsigned indent,
                                  get_mon_event_name(monitor->type));
         }
 
-        if (!os || (os && os_mon_support))
-                printf_indent(indent, "Monitoring\n");
+        printf_indent(indent, "Monitoring\n");
 
         if (strlen(buffer_cache) > 0) {
                 printf_indent(indent + 4,
@@ -217,25 +207,20 @@ cap_print_features_mon(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] l3ca L3 CAT capability structure
- * @param [in] iface PQoS interface
  * @param [in] verbose verbose mode
  */
 static void
 cap_print_features_l3ca(const unsigned indent,
                         const struct pqos_cap_l3ca *l3ca,
-                        const int iface,
                         const int verbose)
 {
         unsigned min_cbm_bits;
-        int cdp_supported;
 
         ASSERT(l3ca != NULL);
 
-        cdp_supported = (iface == PQOS_INTER_OS) ? l3ca->os_cdp : l3ca->cdp;
-
         printf_indent(indent, "L3 CAT\n");
         printf_indent(indent + 4, "CDP: %s\n",
-                cdp_supported ? (l3ca->cdp_on ? "enabled" : "disabled") :
+                l3ca->cdp ? (l3ca->cdp_on ? "enabled" : "disabled") :
                 "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l3ca->num_classes);
 
@@ -257,25 +242,21 @@ cap_print_features_l3ca(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] l2ca L2 CAT capability structure
- * @param [in] iface PQoS interface
  * @param [in] verbose verbose mode
  */
 static void
 cap_print_features_l2ca(const unsigned indent,
                         const struct pqos_cap_l2ca *l2ca,
-                        const int iface,
+
                         const int verbose)
 {
         unsigned min_cbm_bits;
-        int cdp_supported;
 
         ASSERT(l2ca != NULL);
 
-        cdp_supported = (iface == PQOS_INTER_OS) ? l2ca->os_cdp : l2ca->cdp;
-
         printf_indent(indent, "L2 CAT\n");
         printf_indent(indent + 4, "CDP: %s\n",
-                cdp_supported ? (l2ca->cdp_on ? "enabled" : "disabled") :
+                l2ca->cdp ? (l2ca->cdp_on ? "enabled" : "disabled") :
                 "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l2ca->num_classes);
 
@@ -298,13 +279,11 @@ cap_print_features_l2ca(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] mba MBA capability structure
- * @param [in] iface PQoS interface
  * @param [in] verbose verbose mode
  */
 static void
 cap_print_features_mba(const unsigned indent,
                        const struct pqos_cap_mba *mba,
-                       const int iface,
                        const int verbose)
 {
         ASSERT(mba != NULL);
@@ -312,10 +291,10 @@ cap_print_features_mba(const unsigned indent,
         printf_indent(indent, "Memory Bandwidth Allocation (MBA)\n");
         printf_indent(indent + 4, "Num COS: %u\n", mba->num_classes);
 
-        if (iface != PQOS_INTER_MSR && mba->os_ctrl != -1) {
+        if (mba->ctrl != -1) {
                 const char *ctrl_status = NULL;
 
-                if (!mba->os_ctrl)
+                if (!mba->ctrl)
                         ctrl_status = "unsupported";
                 else if (!mba->ctrl_on)
                         ctrl_status = "disabled";
@@ -364,7 +343,7 @@ cap_print_features_hw(const struct pqos_capability *cap_mon,
          * Monitoring capabilities
          */
         if (cap_mon != NULL)
-                cap_print_features_mon(4, cap_mon->u.mon, 0, verbose);
+                cap_print_features_mon(4, cap_mon->u.mon, verbose);
 
         if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL)
                 printf_indent(4, "Allocation\n");
@@ -376,21 +355,19 @@ cap_print_features_hw(const struct pqos_capability *cap_mon,
                 printf_indent(8, "Cache Allocation Technology (CAT)\n");
 
         if (cap_l3ca != NULL)
-                cap_print_features_l3ca(12, cap_l3ca->u.l3ca, PQOS_INTER_MSR,
-                                        verbose);
+                cap_print_features_l3ca(12, cap_l3ca->u.l3ca, verbose);
 
         if (cap_l2ca != NULL)
-                cap_print_features_l2ca(12, cap_l2ca->u.l2ca, PQOS_INTER_MSR,
-                                        verbose);
+                cap_print_features_l2ca(12, cap_l2ca->u.l2ca, verbose);
 
         /**
          * Memory Bandwidth Allocation capabilities
          */
         if (cap_mba != NULL)
-                cap_print_features_mba(8, cap_mba->u.mba, PQOS_INTER_MSR,
-                                       verbose);
+                cap_print_features_mba(8, cap_mba->u.mba, verbose);
 }
 
+#ifdef __linux__
 /**
  * @brief Print OS capabilities
  *
@@ -407,85 +384,64 @@ cap_print_features_os(const struct pqos_capability *cap_mon,
                       const struct pqos_capability *cap_mba,
                       const int verbose)
 {
-	unsigned i;
-        unsigned cat_l2_support = cap_l2ca != NULL && cap_l2ca->os_support;
-        unsigned cat_l3_support = cap_l3ca != NULL && cap_l3ca->os_support;
-        unsigned mba_support = cap_mba != NULL && cap_mba->os_support;
-        unsigned mon_support = 0;
         unsigned min_num_cos = 0;
-#ifdef __linux__
 	struct utsname name;
-#endif
-
-	/**
-	 * Check if at least one event is supported
-	 */
-	if (cap_mon != NULL && cap_mon->os_support)
-		for (i = 0; i < cap_mon->u.mon->num_events; i++)
-			if (cap_mon->u.mon->events[i].os_support) {
-				mon_support = 1;
-				break;
-			}
-
-        if (!(cat_l2_support || cat_l3_support || mba_support || mon_support))
-                return;
 
         /**
          * Get min. number of COS
          */
-        if (cat_l3_support)
+        if (cap_l3ca != NULL)
                 min_num_cos = cap_l3ca->u.l3ca->num_classes;
 
-        if (cat_l2_support)
+        if (cap_l2ca != NULL)
                 if (min_num_cos == 0 ||
                     min_num_cos > cap_l2ca->u.l2ca->num_classes)
                         min_num_cos = cap_l2ca->u.l2ca->num_classes;
 
-        if (mba_support)
+        if (cap_mba != NULL)
                 if (min_num_cos == 0 ||
                     min_num_cos > cap_mba->u.mba->num_classes)
                         min_num_cos = cap_mba->u.mba->num_classes;
 
         printf("OS capabilities");
-#ifdef __linux__
-	if (uname(&name) >= 0)
-		printf(" (%s kernel %s)", name.sysname, name.release);
-#endif
-	printf("\n");
+        if (uname(&name) >= 0)
+                printf(" (%s kernel %s)", name.sysname, name.release);
+        printf("\n");
 
-        if (mon_support)
-                cap_print_features_mon(4, cap_mon->u.mon, 1, verbose);
+        if (cap_mon != NULL)
+                cap_print_features_mon(4, cap_mon->u.mon, verbose);
 
-        if (cat_l2_support || cat_l3_support || mba_support)
+        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL)
                 printf_indent(4, "Allocation\n");
 
-        if (cat_l2_support || cat_l3_support)
+        if (cap_l3ca != NULL || cap_l2ca != NULL)
                 printf_indent(8, "Cache Allocation Technology (CAT)\n");
 
-        if (cat_l3_support) {
+        if (cap_l3ca != NULL) {
                 struct pqos_cap_l3ca l3ca = *cap_l3ca->u.l3ca;
 
                 l3ca.num_classes = min_num_cos;
 
-                cap_print_features_l3ca(12, &l3ca, PQOS_INTER_OS, NON_VERBOSE);
+                cap_print_features_l3ca(12, &l3ca, verbose);
         }
 
-        if (cat_l2_support) {
+        if (cap_l2ca != NULL) {
                 struct pqos_cap_l2ca l2ca = *cap_l2ca->u.l2ca;
 
                 l2ca.num_classes = min_num_cos;
 
-                cap_print_features_l2ca(12, &l2ca, PQOS_INTER_OS, NON_VERBOSE);
+                cap_print_features_l2ca(12, &l2ca, verbose);
         }
 
-        if (mba_support) {
+        if (cap_mba != NULL) {
                 struct pqos_cap_mba mba = *cap_mba->u.mba;
 
                 mba.num_classes = min_num_cos;
 
-                cap_print_features_mba(8, &mba, PQOS_INTER_OS, NON_VERBOSE);
+                cap_print_features_mba(8, &mba, verbose);
         }
 }
+#endif
 
 /**
  * @brief Print capabilities
@@ -526,8 +482,14 @@ cap_print_features(const struct pqos_cap *cap,
                         break;
                 }
 
-        cap_print_features_hw(cap_mon, cap_l3ca, cap_l2ca, cap_mba, verbose);
-        cap_print_features_os(cap_mon, cap_l3ca, cap_l2ca, cap_mba, verbose);
+        if (sel_interface == PQOS_INTER_MSR)
+                cap_print_features_hw(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
+                                      verbose);
+#ifdef __linux__
+        else
+                cap_print_features_os(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
+                                      verbose);
+#endif
 
         if (!verbose)
                 return;

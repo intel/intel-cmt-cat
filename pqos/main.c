@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -749,11 +749,11 @@ int main(int argc, char **argv)
                         if (optarg != NULL) {
                                 if (*optarg == '-') {
                                         /**
-                                        * Next switch option wrongly assumed
-                                        * to be argument to '-R'.
-                                        * Pass NULL as argument to '-R' function
-                                        * and rewind \a optind.
-                                        */
+                                         * Next switch option wrongly assumed
+                                         * to be argument to '-R'.
+                                         * Pass NULL as argument to
+                                         * '-R' function and rewind \a optind.
+                                         */
                                         selfn_reset_alloc(NULL);
                                         optind--;
                                 } else

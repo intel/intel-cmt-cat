@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2018-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,8 +48,6 @@
 #include "resctrl_monitoring.h"
 #include "resctrl_alloc.h"
 
-#define RESCTRL_PATH_INFO_L3_MON RESCTRL_PATH_INFO"/L3_MON"
-
 /**
  * ---------------------------------------
  * Local data structures
@@ -80,37 +78,6 @@ filter(const struct dirent *dir)
         return (dir->d_name[0] == '.') ? 0 : 1;
 }
 
-/**
- * @brief Update monitoring capability structure with supported events
- *
- * @param cap pqos capability structure
- *
- * @return Operational Status
- * @retval PQOS_RETVAL_OK on success
- */
-static void
-set_mon_caps(const struct pqos_cap *cap)
-{
-        int ret;
-        unsigned i;
-        const struct pqos_capability *p_cap = NULL;
-
-        ASSERT(cap != NULL);
-
-        /* find monitoring capability */
-        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &p_cap);
-        if (ret != PQOS_RETVAL_OK)
-                return;
-
-        /* update capabilities structure */
-        for (i = 0; i < p_cap->u.mon->num_events; i++) {
-                struct pqos_monitor *mon = &p_cap->u.mon->events[i];
-
-                if (supported_events & mon->type)
-                        mon->os_support = PQOS_OS_MON_RESCTRL;
-        }
-}
-
 int
 resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
@@ -123,19 +90,7 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         ASSERT(cap != NULL);
 
         /**
-         * Check if resctrl is mounted
-         */
-        if (stat(RESCTRL_PATH_INFO, &st) != 0) {
-                ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
-                                    PQOS_MBA_DEFAULT);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_INFO("Unable to mount resctrl\n");
-                        return PQOS_RETVAL_RESOURCE;
-                }
-        }
-
-        /**
-         * Resctrl monitiring not supported
+         * Resctrl monitoring not supported
          */
         if (stat(RESCTRL_PATH_INFO_L3_MON, &st) != 0)
                 return PQOS_RETVAL_OK;
@@ -176,11 +131,6 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
                 supported_events |= PQOS_MON_EVENT_RMEM_BW;
 
         fclose(fd);
-
-        /**
-         * Update mon capabilities
-         */
-        set_mon_caps(cap);
 
         m_cap = cap;
         m_cpu = cpu;

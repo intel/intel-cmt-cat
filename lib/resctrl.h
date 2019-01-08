@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2018-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -49,6 +49,10 @@ extern "C" {
 #define RESCTRL_PATH "/sys/fs/resctrl"
 #endif
 #define RESCTRL_PATH_INFO RESCTRL_PATH"/info"
+#define RESCTRL_PATH_INFO_L3_MON RESCTRL_PATH_INFO"/L3_MON"
+#define RESCTRL_PATH_INFO_L3 RESCTRL_PATH_INFO"/L3"
+#define RESCTRL_PATH_INFO_L2 RESCTRL_PATH_INFO"/L2"
+#define RESCTRL_PATH_INFO_MB RESCTRL_PATH_INFO"/MB"
 
 
 /**

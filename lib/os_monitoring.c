@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -339,6 +339,9 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
         unsigned ret;
 
+        ASSERT(cpu != NULL);
+        ASSERT(cap != NULL);
+
 	if (cpu == NULL || cap == NULL)
 		return PQOS_RETVAL_PARAM;
 
@@ -416,35 +419,6 @@ os_mon_start(const unsigned num_cores,
         ASSERT(event > 0);
         ASSERT(m_cpu != NULL);
         ASSERT(m_cap != NULL);
-
-        static int warn = 1;
-
-        if (warn) {
-                const struct pqos_capability *monitoring_cap = NULL;
-                int resctrl_monitoring_supported = 0;
-
-                /* Only log warning for first call */
-                warn = 0;
-
-                ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MON,
-                                        &monitoring_cap);
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
-
-                for (i = 0; i < monitoring_cap->u.mon->num_events; i++) {
-                        if (monitoring_cap->u.mon->events[i].os_support
-                            == PQOS_OS_MON_RESCTRL) {
-                                resctrl_monitoring_supported = 1;
-                                break;
-                        }
-                }
-
-                if (!resctrl_monitoring_supported)
-                        LOG_WARN("As of Kernel 4.10, Intel(R) RDT perf "
-                                 "results per core are found to be "
-                                 "incorrect.\n");
-
-        }
 
         /**
          * Validate if event is listed in capabilities

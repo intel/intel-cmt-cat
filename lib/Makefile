@@ -4,7 +4,7 @@
 # @par
 # BSD LICENSE
 #
-# Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
+# Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -88,7 +88,8 @@ CLEAN_OBJS = $(SRCS:.c=.o)
 # On FreeBSD build with no OS support
 ifeq ($(shell uname), FreeBSD)
 OBJS := $(filter-out perf.o \
-	os_allocation.o \
+	os_allocation.o
+	os_cap.o \
 	os_monitoring.o \
 	resctrl.o \
 	resctrl_alloc.o \
@@ -195,6 +196,7 @@ style:
 	-f machine.h -f machine.c \
 	-f monitoring.h -f monitoring.c \
 	-f os_allocation.h -f os_allocation.c \
+	-f os_cap.h -f os_cap.c \
 	-f os_monitoring.h os_monitoring.c \
 	-f perf.h -f perf.c \
 	-f perf_monitoring.h -f perf_monitoring.c \
@@ -215,6 +217,7 @@ cppcheck:
 	log.c log.h types.h machine.c machine.h \
 	utils.c utils.h \
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
+	os_cap.h os_cap.c \
 	os_monitoring.h os_monitoring.c \
 	perf_monitoring.h perf_monitoring.c \
 	resctrl_alloc.h resctrl_alloc.c \

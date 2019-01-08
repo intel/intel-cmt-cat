@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -216,7 +216,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 
         ASSERT(item != NULL);
         m_rmid_max = item->u.mon->max_rmid;
-        if (m_rmid_max == 0) {
+        if (cfg->interface == PQOS_INTER_MSR && m_rmid_max == 0) {
                 pqos_mon_fini();
                 return PQOS_RETVAL_PARAM;
         }

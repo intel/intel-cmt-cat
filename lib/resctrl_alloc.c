@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -95,9 +95,6 @@ resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num)
 	for (i = 0; i < cap->num_cap; i++) {
 		unsigned num_cos = 0;
 		const struct pqos_capability *p_cap = &cap->capabilities[i];
-
-		if (!p_cap->os_support)
-			continue;
 
 		/* get L3 CAT COS num */
 		if (p_cap->type == PQOS_CAP_TYPE_L3CA) {

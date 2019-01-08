@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2017-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2017-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -116,21 +116,21 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
 
-        if (l3_cap != NULL && !l3_cap->os_cdp &&
+        if (l3_cap != NULL && !l3_cap->cdp &&
                 l3_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
                 /* Check against erroneous CDP request */
                 LOG_ERROR("L3 CDP requested but not supported by the "
                           "platform!\n");
                 return PQOS_RETVAL_PARAM;
         }
-        if (l2_cap != NULL && !l2_cap->os_cdp &&
+        if (l2_cap != NULL && !l2_cap->cdp &&
                 l2_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
                 /* Check against erroneous CDP request */
                 LOG_ERROR("L2 CDP requested but not supported by the "
                           "platform!\n");
                 return PQOS_RETVAL_PARAM;
         }
-        if (mba_cap != NULL && mba_cap->os_ctrl == 0 &&
+        if (mba_cap != NULL && mba_cap->ctrl == 0 &&
                 mba_cfg == PQOS_MBA_CTRL) {
                 /* Check against erroneous MBA request */
                 LOG_ERROR("MBA CTRL requested but not supported!\n");
@@ -157,14 +157,12 @@ os_alloc_check(void)
          * Check if resctrl is supported
          */
         for (i = 0; i < m_cap->num_cap; i++) {
-                if (m_cap->capabilities[i].os_support == 1) {
-                        if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
-                                supported = 1;
-                        if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
-                                supported = 1;
-                        if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
-                                supported = 1;
-                }
+                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                        supported = 1;
+                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
+                        supported = 1;
+                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
+                        supported = 1;
         }
 
         if (!supported)
@@ -954,7 +952,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         }
         /* Check against erroneous CDP request */
         if (l3_cap != NULL && l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
-		!l3_cap->os_cdp) {
+		!l3_cap->cdp) {
 		LOG_ERROR("L3 CAT/CDP requested but not supported by the "
                           "platform!\n");
 		ret = PQOS_RETVAL_PARAM;
@@ -968,7 +966,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         }
         /* Check against erroneous L2 CDP request */
         if (l2_cap != NULL && l2_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
-                !l2_cap->os_cdp) {
+                !l2_cap->cdp) {
                 LOG_ERROR("L2 CAT/CDP requested but not supported by the "
                           "platform!\n");
                 ret = PQOS_RETVAL_PARAM;
@@ -982,7 +980,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         }
         /* Check against erroneous MBA CTRL request */
         if (mba_cap != NULL && mba_cfg == PQOS_MBA_CTRL &&
-                mba_cap->os_ctrl == 0) {
+                mba_cap->ctrl == 0) {
                 LOG_ERROR("MBA CTRL requested but not supported!\n");
                 ret = PQOS_RETVAL_PARAM;
                 goto os_alloc_reset_exit;

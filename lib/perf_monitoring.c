@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2018-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -410,51 +410,10 @@ set_mon_events(void)
         return ret;
 }
 
-/**
- * @brief Update monitoring capability structure with supported events
- *
- * @param cap pqos capability structure
- *
- * @return Operational Status
- * @retval PQOS_RETVAL_OK on success
- */
-static void
-set_mon_caps(const struct pqos_cap *cap)
-{
-        int ret;
-        unsigned i;
-        const struct pqos_capability *p_cap = NULL;
-
-        ASSERT(cap != NULL);
-
-        /* find monitoring capability */
-        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &p_cap);
-        if (ret != PQOS_RETVAL_OK)
-                return;
-
-        /* update capabilities structure */
-        for (i = 0; i < DIM(events_tab); i++) {
-                unsigned j;
-
-                if (!events_tab[i].supported)
-                        continue;
-
-                for (j = 0; j < p_cap->u.mon->num_events; j++) {
-                        struct pqos_monitor *mon = &p_cap->u.mon->events[j];
-
-                        if (events_tab[i].event != mon->type)
-                                continue;
-                        mon->os_support = PQOS_OS_MON_PERF;
-                        LOG_INFO("Detected perf monitoring support"
-                                 " for %s\n", events_tab[j].desc);
-                        break;
-                }
-        }
-}
-
 int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
         int ret;
+        unsigned i;
 
         ASSERT(cpu != NULL);
         ASSERT(cap != NULL);
@@ -474,8 +433,13 @@ int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
                 return ret;
 
  perf_mon_init_exit:
-        /* Update capabilities structure with perf supported events */
-        set_mon_caps(cap);
+        for (i = 0; i < DIM(events_tab); i++) {
+                if (!events_tab[i].supported)
+                        continue;
+
+                LOG_INFO("Detected perf monitoring support for %s\n",
+                         events_tab[i].desc);
+        }
 
         m_cap = cap;
         m_cpu = cpu;
