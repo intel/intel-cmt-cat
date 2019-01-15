@@ -359,6 +359,8 @@ pqos_cap_get_type(const struct pqos_cap *cap,
         if (cap == NULL || cap_item == NULL)
                 return PQOS_RETVAL_PARAM;
 
+        *cap_item = NULL;
+
         ASSERT(type < PQOS_CAP_TYPE_NUMOF);
         if (type >= PQOS_CAP_TYPE_NUMOF)
                 return PQOS_RETVAL_PARAM;
