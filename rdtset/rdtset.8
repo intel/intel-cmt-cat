@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH RDTSET 8 "September 13, 2018"
+.TH RDTSET 8 "January 10, 2019"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -41,12 +41,14 @@ http://www.intel.com/content/www/us/en/
 architecture-and-technology/resource-director-technology.html
 .ss 12
 .br
-or https://github.com/01org/intel-cmt-cat/wiki
+or https://github.com/intel/intel-cmt-cat/wiki
 .PP
 The rdtset tool provides support to set up the CAT (Cache Allocation Technology) and MBA (Memory
 Bandwidth Allocation) capabilities for a task and set its CPU affinity. For MBA, rdtset offers two modes of operation, fixed MBA rate
 or closed-loop one monitoring local memory B/W usage and adjust MBA accordingly.
-Intel(R) RDT allocation operations of the utility are done via libpqos library). Class of service 0 (CLOS0)
+For OS interface, it uses MBA CTRL via libpqos (OS support available in Linux kernel 4.18 or later).
+For MSRs, the tool adjusts MBA configuration by itself based on local memory B/W.
+Intel(R) RDT allocation operations of the utility are done via libpqos library. Class of service 0 (CLOS0)
 is assumed as default one. In command mode, rdtset forks and one process executes the command. Another
 process waits for the task to terminate and restores default allocation state by assigning cpu's back to CLOS0.
 This behavior is not in place in PID mode.
@@ -84,7 +86,7 @@ CPU 1 uses four L3 cache-ways (mask 0xf)
 .B \-t\ 'l3=0xf;cpu=2' -t 'l3=0xf0;cpu=3,4,5'
 .br
 CPU 2 uses four L3 cache-ways (mask 0xf), CPUs 3-5 share four L3 cache-ways
-(mask 0xf0), L3 cache-ways used by CPU 2 and 3-4 are non-overlapping
+(mask 0xf0), L3 cache-ways used by CPU 2 and 3-5 are non-overlapping
 
 .B \-t\ 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5'
 .br
@@ -149,8 +151,8 @@ In order to reconfigure allocation, it is needed to reset current configuration
 Do not drop sudo elevated privileges
 .SH NOTES
 .PP
-CAT and MBA are configured using Model Specific Registers (MSRs)
-to set up the class of service masks and manage
+Without --iface-os (-I) parameter, CAT and MBA are configured using
+Model Specific Registers (MSRs) to set up the class of service masks and manage
 the association of the cores/logical threads to a class of service.
 The rdtset software executes in user space, and access to the MSRs is
 obtained through a standard Linux*/FreeBSD* interface.
@@ -172,6 +174,12 @@ sudo kldload cpuctl
 Interface enforcement:
 .br
 If you require system wide interface enforcement you can do so by setting the "RDT_IFACE" environment variable.
+.PP
+.PP
+OS interface (--iface-os, -I)
+.br
+With --iface-os (-I) parameter, rdtset uses resctrl filesystem (/sys/fs/resctrl)
+instead of accessing MSRs directly.
 .SH SEE ALSO
 .BR msr (4)
 .SH AUTHOR
