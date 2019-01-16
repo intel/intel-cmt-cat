@@ -1404,6 +1404,13 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 ret = PQOS_RETVAL_RESOURCE;
                 goto pqos_alloc_reset_exit;
         }
+        /* Check MBA CTRL requested while not present */
+        if (mba_cap == NULL && mba_cfg != PQOS_MBA_ANY) {
+                LOG_ERROR("MBA CTRL setting requested"
+                          " but no MBA CTRL present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_alloc_reset_exit;
+        }
         if (l3_cap != NULL) {
                 ret = pqos_l3ca_cdp_enabled(cap, &cdp_supported, NULL);
                 if (ret != PQOS_RETVAL_OK)
