@@ -60,7 +60,6 @@
  * Local data structures
  * ---------------------------------------
  */
-static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /**
@@ -416,7 +415,8 @@ int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         unsigned i;
 
         ASSERT(cpu != NULL);
-        ASSERT(cap != NULL);
+
+        UNUSED_PARAM(cap);
 
         ret = set_arch_event_attrs(&all_evt_mask);
         if (ret != PQOS_RETVAL_OK)
@@ -441,7 +441,6 @@ int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
                          events_tab[i].desc);
         }
 
-        m_cap = cap;
         m_cpu = cpu;
 
         return ret;
@@ -450,7 +449,6 @@ int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 int
 perf_mon_fini(void)
 {
-        m_cap = NULL;
         m_cpu = NULL;
 
         return PQOS_RETVAL_OK;

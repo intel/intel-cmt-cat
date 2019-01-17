@@ -44,6 +44,7 @@
 #include "pqos.h"
 #include "log.h"
 #include "types.h"
+#include "cap.h"
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
 #include "resctrl_alloc.h"
@@ -53,7 +54,6 @@
  * Local data structures
  * ---------------------------------------
  */
-static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
 static int supported_events = 0;
@@ -87,7 +87,8 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         struct stat st;
 
         ASSERT(cpu != NULL);
-        ASSERT(cap != NULL);
+
+        UNUSED_PARAM(cap);
 
         /**
          * Resctrl monitoring not supported
@@ -132,7 +133,6 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 
         fclose(fd);
 
-        m_cap = cap;
         m_cpu = cpu;
 
         return ret;
@@ -141,7 +141,6 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 int
 resctrl_mon_fini(void)
 {
-        m_cap = NULL;
         m_cpu = NULL;
 
         return PQOS_RETVAL_OK;
@@ -161,10 +160,13 @@ alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
         int ret;
         unsigned max_cos;
+        const struct pqos_cap *cap;
 
         ASSERT(class_id != NULL);
 
-        ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -194,10 +196,13 @@ alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
 {
         int ret;
         unsigned max_cos;
+        const struct pqos_cap *cap;
 
         ASSERT(class_id != NULL);
 
-        ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -828,10 +833,13 @@ resctrl_mon_stop(struct pqos_mon_data *group)
         unsigned max_cos;
         unsigned cos;
         unsigned i;
+        const struct pqos_cap *cap;
 
         ASSERT(group != NULL);
 
-        ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -912,11 +920,13 @@ resctrl_mon_purge(struct pqos_mon_data *group)
         unsigned max_cos;
         unsigned cos;
         int ret;
+        const struct pqos_cap *cap;
 
         ASSERT(group != NULL);
-        ASSERT(m_cap != NULL);
 
-        ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -992,11 +1002,13 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         unsigned cos;
         unsigned i;
         uint64_t old_value;
+        const struct pqos_cap *cap;
 
         ASSERT(group != NULL);
-        ASSERT(m_cap != NULL);
 
-        ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1076,11 +1088,14 @@ resctrl_mon_reset(void)
         unsigned grps;
         int num_groups;
         unsigned cos = 0;
+        const struct pqos_cap *cap;
 
         if (supported_events == 0)
                 return PQOS_RETVAL_RESOURCE;
 
-        ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &grps);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1128,13 +1143,16 @@ resctrl_mon_active(unsigned *monitoring_status)
 	unsigned group_idx = 0;
 	unsigned resctrl_group_count = 0;
 	int ret;
+        const struct pqos_cap *cap;
 
 	if (supported_events == 0) {
 		*monitoring_status = 0;
 		return PQOS_RETVAL_OK;
 	}
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &resctrl_group_count);
+        _pqos_cap_get(&cap, NULL);
+
+	ret = resctrl_alloc_get_grps_num(cap, &resctrl_group_count);
 	if (ret != PQOS_RETVAL_OK) {
 		LOG_ERROR("Failed to count resctrl groups");
 		return ret;

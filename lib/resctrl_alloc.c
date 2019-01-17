@@ -41,6 +41,7 @@
 
 #include "log.h"
 #include "types.h"
+#include "cap.h"
 #include "resctrl_alloc.h"
 
 /**
@@ -48,7 +49,6 @@
  * Local data structures
  * ---------------------------------------
  */
-static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /*
@@ -64,7 +64,6 @@ resctrl_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (cpu == NULL || cap == NULL)
 		return PQOS_RETVAL_PARAM;
 
-	m_cap = cap;
 	m_cpu = cpu;
 
         return PQOS_RETVAL_OK;
@@ -73,7 +72,6 @@ resctrl_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 int
 resctrl_alloc_fini(void)
 {
-        m_cap = NULL;
         m_cpu = NULL;
         return PQOS_RETVAL_OK;
 }
@@ -954,10 +952,11 @@ resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 	unsigned grps;
 	unsigned i;
 	struct resctrl_cpumask mask;
+	const struct pqos_cap *cap;
 
-	ASSERT(m_cap != NULL);
+	_pqos_cap_get(&cap, NULL);
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+	ret = resctrl_alloc_get_grps_num(cap, &grps);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
@@ -985,8 +984,12 @@ resctrl_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
 int
 resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id)
 {
+	const struct pqos_cap *cap;
+
+	_pqos_cap_get(&cap, NULL);
+
 	/* Search tasks files */
-	return resctrl_alloc_task_search(class_id, m_cap, task);
+	return resctrl_alloc_task_search(class_id, cap, task);
 }
 
 int

@@ -138,8 +138,6 @@
  * Local data structures
  * ---------------------------------------
  */
-static const struct pqos_cap *m_cap = NULL; /**< capabilities structure
-                                               passed from cap */
 static const struct pqos_cpuinfo *m_cpu = NULL; /**< cpu topology passed
                                                    from cap */
 static unsigned m_rmid_max = 0;         /**< max RMID */
@@ -231,7 +229,6 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 #endif
  pqos_mon_init_exit:
         m_cpu = cpu;
-        m_cap = cap;
 #ifdef __linux__
         m_interface = cfg->interface;
 #else
@@ -252,7 +249,6 @@ pqos_mon_fini(void)
                 ret = os_mon_fini();
 #endif
         m_cpu = NULL;
-        m_cap = NULL;
 
         return ret;
 }
@@ -302,8 +298,7 @@ rmid_alloc(const unsigned cluster,
          * - look for the \a event in the event list
          * - find max RMID matching the \a event
          */
-        ASSERT(m_cap != NULL);
-        ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MON, &item);
+        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_MON, &item);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         ASSERT(item != NULL);
@@ -390,10 +385,13 @@ rmid_alloc(const unsigned cluster,
 static uint64_t
 scale_event(const enum pqos_mon_event event, const uint64_t val)
 {
+        const struct pqos_cap *cap;
         const struct pqos_monitor *pmon;
         int ret;
 
-        ret = pqos_cap_get_event(m_cap, event, &pmon);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = pqos_cap_get_event(cap, event, &pmon);
         ASSERT(ret == PQOS_RETVAL_OK);
         if (ret != PQOS_RETVAL_OK)
                 return val;
@@ -892,6 +890,7 @@ hw_mon_start(const unsigned num_cores,
         unsigned i = 0;
         int ret = PQOS_RETVAL_OK;
         int retval = PQOS_RETVAL_OK;
+        const struct pqos_cap *cap;
 
         ASSERT(group != NULL);
         ASSERT(cores != NULL);
@@ -900,6 +899,8 @@ hw_mon_start(const unsigned num_cores,
         ASSERT(m_cpu != NULL);
 
         memset(ctxs, 0, sizeof(ctxs));
+
+        _pqos_cap_get(&cap, NULL);
 
         /**
          * Validate if event is listed in capabilities
@@ -912,7 +913,7 @@ hw_mon_start(const unsigned num_cores,
                 if (!(evt_mask & event))
                         continue;
 
-                ret = pqos_cap_get_event(m_cap, evt_mask, &ptr);
+                ret = pqos_cap_get_event(cap, evt_mask, &ptr);
                 if (ret != PQOS_RETVAL_OK || ptr == NULL)
                         return PQOS_RETVAL_PARAM;
         }

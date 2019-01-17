@@ -51,7 +51,6 @@
  * Local data structures
  * ---------------------------------------
  */
-static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /** List of non virtual events */
@@ -352,7 +351,6 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        m_cap = cap;
 	m_cpu = cpu;
 
         return ret;
@@ -361,7 +359,6 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 int
 os_mon_fini(void)
 {
-        m_cap = NULL;
         m_cpu = NULL;
 
         perf_mon_fini();
@@ -412,13 +409,15 @@ os_mon_start(const unsigned num_cores,
 {
         unsigned i = 0;
         int ret;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 
         ASSERT(group != NULL);
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
-        ASSERT(m_cpu != NULL);
-        ASSERT(m_cap != NULL);
+
+        _pqos_cap_get(&cap, &cpu);
 
         /**
          * Validate if event is listed in capabilities
@@ -431,7 +430,7 @@ os_mon_start(const unsigned num_cores,
                 if (!(evt_mask & event))
                         continue;
 
-                ret = pqos_cap_get_event(m_cap, evt_mask, &ptr);
+                ret = pqos_cap_get_event(cap, evt_mask, &ptr);
                 if (ret != PQOS_RETVAL_OK || ptr == NULL)
                         return PQOS_RETVAL_PARAM;
         }
@@ -442,7 +441,7 @@ os_mon_start(const unsigned num_cores,
         for (i = 0; i < num_cores; i++) {
                 const unsigned lcore = cores[i];
 
-                ret = pqos_cpu_check_core(m_cpu, lcore);
+                ret = pqos_cpu_check_core(cpu, lcore);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
         }

@@ -55,7 +55,6 @@
  * Local data structures
  * ---------------------------------------
  */
-static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /**
@@ -102,17 +101,17 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
                 goto mount;
 
         /* Get L3 CAT capabilities */
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
 
         /* Get L2 CAT capabilities */
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l2_cap = alloc_cap->u.l2ca;
 
         /* Get MBA capabilities */
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &alloc_cap);
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
 
@@ -151,44 +150,38 @@ static int
 os_alloc_check(void)
 {
         int ret;
-        unsigned i, supported = 0;
+        const struct pqos_capability *l3_cap;
+        const struct pqos_capability *l2_cap;
+        const struct pqos_capability *mba_cap;
+
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &l3_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &l2_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &mba_cap);
 
         /**
          * Check if resctrl is supported
          */
-        for (i = 0; i < m_cap->num_cap; i++) {
-                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
-                        supported = 1;
-                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
-                        supported = 1;
-                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
-                        supported = 1;
-        }
-
-        if (!supported)
+        if (l3_cap == NULL && l2_cap == NULL && mba_cap == NULL)
                 return PQOS_RETVAL_OK;
+
         /**
          * Check if resctrl is mounted
          */
         if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
-                const struct pqos_capability *alloc_cap = NULL;
                 enum pqos_cdp_config l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
                 enum pqos_cdp_config l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
                 enum pqos_mba_config mba_mount = PQOS_MBA_DEFAULT;
 
-                /* Get L3 CAT capabilities */
-                (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
-                if (alloc_cap != NULL && alloc_cap->u.l3ca->cdp_on)
+                /* Check L3 CAT capabilities */
+                if (l3_cap != NULL && l3_cap->u.l3ca->cdp_on)
                         l3_cdp_mount = PQOS_REQUIRE_CDP_ON;
 
-                /* Get L2 CAT capabilities */
-                (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
-                if (alloc_cap != NULL && alloc_cap->u.l2ca->cdp_on)
+                /* Check L2 CAT capabilities */
+                if (l2_cap != NULL && l2_cap->u.l2ca->cdp_on)
                         l2_cdp_mount = PQOS_REQUIRE_CDP_ON;
 
-                /* Get MBA capabilities */
-                (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
-                if (alloc_cap != NULL && alloc_cap->u.mba->ctrl_on)
+                /* Check MBA capabilities */
+                if (mba_cap != NULL && mba_cap->u.mba->ctrl_on)
                         mba_mount = PQOS_MBA_CTRL;
 
                 ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount, mba_mount);
@@ -212,10 +205,12 @@ static int
 os_alloc_prep(void)
 {
         unsigned i, num_grps = 0;
+        const struct pqos_cap *cap;
         int ret;
 
-        ASSERT(m_cap != NULL);
-        ret = resctrl_alloc_get_grps_num(m_cap, &num_grps);
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &num_grps);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
         /*
@@ -254,7 +249,6 @@ os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (cpu == NULL || cap == NULL)
 		return PQOS_RETVAL_PARAM;
 
-	m_cap = cap;
 	m_cpu = cpu;
 
         ret = os_alloc_check();
@@ -275,7 +269,6 @@ os_alloc_fini(void)
 {
         int ret = PQOS_RETVAL_OK;
 
-        m_cap = NULL;
         m_cpu = NULL;
         return ret;
 }
@@ -287,15 +280,16 @@ os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 	unsigned grps;
         int ret_mon;
         char mon_group[256];
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 
-        ASSERT(m_cpu != NULL);
-        ASSERT(m_cap != NULL);
+        _pqos_cap_get(&cap, &cpu);
 
-        ret = pqos_cpu_check_core(m_cpu, lcore);
+        ret = pqos_cpu_check_core(cpu, lcore);
         if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_PARAM;
 
-        ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+        ret = resctrl_alloc_get_grps_num(cap, &grps);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -363,10 +357,13 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         unsigned grps;
         int ret;
         unsigned *tasks;
+        const struct pqos_cap *cap;
 
-	ASSERT(m_cap != NULL);
         ASSERT(count != NULL);
-        ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &grps);
 	if (ret != PQOS_RETVAL_OK)
 		return NULL;
 
@@ -393,15 +390,17 @@ os_alloc_assign(const unsigned technology,
 {
         unsigned i, num_rctl_grps = 0;
         int ret;
+        const struct pqos_cap *cap;
 
         ASSERT(core_num > 0);
         ASSERT(core_array != NULL);
         ASSERT(class_id != NULL);
-        ASSERT(m_cap != NULL);
         UNUSED_PARAM(technology);
 
+        _pqos_cap_get(&cap, NULL);
+
         /* obtain highest class id for all requested technologies */
-        ret = resctrl_alloc_get_grps_num(m_cap, &num_rctl_grps);
+        ret = resctrl_alloc_get_grps_num(cap, &num_rctl_grps);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -510,14 +509,17 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 	unsigned grps;
 	unsigned i, j;
 	int ret;
+        const struct pqos_cap *cap;
 
 	LOG_INFO("OS alloc reset - schematas\n");
+
+        _pqos_cap_get(&cap, NULL);
 
 	ret = resctrl_lock_exclusive();
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &grps);
+	ret = resctrl_alloc_get_grps_num(cap, &grps);
 	if (ret != PQOS_RETVAL_OK)
 		goto os_alloc_reset_light_schematas_exit;
 
@@ -539,7 +541,7 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 	for (i = 0; i < grps; i++) {
 		struct resctrl_alloc_schemata schmt;
 
-		ret = resctrl_alloc_schemata_init(i, m_cap, m_cpu, &schmt);
+		ret = resctrl_alloc_schemata_init(i, cap, m_cpu, &schmt);
 		if (ret != PQOS_RETVAL_OK) {
 			LOG_ERROR("Error on schemata init "
 				  "for resctrl group %u\n", i);
@@ -922,19 +924,19 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                mba_cfg == PQOS_MBA_ANY);
 
         /* Get L3 CAT capabilities */
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
 
         /* Get L2 CAT capabilities */
         alloc_cap = NULL;
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l2_cap = alloc_cap->u.l2ca;
 
         /* Get MBA capabilities */
         alloc_cap = NULL;
-        (void) pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
+        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &alloc_cap);
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
 
@@ -1033,17 +1035,19 @@ os_l3ca_set(const unsigned socket,
 	unsigned i;
 	unsigned num_grps = 0, l3ca_num;
 	int cdp_enabled = 0;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 
 	ASSERT(ca != NULL);
 	ASSERT(num_cos != 0);
-	ASSERT(m_cap != NULL);
-	ASSERT(m_cpu != NULL);
 
-	ret = pqos_l3ca_get_cos_num(m_cap, &l3ca_num);
+        _pqos_cap_get(&cap, &cpu);
+
+	ret = pqos_l3ca_get_cos_num(cap, &l3ca_num);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &num_grps);
+	ret = resctrl_alloc_get_grps_num(cap, &num_grps);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
@@ -1051,7 +1055,7 @@ os_l3ca_set(const unsigned socket,
 		return PQOS_RETVAL_ERROR;
 
 	/* Get number of sockets in the system */
-	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
 	if (sockets == NULL || sockets_num == 0) {
 		ret = PQOS_RETVAL_ERROR;
 		goto os_l3ca_set_exit;
@@ -1062,7 +1066,7 @@ os_l3ca_set(const unsigned socket,
 		goto os_l3ca_set_exit;
 	}
 
-	ret = pqos_l3ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
+	ret = pqos_l3ca_cdp_enabled(cap, NULL, &cdp_enabled);
 	if (ret != PQOS_RETVAL_OK)
 		goto os_l3ca_set_exit;
 
@@ -1080,7 +1084,7 @@ os_l3ca_set(const unsigned socket,
 			goto os_l3ca_set_unlock;
 		}
 
-		ret = resctrl_alloc_schemata_init(ca[i].class_id, m_cap, m_cpu,
+		ret = resctrl_alloc_schemata_init(ca[i].class_id, cap, cpu,
 		                                  &schmt);
 
 		/* read schemata file */
@@ -1130,25 +1134,27 @@ os_l3ca_get(const unsigned socket,
 	unsigned count = 0;
 	unsigned sockets_num = 0;
 	unsigned *sockets = NULL;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 
 	ASSERT(num_ca != NULL);
 	ASSERT(ca != NULL);
 	ASSERT(max_num_ca != 0);
-	ASSERT(m_cap != NULL);
-	ASSERT(m_cpu != NULL);
 
-	ret = pqos_l3ca_get_cos_num(m_cap, &count);
+        _pqos_cap_get(&cap, &cpu);
+
+	ret = pqos_l3ca_get_cos_num(cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &count);
+	ret = resctrl_alloc_get_grps_num(cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
 	if (count > max_num_ca)
 		return PQOS_RETVAL_ERROR;
 
-	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
 	if (sockets == NULL || sockets_num == 0) {
 		ret = PQOS_RETVAL_ERROR;
 		goto os_l3ca_get_exit;
@@ -1166,8 +1172,7 @@ os_l3ca_get(const unsigned socket,
 	for (class_id = 0; class_id < count; class_id++) {
 		struct resctrl_alloc_schemata schmt;
 
-		ret = resctrl_alloc_schemata_init(class_id, m_cap, m_cpu,
-		                                  &schmt);
+		ret = resctrl_alloc_schemata_init(class_id, cap, cpu, &schmt);
 		if (ret == PQOS_RETVAL_OK)
 			ret = resctrl_alloc_schemata_read(class_id, &schmt);
 
@@ -1199,13 +1204,12 @@ os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	const struct pqos_capability *l3_cap = NULL;
 	FILE *fd;
 
-	ASSERT(m_cap != NULL);
 	ASSERT(min_cbm_bits != NULL);
 
 	/**
 	 * Get L3 CAT capabilities
 	 */
-	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L3CA, &l3_cap);
+	ret = _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &l3_cap);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
 
@@ -1235,23 +1239,26 @@ os_l2ca_set(const unsigned l2id,
 	unsigned *l2ids = NULL;
 	unsigned num_grps = 0, l2ca_num;
         int cdp_enabled;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 
-	ASSERT(m_cap != NULL);
 	ASSERT(ca != NULL);
 	ASSERT(num_cos != 0);
 
-	ret = pqos_l2ca_get_cos_num(m_cap, &l2ca_num);
+        _pqos_cap_get(&cap, &cpu);
+
+	ret = pqos_l2ca_get_cos_num(cap, &l2ca_num);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &num_grps);
+	ret = resctrl_alloc_get_grps_num(cap, &num_grps);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
 	if (num_cos > num_grps)
 		return PQOS_RETVAL_PARAM;
 
-        ret = pqos_l2ca_cdp_enabled(m_cap, NULL, &cdp_enabled);
+        ret = pqos_l2ca_cdp_enabled(cap, NULL, &cdp_enabled);
         if (ret != PQOS_RETVAL_OK)
                 goto os_l2ca_set_exit;
 
@@ -1267,7 +1274,7 @@ os_l2ca_set(const unsigned l2id,
 	}
 
 	/* Get number of L2 ids in the system */
-	l2ids = pqos_cpu_get_l2ids(m_cpu, &l2ids_num);
+	l2ids = pqos_cpu_get_l2ids(cpu, &l2ids_num);
 	if (l2ids == NULL || l2ids_num == 0) {
 		ret = PQOS_RETVAL_ERROR;
 		goto os_l2ca_set_exit;
@@ -1292,7 +1299,7 @@ os_l2ca_set(const unsigned l2id,
                         goto os_l2ca_set_unlock;
                 }
 
-		ret = resctrl_alloc_schemata_init(ca[i].class_id, m_cap, m_cpu,
+		ret = resctrl_alloc_schemata_init(ca[i].class_id, cap, cpu,
 		                                  &schmt);
 
 		/* read schemata file */
@@ -1342,18 +1349,20 @@ os_l2ca_get(const unsigned l2id,
 	unsigned count = 0;
 	unsigned l2ids_num = 0;
 	unsigned *l2ids = NULL;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 
 	ASSERT(num_ca != NULL);
 	ASSERT(ca != NULL);
 	ASSERT(max_num_ca != 0);
-	ASSERT(m_cap != NULL);
-	ASSERT(m_cpu != NULL);
 
-	ret = pqos_l2ca_get_cos_num(m_cap, &count);
+        _pqos_cap_get(&cap, &cpu);
+
+	ret = pqos_l2ca_get_cos_num(cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &count);
+	ret = resctrl_alloc_get_grps_num(cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
@@ -1380,8 +1389,7 @@ os_l2ca_get(const unsigned l2id,
 	for (class_id = 0; class_id < count; class_id++) {
 		struct resctrl_alloc_schemata schmt;
 
-		ret = resctrl_alloc_schemata_init(class_id, m_cap, m_cpu,
-		                                  &schmt);
+		ret = resctrl_alloc_schemata_init(class_id, cap, cpu, &schmt);
 		if (ret == PQOS_RETVAL_OK)
 			ret = resctrl_alloc_schemata_read(class_id, &schmt);
 
@@ -1413,13 +1421,12 @@ os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	const struct pqos_capability *l2_cap = NULL;
 	FILE *fd;
 
-	ASSERT(m_cap != NULL);
 	ASSERT(min_cbm_bits != NULL);
 
 	/**
 	 * Get L2 CAT capabilities
 	 */
-	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
+	ret = _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &l2_cap);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
@@ -1449,21 +1456,23 @@ os_mba_set(const unsigned socket,
 	unsigned *sockets = NULL;
 	unsigned i, step = 0;
 	unsigned num_grps = 0;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 	const struct pqos_capability *mba_cap = NULL;
 
 	ASSERT(requested != NULL);
 	ASSERT(num_cos != 0);
-	ASSERT(m_cap != NULL);
-	ASSERT(m_cpu != NULL);
+
+        _pqos_cap_get(&cap, &cpu);
 
 	/**
 	 * Check if MBA is supported
 	 */
-	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &mba_cap);
+	ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &mba_cap);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* MBA not supported */
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &num_grps);
+	ret = resctrl_alloc_get_grps_num(cap, &num_grps);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
@@ -1511,7 +1520,7 @@ os_mba_set(const unsigned socket,
 		}
 
 		ret = resctrl_alloc_schemata_init(requested[i].class_id,
-		                                  m_cap, m_cpu, &schmt);
+		                                  cap, cpu, &schmt);
 
 		/* read schemata file */
 		if (ret == PQOS_RETVAL_OK)
@@ -1572,29 +1581,31 @@ os_mba_get(const unsigned socket,
 	unsigned count = 0;
 	unsigned sockets_num = 0;
 	unsigned *sockets = NULL;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 	const struct pqos_capability *mba_cap = NULL;
 
 	ASSERT(num_cos != NULL);
 	ASSERT(max_num_cos != 0);
 	ASSERT(mba_tab != NULL);
-	ASSERT(m_cap != NULL);
-	ASSERT(m_cpu != NULL);
+
+        _pqos_cap_get(&cap, &cpu);
 
 	/**
 	 * Check if MBA is supported
 	 */
-	ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MBA, &mba_cap);
+	ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &mba_cap);
 	if (ret != PQOS_RETVAL_OK)
 		return PQOS_RETVAL_RESOURCE; /* MBA not supported */
 
-	ret = resctrl_alloc_get_grps_num(m_cap, &count);
+	ret = resctrl_alloc_get_grps_num(cap, &count);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
 	if (count > max_num_cos)
 		return PQOS_RETVAL_ERROR;
 
-	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
+	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
 	if (sockets == NULL || sockets_num == 0 || socket >= sockets_num) {
 		ret = PQOS_RETVAL_ERROR;
 		goto os_mba_get_exit;
@@ -1607,8 +1618,7 @@ os_mba_get(const unsigned socket,
 	for (class_id = 0; class_id < count; class_id++) {
 		struct resctrl_alloc_schemata schmt;
 
-		ret = resctrl_alloc_schemata_init(class_id, m_cap, m_cpu,
-		                                  &schmt);
+		ret = resctrl_alloc_schemata_init(class_id, cap, cpu, &schmt);
 		if (ret == PQOS_RETVAL_OK)
 			ret = resctrl_alloc_schemata_read(class_id, &schmt);
 
@@ -1640,11 +1650,12 @@ os_alloc_assoc_set_pid(const pid_t task,
 	unsigned max_cos = 0;
         int ret_mon;
         char mon_group[256];
+        const struct pqos_cap *cap;
 
-        ASSERT(m_cap != NULL);
+        _pqos_cap_get(&cap, NULL);
 
 	/* Get number of COS */
-        ret = resctrl_alloc_get_grps_num(m_cap, &max_cos);
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
 	if (ret != PQOS_RETVAL_OK)
 		return ret;
 
@@ -1713,15 +1724,18 @@ os_alloc_assign_pid(const unsigned technology,
 {
         unsigned i, num_rctl_grps = 0;
         int ret;
+        const struct pqos_cap *cap;
+
 
         ASSERT(task_num > 0);
         ASSERT(task_array != NULL);
         ASSERT(class_id != NULL);
-        ASSERT(m_cap != NULL);
         UNUSED_PARAM(technology);
 
+        _pqos_cap_get(&cap, NULL);
+
         /* obtain highest class id for all requested technologies */
-        ret = resctrl_alloc_get_grps_num(m_cap, &num_rctl_grps);
+        ret = resctrl_alloc_get_grps_num(cap, &num_rctl_grps);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 

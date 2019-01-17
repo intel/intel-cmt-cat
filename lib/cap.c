@@ -1559,15 +1559,7 @@ pqos_cap_get(const struct pqos_cap **cap,
                 return ret;
         }
 
-        if (cap != NULL) {
-                ASSERT(m_cap != NULL);
-                *cap = m_cap;
-        }
-
-        if (cpu != NULL) {
-                ASSERT(m_cpu != NULL);
-                *cpu = m_cpu;
-        }
+        _pqos_cap_get(cap, cpu);
 
         _pqos_api_unlock();
         return PQOS_RETVAL_OK;
@@ -1670,3 +1662,24 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
         }
 }
 
+void
+_pqos_cap_get(const struct pqos_cap **cap,
+              const struct pqos_cpuinfo **cpu)
+{
+        if (cap != NULL) {
+                ASSERT(m_cap != NULL);
+                *cap = m_cap;
+        }
+
+        if (cpu != NULL) {
+                ASSERT(m_cpu != NULL);
+                *cpu = m_cpu;
+        }
+}
+
+int
+_pqos_cap_get_type(const enum pqos_cap_type type,
+                   const struct pqos_capability **cap_item)
+{
+        return pqos_cap_get_type(m_cap, type, cap_item);
+}

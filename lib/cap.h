@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2018 Intel Corporation. All rights reserved.
+ * Copyright(c) 2014-2019 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -42,6 +42,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "pqos.h"
 
 /**
  * @brief Modifies L3 CAT capability structure upon CDP config change
@@ -96,6 +98,27 @@ void _pqos_api_unlock(void);
  * @retval PQOS_RETVA_ERROR state different than expected
  */
 int _pqos_check_init(const int expect);
+
+/**
+ * @brief Internal API to retrie PQoS capabilities data
+ *
+ * @param [out] cap location to store PQoS capabilities information at
+ * @param [out] cpu location to store CPU information at
+ */
+void _pqos_cap_get(const struct pqos_cap **cap,
+                   const struct pqos_cpuinfo **cpu);
+
+/**
+ * @brief Internal API to retrie \a type of capability
+ *
+ * @param [in] type capability type to look for
+ * @param [out] cap_item place to store pointer to selected capability
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int _pqos_cap_get_type(const enum pqos_cap_type type,
+                       const struct pqos_capability **cap_item);
 
 #ifdef __cplusplus
 }
