@@ -1,7 +1,7 @@
 ========================================================================
 README for Membw tool
 
-July 2018
+Jan 2019
 
 ========================================================================
 
@@ -35,19 +35,35 @@ Usage
 =====
 
 Usage: For Membw:
-        "./membw"   This option will display usage and operation types
+    "./membw --help"   This option will display extensive help page.
+                       Please refer to "--help" option for usage details
 
-        "./membw <cpuid> <BW [MB/s]> <operation type>"
+    "./membw -c <cpu> -b <BW [MB/s]> <operation type>"
 
-            <t_cpuid> Select CPU ID to generate bandwidth
+        <cpu> Select CPU ID to generate bandwidth
 
-            <BW [MB/s]> Select amount of bandwidth to generate
+        <BW [MB/s]> Select amount of bandwidth to generate
 
-            <operation type> Select operation type from the following list
-                -w        write - x86 stores
-                -r        read - x86 loads
-                -m        read-mod-write - load XOR write
-
+        <operation type> Select operation type from the following list
+          --prefetch-t0      prefetcht0
+          --prefetch-t1      prefetcht1
+          --prefetch-t2      prefetcht2
+          --prefetch-nta     prefetchtnta
+          --prefetch-w       prefetchw
+          --read             x86 loads
+          --read-sse         SSE loads
+          --nt-read-sse      SSE NT loads
+          --read-mod-write   x86 load XOR write
+          --write            x86 stores
+          --write-avx512     AVX512 stores
+          --write-clwb       x86 stores + clwb
+          --write-flush      x86 stores & clflush (naturally generates loads & stores)
+          --write-sse        SSE stores
+          --write-sse-flush  SSE stores & clflush (naturally generates loads & stores)
+          --nt-write         x86 NT stores
+          --nt-write-avx512  AVX512 NT stores
+          --nt-write-clwb    x86 NT stores + clwb
+          --nt-write-sse     SSE NT stores
 
 Legal Disclaimer
 ================
