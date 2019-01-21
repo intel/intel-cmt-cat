@@ -1,4 +1,32 @@
 =======================================================================
+Release  v3.0  ....-..-..
+=======================================================================
+
+Contributors (alphabetical order):
+        Adrian Boczkowski <adrianx.boczkowski@intel.com>
+        Colin Ian King <colin.king@canonical.com>
+        Khawar Abbasi <khawar.abbasi@intel.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+Summary:
+1. Library
+        - Added support for Resctrl MBA software controller
+        - Improved detection of OS (Resctrl) capabilities
+2. PQoS Utility
+        - Added support for Resctrl MBA software controller
+        - Updated feature enumeration to show capabilities for selected
+          interface only
+3. rdtset Utility
+        - Added support for Resctrl MBA software controller
+4. membw
+        - Added support for extra memory operations
+        - Improved accuracy
+5. General
+        - Bug fixes
+
+=======================================================================
 Release  v2.1  2018-10-11
 =======================================================================
 
