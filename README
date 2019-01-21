@@ -1,7 +1,7 @@
 ========================================================================
 README for Intel(R) RDT Software Package
 
-March 2018
+Jan 2019
 
 ========================================================================
 
@@ -240,6 +240,8 @@ Table 3. OS interface feature support
 +---------------+-------------------+----------------+----------------------------------------------------+
 | 2.0.0         | L2 CDP            | 4.16           | OS                                                 |
 +---------------+-------------------+----------------+----------------------------------------------------+
+| 3.0.0         | MBA CTRL (Resctrl)| 4.18           | OS                                                 |
++---------------+-------------------+----------------+----------------------------------------------------+
 
 References:
 (1) Monitoring with Perf on a per core basis is not supported and returns invalid results.
@@ -327,7 +329,7 @@ Table 5. Intel(R) RDT software enabling status.
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
 |Linux cgroup      | No    | Yes   | No    | No    | Yes(4) | No      | No     | No     |
 |------------------+-------+-------+-------+-------+--------+---------+--------+--------|
-|Linux resctrl (5) | Yes   | Yes   | No    | No    | Yes    | Yes     | Yes    | No     |
+|Linux resctrl (5) | Yes   | Yes   | Yes(8)| Yes(8)| Yes    | Yes     | Yes    | Yes(9) |
 +---------------------------------------------------------------------------------------+
 
 Legend:
@@ -343,6 +345,8 @@ References:
 (5) Linux kernel version 4.10 and newer
 (6) perf API allows for CMT/MBM core monitoring but returned values are incorrect
 (7) intel-cmt-cat version 1.0.0 monitoring only and depends on kernel support
+(8) Linux kernel version 4.14 and newer
+(9) Linux kernel version 4.12 and newer
 
 Legal Disclaimer
 ================
