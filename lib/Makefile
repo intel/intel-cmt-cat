@@ -88,7 +88,7 @@ CLEAN_OBJS = $(SRCS:.c=.o)
 # On FreeBSD build with no OS support
 ifeq ($(shell uname), FreeBSD)
 OBJS := $(filter-out perf.o \
-	os_allocation.o
+	os_allocation.o \
 	os_cap.o \
 	os_monitoring.o \
 	resctrl.o \
