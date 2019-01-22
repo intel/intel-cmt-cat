@@ -290,6 +290,10 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu,
 {
         int ret = PQOS_RETVAL_OK;
 
+#ifndef __linux__
+        UNUSED_PARAM(cap);
+#endif
+
         m_cpu = cpu;
         if (cfg == NULL)
                 m_interface = PQOS_INTER_MSR;
