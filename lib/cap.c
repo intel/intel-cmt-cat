@@ -1381,7 +1381,7 @@ pqos_init(const struct pqos_config *config)
         if (config->interface == PQOS_INTER_OS ||
                 config->interface == PQOS_INTER_OS_RESCTRL_MON) {
                 ret = os_cap_init(config->interface);
-                if (ret == PQOS_RETVAL_ERROR) {
+                if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("os_cap_init() error %d\n", ret);
                         goto machine_init_error;
                 }
