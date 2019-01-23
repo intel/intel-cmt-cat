@@ -402,7 +402,12 @@ int main(int argc, char *argv[])
 		exit_val = EXIT_FAILURE;
 		goto error_exit;
 	}
-	(void) pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
+	ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
+	if (ret != PQOS_RETVAL_OK) {
+		printf("Error retrieving monitoring capabilities\n");
+		exit_val = EXIT_FAILURE;
+		goto error_exit;
+	}
 	/* Setup the monitoring resources */
 	ret = setup_monitoring(p_cpu, cap_mon);
 	if (ret != PQOS_RETVAL_OK) {
