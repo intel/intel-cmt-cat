@@ -705,6 +705,7 @@ int main(int argc, char **argv)
                         selfn_monitor_interval(optarg);
                         break;
                 case 'p':
+                        pid_flag = 1;
                         if (optarg != NULL && *optarg == '-') {
                                 /**
                                  * Next switch option wrongly assumed to be
@@ -719,7 +720,6 @@ int main(int argc, char **argv)
                                 break;
                         }
                         selfn_monitor_pids(optarg);
-                        pid_flag = 1;
                         break;
                 case 'm':
                         selfn_monitor_cores(optarg);
