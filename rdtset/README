@@ -1,7 +1,7 @@
 ================================================================================
 README for rdtset
 
-September 2018
+January 2019
 ================================================================================
 
 CONTENTS
@@ -24,7 +24,10 @@ The rdtset tool provides support to set up the CAT (Cache Allocation Technology)
 and MBA (Memory Bandwidth Allocation) capabilities for a task and set its CPU affinity.
 For MBA, rdtset offers two modes of operation, fixed MBA rate
 or closed-loop one monitoring local memory B/W usage and adjust MBA accordingly.
-Intel(R) RDT allocation operations of the utility are done via libpqos library).
+For OS interface, it uses MBA CTRL via libpqos (OS support available
+in Linux kernel 4.18 or later). For MSRs, the tool adjusts MBA configuration
+by itself based on local memory B/W.
+Intel(R) RDT allocation operations of the utility are done via libpqos library.
 Class of service 0 (CLOS0) is assumed as default one.
 In command mode, rdtset forks and one process executes the command. Another
 process waits for the task to terminate and restores default allocation state
@@ -35,7 +38,7 @@ FEATURES
 The following Intel(R) RDT features are supported:
  - L2 CAT (Cache Allocation Technology)
  - L3 CAT (Cache Allocation Technology)
- - MBA (Memory Bandwitch Allocation)
+ - MBA (Memory Bandwidth Allocation)
 
 Supports Linux and FreeBSD.
  - Linux supports allocation on a per core or PID basis (kernel 4.10+ required for PID support)
