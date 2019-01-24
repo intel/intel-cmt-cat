@@ -675,8 +675,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
 {
         unsigned i;
         int ret;
-        enum pqos_mon_event all_core_evts = (enum pqos_mon_event)0;
-        enum pqos_mon_event all_pid_evts = (enum pqos_mon_event)0;
+        enum pqos_mon_event all_evts = (enum pqos_mon_event)0;
         const enum pqos_mon_event evt_all =
                 (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
 
@@ -731,17 +730,14 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         for (i = 0; i < cap_mon->u.mon->num_events; i++) {
                 struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
 
-                all_core_evts |= mon->type;
-                if (sel_interface == PQOS_INTER_OS ||
-                    sel_interface == PQOS_INTER_OS_RESCTRL_MON)
-                        all_pid_evts |= mon->type;
+                all_evts |= mon->type;
         }
         /**
          * If no cores and events selected through command line
          * by default let's monitor all cores
          */
         if (sel_monitor_num == 0 && sel_process_num == 0) {
-                sel_events_max = all_core_evts;
+                sel_events_max = all_evts;
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore  = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
@@ -779,13 +775,13 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
 
                         /* check if all available events were selected */
                         if (cg->events == evt_all) {
-                                cg->events = all_core_evts;
-                                sel_events_max |= all_core_evts;
+                                cg->events = all_evts;
+                                sel_events_max |= all_evts;
                         } else {
-                                if (all_core_evts & PQOS_PERF_EVENT_IPC)
+                                if (all_evts & PQOS_PERF_EVENT_IPC)
                                         cg->events |= (enum pqos_mon_event)
                                                 PQOS_PERF_EVENT_IPC;
-                                if (all_core_evts & PQOS_PERF_EVENT_LLC_MISS)
+                                if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
                                         cg->events |= (enum pqos_mon_event)
                                                 PQOS_PERF_EVENT_LLC_MISS;
                         }
@@ -827,13 +823,13 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
 
                         /* check if all available events were selected */
                         if (pg->events == evt_all) {
-                                pg->events = all_pid_evts;
-                                sel_events_max |= all_pid_evts;
+                                pg->events = all_evts;
+                                sel_events_max |= all_evts;
                         } else {
-                                if (all_pid_evts & PQOS_PERF_EVENT_IPC)
+                                if (all_evts & PQOS_PERF_EVENT_IPC)
                                         pg->events |= (enum pqos_mon_event)
                                                 PQOS_PERF_EVENT_IPC;
-                                if (all_pid_evts & PQOS_PERF_EVENT_LLC_MISS)
+                                if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
                                         pg->events |= (enum pqos_mon_event)
                                                 PQOS_PERF_EVENT_LLC_MISS;
                         }
