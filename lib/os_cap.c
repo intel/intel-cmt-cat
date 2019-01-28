@@ -132,26 +132,23 @@ readuint64(const char *fname, unsigned base, uint64_t *value)
         return PQOS_RETVAL_OK;
 }
 
-int
-os_cap_get_num_closids(const enum pqos_cap_type type, unsigned *num_closids)
+/**
+ * @brief Retrieves number of closids
+ *
+ * @param [in] dir path to info directory
+ * @param [out] num_closids place to store retrieved value
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+get_num_closids(const char *dir, unsigned *num_closids)
 {
-        const char *path;
+        char path[128];
         int ret;
         uint64_t val;
 
-        switch (type) {
-        case PQOS_CAP_TYPE_L3CA:
-                path = RESCTRL_PATH_INFO_L3"/num_closids";
-                break;
-        case PQOS_CAP_TYPE_L2CA:
-                path = RESCTRL_PATH_INFO_L2"/num_closids";
-                break;
-        case PQOS_CAP_TYPE_MBA:
-                path = RESCTRL_PATH_INFO_MB"/num_closids";
-                break;
-        default:
-                return PQOS_RETVAL_ERROR;
-        }
+        snprintf(path, sizeof(path) - 1, "%s/num_closids", dir);
 
         ret = readuint64(path, 10, &val);
         if (ret == PQOS_RETVAL_OK)
@@ -163,29 +160,20 @@ os_cap_get_num_closids(const enum pqos_cap_type type, unsigned *num_closids)
 /**
  * @brief Retrieves number of ways
  *
- * @param [in] type selected technology
+ * @param [in] dir path to info directory
  * @param [out] num_ways place to store retrieved value
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-os_cap_get_num_ways(const enum pqos_cap_type type, unsigned *num_ways)
+get_num_ways(const char *dir, unsigned *num_ways)
 {
-        const char *path;
+        char path[128];
         int ret;
         uint64_t val;
 
-        switch (type) {
-        case PQOS_CAP_TYPE_L3CA:
-                path = RESCTRL_PATH_INFO_L3"/cbm_mask";
-                break;
-        case PQOS_CAP_TYPE_L2CA:
-                path = RESCTRL_PATH_INFO_L2"/cbm_mask";
-                break;
-        default:
-                return PQOS_RETVAL_ERROR;
-        }
+        snprintf(path, sizeof(path) - 1, "%s/cbm_mask", dir);
 
         ret = readuint64(path, 16, &val);
         if (ret == PQOS_RETVAL_OK) {
@@ -202,28 +190,20 @@ os_cap_get_num_ways(const enum pqos_cap_type type, unsigned *num_ways)
 /**
  * @brief Retrieves shareable bit mask
  *
- * @param [in] type selected technology
+ * @param [in] dir path to info directory
  * @param [out] shareable_bits place to store retrieved value
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-os_cap_get_shareable_bits(const enum pqos_cap_type type,
-                          uint64_t *shareable_bits)
+get_shareable_bits(const char *dir, uint64_t *shareable_bits)
 {
-        const char *path;
+        char path[128];
 
-        switch (type) {
-        case PQOS_CAP_TYPE_L3CA:
-                path = RESCTRL_PATH_INFO_L3"/shareable_bits";
-                break;
-        case PQOS_CAP_TYPE_L2CA:
-                path = RESCTRL_PATH_INFO_L2"/shareable_bits";
-                break;
-        default:
-                return PQOS_RETVAL_ERROR;
-        }
+        ASSERT(dir != NULL);
+
+        snprintf(path, sizeof(path) - 1, "%s/shareable_bits", dir);
 
         /* Information not present in info dir */
         if (access(path, F_OK) != 0) {
@@ -558,9 +538,18 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
 {
         struct pqos_cap_l3ca *cap = NULL;
         struct stat st;
+        const char *info;
+        int cdp_on;
         int ret = PQOS_RETVAL_OK;
 
-        if (stat(RESCTRL_PATH_INFO_L3, &st) != 0)
+        if (stat(RESCTRL_PATH_INFO_L3, &st) == 0) {
+                info = RESCTRL_PATH_INFO_L3;
+                cdp_on = 0;
+        } else if (stat(RESCTRL_PATH_INFO_L3CODE, &st) == 0 &&
+                   stat(RESCTRL_PATH_INFO_L3DATA, &st) == 0) {
+                info = RESCTRL_PATH_INFO_L3CODE;
+                cdp_on = 1;
+        } else
                 return PQOS_RETVAL_RESOURCE;
 
         cap = (struct pqos_cap_l3ca *)calloc(1, sizeof(*cap));
@@ -569,30 +558,24 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
 
         ASSERT(cap != NULL);
         cap->mem_size = sizeof(*cap);
-
-        ret = os_cap_get_num_closids(PQOS_CAP_TYPE_L3CA, &cap->num_classes);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
-
-        ret = os_cap_get_num_ways(PQOS_CAP_TYPE_L3CA, &cap->num_ways);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
-
-        ret = os_cap_get_shareable_bits(PQOS_CAP_TYPE_L3CA,
-                                        &cap->way_contention);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
-
-        ret = detect_os_support(PROC_CPUINFO, "cdp_l3", &cap->cdp);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
-
-        ret = detect_os_support(RESCTRL_PATH"/schemata", "L3DATA",
-                                &cap->cdp_on);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
-
+        cap->cdp = cdp_on;
+        cap->cdp_on = cdp_on;
         cap->way_size = cpu->l3.way_size;
+
+        ret = get_num_closids(info, &cap->num_classes);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_cap_l3ca_discover_exit;
+
+        ret = get_num_ways(info, &cap->num_ways);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_cap_l3ca_discover_exit;
+
+        ret = get_shareable_bits(info, &cap->way_contention);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_cap_l3ca_discover_exit;
+
+        if (!cdp_on)
+                ret = detect_os_support(PROC_CPUINFO, "cdp_l3", &cap->cdp);
 
  os_cap_l3ca_discover_exit:
         if (ret == PQOS_RETVAL_OK)
@@ -609,9 +592,18 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
 {
         struct pqos_cap_l2ca *cap = NULL;
         struct stat st;
+        const char *info;
+        int cdp_on;
         int ret = PQOS_RETVAL_OK;
 
-        if (stat(RESCTRL_PATH_INFO_L2, &st) != 0)
+        if (stat(RESCTRL_PATH_INFO_L2, &st) == 0) {
+                info = RESCTRL_PATH_INFO_L2;
+                cdp_on = 0;
+        } else if (stat(RESCTRL_PATH_INFO_L2CODE, &st) == 0 &&
+                   stat(RESCTRL_PATH_INFO_L2DATA, &st) == 0) {
+                info = RESCTRL_PATH_INFO_L2CODE;
+                cdp_on = 1;
+        } else
                 return PQOS_RETVAL_RESOURCE;
 
         cap = (struct pqos_cap_l2ca *)calloc(1, sizeof(*cap));
@@ -620,30 +612,24 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
 
         ASSERT(cap != NULL);
         cap->mem_size = sizeof(*cap);
-
-        ret = os_cap_get_num_closids(PQOS_CAP_TYPE_L2CA, &cap->num_classes);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
-
-        ret = os_cap_get_num_ways(PQOS_CAP_TYPE_L2CA, &cap->num_ways);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
-
-        ret = os_cap_get_shareable_bits(PQOS_CAP_TYPE_L2CA,
-                                        &cap->way_contention);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
-
-        ret = detect_os_support(PROC_CPUINFO, "cdp_l2", &cap->cdp);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
-
-        ret = detect_os_support(RESCTRL_PATH"/schemata", "L2DATA",
-                                &cap->cdp_on);
-        if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
-
+        cap->cdp = cdp_on;
+        cap->cdp_on = cdp_on;
         cap->way_size = cpu->l2.way_size;
+
+        ret = get_num_closids(info, &cap->num_classes);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_cap_l2ca_discover_exit;
+
+        ret = get_num_ways(info, &cap->num_ways);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_cap_l2ca_discover_exit;
+
+        ret = get_shareable_bits(info, &cap->way_contention);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_cap_l2ca_discover_exit;
+
+        if (!cdp_on)
+                ret = detect_os_support(PROC_CPUINFO, "cdp_l2", &cap->cdp);
 
  os_cap_l2ca_discover_exit:
         if (ret == PQOS_RETVAL_OK)
@@ -799,6 +785,7 @@ os_cap_mba_discover(struct pqos_cap_mba **r_cap,
         struct pqos_cap_mba *cap = NULL;
         struct stat st;
         uint64_t val;
+        const char *info = RESCTRL_PATH_INFO_MB;
         int ret = PQOS_RETVAL_OK;
 
         UNUSED_PARAM(cpu);
@@ -813,7 +800,7 @@ os_cap_mba_discover(struct pqos_cap_mba **r_cap,
         ASSERT(cap != NULL);
         cap->mem_size = sizeof(*cap);
 
-        ret = os_cap_get_num_closids(PQOS_CAP_TYPE_MBA, &cap->num_classes);
+        ret = get_num_closids(info, &cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
                 goto os_cap_mba_discover_exit;
 

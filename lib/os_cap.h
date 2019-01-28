@@ -39,18 +39,6 @@ extern "C" {
 #endif
 
 /**
- * @brief Retrieves number of closids
- *
- * @param [in] type selected technology
- * @param [out] num_closids place to store retrieved value
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-int os_cap_get_num_closids(const enum pqos_cap_type type,
-                           unsigned *num_closids);
-
-/**
  * @brief Retrieves MBA controller configuration status
  *
  * @param [in] cap platform QoS capabilities structure
