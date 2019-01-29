@@ -265,6 +265,7 @@ os_cap_init(const enum pqos_interface inter)
          * Mount resctrl with default parameters
          */
         if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
+                LOG_INFO("resctrl not mounted\n");
                 /**
                  * Check if it is possible to enable MBA CTRL
                  */

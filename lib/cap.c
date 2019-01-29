@@ -1084,20 +1084,6 @@ discover_capabilities(struct pqos_cap **p_cap,
                 return PQOS_RETVAL_PARAM;
 
         /**
-         * Check if resctrl is mounted
-         */
-        if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
-                if (inter == PQOS_INTER_OS ||
-                    inter == PQOS_INTER_OS_RESCTRL_MON) {
-                        LOG_INFO("resctrl not mounted\n");
-                        return PQOS_RETVAL_RESOURCE;
-                }
-        } else if (inter == PQOS_INTER_MSR)
-                LOG_WARN("resctl filesystem mounted! Using MSR "
-                         "interface may corrupt resctrl filesystem "
-                         "and cause unexpected behaviour\n");
-
-        /**
          * Monitoring init
          */
         if (inter == PQOS_INTER_MSR)
@@ -1385,7 +1371,10 @@ pqos_init(const struct pqos_config *config)
                         LOG_ERROR("os_cap_init() error %d\n", ret);
                         goto machine_init_error;
                 }
-        }
+        } else if (access(RESCTRL_PATH"/cpus", F_OK) == 0)
+                LOG_WARN("resctl filesystem mounted! Using MSR "
+                         "interface may corrupt resctrl filesystem "
+                         "and cause unexpected behaviour\n");
 #endif
 
         ret = discover_capabilities(&m_cap, m_cpu, config->interface);
