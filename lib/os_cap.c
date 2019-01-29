@@ -799,18 +799,18 @@ os_cap_mba_discover(struct pqos_cap_mba **r_cap,
 
         ASSERT(cap != NULL);
         cap->mem_size = sizeof(*cap);
+        cap->ctrl = -1;
+        cap->ctrl_on = -1;
 
         ret = get_num_closids(info, &cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
                 goto os_cap_mba_discover_exit;
 
-
-        if (cap->ctrl_on == -1) {
-                ret = detect_os_support(PROC_MOUNTS, "mba_MBps",
-                                        &(cap->ctrl_on));
-                if (ret != PQOS_RETVAL_OK)
-                        goto os_cap_mba_discover_exit;
-        } else if (cap->ctrl_on == 1)
+        /* Detect MBA CTRL status */
+        ret = detect_os_support(PROC_MOUNTS, "mba_MBps", &(cap->ctrl_on));
+        if (ret != PQOS_RETVAL_OK)
+                goto os_cap_mba_discover_exit;
+        if (cap->ctrl_on == 1)
                 cap->ctrl = 1;
         else
                 cap->ctrl = mba_ctrl;

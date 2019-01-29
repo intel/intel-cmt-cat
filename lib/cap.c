@@ -1243,7 +1243,8 @@ discover_capabilities(struct pqos_cap **p_cap,
                 /**
                  * Check status of MBA CTRL
                  */
-                if (inter == PQOS_INTER_OS && det_mba->ctrl == -1) {
+                if (inter == PQOS_INTER_OS ||
+                    inter == PQOS_INTER_OS_RESCTRL_MON) {
                         ret = os_cap_get_mba_ctrl(_cap, cpu, &det_mba->ctrl,
                                                   &det_mba->ctrl_on);
                         if (ret != PQOS_RETVAL_OK)
