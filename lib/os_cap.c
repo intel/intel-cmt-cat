@@ -480,7 +480,6 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap,
         int ret = PQOS_RETVAL_OK;
         uint64_t num_rmids = 0;
         unsigned i;
-        struct stat st;
 
         enum pqos_mon_event events[] = {
                 PQOS_MON_EVENT_L3_OCCUP,
@@ -499,11 +498,6 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap,
         }
         if (!supported)
                 return PQOS_RETVAL_RESOURCE;
-
-        if (stat(RESCTRL_PATH_INFO_L3_MON, &st) != 0) {
-                LOG_WARN("As of Kernel 4.10, Intel(R) RDT perf results per "
-                         "core are found to be incorrect.\n");
-        }
 
         if (access(RESCTRL_PATH_INFO_L3_MON"/num_rmids", F_OK) == 0) {
                 ret = readuint64(RESCTRL_PATH_INFO_L3_MON"/num_rmids", 10,
