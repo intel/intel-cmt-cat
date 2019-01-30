@@ -207,7 +207,7 @@ get_shareable_bits(const char *dir, uint64_t *shareable_bits)
 
         /* Information not present in info dir */
         if (access(path, F_OK) != 0) {
-                LOG_WARN("Unable to obtain ways contention bit-mask, %s file "
+                LOG_DEBUG("Unable to obtain ways contention bit-mask, %s file "
                          "does not exist\n", path);
                 *shareable_bits = 0;
                 return PQOS_RETVAL_OK;
