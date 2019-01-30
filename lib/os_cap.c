@@ -324,6 +324,81 @@ detect_mon_resctrl_support(const enum pqos_mon_event event,
         return ret;
 }
 
+
+/**
+ * @brief Reads scale factor of perf monitioring event
+ *
+ * @param [in] event_name perf monitoring event name
+ * @param [out] scale scale factor
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
+{
+        char path[128];
+        char buf[16];
+        double scale_factor;
+        unsigned unit = 1;
+        int ret;
+        FILE *fd;
+
+        ASSERT(scale != NULL);
+        ASSERT(event_name != NULL);
+
+        /* read scale factor value */
+        snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s.scale",
+                 event_name);
+
+        fd = fopen(path, "r");
+        if (fd == NULL) {
+                LOG_ERROR("Failed to open %s perf monitoring event scale "
+                          "file!\n", event_name);
+                return PQOS_RETVAL_ERROR;
+        }
+        ret = fscanf(fd, "%10lf", &scale_factor);
+        fclose(fd);
+        if (ret < 1) {
+                LOG_ERROR("Failed to read %s perf monitoring event scale "
+                          "factor!\n", event_name);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        /* read scale factor unit */
+        snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s.unit",
+                 event_name);
+
+        fd = fopen(path, "r");
+        if (fd == NULL) {
+                LOG_ERROR("Failed to open %s perf monitoring event unit "
+                          "file!\n", event_name);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        if (fgets(buf, sizeof(buf), fd) != NULL) {
+                if (strncmp(buf, "Bytes", sizeof(buf)) == 0)
+                        unit = 1;
+                else if (strncmp(buf, "MB", sizeof(buf)) == 0)
+                        unit = 1000000;
+                else {
+                        LOG_ERROR("Unknown \"%s\" scale factor unit", buf);
+                        fclose(fd);
+                        return PQOS_RETVAL_ERROR;
+                }
+        } else {
+                LOG_ERROR("Failed to read %s perf monitoring event unit!\n",
+                          event_name);
+                fclose(fd);
+                return PQOS_RETVAL_ERROR;
+        }
+        fclose(fd);
+
+        *scale = (uint32_t)(scale_factor * unit);
+
+        return PQOS_RETVAL_OK;
+}
+
 /**
  * @brief Checks if event is supported by perf
  *
@@ -339,7 +414,7 @@ detect_mon_perf_support(const enum pqos_mon_event event,
                         int *supported,
                         uint32_t *scale)
 {
-        char buf[128];
+        char path[128];
         struct stat st;
         const char *event_name = NULL;
         int ret;
@@ -373,21 +448,15 @@ detect_mon_perf_support(const enum pqos_mon_event event,
                 break;
         }
 
-        snprintf(buf, sizeof(buf) - 1, PERF_MON_PATH"/events/%s", event_name);
-        if (stat(buf, &st) == 0)
-                *supported = 1;
+        snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s", event_name);
+        if (stat(path, &st) != 0)
+                return PQOS_RETVAL_OK;
 
-        /* obtain scale factor for the event */
-        if (*supported) {
-                uint64_t scale_factor;
+        *supported = 1;
 
-                snprintf(buf, sizeof(buf) - 1, PERF_MON_PATH"/events/%s.scale",
-                         event_name);
-
-                ret = readuint64(buf, 10, &scale_factor);
-                if (ret == PQOS_RETVAL_OK)
-                        *scale = (unsigned)scale_factor;
-        }
+        ret = get_mon_perf_scale_factor(event_name, scale);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         if (*supported && warn) {
                 LOG_WARN("As of Kernel 4.10, Intel(R) RDT perf results per "
