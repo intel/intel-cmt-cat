@@ -42,12 +42,12 @@ CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-Winline -msse4.2
+	-Winline -mavx512f
 
 ifeq ($(DEBUG),y)
 CFLAGS += -O0 -g -DDEBUG
 else
-CFLAGS += -O3 -g -mtune=native -march=native -D_FORTIFY_SOURCE=2
+CFLAGS += -O3 -g -D_FORTIFY_SOURCE=2
 endif
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")

@@ -25,6 +25,9 @@ on a selected core.
 Requirements and Installation
 =============================
 
+Note: The membw tool requires compiler support for AVX512 instructions.
+      For GCC, this is version 4.9 or above.
+
 For installation of the Intel(R) Membw tool follow below instructions:
 
 To compile:

@@ -80,6 +80,11 @@
 #define MAX_OPTARG_LEN  64
 
 #define MAX_MEM_BW      100 * 1000 /* 100GBps */
+
+#define CPU_FEATURE_SSE4_2  (1ULL << 0)
+#define CPU_FEATURE_CLWB    (1ULL << 1)
+#define CPU_FEATURE_AVX512F (1ULL << 2)
+
 /**
  * DATA STRUCTURES
  */
@@ -110,6 +115,17 @@ enum cl_type {
         CL_TYPE_WRITE_NTDQ
 };
 
+/* structure to store cpuid values */
+struct cpuid_out {
+        uint32_t eax;
+        uint32_t ebx;
+        uint32_t ecx;
+        uint32_t edx;
+};
+
+static struct cpuid_out cpuid_1_0; /* leaf 1, sub-leaf 0 */
+static struct cpuid_out cpuid_7_0; /* leaf 7, sub-leaf 0 */
+
 /**
  * COMMON DATA
  */
@@ -121,6 +137,112 @@ static unsigned memchunk_offset = 0;
 /**
  * UTILS
  */
+
+/*
+ * A C wrapper for CPUID opcode
+ *
+ * Parameters:
+ *    [in] leaf    - CPUID leaf number (EAX)
+ *    [in] subleaf - CPUID sub-leaf number (ECX)
+ *    [out] out    - registers structure to store results of CPUID into
+ */
+static void
+lcpuid(const unsigned leaf,
+       const unsigned subleaf,
+       struct cpuid_out *out)
+{
+        if (out == NULL)
+                return;
+
+#ifdef __x86_64__
+        asm volatile("mov %4, %%eax\n\t"
+                     "mov %5, %%ecx\n\t"
+                     "cpuid\n\t"
+                     "mov %%eax, %0\n\t"
+                     "mov %%ebx, %1\n\t"
+                     "mov %%ecx, %2\n\t"
+                     "mov %%edx, %3\n\t"
+                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
+                       "=g" (out->edx)
+                     : "g" (leaf), "g" (subleaf)
+                     : "%eax", "%ebx", "%ecx", "%edx");
+#else
+        asm volatile("push %%ebx\n\t"
+                     "mov %4, %%eax\n\t"
+                     "mov %5, %%ecx\n\t"
+                     "cpuid\n\t"
+                     "mov %%eax, %0\n\t"
+                     "mov %%ebx, %1\n\t"
+                     "mov %%ecx, %2\n\t"
+                     "mov %%edx, %3\n\t"
+                     "pop %%ebx\n\t"
+                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
+                       "=g" (out->edx)
+                     : "g" (leaf), "g" (subleaf)
+                     : "%eax", "%ecx", "%edx");
+#endif
+}
+
+static uint32_t detect_sse42(void)
+{
+        /* Check presence of SSE4.2 - bit 20 of ECX */
+        return (cpuid_1_0.ecx & (1 << 20));
+}
+
+static uint32_t detect_clwb(void)
+{
+        /* Check presence of CLWB - bit 24 of EBX */
+        return (cpuid_7_0.ebx & (1 << 24));
+}
+
+static uint32_t detect_avx512f(void)
+{
+        /* Check presence of AVX512F - bit 16 of EBX */
+        return (cpuid_7_0.ebx & (1 << 16));
+}
+
+/**
+ * @brief Function to detect CPU features
+ *
+ * @return Bitmap of supported features
+ */
+static uint64_t cpu_feature_detect(void)
+{
+        static const struct {
+                unsigned req_leaf_number;
+                uint64_t feat;
+                uint32_t (*detect_fn)(void);
+        } feat_tab[] = {
+                { 1, CPU_FEATURE_SSE4_2, detect_sse42 },
+                { 7, CPU_FEATURE_CLWB, detect_clwb },
+                { 7, CPU_FEATURE_AVX512F, detect_avx512f },
+        };
+        struct cpuid_out r;
+        unsigned hi_leaf_number = 0;
+        uint64_t features = 0;
+        unsigned i;
+
+        /* Get highest supported CPUID leaf number */
+        lcpuid(0x0, 0x0, &r);
+        hi_leaf_number = r.eax;
+
+        /* Get the most common CPUID leafs to speed up the detection */
+        if (hi_leaf_number >= 1)
+                lcpuid(0x1, 0x0, &cpuid_1_0);
+
+        if (hi_leaf_number >= 7)
+                lcpuid(0x7, 0x0, &cpuid_7_0);
+
+        for (i = 0; i < (sizeof(feat_tab)/sizeof(feat_tab[0])); i++) {
+                if (hi_leaf_number < feat_tab[i].req_leaf_number)
+                        continue;
+
+                if (feat_tab[i].detect_fn() != 0)
+                        features |= feat_tab[i].feat;
+        }
+
+        return features;
+}
 
 /**
  * @brief Function to bind thread to a cpu
@@ -186,17 +308,10 @@ sb(void)
 ALWAYS_INLINE void
 cl_wb(void *p)
 {
-#ifdef bit_CLWB
         asm volatile("clwb (%0)\n\t"
                      :
                      : "r"(p)
                      : "memory");
-#else
-        UNUSED_PARAM(p);
-
-        printf("clwb instruction is not suported\n");
-        exit(EXIT_FAILURE);
-#endif
 }
 
 /**
@@ -356,19 +471,11 @@ cl_read_mod_write(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write_avx512(void *p, const uint64_t v)
 {
-#if defined(__x86_64__) && defined(bit_AVX512F)
         asm volatile("vmovq   %0, %%xmm1\n\t"
                      "vmovdqa64 %%zmm1, (%1)\n\t"
                      :
                      : "r"(v), "r"(p)
                      : "%zmm1", "memory");
-#else
-        UNUSED_PARAM(p);
-        UNUSED_PARAM(v);
-
-        printf("Instruction is not suported\n");
-        exit(EXIT_FAILURE);
-#endif
 }
 
 /**
@@ -380,7 +487,6 @@ cl_write_avx512(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write_dqa(void *p, const uint64_t v)
 {
-#ifdef __x86_64__
         asm volatile("movq   %0, %%xmm1\n\t"
                      "movdqa %%xmm1, (%1)\n\t"
                      "movdqa %%xmm1, 16(%1)\n\t"
@@ -389,13 +495,6 @@ cl_write_dqa(void *p, const uint64_t v)
                      :
                      : "r"(v), "r"(p)
                      : "%xmm1", "memory");
-#else
-        UNUSED_PARAM(p);
-        UNUSED_PARAM(v);
-
-        printf("Instruction is not suported\n");
-        exit(EXIT_FAILURE);
-#endif
 }
 
 /**
@@ -537,19 +636,11 @@ cl_write_nti(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write_nt512(void *p, const uint64_t v)
 {
-#if defined(__x86_64__) && defined(bit_AVX512F)
        asm volatile("vmovq   %0, %%xmm1\n\t"
                      "vmovntpd %%zmm1, (%1)\n\t"
                      :
                      : "r"(v), "r"(p)
                      : "%zmm1", "memory");
-#else
-       UNUSED_PARAM(p);
-       UNUSED_PARAM(v);
-
-       printf("Instruction is not suported\n");
-       exit(EXIT_FAILURE);
-#endif
 }
 
 /**
@@ -575,7 +666,6 @@ cl_write_nti_clwb(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write_ntdq(void *p, const uint64_t v)
 {
-#ifdef __x86_64__
         asm volatile("movq   %0, %%xmm1\n\t"
                      "movntdq %%xmm1, (%1)\n\t"
                      "movntdq %%xmm1, 16(%1)\n\t"
@@ -584,13 +674,6 @@ cl_write_ntdq(void *p, const uint64_t v)
                      :
                      : "r"(v), "r"(p)
                      : "%xmm1", "memory");
-#else
-        UNUSED_PARAM(p);
-        UNUSED_PARAM(v);
-
-        printf("Instruction is not suported\n");
-        exit(EXIT_FAILURE);
-#endif
 }
 
 /**
@@ -888,6 +971,7 @@ int main(int argc, char **argv)
         unsigned cpu = UINT_MAX;
         int option_index;
         int ret;
+        uint64_t features;
 
         struct option options[] = {
             {"bandwidth",       required_argument, 0, 'b'},
@@ -966,6 +1050,36 @@ int main(int argc, char **argv)
                         || optind < argc) {
                 usage(argv);
                 return EXIT_FAILURE;
+        }
+
+        features = cpu_feature_detect();
+
+        switch (type) {
+        case CL_TYPE_READ_WB_DQA:
+        case CL_TYPE_WRITE_DQA:
+        case CL_TYPE_WRITE_DQA_FLUSH:
+        case CL_TYPE_WRITE_NTDQ:
+                if (!(features & CPU_FEATURE_SSE4_2)) {
+                        printf("No CPU support for SSE4.2 instructions!\n");
+                        return EXIT_FAILURE;
+                }
+                break;
+        case CL_TYPE_WRITE_NTI_CLWB:
+        case CL_TYPE_WRITE_WB_CLWB:
+                if (!(features & CPU_FEATURE_CLWB)) {
+                        printf("No CPU support for CLWB instruction!\n");
+                        return EXIT_FAILURE;
+                }
+                break;
+        case CL_TYPE_WRITE_NT512:
+        case CL_TYPE_WRITE_WB_AVX512:
+                if (!(features & CPU_FEATURE_AVX512F)) {
+                        printf("No CPU support for AVX512 instructions!\n");
+                        return EXIT_FAILURE;
+                }
+                break;
+        default:
+                break;
         }
 
         printf("- THREAD logical core id: %u, "
