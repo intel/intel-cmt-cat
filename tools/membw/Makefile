@@ -37,22 +37,38 @@
 
 APP = membw
 
-CFLAGS=-Wall -Winline -msse4.2
+CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
+	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
+	-Wcast-qual -Wundef -Wwrite-strings \
+	-Wformat -Wformat-security -fstack-protector -fPIE \
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
+	-Winline -msse4.2
 
 ifeq ($(DEBUG),y)
 CFLAGS += -O0 -g -DDEBUG
 else
-CFLAGS += -O3 -g -mtune=native -march=native
+CFLAGS += -O3 -g -mtune=native -march=native -D_FORTIFY_SOURCE=2
 endif
+
+SRCS = $(sort $(wildcard *.c))
+OBJS = $(SRCS:.c=.o)
+DEPFILES = $(SRCS:.c=.d)
 
 all: $(APP)
 
-$(APP): $(APP).c
+$(APP): $(OBJS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+
+%.o: %.c %.d
+
+%.d: %.c
+	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
+	cat $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
 .PHONY: clean
 
 clean:
-	-rm -f ./*.o ./$(APP)
+	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: style
@@ -66,5 +82,12 @@ style:
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
-	$(CPPCHECK) enable=warning,portability,performance,missingInclude \
+	$(CPPCHECK) enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 --template=gcc membw.c
+
+
+# if target not clean then make dependencies
+ifneq ($(MAKECMDGOALS),clean)
+-include $(DEPFILES)
+endif
+

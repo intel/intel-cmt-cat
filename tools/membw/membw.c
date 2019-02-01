@@ -59,6 +59,8 @@
  * MACROS
  */
 
+#define UNUSED_PARAM(x) (void)(x)
+
 #ifdef __linux__
 #define PAGE_SIZE       (4 * 1024)
 #endif
@@ -190,6 +192,8 @@ cl_wb(void *p)
                      : "r"(p)
                      : "memory");
 #else
+        UNUSED_PARAM(p);
+
         printf("clwb instruction is not suported\n");
         exit(EXIT_FAILURE);
 #endif
@@ -220,7 +224,7 @@ mem_flush(void *p, size_t s)
  *
  * @retval p allocated memory
  */
-void *malloc_and_init_memory(size_t s)
+static void *malloc_and_init_memory(size_t s)
 {
         void *p = NULL;
         int ret;
@@ -359,6 +363,9 @@ cl_write_avx512(void *p, const uint64_t v)
                      : "r"(v), "r"(p)
                      : "%zmm1", "memory");
 #else
+        UNUSED_PARAM(p);
+        UNUSED_PARAM(v);
+
         printf("Instruction is not suported\n");
         exit(EXIT_FAILURE);
 #endif
@@ -534,8 +541,11 @@ cl_write_nt512(void *p, const uint64_t v)
                      : "r"(v), "r"(p)
                      : "%zmm1", "memory");
 #else
-        printf("Instruction is not suported\n");
-        exit(EXIT_FAILURE);
+       UNUSED_PARAM(p);
+       UNUSED_PARAM(v);
+
+       printf("Instruction is not suported\n");
+       exit(EXIT_FAILURE);
 #endif
 }
 
