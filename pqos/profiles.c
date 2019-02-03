@@ -169,7 +169,7 @@ static const char * const classes_way20_overlapY_equalN[] = {
 };
 
 /**
- * meat and potatos now :)
+ * meat and potatoes now :)
  */
 struct llc_allocation_config {
         unsigned num_ways;

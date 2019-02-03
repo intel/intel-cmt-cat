@@ -373,7 +373,7 @@ strtogrps(char *s,
                  * Ungrouped cores/pids
                  */
                 if (*non_grp != '\0') {
-                        /* for seperate cores/pids - each will get his own
+                        /* for separate cores/pids - each will get his own
                          * group so strlisttotab result is treated as the
                          * number of new groups
                          */
@@ -1284,7 +1284,7 @@ unsigned_cmp(const void *a, const void *b)
 }
 
 /**
- * @brief Function to return a comma seperated list of all cores that PIDs
+ * @brief Function to return a comma separated list of all cores that PIDs
  *        in \a mon_data last ran on.
  *
  * @param mon_data struct with info on the group of pids to be monitored

@@ -154,7 +154,7 @@ print_allocation_config(void)
  * @return Number of associations made
  * @retval 0 no association made (nor requested)
  * @retval negative error
- * @retval positive sucess
+ * @retval positive success
  */
 static int
 set_allocation_assoc(void)

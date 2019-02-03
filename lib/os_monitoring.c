@@ -471,7 +471,7 @@ os_mon_start(const unsigned num_cores,
  * @brief Check if \a tid is in \a tid_map
  *
  * @param[in] tid TID number to search for
- * @param[in] tid_nr lenght of \a tid_map
+ * @param[in] tid_nr length of \a tid_map
  * @param[in] tid_map list of TIDs
  *
  * @retval 1 if found
@@ -495,7 +495,7 @@ tid_exists(const pid_t tid, const unsigned tid_nr, const pid_t *tid_map)
  * @brief Add TID to \a tid_map
  *
  * @param[in] tid TID number to add
- * @param[in] tid_nr lenght of \a tid_map
+ * @param[in] tid_nr length of \a tid_map
  * @param[in] tid_map list of TIDs
  *
  * @return Operational status

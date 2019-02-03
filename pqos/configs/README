@@ -45,7 +45,7 @@ Example:
 
 Description:    Selects log file
 Syntax:         log-file: <log file>
-Exmaple:
+Example:
                 log-file: /tmp/example.log
 
 
