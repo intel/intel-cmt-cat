@@ -26,7 +26,7 @@ CMT_MBM sample application build will create one target as follows:
 to monitoring events like cache occupancy, local memory bandwidth usage and
 remote memory bandwidth usage. It operates in user space and uses PQoS/Intel(R)
 RDT and C libraries only.
-Note: Monitor events are hardware dependant. Only supported event will be shown.
+Note: Monitor events are hardware dependent. Only supported event will be shown.
 
 
 COMPILATION

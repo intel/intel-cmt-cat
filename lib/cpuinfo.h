@@ -49,7 +49,7 @@ extern "C" {
 /**
  * @brief Initializes CPU information module
  *
- * CPU topology detection method is OS dependant.
+ * CPU topology detection method is OS dependent.
  *
  * @param [out] topology place to store pointer to CPU topology data
  *
