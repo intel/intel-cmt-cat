@@ -390,6 +390,9 @@ cl_write_dqa(void *p, const uint64_t v)
                      : "r"(v), "r"(p)
                      : "%xmm1", "memory");
 #else
+        UNUSED_PARAM(p);
+        UNUSED_PARAM(v);
+
         printf("Instruction is not suported\n");
         exit(EXIT_FAILURE);
 #endif
@@ -582,6 +585,9 @@ cl_write_ntdq(void *p, const uint64_t v)
                      : "r"(v), "r"(p)
                      : "%xmm1", "memory");
 #else
+        UNUSED_PARAM(p);
+        UNUSED_PARAM(v);
+
         printf("Instruction is not suported\n");
         exit(EXIT_FAILURE);
 #endif
