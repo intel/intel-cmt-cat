@@ -1285,10 +1285,10 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 	const struct pqos_coreinfo *ci = NULL;
 	int ret;
 
-	if (NULL == l2ca || NULL == l3ca)
+	if (NULL == l2ca || NULL == l3ca || NULL == mba)
 		return -EINVAL;
 
-	if (NULL == m_cap_l2ca && NULL == m_cap_l3ca)
+	if (NULL == m_cap_l2ca && NULL == m_cap_l3ca && NULL == m_cap_mba)
 		return -EFAULT;
 
 
