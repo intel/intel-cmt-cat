@@ -1008,12 +1008,12 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
  * @brief Retrieves and prints core association
  *
  * @param [in] is_alloc indicates if any allocation technology is present
- * @param [in] is_l3cat indicates if L3 CAT is present
+ * @param [in] is_l3 indicates if L3 cache is present
  * @param [in] is_mon indicates if monitoring technology is present
  * @param [in] ci core info structure with all topology details
  */
 static void
-print_core_assoc(const int is_alloc, const int is_l3cat, const int is_mon,
+print_core_assoc(const int is_alloc, const int is_l3, const int is_mon,
                  const struct pqos_coreinfo *ci)
 {
         unsigned class_id = 0;
@@ -1031,7 +1031,7 @@ print_core_assoc(const int is_alloc, const int is_l3cat, const int is_mon,
                 return;
         }
 
-        if (is_l3cat || is_mon)
+        if (is_l3)
                 printf("    Core %u, L2ID %u, L3ID %u => ",
                        ci->lcore, ci->l2_id, ci->l3_id);
         else
@@ -1113,8 +1113,9 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         }
 
                         print_core_assoc((cap_l3ca != NULL) ||
-                                         (cap_l2ca != NULL) /* is_alloc */,
-                                         (cap_l3ca != NULL) /* is_l3cat */,
+                                         (cap_l2ca != NULL) ||
+                                         (cap_mba != NULL) /* is_alloc */,
+                                         cpu_info->l3.detected /* is_l3 */,
                                          (cap_mon != NULL) /* is_mon */,
                                          core_info);
                 }
