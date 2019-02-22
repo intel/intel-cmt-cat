@@ -1505,14 +1505,14 @@ os_mba_set(const unsigned socket,
 	for (i = 0; i < num_cos; i++) {
 		struct resctrl_alloc_schemata schmt;
 
-		if (!mba_cap->u.mba->ctrl_on && requested[i].ctrl) {
+		if (mba_cap->u.mba->ctrl_on == 0 && requested[i].ctrl) {
 			LOG_ERROR("MBA controller requested but"
 			          " not enabled!\n");
 			ret = PQOS_RETVAL_PARAM;
 			goto os_mba_set_unlock;
 		}
 
-		if (mba_cap->u.mba->ctrl_on && !requested[i].ctrl) {
+		if (mba_cap->u.mba->ctrl_on == 1 && !requested[i].ctrl) {
 			LOG_ERROR("Expected MBA controller but"
 			          " not requested!\n");
 			ret = PQOS_RETVAL_PARAM;
