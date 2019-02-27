@@ -252,8 +252,18 @@ os_cap_init(const enum pqos_interface inter)
                 ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
                                     PQOS_MBA_CTRL);
                 if (ret == PQOS_RETVAL_OK) {
+                        FILE *fd;
+
+                        /* Verify possibility of setting mba value above 100 */
+                        fd = resctrl_alloc_fopen(0, "schemata", "w");
+                        if (fd != NULL) {
+                                fprintf(fd, "MB:0=200\n");
+                                if (fclose(fd) == 0)
+                                        mba_ctrl = 1;
+                                else
+                                        mba_ctrl = 0;
+                        }
                         resctrl_umount();
-                        mba_ctrl = 1;
                 } else
                         mba_ctrl = 0;
 
@@ -721,9 +731,10 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        if (mba_ctrl == 0) {
+        /* resctrl is mounted with default options */
+        if (mba_ctrl != -1) {
                 *enabled = 0;
-                *supported = 0;
+                *supported = mba_ctrl;
                 return PQOS_RETVAL_OK;
         }
 
@@ -792,7 +803,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 if (ret == PQOS_RETVAL_OK) {
                         fd = resctrl_alloc_fopen(grp, "schemata", "w");
                         if (fd != NULL) {
-                                fprintf(fd, "MB:0=%u", (uint32_t)UINT32_MAX);
+                                fprintf(fd, "MB:0=%u\n", (uint32_t)UINT32_MAX);
                                 if (fclose(fd) == 0)
                                         *enabled = 1;
                                 else
@@ -816,8 +827,6 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
 
         if (*enabled == 1)
                 *supported = 1;
-        else if (mba_ctrl != -1)
-                *supported = mba_ctrl;
         /* Check if it is possible to mount resctrl with mba_MBps enabled */
         else if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
                 ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
