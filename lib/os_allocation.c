@@ -532,8 +532,9 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 	if (l2_cap != NULL)
 		default_l2ca = ((uint64_t)1 << l2_cap->num_ways) - 1;
 
-        if (mba_cap != NULL && mba_cap->ctrl_on)
-                default_mba = UINT32_MAX;
+	if (mba_cap != NULL && mba_cap->ctrl_on)
+		/* kernel always rounds up value to MBA granularity */
+		default_mba = UINT32_MAX - UINT32_MAX % mba_cap->throttle_step;
 
 	/**
 	 * Reset schematas
