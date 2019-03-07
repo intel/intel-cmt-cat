@@ -57,7 +57,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION       30000        /**< version 3.0.0 */
+#define PQOS_VERSION       30001        /**< version 3.0.1 */
 #define PQOS_MAX_L3CA_COS  16           /**< 16 x COS */
 #define PQOS_MAX_L2CA_COS  16           /**< 16 x COS */
 
