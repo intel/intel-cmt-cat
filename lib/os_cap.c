@@ -329,14 +329,15 @@ detect_mon_resctrl_support(const enum pqos_mon_event event,
         ret = detect_os_support(RESCTRL_PATH_INFO_L3_MON"/mon_features",
                                  event_name, supported);
 
-        *scale = 1;
+        if (scale != NULL)
+                *scale = 1;
 
         return ret;
 }
 
 
 /**
- * @brief Reads scale factor of perf monitioring event
+ * @brief Reads scale factor of perf monitoring event
  *
  * @param [in] event_name perf monitoring event name
  * @param [out] scale scale factor
@@ -489,8 +490,8 @@ detect_mon_perf_support(const enum pqos_mon_event event,
  */
 static int
 detect_mon_support(const enum pqos_mon_event event,
-                        int *supported,
-                        uint32_t *scale)
+                   int *supported,
+                   uint32_t *scale)
 {
         int ret;
 
@@ -827,25 +828,23 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
 
         if (*enabled == 1)
                 *supported = 1;
-        /* Check if it is possible to mount resctrl with mba_MBps enabled */
-        else if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
-                ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
-                                    PQOS_MBA_CTRL);
-                if (ret == PQOS_RETVAL_OK)
-                        *supported = 1;
-                else {
-                        ret = resctrl_mount(PQOS_REQUIRE_CDP_OFF,
-                                            PQOS_REQUIRE_CDP_OFF,
-                                            PQOS_MBA_DEFAULT);
-                        if (ret == PQOS_RETVAL_OK)
-                                *supported = 0;
-                }
 
-                if (ret == PQOS_RETVAL_OK)
-                        resctrl_umount();
+        /* Check if MBL monitoring is supported */
+        else {
+                int mbl = 0;
+
+                ret = detect_mon_resctrl_support(PQOS_MON_EVENT_LMEM_BW, &mbl,
+                                                 NULL);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                if (!mbl)
+                        *supported = 0;
         }
 
  ctrl_exit:
+        if (*supported == 0)
+                *enabled = 0;
+
         if (*supported == 1)
                 LOG_INFO("OS support for MBA CTRL detected\n");
         else if (*supported == 0)
