@@ -46,17 +46,6 @@ PRODUCTION = "prod"
 PRE_PRODUCTION = "preprod"
 BEST_EFFORT = "besteff"
 
-TYPE_STATIC = "static"
-TYPE_DYNAMIC = "dynamic"
-
-# sampling interval, 1sec
-SAMPLING_INTERVAL = 1
-
-# deadline for data acquisition, 50% of sampling interval, 0.5sec
-ACQUISITION_MAX_TIME = SAMPLING_INTERVAL * 0.5
-
-PID_FLUSH_PROCFS_FILENAME = "/proc/intel_pid_cache_flush"
-
 CAT_CAP = "cat"
 MBA_CAP = "mba"
 

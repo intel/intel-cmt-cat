@@ -37,7 +37,6 @@ Stats processing helper functions and storage for stats
 """
 
 import common
-import perf
 
 
 class StatsStore(object):
@@ -51,80 +50,14 @@ class StatsStore(object):
         Helper class
         """
         #pylint: disable=too-few-public-methods
-        NUM_FLUSHES = 'num_flushes'
         NUM_APPS_MOVES = 'num_apps_moves'
         NUM_ERR = 'num_err'
 
 
     def __init__(self):
-        self.nspc = common.MANAGER.Namespace()
-        self.nspc.app_stats = {}
-        self.nspc.pool_stats = {}
-        self.nspc.pool_cat = {}
-
         self.general_stats = common.MANAGER.dict()
-        for cntr in [self.General.NUM_FLUSHES, self.General.NUM_APPS_MOVES, self.General.NUM_ERR]:
+        for cntr in [self.General.NUM_APPS_MOVES, self.General.NUM_ERR]:
             self.general_stats[cntr] = 0
-
-
-    def set_app_stats(self, data):
-        """
-        Setter for Apps' stat
-
-        Paramaters:
-            data: value to set handled stat to
-        """
-        self.nspc.app_stats = data
-
-
-    def get_app_stats(self):
-        """
-        Getter for Apps' stat
-
-        Returns:
-            Stat value
-        """
-        return self.nspc.app_stats
-
-
-    def set_pool_stats(self, data):
-        """
-        Setter for Pools' stat
-
-        Paramaters:
-            data: value to set handled stat to
-        """
-        self.nspc.pool_stats = data
-
-
-    def get_pool_stats(self):
-        """
-        Getter for Pools' stat
-
-        Returns:
-            Stat value
-        """
-        return self.nspc.pool_stats
-
-
-    def set_pool_cat(self, data):
-        """
-        Setter for Pools' CAT stat
-
-        Paramaters:
-            data: value to set handled stat to
-        """
-        self.nspc.pool_cat = data
-
-
-    def get_pool_cat(self):
-        """
-        Getter for Pools' CAT stats
-
-        Returns:
-            Stat value
-        """
-        return self.nspc.pool_cat
 
 
     def general_stats_inc(self, gen_stats_id):
@@ -156,13 +89,6 @@ class StatsStore(object):
         return self.general_stats[get_stats_id]
 
 
-    def general_stats_inc_num_flushes(self):
-        """
-        Increases num flushes stat value by 1
-        """
-        self.general_stats_inc(StatsStore.General.NUM_FLUSHES)
-
-
     def general_stats_inc_apps_moves(self):
         """
         Increases apps moves stat value by 1
@@ -175,147 +101,3 @@ class StatsStore(object):
         Increases num errors stat value by 1
         """
         self.general_stats_inc(StatsStore.General.NUM_ERR)
-
-
-def calculate(item):
-    """
-    Process single item/stat
-
-    Parameters:
-        item: stats to be processed
-    """
-    # if needed, scale values
-    _scale_values(item)
-
-
-def _scale_values(item):
-    """
-    Scale values in item/stat if needed
-
-    Paramaters:
-        item: stats to be processed
-    """
-    supported_events = perf.get_supported_events()
-
-    for event in item.keys():
-        for event_list in supported_events:
-            if event in event_list:
-                item[event]['value'] = item[event]['raw']
-
-                if 'scale' in event_list[event]:
-                    item[event]['value'] *= event_list[event]['scale']
-
-
-def aggregate(grouped_items):
-    """
-    Aggregate values in item/stat
-
-    Paramaters:
-        grouped_items: grouped stats to be processed
-
-    Returns:
-        item with aggregated values
-    """
-    result = {}
-
-    # iterate through all items
-    for group in grouped_items.keys():
-        # Create aggregated item with UID
-        result[group] = agg_item = {}
-        agg_item['uid'] = group
-
-        # iterate through all the item of selected type
-        for item in grouped_items[group]:
-
-            # iterate through all stats in item
-            # and process them, sum or create a list
-            for stat in item.keys():
-
-                # if it is dict, look for 'raw' key
-                if isinstance(item[stat], dict):
-                    if 'raw' not in item[stat]:
-                        continue
-
-                    if not stat in agg_item:
-                        agg_item[stat] = {}
-
-                    if 'raw' not in agg_item[stat]:
-                        agg_item[stat]['raw'] = item[stat]['raw']
-                    else:
-                        agg_item[stat]['raw'] += item[stat]['raw']
-                else:
-                    # skip those stats
-                    if stat in ['time_stamp']:
-                        continue
-
-                    # if it is not a dict, creat a list of those stats
-                    # e.g.: timestamps, pids, etc.
-                    stat_list = '{}_list'.format(stat)
-                    if stat_list not in agg_item:
-                        agg_item[stat_list] = []
-
-                    agg_item[stat_list].append(item[stat])
-
-        if 'pid_list' in agg_item:
-            agg_item['pids_no'] = len(agg_item['pid_list'])
-
-    return result
-
-
-def calculate_llc_stats(stats):
-    """
-    Calculate LLC stats
-
-    Paramaters:
-        stats: LLC stats
-
-    Returns:
-        result(dict), calculated LLC stats
-    """
-    result = {}
-
-    for key in stats:
-        if "llc_occupancy" in stats[key]:
-            result[key] = {}
-            result[key]['llc_occup'] = round(stats[key]['llc_occupancy']['value'] / 1024, 0)
-
-        if "cat_cws" in stats[key] and "cat_cw_size" in stats[key]:
-            if key not in result:
-                result[key] = {}
-
-            result[key]['llc_alloc'] = stats[key]['cat_cws'] * stats[key]['cat_cw_size']
-
-    return result
-
-
-def group_stats_per_pool(item, recv_stats_pool):
-    """
-    Group perf stats by pool
-
-    Parameters:
-        item: input stats
-        recv_stats_pool(dict): destination
-    """
-    pool_id, _ = common.CONFIG_STORE.pid_to_pool(item['pid'])
-
-    if pool_id not in recv_stats_pool:
-        recv_stats_pool[pool_id] = []
-
-    recv_stats_pool[pool_id].append(item)
-
-
-def group_stats_per_app(item, recv_stats_apps):
-    """
-    Group perf stats by APP
-
-    Parameters:
-        item: input stats
-        recv_stats_apps(dict): destination
-    """
-    app_id = common.CONFIG_STORE.pid_to_app(item['pid'])
-
-    if app_id:
-        if app_id not in recv_stats_apps:
-            recv_stats_apps[app_id] = []
-
-        recv_stats_apps[app_id].append(item)

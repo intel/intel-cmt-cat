@@ -1,7 +1,7 @@
 ################################################################################
 # BSD LICENSE
 #
-# Copyright(c) 2018 Intel Corporation. All rights reserved.
+# Copyright(c) 2019 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -36,16 +36,8 @@ from config import *
 
 def create_sample_config():
 
-    groups = []
     apps = []
     pools = []
-
-    # Creating Dynamic Pool
-    # NN_VM
-    nn_vm = {}
-    nn_vm['id'] = 1
-    nn_vm['name'] = "Noisy Neighbor VM"
-    nn_vm['cores'] = [1, 6]
 
     # IPSEC VM
     ipsec_vm = {}
@@ -68,18 +60,9 @@ def create_sample_config():
     os_vm['pids'] = [1896,1897]
     os_vm['cores'] = [1,6]
 
-    apps.append(nn_vm)
     apps.append(ipsec_vm)
     apps.append(ndpi_vm)
     apps.append(os_vm)
-
-    # NFVI pool
-    nfvi_pool = {}
-    nfvi_pool['id'] = 1
-    nfvi_pool['min_cws'] = 2
-    nfvi_pool['name'] = 'NFVI'
-    nfvi_pool['priority'] = "prod"
-    nfvi_pool['apps'] = [1]
 
     # Production pool
     p_pool = {}
@@ -105,32 +88,13 @@ def create_sample_config():
     be_pool['priority'] = 'besteff'
     be_pool['apps'] = [2]
 
-    pools.append(nfvi_pool)
     pools.append(p_pool)
     pools.append(pp_pool)
     pools.append(be_pool)
 
-    # group for dynamic change of llc
-    dynamic_llc_group = {}
-    dynamic_llc_group['type'] = 'dynamic'
-    dynamic_llc_group['pools'] = [2,3,4]
-    dynamic_llc_group['cbm'] = "0x3ff"
-    dynamic_llc_group['id'] = 1
-
-    # group for static llc
-    static_llc_group = {}
-    static_llc_group['type'] = 'static'
-    static_llc_group['pools'] = [1]
-    static_llc_group['cbm'] = "0xc00"
-    static_llc_group['id'] = 2
-
-    groups.append(dynamic_llc_group)
-    groups.append(static_llc_group)
-
     config_store = ConfigStore()
     cs_cfg = config_store.get_config()
 
-    cs_cfg['groups'] = groups
     cs_cfg['pools'] = pools
     cs_cfg['apps'] = apps
 

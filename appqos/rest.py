@@ -115,8 +115,6 @@ class Server(object):
 
         self.api.add_resource(Apps, '/apps')
         self.api.add_resource(App, '/apps/<app_id>')
-        self.api.add_resource(Groups, '/groups')
-        self.api.add_resource(Group, '/groups/<group_id>')
         self.api.add_resource(Pools, '/pools')
         self.api.add_resource(Pool, '/pools/<pool_id>')
         self.api.add_resource(Stats, '/stats')
@@ -227,13 +225,6 @@ class App(Resource):
             if not app['id'] == int(app_id):
                 continue
 
-            stats = common.STATS_STORE.get_app_stats()
-            if 'pids' in app:
-                if app['id'] in stats:
-                    app['llc_occup'] = stats[app['id']]['llc_occup']
-                else:
-                    app['llc_occup'] = 0
-
             return app, 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
@@ -270,12 +261,8 @@ class App(Resource):
 
                 # remove app
                 data['apps'].remove(data['apps'][i])
-                try:
-                    common.CONFIG_STORE.to_file(data)
-                    return "APP " + str(app_id) + " deleted", 200
-                except:
-                    raise InternalError("APP " + str(app_id) + " has not been deleted, " + \
-                                        "error writing config to file")
+                common.CONFIG_STORE.set_config(data)
+                return "APP " + str(app_id) + " deleted", 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
 
@@ -327,13 +314,9 @@ class App(Resource):
                             data['pools'][j]['apps'] = [data['apps'][i]['id']]
                             break
 
-                try:
-                    common.CONFIG_STORE.to_file(data)
-                    common.STATS_STORE.general_stats_inc_apps_moves()
-                    return "APP " + str(app_id) + " moved to new pool", 200
-                except Exception:
-                    raise InternalError("APP " + str(app_id) + " has not been moved to new " + \
-                                        "pool, error writing config to file")
+                common.CONFIG_STORE.set_config(data)
+                common.STATS_STORE.general_stats_inc_apps_moves()
+                return "APP " + str(app_id) + " moved to new pool", 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
 
@@ -358,15 +341,6 @@ class Apps(Resource):
         data = common.CONFIG_STORE.get_config()
         if 'apps' not in data:
             raise NotFound("No apps in config file")
-
-        # Add stats to apps
-        stats = common.STATS_STORE.get_app_stats()
-        for app in data['apps']:
-            if 'pids' in app:
-                if app['id'] in stats:
-                    app['llc_occup'] = stats[app['id']]['llc_occup']
-                else:
-                    app['llc_occup'] = 0
 
         return (data['apps']), 200
 
@@ -449,70 +423,8 @@ class Apps(Resource):
         if not app_added:
             raise NotFound("New APP not added, pool " + json_data['pool_id'] + " doesn't exist")
 
-        try:
-            common.CONFIG_STORE.to_file(data)
-        except IOError:
-            raise InternalError("New APP has not been added, error writing config to file")
-
         res = {'id': json_data['id']}
         return res, 201
-
-
-class Group(Resource):
-    """
-    Handles /groups/<group_id> HTTP requests
-    """
-
-
-    @staticmethod
-    @Server.auth.login_required
-    def get(group_id):
-        """
-        Handles HTTP GET /groups/<group_id> request.
-        Retrieve single group
-        Raises NotFound
-
-        Parameters:
-            group_id: Id of group to retrieve
-
-        Returns:
-            response, status code
-        """
-        data = common.CONFIG_STORE.get_config()
-        if 'groups' not in data:
-            raise NotFound("No groups in config file")
-
-        for group in data['groups']:
-            if not group['id'] == int(group_id):
-                continue
-            return group, 200
-
-        raise NotFound("Group " + str(group_id) + " not found in config")
-
-
-class Groups(Resource):
-    """
-    Handles /groups HTTP requests
-    """
-
-
-    @staticmethod
-    @Server.auth.login_required
-    def get():
-        """
-        Handles HTTP GET /groups request.
-        Retrieve all groups
-        Raises NotFound
-
-        Returns:
-            response, status code
-        """
-
-        data = common.CONFIG_STORE.get_config()
-        if 'groups' not in data:
-            raise NotFound("No groups in config file")
-
-        return data['groups'], 200
 
 
 class Pool(Resource):
@@ -544,14 +456,6 @@ class Pool(Resource):
             if not pool['id'] == int(pool_id):
                 continue
 
-            # Add stats to pool
-            stats = common.STATS_STORE.get_pool_stats()
-            if pool['id'] in stats:
-                if 'llc_occup' in stats[pool['id']]:
-                    pool['llc_occup'] = stats[pool['id']]['llc_occup']
-                if 'llc_alloc' in stats[pool['id']]:
-                    pool['llc_alloc'] = stats[pool['id']]['llc_alloc']
-
             return pool, 200
 
         raise NotFound("Pool " + str(pool_id) + " not found in config")
@@ -578,15 +482,6 @@ class Pools(Resource):
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
-        # Add stats to pools
-        stats = common.STATS_STORE.get_pool_stats()
-        for pool in data['pools']:
-            if pool['id'] in stats:
-                if 'llc_occup' in stats[pool['id']]:
-                    pool['llc_occup'] = stats[pool['id']]['llc_occup']
-                if 'llc_alloc' in stats[pool['id']]:
-                    pool['llc_alloc'] = stats[pool['id']]['llc_alloc']
-
         return (data['pools']), 200
 
 
@@ -607,8 +502,6 @@ class Stats(Resource):
             response, status code
         """
         data = {}
-        data["num_flushes"] = \
-            common.STATS_STORE.general_stats_get(StatsStore.General.NUM_FLUSHES)
         data["num_apps_moves"] = \
             common.STATS_STORE.general_stats_get(StatsStore.General.NUM_APPS_MOVES)
         data["num_err"] = common.STATS_STORE.general_stats_get(StatsStore.General.NUM_ERR)

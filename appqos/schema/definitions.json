@@ -65,11 +65,7 @@
             "$ref": "#uint"
           }
         },
-        "required": ["id"],
-        "dependencies": {
-          "pids": ["llc_occup"],
-          "llc_occup": ["pids"]
-        }
+        "required": ["id"]
       }
     ]
   },
@@ -139,32 +135,5 @@
         }
       }
     ]
-  },
-
-  "group": {
-    "description": "Definition of Group of APPs' Pools",
-    "type": "object",
-    "properties": {
-      "id": {
-        "description": "Group ID",
-        "$ref": "#uint"
-      },
-      "type": {
-        "description": "Type of the group of Pools",
-        "type": "string",
-        "enum": ["static", "dynamic"]
-      },
-      "pools": {
-        "description": "Pools assigned to that Group",
-        "$ref": "#uint_uniq_array"
-      },
-      "cbm": {
-        "description": "Cache area/CWs used by that Group, in form of CBM, hex string",
-        "type": "string",
-        "pattern": "0[xX][0-9a-fA-F]+"
-      }
-    },
-    "required": ["id", "type", "pools", "cbm"],
-    "additionalProperties": false
   }
 }

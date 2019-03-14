@@ -1,7 +1,7 @@
 ################################################################################
 # BSD LICENSE
 #
-# Copyright(c) 2018 Intel Corporation. All rights reserved.
+# Copyright(c) 2019 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -40,36 +40,6 @@ from config import *
 from gen_config import create_sample_config
 
 
-def test_config_to_and_from_file():
-    # Test saving config to file and retrieving it from file
-
-    # Config_store to save to file
-    config_store_to_file = ConfigStore()
-    config_store_str = create_sample_config()  # from config_gen module
-    config_store_to_file.set_path("test_config.conf")
-
-    # Config_store to load config from file
-    config_store_from_file = ConfigStore()
-
-        # Full config schema is validated in to to_file and from_file functions
-    config_store_to_file.to_file(config_store_str)
-    config_store_from_file.from_file("test_config.conf")
-
-def test_config_to_file_empty():
-    # Test saving config to file and retrieving it from file
-
-    # Config_store to save to file
-    config_store_to_file = ConfigStore()
-    config_store_str = create_sample_config()  # from config_gen module
-    config_store_to_file.set_path("test_config.conf")
-
-    # Config_store to load config from file
-    config_store_from_file = ConfigStore()
-
-    with pytest.raises(jsonschema.ValidationError):
-        # Full config schema is validated in to to_file and from_file functions
-        config_store_to_file.to_file({}) # Fails because config cannot be empty
-
 def test_config_get_attr_list_unknown():
     # Test get_attr_list function with "unknown" attribute
     # Should return empty because attribute "unknown" doesnt exist in config
@@ -78,14 +48,14 @@ def test_config_get_attr_list_unknown():
     config_store = ConfigStore()
     config_store.set_config(create_sample_config())  # from config_gen module
 
-    #Test all options: Dynamic (prod, pre prod, best effort) and Static
-    p_unknown = config_store.get_attr_list('unknown',common.TYPE_DYNAMIC, common.PRODUCTION)
+    #Test all options: (prod, pre prod, best effort)
+    p_unknown = config_store.get_attr_list('unknown',common.PRODUCTION)
 
-    pp_unknown = config_store.get_attr_list('unknown',common.TYPE_DYNAMIC, common.PRE_PRODUCTION)
+    pp_unknown = config_store.get_attr_list('unknown',common.PRE_PRODUCTION)
 
-    be_unknown = config_store.get_attr_list('unknown',common.TYPE_DYNAMIC, common.BEST_EFFORT)
+    be_unknown = config_store.get_attr_list('unknown',common.BEST_EFFORT)
 
-    static_unknown = config_store.get_attr_list('unknown',common.TYPE_STATIC, None)
+    static_unknown = config_store.get_attr_list('unknown',None)
 
     assert p_unknown == []
 
@@ -104,21 +74,17 @@ def test_config_get_attr_list_cores():
     config_store.set_config(create_sample_config())  # from config_gen module
 
     #Test all options: Dynamic (prod, pre prod, best effort) and Static
-    p_cores = config_store.get_attr_list('cores',common.TYPE_DYNAMIC, common.PRODUCTION)
+    p_cores = config_store.get_attr_list('cores',common.PRODUCTION)
 
-    pp_cores = config_store.get_attr_list('cores',common.TYPE_DYNAMIC, common.PRE_PRODUCTION)
+    pp_cores = config_store.get_attr_list('cores',common.PRE_PRODUCTION)
 
-    be_cores = config_store.get_attr_list('cores',common.TYPE_DYNAMIC, common.BEST_EFFORT)
-
-    static_cores = config_store.get_attr_list('cores',common.TYPE_STATIC, None)
+    be_cores = config_store.get_attr_list('cores',common.BEST_EFFORT)
 
     assert p_cores == [4, 8]
 
     assert pp_cores == [1, 6]
 
     assert be_cores == [3, 7]
-
-    assert static_cores == [1, 6]
 
 def test_config_get_attr_list_pids():
     # Test get_attr_list function with "pids" attribute
@@ -128,13 +94,13 @@ def test_config_get_attr_list_pids():
     config_store.set_config(create_sample_config())  # from config_gen module
 
     #Test all options: Dynamic (prod, pre prod, best effort) and Static
-    p_pids = config_store.get_attr_list('pids', common.TYPE_DYNAMIC, common.PRODUCTION)
+    p_pids = config_store.get_attr_list('pids',common.PRODUCTION)
 
-    pp_pids = config_store.get_attr_list('pids', common.TYPE_DYNAMIC, common.PRE_PRODUCTION)
+    pp_pids = config_store.get_attr_list('pids',common.PRE_PRODUCTION)
 
-    be_pids = config_store.get_attr_list('pids',common.TYPE_DYNAMIC, common.BEST_EFFORT)
+    be_pids = config_store.get_attr_list('pids',common.BEST_EFFORT)
 
-    static_pids = config_store.get_attr_list('pids',common.TYPE_STATIC, None)
+    static_pids = config_store.get_attr_list('pids',None)
 
     assert p_pids == [1234, 213]
 
@@ -153,21 +119,17 @@ def test_config_get_attr_list_name():
     config_store.set_config(create_sample_config())  # from config_gen module
 
     #Test all options: Dynamic (prod, pre prod, best effort) and Static
-    p_name = config_store.get_attr_list('name', common.TYPE_DYNAMIC, common.PRODUCTION)
+    p_name = config_store.get_attr_list('name',common.PRODUCTION)
 
-    pp_name = config_store.get_attr_list('name', common.TYPE_DYNAMIC, common.PRE_PRODUCTION)
+    pp_name = config_store.get_attr_list('name',common.PRE_PRODUCTION)
 
-    be_name = config_store.get_attr_list('name',common.TYPE_DYNAMIC, common.BEST_EFFORT)
-
-    static_name = config_store.get_attr_list('name',common.TYPE_STATIC, None)
+    be_name = config_store.get_attr_list('name',common.BEST_EFFORT)
 
     assert p_name == ['nDPI VM']
 
     assert pp_name == ['OS VM']
 
     assert be_name == ['IPSec VM']
-
-    assert static_name == ['Noisy Neighbor VM']
 
 
 def test_config_get_attr_list_min_cws():
@@ -178,13 +140,11 @@ def test_config_get_attr_list_min_cws():
     config_store.set_config(create_sample_config())  # from config_gen module
 
     #Test all options: Dynamic (prod, pre prod, best effort) and Static
-    p_min_cws = config_store.get_attr_list('min_cws', common.TYPE_DYNAMIC, common.PRODUCTION)
+    p_min_cws = config_store.get_attr_list('min_cws',common.PRODUCTION)
 
-    pp_min_cws = config_store.get_attr_list('min_cws', common.TYPE_DYNAMIC, common.PRE_PRODUCTION)
+    pp_min_cws = config_store.get_attr_list('min_cws',common.PRE_PRODUCTION)
 
-    be_min_cws = config_store.get_attr_list('min_cws',common.TYPE_DYNAMIC, common.BEST_EFFORT)
-
-    static_min_cws = config_store.get_attr_list('min_cws',common.TYPE_STATIC, None)
+    be_min_cws = config_store.get_attr_list('min_cws',common.BEST_EFFORT)
 
     assert p_min_cws == 5
 
@@ -192,12 +152,8 @@ def test_config_get_attr_list_min_cws():
 
     assert be_min_cws == 1
 
-    assert static_min_cws == 2
-
 
 CONFIG = {\
-"groups": [{"id": 1, "type": "static", "pools": [1], "cbm": "0xc00"},\
-           {"id": 2, "type": "dynamic", "pools": [2,3,4], "cbm": "0x3ff"}],\
 "apps": [{"id": 1, "cores": [0], "name": "OS pseudoVM"},\
          {"id": 2, "cores": [8], "name": "Infrastructure"},\
          {"id": 3, "cores": [7, 15], "name": "PMDs pseudoVM"},\

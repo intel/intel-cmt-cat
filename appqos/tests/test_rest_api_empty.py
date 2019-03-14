@@ -132,29 +132,6 @@ def test_get_pool_empty(my_app):
     assert status == 404
 
 
-def test_get_groups_empty(my_app):
-
-    status, rawData = my_app.api_requests('GET','groups')
-
-    data = json.loads(rawData)
-
-    # assert 0 groups are returned
-    # structure, types and required fields are validated using schema
-    assert data["message"] == "No groups in config file"
-    assert status == 404
-
-def test_get_group_empty(my_app):
-
-    status, rawData = my_app.api_requests('GET','groups/2')
-
-    data = json.loads(rawData)
-
-    # assert 0 groups are returned
-    # structure, types and required fields are validated using schema
-    assert data["message"] == "No groups in config file"
-
-    assert status == 404
-
 def test_add_app(my_app):
 
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name": "hello", "cores": [1,2], "pids": [1324,124]})

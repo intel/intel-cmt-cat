@@ -7,10 +7,6 @@
   "type": "object",
 
   "properties": {
-    "num_flushes": {
-      "description": "Number of cache flush operations",
-      "$ref": "definitions.json#/uint"
-    },
     "num_apps_moves": {
       "description": "Number of APP move operations",
       "$ref": "definitions.json#/uint"
@@ -20,5 +16,5 @@
       "$ref": "definitions.json#/uint"
     }
   },
-  "required": ["num_flushes", "num_apps_moves", "num_err"]
+  "required": ["num_apps_moves", "num_err"]
 }

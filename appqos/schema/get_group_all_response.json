@@ -1,9 +1,0 @@
-{
-  "$schema": "http://json-schema.org/draft-04/schema#",
-
-  "title": "REST API get group",
-  "description": "GET all GROUPs results, URI /groups",
-
-  "type": "array",
-  "items": { "$ref": "definitions.json#/group"}
-}

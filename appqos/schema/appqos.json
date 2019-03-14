@@ -53,16 +53,8 @@
       "items": { "$ref": "definitions.json#/pool" },
       "uniqueItems": true,
       "minItems": 1
-    },
-
-    "groups": {
-      "description": "Groups of Pools definitions",
-      "type": "array",
-      "items": { "$ref": "definitions.json#/group" },
-      "uniqueItems": true,
-      "minItems": 1
     }
   },
 
-  "required": ["auth", "pools", "groups"]
+  "required": ["auth", "pools"]
 }

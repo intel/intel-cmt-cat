@@ -38,9 +38,6 @@ get_app_response.json - GET single APP response schema
 get_app_all_response.json - GET all APP response schema
 move_app.json - MOVE APP call schema
 
-get_group_response.json - GET single GROUP response schema
-get_group_all_response.json - GET all GROUPs response schema
-
 get_stats_response.json - GET STATS response schema
 
 Legal Disclaimer

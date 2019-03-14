@@ -57,14 +57,13 @@ class ConfigStore(object):
         self.timer = None
 
 
-    def get_attr_list(self, attr, group_type, priority):
+    def get_attr_list(self, attr, priority):
         # pylint: disable=too-many-return-statements, too-many-branches
         """
         Get specific attribute from config
 
         Parameters:
             attr: Attribute to be found in config
-            group_type: Group type where to find attribute
             priority: Priority of pool to find attribute
 
         Returns:
@@ -72,45 +71,27 @@ class ConfigStore(object):
         """
 
         data = self.namespace.config
-        if priority is None and group_type is None:
+        if priority is None:
             if str(attr) in data:
                 return data[str(attr)]
         else:
-            pools = []
-
-            if 'groups' not in data:
-                return None
-
-            for group in data['groups']:
-                if group_type is not None and group['type'] != group_type:
-                    continue
-                if attr == 'cbm' and group['type'] != group_type:
-                    continue
-                if attr == 'cbm' and group['type'] == group_type and \
-                    priority is None and 'cbm' in group:
-                    return group['cbm']
-
-                for pool in group['pools']:
-                    pools.append(pool)
-
             apps = []
 
             for pool in data['pools']:
-                if pool['id'] in pools:
-                    if priority is None:
-                        if attr == 'min_cws':
-                            return pool['min_cws']
-                        if attr == 'pool_id':
-                            return pool['id']
-                        for app in pool['apps']:
-                            apps.append(app)
-                    elif attr == 'min_cws' and pool['priority'] == priority:
+                if priority is None:
+                    if attr == 'min_cws':
                         return pool['min_cws']
-                    elif attr == 'pool_id' and pool['priority'] == priority:
+                    if attr == 'pool_id':
                         return pool['id']
-                    elif 'apps' in pool and pool['priority'] == priority:
-                        for app in pool['apps']:
-                            apps.append(app)
+                    for app in pool['apps']:
+                        apps.append(app)
+                elif attr == 'min_cws' and pool['priority'] == priority:
+                    return pool['min_cws']
+                elif attr == 'pool_id' and pool['priority'] == priority:
+                    return pool['id']
+                elif 'apps' in pool and pool['priority'] == priority:
+                    for app in pool['apps']:
+                        apps.append(app)
 
             values = []
             for app in data['apps']:
@@ -146,19 +127,6 @@ class ConfigStore(object):
         """
         self.set_path(path)
         data = self.load(path)
-        self.set_config(data)
-
-
-    def to_file(self, data):
-        """
-        Save config to file
-
-        Parameters:
-            data: dictionary contatining config
-        """
-        self.save(self.namespace.path, data)
-
-        # update stored config
         self.set_config(data)
 
 
@@ -208,35 +176,17 @@ class ConfigStore(object):
         return None
 
 
-    @staticmethod
-    def save(path, data):
-        """
-        Save config to file
-
-        Parameters:
-            path: Path of the configuration file
-            data: Dictionary containing config
-        """
-        # validate config schema to write to file
-        schema, resolver = ConfigStore.load_json_schema('appqos.json')
-        jsonschema.validate(data, schema, resolver=resolver)
-
-        with open(path, 'w') as fd:
-            json.dump(data, fd, indent=4)
-
-
-    def get_pool_id(self, group_type, priority):
+    def get_pool_id(self, priority):
         """
         Get pool id from config
 
         Parameters:
-            group_type: Group type where to find attribute
             priority: Priority of pool to find attribute
 
         Returns:
             Pool ID, None on error
         """
-        pool_id = self.get_attr_list('pool_id', group_type, priority)
+        pool_id = self.get_attr_list('pool_id', priority)
         return pool_id or None
 
 
@@ -340,7 +290,7 @@ class ConfigStore(object):
         self.namespace.config = data
         self.changed_event.set()
 
-        self.timer = threading.Timer(common.SAMPLING_INTERVAL, clear_event)
+        self.timer = threading.Timer(1, clear_event)
         self.timer.start()
 
 

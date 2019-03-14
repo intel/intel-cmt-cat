@@ -1,7 +1,7 @@
 ################################################################################
 # BSD LICENSE
 #
-# Copyright(c) 2018 Intel Corporation. All rights reserved.
+# Copyright(c) 2019 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -64,9 +64,7 @@ class RESTAPI(object):
     def start_flask(self):
         # create a new config_store object and generate config
         data = create_sample_config()  # from config_gen module
-        path = os.getcwd() + '/tests/test_rest_api.conf'
-        common.CONFIG_STORE.set_path(path)
-        common.CONFIG_STORE.to_file(data)
+        common.CONFIG_STORE.set_config(data)
         # start process to run flask in the background
         server = rest.Server()
         server.start(self.address, self.port, True)
@@ -111,11 +109,11 @@ def test_get_apps(my_app):
 
     # assert 4 apps are returned
     # structure, types and required fields are validated using schema
-    assert len(data) == 4
+    assert len(data) == 3
     assert status == 200
 
 def test_get_app(my_app):
-    status, rawData = my_app.api_requests('GET', 'apps/1')
+    status, rawData = my_app.api_requests('GET', 'apps/2')
 
     data = json.loads(rawData)
 
@@ -125,8 +123,8 @@ def test_get_app(my_app):
 
     # assert 1 app is returned
     # structure, types and required fields are validated using schema
-    assert len(data) == 3 # 3 fields in dict
-    assert data['id'] == 1
+    assert len(data) == 4 # 4 fields in dict
+    assert data['id'] == 2
     assert status == 200
 
 def test_get_pools(my_app):
@@ -140,7 +138,7 @@ def test_get_pools(my_app):
 
     # assert 4 pools are returned
     # structure, types and required fields are validated using schema
-    assert len(data) == 4
+    assert len(data) ==3
     assert status == 200
 
 
@@ -159,35 +157,6 @@ def test_get_pool(my_app):
     assert status == 200
 
 
-def test_get_groups(my_app):
-    status, rawData = my_app.api_requests('GET', 'groups')
-
-    data = json.loads(rawData)
-
-    #validate get 1 group response schema
-    schema, resolver = my_app._load_json_schema('get_group_all_response.json')
-    validate(data, schema, resolver=resolver)
-    # assert 4 pools are returned
-    # structure, types and required fields are validated using schema
-    assert len(data) == 2
-    assert status == 200
-
-
-def test_get_group(my_app):
-    status, rawData = my_app.api_requests('GET', 'groups/2')
-
-    data = json.loads(rawData)
-
-    #validate get all groups response schema
-    schema, resolver = my_app._load_json_schema('get_group_response.json')
-    validate(data, schema, resolver=resolver)
-
-    # assert 1 pool is returned
-    # structure, types and required fields are validated using schema
-    assert len(data) == 4 # 4 fields in dict
-    assert data['id'] == 2
-    assert status == 200
-
 def test_add_app_all(my_app):
 
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name":"hello","cores":[1,2],"pids":[1]})
@@ -195,22 +164,6 @@ def test_add_app_all(my_app):
     data = json.loads(rawData)
 
     print data
-
-    #validate add app response schema
-    schema, resolver = my_app._load_json_schema('add_app_response.json')
-    validate(data, schema, resolver=resolver)
-
-    # assert app is added
-    # structure, types and required fields are validated using schema
-    assert len(data) == 1 # 1 fields in dict
-    assert 'id' in data
-    assert status == 201
-
-def test_add_app_no_throughputs(my_app):
-
-    status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name": "hello", "cores": [1,2],"pids": [1]})
-
-    data = json.loads(rawData)
 
     #validate add app response schema
     schema, resolver = my_app._load_json_schema('add_app_response.json')
@@ -317,7 +270,7 @@ def test_add_app_invalid(my_app):
 
 
 def test_move_app_to_pool(my_app):
-    status, rawData = my_app.api_requests('PUT', 'apps/1', {"pool_id": 2})
+    status, rawData = my_app.api_requests('PUT', 'apps/2', {"pool_id": 2})
 
     assert status == 200
 
@@ -328,7 +281,7 @@ def test_move_app_to_pool(my_app):
     # assert 1 pool is returned with new app id
     # structure, types and required fields are validated using schema
     assert data['id'] == 2
-    assert 1 in data['apps']
+    assert 2 in data['apps']
     assert status == 200
 
 def test_move_app_to_pool_no_pool_id(my_app):
@@ -342,21 +295,21 @@ def test_move_app_to_pool_no_pool_id(my_app):
 
 def test_delete_app(my_app):
 
-    status, rawData = my_app.api_requests('DELETE', 'apps/1')
+    status, rawData = my_app.api_requests('DELETE', 'apps/2')
 
     assert status == 200
 
-    status, rawData = my_app.api_requests('GET', 'apps/1')
+    status, rawData = my_app.api_requests('GET', 'apps/2')
 
     assert status == 404
 
-    status, rawData = my_app.api_requests('GET', 'pools/2')
+    status, rawData = my_app.api_requests('GET', 'pools/3')
 
     data = json.loads(rawData)
 
     # assert 1 app is returned
     # structure, types and required fields are validated using schema
-    assert not 1 in data['apps']
+    assert not 2 in data['apps']
     assert status == 200
 
 def test_stats(my_app):
@@ -365,6 +318,5 @@ def test_stats(my_app):
     assert status == 200
 
     data = json.loads(rawData)
-    assert 'num_flushes' in data
     assert 'num_apps_moves' in data
     assert 'num_err' in data
