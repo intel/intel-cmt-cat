@@ -47,6 +47,7 @@ from flask_restful import Api, Resource, request
 
 import jsonschema
 
+import caps
 import common
 import log
 import pid_ops
@@ -119,6 +120,7 @@ class Server(object):
         self.api.add_resource(Pools, '/pools')
         self.api.add_resource(Pool, '/pools/<pool_id>')
         self.api.add_resource(Stats, '/stats')
+        self.api.add_resource(Caps, '/caps')
 
         self.app.register_error_handler(RestError, Server.error_handler)
 
@@ -610,5 +612,27 @@ class Stats(Resource):
         data["num_apps_moves"] = \
             common.STATS_STORE.general_stats_get(StatsStore.General.NUM_APPS_MOVES)
         data["num_err"] = common.STATS_STORE.general_stats_get(StatsStore.General.NUM_ERR)
+
+        return data, 200
+
+
+class Caps(Resource):
+    """
+    Handles /caps HTTP requests
+    """
+
+
+    @staticmethod
+    @Server.auth.login_required
+    def get():
+        """
+        Handles HTTP GET /caps request.
+        Retrieve capabilities
+
+        Returns:
+            response, status code
+        """
+        data = {}
+        data["capabilities"] = caps.SYSTEM_CAPS
 
         return data, 200

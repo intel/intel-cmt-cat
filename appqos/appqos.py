@@ -48,6 +48,7 @@ from time import sleep
 from jsonschema import ValidationError
 
 import cache_ops
+import caps
 import common
 import log
 import perf
@@ -313,21 +314,25 @@ def main():
         log.error("libpqos initialization failed, Terminating...")
         return
 
-    # initialize main logic
-    app_qos = AppQoS()
+    # initialize capabilities
+    result = caps.caps_init()
+    if result == 0:
+        # initialize main logic
+        app_qos = AppQoS()
 
-    # start REST API server
-    server = rest.Server()
-    result = server.start("0.0.0.0", cmd_args.port[0], cmd_args.verbose)
-    if result != 0:
-        log.error("Failed to start REST API server, Terminating...")
-        return
+        # start REST API server
+        server = rest.Server()
+        result = server.start("0.0.0.0", cmd_args.port[0], cmd_args.verbose)
+        if result == 0:
+            # run main logic
+            app_qos.run(cmd_args)
 
-    # run main logic
-    app_qos.run(cmd_args)
-
-    # stop REST API server
-    server.terminate()
+            # stop REST API server
+            server.terminate()
+        else:
+            log.error("Failed to start REST API server, Terminating...")
+    else:
+        log.error("Required capabilities not supported, Terminating...")
 
     # de-initialize libpqos
     cache_ops.PQOS_API.fini()

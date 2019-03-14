@@ -44,6 +44,7 @@ import flusher
 import log
 from pqosapi import pqos_init, pqos_fini # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_alloc_assoc_set, pqos_l3ca_set, pqos_mba_set # pylint: disable=import-error,no-name-in-module
+from pqosapi import pqos_is_mba_supported, pqos_is_cat_supported, pqos_is_multicore # pylint: disable=import-error,no-name-in-module
 
 __CW_SIZE__ = None
 
@@ -151,6 +152,50 @@ class Pqos(object):
 
         return 0
 
+    @staticmethod
+    def is_mba_supported():
+        """
+        Checks for MBA support
+
+        Returns:
+            1 if supported
+            0 otherwise
+        """
+        try:
+            return pqos_is_mba_supported()
+        except Exception as ex:
+            log.error(str(ex))
+            return 0
+
+    @staticmethod
+    def is_cat_supported():
+        """
+        Checks for CAT support
+
+        Returns:
+            1 if supported
+            0 otherwise
+        """
+        try:
+            return pqos_is_cat_supported()
+        except Exception as ex:
+            log.error(str(ex))
+            return 0
+
+    @staticmethod
+    def is_multicore():
+        """
+        Checks if system is multicore
+
+        Returns:
+            1 if multicore
+            0 otherwise
+        """
+        try:
+            return pqos_is_multicore()
+        except Exception as ex:
+            log.error(str(ex))
+            return 0
 
 PQOS_API = Pqos()
 

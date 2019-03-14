@@ -32,63 +32,65 @@
 ################################################################################
 
 """
-Common global constants and helper functions
+System capabilities module
 """
 
-import multiprocessing
-import numbers
-import config # pylint: disable=cyclic-import
-import stats # pylint: disable=cyclic-import
+import cache_ops
+
+import common
+import log
 
 
-CONFIG_FILENAME = "appqos.conf"
-PRODUCTION = "prod"
-PRE_PRODUCTION = "preprod"
-BEST_EFFORT = "besteff"
+# System capabilities are detected during the runtime
+SYSTEM_CAPS = {}
 
-TYPE_STATIC = "static"
-TYPE_DYNAMIC = "dynamic"
-
-# sampling interval, 1sec
-SAMPLING_INTERVAL = 1
-
-# deadline for data acquisition, 50% of sampling interval, 0.5sec
-ACQUISITION_MAX_TIME = SAMPLING_INTERVAL * 0.5
-
-PID_FLUSH_PROCFS_FILENAME = "/proc/intel_pid_cache_flush"
-
-CAT_CAP = "cat"
-MBA_CAP = "mba"
-
-MANAGER = multiprocessing.Manager()
-CONFIG_STORE = config.ConfigStore()
-STATS_STORE = stats.StatsStore()
-
-
-def is_core_valid(core):
+def caps_init():
     """
-    Checks core validity
-
-    Parameters:
-        core: core to be tested
-    Returns:
-        result: bool
+    Runs supported capabilities detection and logs to console
     """
-    if not isinstance(core, numbers.Number):
-        return False
-    return core < multiprocessing.cpu_count()
+    global SYSTEM_CAPS
+
+    if SYSTEM_CAPS:
+        SYSTEM_CAPS.clear()
+
+    SYSTEM_CAPS = detect_supported_caps()
+    log.debug("Supported capabilities:")
+    log.debug(SYSTEM_CAPS)
+
+    if (cat_supported() or mba_supported()) and cache_ops.PQOS_API.is_multicore:
+        return 0
+
+    return -1
 
 
-def is_event_set(event):
+def cat_supported():
     """
-    Checks is event set
-
-    Parameters:
-        event: event to be tested
-    Returns:
-        result: bool
+    Returns CAT support status
     """
-    try:
-        return event.is_set()
-    except IOError:
-        return False
+    return common.CAT_CAP in SYSTEM_CAPS
+
+
+def mba_supported():
+    """
+    Returns MBA support status
+    """
+    return common.MBA_CAP in SYSTEM_CAPS
+
+
+def detect_supported_caps():
+    """
+    Generates list of supported caps
+
+    Returns
+        list of supported caps
+    """
+    result = []
+    # generate list of supported capabilities
+
+    if cache_ops.PQOS_API.is_cat_supported():
+        result.append(common.CAT_CAP)
+
+    if cache_ops.PQOS_API.is_mba_supported():
+        result.append(common.MBA_CAP)
+
+    return result
