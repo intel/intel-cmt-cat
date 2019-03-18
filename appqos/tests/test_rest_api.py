@@ -151,7 +151,8 @@ def set_config():
     #restore config
     common.CONFIG_STORE.set_config(CONFIG.copy())
 
-def test_get_apps(my_app):
+
+def test_apps_get(my_app):
     status, rawData = my_app.api_requests('GET', 'apps')
 
     data = json.loads(rawData)
@@ -165,7 +166,7 @@ def test_get_apps(my_app):
     assert len(data) == 3
     assert status == 200
 
-def test_get_app(my_app):
+def test_app_get(my_app):
     status, rawData = my_app.api_requests('GET', 'apps/2')
 
     data = json.loads(rawData)
@@ -179,7 +180,7 @@ def test_get_app(my_app):
     assert data['id'] == 2
     assert status == 200
 
-def test_get_pools(my_app):
+def test_pools_get(my_app):
     status, rawData = my_app.api_requests('GET', 'pools')
 
     data = json.loads(rawData)
@@ -194,7 +195,7 @@ def test_get_pools(my_app):
     assert status == 200
 
 
-def test_get_pool(my_app):
+def test_pool_get(my_app):
     status, rawData = my_app.api_requests('GET', 'pools/3')
 
     data = json.loads(rawData)
@@ -209,7 +210,38 @@ def test_get_pool(my_app):
     assert status == 200
 
 
-def test_add_app_all(my_app):
+def test_pool_delete_empty(my_app):
+    status, rawData = my_app.api_requests('DELETE', 'pools/3')
+    assert status == 200
+
+    status, rawData = my_app.api_requests('GET', 'pools/3')
+    assert status == 404
+
+
+def test_pool_delete_not_empty(my_app):
+    status, rawData = my_app.api_requests('DELETE', 'pools/2')
+    assert status == 400
+
+
+def test_pool_add_cbm(my_app):
+    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello", "cores":[6, 7], "cbm": "0xf"})
+    assert status == 201
+
+    data = json.loads(rawData)
+
+    print data
+
+    #validate add app response schema
+    schema, resolver = my_app._load_json_schema('add_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    # assert app is added
+    # structure, types and required fields are validated using schema
+    assert len(data) == 1 # 1 fields in dict
+    assert 'id' in data
+
+
+def test_app_add_all(my_app):
 
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name":"hello","cores":[1,2],"pids":[1]})
 
@@ -227,7 +259,7 @@ def test_add_app_all(my_app):
     assert 'id' in data
     assert status == 201
 
-def test_add_app_cores_only(my_app):
+def test_app_add_cores_only(my_app):
     # cores only
     status, rawData = my_app.api_requests('POST', 'apps', {"cores":[7,9]})
 
@@ -237,7 +269,7 @@ def test_add_app_cores_only(my_app):
     assert "Request validation failed" in data["message"]
     assert status == 400
 
-def test_add_app_unknown(my_app):
+def test_app_add_unknown(my_app):
     # cores only
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name": "hello", "cores": [1,2], "pids": [1], "unknown": [7,9]})
 
@@ -247,7 +279,7 @@ def test_add_app_unknown(my_app):
     assert status == 400
     assert "Request validation failed" in data["message"]
 
-def test_add_app_no_pool_id(my_app):
+def test_app_add_no_pool_id(my_app):
     # no pool_id
     status, rawData = my_app.api_requests('POST', 'apps', {"name": "hello", "cores": [1,2], "pids": [1]})
 
@@ -257,7 +289,7 @@ def test_add_app_no_pool_id(my_app):
     assert "Request validation failed" in data["message"]
     assert status == 400
 
-def test_add_app_no_name(my_app):
+def test_app_add_no_name(my_app):
     # no name
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "cores": [1,2], "pids": [1]})
 
@@ -267,7 +299,7 @@ def test_add_app_no_name(my_app):
     assert "Request validation failed" in data["message"]
     assert status == 400
 
-def test_add_app_no_cores(my_app):
+def test_app_add_no_cores(my_app):
     # no cores
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name": "hello", "pids": [1]})
 
@@ -277,7 +309,7 @@ def test_add_app_no_cores(my_app):
     assert "Request validation failed" in data["message"]
     assert status == 400
 
-def test_add_app_invalid_cores(my_app):
+def test_app_add_invalid_cores(my_app):
     # invalid cores
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name": "hello", "cores": 1, "pids": [1]})
 
@@ -305,7 +337,7 @@ def test_add_app_invalid_cores(my_app):
     assert "Request validation failed" in data["message"]
     assert status == 400
 
-def test_add_app_invalid_pids(my_app):
+def test_app_add_invalid_pids(my_app):
     # invalid pids
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name": "hello", "cores": [1,2], "pids": [1324,124545454545454]})
 
@@ -315,13 +347,13 @@ def test_add_app_invalid_pids(my_app):
     assert "please provide valid pid's" in data["message"]
     assert status == 400
 
-def test_add_app_invalid(my_app):
+def test_app_add_invalid(my_app):
     status, rawData = my_app.api_requests('POST', 'apps', 'invalid')
 
     assert status == 400
 
 
-def test_move_app_to_pool(my_app):
+def test_app_move_to_pool(my_app):
     status, rawData = my_app.api_requests('PUT', 'apps/2', {"pool_id": 2})
 
     assert status == 200
@@ -336,7 +368,7 @@ def test_move_app_to_pool(my_app):
     assert 2 in data['apps']
     assert status == 200
 
-def test_move_app_to_pool_no_pool_id(my_app):
+def test_app_move_no_pool_id(my_app):
     status, rawData = my_app.api_requests('PUT', 'apps/2')
 
     data = json.loads(rawData)
@@ -345,7 +377,7 @@ def test_move_app_to_pool_no_pool_id(my_app):
     assert "Request validation failed" in data["message"]
 
 
-def test_delete_app(my_app):
+def test_app_delete(my_app):
 
     status, rawData = my_app.api_requests('DELETE', 'apps/2')
     assert status == 200
@@ -364,6 +396,7 @@ def test_delete_app(my_app):
     # structure, types and required fields are validated using schema
     assert not 2 in data['apps']
     assert status == 200
+
 
 def test_stats(my_app):
     status, rawData = my_app.api_requests('GET', 'stats')

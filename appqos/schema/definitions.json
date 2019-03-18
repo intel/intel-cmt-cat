@@ -61,10 +61,6 @@
     "allOf": [
       { "$ref": "#app" },
       { "properties": {
-          "llc_occup": {
-            "description": "Actual LLC occupation [KB]",
-            "$ref": "#uint"
-          },
           "id": {
             "description": "APP ID",
             "$ref": "#uint"
@@ -125,7 +121,7 @@
         "minItems": 0
       }
     },
-    "required": ["id", "name"],
+    "required": ["name"],
     "anyOf": [
       { "required": ["cbm"] },
       { "required": ["mba"] }
@@ -134,17 +130,21 @@
 
   "pool_api_get": {
     "allOf": [
+      { "$ref": "#pool" }
+    ]
+  },
+
+  "pool_api_post": {
+    "allOf": [
       { "$ref": "#pool" },
       { "properties": {
-          "llc_alloc": {
-            "description": "Cache allocated [KB]",
-            "$ref": "#uint_nonzero"
-          },
-          "llc_occup": {
-            "description": "Actual LLC occupation [KB]",
-            "$ref": "#uint"
-          }
-        }
+          "name": {},
+          "cores": {},
+          "cbm": {},
+          "mba": {}
+        },
+        "required": ["cores"],
+        "additionalProperties": false
       }
     ]
   }

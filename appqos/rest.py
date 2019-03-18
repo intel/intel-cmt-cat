@@ -384,9 +384,9 @@ class Apps(Resource):
 
             # add new app to apps
             # find an id
-            new_id = list(set(range(1, app_ids[-1])) - set(app_ids))
-            if new_id:
-                return new_id[0]
+            new_ids = list(set(range(1, app_ids[-1])) - set(app_ids))
+            if new_ids:
+                return new_ids[0]
 
             return app_ids[-1] + 1
 
@@ -470,6 +470,39 @@ class Pool(Resource):
         raise NotFound("Pool " + str(pool_id) + " not found in config")
 
 
+    @staticmethod
+    @Server.auth.login_required
+    def delete(pool_id):
+        """
+        Handles HTTP DELETE /pool/<pull_id> request.
+        Deletes single Pool
+        Raises NotFound, InternalError
+
+        Parameters:
+            pool_id: Id of pool to delete
+
+        Returns:
+            response, status code
+        """
+        data = common.CONFIG_STORE.get_config().copy()
+        if 'pools' not in data:
+            raise NotFound("No pools in config file")
+
+        for pool in data['pools']:
+            if pool['id'] != int(pool_id):
+                continue
+
+            if 'apps' in pool and pool['apps']:
+                raise BadRequest("POOL " + str(pool_id) + " is not empty")
+
+            # remove app
+            data['pools'].remove(pool)
+            common.CONFIG_STORE.set_config(data)
+            return "POOL " + str(pool_id) + " deleted", 200
+
+        raise NotFound("POOL " + str(pool_id) + " not found in config")
+
+
 class Pools(Resource):
     """
     Handles /pools HTTP requests
@@ -492,6 +525,66 @@ class Pools(Resource):
             raise NotFound("No pools in config file")
 
         return (data['pools']), 200
+
+
+    @staticmethod
+    @Server.auth.login_required
+    def post():
+        """
+        Handles HTTP POST /pools request.
+        Add a new Pool
+        Raises NotFound, BadRequest, InternalError
+
+        Returns:
+            response, status code
+        """
+
+        def get_pool_id():
+            """
+            Get ID for new Pool
+
+            Returns:
+                ID for new Pool
+            """
+            # put all ids into list
+            pool_ids = []
+            for pool in data['pools']:
+                pool_ids.append(pool['id'])
+            pool_ids = sorted(pool_ids)
+            # no pool found in config
+            if not pool_ids:
+                return 1
+
+            # add new pool to pools
+            # find an id
+            new_id = list(set(range(1, pool_ids[-1])) - set(pool_ids))
+            if new_id:
+                return new_id[0]
+
+            return pool_ids[-1] + 1
+
+        json_data = request.get_json()
+
+        # validate pool schema
+        try:
+            schema, resolver = ConfigStore.load_json_schema('add_pool.json')
+            jsonschema.validate(json_data, schema, resolver=resolver)
+        except jsonschema.ValidationError as error:
+            raise BadRequest("Request validation failed - %s" % (str(error)))
+
+        data = common.CONFIG_STORE.get_config()
+
+        json_data['id'] = get_pool_id()
+
+        if 'cores' in json_data:
+            for core in json_data['cores']:
+                if not common.is_core_valid(core):
+                    raise BadRequest("New POOL not added, please provide valid cores")
+
+        data['pools'].append(json_data)
+
+        res = {'id': json_data['id']}
+        return res, 201
 
 
 class Stats(Resource):
