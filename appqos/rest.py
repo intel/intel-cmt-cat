@@ -244,25 +244,27 @@ class App(Resource):
         Returns:
             response, status code
         """
-        data = common.CONFIG_STORE.get_config()
+        data = common.CONFIG_STORE.get_config().copy()
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
 
-        # remove app
-        for i in range(len(data['apps'])):
-            if data['apps'][i]['id'] == int(app_id):
+        for app in data['apps']:
+            if app['id'] != int(app_id):
+                continue
 
-                # remove app id from pool
-                for k in range(len(data['pools'])):
-                    if 'apps' in data['pools'][k]:
-                        if data['apps'][i]['id'] in data['pools'][k]['apps']:
-                            data['pools'][k]['apps'].remove(data['apps'][i]['id'])
-                            break
+            # remove app id from pool
+            for pool in data['pools']:
+                if 'apps' not in pool:
+                    continue
 
-                # remove app
-                data['apps'].remove(data['apps'][i])
-                common.CONFIG_STORE.set_config(data)
-                return "APP " + str(app_id) + " deleted", 200
+                if app['id'] in pool['apps']:
+                    pool['apps'].remove(app['id'])
+                    break
+
+            # remove app
+            data['apps'].remove(app)
+            common.CONFIG_STORE.set_config(data)
+            return "APP " + str(app_id) + " deleted", 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
 
@@ -292,31 +294,38 @@ class App(Resource):
 
         pool_id = json_data["pool_id"]
 
-        data = common.CONFIG_STORE.get_config()
+        data = common.CONFIG_STORE.get_config().copy()
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
 
-        for i in range(len(data['apps'])):
-            if data['apps'][i]['id'] == int(app_id):
-                # remove app id from pool
-                for k in range(len(data['pools'])):
-                    if 'apps' in data['pools'][k]:
-                        if int(data['apps'][i]['id']) in data['pools'][k]['apps']:
-                            data['pools'][k]['apps'].remove(data['apps'][i]['id'])
-                            break
-                # add app id to new pool
-                for j in range(len(data['pools'])):
-                    if data['pools'][j]['id'] == int(pool_id):
-                        if 'apps' in data['pools'][j]:
-                            data['pools'][j]['apps'].append(data['apps'][i]['id'])
-                            break
-                        else:
-                            data['pools'][j]['apps'] = [data['apps'][i]['id']]
-                            break
+        for app in data['apps']:
+            if app['id'] != int(app_id):
+                continue
 
-                common.CONFIG_STORE.set_config(data)
-                common.STATS_STORE.general_stats_inc_apps_moves()
-                return "APP " + str(app_id) + " moved to new pool", 200
+            # remove app id from pool
+            for pool in data['pools']:
+                if 'apps' in pool:
+                    if app['id'] in pool['apps']:
+                        pool['apps'].remove(app['id'])
+                        break
+            # add app id to new pool
+            for pool in data['pools']:
+                if pool['id'] == int(pool_id):
+                    if 'apps' in pool:
+                        pool['apps'].append(app['id'])
+                        break
+                    else:
+                        pool['apps'] = [app['id']]
+                        break
+            # set new cores
+            if 'cores' in json_data:
+                app['cores'] = json_data['cores']
+            elif 'cores' in app:
+                app.pop('cores')
+
+            common.CONFIG_STORE.set_config(data)
+            common.STATS_STORE.general_stats_inc_apps_moves()
+            return "APP " + str(app_id) + " moved to new pool", 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
 

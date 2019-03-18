@@ -34,7 +34,6 @@
 import pytest
 import json
 from config import *
-from gen_config import create_sample_config
 import rest
 
 from jsonschema  import validate, RefResolver

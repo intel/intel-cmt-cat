@@ -277,16 +277,6 @@ class Pool(object):
         return None
 
 
-    def get_pool_id(self):
-        """
-        Get pool ID
-
-        Returns:
-            Pool ID
-        """
-        return common.CONFIG_STORE.get_pool_id(self.get_common_priority())
-
-
     def enabled_get(self):
         """
         Check if pool is enabled
@@ -344,9 +334,9 @@ class Pool(object):
         """
         cores = common.CONFIG_STORE.get_attr_list('cores', self.get_common_priority())
         pids = common.CONFIG_STORE.get_attr_list('pids', self.get_common_priority())
-        cbm = common.CONFIG_STORE.get_attr_list('min_cws', self.get_common_priority())
+        cbm = common.CONFIG_STORE.get_attr_list('cbm', self.get_common_priority())
 
-        self.cbm_set(int(cbm))
+        self.cbm_set(cbm)
         self.cores_set(cores)
         self.pids_set(pids)
         return self.enabled_set(True)

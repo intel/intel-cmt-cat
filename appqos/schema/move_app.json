@@ -10,6 +10,10 @@
     "pool_id": {
       "description": "Destination Pool ID",
       "$ref": "definitions.json#/uint"
+    },
+    "cores": {
+      "description": "Cores APP are pinned to",
+      "$ref": "definitions.json#/uint_uniq_array"
     }
   },
 

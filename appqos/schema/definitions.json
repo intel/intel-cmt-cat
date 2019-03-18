@@ -32,6 +32,11 @@
     "maxLength": 64
   },
 
+  "string_hex" : {
+    "type": [ "integer", "string" ],
+    "pattern": "^0x[0-9a-fA-F]+$"
+  },
+
   "app": {
     "description": "APP definition",
     "type": "object",
@@ -41,15 +46,15 @@
         "$ref": "#string_nonempty"
       },
       "cores": {
-        "description": "Cores APP's VCPUs are pinned to",
+        "description": "Cores APP is pinned to",
         "$ref": "#uint_uniq_array"
       },
       "pids": {
-        "description": "PIDs of APP's VCPUs",
+        "description": "PIDs of APP",
         "$ref": "#uint_uniq_array"
       }
     },
-    "required": ["name", "cores"]
+    "required": ["name", "pids", "cores"]
   },
 
   "app_api_get": {
@@ -96,18 +101,21 @@
         "description": "Pool ID",
         "$ref": "#uint"
       },
-      "priority": {
-        "description": "Priority of the Pool of APPs",
-        "type": "string",
-        "enum": ["prod", "preprod", "besteff"]
-      },
       "name": {
         "description": "Pool's name",
         "$ref": "#string_nonempty"
       },
-      "min_cws": {
-        "description": "Number of guaranteed CWs, for static - number of CWs assigned to the pool",
-        "$ref": "#uint_nonzero"
+      "cbm": {
+        "description": "L3 CAT cache bit mask",
+        "$ref": "#string_hex"
+      },
+      "mba": {
+        "description": "MBA rate",
+        "$ref": "#uint"
+      },
+      "cores": {
+        "description": "POOL cores",
+        "$ref": "#uint_uniq_array"
       },
       "apps": {
         "description": "APPs assigned to that pool",
@@ -117,7 +125,11 @@
         "minItems": 0
       }
     },
-    "required": ["id", "priority", "name", "min_cws", "apps"]
+    "required": ["id", "name"],
+    "anyOf": [
+      { "required": ["cbm"] },
+      { "required": ["mba"] }
+    ]
   },
 
   "pool_api_get": {

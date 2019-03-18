@@ -35,7 +35,6 @@ import pytest
 import json
 import common
 import config
-from gen_config import create_sample_config
 import rest
 
 from jsonschema  import validate, RefResolver
@@ -52,6 +51,58 @@ from requests.auth import HTTPBasicAuth
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+
+CONFIG =                               \
+{                                      \
+    "apps": [                          \
+        {                              \
+            "cores": [1],              \
+            "id": 1,                   \
+            "name": "app 1",           \
+            "pids": [1]                \
+        },                             \
+        {                              \
+            "cores": [3],              \
+            "id": 2,                   \
+            "name": "app 2",           \
+            "pids": [2, 3]             \
+        },                             \
+        {                              \
+            "cores": [3],              \
+            "id": 3,                   \
+            "name": "app 3",           \
+            "pids": [4]                \
+        }                              \
+    ],                                 \
+    "auth": {                          \
+        "password": "secretsecret",    \
+        "username": "superadmin"       \
+    },                                 \
+    "pools": [                         \
+        {                              \
+            "apps": [1],               \
+            "cbm": 0xf0,               \
+            "cores": [1],              \
+            "id": 1,                   \
+            "mba": 20,                 \
+            "name": "cat&mba"          \
+        },                             \
+        {                              \
+            "apps": [2, 3],            \
+            "cbm": 0xf,                \
+            "cores": [3],              \
+            "id": 2,                   \
+            "name": "cat"              \
+        },                             \
+        {                              \
+            "id": 3,                   \
+            "mba": 30,                 \
+            "name": "mba"              \
+        }                              \
+    ]                                  \
+}
+
+
 class RESTAPI(object):
     def __init__(self):
         self.user = 'superadmin'
@@ -62,9 +113,6 @@ class RESTAPI(object):
         self.port = 6000
 
     def start_flask(self):
-        # create a new config_store object and generate config
-        data = create_sample_config()  # from config_gen module
-        common.CONFIG_STORE.set_config(data)
         # start process to run flask in the background
         server = rest.Server()
         server.start(self.address, self.port, True)
@@ -98,6 +146,11 @@ def my_app():
     yield my_app
     p.terminate()
 
+@pytest.fixture(autouse=True)
+def set_config():
+    #restore config
+    common.CONFIG_STORE.set_config(CONFIG.copy())
+
 def test_get_apps(my_app):
     status, rawData = my_app.api_requests('GET', 'apps')
 
@@ -107,7 +160,7 @@ def test_get_apps(my_app):
     schema, resolver = my_app._load_json_schema('get_app_all_response.json')
     validate(data, schema, resolver=resolver)
 
-    # assert 4 apps are returned
+    # assert 3 apps are returned
     # structure, types and required fields are validated using schema
     assert len(data) == 3
     assert status == 200
@@ -123,7 +176,6 @@ def test_get_app(my_app):
 
     # assert 1 app is returned
     # structure, types and required fields are validated using schema
-    assert len(data) == 4 # 4 fields in dict
     assert data['id'] == 2
     assert status == 200
 
@@ -136,7 +188,7 @@ def test_get_pools(my_app):
     schema, resolver = my_app._load_json_schema('get_pool_all_response.json')
     validate(data, schema, resolver=resolver)
 
-    # assert 4 pools are returned
+    # assert 3 pools are returned
     # structure, types and required fields are validated using schema
     assert len(data) ==3
     assert status == 200
@@ -296,14 +348,15 @@ def test_move_app_to_pool_no_pool_id(my_app):
 def test_delete_app(my_app):
 
     status, rawData = my_app.api_requests('DELETE', 'apps/2')
-
     assert status == 200
 
     status, rawData = my_app.api_requests('GET', 'apps/2')
-
     assert status == 404
 
-    status, rawData = my_app.api_requests('GET', 'pools/3')
+    status, rawData = my_app.api_requests('GET', 'apps/3')
+    assert status == 200
+
+    status, rawData = my_app.api_requests('GET', 'pools/2')
 
     data = json.loads(rawData)
 

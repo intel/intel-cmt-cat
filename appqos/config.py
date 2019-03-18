@@ -57,53 +57,28 @@ class ConfigStore(object):
         self.timer = None
 
 
-    def get_attr_list(self, attr, priority):
+    def get_attr_list(self, attr, pool_id):
         # pylint: disable=too-many-return-statements, too-many-branches
         """
         Get specific attribute from config
 
         Parameters:
             attr: Attribute to be found in config
-            priority: Priority of pool to find attribute
+            pool_id: Id of pool to find attribute
 
         Returns:
             attribute value, None
         """
 
         data = self.namespace.config
-        if priority is None:
-            if str(attr) in data:
-                return data[str(attr)]
-        else:
-            apps = []
 
-            for pool in data['pools']:
-                if priority is None:
-                    if attr == 'min_cws':
-                        return pool['min_cws']
-                    if attr == 'pool_id':
-                        return pool['id']
-                    for app in pool['apps']:
-                        apps.append(app)
-                elif attr == 'min_cws' and pool['priority'] == priority:
-                    return pool['min_cws']
-                elif attr == 'pool_id' and pool['priority'] == priority:
-                    return pool['id']
-                elif 'apps' in pool and pool['priority'] == priority:
-                    for app in pool['apps']:
-                        apps.append(app)
+        for pool in data['pools']:
+            if pool['id'] == pool_id:
+                if attr in pool:
+                    return pool[attr]
 
-            values = []
-            for app in data['apps']:
-                if app['id'] in apps:
-                    if not attr in app:
-                        continue
-                    if isinstance(app[str(attr)], list):
-                        values += app[str(attr)]
-                    else:
-                        values.append(str(app[attr]))
-
-            return values
+        if attr == "cbm":
+            return 0
 
         return []
 
@@ -171,23 +146,14 @@ class ConfigStore(object):
             schema, resolver = ConfigStore.load_json_schema('appqos.json')
             jsonschema.validate(data, schema, resolver=resolver)
 
+            # convert cbm to int
+            for pool in data['pools']:
+                if 'cbm' in pool and not isinstance(pool['cbm'], int):
+                    pool['cbm'] = int(pool['cbm'], 16)
+
             return data
 
         return None
-
-
-    def get_pool_id(self, priority):
-        """
-        Get pool id from config
-
-        Parameters:
-            priority: Priority of pool to find attribute
-
-        Returns:
-            Pool ID, None on error
-        """
-        pool_id = self.get_attr_list('pool_id', priority)
-        return pool_id or None
 
 
     def pid_to_app(self, pid):
@@ -214,60 +180,37 @@ class ConfigStore(object):
 
     def app_to_pool(self, app):
         """
-        Gets Pool ID and Priority for App
+        Gets Pool ID for App
 
         Parameters:
-            app: App ID to get Pool ID and Priority for
+            app: App ID to get Pool ID for
 
         Returns:
-            Pool ID, Priority, or None, None on error
+            Pool ID or None on error
         """
         if not app:
-            return None, None
-
+            return None
         data = self.get_config()
         for pool in data['pools']:
             if not ('id' in pool and 'apps' in pool):
                 continue
             if app in pool['apps']:
-                return pool['id'], pool['priority']
-        return None, None
+                return pool['id']
+        return None
 
 
     def pid_to_pool(self, pid):
         """
-        Gets Pool ID and Priority for PID
+        Gets Pool ID for PID
 
         Parameters:
-            PID: PID to get Pool ID and Priority for
+            PID: PID to get Pool ID for
 
         Returns:
-            Pool ID, Priority, or None, None on error
+            Pool ID or None on error
         """
         app_id = self.pid_to_app(pid)
         return self.app_to_pool(app_id)
-
-
-    def pool_to_prio(self, pool_id):
-        """
-        Gets Priority for Pool ID
-
-        Parameters:
-            pool_id: Pool ID to get Priority for
-
-        Returns:
-            Priority, None on error
-        """
-        if not pool_id:
-            return None
-
-        data = self.get_config()
-        for pool in data['pools']:
-            if 'id' not in pool:
-                continue
-            if pool_id == pool['id']:
-                return pool['priority']
-        return None
 
 
     def set_config(self, data):
