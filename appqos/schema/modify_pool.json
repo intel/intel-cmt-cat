@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API modify pool",
+  "description": "PUT command, URI /pools",
+
+  "type": "object",
+
+  "properties": {
+    "cbm": {
+      "description": "L3 CAT cache bit mask",
+      "$ref": "definitions.json#/string_hex"
+    },
+    "mba": {
+      "description": "MBA rate",
+      "$ref": "definitions.json#/uint"
+    }
+  },
+  "anyOf": [
+    { "required": ["cbm"] },
+    { "required": ["mba"] }
+  ]
+}

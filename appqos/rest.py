@@ -503,6 +503,54 @@ class Pool(Resource):
         raise NotFound("POOL " + str(pool_id) + " not found in config")
 
 
+    @staticmethod
+    @Server.auth.login_required
+    def put(pool_id):
+        """
+        Handles HTTP PUT /pools/<pool_id> request.
+        Modifies a Pool
+        Raises NotFound, BadRequest, InternalError
+
+        Parameters:
+            pool_id: Id of pool
+
+        Returns:
+            response, status code
+        """
+        json_data = request.get_json()
+
+        # validate app schema
+        try:
+            schema, resolver = ConfigStore.load_json_schema('modify_pool.json')
+            jsonschema.validate(json_data, schema, resolver=resolver)
+        except jsonschema.ValidationError as error:
+            raise BadRequest("Request validation failed - %s" % (str(error)))
+
+        data = common.CONFIG_STORE.get_config().copy()
+        if 'pools' not in data:
+            raise NotFound("No pools in config file")
+
+        for pool in data['pools']:
+            if pool['id'] != int(pool_id):
+                continue
+
+            # set new cbm
+            if 'cbm' in json_data:
+                cbm = json_data['cbm']
+                if not isinstance(cbm, int):
+                    cbm = int(cbm, 16)
+
+                pool['cbm'] = cbm
+
+            # set new mba
+            if 'mba' in json_data:
+                pool['mba'] = json_data['mba']
+
+            common.CONFIG_STORE.set_config(data)
+            return "POOL " + str(pool_id) + " updated", 200
+
+        raise NotFound("POOL " + str(pool_id) + " not found in config")
+
 class Pools(Resource):
     """
     Handles /pools HTTP requests

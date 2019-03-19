@@ -240,6 +240,24 @@ def test_pool_add_cbm(my_app):
     assert len(data) == 1 # 1 fields in dict
     assert 'id' in data
 
+def test_pool_set_cbm(my_app):
+    status, rawData = my_app.api_requests('PUT', 'pools/2', {"cbm": "0xc"})
+    assert status == 200
+
+    status, rawData = my_app.api_requests('GET', 'pools/2')
+    assert status == 200
+    data = json.loads(rawData)
+    assert data['cbm'] == 0xc
+
+def test_pool_set_mba(my_app):
+    status, rawData = my_app.api_requests('PUT', 'pools/2', {"mba": 30})
+    assert status == 200
+
+    status, rawData = my_app.api_requests('GET', 'pools/2')
+    assert status == 200
+    data = json.loads(rawData)
+    assert data['mba'] == 30
+
 
 def test_app_add_all(my_app):
 
