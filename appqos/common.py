@@ -42,10 +42,6 @@ import stats # pylint: disable=cyclic-import
 
 
 CONFIG_FILENAME = "appqos.conf"
-PRODUCTION = 1
-PRE_PRODUCTION = 2
-BEST_EFFORT = 3
-
 CAT_CAP = "cat"
 MBA_CAP = "mba"
 

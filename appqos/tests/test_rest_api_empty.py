@@ -62,8 +62,6 @@ class Empty_RESTAPI(object):
         self.port = 5001
 
     def start_flask(self):
-        path = os.getcwd() + '/tests/unit-test/test_rest_api_empty.conf'
-        common.CONFIG_STORE.set_path(path)
         common.CONFIG_STORE.set_config({"auth": {"username": self.user, "password":self.password}})
         # start process to run flask in the background
         server = rest.Server()

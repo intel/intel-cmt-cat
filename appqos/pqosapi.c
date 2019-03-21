@@ -202,6 +202,47 @@ static PyObject *multicore(PyObject *self, PyObject *unused)
 }
 
 /**
+ * @brief  pqos_cpu_get_sockets libpqos call wrapper to get sockets list
+ *
+ * @param [in] self NULL
+ *
+ * @return Python tuple object containing return value
+ */
+static PyObject *cpu_get_sockets(PyObject *self, PyObject *unused)
+{
+    int ret;
+    const struct pqos_cpuinfo *p_cpu = NULL;
+    unsigned int sock_count = 0;
+    unsigned int *p_sockets = NULL;
+    PyObject *sockets = NULL;
+    unsigned int i;
+
+    /* Get capability pointer */
+    ret = pqos_cap_get(NULL, &p_cpu);
+    if (ret != PQOS_RETVAL_OK || p_cpu == NULL) {
+        PyErr_SetString(exception, "Error retrieving CPU topology!");
+        return NULL;
+    }
+
+    /* Get socket ids */
+    p_sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
+    if (p_sockets == NULL) {
+        PyErr_SetString(exception, "Error retrieving socket ids!");
+        return NULL;
+    }
+
+    sockets = PyList_New(sock_count);
+
+    for (i = 0; i < sock_count; i++)
+        PyList_SetItem(sockets, i, Py_BuildValue("I", p_sockets[i]));
+
+    free(p_sockets);
+
+    return sockets;
+}
+
+
+/**
  * @brief Python's "Module's Method Table".
  *        Bind Python function names to our C functions
  */
@@ -214,6 +255,7 @@ static PyMethodDef pqosapi_methods[] = {
     {"pqos_is_mba_supported", mba_supported, METH_NOARGS},
     {"pqos_is_cat_supported", cat_supported, METH_NOARGS},
     {"pqos_is_multicore", multicore, METH_NOARGS},
+    {"pqos_cpu_get_sockets", cpu_get_sockets, METH_NOARGS},
     {NULL, NULL}
 };
 

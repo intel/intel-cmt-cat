@@ -620,18 +620,29 @@ class Pools(Resource):
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
-        data = common.CONFIG_STORE.get_config()
+        data = common.CONFIG_STORE.get_config().copy()
 
-        json_data['id'] = get_pool_id()
+        post_data = json_data.copy()
 
-        if 'cores' in json_data:
-            for core in json_data['cores']:
+        post_data['id'] = get_pool_id()
+
+        # convert cbm from string to int
+        if 'cbm' in post_data:
+            cbm = post_data['cbm']
+            if not isinstance(cbm, int):
+                cbm = int(cbm, 16)
+
+            post_data['cbm'] = cbm
+
+        if 'cores' in post_data:
+            for core in post_data['cores']:
                 if not common.is_core_valid(core):
                     raise BadRequest("New POOL not added, please provide valid cores")
 
-        data['pools'].append(json_data)
+        data['pools'].append(post_data)
+        common.CONFIG_STORE.set_config(data)
 
-        res = {'id': json_data['id']}
+        res = {'id': post_data['id']}
         return res, 201
 
 

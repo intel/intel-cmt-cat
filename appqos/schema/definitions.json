@@ -121,7 +121,7 @@
         "minItems": 0
       }
     },
-    "required": ["name"],
+    "required": ["cores"],
     "anyOf": [
       { "required": ["cbm"] },
       { "required": ["mba"] }
