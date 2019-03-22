@@ -564,6 +564,9 @@ tid_find(const pid_t pid, unsigned *tid_nr, pid_t **tid_map)
                                 break;
                 }
 
+        for (i = 0; i < num_tasks; i++)
+                free(namelist[i]);
+
         free(namelist);
 
         return ret;
