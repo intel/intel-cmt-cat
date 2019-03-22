@@ -40,7 +40,7 @@ import common
 import log
 from pqosapi import pqos_init, pqos_fini # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_alloc_assoc_set, pqos_l3ca_set, pqos_mba_set # pylint: disable=import-error,no-name-in-module
-from pqosapi import pqos_is_mba_supported, pqos_is_cat_supported, pqos_is_multicore # pylint: disable=import-error,no-name-in-module
+from pqosapi import pqos_is_mba_supported, pqos_is_cat_supported, pqos_get_num_cores # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_cpu_get_sockets # pylint: disable=import-error,no-name-in-module
 
 class Pqos(object):
@@ -186,8 +186,19 @@ class Pqos(object):
             1 if multicore
             0 otherwise
         """
+        return Pqos.get_num_cores() > 1
+
+    @staticmethod
+    def get_num_cores():
+        """
+        Gets number of cores in system
+
+        Returns:
+            num of cores
+            0 otherwise
+        """
         try:
-            return pqos_is_multicore()
+            return pqos_get_num_cores()
         except Exception as ex:
             log.error(str(ex))
             return 0
@@ -434,14 +445,17 @@ class Pool(object):
 
             if cbm:
                 if PQOS_API.l3ca_set(sockets, cos, cbm) != 0:
+                    log.error("Failed to apply CAT configuration!")
                     return -1
 
             if mba:
                 if PQOS_API.mba_set(sockets, cos, mba) != 0:
+                    log.error("Failed to apply MBA configuration!")
                     return -1
 
             if cores:
                 if PQOS_API.alloc_assoc_set(cores, cos) != 0:
+                    log.error("Failed to associate RDT COS!")
                     return -1
 
         return 0
@@ -476,12 +490,18 @@ def configure_rdt():
     old_pools = Pool.pools.copy()
 
     pool_ids = common.CONFIG_STORE.get_pool_attr('id', None)
-    for cos in old_pools:
-        if cos not in pool_ids:
-            log.debug("Pool {} removed...".format(cos))
-            Pool(cos).cores_set([])
+
+    if old_pools:
+        for cos in old_pools:
+            if not pool_ids or cos not in pool_ids:
+                log.debug("Pool {} removed...".format(cos))
+                Pool(cos).cores_set([])
 
     Pool.reset()
+
+    if not pool_ids:
+        log.error("No Pools to configure...")
+        return -1
 
     for cos in pool_ids:
         Pool(cos)

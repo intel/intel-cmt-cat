@@ -83,7 +83,8 @@ CONFIG =                               \
         {                              \
             "id": 3,                   \
             "mba": 30,                 \
-            "name": "mba"              \
+            "name": "mba",             \
+            "cores": [4],              \
         }                              \
     ]                                  \
 }
@@ -132,3 +133,38 @@ def test_config_pid_to_pool(mock_get_config, pid, pool_id):
     config_store = ConfigStore()
 
     assert config_store.pid_to_pool(pid) == pool_id
+
+
+@mock.patch('cache_ops.PQOS_API.get_num_cores')
+def test_config_default_pool(mock_get_num_cores):
+    mock_get_num_cores.return_value = 16
+    config_store = ConfigStore()
+    config = CONFIG.copy()
+
+    # just in case, remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config_store.is_default_pool_defined(config)
+
+    # add default pool to config
+    config_store.add_default_pool(config)
+    assert config_store.is_default_pool_defined(config)
+
+    # test that config now contains all cores (cores configured + default pool cores)
+    all_cores = range(cache_ops.PQOS_API.get_num_cores())
+    for pool in config['pools']:
+        all_cores = [core for core in all_cores if core not in pool['cores']]
+    assert not all_cores
+
+    # remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config_store.is_default_pool_defined(config)

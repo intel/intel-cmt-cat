@@ -41,6 +41,7 @@ from os.path import join, dirname
 import jsonschema
 
 import common
+import cache_ops
 
 
 class ConfigStore(object):
@@ -71,7 +72,7 @@ class ConfigStore(object):
 
         data = self.get_config()
 
-        if pool_id:
+        if pool_id is not None:
             for pool in data['pools']:
                 if pool['id'] == pool_id:
                     return pool.get(attr)
@@ -129,6 +130,10 @@ class ConfigStore(object):
         """
         self.set_path(path)
         data = self.load(path)
+
+        if not self.is_default_pool_defined(data):
+            self.add_default_pool(data)
+
         self.set_config(data)
 
 
@@ -281,3 +286,36 @@ class ConfigStore(object):
             result
         """
         return common.is_event_set(self.changed_event)
+
+
+    @staticmethod
+    def is_default_pool_defined(data):
+        """
+        Check is Default pool defined
+
+        Returns:
+            result
+        """
+        for pool in data['pools']:
+            if pool['id'] == 0:
+                return 1
+
+        return 0
+
+    @staticmethod
+    def add_default_pool(data):
+        """
+        Update config with "Default" pool
+        """
+
+        # no Default pool configured
+        default_pool = {}
+        default_pool['id'] = 0
+        default_pool['name'] = "Default"
+        default_pool['cores'] = range(cache_ops.PQOS_API.get_num_cores())
+
+        for pool in data['pools']:
+            default_pool['cores'] = \
+                [core for core in default_pool['cores'] if core not in pool['cores']]
+
+        data['pools'].append(default_pool)

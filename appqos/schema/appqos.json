@@ -51,8 +51,7 @@
       "description": "Pools of APPs definitions",
       "type": "array",
       "items": { "$ref": "definitions.json#/pool" },
-      "uniqueItems": true,
-      "minItems": 1
+      "uniqueItems": true
     }
   },
 
