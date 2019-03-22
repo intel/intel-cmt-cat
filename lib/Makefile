@@ -205,6 +205,7 @@ style:
 	-f resctrl_alloc.h -f resctrl_alloc.c \
 	-f types.h \
 	-f utils.h -f utils.c
+	$(MAKE) -C python style
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck

@@ -21,3 +21,6 @@ tools/membw/membw
 appqos/appqos.crt
 appqos/appqos.key
 appqos/virtual_env
+
+lib/python/.coverage
+lib/python/test_env
