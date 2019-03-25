@@ -42,6 +42,7 @@ from pqosapi import pqos_init, pqos_fini # pylint: disable=import-error,no-name-
 from pqosapi import pqos_alloc_assoc_set, pqos_l3ca_set, pqos_mba_set # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_is_mba_supported, pqos_is_cat_supported, pqos_get_num_cores # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_cpu_get_sockets # pylint: disable=import-error,no-name-in-module
+from pqosapi import pqos_get_l3ca_num_cos, pqos_get_mba_num_cos # pylint: disable=import-error,no-name-in-module
 
 class Pqos(object):
     """
@@ -217,6 +218,69 @@ class Pqos(object):
         except Exception as ex:
             log.error(str(ex))
             return None
+
+    @staticmethod
+    def get_l3ca_num_cos():
+        """
+        Gets number of COS for L3 CAT
+
+        Returns:
+            num of COS for L3 CAT
+            None otherwise
+        """
+        try:
+            return pqos_get_l3ca_num_cos()
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    @staticmethod
+    def get_mba_num_cos():
+        """
+        Gets number of COS for MBA
+
+        Returns:
+            num of COS for MBA
+            None otherwise
+        """
+        try:
+            return pqos_get_mba_num_cos()
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    @staticmethod
+    def get_max_cos_id(alloc_type):
+        """
+        Gets max COS# (id) that can be used to configure set of allocation technologies
+
+        Returns:
+            Available COS# to be used
+            None otherwise
+        """
+        max_cos_num = None
+        max_cos_cat = Pqos.get_l3ca_num_cos()
+        max_cos_mba = Pqos.get_mba_num_cos()
+
+        if common.CAT_CAP not in alloc_type and common.MBA_CAP not in alloc_type:
+            return None
+
+        if common.CAT_CAP in alloc_type and not max_cos_cat:
+            return None
+
+        if common.MBA_CAP in alloc_type and not max_cos_mba:
+            return None
+
+        if common.CAT_CAP in alloc_type:
+            max_cos_num = max_cos_cat
+
+        if common.MBA_CAP in alloc_type:
+            if max_cos_num is not None:
+                max_cos_num = min(max_cos_mba, max_cos_num)
+            else:
+                max_cos_num = max_cos_mba
+
+        return max_cos_num - 1
 
 PQOS_API = Pqos()
 

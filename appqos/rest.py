@@ -44,6 +44,7 @@ from time import sleep
 from flask import Flask
 from flask_httpauth import HTTPBasicAuth
 from flask_restful import Api, Resource, request
+from werkzeug.exceptions import HTTPException
 
 import jsonschema
 
@@ -56,16 +57,16 @@ from config import ConfigStore
 from stats import StatsStore
 
 
-class RestError(Exception):
+class RestError(HTTPException):
     """
     RestError exception base class
     """
 
 
-    def __init__(self, code, message):
-        Exception.__init__(self)
+    def __init__(self, code, description):
+        HTTPException.__init__(self)
         self.code = code
-        self.message = message
+        self.description = description
 
 
 class NotFound(RestError):
@@ -74,8 +75,8 @@ class NotFound(RestError):
     """
 
 
-    def __init__(self, message="Not Found"):
-        RestError.__init__(self, 404, message)
+    def __init__(self, description="Not Found"):
+        RestError.__init__(self, 404, description)
 
 
 class BadRequest(RestError):
@@ -84,8 +85,8 @@ class BadRequest(RestError):
     """
 
 
-    def __init__(self, message="BadRequest"):
-        RestError.__init__(self, 400, message)
+    def __init__(self, description="BadRequest"):
+        RestError.__init__(self, 400, description)
 
 
 class InternalError(RestError):
@@ -94,8 +95,8 @@ class InternalError(RestError):
     """
 
 
-    def __init__(self, message="Internal Server Error"):
-        RestError.__init__(self, 500, message)
+    def __init__(self, description="Internal Server Error"):
+        RestError.__init__(self, 500, description)
 
 
 class Server(object):
@@ -488,6 +489,9 @@ class Pool(Resource):
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
+        if int(pool_id) == 0:
+            raise BadRequest("POOL " + str(pool_id) + " is Default, cannot delete")
+
         for pool in data['pools']:
             if pool['id'] != int(pool_id):
                 continue
@@ -586,31 +590,6 @@ class Pools(Resource):
         Returns:
             response, status code
         """
-
-        def get_pool_id():
-            """
-            Get ID for new Pool
-
-            Returns:
-                ID for new Pool
-            """
-            # put all ids into list
-            pool_ids = []
-            for pool in data['pools']:
-                pool_ids.append(pool['id'])
-            pool_ids = sorted(pool_ids)
-            # no pool found in config
-            if not pool_ids:
-                return 1
-
-            # add new pool to pools
-            # find an id
-            new_id = list(set(range(1, pool_ids[-1])) - set(pool_ids))
-            if new_id:
-                return new_id[0]
-
-            return pool_ids[-1] + 1
-
         json_data = request.get_json()
 
         # validate pool schema
@@ -620,11 +599,11 @@ class Pools(Resource):
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
-        data = common.CONFIG_STORE.get_config().copy()
-
         post_data = json_data.copy()
-
-        post_data['id'] = get_pool_id()
+        post_data['id'] = common.CONFIG_STORE.get_new_pool_id(post_data)
+        if post_data['id'] is None:
+            raise InternalError("New POOL not added, maximum number of POOLS"\
+                " reached for requested allocation combination")
 
         # convert cbm from string to int
         if 'cbm' in post_data:
@@ -639,6 +618,7 @@ class Pools(Resource):
                 if not common.is_core_valid(core):
                     raise BadRequest("New POOL not added, please provide valid cores")
 
+        data = common.CONFIG_STORE.get_config().copy()
         data['pools'].append(post_data)
         common.CONFIG_STORE.set_config(data)
 

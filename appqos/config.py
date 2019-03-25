@@ -319,3 +319,38 @@ class ConfigStore(object):
                 [core for core in default_pool['cores'] if core not in pool['cores']]
 
         data['pools'].append(default_pool)
+
+
+    def get_new_pool_id(self, new_pool_data):
+        """
+        Get ID for new Pool
+
+        Returns:
+            ID for new Pool
+        """
+        # get max cos id for combination of allocation technologies
+        alloc_type = []
+        if 'mba' in new_pool_data:
+            alloc_type.append(common.MBA_CAP)
+        if 'cbm' in new_pool_data:
+            alloc_type.append(common.CAT_CAP)
+        max_cos_id = cache_ops.PQOS_API.get_max_cos_id(alloc_type)
+
+        data = self.get_config()
+
+        # put all pool ids into list
+        pool_ids = []
+        for pool in data['pools']:
+            pool_ids.append(pool['id'])
+
+        # no pool found in config, return highest id
+        if not pool_ids:
+            return max_cos_id
+
+        # find highest available id
+        new_ids = list(set(range(1, max_cos_id + 1)) - set(pool_ids))
+        if new_ids:
+            new_ids.sort()
+            return new_ids[-1]
+
+        return None

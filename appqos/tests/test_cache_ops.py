@@ -34,6 +34,8 @@
 import pytest
 import mock
 
+import common
+
 from cache_ops import *
 
 class TestCacheOps(object):
@@ -164,3 +166,40 @@ class TestCacheOps(object):
         Pool.reset()
         assert 2 not in Pool.pools
 
+
+    @mock.patch('cache_ops.Pqos.get_l3ca_num_cos')
+    @mock.patch('cache_ops.Pqos.get_mba_num_cos')
+    def test_get_max_cos_id(self, mock_get_mba_num_cos, mock_get_l3ca_num_cos):
+
+       mock_get_l3ca_num_cos.return_value = 16
+       mock_get_mba_num_cos.return_value = 8
+       assert 7 == Pqos.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert 7 == Pqos.get_max_cos_id([common.MBA_CAP])
+       assert 15 == Pqos.get_max_cos_id([common.CAT_CAP])
+       assert None == Pqos.get_max_cos_id([])
+
+       mock_get_l3ca_num_cos.return_value = 0
+       assert None == Pqos.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert 7 == Pqos.get_max_cos_id([common.MBA_CAP])
+       assert None == Pqos.get_max_cos_id([common.CAT_CAP])
+       assert None == Pqos.get_max_cos_id([])
+
+       mock_get_mba_num_cos.return_value = 0
+       assert None == Pqos.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert None == Pqos.get_max_cos_id([common.MBA_CAP])
+       assert None == Pqos.get_max_cos_id([common.CAT_CAP])
+       assert None == Pqos.get_max_cos_id([])
+
+
+    @mock.patch('cache_ops.pqos_get_l3ca_num_cos')
+    def test_get_l3ca_num_cos(self, mock_pqos_get_l3ca_num_cos):
+       mock_pqos_get_l3ca_num_cos.return_value = 32
+
+       assert 32 == Pqos.get_l3ca_num_cos()
+
+
+    @mock.patch('cache_ops.pqos_get_mba_num_cos')
+    def test_get_mba_num_cos(self, mock_pqos_get_mba_num_cos):
+       mock_pqos_get_mba_num_cos.return_value = 16
+
+       assert 16 == Pqos.get_mba_num_cos()
