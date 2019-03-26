@@ -556,17 +556,15 @@ tid_find(const pid_t pid, unsigned *tid_nr, pid_t **tid_map)
         tid = atoi(namelist[0]->d_name);
         if (pid != tid)
                 ret = tid_add(pid, tid_nr, tid_map);
-        else {
+        else
                 for (i = 0; i < num_tasks; i++) {
                         ret = tid_add((pid_t)atoi(namelist[i]->d_name),
                                       tid_nr, tid_map);
                         if (ret != PQOS_RETVAL_OK)
                                 break;
                 }
-       }
-       for (i = 0; i < num_tasks; i++) {
-       			free(namelist[i]);
-       }
+        for (i = 0; i < num_tasks; i++)
+                free(namelist[i]);
 
         free(namelist);
 
