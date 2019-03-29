@@ -180,13 +180,13 @@ static PyObject *mba_supported(PyObject *self, PyObject *unused)
 }
 
 /**
- * @brief pqos_cap_get libpqos call wrapper to get multicore status
+ * @brief pqos_cap_get libpqos call wrapper to get number of cores in the sys
  *
  * @param [in] self NULL
  *
  * @return Python tuple object containing return value
  */
-static PyObject *multicore(PyObject *self, PyObject *unused)
+static PyObject *num_cores(PyObject *self, PyObject *unused)
 {
     int ret;
     const struct pqos_cpuinfo *p_cpu = NULL;
@@ -198,7 +198,7 @@ static PyObject *multicore(PyObject *self, PyObject *unused)
         return NULL;
     }
 
-    return Py_BuildValue("i", (int)(p_cpu->num_cores > 1));
+    return Py_BuildValue("i", p_cpu->num_cores);
 }
 
 /**
@@ -254,7 +254,7 @@ static PyMethodDef pqosapi_methods[] = {
     {"pqos_mba_set", mba_set, METH_VARARGS},
     {"pqos_is_mba_supported", mba_supported, METH_NOARGS},
     {"pqos_is_cat_supported", cat_supported, METH_NOARGS},
-    {"pqos_is_multicore", multicore, METH_NOARGS},
+    {"pqos_get_num_cores", num_cores, METH_NOARGS},
     {"pqos_cpu_get_sockets", cpu_get_sockets, METH_NOARGS},
     {NULL, NULL}
 };
