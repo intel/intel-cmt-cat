@@ -74,7 +74,7 @@ class Empty_RESTAPI(object):
 
         r = requests.request(method, url, json=data, auth=(self.user, self.password), verify=False)
 
-        return (r.status_code, r.content)
+        return (r.status_code, r.content.decode('utf-8'))
 
 @pytest.fixture(scope="session")
 def my_app():
@@ -134,7 +134,7 @@ def test_add_app(my_app):
     status, rawData = my_app.api_requests('POST', 'apps', {"pool_id": 2, "name": "hello", "cores": [1,2], "pids": [1324,124]})
 
     data = json.loads(rawData)
-    print data
+    print(data)
 
     assert status == 404
 

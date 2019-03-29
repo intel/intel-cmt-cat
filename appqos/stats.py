@@ -39,13 +39,13 @@ Stats processing helper functions and storage for stats
 import common
 
 
-class StatsStore(object):
+class StatsStore:
     """
     Storage for stats
     """
 
 
-    class General(object):
+    class General:
         """
         Helper class
         """

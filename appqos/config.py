@@ -44,7 +44,7 @@ import common
 import cache_ops
 
 
-class ConfigStore(object):
+class ConfigStore:
     """
     Class to handle config file operations
     """
@@ -312,7 +312,7 @@ class ConfigStore(object):
         default_pool = {}
         default_pool['id'] = 0
         default_pool['name'] = "Default"
-        default_pool['cores'] = range(cache_ops.PQOS_API.get_num_cores())
+        default_pool['cores'] = list(range(cache_ops.PQOS_API.get_num_cores()))
 
         for pool in data['pools']:
             default_pool['cores'] = \

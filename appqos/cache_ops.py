@@ -44,7 +44,7 @@ from pqosapi import pqos_is_mba_supported, pqos_is_cat_supported, pqos_get_num_c
 from pqosapi import pqos_cpu_get_sockets # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_get_l3ca_num_cos, pqos_get_mba_num_cos # pylint: disable=import-error,no-name-in-module
 
-class Pqos(object):
+class Pqos:
     """
     Wrapper for "libpqos".
     Uses "libpqos" to configure Intel(R) RDT
@@ -285,7 +285,7 @@ class Pqos(object):
 PQOS_API = Pqos()
 
 
-class Pool(object):
+class Pool:
     # pylint: disable=too-many-public-methods
     """
     Static table of pools
