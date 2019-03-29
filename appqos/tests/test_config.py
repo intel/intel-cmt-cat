@@ -38,55 +38,54 @@ import mock
 
 from config import *
 
-CONFIG =                               \
-{                                      \
-    "apps": [                          \
-        {                              \
-            "cores": [1],              \
-            "id": 1,                   \
-            "name": "app 1",           \
-            "pids": [1]                \
-        },                             \
-        {                              \
-            "cores": [3],              \
-            "id": 2,                   \
-            "name": "app 2",           \
-            "pids": [2, 3]             \
-        },                             \
-        {                              \
-            "cores": [3],              \
-            "id": 3,                   \
-            "name": "app 3",           \
-            "pids": [4]                \
-        }                              \
-    ],                                 \
-    "auth": {                          \
-        "password": "password",        \
-        "username": "admin"            \
-    },                                 \
-    "pools": [                         \
-        {                              \
-            "apps": [1],               \
-            "cbm": 0xf0,               \
-            "cores": [1],              \
-            "id": 1,                   \
-            "mba": 20,                 \
-            "name": "cat&mba"          \
-        },                             \
-        {                              \
-            "apps": [2, 3],            \
-            "cbm": 0xf,                \
-            "cores": [3],              \
-            "id": 2,                   \
-            "name": "cat"              \
-        },                             \
-        {                              \
-            "id": 3,                   \
-            "mba": 30,                 \
-            "name": "mba",             \
-            "cores": [4],              \
-        }                              \
-    ]                                  \
+CONFIG = {
+    "apps": [
+        {
+            "cores": [1],
+            "id": 1,
+            "name": "app 1",
+            "pids": [1]
+        },
+        {
+            "cores": [3],
+            "id": 2,
+            "name": "app 2",
+            "pids": [2, 3]
+        },
+        {
+            "cores": [3],
+            "id": 3,
+            "name": "app 3",
+            "pids": [4]
+        }
+    ],
+    "auth": {
+        "password": "password",
+        "username": "admin"
+    },
+    "pools": [
+        {
+            "apps": [1],
+            "cbm": 0xf0,
+            "cores": [1],
+            "id": 1,
+            "mba": 20,
+            "name": "cat&mba"
+        },
+        {
+            "apps": [2, 3],
+            "cbm": 0xf,
+            "cores": [3],
+            "id": 2,
+            "name": "cat"
+        },
+        {
+            "id": 3,
+            "mba": 30,
+            "name": "mba",
+            "cores": [4],
+        }
+    ]
 }
 
 @mock.patch('config.ConfigStore.get_config')
@@ -168,3 +167,55 @@ def test_config_default_pool(mock_get_num_cores):
 
     # no default pool in config
     assert not config_store.is_default_pool_defined(config)
+
+
+CONFIG_POOLS = {
+    "pools": [
+        {
+            "apps": [1],
+            "cbm": 0xf0,
+            "cores": [1],
+            "id": 0,
+            "mba": 20,
+            "name": "cat&mba_0"
+        },
+        {
+            "apps": [2, 3],
+            "cbm": 0xf,
+            "cores": [3],
+            "id": 9,
+            "name": "cat_9"
+        },
+        {
+            "id": 31,
+            "cbm": "0xf0",
+            "name": "cat_31",
+            "cores": [4],
+        }
+    ]
+}
+
+
+@mock.patch('config.ConfigStore.get_config')
+def test_config_get_new_pool_id(mock_get_config):
+
+    def get_max_cos_id(alloc_type):
+        if 'mba' in alloc_type:
+            return 9
+        else:
+            return 31
+
+
+    with mock.patch('cache_ops.PQOS_API.get_max_cos_id', new=get_max_cos_id):
+        config_store = ConfigStore()
+
+        mock_get_config.return_value = CONFIG
+        assert 9 == config_store.get_new_pool_id({"mba":10})
+        assert 9 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
+        assert 31 == config_store.get_new_pool_id({"cbm":"0xff"})
+
+        mock_get_config.return_value = CONFIG_POOLS
+        assert 8 == config_store.get_new_pool_id({"mba":10})
+        assert 8 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
+        assert 30 == config_store.get_new_pool_id({"cbm":"0xff"})
+

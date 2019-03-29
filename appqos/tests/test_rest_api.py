@@ -32,8 +32,11 @@
 ################################################################################
 
 import pytest
+import mock
+
 import json
 import common
+import cache_ops
 import config
 import rest
 
@@ -51,61 +54,68 @@ from requests.auth import HTTPBasicAuth
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
+MAX_L3CA_COS_ID = 15
+MAX_MBA_COS_ID = 7
 
-CONFIG =                               \
-{                                      \
-    "apps": [                          \
-        {                              \
-            "cores": [1],              \
-            "id": 1,                   \
-            "name": "app 1",           \
-            "pids": [1]                \
-        },                             \
-        {                              \
-            "cores": [3],              \
-            "id": 2,                   \
-            "name": "app 2",           \
-            "pids": [2, 3]             \
-        },                             \
-        {                              \
-            "cores": [3],              \
-            "id": 3,                   \
-            "name": "app 3",           \
-            "pids": [4]                \
-        }                              \
-    ],                                 \
-    "auth": {                          \
-        "password": "secretsecret",    \
-        "username": "superadmin"       \
-    },                                 \
-    "pools": [                         \
-        {                              \
-            "apps": [1],               \
-            "cbm": 0xf0,               \
-            "cores": [1],              \
-            "id": 1,                   \
-            "mba": 20,                 \
-            "name": "cat&mba"          \
-        },                             \
-        {                              \
-            "apps": [2, 3],            \
-            "cbm": 0xf,                \
-            "cores": [3],              \
-            "id": 2,                   \
-            "name": "cat"              \
-        },                             \
-        {                              \
-            "id": 3,                   \
-            "mba": 30,                 \
-            "name": "mba",             \
-            "cores": [4]               \
-        },                             \
-        {                              \
-            "id": 4,                   \
-            "mba": 30,                 \
-            "cores": [5]               \
-        }                              \
-    ]                                  \
+CONFIG = {
+    "apps": [
+        {
+            "cores": [1],
+            "id": 1,
+            "name": "app 1",
+            "pids": [1]
+        },
+        {
+            "cores": [2],
+            "id": 2,
+            "name": "app 2",
+            "pids": [2, 3]
+        },
+        {
+            "cores": [3],
+            "id": 3,
+            "name": "app 3",
+            "pids": [4]
+        }
+    ],
+    "auth": {
+        "password": "secretsecret",
+        "username": "superadmin"
+    },
+    "pools": [
+        {
+            "cores": [20,21,22],
+            "id": 0,
+            "mba": 100,
+            "name": "Default"
+        },
+        {
+            "apps": [1],
+            "cbm": 0xf0,
+            "cores": [1],
+            "id": 1,
+            "mba": 20,
+            "name": "cat&mba"
+        },
+        {
+            "apps": [2, 3],
+            "cbm": 0xf,
+            "cores": [2, 3],
+            "id": 2,
+            "name": "cat"
+        },
+        {
+            "id": 3,
+            "mba": 30,
+            "name": "mba",
+            "cores": [4]
+        },
+        {
+            "id": 4,
+            "mba": 30,
+            "cores": [5]
+        }
+    ]
 }
 
 
@@ -119,10 +129,17 @@ class RESTAPI(object):
         self.port = 6000
 
     def start_flask(self):
-        # start process to run flask in the background
-        server = rest.Server()
-        server.start(self.address, self.port, True)
-        return server
+        def get_max_cos_id(alloc_type):
+            if 'mba' in alloc_type:
+                return MAX_MBA_COS_ID
+            else:
+                return MAX_L3CA_COS_ID
+
+        with mock.patch('cache_ops.PQOS_API.get_max_cos_id', new=get_max_cos_id):
+            # start process to run flask in the background
+            server = rest.Server()
+            server.start(self.address, self.port, True)
+            return server
 
     def api_requests(self, method, endpoint, data={}):
 
@@ -195,9 +212,9 @@ def test_pools_get(my_app):
     schema, resolver = my_app._load_json_schema('get_pool_all_response.json')
     validate(data, schema, resolver=resolver)
 
-    # assert 3 pools are returned
+    # assert 5 pools are returned
     # structure, types and required fields are validated using schema
-    assert len(data) == 4
+    assert len(data) == 5
     assert status == 200
 
 
@@ -235,6 +252,14 @@ def test_pool_delete_empty(my_app, empty_pool_id):
 ])
 def test_pool_delete_not_empty(my_app, not_empty_pool_id):
     status, rawData = my_app.api_requests('DELETE', 'pools/' + str(not_empty_pool_id))
+    assert status == 400
+
+
+def test_pool_delete_default(my_app):
+    status, rawData = my_app.api_requests('GET', 'pools/0')
+    assert status == 200
+
+    status, rawData = my_app.api_requests('DELETE', 'pools/0')
     assert status == 400
 
 
@@ -370,16 +395,17 @@ def test_pool_add_mba_cbm(my_app):
 def test_pool_add_multiple(my_app):
     # create new pools
     pools = [
-        {"name":"pool_1", "cores":[1], "mba": 10, "cbm": "0x1"},
-        {"cores":[2], "mba": 20, "cbm": "0x2"},
-        {"name":"pool_3", "cores":[3], "cbm": "0x4"},
-        {"name":"pool_4", "cores":[4], "mba": 40},
-        {"cores":[5, 6], "mba": 50, "cbm": "0x10"},
-        {"name":"pool_6", "cores":[7, 8, 9], "cbm": "0x30"},
-        {"name":"pool_7", "cores":[10], "mba": 70},
-        {"name":"pool_8", "cores":[11], "cbm": "0xf0"},
-        {"name":"pool_9", "cores":[12], "cbm": "0x17"},
-        {"name":"pool_10", "cores":[13,14,15,16], "mba": 70, "cbm": "0x37"}
+        {"name":"pool_1", "cores":[6], "mba": 10, "cbm": "0x1"},
+        {"cores":[7], "mba": 20, "cbm": "0x2"},
+        {"name":"pool_3", "cores":[8], "cbm": "0x4"},
+        {"name":"pool_4", "cores":[9], "cbm": "0x40"},
+        {"cores":[10, 11], "cbm": "0x10"},
+        {"name":"pool_6", "cores":[12, 13, 14], "cbm": "0x30"},
+        {"name":"pool_7", "cores":[15], "cbm": "0x70"},
+        {"name":"pool_10", "cores":[16], "mba": 70, "cbm": "0x37"},
+        {"name":"pool_8", "cores":[17], "cbm": "0xf0"},
+        {"name":"pool_9", "cores":[18], "cbm": "0x17"},
+        {"name":"pool_11", "cores":[19], "cbm": "0x1f"}
     ]
 
     pool_ids = []
@@ -399,6 +425,12 @@ def test_pool_add_multiple(my_app):
         assert len(data) == 1 # 1 fields in dict
         assert 'id' in data
 
+        # check allocated pool_id/COS
+        if 'mba' in pool_data:
+            assert data['id'] <= MAX_MBA_COS_ID
+        else:
+            assert data['id'] <= MAX_L3CA_COS_ID
+
         pool_ids.append(data['id'])
 
         status, rawData = my_app.api_requests('GET', 'pools/' + str(pool_ids[-1]))
@@ -411,6 +443,15 @@ def test_pool_add_multiple(my_app):
         validate(data, schema, resolver=resolver)
 
         assert data['id'] == pool_ids[-1]
+
+    # attempt add one pool over the limit
+    status, rawData = my_app.api_requests('POST', 'pools', {"name":"pool_12", "cores":[25], "cbm": "0x17"})
+    assert status == 500
+
+    # no more pools than number of classes
+    status, rawData = my_app.api_requests('GET', 'pools')
+    data = json.loads(rawData)
+    assert len(data) == max(MAX_L3CA_COS_ID, MAX_MBA_COS_ID) + 1
 
     # remove pools
     for pool_id in pool_ids:

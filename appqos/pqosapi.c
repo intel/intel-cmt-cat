@@ -243,6 +243,70 @@ static PyObject *cpu_get_sockets(PyObject *self, PyObject *unused)
 
 
 /**
+ * @brief pqos_l3ca_get_cos_num libpqos call wrapper
+ * to get number of COSes for L3 CAT
+ *
+ * @param [in] self NULL
+ *
+ * @return Python tuple object containing return value
+ */
+static PyObject *l3ca_num_cos(PyObject *self, PyObject *unused)
+{
+    int ret;
+    const struct pqos_cap *p_cap = NULL;
+    unsigned int l3ca_cos_num = 0;
+
+    /* Get capability pointer */
+    ret = pqos_cap_get(&p_cap, NULL);
+    if (ret != PQOS_RETVAL_OK || p_cap == NULL) {
+        PyErr_SetString(exception, "Error retrieving PQoS capabilities!");
+        return NULL;
+    }
+
+    /* Get COS num for L3 CAT  */
+    ret = pqos_l3ca_get_cos_num(p_cap, &l3ca_cos_num);
+    if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
+        PyErr_SetString(exception, "Error retrieving num of COS for L3 CAT!");
+        return NULL;
+    }
+
+    return Py_BuildValue("I", l3ca_cos_num);
+}
+
+
+/**
+ * @brief pqos_mba_get_cos_num libpqos call wrapper
+ * to get number of COSes for MBA
+ *
+ * @param [in] self NULL
+ *
+ * @return Python tuple object containing return value
+ */
+static PyObject *mba_num_cos(PyObject *self, PyObject *unused)
+{
+    int ret;
+    const struct pqos_cap *p_cap = NULL;
+    unsigned int mba_cos_num = 0;
+
+    /* Get capability pointer */
+    ret = pqos_cap_get(&p_cap, NULL);
+    if (ret != PQOS_RETVAL_OK || p_cap == NULL) {
+        PyErr_SetString(exception, "Error retrieving PQoS capabilities!");
+        return NULL;
+    }
+
+    /* Get COS num for MBA  */
+    ret = pqos_mba_get_cos_num(p_cap, &mba_cos_num);
+    if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE) {
+        PyErr_SetString(exception, "Error retrieving num of COS for MBA!");
+        return NULL;
+    }
+
+    return Py_BuildValue("I", mba_cos_num);
+}
+
+
+/**
  * @brief Python's "Module's Method Table".
  *        Bind Python function names to our C functions
  */
@@ -256,6 +320,8 @@ static PyMethodDef pqosapi_methods[] = {
     {"pqos_is_cat_supported", cat_supported, METH_NOARGS},
     {"pqos_get_num_cores", num_cores, METH_NOARGS},
     {"pqos_cpu_get_sockets", cpu_get_sockets, METH_NOARGS},
+    {"pqos_get_l3ca_num_cos", l3ca_num_cos, METH_NOARGS},
+    {"pqos_get_mba_num_cos", mba_num_cos, METH_NOARGS},
     {NULL, NULL}
 };
 

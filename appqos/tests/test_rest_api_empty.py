@@ -91,7 +91,7 @@ def test_get_apps_empty(my_app):
 
     # assert 0 apps are returned
     # structure, types and required fields are validated using schema
-    assert data["message"] == "No apps in config file"
+    assert "No apps in config file" in data["message"]
     assert status == 404
 
 def test_get_app_empty(my_app):
@@ -102,7 +102,7 @@ def test_get_app_empty(my_app):
 
     # assert no app is returned
     # structure, types and required fields are validated using schema
-    assert data["message"] == "No apps in config file"
+    assert "No apps in config file" in data["message"]
     assert status == 404
 
 def test_get_pools_empty(my_app):
@@ -113,7 +113,7 @@ def test_get_pools_empty(my_app):
 
     # assert 0 pools are returned
     # structure, types and required fields are validated using schema
-    assert data["message"] == "No pools in config file"
+    assert "No pools in config file" in data["message"]
     assert status == 404
 
 
@@ -125,7 +125,7 @@ def test_get_pool_empty(my_app):
 
     # assert no pool is returned
     # structure, types and required fields are validated using schema
-    assert data["message"] == "No pools in config file"
+    assert "No pools in config file" in data["message"]
     assert status == 404
 
 
