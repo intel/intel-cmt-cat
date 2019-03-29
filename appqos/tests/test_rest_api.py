@@ -97,7 +97,13 @@ CONFIG =                               \
         {                              \
             "id": 3,                   \
             "mba": 30,                 \
-            "name": "mba"              \
+            "name": "mba",             \
+            "cores": [4]               \
+        },                             \
+        {                              \
+            "id": 4,                   \
+            "mba": 30,                 \
+            "cores": [5]               \
         }                              \
     ]                                  \
 }
@@ -191,7 +197,7 @@ def test_pools_get(my_app):
 
     # assert 3 pools are returned
     # structure, types and required fields are validated using schema
-    assert len(data) ==3
+    assert len(data) == 4
     assert status == 200
 
 
@@ -210,35 +216,210 @@ def test_pool_get(my_app):
     assert status == 200
 
 
-def test_pool_delete_empty(my_app):
-    status, rawData = my_app.api_requests('DELETE', 'pools/3')
+@pytest.mark.parametrize("empty_pool_id", [
+    3,
+    4
+])
+
+def test_pool_delete_empty(my_app, empty_pool_id):
+    status, rawData = my_app.api_requests('DELETE', 'pools/' + str(empty_pool_id))
     assert status == 200
 
-    status, rawData = my_app.api_requests('GET', 'pools/3')
+    status, rawData = my_app.api_requests('GET', 'pools/' + str(empty_pool_id))
     assert status == 404
 
 
-def test_pool_delete_not_empty(my_app):
-    status, rawData = my_app.api_requests('DELETE', 'pools/2')
+@pytest.mark.parametrize("not_empty_pool_id", [
+    1,
+    2
+])
+def test_pool_delete_not_empty(my_app, not_empty_pool_id):
+    status, rawData = my_app.api_requests('DELETE', 'pools/' + str(not_empty_pool_id))
     assert status == 400
 
 
+@pytest.mark.parametrize("no_req_fields_json", [
+    {"mba": 10},                                # missing cores
+    {"cbm": "0xf"},                             # missing cores
+    {"mba": 10, "cbm": "0xf"},                  # missing cores
+    {"name":"hello", "mba": 10, "cbm": "0xf"},  # missing cores
+    {"name":"hello", "cbm": "0xf"},             # missing cores
+
+    {"cores":[3, 10]},                  # missing at least one alloc technology
+    {"name":"hello", "cores":[3, 10]},  # missing at least one alloc technology
+
+    {"name":"hello"},                   # missing at least one alloc technology and cores
+
+    {"cores":[3, 10], "cbm": "0xf", "apps":[1]} # extra property "apps"
+])
+def test_pool_add_no_req_fields(my_app, no_req_fields_json):
+    status, rawData = my_app.api_requests('POST', 'pools', no_req_fields_json)
+    assert status == 400
+
+
+def test_pool_add_no_name(my_app):
+    status, rawData = my_app.api_requests('POST', 'pools', {"cores":[1, 2], "cbm": "0xf"})
+    assert status == 201
+
+
 def test_pool_add_cbm(my_app):
-    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello", "cores":[6, 7], "cbm": "0xf"})
+    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello", "cores":[13, 17], "cbm": "0xf"})
     assert status == 201
 
     data = json.loads(rawData)
 
-    print data
-
-    #validate add app response schema
+    #validate add pool response schema
     schema, resolver = my_app._load_json_schema('add_pool_response.json')
     validate(data, schema, resolver=resolver)
 
-    # assert app is added
+    # assert pool is added
     # structure, types and required fields are validated using schema
     assert len(data) == 1 # 1 fields in dict
     assert 'id' in data
+
+    pool_id = data['id']
+
+    status, rawData = my_app.api_requests('GET', 'pools/' + str(pool_id))
+    assert status == 200
+
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    assert len(data) == 4
+
+    assert data['id'] == pool_id
+    assert data['name'] == "hello"
+    assert data['cores'] == [13, 17]
+    assert data['cbm'] == 0xf
+    assert 'mba' not in data
+
+
+def test_pool_add_mba(my_app):
+    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello_mba", "cores":[1, 6, 7], "mba": 50})
+    assert status == 201
+
+    data = json.loads(rawData)
+
+    #validate add pool response schema
+    schema, resolver = my_app._load_json_schema('add_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    # assert pool is added
+    # structure, types and required fields are validated using schema
+    assert len(data) == 1 # 1 fields in dict
+    assert 'id' in data
+
+    pool_id = data['id']
+
+    status, rawData = my_app.api_requests('GET', 'pools/' + str(data['id']))
+    assert status == 200
+
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    assert len(data) == 4
+
+    assert data['id'] == pool_id
+    assert data['name'] == "hello_mba"
+    assert data['cores'] == [1, 6, 7]
+    assert data['mba'] == 50
+    assert 'cbm' not in data
+
+
+def test_pool_add_mba_cbm(my_app):
+    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello_mba_cbm", "cores":[1, 2, 6, 7], "mba": 50, "cbm": "0xf0"})
+    assert status == 201
+
+    data = json.loads(rawData)
+
+    #validate add pool response schema
+    schema, resolver = my_app._load_json_schema('add_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    # assert pool is added
+    # structure, types and required fields are validated using schema
+    assert len(data) == 1 # 1 fields in dict
+    assert 'id' in data
+
+    pool_id = data['id']
+
+    status, rawData = my_app.api_requests('GET', 'pools/' + str(pool_id))
+    assert status == 200
+
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    assert len(data) == 5
+
+    assert data['id'] == pool_id
+    assert data['name'] == "hello_mba_cbm"
+    assert data['cores'] == [1, 2, 6, 7]
+    assert data['mba'] == 50
+    assert data['cbm'] == 0xf0
+
+
+def test_pool_add_multiple(my_app):
+    # create new pools
+    pools = [
+        {"name":"pool_1", "cores":[1], "mba": 10, "cbm": "0x1"},
+        {"cores":[2], "mba": 20, "cbm": "0x2"},
+        {"name":"pool_3", "cores":[3], "cbm": "0x4"},
+        {"name":"pool_4", "cores":[4], "mba": 40},
+        {"cores":[5, 6], "mba": 50, "cbm": "0x10"},
+        {"name":"pool_6", "cores":[7, 8, 9], "cbm": "0x30"},
+        {"name":"pool_7", "cores":[10], "mba": 70},
+        {"name":"pool_8", "cores":[11], "cbm": "0xf0"},
+        {"name":"pool_9", "cores":[12], "cbm": "0x17"},
+        {"name":"pool_10", "cores":[13,14,15,16], "mba": 70, "cbm": "0x37"}
+    ]
+
+    pool_ids = []
+
+    for pool_data in pools:
+        status, rawData = my_app.api_requests('POST', 'pools', pool_data)
+        assert status == 201
+
+        data = json.loads(rawData)
+
+        #validate add pool response schema
+        schema, resolver = my_app._load_json_schema('add_pool_response.json')
+        validate(data, schema, resolver=resolver)
+
+        # assert pool is added
+        # structure, types and required fields are validated using schema
+        assert len(data) == 1 # 1 fields in dict
+        assert 'id' in data
+
+        pool_ids.append(data['id'])
+
+        status, rawData = my_app.api_requests('GET', 'pools/' + str(pool_ids[-1]))
+        assert status == 200
+
+        data = json.loads(rawData)
+
+        #validate add pool response schema
+        schema, resolver = my_app._load_json_schema('get_pool_response.json')
+        validate(data, schema, resolver=resolver)
+
+        assert data['id'] == pool_ids[-1]
+
+    # remove pools
+    for pool_id in pool_ids:
+        status, rawData = my_app.api_requests('DELETE', 'pools/' + str(pool_id))
+        assert status == 200
+
+        status, rawData = my_app.api_requests('GET', 'pools/' + str(pool_id))
+        assert status == 404
+
 
 def test_pool_set_cbm(my_app):
     status, rawData = my_app.api_requests('PUT', 'pools/2', {"cbm": "0xc"})
@@ -247,6 +428,11 @@ def test_pool_set_cbm(my_app):
     status, rawData = my_app.api_requests('GET', 'pools/2')
     assert status == 200
     data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
     assert data['cbm'] == 0xc
 
 def test_pool_set_mba(my_app):
@@ -256,6 +442,11 @@ def test_pool_set_mba(my_app):
     status, rawData = my_app.api_requests('GET', 'pools/2')
     assert status == 200
     data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
     assert data['mba'] == 30
 
 

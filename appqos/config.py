@@ -57,8 +57,7 @@ class ConfigStore(object):
         self.timer = None
 
 
-    def get_attr_list(self, attr, pool_id):
-        # pylint: disable=too-many-return-statements, too-many-branches
+    def get_pool_attr(self, attr, pool_id):
         """
         Get specific attribute from config
 
@@ -67,20 +66,48 @@ class ConfigStore(object):
             pool_id: Id of pool to find attribute
 
         Returns:
+            attribute value or None
+        """
+
+        data = self.get_config()
+
+        if pool_id:
+            for pool in data['pools']:
+                if pool['id'] == pool_id:
+                    return pool.get(attr)
+        else:
+            result = []
+            for pool in data['pools']:
+                if attr in pool:
+                    if isinstance(pool[attr], list):
+                        result.extend(pool[attr])
+                    else:
+                        result.append(pool[attr])
+            if result:
+                return result
+
+        return None
+
+    def get_app_attr(self, attr, app_id):
+        """
+        Get specific attribute from config
+
+        Parameters:
+            attr: Attribute to be found in config
+            app_id: Id of app to find attribute
+
+        Returns:
             attribute value, None
         """
 
-        data = self.namespace.config
+        data = self.get_config()
 
-        for pool in data['pools']:
-            if pool['id'] == pool_id:
-                if attr in pool:
-                    return pool[attr]
+        for app in data['apps']:
+            if app['id'] == app_id:
+                if attr in app:
+                    return app[attr]
 
-        if attr == "cbm":
-            return 0
-
-        return []
+        return None
 
 
     def set_path(self, path):

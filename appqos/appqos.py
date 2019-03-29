@@ -57,7 +57,6 @@ import rest
 class AppQoS(object):
     """
     Main logic.
-    Starts and stops all processes.
     Handles configuration changes.
     """
 
@@ -85,33 +84,19 @@ class AppQoS(object):
             log.error(ex)
             return
 
-        # get SYS, HP, BE PIDs and cores
-        p_pids = common.CONFIG_STORE.get_attr_list('pids', common.PRODUCTION)
-        p_cores = common.CONFIG_STORE.get_attr_list('cores', common.PRODUCTION)
+        log.debug("Cores controlled: {}".\
+            format(common.CONFIG_STORE.get_pool_attr('cores', None)))
 
-        pp_pids = common.CONFIG_STORE.get_attr_list('pids', common.PRE_PRODUCTION)
-        pp_cores = common.CONFIG_STORE.get_attr_list('cores', common.PRE_PRODUCTION)
+        data = common.CONFIG_STORE.get_config()
+        for pool in data['pools']:
+            log.debug("Pool: {}/{} Cores: {}, Apps: {}".format(pool.get('name'),\
+                pool.get('id'), pool.get('cores'), pool.get('apps')))
 
-        be_pids = common.CONFIG_STORE.get_attr_list('pids', common.BEST_EFFORT)
-        be_cores = common.CONFIG_STORE.get_attr_list('cores', common.BEST_EFFORT)
-
-        log.debug("P Pool")
-        log.debug("Cores: {}".format(p_cores))
-        log.debug("PIDs: {}".format(p_pids))
-
-        log.debug("PP Pool")
-        log.debug("Cores: {}".format(pp_cores))
-        log.debug("PIDs: {}".format(pp_pids))
-
-        log.debug("BE Pool")
-        log.debug("Cores: {}".format(be_cores))
-        log.debug("PIDs: {}".format(be_pids))
-
-        # set initial, static CAT configuration
-        log.info("Configuring CAT")
-        result = cache_ops.configure_cat()
+        # set initial, static RDT configuration
+        log.info("Configuring RDT")
+        result = cache_ops.configure_rdt()
         if result != 0:
-            log.error("Failed to apply initial CAT configuration, terminating...")
+            log.error("Failed to apply initial RDT configuration, terminating...")
             return
 
         # set CTRL+C sig handler
@@ -122,7 +107,10 @@ class AppQoS(object):
 
             if common.CONFIG_STORE.is_config_changed():
                 log.info("Configuration changed")
-                cache_ops.configure_cat()
+                result = cache_ops.configure_rdt()
+                if result != 0:
+                    log.error("Failed to apply RDT configuration!")
+                    break
 
             sleep(1)
 

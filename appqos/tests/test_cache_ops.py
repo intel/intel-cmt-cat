@@ -45,63 +45,63 @@ class TestCacheOps(object):
     ## @endcond
 
 
-    def test_enabled_get(self):
-        Pool.pools[Pool.Cos.PP] = {}
-        Pool.pools[Pool.Cos.PP]['enabled'] = True
-        Pool.pools[Pool.Cos.P] = {}
-        Pool.pools[Pool.Cos.P]['enabled'] = False
-
-        assert Pool(Pool.Cos.PP).enabled_get()
-        assert not Pool(Pool.Cos.P).enabled_get()
-        assert not Pool(Pool.Cos.BE).enabled_get()
-
-
-    @mock.patch('cache_ops.Pool.apply')
-    @pytest.mark.parametrize("pool_id", [Pool.Cos.PP, Pool.Cos.P])
-    def test_enabled_set_enable(self, mock_apply, pool_id):
-        Pool.pools[pool_id] = {}
-        Pool.pools[pool_id]['enabled'] = False
-        Pool.pools[pool_id]['cbm_bits_min'] = 2
-
-        Pool(pool_id).enabled_set(True)
-
-        mock_apply.assert_called_once()
-        assert Pool.pools[pool_id]['enabled']
-
-
     def test_cbm_get(self):
-        Pool.pools[Pool.Cos.BE] = {}
-        Pool.pools[Pool.Cos.BE]['cbm'] = 0xf
-        Pool.pools[Pool.Cos.P] = {}
+        Pool.pools[3] = {}
+        Pool.pools[3]['cbm'] = 0xf
+        Pool.pools[1] = {}
 
-        assert Pool(Pool.Cos.BE).cbm_get() == 0xf
-        assert Pool(Pool.Cos.P).cbm_get() == 0
-        assert Pool(Pool.Cos.PP).cbm_get() == 0
+        assert Pool(3).cbm_get() == 0xf
+        assert not Pool(1).cbm_get()
+        assert not Pool(2).cbm_get()
 
 
-    def test_cores_set_disabled(self):
-        Pool(Pool.Cos.P).cores_set([1])
-        assert Pool.pools[Pool.Cos.P]['cores'] == [1]
+    def test_mba_get(self):
+        Pool.pools[11] = {}
+        Pool.pools[11]['mba'] = 10
+        Pool.pools[33] = {}
+        Pool.pools[33]['mba'] = 30
 
-        Pool(Pool.Cos.P).cores_set([2])
-        assert Pool.pools[Pool.Cos.P]['cores'] == [2]
+        assert Pool(11).mba_get() == 10
+        assert not Pool(20).mba_get()
+        assert Pool(33).mba_get() == 30
+
+
+    def test_pids_get(self):
+        Pool.pools[1] = {}
+        Pool.pools[1]['pids'] = [1, 10,1010]
+        Pool.pools[30] = {}
+        Pool.pools[30]['pids'] = [3, 30, 3030]
+
+        assert Pool(1).pids_get() == [1, 10,1010]
+        assert Pool(2).pids_get() == []
+        assert Pool(30).pids_get() == [3, 30, 3030]
+
+
+    def test_cores_get(self):
+        Pool.pools[12] = {}
+        Pool.pools[12]['cores'] = [1, 10,11]
+        Pool.pools[35] = {}
+        Pool.pools[35]['cores'] = [3, 30, 33]
+
+        assert Pool(12).cores_get() == [1, 10,11]
+        assert Pool(20).cores_get() == []
+        assert Pool(35).cores_get() == [3, 30, 33]
 
 
     @mock.patch('cache_ops.PQOS_API.alloc_assoc_set')
-    def test_cores_set_enabled(self, mock_alloc_assoc_set):
-        Pool.pools[Pool.Cos.P] = {}
-        Pool.pools[Pool.Cos.P]['enabled'] = True
-        Pool.pools[Pool.Cos.P]['cores'] = []
+    def test_cores_set(self, mock_alloc_assoc_set):
+        Pool.pools[1] = {}
+        Pool.pools[1]['cores'] = []
 
-        Pool(Pool.Cos.P).cores_set([1])
-        assert Pool.pools[Pool.Cos.P]['cores'] == [1]
-        mock_alloc_assoc_set.assert_called_once_with([1], Pool.Cos.P)
+        Pool(1).cores_set([1])
+        assert Pool.pools[1]['cores'] == [1]
+        mock_alloc_assoc_set.assert_called_once_with([1], 1)
 
 
     @mock.patch('cache_ops.PQOS_API.l3ca_set')
     @mock.patch('cache_ops.PQOS_API.alloc_assoc_set')
     def test_apply_not_configured(self, mock_l3ca_set, mock_alloc_assoc_set):
-        result = Pool.apply(Pool.Cos.P)
+        result = Pool.apply(1)
 
         assert result == 0
 
@@ -111,52 +111,56 @@ class TestCacheOps(object):
 
     @mock.patch('cache_ops.PQOS_API.l3ca_set')
     @mock.patch('cache_ops.PQOS_API.alloc_assoc_set')
-    def test_apply(self, mock_alloc_assoc_set, mock_l3ca_set):
-        Pool.pools[Pool.Cos.PP] = {}
-        Pool.pools[Pool.Cos.PP]['enabled'] = True
-        Pool.pools[Pool.Cos.PP]['cores'] = [1]
-        Pool.pools[Pool.Cos.PP]['cbm'] = 0xc00
+    @mock.patch('cache_ops.PQOS_API.get_sockets')
+    def test_apply(self, mock_get_socket, mock_alloc_assoc_set, mock_l3ca_set):
+        Pool.pools[2] = {}
+        Pool.pools[2]['cores'] = [1]
+        Pool.pools[2]['cbm'] = 0xc00
 
-        Pool.pools[Pool.Cos.P] = {}
-        Pool.pools[Pool.Cos.P]['enabled'] = False
-        Pool.pools[Pool.Cos.P]['cores'] = [2, 3]
-        Pool.pools[Pool.Cos.P]['cbm'] = 0x300
+        Pool.pools[1] = {}
+        Pool.pools[1]['cores'] = [2, 3]
+        Pool.pools[1]['cbm'] = 0x300
 
         mock_alloc_assoc_set.return_value = 0
         mock_l3ca_set.return_value = 0
+        mock_get_socket.return_value = [0, 2]
 
-        result = Pool.apply([Pool.Cos.PP, Pool.Cos.P])
+        result = Pool.apply([2, 1])
 
         assert result == 0
 
-        mock_l3ca_set.assert_called_once_with(0, Pool.Cos.PP, 0xc00)
-        mock_alloc_assoc_set.assert_any_call([1], Pool.Cos.PP)
-
-        mock_alloc_assoc_set.assert_any_call([2, 3], 0)
+        mock_l3ca_set.assert_any_call([0, 2], 2, 0xc00)
+        mock_l3ca_set.assert_any_call([0, 2], 1, 0x300)
+        mock_alloc_assoc_set.assert_any_call([1], 2)
+        mock_alloc_assoc_set.assert_any_call([2, 3], 1)
 
         # libpqos fails
+        mock_get_socket.return_value = None
+        result = Pool.apply([2, 1])
+        assert result != 0
+
+        mock_get_socket.return_value = [0,2]
         mock_alloc_assoc_set.return_value = -1
         mock_l3ca_set.return_value = 0
-        result = Pool.apply([Pool.Cos.PP, Pool.Cos.P])
+        result = Pool.apply([2, 1])
         assert result != 0
 
         mock_alloc_assoc_set.return_value = 0
         mock_l3ca_set.return_value = -1
-        result = Pool.apply([Pool.Cos.PP, Pool.Cos.P])
+        result = Pool.apply([2, 1])
         assert result != 0
 
         mock_alloc_assoc_set.return_value = -1
         mock_l3ca_set.return_value = -1
-        result = Pool.apply([Pool.Cos.PP, Pool.Cos.P])
+        result = Pool.apply([2, 1])
         assert result != 0
 
 
     def test_reset(self):
-        Pool.pools[Pool.Cos.PP] = {}
-        Pool.pools[Pool.Cos.PP]['enabled'] = True
-        Pool.pools[Pool.Cos.PP]['cores'] = [1]
-        Pool.pools[Pool.Cos.PP]['cbm'] = 0xc00
+        Pool.pools[2] = {}
+        Pool.pools[2]['cores'] = [1]
+        Pool.pools[2]['cbm'] = 0xc00
 
         Pool.reset()
-        assert Pool.Cos.PP not in Pool.pools
+        assert 2 not in Pool.pools
 

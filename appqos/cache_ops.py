@@ -33,8 +33,7 @@
 
 """
 Cache Ops module.
-Provides Cache related helper functions
-used to configure CAT.
+Provides RDT related helper functions used to configure RDT.
 """
 
 import common
@@ -42,7 +41,7 @@ import log
 from pqosapi import pqos_init, pqos_fini # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_alloc_assoc_set, pqos_l3ca_set, pqos_mba_set # pylint: disable=import-error,no-name-in-module
 from pqosapi import pqos_is_mba_supported, pqos_is_cat_supported, pqos_is_multicore # pylint: disable=import-error,no-name-in-module
-
+from pqosapi import pqos_cpu_get_sockets # pylint: disable=import-error,no-name-in-module
 
 class Pqos(object):
     """
@@ -103,12 +102,12 @@ class Pqos(object):
 
 
     @staticmethod
-    def l3ca_set(socket, cos, ways_mask):
+    def l3ca_set(sockets, cos, ways_mask):
         """
         Configures L3 CAT for CoS
 
         Parameters:
-            socket: socket on which to configure L3 CAT
+            sockets: sockets list on which to configure L3 CAT
             cos: Class of Service
             ways_mask: L3 CAT CBM to set
 
@@ -116,9 +115,9 @@ class Pqos(object):
             0 on success
             -1 otherwise
         """
-
         try:
-            pqos_l3ca_set(socket, cos, ways_mask)
+            for socket in sockets:
+                pqos_l3ca_set(socket, cos, ways_mask)
         except Exception as ex:
             log.error(str(ex))
             return -1
@@ -126,12 +125,12 @@ class Pqos(object):
         return 0
 
     @staticmethod
-    def mba_set(socket, cos, mb_max):
+    def mba_set(sockets, cos, mb_max):
         """
         Configures MBA for CoS
 
         Parameters:
-            socket: socket on which to configure L3 CAT
+            sockets: sockets list on which to configure L3 CAT
             cos: Class of Service
             mb_max: MBA to set
 
@@ -140,7 +139,8 @@ class Pqos(object):
             -1 otherwise
         """
         try:
-            pqos_mba_set(socket, cos, mb_max)
+            for socket in sockets:
+                pqos_mba_set(socket, cos, mb_max)
         except Exception as ex:
             log.error(str(ex))
             return -1
@@ -192,6 +192,21 @@ class Pqos(object):
             log.error(str(ex))
             return 0
 
+    @staticmethod
+    def get_sockets():
+        """
+        Gets list of sockets
+
+        Returns:
+            sockets list,
+            None otherwise
+        """
+        try:
+            return pqos_cpu_get_sockets()
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
 PQOS_API = Pqos()
 
 
@@ -201,26 +216,6 @@ class Pool(object):
     Static table of pools
     """
     pools = {}
-
-
-    class Cos(object):
-        #pylint: disable=too-few-public-methods, invalid-name
-        """
-        Cos enum
-        """
-        P = 1
-        PP = 2
-        BE = 0
-
-
-    class Priority(object):
-        #pylint: disable=too-few-public-methods, invalid-name
-        """
-        Priority enum
-        """
-        P = 1
-        PP = 2
-        BE = 0
 
 
     def __init__(self, pool):
@@ -235,77 +230,9 @@ class Pool(object):
 
         if self.pool not in Pool.pools:
             Pool.pools[self.pool] = {}
-            Pool.pools[self.pool]['enabled'] = False
             Pool.pools[self.pool]['cores'] = []
+            Pool.pools[self.pool]['apps'] = []
             Pool.pools[self.pool]['pids'] = []
-
-
-    def priority_get(self, cos=None):
-        """
-        Get pool priority
-
-        Parameters:
-            cos: Class of Service
-
-        Returns:
-            Priority of Class of Service or current Pool
-        """
-
-        if cos is None:
-            return self.priority_get(self.pool)
-
-        return {
-            Pool.Cos.P: Pool.Priority.P,
-            Pool.Cos.PP: Pool.Priority.PP,
-            Pool.Cos.BE: Pool.Priority.BE
-        }[cos]
-
-
-    def get_common_priority(self):
-        """
-        Get pool priority
-
-        Returns:
-            Pool priority
-        """
-        if self.pool == Pool.Cos.P:
-            return common.PRODUCTION
-        elif self.pool == Pool.Cos.BE:
-            return common.BEST_EFFORT
-        elif self.pool == Pool.Cos.PP:
-            return common.PRE_PRODUCTION
-        return None
-
-
-    def enabled_get(self):
-        """
-        Check if pool is enabled
-
-        Parameters:
-            pool: Pool ID
-
-        Returns:
-            bool: pool enable status
-        """
-        return Pool.pools[self.pool]['enabled']
-
-
-    def enabled_set(self, enabled):
-        """
-        Set pool enabled/disabled
-
-        Parameters:
-            enabled: Flag for enabling/disabling the pool
-
-        Returns:
-            result: 0 on success
-        """
-        if Pool.pools[self.pool]['enabled'] == enabled:
-            return 0
-
-        Pool.pools[self.pool]['enabled'] = enabled
-
-        return Pool.apply(self.pool)
 
 
     def cbm_set(self, cbm):
@@ -325,21 +252,52 @@ class Pool(object):
         Returns:
             cbm mask, 0 on error
         """
-        return Pool.pools[self.pool].get('cbm', 0)
+        return Pool.pools[self.pool].get('cbm')
+
+
+    def mba_set(self, mba):
+        """
+        Set mba value for the pool
+
+        Parameters:
+            mba: new mba value
+        """
+        Pool.pools[self.pool]['mba'] = mba
+
+
+    def mba_get(self):
+        """
+        Get mba value for the pool
+
+        Returns:
+            mba value, 0 on error
+        """
+        return Pool.pools[self.pool].get('mba')
 
 
     def configure(self):
         """
-        Configure Pool, based on config file content.
+        Configure Pool, based on config content.
         """
-        cores = common.CONFIG_STORE.get_attr_list('cores', self.get_common_priority())
-        pids = common.CONFIG_STORE.get_attr_list('pids', self.get_common_priority())
-        cbm = common.CONFIG_STORE.get_attr_list('cbm', self.get_common_priority())
+        config = common.CONFIG_STORE
+        cores = config.get_pool_attr('cores', self.pool)
+        cbm = config.get_pool_attr('cbm', self.pool)
+        mba = config.get_pool_attr('mba', self.pool)
+        apps = config.get_pool_attr('apps', self.pool)
 
         self.cbm_set(cbm)
+        self.mba_set(mba)
         self.cores_set(cores)
-        self.pids_set(pids)
-        return self.enabled_set(True)
+
+        if apps:
+            pids = []
+            for app in apps:
+                pids.extend(config.get_app_attr('pids', app))
+
+            if pids:
+                self.pids_set(pids)
+
+        return Pool.apply(self.pool)
 
 
     def pids_set(self, pids):
@@ -352,16 +310,18 @@ class Pool(object):
         old_pids = self.pids_get()
 
         # change core affinity for PIDs not assigned to any pool
-        if self.enabled_get() and not self.pool == Pool.Cos.BE:
-            removed_pids = [pid for pid in old_pids if pid not in pids]
+        removed_pids = [pid for pid in old_pids if pid not in pids]
 
-            # skip pids assigned to any pool
-            for cos in Pool.pools:
-                if cos == self.pool:
-                    continue
-                removed_pids = \
-                    [pid for pid in removed_pids if pid not in Pool.pools[cos]['pids']]
-                # core affinity logic here
+        # skip pids assigned to any pool
+        for cos in Pool.pools:
+            if cos == self.pool:
+                continue
+            removed_pids = \
+                [pid for pid in removed_pids if pid not in Pool.pools[cos]['pids']]
+
+        if removed_pids:
+            log.debug("PIDs to be set to core affinity to 'Default' CPUs {}".\
+                format(removed_pids))
 
         # remove pid form old pool
         if old_pids:
@@ -369,10 +329,14 @@ class Pool(object):
                 if cos == self.pool:
                     continue
 
-                # core affinity logic here
-                # pids_to_change_core_affinity = \
-                # [pid for pid in Pool.pools[cos]['pids'] if pid in pids]
+                pids_moved_from_other_pool = \
+                    [pid for pid in Pool.pools[cos]['pids'] if pid in pids]
 
+                if pids_moved_from_other_pool:
+                    log.debug("PIDs moved from other pools {}".\
+                        format(pids_moved_from_other_pool))
+
+                # update other pool PIDs
                 Pool.pools[cos]['pids'] = \
                     [pid for pid in Pool.pools[cos]['pids'] if pid not in pids]
 
@@ -381,12 +345,12 @@ class Pool(object):
 
     def pids_get(self):
         """
-        Get Pool's PIDs
+        Get pids for the pool
 
         Returns:
-            Pool's PIDs
+            pids list, None on error
         """
-        return Pool.pools[self.pool]['pids']
+        return Pool.pools[self.pool].get('pids')
 
 
     def cores_set(self, cores):
@@ -396,40 +360,53 @@ class Pool(object):
         Parameters:
             cores: Pool's cores
         """
-        old_cores = Pool.pools[self.pool]['cores']
-        Pool.pools[self.pool]['cores'] = cores
+        old_cores = self.cores_get()
 
-        # remove core form old pool
+        # create a diff, create a list of cores that were removed from current pool
+        removed_cores = [core for core in old_cores if core not in cores]
+
+        # update pool with new core list
+        Pool.pools[self.pool]['cores'] = cores
+        # updated RDT configuration
+        PQOS_API.alloc_assoc_set(cores, self.pool)
+
+        # process list of removed cores
         for cos in Pool.pools:
             if cos == self.pool:
                 continue
+
+            # check if cores were assigned to another pool,
+            # if they were, remove them from that pool
             Pool.pools[cos]['cores'] = \
                 [core for core in Pool.pools[cos]['cores'] if core not in cores]
 
-        if self.enabled_get():
-            removed_cores = [core for core in old_cores if core not in cores]
+            # filter out cores assigned to other pools
+            removed_cores = \
+                [core for core in removed_cores if core not in Pool.pools[cos]['cores']]
 
-            # skip cores assigned to any pool
-            for cos in Pool.pools:
-                if cos == self.pool:
-                    continue
-                removed_cores = \
-                    [core for core in removed_cores if core not in Pool.pools[cos]['cores']]
+        # Finally assign removed cores back to COS0/"Default" Pool
+        if removed_cores:
+            log.debug("Cores assigned to COS#0 {}".format(removed_cores))
+            PQOS_API.alloc_assoc_set(removed_cores, 0)
 
-            # Assign unasigned removed cores back to COS0
-            if removed_cores:
-                PQOS_API.alloc_assoc_set(removed_cores, 0)
 
-        PQOS_API.alloc_assoc_set(cores, self.pool if self.enabled_get() else 0)
+    def cores_get(self):
+        """
+        Get cores for the pool
+
+        Returns:
+            cores list, None on error
+        """
+        return Pool.pools[self.pool].get('cores')
 
 
     @staticmethod
     def apply(pools):
         """
-        Apply CAT configuration for Pools
+        Apply RDT configuration for Pools
 
         Parameters:
-            pools: Pools to apply CAT config for
+            pools: Pools to apply RDT config for
 
         Returns:
             0 on success
@@ -440,24 +417,31 @@ class Pool(object):
         else:
             _pools = [pools]
 
-        # configure CAT
+        # configure RDT
         for item in _pools:
             if item not in Pool.pools:
                 continue
-            pool = Pool(item)
-            if pool.enabled_get():
-                cbm = pool.cbm_get()
-                cos = item
-            else:
-                cos = 0
-                cbm = Pool(Pool.Cos.BE).cbm_get()
 
-            if cbm > 0:
-                if PQOS_API.l3ca_set(0, cos, cbm) != 0:
+            pool = Pool(item)
+            cbm = pool.cbm_get()
+            mba = pool.mba_get()
+            cores = pool.cores_get()
+            cos = item
+
+            sockets = PQOS_API.get_sockets()
+            if sockets is None:
+                return -1
+
+            if cbm:
+                if PQOS_API.l3ca_set(sockets, cos, cbm) != 0:
                     return -1
 
-            if 'cores' in Pool.pools[item] and Pool.pools[item]['cores']:
-                if PQOS_API.alloc_assoc_set(Pool.pools[item]['cores'], cos) != 0:
+            if mba:
+                if PQOS_API.mba_set(sockets, cos, mba) != 0:
+                    return -1
+
+            if cores:
+                if PQOS_API.alloc_assoc_set(cores, cos) != 0:
                     return -1
 
         return 0
@@ -479,15 +463,30 @@ class Pool(object):
         log.info("Pools:{}".format(Pool.pools))
 
 
-def configure_cat():
+def configure_rdt():
     """
-    Configure cache allocation
+    Configure RDT
 
     Returns:
         0 on success
     """
     result = 0
-    for cos in [Pool.Cos.P, Pool.Cos.PP, Pool.Cos.BE]:
+
+    # detect removed pools
+    old_pools = Pool.pools.copy()
+
+    pool_ids = common.CONFIG_STORE.get_pool_attr('id', None)
+    for cos in old_pools:
+        if cos not in pool_ids:
+            log.debug("Pool {} removed...".format(cos))
+            Pool(cos).cores_set([])
+
+    Pool.reset()
+
+    for cos in pool_ids:
+        Pool(cos)
+
+    for cos in Pool.pools:
         result = Pool(cos).configure()
         if result != 0:
             break
