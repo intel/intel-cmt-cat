@@ -7,17 +7,35 @@
   "type": "object",
 
   "properties": {
+    "name": {
+      "description": "Pool's name",
+      "$ref": "definitions.json#/string_nonempty"
+    },
     "cbm": {
       "description": "L3 CAT cache bit mask",
       "$ref": "definitions.json#/string_hex"
     },
     "mba": {
       "description": "MBA rate",
-      "$ref": "definitions.json#/uint"
+      "$ref": "definitions.json#/uint_nonzero"
+    },
+    "cores": {
+      "description": "POOL cores",
+      "$ref": "definitions.json#/uint_uniq_array"
+    },
+    "apps": {
+      "description": "APPs assigned to that pool",
+      "type": "array",
+      "items": { "$ref": "definitions.json#/uint" },
+      "uniqueItems": true,
+      "minItems": 0
     }
   },
   "anyOf": [
+    { "required": ["name"] },
     { "required": ["cbm"] },
-    { "required": ["mba"] }
+    { "required": ["mba"] },
+    { "required": ["cores"] },
+    { "required": ["apps"] }
   ]
 }

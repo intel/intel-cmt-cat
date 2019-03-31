@@ -105,7 +105,7 @@ class TestCacheOps(object):
     def test_apply_not_configured(self, mock_l3ca_set, mock_alloc_assoc_set):
         result = Pool.apply(1)
 
-        assert result == 0
+        assert result == -1
 
         mock_l3ca_set.assert_not_called()
         mock_alloc_assoc_set.assert_not_called()
@@ -127,8 +127,9 @@ class TestCacheOps(object):
         mock_l3ca_set.return_value = 0
         mock_get_socket.return_value = [0, 2]
 
-        result = Pool.apply([2, 1])
-
+        result = Pool.apply(2)
+        assert result == 0
+        result = Pool.apply(1)
         assert result == 0
 
         mock_l3ca_set.assert_any_call([0, 2], 2, 0xc00)
@@ -138,23 +139,31 @@ class TestCacheOps(object):
 
         # libpqos fails
         mock_get_socket.return_value = None
-        result = Pool.apply([2, 1])
+        result = Pool.apply(2)
+        assert result != 0
+        result = Pool.apply(1)
         assert result != 0
 
         mock_get_socket.return_value = [0,2]
         mock_alloc_assoc_set.return_value = -1
         mock_l3ca_set.return_value = 0
-        result = Pool.apply([2, 1])
+        result = Pool.apply(2)
+        assert result != 0
+        result = Pool.apply(1)
         assert result != 0
 
         mock_alloc_assoc_set.return_value = 0
         mock_l3ca_set.return_value = -1
-        result = Pool.apply([2, 1])
+        result = Pool.apply(2)
+        assert result != 0
+        result = Pool.apply(1)
         assert result != 0
 
         mock_alloc_assoc_set.return_value = -1
         mock_l3ca_set.return_value = -1
-        result = Pool.apply([2, 1])
+        result = Pool.apply(2)
+        assert result != 0
+        result = Pool.apply(1)
         assert result != 0
 
 

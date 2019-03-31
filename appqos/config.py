@@ -354,3 +354,18 @@ class ConfigStore:
             return new_ids[-1]
 
         return None
+
+    def check_cores(self, cores, pool_id=None):
+        """
+        Verify that cores are not assigned to another pool
+
+        Returns:
+            True if are not, False otherwise
+        """
+        temp = set(self.get_pool_attr('cores', None))
+
+        if pool_id is not None:
+            cur_cores = set(self.get_pool_attr('cores', pool_id))
+            temp -= cur_cores
+
+        return not set(cores).intersection(temp)

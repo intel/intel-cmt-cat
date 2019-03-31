@@ -92,7 +92,7 @@ class AppQoS:
             log.debug("Pool: {}/{} Cores: {}, Apps: {}".format(pool.get('name'),\
                 pool.get('id'), pool.get('cores'), pool.get('apps')))
 
-        # set initial, static RDT configuration
+        # set initial RDT configuration
         log.info("Configuring RDT")
         result = cache_ops.configure_rdt()
         if result != 0:

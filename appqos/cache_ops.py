@@ -310,8 +310,8 @@ class Apps:
             cores = app['cores'] if 'cores' in app else []
 
             if not cores:
-                pool_id = config.app_to_pool(app['id'])
-                cores = config.get_pool_attr('cores', pool_id)
+                pool_id = common.CONFIG_STORE.app_to_pool(app['id'])
+                cores = common.CONFIG_STORE.get_pool_attr('cores', pool_id)
 
             if not cores:
                 continue
@@ -491,6 +491,7 @@ class Pool:
 
         # update pool with new core list
         Pool.pools[self.pool]['cores'] = cores
+
         # updated RDT configuration
         PQOS_API.alloc_assoc_set(cores, self.pool)
 
@@ -525,51 +526,45 @@ class Pool:
 
 
     @staticmethod
-    def apply(pools):
+    def apply(pool_id):
         """
-        Apply RDT configuration for Pools
+        Apply RDT configuration for Pool
 
         Parameters:
-            pools: Pools to apply RDT config for
+            pool_id: Pool to apply RDT config for
 
         Returns:
             0 on success
             -1 otherwise
         """
-        if isinstance(pools, list):
-            _pools = pools
-        else:
-            _pools = [pools]
-
         # configure RDT
-        for item in _pools:
-            if item not in Pool.pools:
-                continue
+        if pool_id not in Pool.pools:
+            return -1
 
-            pool = Pool(item)
-            cbm = pool.cbm_get()
-            mba = pool.mba_get()
-            cores = pool.cores_get()
-            cos = item
+        pool = Pool(pool_id)
+        cbm = pool.cbm_get()
+        mba = pool.mba_get()
+        cores = pool.cores_get()
 
-            sockets = PQOS_API.get_sockets()
-            if sockets is None:
+        sockets = PQOS_API.get_sockets()
+        if sockets is None:
+            return -1
+
+        # pool id to COS, 1:1 mapping
+        if cbm:
+            if PQOS_API.l3ca_set(sockets, pool_id, cbm) != 0:
+                log.error("Failed to apply CAT configuration!")
                 return -1
 
-            if cbm:
-                if PQOS_API.l3ca_set(sockets, cos, cbm) != 0:
-                    log.error("Failed to apply CAT configuration!")
-                    return -1
+        if mba:
+            if PQOS_API.mba_set(sockets, pool_id, mba) != 0:
+                log.error("Failed to apply MBA configuration!")
+                return -1
 
-            if mba:
-                if PQOS_API.mba_set(sockets, cos, mba) != 0:
-                    log.error("Failed to apply MBA configuration!")
-                    return -1
-
-            if cores:
-                if PQOS_API.alloc_assoc_set(cores, cos) != 0:
-                    log.error("Failed to associate RDT COS!")
-                    return -1
+        if cores:
+            if PQOS_API.alloc_assoc_set(cores, pool_id) != 0:
+                log.error("Failed to associate RDT COS!")
+                return -1
 
         return 0
 
@@ -605,10 +600,10 @@ def configure_rdt():
     pool_ids = common.CONFIG_STORE.get_pool_attr('id', None)
 
     if old_pools:
-        for cos in old_pools:
-            if not pool_ids or cos not in pool_ids:
-                log.debug("Pool {} removed...".format(cos))
-                Pool(cos).cores_set([])
+        for pool_id in old_pools:
+            if not pool_ids or pool_id not in pool_ids:
+                log.debug("Pool {} removed...".format(pool_id))
+                Pool(pool_id).cores_set([])
 
     Pool.reset()
 
@@ -616,11 +611,11 @@ def configure_rdt():
         log.error("No Pools to configure...")
         return -1
 
-    for cos in pool_ids:
-        Pool(cos)
+    for pool_id in pool_ids:
+        Pool(pool_id)
 
-    for cos in Pool.pools:
-        result = Pool(cos).configure()
+    for pool_id in Pool.pools:
+        result = Pool(pool_id).configure()
         if result != 0:
             return result
 

@@ -49,6 +49,7 @@ from werkzeug.exceptions import HTTPException
 import jsonschema
 
 import caps
+import cache_ops
 import common
 import log
 import pid_ops
@@ -524,6 +525,18 @@ class Pool(Resource):
         Returns:
             response, status code
         """
+        def check_alloc_tech(pool_id, json_data):
+            alloc_tech = []
+            if 'cbm' in json_data:
+                alloc_tech.append(common.CAT_CAP)
+            if 'mba' in json_data:
+                alloc_tech.append(common.MBA_CAP)
+
+            if not alloc_tech:
+                return True
+
+            return pool_id <= cache_ops.PQOS_API.get_max_cos_id(alloc_tech)
+
         json_data = request.get_json()
 
         # validate app schema
@@ -541,6 +554,10 @@ class Pool(Resource):
             if pool['id'] != int(pool_id):
                 continue
 
+            if not check_alloc_tech(int(pool_id), json_data):
+                raise BadRequest("Pool {} does not support requested technologies!"\
+                    .format(pool_id))
+
             # set new cbm
             if 'cbm' in json_data:
                 cbm = json_data['cbm']
@@ -553,7 +570,27 @@ class Pool(Resource):
             if 'mba' in json_data:
                 pool['mba'] = json_data['mba']
 
+            # set new cores
+            if 'cores' in json_data:
+                if not json_data['cores']:
+                    raise BadRequest("At least one core required")
+
+                for core in json_data['cores']:
+                    if not common.is_core_valid(core):
+                        raise BadRequest("Pool {}, Invalid core {}!".format(pool_id, core))
+
+                if not common.CONFIG_STORE.check_cores(json_data['cores'], int(pool_id)):
+                    raise BadRequest("Pool {}, One or more of the {} cores already"\
+                        " assigned to another pool!".format(pool_id, json_data['cores']))
+
+                pool['cores'] = json_data['cores']
+
+            # set new name
+            if 'name' in json_data:
+                pool['name'] = json_data['name']
+
             common.CONFIG_STORE.set_config(data)
+
             return "POOL " + str(pool_id) + " updated", 200
 
         raise NotFound("POOL " + str(pool_id) + " not found in config")
@@ -620,6 +657,10 @@ class Pools(Resource):
             for core in post_data['cores']:
                 if not common.is_core_valid(core):
                     raise BadRequest("New POOL not added, please provide valid cores")
+
+            if not common.CONFIG_STORE.check_cores(post_data['cores']):
+                raise BadRequest("New POOL not added, One or more of the {} cores"\
+                    " already assigned to another pool!".format(post_data['cores']))
 
         data = common.CONFIG_STORE.get_config().copy()
         data['pools'].append(post_data)

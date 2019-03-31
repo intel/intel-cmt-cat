@@ -111,8 +111,8 @@ CONFIG = {
             "cores": [4]
         },
         {
-            "id": 4,
-            "mba": 30,
+            "id": MAX_L3CA_COS_ID,
+            "cbm": "0xf0",
             "cores": [5]
         }
     ]
@@ -235,7 +235,7 @@ def test_pool_get(my_app):
 
 @pytest.mark.parametrize("empty_pool_id", [
     3,
-    4
+    MAX_L3CA_COS_ID
 ])
 
 def test_pool_delete_empty(my_app, empty_pool_id):
@@ -283,7 +283,7 @@ def test_pool_add_no_req_fields(my_app, no_req_fields_json):
 
 
 def test_pool_add_no_name(my_app):
-    status, rawData = my_app.api_requests('POST', 'pools', {"cores":[1, 2], "cbm": "0xf"})
+    status, rawData = my_app.api_requests('POST', 'pools', {"cores":[11, 12], "cbm": "0xf"})
     assert status == 201
 
 
@@ -323,7 +323,7 @@ def test_pool_add_cbm(my_app):
 
 
 def test_pool_add_mba(my_app):
-    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello_mba", "cores":[1, 6, 7], "mba": 50})
+    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello_mba", "cores":[11, 6, 7], "mba": 50})
     assert status == 201
 
     data = json.loads(rawData)
@@ -352,13 +352,13 @@ def test_pool_add_mba(my_app):
 
     assert data['id'] == pool_id
     assert data['name'] == "hello_mba"
-    assert data['cores'] == [1, 6, 7]
+    assert data['cores'] == [11, 6, 7]
     assert data['mba'] == 50
     assert 'cbm' not in data
 
 
 def test_pool_add_mba_cbm(my_app):
-    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello_mba_cbm", "cores":[1, 2, 6, 7], "mba": 50, "cbm": "0xf0"})
+    status, rawData = my_app.api_requests('POST', 'pools', {"name":"hello_mba_cbm", "cores":[11, 12, 6, 7], "mba": 50, "cbm": "0xf0"})
     assert status == 201
 
     data = json.loads(rawData)
@@ -387,7 +387,7 @@ def test_pool_add_mba_cbm(my_app):
 
     assert data['id'] == pool_id
     assert data['name'] == "hello_mba_cbm"
-    assert data['cores'] == [1, 2, 6, 7]
+    assert data['cores'] == [11, 12, 6, 7]
     assert data['mba'] == 50
     assert data['cbm'] == 0xf0
 
@@ -462,6 +462,29 @@ def test_pool_add_multiple(my_app):
         assert status == 404
 
 
+def test_pool_add_with_already_used_core(my_app):
+    status, rawData = my_app.api_requests('POST', 'pools', {"cores":[6, 7, 8], "cbm": "0xf"})
+    assert status == 201
+
+    data = json.loads(rawData)
+
+    #validate add pool response schema
+    schema, resolver = my_app._load_json_schema('add_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    # try to create pool using same core as prev. pool (#8)
+    status, rawData = my_app.api_requests('POST', 'pools', {"cores":[8, 9], "cbm": "0xf"})
+    assert status == 400
+
+    # try to create pool using same core as other pool (#1)
+    status, rawData = my_app.api_requests('POST', 'pools', {"cores":[1], "cbm": "0xf"})
+    assert status == 400
+
+    # try to create pool using same cores as other pool (#1,2,3,4)
+    status, rawData = my_app.api_requests('POST', 'pools', {"cores":[1,2,3,4], "cbm": "0xf"})
+    assert status == 400
+
+
 def test_pool_set_cbm(my_app):
     status, rawData = my_app.api_requests('PUT', 'pools/2', {"cbm": "0xc"})
     assert status == 200
@@ -476,6 +499,7 @@ def test_pool_set_cbm(my_app):
 
     assert data['cbm'] == 0xc
 
+
 def test_pool_set_mba(my_app):
     status, rawData = my_app.api_requests('PUT', 'pools/2', {"mba": 30})
     assert status == 200
@@ -489,6 +513,109 @@ def test_pool_set_mba(my_app):
     validate(data, schema, resolver=resolver)
 
     assert data['mba'] == 30
+
+
+def test_pool_set_mba_unsupported(my_app):
+    # try to set MBA to the pool that does not support MBA
+    status, rawData = my_app.api_requests('PUT', 'pools/' + str(MAX_L3CA_COS_ID), {"mba": 30})
+    assert status == 400
+
+    status, rawData = my_app.api_requests('GET', 'pools/' + str(MAX_L3CA_COS_ID))
+    assert status == 200
+    data = json.loads(rawData)
+    assert 'mba' not in data
+
+
+def test_pool_set_core(my_app):
+    status, rawData = my_app.api_requests('GET', 'pools/2')
+    assert status == 200
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    # add new core #11 to the list
+    cores = data['cores']
+    cores.append(11)
+
+    status, rawData = my_app.api_requests('PUT', 'pools/2', {"cores": cores})
+    assert status == 200
+
+    assert data['cores'] == cores
+
+
+def test_pool_set_already_used_core(my_app):
+    # get pool#1 cores
+    status, rawData = my_app.api_requests('GET', 'pools/1')
+    assert status == 200
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    pool_1_cores = data['cores']
+
+    # get pool#2 cores
+    status, rawData = my_app.api_requests('GET', 'pools/2')
+    assert status == 200
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    # try to add cores used by pool#1 to pool#2
+    data['cores'].extend(pool_1_cores)
+
+    status, rawData = my_app.api_requests('PUT', 'pools/2', {"cores": data['cores']})
+    assert status == 400
+
+
+def test_pool_move_core(my_app):
+    # get pool#0 cores
+    status, rawData = my_app.api_requests('GET', 'pools/0')
+    assert status == 200
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    # remove last core
+    pool_0_last_core = data['cores'].pop()
+    status, rawData = my_app.api_requests('PUT', 'pools/0', {"cores": data['cores']})
+    print(rawData)
+    assert status == 200
+
+    # verify that last core was removed from pool#1
+    status, rawData = my_app.api_requests('GET', 'pools/0')
+    assert status == 200
+    data = json.loads(rawData)
+    assert pool_0_last_core not in data['cores']
+
+    # get pool#2 cores
+    status, rawData = my_app.api_requests('GET', 'pools/2')
+    assert status == 200
+    data = json.loads(rawData)
+
+    #validate get pool response schema
+    schema, resolver = my_app._load_json_schema('get_pool_response.json')
+    validate(data, schema, resolver=resolver)
+
+    assert pool_0_last_core not in data['cores']
+
+    # try to add core which was removed from pool#0 to pool#2
+    data['cores'].append(pool_0_last_core)
+    status, rawData = my_app.api_requests('PUT', 'pools/2', {"cores": data['cores']})
+    assert status == 200
+
+    # get pool#2 cores and verify that new core is there
+    status, rawData = my_app.api_requests('GET', 'pools/2')
+    assert status == 200
+    data = json.loads(rawData)
+    assert pool_0_last_core in data['cores']
 
 
 def test_app_add_all(my_app):
