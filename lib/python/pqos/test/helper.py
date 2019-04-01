@@ -46,6 +46,13 @@ def ctypes_ref_set_int(ref, num):
     ctypes.memmove(ref, ctypes.addressof(cnum), ctypes.sizeof(cnum))
 
 
+def ctypes_ref_set_uint(ref, num):
+    "Assigns an integer to a ctypes reference to an unsigned integer."
+
+    cnum = ctypes.c_uint(num)
+    ctypes.memmove(ref, ctypes.addressof(cnum), ctypes.sizeof(cnum))
+
+
 def ctypes_build_array(arr):
     "Builds ctypes array out of ctypes objects."
 
