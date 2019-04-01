@@ -36,6 +36,8 @@ Cache Ops module.
 Provides RDT related helper functions used to configure RDT.
 """
 
+import os
+
 import common
 import log
 from pqosapi import pqos_init, pqos_fini # pylint: disable=import-error,no-name-in-module
@@ -284,6 +286,44 @@ class Pqos:
 
 PQOS_API = Pqos()
 
+class Apps:
+    """
+    Apps options
+    """
+    @staticmethod
+    def configure():
+        """
+        Configure Apps, based on config content.
+        """
+
+        config = common.CONFIG_STORE.get_config()
+
+        if 'apps' not in config:
+            return 0
+
+        # set pid affinity
+        for app in config['apps']:
+            if 'pids' not in app:
+                continue
+
+            pids = app['pids']
+            cores = app['cores'] if 'cores' in app else []
+
+            if not cores:
+                pool_id = config.app_to_pool(app['id'])
+                cores = config.get_pool_attr('cores', pool_id)
+
+            if not cores:
+                continue
+
+            for pid in pids:
+                try:
+                    os.sched_setaffinity(pid, cores)
+                except OSError:
+                    log.error("Failed to set {} PID affinity".format(pid))
+
+        return 0
+
 
 class Pool:
     # pylint: disable=too-many-public-methods
@@ -416,6 +456,15 @@ class Pool:
                     [pid for pid in Pool.pools[cos]['pids'] if pid not in pids]
 
         Pool.pools[self.pool]['pids'] = pids
+
+        # set affinity of removed pids to default
+        if removed_pids:
+            cores = common.CONFIG_STORE.get_pool_attr('cores', 0)
+            for pid in removed_pids:
+                try:
+                    os.sched_setaffinity(pid, cores)
+                except OSError:
+                    pass
 
 
     def pids_get(self):
@@ -573,6 +622,8 @@ def configure_rdt():
     for cos in Pool.pools:
         result = Pool(cos).configure()
         if result != 0:
-            break
+            return result
+
+    result = Apps().configure()
 
     return result

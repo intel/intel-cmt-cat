@@ -420,19 +420,22 @@ class Apps(Resource):
                     raise BadRequest("New APP not added, please provide valid pid's")
 
         app_added = False
-        for i in range(len(data['pools'])):
-            if data['pools'][i]['id'] == json_data['pool_id']:
+        for pool in data['pools']:
+            if pool['id'] == json_data['pool_id']:
 
                 json_data.pop('pool_id')
                 data['apps'].append(json_data)
 
-                data['pools'][i]['apps'].append(json_data['id'])
+                if not 'apps' in pool:
+                    pool['apps'] = []
+                pool['apps'].append(json_data['id'])
                 app_added = True
                 break
 
         if not app_added:
             raise NotFound("New APP not added, pool " + json_data['pool_id'] + " doesn't exist")
 
+        common.CONFIG_STORE.set_config(data)
         res = {'id': json_data['id']}
         return res, 201
 
