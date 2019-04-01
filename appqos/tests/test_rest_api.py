@@ -147,7 +147,7 @@ class RESTAPI(object):
 
         r = requests.request(method, url, json=data, auth=(self.user, self.password), verify=False)
 
-        return (r.status_code, r.content)
+        return (r.status_code, r.content.decode('utf-8'))
 
     def _load_json_schema(self, filename):
         """ Loads the given schema file """
@@ -497,7 +497,7 @@ def test_app_add_all(my_app):
 
     data = json.loads(rawData)
 
-    print data
+    print(data)
 
     #validate add app response schema
     schema, resolver = my_app._load_json_schema('add_app_response.json')

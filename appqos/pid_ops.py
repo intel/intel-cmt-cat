@@ -125,7 +125,7 @@ def get_pid_children(pid):
 
     # read procfs /proc/PID/task/PID/children file to get info about PIDs children
     try:
-        with open("/proc/{}/task/{}/children".format(pid, pid)) as children_file:
+        with open("/proc/{pid}/task/{pid}/children".format(pid=pid)) as children_file:
             return children_file.readline().strip().split(' ')
     except EnvironmentError:
         return []

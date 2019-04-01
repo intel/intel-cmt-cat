@@ -99,7 +99,7 @@ class InternalError(RestError):
         RestError.__init__(self, 500, description)
 
 
-class Server(object):
+class Server:
     """
     REST API server
     """
@@ -458,7 +458,7 @@ class Pool(Resource):
             response, status code
         """
 
-        data = common.CONFIG_STORE.get_config()
+        data = common.CONFIG_STORE.get_config().copy()
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
@@ -572,7 +572,7 @@ class Pools(Resource):
         Returns:
             response, status code
         """
-        data = common.CONFIG_STORE.get_config()
+        data = common.CONFIG_STORE.get_config().copy()
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 

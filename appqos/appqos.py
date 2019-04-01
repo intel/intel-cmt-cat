@@ -1,4 +1,4 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 
 ################################################################################
 # BSD LICENSE
@@ -54,7 +54,7 @@ import log
 import rest
 
 
-class AppQoS(object):
+class AppQoS:
     """
     Main logic.
     Handles configuration changes.
@@ -124,7 +124,7 @@ class AppQoS(object):
         Handles CTR+C
         """
 
-        print "CTRL+C..."
+        print("CTRL+C...")
         self.stop_event.set()
 
 

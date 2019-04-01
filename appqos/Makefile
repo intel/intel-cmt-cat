@@ -35,9 +35,9 @@
 ###############################################################################
 
 LIBDIR ?= ../lib
-PYTHON_INCLUDES?=$(shell python2.7-config --includes)
+PYTHON_INCLUDES?=$(shell python-config --includes)
 INCLUDES=$(PYTHON_INCLUDES)
-LIBS=-lpython2.7
+LIBS=$(shell python-config --libs)
 CCFLAGS=-shared -fPIC -I$(LIBDIR)
 LDFLAGS=-L$(LIBDIR)
 
@@ -49,7 +49,7 @@ pqos_api:
 clean:
 	-$(RM) -f pqosapi.so
 
-.PHONY: test cov style pylint_style pqos_api_style virtual_env
+.PHONY: test cov style pylint_style pqos_api_style run
 .PHONY: cppcheck pqos_api_cppcheck
 
 test: pqos_api
@@ -60,8 +60,8 @@ cov: pqos_api
 
 style: pqos_api_style pylint_style
 
-virtual_env:
-	@bash -c "virtualenv $(CURDIR)/virtual_env"
+virtual_env: requirements.txt
+	@bash -c "virtualenv -p python3 $(CURDIR)/virtual_env"
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
 		python -m pip install -r $(CURDIR)/requirements.txt && \
 		deactivate"
@@ -82,3 +82,8 @@ cppcheck: pqos_api_cppcheck
 
 pqos_api_cppcheck:
 	$(CPPCHECK) --enable=all --std=c99 --template=gcc --suppress=unusedFunction pqosapi.c
+
+run: virtual_env
+	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+	python appqos.py && \
+	deactivate"

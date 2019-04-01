@@ -325,6 +325,36 @@ static PyMethodDef pqosapi_methods[] = {
     {NULL, NULL}
 };
 
+
+#if PY_MAJOR_VERSION >= 3
+static struct PyModuleDef pqosapi = {
+    PyModuleDef_HEAD_INIT,
+    "pqosapi",
+    "wrapper for pqos library",
+    -1,
+    pqosapi_methods
+};
+
+/**
+ * @brief Module’s initialisation function.
+ *        Python calls this to let us initialise our module
+ */
+PyMODINIT_FUNC PyInit_pqosapi(void)
+{
+    PyObject *m;
+
+    m = PyModule_Create(&pqosapi);
+    if (m == NULL)
+        return m;
+
+    exception = PyErr_NewException("pqosapi.error", NULL, NULL);
+    Py_INCREF(exception);
+    PyModule_AddObject(m, "pqosapi.error", exception);
+
+    return m;
+}
+
+#else
 /**
  * @brief Module’s initialisation function.
  *        Python calls this to let us initialise our module
@@ -338,3 +368,4 @@ PyMODINIT_FUNC initpqosapi(void)
     Py_INCREF(exception);
     PyModule_AddObject(m, "pqosapi.error", exception);
 }
+#endif
