@@ -83,7 +83,7 @@ CONFIG = {
             "id": 3,
             "mba": 30,
             "name": "mba",
-            "cores": [4],
+            "cores": [4]
         }
     ]
 }
@@ -218,4 +218,38 @@ def test_config_get_new_pool_id(mock_get_config):
         assert 8 == config_store.get_new_pool_id({"mba":10})
         assert 8 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
         assert 30 == config_store.get_new_pool_id({"cbm":"0xff"})
+
+
+@mock.patch('cache_ops.PQOS_API.get_num_cores')
+@mock.patch('config.ConfigStore.load')
+def test_config_reset(mock_load, mock_get_num_cores):
+        from copy import deepcopy
+
+        # mock load to avoid reading config from external file
+        mock_load.return_value = deepcopy(CONFIG)
+        mock_get_num_cores.return_value = 8
+
+        config_store = ConfigStore()
+        config_store.from_file("/tmp/appqos_test.config")
+
+        assert len(config_store.get_pool_attr('cores', None)) == 8
+
+        # reset mock and change return values
+        # more cores this time (8 vs. 16)
+        mock_get_num_cores.return_value = 16
+        mock_get_num_cores.reset_mock()
+
+        # get fresh copy of CONFIG
+        mock_load.return_value = deepcopy(CONFIG)
+        mock_load.reset_mock()
+
+        # verify that reset reloads config from file and Default pool is
+        # recreated with different set of cores
+        # (get_num_cores mocked to return different values)
+        config_store.reset()
+
+        mock_load.assert_called_once_with("/tmp/appqos_test.config")
+        mock_get_num_cores.assert_called_once()
+
+        assert len(config_store.get_pool_attr('cores', None)) == 16
 

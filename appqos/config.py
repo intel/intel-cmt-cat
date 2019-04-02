@@ -121,6 +121,24 @@ class ConfigStore:
         self.namespace.path = path
 
 
+    def get_path(self):
+        """
+        Get path to configuration file
+
+        Returns:
+            path: path to config file
+        """
+        return self.namespace.path
+
+
+    def reset(self):
+        """
+        Reset configuration, reload config file
+        """
+
+        self.from_file(self.get_path())
+
+
     def from_file(self, path):
         """
         Retrieve config from file

@@ -135,11 +135,12 @@ class RESTAPI(object):
             else:
                 return MAX_L3CA_COS_ID
 
-        with mock.patch('cache_ops.PQOS_API.get_max_cos_id', new=get_max_cos_id):
-            # start process to run flask in the background
-            server = rest.Server()
-            server.start(self.address, self.port, True)
-            return server
+        with mock.patch('common.CONFIG_STORE.reset'):
+            with mock.patch('cache_ops.PQOS_API.get_max_cos_id', new=get_max_cos_id):
+                # start process to run flask in the background
+                server = rest.Server()
+                server.start(self.address, self.port, True)
+                return server
 
     def api_requests(self, method, endpoint, data={}):
 
@@ -783,3 +784,16 @@ def test_stats(my_app):
     data = json.loads(rawData)
     assert 'num_apps_moves' in data
     assert 'num_err' in data
+
+def test_reset(my_app):
+    status, rawData = my_app.api_requests('POST', 'reset')
+    assert status == 200
+
+    status, rawData = my_app.api_requests('GET', 'reset')
+    assert status == 405
+
+    status, rawData = my_app.api_requests('PUT', 'reset', {"pool_id": 2})
+    assert status == 405
+
+    status, rawData = my_app.api_requests('DELETE', 'reset')
+    assert status == 405

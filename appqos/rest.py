@@ -121,6 +121,7 @@ class Server:
         self.api.add_resource(Pool, '/pools/<pool_id>')
         self.api.add_resource(Stats, '/stats')
         self.api.add_resource(Caps, '/caps')
+        self.api.add_resource(Reset, '/reset')
 
         self.app.register_error_handler(RestError, Server.error_handler)
 
@@ -714,3 +715,25 @@ class Caps(Resource):
         data["capabilities"] = caps.SYSTEM_CAPS
 
         return data, 200
+
+
+class Reset(Resource):
+    """
+    Handles /reset HTTP requests
+    """
+
+
+    @staticmethod
+    @Server.auth.login_required
+    def post():
+        """
+        Handles HTTP POST /reset request.
+        Resets configuration, reloads config file
+
+        Returns:
+            response, status code
+        """
+
+        common.CONFIG_STORE.reset()
+
+        return "", 200
