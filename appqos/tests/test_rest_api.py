@@ -56,6 +56,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 MAX_L3CA_COS_ID = 15
 MAX_MBA_COS_ID = 7
+MAX_CORE_ID = 31
 
 CONFIG = {
     "apps": [
@@ -128,19 +129,30 @@ class RESTAPI(object):
         self.address = '0.0.0.0'
         self.port = 6000
 
-    def start_flask(self):
+    @mock.patch('common.CONFIG_STORE.reset')
+    @mock.patch('common.PQOS_API.get_num_cores')
+    @mock.patch('common.PQOS_API.get_max_cos_id')
+    @mock.patch('common.PQOS_API.check_core')
+    def start_flask(self, mock_check_core, mock_get_max_cos_id, mock_get_num_cores, mock_reset):
         def get_max_cos_id(alloc_type):
             if 'mba' in alloc_type:
                 return MAX_MBA_COS_ID
             else:
                 return MAX_L3CA_COS_ID
 
-        with mock.patch('common.CONFIG_STORE.reset'):
-            with mock.patch('cache_ops.PQOS_API.get_max_cos_id', new=get_max_cos_id):
-                # start process to run flask in the background
-                server = rest.Server()
-                server.start(self.address, self.port, True)
-                return server
+        mock_get_max_cos_id.side_effect = get_max_cos_id
+
+        def check_core(core):
+            return core <= MAX_CORE_ID
+
+        mock_check_core.side_effect = check_core
+
+        mock_get_num_cores.return_value = MAX_CORE_ID
+
+        # start process to run flask in the background
+        server = rest.Server()
+        server.start(self.address, self.port, True)
+        return server
 
     def api_requests(self, method, endpoint, data={}):
 

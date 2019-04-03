@@ -40,8 +40,8 @@ import threading
 from os.path import join, dirname
 import jsonschema
 
+import caps
 import common
-import cache_ops
 
 
 class ConfigStore:
@@ -329,8 +329,15 @@ class ConfigStore:
         # no Default pool configured
         default_pool = {}
         default_pool['id'] = 0
+
+        if caps.mba_supported():
+            default_pool['mba'] = 100
+
+        if caps.cat_supported():
+            default_pool['cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
+
         default_pool['name'] = "Default"
-        default_pool['cores'] = list(range(cache_ops.PQOS_API.get_num_cores()))
+        default_pool['cores'] = list(range(common.PQOS_API.get_num_cores()))
 
         for pool in data['pools']:
             default_pool['cores'] = \
@@ -352,7 +359,7 @@ class ConfigStore:
             alloc_type.append(common.MBA_CAP)
         if 'cbm' in new_pool_data:
             alloc_type.append(common.CAT_CAP)
-        max_cos_id = cache_ops.PQOS_API.get_max_cos_id(alloc_type)
+        max_cos_id = common.PQOS_API.get_max_cos_id(alloc_type)
 
         data = self.get_config()
 

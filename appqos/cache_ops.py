@@ -40,251 +40,6 @@ import os
 
 import common
 import log
-from pqosapi import pqos_init, pqos_fini # pylint: disable=import-error,no-name-in-module
-from pqosapi import pqos_alloc_assoc_set, pqos_l3ca_set, pqos_mba_set # pylint: disable=import-error,no-name-in-module
-from pqosapi import pqos_is_mba_supported, pqos_is_cat_supported, pqos_get_num_cores # pylint: disable=import-error,no-name-in-module
-from pqosapi import pqos_cpu_get_sockets # pylint: disable=import-error,no-name-in-module
-from pqosapi import pqos_get_l3ca_num_cos, pqos_get_mba_num_cos # pylint: disable=import-error,no-name-in-module
-
-class Pqos:
-    """
-    Wrapper for "libpqos".
-    Uses "libpqos" to configure Intel(R) RDT
-    """
-
-    @staticmethod
-    def init():
-        """
-        Initializes libpqos
-
-        Returns:
-            0 on success
-            -1 otherwise
-        """
-        try:
-            pqos_init()
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        return 0
-
-    @staticmethod
-    def fini():
-        """
-        De-initializes libpqos
-        """
-        pqos_fini()
-
-        return 0
-
-    @staticmethod
-    def alloc_assoc_set(cores, cos):
-        """
-        Assigns cores to CoS
-
-        Parameters:
-            cos: Class of Service
-            cores: list of cores to be assigned to cos
-
-        Returns:
-            0 on success
-            -1 otherwise
-        """
-        if not cores:
-            return 0
-
-        try:
-            for core in cores:
-                pqos_alloc_assoc_set(core, cos)
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        return 0
-
-
-    @staticmethod
-    def l3ca_set(sockets, cos, ways_mask):
-        """
-        Configures L3 CAT for CoS
-
-        Parameters:
-            sockets: sockets list on which to configure L3 CAT
-            cos: Class of Service
-            ways_mask: L3 CAT CBM to set
-
-        Returns:
-            0 on success
-            -1 otherwise
-        """
-        try:
-            for socket in sockets:
-                pqos_l3ca_set(socket, cos, ways_mask)
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        return 0
-
-    @staticmethod
-    def mba_set(sockets, cos, mb_max):
-        """
-        Configures MBA for CoS
-
-        Parameters:
-            sockets: sockets list on which to configure L3 CAT
-            cos: Class of Service
-            mb_max: MBA to set
-
-        Returns:
-            0 on success
-            -1 otherwise
-        """
-        try:
-            for socket in sockets:
-                pqos_mba_set(socket, cos, mb_max)
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        return 0
-
-    @staticmethod
-    def is_mba_supported():
-        """
-        Checks for MBA support
-
-        Returns:
-            1 if supported
-            0 otherwise
-        """
-        try:
-            return pqos_is_mba_supported()
-        except Exception as ex:
-            log.error(str(ex))
-            return 0
-
-    @staticmethod
-    def is_cat_supported():
-        """
-        Checks for CAT support
-
-        Returns:
-            1 if supported
-            0 otherwise
-        """
-        try:
-            return pqos_is_cat_supported()
-        except Exception as ex:
-            log.error(str(ex))
-            return 0
-
-    @staticmethod
-    def is_multicore():
-        """
-        Checks if system is multicore
-
-        Returns:
-            1 if multicore
-            0 otherwise
-        """
-        return Pqos.get_num_cores() > 1
-
-    @staticmethod
-    def get_num_cores():
-        """
-        Gets number of cores in system
-
-        Returns:
-            num of cores
-            0 otherwise
-        """
-        try:
-            return pqos_get_num_cores()
-        except Exception as ex:
-            log.error(str(ex))
-            return 0
-
-    @staticmethod
-    def get_sockets():
-        """
-        Gets list of sockets
-
-        Returns:
-            sockets list,
-            None otherwise
-        """
-        try:
-            return pqos_cpu_get_sockets()
-        except Exception as ex:
-            log.error(str(ex))
-            return None
-
-    @staticmethod
-    def get_l3ca_num_cos():
-        """
-        Gets number of COS for L3 CAT
-
-        Returns:
-            num of COS for L3 CAT
-            None otherwise
-        """
-        try:
-            return pqos_get_l3ca_num_cos()
-        except Exception as ex:
-            log.error(str(ex))
-            return None
-
-    @staticmethod
-    def get_mba_num_cos():
-        """
-        Gets number of COS for MBA
-
-        Returns:
-            num of COS for MBA
-            None otherwise
-        """
-        try:
-            return pqos_get_mba_num_cos()
-        except Exception as ex:
-            log.error(str(ex))
-            return None
-
-    @staticmethod
-    def get_max_cos_id(alloc_type):
-        """
-        Gets max COS# (id) that can be used to configure set of allocation technologies
-
-        Returns:
-            Available COS# to be used
-            None otherwise
-        """
-        max_cos_num = None
-        max_cos_cat = Pqos.get_l3ca_num_cos()
-        max_cos_mba = Pqos.get_mba_num_cos()
-
-        if common.CAT_CAP not in alloc_type and common.MBA_CAP not in alloc_type:
-            return None
-
-        if common.CAT_CAP in alloc_type and not max_cos_cat:
-            return None
-
-        if common.MBA_CAP in alloc_type and not max_cos_mba:
-            return None
-
-        if common.CAT_CAP in alloc_type:
-            max_cos_num = max_cos_cat
-
-        if common.MBA_CAP in alloc_type:
-            if max_cos_num is not None:
-                max_cos_num = min(max_cos_mba, max_cos_num)
-            else:
-                max_cos_num = max_cos_mba
-
-        return max_cos_num - 1
-
-PQOS_API = Pqos()
 
 class Apps:
     """
@@ -493,7 +248,7 @@ class Pool:
         Pool.pools[self.pool]['cores'] = cores
 
         # updated RDT configuration
-        PQOS_API.alloc_assoc_set(cores, self.pool)
+        common.PQOS_API.alloc_assoc_set(cores, self.pool)
 
         # process list of removed cores
         for cos in Pool.pools:
@@ -512,7 +267,7 @@ class Pool:
         # Finally assign removed cores back to COS0/"Default" Pool
         if removed_cores:
             log.debug("Cores assigned to COS#0 {}".format(removed_cores))
-            PQOS_API.alloc_assoc_set(removed_cores, 0)
+            common.PQOS_API.release(removed_cores)
 
 
     def cores_get(self):
@@ -546,23 +301,24 @@ class Pool:
         mba = pool.mba_get()
         cores = pool.cores_get()
 
-        sockets = PQOS_API.get_sockets()
+        sockets = common.PQOS_API.get_sockets()
         if sockets is None:
+            log.error("Failed to get sockets info!")
             return -1
 
         # pool id to COS, 1:1 mapping
         if cbm:
-            if PQOS_API.l3ca_set(sockets, pool_id, cbm) != 0:
+            if common.PQOS_API.l3ca_set(sockets, pool_id, cbm) != 0:
                 log.error("Failed to apply CAT configuration!")
                 return -1
 
         if mba:
-            if PQOS_API.mba_set(sockets, pool_id, mba) != 0:
+            if common.PQOS_API.mba_set(sockets, pool_id, mba) != 0:
                 log.error("Failed to apply MBA configuration!")
                 return -1
 
         if cores:
-            if PQOS_API.alloc_assoc_set(cores, pool_id) != 0:
+            if common.PQOS_API.alloc_assoc_set(cores, pool_id) != 0:
                 log.error("Failed to associate RDT COS!")
                 return -1
 

@@ -134,7 +134,7 @@ def test_config_pid_to_pool(mock_get_config, pid, pool_id):
     assert config_store.pid_to_pool(pid) == pool_id
 
 
-@mock.patch('cache_ops.PQOS_API.get_num_cores')
+@mock.patch('common.PQOS_API.get_num_cores')
 def test_config_default_pool(mock_get_num_cores):
     mock_get_num_cores.return_value = 16
     config_store = ConfigStore()
@@ -154,7 +154,7 @@ def test_config_default_pool(mock_get_num_cores):
     assert config_store.is_default_pool_defined(config)
 
     # test that config now contains all cores (cores configured + default pool cores)
-    all_cores = range(cache_ops.PQOS_API.get_num_cores())
+    all_cores = range(common.PQOS_API.get_num_cores())
     for pool in config['pools']:
         all_cores = [core for core in all_cores if core not in pool['cores']]
     assert not all_cores
@@ -206,7 +206,7 @@ def test_config_get_new_pool_id(mock_get_config):
             return 31
 
 
-    with mock.patch('cache_ops.PQOS_API.get_max_cos_id', new=get_max_cos_id):
+    with mock.patch('common.PQOS_API.get_max_cos_id', new=get_max_cos_id):
         config_store = ConfigStore()
 
         mock_get_config.return_value = CONFIG
@@ -220,7 +220,7 @@ def test_config_get_new_pool_id(mock_get_config):
         assert 30 == config_store.get_new_pool_id({"cbm":"0xff"})
 
 
-@mock.patch('cache_ops.PQOS_API.get_num_cores')
+@mock.patch('common.PQOS_API.get_num_cores')
 @mock.patch('config.ConfigStore.load')
 def test_config_reset(mock_load, mock_get_num_cores):
         from copy import deepcopy

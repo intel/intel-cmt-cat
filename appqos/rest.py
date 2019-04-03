@@ -49,7 +49,6 @@ from werkzeug.exceptions import HTTPException
 import jsonschema
 
 import caps
-import cache_ops
 import common
 import log
 import pid_ops
@@ -411,7 +410,7 @@ class Apps(Resource):
 
         if 'cores' in json_data:
             for core in json_data['cores']:
-                if not common.is_core_valid(core):
+                if not common.PQOS_API.check_core(core):
                     raise BadRequest("New APP not added, please provide valid cores")
 
         if 'pids' in json_data:
@@ -536,7 +535,7 @@ class Pool(Resource):
             if not alloc_tech:
                 return True
 
-            return pool_id <= cache_ops.PQOS_API.get_max_cos_id(alloc_tech)
+            return pool_id <= common.PQOS_API.get_max_cos_id(alloc_tech)
 
         json_data = request.get_json()
 
@@ -577,7 +576,7 @@ class Pool(Resource):
                     raise BadRequest("At least one core required")
 
                 for core in json_data['cores']:
-                    if not common.is_core_valid(core):
+                    if not common.PQOS_API.check_core(core):
                         raise BadRequest("Pool {}, Invalid core {}!".format(pool_id, core))
 
                 if not common.CONFIG_STORE.check_cores(json_data['cores'], int(pool_id)):
@@ -656,7 +655,7 @@ class Pools(Resource):
 
         if 'cores' in post_data:
             for core in post_data['cores']:
-                if not common.is_core_valid(core):
+                if not common.PQOS_API.check_core(core):
                     raise BadRequest("New POOL not added, please provide valid cores")
 
             if not common.CONFIG_STORE.check_cores(post_data['cores']):

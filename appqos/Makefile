@@ -34,31 +34,17 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-LIBDIR ?= ../lib
-PYTHON_INCLUDES?=$(shell python-config --includes)
-INCLUDES=$(PYTHON_INCLUDES)
-LIBS=$(shell python-config --libs)
-CCFLAGS=-shared -fPIC -I$(LIBDIR)
-LDFLAGS=-L$(LIBDIR)
+.PHONY: test cov style run
 
-all: pqos_api
+test: virtual_env
+	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+		PYTHONPATH=$(CURDIR)/../lib/python:. pytest tests/ && \
+		deactivate"
 
-pqos_api:
-	$(CC) $(CCFLAGS) $(LDFLAGS) $(INCLUDES) $(LIBS) -lpqos -o pqosapi.so pqosapi.c
-
-clean:
-	-$(RM) -f pqosapi.so
-
-.PHONY: test cov style pylint_style pqos_api_style run
-.PHONY: cppcheck pqos_api_cppcheck
-
-test: pqos_api
-	PYTHONPATH=. pytest tests/
-
-cov: pqos_api
-	PYTHONPATH=. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/
-
-style: pqos_api_style pylint_style
+cov: virtual_env
+	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+		PYTHONPATH=$(CURDIR)/../lib/python:. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/ && \
+		deactivate"
 
 virtual_env: requirements.txt
 	@bash -c "virtualenv -p python3 $(CURDIR)/virtual_env"
@@ -66,24 +52,12 @@ virtual_env: requirements.txt
 		python -m pip install -r $(CURDIR)/requirements.txt && \
 		deactivate"
 
-pylint_style: virtual_env
+style: virtual_env
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-		pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
+		PYTHONPATH=$(CURDIR)/../lib/python pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
 		deactivate"
-
-CHECKPATCH?=checkpatch.pl
-
-pqos_api_style:
-	$(CHECKPATCH) --no-tree --no-signoff --emacs \
-	--ignore CODE_INDENT,LEADING_SPACE -f pqosapi.c
-
-CPPCHECK?=cppcheck
-cppcheck: pqos_api_cppcheck
-
-pqos_api_cppcheck:
-	$(CPPCHECK) --enable=all --std=c99 --template=gcc --suppress=unusedFunction pqosapi.c
 
 run: virtual_env
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-	python appqos.py && \
-	deactivate"
+		PYTHONPATH=$(CURDIR)/../lib/python:. python appqos.py && \
+		deactivate"

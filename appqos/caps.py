@@ -35,8 +35,6 @@
 System capabilities module
 """
 
-import cache_ops
-
 import common
 import log
 
@@ -57,7 +55,7 @@ def caps_init():
     log.debug("Supported capabilities:")
     log.debug(SYSTEM_CAPS)
 
-    if (cat_supported() or mba_supported()) and cache_ops.PQOS_API.is_multicore:
+    if (cat_supported() or mba_supported()) and common.PQOS_API.is_multicore():
         return 0
 
     return -1
@@ -87,10 +85,10 @@ def detect_supported_caps():
     result = []
     # generate list of supported capabilities
 
-    if cache_ops.PQOS_API.is_cat_supported():
+    if common.PQOS_API.is_l3_cat_supported():
         result.append(common.CAT_CAP)
 
-    if cache_ops.PQOS_API.is_mba_supported():
+    if common.PQOS_API.is_mba_supported():
         result.append(common.MBA_CAP)
 
     return result

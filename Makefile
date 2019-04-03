@@ -57,9 +57,6 @@ all:
 	$(MAKE) -C examples/c/CAT_MBA
 	$(MAKE) -C examples/c/CMT_MBM
 	$(MAKE) -C examples/c/PSEUDO_LOCK
-ifeq ($(shell uname), Linux)
-	$(MAKE) -C appqos
-endif
 
 clean:
 	$(MAKE) -C lib clean
@@ -69,7 +66,6 @@ clean:
 	$(MAKE) -C examples/c/CAT_MBA clean
 	$(MAKE) -C examples/c/CMT_MBM clean
 	$(MAKE) -C examples/c/PSEUDO_LOCK clean
-	$(MAKE) -C appqos clean
 
 style:
 	$(MAKE) -C lib style
@@ -89,7 +85,6 @@ cppcheck:
 	$(MAKE) -C examples/c/CAT_MBA cppcheck
 	$(MAKE) -C examples/c/CMT_MBM cppcheck
 	$(MAKE) -C examples/c/PSEUDO_LOCK cppcheck
-	$(MAKE) -C appqos cppcheck
 
 install:
 	$(MAKE) -C lib install

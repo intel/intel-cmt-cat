@@ -33,7 +33,6 @@
 
 import pytest
 import json
-from config import *
 import rest
 
 from jsonschema  import validate, RefResolver
@@ -49,6 +48,8 @@ from requests.auth import HTTPBasicAuth
 # suppress warning from requests
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+import common
 
 class Empty_RESTAPI(object):
 

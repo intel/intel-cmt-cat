@@ -147,7 +147,7 @@ def main():
     if cmd_args.verbose:
         log.enable_verbose()
 
-    result = cache_ops.PQOS_API.init()
+    result = common.PQOS_API.init()
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
         return
@@ -173,7 +173,7 @@ def main():
         log.error("Required capabilities not supported, Terminating...")
 
     # de-initialize libpqos
-    cache_ops.PQOS_API.fini()
+    common.PQOS_API.fini()
 
 
 if __name__ == '__main__':

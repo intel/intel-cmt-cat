@@ -31,36 +31,54 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
-"""
-Common global constants and helper functions
-"""
+import pytest
+import mock
 
-import multiprocessing
-import pqos_api # pylint: disable=cyclic-import
-import config # pylint: disable=cyclic-import
-import stats # pylint: disable=cyclic-import
+import common
+
+import pqos_api
+
+class TestPqosApi(object):
+
+    ## @cond
+    @pytest.fixture(autouse=True)
+    def init(self):
+       self.Pqos = pqos_api.PqosApi()
+       self.Pqos.cap = mock.MagicMock()
+       self.Pqos.cap.get_l3ca_cos_num = mock.MagicMock()
+       self.Pqos.cap.get_mba_cos_num = mock.MagicMock()
+    ## @endcond
 
 
-CONFIG_FILENAME = "appqos.conf"
-CAT_CAP = "cat"
-MBA_CAP = "mba"
+    def test_get_max_cos_id(self):
+       self.Pqos.cap.get_l3ca_cos_num.return_value = 16
+       self.Pqos.cap.get_mba_cos_num.return_value = 8
 
-MANAGER = multiprocessing.Manager()
-CONFIG_STORE = config.ConfigStore()
-STATS_STORE = stats.StatsStore()
-PQOS_API = pqos_api.PqosApi()
+       assert 7 == self.Pqos.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert 7 == self.Pqos.get_max_cos_id([common.MBA_CAP])
+       assert 15 == self.Pqos.get_max_cos_id([common.CAT_CAP])
+       assert None == self.Pqos.get_max_cos_id([])
+
+       self.Pqos.cap.get_l3ca_cos_num.return_value = 0
+       assert None == self.Pqos.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert 7 == self.Pqos.get_max_cos_id([common.MBA_CAP])
+       assert None == self.Pqos.get_max_cos_id([common.CAT_CAP])
+       assert None == self.Pqos.get_max_cos_id([])
+
+       self.Pqos.cap.get_mba_cos_num.return_value = 0
+       assert None == self.Pqos.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert None == self.Pqos.get_max_cos_id([common.MBA_CAP])
+       assert None == self.Pqos.get_max_cos_id([common.CAT_CAP])
+       assert None == self.Pqos.get_max_cos_id([])
 
 
-def is_event_set(event):
-    """
-    Checks is event set
+    def test_get_l3ca_num_cos(self):
+       self.Pqos.cap.get_l3ca_cos_num.return_value = 32
 
-    Parameters:
-        event: event to be tested
-    Returns:
-        result: bool
-    """
-    try:
-        return event.is_set()
-    except IOError:
-        return False
+       assert 32 == self.Pqos.get_l3ca_num_cos()
+
+
+    def test_get_mba_cos_num(self):
+       self.Pqos.cap.get_mba_cos_num.return_value = 16
+
+       assert 16 == self.Pqos.get_mba_num_cos()
