@@ -274,7 +274,7 @@ def _get_cap_mba(p_capability):
     return capability
 
 
-def _get_type_enum(type_str):
+def pqos_get_type_enum(type_str):
     "Converts capability type string to pqos_capability's enum."
     type_enum_map = {
         'mon': CPqosCapability.PQOS_CAP_TYPE_MON,
@@ -315,7 +315,7 @@ class PqosCap(object):
             type_str: a string indicating a type of capability, available
                       options: mon, l3ca, l2ca and mba
         """
-        type_enum = _get_type_enum(type_str)
+        type_enum = pqos_get_type_enum(type_str)
         p_cap_item = ctypes.POINTER(CPqosCapability)()
         ret = self.pqos.lib.pqos_cap_get_type(self.p_cap, type_enum,
                                               ctypes.byref(p_cap_item))
