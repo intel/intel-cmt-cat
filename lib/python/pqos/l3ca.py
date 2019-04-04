@@ -40,7 +40,9 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 
 from pqos.capability import PqosCap
-from pqos.common import pqos_handle_error
+from pqos.common import (
+    pqos_handle_error, convert_from_cos, convert_to_cos, COSBase
+)
 from pqos.pqos import Pqos
 
 
@@ -77,94 +79,19 @@ class CPqosL3Ca(ctypes.Structure):
     def from_cos(cls, cos):
         "Creates CPqosL3Ca object from PqosCatL3.COS object."
 
-        l3ca = cls(class_id=cos.class_id, cdp=int(cos.cdp))
-
-        if cos.cdp:
-            l3ca.u.s.data_mask = cos.data_mask
-            l3ca.u.s.code_mask = cos.code_mask
-        else:
-            l3ca.u.ways_mask = cos.mask
-
-        return l3ca
+        return convert_from_cos(cos, cls)
 
     def to_cos(self, cls):
         "Creates PqosCatL3.COS object from CPqosL3Ca object."
 
-        mask = None
-        code_mask = None
-        data_mask = None
-
-        if self.cdp:
-            code_mask = self.u.s.code_mask
-            data_mask = self.u.s.data_mask
-        else:
-            mask = self.u.ways_mask
-
-        class_id = self.class_id
-
-        return cls(class_id, mask, code_mask, data_mask)
-
-
-def _get_mask_int(mask):
-    "Returns a bitmask as an integer."
-
-    if isinstance(mask, type(u'')):
-        if mask.lower().startswith('0x'):
-            return int(mask.lower(), 16)
-
-        return int(mask)
-
-    if isinstance(mask, int):
-        return mask
-
-    if mask is None:
-        return 0
-
-    raise ValueError(u'Please specify mask as either a string,' \
-                     u' an integer or None')
+        return convert_to_cos(self, cls)
 
 
 class PqosCatL3(object):
     "PQoS L3 Cache Allocation Technology"
 
-    class COS(object):
+    class COS(COSBase):  # pylint: disable=too-few-public-methods
         "L3 class of service configuration"
-
-        def __init__(self, class_id, mask=None, code_mask=None, data_mask=None):
-            """
-            Initializes L3 COS configuration object.
-
-            Parameters:
-                class_id: a class of service
-                mask: a bitmask (an integer or a string starting from '0x')
-                      representing used cache ways or None, if None is given,
-                      then code_mask and data_mask must be set (default None)
-                code_mask: a bitmask (an integer or a string starting from '0x')
-                           representing used cache ways for code or None,
-                           if None is given, then mask must be set
-                           (default None)
-                data_mask: a bitmask (an integer or a string starting from '0x')
-                           representing used cache ways for data or None,
-                           if None is given, then mask must be set
-                           (default None)
-            """
-            if not mask and not (code_mask or data_mask):
-                raise ValueError(u'Please specify mask or code mask'
-                                 u' and data mask')
-
-            self.class_id = class_id
-            self.mask = _get_mask_int(mask)
-            self.code_mask = _get_mask_int(code_mask)
-            self.data_mask = _get_mask_int(data_mask)
-            self.cdp = bool(code_mask is not None or \
-                       data_mask is not None)
-
-        def __repr__(self):
-            params = (self.class_id, repr(self.mask), repr(self.code_mask),
-                      repr(self.data_mask))
-            return u'COS(class_id=%s, mask=%s, code_mask=%s,' \
-                   u' data_mask=%s)' % params
-
 
     def __init__(self):
         self.pqos = Pqos()

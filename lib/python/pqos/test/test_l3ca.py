@@ -68,17 +68,17 @@ class TestPqosCatL3(unittest.TestCase):
             self.assertEqual(num_ca, 1)
 
             cos = l3_ca_arr[0]
-            self.assertEqual(cos.class_id, 1)
+            self.assertEqual(cos.class_id, 4)
             self.assertEqual(cos.cdp, 1)
-            self.assertEqual(cos.u.s.data_mask, 0x1f)
-            self.assertEqual(cos.u.s.code_mask, 0x0f)
+            self.assertEqual(cos.u.s.data_mask, 0x0f)
+            self.assertEqual(cos.u.s.code_mask, 0x1f)
 
             return 0
 
         lib.pqos_l3ca_set = MagicMock(side_effect=pqos_l3ca_set_mock)
 
         l3ca = PqosCatL3()
-        cos = l3ca.COS(1, data_mask=u'0x1f', code_mask=0x0f)
+        cos = l3ca.COS(4, data_mask=u'0x0f', code_mask=0x1f)
         l3ca.set(0, [cos])
 
         lib.pqos_l3ca_set.assert_called_once()
@@ -94,8 +94,8 @@ class TestPqosCatL3(unittest.TestCase):
             self.assertEqual(socket, 1)
             self.assertEqual(cos_num, 2)
 
-            cos_c = CPqosL3Ca(class_id=0, u=CPqosL3CaMask(ways_mask=0x01ff))
-            cos2_c = CPqosL3Ca(class_id=1, u=CPqosL3CaMask(ways_mask=0x007f))
+            cos_c = CPqosL3Ca(class_id=0, u=CPqosL3CaMask(ways_mask=0x01fe))
+            cos2_c = CPqosL3Ca(class_id=1, u=CPqosL3CaMask(ways_mask=0x003f))
             cos_arr_c = ctypes_build_array([cos_c, cos2_c])
 
             ctypes.memmove(l3cas, cos_arr_c, ctypes.sizeof(cos_arr_c))
@@ -116,9 +116,9 @@ class TestPqosCatL3(unittest.TestCase):
 
         self.assertEqual(len(coses), 2)
         self.assertEqual(coses[0].class_id, 0)
-        self.assertEqual(coses[0].mask, 0x01ff)
+        self.assertEqual(coses[0].mask, 0x01fe)
         self.assertEqual(coses[1].class_id, 1)
-        self.assertEqual(coses[1].mask, 0x007f)
+        self.assertEqual(coses[1].mask, 0x003f)
 
     @mock_pqos_lib
     def test_get_min_cbm_bits(self, lib):
