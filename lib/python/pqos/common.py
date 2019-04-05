@@ -36,6 +36,7 @@ Common module which defines functions used in other modules.
 """
 
 from __future__ import absolute_import, division, print_function
+import ctypes
 
 from pqos.error import ERRORS, PqosError
 
@@ -142,3 +143,14 @@ def convert_to_cos(ctypes_cos, cls):
     class_id = ctypes_cos.class_id
 
     return cls(class_id, mask, code_mask, data_mask)
+
+def free_memory(ptr):
+    "Releases memory allocated by the library."
+
+    libc_path = ctypes.util.find_library(u'c')
+
+    if not libc_path:
+        raise Exception(u'Cannot find libc')
+
+    libc = ctypes.cdll.LoadLibrary(libc_path)
+    libc.free(ptr)

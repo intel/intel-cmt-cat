@@ -39,7 +39,7 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 import unittest
 
-from mock import MagicMock
+from mock import MagicMock, patch
 
 from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_int, ctypes_build_array
@@ -138,7 +138,8 @@ class TestPqosCpuInfo(unittest.TestCase):
             return 1
 
         lib.pqos_cap_get = MagicMock(side_effect=pqos_cap_get_mock)
-        lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_socketid_m)
+        lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_socketid_m,
+                                              __name__=u'pqos_cpu_get_socketid')
 
         pqos_cpu = PqosCpuInfo()
 
@@ -165,7 +166,9 @@ class TestPqosCpuInfo(unittest.TestCase):
         lib.pqos_cpu_get_sockets = MagicMock(side_effect=pqos_cpu_get_sockets_m)
 
         cpu = PqosCpuInfo()
-        sockets = cpu.get_sockets()
+
+        with patch('pqos.cpuinfo.free_memory'):
+            sockets = cpu.get_sockets()
 
         self.assertEqual(len(sockets), 4)
         self.assertEqual(sockets[0], 0)
@@ -190,7 +193,9 @@ class TestPqosCpuInfo(unittest.TestCase):
         lib.pqos_cpu_get_l2ids = MagicMock(side_effect=pqos_cpu_get_l2ids_m)
 
         cpu = PqosCpuInfo()
-        l2ids = cpu.get_l2ids()
+
+        with patch('pqos.cpuinfo.free_memory'):
+            l2ids = cpu.get_l2ids()
 
         self.assertEqual(len(l2ids), 4)
         self.assertEqual(l2ids[0], 7)
@@ -216,7 +221,9 @@ class TestPqosCpuInfo(unittest.TestCase):
         lib.pqos_cpu_get_cores_l3id = MagicMock(side_effect=pqos_cores_l3id_m)
 
         cpu = PqosCpuInfo()
-        cores = cpu.get_cores_l3id(2)
+
+        with patch('pqos.cpuinfo.free_memory'):
+            cores = cpu.get_cores_l3id(2)
 
         self.assertEqual(len(cores), 3)
         self.assertEqual(cores[0], 4)
@@ -243,7 +250,9 @@ class TestPqosCpuInfo(unittest.TestCase):
         lib.pqos_cpu_get_cores = MagicMock(side_effect=pqos_cpu_get_cores_m)
 
         cpu = PqosCpuInfo()
-        cores = cpu.get_cores(0)
+
+        with patch('pqos.cpuinfo.free_memory'):
+            cores = cpu.get_cores(0)
 
         self.assertEqual(len(cores), 3)
         self.assertEqual(cores[0], 8)
@@ -289,7 +298,8 @@ class TestPqosCpuInfo(unittest.TestCase):
             return 0
 
         lib.pqos_cap_get = MagicMock(return_value=0)
-        lib.pqos_cpu_get_one_core = MagicMock(side_effect=pqos_get_one_core_m)
+        lib.pqos_cpu_get_one_core = MagicMock(side_effect=pqos_get_one_core_m,
+                                              __name__=u'pqos_cpu_get_one_core')
 
         cpu = PqosCpuInfo()
         core = cpu.get_one_core(1)
@@ -310,7 +320,9 @@ class TestPqosCpuInfo(unittest.TestCase):
             return 0
 
         lib.pqos_cap_get = MagicMock(return_value=0)
-        lib.pqos_cpu_get_one_by_l2id = MagicMock(side_effect=pqos_get_by_l2id_m)
+        func_mock = MagicMock(side_effect=pqos_get_by_l2id_m,
+                              __name__=u'pqos_cpu_get_one_by_l2id')
+        lib.pqos_cpu_get_one_by_l2id = func_mock
 
         cpu = PqosCpuInfo()
         core = cpu.get_one_by_l2id(8)
@@ -371,7 +383,8 @@ class TestPqosCpuInfo(unittest.TestCase):
             return 0
 
         lib.pqos_cap_get = MagicMock(return_value=0)
-        lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_get_socketid_m)
+        lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_get_socketid_m,
+                                              __name__=u'pqos_cpu_get_socketid')
 
         cpu = PqosCpuInfo()
         socket = cpu.get_socketid(3)
@@ -392,7 +405,9 @@ class TestPqosCpuInfo(unittest.TestCase):
             return 0
 
         lib.pqos_cap_get = MagicMock(return_value=0)
-        lib.pqos_cpu_get_clusterid = MagicMock(side_effect=pqos_get_clusterid_m)
+        func_mock = MagicMock(side_effect=pqos_get_clusterid_m,
+                              __name__=u'pqos_cpu_get_clusterid')
+        lib.pqos_cpu_get_clusterid = func_mock
 
         cpu = PqosCpuInfo()
         cluster = cpu.get_clusterid(1)

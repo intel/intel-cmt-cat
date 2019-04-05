@@ -39,7 +39,8 @@ like number of cores, L2/L3 cache ID etc.
 from __future__ import absolute_import, division, print_function
 import ctypes
 
-from pqos.common import pqos_handle_error
+from pqos.common import pqos_handle_error, free_memory
+from pqos.error import PqosError
 from pqos.pqos import Pqos
 
 
@@ -124,6 +125,55 @@ class PqosCpuInfo(object):
         ret = self.pqos.lib.pqos_cap_get(None, ctypes.byref(self.p_cpu))
         pqos_handle_error(u'pqos_cap_get', ret)
 
+    def _call_func_array(self, func, arg=None, use_arg=False):
+        """
+        Calls a function from PQoS library and returns the result as a list of
+        integers.
+
+        Parameters:
+            func: a function from PQoS library
+            arg: a function argument
+            use_arg: if True then func will be invoked with arg as an argument
+
+        Returns:
+            a list of integers
+        """
+
+        count = ctypes.c_uint(0)
+        count_ref = ctypes.byref(count)
+        func.restype = ctypes.POINTER(ctypes.c_uint)
+
+        if use_arg:
+            p_items = func(self.p_cpu, arg, count_ref)
+        else:
+            p_items = func(self.p_cpu, count_ref)
+
+        if not p_items:
+            return []
+
+        items = [p_items[i] for i in range(count.value)] if count.value else []
+        free_memory(p_items)
+        return items
+
+    def _call_func_ref(self, func, arg):
+        """
+        Calls a function from PQoS library, handles errors and returns
+        an integer set by the called function.
+
+        Parameters:
+            func: a function from PQoS library
+            arg: a function argument
+
+        Returns:
+            an integer set by the called function
+        """
+
+        result = ctypes.c_uint(0)
+        result_ref = ctypes.byref(result)
+        ret = func(self.p_cpu, arg, result_ref)
+        pqos_handle_error(func.__name__, ret)
+        return result.value
+
     def get_sockets(self):
         """
         Retrieves socket IDs from CPU info structure.
@@ -132,11 +182,7 @@ class PqosCpuInfo(object):
             a list of socket IDs
         """
 
-        count = ctypes.c_uint(0)
-        count_ref = ctypes.byref(count)
-        p_socket_ids = self.pqos.lib.pqos_cpu_get_sockets(self.p_cpu, count_ref)
-        socket_ids = _get_array_items(count.value, p_socket_ids)
-        return socket_ids
+        return self._call_func_array(self.pqos.lib.pqos_cpu_get_sockets)
 
     def get_l2ids(self):
         """
@@ -146,11 +192,7 @@ class PqosCpuInfo(object):
             a list of L2 IDs
         """
 
-        count = ctypes.c_uint(0)
-        count_ref = ctypes.byref(count)
-        p_l2_ids = self.pqos.lib.pqos_cpu_get_l2ids(self.p_cpu, count_ref)
-        l2_ids = _get_array_items(count.value, p_l2_ids)
-        return l2_ids
+        return self._call_func_array(self.pqos.lib.pqos_cpu_get_l2ids)
 
     def get_cores_l3id(self, l3_id):
         """
@@ -163,12 +205,8 @@ class PqosCpuInfo(object):
             a list of cores
         """
 
-        count = ctypes.c_uint(0)
-        count_ref = ctypes.byref(count)
-        p_l3_ids = self.pqos.lib.pqos_cpu_get_cores_l3id(self.p_cpu, l3_id,
-                                                         count_ref)
-        l3_ids = _get_array_items(count.value, p_l3_ids)
-        return l3_ids
+        return self._call_func_array(self.pqos.lib.pqos_cpu_get_cores_l3id,
+                                     l3_id, use_arg=True)
 
     def get_cores(self, socket):
         """
@@ -181,12 +219,8 @@ class PqosCpuInfo(object):
             a list of cores
         """
 
-        count = ctypes.c_uint(0)
-        count_ref = ctypes.byref(count)
-        p_cores = self.pqos.lib.pqos_cpu_get_cores(self.p_cpu, socket,
-                                                   count_ref)
-        cores = _get_array_items(count.value, p_cores)
-        return cores
+        return self._call_func_array(self.pqos.lib.pqos_cpu_get_cores,
+                                     socket, use_arg=True)
 
     def get_core_info(self, core):
         """
@@ -199,10 +233,12 @@ class PqosCpuInfo(object):
             core information
         """
 
+        restype = ctypes.POINTER(CPqosCoreInfo)
+        self.pqos.lib.pqos_cpu_get_core_info.restype = restype
         p_coreinfo = self.pqos.lib.pqos_cpu_get_core_info(self.p_cpu, core)
 
         if not p_coreinfo:
-            return None
+            raise PqosError(u'Core information not found')
 
         coreinfo_struct = p_coreinfo.contents
         coreinfo = PqosCoreInfo(core=coreinfo_struct.lcore,
@@ -222,11 +258,7 @@ class PqosCpuInfo(object):
             core ID
         """
 
-        core = ctypes.c_uint(0)
-        core_ref = ctypes.byref(core)
-        ret = self.pqos.lib.pqos_cpu_get_one_core(self.p_cpu, socket, core_ref)
-        pqos_handle_error(u"pqos_cpu_get_one_core", ret)
-        return core.value
+        return self._call_func_ref(self.pqos.lib.pqos_cpu_get_one_core, socket)
 
     def get_one_by_l2id(self, l2_id):
         """
@@ -239,12 +271,8 @@ class PqosCpuInfo(object):
             core ID
         """
 
-        core = ctypes.c_uint(0)
-        core_ref = ctypes.byref(core)
-        ret = self.pqos.lib.pqos_cpu_get_one_by_l2id(self.p_cpu, l2_id,
-                                                     core_ref)
-        pqos_handle_error(u"pqos_cpu_get_one_by_l2id", ret)
-        return core.value
+        return self._call_func_ref(self.pqos.lib.pqos_cpu_get_one_by_l2id,
+                                   l2_id)
 
     def check_core(self, core):
         """
@@ -271,11 +299,7 @@ class PqosCpuInfo(object):
             socket ID
         """
 
-        socket = ctypes.c_uint(0)
-        socket_ref = ctypes.byref(socket)
-        ret = self.pqos.lib.pqos_cpu_get_socketid(self.p_cpu, core, socket_ref)
-        pqos_handle_error(u"pqos_cpu_get_socketid", ret)
-        return socket.value
+        return self._call_func_ref(self.pqos.lib.pqos_cpu_get_socketid, core)
 
     def get_clusterid(self, core):
         """
@@ -288,9 +312,4 @@ class PqosCpuInfo(object):
             cluster ID
         """
 
-        cluster = ctypes.c_uint(0)
-        cluster_ref = ctypes.byref(cluster)
-        ret = self.pqos.lib.pqos_cpu_get_clusterid(self.p_cpu, core,
-                                                   cluster_ref)
-        pqos_handle_error(u"pqos_cpu_get_clusterid", ret)
-        return cluster.value
+        return self._call_func_ref(self.pqos.lib.pqos_cpu_get_clusterid, core)

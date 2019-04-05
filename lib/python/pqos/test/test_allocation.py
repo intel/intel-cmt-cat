@@ -39,7 +39,7 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 import unittest
 
-from mock import MagicMock
+from mock import MagicMock, patch
 
 from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_uint, ctypes_build_array
@@ -237,7 +237,9 @@ class TestPqosAlloc(unittest.TestCase):
         lib.pqos_pid_get_pid_assoc = func_mock
 
         alloc = PqosAlloc()
-        pids = alloc.get_pids(7)
+
+        with patch('pqos.allocation.free_memory'):
+            pids = alloc.get_pids(7)
 
         lib.pqos_pid_get_pid_assoc.assert_called_once()
 

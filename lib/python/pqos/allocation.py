@@ -40,7 +40,7 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 
 from pqos.capability import pqos_get_type_enum
-from pqos.common import pqos_handle_error
+from pqos.common import pqos_handle_error, free_memory
 from pqos.pqos import Pqos
 
 
@@ -253,10 +253,14 @@ class PqosAlloc(object):
 
         count = ctypes.c_uint(0)
         count_ref = ctypes.byref(count)
+
+        restype = ctypes.POINTER(ctypes.c_uint)
+        self.pqos.lib.pqos_pid_get_pid_assoc.restype = restype
         p_pids = self.pqos.lib.pqos_pid_get_pid_assoc(class_id, count_ref)
 
         if p_pids:
             pids = [p_pids[i] for i in range(count.value)]
+            free_memory(p_pids)
         else:
             pids = []
 

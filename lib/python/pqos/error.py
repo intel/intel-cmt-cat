@@ -44,9 +44,12 @@ class PqosError(Exception):
     Field 'code' is an error code.
     """
 
-    def __init__(self, message, code, *args, **kwargs):
+    CODE = 1  # Generic error code
+
+    def __init__(self, message, *args, **kwargs):
         super(PqosError, self).__init__(message, *args, **kwargs)
-        self.code = code
+        code = args[0] if args else kwargs.get(u'code')
+        self.code = code or self.CODE
 
 
 class PqosErrorParam(PqosError):
