@@ -7,6 +7,5 @@ flask
 flask_httpauth
 flask_restful
 pytest
-pytest-spec
 pytest-cov
-
+mock

@@ -33,6 +33,7 @@
 
 import pytest
 import json
+import warnings
 import rest
 
 from jsonschema  import validate, RefResolver
@@ -44,10 +45,7 @@ import time
 import multiprocessing as mp
 import requests
 from requests.auth import HTTPBasicAuth
-
-# suppress warning from requests
-import urllib3
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
 
 import common
 
@@ -73,7 +71,9 @@ class Empty_RESTAPI(object):
 
         url = '%s://%s:%d/%s' % (self.tcp, self.host, self.port, endpoint)
 
-        r = requests.request(method, url, json=data, auth=(self.user, self.password), verify=False)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=InsecureRequestWarning)
+            r = requests.request(method, url, json=data, auth=(self.user, self.password), verify=False)
 
         return (r.status_code, r.content.decode('utf-8'))
 
