@@ -1,0 +1,54 @@
+========================================================================
+README for Python PQoS Library Wrapper examples
+
+April 2019
+========================================================================
+
+
+Contents
+========
+
+- Overview
+- Legal Disclaimer
+
+
+Overview
+========
+
+This folder contains examples how to use Python Wrapper for PQoS Library.
+Examples contain simple code snippets presenting usage of allocation,
+capabilities, CPU information, L3 cache allocation and memory bandwidth
+allocation. These ones might be executed by running the following commands,
+respectively (please note they require root privileges, so it might be needed
+to run them as root or with sudo):
+
+        make run_allocation_example
+
+        make run_capability_example
+
+        make run_cpuinfo_example
+
+        make run_l3ca_example
+
+        make run_mba_example
+
+
+All of the above commands will first create virtual environment in env/
+and install the wrapper if it has not been created yet.
+
+To clean all Python cache files and env/ run:
+
+        make clean
+
+
+Legal Disclaimer
+================
+
+THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
+IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
+ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
+CONDITIONS OF SALE, INTEL ASSUMES NO LIABILITY WHATSOEVER AND INTEL
+DISCLAIMS ANY EXPRESS OR IMPLIED WARRANTY, RELATING TO SALE AND/OR
+USE OF INTEL PRODUCTS INCLUDING LIABILITY OR WARRANTIES RELATING TO
+FITNESS FOR A PARTICULAR PURPOSE, MERCHANTABILITY, OR INFRINGEMENT
+OF ANY PATENT, COPYRIGHT OR OTHER INTELLECTUAL PROPERTY RIGHT.
