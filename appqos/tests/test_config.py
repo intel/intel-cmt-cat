@@ -31,12 +31,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
+"""
+Unit tests for config module
+"""
+
+
 import pytest
-import common
-import jsonschema
 import mock
 
-from config import *
+import common
+from config import ConfigStore
 
 CONFIG = {
     "apps": [
@@ -202,54 +206,238 @@ def test_config_get_new_pool_id(mock_get_config):
     def get_max_cos_id(alloc_type):
         if 'mba' in alloc_type:
             return 9
-        else:
-            return 31
+        return 31
 
 
     with mock.patch('common.PQOS_API.get_max_cos_id', new=get_max_cos_id):
         config_store = ConfigStore()
 
         mock_get_config.return_value = CONFIG
-        assert 9 == config_store.get_new_pool_id({"mba":10})
-        assert 9 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
-        assert 31 == config_store.get_new_pool_id({"cbm":"0xff"})
+        assert config_store.get_new_pool_id({"mba":10}) == 9
+        assert config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"}) == 9
+        assert config_store.get_new_pool_id({"cbm":"0xff"}) == 31
 
         mock_get_config.return_value = CONFIG_POOLS
-        assert 8 == config_store.get_new_pool_id({"mba":10})
-        assert 8 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
-        assert 30 == config_store.get_new_pool_id({"cbm":"0xff"})
+        assert config_store.get_new_pool_id({"mba":10}) == 8
+        assert config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"}) == 8
+        assert config_store.get_new_pool_id({"cbm":"0xff"}) == 30
 
 
 @mock.patch('common.PQOS_API.get_num_cores')
 @mock.patch('config.ConfigStore.load')
 def test_config_reset(mock_load, mock_get_num_cores):
-        from copy import deepcopy
+    from copy import deepcopy
 
-        # mock load to avoid reading config from external file
-        mock_load.return_value = deepcopy(CONFIG)
-        mock_get_num_cores.return_value = 8
+    # mock load to avoid reading config from external file
+    mock_load.return_value = deepcopy(CONFIG)
+    mock_get_num_cores.return_value = 8
 
-        config_store = ConfigStore()
-        config_store.from_file("/tmp/appqos_test.config")
+    config_store = ConfigStore()
+    config_store.from_file("/tmp/appqos_test.config")
 
-        assert len(config_store.get_pool_attr('cores', None)) == 8
+    assert len(config_store.get_pool_attr('cores', None)) == 8
 
-        # reset mock and change return values
-        # more cores this time (8 vs. 16)
-        mock_get_num_cores.return_value = 16
-        mock_get_num_cores.reset_mock()
+    # reset mock and change return values
+    # more cores this time (8 vs. 16)
+    mock_get_num_cores.return_value = 16
+    mock_get_num_cores.reset_mock()
 
-        # get fresh copy of CONFIG
-        mock_load.return_value = deepcopy(CONFIG)
-        mock_load.reset_mock()
+    # get fresh copy of CONFIG
+    mock_load.return_value = deepcopy(CONFIG)
+    mock_load.reset_mock()
 
-        # verify that reset reloads config from file and Default pool is
-        # recreated with different set of cores
-        # (get_num_cores mocked to return different values)
-        config_store.reset()
+    # verify that reset reloads config from file and Default pool is
+    # recreated with different set of cores
+    # (get_num_cores mocked to return different values)
+    config_store.reset()
 
-        mock_load.assert_called_once_with("/tmp/appqos_test.config")
-        mock_get_num_cores.assert_called_once()
+    mock_load.assert_called_once_with("/tmp/appqos_test.config")
+    mock_get_num_cores.assert_called_once()
 
-        assert len(config_store.get_pool_attr('cores', None)) == 16
+    assert len(config_store.get_pool_attr('cores', None)) == 16
 
+
+class TestConfigValidate:
+    """
+    Unittests for ConfigStore::validate method
+    """
+
+    def test_pool_invalid_core(self):
+        def check_core(core):
+            return core != 3
+
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "cbm": 0xf0,
+                    "cores": [1],
+                    "id": 1,
+                    "name": "valid"
+                },
+                {
+                    "cbm": 0xf,
+                    "cores": [3],
+                    "name": "invalid"
+                }
+            ]
+        }
+
+        with mock.patch('common.PQOS_API.check_core', new=check_core):
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert "Invalid core 3" in str(ex)
+
+
+    @staticmethod
+    def test_pool_duplicate_core():
+        def check_core(core):
+            return True
+
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "cbm": 0xf0,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                },
+                {
+                    "cbm": 0xf,
+                    "cores": [3],
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with mock.patch('common.PQOS_API.check_core', new=check_core):
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert "already asigned to another pool" in str(ex)
+
+
+    def test_pool_invalid_app(self):
+        def check_core(core):
+            return True
+
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "apps": [1, 3],
+                    "cbm": 0xf0,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ],
+            "apps": [
+                {
+                    "cores": [3],
+                    "id": 1,
+                    "name": "app 1",
+                    "pids": [1]
+                }
+            ]
+        }
+
+        with mock.patch('common.PQOS_API.check_core', new=check_core):
+            with pytest.raises(KeyError) as ex:
+                ConfigStore.validate(data)
+
+            assert "does not exist" in str(ex)
+
+
+    def test_app_invalid_core(self):
+        def check_core(core):
+            return core != 3
+
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "apps": [1],
+                    "cbm": 0xf0,
+                    "cores": [1],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ],
+            "apps": [
+                {
+                    "cores": [3],
+                    "id": 1,
+                    "name": "app 1",
+                    "pids": [1]
+                }
+            ]
+        }
+
+        with mock.patch('common.PQOS_API.check_core', new=check_core):
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert "Invalid core 3" in str(ex)
+
+
+    @staticmethod
+    def test_app_without_pool():
+        def check_core(core):
+            return True
+
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "apps": [1],
+                    "cbm": 0xf0,
+                    "cores": [1],
+                    "id": 1,
+                    "name": "pool 1"
+                },
+                {
+                    "cbm": 0xf0,
+                    "cores": [2],
+                    "id": 2,
+                    "name": "pool 2"
+                }
+            ],
+            "apps": [
+                {
+                    "cores": [1],
+                    "id": 1,
+                    "name": "app 1",
+                    "pids": [1]
+                },
+                {
+                    "cores": [1],
+                    "id": 2,
+                    "name": "app 2",
+                    "pids": [1]
+                }
+            ]
+        }
+
+        with mock.patch('common.PQOS_API.check_core', new=check_core):
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert "not assigned to any pool" in str(ex)

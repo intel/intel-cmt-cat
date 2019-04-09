@@ -401,17 +401,12 @@ class Apps(Resource):
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
-        data = common.CONFIG_STORE.get_config()
+        data = common.CONFIG_STORE.get_config().copy()
 
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
         json_data['id'] = get_app_id()
-
-        if 'cores' in json_data:
-            for core in json_data['cores']:
-                if not common.PQOS_API.check_core(core):
-                    raise BadRequest("New APP not added, please provide valid cores")
 
         if 'pids' in json_data:
             # validate pids
@@ -420,26 +415,24 @@ class Apps(Resource):
                 if not valid:
                     raise BadRequest("New APP not added, please provide valid pid's")
 
-        app_added = False
         for pool in data['pools']:
             if pool['id'] == json_data['pool_id']:
-
-                json_data.pop('pool_id')
-                data['apps'].append(json_data)
-
                 if not 'apps' in pool:
                     pool['apps'] = []
                 pool['apps'].append(json_data['id'])
-                app_added = True
                 break
 
-        if not app_added:
-            raise NotFound("New APP not added, pool " + json_data['pool_id'] + " doesn't exist")
+        json_data.pop('pool_id')
+        data['apps'].append(json_data)
 
-        common.CONFIG_STORE.set_config(data)
-        res = {'id': json_data['id']}
-        return res, 201
-
+        try:
+            common.CONFIG_STORE.validate(data)
+        except Exception as ex:
+            raise BadRequest("New APP not added, " + str(ex))
+        else:
+            common.CONFIG_STORE.set_config(data)
+            res = {'id': json_data['id']}
+            return res, 201
 
 class Pool(Resource):
     """
@@ -575,23 +568,23 @@ class Pool(Resource):
                 if not json_data['cores']:
                     raise BadRequest("At least one core required")
 
-                for core in json_data['cores']:
-                    if not common.PQOS_API.check_core(core):
-                        raise BadRequest("Pool {}, Invalid core {}!".format(pool_id, core))
-
-                if not common.CONFIG_STORE.check_cores(json_data['cores'], int(pool_id)):
-                    raise BadRequest("Pool {}, One or more of the {} cores already"\
-                        " assigned to another pool!".format(pool_id, json_data['cores']))
-
                 pool['cores'] = json_data['cores']
 
             # set new name
             if 'name' in json_data:
                 pool['name'] = json_data['name']
 
-            common.CONFIG_STORE.set_config(data)
+            # set new power profile
+            if 'power_profile_id' in json_data:
+                pool['power_profile_id'] = json_data['power_profile_id']
 
-            return "POOL " + str(pool_id) + " updated", 200
+            try:
+                common.CONFIG_STORE.validate(data)
+            except Exception as ex:
+                raise BadRequest("POOL " + str(pool_id) + " not updated, " + str(ex))
+            else:
+                common.CONFIG_STORE.set_config(data)
+                return "POOL " + str(pool_id) + " updated", 200
 
         raise NotFound("POOL " + str(pool_id) + " not found in config")
 
@@ -653,21 +646,17 @@ class Pools(Resource):
 
             post_data['cbm'] = cbm
 
-        if 'cores' in post_data:
-            for core in post_data['cores']:
-                if not common.PQOS_API.check_core(core):
-                    raise BadRequest("New POOL not added, please provide valid cores")
-
-            if not common.CONFIG_STORE.check_cores(post_data['cores']):
-                raise BadRequest("New POOL not added, One or more of the {} cores"\
-                    " already assigned to another pool!".format(post_data['cores']))
-
         data = common.CONFIG_STORE.get_config().copy()
         data['pools'].append(post_data)
-        common.CONFIG_STORE.set_config(data)
 
-        res = {'id': post_data['id']}
-        return res, 201
+        try:
+            common.CONFIG_STORE.validate(data)
+        except Exception as ex:
+            raise BadRequest("New POOL not added, " + str(ex))
+        else:
+            common.CONFIG_STORE.set_config(data)
+            res = {'id': post_data['id']}
+            return res, 201
 
 
 class Stats(Resource):

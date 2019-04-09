@@ -139,6 +139,101 @@ class ConfigStore:
         self.from_file(self.get_path())
 
 
+
+    @staticmethod
+    def get_pool(data, pool_id):
+        """
+        Get pool
+
+        Parameters
+            data: configuration (dict)
+            pool_id: pool id
+
+        Return
+            Pool details
+        """
+        if 'pools' not in data:
+            raise KeyError("No pools in config")
+
+        for pool in data['pools']:
+            if pool['id'] == pool_id:
+                return pool
+
+        raise KeyError(("Pool {} does not exists").format(pool_id))
+
+
+    @staticmethod
+    def get_app(data, app_id):
+        """
+        Get app
+
+        Parameters
+            data: configuration (dict)
+            app_id: app id
+
+        Return
+            Pool details
+        """
+        if 'apps' not in data:
+            raise KeyError("No apps in config")
+
+        for app in data['apps']:
+            if app['id'] == app_id:
+                return app
+
+        raise KeyError(("App {} does not exists").format(app_id))
+
+
+    @staticmethod
+    def validate(data):
+        #pylint: disable=too-many-branches
+        """
+        Validate configuration
+
+        Parameters
+            data: configuration (dict)
+        """
+
+        # validates config schema
+        schema, resolver = ConfigStore.load_json_schema('appqos.json')
+        jsonschema.validate(data, schema, resolver=resolver)
+
+        cores = set()
+
+        # verify pools
+        for pool in data['pools']:
+            for core in pool['cores']:
+                if not common.PQOS_API.check_core(core):
+                    raise ValueError(("Invalid core {}").format(core))
+
+            if cores.intersection(pool['cores']):
+                raise ValueError(("Cores {} already asigned to another pool").format(
+                    cores.intersection(pool['cores'])))
+
+            cores |= set(pool['cores'])
+
+            # check app reference
+            if 'apps' in pool:
+                for app_id in pool['apps']:
+                    ConfigStore.get_app(data, app_id)
+
+        if 'apps' in data:
+            for app in data['apps']:
+                if 'cores' in app:
+                    for core in app['cores']:
+                        if not common.PQOS_API.check_core(core):
+                            raise ValueError(("Invalid core {}").format(core))
+
+                app_pool = None
+                for pool in data['pools']:
+                    if 'apps' in pool and app['id'] in pool['apps']:
+                        app_pool = pool
+                        break
+
+                if not app_pool:
+                    raise ValueError(("App {} not assigned to any pool").format(app['id']))
+
+
     def from_file(self, path):
         """
         Retrieve config from file
@@ -379,18 +474,3 @@ class ConfigStore:
             return new_ids[-1]
 
         return None
-
-    def check_cores(self, cores, pool_id=None):
-        """
-        Verify that cores are not assigned to another pool
-
-        Returns:
-            True if are not, False otherwise
-        """
-        temp = set(self.get_pool_attr('cores', None))
-
-        if pool_id is not None:
-            cur_cores = set(self.get_pool_attr('cores', pool_id))
-            temp -= cur_cores
-
-        return not set(cores).intersection(temp)

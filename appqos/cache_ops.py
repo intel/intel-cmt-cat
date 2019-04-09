@@ -361,7 +361,8 @@ def configure_rdt():
                 log.debug("Pool {} removed...".format(pool_id))
                 Pool(pool_id).cores_set([])
 
-    Pool.reset()
+                # remove pool
+                Pool.pools.pop(pool_id)
 
     if not pool_ids:
         log.error("No Pools to configure...")
