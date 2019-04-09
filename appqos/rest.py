@@ -40,6 +40,7 @@ import multiprocessing
 import os
 import signal
 
+from copy import deepcopy
 from time import sleep
 from flask import Flask
 from flask_httpauth import HTTPBasicAuth
@@ -104,7 +105,6 @@ class Server:
     REST API server
     """
     auth = HTTPBasicAuth()
-
 
     def __init__(self):
         self.process = None
@@ -223,13 +223,13 @@ class App(Resource):
         if 'apps' not in data:
             raise NotFound("No apps in config file")
 
-        for app in data['apps']:
-            if not app['id'] == int(app_id):
-                continue
+        try:
+            app = common.CONFIG_STORE.get_app(data, int(app_id))
+        except:
+            raise NotFound("APP " + str(app_id) + " not found in config")
 
-            return app, 200
+        return app, 200
 
-        raise NotFound("APP " + str(app_id) + " not found in config")
 
 
     @staticmethod
@@ -246,7 +246,7 @@ class App(Resource):
         Returns:
             response, status code
         """
-        data = common.CONFIG_STORE.get_config().copy()
+        data = deepcopy(common.CONFIG_STORE.get_config())
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
 
@@ -296,7 +296,7 @@ class App(Resource):
 
         pool_id = json_data["pool_id"]
 
-        data = common.CONFIG_STORE.get_config().copy()
+        data = deepcopy(common.CONFIG_STORE.get_config())
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
 
@@ -325,9 +325,14 @@ class App(Resource):
             elif 'cores' in app:
                 app.pop('cores')
 
-            common.CONFIG_STORE.set_config(data)
-            common.STATS_STORE.general_stats_inc_apps_moves()
-            return "APP " + str(app_id) + " moved to new pool", 200
+            try:
+                common.CONFIG_STORE.validate(data)
+            except Exception as ex:
+                raise BadRequest("APP not updated, " + str(ex))
+            else:
+                common.CONFIG_STORE.set_config(data)
+                common.STATS_STORE.general_stats_inc_apps_moves()
+                return "APP " + str(app_id) + " moved to new pool", 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
 
@@ -401,7 +406,7 @@ class Apps(Resource):
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
-        data = common.CONFIG_STORE.get_config().copy()
+        data = deepcopy(common.CONFIG_STORE.get_config())
 
         if 'pools' not in data:
             raise NotFound("No pools in config file")
@@ -455,17 +460,17 @@ class Pool(Resource):
             response, status code
         """
 
-        data = common.CONFIG_STORE.get_config().copy()
+        data = deepcopy(common.CONFIG_STORE.get_config())
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
-        for pool in data['pools']:
-            if not pool['id'] == int(pool_id):
-                continue
+        try:
+            pool = common.CONFIG_STORE.get_pool(data, int(pool_id))
+        except:
+            raise NotFound("POOL " + str(pool_id) + " not found in config")
 
-            return pool, 200
+        return pool, 200
 
-        raise NotFound("Pool " + str(pool_id) + " not found in config")
 
 
     @staticmethod
@@ -565,18 +570,11 @@ class Pool(Resource):
 
             # set new cores
             if 'cores' in json_data:
-                if not json_data['cores']:
-                    raise BadRequest("At least one core required")
-
                 pool['cores'] = json_data['cores']
 
             # set new name
             if 'name' in json_data:
                 pool['name'] = json_data['name']
-
-            # set new power profile
-            if 'power_profile_id' in json_data:
-                pool['power_profile_id'] = json_data['power_profile_id']
 
             try:
                 common.CONFIG_STORE.validate(data)
@@ -609,7 +607,7 @@ class Pools(Resource):
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
-        return (data['pools']), 200
+        return data['pools'], 200
 
 
     @staticmethod

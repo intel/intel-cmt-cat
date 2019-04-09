@@ -31,16 +31,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
-"""
-Unit tests for config module
-"""
-
-
 import pytest
+import common
+import jsonschema
 import mock
 
-import common
-from config import ConfigStore
+from config import *
 
 CONFIG = {
     "apps": [
@@ -206,21 +202,22 @@ def test_config_get_new_pool_id(mock_get_config):
     def get_max_cos_id(alloc_type):
         if 'mba' in alloc_type:
             return 9
-        return 31
+        else:
+            return 31
 
 
     with mock.patch('common.PQOS_API.get_max_cos_id', new=get_max_cos_id):
         config_store = ConfigStore()
 
         mock_get_config.return_value = CONFIG
-        assert config_store.get_new_pool_id({"mba":10}) == 9
-        assert config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"}) == 9
-        assert config_store.get_new_pool_id({"cbm":"0xff"}) == 31
+        assert 9 == config_store.get_new_pool_id({"mba":10})
+        assert 9 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
+        assert 31 == config_store.get_new_pool_id({"cbm":"0xff"})
 
         mock_get_config.return_value = CONFIG_POOLS
-        assert config_store.get_new_pool_id({"mba":10}) == 8
-        assert config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"}) == 8
-        assert config_store.get_new_pool_id({"cbm":"0xff"}) == 30
+        assert 8 == config_store.get_new_pool_id({"mba":10})
+        assert 8 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
+        assert 30 == config_store.get_new_pool_id({"cbm":"0xff"})
 
 
 @mock.patch('common.PQOS_API.get_num_cores')
@@ -258,9 +255,6 @@ def test_config_reset(mock_load, mock_get_num_cores):
 
 
 class TestConfigValidate:
-    """
-    Unittests for ConfigStore::validate method
-    """
 
     def test_pool_invalid_core(self):
         def check_core(core):
@@ -293,8 +287,7 @@ class TestConfigValidate:
             assert "Invalid core 3" in str(ex)
 
 
-    @staticmethod
-    def test_pool_duplicate_core():
+    def test_pool_duplicate_core(self):
         def check_core(core):
             return True
 
@@ -322,7 +315,7 @@ class TestConfigValidate:
             with pytest.raises(ValueError) as ex:
                 ConfigStore.validate(data)
 
-            assert "already asigned to another pool" in str(ex)
+            assert "already assigned to another pool" in str(ex)
 
 
     def test_pool_invalid_app(self):
@@ -395,8 +388,7 @@ class TestConfigValidate:
             assert "Invalid core 3" in str(ex)
 
 
-    @staticmethod
-    def test_app_without_pool():
+    def test_app_without_pool(self):
         def check_core(core):
             return True
 

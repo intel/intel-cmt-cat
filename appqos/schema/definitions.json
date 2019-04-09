@@ -54,7 +54,7 @@
         "$ref": "#uint_uniq_array"
       }
     },
-    "required": ["name", "pids", "cores"]
+    "required": ["name", "pids"]
   },
 
   "app_api_get": {

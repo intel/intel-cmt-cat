@@ -207,7 +207,7 @@ class ConfigStore:
                     raise ValueError(("Invalid core {}").format(core))
 
             if cores.intersection(pool['cores']):
-                raise ValueError(("Cores {} already asigned to another pool").format(
+                raise ValueError(("Cores {} already assigned to another pool").format(
                     cores.intersection(pool['cores'])))
 
             cores |= set(pool['cores'])

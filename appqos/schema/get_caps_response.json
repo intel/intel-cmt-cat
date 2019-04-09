@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get caps",
+  "description": "GET caps result, URI /caps",
+
+  "type": "object",
+
+  "properties": {
+    "capabilities": {
+      "description": "List of capabilities supported by the system",
+      "type": "array",
+      "items": { "$ref": "definitions.json#/string_nonempty" },
+      "uniqueItems": true,
+      "minItems": 1
+    }
+  },
+  "required": ["capabilities"]
+}
