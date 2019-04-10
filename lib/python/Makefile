@@ -1,7 +1,9 @@
 .PHONY: install uninstall test coverage style clean
 
 install:
-	@bash -c "python -m pip install ."
+	@bash -c "python -m pip wheel --wheel-dir=/tmp . && \
+		python -m pip install --no-index --find-links=/tmp pqos && \
+		rm -rf /tmp/pqos*.whl"
 
 uninstall:
 	@bash -c "python -m pip uninstall pqos"
