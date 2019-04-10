@@ -36,15 +36,15 @@ PQoS API module.
 Provides RDT related helper functions used to configure RDT.
 """
 
-import common
-import log
-
 from pqos import Pqos
 from pqos.capability import PqosCap
 from pqos.l3ca import PqosCatL3
 from pqos.mba import PqosMba
 from pqos.allocation import PqosAlloc
 from pqos.cpuinfo import PqosCpuInfo
+
+import common
+import log
 
 class PqosApi:
     """

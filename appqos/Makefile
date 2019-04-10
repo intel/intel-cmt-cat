@@ -38,26 +38,29 @@
 
 test: virtual_env
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-		PYTHONPATH=$(CURDIR)/../lib/python:. pytest tests/ && \
+		PYTHONPATH=. pytest tests/ && \
 		deactivate"
 
 cov: virtual_env
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-		PYTHONPATH=$(CURDIR)/../lib/python:. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/ && \
+		PYTHONPATH=. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/ && \
 		deactivate"
 
 virtual_env: requirements.txt
 	@bash -c "virtualenv -p python3 $(CURDIR)/virtual_env"
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
 		python -m pip install -r $(CURDIR)/requirements.txt && \
+		python -m pip wheel --wheel-dir=$(CURDIR) $(CURDIR)/../lib/python && \
+		python -m pip install --no-index --find-links=$(CURDIR) pqos && \
+		rm -rf $(CURDIR)/pqos*.whl && \
 		deactivate"
 
 style: virtual_env
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-		PYTHONPATH=$(CURDIR)/../lib/python pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
+		pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
 		deactivate"
 
 run: virtual_env
 	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-		PYTHONPATH=$(CURDIR)/../lib/python:. python appqos.py && \
+		PYTHONPATH=. python appqos.py && \
 		deactivate"
