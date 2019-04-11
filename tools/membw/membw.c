@@ -952,7 +952,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_WRITE_NT512:
                 case CL_TYPE_WRITE_NTI_CLWB:
                 case CL_TYPE_WRITE_NTDQ:
-                        type = cmd;
+                        type = (enum cl_type) cmd;
                         break;
                 default:
                         usage(argv);

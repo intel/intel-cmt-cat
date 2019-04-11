@@ -981,10 +981,16 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                         struct pqos_mba tab[mba->num_classes];
                         unsigned num = 0;
                         unsigned n = 0;
-                        int ctrl_on = sel_interface != PQOS_INTER_MSR &&
-                                      mba->ctrl_on == 1;
-                        const char *unit = ctrl_on ? " MBps" : "%";
-                        const char *available = ctrl_on ? "" : " available";
+                        const char *unit;
+                        const char *available;
+
+                        if (mba->ctrl_on == 1) {
+                                unit = " MBps";
+                                available = "";
+                        } else {
+                                unit = "%";
+                                available = " available";
+                        }
 
                         ret = pqos_mba_get(sockets[i], mba->num_classes,
                                            &num, tab);
