@@ -62,7 +62,6 @@ class PqosApi:
 
 
     def init(self):
-        # pylint: disable=too-many-return-statements
         """
         Initializes libpqos
 
@@ -73,35 +72,10 @@ class PqosApi:
 
         try:
             self.pqos.init('MSR')
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        try:
             self.cap = PqosCap()
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        try:
             self.l3ca = PqosCatL3()
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        try:
             self.mba = PqosMba()
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        try:
             self.alloc = PqosAlloc()
-        except Exception as ex:
-            log.error(str(ex))
-            return -1
-
-        try:
             self.cpuinfo = PqosCpuInfo()
         except Exception as ex:
             log.error(str(ex))
