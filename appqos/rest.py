@@ -225,11 +225,11 @@ class App(Resource):
 
         try:
             app = common.CONFIG_STORE.get_app(data, int(app_id))
+            app['pool_id'] = common.CONFIG_STORE.app_to_pool(int(app_id))
         except:
             raise NotFound("APP " + str(app_id) + " not found in config")
 
         return app, 200
-
 
 
     @staticmethod
@@ -355,8 +355,13 @@ class Apps(Resource):
             response, status code
         """
         data = common.CONFIG_STORE.get_config()
-        if 'apps' not in data:
+        if 'apps' not in data or not data['apps']:
             raise NotFound("No apps in config file")
+
+        apps = data['apps']
+
+        for app in apps:
+            app['pool_id'] = common.CONFIG_STORE.app_to_pool(app['id'])
 
         return (data['apps']), 200
 
@@ -364,6 +369,7 @@ class Apps(Resource):
     @staticmethod
     @Server.auth.login_required
     def post():
+        # pylint: disable=too-many-branches
         """
         Handles HTTP POST /apps request.
         Add a new App
@@ -420,6 +426,25 @@ class Apps(Resource):
                 if not valid:
                     raise BadRequest("New APP not added, please provide valid pid's")
 
+        # if pool_id not provided on app creation
+        if 'pool_id' not in json_data or not json_data['pool_id']:
+            json_data['pool_id'] = None
+
+            # if apps cores list is a subset of existing pool cores list,
+            # make existing pool a destination pool for app
+            if 'cores' in json_data and json_data['cores']:
+                for pool in data['pools']:
+                    if set(json_data['cores']).issubset(pool['cores']):
+                        json_data['pool_id'] = pool['id']
+                        break
+
+            # if it is not, make default pool a destination pool
+            if json_data['pool_id'] is None:
+                json_data['pool_id'] = 0
+                if 'cores' in json_data:
+                    json_data.pop('cores')
+
+        # update pool configuration to include new app
         for pool in data['pools']:
             if pool['id'] == json_data['pool_id']:
                 if not 'apps' in pool:
@@ -512,6 +537,7 @@ class Pool(Resource):
     @staticmethod
     @Server.auth.login_required
     def put(pool_id):
+        # pylint: disable=too-many-branches
         """
         Handles HTTP PUT /pools/<pool_id> request.
         Modifies a Pool
@@ -571,6 +597,14 @@ class Pool(Resource):
             # set new cores
             if 'cores' in json_data:
                 pool['cores'] = json_data['cores']
+
+            if 'apps' in pool and pool['apps']:
+                for app_id in pool['apps']:
+                    for app in data['apps']:
+                        if app['id'] != app_id or 'cores' not in app:
+                            continue
+                        if not set(app['cores']).issubset(pool['cores']):
+                            app.pop('cores')
 
             # set new name
             if 'name' in json_data:

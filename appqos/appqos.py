@@ -103,8 +103,6 @@ class AppQoS:
         signal.signal(signal.SIGINT, self.signal_handler)
 
         while not self.stop_event.is_set():
-            log.debug("GENERAL stats: {}".format(common.STATS_STORE.general_stats_get()))
-
             if common.CONFIG_STORE.is_config_changed():
                 log.info("Configuration changed")
                 result = cache_ops.configure_rdt()
@@ -112,7 +110,7 @@ class AppQoS:
                     log.error("Failed to apply RDT configuration!")
                     break
 
-            sleep(1)
+            sleep(0.1)
 
         log.info("Terminating...")
 

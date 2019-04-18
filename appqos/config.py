@@ -36,7 +36,6 @@ Module handling config file
 """
 
 import json
-import threading
 from os.path import join, dirname
 import jsonschema
 
@@ -55,7 +54,6 @@ class ConfigStore:
         self.namespace.config = {}
         self.namespace.path = None
         self.changed_event = common.MANAGER.Event()
-        self.timer = None
 
 
     def get_pool_attr(self, attr, pool_id):
@@ -366,20 +364,8 @@ class ConfigStore:
             data: new configuration
         """
 
-        def clear_event():
-            """
-            Clears "changed_event" used to propagate info about config change
-            """
-            self.changed_event.clear()
-
-        if self.timer is not None:
-            self.timer.cancel()
-
         self.namespace.config = data
         self.changed_event.set()
-
-        self.timer = threading.Timer(1, clear_event)
-        self.timer.start()
 
 
     def get_config(self):
@@ -398,7 +384,14 @@ class ConfigStore:
         Returns:
             result
         """
-        return common.is_event_set(self.changed_event)
+        try:
+            result = self.changed_event.is_set()
+            if result:
+                self.changed_event.clear()
+        except IOError:
+            result = False
+
+        return result
 
 
     @staticmethod

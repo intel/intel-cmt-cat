@@ -275,9 +275,9 @@ class TestApps:
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
         {"cores":[7,9]},                                                                # cores only
-        {"pool_id": 2, "name": "hello", "cores": [1,2], "pids": [1], "unknown": [7,9]}, # unknown
-        {"name": "hello", "cores": [1,2], "pids": [1]},                                 # no pool_id
-        {"pool_id": 2, "cores": [1,2], "pids": [1]}                                     # no name
+        {"cores":[7,9], "pids": 1},                                                     # invalid "pids" format
+        {"cores":[7,9], "pids": [-1]},                                                  # invalid PID
+        {"pool_id": 2, "name": "hello", "cores": [1,2], "pids": [1], "unknown": [7,9]}  # unknown
     ])
     def test_post_badrequest(self, app_config):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:

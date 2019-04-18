@@ -61,19 +61,19 @@ class Apps:
             if 'pids' not in app:
                 continue
 
-            pids = app['pids']
-            cores = app['cores'] if 'cores' in app else []
+            app_cores = app['cores'] if 'cores' in app else []
+            pool_id = common.CONFIG_STORE.app_to_pool(app['id'])
+            pool_cores = common.CONFIG_STORE.get_pool_attr('cores', pool_id)
 
-            if not cores:
-                pool_id = common.CONFIG_STORE.app_to_pool(app['id'])
-                cores = common.CONFIG_STORE.get_pool_attr('cores', pool_id)
+            if not app_cores or not set(app_cores).issubset(pool_cores):
+                app_cores = pool_cores
 
-            if not cores:
+            if not app_cores:
                 continue
 
-            for pid in pids:
+            for pid in app['pids']:
                 try:
-                    os.sched_setaffinity(pid, cores)
+                    os.sched_setaffinity(pid, app_cores)
                 except OSError:
                     log.error("Failed to set {} PID affinity".format(pid))
 
@@ -159,13 +159,12 @@ class Pool:
         self.mba_set(mba)
         self.cores_set(cores)
 
-        if apps:
+        if apps is not None:
             pids = []
             for app in apps:
                 pids.extend(config.get_app_attr('pids', app))
 
-            if pids:
-                self.pids_set(pids)
+            self.pids_set(pids)
 
         return Pool.apply(self.pool)
 
