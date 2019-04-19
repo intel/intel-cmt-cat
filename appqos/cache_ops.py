@@ -71,13 +71,24 @@ class Apps:
             if not app_cores:
                 continue
 
-            for pid in app['pids']:
-                try:
-                    os.sched_setaffinity(pid, app_cores)
-                except OSError:
-                    log.error("Failed to set {} PID affinity".format(pid))
+            Apps.set_affinity(app['pids'], app_cores)
 
         return 0
+
+    @staticmethod
+    def set_affinity(pids, cores):
+        """
+        Sets PIDs' core affinity
+
+        Parameters:
+            pids: PIDs to set core affinity for
+            cores: cores to set to
+        """
+        for pid in pids:
+            try:
+                os.sched_setaffinity(pid, cores)
+            except OSError:
+                log.error("Failed to set {} PID affinity".format(pid))
 
 
 class Pool:

@@ -36,8 +36,6 @@ PIDs ops module
 Provides PIDs related helper functions
 """
 
-import os
-
 # list of valid PIDs' status, (R)unning, (S)leeping, (D)isk wait
 PID_VALID_STATUS = set('RSD')
 
@@ -57,19 +55,33 @@ def get_pid_status(pid):
     else:
         pid_str = 'self'
 
-    # read procfs /proc/PID/stat file to get PID status
     try:
-        with open("/proc/{}/stat".format(pid_str)) as stat_file:
-            # split by '(' and ')' needed
-            # as processes/threads could have spaces in the name
-            line_split = stat_file.readline().strip().split(')')
-            pid_name = line_split[0].split('(')[1]
-            state = line_split[1].strip().split(' ')[0]
-            return state, state in PID_VALID_STATUS, pid_name
+        state, pid_name = _read_pid_state(pid_str)
+        return state, state in PID_VALID_STATUS, pid_name
     except EnvironmentError:
         pass
 
     return 'E', False, ''
+
+
+def _read_pid_state(pid_str):
+    """
+    Reads PID's /proc/PID/stat file for state and process name
+
+    Parameters:
+        pid_str: PID to be tested (number or 'self')
+
+    Returns:
+        state, pid_name
+    """
+    # read procfs /proc/PID/stat file to get PID status
+    with open("/proc/{}/stat".format(pid_str)) as stat_file:
+        # split by '(' and ')' needed
+        # as processes/threads could have spaces in the name
+        line_split = stat_file.readline().strip().split(')')
+        pid_name = line_split[0].split('(')[1]
+        state = line_split[1].strip().split(' ')[0]
+        return state, pid_name
 
 
 def is_pid_valid(pid):
@@ -83,68 +95,3 @@ def is_pid_valid(pid):
         (bool) test result
     """
     return get_pid_status(pid)[1]
-
-
-def get_pid_processor(pid):
-    """
-    Get processor/core that PID was scheduled on last time
-
-    Parameters:
-        pid: PID to be tested
-
-    Returns:
-        processor/core number, -1 on error
-    """
-    if pid != 0:
-        pid_str = pid
-    else:
-        pid_str = 'self'
-
-    # read procfs /proc/PID/stat file to get info about processor
-    # that PID was scheduled on last time
-    try:
-        with open("/proc/{}/stat".format(pid_str)) as stat_file:
-            proc_stat = stat_file.readline().strip().split(' ')
-            return int(proc_stat[39])
-    except EnvironmentError:
-        return -1
-
-
-def get_pid_children(pid):
-    """
-    Get PID's children
-
-    Parameters:
-        pid: parent PID
-
-    Returns:
-        array of PIDs, empty array on error
-    """
-    if int(pid) < 0:
-        return []
-
-    # read procfs /proc/PID/task/PID/children file to get info about PIDs children
-    try:
-        with open("/proc/{pid}/task/{pid}/children".format(pid=pid)) as children_file:
-            return children_file.readline().strip().split(' ')
-    except EnvironmentError:
-        return []
-
-
-def get_pid_tids(pid):
-    """
-    Get PID's threads
-
-    Parameters:
-        pid: PID
-
-    Returns:
-        array of TIDs, empty array on error
-    """
-    if int(pid) < 0:
-        return []
-    # list procfs /proc/PID/task/ directories to get list of PID's threads
-    try:
-        return map(int, os.listdir("/proc/{}/task/".format(pid)))
-    except EnvironmentError:
-        return []

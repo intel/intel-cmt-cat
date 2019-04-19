@@ -104,7 +104,7 @@ class PqosApi:
             0 on success
             -1 otherwise
         """
-        if not cores:
+        if cores is None:
             return 0
 
         try:
@@ -121,8 +121,8 @@ class PqosApi:
         Assigns cores to CoS
 
         Parameters:
-            cos: Class of Service
             cores: list of cores to be assigned to cos
+            cos: Class of Service
 
         Returns:
             0 on success
@@ -352,7 +352,7 @@ class PqosApi:
             None otherwise
         """
 
-        if not self.is_l3_cat_supported:
+        if not self.is_l3_cat_supported():
             return None
 
         try:
