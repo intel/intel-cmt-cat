@@ -253,11 +253,12 @@ class TestApps:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
-            {"pool_id": 2, "name":"hello","cores":[1,2],"pids":[1]},
-            {"pool_id": 2, "name":"hello", "pids": [1]}                                    # no cores
+            {"pool_id": 2, "name":"hello","cores":[2, 3],"pids":[11]},
+            {"pool_id": 2, "name":"hello", "pids": [12]}                                    # no cores
         ])
     def test_post(self, app_config):
-        with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
             response = REST.post("/apps", app_config)
             func_mock.assert_called_once()
         data = json.loads(response.data.decode('utf-8'))
@@ -275,9 +276,7 @@ class TestApps:
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
         {"cores":[7,9]},                                                                # cores only
-        {"cores":[7,9], "pids": 1},                                                     # invalid "pids" format
-        {"cores":[7,9], "pids": [-1]},                                                  # invalid PID
-        {"pool_id": 2, "name": "hello", "cores": [1,2], "pids": [1], "unknown": [7,9]}  # unknown
+        {"pool_id": 2, "name": "hello", "cores": [2], "pids": [1], "unknown": [7,9]}    # unknown
     ])
     def test_post_badrequest(self, app_config):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
@@ -290,7 +289,9 @@ class TestApps:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=False))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
-        {"pool_id": 2, "name":"hello", "cores":[50], "pids":[1]}
+        {"pool_id": 2, "name":"hello", "cores":2, "pids":[1]},                          # invalid core
+        {"pool_id": 2, "name":"hello", "cores":[-9], "pids":[1]},                       # invalid core
+        {"pool_id": 2, "name": "hello", "cores": [22], "pids": [1]}                     # core does not match pool id
     ])
     def test_post_invalid_core(self, app_config):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
@@ -303,7 +304,9 @@ class TestApps:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=False))
     @pytest.mark.parametrize("app_config", [
-        {"pool_id": 2, "name":"hello", "cores":[50], "pids":[199099]}
+        {"pool_id": 2, "name":"hello", "cores":[2], "pids":[199099]},                  # invalid PID
+        {"pool_id": 2, "pids": 1},                                                     # invalid "pids" format
+        {"pool_id": 2, "pids": [-1]},                                                  # invalid PID
     ])
     def test_post_invalid_pid(self, app_config):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
@@ -321,7 +324,7 @@ class TestApps:
         assert response.status_code == 404
 
 
-class TestApp:
+class TestApp_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     def test_get(self):
         response = REST.get("/apps/2")
@@ -494,7 +497,7 @@ class TestPools:
         assert "not found in config" in data["message"]
 
 
-class TestPool:
+class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     def test_get(self):
         response = REST.get("/pools/3")
@@ -609,7 +612,8 @@ class TestPool:
                 if pool['id'] == 1:
                     assert pool['cbm'] == 0xc
 
-        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock:
+        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
             response = REST.put("/pools/1", {"cbm": "0xc"})
             func_mock.assert_called_once()
 
@@ -625,7 +629,8 @@ class TestPool:
                 if pool['id'] == 1:
                     assert pool['mba'] == 30
 
-        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock:
+        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
             response = REST.put("/pools/1", {"mba": 30})
             func_mock.assert_called_once()
 
@@ -654,7 +659,8 @@ class TestPool:
                 if pool['id'] == 2:
                     assert pool['cores'] == [2, 3, 11]
 
-        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock:
+        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
             response = REST.put("/pools/2", {"cores": [2, 3, 11]})
             func_mock.assert_called_once()
 
@@ -670,7 +676,8 @@ class TestPool:
                 if pool['id'] == 2:
                     assert pool['name'] == "test"
 
-        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock:
+        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
             response = REST.put("/pools/2", {"name": "test"})
             func_mock.assert_called_once()
 
@@ -725,7 +732,8 @@ class TestPool:
         {"name":"hello_mba_cbm", "cores":[14, 18], "mba": 50, "cbm": "0xf0"} # cbm & mba
     ])
     def test_post(self, pool_config):
-        with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
             response = REST.post("/pools", pool_config)
             func_mock.assert_called_once()
         data = json.loads(response.data.decode('utf-8'))

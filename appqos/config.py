@@ -41,6 +41,7 @@ import jsonschema
 
 import caps
 import common
+import pid_ops
 
 
 class ConfigStore:
@@ -137,7 +138,6 @@ class ConfigStore:
         self.from_file(self.get_path())
 
 
-
     @staticmethod
     def get_pool(data, pool_id):
         """
@@ -157,7 +157,7 @@ class ConfigStore:
             if pool['id'] == pool_id:
                 return pool
 
-        raise KeyError(("Pool {} does not exists").format(pool_id))
+        raise KeyError("Pool {} does not exists.".format(pool_id))
 
 
     @staticmethod
@@ -179,7 +179,7 @@ class ConfigStore:
             if app['id'] == app_id:
                 return app
 
-        raise KeyError(("App {} does not exists").format(app_id))
+        raise KeyError("App {} does not exists.".format(app_id))
 
 
     @staticmethod
@@ -197,16 +197,23 @@ class ConfigStore:
         jsonschema.validate(data, schema, resolver=resolver)
 
         cores = set()
+        pool_ids = []
 
         # verify pools
         for pool in data['pools']:
+            # id
+            if pool['id'] in pool_ids:
+                raise ValueError("Pool {}, multiple pools with same id.".format(pool['id']))
+            pool_ids.append(pool['id'])
+
+            # pool cores
             for core in pool['cores']:
                 if not common.PQOS_API.check_core(core):
-                    raise ValueError(("Invalid core {}").format(core))
+                    raise ValueError("Pool {}, Invalid core {}.".format(pool['id'], core))
 
             if cores.intersection(pool['cores']):
-                raise ValueError(("Cores {} already assigned to another pool").format(
-                    cores.intersection(pool['cores'])))
+                raise ValueError("Pool {}, Cores {} already assigned to another pool."\
+                    .format(pool['id'], cores.intersection(pool['cores'])))
 
             cores |= set(pool['cores'])
 
@@ -215,21 +222,51 @@ class ConfigStore:
                 for app_id in pool['apps']:
                     ConfigStore.get_app(data, app_id)
 
+        # verify apps
         if 'apps' in data:
+            pids = set()
+            app_ids = []
+
             for app in data['apps']:
+                # id
+                if app['id'] in app_ids:
+                    raise ValueError("App {}, multiple apps with same id.".format(app['id']))
+                app_ids.append(app['id'])
+
+                # app's cores validation
                 if 'cores' in app:
                     for core in app['cores']:
                         if not common.PQOS_API.check_core(core):
-                            raise ValueError(("Invalid core {}").format(core))
+                            raise ValueError("App {}, Invalid core {}.".format(app['id'], core))
 
+                # app's pool validation
                 app_pool = None
                 for pool in data['pools']:
                     if 'apps' in pool and app['id'] in pool['apps']:
+                        if app_pool:
+                            raise ValueError("App {}, Assigned to more than one pool."\
+                                .format(app['id']))
                         app_pool = pool
-                        break
 
-                if not app_pool:
-                    raise ValueError(("App {} not assigned to any pool").format(app['id']))
+                if app_pool is None:
+                    raise ValueError("App {} not assigned to any pool.".format(app['id']))
+
+                if 'cores' in app:
+                    diff_cores = set(app['cores']).difference(app_pool['cores'])
+                    if diff_cores:
+                        raise ValueError("App {}, cores {} does not match Pool {}."\
+                            .format(app['id'], diff_cores, app_pool['id']))
+
+                # app's pids validation
+                for pid in app['pids']:
+                    if not pid_ops.is_pid_valid(pid):
+                        raise ValueError("App {}, PID {} is not valid.".format(app['id'], pid))
+
+                if pids.intersection(app['pids']):
+                    raise ValueError("App {}, PIDs {} already assigned to another App."\
+                        .format(app['id'], cores.intersection(app['pids'])))
+
+                pids |= set(app['pids'])
 
 
     def from_file(self, path):
@@ -244,6 +281,8 @@ class ConfigStore:
 
         if not self.is_default_pool_defined(data):
             self.add_default_pool(data)
+
+        self.validate(data)
 
         self.set_config(data)
 

@@ -18,13 +18,23 @@
     "exclusiveMinimum": true
   },
 
+  "uint_uniq_nonempty_array": {
+    "description": "Non-empty array of unique Unsigned Integers",
+    "type": "array",
+    "items": { "$ref": "#uint" },
+    "uniqueItems": true,
+    "minItems": 1,
+    "maxItems": 64
+  },
+
   "uint_uniq_array": {
     "description": "Non-empty array of unique Unsigned Integers",
     "type": "array",
     "items": { "$ref": "#uint" },
     "uniqueItems": true,
-    "minItems": 1
+    "maxItems": 64
   },
+
 
   "string_nonempty": {
     "type": "string",
@@ -34,7 +44,8 @@
 
   "string_hex" : {
     "type": [ "integer", "string" ],
-    "pattern": "^0x[0-9a-fA-F]+$"
+    "pattern": "^0x[0-9a-fA-F]+$",
+    "maxLength": 64
   },
 
   "app": {
@@ -51,7 +62,7 @@
       },
       "pids": {
         "description": "PIDs of APP",
-        "$ref": "#uint_uniq_array"
+        "$ref": "#uint_uniq_nonempty_array"
       }
     },
     "required": ["pids"]
@@ -110,14 +121,11 @@
       },
       "cores": {
         "description": "POOL cores",
-        "$ref": "#uint_uniq_array"
+        "$ref": "#uint_uniq_nonempty_array"
       },
       "apps": {
         "description": "APPs assigned to that pool",
-        "type": "array",
-        "items": { "$ref": "#uint" },
-        "uniqueItems": true,
-        "minItems": 0
+        "$ref": "#uint_uniq_array"
       }
     },
     "required": ["cores"],
