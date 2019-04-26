@@ -64,6 +64,9 @@ sudo_drop(void)
 	const char *sudo_uid = getenv("SUDO_UID");
 	const char *sudo_gid = getenv("SUDO_GID");
 	const char *sudo_user = getenv("SUDO_USER");
+	uid_t uid;
+	gid_t gid;
+	char *tailp;
 
 	/* Was sudo used to elevate privileges? */
 	if (NULL == sudo_uid || NULL == sudo_gid || NULL == sudo_user)
@@ -71,18 +74,15 @@ sudo_drop(void)
 
 	/* get user UID and GID */
 	errno = 0;
-	char *tailp = NULL;
-
-	const uid_t uid = (uid_t) strtol(sudo_uid, &tailp, 10);
-
+	tailp = NULL;
+	uid = (uid_t) strtol(sudo_uid, &tailp, 10);
 	if (NULL == tailp || *tailp != '\0' || errno != 0 ||
 			sudo_uid == tailp || 0 == uid)
 		goto err;
 
 	errno = 0;
 	tailp = NULL;
-	const gid_t gid = (gid_t) strtol(sudo_gid, &tailp, 10);
-
+	gid = (gid_t) strtol(sudo_gid, &tailp, 10);
 	if (NULL == tailp || *tailp != '\0' || errno != 0 ||
 			sudo_gid == tailp || 0 == gid)
 		goto err;
