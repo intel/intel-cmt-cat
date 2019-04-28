@@ -44,6 +44,7 @@ import stats # pylint: disable=cyclic-import
 CONFIG_FILENAME = "appqos.conf"
 CAT_CAP = "cat"
 MBA_CAP = "mba"
+SSTBF_CAP = "sstbf"
 
 
 MANAGER = multiprocessing.Manager()

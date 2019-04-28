@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get SST-BF caps",
+  "description": "GET sstbf capability result, URI /caps/sstbf",
+
+  "type": "object",
+
+  "properties": {
+    "enabled": {
+      "description": "SST-BF status",
+      "type": "boolean"
+    },
+    "hp_cores": {
+      "description": "SST-BF HP cores",
+      "$ref": "definitions.json#/uint_uniq_nonempty_array"
+    },
+    "std_cores": {
+      "description": "SST-BF Standard cores",
+      "$ref": "definitions.json#/uint_uniq_nonempty_array"
+    }
+  },
+  "required": ["enabled", "hp_cores", "std_cores"],
+  "additionalProperties": false
+}

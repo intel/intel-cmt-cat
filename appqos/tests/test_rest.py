@@ -837,7 +837,7 @@ class TestStats:
 
 class TestCaps:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
-    @mock.patch("caps.SYSTEM_CAPS", ['cat', 'mba'])
+    @mock.patch("caps.SYSTEM_CAPS", ['cat', 'mba', 'sstbf'])
     def test_get(self):
         response = REST.get("/caps")
         data = json.loads(response.data.decode('utf-8'))
@@ -849,6 +849,90 @@ class TestCaps:
         assert response.status_code == 200
         assert 'cat' in data["capabilities"]
         assert 'mba' in data["capabilities"]
+        assert 'sstbf' in data["capabilities"]
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
+    @mock.patch("sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
+    @mock.patch("caps.sstbf_supported", mock.MagicMock(return_value=True))
+    def test_get_sstbf(self):
+        for ret_val in [True, False]:
+           with mock.patch("sstbf.is_sstbf_enabled", return_value=ret_val):
+               response = Rest().get("/caps/sstbf")
+
+               assert response.status_code == 200
+
+               data = json.loads(response.data.decode('utf-8'))
+
+               # validate response schema
+               schema, resolver = load_json_schema('get_sstbf_response.json')
+               validate(data, schema, resolver=resolver)
+
+               params = ['enabled', 'hp_cores', 'std_cores']
+
+               assert len(data) == len(params)
+
+               for param in params:
+                   assert param in data
+
+               assert data['enabled'] == ret_val
+               assert data['hp_cores'] == [0,1,2,3]
+               assert data['std_cores'] == [4,5,6,7]
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("caps.sstbf_supported", mock.MagicMock(return_value=False))
+    def test_get_sstbf_unsupported(self):
+        response = Rest().get("/caps/sstbf")
+        assert response.status_code == 404
+
+        response = Rest().put("/caps/sstbf", {"enabled": True})
+        assert response.status_code == 404
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
+    @mock.patch("sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
+    @mock.patch("caps.sstbf_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("enabled_value", [
+        True,
+        False
+    ])
+    def test_put_sstbf(self, enabled_value):
+        with mock.patch("sstbf.enable_sstbf", return_value=0) as func_mock:
+            response = Rest().put("/caps/sstbf", {"enabled": enabled_value})
+            assert response.status_code == 200
+            func_mock.called_once_with(enabled_value)
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("caps.sstbf_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("invalid_fields_json", [
+        {"enabled": 10},
+        {"enabled": -1},
+        {"enabled": 0},
+        {"enabled": "true"},
+        {"Enabled": True},
+        {"enabled": True, "extra_field": 1},
+        {"enabled": True, "hp_cores": [1,2,3]},
+        {"enabled": False, "std_cores": [1,2,3]}
+    ])
+    def test_put_sstbf_invalid(self, invalid_fields_json):
+        with mock.patch("sstbf.enable_sstbf", return_value=0) as func_mock:
+            response = Rest().put("/caps/sstbf", invalid_fields_json)
+            # expect 400 BAD REQUEST
+            assert response.status_code == 400
+            func_mock.assert_not_called()
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("caps.sstbf_supported", mock.MagicMock(return_value=True))
+    def test_put_sstbf_enable_failed(self):
+        with mock.patch("sstbf.enable_sstbf", return_value=-1) as func_mock:
+            response = Rest().put("/caps/sstbf", {"enabled": True})
+            assert response.status_code == 500
+            func_mock.assert_called()
 
 
 class TestReset:

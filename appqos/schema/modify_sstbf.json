@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API modify SST-BF",
+  "description": "PUT command, URI /caps/sstbf",
+
+  "type": "object",
+
+  "properties": {
+    "enabled": {
+      "description": "SST-BF status",
+      "type": "boolean"
+    }
+  },
+  "required": ["enabled"],
+  "additionalProperties": false
+}

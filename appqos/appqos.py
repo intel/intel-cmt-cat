@@ -51,7 +51,7 @@ import caps
 import common
 import log
 import rest
-
+import sstbf
 
 class AppQoS:
     """
@@ -93,6 +93,13 @@ class AppQoS:
         for pool in data['pools']:
             log.debug("Pool: {}/{} Cores: {}, Apps: {}".format(pool.get('name'),\
                 pool.get('id'), pool.get('cores'), pool.get('apps')))
+
+        # set initial SST-BF configuration
+        if caps.sstbf_supported():
+            result = sstbf.configure_sstbf()
+            if result != 0:
+                log.error("Failed to apply initial SST-BF configuration, terminating...")
+                return
 
         # set initial RDT configuration
         log.info("Configuring RDT")
