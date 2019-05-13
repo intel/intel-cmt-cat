@@ -105,6 +105,13 @@ void selfn_monitor_file(const char *arg);
 void selfn_monitor_cores(const char *arg);
 
 /**
+ * @brief Allows to use LLC-percent representation (by default LLC
+ *        values are represented in kilobytes)
+ *
+ */
+void selfn_monitor_set_llc_percent(void);
+
+/**
  * @brief Stops monitoring on selected core(s)/pid(s)
  *
  */

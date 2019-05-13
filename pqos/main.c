@@ -549,6 +549,7 @@ static const char help_printf_short[] =
         "          [-o FILE] [--mon-file=FILE]\n"
         "          [-u TYPE] [--mon-file-type=TYPE]\n"
         "          [-r] [--mon-reset]\n"
+        "          [-P] [--percent-llc]\n"
         "       %s [-e CLASSDEF] [--alloc-class=CLASSDEF]\n"
         "          [-a CLASS2ID] [--alloc-assoc=CLASS2ID]\n"
         "       %s [-R] [--alloc-reset]\n"
@@ -605,6 +606,9 @@ static const char help_printf_long[] =
         "               Requires Linux and kernel versions 4.10 and newer.\n"
         "               The -I option must be used for PID monitoring.\n"
         "               Processes and cores cannot be monitored together.\n"
+        "  -P, --percent-llc\n"
+        "         Displays LLC as percentage value (by default LLC is displayed\n"
+        "         in kilobytes if this parameter is not used)\n"
         "  -o FILE, --mon-file=FILE    output monitored data in a FILE\n"
         "  -u TYPE, --mon-file-type=TYPE\n"
         "          select output file format type for monitored data.\n"
@@ -663,6 +667,7 @@ static struct option long_cmd_opts[] = {
         {"verbose",         no_argument,       0, 'v'},
         {"super-verbose",   no_argument,       0, 'V'},
         {"iface-os",        no_argument,       0, 'I'},
+        {"percent-llc",     no_argument,       0, 'P'},
         {0, 0, 0, 0} /* end */
 };
 
@@ -683,7 +688,7 @@ int main(int argc, char **argv)
         memset(&cfg, 0, sizeof(cfg));
 
         while ((cmd = getopt_long(argc, argv,
-                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIR:",
+                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIPR:",
                                   long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
@@ -720,6 +725,9 @@ int main(int argc, char **argv)
                                 break;
                         }
                         selfn_monitor_pids(optarg);
+                        break;
+                case 'P':
+                        selfn_monitor_set_llc_percent();
                         break;
                 case 'm':
                         selfn_monitor_cores(optarg);

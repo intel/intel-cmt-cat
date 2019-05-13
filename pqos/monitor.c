@@ -179,6 +179,23 @@ struct slist {
 };
 
 /**
+ * Stores display format for LLC (kilobytes/percent)
+ */
+static enum llc_format {
+        LLC_FORMAT_KILOBYTES = 0,
+        LLC_FORMAT_PERCENT
+} sel_llc_format = LLC_FORMAT_KILOBYTES;
+
+/**
+ * Manages llc entry with data to be displayed with current llc_format
+ * (value may be displayed as kilobytes value or as percent of total cache)
+ */
+struct llc_entry_data {
+        double val;
+        enum llc_format format;
+};
+
+/**
  * @brief Scale byte value up to KB
  *
  * @param bytes value to be scaled up
@@ -643,6 +660,11 @@ void selfn_monitor_file_type(const char *arg)
 void selfn_monitor_file(const char *arg)
 {
         selfn_strdup(&sel_output_file, arg);
+}
+
+void selfn_monitor_set_llc_percent(void)
+{
+        sel_llc_format = LLC_FORMAT_PERCENT;
 }
 
 void selfn_monitor_cores(const char *arg)
@@ -2028,14 +2050,14 @@ fillin_csv_column(const double val, char data[], const size_t sz_data,
  *
  * @param fp pointer to file to direct output
  * @param mon_data pointer to pqos_mon_data structure
- * @param llc LLC occupancy data
+ * @param llc_entry LLC occupancy data structure
  * @param mbr remote memory bandwidth data
  * @param mbl local memory bandwidth data
  */
 static void
 print_text_row(FILE *fp,
                struct pqos_mon_data *mon_data,
-               const double llc,
+               const struct llc_entry_data *llc_entry,
                const double mbr,
                const double mbl)
 {
@@ -2046,10 +2068,12 @@ print_text_row(FILE *fp,
 
         ASSERT(fp != NULL);
         ASSERT(mon_data != NULL);
+        ASSERT(llc_entry != NULL);
 
         memset(data, 0, sz_data);
 
-        offset += fillin_text_column(llc, data + offset, sz_data - offset,
+        offset += fillin_text_column(llc_entry->val, data + offset,
+                                     sz_data - offset,
                                      mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                      sel_events_max & PQOS_MON_EVENT_L3_OCCUP);
 
@@ -2090,14 +2114,14 @@ print_text_row(FILE *fp,
  * @param fp pointer to file to direct output
  * @param time pointer to string containing time data
  * @param mon_data pointer to pqos_mon_data structure
- * @param llc LLC occupancy data
+ * @param llc_entry LLC occupancy data structure
  * @param mbr remote memory bandwidth data
  * @param mbl local memory bandwidth data
  */
 static void
 print_xml_row(FILE *fp, char *time,
               struct pqos_mon_data *mon_data,
-              const double llc,
+              const struct llc_entry_data *llc_entry,
               const double mbr,
               const double mbl)
 {
@@ -2109,11 +2133,16 @@ print_xml_row(FILE *fp, char *time,
         ASSERT(fp != NULL);
         ASSERT(time != NULL);
         ASSERT(mon_data != NULL);
+        ASSERT(llc_entry != NULL);
 
-        offset += fillin_xml_column(llc, data + offset, sz_data - offset,
+        const char *l3_text = (llc_entry->format == LLC_FORMAT_KILOBYTES) ?
+                "l3_occupancy_kB" : "l3_occupancy_percent";
+
+        offset += fillin_xml_column(llc_entry->val, data + offset,
+                                    sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                     sel_events_max & PQOS_MON_EVENT_L3_OCCUP,
-                                    "l3_occupancy_kB");
+                                    l3_text);
 
         offset += fillin_xml_column(mbl, data + offset, sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_LMEM_BW,
@@ -2176,14 +2205,14 @@ print_xml_row(FILE *fp, char *time,
  * @param fp pointer to file to direct output
  * @param time pointer to string containing time data
  * @param mon_data pointer to pqos_mon_data structure
- * @param llc LLC occupancy data
+ * @param llc_entry LLC occupancy data structure
  * @param mbr remote memory bandwidth data
  * @param mbl local memory bandwidth data
  */
 static void
 print_csv_row(FILE *fp, char *time,
               struct pqos_mon_data *mon_data,
-              const double llc,
+              const struct llc_entry_data *llc_entry,
               const double mbr,
               const double mbl)
 {
@@ -2195,10 +2224,12 @@ print_csv_row(FILE *fp, char *time,
         ASSERT(fp != NULL);
         ASSERT(time != NULL);
         ASSERT(mon_data != NULL);
+        ASSERT(llc_entry != NULL);
 
         memset(data, 0, sz_data);
 
-        offset += fillin_csv_column(llc, data + offset, sz_data - offset,
+        offset += fillin_csv_column(llc_entry->val, data + offset,
+                                    sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                     sel_events_max & PQOS_MON_EVENT_L3_OCCUP);
 
@@ -2243,12 +2274,14 @@ print_csv_row(FILE *fp, char *time,
  * @param isxml true if XML output selected
  * @param istext true is TEXT output selected
  * @param iscsv true is CSV output selected
+ * @param format llc_format representation mode (kilobytes or percent)
  */
 static void
 build_header_row(char *hdr, const size_t sz_hdr,
                  const int isxml,
                  const int istext,
-                 const int iscsv)
+                 const int iscsv,
+                 const enum llc_format format)
 {
         ASSERT(hdr != NULL && sz_hdr > 0);
         memset(hdr, 0, sz_hdr);
@@ -2262,8 +2295,14 @@ build_header_row(char *hdr, const size_t sz_hdr,
                 else
                         strncpy(hdr, "     PID     CORE    IPC   MISSES",
                                 sz_hdr - 1);
-                if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
-                        strncat(hdr, "     LLC[KB]", sz_hdr - strlen(hdr) - 1);
+                if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP) {
+                        if (format == LLC_FORMAT_KILOBYTES)
+                                strncat(hdr, "     LLC[KB]",
+                                        sz_hdr - strlen(hdr) - 1);
+                        else
+                                strncat(hdr, "      LLC[%]",
+                                        sz_hdr - strlen(hdr) - 1);
+                }
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
                         strncat(hdr, "   MBL[MB/s]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
@@ -2277,8 +2316,14 @@ build_header_row(char *hdr, const size_t sz_hdr,
                 else
                         strncpy(hdr, "Time,PID,Core,IPC,LLC Misses",
                                 sz_hdr - 1);
-                if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP)
-                        strncat(hdr, ",LLC[KB]", sz_hdr - strlen(hdr) - 1);
+                if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP) {
+                        if (format == LLC_FORMAT_KILOBYTES)
+                                strncat(hdr, ",LLC[KB]",
+                                        sz_hdr - strlen(hdr) - 1);
+                        else
+                                strncat(hdr, ",LLC[%]",
+                                        sz_hdr - strlen(hdr) - 1);
+                }
                 if (sel_events_max & PQOS_MON_EVENT_LMEM_BW)
                         strncat(hdr, ",MBL[MB/s]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
@@ -2361,6 +2406,77 @@ static long timeval_to_usec(const struct timeval *tv)
         return ((long)tv->tv_usec) + ((long)tv->tv_sec * 1000000L);
 }
 
+/**
+ * @brief Gets total l3 cache value
+ *
+ * @param[in] p_cache_size pointer to cache-size value to be filled.
+ *            It must not be NULL.
+ *
+ * @return PQOS_RETVAL_OK on success or error code in case of failure
+ */
+static int get_cache_size(unsigned *p_cache_size)
+{
+        const struct pqos_cpuinfo *p_cpu = NULL;
+        int ret;
+
+        if (p_cache_size == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get(NULL, &p_cpu);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error retrieving PQoS capabilities!\n");
+                return ret;
+        }
+
+        if (p_cpu == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        *p_cache_size = p_cpu->l3.total_size;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Fills llc_entry_data structure with percentage or kilobytes
+ *        cache usage representation
+ *
+ * @param[in] llc_entry pointer to llc_entry_data structure to be filled.
+ *            It must not be NULL
+ * @param llc_bytes amount of cache(in bytes) used by core
+ * @param cache_total total l3 cache size
+ * @param format enum representing percentage or kilobyte format used
+ *        for showing cache occupancy for core
+ *
+ * @return PQOS_RETVAL_OK on success or error code otherwise
+ */
+static int get_llc_entry(struct llc_entry_data *llc_entry,
+                         uint64_t llc_bytes,
+                         unsigned cache_total,
+                         enum llc_format format)
+{
+        if (llc_entry == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (cache_total == 0)
+                return PQOS_RETVAL_PARAM;
+
+        switch (format) {
+        case LLC_FORMAT_KILOBYTES:
+                llc_entry->val = bytes_to_kb(llc_bytes);
+                break;
+        case LLC_FORMAT_PERCENT:
+                llc_entry->val = llc_bytes*100/cache_total;
+                break;
+        default:
+                printf("Incorrect llc_format: %i\n", format);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        llc_entry->format = format;
+
+        return PQOS_RETVAL_OK;
+}
+
 void monitor_loop(void)
 {
 #define TERM_MIN_NUM_LINES 3
@@ -2373,6 +2489,7 @@ void monitor_loop(void)
         const int isxml = !strcasecmp(sel_output_type, "xml");
         const int iscsv = !strcasecmp(sel_output_type, "csv");
         const size_t sz_header = 128;
+        unsigned cache_size;
         char header[sz_header];
         unsigned mon_number = 0, display_num = 0;
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
@@ -2380,6 +2497,11 @@ void monitor_loop(void)
         if ((!istext)  && (!isxml) && (!iscsv)) {
                 printf("Invalid selection of output file type '%s'!\n",
                        sel_output_type);
+                return;
+        }
+
+        if (get_cache_size(&cache_size) != PQOS_RETVAL_OK) {
+                printf("Error during getting L3 cache size\n");
                 return;
         }
 
@@ -2416,7 +2538,8 @@ void monitor_loop(void)
         /**
          * Build the header
          */
-        build_header_row(header, sz_header, isxml, istext, iscsv);
+        build_header_row(header, sz_header, isxml, istext, iscsv,
+                         sel_llc_format);
 
         if (iscsv)
                 fprintf(fp_monitor, "%s\n", header);
@@ -2469,19 +2592,29 @@ void monitor_loop(void)
                 for (i = 0; i < display_num; i++) {
                         const struct pqos_event_values *pv =
                                  &mon_data[i]->values;
-                        double llc = bytes_to_kb(pv->llc);
+
+                        struct llc_entry_data llc_entry;
+                        int ret = get_llc_entry(&llc_entry, pv->llc,
+                                                cache_size,
+                                                sel_llc_format);
+                        if (ret != PQOS_RETVAL_OK) {
+                                printf("Could not fill llc_entry data!\n");
+                                stop_monitoring_loop = 1;
+                                break;
+                        }
+
                         double mbr = bytes_to_mb(pv->mbm_remote_delta) * coeff;
                         double mbl = bytes_to_mb(pv->mbm_local_delta) * coeff;
 
                         if (istext)
                                 print_text_row(fp_monitor, mon_data[i],
-                                               llc, mbr, mbl);
+                                               &llc_entry, mbr, mbl);
                         if (isxml)
                                 print_xml_row(fp_monitor, cb_time, mon_data[i],
-                                              llc, mbr, mbl);
+                                              &llc_entry, mbr, mbl);
                         if (iscsv)
                                 print_csv_row(fp_monitor, cb_time, mon_data[i],
-                                              llc, mbr, mbl);
+                                              &llc_entry, mbr, mbl);
                 }
                 if (!istty && istext)
                         fputs("\n", fp_monitor);
