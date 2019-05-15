@@ -25,3 +25,5 @@ appqos/virtual_env
 
 lib/python/.coverage
 lib/python/test_env
+
+bat/test_env
