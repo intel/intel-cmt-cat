@@ -264,7 +264,7 @@ class ConfigStore:
 
                 if pids.intersection(app['pids']):
                     raise ValueError("App {}, PIDs {} already assigned to another App."\
-                        .format(app['id'], cores.intersection(app['pids'])))
+                        .format(app['id'], pids.intersection(app['pids'])))
 
                 pids |= set(app['pids'])
 
