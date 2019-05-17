@@ -35,8 +35,8 @@
 
 """
 Main module.
-Parses command line arguments, sets up logging, initialises perf interface,
-REST API server and runs main logic (AppQoS)
+Parses command line arguments, sets up logging, initialises libpqos,
+starts REST API server and runs main loop (AppQoS)
 """
 
 import argparse
@@ -44,7 +44,6 @@ import multiprocessing
 import signal
 import syslog
 
-from time import sleep
 from jsonschema import ValidationError
 
 import cache_ops
@@ -57,6 +56,8 @@ import rest
 class AppQoS:
     """
     Main logic.
+    Loads config file.
+    Applies initial Intel RDT and SST-BF configuration.
     Handles configuration changes.
     """
 
@@ -73,6 +74,7 @@ class AppQoS:
             args: command line arguments
         """
 
+        # load config file
         try:
             common.CONFIG_STORE.from_file(args.config)
         except IOError as ex:
@@ -110,8 +112,6 @@ class AppQoS:
                     log.error("Failed to apply RDT configuration!")
                     break
 
-            sleep(0.1)
-
         log.info("Terminating...")
 
         return
@@ -131,6 +131,7 @@ def main():
     Main entry point
     """
 
+    # parse command line arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', metavar="PATH", default=common.CONFIG_FILENAME,
                         help="Configuration file path")
@@ -145,6 +146,7 @@ def main():
     if cmd_args.verbose:
         log.enable_verbose()
 
+    # initialize libpqos/Intel RDT interface
     result = common.PQOS_API.init()
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
@@ -158,7 +160,7 @@ def main():
 
         # start REST API server
         server = rest.Server()
-        result = server.start("0.0.0.0", cmd_args.port[0], cmd_args.verbose)
+        result = server.start("127.0.0.1", cmd_args.port[0], cmd_args.verbose)
         if result == 0:
             # run main logic
             app_qos.run(cmd_args)

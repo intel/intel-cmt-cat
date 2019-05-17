@@ -88,6 +88,7 @@ class ConfigStore:
 
         return None
 
+
     def get_app_attr(self, attr, app_id):
         """
         Get specific attribute from config
@@ -97,7 +98,7 @@ class ConfigStore:
             app_id: Id of app to find attribute
 
         Returns:
-            attribute value, None
+            attribute value or None
         """
 
         data = self.get_config()
@@ -184,7 +185,6 @@ class ConfigStore:
 
     @staticmethod
     def validate(data):
-        #pylint: disable=too-many-branches
         """
         Validate configuration
 
@@ -196,10 +196,25 @@ class ConfigStore:
         schema, resolver = ConfigStore.load_json_schema('appqos.json')
         jsonschema.validate(data, schema, resolver=resolver)
 
+        ConfigStore._validate_pools(data)
+        ConfigStore._validate_apps(data)
+
+
+    @staticmethod
+    def _validate_pools(data):
+        """
+        Validate Pools configuration
+
+        Parameters
+            data: configuration (dict)
+        """
+        if not 'pools' in data:
+            return
+
+        # verify pools
         cores = set()
         pool_ids = []
 
-        # verify pools
         for pool in data['pools']:
             # id
             if pool['id'] in pool_ids:
@@ -222,51 +237,62 @@ class ConfigStore:
                 for app_id in pool['apps']:
                     ConfigStore.get_app(data, app_id)
 
+
+    @staticmethod
+    def _validate_apps(data):
+        """
+        Validate Apps configuration
+
+        Parameters
+            data: configuration (dict)
+        """
+        if not 'apps' in data:
+            return
+
         # verify apps
-        if 'apps' in data:
-            pids = set()
-            app_ids = []
+        pids = set()
+        app_ids = []
 
-            for app in data['apps']:
-                # id
-                if app['id'] in app_ids:
-                    raise ValueError("App {}, multiple apps with same id.".format(app['id']))
-                app_ids.append(app['id'])
+        for app in data['apps']:
+            # id
+            if app['id'] in app_ids:
+                raise ValueError("App {}, multiple apps with same id.".format(app['id']))
+            app_ids.append(app['id'])
 
-                # app's cores validation
-                if 'cores' in app:
-                    for core in app['cores']:
-                        if not common.PQOS_API.check_core(core):
-                            raise ValueError("App {}, Invalid core {}.".format(app['id'], core))
+            # app's cores validation
+            if 'cores' in app:
+                for core in app['cores']:
+                    if not common.PQOS_API.check_core(core):
+                        raise ValueError("App {}, Invalid core {}.".format(app['id'], core))
 
-                # app's pool validation
-                app_pool = None
-                for pool in data['pools']:
-                    if 'apps' in pool and app['id'] in pool['apps']:
-                        if app_pool:
-                            raise ValueError("App {}, Assigned to more than one pool."\
-                                .format(app['id']))
-                        app_pool = pool
+            # app's pool validation
+            app_pool = None
+            for pool in data['pools']:
+                if 'apps' in pool and app['id'] in pool['apps']:
+                    if app_pool:
+                        raise ValueError("App {}, Assigned to more than one pool."\
+                            .format(app['id']))
+                    app_pool = pool
 
-                if app_pool is None:
-                    raise ValueError("App {} not assigned to any pool.".format(app['id']))
+            if app_pool is None:
+                raise ValueError("App {} not assigned to any pool.".format(app['id']))
 
-                if 'cores' in app:
-                    diff_cores = set(app['cores']).difference(app_pool['cores'])
-                    if diff_cores:
-                        raise ValueError("App {}, cores {} does not match Pool {}."\
-                            .format(app['id'], diff_cores, app_pool['id']))
+            if 'cores' in app:
+                diff_cores = set(app['cores']).difference(app_pool['cores'])
+                if diff_cores:
+                    raise ValueError("App {}, cores {} does not match Pool {}."\
+                        .format(app['id'], diff_cores, app_pool['id']))
 
-                # app's pids validation
-                for pid in app['pids']:
-                    if not pid_ops.is_pid_valid(pid):
-                        raise ValueError("App {}, PID {} is not valid.".format(app['id'], pid))
+            # app's pids validation
+            for pid in app['pids']:
+                if not pid_ops.is_pid_valid(pid):
+                    raise ValueError("App {}, PID {} is not valid.".format(app['id'], pid))
 
-                if pids.intersection(app['pids']):
-                    raise ValueError("App {}, PIDs {} already assigned to another App."\
-                        .format(app['id'], pids.intersection(app['pids'])))
+            if pids.intersection(app['pids']):
+                raise ValueError("App {}, PIDs {} already assigned to another App."\
+                    .format(app['id'], pids.intersection(app['pids'])))
 
-                pids |= set(app['pids'])
+            pids |= set(app['pids'])
 
 
     def from_file(self, path):
@@ -318,7 +344,7 @@ class ConfigStore:
             path: Path of the configuration file
 
         Returns:
-            validated configuration
+            schema validated configuration
         """
         with open(path, 'r+') as fd:
             raw_data = fd.read()
@@ -424,6 +450,7 @@ class ConfigStore:
             result
         """
         try:
+            self.changed_event.wait(0.1)
             result = self.changed_event.is_set()
             if result:
                 self.changed_event.clear()
@@ -443,9 +470,9 @@ class ConfigStore:
         """
         for pool in data['pools']:
             if pool['id'] == 0:
-                return 1
+                return True
 
-        return 0
+        return False
 
     @staticmethod
     def add_default_pool(data):
@@ -464,8 +491,9 @@ class ConfigStore:
             default_pool['cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
 
         default_pool['name'] = "Default"
-        default_pool['cores'] = list(range(common.PQOS_API.get_num_cores()))
 
+        # Use all unallocated cores
+        default_pool['cores'] = list(range(common.PQOS_API.get_num_cores()))
         for pool in data['pools']:
             default_pool['cores'] = \
                 [core for core in default_pool['cores'] if core not in pool['cores']]
@@ -506,3 +534,31 @@ class ConfigStore:
             return new_ids[-1]
 
         return None
+
+
+    def get_new_app_id(self):
+        """
+        Get ID for new App
+
+        Returns:
+            ID for new App
+        """
+
+        data = self.get_config()
+
+        # put all ids into list
+        app_ids = []
+        for app in data['apps']:
+            app_ids.append(app['id'])
+        app_ids = sorted(app_ids)
+        # no app found in config
+        if not app_ids:
+            return 1
+
+        # add new app to apps
+        # find an id
+        new_ids = list(set(range(1, app_ids[-1])) - set(app_ids))
+        if new_ids:
+            return new_ids[0]
+
+        return app_ids[-1] + 1

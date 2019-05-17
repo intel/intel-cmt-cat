@@ -15,8 +15,9 @@ Contents
 Overview
 ========
 AppQoS is a proof-of-concept software created to demonstrate the use of
-Intel(R) Resource Director Technology (Intel(R) RDT) (currently CAT and MBA)
-to improve QoS for applications via partitioning system resources.
+Intel(R) Resource Director Technology (Intel(R) RDT) (currently CAT and MBA) and
+Intel(R) Speed Select Technology - Base Frequency (Intel(R) SST-BF) to
+improve QoS for applications via partitioning system resources.
 
 Legal Disclaimer
 ================

@@ -34,33 +34,36 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
+VENV_DIR=env_$(shell hostname)
+
 .PHONY: test cov style run
 
-test: virtual_env
-	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+test: $(VENV_DIR)
+	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
 		PYTHONPATH=. pytest tests/ && \
 		deactivate"
 
-cov: virtual_env
-	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+cov: $(VENV_DIR)
+	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
 		PYTHONPATH=. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/ && \
 		deactivate"
 
-virtual_env: requirements.txt
-	@bash -c "virtualenv -p python3 $(CURDIR)/virtual_env"
-	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
+$(VENV_DIR): requirements.txt
+	@bash -c "virtualenv -p python3 $(CURDIR)/$(VENV_DIR)"
+	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
 		python -m pip install -r $(CURDIR)/requirements.txt && \
 		python -m pip wheel --wheel-dir=$(CURDIR) $(CURDIR)/../lib/python && \
 		python -m pip install --no-index --find-links=$(CURDIR) pqos && \
 		rm -rf $(CURDIR)/pqos*.whl && \
 		deactivate"
 
-style: virtual_env
-	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-		pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
+style: $(VENV_DIR)
+	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
+		python -m pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
+		python -m bandit *.py &&\
 		deactivate"
 
-run: virtual_env
-	@bash -c "source $(CURDIR)/virtual_env/bin/activate && \
-		PYTHONPATH=. python appqos.py && \
+run: $(VENV_DIR)
+	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
+		./appqos.py && \
 		deactivate"

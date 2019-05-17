@@ -99,6 +99,35 @@
     ]
   },
 
+  "app_api_put": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "description": "APP's name",
+        "$ref": "#string_nonempty"
+      },
+      "cores": {
+        "description": "Cores APP is pinned to",
+        "$ref": "#uint_uniq_array"
+      },
+      "pids": {
+        "description": "PIDs of APP",
+        "$ref": "#uint_uniq_nonempty_array"
+      },
+      "pool_id": {
+        "description": "Destination Pool ID",
+        "$ref": "#uint"
+      }
+    },
+    "additionalProperties": false,
+    "anyOf": [
+      { "required": ["name"] },
+      { "required": ["cores"] },
+      { "required": ["pids"] },
+      { "required": ["pool_id"] }
+    ]
+  },
+
   "pool": {
     "description": "Definition of Pool of APPs",
     "type": "object",

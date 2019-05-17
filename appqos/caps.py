@@ -42,6 +42,7 @@ import log
 # System capabilities are detected during the runtime
 SYSTEM_CAPS = {}
 
+
 def caps_init():
     """
     Runs supported capabilities detection and logs to console
@@ -52,8 +53,8 @@ def caps_init():
         SYSTEM_CAPS.clear()
 
     SYSTEM_CAPS = detect_supported_caps()
-    log.debug("Supported capabilities:")
-    log.debug(SYSTEM_CAPS)
+    log.info("Supported capabilities:")
+    log.info(SYSTEM_CAPS)
 
     if (cat_supported() or mba_supported()) and common.PQOS_API.is_multicore():
         return 0
@@ -85,9 +86,11 @@ def detect_supported_caps():
     result = []
     # generate list of supported capabilities
 
+    # Intel RDT L3 CAT
     if common.PQOS_API.is_l3_cat_supported():
         result.append(common.CAT_CAP)
 
+    # Intel RDT MBA
     if common.PQOS_API.is_mba_supported():
         result.append(common.MBA_CAP)
 

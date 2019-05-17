@@ -32,7 +32,7 @@
 ################################################################################
 
 """
-Common global constants and helper functions
+Common global constants and instances
 """
 
 import multiprocessing
@@ -45,22 +45,8 @@ CONFIG_FILENAME = "appqos.conf"
 CAT_CAP = "cat"
 MBA_CAP = "mba"
 
+
 MANAGER = multiprocessing.Manager()
 CONFIG_STORE = config.ConfigStore()
 STATS_STORE = stats.StatsStore()
 PQOS_API = pqos_api.PqosApi()
-
-
-def is_event_set(event):
-    """
-    Checks is event set
-
-    Parameters:
-        event: event to be tested
-    Returns:
-        result: bool
-    """
-    try:
-        return event.is_set()
-    except IOError:
-        return False

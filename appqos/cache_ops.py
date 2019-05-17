@@ -65,6 +65,8 @@ class Apps:
             pool_id = common.CONFIG_STORE.app_to_pool(app['id'])
             pool_cores = common.CONFIG_STORE.get_pool_attr('cores', pool_id)
 
+            # if there are no cores configured for App, or cores configured are
+            # not a subset of Pool cores, revert to all Pool cores
             if not app_cores or not set(app_cores).issubset(pool_cores):
                 app_cores = pool_cores
 
@@ -75,6 +77,7 @@ class Apps:
 
         return 0
 
+
     @staticmethod
     def set_affinity(pids, cores):
         """
@@ -84,6 +87,9 @@ class Apps:
             pids: PIDs to set core affinity for
             cores: cores to set to
         """
+
+        # set core affinity for each PID,
+        # even if operation fails for one PID, continue with other PIDs
         for pid in pids:
             try:
                 os.sched_setaffinity(pid, cores)
@@ -192,38 +198,38 @@ class Pool:
         # change core affinity for PIDs not assigned to any pool
         removed_pids = [pid for pid in old_pids if pid not in pids]
 
-        # skip pids assigned to any pool
-        for cos in Pool.pools:
-            if cos == self.pool:
+        # skip pids assigned to any pool e.g.: apps moved to other pool
+        for pool_id in Pool.pools:
+            if pool_id == self.pool:
                 continue
             removed_pids = \
-                [pid for pid in removed_pids if pid not in Pool.pools[cos]['pids']]
-
-        if removed_pids:
-            log.debug("PIDs to be set to core affinity to 'Default' CPUs {}".\
-                format(removed_pids))
+                [pid for pid in removed_pids if pid not in Pool.pools[pool_id]['pids']]
 
         # remove pid form old pool
         if old_pids:
-            for cos in Pool.pools:
-                if cos == self.pool:
+            for pool_id in Pool.pools:
+                if pool_id == self.pool:
                     continue
 
                 pids_moved_from_other_pool = \
-                    [pid for pid in Pool.pools[cos]['pids'] if pid in pids]
+                    [pid for pid in Pool.pools[pool_id]['pids'] if pid in pids]
 
                 if pids_moved_from_other_pool:
                     log.debug("PIDs moved from other pools {}".\
                         format(pids_moved_from_other_pool))
 
                 # update other pool PIDs
-                Pool.pools[cos]['pids'] = \
-                    [pid for pid in Pool.pools[cos]['pids'] if pid not in pids]
+                Pool.pools[pool_id]['pids'] = \
+                    [pid for pid in Pool.pools[pool_id]['pids'] if pid not in pids]
 
         Pool.pools[self.pool]['pids'] = pids
 
         # set affinity of removed pids to default
         if removed_pids:
+            log.debug("PIDs to be set to core affinity to 'Default' CPUs {}".\
+                format(removed_pids))
+
+            # get cores for Default Pool #0
             cores = common.CONFIG_STORE.get_pool_attr('cores', 0)
             for pid in removed_pids:
                 try:
@@ -261,18 +267,18 @@ class Pool:
         common.PQOS_API.alloc_assoc_set(cores, self.pool)
 
         # process list of removed cores
-        for cos in Pool.pools:
-            if cos == self.pool:
+        for pool_id in Pool.pools:
+            if pool_id == self.pool:
                 continue
 
             # check if cores were assigned to another pool,
             # if they were, remove them from that pool
-            Pool.pools[cos]['cores'] = \
-                [core for core in Pool.pools[cos]['cores'] if core not in cores]
+            Pool.pools[pool_id]['cores'] = \
+                [core for core in Pool.pools[pool_id]['cores'] if core not in cores]
 
             # filter out cores assigned to other pools
             removed_cores = \
-                [core for core in removed_cores if core not in Pool.pools[cos]['cores']]
+                [core for core in removed_cores if core not in Pool.pools[pool_id]['cores']]
 
         # Finally assign removed cores back to COS0/"Default" Pool
         if removed_cores:
@@ -311,6 +317,7 @@ class Pool:
         mba = pool.mba_get()
         cores = pool.cores_get()
 
+        # Apply same RDT configuration on all sockets in the system
         sockets = common.PQOS_API.get_sockets()
         if sockets is None:
             log.error("Failed to get sockets info!")
@@ -343,14 +350,6 @@ class Pool:
         Pool.pools = {}
 
 
-    @staticmethod
-    def dump():
-        """
-        Dump pool CAT configuration
-        """
-        log.info("Pools:{}".format(Pool.pools))
-
-
 def configure_rdt():
     """
     Configure RDT
@@ -381,11 +380,13 @@ def configure_rdt():
     for pool_id in pool_ids:
         Pool(pool_id)
 
+    # Configure Pools, Intel RDT (CAT, MBA)
     for pool_id in Pool.pools:
         result = Pool(pool_id).configure()
         if result != 0:
             return result
 
+    # Configure Apps, core affinity
     result = Apps().configure()
 
     return result

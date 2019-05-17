@@ -1,4 +1,4 @@
 [run]
 omit =
-    virtual_env/*
+    env_*/*
     tests/*

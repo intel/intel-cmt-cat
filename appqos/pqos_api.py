@@ -46,6 +46,7 @@ from pqos.cpuinfo import PqosCpuInfo
 import common
 import log
 
+
 class PqosApi:
     """
     Wrapper for libpqos wrapper.
@@ -167,12 +168,12 @@ class PqosApi:
 
     def mba_set(self, sockets, cos_id, mb_max):
         """
-        Configures MBA for CoS
+        Configures MBA rate for CoS
 
         Parameters:
             sockets: sockets list on which to configure L3 CAT
             cos_id: Class of Service
-            mb_max: MBA to set
+            mb_max: MBA rate to set
 
         Returns:
             0 on success
@@ -194,14 +195,14 @@ class PqosApi:
         Checks for MBA support
 
         Returns:
-            1 if supported
-            0 otherwise
+            True if supported
+            False otherwise
         """
         try:
             return self.get_mba_num_cos() != 0
         except Exception as ex:
             log.error(str(ex))
-            return 0
+            return False
 
 
     def is_l3_cat_supported(self):
@@ -209,14 +210,14 @@ class PqosApi:
         Checks for L3 CAT support
 
         Returns:
-            1 if supported
-            0 otherwise
+            True if supported
+            False otherwise
         """
         try:
             return self.get_l3ca_num_cos() != 0
         except Exception as ex:
             log.error(str(ex))
-            return 0
+            return False
 
 
     def is_multicore(self):
@@ -236,7 +237,7 @@ class PqosApi:
 
         Returns:
             num of cores
-            0 otherwise
+            None otherwise
         """
         try:
             sockets = self.cpuinfo.get_sockets()

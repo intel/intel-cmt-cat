@@ -106,6 +106,7 @@ class Server:
     """
     auth = HTTPBasicAuth()
 
+
     def __init__(self):
         self.process = None
         self.app = Flask(__name__)
@@ -238,7 +239,7 @@ class App(Resource):
         """
         Handles HTTP DELETE /apps/<app_id> request.
         Deletes single App
-        Raises NotFound, InternalError
+        Raises NotFound
 
         Parameters:
             app_id: Id of app to delete
@@ -274,10 +275,12 @@ class App(Resource):
     @staticmethod
     @Server.auth.login_required
     def put(app_id):
+        # pylint: disable=too-many-branches
+
         """
         Handles HTTP PUT /apps/<app_id> request.
         Modifies an App (e.g.: moves to different pool)
-        Raises NotFound, InternalError
+        Raises NotFound, BadRequest
 
         Parameters:
             app_id: Id of app to modify
@@ -289,41 +292,49 @@ class App(Resource):
 
         # validate app schema
         try:
-            schema, resolver = ConfigStore.load_json_schema('move_app.json')
+            schema, resolver = ConfigStore.load_json_schema('modify_app.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
-
-        pool_id = json_data["pool_id"]
 
         data = deepcopy(common.CONFIG_STORE.get_config())
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
 
+        # move to another pool
         for app in data['apps']:
             if app['id'] != int(app_id):
                 continue
 
-            # remove app id from pool
-            for pool in data['pools']:
-                if 'apps' in pool:
-                    if app['id'] in pool['apps']:
-                        pool['apps'].remove(app['id'])
-                        break
-            # add app id to new pool
-            for pool in data['pools']:
-                if pool['id'] == int(pool_id):
+            if 'pool_id' in json_data:
+                pool_id = json_data['pool_id']
+
+                # remove app id from pool
+                for pool in data['pools']:
                     if 'apps' in pool:
+                        if app['id'] in pool['apps']:
+                            pool['apps'].remove(app['id'])
+                            break
+
+                # add app id to new pool
+                for pool in data['pools']:
+                    if pool['id'] == int(pool_id):
+                        if not 'apps' in pool:
+                            pool['apps'] = []
                         pool['apps'].append(app['id'])
                         break
-                    else:
-                        pool['apps'] = [app['id']]
-                        break
+
             # set new cores
             if 'cores' in json_data:
                 app['cores'] = json_data['cores']
-            elif 'cores' in app:
-                app.pop('cores')
+
+            # set new name
+            if 'name' in json_data:
+                app['name'] = json_data['name']
+
+            # set new PIDs
+            if 'pids' in json_data:
+                app['pids'] = json_data['pids']
 
             try:
                 common.CONFIG_STORE.validate(data)
@@ -373,36 +384,11 @@ class Apps(Resource):
         """
         Handles HTTP POST /apps request.
         Add a new App
-        Raises NotFound, BadRequest, InternalError
+        Raises NotFound, BadRequest
 
         Returns:
             response, status code
         """
-
-        def get_app_id():
-            """
-            Get ID for new App
-
-            Returns:
-                ID for new App
-            """
-            # put all ids into list
-            app_ids = []
-            for app in data['apps']:
-                app_ids.append(app['id'])
-            app_ids = sorted(app_ids)
-            # no app found in config
-            if not app_ids:
-                return 1
-
-            # add new app to apps
-            # find an id
-            new_ids = list(set(range(1, app_ids[-1])) - set(app_ids))
-            if new_ids:
-                return new_ids[0]
-
-            return app_ids[-1] + 1
-
         json_data = request.get_json()
 
         # validate app schema
@@ -417,13 +403,12 @@ class Apps(Resource):
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
-        json_data['id'] = get_app_id()
+        json_data['id'] = common.CONFIG_STORE.get_new_app_id()
 
         if 'pids' in json_data:
             # validate pids
             for pid in json_data['pids']:
-                valid = pid_ops.is_pid_valid(pid)
-                if not valid:
+                if not pid_ops.is_pid_valid(pid):
                     raise BadRequest("New APP not added, please provide valid pid's")
 
         # if pool_id not provided on app creation
@@ -504,7 +489,7 @@ class Pool(Resource):
         """
         Handles HTTP DELETE /pool/<pull_id> request.
         Deletes single Pool
-        Raises NotFound, InternalError
+        Raises NotFound, BadRequest
 
         Parameters:
             pool_id: Id of pool to delete
@@ -512,7 +497,7 @@ class Pool(Resource):
         Returns:
             response, status code
         """
-        data = common.CONFIG_STORE.get_config().copy()
+        data = deepcopy(common.CONFIG_STORE.get_config())
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
@@ -541,7 +526,7 @@ class Pool(Resource):
         """
         Handles HTTP PUT /pools/<pool_id> request.
         Modifies a Pool
-        Raises NotFound, BadRequest, InternalError
+        Raises NotFound, BadRequest
 
         Parameters:
             pool_id: Id of pool
@@ -570,7 +555,7 @@ class Pool(Resource):
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
-        data = common.CONFIG_STORE.get_config().copy()
+        data = deepcopy(common.CONFIG_STORE.get_config())
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
@@ -678,7 +663,7 @@ class Pools(Resource):
 
             post_data['cbm'] = cbm
 
-        data = common.CONFIG_STORE.get_config().copy()
+        data = deepcopy(common.CONFIG_STORE.get_config())
         data['pools'].append(post_data)
 
         try:
@@ -756,4 +741,4 @@ class Reset(Resource):
 
         common.CONFIG_STORE.reset()
 
-        return "", 200
+        return "Reset performed. Configuration reloaded.", 200

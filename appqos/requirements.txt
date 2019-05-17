@@ -1,7 +1,8 @@
 pylint
+bandit
 jsonschema
 pexpect
-urllib3<1.25
+urllib3
 requests
 flask
 flask_httpauth
