@@ -161,8 +161,15 @@ class CPqosCap(ctypes.Structure):
     ]
 
 
-class PqosCapabilityMonitoring(object):  # pylint: disable=too-few-public-methods
+class PqosCapabilityMonitoring(object):
     "PQoS monitoring capability"
+    # pylint: disable=too-few-public-methods
+
+    def __init__(self):
+        self.mem_size = 0    # byte size of the structure
+        self.max_rmid = 0    # max RMID supported by socket
+        self.l3_size = 0     # L3 cache size in bytes
+        self.events = []     # a list of supported events
 
 
 class PqosCapabilityL3Ca(object):
@@ -218,8 +225,22 @@ def _get_tristate_bool(c_val):
     return tristate_map.get(c_val)
 
 
-def _get_cap_mon(_p_capability):
+def _get_cap_mon(p_capability):
+    """
+    Converts low-level pqos_cap_mon structure to
+    high-level PqosCapabilityMonitoring object.
+    """
+    c_capability = p_capability.contents
     capability = PqosCapabilityMonitoring()
+    capability.mem_size = c_capability.mem_size
+    capability.max_rmid = c_capability.max_rmid
+    capability.l3_size = c_capability.l3_size
+
+    events_ptr = ctypes.cast(c_capability.events, ctypes.POINTER(CPqosMonitor))
+
+    for i in range(c_capability.num_events):
+        capability.events.append(events_ptr[i])
+
     return capability
 
 
