@@ -24,15 +24,15 @@
     "items": { "$ref": "#uint" },
     "uniqueItems": true,
     "minItems": 1,
-    "maxItems": 64
+    "maxItems": 512
   },
 
   "uint_uniq_array": {
-    "description": "Non-empty array of unique Unsigned Integers",
+    "description": "Array of unique Unsigned Integers",
     "type": "array",
     "items": { "$ref": "#uint" },
     "uniqueItems": true,
-    "maxItems": 64
+    "maxItems": 512
   },
 
 
