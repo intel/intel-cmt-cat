@@ -35,7 +35,6 @@
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 #include <errno.h>
 #include <dirent.h>
 
@@ -43,6 +42,7 @@
 #include "types.h"
 #include "cap.h"
 #include "resctrl_alloc.h"
+#include "resctrl_utils.h"
 
 /**
  * ---------------------------------------
@@ -129,36 +129,6 @@ resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num)
 		}
 	}
 	*grps_num = max_rctl_grps;
-	return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Converts string into 64-bit unsigned number.
- *
- * Numbers can be in decimal or hexadecimal format.
- *
- * @param [in] s string to be converted into 64-bit unsigned number
- * @param [in] base Numerical base
- * @param [out] Numeric value of the string representing the number
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-strtouint64(const char *s, int base, uint64_t *value)
-{
-	char *endptr = NULL;
-
-	ASSERT(s != NULL);
-	if (strncasecmp(s, "0x", 2) == 0) {
-		base = 16;
-		s += 2;
-	}
-
-	*value = strtoull(s, &endptr, base);
-	if (!(*s != '\0' && (*endptr == '\0' || *endptr == '\n')))
-		return PQOS_RETVAL_ERROR;
-
 	return PQOS_RETVAL_OK;
 }
 
@@ -268,262 +238,13 @@ resctrl_alloc_cpumask_read(const unsigned class_id,
 	return ret;
 }
 
-/*
- * ---------------------------------------
- * Schemata structures and utility functions
- * ---------------------------------------
- */
-
-void
-resctrl_alloc_schemata_fini(struct resctrl_alloc_schemata *schemata)
-{
-	if (schemata->l2ca != NULL) {
-		free(schemata->l2ca);
-		schemata->l2ca = NULL;
-	}
-	if (schemata->l3ca != NULL) {
-		free(schemata->l3ca);
-		schemata->l3ca = NULL;
-	}
-	if (schemata->mba != NULL) {
-		free(schemata->mba);
-		schemata->mba = NULL;
-	}
-}
-
-int
-resctrl_alloc_schemata_init(const unsigned class_id,
-			    const struct pqos_cap *cap,
-			    const struct pqos_cpuinfo *cpu,
-			    struct resctrl_alloc_schemata *schemata)
-{
-	int ret = PQOS_RETVAL_OK;
-	int retval;
-	unsigned num_cos, num_ids, i;
-
-	ASSERT(schemata != NULL);
-
-	memset(schemata, 0, sizeof(struct resctrl_alloc_schemata));
-
-	/* L2 */
-	retval = pqos_l2ca_get_cos_num(cap, &num_cos);
-	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
-		unsigned *l2ids = NULL;
-		int cdp_enabled;
-
-		l2ids = pqos_cpu_get_l2ids(cpu, &num_ids);
-		if (l2ids == NULL) {
-			ret = PQOS_RETVAL_ERROR;
-			goto resctrl_alloc_schemata_init_exit;
-		}
-
-		free(l2ids);
-
-		schemata->l2ca_num = num_ids;
-		schemata->l2ca = calloc(num_ids, sizeof(struct pqos_l2ca));
-		if (schemata->l2ca == NULL) {
-			ret = PQOS_RETVAL_ERROR;
-			goto resctrl_alloc_schemata_init_exit;
-		}
-
-		ret = pqos_l2ca_cdp_enabled(cap, NULL, &cdp_enabled);
-		if (ret != PQOS_RETVAL_OK)
-			goto resctrl_alloc_schemata_init_exit;
-
-		/* fill class_id */
-		for (i = 0; i < num_ids; i++) {
-			schemata->l2ca[i].class_id = class_id;
-			schemata->l2ca[i].cdp = cdp_enabled;
-		}
-	}
-
-	/* L3 */
-	retval = pqos_l3ca_get_cos_num(cap, &num_cos);
-	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
-		unsigned *sockets = NULL;
-		int cdp_enabled;
-
-		sockets = pqos_cpu_get_sockets(cpu, &num_ids);
-		if (sockets == NULL) {
-			ret = PQOS_RETVAL_ERROR;
-			goto resctrl_alloc_schemata_init_exit;
-		}
-
-		free(sockets);
-
-		schemata->l3ca_num = num_ids;
-		schemata->l3ca = calloc(num_ids, sizeof(struct pqos_l3ca));
-		if (schemata->l3ca == NULL) {
-			ret = PQOS_RETVAL_ERROR;
-			goto resctrl_alloc_schemata_init_exit;
-		}
-
-		ret = pqos_l3ca_cdp_enabled(cap, NULL, &cdp_enabled);
-		if (ret != PQOS_RETVAL_OK)
-			goto resctrl_alloc_schemata_init_exit;
-
-		/* fill class_id and cdp values */
-		for (i = 0; i < num_ids; i++) {
-			schemata->l3ca[i].class_id = class_id;
-			schemata->l3ca[i].cdp = cdp_enabled;
-		}
-	}
-
-	/* MBA */
-	retval = pqos_mba_get_cos_num(cap, &num_cos);
-	if (retval == PQOS_RETVAL_OK && class_id < num_cos) {
-		unsigned *sockets = NULL;
-		int ctrl_enabled;
-
-		sockets = pqos_cpu_get_sockets(cpu, &num_ids);
-		if (sockets == NULL) {
-			ret = PQOS_RETVAL_ERROR;
-			goto resctrl_alloc_schemata_init_exit;
-		}
-
-		free(sockets);
-
-		schemata->mba_num = num_ids;
-		schemata->mba = calloc(num_ids, sizeof(struct pqos_mba));
-		if (schemata->mba == NULL) {
-			ret = PQOS_RETVAL_ERROR;
-			goto resctrl_alloc_schemata_init_exit;
-		}
-
-		ret = pqos_mba_ctrl_enabled(cap, NULL, &ctrl_enabled);
-		if (ret != PQOS_RETVAL_OK)
-			goto resctrl_alloc_schemata_init_exit;
-
-		/* fill ctrl and class_id */
-		for (i = 0; i < num_ids; i++) {
-			schemata->mba[i].ctrl = ctrl_enabled;
-			schemata->mba[i].class_id = class_id;
-		}
-	}
-
- resctrl_alloc_schemata_init_exit:
-	/* Deallocate memory in case of error */
-	if (ret != PQOS_RETVAL_OK)
-		resctrl_alloc_schemata_fini(schemata);
-
-	return ret;
-}
-
-/**
- * @brief Schemata type
- */
-enum resctrl_alloc_schemata_type {
-	RESCTRL_ALLOC_SCHEMATA_TYPE_NONE,   /**< unknown */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_L2,     /**< L2 CAT without CDP */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_L2CODE, /**< L2 CAT code */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_L2DATA, /**< L2 CAT data */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_L3,     /**< L3 CAT without CDP */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_L3CODE, /**< L3 CAT code */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_L3DATA, /**< L3 CAT data */
-	RESCTRL_ALLOC_SCHEMATA_TYPE_MB,     /**< MBA data */
-};
-
-/**
- * @brief Determine allocation type
- *
- * @param [in] str resctrl label
- *
- * @return Allocation type
- */
-static int
-resctrl_alloc_schemata_type_get(const char *str)
-{
-	int type = RESCTRL_ALLOC_SCHEMATA_TYPE_NONE;
-
-	if (strcasecmp(str, "L2") == 0)
-		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L2;
-	else if (strcasecmp(str, "L2CODE") == 0)
-		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L2CODE;
-	else if (strcasecmp(str, "L2DATA") == 0)
-		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L2DATA;
-	else if (strcasecmp(str, "L3") == 0)
-		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L3;
-	else if (strcasecmp(str, "L3CODE") == 0)
-		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L3CODE;
-	else if (strcasecmp(str, "L3DATA") == 0)
-		type = RESCTRL_ALLOC_SCHEMATA_TYPE_L3DATA;
-	else if (strcasecmp(str, "MB") == 0)
-		type = RESCTRL_ALLOC_SCHEMATA_TYPE_MB;
-
-	return type;
-}
-
-/**
- * @brief Fill schemata structure
- *
- * @param [in] res_id Resource id
- * @param [in] value Ways mask/Memory B/W rate
- * @param [in] type Schemata type
- * @param [out] schemata Schemata structure
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-resctrl_alloc_schemata_set(const unsigned res_id,
-	     const uint64_t value,
-	     const int type,
-	     struct resctrl_alloc_schemata *schemata)
-{
-	if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L2) {
-		if (schemata->l2ca_num <= res_id)
-			return PQOS_RETVAL_ERROR;
-		schemata->l2ca[res_id].u.ways_mask = value;
-
-	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L2CODE) {
-		if (schemata->l2ca_num <= res_id || !schemata->l2ca[res_id].cdp)
-			return PQOS_RETVAL_ERROR;
-		schemata->l2ca[res_id].u.s.code_mask = value;
-
-	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L2DATA) {
-		if (schemata->l2ca_num <= res_id || !schemata->l2ca[res_id].cdp)
-			return PQOS_RETVAL_ERROR;
-		schemata->l2ca[res_id].u.s.data_mask = value;
-
-	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L3) {
-		if (schemata->l3ca_num <= res_id || schemata->l3ca[res_id].cdp)
-			return PQOS_RETVAL_ERROR;
-		schemata->l3ca[res_id].u.ways_mask = value;
-
-	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L3CODE) {
-		if (schemata->l3ca_num <= res_id || !schemata->l3ca[res_id].cdp)
-			return PQOS_RETVAL_ERROR;
-		schemata->l3ca[res_id].u.s.code_mask = value;
-
-	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_L3DATA) {
-		if (schemata->l3ca_num <= res_id || !schemata->l3ca[res_id].cdp)
-			return PQOS_RETVAL_ERROR;
-		schemata->l3ca[res_id].u.s.data_mask = value;
-
-	} else if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_MB) {
-		if (schemata->mba_num <= res_id)
-			return PQOS_RETVAL_ERROR;
-		schemata->mba[res_id].mb_max = value;
-	}
-
-	return PQOS_RETVAL_OK;
-}
-
 int
 resctrl_alloc_schemata_read(const unsigned class_id,
-			    struct resctrl_alloc_schemata *schemata)
+			    struct resctrl_schemata *schemata)
 {
 	int ret = PQOS_RETVAL_OK;
 	FILE *fd = NULL;
-	int type = RESCTRL_ALLOC_SCHEMATA_TYPE_NONE;
-	char *p = NULL, *q = NULL, *saveptr = NULL;
-	const size_t buf_size = 16 * 1024;
-	char *buf = calloc(buf_size, sizeof(*buf));
 
-	if (buf == NULL) {
-		ret = PQOS_RETVAL_ERROR;
-		goto resctrl_alloc_schemata_read_exit;
-	}
 
 	ASSERT(schemata != NULL);
 
@@ -533,80 +254,9 @@ resctrl_alloc_schemata_read(const unsigned class_id,
 		goto resctrl_alloc_schemata_read_exit;
 	}
 
-	if ((schemata->l3ca_num > 0 && schemata->l3ca == NULL)
-	    || (schemata->l2ca_num > 0 && schemata->l2ca == NULL)
-	    || (schemata->mba_num > 0 && schemata->mba == NULL)) {
-		ret = PQOS_RETVAL_ERROR;
-		goto resctrl_alloc_schemata_read_exit;
-	}
-
-	while (fgets(buf, buf_size, fd) != NULL) {
-		q = buf;
-		/**
-		 * Trim white spaces
-		 */
-		while (isspace(*q))
-			q++;
-
-		/**
-		 * Determine allocation type
-		 */
-		p = strchr(q, ':');
-		if (p == NULL) {
-			ret = PQOS_RETVAL_ERROR;
-			break;
-		}
-		*p = '\0';
-		type = resctrl_alloc_schemata_type_get(q);
-
-		/* Skip unknown label */
-		if (type == RESCTRL_ALLOC_SCHEMATA_TYPE_NONE)
-			continue;
-
-		/**
-		 * Parse COS masks
-		 */
-		for (++p; ; p = NULL) {
-			char *token = NULL;
-			uint64_t id = 0;
-			uint64_t value = 0;
-			unsigned base = (type == RESCTRL_ALLOC_SCHEMATA_TYPE_MB
-				         ? 10 : 16);
-
-			token = strtok_r(p, ";", &saveptr);
-			if (token == NULL)
-				break;
-
-			q = strchr(token, '=');
-			if (q == NULL) {
-				ret = PQOS_RETVAL_ERROR;
-				goto resctrl_alloc_schemata_read_exit;
-			}
-			*q = '\0';
-
-			ret = strtouint64(token, 10, &id);
-			if (ret != PQOS_RETVAL_OK)
-				goto resctrl_alloc_schemata_read_exit;
-
-			ret = strtouint64(q + 1, base, &value);
-			if (ret != PQOS_RETVAL_OK)
-				goto resctrl_alloc_schemata_read_exit;
-
-			ret = resctrl_alloc_schemata_set(id,
-				                         value,
-				                         type,
-				                         schemata);
-			if (ret != PQOS_RETVAL_OK)
-				goto resctrl_alloc_schemata_read_exit;
-		}
-	}
-
+	ret = resctrl_schemata_read(fd, schemata);
 
  resctrl_alloc_schemata_read_exit:
-
-	if (buf != NULL)
-		free(buf);
-
 	/* check if error occurred */
 	if (ret == PQOS_RETVAL_OK)
 		ret = resctrl_alloc_fclose(fd);
@@ -618,10 +268,9 @@ resctrl_alloc_schemata_read(const unsigned class_id,
 
 int
 resctrl_alloc_schemata_write(const unsigned class_id,
-                             const struct resctrl_alloc_schemata *schemata)
+                             const struct resctrl_schemata *schemata)
 {
 	int ret = PQOS_RETVAL_OK;
-	unsigned i;
 	FILE *fd = NULL;
 	const size_t buf_size = 16 * 1024;
 	char *buf = calloc(buf_size, sizeof(*buf));
@@ -646,79 +295,7 @@ resctrl_alloc_schemata_write(const unsigned class_id,
 		goto resctrl_alloc_schemata_write_exit;
 	}
 
-	/* L2 without CDP */
-	if (schemata->l2ca_num > 0 && !schemata->l2ca[0].cdp) {
-		fprintf(fd, "L2:");
-		for (i = 0; i < schemata->l2ca_num; i++) {
-			if (i > 0)
-				fprintf(fd, ";");
-			fprintf(fd, "%u=%llx", i, (unsigned long long)
-			        schemata->l2ca[i].u.ways_mask);
-		}
-		fprintf(fd, "\n");
-	}
-
-	/* L2 with CDP */
-	if (schemata->l2ca_num > 0 && schemata->l2ca[0].cdp) {
-		fprintf(fd, "L2CODE:");
-		for (i = 0; i < schemata->l2ca_num; i++) {
-			if (i > 0)
-				fprintf(fd, ";");
-			fprintf(fd, "%u=%llx", i, (unsigned long long)
-				schemata->l2ca[i].u.s.code_mask);
-		}
-		fprintf(fd, "\nL2DATA:");
-		for (i = 0; i < schemata->l2ca_num; i++) {
-			if (i > 0)
-				fprintf(fd, ";");
-			fprintf(fd, "%u=%llx", i, (unsigned long long)
-				schemata->l2ca[i].u.s.data_mask);
-		}
-		fprintf(fd, "\n");
-	}
-
-	/* L3 without CDP */
-	if (schemata->l3ca_num > 0 && !schemata->l3ca[0].cdp) {
-		fprintf(fd, "L3:");
-		for (i = 0; i < schemata->l3ca_num; i++) {
-			if (i > 0)
-				fprintf(fd, ";");
-			fprintf(fd, "%u=%llx", i, (unsigned long long)
-				schemata->l3ca[i].u.ways_mask);
-		}
-		fprintf(fd, "\n");
-	}
-
-	/* L3 with CDP */
-	if (schemata->l3ca_num > 0 && schemata->l3ca[0].cdp) {
-		fprintf(fd, "L3CODE:");
-		for (i = 0; i < schemata->l3ca_num; i++) {
-			if (i > 0)
-				fprintf(fd, ";");
-			fprintf(fd, "%u=%llx", i, (unsigned long long)
-				schemata->l3ca[i].u.s.code_mask);
-		}
-		fprintf(fd, "\nL3DATA:");
-		for (i = 0; i < schemata->l3ca_num; i++) {
-			if (i > 0)
-				fprintf(fd, ";");
-			fprintf(fd, "%u=%llx", i, (unsigned long long)
-				schemata->l3ca[i].u.s.data_mask);
-		}
-		fprintf(fd, "\n");
-	}
-
-	/* MBA */
-	if (schemata->mba_num > 0) {
-		fprintf(fd, "MB:");
-		for (i = 0; i < schemata->mba_num; i++) {
-			if (i > 0)
-				fprintf(fd, ";");
-			fprintf(fd, "%u=%u", i, schemata->mba[i].mb_max);
-		}
-		fprintf(fd, "\n");
-	}
-
+	ret = resctrl_schemata_write(fd, schemata);
 
 resctrl_alloc_schemata_write_exit:
 
@@ -809,7 +386,7 @@ resctrl_alloc_task_read(unsigned class_id, unsigned *count)
 		uint64_t tmp;
 		struct linked_list *p = NULL;
 
-		ret = strtouint64(buf, 10, &tmp);
+		ret = resctrl_utils_strtouint64(buf, 10, &tmp);
 		if (ret != PQOS_RETVAL_OK)
 			goto resctrl_alloc_task_read_exit_clean;
 		p = malloc(sizeof(head));
@@ -886,7 +463,7 @@ resctrl_alloc_task_search(unsigned *class_id,
 		/* Search tasks file for specified task ID */
 		memset(buf, 0, sizeof(buf));
 		while (fgets(buf, sizeof(buf), fd) != NULL) {
-			ret = strtouint64(buf, 10, &tid);
+			ret = resctrl_utils_strtouint64(buf, 10, &tid);
 			if (ret != PQOS_RETVAL_OK)
 				continue;
 

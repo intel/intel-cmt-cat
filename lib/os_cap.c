@@ -754,35 +754,49 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 unsigned grp;
                 unsigned count = 0;
                 unsigned i;
+                unsigned *sock, sock_num;
+                struct resctrl_schemata *schmt;
 
                 ret = resctrl_alloc_get_grps_num(cap, &count);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
-                for (grp = 0; grp < count && *enabled == -1; grp++) {
-                        struct resctrl_alloc_schemata schmt;
+                sock = pqos_cpu_get_sockets(cpu, &sock_num);
+                if (sock == NULL)
+                        return PQOS_RETVAL_ERROR;
 
-                        ret = resctrl_alloc_schemata_init(grp, cap, cpu,
-                                                          &schmt);
-                        if (ret == PQOS_RETVAL_OK)
-                                ret = resctrl_alloc_schemata_read(grp, &schmt);
-
-                        if (ret == PQOS_RETVAL_OK)
-                                for (i = 0; i < schmt.mba_num; i++)
-                                        if (schmt.mba[i].mb_max > 100) {
-                                                *enabled = 1;
-                                                break;
-                                        }
-
-                        resctrl_alloc_schemata_fini(&schmt);
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL) {
+                        free(sock);
+                        return PQOS_RETVAL_ERROR;
                 }
+
+                for (grp = 0; grp < count && *enabled == -1; grp++) {
+                        ret = resctrl_alloc_schemata_read(grp, schmt);
+                        if (ret != PQOS_RETVAL_OK)
+                                continue;
+
+                        for (i = 0; i < sock_num; i++) {
+                                struct pqos_mba mba;
+
+                                ret = resctrl_schemata_mba_get(schmt, sock[i],
+                                                               &mba);
+                                if (ret == PQOS_RETVAL_OK && mba.mb_max > 100) {
+                                        *enabled = 1;
+                                        break;
+                                }
+                        }
+                }
+
+                resctrl_schemata_free(schmt);
+                free(sock);
         }
 
         /* get free COS and try to write value above 100 */
         if (*enabled == -1) {
                 unsigned grp;
                 unsigned count = 0;
-                struct resctrl_alloc_schemata schmt;
+                struct resctrl_schemata *schmt;
                 FILE *fd;
 
                 ret = resctrl_alloc_get_grps_num(cap, &count);
@@ -796,11 +810,11 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                         goto ctrl_support;
                 }
 
-                ret = resctrl_alloc_schemata_init(grp, cap, cpu, &schmt);
-                if (ret != PQOS_RETVAL_OK)
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
                         goto ctrl_support;
 
-                ret = resctrl_alloc_schemata_read(grp, &schmt);
+                ret = resctrl_alloc_schemata_read(grp, schmt);
                 if (ret == PQOS_RETVAL_OK) {
                         fd = resctrl_alloc_fopen(grp, "schemata", "w");
                         if (fd != NULL) {
@@ -812,14 +826,14 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                         }
                         /* restore MBA configuration */
                         if (*enabled == 1) {
-                                ret = resctrl_alloc_schemata_write(grp, &schmt);
+                                ret = resctrl_alloc_schemata_write(grp, schmt);
                                 if (ret != PQOS_RETVAL_OK)
                                         LOG_WARN("Unable to restore MBA "
                                                  "settings\n");
                         }
                 }
 
-                resctrl_alloc_schemata_fini(&schmt);
+                resctrl_schemata_free(schmt);
         }
 
  ctrl_support:

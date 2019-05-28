@@ -41,6 +41,7 @@
 
 #include "pqos.h"
 #include "resctrl.h"
+#include "resctrl_schemata.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -115,53 +116,17 @@ int resctrl_alloc_cpumask_write(const unsigned class_id,
 int resctrl_alloc_cpumask_read(const unsigned class_id,
 	                       struct resctrl_cpumask *mask);
 
-/*
- * @brief Structure to hold parsed schemata
- */
-struct resctrl_alloc_schemata {
-	unsigned l3ca_num;      /**< Number of L3 COS held in struct */
-	struct pqos_l3ca *l3ca; /**< L3 COS definitions */
-	unsigned l2ca_num;      /**< Number of L2 COS held in struct */
-	struct pqos_l2ca *l2ca; /**< L2 COS definitions */
-	unsigned mba_num;       /**< Number of MBA COS held in struct */
-	struct pqos_mba *mba;   /**< MBA COS definitions */
-};
-
-/*
- * @brief Deallocate memory of schemata struct
- *
- * @param[in] schemata Schemata structure
- */
-void resctrl_alloc_schemata_fini(struct resctrl_alloc_schemata *schemata);
-
-/**
- * @brief Allocates memory of schemata struct
- *
- * @param [in] class_id COS id
- * @param [in] cap platform QoS capabilities structure
- *                 returned by \a pqos_cap_get
- * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param[out] schemata Schemata structure
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-int resctrl_alloc_schemata_init(const unsigned class_id,
-	                        const struct pqos_cap *cap,
-	                        const struct pqos_cpuinfo *cpu,
-	                        struct resctrl_alloc_schemata *schemata);
-
 /**
  * @brief Read resctrl schemata from file
  *
- * @param [in] class_is COS id
+ * @param [in] class_id COS id
  * @param [out] schemata Parsed schemata
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_schemata_read(const unsigned class_id,
-	                        struct resctrl_alloc_schemata *schemata);
+	                        struct resctrl_schemata *schemata);
 
 /**
  * @brief Write resctrl schemata to file
@@ -173,7 +138,7 @@ int resctrl_alloc_schemata_read(const unsigned class_id,
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_schemata_write(const unsigned class_id,
-	                         const struct resctrl_alloc_schemata *schemata);
+	                         const struct resctrl_schemata *schemata);
 
 /**
  * @brief Function to validate if \a task is a valid task ID

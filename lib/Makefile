@@ -94,6 +94,8 @@ OBJS := $(filter-out perf.o \
 	resctrl.o \
 	resctrl_alloc.o \
 	resctrl_monitoring.o \
+	resctrl_schemata.o \
+	resctrl_utils.o \
 	perf_monitoring.o,$(OBJS))
 endif
 
@@ -204,6 +206,8 @@ style:
 	-f resctrl.h -f resctrl.c \
 	-f resctrl_monitoring.h -f resctrl_monitoring.c \
 	-f resctrl_alloc.h -f resctrl_alloc.c \
+	-f resctrl_schemata.h -f resctrl_schemata.c \
+	-f resctrl_utils.h -f resctrl_utils.c \
 	-f types.h \
 	-f utils.h -f utils.c
 	$(MAKE) -C python style
@@ -224,7 +228,9 @@ cppcheck:
 	perf_monitoring.h perf_monitoring.c \
 	resctrl_alloc.h resctrl_alloc.c \
 	resctrl.h resctrl.c \
-	resctrl_monitoring.h resctrl_monitoring.c
+	resctrl_monitoring.h resctrl_monitoring.c \
+	resctrl_schemata.h resctrl_schemata.c \
+	resctrl_utils.h resctrl_utils.c
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)
@@ -232,3 +238,4 @@ ifneq ($(MAKECMDGOALS),clobber)
 -include $(DEPFILES)
 endif
 endif
+

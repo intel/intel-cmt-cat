@@ -503,11 +503,8 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
                          const struct pqos_cap_l2ca *l2_cap,
                          const struct pqos_cap_mba *mba_cap)
 {
-	uint32_t default_mba = 100;
-	uint64_t default_l3ca = 0;
-	uint64_t default_l2ca = 0;
 	unsigned grps;
-	unsigned i, j;
+	unsigned i;
 	int ret;
         const struct pqos_cap *cap;
 
@@ -524,59 +521,25 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 		goto os_alloc_reset_light_schematas_exit;
 
 	/**
-	 * Obtain default L2/L3 CAT mask
-	 */
-	if (l3_cap != NULL)
-		default_l3ca = ((uint64_t)1 << l3_cap->num_ways) - 1;
-
-	if (l2_cap != NULL)
-		default_l2ca = ((uint64_t)1 << l2_cap->num_ways) - 1;
-
-	if (mba_cap != NULL && mba_cap->ctrl_on)
-		/* kernel always rounds up value to MBA granularity */
-		default_mba = UINT32_MAX - UINT32_MAX % mba_cap->throttle_step;
-
-	/**
 	 * Reset schematas
 	 */
 	for (i = 0; i < grps; i++) {
-		struct resctrl_alloc_schemata schmt;
+		struct resctrl_schemata *schmt;
 
-		ret = resctrl_alloc_schemata_init(i, cap, m_cpu, &schmt);
-		if (ret != PQOS_RETVAL_OK) {
-			LOG_ERROR("Error on schemata init "
-				  "for resctrl group %u\n", i);
-			goto os_alloc_reset_light_schematas_exit;
-		}
+                schmt = resctrl_schemata_alloc(cap, m_cpu);
+                if (schmt == NULL) {
+                        ret = PQOS_RETVAL_ERROR;
+                        LOG_ERROR("Error on schemata memory allocation "
+                                  "for resctrl group %u\n", i);
+                        goto os_alloc_reset_light_schematas_exit;
 
-		for (j = 0; j < schmt.l3ca_num; j++) {
-			/* l3ca_num should be greater
-			 * than 0 if l3_cap is provided */
-			ASSERT(l3_cap != NULL);
-			if (schmt.l3ca[j].cdp) {
-				schmt.l3ca[j].u.s.code_mask = default_l3ca;
-				schmt.l3ca[j].u.s.data_mask = default_l3ca;
-			} else
-				schmt.l3ca[j].u.ways_mask = default_l3ca;
-		}
+                }
 
-		for (j = 0; j < schmt.l2ca_num; j++) {
-			/* l2ca_num should be greater
-			 * than 0 if l2_cap is provided */
-			ASSERT(l2_cap != NULL);
-			if (schmt.l2ca[j].cdp) {
-				schmt.l2ca[j].u.s.code_mask = default_l2ca;
-				schmt.l2ca[j].u.s.data_mask = default_l2ca;
-			} else
-				schmt.l2ca[j].u.ways_mask = default_l2ca;
-		}
+                ret = resctrl_schemata_reset(schmt, l3_cap, l2_cap, mba_cap);
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_write(i, schmt);
 
-		for (j = 0; j < schmt.mba_num; j++)
-			schmt.mba[j].mb_max = default_mba;
-
-		ret = resctrl_alloc_schemata_write(i, &schmt);
-
-		resctrl_alloc_schemata_fini(&schmt);
+		resctrl_schemata_free(schmt);
 
 		if (ret != PQOS_RETVAL_OK) {
 			LOG_ERROR("Error on schemata write "
@@ -1025,14 +988,45 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         return ret;
 }
 
+/*
+ * @brief Check if socket is correct
+ *
+ * @param [in] socket CPU socket id
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+verify_socket_id(const unsigned socket, const struct pqos_cpuinfo *cpu)
+{
+        int ret = PQOS_RETVAL_PARAM;
+        unsigned i;
+        unsigned sockets_num;
+        unsigned *sockets;
+
+        /* Get socket ids in the system */
+        sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
+        if (sockets == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        for (i = 0; i < sockets_num; ++i)
+                if (socket == sockets[i]) {
+                        ret = PQOS_RETVAL_OK;
+                        break;
+                }
+
+        free(sockets);
+
+        return ret;
+}
+
 int
 os_l3ca_set(const unsigned socket,
             const unsigned num_cos,
             const struct pqos_l3ca *ca)
 {
 	int ret;
-	unsigned sockets_num = 0;
-	unsigned *sockets = NULL;
 	unsigned i;
 	unsigned num_grps = 0, l3ca_num;
 	int cdp_enabled = 0;
@@ -1055,17 +1049,9 @@ os_l3ca_set(const unsigned socket,
 	if (num_cos > num_grps)
 		return PQOS_RETVAL_ERROR;
 
-	/* Get number of sockets in the system */
-	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
-	if (sockets == NULL || sockets_num == 0) {
-		ret = PQOS_RETVAL_ERROR;
-		goto os_l3ca_set_exit;
-	}
-
-	if (socket >= sockets_num) {
-		ret = PQOS_RETVAL_PARAM;
-		goto os_l3ca_set_exit;
-	}
+        ret = verify_socket_id(socket, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l3ca_set_exit;
 
 	ret = pqos_l3ca_cdp_enabled(cap, NULL, &cdp_enabled);
 	if (ret != PQOS_RETVAL_OK)
@@ -1076,7 +1062,7 @@ os_l3ca_set(const unsigned socket,
                 goto os_l3ca_set_exit;
 
 	for (i = 0; i < num_cos; i++) {
-		struct resctrl_alloc_schemata schmt;
+		struct resctrl_schemata *schmt;
 
 		if (ca[i].cdp == 1 && cdp_enabled == 0) {
 			LOG_ERROR("Attempting to set CDP COS while L3 CDP "
@@ -1085,30 +1071,35 @@ os_l3ca_set(const unsigned socket,
 			goto os_l3ca_set_unlock;
 		}
 
-		ret = resctrl_alloc_schemata_init(ca[i].class_id, cap, cpu,
-		                                  &schmt);
+		schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
 
 		/* read schemata file */
 		if (ret == PQOS_RETVAL_OK)
 			ret = resctrl_alloc_schemata_read(ca[i].class_id,
-			                                  &schmt);
+			                                  schmt);
 
-		/* update and write schemata */
-		if (ret == PQOS_RETVAL_OK) {
-			struct pqos_l3ca *l3ca = &(schmt.l3ca[socket]);
+                /* update schemata */
+                if (ret == PQOS_RETVAL_OK) {
+                        struct pqos_l3ca l3ca;
 
 			if (cdp_enabled == 1 && ca[i].cdp == 0) {
-				l3ca->cdp = 1;
-				l3ca->u.s.data_mask = ca[i].u.ways_mask;
-				l3ca->u.s.code_mask = ca[i].u.ways_mask;
+				l3ca.cdp = 1;
+				l3ca.u.s.data_mask = ca[i].u.ways_mask;
+				l3ca.u.s.code_mask = ca[i].u.ways_mask;
 			} else
-				*l3ca = ca[i];
+				l3ca = ca[i];
 
+                        ret = resctrl_schemata_l3ca_set(schmt, socket, &l3ca);
+                }
+
+		/* write schemata */
+		if (ret == PQOS_RETVAL_OK)
 			ret = resctrl_alloc_schemata_write(ca[i].class_id,
-				                           &schmt);
-		}
+				                           schmt);
 
-		resctrl_alloc_schemata_fini(&schmt);
+		resctrl_schemata_free(schmt);
 
 		if (ret != PQOS_RETVAL_OK)
 			goto os_l3ca_set_unlock;
@@ -1118,9 +1109,6 @@ os_l3ca_set(const unsigned socket,
         resctrl_lock_release();
 
  os_l3ca_set_exit:
-	if (sockets != NULL)
-		free(sockets);
-
 	return ret;
 }
 
@@ -1133,8 +1121,6 @@ os_l3ca_get(const unsigned socket,
 	int ret;
 	unsigned class_id;
 	unsigned count = 0;
-	unsigned sockets_num = 0;
-	unsigned *sockets = NULL;
         const struct pqos_cap *cap;
         const struct pqos_cpuinfo *cpu;
 
@@ -1155,32 +1141,31 @@ os_l3ca_get(const unsigned socket,
 	if (count > max_num_ca)
 		return PQOS_RETVAL_ERROR;
 
-	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
-	if (sockets == NULL || sockets_num == 0) {
-		ret = PQOS_RETVAL_ERROR;
-		goto os_l3ca_get_exit;
-	}
-
-	if (socket >= sockets_num) {
-		ret = PQOS_RETVAL_PARAM;
-		goto os_l3ca_get_exit;
-	}
+        ret = verify_socket_id(socket, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l3ca_get_exit;
 
         ret = resctrl_lock_shared();
         if (ret != PQOS_RETVAL_OK)
                 goto os_l3ca_get_exit;
 
-	for (class_id = 0; class_id < count; class_id++) {
-		struct resctrl_alloc_schemata schmt;
+        for (class_id = 0; class_id < count; class_id++) {
+                struct resctrl_schemata *schmt;
 
-		ret = resctrl_alloc_schemata_init(class_id, cap, cpu, &schmt);
-		if (ret == PQOS_RETVAL_OK)
-			ret = resctrl_alloc_schemata_read(class_id, &schmt);
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
 
-		if (ret == PQOS_RETVAL_OK)
-			ca[class_id] = schmt.l3ca[socket];
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_read(class_id, schmt);
 
-		resctrl_alloc_schemata_fini(&schmt);
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_schemata_l3ca_get(schmt, socket,
+                                                        &ca[class_id]);
+
+                ca[class_id].class_id = class_id;
+
+		resctrl_schemata_free(schmt);
 
 		if (ret != PQOS_RETVAL_OK)
 			goto os_l3ca_get_unlock;
@@ -1191,9 +1176,6 @@ os_l3ca_get(const unsigned socket,
         resctrl_lock_release();
 
  os_l3ca_get_exit:
-	if (sockets != NULL)
-		free(sockets);
-
 	return ret;
 }
 
@@ -1229,6 +1211,39 @@ os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	return ret;
 }
 
+/*
+ * @brief Check if L2 id is correct
+ *
+ * @param [in] l2id unique L2 cache identifier
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+verify_l2_id(const unsigned l2id, const struct pqos_cpuinfo *cpu)
+{
+        int ret = PQOS_RETVAL_PARAM;
+        unsigned i;
+        unsigned l2ids_num;
+        unsigned *l2ids;
+
+        /* Get L2 ids in the system */
+        l2ids = pqos_cpu_get_l2ids(cpu, &l2ids_num);
+        if (l2ids == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        for (i = 0; i < l2ids_num; ++i)
+                if (l2id == l2ids[i]) {
+                        ret = PQOS_RETVAL_OK;
+                        break;
+                }
+
+        free(l2ids);
+
+        return ret;
+}
+
 int
 os_l2ca_set(const unsigned l2id,
             const unsigned num_cos,
@@ -1236,8 +1251,6 @@ os_l2ca_set(const unsigned l2id,
 {
 	int ret;
 	unsigned i;
-	unsigned l2ids_num = 0;
-	unsigned *l2ids = NULL;
 	unsigned num_grps = 0, l2ca_num;
         int cdp_enabled;
         const struct pqos_cap *cap;
@@ -1274,24 +1287,16 @@ os_l2ca_set(const unsigned l2id,
 		}
 	}
 
-	/* Get number of L2 ids in the system */
-	l2ids = pqos_cpu_get_l2ids(cpu, &l2ids_num);
-	if (l2ids == NULL || l2ids_num == 0) {
-		ret = PQOS_RETVAL_ERROR;
-		goto os_l2ca_set_exit;
-	}
-
-	if (l2id >= l2ids_num) {
-		ret = PQOS_RETVAL_PARAM;
-		goto os_l2ca_set_exit;
-	}
+        ret = verify_l2_id(l2id, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l2ca_set_exit;
 
         ret = resctrl_lock_exclusive();
         if (ret != PQOS_RETVAL_OK)
                 goto os_l2ca_set_exit;
 
 	for (i = 0; i < num_cos; i++) {
-		struct resctrl_alloc_schemata schmt;
+		struct resctrl_schemata *schmt;
 
                 if (ca[i].cdp == 1 && cdp_enabled == 0) {
                         LOG_ERROR("Attempting to set CDP COS while L2 CDP "
@@ -1300,30 +1305,34 @@ os_l2ca_set(const unsigned l2id,
                         goto os_l2ca_set_unlock;
                 }
 
-		ret = resctrl_alloc_schemata_init(ca[i].class_id, cap, cpu,
-		                                  &schmt);
+		schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
 
 		/* read schemata file */
 		if (ret == PQOS_RETVAL_OK)
 			ret = resctrl_alloc_schemata_read(ca[i].class_id,
-			                                  &schmt);
+			                                  schmt);
 
-                /* update and write schemata */
+                /* update schemata */
                 if (ret == PQOS_RETVAL_OK) {
-                        struct pqos_l2ca *l2ca = &(schmt.l2ca[l2id]);
+                        struct pqos_l2ca l2ca;
 
                         if (cdp_enabled == 1 && ca[i].cdp == 0) {
-                                l2ca->cdp = 1;
-                                l2ca->u.s.data_mask = ca[i].u.ways_mask;
-                                l2ca->u.s.code_mask = ca[i].u.ways_mask;
+                                l2ca.cdp = 1;
+                                l2ca.u.s.data_mask = ca[i].u.ways_mask;
+                                l2ca.u.s.code_mask = ca[i].u.ways_mask;
                         } else
-                                *l2ca = ca[i];
+                                l2ca = ca[i];
 
-                        ret = resctrl_alloc_schemata_write(ca[i].class_id,
-                                                           &schmt);
+                        ret = resctrl_schemata_l2ca_set(schmt, l2id, &l2ca);
                 }
 
-		resctrl_alloc_schemata_fini(&schmt);
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_write(ca[i].class_id,
+                                                           schmt);
+
+		resctrl_schemata_free(schmt);
 
 		if (ret != PQOS_RETVAL_OK)
 			goto os_l2ca_set_unlock;
@@ -1333,9 +1342,6 @@ os_l2ca_set(const unsigned l2id,
         resctrl_lock_release();
 
  os_l2ca_set_exit:
-	if (l2ids != NULL)
-		free(l2ids);
-
 	return ret;
 }
 
@@ -1348,8 +1354,6 @@ os_l2ca_get(const unsigned l2id,
 	int ret;
 	unsigned class_id;
 	unsigned count = 0;
-	unsigned l2ids_num = 0;
-	unsigned *l2ids = NULL;
         const struct pqos_cap *cap;
         const struct pqos_cpuinfo *cpu;
 
@@ -1371,33 +1375,31 @@ os_l2ca_get(const unsigned l2id,
 		/* Not enough space to store the classes */
 		return PQOS_RETVAL_PARAM;
 
-	l2ids = pqos_cpu_get_l2ids(m_cpu, &l2ids_num);
-	if (l2ids == NULL || l2ids_num == 0) {
-		ret = PQOS_RETVAL_ERROR;
-		goto os_l2ca_get_exit;
-	}
-
-	if (l2id >= l2ids_num) {
-		ret = PQOS_RETVAL_PARAM;
-		goto os_l2ca_get_exit;
-	}
-
+        ret = verify_l2_id(l2id, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_l2ca_get_exit;
 
         ret = resctrl_lock_shared();
         if (ret != PQOS_RETVAL_OK)
                 goto os_l2ca_get_exit;
 
 	for (class_id = 0; class_id < count; class_id++) {
-		struct resctrl_alloc_schemata schmt;
+		struct resctrl_schemata *schmt;
 
-		ret = resctrl_alloc_schemata_init(class_id, cap, cpu, &schmt);
+		schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
+
 		if (ret == PQOS_RETVAL_OK)
-			ret = resctrl_alloc_schemata_read(class_id, &schmt);
+			ret = resctrl_alloc_schemata_read(class_id, schmt);
 
-		if (ret == PQOS_RETVAL_OK)
-			ca[class_id] = schmt.l2ca[l2id];
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_schemata_l2ca_get(schmt, l2id,
+                                                        &ca[class_id]);
 
-		resctrl_alloc_schemata_fini(&schmt);
+                ca[class_id].class_id = class_id;
+
+		resctrl_schemata_free(schmt);
 
 		if (ret != PQOS_RETVAL_OK)
 			goto os_l2ca_get_unlock;
@@ -1408,9 +1410,6 @@ os_l2ca_get(const unsigned l2id,
         resctrl_lock_release();
 
  os_l2ca_get_exit:
-	if (l2ids != NULL)
-		free(l2ids);
-
 	return ret;
 }
 
@@ -1453,8 +1452,6 @@ os_mba_set(const unsigned socket,
            struct pqos_mba *actual)
 {
 	int ret;
-	unsigned sockets_num = 0;
-	unsigned *sockets = NULL;
 	unsigned i, step = 0;
 	unsigned num_grps = 0;
         const struct pqos_cap *cap;
@@ -1492,19 +1489,16 @@ os_mba_set(const unsigned socket,
 			return PQOS_RETVAL_PARAM;
 		}
 
-	/* Get number of sockets in the system */
-	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
-	if (sockets == NULL || sockets_num == 0 || socket >= sockets_num) {
-		ret = PQOS_RETVAL_ERROR;
-		goto os_mba_set_exit;
-	}
+        ret = verify_socket_id(socket, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_set_exit;
 
         ret = resctrl_lock_exclusive();
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_set_exit;
 
 	for (i = 0; i < num_cos; i++) {
-		struct resctrl_alloc_schemata schmt;
+		struct resctrl_schemata *schmt;
 
 		if (mba_cap->u.mba->ctrl_on == 0 && requested[i].ctrl) {
 			LOG_ERROR("MBA controller requested but"
@@ -1520,42 +1514,50 @@ os_mba_set(const unsigned socket,
 			goto os_mba_set_unlock;
 		}
 
-		ret = resctrl_alloc_schemata_init(requested[i].class_id,
-		                                  cap, cpu, &schmt);
+		schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
 
 		/* read schemata file */
 		if (ret == PQOS_RETVAL_OK)
 			ret = resctrl_alloc_schemata_read(requested[i].class_id,
-				                          &schmt);
+				                          schmt);
 
 		/* update and write schemata */
 		if (ret == PQOS_RETVAL_OK) {
-			struct pqos_mba *mba = &(schmt.mba[socket]);
+			struct pqos_mba mba;
 
-			*mba = requested[i];
+			mba = requested[i];
 
-			if (mba->ctrl == 0) {
-                                mba->mb_max = (((requested[i].mb_max
+			if (mba.ctrl == 0) {
+                                mba.mb_max = (((requested[i].mb_max
                                                   + (step/2)) / step) * step);
-                                if (mba->mb_max == 0)
-                                        mba->mb_max = step;
+                                if (mba.mb_max == 0)
+                                        mba.mb_max = step;
 			}
 
+                        ret = resctrl_schemata_mba_set(schmt, socket, &mba);
+                }
+
+                /* write schemata */
+                if (ret == PQOS_RETVAL_OK)
                         ret = resctrl_alloc_schemata_write(
-                                requested[i].class_id, &schmt);
-		}
+                                requested[i].class_id, schmt);
 
 		if (actual != NULL) {
 			/* read actual schemata */
 			if (ret == PQOS_RETVAL_OK)
 				ret = resctrl_alloc_schemata_read(
-					requested[i].class_id, &schmt);
+					requested[i].class_id, schmt);
 
 			/* update actual schemata */
-			if (ret == PQOS_RETVAL_OK)
-				actual[i] = schmt.mba[socket];
+                        if (ret == PQOS_RETVAL_OK) {
+                                ret = resctrl_schemata_mba_get(schmt, socket,
+                                                               &actual[i]);
+                                actual[i].class_id = requested[i].class_id;
+                        }
 		}
-		resctrl_alloc_schemata_fini(&schmt);
+		resctrl_schemata_free(schmt);
 
 		if (ret != PQOS_RETVAL_OK)
 			goto os_mba_set_unlock;
@@ -1565,9 +1567,6 @@ os_mba_set(const unsigned socket,
         resctrl_lock_release();
 
  os_mba_set_exit:
-	if (sockets != NULL)
-		free(sockets);
-
 	return ret;
 }
 
@@ -1580,8 +1579,6 @@ os_mba_get(const unsigned socket,
 	int ret;
 	unsigned class_id;
 	unsigned count = 0;
-	unsigned sockets_num = 0;
-	unsigned *sockets = NULL;
         const struct pqos_cap *cap;
         const struct pqos_cpuinfo *cpu;
 	const struct pqos_capability *mba_cap = NULL;
@@ -1606,27 +1603,31 @@ os_mba_get(const unsigned socket,
 	if (count > max_num_cos)
 		return PQOS_RETVAL_ERROR;
 
-	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
-	if (sockets == NULL || sockets_num == 0 || socket >= sockets_num) {
-		ret = PQOS_RETVAL_ERROR;
-		goto os_mba_get_exit;
-	}
+        ret = verify_socket_id(socket, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_get_exit;
 
         ret = resctrl_lock_shared();
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_get_exit;
 
 	for (class_id = 0; class_id < count; class_id++) {
-		struct resctrl_alloc_schemata schmt;
+		struct resctrl_schemata *schmt;
 
-		ret = resctrl_alloc_schemata_init(class_id, cap, cpu, &schmt);
+		schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
+
 		if (ret == PQOS_RETVAL_OK)
-			ret = resctrl_alloc_schemata_read(class_id, &schmt);
+			ret = resctrl_alloc_schemata_read(class_id, schmt);
 
 		if (ret == PQOS_RETVAL_OK)
-			mba_tab[class_id] = schmt.mba[socket];
+                        ret = resctrl_schemata_mba_get(schmt, socket,
+                                                       &mba_tab[class_id]);
 
-		resctrl_alloc_schemata_fini(&schmt);
+                mba_tab[class_id].class_id = class_id;
+
+		resctrl_schemata_free(schmt);
 
 		if (ret != PQOS_RETVAL_OK)
 			goto os_mba_get_unlock;
@@ -1637,9 +1638,6 @@ os_mba_get(const unsigned socket,
         resctrl_lock_release();
 
  os_mba_get_exit:
-	if (sockets != NULL)
-		free(sockets);
-
 	return ret;
 }
 
