@@ -50,6 +50,14 @@ else
 CFLAGS += -O3 -g -mtune=native -march=native -D_FORTIFY_SOURCE=2
 endif
 
+IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
+# GCC-only options
+ifeq ($(IS_GCC),1)
+CFLAGS += -fno-strict-overflow \
+    -fno-delete-null-pointer-checks \
+    -fwrapv
+endif
+
 SRCS = $(sort $(wildcard *.c))
 OBJS = $(SRCS:.c=.o)
 DEPFILES = $(SRCS:.c=.d)

@@ -57,6 +57,14 @@ CFLAGS += -Wcast-align \
     -Wmissing-noreturn
 endif
 
+IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
+# GCC-only options
+ifeq ($(IS_GCC),1)
+CFLAGS += -fno-strict-overflow \
+    -fno-delete-null-pointer-checks \
+    -fwrapv
+endif
+
 # Build targets and dependencies
 ALLOCAPP_L2CAT = allocation_app_l2cat
 ALLOCAPP_L3CAT = allocation_app_l3cat
