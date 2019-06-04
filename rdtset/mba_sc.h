@@ -31,7 +31,11 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef _MBA_SC_H
+#define _MBA_SC_H
+
 #include <unistd.h>
+#include "common.h"
 
 #define MBA_SC_SAMPLING_INTERVAL    100 /**< Sampling interval in ms */
 #define MBA_SC_DEF_INIT_MBA         100 /**< Default, initial MBA value, 100% */
@@ -56,9 +60,11 @@ void mba_sc_fini(void);
 void mba_sc_exit(void);
 
 /**
- * Checks if MBA SC is configured
+ * @brief Checks if MBA SC is configured
+ *
+ * @param[in] cfg rdtset configuration
  */
-int mba_sc_mode(void);
+int mba_sc_mode(const struct rdtset *cfg);
 
 /**
  * @brief Main loop of SW controller
@@ -70,3 +76,5 @@ int mba_sc_mode(void);
  * @retval negative on error (-errno)
  */
 int mba_sc_main(pid_t pid);
+
+#endif /* #define _MBA_SC_H */
