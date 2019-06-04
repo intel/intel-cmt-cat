@@ -9,6 +9,7 @@ Contents
 ========
 
 - Overview
+- Monitoring example
 - Legal Disclaimer
 
 
@@ -32,9 +33,31 @@ to run them as root or with sudo):
 
         make run_mba_example
 
-
 All of the above commands will first create virtual environment in env/
 and install the wrapper if it has not been created yet.
+
+
+Monitoring example
+==================
+
+To run the monitoring example it is needed to install virtual environment first
+(if not created):
+
+        make env
+
+It will create Python 3 virtual environment with Python wrapper for PQoS
+library in env/.
+
+Then the example may be run by executing monitoring.py script using installed
+Python environment (root privileges required). To display help message,
+-h flag can be used:
+
+        ./env/bin/python monitoring.py -h
+
+or
+
+        source ./env/bin/activate
+        python monitoring.py -h
 
 To clean all Python cache files and env/ run:
 
