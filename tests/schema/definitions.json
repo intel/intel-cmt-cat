@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "Common definitions",
+
+  "uint": {
+    "description": "Unsigned Integer",
+    "type": "number",
+    "multipleOf": 1.0,
+    "minimum": 0
+  },
+
+  "uint_nonzero": {
+    "description": "Unsigned Integer > 0",
+    "type": "number",
+    "multipleOf": 1.0,
+    "minimum": 0,
+    "exclusiveMinimum": true
+  }
+}
