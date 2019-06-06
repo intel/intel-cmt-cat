@@ -176,7 +176,7 @@ doxy:
 
 clean:
 	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
-	make -C python clean
+	$(MAKE) -C python clean
 
 clobber:
 	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
