@@ -95,7 +95,7 @@ class COSBase(object):
                        if None is given, then mask must be set
                        (default None)
         """
-        if not mask and not (code_mask or data_mask):
+        if not mask and (not code_mask or not data_mask):
             raise ValueError(u'Please specify mask or code mask'
                              u' and data mask')
 
