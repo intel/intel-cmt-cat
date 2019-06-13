@@ -54,12 +54,21 @@ endif
 
 DOXY_DIRS = doc_api doc_lib
 
-# ICC and GCC options
+# ICC and GCC/CLANG options
 ifeq ($(CC),icc)
 else
+# GCC and clang
 CFLAGS += -Wcast-align \
     -Wnested-externs \
     -Wmissing-noreturn
+endif
+
+IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
+# GCC-only options
+ifeq ($(IS_GCC),1)
+CFLAGS += -fno-strict-overflow \
+    -fno-delete-null-pointer-checks \
+    -fwrapv
 endif
 
 # so or static build
