@@ -160,3 +160,56 @@ class TestPqosCMT(test.Test):
 
         assert get_cmt(stdout, memtester.pid) > 1000
         assert get_cmt(stdout, 1) < 500
+
+    ## PQOS - CMT Monitor LLC occupancy - percentage LLC for tasks
+    #
+    #  \b Priority: High
+    #
+    #  \b Objective:
+    #  Verify CMT values for task id - value should be displayed as percentage of total cache
+    #
+    #  \b Instruction:
+    #  1. Run "memtester 100M" in the background
+    #  2. Run "pqos -I -p llc:<memtester pid> -p llc:1 -P" to start CMT monitoring and LLC
+    #     displayed as percentage value
+    #  3. Terminate memtester
+    #
+    #  \b Result:
+    #  LLC column present in output and is shown in percents. LLC value for memtester is much
+    #  higher than for other PID
+    @PRIORITY_HIGH
+    @pytest.mark.iface_os
+    @pytest.mark.rdt_supported("cqm_occup_llc")
+    def test_pqos_cmt_llc_occupancy_tasks_percent(self, iface):
+        def get_cmt_percent(output, pid):
+            cmt = None
+            lines = output.split("\n")
+
+            for line in lines:
+                match = re.match(r"^\s*(\d+)"              # PID number
+                                 r"(?:\s+\S+){3}"          # CORE, IPC and MISSES (ignored)
+                                 r"\s+(\d{1,3}\.\d+)\s*$", # LLC[%] value
+                                 line)
+                if match:
+                    curr_pid = int(match.group(1))
+                    if curr_pid == pid:
+                        cmt = float(match.group(2))
+
+            return cmt
+
+        command = "memtester 100M"
+        memtester = subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE)
+
+        time.sleep(2)
+
+        (stdout, _, exitcode) = self.run_pqos(iface,
+                                              "-p llc:1 -p llc:%d -t 2 -P" % memtester.pid)
+        assert exitcode == 0
+        assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*LLC\[%\]", stdout) is not None
+
+        memtester_percent = get_cmt_percent(stdout, memtester.pid)
+        pid_one_percent = get_cmt_percent(stdout, 1)
+
+        # assuming that memtester will show higher LLC load than other pid
+        assert memtester_percent > pid_one_percent
