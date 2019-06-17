@@ -134,7 +134,7 @@ class Server:
         self.api.add_resource(Pool, '/pools/<pool_id>')
         self.api.add_resource(Stats, '/stats')
         self.api.add_resource(Caps, '/caps')
-        if caps.sstbf_supported():
+        if caps.sstbf_enabled():
             self.api.add_resource(Sstbf, '/caps/sstbf')
         self.api.add_resource(Reset, '/reset')
 
@@ -822,7 +822,7 @@ class Sstbf(Resource):
             response, status code
         """
         res = {
-            'enabled': sstbf.is_sstbf_enabled(),
+            'configured': sstbf.is_sstbf_configured(),
             'hp_cores': sstbf.get_hp_cores(),
             'std_cores': sstbf.get_std_cores()
         }
@@ -848,8 +848,8 @@ class Sstbf(Resource):
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
-        if not sstbf.enable_sstbf(json_data['enabled']) == 0:
-            raise InternalError("Failed to change SST-BF enable state.")
+        if not sstbf.configure_sstbf(json_data['configured']) == 0:
+            raise InternalError("Failed to change SST-BF configured state.")
 
         res = {'message': "SST-BF caps modified"}
         return res, 200

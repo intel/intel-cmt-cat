@@ -55,33 +55,33 @@ def test_caps_init():
 
 @mock.patch("common.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=True))
 @mock.patch("common.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
+@mock.patch("sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
 def test_detect_cat_l3():
     assert common.CAT_CAP in caps.detect_supported_caps()
+    assert not common.MBA_CAP in caps.detect_supported_caps()
+    assert not common.SSTBF_CAP in caps.detect_supported_caps()
 
 
 @mock.patch("common.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=False))
 @mock.patch("common.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
+@mock.patch("sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
 def test_detect_cat_l3_negative():
     assert common.CAT_CAP not in caps.detect_supported_caps()
 
 
 @mock.patch("common.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=False))
 @mock.patch("common.PQOS_API.is_mba_supported", mock.MagicMock(return_value=True))
+@mock.patch("sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
 def test_detect_mba():
+    assert not common.CAT_CAP in caps.detect_supported_caps()
     assert common.MBA_CAP in caps.detect_supported_caps()
+    assert not common.SSTBF_CAP in caps.detect_supported_caps()
 
 
 @mock.patch("common.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=False))
 @mock.patch("common.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
+@mock.patch("sstbf.is_sstbf_enabled", mock.MagicMock(return_value=True))
 def test_detect_mba_negative():
-    assert common.MBA_CAP not in caps.detect_supported_caps()
-
-
-@mock.patch("sstbf.is_sstbf_supported", mock.MagicMock(return_value=False))
-def test_detect_sstbf_negative():
-    assert common.SSTBF_CAP not in caps.detect_supported_caps()
-
-
-@mock.patch("sstbf.is_sstbf_supported", mock.MagicMock(return_value=True))
-def test_detect_sstbf_positive():
+    assert not common.CAT_CAP in caps.detect_supported_caps()
+    assert not common.MBA_CAP in caps.detect_supported_caps()
     assert common.SSTBF_CAP in caps.detect_supported_caps()
