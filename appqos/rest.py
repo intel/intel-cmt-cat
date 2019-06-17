@@ -53,6 +53,7 @@ import caps
 import common
 import log
 import pid_ops
+import sstbf
 
 from config import ConfigStore
 from stats import StatsStore
@@ -121,6 +122,8 @@ class Server:
         self.api.add_resource(Pool, '/pools/<pool_id>')
         self.api.add_resource(Stats, '/stats')
         self.api.add_resource(Caps, '/caps')
+        if caps.sstbf_supported():
+            self.api.add_resource(Sstbf, '/caps/sstbf')
         self.api.add_resource(Reset, '/reset')
 
         self.app.register_error_handler(RestError, Server.error_handler)
@@ -720,6 +723,55 @@ class Caps(Resource):
         data["capabilities"] = caps.SYSTEM_CAPS
 
         return data, 200
+
+
+class Sstbf(Resource):
+    """
+    Handles /caps/sstbf HTTP requests
+    """
+
+
+    @staticmethod
+    @Server.auth.login_required
+    def get():
+        """
+        Handles HTTP GET /caps/sstbf request.
+        Retrieve SST-BF capabilities details
+
+        Returns:
+            response, status code
+        """
+        data = {}
+        data["enabled"] = sstbf.is_sstbf_enabled()
+        data["hp_cores"] = sstbf.get_hp_cores()
+        data["std_cores"] = sstbf.get_std_cores()
+
+        return data, 200
+
+
+    @staticmethod
+    @Server.auth.login_required
+    def put():
+        """
+        Handles HTTP PUT /caps/sstbf request.
+        Raises BadRequest, InternalError
+
+        Returns:
+            response, status code
+        """
+        json_data = request.get_json()
+
+        # validate app schema
+        try:
+            schema, resolver = ConfigStore.load_json_schema('modify_sstbf.json')
+            jsonschema.validate(json_data, schema, resolver=resolver)
+        except jsonschema.ValidationError as error:
+            raise BadRequest("Request validation failed - %s" % (str(error)))
+
+        if not sstbf.enable_sstbf(json_data['enabled']) == 0:
+            raise InternalError("Failed to change SST-BF enable state.")
+
+        return "SST-BF caps modified", 200
 
 
 class Reset(Resource):

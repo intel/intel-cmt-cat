@@ -52,8 +52,22 @@
       "type": "array",
       "items": { "$ref": "definitions.json#/pool" },
       "uniqueItems": true
+    },
+
+    "sstbf": {
+      "description": "SST-BF configuration",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "SST-BF status",
+          "type": "boolean"
+        }
+      },
+      "required": ["enabled"],
+      "additionalProperties": false
     }
   },
 
-  "required": ["auth", "pools"]
+  "required": ["auth", "pools"],
+  "additionalProperties": false
 }

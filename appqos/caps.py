@@ -37,6 +37,7 @@ System capabilities module
 
 import common
 import log
+import sstbf
 
 
 # System capabilities are detected during the runtime
@@ -56,7 +57,8 @@ def caps_init():
     log.info("Supported capabilities:")
     log.info(SYSTEM_CAPS)
 
-    if (cat_supported() or mba_supported()) and common.PQOS_API.is_multicore():
+    if (cat_supported() or mba_supported() or sstbf_supported())\
+            and common.PQOS_API.is_multicore():
         return 0
 
     return -1
@@ -76,6 +78,13 @@ def mba_supported():
     return common.MBA_CAP in SYSTEM_CAPS
 
 
+def sstbf_supported():
+    """
+    Returns SST-BF support status
+    """
+    return common.SSTBF_CAP in SYSTEM_CAPS
+
+
 def detect_supported_caps():
     """
     Generates list of supported caps
@@ -93,5 +102,8 @@ def detect_supported_caps():
     # Intel RDT MBA
     if common.PQOS_API.is_mba_supported():
         result.append(common.MBA_CAP)
+
+    if sstbf.is_sstbf_supported():
+        result.append(common.SSTBF_CAP)
 
     return result

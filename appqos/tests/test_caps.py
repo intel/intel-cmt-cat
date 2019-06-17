@@ -38,7 +38,7 @@ import common
 import caps
 
 def test_caps_init():
-    with mock.patch('caps.detect_supported_caps', return_value=[common.CAT_CAP, common.MBA_CAP]) as mock_detect_caps,\
+    with mock.patch('caps.detect_supported_caps', return_value=[common.CAT_CAP, common.MBA_CAP, common.SSTBF_CAP]) as mock_detect_caps,\
          mock.patch('common.PQOS_API.is_multicore', return_value = True) as mock_is_multi:
 
         assert not caps.caps_init()
@@ -75,3 +75,13 @@ def test_detect_mba():
 @mock.patch("common.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
 def test_detect_mba_negative():
     assert common.MBA_CAP not in caps.detect_supported_caps()
+
+
+@mock.patch("sstbf.is_sstbf_supported", mock.MagicMock(return_value=False))
+def test_detect_sstbf_negative():
+    assert common.SSTBF_CAP not in caps.detect_supported_caps()
+
+
+@mock.patch("sstbf.is_sstbf_supported", mock.MagicMock(return_value=True))
+def test_detect_sstbf_positive():
+    assert common.SSTBF_CAP in caps.detect_supported_caps()
