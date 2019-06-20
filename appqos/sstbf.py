@@ -136,6 +136,8 @@ def enable_sstbf(enable):
     if result is None:
         return -1
 
+    log.sys("Intel SST-BF {}configured.".format("" if enable else "un"))
+
     return 0
 
 

@@ -111,6 +111,7 @@ class Server:
     def __init__(self):
         self.process = None
         self.app = Flask(__name__)
+        self.app.config['MAX_CONTENT_LENGTH'] = 2 * 1024
         self.api = Api(self.app)
 
         # initialize SSL context
@@ -177,7 +178,8 @@ class Server:
         Parameters:
             error: error
         """
-        response = {"message": error.message}
+        common.STATS_STORE.general_stats_inc_num_err()
+        response = {'message': error.message}
         return json.dumps(response), error.code
 
 
@@ -195,11 +197,15 @@ class Server:
             Authentication result (bool)
         """
         if not (username and password):
+            common.STATS_STORE.general_stats_inc_num_invalid_access()
             return False
+
         if 'auth' in common.CONFIG_STORE.get_config():
             if username == common.CONFIG_STORE.get_config()['auth']['username'] and \
                 password == common.CONFIG_STORE.get_config()['auth']['password']:
                 return True
+
+        common.STATS_STORE.general_stats_inc_num_invalid_access()
         return False
 
 
@@ -270,7 +276,9 @@ class App(Resource):
             # remove app
             data['apps'].remove(app)
             common.CONFIG_STORE.set_config(data)
-            return "APP " + str(app_id) + " deleted", 200
+
+            res = {'message': "APP " + str(app_id) + " deleted"}
+            return res, 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
 
@@ -342,11 +350,14 @@ class App(Resource):
             try:
                 common.CONFIG_STORE.validate(data)
             except Exception as ex:
-                raise BadRequest("APP not updated, " + str(ex))
+                raise BadRequest("APP " + str(app_id) + " not updated, " + str(ex))
             else:
                 common.CONFIG_STORE.set_config(data)
-                common.STATS_STORE.general_stats_inc_apps_moves()
-                return "APP " + str(app_id) + " moved to new pool", 200
+                if 'pool_id' in json_data:
+                    common.STATS_STORE.general_stats_inc_apps_moves()
+
+                res = {'message': "APP " + str(app_id) + " updated"}
+                return res, 200
 
         raise NotFound("APP " + str(app_id) + " not found in config")
 
@@ -432,13 +443,15 @@ class Apps(Resource):
                 if 'cores' in json_data:
                     json_data.pop('cores')
 
+        try:
+            pool = common.CONFIG_STORE.get_pool(data, json_data['pool_id'])
+        except Exception as ex:
+            raise BadRequest("New APP not added, " + str(ex))
+
         # update pool configuration to include new app
-        for pool in data['pools']:
-            if pool['id'] == json_data['pool_id']:
-                if not 'apps' in pool:
-                    pool['apps'] = []
-                pool['apps'].append(json_data['id'])
-                break
+        if not 'apps' in pool:
+            pool['apps'] = []
+        pool['apps'].append(json_data['id'])
 
         json_data.pop('pool_id')
         data['apps'].append(json_data)
@@ -449,7 +462,11 @@ class Apps(Resource):
             raise BadRequest("New APP not added, " + str(ex))
         else:
             common.CONFIG_STORE.set_config(data)
-            res = {'id': json_data['id']}
+
+            res = {
+                'id': json_data['id'],
+                'message': "New APP added to pool {}".format(str(pool['id']))
+            }
             return res, 201
 
 class Pool(Resource):
@@ -517,7 +534,9 @@ class Pool(Resource):
             # remove app
             data['pools'].remove(pool)
             common.CONFIG_STORE.set_config(data)
-            return "POOL " + str(pool_id) + " deleted", 200
+
+            res = {'message': "POOL " + str(pool_id) + " deleted"}
+            return res, 200
 
         raise NotFound("POOL " + str(pool_id) + " not found in config")
 
@@ -604,7 +623,9 @@ class Pool(Resource):
                 raise BadRequest("POOL " + str(pool_id) + " not updated, " + str(ex))
             else:
                 common.CONFIG_STORE.set_config(data)
-                return "POOL " + str(pool_id) + " updated", 200
+
+                res = {'message': "POOL " + str(pool_id) + " updated"}
+                return res, 200
 
         raise NotFound("POOL " + str(pool_id) + " not found in config")
 
@@ -675,7 +696,11 @@ class Pools(Resource):
             raise BadRequest("New POOL not added, " + str(ex))
         else:
             common.CONFIG_STORE.set_config(data)
-            res = {'id': post_data['id']}
+
+            res = {
+                'id': post_data['id'],
+                'message': "New POOL {} added".format(post_data['id'])
+            }
             return res, 201
 
 
@@ -695,12 +720,12 @@ class Stats(Resource):
         Returns:
             response, status code
         """
-        data = {}
-        data["num_apps_moves"] = \
-            common.STATS_STORE.general_stats_get(StatsStore.General.NUM_APPS_MOVES)
-        data["num_err"] = common.STATS_STORE.general_stats_get(StatsStore.General.NUM_ERR)
-
-        return data, 200
+        res = {
+            'num_apps_moves': \
+                common.STATS_STORE.general_stats_get(StatsStore.General.NUM_APPS_MOVES),
+            'num_err': common.STATS_STORE.general_stats_get(StatsStore.General.NUM_ERR)
+        }
+        return res, 200
 
 
 class Caps(Resource):
@@ -719,10 +744,8 @@ class Caps(Resource):
         Returns:
             response, status code
         """
-        data = {}
-        data["capabilities"] = caps.SYSTEM_CAPS
-
-        return data, 200
+        res = {'capabilities': caps.SYSTEM_CAPS}
+        return res, 200
 
 
 class Sstbf(Resource):
@@ -741,12 +764,12 @@ class Sstbf(Resource):
         Returns:
             response, status code
         """
-        data = {}
-        data["enabled"] = sstbf.is_sstbf_enabled()
-        data["hp_cores"] = sstbf.get_hp_cores()
-        data["std_cores"] = sstbf.get_std_cores()
-
-        return data, 200
+        res = {
+            'enabled': sstbf.is_sstbf_enabled(),
+            'hp_cores': sstbf.get_hp_cores(),
+            'std_cores': sstbf.get_std_cores()
+        }
+        return res, 200
 
 
     @staticmethod
@@ -771,7 +794,8 @@ class Sstbf(Resource):
         if not sstbf.enable_sstbf(json_data['enabled']) == 0:
             raise InternalError("Failed to change SST-BF enable state.")
 
-        return "SST-BF caps modified", 200
+        res = {'message': "SST-BF caps modified"}
+        return res, 200
 
 
 class Reset(Resource):
@@ -793,4 +817,5 @@ class Reset(Resource):
 
         common.CONFIG_STORE.reset()
 
-        return "Reset performed. Configuration reloaded.", 200
+        res = {'message': "Reset performed. Configuration reloaded."}
+        return res, 200

@@ -9,8 +9,13 @@
     "id": {
       "description": "POOL ID",
       "$ref": "definitions.json#/uint"
+    },
+    "message": {
+      "description": "Message",
+      "$ref": "definitions.json#/string_nonempty"
     }
   },
 
-  "required": ["id"]
+  "required": ["id"],
+  "additionalProperties": false
 }

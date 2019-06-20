@@ -46,6 +46,7 @@ CAT_CAP = "cat"
 MBA_CAP = "mba"
 SSTBF_CAP = "sstbf"
 
+RATE_LIMIT = 10 # rate limit of configuration changes in HZ
 
 MANAGER = multiprocessing.Manager()
 CONFIG_STORE = config.ConfigStore()

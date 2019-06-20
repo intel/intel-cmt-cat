@@ -174,13 +174,13 @@ class ConfigStore:
             Pool details
         """
         if 'apps' not in data:
-            raise KeyError("No apps in config")
+            raise KeyError("App {} does not exist. No apps in config.".format(app_id))
 
         for app in data['apps']:
             if app['id'] == app_id:
                 return app
 
-        raise KeyError("App {} does not exists.".format(app_id))
+        raise KeyError("App {} does not exist.".format(app_id))
 
 
     @staticmethod
@@ -236,6 +236,18 @@ class ConfigStore:
             if 'apps' in pool:
                 for app_id in pool['apps']:
                     ConfigStore.get_app(data, app_id)
+
+            if 'cbm' in pool:
+                import re
+                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['cbm']))
+                if result or pool['cbm'] == 0:
+                    raise ValueError("Pool {}, CBM {}/{} is not contiguous."\
+                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
+
+            if 'mba' in pool:
+                if pool['mba'] > 100 or pool['mba'] <= 0:
+                    raise ValueError("Pool {}, MBA rate {} out of range! (1-100)."\
+                    .format(pool['id'], pool['mba']))
 
 
     @staticmethod

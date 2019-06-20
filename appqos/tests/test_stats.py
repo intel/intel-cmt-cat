@@ -47,6 +47,7 @@ class TestStats(object):
             assert cntr in gen_stats
             assert gen_stats[cntr] == 0
 
+
     def test_stats_inc_num_apps_moves(self):
         stats_store = StatsStore()
 
@@ -64,6 +65,7 @@ class TestStats(object):
         gen_stats_moves = stats_store.general_stats_get(StatsStore.General.NUM_APPS_MOVES)
         assert gen_stats_moves == INC_CNT
 
+
     def test_stats_inc_num_err(self):
         stats_store = StatsStore()
 
@@ -80,6 +82,25 @@ class TestStats(object):
 
         gen_stats_err = stats_store.general_stats_get(StatsStore.General.NUM_ERR)
         assert gen_stats_err == INC_CNT
+
+
+    def test_stats_inc_num_invalid_access(self):
+        stats_store = StatsStore()
+
+        gen_stats = stats_store.general_stats_get()
+        assert gen_stats['num_invalid_access_attempts'] == 0
+
+        INC_CNT = 4
+
+        for _ in range(INC_CNT):
+            stats_store.general_stats_inc_num_invalid_access()
+
+        gen_stats = stats_store.general_stats_get()
+        assert gen_stats['num_invalid_access_attempts'] == INC_CNT
+
+        gen_stats_invalid_access = stats_store.general_stats_get(StatsStore.General.NUM_INV_ACCESS)
+        assert gen_stats_invalid_access == INC_CNT
+
 
     def test_stats_get(self):
         stats_store = StatsStore()

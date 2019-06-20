@@ -43,6 +43,7 @@ import argparse
 import multiprocessing
 import signal
 import syslog
+import time
 
 from jsonschema import ValidationError
 
@@ -81,7 +82,7 @@ class AppQoS:
             log.error("Error reading from config file {}... ".format(args.config))
             log.error(ex)
             return
-        except (ValueError, ValidationError) as ex:
+        except (ValueError, ValidationError, KeyError) as ex:
             log.error("Could not parse config file {}... ".format(args.config))
             log.error(ex)
             return
@@ -101,6 +102,13 @@ class AppQoS:
                 log.error("Failed to apply initial SST-BF configuration, terminating...")
                 return
 
+            log.info("SST-BF enabled, {}configured.".\
+                format("not " if not sstbf.is_sstbf_enabled() else ""))
+            log.info("SST-BF HP cores: {}".format(sstbf.get_hp_cores()))
+            log.info("SST-BF STD cores: {}".format(sstbf.get_std_cores()))
+        else:
+            log.info("SST-BF not enabled")
+
         # set initial RDT configuration
         log.info("Configuring RDT")
         result = cache_ops.configure_rdt()
@@ -111,10 +119,24 @@ class AppQoS:
         # set CTRL+C sig handler
         signal.signal(signal.SIGINT, self.signal_handler)
 
+        # rate limiting
+        last_cfg_change_ts = 0
+        min_time_diff = 1 / common.RATE_LIMIT
+
         while not self.stop_event.is_set():
             if common.CONFIG_STORE.is_config_changed():
-                log.info("Configuration changed")
+
+                time_diff = time.time() - last_cfg_change_ts
+                if time_diff < min_time_diff:
+                    log.info("Rate Limiter, sleeping " \
+                        + str(round((min_time_diff - time_diff) * 1000)) + "ms...")
+                    time.sleep(min_time_diff - time_diff)
+
+                log.info("Configuration changed, processing new config...")
                 result = cache_ops.configure_rdt()
+
+                last_cfg_change_ts = time.time()
+
                 if result != 0:
                     log.error("Failed to apply RDT configuration!")
                     break

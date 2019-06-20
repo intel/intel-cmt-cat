@@ -52,11 +52,14 @@ class StatsStore:
         #pylint: disable=too-few-public-methods
         NUM_APPS_MOVES = 'num_apps_moves'
         NUM_ERR = 'num_err'
+        NUM_INV_ACCESS = 'num_invalid_access_attempts'
 
 
     def __init__(self):
         self.general_stats = common.MANAGER.dict()
-        for cntr in [self.General.NUM_APPS_MOVES, self.General.NUM_ERR]:
+        for cntr in [self.General.NUM_APPS_MOVES,\
+                self.General.NUM_ERR,\
+                self.General.NUM_INV_ACCESS]:
             self.general_stats[cntr] = 0
 
 
@@ -101,3 +104,10 @@ class StatsStore:
         Increases num errors stat value by 1
         """
         self.general_stats_inc(StatsStore.General.NUM_ERR)
+
+
+    def general_stats_inc_num_invalid_access(self):
+        """
+        Increases num invalid access attempts stat value by 1
+        """
+        self.general_stats_inc(StatsStore.General.NUM_INV_ACCESS)

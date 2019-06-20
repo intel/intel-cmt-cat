@@ -397,6 +397,71 @@ class TestConfigValidate:
             assert "does not exist" in str(ex)
 
 
+    def test_pool_invalid_cbm(self):
+        def check_core(core):
+            return True
+
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "apps": [],
+                    "cbm": 0x5,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with mock.patch('common.PQOS_API.check_core', new=check_core):
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert "not contiguous" in str(ex)
+
+            data['pools'][0]['cbm'] = 0
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert "not contiguous" in str(ex)
+
+
+    def test_pool_invalid_mba(self):
+        def check_core(core):
+            return True
+
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "mba": 101,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with mock.patch('common.PQOS_API.check_core', new=check_core):
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert "out of range" in str(ex)
+
+            data['pools'][0]['mba'] = 0
+            with pytest.raises(ValueError) as ex:
+                ConfigStore.validate(data)
+
+            assert " out of range" in str(ex)
+
+
     def test_app_invalid_core(self):
         def check_core(core):
             return core != 3

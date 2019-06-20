@@ -44,8 +44,8 @@
 
   "string_hex" : {
     "type": [ "integer", "string" ],
-    "pattern": "^0x[0-9a-fA-F]+$",
-    "maxLength": 64
+    "pattern": "^0x[0-9a-fA-F]{1,32}$",
+    "maxLength": 34
   },
 
   "app": {
@@ -161,6 +161,23 @@
     "anyOf": [
       { "required": ["cbm"] },
       { "required": ["mba"] }
+    ]
+  },
+
+  "pool_cfg": {
+    "allOf": [
+      { "$ref": "#pool" },
+      { "properties": {
+          "name": {},
+          "cores": {},
+          "cbm": {},
+          "mba": {},
+          "id": {},
+          "apps": {}
+        },
+        "required": ["cores", "id"],
+        "additionalProperties": false
+      }
     ]
   },
 
