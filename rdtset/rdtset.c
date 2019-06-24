@@ -321,21 +321,13 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
 {
         unsigned i;
         int f_n = 0; /**< non cpu (pid) config flag */
-        int f_sc = 0; /**< mba_max config flag */
 
         for (i = 0; i < g_cfg.config_count; i++) {
                 if (g_cfg.config[i].pid_cfg)
                         f_n++;
-                if (g_cfg.config[i].mba.ctrl)
-                        f_sc++;
                 /* Validate that only 1 pid config selected */
                 if (f_n > 1) {
                         fprintf(stderr, "Only 1 PID config allowed!\n");
-                        return 0;
-                }
-                /* Validate that only 1 MBA SC configured */
-                if (f_sc > 1 && !f_i) {
-                        fprintf(stderr, "Only 1 MBA SC config allowed!\n");
                         return 0;
                 }
         }
@@ -527,7 +519,7 @@ rdtset_init(void)
         }
 
         /* Initialize MBA SW controller */
-        if (mba_sc_mode()) {
+        if (mba_sc_mode(&g_cfg)) {
                 ret = mba_sc_init();
                 if (ret < 0) {
                         fprintf(stderr, "%s,%s:%d MBA SC init failed!\n",
@@ -664,7 +656,7 @@ main(int argc, char **argv)
                         }
         }
 
-        if (mba_sc_mode()) {
+        if (mba_sc_mode(&g_cfg)) {
                 mba_sc_main(child);
 
         } else if (0 != g_cfg.command) {
@@ -675,7 +667,7 @@ main(int argc, char **argv)
                         exit(EXIT_FAILURE);
         }
 
-	if (0 != g_cfg.command || mba_sc_mode())
+	if (0 != g_cfg.command || mba_sc_mode(&g_cfg))
 		/*
 		 * If we were running some command or doing MBA SW control,
 		 * do clean-up. Clean-up function is executed on process exit.

@@ -51,13 +51,16 @@ struct mba_sc_state {
         struct pqos_mon_data group;
         cpu_set_t cpumask;
         unsigned prev_rate;
+        uint64_t prev_time;
         uint64_t max_bw;
         uint64_t prev_bw;
         unsigned delta_comp;
         uint64_t delta_bw;
+        uint64_t reg_start_time;
 };
 
-static struct mba_sc_state state;
+static struct mba_sc_state *state = NULL;
+static unsigned state_num;
 static int supported = 0;
 
 
@@ -195,8 +198,6 @@ mba_sc_init(void)
                 goto err;
         }
 
-
-        memset(&state, 0, sizeof(state));
         supported = 1;
 
         return 0;
@@ -217,10 +218,31 @@ mba_sc_fini(void)
         m_cap_mba = NULL;
 }
 
+static int
+mba_sc_stop(void)
+{
+        unsigned i;
+        int ret = 0;
+
+        if (state == NULL)
+                return 0;
+
+        for (i = 0; i < state_num; i++) {
+                int retval = mba_sc_mon_stop(&state[i].group);
+
+                if (retval < 0)
+                        ret = retval;
+        }
+
+        free(state);
+
+        return ret;
+}
+
 void
 mba_sc_exit(void)
 {
-        mba_sc_mon_stop(&state.group);
+        mba_sc_stop();
 }
 
 /**
@@ -259,15 +281,15 @@ mba_sc_running(const pid_t pid)
 }
 
 int
-mba_sc_mode(void)
+mba_sc_mode(const struct rdtset *cfg)
 {
         unsigned i;
 
-        if (g_cfg.interface != PQOS_INTER_MSR)
+        if (cfg->interface != PQOS_INTER_MSR)
                 return 0;
 
-        for (i = 0; i < g_cfg.config_count; i++)
-                if (g_cfg.config[i].mba.ctrl == 1)
+        for (i = 0; i < cfg->config_count; i++)
+                if (cfg->config[i].mba.ctrl == 1)
                         return 1;
 
         return 0;
@@ -323,112 +345,149 @@ mba_sc_mba_set(const cpu_set_t cpumask, struct pqos_mba *mba_cfg)
         return 0;
 }
 
-int
-mba_sc_main(pid_t pid)
+/**
+ * @brief Get number of MBA SC instances
+ *
+ * @param[in] cfg rdtset configuration
+ *
+ * @return Number of MBA SC instances
+ */
+static unsigned
+mba_sc_count(const struct rdtset *cfg)
 {
-        int ret;
-        uint64_t prev_time;
-        uint64_t reg_start_time = 0;
         unsigned i;
+        unsigned count = 0;
 
-        if (!supported)
-                return PQOS_RETVAL_RESOURCE;
+        for (i = 0; i < cfg->config_count; i++)
+                if (cfg->config[i].mba.ctrl == 1)
+                        count++;
 
+        return count;
+}
+
+static int
+mba_sc_update(struct mba_sc_state *state)
+{
+        uint64_t cur_time;
+        uint64_t delta_time;
+        struct pqos_mba mba_cfg;
+        uint64_t prev_bw = state->prev_bw;
+        uint64_t cur_bw;
+        int ret;
+        const struct pqos_event_values *pv = &state->group.values;
         const unsigned min_rate = m_cap_mba->u.mba->throttle_step;
         const unsigned step_rate = m_cap_mba->u.mba->throttle_step;
         const unsigned max_rate = 100;
 
-        for (i = 0; i < g_cfg.config_count; i++) {
+        mba_cfg.ctrl = 0;
+
+        ret = mba_sc_mon_poll(&state->group);
+        if (ret != 0)
+                return ret;
+
+        cur_time = get_time_usec();
+        delta_time = cur_time - state->prev_time;
+        state->prev_time = cur_time;
+
+        /* calculate bw in bytes per second */
+        cur_bw = pv->mbm_local_delta * 1000000 / delta_time;
+        state->prev_bw = cur_bw;
+
+        if (state->delta_comp) {
+                state->delta_comp = 0;
+                if (cur_bw >= prev_bw)
+                        state->delta_bw = cur_bw - prev_bw;
+                else
+                        state->delta_bw = prev_bw - cur_bw;
+        }
+
+        DBG("MBA SC: Current BW %lluMBps",
+            (unsigned long long)bytes_to_mb(cur_bw));
+        if (state->prev_rate > min_rate && cur_bw > state->max_bw) {
+                DBG(" > %lluMBps",
+                    (unsigned long long)bytes_to_mb(state->max_bw));
+                mba_cfg.mb_max = state->prev_rate - step_rate;
+        } else if (state->prev_rate < max_rate &&
+                   (cur_bw + state->delta_bw) < state->max_bw) {
+                DBG(" < %lluMBps",
+                    (unsigned long long)bytes_to_mb(state->max_bw));
+                mba_cfg.mb_max = state->prev_rate + step_rate;
+        } else {
+                if (state->reg_start_time) {
+                        DBG(" Max BW %lluMBps, regulation took %.1fs\n",
+                            (unsigned long long) bytes_to_mb(state->max_bw),
+                            (cur_time - state->reg_start_time) / 1000000.0);
+                        state->reg_start_time = 0;
+                } else
+                        DBG("\n");
+                return 0;
+        }
+
+        DBG(", setting MBA to %u%%\n", mba_cfg.mb_max);
+        ret = mba_sc_mba_set(state->cpumask, &mba_cfg);
+        if (ret != 0) {
+                DBG(" Failed to update mba rate!\n");
+                return ret;
+        }
+
+        state->prev_rate = mba_cfg.mb_max;
+        state->delta_comp = 1;
+
+        if (!state->reg_start_time)
+                state->reg_start_time = get_time_usec();
+
+        return 0;
+}
+
+int
+mba_sc_main(pid_t pid)
+{
+        int ret;
+        unsigned i;
+        unsigned index;
+
+        if (!supported)
+                return PQOS_RETVAL_RESOURCE;
+
+        /* allocate memory for state struct */
+        state_num = mba_sc_count(&g_cfg);
+        state = calloc(state_num, sizeof(*state));
+        if (state == NULL) {
+                DBG("MBA SC: memory allocation failed\n");
+                return -EFAULT;
+        }
+
+        for (i = 0, index = 0; i < g_cfg.config_count; i++) {
                 const struct rdt_config *config = &g_cfg.config[i];
 
                 if (config->mba.ctrl == 1) {
-                        ret = mba_sc_mon_start(config->cpumask, &state.group);
+                        ret = mba_sc_mon_start(config->cpumask,
+                                               &state[index].group);
                         if (ret != 0) {
                                 DBG("MBA SC: failed to start monitoring\n");
                                 goto err;
                         }
 
-                        state.max_bw = mb_to_bytes(config->mba.mb_max);
-                        state.prev_rate = MBA_SC_DEF_INIT_MBA;
-                        state.cpumask = config->cpumask;
+                        state[index].max_bw = mb_to_bytes(config->mba.mb_max);
+                        state[index].prev_rate = MBA_SC_DEF_INIT_MBA;
+                        state[index].cpumask = config->cpumask;
 
-                        break;
+                        index++;
                 }
         }
 
-        prev_time = get_time_usec();
+        for (i = 0; i < state_num; i++)
+                state[i].prev_time = get_time_usec();
 
         while (mba_sc_running(pid)) {
-                uint64_t cur_time;
-                uint64_t delta_time;
-                struct pqos_mba mba_cfg;
-                uint64_t prev_bw = state.prev_bw;
-                uint64_t cur_bw;
-                const struct pqos_event_values *pv = &state.group.values;
-
-		mba_cfg.ctrl = 0;
-
                 usleep(MBA_SC_SAMPLING_INTERVAL * 1000);
 
-                ret = mba_sc_mon_poll(&state.group);
-                if (ret != 0)
-                        continue;
-
-                cur_time = get_time_usec();
-                delta_time = cur_time - prev_time;
-                prev_time = cur_time;
-
-                cur_bw = pv->mbm_local_delta * 1000000 / delta_time;
-                state.prev_bw = cur_bw;
-
-                if (state.delta_comp) {
-                        state.delta_comp = 0;
-                        if (cur_bw >= prev_bw)
-                                state.delta_bw = cur_bw - prev_bw;
-                        else
-                                state.delta_bw = prev_bw - cur_bw;
-                }
-
-                DBG("MBA SC: Current BW %lluMBps",
-                    (unsigned long long)bytes_to_mb(cur_bw));
-                if (state.prev_rate > min_rate &&
-                    cur_bw > state.max_bw) {
-                        DBG(" > %lluMBps",
-                            (unsigned long long)bytes_to_mb(state.max_bw));
-                        mba_cfg.mb_max = state.prev_rate - step_rate;
-                } else if (state.prev_rate < max_rate &&
-                           (cur_bw + state.delta_bw) < state.max_bw) {
-                        DBG(" < %lluMBps",
-                            (unsigned long long)bytes_to_mb(state.max_bw));
-                        mba_cfg.mb_max = state.prev_rate + step_rate;
-                } else {
-                        if (reg_start_time) {
-                                DBG(" Max BW %lluMBps, regulation took %.1fs\n",
-                                    (unsigned long long)
-                                    bytes_to_mb(state.max_bw),
-                                    (cur_time - reg_start_time) / 1000000.0);
-                                reg_start_time = 0;
-                        } else
-                                DBG("\n");
-                        continue;
-                }
-
-                DBG(", setting MBA to %u%%\n", mba_cfg.mb_max);
-                ret = mba_sc_mba_set(state.cpumask, &mba_cfg);
-                if (ret != 0) {
-                        DBG(" Failed to update mba rate!\n");
-                        continue;
-                }
-
-                state.prev_rate = mba_cfg.mb_max;
-                state.delta_comp = 1;
-
-                if (!reg_start_time)
-                        reg_start_time = get_time_usec();
+                for (i = 0; i < state_num; i++)
+                        mba_sc_update(&state[i]);
         }
 
  err:
-        ret = mba_sc_mon_stop(&state.group);
+        ret = mba_sc_stop();
 
         return ret;
 }
