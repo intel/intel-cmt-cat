@@ -61,6 +61,7 @@
 #define PID_COL_CORE  (39) /**< col for core number in /proc/pid/stat*/
 #define PID_CPU_TIME_DELAY_USEC (1200000) /**< delay for cpu stats */
 #define TOP_PROC_MAX (10) /**< maximum number of top-pids to be handled*/
+#define NUM_TIDS_MAX (128) /**< maximum number of TIDs */
 
 /**
  * Local data structures
@@ -1325,26 +1326,45 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
         int cores_s_len = 0;
         int comma_len = 1;
         unsigned *cores;
+        int ret;
+        pid_t *tids;
+        unsigned num_tids;
+        int result = 0;
 
         ASSERT(mon_data != NULL);
         ASSERT(cores_s != NULL);
 
-        cores = calloc(mon_data->num_pids, sizeof(*cores));
+        tids = calloc(NUM_TIDS_MAX, sizeof(*tids));
 
-        if (cores == NULL) {
+        if (tids == NULL) {
                 printf("Error allocating memory\n");
                 return -1;
         }
 
-        for (i = 0; i < mon_data->num_pids; i++)
-                if (get_pid_core_num(mon_data->pids[i], &cores[i]) == -1) {
-                        free(cores);
-                        return -1;
+        ret = pqos_mon_tids_get(mon_data, tids, NUM_TIDS_MAX, &num_tids);
+
+        if (ret != PQOS_RETVAL_OK) {
+                free(tids);
+                return -1;
+        }
+
+        cores = calloc(num_tids, sizeof(*cores));
+
+        if (cores == NULL) {
+                printf("Error allocating memory\n");
+                free(tids);
+                return -1;
+        }
+
+        for (i = 0; i < num_tids; i++)
+                if (get_pid_core_num(tids[i], &cores[i]) == -1) {
+                        result = -1;
+                        goto free_memory;
                 }
 
-        qsort(cores, mon_data->num_pids, sizeof(*cores), unsigned_cmp);
+        qsort(cores, num_tids, sizeof(*cores), unsigned_cmp);
 
-        for (i = 0; i < mon_data->num_pids; i++) {
+        for (i = 0; i < num_tids; i++) {
 
                 /* check for duplicate cores and skips them*/
                 if (i != 0 && cores[i] == cores[i-1])
@@ -1352,8 +1372,8 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
 
                 str_len = uinttostr_noalloc(core, sizeof(core), cores[i]);
                 if (str_len < 0) {
-                        free(cores);
-                        return -1;
+                        result = -1;
+                        goto free_memory;
                 }
 
                 cores_s_len = strlen(cores_s);
@@ -1364,13 +1384,15 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
                 } else if (i == 0 && (cores_s_len + str_len) < len)
                         strcat(cores_s, core);
                 else {
-                        free(cores);
-                        return -1;
+                        result = -1;
+                        goto free_memory;
                 }
         }
 
+free_memory:
         free(cores);
-        return 0;
+        free(tids);
+        return result;
 }
 
 /**
@@ -2692,4 +2714,3 @@ void monitor_cleanup(void)
                 free(sel_output_type);
         sel_output_type = NULL;
 }
-
