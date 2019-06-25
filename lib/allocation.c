@@ -1369,7 +1369,9 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
 
-        ASSERT(mba_cfg == PQOS_MBA_DEFAULT || mba_cfg == PQOS_MBA_CTRL);
+        ASSERT(mba_cfg == PQOS_MBA_DEFAULT ||
+               mba_cfg == PQOS_MBA_CTRL ||
+               mba_cfg == PQOS_MBA_ANY);
 
         _pqos_cap_get(&cap, NULL);
 
