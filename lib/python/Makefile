@@ -28,7 +28,8 @@ coverage: test_env
 
 style: test_env
 	@bash -c "source test_env/bin/activate && \
-		python -m pylint pqos/*.py pqos/test/*.py; \
+		python -m pylint pqos/*.py pqos/test/*.py && \
+		python -m bandit *.py; \
 		deactivate"
 
 clean:
