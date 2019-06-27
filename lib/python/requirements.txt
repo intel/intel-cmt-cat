@@ -1,3 +1,4 @@
+bandit
 pylint
 coverage
 mock
