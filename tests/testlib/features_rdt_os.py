@@ -120,8 +120,11 @@ class FeaturesRdtOs(FeaturesRdt):
         if not self.resctrl.mount(mba_mbps=True):
             return False
 
-        schemata = self.resctrl.get_schemata()
-        result = schemata.get('MB', 0) > 100
+        result = self._check_resctrl_info_dir("MB") and \
+                 self._check_resctrl_info_dir("L3_MON")
+        if result:
+            schemata = self.resctrl.get_schemata()
+            result = schemata.get('MB', 0) > 100
 
         self.resctrl.umount()
         return result
