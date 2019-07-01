@@ -32,11 +32,16 @@
 ################################################################################
 
 import pytest
+import logging
 import common
 import jsonschema
 import mock
 
 from config import *
+
+logging.basicConfig(level=logging.DEBUG)
+
+LOG = logging.getLogger('config')
 
 CONFIG = {
     "apps": [
@@ -292,10 +297,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="Invalid core 3"):
                 ConfigStore.validate(data)
-
-            assert "Invalid core 3" in str(ex)
 
 
     def test_pool_duplicate_core(self):
@@ -324,10 +327,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="already assigned to another pool"):
                 ConfigStore.validate(data)
-
-            assert "already assigned to another pool" in str(ex)
 
 
     def test_pool_same_ids(self):
@@ -356,10 +357,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="Pool 1, multiple pools with same id"):
                 ConfigStore.validate(data)
-
-            assert "Pool 1, multiple pools with same id" in str(ex)
 
 
     def test_pool_invalid_app(self):
@@ -391,10 +390,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(KeyError) as ex:
+            with pytest.raises(KeyError, match="does not exist"):
                 ConfigStore.validate(data)
-
-            assert "does not exist" in str(ex)
 
 
     def test_pool_invalid_cbm(self):
@@ -418,16 +415,12 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="not contiguous"):
                 ConfigStore.validate(data)
-
-            assert "not contiguous" in str(ex)
 
             data['pools'][0]['cbm'] = 0
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="not contiguous"):
                 ConfigStore.validate(data)
-
-            assert "not contiguous" in str(ex)
 
 
     def test_pool_invalid_mba(self):
@@ -450,16 +443,12 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="out of range"):
                 ConfigStore.validate(data)
-
-            assert "out of range" in str(ex)
 
             data['pools'][0]['mba'] = 0
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="out of range"):
                 ConfigStore.validate(data)
-
-            assert " out of range" in str(ex)
 
 
     def test_app_invalid_core(self):
@@ -491,10 +480,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="Invalid core 3"):
                 ConfigStore.validate(data)
-
-            assert "Invalid core 3" in str(ex)
 
 
     def test_app_core_does_not_match_pool(self):
@@ -523,10 +510,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', return_value = True):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="App 1, cores {3, 4, 5} does not match Pool 1"):
                 ConfigStore.validate(data)
-
-            assert "App 1, cores {3, 4, 5} does not match Pool 1" in str(ex)
 
 
     def test_app_without_pool(self):
@@ -570,10 +555,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="not assigned to any pool"):
                 ConfigStore.validate(data)
-
-            assert "not assigned to any pool" in str(ex)
 
 
     def test_app_without_pool(self):
@@ -618,10 +601,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="App 1, Assigned to more than one pool"):
                 ConfigStore.validate(data)
-
-            assert "App 1, Assigned to more than one pool" in str(ex)
 
 
     def test_app_same_ids(self):
@@ -659,10 +640,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="App 1, multiple apps with same id"):
                 ConfigStore.validate(data)
-
-            assert "App 1, multiple apps with same id" in str(ex)
 
 
     def test_app_same_pid(self):
@@ -700,10 +679,8 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match=r"App 2, PIDs \{1} already assigned to another App."):
                 ConfigStore.validate(data)
-
-            assert "App 2, PIDs {1} already assigned to another App" in str(ex)
 
 
     def test_app_invalid_pid(self):
@@ -741,7 +718,6 @@ class TestConfigValidate:
         }
 
         with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError) as ex:
+            with pytest.raises(ValueError, match="App 2, PID 99999 is not valid"):
                 ConfigStore.validate(data)
 
-            assert "App 2, PID 99999 is not valid" in str(ex)
