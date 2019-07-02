@@ -35,7 +35,7 @@ import argparse
 
 from pqos import Pqos
 from pqos.cpuinfo import PqosCpuInfo
-from pqos.mba import PqosMba
+from pqos.l2ca import PqosCatL2
 
 
 def str_to_int(num_str):
@@ -63,48 +63,45 @@ def str_to_int(num_str):
 #  * @param argv Input arguments for COS allocation
 #  */
 
-def set_allocation_class(sockets, class_id, mb_max):
+def set_allocation_class(l2_ids, class_id, mask):
     """
     Sets up allocation classes of service on selected CPU sockets
 
     Parameters:
-        sockets: array with socket IDs
+        l2_ids: a list of L2 IDs
         class_id: class of service ID
-        mb_max: COS rate in percent
+        mask: COS bitmask
     """
 
-    mba = PqosMba()
-    cos = mba.COS(class_id, mb_max)
+    l2ca = PqosCatL2()
+    cos = l2ca.COS(class_id, mask)
 
-    for socket in sockets:
+    for l2_id in l2_ids:
         try:
-            actual = mba.set(socket, [cos])
-
-            params = (socket, class_id, mb_max, actual[0].mb_max)
-            print("SKT%u: MBA COS%u => %u%% requested, %u%% applied" % params)
+            l2ca.set(l2_id, [cos])
         except:
             print("Setting up cache allocation class of service failed!")
 
 
-def print_allocation_config(sockets):
+def print_allocation_config(l2_ids):
     """
     Prints allocation configuration.
 
     Parameters:
-        sockets: array with socket IDs
+        l2_ids: a list of L2 IDs
     """
 
-    mba = PqosMba()
+    l2ca = PqosCatL2()
 
-    for socket in sockets:
+    for l2_id in l2_ids:
         try:
-            coses = mba.get(socket)
+            coses = l2ca.get(l2_id)
 
-            print("MBA COS definitions for Socket %u:" % socket)
+            print("L2CA COS definitions for L2 ID %u:" % l2_id)
 
             for cos in coses:
-                cos_params = (cos.class_id, cos.mb_max)
-                print("    MBA COS%u => %u%% available" % cos_params)
+                cos_params = (cos.class_id, cos.mask)
+                print("    L2CA COS%u => MASK 0x%x" % cos_params)
         except:
             print("Error")
             raise
@@ -118,13 +115,20 @@ def parse_args():
         an object with parsed command line arguments
     """
 
-    description = 'PQoS Library Python wrapper - MBA allocation example'
+    def int_dec_or_hex(num):
+        try:
+            return str_to_int(num)
+        except:
+            msg = 'Cannot convert a parameter to a number'
+            raise argparse.ArgumentError(msg)
+
+    description = 'PQoS Library Python wrapper - L2 CAT allocation example'
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-I', dest='interface', action='store_const',
                         const='OS', default='MSR',
                         help='select library OS interface')
     parser.add_argument('class_id', type=int, help='COS ID')
-    parser.add_argument('mb_max', type=int, help='MBA rate')
+    parser.add_argument('mask', type=int_dec_or_hex, help='COS bitmask')
 
     args = parser.parse_args()
     return args
@@ -160,10 +164,10 @@ def main():
     try:
         with PqosContextManager(args.interface):
             cpu = PqosCpuInfo()
-            sockets = cpu.get_sockets()
+            l2_ids = cpu.get_l2ids()
 
-            set_allocation_class(sockets, args.class_id, args.mb_max)
-            print_allocation_config(sockets)
+            set_allocation_class(l2_ids, args.class_id, args.mask)
+            print_allocation_config(l2_ids)
     except:
         print("Error!")
         raise
