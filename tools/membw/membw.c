@@ -764,7 +764,7 @@ mem_execute(const unsigned bw, const enum cl_type type)
  * MAIN
  */
 
- /**
+/**
  * @brief Function to print Membw command line usage
  *
  * @param argv list of arguments supplied by user

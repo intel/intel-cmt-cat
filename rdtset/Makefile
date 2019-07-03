@@ -130,7 +130,7 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,NEW_TYPEDEFS,\
 	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,CONSTANT_COMPARISON,\
-	SPDX_LICENSE_TAG \
+	SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f rdtset.c -f rdt.c -f rdt.h -f cpu.c -f cpu.h \
 	-f common.c -f common.h \
 	-f mba_sc.h -f mba_sc.c

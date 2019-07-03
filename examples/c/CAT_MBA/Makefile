@@ -89,6 +89,7 @@ CHECKPATCH?=checkpatch.pl
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT \
+	--ignore SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f allocation_app_l2cat.c allocation_app_l3cat.c -f allocation_app_mba.c \
         -f association_app.c -f reset_app.c
 

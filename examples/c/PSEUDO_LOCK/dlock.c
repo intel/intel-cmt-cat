@@ -183,6 +183,7 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         int ret = 0, res = 0;
         size_t num_cache_ways = 0;
         unsigned clos_save = 0;
+	char err_buf[64];
 
 #ifdef __linux__
         cpu_set_t cpuset_save, cpuset;
@@ -226,7 +227,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                                  sizeof(cpuset_save), &cpuset_save);
 #endif
         if (res != 0) {
-                perror("dlock_init() error");
+                snprintf(err_buf, sizeof(err_buf), "%s() error", __func__);
+                perror(err_buf);
                 ret = -4;
                 goto dlock_init_error1;
         }
@@ -244,7 +246,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                                  sizeof(cpuset), &cpuset);
 #endif
         if (res != 0) {
-                perror("dlock_init() error");
+                snprintf(err_buf, sizeof(err_buf), "%s() error", __func__);
+                perror(err_buf);
                 ret = -4;
                 goto dlock_init_error1;
         }
@@ -426,8 +429,11 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         res = cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
                                  sizeof(cpuset_save), &cpuset_save);
 #endif
-        if (res != 0)
-                perror("dlock_init() error restoring affinity");
+        if (res != 0) {
+                snprintf(err_buf, sizeof(err_buf),
+                         "%s() error restoring affinity", __func__);
+                perror(err_buf);
+        }
 
  dlock_init_error1:
         if (m_is_chunk_allocated && ret != 0)
