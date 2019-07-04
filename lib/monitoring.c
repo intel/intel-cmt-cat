@@ -1196,3 +1196,22 @@ get_delta(const uint64_t old_value, const uint64_t new_value)
         else
                 return new_value - old_value;
 }
+
+int
+pqos_mon_tids_get(const struct pqos_mon_data *group,
+                  pid_t *tids,
+                  unsigned max_num_tids,
+                  unsigned *num_tids)
+{
+        unsigned i = 0;
+
+        if (group == NULL || tids == NULL || num_tids == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < group->tid_nr && i < max_num_tids; i++)
+                tids[i] = group->tid_map[i];
+
+        *num_tids = i;
+
+        return PQOS_RETVAL_OK;
+}
