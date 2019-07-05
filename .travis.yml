@@ -1,8 +1,8 @@
 sudo: required
-dist: trusty
+dist: bionic
 before_script:
     - sudo apt-get -q update
-    - sudo apt-get install -y swig cppcheck wget
+    - sudo apt-get install -y swig cppcheck wget python3-virtualenv
     - wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/879be4f378cb412af3a3fe107d35835c99099add/scripts/checkpatch.pl && chmod a+x /tmp/checkpatch.pl
     - wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/879be4f378cb412af3a3fe107d35835c99099add/scripts/spelling.txt
 script: make cppcheck && make style CHECKPATCH=/tmp/checkpatch.pl && make && sudo make install && (cd lib/perl && perl Makefile.PL && make && sudo make install)
