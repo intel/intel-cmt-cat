@@ -35,16 +35,18 @@ Environment File
 In order to run unit tests, it is required to crerate enviroment file describing
 hardware features. Please, follow schema env.json for full documentation.
 
+The example.json contains example environment file for Intel(R) Xeon(R) Gold 6252N CPU.
+
 
 Running tests
 =============
 It is assummed that pqos library will be installed in the system.
 
 Run tests without virtualenv:
-	sudo py.test tests
+	sudo py.test --env=example.json testcases
 
 Run tests using virtualenv:
-	sudo bash -c "source test_env/bin/activate && py.test tests; deactivate"
+	sudo bash -c "source test_env/bin/activate && py.test --env=example.json testcases; deactivate"
 
 
 Additional Parameters
@@ -53,6 +55,7 @@ Custom py.test options:
   --pqos=PQOS           Path to pqos utility
   --rdtset=RDTSET       Path to rdtset utility
   --membw=MEMBW         Path to membw tool
+  --env=ENV             Path to environment file
   --iface-msr           MSR interface
   -I, --iface-os        OS interface
 
