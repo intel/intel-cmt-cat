@@ -38,6 +38,7 @@
 #include <linux/perf_event.h>
 
 #include "pqos.h"
+#include "common.h"
 #include "perf.h"
 #include "log.h"
 #include "types.h"
@@ -194,7 +195,7 @@ set_mon_type(void)
         char file[64], evt[8];
 
         snprintf(file, sizeof(file) - 1, "%s%s", PERF_MON_PATH, perf_type);
-        fd = fopen(file, "r");
+        fd = fopen_check_symlink(file, "r");
         if (fd == NULL) {
                 LOG_INFO("Perf monitoring not supported. "
                          "Kernel version 4.6 or higher required.\n");
@@ -286,7 +287,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
          */
         snprintf(file, sizeof(file) - 1, "%s%s%s", PERF_MON_PATH, perf_events,
                  fname);
-        fd = fopen(file, "r");
+        fd = fopen_check_symlink(file, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s!\n", file);
                 return PQOS_RETVAL_ERROR;
@@ -311,7 +312,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
          */
         snprintf(file, sizeof(file) - 1, "%s%s%s.scale",
                  PERF_MON_PATH, perf_events, fname);
-        fd = fopen(file, "r");
+        fd = fopen_check_symlink(file, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open OS monitoring event scale file!\n");
                 return PQOS_RETVAL_ERROR;

@@ -37,6 +37,7 @@
 
 #include "pqos.h"
 
+#include "common.h"
 #include "os_cap.h"
 #include "types.h"
 #include "log.h"
@@ -53,15 +54,18 @@ static int mba_ctrl = -1; /**< mba ctrl support */
 /**
  * @brief Checks file fname to detect str and sets a flag
  *
- * @param fname name of the file to be searched
- * @param str string being searched for
- * @param supported pointer to os_supported flag
+ * @param [in] fname name of the file to be searched
+ * @param [in] str string being searched for
+ * @param [in] check_symlink a flag indicating if a path must be checked
+ *             against symlinks
+ * @param [out] supported pointer to os_supported flag
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
 static int
-detect_os_support(const char *fname, const char *str, int *supported)
+detect_os_support(const char *fname, const char *str, int check_symlink,
+                  int *supported)
 {
         FILE *fd;
         char temp[1024];
@@ -69,7 +73,11 @@ detect_os_support(const char *fname, const char *str, int *supported)
         if (fname == NULL || str == NULL || supported == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        fd = fopen(fname, "r");
+        if (check_symlink)
+                fd = fopen_check_symlink(fname, "r");
+        else
+                fd = fopen(fname, "r");
+
         if (fd == NULL) {
                 LOG_DEBUG("%s not found.\n", fname);
                 *supported = 0;
@@ -110,7 +118,7 @@ readuint64(const char *fname, unsigned base, uint64_t *value)
         ASSERT(fname != NULL);
         ASSERT(value != NULL);
 
-        fd = fopen(fname, "r");
+        fd = fopen_check_symlink(fname, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -226,7 +234,7 @@ os_cap_init(const enum pqos_interface inter)
         /**
          * resctrl detection
          */
-        ret = detect_os_support(PROC_FILESYSTEMS, "resctrl", &res_flag);
+        ret = detect_os_support(PROC_FILESYSTEMS, "resctrl", 0, &res_flag);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Fatal error encountered in resctrl detection!\n");
                 return ret;
@@ -327,7 +335,7 @@ detect_mon_resctrl_support(const enum pqos_mon_event event,
         }
 
         ret = detect_os_support(RESCTRL_PATH_INFO_L3_MON"/mon_features",
-                                 event_name, supported);
+                                 event_name, 1, supported);
 
         if (scale != NULL)
                 *scale = 1;
@@ -362,7 +370,7 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s.scale",
                  event_name);
 
-        fd = fopen(path, "r");
+        fd = fopen_check_symlink(path, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s perf monitoring event scale "
                           "file!\n", event_name);
@@ -380,7 +388,7 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s.unit",
                  event_name);
 
-        fd = fopen(path, "r");
+        fd = fopen_check_symlink(path, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s perf monitoring event unit "
                           "file!\n", event_name);
@@ -550,7 +558,7 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap,
                 PQOS_PERF_EVENT_IPC
         };
 
-        ret = detect_os_support(PROC_CPUINFO, "cqm", &supported);
+        ret = detect_os_support(PROC_CPUINFO, "cqm", 0, &supported);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Fatal error encountered in"
                           " OS detection!\n");
@@ -655,7 +663,7 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
                 goto os_cap_l3ca_discover_exit;
 
         if (!cdp_on)
-                ret = detect_os_support(PROC_CPUINFO, "cdp_l3", &cap->cdp);
+                ret = detect_os_support(PROC_CPUINFO, "cdp_l3", 0, &cap->cdp);
 
  os_cap_l3ca_discover_exit:
         if (ret == PQOS_RETVAL_OK)
@@ -709,7 +717,7 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
                 goto os_cap_l2ca_discover_exit;
 
         if (!cdp_on)
-                ret = detect_os_support(PROC_CPUINFO, "cdp_l2", &cap->cdp);
+                ret = detect_os_support(PROC_CPUINFO, "cdp_l2", 0, &cap->cdp);
 
  os_cap_l2ca_discover_exit:
         if (ret == PQOS_RETVAL_OK)
@@ -744,7 +752,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
 
         /* check mount flags */
         if (*enabled == -1) {
-                ret = detect_os_support(PROC_MOUNTS, "mba_MBps", enabled);
+                ret = detect_os_support(PROC_MOUNTS, "mba_MBps", 0, enabled);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
         }
@@ -898,7 +906,7 @@ os_cap_mba_discover(struct pqos_cap_mba **r_cap,
                 goto os_cap_mba_discover_exit;
 
         /* Detect MBA CTRL status */
-        ret = detect_os_support(PROC_MOUNTS, "mba_MBps", &(cap->ctrl_on));
+        ret = detect_os_support(PROC_MOUNTS, "mba_MBps", 0, &(cap->ctrl_on));
         if (ret != PQOS_RETVAL_OK)
                 goto os_cap_mba_discover_exit;
         if (cap->ctrl_on == 1)
@@ -932,4 +940,3 @@ os_cap_mba_discover(struct pqos_cap_mba **r_cap,
 
         return ret;
 }
-
