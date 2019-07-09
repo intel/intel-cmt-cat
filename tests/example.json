@@ -1,0 +1,24 @@
+{
+	"cpu" : {
+		"sockets": 2,
+		"cores"  : 48
+	},
+	"cat" : {
+		"l3" : {
+			"cos"        : 16,
+			"ways"       : 11,
+			"cdp"        : true,
+			"minCbmBits" : 1
+		}
+	},
+	"mba" : {
+		"cos" : 8
+	},
+	"cmt" : {
+	    "occup_llc": true
+	},
+	"mbm" : {
+	    "mbm_local": true,
+	    "mbm_total": true
+	}
+}
