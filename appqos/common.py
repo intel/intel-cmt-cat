@@ -35,7 +35,10 @@
 Common global constants and instances
 """
 
+import errno
 import multiprocessing
+import os
+
 import pqos_api # pylint: disable=cyclic-import
 import config # pylint: disable=cyclic-import
 import stats # pylint: disable=cyclic-import
@@ -52,3 +55,19 @@ MANAGER = multiprocessing.Manager()
 CONFIG_STORE = config.ConfigStore()
 STATS_STORE = stats.StatsStore()
 PQOS_API = pqos_api.PqosApi()
+
+
+def check_link(path, flags):
+    """
+    A custom opener for "open" function.
+    Rises PermissionError if path points to a link
+
+    Parameters:
+        path: path to file
+        flags: flags for "os.open" function
+    Returns:
+        an open file descriptor
+    """
+    if os.path.islink(path):
+        raise PermissionError(errno.EPERM, os.strerror(errno.EPERM) + ". Is a link.", path)
+    return os.open(path, flags)

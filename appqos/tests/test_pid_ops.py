@@ -54,5 +54,5 @@ def test_get_pid_status():
         assert ('R', True, 'TestApp') == get_pid_status(0)
         read_pid_state_mock.assert_called_with("self")
 
-    with mock.patch('pid_ops._read_pid_state', side_effect=EnvironmentError()):
+    with mock.patch('pid_ops._read_pid_state', side_effect=OSError()):
         assert ('E', False, '') == get_pid_status(2345)

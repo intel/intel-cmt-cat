@@ -155,8 +155,13 @@ class Server:
         """
 
         try:
+            # check for file existence and type
+            with open(TLS_CERT_FILE, opener=common.check_link):
+                pass
+            with open(TLS_KEY_FILE, opener=common.check_link):
+                pass
             self.context.load_cert_chain(TLS_CERT_FILE, TLS_KEY_FILE)
-        except FileNotFoundError as ex:
+        except (FileNotFoundError, PermissionError) as ex:
             log.error("SSL cert or key file, {}".format(str(ex)))
             return -1
 

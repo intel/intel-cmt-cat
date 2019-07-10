@@ -116,7 +116,7 @@ def _get_core_freqs(core):
 
 def _read_int_from_file(fname):
     try:
-        with open(fname) as file:
+        with open(fname, opener=common.check_link) as file:
             return int(file.read())
     except Exception as ex:
         log.error("{} {}".format(str(fname), str(ex)))

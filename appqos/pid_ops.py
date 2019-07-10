@@ -36,6 +36,9 @@ PIDs ops module
 Provides PIDs related helper functions
 """
 
+import common
+import log
+
 # list of valid PIDs' status, (R)unning, (S)leeping, (D)isk wait
 PID_VALID_STATUS = set('RSD')
 
@@ -58,7 +61,10 @@ def get_pid_status(pid):
     try:
         state, pid_name = _read_pid_state(pid_str)
         return state, state in PID_VALID_STATUS, pid_name
-    except EnvironmentError:
+    except PermissionError as ex:
+        log.error("procfs file, {}".format(str(ex)))
+    except OSError as ex:
+        # handle silently, most likely PID has terminated
         pass
 
     return 'E', False, ''
@@ -75,7 +81,7 @@ def _read_pid_state(pid_str):
         state, pid_name
     """
     # read procfs /proc/PID/stat file to get PID status
-    with open("/proc/{}/stat".format(pid_str)) as stat_file:
+    with open("/proc/{}/stat".format(pid_str), opener=common.check_link) as stat_file:
         # split by '(' and ')' needed
         # as processes/threads could have spaces in the name
         line_split = stat_file.readline().strip().split(')')
