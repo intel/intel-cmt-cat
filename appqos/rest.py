@@ -39,6 +39,7 @@ import json
 import multiprocessing
 import os
 import signal
+import ssl
 
 from copy import deepcopy
 from time import sleep
@@ -57,6 +58,10 @@ import sstbf
 
 from config import ConfigStore
 from stats import StatsStore
+
+
+TLS_CERT_FILE = 'appqos.crt'
+TLS_KEY_FILE = 'appqos.key'
 
 
 class RestError(HTTPException):
@@ -115,7 +120,12 @@ class Server:
         self.api = Api(self.app)
 
         # initialize SSL context
-        self.context = ('appqos.crt', 'appqos.key')
+        self.context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+
+        # allow TLS 1.1 and later
+        self.context.options |= ssl.OP_NO_SSLv2
+        self.context.options |= ssl.OP_NO_SSLv3
+        self.context.options |= ssl.OP_NO_TLSv1
 
         self.api.add_resource(Apps, '/apps')
         self.api.add_resource(App, '/apps/<app_id>')
@@ -143,10 +153,11 @@ class Server:
             0 on success
         """
 
-        for ssl_ctx_file in self.context:
-            if not os.path.isfile(ssl_ctx_file):
-                log.error("SSL cert or key file missing.")
-                return -1
+        try:
+            self.context.load_cert_chain(TLS_CERT_FILE, TLS_KEY_FILE)
+        except FileNotFoundError as ex:
+            log.error("SSL cert or key file, {}".format(str(ex)))
+            return -1
 
         self.process = multiprocessing.Process(target=self.app.run,
                                                kwargs={'host': host,
