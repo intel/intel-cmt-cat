@@ -120,12 +120,13 @@ class Server:
         self.api = Api(self.app)
 
         # initialize SSL context
-        self.context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
+        self.context = ssl.SSLContext(ssl.PROTOCOL_TLS)
 
-        # allow TLS 1.1 and later
+        # allow TLS 1.2 and later
         self.context.options |= ssl.OP_NO_SSLv2
         self.context.options |= ssl.OP_NO_SSLv3
         self.context.options |= ssl.OP_NO_TLSv1
+        self.context.options |= ssl.OP_NO_TLSv1_1
 
         self.api.add_resource(Apps, '/apps')
         self.api.add_resource(App, '/apps/<app_id>')
