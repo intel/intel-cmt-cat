@@ -285,29 +285,24 @@ static const struct llc_allocation allocation_tab[] = {
         },
 };
 
-void profile_l3ca_list(FILE *fp)
+void profile_l3ca_list(void)
 {
         unsigned i = 0;
-
-        ASSERT(fp != NULL);
-        if (fp == NULL)
-                return;
 
         for (i = 0; i < DIM(allocation_tab); i++) {
                 const struct llc_allocation *ap = &allocation_tab[i];
                 unsigned j;
 
-                fprintf(fp,
-                        "%u)\n"
-                        "      Config ID: %s\n"
-                        "    Description: %s\n"
-                        " Configurations:\n",
-                        i+1, ap->id, ap->descr);
+                printf("%u)\n"
+                       "      Config ID: %s\n"
+                       "    Description: %s\n"
+                       " Configurations:\n",
+                       i+1, ap->id, ap->descr);
                 for (j = 0; j < ap->num_config; j++) {
-                        fprintf(fp,
-                                "\tnumber of classes = %u, number of cache ways = %u\n",
-                                (unsigned) ap->config[j].num_classes,
-                                (unsigned) ap->config[j].num_ways);
+                        printf("\tnumber of classes = %u,"
+                               " number of cache ways = %u\n",
+                               (unsigned) ap->config[j].num_classes,
+                               (unsigned) ap->config[j].num_ways);
                 }
         }
 }

@@ -53,6 +53,8 @@
 #include "alloc.h"
 #include "cap.h"
 
+#define FILE_READ_WRITE (0600)
+
 /**
  * Default L3 CDP configuration option - don't enforce on or off
  */
@@ -452,7 +454,7 @@ parse_config_file(const char *fname)
 
         static const struct {
                 const char *option;
-                void (*fn)(const char *);
+                void (*fn)(const char *arg);
         } optab[] = {
                 {"show-alloc:",         selfn_show_allocation },   /**< -s */
                 {"display:",            selfn_display },           /**< -d */
@@ -695,7 +697,7 @@ int main(int argc, char **argv)
                         print_help(1);
                         return EXIT_SUCCESS;
                 case 'H':
-                        profile_l3ca_list(stdout);
+                        profile_l3ca_list();
                         return EXIT_SUCCESS;
                 case 'f':
                         if (sel_config_file != NULL) {
@@ -844,7 +846,7 @@ int main(int argc, char **argv)
                 cfg.fd_log = STDOUT_FILENO;
         } else {
                 cfg.fd_log = open(sel_log_file, O_WRONLY|O_CREAT,
-                                  S_IRUSR|S_IWUSR);
+                                  FILE_READ_WRITE);
                 if (cfg.fd_log == -1) {
                         printf("Error opening %s log file!\n", sel_log_file);
                         exit_val = EXIT_FAILURE;

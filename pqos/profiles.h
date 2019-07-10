@@ -48,10 +48,8 @@ extern "C" {
 
 /**
  * @brief Prints list of supported L3CA profiles to STDOUT
- *
- * @param [in] fp file stream to write profile descriptions to
  */
-void profile_l3ca_list(FILE *fp);
+void profile_l3ca_list(void);
 
 /**
  * @brief Applies selected profile via selfn_allocation_class()

@@ -81,6 +81,7 @@ CHECKPATCH?=checkpatch.pl
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT \
+	--ignore SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f monitor_app.c
 
 CPPCHECK?=cppcheck

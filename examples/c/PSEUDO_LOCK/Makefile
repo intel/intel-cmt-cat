@@ -82,7 +82,7 @@ CHECKPATCH?=checkpatch.pl
 style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,\
-	ARRAY_SIZE,BLOCK_COMMENT_STYLE \
+	ARRAY_SIZE,BLOCK_COMMENT_STYLE,SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f pseudo_lock.c -f tsc.c -f tsc.h -f dlock.c -f dlock.h
 
 CPPCHECK?=cppcheck

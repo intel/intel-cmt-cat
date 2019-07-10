@@ -1972,7 +1972,7 @@ static size_t
 fillin_text_column(const double val, char data[], const size_t sz_data,
                    const int is_monitored, const int is_column_present)
 {
-        const char blank_column[] = "            ";
+        static const char blank_column[] = "            ";
         size_t offset = 0;
 
         if (sz_data <= sizeof(blank_column))

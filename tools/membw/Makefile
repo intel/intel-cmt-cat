@@ -84,7 +84,7 @@ style:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE \
 	--ignore SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE,COMPLEX_MACRO \
-	--ignore STORAGE_CLASS \
+	--ignore STORAGE_CLASS,SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f membw.c
 
 CPPCHECK?=cppcheck
