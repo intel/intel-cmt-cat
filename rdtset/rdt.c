@@ -47,11 +47,11 @@
 #include "rdt.h"
 #include "cpu.h"
 
-static const struct pqos_cap *m_cap;
-static const struct pqos_cpuinfo *m_cpu;
-static const struct pqos_capability *m_cap_l2ca;
-static const struct pqos_capability *m_cap_l3ca;
-static const struct pqos_capability *m_cap_mba;
+static const struct pqos_cap *m_cap = NULL;
+static const struct pqos_cpuinfo *m_cpu = NULL;
+static const struct pqos_capability *m_cap_l2ca = NULL;
+static const struct pqos_capability *m_cap_l3ca = NULL;
+static const struct pqos_capability *m_cap_mba = NULL;
 
 /**
  * @brief Prints L2, L3 or MBA configuration in \a cfg
