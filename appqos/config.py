@@ -358,7 +358,7 @@ class ConfigStore:
         Returns:
             schema validated configuration
         """
-        with open(path, 'r+') as fd:
+        with open(path, 'r') as fd:
             raw_data = fd.read()
             data = json.loads(raw_data.replace('\r\n', '\\r\\n'))
 
