@@ -1,4 +1,32 @@
+========================================================================
+Release  v3.1  ....-..-..
 =======================================================================
+
+Contributors (alphabetical order):
+        Adrian Boczkowski <adrianx.boczkowski@intel.com>
+        Khawar Abbasi <khawar.abbasi@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Philipp Wendler <uni@philippwendler.de>
+        Radoslaw Jablonski <radoslawx.jablonski@intel.com>
+        WangJialei-A <jialei.a.wang@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+1. Library:
+        - Added Python wrapper for the library
+2. PQoS Utility:
+        - Output LLC occupancy in percent
+3. rdtset Utility:
+        - Added support for multiple instances
+4. AppQoS:
+        - Added new sample application
+5. examples:
+        - Added examples for python library
+6. tests:
+        - Added basic functional tests
+7. General
+        - Bug fixes
+
+======================================================================
 Release  v3.0.1  2019-03-14
 =======================================================================
 
