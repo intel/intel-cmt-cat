@@ -1813,3 +1813,13 @@ print_cmd_line_rdt_config(void)
 		}
 	}
 }
+
+void
+print_lib_version(void)
+{
+        int major = m_cap->version / 10000;
+        int minor = (m_cap->version % 10000) / 100;
+        int patch = m_cap->version % 100;
+
+        printf("PQoS Library version: %d.%d.%d\n", major, minor, patch);
+}

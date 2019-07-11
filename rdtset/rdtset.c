@@ -223,7 +223,10 @@ print_usage(char *prgname, unsigned short_usage)
 	        "If not set the default implementation"
 	        " is to program the MSR's directly\n"
 		" -h, --help                            "
-		"display help\n\n");
+		"display help\n"
+		" -w, --version                         "
+		"display PQoS library version\n\n");
+
 
 	if (short_usage) {
 		printf("For more help run with -h/--help\n");
@@ -310,6 +313,7 @@ print_usage(char *prgname, unsigned short_usage)
  * @param [in] f_p flag for -p argument
  * @param [in] f_i flag for -I argument
  * @param [in] cmd flag for command to be executed
+ * @param [in] f_w flag for -w argument
  *
  * @return Operation status
  * @retval 1 on success
@@ -317,7 +321,8 @@ print_usage(char *prgname, unsigned short_usage)
  */
 static int
 validate_args(const int f_r, __attribute__((unused)) const int f_t,
-              const int f_c, const int f_p, const int f_i, const int cmd)
+              const int f_c, const int f_p, const int f_i, const int cmd,
+              const int f_w)
 {
         unsigned i;
         int f_n = 0; /**< non cpu (pid) config flag */
@@ -336,7 +341,8 @@ validate_args(const int f_r, __attribute__((unused)) const int f_t,
 		(f_c && f_p && !cmd && !f_n) ||
 		(f_r && f_p && !cmd) ||
 		(f_i && f_n && !f_p && cmd) ||
-		(f_i && f_n && f_p && !cmd);
+		(f_i && f_n && f_p && !cmd) ||
+		f_w;
 }
 
 /**
@@ -400,10 +406,11 @@ parse_args(int argc, char **argv)
 		{ "verbose",	no_argument,		0, 'v' },
 		{ "iface-os",   no_argument,            0, 'I' },
 		{ "help",	no_argument,		0, 'h' },
+		{ "version",	no_argument,		0, 'w' },
 		{ NULL, 0, 0, 0 } };
 
 	while ((opt = getopt_long(argc, argvopt,
-	                          "+c:p:r:t:kvIh", lgopts, NULL)) != -1) {
+	                          "+c:p:r:t:kvIhw", lgopts, NULL)) != -1) {
 		switch (opt) {
 		case 'c':
 			retval = parse_cpu(optarg);
@@ -448,6 +455,9 @@ parse_args(int argc, char **argv)
 		case 'h':
 			retval = -EAGAIN;
 			goto exit;
+		case 'w':
+			g_cfg.show_version = 1;
+			break;
 		}
 	}
 
@@ -586,7 +596,8 @@ main(int argc, char **argv)
 			0 != CPU_COUNT(&g_cfg.cpu_aff_cpuset),
 			0 != g_cfg.pid_count,
                         0 != g_cfg.interface,
-			0 != g_cfg.command)) {
+			0 != g_cfg.command,
+			0 != g_cfg.show_version)) {
 		fprintf(stderr, "Incorrect invocation!\n");
 		print_usage(argv[0], 1);
 		exit(EXIT_FAILURE);
@@ -601,6 +612,12 @@ main(int argc, char **argv)
         ret = rdtset_init();
         if (ret < 0)
                 exit(EXIT_FAILURE);
+
+	/* display library version */
+	if (0 != g_cfg.show_version) {
+		print_lib_version();
+		exit(EXIT_SUCCESS);
+	}
 
 	/* reset COS association */
 	if (0 != CPU_COUNT(&g_cfg.reset_cpuset)) {

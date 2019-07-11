@@ -123,6 +123,11 @@ int alloc_reset(void);
  */
 void print_cmd_line_rdt_config(void);
 
+/**
+ * @brief Displays PQoS library version
+ */
+void print_lib_version(void);
+
 #ifdef __cplusplus
 }
 #endif

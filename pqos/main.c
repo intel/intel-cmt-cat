@@ -121,6 +121,11 @@ static int sel_display_verbose = 0;
 enum pqos_interface sel_interface = PQOS_INTER_MSR;
 
 /**
+ * Enable displaying library version
+ */
+static int sel_print_version = 0;
+
+/**
  * @brief Function to check if a value is already contained in a table
  *
  * @param tab table of values to check
@@ -442,6 +447,18 @@ selfn_iface_os(const char *arg)
 }
 
 /**
+ * @brief Selects printing library version
+ *
+ * @param arg not used
+ */
+static void
+selfn_print_version(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_print_version = 1;
+}
+
+/**
  * @brief Opens configuration file and parses its contents
  *
  * @param fname Name of the file with configuration parameters
@@ -540,6 +557,7 @@ parse_config_file(const char *fname)
 static const char *m_cmd_name = "pqos";                     /**< command name */
 static const char help_printf_short[] =
         "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
+        "       %s [-w] [--version]\n"
         "          [-l FILE] [--log-file=FILE] [-I] [--iface-os]\n"
         "       %s [-s] [--show]\n"
         "       %s [-d] [--display] [-D] [--display-verbose]\n"
@@ -564,6 +582,7 @@ static const char help_printf_long[] =
         "  -h, --help                  help page\n"
         "  -v, --verbose               verbose mode\n"
         "  -V, --super-verbose         super-verbose mode\n"
+        "  -w, --version               show PQoS library version\n"
         "  -s, --show                  show current PQoS configuration\n"
         "  -d, --display               display supported capabilities\n"
         "  -D, --display-verbose       display supported capabilities in verbose mode\n"
@@ -641,9 +660,23 @@ static void print_help(const int is_long)
 {
         printf(help_printf_short,
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
-               m_cmd_name, m_cmd_name, m_cmd_name);
+               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name);
         if (is_long)
                 printf("%s", help_printf_long);
+}
+
+/**
+ * @brief Displays PQoS library version
+ *
+ * @param [in] p_cap platform capabilities
+ */
+static void print_lib_version(const struct pqos_cap *p_cap)
+{
+        int major = p_cap->version / 10000;
+        int minor = (p_cap->version % 10000) / 100;
+        int patch = p_cap->version % 100;
+
+        printf("PQoS Library version: %d.%d.%d\n", major, minor, patch);
 }
 
 static struct option long_cmd_opts[] = {
@@ -670,6 +703,7 @@ static struct option long_cmd_opts[] = {
         {"super-verbose",   no_argument,       0, 'V'},
         {"iface-os",        no_argument,       0, 'I'},
         {"percent-llc",     no_argument,       0, 'P'},
+        {"version",         no_argument,       0, 'w'},
         {0, 0, 0, 0} /* end */
 };
 
@@ -690,7 +724,7 @@ int main(int argc, char **argv)
         memset(&cfg, 0, sizeof(cfg));
 
         while ((cmd = getopt_long(argc, argv,
-                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIPR:",
+                                  ":Hhwf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIPR:",
                                   long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
@@ -699,6 +733,9 @@ int main(int argc, char **argv)
                 case 'H':
                         profile_l3ca_list();
                         return EXIT_SUCCESS;
+                case 'w':
+                        selfn_print_version(NULL);
+                        break;
                 case 'f':
                         if (sel_config_file != NULL) {
                                 printf("Only one config file argument is "
@@ -900,6 +937,12 @@ int main(int argc, char **argv)
         if (ret == PQOS_RETVAL_PARAM) {
                 printf("Error retrieving MB allocation capabilities!\n");
                 exit_val = EXIT_FAILURE;
+                goto error_exit_2;
+        }
+
+        if (sel_print_version) {
+                print_lib_version(p_cap);
+                exit_val = EXIT_SUCCESS;
                 goto error_exit_2;
         }
 
