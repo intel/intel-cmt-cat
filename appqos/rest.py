@@ -221,6 +221,21 @@ class Server:
         return False
 
 
+def validate_str_int(string):
+    """
+    Check if string is valid integer
+
+    Parameters:
+        string: string to be validated
+    """
+    try:
+        int(string)
+    except ValueError:
+        return False
+
+    return True
+
+
 class App(Resource):
     """
     Handle /apps/<app_id> HTTP requests
@@ -233,7 +248,7 @@ class App(Resource):
         """
         Handles HTTP GET /apps/<app_id> request.
         Retrieve single app
-        Raises NotFound
+        Raises NotFound, BadRequest
 
         Parameters:
             app_id: Id of app to retrieve
@@ -241,6 +256,10 @@ class App(Resource):
         Returns:
             response, status code
         """
+
+        if not validate_str_int(app_id):
+            raise BadRequest("APP index {} is invalid.".format(str(app_id)))
+
         data = common.CONFIG_STORE.get_config()
         if 'apps' not in data:
             raise NotFound("No apps in config file")
@@ -260,7 +279,7 @@ class App(Resource):
         """
         Handles HTTP DELETE /apps/<app_id> request.
         Deletes single App
-        Raises NotFound
+        Raises NotFound, BadRequest
 
         Parameters:
             app_id: Id of app to delete
@@ -268,6 +287,10 @@ class App(Resource):
         Returns:
             response, status code
         """
+
+        if not validate_str_int(app_id):
+            raise BadRequest("APP index {} is invalid.".format(str(app_id)))
+
         data = deepcopy(common.CONFIG_STORE.get_config())
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
@@ -311,6 +334,10 @@ class App(Resource):
         Returns:
             response, status code
         """
+
+        if not validate_str_int(app_id):
+            raise BadRequest("APP index {} is invalid.".format(str(app_id)))
+
         json_data = request.get_json()
 
         # validate app schema
@@ -493,7 +520,7 @@ class Pool(Resource):
         """
         Handles HTTP GET /pools/<pool_id> request.
         Retrieve single pool
-        Raises NotFound
+        Raises NotFound, BadRequest
 
         Parameters:
             pool_id: Id of pool to retrieve
@@ -501,6 +528,9 @@ class Pool(Resource):
         Returns:
             response, status code
         """
+
+        if not validate_str_int(pool_id):
+            raise BadRequest("POOL index {} is invalid.".format(str(pool_id)))
 
         data = deepcopy(common.CONFIG_STORE.get_config())
         if 'pools' not in data:
@@ -529,6 +559,10 @@ class Pool(Resource):
         Returns:
             response, status code
         """
+
+        if not validate_str_int(pool_id):
+            raise BadRequest("POOL index {} is invalid.".format(str(pool_id)))
+
         data = deepcopy(common.CONFIG_STORE.get_config())
         if 'pools' not in data:
             raise NotFound("No pools in config file")
@@ -579,6 +613,9 @@ class Pool(Resource):
                 return True
 
             return pool_id <= common.PQOS_API.get_max_cos_id(alloc_tech)
+
+        if not validate_str_int(pool_id):
+            raise BadRequest("POOL index {} is invalid.".format(str(pool_id)))
 
         json_data = request.get_json()
 
