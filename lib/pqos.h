@@ -309,6 +309,8 @@ struct pqos_coreinfo {
         unsigned socket;                /**< socket id in the system */
         unsigned l3_id;                 /**< L3/LLC cluster id */
         unsigned l2_id;                 /**< L2 cluster id */
+	unsigned l3cat_id;              /**< L3 CAT classes id */
+	unsigned mba_id;                /**< MBA id */
 };
 
 /**
