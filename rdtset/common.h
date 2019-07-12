@@ -47,6 +47,11 @@ extern "C" {
 #define RDT_MAX_PIDS    128
 #define MAX_OPTARG_LEN  64
 
+/**
+ * MBA linear max value.
+ */
+#define RDT_MAX_MBA	100
+
 #ifndef MIN
 /**
  * Macro to return the minimum of two numbers

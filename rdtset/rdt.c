@@ -160,7 +160,7 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
 
 	case PQOS_CAP_TYPE_MBA:
 		return cfg.u.mba != NULL && cfg.u.mba->mb_max > 0 &&
-			((cfg.u.mba->ctrl == 0 && cfg.u.mba->mb_max <= 100) ||
+			((cfg.u.mba->ctrl == 0 && cfg.u.mba->mb_max <= RDT_MAX_MBA) ||
 			cfg.u.mba->ctrl == 1);
 
 	default:
@@ -435,7 +435,7 @@ rdt_mba_str_to_rate(const char *param, struct rdt_cfg mba)
 		return -EINVAL;
 
 	ret = str_to_uint64(param, 10, &rate);
-	if (ret < 0 || rate == 0 || rate > 100)
+	if (ret < 0 || rate == 0 || rate > RDT_MAX_MBA)
 		return -EINVAL;
 
 	mba.u.mba->ctrl = 0;
@@ -1255,7 +1255,7 @@ alloc_get_default_cos(struct pqos_l2ca *l2_def, struct pqos_l3ca *l3_def,
 			mba_def->ctrl = 1;
 			mba_def->mb_max = UINT32_MAX;
 		} else
-			mba_def->mb_max = 100;
+			mba_def->mb_max = RDT_MAX_MBA;
 	}
 
 	return 0;
@@ -1353,7 +1353,7 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 		if (!rdt_cfg_is_valid(wrap_mba(&mba_requested)))
 			mba_requested = mba_defs;
 		else if (mba_sc_mode(&g_cfg)) {
-			mba_requested.mb_max = MBA_SC_DEF_INIT_MBA;
+			mba_requested.mb_max = RDT_MAX_MBA;
 			mba_requested.ctrl = 0;
 		}
 

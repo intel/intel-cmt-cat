@@ -50,6 +50,7 @@
 #include "resctrl.h"
 #include "resctrl_alloc.h"
 #include "resctrl_monitoring.h"
+#include "cpu_registers.h"
 
 /**
  * ---------------------------------------
