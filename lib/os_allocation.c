@@ -991,36 +991,36 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 }
 
 /*
- * @brief Check if socket is correct
+ * @brief Check if l3cat_id is correct
  *
- * @param [in] socket CPU socket id
+ * @param [in] cpu l3cat id
  * @param [in] cpu CPU information structure from \a pqos_cap_get
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-verify_socket_id(const unsigned socket, const struct pqos_cpuinfo *cpu)
+verify_l3cat_id(const unsigned l3cat_id, const struct pqos_cpuinfo *cpu)
 {
-        int ret = PQOS_RETVAL_PARAM;
-        unsigned i;
-        unsigned sockets_num;
-        unsigned *sockets;
+	int ret = PQOS_RETVAL_PARAM;
+	unsigned i;
+	unsigned l3cat_num;
+	unsigned *l3cat_ids;
 
-        /* Get socket ids in the system */
-        sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
-        if (sockets == NULL)
-                return PQOS_RETVAL_ERROR;
+	/* Get l3cat ids in the system */
+	l3cat_ids = pqos_cpu_get_l3cat_ids(cpu, &l3cat_num);
+	if (l3cat_ids == NULL)
+		return PQOS_RETVAL_ERROR;
 
-        for (i = 0; i < sockets_num; ++i)
-                if (socket == sockets[i]) {
-                        ret = PQOS_RETVAL_OK;
-                        break;
-                }
+	for (i = 0; i < l3cat_num; ++i)
+		if (l3cat_id == l3cat_ids[i]) {
+			ret = PQOS_RETVAL_OK;
+			break;
+		}
 
-        free(sockets);
+	free(l3cat_ids);
 
-        return ret;
+	return ret;
 }
 
 int
@@ -1051,7 +1051,7 @@ os_l3ca_set(const unsigned socket,
 	if (num_cos > num_grps)
 		return PQOS_RETVAL_ERROR;
 
-        ret = verify_socket_id(socket, cpu);
+	ret = verify_l3cat_id(socket, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_l3ca_set_exit;
 
@@ -1143,7 +1143,7 @@ os_l3ca_get(const unsigned socket,
 	if (count > max_num_ca)
 		return PQOS_RETVAL_ERROR;
 
-        ret = verify_socket_id(socket, cpu);
+	ret = verify_l3cat_id(socket, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_l3ca_get_exit;
 
@@ -1491,7 +1491,7 @@ os_mba_set(const unsigned socket,
 			return PQOS_RETVAL_PARAM;
 		}
 
-        ret = verify_socket_id(socket, cpu);
+	ret = verify_l3cat_id(socket, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_set_exit;
 
@@ -1605,7 +1605,7 @@ os_mba_get(const unsigned socket,
 	if (count > max_num_cos)
 		return PQOS_RETVAL_ERROR;
 
-        ret = verify_socket_id(socket, cpu);
+	ret = verify_l3cat_id(socket, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_get_exit;
 
