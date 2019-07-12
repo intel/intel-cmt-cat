@@ -1481,7 +1481,7 @@ os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 }
 
 int
-os_mba_set(const unsigned socket,
+os_mba_set(const unsigned mba_id,
            const unsigned num_cos,
            const struct pqos_mba *requested,
            struct pqos_mba *actual)
@@ -1524,7 +1524,7 @@ os_mba_set(const unsigned socket,
 			return PQOS_RETVAL_PARAM;
 		}
 
-	ret = verify_mba_id(socket, cpu);
+	ret = verify_mba_id(mba_id, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_set_exit;
 
@@ -1571,7 +1571,7 @@ os_mba_set(const unsigned socket,
                                         mba.mb_max = step;
 			}
 
-                        ret = resctrl_schemata_mba_set(schmt, socket, &mba);
+			ret = resctrl_schemata_mba_set(schmt, mba_id, &mba);
                 }
 
                 /* write schemata */
@@ -1587,7 +1587,7 @@ os_mba_set(const unsigned socket,
 
 			/* update actual schemata */
                         if (ret == PQOS_RETVAL_OK) {
-                                ret = resctrl_schemata_mba_get(schmt, socket,
+				ret = resctrl_schemata_mba_get(schmt, mba_id,
                                                                &actual[i]);
                                 actual[i].class_id = requested[i].class_id;
                         }
@@ -1606,7 +1606,7 @@ os_mba_set(const unsigned socket,
 }
 
 int
-os_mba_get(const unsigned socket,
+os_mba_get(const unsigned mba_id,
            const unsigned max_num_cos,
            unsigned *num_cos,
            struct pqos_mba *mba_tab)
@@ -1638,7 +1638,7 @@ os_mba_get(const unsigned socket,
 	if (count > max_num_cos)
 		return PQOS_RETVAL_ERROR;
 
-	ret = verify_mba_id(socket, cpu);
+	ret = verify_mba_id(mba_id, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_get_exit;
 
@@ -1657,8 +1657,8 @@ os_mba_get(const unsigned socket,
 			ret = resctrl_alloc_schemata_read(class_id, schmt);
 
 		if (ret == PQOS_RETVAL_OK)
-                        ret = resctrl_schemata_mba_get(schmt, socket,
-                                                       &mba_tab[class_id]);
+			ret = resctrl_schemata_mba_get(schmt, mba_id,
+						       &mba_tab[class_id]);
 
                 mba_tab[class_id].class_id = class_id;
 

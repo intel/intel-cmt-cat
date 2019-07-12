@@ -762,20 +762,20 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 unsigned grp;
                 unsigned count = 0;
                 unsigned i;
-                unsigned *sock, sock_num;
+		unsigned *mba_ids, mba_id_num;
                 struct resctrl_schemata *schmt;
 
                 ret = resctrl_alloc_get_grps_num(cap, &count);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
-                sock = pqos_cpu_get_sockets(cpu, &sock_num);
-                if (sock == NULL)
+		mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+		if (mba_ids == NULL)
                         return PQOS_RETVAL_ERROR;
 
                 schmt = resctrl_schemata_alloc(cap, cpu);
                 if (schmt == NULL) {
-                        free(sock);
+			free(mba_ids);
                         return PQOS_RETVAL_ERROR;
                 }
 
@@ -784,11 +784,11 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                         if (ret != PQOS_RETVAL_OK)
                                 continue;
 
-                        for (i = 0; i < sock_num; i++) {
+			for (i = 0; i < mba_id_num; i++) {
                                 struct pqos_mba mba;
 
-                                ret = resctrl_schemata_mba_get(schmt, sock[i],
-                                                               &mba);
+				ret = resctrl_schemata_mba_get(schmt, mba_ids[i],
+							       &mba);
                                 if (ret == PQOS_RETVAL_OK && mba.mb_max > 100) {
                                         *enabled = 1;
                                         break;
@@ -797,7 +797,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 }
 
                 resctrl_schemata_free(schmt);
-                free(sock);
+		free(mba_ids);
         }
 
         /* get free COS and try to write value above 100 */
