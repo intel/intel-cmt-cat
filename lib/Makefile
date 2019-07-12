@@ -203,6 +203,7 @@ style:
 	-f allocation.h -f allocation.c \
 	-f api.h -f api.c \
 	-f cap.h -f cap.c \
+	-f common.h -f common.c \
 	-f cpuinfo.h -f cpuinfo.c \
 	-f log.h -f log.c \
 	-f machine.h -f machine.c \
@@ -227,7 +228,7 @@ cppcheck:
 	$(CPPCHECK) \
 	--enable=warning,portability,performance,missingInclude \
 	--std=c99 --template=gcc \
-	api.c api.h cap.c cap.h allocation.c perf.c perf.h \
+	api.c api.h cap.c cap.h common.h common.c allocation.c perf.c perf.h \
 	allocation.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \
 	utils.c utils.h \
@@ -247,4 +248,3 @@ ifneq ($(MAKECMDGOALS),clobber)
 -include $(DEPFILES)
 endif
 endif
-

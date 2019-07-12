@@ -45,6 +45,7 @@
 #include "log.h"
 #include "types.h"
 #include "cap.h"
+#include "common.h"
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
 #include "resctrl_alloc.h"
@@ -99,7 +100,7 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         /**
          * Discover supported events
          */
-        fd = fopen(RESCTRL_PATH_INFO_L3_MON"/mon_features", "r");
+        fd = fopen_check_symlink(RESCTRL_PATH_INFO_L3_MON"/mon_features", "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to obtain resctrl monitoring features\n");
                 return PQOS_RETVAL_ERROR;
@@ -281,7 +282,7 @@ resctrl_mon_cpumask_write(const unsigned class_id,
         resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
                                sizeof(path));
 
-        fd = fopen(path, "w");
+        fd = fopen_check_symlink(path, "w");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -317,7 +318,7 @@ resctrl_mon_cpumask_read(const unsigned class_id,
         resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
                                sizeof(path));
 
-        fd = fopen(path, "r");
+        fd = fopen_check_symlink(path, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -388,7 +389,7 @@ resctrl_mon_read_counters(const unsigned class_id,
 
                 snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf,
                          sockets[socket], name);
-                fd = fopen(path, "r");
+                fd = fopen_check_symlink(path, "r");
                 if (fd == NULL) {
                         ret = PQOS_RETVAL_ERROR;
                         goto resctrl_mon_read_exit;
@@ -452,7 +453,7 @@ resctrl_mon_empty(const unsigned class_id,
          */
         resctrl_mon_group_path(class_id, resctrl_group, "/tasks", path,
                                sizeof(path));
-        fd = fopen(path, "r");
+        fd = fopen_check_symlink(path, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
         /* Search tasks file for any task ID */
@@ -475,7 +476,8 @@ resctrl_mon_empty(const unsigned class_id,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        fd = fopen(RESCTRL_PATH"/info/L3_MON/max_threshold_occupancy", "r");
+        fd = fopen_check_symlink(RESCTRL_PATH
+                                 "/info/L3_MON/max_threshold_occupancy", "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
         if (fscanf(fd, "%u", &max_threshold_occupancy) != 1)
@@ -687,7 +689,7 @@ resctrl_mon_assoc_get_pid(const pid_t task,
                 resctrl_mon_group_path(class_id, namelist[i]->d_name, "/tasks",
                                        path, sizeof(path));
 
-                fd = fopen(path, "r");
+                fd = fopen_check_symlink(path, "r");
                 if (fd == NULL)
                         goto resctrl_mon_assoc_get_pid_exit;
 
@@ -744,7 +746,7 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
         }
 
         strncat(path, "/tasks", sizeof(path) - strlen(path) - 1);
-        fd = fopen(path, "w");
+        fd = fopen_check_symlink(path, "w");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 
