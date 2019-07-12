@@ -67,6 +67,44 @@ _pqos_utils_init(int interface)
 }
 
 unsigned *
+pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu,
+		     unsigned *count)
+{
+	unsigned mba_id_count = 0, i = 0;
+	unsigned *mba_ids = NULL;
+
+	ASSERT(cpu != NULL);
+	ASSERT(count != NULL);
+	if (cpu == NULL || count == NULL)
+		return NULL;
+
+	mba_ids = (unsigned *) malloc(sizeof(mba_ids[0]) * cpu->num_cores);
+	if (mba_ids == NULL)
+		return NULL;
+
+	for (i = 0; i < cpu->num_cores; i++) {
+		unsigned j = 0;
+
+		/**
+		 * Check if this mba id is already on the \a mbas list
+		 */
+		for (j = 0; j < mba_id_count && mba_id_count > 0; j++)
+			if (cpu->cores[i].mba_id  == mba_ids[j])
+				break;
+
+		if (j >= mba_id_count || mba_id_count == 0) {
+			/**
+			 * This mba_id wasn't reported before
+			 */
+			mba_ids[mba_id_count++] = cpu->cores[i].mba_id;
+		}
+	}
+
+	*count = mba_id_count;
+	return mba_ids;
+}
+
+unsigned *
 pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu,
 		       unsigned *count)
 {
