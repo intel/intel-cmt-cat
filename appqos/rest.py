@@ -467,7 +467,7 @@ class Apps(Resource):
             # validate pids
             for pid in json_data['pids']:
                 if not pid_ops.is_pid_valid(pid):
-                    raise BadRequest("New APP not added, please provide valid pid's")
+                    raise BadRequest("New APP not added, invalid PID: " + str(pid))
 
         # if pool_id not provided on app creation
         if 'pool_id' not in json_data or not json_data['pool_id']:
@@ -476,6 +476,9 @@ class Apps(Resource):
             # if apps cores list is a subset of existing pool cores list,
             # make existing pool a destination pool for app
             if 'cores' in json_data and json_data['cores']:
+                for core in json_data['cores']:
+                    if not common.PQOS_API.check_core(core):
+                        raise BadRequest("New APP not added, invalid core: " + str(core))
                 for pool in data['pools']:
                     if set(json_data['cores']).issubset(pool['cores']):
                         json_data['pool_id'] = pool['id']
