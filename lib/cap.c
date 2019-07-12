@@ -66,6 +66,7 @@
 #include "allocation.h"
 #include "monitoring.h"
 
+#include "cpu_registers.h"
 #include "cpuinfo.h"
 #include "machine.h"
 #include "types.h"
@@ -81,31 +82,6 @@
  * ---------------------------------------
  */
 
-/**
- * Available types of allocation resource ID's.
- * (matches CPUID enumeration)
- */
-#define PQOS_RES_ID_L3_ALLOCATION    1       /**< L3 cache allocation */
-#define PQOS_RES_ID_L2_ALLOCATION    2       /**< L2 cache allocation */
-#define PQOS_RES_ID_MB_ALLOCATION    3       /**< Memory BW allocation */
-
-#define PQOS_CPUID_CAT_CDP_BIT       2       /**< CDP supported bit */
-
-#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< L3 CAT config register */
-#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< L3 CDP enable bit */
-
-#define PQOS_MSR_L3CA_MASK_START     0xC90   /**< L3 CAT class 0 register */
-#define PQOS_MSR_L3CA_MASK_END       0xD0F   /**< L3 CAT class 127 register */
-#define PQOS_MSR_ASSOC               0xC8F   /**< CAT class to core association
-                                                register */
-#define PQOS_MSR_ASSOC_QECOS_SHIFT   32
-#define PQOS_MSR_ASSOC_QECOS_MASK    0xffffffff00000000ULL
-
-#define PQOS_MSR_L2_QOS_CFG          0xC82   /**< L2 CAT config register */
-#define PQOS_MSR_L2_QOS_CFG_CDP_EN   1ULL    /**< L2 CDP enable bit */
-
-#define PQOS_MSR_L2CA_MASK_START     0xC10   /**< L2 CAT class 0 register */
-#define PQOS_MSR_L2CA_MASK_END       0xD8F   /**< L2 CAT class 127 register */
 
 #ifndef LOCKFILE
 #ifdef __linux__
