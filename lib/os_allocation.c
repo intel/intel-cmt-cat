@@ -1023,6 +1023,39 @@ verify_l3cat_id(const unsigned l3cat_id, const struct pqos_cpuinfo *cpu)
 	return ret;
 }
 
+/*
+ * @brief Check if mba_id is correct
+ *
+ * @param [in] mba_id MBA resource id
+ * @param [in] CPU information structure from \a pqos_cap_get
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+verify_mba_id(const unsigned mba_id, const struct pqos_cpuinfo *cpu)
+{
+	int ret = PQOS_RETVAL_PARAM;
+	unsigned i;
+	unsigned mba_id_num;
+	unsigned *mba_ids;
+
+	/* Get mba ids in the system */
+	mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+	if (mba_ids == NULL)
+		return PQOS_RETVAL_ERROR;
+
+	for (i = 0; i < mba_id_num; ++i)
+		if (mba_id == mba_ids[i]) {
+			ret = PQOS_RETVAL_OK;
+			break;
+		}
+
+	free(mba_ids);
+
+	return ret;
+}
+
 int
 os_l3ca_set(const unsigned socket,
             const unsigned num_cos,
@@ -1491,7 +1524,7 @@ os_mba_set(const unsigned socket,
 			return PQOS_RETVAL_PARAM;
 		}
 
-	ret = verify_l3cat_id(socket, cpu);
+	ret = verify_mba_id(socket, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_set_exit;
 
@@ -1605,7 +1638,7 @@ os_mba_get(const unsigned socket,
 	if (count > max_num_cos)
 		return PQOS_RETVAL_ERROR;
 
-	ret = verify_l3cat_id(socket, cpu);
+	ret = verify_mba_id(socket, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mba_get_exit;
 
