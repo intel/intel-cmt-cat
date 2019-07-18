@@ -60,6 +60,9 @@ check_symlink(const char *name)
         int oflag;
         char *dir = strdup(name);
 
+        if (dir == NULL)
+                return PQOS_RETVAL_ERROR;
+
         oflag = O_RDONLY;
 
         do {
