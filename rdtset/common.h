@@ -156,7 +156,8 @@ struct rdtset {
 	cpu_set_t reset_cpuset;		/**< List of CPUs to reset COS assoc */
 	unsigned sudo_keep:1,		/**< don't drop elevated privileges */
 		 verbose:1,		/**< be verbose */
-		 command:1;		/**< command to be executed detected */
+		 command:1,		/**< command to be executed detected */
+		 show_version:1;	/**< print library version */
 	enum pqos_interface interface;  /**< pqos interface to use */
 };
 
