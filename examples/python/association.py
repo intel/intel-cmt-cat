@@ -34,77 +34,49 @@
 import argparse
 
 from pqos import Pqos
+from pqos.allocation import PqosAlloc
 from pqos.cpuinfo import PqosCpuInfo
-from pqos.mba import PqosMba
 
 
-def str_to_int(num_str):
+def set_allocation_class(class_id, cores):
     """
-    Converts string into number.
+    Sets up allocation classes of service on selected CPUs
 
     Parameters:
-        num_str: a string to be converted into number
-
-    Returns:
-        numeric value of the string representing the number
-    """
-
-    if num_str.lower().startswith('0x'):
-        return int(num_str[2:], 16)
-
-    return int(num_str)
-
-# /**
-#  * @brief Verifies and translates definition of single
-#  *        allocation class of service
-#  *        from args into internal configuration.
-#  *
-#  * @param argc Number of arguments in input command
-#  * @param argv Input arguments for COS allocation
-#  */
-
-def set_allocation_class(sockets, class_id, mb_max):
-    """
-    Sets up allocation classes of service on selected CPU sockets
-
-    Parameters:
-        sockets: array with socket IDs
         class_id: class of service ID
-        mb_max: COS rate in percent
+        cores: a list of cores
     """
 
-    mba = PqosMba()
-    cos = mba.COS(class_id, mb_max)
+    alloc = PqosAlloc()
 
-    for socket in sockets:
+    for core in cores:
         try:
-            actual = mba.set(socket, [cos])
-
-            params = (socket, class_id, mb_max, actual[0].mb_max)
-            print("SKT%u: MBA COS%u => %u%% requested, %u%% applied" % params)
+            alloc.assoc_set(core, class_id)
         except:
-            print("Setting up cache allocation class of service failed!")
+            print("Setting allocation class of service association failed!")
 
 
-def print_allocation_config(sockets):
+def print_allocation_config():
     """
     Prints allocation configuration.
-
-    Parameters:
-        sockets: array with socket IDs
     """
 
-    mba = PqosMba()
+    alloc = PqosAlloc()
+    cpuinfo = PqosCpuInfo()
+    sockets = cpuinfo.get_sockets()
 
     for socket in sockets:
         try:
-            coses = mba.get(socket)
+            print("Core information for socket %u:" % socket)
 
-            print("MBA COS definitions for Socket %u:" % socket)
+            cores = cpuinfo.get_cores(socket)
 
-            for cos in coses:
-                cos_params = (cos.class_id, cos.mb_max)
-                print("    MBA COS%u => %u%% available" % cos_params)
+            for core in cores:
+                class_id = alloc.assoc_get(core)
+                try:
+                    print("    Core %u => COS%u" % (core, class_id))
+                except:
+                    print("    Core %u => ERROR" % core)
         except:
             print("Error")
             raise
@@ -118,13 +90,14 @@ def parse_args():
         an object with parsed command line arguments
     """
 
-    description = 'PQoS Library Python wrapper - MBA allocation example'
+    description = 'PQoS Library Python wrapper - COS association example'
     parser = argparse.ArgumentParser(description=description)
     parser.add_argument('-I', dest='interface', action='store_const',
                         const='OS', default='MSR',
                         help='select library OS interface')
-    parser.add_argument('class_id', type=int, help='COS ID')
-    parser.add_argument('mb_max', type=int, help='MBA rate')
+    parser.add_argument('class_id', type=int, nargs='?', help='COS ID')
+    parser.add_argument('cores', metavar='CORE', type=int, nargs='*',
+                        help='a core to be associated')
 
     args = parser.parse_args()
     return args
@@ -159,11 +132,10 @@ def main():
 
     try:
         with PqosContextManager(args.interface):
-            cpu = PqosCpuInfo()
-            sockets = cpu.get_sockets()
+            if args.cores:
+                set_allocation_class(args.class_id, args.cores)
 
-            set_allocation_class(sockets, args.class_id, args.mb_max)
-            print_allocation_config(sockets)
+            print_allocation_config()
     except:
         print("Error!")
         raise

@@ -31,38 +31,12 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
-.PHONY: run_allocation_example run_capability_example run_cpuinfo_example
-.PHONY: run_l3ca_example run_mba_example clean
+.PHONY: clean
 
 env:
 	@bash -c "virtualenv -p python3 env"
 	@bash -c "source env/bin/activate && \
 		make -C ../../lib/python install; \
-		deactivate"
-
-run_allocation_example: env
-	@bash -c "source env/bin/activate && \
-		python allocation.py; \
-		deactivate"
-
-run_capability_example: env
-	@bash -c "source env/bin/activate && \
-		python capability.py; \
-		deactivate"
-
-run_cpuinfo_example: env
-	@bash -c "source env/bin/activate && \
-		python cpuinfo.py; \
-		deactivate"
-
-run_l3ca_example: env
-	@bash -c "source env/bin/activate && \
-		python l3ca.py; \
-		deactivate"
-
-run_mba_example: env
-	@bash -c "source env/bin/activate && \
-		python mba.py; \
 		deactivate"
 
 clean:
