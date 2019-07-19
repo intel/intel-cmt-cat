@@ -318,7 +318,7 @@ poll_events(struct pqos_mon_data *group)
                                 group->values.mbm_local_delta;
         }
         if (group->event & PQOS_PERF_EVENT_IPC) {
-                if (group->values.ipc_unhalted > 0)
+                if (group->values.ipc_unhalted_delta > 0)
                         group->values.ipc =
                                 (double)group->values.ipc_retired_delta /
                                 (double)group->values.ipc_unhalted_delta;
@@ -912,4 +912,3 @@ os_mon_poll(struct pqos_mon_data **groups,
 
         return PQOS_RETVAL_OK;
 }
-
