@@ -59,6 +59,7 @@ check_symlink(const char *name)
         int fd;
         int oflag;
         char *dir = strdup(name);
+        char *path = dir;
 
         if (dir == NULL)
                 return PQOS_RETVAL_ERROR;
@@ -66,21 +67,21 @@ check_symlink(const char *name)
         oflag = O_RDONLY;
 
         do {
-                fd = open(dir, oflag | O_NOFOLLOW);
+                fd = open(path, oflag | O_NOFOLLOW);
                 if (fd == -1) {
                         if (errno == ELOOP)
-                                LOG_ERROR("File %s is a symlink\n", dir);
+                                LOG_ERROR("File %s is a symlink\n", path);
 
                         free(dir);
                         return PQOS_RETVAL_ERROR;
                 }
 
                 oflag = O_RDONLY | O_DIRECTORY;
-                dir = dirname(dir);
+                path = dirname(path);
 
                 if (fd != -1)
                         close(fd);
-        } while ((strcmp(dir, ".") != 0) && (strcmp(dir, "/") != 0));
+        } while ((strcmp(path, ".") != 0) && (strcmp(path, "/") != 0));
 
         free(dir);
         return PQOS_RETVAL_OK;
