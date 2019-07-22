@@ -90,9 +90,32 @@ check_symlink(const char *name)
 FILE *
 fopen_check_symlink(const char *name, const char *mode)
 {
+        int fd;
         int ret;
+        char *dir;
+        char *file_name;
 
-        ret = check_symlink(name);
+        /* If the file will be created, check a parent directory for symlinks */
+        if (mode != NULL && (mode[0] == 'w' || mode[0] == 'a')) {
+                file_name = strdup(name);
+
+                if (file_name == NULL)
+                        return NULL;
+
+                fd = open(file_name, O_RDONLY);
+
+                if (fd == -1) {
+                        dir = dirname(file_name);
+                        ret = check_symlink(dir);
+                } else {
+                        ret = check_symlink(name);
+                        close(fd);
+                }
+
+                free(file_name);
+        } else
+                ret = check_symlink(name);
+
         if (ret != PQOS_RETVAL_OK)
                 return NULL;
 
