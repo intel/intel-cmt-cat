@@ -199,7 +199,7 @@ class PqosApi:
             False otherwise
         """
         try:
-            return self.get_mba_num_cos() != 0
+            return bool(self.get_mba_num_cos())
         except Exception as ex:
             log.error(str(ex))
             return False
@@ -214,7 +214,7 @@ class PqosApi:
             False otherwise
         """
         try:
-            return self.get_l3ca_num_cos() != 0
+            return bool(self.get_l3ca_num_cos())
         except Exception as ex:
             log.error(str(ex))
             return False
