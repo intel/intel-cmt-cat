@@ -235,6 +235,7 @@ mba_sc_stop(void)
         }
 
         free(state);
+        state = NULL;
 
         return ret;
 }
