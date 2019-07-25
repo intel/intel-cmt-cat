@@ -179,7 +179,9 @@ class Pool:
         if apps is not None:
             pids = []
             for app in apps:
-                pids.extend(config.get_app_attr('pids', app))
+                app_pids = config.get_app_attr('pids', app)
+                if app_pids:
+                    pids.extend(app_pids)
 
             self.pids_set(pids)
 
