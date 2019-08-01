@@ -40,12 +40,12 @@ VENV_DIR=env_$(shell hostname)
 
 test: $(VENV_DIR)
 	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		PYTHONPATH=. pytest tests/ && \
+		python -m pytest tests/ && \
 		deactivate"
 
 cov: $(VENV_DIR)
 	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		PYTHONPATH=. pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/ && \
+		python -m pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/ && \
 		deactivate"
 
 $(VENV_DIR): requirements.txt

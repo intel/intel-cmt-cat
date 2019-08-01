@@ -96,8 +96,8 @@ class AppQoS:
                 pool.get('id'), pool.get('cores'), pool.get('apps')))
 
         # set initial SST-BF configuration
-        if caps.sstbf_supported():
-            result = sstbf.configure_sstbf()
+        if caps.sstbf_enabled():
+            result = sstbf.init_sstbf()
             if result != 0:
                 log.error("Failed to apply initial SST-BF configuration, terminating...")
                 return

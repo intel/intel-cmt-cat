@@ -7,7 +7,7 @@
   "type": "object",
 
   "properties": {
-    "enabled": {
+    "configured": {
       "description": "SST-BF status",
       "type": "boolean"
     },
@@ -20,6 +20,6 @@
       "$ref": "definitions.json#/uint_uniq_nonempty_array"
     }
   },
-  "required": ["enabled", "hp_cores", "std_cores"],
+  "required": ["configured", "hp_cores", "std_cores"],
   "additionalProperties": false
 }

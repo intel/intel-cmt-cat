@@ -7,11 +7,11 @@
   "type": "object",
 
   "properties": {
-    "enabled": {
+    "configured": {
       "description": "SST-BF status",
       "type": "boolean"
     }
   },
-  "required": ["enabled"],
+  "required": ["configured"],
   "additionalProperties": false
 }
