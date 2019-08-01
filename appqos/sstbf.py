@@ -67,6 +67,8 @@ def is_sstbf_enabled():
         cpus = pwr.get_cpus()
     except IOError:
         return False
+    except ValueError:
+        return False
 
     if not cpus:
         return False
