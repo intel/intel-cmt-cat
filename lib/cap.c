@@ -1119,9 +1119,10 @@ discover_capabilities(struct pqos_cap **p_cap,
         case PQOS_RETVAL_OK:
                 LOG_INFO("L3CA capability detected\n");
                 LOG_INFO("L3 CAT details: CDP support=%d, CDP on=%d, "
-                         "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
+                         "#COS=%u, #ways=%u, ways contention bit-mask 0x%lx\n",
                          det_l3ca->cdp, det_l3ca->cdp_on, det_l3ca->num_classes,
-                         det_l3ca->num_ways, det_l3ca->way_contention);
+                         det_l3ca->num_ways,
+                         (unsigned long)det_l3ca->way_contention);
                 LOG_INFO("L3 CAT details: cache size %u bytes, "
                          "way size %u bytes\n",
                          det_l3ca->way_size * det_l3ca->num_ways,
@@ -1150,9 +1151,10 @@ discover_capabilities(struct pqos_cap **p_cap,
         case PQOS_RETVAL_OK:
                 LOG_INFO("L2CA capability detected\n");
                 LOG_INFO("L2 CAT details: CDP support=%d, CDP on=%d, "
-                         "#COS=%u, #ways=%u, ways contention bit-mask 0x%x\n",
+                         "#COS=%u, #ways=%u, ways contention bit-mask 0x%lx\n",
                          det_l2ca->cdp, det_l2ca->cdp_on, det_l2ca->num_classes,
-                         det_l2ca->num_ways, det_l2ca->way_contention);
+                         det_l2ca->num_ways,
+                         (unsigned long)det_l2ca->way_contention);
                 LOG_INFO("L2 CAT details: cache size %u bytes, way size %u "
                          "bytes\n", det_l2ca->way_size * det_l2ca->num_ways,
                          det_l2ca->way_size);
