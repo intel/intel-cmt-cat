@@ -238,6 +238,7 @@ static int
 get_max_res_id(unsigned technology)
 {
         unsigned num_ids, max = 0, *ids = NULL;
+	unsigned i;
 
         if (m_cpu == NULL || technology == 0)
                 return 0;
@@ -248,7 +249,9 @@ get_max_res_id(unsigned technology)
                 if (ids == NULL)
                         return 0;
 
-                max = num_ids > max ? num_ids : max;
+                for (i = 0; i < num_ids; i++)
+                        max = ids[i] > max ? ids[i] : max;
+
                 free(ids);
         }
         /* get number of sockets */
@@ -258,7 +261,9 @@ get_max_res_id(unsigned technology)
                 if (ids == NULL)
                         return 0;
 
-                max = num_ids > max ? num_ids : max;
+                for (i = 0; i < num_ids; i++)
+                        max = ids[i] > max ? ids[i] : max;
+
                 free(ids);
         }
         return max;
@@ -1527,7 +1532,7 @@ cfg_set_pids(const unsigned technology, const struct pqos_l3ca *l3ca,
              const struct pqos_l2ca *l2ca, const struct pqos_mba *mba)
 {
         int ret = 0;
-	unsigned i, cos_id, max_id, num_pids = 1;
+	unsigned i, cos_id, num_pids = 1;
         pid_t pid = getpid(), *p = &pid;
 
         /* Assign COS to selected pids otherwise assign to this pid */
@@ -1550,26 +1555,51 @@ cfg_set_pids(const unsigned technology, const struct pqos_l3ca *l3ca,
                 goto set_pids_exit;
         }
 
-        max_id = get_max_res_id(technology);
-        if (!max_id)
-                return -EFAULT;
+        /* Set COS definitions across all res L2 IDs */
+        if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
+                unsigned num_ids, *ids;
 
-        /* Set COS definitions across all res IDs */
-        for (i = 0; i < max_id; i++) {
-                unsigned core;
+                ids = pqos_cpu_get_l2ids(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return -EFAULT;
 
-                /* Get cores on res ID i */
-                if (technology & (1 << PQOS_CAP_TYPE_L2CA))
-                        ret = pqos_cpu_get_one_by_l2id(m_cpu, i, &core);
-                else
-                        ret = pqos_cpu_get_one_core(m_cpu, i, &core);
-                if (ret != 0)
-                        break;
+                for (i = 0; i < num_ids; i++) {
+                        unsigned core;
 
-                /* Configure COS on res ID i */
-                ret = cfg_configure_cos(l2ca, l3ca, mba, core, cos_id);
-                if (ret != 0)
-                        break;
+                        ret = pqos_cpu_get_one_by_l2id(m_cpu, ids[i], &core);
+                        if (ret != 0)
+                                break;
+
+                        /* Configure COS on res L2 ID i */
+                        ret = cfg_configure_cos(l2ca, l3ca, mba, core, cos_id);
+                        if (ret != 0)
+                                break;
+                }
+                free(ids);
+        }
+
+        /* Set COS definitions across all res L3 IDs */
+        if (technology & (1 << PQOS_CAP_TYPE_L3CA) ||
+            technology & (1 << PQOS_CAP_TYPE_MBA)) {
+                unsigned num_ids, *ids;
+
+                ids = pqos_cpu_get_sockets(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return -EFAULT;
+
+                for (i = 0; i < num_ids; i++) {
+                        unsigned core;
+
+                        ret = pqos_cpu_get_one_core(m_cpu, ids[i], &core);
+                        if (ret != 0)
+                                break;
+
+                        /* Configure COS on res L3 ID i */
+                        ret = cfg_configure_cos(l2ca, l3ca, mba, core, cos_id);
+                        if (ret != 0)
+                                break;
+                }
+                free(ids);
         }
 set_pids_exit:
         if (ret != 0)
