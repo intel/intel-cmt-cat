@@ -1,23 +1,760 @@
-========================================================================
+
+================================================================================
 README for AppQoS
 
-January 2019
-========================================================================
+August 2019
+================================================================================
 
-
-Contents
+CONTENTS
 ========
 
-- Overview
+- Introduction
+- Requirements and Installation
+- Configuration
+- Usage
+- REST API
+- Usage Scenario
+- How To Generate self-signed SSL certificate
 - Legal Disclaimer
 
 
-Overview
-========
+INTRODUCTION
+============
+
 AppQoS is a proof-of-concept software created to demonstrate the use of
-Intel(R) Resource Director Technology (Intel(R) RDT) (currently CAT and MBA) and
-Intel(R) Speed Select Technology - Base Frequency (Intel(R) SST-BF) to
-improve QoS for applications via partitioning system resources.
+Intel® RDT technologies (CAT, MBA) and Intel® SST-BF to improve QoS for
+applications via partitioning system resources.
+AppQoS allows to assign Apps to Pools with different resources.
+In current version each of the Pools (group of cores) has fixed amount of
+cache and memory bandwidth allocated. Thanks to Intel® SST-BF support,
+AppQoS allows the CPU to be deployed with an asymmetric core frequency
+configuration. Amount of resources allocated and cores frequency
+configuration could depend on Pool’s priority.
+Intel® RDT CAT and MBA configuration is done via "libpqos" library and
+Intel® SST-BF configuration via external "Intel pwr" library.
+
+AppQoS provides simple, local, REST API management interface secured
+with HTTPS and "Basic HTTP Auth". REST API management interface allows
+user to manage Apps and Pools. An App controlled by AppQoS could be
+a process, a container or a VNF.
+
+AppQoS is reference code written in Python. It is fully configurable and
+can be easily modified to suit other use cases and allow remote management.
+
+
+REQUIREMENTS AND INSTALLATION
+=============================
+
+AppQoS requires Linux kernel v4.20/v5.2 (for Intel® SST-BF)
+AppQoS is a part of Intel® RDT Software Package, it is located in "appqos"
+directory.
+AppQoS depends on the following Python modules and external components:
+ - pqos (libqos Python wrapper)
+ - flask
+ - flask_httpauth
+ - flask_restful
+ - jsonschema
+ - Intel pwr library (github.com, CommsPowerManagement)
+
+To install "pqos" module,
+clone "intel/intel-cmt-cat" repository or download source code from github
+(for more information about repository cloning or downloading source code,
+please see github.com help).
+
+git clone https://github.com/intel/intel-cmt-cat.git
+cd ./intel-cmt-cat
+
+or
+
+wget https://github.com/intel/intel-cmt-cat/archive/master.zip
+unzip ./master.zip
+cd ./intel-cmt-cat-master
+
+After getting the code, compile and install Intel® RDT Software Package
+(for more information, please see INSTALL file for Intel® Software Package).
+
+make
+sudo make install
+
+Intel® RDT CAT and MBA configuration is done via libpqos using MSR interface,
+for more information please see "Software Compatibility" section of
+README for Intel® RDT Software Package.
+For hardware requirements please see "Hardware Support" section of
+mentioned README file.
+
+To get and install "Intel pwr" library required to configure Intel® SST-BF
+please follow instructions at:
+https://github.com/intel/CommsPowerManagement
+
+
+CONFIGURATION
+=============
+
+AppQoS supports Pools of Apps, each with defined cores, cache and memory
+bandwidth allocation. Each App describes a single app, with one or more PIDs.
+
+Cache Allocation, Memory Bandwidth Allocation (via CAT and MBA),
+affinity and SST-BF are configured by AppQoS on per core basis.
+
+NOTE: make sure that cores are isolated via "isolcpu=" kernel param.
+
+AppQoS config is stored in JSON format in file "./appqos.conf" for which
+JSON Schema file is available in "./schema" directory.
+
+Configuration file is "Read-Only", no runtime changes are saved.
+
+If there is no "Default" pool (with "id" equal to 0) defined in config file,
+AppQoS will dynamically create one on start-up.
+All unassigned cores will be assigned to "Default" pool,
+MBA will be configured to 100% and CAT CBM to all cache ways.
+
+EXAMPLE CONFIG
+
+{
+"apps": [{"id": 1, "name": "App1", "pids": [1979, 1980]},
+         {"id": 2, "cores": [4], "name": "App2", "pids": [1592, 1593, 1594]},
+         {"id": 3, "cores": [5], "name": "App3", "pids": [1576, 1577, 1578]}],
+"pools": [{"id": 1, "cores": [1, 2, 3], "name": "HP", "mba": 100, "cbm": "0xFF0", "apps": [1]},
+          {"id": 2, "cores": [4, 5, 6], "name": "MP", "mba": 50, "cbm": "0xC", "apps": [2, 3]},
+          {"id": 3, "cores": [7, 8, 9], "name": "LP", "mba": 10, "cbm": "0x3", "apps": []}],
+"auth": {"username": "admin", "password": "password"},
+"sstbf": {"enabled": true}
+}
+
+"apps" section, Apps being managed by App QoS.
+ - "id" - App’s ID
+ - "name" - App's name (optional)
+ - "cores" - cores being used by App (optional)
+ - "pids" - list of App's PIDs
+
+"pools" section, Pools of Apps.
+ - "id" - Pool's ID
+ - "name" - Pool's name
+ - "apps" - list of Apps being part of the Pool
+ - "cbm" - Intel RDT CAT CacheWayBitmask assigned to Pool
+ - "mba" - Intel RDT MBA rate [%] assigned to Pool
+ - "cores" - cores being assigned to Pool
+
+"auth" section, REST API username and password.
+ - "username" - username
+ - "password" - password
+
+"sstbf" section, Intel® SST-BF configuration.
+ - "enabled" – SST-BF requested state
+
+
+USAGE
+=====
+
+AppQoS is a Python script accepting the following, optional,
+command line options:
+ - -h, --help, show this help message and exit
+ - -c PATH, --config PATH, Configuration file path
+ - --port PORT, REST API port (default: 5000)
+ - -V, --verbose, Verbose mode
+
+NOTE: AppQoS requires root privileges.
+
+By default it will attempt to read from "appqos.config" file from current folder.
+Example command line to run AppQoS in verbose mode and config file in
+non-default location:
+
+sudo ./appqos.py -c /tmp/appqos.conf -V
+
+For more information about configuration file please see CONFIGURATION paragraph,
+for information about runtime configuration please see REST API paragraph.
+For more info please see Step-by-step.
+
+
+REST API
+========
+
+The REST API is a local (but can be easily modified to allow remote access),
+secured interface that allows the user to control AppQoS.
+The REST API allows to add, remove or move App between Pools and to add or remove Pools.
+
+NOTE: None of configuration changes made via REST API are saved to configuration file.
+
+As REST API uses HTTPS, it requires SSL certificate,
+please see HOW TO GENERATE SELF-SIGNED SSL CERTIFICATE paragraph for more info.
+
+The REST API uses "Basic HTTP Auth", username and password are stored in appqos.conf.
+To set your own username and password please modify the following section of appqos.conf:
+
+"auth": {"username": "admin", "password": "password"}
+
+NOTE: If using curl to do REST API calls, add --user admin:password to command line
+
+REST API URIs
+-------------
+
+JSON Schema files for REST API commands and responses are available in "./schema" directory.
+
+- GET /apps - get all/collection of apps
+
+- POST /apps - create new app
+ Example request:
+  {"pool_id": 2,
+  "name": "hello",
+  "cores": [1,2],
+  "pids": [1]}
+
+ Result:
+  {"id": 5}
+
+- GET /apps/{id} - get app for given id
+ Example response:
+  {"id": 6,
+  "cores": [2, 3, 11],
+  "name": "App",
+  "pids": [1748, 1749, 1750],
+  "pool_id": 3
+  }
+
+- PUT /apps/{id} - update app (e.g.:move between pools) for given id
+ Example request:
+  {"pool_id": 2}
+
+- DELETE /apps/{id} - delete app for given id
+
+- GET /pools - get all/collection of pools
+
+- GET /pools/{id} - get pool for given id
+
+- DELETE /pools/{id} - delete empty pool for given id
+
+- GET /stats - get stats
+
+- GET /caps - get system capabilities
+ Example response:
+  {"capabilities": ["cat","mba","sstbf"]
+  }
+
+- GET /caps/sstbf - get Intel® SST-BF details
+ Example response:
+  {"enabled": true,
+   "hp_cores": [2,...,88],
+   "std_cores": [0,...,95]
+  }
+
+
+USAGE SCENARIO
+==============
+
+AppQoS, leveraging Intel® RDT (CAT, MBA) and SST-BF Technologies,
+is to be used prioritize and protect performance of high priority applications.
+
+Please see below for complete step-by-step guide to configure AppQoS to
+leverage Intel® RDT (CAT, MBA) and SST-BF Technologies to prioritize and
+protect performance of high priority application.
+
+SETUP
+
+Get self-signed SSL certificate (for more info please see
+HOW TO GENERATE SELF-SIGNED SSL CERTIFICATE paragraph).
+
+Create appqos.conf file (for more info please see Configuration).
+
+cat /tmp/appqos.conf
+{
+    "apps": [
+    ],
+    "auth": {
+        "password": "password",
+        "username": "admin"
+    },
+    "sstbf": {
+        "enabled": true
+    },
+    "pools": [
+    ]
+}
+
+Empty config file with essential configuration only.
+REST API Authentication details and SST-BF enabled.
+
+AppQoS command line parameters (for more info please see USAGE paragraph)
+
+./appqos.py --help
+usage: appqos.py [-h] [-c PATH] [--port PORT] [-V]
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -c PATH, --config PATH
+                        Configuration file path
+  --port PORT           REST API port
+  -V, --verbose         Verbose mode
+
+NOTE: REST API port (5000 by default) can be set via "--port"
+
+START APPQOS
+
+# ./appqos.py -c /tmp/appqos.conf -V
+2019-05-09 14:17:39,955 DEBUG Supported capabilities:
+2019-05-09 14:17:39,955 DEBUG ['cat', 'mba', 'sstbf']
+ * Serving Flask app "rest" (lazy loading)
+ * Environment: production
+   WARNING: Do not use the development server in a production environment.
+   Use a production WSGI server instead.
+ * Debug mode: on
+2019-05-09 14:17:40,001 INFO   * Running on https://0.0.0.0:5000/ (Press CTRL+C to quit)
+2019-05-09 14:17:40,130 DEBUG Cores controlled: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95]
+2019-05-09 14:17:40,130 DEBUG Pool: Default/0 Cores: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95], Apps: None
+2019-05-09 14:17:40,130 INFO  Configuring SST-BF
+2019-05-09 14:17:40,214 INFO  Configuring RDT
+2019-05-09 14:17:40,232 INFO  Configuration changed
+
+VERIFY INITIAL CONFIGURATION
+
+List all Pools
+curl https://localhost:5000/pools -X GET --user admin:password -k
+
+[
+    {
+        "id": 0,
+        "mba": 100,
+        "cbm": 2047,
+        "name": "Default",
+        "cores": [
+            0,
+            1,
+            2,
+. . .
+            93,
+            94,
+            95
+        ]
+    }
+]
+
+NOTE: "Default" pool automatically created (id=0).
+Pool takes all cores (96), 100% of MBA and full CAT CBM (all cache ways).
+
+List all Apps
+curl https://localhost:5000/apps -X GET --user admin:password -k
+
+{
+    "message": "No apps in config file"
+}
+
+NOTE: No Apps defined.
+
+List capabilities
+curl https://localhost:5000/caps -X GET --user admin:password -k
+
+{
+    "capabilities": [
+        "cat",
+        "mba",
+        "sstbf"
+    ]
+}
+
+NOTE: Detected capabilities listed,
+Intel® RDT CAT, MBA and Intel® SST-BF technologies supported.
+
+List Intel® SST-BF details
+curl https://localhost:5000/caps/sstbf -X GET --user admin:password -k | jq -c
+
+{"enabled":true,
+"hp_cores":[2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40,50,58,59,60,61,62,63,64,73,82,83,84,85,86,87,88],
+"std_cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,74,75,76,77,78,79,80,81,89,90,91,92,93,94,95]}
+
+NOTE: SST-BF enabled (as per config file), list of HP and STD cores provided.
+
+CREATE APPS
+
+Create multiple processes, list their PIDs and core affinity
+
+killall sleep
+for n in {1..5}; do bash -c "sleep 1d &"; done
+for i in `pidof sleep`; do taskset -p -c $i; done
+
+pid 13894's current affinity list: 0-95
+pid 13892's current affinity list: 0-95
+pid 13890's current affinity list: 0-95
+pid 13888's current affinity list: 0-95
+pid 13886's current affinity list: 0-95
+
+Create App, specify cores
+
+curl https://localhost:5000/apps -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "APP1", "cores": [0,1,2,3], "pids": [13894, 13892]}'
+
+{
+    "id": 1
+}
+
+Verify App’s creation (list ALL apps)
+
+curl https://localhost:5000/apps -X GET --user admin:password -k
+[
+    {
+        "name": " APP1",
+        "cores": [
+            0,
+            1,
+            2,
+            3
+        ],
+        "pids": [
+            13894,
+            13892
+        ],
+        "id": 1,
+        "pool_id": 0
+    }
+]
+
+NOTE: App was assigned to Pool #0 as cores 0,1,2,3 are part of that Pool
+
+Verify PIDs’ core affinity
+
+for i in `pidof sleep`; do taskset -p -c $i; done
+pid 13894's current affinity list: 0-3
+pid 13892's current affinity list: 0-3
+pid 13890's current affinity list: 0-95
+pid 13888's current affinity list: 0-95
+pid 13886's current affinity list: 0-95
+
+Create App, specify destination Pool ID
+
+curl https://localhost:5000/apps -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "APP2", "pool_id": 0, "pids": [13890]}'
+
+{
+    "id": 2
+}
+
+Verify App’s creation (get specific App)
+
+curl https://localhost:5000/apps/2 -X GET --user admin:password -k
+
+{
+    "name": "APP2",
+    "pids": [
+        13890
+    ],
+    "id": 2,
+    "pool_id": 0
+}
+
+NOTE: App was assigned to Pool #0 as requested via "pool_id" param
+
+Verify PIDs’ core affinity
+
+for i in `pidof sleep`; do taskset -p -c $i; done
+pid 13894's current affinity list: 0-3
+pid 13892's current affinity list: 0-3
+pid 13890's current affinity list: 0-95
+pid 13888's current affinity list: 0-95
+pid 13886's current affinity list: 0-95
+
+NOTE: App2 PID’s core affinity is 0-95 as those are "Default" pool cores.
+
+MODIFY "DEFAULT" POOL
+
+List SST-BF’s STD cores
+
+curl https://localhost:5000/caps/sstbf -X GET --user admin:password -k | jq .std_cores -c
+ [0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,74,75,76,77,78,79,80,81,89,90,91,92,93,94,95]
+
+Modify "Default" pool to exclude HP cores, assign 50% of MBA and 4 LLC CWs (CBM: 0xF/15)
+
+curl https://localhost:5000/pools/0 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"cores": [0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,74,75,76,77,78,79,80,81,89,90,91,92,93,94,95], "mba": 50, "cbm": "0xf"}'
+
+"POOL 0 updated"
+
+Check new "Default" pool configuration
+
+curl https://localhost:5000/pools/0 -X GET --user admin:password -k | jq -c
+
+{"id":0,
+"mba":50,
+"cbm":15,
+"name":"Default",
+"cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,74,75,76,77,78,79,80,81,89,90,91,92,93,94,95],
+"apps":[1,2]}
+
+Check how does "Default" pool modification has affected Apps in that pool
+
+curl https://localhost:5000/apps -X GET --user admin:password -k
+
+[
+    {
+        "name": "APP1",
+        "pids": [
+            13894,
+            13892
+        ],
+        "id": 1,
+        "pool_id": 0
+    },
+    {
+        "name": "APP2",
+        "pids": [
+            13890
+        ],
+        "id": 2,
+        "pool_id": 0
+    }
+]
+
+for i in `pidof sleep`; do taskset -p -c $i; done
+
+pid 13894's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13892's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13890's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13888's current affinity list: 0-95
+pid 13886's current affinity list: 0-95
+
+NOTE: As some of the cores that were specified for APP1 are not part of
+"Default" pool anymore, core affinity for APP1 PIDs’ was reset to
+new "Default" pool cores.
+
+CREATE HP POOL
+
+Get list of HP cores
+
+curl https://localhost:5000/caps/sstbf -X GET --user admin:password -k | jq .hp_cores –c
+[2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40,50,58,59,60,61,62,63,64,73,82,83,84,85,86,87,88]
+
+Create HP Pool, with 7 (isolated) LLC CWs allocated and 100% of MBA
+
+curl https://localhost:5000/pools -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "HP", "cores": [2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40,50,58,59,60,61,62,63,64,73,82,83,84,85,86,87,88], "cbm": "0x7F0", "mba": 100}'
+
+{
+    "id": 7
+}
+
+NOTE: Pool with "id=7" was created.
+
+Get All Pools to verify creation of new HP Pool(#7)
+
+curl https://localhost:5000/pools -X GET --user admin:password -k | jq –c
+
+[{"id":0,
+"mba":50,
+"cbm":15,
+"name":"Default",
+"cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,74,75,76,77,78,79,80,81,89,90,91,92,93,94,95],
+"apps":[1,2]},
+{"name":"HP",
+"cores":[2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40,50,58,59,60,61,62,63,64,73,82,83,84,85,86,87,88],
+"cbm":2032,
+"mba":100,
+"id":7}]
+
+MOVE APP#2
+
+Move App#2 to HP Pool(#7)
+
+curl https://localhost:5000/apps/2 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"pool_id": 7}'
+
+"APP 2 moved to new pool"
+
+Verify new configuration, list all apps
+
+curl https://localhost:5000/apps -X GET --user admin:password -k
+
+[
+    {
+        "name": "APP1",
+        "pids": [
+            13894,
+            13892
+        ],
+        "id": 1,
+        "pool_id": 0
+    },
+    {
+        "name": "APP2",
+        "pids": [
+            13890
+        ],
+        "id": 2,
+        "pool_id": 7
+    }
+]
+
+Verify new configuration, list pools
+
+curl https://localhost:5000/pools -X GET --user admin:password -k | jq -c
+
+[{"id":0,
+"mba":50,
+"cbm":15,
+"name":"Default",
+"cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,74,75,76,77,78,79,80,81,89,90,91,92,93,94,95],
+"apps":[1]},
+{"name":"HP",
+"cores":[2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40,50,58,59,60,61,62,63,64,73,82,83,84,85,86,87,88],
+"cbm":2032,
+"mba":100,
+"id":7,
+"apps":[2]}]
+
+Verify new configuration, check core affinity
+
+for i in `pidof sleep`; do taskset -p -c $i; done
+
+pid 13894's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13892's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13890's current affinity list: 2,10-16,25,34-40,50,58-64,73,82-88
+pid 13888's current affinity list: 0-95
+pid 13886's current affinity list: 0-95
+
+MODIFY APP#2
+
+Modify App core affinity and name
+
+curl https://localhost:5000/apps/2 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"cores": [2,11,13], "name": "APP2 HP"}'
+
+"APP 2 moved to new pool"
+
+Verify new configuration, get App#2 details
+
+curl https://localhost:5000/apps/2 -X GET --user admin:password -k
+
+{
+    "name": "APP2 HP",
+    "pids": [
+        13890
+    ],
+    "id": 2,
+    "cores": [
+        2,
+        11,
+        13
+    ],
+    "pool_id": 7
+}
+
+Verify new configuration, check core affinity
+
+for i in `pidof sleep`; do taskset -p -c $i; done
+
+pid 13894's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13892's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13890's current affinity list: 2,11,13
+pid 13888's current affinity list: 0-95
+pid 13886's current affinity list: 0-95
+
+REMOVE APP#2
+
+Remove App#2
+
+curl https://localhost:5000/apps/2 -X DELETE --user admin:password -k
+
+"APP 2 deleted"
+
+Verify new configuration, get App#2 and all Apps details
+
+curl https://localhost:5000/apps/2 -X GET --user admin:password -k
+
+{
+    "message": "APP 2 not found in config"
+}
+
+NOTE: App#2 not found
+
+curl https://localhost:5000/apps -X GET --user admin:password -k
+[
+    {
+        "name": "stress-ng",
+        "pids": [
+            13894,
+            13892
+        ],
+        "id": 1,
+        "pool_id": 0
+    }
+]
+
+NOTE: No App#2 listed
+
+Verify new configuration, check core affinity
+
+for i in `pidof sleep`; do taskset -p -c $i; done
+pid 13894's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13892's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13890's current affinity list: 0,1,3-9,17-24,26-33,41-49,51-57,65-72,74-81,89-95
+pid 13888's current affinity list: 0-95
+pid 13886's current affinity list: 0-95
+
+NOTE: App#2’s PID core affinity set to "Default" pool cores
+
+REMOVE HP POOL
+
+Remove HP Pool (#7)
+
+curl https://localhost:5000/pools/7 -X DELETE --user admin:password -k
+
+"POOL 7 deleted"
+
+Verify new configuration, get Pool#7 and all  pools details
+
+curl https://localhost:5000/pools/7 -X GET --user admin:password -k
+
+{
+    "message": "POOL 7 not found in config"
+}
+
+NOTE: Pool#7 not found
+
+curl https://localhost:5000/pools -X GET --user admin:password -k | jq –c
+
+[{"id":0,
+"mba":50,
+"cbm":15,
+"name":"Default",
+"cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47,48,49,51,52,53,54,55,56,57,65,66,67,68,69,70,71,72,74,75,76,77,78,79,80,81,89,90,91,92,93,94,95],
+"apps":[1]}]
+
+NOTE: No Pool#7 listed
+
+RESET CONFIGURATION
+
+Perform configuration reset.
+
+curl https://localhost:5000/reset -X POST --user admin:password -k
+
+"Reset performed. Configuration reloaded."
+
+Verify configuration after reset
+
+curl https://localhost:5000/apps -X GET --user admin:password -k
+
+{
+    "message": "No apps in config file"
+}
+
+NOTE: No Apps configured
+
+curl https://localhost:5000/pools -X GET --user admin:password -k | jq –c
+
+[{"id":0,
+"mba":100,
+"cbm":2047,
+"name":"Default",
+"cores":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95]}]
+
+NOTE: "Default" pool reconfigured, takes all cores (96),
+100% of MBA and full CAT CBM (all cache ways).
+
+
+HOW TO GENERATE SELF-SIGNED SSL CERTIFICATE
+===========================================
+
+NOTE: just for example purposes, please obtain proper certificate !
+
+It is needed to generate self-signed SSL certificate
+(e.g.: using the OpenSSL toolkit) to enable HTTPS connections.
+
+To generate a self-signed SSL certificate using the OpenSSL, run:
+
+openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout appqos.key -out appqos.crt
+
+NOTE: The filenames are hardcoded to "appqos.key" and "appqos.crt"
+
 
 Legal Disclaimer
 ================
