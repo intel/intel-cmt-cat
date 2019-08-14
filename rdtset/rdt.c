@@ -228,26 +228,28 @@ is_contiguous(const char *cat_type, const uint64_t bitmask)
 /**
  * @brief Function to get the highest resource ID (socket/cluster)
  *
- * @param technology used to determine if res ID should be socket or cluster
+ * @param [in] technology used to determine if res ID should be socket or
+ *             cluster
+ * @param [out] max_res_id the highest possible resource ID
  *
- * @return highest resource ID
- * @retval positive on success
- * @retval 0 on error
+ * @return Result
+ * @retval 0 on success
+ * @retval negative on error (-errno)
  */
 static int
-get_max_res_id(unsigned technology)
+get_max_res_id(unsigned technology, unsigned *max_res_id)
 {
         unsigned num_ids, max = 0, *ids = NULL;
 	unsigned i;
 
         if (m_cpu == NULL || technology == 0)
-                return 0;
+                return -EFAULT;
 
         /* get number of L2IDs */
         if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
                 ids = pqos_cpu_get_l2ids(m_cpu, &num_ids);
                 if (ids == NULL)
-                        return 0;
+                        return -EFAULT;
 
                 for (i = 0; i < num_ids; i++)
                         max = ids[i] > max ? ids[i] : max;
@@ -259,14 +261,16 @@ get_max_res_id(unsigned technology)
             technology & (1 << PQOS_CAP_TYPE_MBA)) {
                 ids = pqos_cpu_get_sockets(m_cpu, &num_ids);
                 if (ids == NULL)
-                        return 0;
+                        return -EFAULT;
 
                 for (i = 0; i < num_ids; i++)
                         max = ids[i] > max ? ids[i] : max;
 
                 free(ids);
         }
-        return max;
+
+        *max_res_id = max;
+        return 0;
 }
 
 /**
@@ -1422,9 +1426,9 @@ cfg_set_cores_os(const unsigned technology, const cpu_set_t *cores,
                 return -EFAULT;
         }
 
-        max_id = get_max_res_id(technology);
-        if (!max_id)
-                return -EFAULT;
+        ret = get_max_res_id(technology, &max_id);
+        if (ret != 0)
+                return ret;
 
         /* Set COS definition on necessary sockets/clusters */
         for (i = 0; i < max_id; i++) {
@@ -1472,9 +1476,9 @@ cfg_set_cores_msr(const unsigned technology, const cpu_set_t *cores,
 	int ret;
         unsigned i, max_id;
 
-        max_id = get_max_res_id(technology);
-        if (!max_id)
-                return -EFAULT;
+        ret = get_max_res_id(technology, &max_id);
+        if (ret != 0)
+                return ret;
 
         /* Assign new COS for all applicable res ids */
         for (i = 0; i < max_id; i++) {
