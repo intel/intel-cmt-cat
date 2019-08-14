@@ -22,16 +22,16 @@ INTRODUCTION
 ============
 
 AppQoS is a proof-of-concept software created to demonstrate the use of
-Intel® RDT technologies (CAT, MBA) and Intel® SST-BF to improve QoS for
+Intel(R) RDT technologies (CAT, MBA) and Intel(R) SST-BF to improve QoS for
 applications via partitioning system resources.
 AppQoS allows to assign Apps to Pools with different resources.
 In current version each of the Pools (group of cores) has fixed amount of
-cache and memory bandwidth allocated. Thanks to Intel® SST-BF support,
+cache and memory bandwidth allocated. Thanks to Intel(R) SST-BF support,
 AppQoS allows the CPU to be deployed with an asymmetric core frequency
 configuration. Amount of resources allocated and cores frequency
 configuration could depend on Pool’s priority.
-Intel® RDT CAT and MBA configuration is done via "libpqos" library and
-Intel® SST-BF configuration via external "Intel pwr" library.
+Intel(R) RDT CAT and MBA configuration is done via "libpqos" library and
+Intel(R) SST-BF configuration via external "Intel pwr" library.
 
 AppQoS provides simple, local, REST API management interface secured
 with HTTPS and "Basic HTTP Auth". REST API management interface allows
@@ -45,8 +45,8 @@ can be easily modified to suit other use cases and allow remote management.
 REQUIREMENTS AND INSTALLATION
 =============================
 
-AppQoS requires Linux kernel v4.20/v5.2 (for Intel® SST-BF)
-AppQoS is a part of Intel® RDT Software Package, it is located in "appqos"
+AppQoS requires Linux kernel v4.20/v5.2 (for Intel(R) SST-BF)
+AppQoS is a part of Intel(R) RDT Software Package, it is located in "appqos"
 directory.
 AppQoS depends on the following Python modules and external components:
  - pqos (libqos Python wrapper)
@@ -70,19 +70,19 @@ wget https://github.com/intel/intel-cmt-cat/archive/master.zip
 unzip ./master.zip
 cd ./intel-cmt-cat-master
 
-After getting the code, compile and install Intel® RDT Software Package
-(for more information, please see INSTALL file for Intel® Software Package).
+After getting the code, compile and install Intel(R) RDT Software Package
+(for more information, please see INSTALL file for Intel(R) Software Package).
 
 make
 sudo make install
 
-Intel® RDT CAT and MBA configuration is done via libpqos using MSR interface,
+Intel(R) RDT CAT and MBA configuration is done via libpqos using MSR interface,
 for more information please see "Software Compatibility" section of
-README for Intel® RDT Software Package.
+README for Intel(R) RDT Software Package.
 For hardware requirements please see "Hardware Support" section of
 mentioned README file.
 
-To get and install "Intel pwr" library required to configure Intel® SST-BF
+To get and install "Intel pwr" library required to configure Intel(R) SST-BF
 please follow instructions at:
 https://github.com/intel/CommsPowerManagement
 
@@ -139,7 +139,7 @@ EXAMPLE CONFIG
  - "username" - username
  - "password" - password
 
-"sstbf" section, Intel® SST-BF configuration.
+"sstbf" section, Intel(R) SST-BF configuration.
  - "enabled" – SST-BF requested state
 
 
@@ -230,7 +230,7 @@ JSON Schema files for REST API commands and responses are available in "./schema
   {"capabilities": ["cat","mba","sstbf"]
   }
 
-- GET /caps/sstbf - get Intel® SST-BF details
+- GET /caps/sstbf - get Intel(R) SST-BF details
  Example response:
   {"enabled": true,
    "hp_cores": [2,...,88],
@@ -241,11 +241,11 @@ JSON Schema files for REST API commands and responses are available in "./schema
 USAGE SCENARIO
 ==============
 
-AppQoS, leveraging Intel® RDT (CAT, MBA) and SST-BF Technologies,
+AppQoS, leveraging Intel(R) RDT (CAT, MBA) and SST-BF Technologies,
 is to be used prioritize and protect performance of high priority applications.
 
 Please see below for complete step-by-step guide to configure AppQoS to
-leverage Intel® RDT (CAT, MBA) and SST-BF Technologies to prioritize and
+leverage Intel(R) RDT (CAT, MBA) and SST-BF Technologies to prioritize and
 protect performance of high priority application.
 
 SETUP
@@ -351,9 +351,9 @@ curl https://localhost:5000/caps -X GET --user admin:password -k
 }
 
 NOTE: Detected capabilities listed,
-Intel® RDT CAT, MBA and Intel® SST-BF technologies supported.
+Intel(R) RDT CAT, MBA and Intel(R) SST-BF technologies supported.
 
-List Intel® SST-BF details
+List Intel(R) SST-BF details
 curl https://localhost:5000/caps/sstbf -X GET --user admin:password -k | jq -c
 
 {"enabled":true,
