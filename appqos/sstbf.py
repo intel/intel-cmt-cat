@@ -35,10 +35,10 @@
 SST-BF module
 """
 
+import pwr
+
 import common
 import log
-
-import pwr # pylint: disable=import-error
 
 PWR_CFG_SST_BF_BASE = "sst_bf_base"
 PWR_CFG_BASE = "base"
