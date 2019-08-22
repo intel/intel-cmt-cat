@@ -1431,7 +1431,7 @@ cfg_set_cores_os(const unsigned technology, const cpu_set_t *cores,
                 return ret;
 
         /* Set COS definition on necessary sockets/clusters */
-        for (i = 0; i < max_id; i++) {
+        for (i = 0; i <= max_id; i++) {
                 memset(core_array, 0, sizeof(core_array));
 
                 /* Get cores on res id i */
@@ -1481,7 +1481,7 @@ cfg_set_cores_msr(const unsigned technology, const cpu_set_t *cores,
                 return ret;
 
         /* Assign new COS for all applicable res ids */
-        for (i = 0; i < max_id; i++) {
+        for (i = 0; i <= max_id; i++) {
                 unsigned core_array[CPU_SETSIZE] = {0};
                 unsigned core_num, cos_id;
 
