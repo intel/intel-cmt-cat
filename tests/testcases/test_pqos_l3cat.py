@@ -165,8 +165,8 @@ class TestPqosL3Cat(test.Test):
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
         assert exitstatus == 0
-        assert re.search("Core 1, L2ID [0-9], L3ID 0 => COS7", stdout) is not None
-        assert re.search("Core 3, L2ID [0-9], L3ID 0 => COS7", stdout) is not None
+        assert re.search("Core 1, L2ID [0-9]+, L3ID [0-9]+ => COS7", stdout) is not None
+        assert re.search("Core 3, L2ID [0-9]+, L3ID [0-9]+ => COS7", stdout) is not None
 
 
     ## PQOS - L3 CAT Set COS association (core) - Negative

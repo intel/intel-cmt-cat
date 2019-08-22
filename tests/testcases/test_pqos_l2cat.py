@@ -165,8 +165,8 @@ class TestPqosL2Cat(test.Test):
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
         assert exitstatus == 0
-        assert re.search("Core 1, L2ID [0-9].* => COS1", stdout)
-        assert re.search("Core 3, L2ID [0-9].* => COS1", stdout)
+        assert re.search("Core 1, L2ID [0-9]+ => COS1", stdout)
+        assert re.search("Core 3, L2ID [0-9]+ => COS1", stdout)
 
 
     ## PQOS - L2 CAT Set COS association (core) - Negative
