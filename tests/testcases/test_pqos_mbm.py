@@ -63,7 +63,7 @@ class TestPqosMBM(test.Test):
     #  Observe "Total Memory Bandwidth" and "Local Memory Bandwidth" in
     #  "Memory Bandwidth Monitoring (CMT) events" section
     @PRIORITY_HIGH
-    @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_local")
+    @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_total")
     def test_pqos_mbm_detection(self, iface):
         (stdout, _, exitstatus) = self.run_pqos(iface, "-d")
         assert exitstatus == 0
@@ -88,7 +88,7 @@ class TestPqosMBM(test.Test):
     #  \b Result:
     #  Value in MBL column for core 4 is much higher than for other cores
     @PRIORITY_HIGH
-    @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_local")
+    @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_total")
     def test_pqos_mbm_cores(self, iface):
         def get_mbm(output, core):
             mbl = None
@@ -143,7 +143,7 @@ class TestPqosMBM(test.Test):
     #  than for other PID
     @PRIORITY_HIGH
     @pytest.mark.iface_os
-    @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_local")
+    @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_total")
     def test_pqos_mbm_tasks(self, iface):
         def get_mbm(output, pid):
             mbl = None
@@ -160,7 +160,7 @@ class TestPqosMBM(test.Test):
                         mbr = float(match.group(3))
             return mbl, mbr
 
-        command = "memtester 100M"
+        command = "taskset -c 4 memtester 100M"
         memtester = subprocess.Popen(command.split(), stdin=subprocess.PIPE,
                                      stdout=subprocess.PIPE)
 
