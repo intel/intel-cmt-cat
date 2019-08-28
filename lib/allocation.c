@@ -1318,6 +1318,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 {
 	unsigned *l3cat_ids = NULL;
 	unsigned l3cat_id_num = 0;
+	unsigned *mba_ids = NULL;
+	unsigned mba_id_num = 0;
         unsigned *l2ids = NULL;
         unsigned l2id_num = 0;
         const struct pqos_cap *cap;
@@ -1430,14 +1432,13 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 goto pqos_alloc_reset_exit;
         }
 
-        /**
-	 * Get number & list of l3cat_ids in the system
-         */
-	l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
-	if (l3cat_ids == NULL || l3cat_id_num == 0)
-                goto pqos_alloc_reset_exit;
-
         if (l3_cap != NULL) {
+		/**
+		 * Get number & list of l3cat_ids in the system
+		 */
+		l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
+		if (l3cat_ids == NULL || l3cat_id_num == 0)
+			goto pqos_alloc_reset_exit;
                 /**
 		 * Change L3 COS definition on all l3cat ids
                  * so that each COS allows for access to all cache ways
@@ -1485,14 +1486,21 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         }
 
         if (mba_cap != NULL) {
+		/**
+		 * Get number & list of mba_ids in the system
+		 */
+		mba_ids = pqos_cpu_get_mba_ids(m_cpu, &mba_id_num);
+		if (mba_ids == NULL || mba_id_num == 0)
+			goto pqos_alloc_reset_exit;
+
                 /**
 		 * Go through all L3 CAT ids and reset MBA class definitions
                  * 0 is the default MBA COS value in linear mode.
                  */
-		for (j = 0; j < l3cat_id_num; j++) {
+		for (j = 0; j < mba_id_num; j++) {
                         unsigned core = 0;
 
-			ret = pqos_cpu_get_one_core(m_cpu, l3cat_ids[j], &core);
+			ret = pqos_cpu_get_one_core(m_cpu, mba_ids[j], &core);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
@@ -1573,6 +1581,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
  pqos_alloc_reset_exit:
 	if (l3cat_ids != NULL)
 		free(l3cat_ids);
+	if (mba_ids != NULL)
+		free(mba_ids);
         if (l2ids != NULL)
                 free(l2ids);
         return ret;

@@ -444,7 +444,7 @@ set_allocation_cos(char *str, unsigned *res_ids,
                 int ctrl = (type == MBA_CTRL) ? 1 : 0;
 
                 if (ids == NULL)
-                        ids = pqos_cpu_get_sockets(cpu, &n);
+			ids = pqos_cpu_get_mba_ids(cpu, &n);
                 if (ids == NULL) {
                         printf("Failed to retrieve socket info!\n");
                         return -1;
