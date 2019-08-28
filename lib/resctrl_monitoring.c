@@ -347,9 +347,9 @@ resctrl_mon_read_counters(const unsigned class_id,
                  uint64_t *value)
 {
         int ret = PQOS_RETVAL_OK;
-        unsigned *sockets = NULL;
-        unsigned sockets_num;
-        unsigned socket;
+	unsigned *l3cat_ids = NULL;
+	unsigned l3cat_id_num;
+	unsigned l3cat_id;
         char buf[128];
         const char *name;
 
@@ -376,19 +376,19 @@ resctrl_mon_read_counters(const unsigned class_id,
 
         resctrl_mon_group_path(class_id, resctrl_group, NULL, buf, sizeof(buf));
 
-        sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
-        if (sockets == NULL) {
+	l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
+	if (l3cat_ids == NULL) {
                 ret = PQOS_RETVAL_ERROR;
                 goto resctrl_mon_read_exit;
         }
 
-        for (socket = 0; socket < sockets_num; socket++) {
+	for (l3cat_id = 0; l3cat_id < l3cat_id_num; l3cat_id++) {
                 char path[PATH_MAX];
                 FILE *fd;
                 unsigned long long counter;
 
                 snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf,
-                         sockets[socket], name);
+			 l3cat_ids[l3cat_id], name);
                 fd = fopen_check_symlink(path, "r");
                 if (fd == NULL) {
                         ret = PQOS_RETVAL_ERROR;
@@ -400,8 +400,8 @@ resctrl_mon_read_counters(const unsigned class_id,
         }
 
  resctrl_mon_read_exit:
-        if (sockets != NULL)
-                free(sockets);
+	if (l3cat_ids != NULL)
+		free(l3cat_ids);
 
         return ret;
 }

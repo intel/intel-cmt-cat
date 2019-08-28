@@ -162,21 +162,21 @@ int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
  * @brief OS interface to set classes of service
  *        defined by \a ca on \a socket
  *
- * @param [in] socket CPU socket id
+ * @param [in] l3cat_id L3 cat identifier
  * @param [in] num_cos number of classes of service at \a ca
  * @param [in] ca table with class of service definitions
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l3ca_set(const unsigned socket,
+int os_l3ca_set(const unsigned l3cat_id,
                 const unsigned num_cos,
                 const struct pqos_l3ca *ca);
 
 /**
  * @brief OS interface to read classes of service from \a socket
  *
- * @param [in] socket CPU socket id
+ * @param [in] l3cat_id L3 cat identifier
  * @param [in] max_num_ca maximum number of classes of service
  *             that can be accommodated at \a ca
  * @param [out] num_ca number of classes of service read into \a ca
@@ -185,7 +185,7 @@ int os_l3ca_set(const unsigned socket,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l3ca_get(const unsigned socket,
+int os_l3ca_get(const unsigned l3cat_id,
                 const unsigned max_num_ca,
                 unsigned *num_ca,
                 struct pqos_l3ca *ca);

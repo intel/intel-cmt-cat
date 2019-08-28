@@ -479,8 +479,8 @@ static int
 l3cdp_is_enabled(const struct pqos_cpuinfo *cpu,
                int *enabled)
 {
-        unsigned *sockets = NULL;
-        unsigned sockets_num = 0, j = 0;
+	unsigned *l3cat_ids = NULL;
+	unsigned l3cat_id_num = 0, j = 0;
         unsigned enabled_num = 0, disabled_num = 0;
         int ret = PQOS_RETVAL_OK;
 
@@ -491,17 +491,17 @@ l3cdp_is_enabled(const struct pqos_cpuinfo *cpu,
         *enabled = 0;
 
         /**
-         * Get list of socket id's
+	 * Get list of l3cat id's
          */
-	sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
-        if (sockets == NULL)
+	l3cat_ids = pqos_cpu_get_l3cat_ids(cpu, &l3cat_id_num);
+	if (l3cat_ids == NULL)
                 return PQOS_RETVAL_RESOURCE;
 
-        for (j = 0; j < sockets_num; j++) {
+	for (j = 0; j < l3cat_id_num; j++) {
                 uint64_t reg = 0;
                 unsigned core = 0;
 
-                ret = pqos_cpu_get_one_core(cpu, sockets[j], &core);
+		ret = pqos_cpu_get_one_core(cpu, l3cat_ids[j], &core);
                 if (ret != PQOS_RETVAL_OK)
                         goto l3cdp_is_enabled_exit;
 
@@ -518,7 +518,7 @@ l3cdp_is_enabled(const struct pqos_cpuinfo *cpu,
         }
 
         if (disabled_num > 0 && enabled_num > 0) {
-                LOG_ERROR("Inconsistent L3 CDP settings across sockets."
+		LOG_ERROR("Inconsistent L3 CDP settings across l3cat_ids."
                           "Please reset CAT or reboot your system!\n");
                 ret = PQOS_RETVAL_ERROR;
                 goto l3cdp_is_enabled_exit;
@@ -530,8 +530,8 @@ l3cdp_is_enabled(const struct pqos_cpuinfo *cpu,
         LOG_INFO("L3 CDP is %s\n", (*enabled) ? "enabled" : "disabled");
 
  l3cdp_is_enabled_exit:
-        if (sockets != NULL)
-                free(sockets);
+	if (l3cat_ids != NULL)
+		free(l3cat_ids);
 
         return ret;
 }

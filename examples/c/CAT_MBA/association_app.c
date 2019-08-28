@@ -104,7 +104,7 @@ print_allocation_config(void)
 {
 	int ret;
 	unsigned i;
-	unsigned sock_count, *sockets = NULL;
+	unsigned l3cat_id_count, *l3cat_ids = NULL;
 	const struct pqos_cpuinfo *p_cpu = NULL;
 	const struct pqos_cap *p_cap = NULL;
 
@@ -114,25 +114,25 @@ print_allocation_config(void)
 		printf("Error retrieving PQoS capabilities!\n");
 		return;
 	}
-	/* Get CPU socket information to set COS */
-	sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
-	if (sockets == NULL) {
+	/* Get CPU l3cat_id information to set COS */
+	l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
+	if (l3cat_ids == NULL) {
 		printf("Error retrieving CPU socket information!\n");
 		return;
 	}
-	for (i = 0; i < sock_count; i++) {
+	for (i = 0; i < l3cat_id_count; i++) {
 		unsigned *lcores = NULL;
 		unsigned lcount = 0, n = 0;
 
-		lcores = pqos_cpu_get_cores(p_cpu, sockets[i], &lcount);
+		lcores = pqos_cpu_get_cores(p_cpu, l3cat_ids[i], &lcount);
 		if (lcores == NULL || lcount == 0) {
 			printf("Error retrieving core information!\n");
                         free(lcores);
-                        free(sockets);
+			free(l3cat_ids);
 			return;
 		}
 		printf("Core information for socket %u:\n",
-				sockets[i]);
+				l3cat_ids[i]);
 		for (n = 0; n < lcount; n++) {
 			unsigned class_id = 0;
 
@@ -146,7 +146,7 @@ print_allocation_config(void)
 		}
                 free(lcores);
 	}
-        free(sockets);
+	free(l3cat_ids);
 }
 /**
  * @brief Sets up association between cores and allocation classes of service
