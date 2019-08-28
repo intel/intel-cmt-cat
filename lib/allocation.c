@@ -298,7 +298,7 @@ pqos_alloc_fini(void)
  */
 
 int
-hw_l3ca_set(const unsigned socket,
+hw_l3ca_set(const unsigned l3cat_id,
             const unsigned num_ca,
             const struct pqos_l3ca *ca)
 {
@@ -325,7 +325,7 @@ hw_l3ca_set(const unsigned socket,
                 return ret;
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_one_core(cpu, socket, &core);
+	ret = pqos_cpu_get_one_by_l3cat_id(cpu, l3cat_id, &core);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -374,7 +374,7 @@ hw_l3ca_set(const unsigned socket,
 }
 
 int
-hw_l3ca_get(const unsigned socket,
+hw_l3ca_get(const unsigned l3cat_id,
             const unsigned max_num_ca,
             unsigned *num_ca,
             struct pqos_l3ca *ca)
@@ -405,7 +405,7 @@ hw_l3ca_get(const unsigned socket,
                 return PQOS_RETVAL_ERROR;
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
+	ret = pqos_cpu_get_one_by_l3cat_id(m_cpu, l3cat_id, &core);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1170,23 +1170,23 @@ hw_alloc_release(const unsigned *core_array,
  * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
  */
 static int
-l3cdp_enable(const unsigned sockets_num,
-           const unsigned *sockets,
-           const int enable)
+l3cdp_enable(const unsigned l3cat_id_num,
+	     const unsigned *l3cat_ids,
+	     const int enable)
 {
         unsigned j = 0;
 
-        ASSERT(sockets_num > 0 && sockets != NULL);
+	ASSERT(l3cat_id_num > 0 && l3cat_ids != NULL);
 
         LOG_INFO("%s L3 CDP across sockets...\n",
                  (enable) ? "Enabling" : "Disabling");
 
-        for (j = 0; j < sockets_num; j++) {
+	for (j = 0; j < l3cat_id_num; j++) {
                 uint64_t reg = 0;
                 unsigned core = 0;
                 int ret = PQOS_RETVAL_OK;
 
-                ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
+		ret = pqos_cpu_get_one_by_l3cat_id(m_cpu, l3cat_ids[j], &core);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
@@ -1446,7 +1446,9 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 		for (j = 0; j < l3cat_id_num; j++) {
                         unsigned core = 0;
 
-			ret = pqos_cpu_get_one_core(m_cpu, l3cat_ids[j], &core);
+			ret = pqos_cpu_get_one_by_l3cat_id(m_cpu,
+							   l3cat_ids[j],
+							   &core);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
