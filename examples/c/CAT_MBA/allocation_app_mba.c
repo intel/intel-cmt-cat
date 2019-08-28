@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 	struct pqos_config cfg;
 	const struct pqos_cpuinfo *p_cpu = NULL;
 	const struct pqos_cap *p_cap = NULL;
-	unsigned sock_count, *p_sockets = NULL;
+	unsigned mba_id_count, *p_mba_ids = NULL;
 	int ret, exit_val = EXIT_SUCCESS;
 
 	memset(&cfg, 0, sizeof(cfg));
@@ -228,10 +228,10 @@ int main(int argc, char *argv[])
 		exit_val = EXIT_FAILURE;
 		goto error_exit;
 	}
-	/* Get CPU socket information to set COS */
-	p_sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
-	if (p_sockets == NULL) {
-		printf("Error retrieving CPU socket information!\n");
+	/* Get CPU mba_id information to set COS */
+	p_mba_ids = pqos_cpu_get_mba_ids(p_cpu, &mba_id_count);
+	if (p_mba_ids == NULL) {
+		printf("Error retrieving MBA ID information!\n");
 		exit_val = EXIT_FAILURE;
 		goto error_exit;
 	}
@@ -239,7 +239,7 @@ int main(int argc, char *argv[])
 	allocation_get_input(argc, argv);
 	if (sel_mba_cos_num != 0) {
 		/* Set delay value for MBA COS allocation */
-		ret = set_allocation_class(sock_count, p_sockets);
+		ret = set_allocation_class(mba_id_count, p_mba_ids);
 		if (ret < 0) {
 			printf("Allocation configuration error!\n");
 			goto error_exit;
@@ -247,7 +247,7 @@ int main(int argc, char *argv[])
 		printf("Allocation configuration altered.\n");
 	}
 	/* Print COS definition */
-	ret = print_allocation_config(p_cap, sock_count, p_sockets);
+	ret = print_allocation_config(p_cap, mba_id_count, p_mba_ids);
 	if (ret != PQOS_RETVAL_OK) {
 		printf("Allocation capability not detected!\n");
 		exit_val = EXIT_FAILURE;
@@ -258,7 +258,7 @@ int main(int argc, char *argv[])
 	ret = pqos_fini();
 	if (ret != PQOS_RETVAL_OK)
 		printf("Error shutting down PQoS library!\n");
-        if (p_sockets != NULL)
-                free(p_sockets);
+	if (p_mba_ids != NULL)
+		free(p_mba_ids);
 	return exit_val;
 }

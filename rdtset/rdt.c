@@ -258,8 +258,7 @@ get_max_res_id(unsigned technology, unsigned *max_res_id)
                 free(ids);
         }
 	/* get number of l3cat_ids */
-        if (technology & (1 << PQOS_CAP_TYPE_L3CA) ||
-            technology & (1 << PQOS_CAP_TYPE_MBA)) {
+	if (technology & (1 << PQOS_CAP_TYPE_L3CA)) {
 		ids = pqos_cpu_get_l3cat_ids(m_cpu, &num_ids);
                 if (ids == NULL)
                         return -EFAULT;
@@ -269,6 +268,18 @@ get_max_res_id(unsigned technology, unsigned *max_res_id)
 
                 free(ids);
         }
+
+	/* get number of mba_ids */
+	if (technology & (1 << PQOS_CAP_TYPE_MBA)) {
+		ids = pqos_cpu_get_mba_ids(m_cpu, &num_ids);
+		if (ids == NULL)
+			return -EFAULT;
+
+		for (i = 0; i < num_ids; i++)
+			max = ids[i] > max ? ids[i] : max;
+
+		free(ids);
+	}
 
         *max_res_id = max;
         return 0;
