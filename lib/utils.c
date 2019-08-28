@@ -66,6 +66,43 @@ _pqos_utils_init(int interface)
         return PQOS_RETVAL_OK;
 }
 
+unsigned *
+pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu,
+		       unsigned *count)
+{
+	unsigned l3cat_count = 0, i = 0;
+	unsigned *l3cat_ids = NULL;
+
+	ASSERT(cpu != NULL);
+	ASSERT(count != NULL);
+	if (cpu == NULL || count == NULL)
+		return NULL;
+
+	l3cat_ids = (unsigned *) malloc(sizeof(l3cat_ids[0]) * cpu->num_cores);
+	if (l3cat_ids == NULL)
+		return NULL;
+
+	for (i = 0; i < cpu->num_cores; i++) {
+		unsigned j = 0;
+
+		/**
+		 * Check if this l3cat id is already on the \a l3cat_ids list
+		 */
+		for (j = 0; j < l3cat_count && l3cat_count > 0; j++)
+			if (cpu->cores[i].l3cat_id  == l3cat_ids[j])
+				break;
+
+		if (j >= l3cat_count || l3cat_count == 0) {
+			/**
+			 * This l3cat_id wasn't reported before
+			 */
+			l3cat_ids[l3cat_count++] = cpu->cores[i].l3cat_id;
+		}
+	}
+
+	*count = l3cat_count;
+	return l3cat_ids;
+}
 
 unsigned *
 pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
