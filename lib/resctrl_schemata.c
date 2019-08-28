@@ -47,6 +47,9 @@ struct resctrl_schemata {
         unsigned l3ids_num;     /**< Number of L3 */
         unsigned *l3ids;
         struct pqos_l3ca *l3ca; /**< L3 COS definitions */
+
+	unsigned mbaids_num;     /**< Number of mba ids */
+	unsigned *mbaids;
         struct pqos_mba *mba;   /**< MBA COS definitions */
 
         unsigned l2ids_num;     /**< Number of L2 clusters */
@@ -70,6 +73,8 @@ resctrl_schemata_free(struct resctrl_schemata *schemata)
                 free(schemata->l2ids);
         if (schemata->l3ids != NULL)
                 free(schemata->l3ids);
+	if (schemata->mbaids != NULL)
+		free(schemata->mbaids);
         free(schemata);
 }
 
@@ -120,16 +125,16 @@ resctrl_schemata_alloc(const struct pqos_cap *cap,
         if (retval == PQOS_RETVAL_OK && cap_mba != NULL) {
                 int ctrl_enabled;
 
-                if (schemata->l3ids == NULL) {
-                        schemata->l3ids = pqos_cpu_get_sockets(cpu,
-                                &schemata->l3ids_num);
-                        if (schemata->l3ids == NULL)
+		if (schemata->mbaids == NULL) {
+			schemata->mbaids = pqos_cpu_get_mba_ids(cpu,
+					   &schemata->mbaids_num);
+			if (schemata->mbaids == NULL)
                                 goto resctrl_schemata_alloc_error;
                 }
 
-                schemata->mba = calloc(schemata->l3ids_num,
+		schemata->mba = calloc(schemata->mbaids_num,
                                        sizeof(struct pqos_mba));
-                if (schemata->mba == NULL)
+		if (schemata->mba == NULL)
                         goto resctrl_schemata_alloc_error;
 
                 retval = pqos_mba_ctrl_enabled(cap, NULL, &ctrl_enabled);
@@ -137,7 +142,7 @@ resctrl_schemata_alloc(const struct pqos_cap *cap,
                         goto resctrl_schemata_alloc_error;
 
                 /* fill ctrl and class_id */
-                for (i = 0; i < schemata->l3ids_num; i++)
+		for (i = 0; i < schemata->mbaids_num; i++)
                         schemata->mba[i].ctrl = ctrl_enabled;
         }
 
@@ -197,7 +202,7 @@ resctrl_schemata_reset(struct resctrl_schemata *schmt,
                         default_mba = UINT32_MAX -
                                 UINT32_MAX % mba_cap->throttle_step;
 
-                for (j = 0; j < schmt->l3ids_num; j++)
+		for (j = 0; j < schmt->mbaids_num; j++)
                         schmt->mba[j].mb_max = default_mba;
         }
 
@@ -312,6 +317,20 @@ resctrl_schemata_l3ca_set(struct resctrl_schemata *schemata,
         return PQOS_RETVAL_OK;
 }
 
+static int
+get_mba_index(const struct resctrl_schemata *schemata, unsigned resource_id)
+{
+	unsigned i;
+
+	ASSERT(schemata->mbaids != NULL);
+
+	for (i = 0; i < schemata->mbaids_num; ++i)
+		if (schemata->mbaids[i] == resource_id)
+			return i;
+
+	return -1;
+}
+
 int
 resctrl_schemata_mba_get(const struct resctrl_schemata *schemata,
                          unsigned resource_id,
@@ -323,7 +342,7 @@ resctrl_schemata_mba_get(const struct resctrl_schemata *schemata,
         ASSERT(ca != NULL);
         ASSERT(schemata->mba != NULL);
 
-        index = get_l3_index(schemata, resource_id);
+	index = get_mba_index(schemata, resource_id);
         if (index < 0)
                 return PQOS_RETVAL_ERROR;
 
@@ -343,7 +362,7 @@ resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
         ASSERT(ca != NULL);
         ASSERT(schemata->mba != NULL);
 
-        index = get_l3_index(schemata, resource_id);
+	index = get_mba_index(schemata, resource_id);
         if (index < 0)
                 return PQOS_RETVAL_ERROR;
 
@@ -424,9 +443,11 @@ resctrl_schemata_set(const unsigned res_id,
         case RESCTRL_SCHEMATA_TYPE_L3:
         case RESCTRL_SCHEMATA_TYPE_L3CODE:
         case RESCTRL_SCHEMATA_TYPE_L3DATA:
-        case RESCTRL_SCHEMATA_TYPE_MB:
                 index = get_l3_index(schemata, res_id);
                 break;
+	case RESCTRL_SCHEMATA_TYPE_MB:
+		index = get_mba_index(schemata, res_id);
+		break;
         }
 
         if (index < 0)
@@ -620,10 +641,10 @@ resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata)
         /* MBA */
         if (schemata->mba != NULL) {
                 fprintf(fd, "MB:");
-                for (i = 0; i < schemata->l3ids_num; i++) {
+		for (i = 0; i < schemata->mbaids_num; i++) {
                         if (i > 0)
                                 fprintf(fd, ";");
-                        fprintf(fd, "%u=%u", schemata->l3ids[i],
+			fprintf(fd, "%u=%u", schemata->mbaids[i],
                                 schemata->mba[i].mb_max);
                 }
                 fprintf(fd, "\n");
