@@ -44,6 +44,7 @@
 #include "cap.h"
 #include "log.h"
 #include "types.h"
+#include "cpu_registers.h"
 
 /**
  * Value marking monitoring group structure as "valid".
@@ -755,9 +756,10 @@ pqos_mba_set(const unsigned socket,
 	 */
 	for (i = 0; i < num_cos; i++)
 		if (requested[i].ctrl == 0 &&
-		    (requested[i].mb_max == 0 || requested[i].mb_max > 100)) {
-			LOG_ERROR("MBA COS%u rate out of range (from 1-100)!\n",
-			          requested[i].class_id);
+		    (requested[i].mb_max == 0 ||
+		     requested[i].mb_max > PQOS_MBA_LINEAR_MAX)) {
+			LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
+				   requested[i].class_id, PQOS_MBA_LINEAR_MAX);
 			return PQOS_RETVAL_PARAM;
 		}
 
