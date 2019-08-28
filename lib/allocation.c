@@ -52,6 +52,7 @@
 #include "machine.h"
 #include "types.h"
 #include "log.h"
+#include "cpu_registers.h"
 
 /**
  * ---------------------------------------
@@ -59,37 +60,6 @@
  * ---------------------------------------
  */
 
-/**
- * Allocation & Monitoring association MSR register
- * - bits [63..32] QE COS
- * - bits [31..10] Reserved
- * - bits [9..0] RMID
- */
-#define PQOS_MSR_ASSOC             0xC8F
-#define PQOS_MSR_ASSOC_QECOS_SHIFT 32
-#define PQOS_MSR_ASSOC_QECOS_MASK  0xffffffff00000000ULL
-
-/**
- * Allocation class of service (COS) MSR registers
- */
-#define PQOS_MSR_L3CA_MASK_START 0xC90
-#define PQOS_MSR_L3CA_MASK_END   0xD0F
-#define PQOS_MSR_L3CA_MASK_NUMOF                                \
-        (PQOS_MSR_L3CA_MASK_END - PQOS_MSR_L3CA_MASK_START + 1)
-
-#define PQOS_MSR_L2CA_MASK_START 0xD10
-#define PQOS_MSR_MBA_MASK_START  0xD50
-
-#define PQOS_MSR_L3_QOS_CFG          0xC81   /**< L3 CAT config register */
-#define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< L3 CDP enable bit */
-
-#define PQOS_MSR_L2_QOS_CFG          0xC82   /**< L2 CAT config register */
-#define PQOS_MSR_L2_QOS_CFG_CDP_EN   1ULL    /**< L2 CDP enable bit */
-
-/**
- * MBA linear max value
- */
-#define PQOS_MBA_LINEAR_MAX 100
 
 /**
  * ---------------------------------------
