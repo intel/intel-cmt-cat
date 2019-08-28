@@ -923,6 +923,19 @@ int pqos_mba_get(const unsigned socket,
  */
 
 /**
+ * @brief Retrieves l3cat id's from cpu info structure
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [out] count place to store actual number of l3cat ids returned
+ *
+ * @return Allocated array of size \a count populated with l3cat id's
+ * @retval NULL on error
+ */
+unsigned *
+pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu,
+		       unsigned *count);
+
+/**
  * @brief Retrieves socket id's from cpu info structure
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
