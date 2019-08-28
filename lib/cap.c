@@ -501,7 +501,7 @@ l3cdp_is_enabled(const struct pqos_cpuinfo *cpu,
                 uint64_t reg = 0;
                 unsigned core = 0;
 
-		ret = pqos_cpu_get_one_core(cpu, l3cat_ids[j], &core);
+		ret = pqos_cpu_get_one_by_l3cat_id(cpu, l3cat_ids[j], &core);
                 if (ret != PQOS_RETVAL_OK)
                         goto l3cdp_is_enabled_exit;
 
