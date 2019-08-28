@@ -121,7 +121,7 @@ int main(int argc, char *argv[])
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
         const struct pqos_capability *cap_l3ca = NULL;
-        unsigned sock_count, *sockets = NULL;
+	unsigned l3cat_id_count, *l3cat_ids = NULL;
         int ret, exit_val = EXIT_SUCCESS;
 
 	memset(&cfg, 0, sizeof(cfg));
@@ -152,22 +152,22 @@ int main(int argc, char *argv[])
 		printf("CAT reset failed!\n");
 	else
 		printf("CAT reset successful\n");
-	/* Get CPU socket information to set COS */
-	sockets = pqos_cpu_get_sockets(p_cpu, &sock_count);
-        if (sockets == NULL) {
+	/* Get CPU l3cat_id information to set COS */
+	l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
+	if (l3cat_ids == NULL) {
                 printf("Error retrieving CPU socket information!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit;
         }
 	(void) pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
 	/* Print COS and associated cores */
-	print_allocation_config(cap_l3ca, sock_count, sockets, p_cpu);
+	print_allocation_config(cap_l3ca, l3cat_id_count, l3cat_ids, p_cpu);
  error_exit:
 	/* reset and deallocate all the resources */
 	ret = pqos_fini();
 	if (ret != PQOS_RETVAL_OK)
 		printf("Error shutting down PQoS library!\n");
-        if (sockets != NULL)
-                free(sockets);
+	if (l3cat_ids != NULL)
+		free(l3cat_ids);
 	return exit_val;
 }

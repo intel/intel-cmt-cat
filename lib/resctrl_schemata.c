@@ -104,8 +104,8 @@ resctrl_schemata_alloc(const struct pqos_cap *cap,
         /* L3 */
         retval = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
         if (retval == PQOS_RETVAL_OK && cap_l3ca != NULL) {
-                schemata->l3ids = pqos_cpu_get_sockets(cpu,
-                                                       &schemata->l3ids_num);
+		schemata->l3ids = pqos_cpu_get_l3cat_ids(cpu,
+							 &schemata->l3ids_num);
                 if (schemata->l3ids == NULL)
                         goto resctrl_schemata_alloc_error;
 

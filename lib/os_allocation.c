@@ -1055,8 +1055,18 @@ verify_mba_id(const unsigned mba_id, const struct pqos_cpuinfo *cpu)
 	return ret;
 }
 
+/*
+ * @brief Set the bitmask for a given COS
+ *
+ * @param [in] l3cat_id L3 cat identifier
+ * @param [in] num_cos Total number of COS
+ * @param [in] ca Bitmask information to set
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
 int
-os_l3ca_set(const unsigned socket,
+os_l3ca_set(const unsigned l3cat_id,
             const unsigned num_cos,
             const struct pqos_l3ca *ca)
 {
@@ -1083,7 +1093,7 @@ os_l3ca_set(const unsigned socket,
 	if (num_cos > num_grps)
 		return PQOS_RETVAL_ERROR;
 
-	ret = verify_l3cat_id(socket, cpu);
+	ret = verify_l3cat_id(l3cat_id, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_l3ca_set_exit;
 
@@ -1125,7 +1135,7 @@ os_l3ca_set(const unsigned socket,
 			} else
 				l3ca = ca[i];
 
-                        ret = resctrl_schemata_l3ca_set(schmt, socket, &l3ca);
+			ret = resctrl_schemata_l3ca_set(schmt, l3cat_id, &l3ca);
                 }
 
 		/* write schemata */
@@ -1147,7 +1157,7 @@ os_l3ca_set(const unsigned socket,
 }
 
 int
-os_l3ca_get(const unsigned socket,
+os_l3ca_get(const unsigned l3cat_id,
             const unsigned max_num_ca,
             unsigned *num_ca,
             struct pqos_l3ca *ca)
@@ -1175,7 +1185,7 @@ os_l3ca_get(const unsigned socket,
 	if (count > max_num_ca)
 		return PQOS_RETVAL_ERROR;
 
-	ret = verify_l3cat_id(socket, cpu);
+	ret = verify_l3cat_id(l3cat_id, cpu);
         if (ret != PQOS_RETVAL_OK)
                 goto os_l3ca_get_exit;
 
@@ -1194,7 +1204,7 @@ os_l3ca_get(const unsigned socket,
                         ret = resctrl_alloc_schemata_read(class_id, schmt);
 
                 if (ret == PQOS_RETVAL_OK)
-                        ret = resctrl_schemata_l3ca_get(schmt, socket,
+			ret = resctrl_schemata_l3ca_get(schmt, l3cat_id,
                                                         &ca[class_id]);
 
                 ca[class_id].class_id = class_id;

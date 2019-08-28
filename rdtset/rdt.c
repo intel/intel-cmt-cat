@@ -229,7 +229,7 @@ is_contiguous(const char *cat_type, const uint64_t bitmask)
 /**
  * @brief Function to get the highest resource ID (socket/cluster)
  *
- * @param [in] technology used to determine if res ID should be socket or
+ * @param [in] technology used to determine if res ID should be l3cat_id or
  *             cluster
  * @param [out] max_res_id the highest possible resource ID
  *
@@ -257,10 +257,10 @@ get_max_res_id(unsigned technology, unsigned *max_res_id)
 
                 free(ids);
         }
-        /* get number of sockets */
+	/* get number of l3cat_ids */
         if (technology & (1 << PQOS_CAP_TYPE_L3CA) ||
             technology & (1 << PQOS_CAP_TYPE_MBA)) {
-                ids = pqos_cpu_get_sockets(m_cpu, &num_ids);
+		ids = pqos_cpu_get_l3cat_ids(m_cpu, &num_ids);
                 if (ids == NULL)
                         return -EFAULT;
 

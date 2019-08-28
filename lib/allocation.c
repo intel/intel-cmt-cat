@@ -448,7 +448,7 @@ int
 hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 {
 	int ret;
-	unsigned *sockets, socket_id, sockets_num;
+	unsigned *l3cat_ids, l3cat_id, l3cat_id_num;
 	unsigned class_id, l3ca_num, ways, i;
 	int technology = 1 << PQOS_CAP_TYPE_L3CA;
 	const struct pqos_capability *l3_cap = NULL;
@@ -465,10 +465,10 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
 
 	/**
-	 * Get number & list of sockets in the system
+	 * Get number & list of l3cat_ids in the system
 	 */
-	sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
-	if (sockets == NULL || sockets_num == 0) {
+	l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
+	if (l3cat_ids == NULL || l3cat_id_num == 0) {
 		ret = PQOS_RETVAL_ERROR;
 		goto pqos_l3ca_get_min_cbm_bits_exit;
 	}
@@ -476,8 +476,8 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	/**
 	 * Find free COS
 	 */
-	for (socket_id = 0; socket_id < sockets_num; socket_id++) {
-		ret = get_unused_cos(socket_id, technology, &class_id);
+	for (l3cat_id = 0; l3cat_id < l3cat_id_num; l3cat_id++) {
+		ret = get_unused_cos(l3cat_id, technology, &class_id);
 		if (ret == PQOS_RETVAL_OK)
 			break;
 
@@ -494,7 +494,7 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	/**
 	 * Get current configuration
 	 */
-	ret = hw_l3ca_get(socket_id, PQOS_MAX_L3CA_COS, &l3ca_num, l3ca_config);
+	ret = hw_l3ca_get(l3cat_id, PQOS_MAX_L3CA_COS, &l3ca_num, l3ca_config);
 	if (ret != PQOS_RETVAL_OK)
 		goto pqos_l3ca_get_min_cbm_bits_exit;
 
@@ -513,14 +513,14 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		/**
 		 * Try to set mask
 		 */
-		ret = hw_l3ca_set(socket_id, 1, l3ca_tab);
+		ret = hw_l3ca_set(l3cat_id, 1, l3ca_tab);
 		if (ret != PQOS_RETVAL_OK)
 			continue;
 
 		/**
 		 * Validate if mask was correctly set
 		 */
-		ret = hw_l3ca_get(socket_id, PQOS_MAX_L3CA_COS, &num_ca,
+		ret = hw_l3ca_get(l3cat_id, PQOS_MAX_L3CA_COS, &num_ca,
 		                  l3ca_tab);
 		if (ret != PQOS_RETVAL_OK)
 			goto pqos_l3ca_get_min_cbm_bits_restore;
@@ -552,7 +552,7 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 		if (l3ca_config[i].class_id != class_id)
 			continue;
 
-		ret_val = hw_l3ca_set(socket_id, 1, &(l3ca_config[i]));
+		ret_val = hw_l3ca_set(l3cat_id, 1, &(l3ca_config[i]));
 		if (ret_val != PQOS_RETVAL_OK) {
 			LOG_ERROR("Failed to restore CAT configuration. CAT"
 			          " configuration has been altered!\n");
@@ -562,8 +562,8 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	}
 
  pqos_l3ca_get_min_cbm_bits_exit:
-	if (sockets != NULL)
-		free(sockets);
+	if (l3cat_ids != NULL)
+		free(l3cat_ids);
 
 	return ret;
 }
@@ -1316,8 +1316,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                const enum pqos_cdp_config l2_cdp_cfg,
                const enum pqos_mba_config mba_cfg)
 {
-        unsigned *sockets = NULL;
-        unsigned sockets_num = 0;
+	unsigned *l3cat_ids = NULL;
+	unsigned l3cat_id_num = 0;
         unsigned *l2ids = NULL;
         unsigned l2id_num = 0;
         const struct pqos_cap *cap;
@@ -1431,21 +1431,21 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         }
 
         /**
-         * Get number & list of sockets in the system
+	 * Get number & list of l3cat_ids in the system
          */
-        sockets = pqos_cpu_get_sockets(m_cpu, &sockets_num);
-        if (sockets == NULL || sockets_num == 0)
+	l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
+	if (l3cat_ids == NULL || l3cat_id_num == 0)
                 goto pqos_alloc_reset_exit;
 
         if (l3_cap != NULL) {
                 /**
-                 * Change L3 COS definition on all sockets
+		 * Change L3 COS definition on all l3cat ids
                  * so that each COS allows for access to all cache ways
                  */
-                for (j = 0; j < sockets_num; j++) {
+		for (j = 0; j < l3cat_id_num; j++) {
                         unsigned core = 0;
 
-                        ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
+			ret = pqos_cpu_get_one_core(m_cpu, l3cat_ids[j], &core);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
@@ -1486,13 +1486,13 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 
         if (mba_cap != NULL) {
                 /**
-                 * Go through all sockets and reset MBA class defintions
+		 * Go through all L3 CAT ids and reset MBA class definitions
                  * 0 is the default MBA COS value in linear mode.
                  */
-                for (j = 0; j < sockets_num; j++) {
+		for (j = 0; j < l3cat_id_num; j++) {
                         unsigned core = 0;
 
-                        ret = pqos_cpu_get_one_core(m_cpu, sockets[j], &core);
+			ret = pqos_cpu_get_one_core(m_cpu, l3cat_ids[j], &core);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
@@ -1519,7 +1519,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                          * Turn on L3 CDP
                          */
                         LOG_INFO("Turning L3 CDP ON ...\n");
-                        ret = l3cdp_enable(sockets_num, sockets, 1);
+			ret = l3cdp_enable(l3cat_id_num, l3cat_ids, 1);
                         if (ret != PQOS_RETVAL_OK) {
                                 LOG_ERROR("L3 CDP enable error!\n");
                                 goto pqos_alloc_reset_exit;
@@ -1531,7 +1531,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                          * Turn off L3 CDP
                          */
                         LOG_INFO("Turning L3 CDP OFF ...\n");
-                        ret = l3cdp_enable(sockets_num, sockets, 0);
+			ret = l3cdp_enable(l3cat_id_num, l3cat_ids, 0);
                         if (ret != PQOS_RETVAL_OK) {
                                 LOG_ERROR("L3 CDP disable error!\n");
                                 goto pqos_alloc_reset_exit;
@@ -1571,8 +1571,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         }
 
  pqos_alloc_reset_exit:
-        if (sockets != NULL)
-                free(sockets);
+	if (l3cat_ids != NULL)
+		free(l3cat_ids);
         if (l2ids != NULL)
                 free(l2ids);
         return ret;
