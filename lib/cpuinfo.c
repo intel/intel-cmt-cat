@@ -386,6 +386,16 @@ detect_cpu(const int cpu,
         info->l3_id = apicid >> apic->l3_shift;
         info->l2_id = apicid >> apic->l2_shift;
 
+	/*
+	 * Update l3cat_id and mba_id. For Intel, CAT and MBA ids are
+	 * initialized to socket id. AMD uses l3_id for both CAT and MBA
+	 * ids. Right now, both these ids are same. This could change in
+	 * the future.
+	 */
+
+	info->l3cat_id = info->socket;
+	info->mba_id = info->socket;
+
         LOG_DEBUG("Detected core %u, socket %u, "
                   "L2 ID %u, L3 ID %u, APICID %u\n",
                   info->lcore, info->socket,
