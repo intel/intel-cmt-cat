@@ -51,6 +51,19 @@
 
 static pid_t child = -1;
 
+
+/**
+ * @brief flushes output buffers and terminate
+ *
+ * @status exit status
+ */
+static void
+_exit_flush(int status)
+{
+	fflush(NULL);
+	_exit(status);
+}
+
 /**
  * @brief Detect if sudo was used to elevate privileges and drop them
  *
@@ -157,12 +170,12 @@ execute_cmd(int argc, char **argv)
                                 fprintf(stderr, "%s,%s:%d Failed to set core "
                                         "affinity!\n", __FILE__, __func__,
                                         __LINE__);
-                                _Exit(EXIT_FAILURE);
+                                _exit_flush(EXIT_FAILURE);
                         }
 
 		/* drop elevated root privileges */
 		if (0 == g_cfg.sudo_keep && 0 != sudo_drop())
-			_Exit(EXIT_FAILURE);
+			_exit_flush(EXIT_FAILURE);
 
 		errno = 0;
 		/* execute command */
@@ -172,7 +185,7 @@ execute_cmd(int argc, char **argv)
 				__FILE__, __func__, __LINE__,
 				argv[0], strerror(errno), errno);
 
-		_Exit(EXIT_FAILURE);
+		_exit_flush(EXIT_FAILURE);
 	}
 
 	return 0;
@@ -643,7 +656,7 @@ main(int argc, char **argv)
 			fprintf(stderr, "Allocation: Failed to configure "
 				"allocation!\n");
 			alloc_fini();
-			_Exit(EXIT_FAILURE);
+			_exit_flush(EXIT_FAILURE);
 		}
 	}
 
@@ -697,6 +710,8 @@ main(int argc, char **argv)
 		 * just deinit libpqos
 		 **/
 		rdtset_fini();
-		_Exit(EXIT_SUCCESS);
+		_exit_flush(EXIT_SUCCESS);
 	}
+
+	exit(EXIT_FAILURE);
 }
