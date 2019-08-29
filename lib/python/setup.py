@@ -1,16 +1,16 @@
 from distutils.core import setup
 
-with open(u'README.txt', 'r') as long_desc_file:
+with open('README.txt', 'r') as long_desc_file:
     long_description = long_desc_file.read()
 
 setup(
-    name=u'pqos',
-    version=u'3.1.0',
-    maintainer=u'Intel',
-    maintainer_email=u'adrianx.boczkowski@intel.com',
-    packages=[u'pqos', u'pqos.test'],
-    url=u'https://github.com/intel/intel-cmt-cat',
-    license=u'BSD',
-    description=u'Python interface for PQoS library',
+    name='pqos',
+    version='3.1.0',
+    maintainer='Intel',
+    maintainer_email='adrianx.boczkowski@intel.com',
+    packages=['pqos', 'pqos.test'],
+    url='https://github.com/intel/intel-cmt-cat',
+    license='BSD',
+    description='Python interface for PQoS library',
     long_description=long_description,
 )
