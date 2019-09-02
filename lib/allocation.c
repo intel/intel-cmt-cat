@@ -852,7 +852,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 }
 
 int
-hw_mba_set(const unsigned socket,
+hw_mba_set(const unsigned mba_id,
            const unsigned num_cos,
            const struct pqos_mba *requested,
            struct pqos_mba *actual)
@@ -899,7 +899,7 @@ hw_mba_set(const unsigned socket,
         }
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
+	ret = pqos_cpu_get_one_by_mba_id(m_cpu, mba_id, &core);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -936,7 +936,7 @@ hw_mba_set(const unsigned socket,
 }
 
 int
-hw_mba_get(const unsigned socket,
+hw_mba_get(const unsigned mba_id,
            const unsigned max_num_cos,
            unsigned *num_cos,
            struct pqos_mba *mba_tab)
@@ -959,7 +959,7 @@ hw_mba_get(const unsigned socket,
                 return PQOS_RETVAL_ERROR;
 
         ASSERT(m_cpu != NULL);
-        ret = pqos_cpu_get_one_core(m_cpu, socket, &core);
+	ret = pqos_cpu_get_one_by_mba_id(m_cpu, mba_id, &core);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1502,7 +1502,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 		for (j = 0; j < mba_id_num; j++) {
                         unsigned core = 0;
 
-			ret = pqos_cpu_get_one_core(m_cpu, mba_ids[j], &core);
+			ret = pqos_cpu_get_one_by_mba_id(m_cpu, mba_ids[j],
+							 &core);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
