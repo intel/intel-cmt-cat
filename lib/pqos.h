@@ -1019,6 +1019,20 @@ unsigned *
 pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
 
 /**
+ * @brief Retrieves one core id from cpu info structure for \a mba_id
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [in] mba to enumerate
+ * @param [out] lcore place to store returned core id
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_cpu_get_one_by_mba_id(const struct pqos_cpuinfo *cpu,
+			    const unsigned mba_id,
+			    unsigned *lcore);
+/**
  * @brief Retrieves core information from cpu info structure for \a lcore
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
