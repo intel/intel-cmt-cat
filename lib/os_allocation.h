@@ -160,9 +160,9 @@ int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 
 /**
  * @brief OS interface to set classes of service
- *        defined by \a ca on \a socket
+ *        defined by \a ca on \a l3cat_id
  *
- * @param [in] l3cat_id L3 cat identifier
+ * @param [in] l3cat_id L3 CAT resource id
  * @param [in] num_cos number of classes of service at \a ca
  * @param [in] ca table with class of service definitions
  *
@@ -174,9 +174,9 @@ int os_l3ca_set(const unsigned l3cat_id,
                 const struct pqos_l3ca *ca);
 
 /**
- * @brief OS interface to read classes of service from \a socket
+ * @brief OS interface to read classes of service from \a l3cat_id
  *
- * @param [in] l3cat_id L3 cat identifier
+ * @param [in] l3cat_id L3 CAT resource id
  * @param [in] max_num_ca maximum number of classes of service
  *             that can be accommodated at \a ca
  * @param [out] num_ca number of classes of service read into \a ca
@@ -244,9 +244,9 @@ int os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
 
 /**
  * @brief OS interface to set classes of service
- *        defined by \a mba on \a socket
+ *        defined by \a MBA id
  *
- * @param [in]  socket CPU socket id
+ * @param [in]  mba_id MBA resource id
  * @param [in]  num_cos number of classes of service at \a ca
  * @param [in]  requested table with class of service definitions
  * @param [out] actual table with class of service definitions
@@ -254,15 +254,15 @@ int os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mba_set(const unsigned socket,
+int os_mba_set(const unsigned mba_id,
                const unsigned num_cos,
                const struct pqos_mba *requested,
                struct pqos_mba *actual);
 
 /**
- * @brief OS interface to read MBA from \a socket
+ * @brief OS interface to read MBA from \a mba_id
  *
- * @param [in]  socket CPU socket id
+ * @param [in]  mba_id MBA resource id
  * @param [in]  max_num_cos maximum number of classes of service
  *              that can be accommodated at \a mba_tab
  * @param [out] num_cos number of classes of service read into \a mba_tab
@@ -271,7 +271,7 @@ int os_mba_set(const unsigned socket,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mba_get(const unsigned socket,
+int os_mba_get(const unsigned mba_id,
                const unsigned max_num_cos,
                unsigned *num_cos,
                struct pqos_mba *mba_tab);

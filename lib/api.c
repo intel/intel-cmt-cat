@@ -490,7 +490,7 @@ is_contiguous(uint64_t bitmask)
 }
 
 int
-pqos_l3ca_set(const unsigned socket,
+pqos_l3ca_set(const unsigned l3cat_id,
               const unsigned num_cos,
               const struct pqos_l3ca *ca)
 {
@@ -529,10 +529,10 @@ pqos_l3ca_set(const unsigned socket,
 	}
 
 	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_l3ca_set(socket, num_cos, ca);
+		ret = hw_l3ca_set(l3cat_id, num_cos, ca);
 	else {
 #ifdef __linux__
-		ret = os_l3ca_set(socket, num_cos, ca);
+		ret = os_l3ca_set(l3cat_id, num_cos, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
@@ -544,7 +544,7 @@ pqos_l3ca_set(const unsigned socket,
 }
 
 int
-pqos_l3ca_get(const unsigned socket,
+pqos_l3ca_get(const unsigned l3cat_id,
               const unsigned max_num_ca,
               unsigned *num_ca,
               struct pqos_l3ca *ca)
@@ -562,10 +562,10 @@ pqos_l3ca_get(const unsigned socket,
                 return ret;
         }
 	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_l3ca_get(socket, max_num_ca, num_ca, ca);
+		ret = hw_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
 	else {
 #ifdef __linux__
-		ret = os_l3ca_get(socket, max_num_ca, num_ca, ca);
+		ret = os_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
@@ -740,7 +740,7 @@ pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
  */
 
 int
-pqos_mba_set(const unsigned socket,
+pqos_mba_set(const unsigned mba_id,
              const unsigned num_cos,
              const struct pqos_mba *requested,
              struct pqos_mba *actual)
@@ -772,10 +772,10 @@ pqos_mba_set(const unsigned socket,
         }
 
         if (m_interface == PQOS_INTER_MSR)
-                ret = hw_mba_set(socket, num_cos, requested, actual);
+		ret = hw_mba_set(mba_id, num_cos, requested, actual);
         else {
 #ifdef __linux__
-                ret = os_mba_set(socket, num_cos, requested, actual);
+		ret = os_mba_set(mba_id, num_cos, requested, actual);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
@@ -789,7 +789,7 @@ pqos_mba_set(const unsigned socket,
 }
 
 int
-pqos_mba_get(const unsigned socket,
+pqos_mba_get(const unsigned mba_id,
              const unsigned max_num_cos,
              unsigned *num_cos,
              struct pqos_mba *mba_tab)
@@ -808,10 +808,10 @@ pqos_mba_get(const unsigned socket,
         }
 
         if (m_interface == PQOS_INTER_MSR)
-                ret = hw_mba_get(socket, max_num_cos, num_cos, mba_tab);
+		ret = hw_mba_get(mba_id, max_num_cos, num_cos, mba_tab);
         else {
 #ifdef __linux__
-                ret = os_mba_get(socket, max_num_cos, num_cos, mba_tab);
+		ret = os_mba_get(mba_id, max_num_cos, num_cos, mba_tab);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
