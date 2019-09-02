@@ -122,7 +122,7 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
                 }
 
                 if (strncmp(buf, "mbm_total_bytes\n", sizeof(buf)) == 0) {
-                        LOG_INFO("Detected resctrl support "
+                        LOG_INFO("Detected resctrl support for "
                                 "Total Memory B/W\n");
                         supported_events |= PQOS_MON_EVENT_TMEM_BW;
                 }
