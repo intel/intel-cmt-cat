@@ -58,17 +58,7 @@
  */
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
-/**
- * @brief Function to mount the resctrl file system with CDP option
- *
- * @param l3_cdp_cfg L3 CDP option
- * @param l2_cdp_cfg L2 CDP option
- * @param mba_cfg requested MBA config
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
                    const enum pqos_cdp_config l2_cdp_cfg,
                    const enum pqos_mba_config mba_cfg)
@@ -141,13 +131,7 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
         return resctrl_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 }
 
-/**
- * @brief Check to see if resctrl is supported.
- *        If it is attempt to mount the file system.
- *
- * @return Operational status
- */
-static int
+int
 os_alloc_check(void)
 {
         int ret;
@@ -195,14 +179,7 @@ os_alloc_check(void)
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Prepares and authenticates resctrl file system
- *        used for OS allocation interface
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK success
- */
-static int
+int
 os_alloc_prep(void)
 {
         unsigned i, num_grps = 0;
@@ -461,12 +438,7 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
         return ret;
 }
 
-/**
- * @brief Moves all cores to COS0 (default)
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_cores(void)
 {
 	const unsigned default_cos = 0;
@@ -490,16 +462,7 @@ os_alloc_reset_cores(void)
 	return ret;
 }
 
-/**
- * @brief Resets L3, L2 and MBA schematas to default value
- *
- * @param [in] l3_cap l3 cache capability
- * @param [in] l2_cap l2 cache capability
- * @param [in] mba_cap mba capability
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
                          const struct pqos_cap_l2ca *l2_cap,
                          const struct pqos_cap_mba *mba_cap)
@@ -585,12 +548,7 @@ filter_pids(const struct dirent *dir)
         return 1;
 }
 
-/**
- * @brief Move all tasks to COS0 (default)
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_tasks(void)
 {
 	struct dirent **pids_list = NULL;
@@ -626,22 +584,7 @@ os_alloc_reset_tasks(void)
 	return alloc_result;
 }
 
-/**
- * @brief Performs "light reset" of CAT.
- *
- * Moves all cores to default COS
- * Resets all l3 schematas to default value
- * Resets all l2 schematas to default value
- * Resets all mba schematas to default value
- * Moves all tasks to default COS
- *
- * @param [in] l3_cap L3 CAT capability
- * @param [in] l2_cap L2 CAT capability
- * @param [in] mba_cap MBA capability
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
 		     const struct pqos_cap_l2ca *l2_cap,
                      const struct pqos_cap_mba *mba_cap)
@@ -666,17 +609,7 @@ os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
 	return ret;
 }
 
-/**
- * @brief updates CDP for l2 cache capability
- *
- * @param [in] l2_cdp_cfg requsted l2 cdp configuration
- * @param [in] l2_cap l2 capability
- * @param [out] l2_cdp id of default COS
- *
- * @retval > 0 on l2_cdp change
- * @retval 0 on no change
- */
-static int
+int
 l2_cdp_update(const enum pqos_cdp_config l2_cdp_cfg,
 	      const struct pqos_cap_l2ca *l2_cap,
 	      enum pqos_cdp_config *l2_cdp)
@@ -705,17 +638,7 @@ l2_cdp_update(const enum pqos_cdp_config l2_cdp_cfg,
 	return ret;
 }
 
-/**
- * @brief updates CDP for l3 cache capability
- *
- * @param [in] l3_cdp_cfg requsted l3 cdp configuration
- * @param [in] l3_cap l3 capability
- * @param [out] l3_cdp id of default COS
- *
- * @retval > 0 on l3_cdp change
- * @retval 0 on no change
- */
-static int
+int
 l3_cdp_update(const enum pqos_cdp_config l3_cdp_cfg,
               const struct pqos_cap_l3ca *l3_cap,
               enum pqos_cdp_config *l3_cdp)
@@ -744,17 +667,7 @@ l3_cdp_update(const enum pqos_cdp_config l3_cdp_cfg,
         return ret;
 }
 
-/**
- * @brief updates MBA configuration for MBA capability
- *
- * @param [in] mba_cfg requsted MBA configuration
- * @param [in] mba_cap MBA capability
- * @param [out] mba_ctrl updated MBA config
- *
- * @retval > 0 mba_ctrl change
- * @retval 0 no change
- */
-static int
+int
 mba_cfg_update(const enum pqos_mba_config mba_cfg,
                 const struct pqos_cap_mba *mba_cap,
                 enum pqos_mba_config *mba_ctrl)
@@ -784,22 +697,7 @@ mba_cfg_update(const enum pqos_mba_config mba_cfg,
         return ret;
 }
 
-/**
- * @brief Performs "full reset" of CAT.
- *
- * Allocs all cores to default COS
- * Remounts resctrl file system with new CDP configuration
- *
- * @param [in] l3_cdp_cfg requested L3 CAT CDP config
- * @param [in] l2_cdp_cfg requested L2 CAT CDP config
- * @param [in] mba_cfg requested MBA config
- * @param [in] l3_cap l3 capability
- * @param [in] l2_cap l2 capability
- * @param [in] mba_cap mba capability
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
 		    const enum pqos_cdp_config l2_cdp_cfg,
                     const enum pqos_mba_config mba_cfg,
@@ -989,16 +887,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         return ret;
 }
 
-/*
- * @brief Check if l3cat_id is correct
- *
- * @param [in] cpu l3cat id
- * @param [in] cpu CPU information structure from \a pqos_cap_get
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 verify_l3cat_id(const unsigned l3cat_id, const struct pqos_cpuinfo *cpu)
 {
 	int ret = PQOS_RETVAL_PARAM;
@@ -1022,16 +911,7 @@ verify_l3cat_id(const unsigned l3cat_id, const struct pqos_cpuinfo *cpu)
 	return ret;
 }
 
-/*
- * @brief Check if mba_id is correct
- *
- * @param [in] mba_id MBA resource id
- * @param [in] CPU information structure from \a pqos_cap_get
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 verify_mba_id(const unsigned mba_id, const struct pqos_cpuinfo *cpu)
 {
 	int ret = PQOS_RETVAL_PARAM;
@@ -1055,16 +935,6 @@ verify_mba_id(const unsigned mba_id, const struct pqos_cpuinfo *cpu)
 	return ret;
 }
 
-/*
- * @brief Set the bitmask for a given COS
- *
- * @param [in] l3cat_id L3 cat identifier
- * @param [in] num_cos Total number of COS
- * @param [in] ca Bitmask information to set
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
 int
 os_l3ca_set(const unsigned l3cat_id,
             const unsigned num_cos,
@@ -1255,16 +1125,7 @@ os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 	return ret;
 }
 
-/*
- * @brief Check if L2 id is correct
- *
- * @param [in] l2id unique L2 cache identifier
- * @param [in] cpu CPU information structure from \a pqos_cap_get
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 verify_l2_id(const unsigned l2id, const struct pqos_cpuinfo *cpu)
 {
         int ret = PQOS_RETVAL_PARAM;
