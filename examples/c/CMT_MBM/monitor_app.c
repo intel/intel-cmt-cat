@@ -104,13 +104,13 @@ static void stop_monitoring(void);
  */
 static void __attribute__((noreturn)) monitoring_ctrlc(int signo)
 {
-	printf("\nExiting[%d]...\n", signo);
+        printf("\nExiting[%d]...\n", signo);
         stop_monitoring();
         if (pqos_fini() != PQOS_RETVAL_OK) {
-		printf("Error shutting down PQoS library!\n");
+                printf("Error shutting down PQoS library!\n");
                 exit(EXIT_FAILURE);
         }
-	exit(EXIT_SUCCESS);
+        exit(EXIT_SUCCESS);
 }
 
 /**
@@ -157,7 +157,7 @@ static inline int process_mode(void)
 static void
 monitoring_get_input(int argc, char *argv[])
 {
-	int num_args, num_opts = 1, i = 0, sel_pid = 0, help = 0;
+        int num_args, num_opts = 1, i = 0, sel_pid = 0, help = 0;
 
         for (i = 0; i < argc; i++) {
                 if (!strcmp(argv[i], "-p")) {
@@ -179,19 +179,19 @@ monitoring_get_input(int argc, char *argv[])
         }
         num_args = (argc - num_opts);
         if (help) {
-		printf("Usage:  %s [<core1> <core2> <core3> ...]\n"
+                printf("Usage:  %s [<core1> <core2> <core3> ...]\n"
                        "        %s -I -p [<pid1> <pid2> <pid3> ...]\n",
                        argv[0], argv[0]);
-		printf("Eg   :  %s 1 2 6\n        "
+                printf("Eg   :  %s 1 2 6\n        "
                        "%s -I -p 3564 7638 356\n"
                        "Notes:\n        "
                        "-h      help\n        "
                        "-I      select library OS interface\n        "
                        "-p      select process ID's to monitor LLC occupancy"
                        "\n\n", argv[0], argv[0]);
-		exit(EXIT_SUCCESS);
+                exit(EXIT_SUCCESS);
         } else if (num_args == 0) {
-		sel_monitor_num = 0;
+                sel_monitor_num = 0;
         } else {
                 if (sel_pid) {
                         if (num_args > PQOS_MAX_PIDS)
@@ -214,7 +214,7 @@ monitoring_get_input(int argc, char *argv[])
                         }
                         sel_monitor_num = (int) num_args;
                 }
-	}
+        }
 }
 
 /**
@@ -231,7 +231,7 @@ static int
 setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                  const struct pqos_capability * const cap_mon)
 {
-	unsigned i;
+        unsigned i;
         const enum pqos_mon_event perf_events = (enum pqos_mon_event)
             (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS);
 
@@ -285,7 +285,7 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         }
                 }
         }
-	return PQOS_RETVAL_OK;
+        return PQOS_RETVAL_OK;
 }
 
 /**
@@ -294,21 +294,21 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
  */
 static void stop_monitoring(void)
 {
-	unsigned i, mon_number = 0;
+        unsigned i, mon_number = 0;
 
         if (!process_mode())
                 mon_number = (unsigned) sel_monitor_num;
         else
                 mon_number = (unsigned) sel_process_num;
 
-	for (i = 0; i < mon_number; i++) {
+        for (i = 0; i < mon_number; i++) {
                 int ret;
 
-		ret = pqos_mon_stop(m_mon_grps[i]);
-		if (ret != PQOS_RETVAL_OK)
-			printf("Monitoring stop error!\n");
+                ret = pqos_mon_stop(m_mon_grps[i]);
+                if (ret != PQOS_RETVAL_OK)
+                        printf("Monitoring stop error!\n");
                 free(m_mon_grps[i]);
-	}
+        }
 }
 
 /**
@@ -317,18 +317,18 @@ static void stop_monitoring(void)
 static void monitoring_loop(void)
 {
         unsigned mon_number = 0;
-	int ret = PQOS_RETVAL_OK;
-	int i = 0;
+        int ret = PQOS_RETVAL_OK;
+        int i = 0;
 
-	if (signal(SIGINT, monitoring_ctrlc) == SIG_ERR)
-		printf("Failed to catch SIGINT!\n");
+        if (signal(SIGINT, monitoring_ctrlc) == SIG_ERR)
+                printf("Failed to catch SIGINT!\n");
 
         if (!process_mode())
-	        mon_number = (unsigned) sel_monitor_num;
-	else
-	        mon_number = (unsigned) sel_process_num;
+                mon_number = (unsigned) sel_monitor_num;
+        else
+                mon_number = (unsigned) sel_process_num;
 
-	while (1) {
+        while (1) {
                 ret = pqos_mon_poll(m_mon_grps, (unsigned)mon_number);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to poll monitoring data!\n");
@@ -365,63 +365,63 @@ static void monitoring_loop(void)
                                        m_mon_grps[i]->pids[0], llc);
                         }
                 }
-		printf("\nPress Enter to continue or Ctrl+c to exit");
-		if (getchar() != '\n')
-			break;
-		printf("\e[1;1H\e[2J");
-	}
+                printf("\nPress Enter to continue or Ctrl+c to exit");
+                if (getchar() != '\n')
+                        break;
+                printf("\e[1;1H\e[2J");
+        }
 }
 
 int main(int argc, char *argv[])
 {
-	struct pqos_config config;
-	const struct pqos_cpuinfo *p_cpu = NULL;
-	const struct pqos_cap *p_cap = NULL;
-	int ret, exit_val = EXIT_SUCCESS;
-	const struct pqos_capability *cap_mon = NULL;
+        struct pqos_config config;
+        const struct pqos_cpuinfo *p_cpu = NULL;
+        const struct pqos_cap *p_cap = NULL;
+        int ret, exit_val = EXIT_SUCCESS;
+        const struct pqos_capability *cap_mon = NULL;
 
         /* Get input from user */
-	monitoring_get_input(argc, argv);
+        monitoring_get_input(argc, argv);
 
         memset(&config, 0, sizeof(config));
         config.fd_log = STDOUT_FILENO;
         config.verbose = 0;
         config.interface = interface;
 
-	/* PQoS Initialization - Check and initialize CAT and CMT capability */
-	ret = pqos_init(&config);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error initializing PQoS library!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get CMT capability and CPU info pointer */
-	ret = pqos_cap_get(&p_cap, &p_cpu);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error retrieving PQoS capabilities!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error retrieving monitoring capabilities\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Setup the monitoring resources */
-	ret = setup_monitoring(p_cpu, cap_mon);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error Setting up monitoring!\n");
+        /* PQoS Initialization - Check and initialize CAT and CMT capability */
+        ret = pqos_init(&config);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error initializing PQoS library!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit;
         }
-	/* Start Monitoring */
-	monitoring_loop();
-	/* Stop Monitoring */
-	stop_monitoring();
+        /* Get CMT capability and CPU info pointer */
+        ret = pqos_cap_get(&p_cap, &p_cpu);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error retrieving PQoS capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error retrieving monitoring capabilities\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Setup the monitoring resources */
+        ret = setup_monitoring(p_cpu, cap_mon);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error Setting up monitoring!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Start Monitoring */
+        monitoring_loop();
+        /* Stop Monitoring */
+        stop_monitoring();
  error_exit:
-	ret = pqos_fini();
-	if (ret != PQOS_RETVAL_OK)
-		printf("Error shutting down PQoS library!\n");
-	return exit_val;
+        ret = pqos_fini();
+        if (ret != PQOS_RETVAL_OK)
+                printf("Error shutting down PQoS library!\n");
+        return exit_val;
 }
