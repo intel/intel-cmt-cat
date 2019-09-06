@@ -240,7 +240,7 @@ static int init_timer(const long long freq_nanosecs)
 static int close_timer(void)
 {
         if (timer_delete(timerid) == -1) {
-		printf("Error deleting the timer!\n");
+                printf("Error deleting the timer!\n");
                 return -1;
         }
         return 0;
@@ -261,33 +261,33 @@ static int init_pqos(void)
 {
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
-	struct pqos_config cfg;
+        struct pqos_config cfg;
         int ret;
 
-	memset(&cfg, 0, sizeof(cfg));
+        memset(&cfg, 0, sizeof(cfg));
         cfg.fd_log = STDOUT_FILENO;
         cfg.verbose = 0;
-	ret = pqos_init(&cfg);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error initializing PQoS library!\n");
-		return -1;
-	}
+        ret = pqos_init(&cfg);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error initializing PQoS library!\n");
+                return -1;
+        }
 
-	/* Get CMT capability and CPU info pointer */
-	ret = pqos_cap_get(&p_cap, &p_cpu);
-	if (ret != PQOS_RETVAL_OK) {
+        /* Get CMT capability and CPU info pointer */
+        ret = pqos_cap_get(&p_cap, &p_cpu);
+        if (ret != PQOS_RETVAL_OK) {
                 pqos_fini();
                 printf("Error retrieving PQoS capabilities!\n");
-		return -1;
-	}
+                return -1;
+        }
 
         /* Reset CAT */
-	ret = pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
+        ret = pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
                                PQOS_MBA_ANY);
-	if (ret != PQOS_RETVAL_OK) {
+        if (ret != PQOS_RETVAL_OK) {
                 pqos_fini();
-		printf("Error resetting CAT!\n");
-		return -1;
+                printf("Error resetting CAT!\n");
+                return -1;
         }
 
         return 0;
@@ -304,8 +304,8 @@ static int close_pqos(void)
 {
         int ret_val = 0;
 
-	if (pqos_fini() != PQOS_RETVAL_OK) {
-		printf("Error shutting down PQoS library!\n");
+        if (pqos_fini() != PQOS_RETVAL_OK) {
+                printf("Error shutting down PQoS library!\n");
                 ret_val = -1;
         }
 
@@ -324,7 +324,7 @@ static void main_thread(char *p, const size_t size)
 {
         const size_t half_size = size / 2;
         const unsigned loop_iter = 10000000;
-	unsigned i;
+        unsigned i;
 
         printf("%s() started. please wait ...\n", __func__);
 
@@ -352,7 +352,7 @@ static void main_thread(char *p, const size_t size)
 int main(int argc, char *argv[])
 {
         const long long freq_nanosecs = freq_ms * 1000LL * 1000LL;
-	int core_id, lock_data = 1, exit_val = EXIT_SUCCESS;
+        int core_id, lock_data = 1, exit_val = EXIT_SUCCESS;
 
         if (argc < 3) {
                 printf("Usage: %s <core_id> <lock|nolock>\n", argv[0]);
@@ -419,5 +419,5 @@ int main(int argc, char *argv[])
                 free(main_data_ptr);
         if (timer_data_ptr != NULL)
                 free(timer_data_ptr);
-	return exit_val;
+        return exit_val;
 }

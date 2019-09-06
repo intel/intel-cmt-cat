@@ -175,15 +175,15 @@ static int bytes_to_cache_ways(const struct pqos_capability *cat_cap,
 
 int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
 {
-	const struct pqos_cpuinfo *p_cpu = NULL;
-	const struct pqos_cap *p_cap = NULL;
+        const struct pqos_cpuinfo *p_cpu = NULL;
+        const struct pqos_cap *p_cap = NULL;
         const struct pqos_capability *p_l3ca_cap = NULL;
-	unsigned *l3cat_ids = NULL;
-	unsigned l3cat_id_count = 0, i = 0;
+        unsigned *l3cat_ids = NULL;
+        unsigned l3cat_id_count = 0, i = 0;
         int ret = 0, res = 0;
         size_t num_cache_ways = 0;
         unsigned clos_save = 0;
-	char err_buf[64];
+        char err_buf[64];
 
 #ifdef __linux__
         cpu_set_t cpuset_save, cpuset;
@@ -255,36 +255,36 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         /**
          * Clear table for restoring CAT configuration
          */
-	for (i = 0; i < DIM(m_l3cat_cos); i++) {
-		m_l3cat_cos[i].id = 0;
-		m_l3cat_cos[i].cos_tab = NULL;
-	}
+        for (i = 0; i < DIM(m_l3cat_cos); i++) {
+                m_l3cat_cos[i].id = 0;
+                m_l3cat_cos[i].cos_tab = NULL;
+        }
 
         /**
          * Retrieve CPU topology and PQoS capabilities
          */
-	res = pqos_cap_get(&p_cap, &p_cpu);
-	if (res != PQOS_RETVAL_OK) {
-		ret = -5;
-		goto dlock_init_error2;
-	}
+        res = pqos_cap_get(&p_cap, &p_cpu);
+        if (res != PQOS_RETVAL_OK) {
+                ret = -5;
+                goto dlock_init_error2;
+        }
 
         /**
-	 * Retrieve list of CPU l3cat_ids
+         * Retrieve list of CPU l3cat_ids
          */
-	l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
-	if (l3cat_ids == NULL) {
-		ret = -6;
-		goto dlock_init_error2;
-	}
+        l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
+        if (l3cat_ids == NULL) {
+                ret = -6;
+                goto dlock_init_error2;
+        }
 
         /**
          * Get CAT capability structure
          */
         res = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &p_l3ca_cap);
         if (res != PQOS_RETVAL_OK) {
-		ret = -7;
-		goto dlock_init_error2;
+                ret = -7;
+                goto dlock_init_error2;
         }
 
         /**
@@ -292,8 +292,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
          */
         res = bytes_to_cache_ways(p_l3ca_cap, size, &num_cache_ways);
         if (res != 0) {
-		ret = -8;
-		goto dlock_init_error2;
+                ret = -8;
+                goto dlock_init_error2;
         }
 
         /**
@@ -302,76 +302,76 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
          */
         m_num_clos = p_l3ca_cap->u.l3ca->num_classes;
 
-	for (i = 0; i < l3cat_id_count; i++) {
-		/**
-		 * This would be enough to run the below code for the l3cat_id
-		 * corresponding to \a cpuid. Yet it is safer to keep CLOS
-		 * definitions coherent across l3cat_ids.
-		 */
-		const uint64_t dlock_mask = (1ULL << num_cache_ways) - 1ULL;
+        for (i = 0; i < l3cat_id_count; i++) {
+                /**
+                 * This would be enough to run the below code for the l3cat_id
+                 * corresponding to \a cpuid. Yet it is safer to keep CLOS
+                 * definitions coherent across l3cat_ids.
+                 */
+                const uint64_t dlock_mask = (1ULL << num_cache_ways) - 1ULL;
 
-		ASSERT(m_num_clos > 0);
-		struct pqos_l3ca cos[m_num_clos];
-		unsigned num = 0, j;
+                ASSERT(m_num_clos > 0);
+                struct pqos_l3ca cos[m_num_clos];
+                unsigned num = 0, j;
 
-		/* get current CAT classes on this l3cat_ids */
-		res = pqos_l3ca_get(l3cat_ids[i], m_num_clos, &num, &cos[0]);
-		if (res != PQOS_RETVAL_OK) {
-			printf("pqos_l3ca_get() error!\n");
-			ret = -9;
-			goto dlock_init_error2;
-		}
+                /* get current CAT classes on this l3cat_ids */
+                res = pqos_l3ca_get(l3cat_ids[i], m_num_clos, &num, &cos[0]);
+                if (res != PQOS_RETVAL_OK) {
+                        printf("pqos_l3ca_get() error!\n");
+                        ret = -9;
+                        goto dlock_init_error2;
+                }
 
-		/* paranoia check */
-		if (m_num_clos != num) {
-			printf("CLOS number mismatch!\n");
-			ret = -9;
-			goto dlock_init_error2;
-		}
+                /* paranoia check */
+                if (m_num_clos != num) {
+                        printf("CLOS number mismatch!\n");
+                        ret = -9;
+                        goto dlock_init_error2;
+                }
 
-		/* save CAT classes to restore it later */
-		m_l3cat_cos[i].id = l3cat_ids[i];
-		m_l3cat_cos[i].cos_tab = malloc(m_num_clos * sizeof(cos[0]));
-		if (m_l3cat_cos[i].cos_tab == NULL) {
-			printf("malloc() error!\n");
-			ret = -9;
-			goto dlock_init_error2;
-		}
-		memcpy(m_l3cat_cos[i].cos_tab, cos,
-				m_num_clos * sizeof(cos[0]));
+                /* save CAT classes to restore it later */
+                m_l3cat_cos[i].id = l3cat_ids[i];
+                m_l3cat_cos[i].cos_tab = malloc(m_num_clos * sizeof(cos[0]));
+                if (m_l3cat_cos[i].cos_tab == NULL) {
+                        printf("malloc() error!\n");
+                        ret = -9;
+                        goto dlock_init_error2;
+                }
+                memcpy(m_l3cat_cos[i].cos_tab, cos,
+                                m_num_clos * sizeof(cos[0]));
 
-		/**
-		 * Modify the classes in the following way:
-		 * if class_id == clos then
-		 *   set class mask so that it has exclusive access to
-		 *   \a num_cache_ways
-		 * else
-		 *   exclude class from accessing \a num_cache_ways
-		 */
-		for (j = 0; j < m_num_clos; j++) {
-			if (cos[j].cdp) {
-				if (cos[j].class_id == (unsigned)clos) {
-					cos[j].u.s.code_mask = dlock_mask;
-					cos[j].u.s.data_mask = dlock_mask;
-				} else {
-					cos[j].u.s.code_mask &= ~dlock_mask;
-					cos[j].u.s.data_mask &= ~dlock_mask;
-				}
-			} else {
-				if (cos[j].class_id == (unsigned)clos)
-					cos[j].u.ways_mask = dlock_mask;
-				else
-					cos[j].u.ways_mask &= ~dlock_mask;
-			}
-		}
+                /**
+                 * Modify the classes in the following way:
+                 * if class_id == clos then
+                 *   set class mask so that it has exclusive access to
+                 *   \a num_cache_ways
+                 * else
+                 *   exclude class from accessing \a num_cache_ways
+                 */
+                for (j = 0; j < m_num_clos; j++) {
+                        if (cos[j].cdp) {
+                                if (cos[j].class_id == (unsigned)clos) {
+                                        cos[j].u.s.code_mask = dlock_mask;
+                                        cos[j].u.s.data_mask = dlock_mask;
+                                } else {
+                                        cos[j].u.s.code_mask &= ~dlock_mask;
+                                        cos[j].u.s.data_mask &= ~dlock_mask;
+                                }
+                        } else {
+                                if (cos[j].class_id == (unsigned)clos)
+                                        cos[j].u.ways_mask = dlock_mask;
+                                else
+                                        cos[j].u.ways_mask &= ~dlock_mask;
+                        }
+                }
 
-		res = pqos_l3ca_set(l3cat_ids[i], m_num_clos, &cos[0]);
-		if (res != PQOS_RETVAL_OK) {
-			printf("pqos_l3ca_set() error!\n");
-			ret = -10;
-			goto dlock_init_error2;
-		}
-	}
+                res = pqos_l3ca_set(l3cat_ids[i], m_num_clos, &cos[0]);
+                if (res != PQOS_RETVAL_OK) {
+                        printf("pqos_l3ca_set() error!\n");
+                        ret = -10;
+                        goto dlock_init_error2;
+                }
+        }
 
         /**
          * Read current cpuid CLOS association and set the new one
@@ -418,9 +418,9 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         }
 
  dlock_init_error2:
-	for (i = 0; (i < DIM(m_l3cat_cos)) && (ret != 0); i++)
-		if (m_l3cat_cos[i].cos_tab != NULL)
-			free(m_l3cat_cos[i].cos_tab);
+        for (i = 0; (i < DIM(m_l3cat_cos)) && (ret != 0); i++)
+                if (m_l3cat_cos[i].cos_tab != NULL)
+                        free(m_l3cat_cos[i].cos_tab);
 
 #ifdef __linux__
         res = sched_setaffinity(0, sizeof(cpuset_save), &cpuset_save);
@@ -445,8 +445,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                 m_is_chunk_allocated = 0;
         }
 
-	if (l3cat_ids != NULL)
-		free(l3cat_ids);
+        if (l3cat_ids != NULL)
+                free(l3cat_ids);
 
         return ret;
 }
@@ -459,18 +459,18 @@ int dlock_exit(void)
         if (m_chunk_start == NULL)
                 return -1;
 
-	for (i = 0; i < DIM(m_l3cat_cos); i++) {
-		if (m_l3cat_cos[i].cos_tab != NULL) {
-			int res = pqos_l3ca_set(m_l3cat_cos[i].id, m_num_clos,
-						m_l3cat_cos[i].cos_tab);
+        for (i = 0; i < DIM(m_l3cat_cos); i++) {
+                if (m_l3cat_cos[i].cos_tab != NULL) {
+                        int res = pqos_l3ca_set(m_l3cat_cos[i].id, m_num_clos,
+                                                m_l3cat_cos[i].cos_tab);
 
-			if (res != PQOS_RETVAL_OK)
-				ret = -2;
-		}
-		free(m_l3cat_cos[i].cos_tab);
-		m_l3cat_cos[i].cos_tab = NULL;
-		m_l3cat_cos[i].id = 0;
-	}
+                        if (res != PQOS_RETVAL_OK)
+                                ret = -2;
+                }
+                free(m_l3cat_cos[i].cos_tab);
+                m_l3cat_cos[i].cos_tab = NULL;
+                m_l3cat_cos[i].id = 0;
+        }
 
         if (m_is_chunk_allocated)
                 free(m_chunk_start);
