@@ -385,7 +385,7 @@ cap_print_features_os(const struct pqos_capability *cap_mon,
                       const int verbose)
 {
         unsigned min_num_cos = 0;
-	struct utsname name;
+        struct utsname name;
 
         /**
          * Get min. number of COS

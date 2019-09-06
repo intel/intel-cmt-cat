@@ -439,12 +439,12 @@ set_allocation_cos(char *str, unsigned *res_ids,
         parse_cos_mask_type(str, &update_scope, &class_id);
         mask = strtouint64(p+1);
 
-	/* if MBA selected, set MBA classes */
+        /* if MBA selected, set MBA classes */
         if (type == MBA || type == MBA_CTRL) {
                 int ctrl = (type == MBA_CTRL) ? 1 : 0;
 
                 if (ids == NULL)
-			ids = pqos_cpu_get_mba_ids(cpu, &n);
+                        ids = pqos_cpu_get_mba_ids(cpu, &n);
                 if (ids == NULL) {
                         printf("Failed to retrieve socket info!\n");
                         return -1;
@@ -470,7 +470,7 @@ set_allocation_cos(char *str, unsigned *res_ids,
         }
         /* set L3 CAT classes */
         if (ids == NULL)
-		ids = pqos_cpu_get_l3cat_ids(cpu, &n);
+                ids = pqos_cpu_get_l3cat_ids(cpu, &n);
         if (ids == NULL) {
                 printf("Failed to retrieve socket info!\n");
                 return -1;
@@ -514,14 +514,14 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
         /**
          * Set up selected res_ids table
          */
-	q = strchr(str, '@');
-	if (q != NULL) {
+        q = strchr(str, '@');
+        if (q != NULL) {
                 uint64_t ids[max_res_sz];
                 /**
                  * Socket ID's selected - set up res_ids table
                  */
                 *p = '\0';
-		*q = '\0';
+                *q = '\0';
                 n = strlisttotab(++q, ids, DIM(ids));
                 if (n == 0) {
                         printf("No resource ID specified: %s\n", s);
@@ -538,12 +538,12 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                         res_ids[i] = (unsigned)ids[i];
                 }
                 sp = res_ids;
-	} else
+        } else
                 *p = '\0';
         /**
-	 * Determine selected type (L3/L2/MBA/MBA CTRL)
-	 */
-	if (strcasecmp(str, "llc") == 0)
+         * Determine selected type (L3/L2/MBA/MBA CTRL)
+         */
+        if (strcasecmp(str, "llc") == 0)
                 type = L3CA;
         else if (strcasecmp(str, "l2") == 0)
                 type = L2CA;
@@ -552,7 +552,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
         else if (strcasecmp(str, "mba_max") == 0)
                 type = MBA_CTRL;
         else {
-		printf("Unrecognized allocation type: %s\n", s);
+                printf("Unrecognized allocation type: %s\n", s);
                 free(s);
                 return ret;
         }
@@ -1170,7 +1170,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
 
 int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_capability *cap_l2ca,
-		const struct pqos_capability *cap_mba,
+                const struct pqos_capability *cap_mba,
                 const struct pqos_cpuinfo *cpu)
 {
         if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL) {
