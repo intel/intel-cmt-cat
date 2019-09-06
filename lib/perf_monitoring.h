@@ -85,7 +85,7 @@ int perf_mon_fini(void);
  * @retval PQOS_RETVAL_OK on success
  */
 int perf_mon_start(struct pqos_mon_data *group,
-	           const enum pqos_mon_event event);
+                   const enum pqos_mon_event event);
 
 /**
  * @brief Function to stop Perf event counters

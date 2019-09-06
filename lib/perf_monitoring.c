@@ -298,7 +298,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
                 return PQOS_RETVAL_ERROR;
         }
         fclose(fd);
-	p = buf;
+        p = buf;
         strsep(&p, "=");
         if (p == NULL) {
                 LOG_ERROR("Failed to parse OS monitoring event value!\n");
