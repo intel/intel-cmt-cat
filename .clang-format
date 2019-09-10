@@ -1,0 +1,16 @@
+BasedOnStyle: LLVM
+IndentWidth: 8
+
+Language: Cpp
+BreakBeforeBraces: Linux
+AllowShortIfStatementsOnASingleLine: false
+IndentCaseLabels: false
+UseTab: Never
+#AlignConsecutiveMacros: true
+AlignTrailingComments: true
+AlwaysBreakAfterReturnType: AllDefinitions
+SortIncludes: false
+BreakBeforeInheritanceComma: true
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackParameters: false
+ReflowComments: true

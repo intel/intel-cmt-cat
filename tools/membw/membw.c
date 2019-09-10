@@ -60,12 +60,12 @@
  */
 
 #ifdef __linux__
-#define PAGE_SIZE       (4 * 1024)
+#define PAGE_SIZE (4 * 1024)
 #endif
 
-#define MEMCHUNK_SIZE   (PAGE_SIZE * 32 * 1024) /* 128MB chunk */
-#define CL_SIZE         (64)
-#define CHUNKS          (128)
+#define MEMCHUNK_SIZE (PAGE_SIZE * 32 * 1024) /* 128MB chunk */
+#define CL_SIZE (64)
+#define CHUNKS (128)
 
 #ifdef DEBUG
 #include <assert.h>
@@ -75,12 +75,12 @@
 #define ALWAYS_INLINE static inline __attribute__((always_inline))
 #endif
 
-#define MAX_OPTARG_LEN  64
+#define MAX_OPTARG_LEN 64
 
-#define MAX_MEM_BW      100 * 1000 /* 100GBps */
+#define MAX_MEM_BW 100 * 1000 /* 100GBps */
 
-#define CPU_FEATURE_SSE4_2  (1ULL << 0)
-#define CPU_FEATURE_CLWB    (1ULL << 1)
+#define CPU_FEATURE_SSE4_2 (1ULL << 0)
+#define CPU_FEATURE_CLWB (1ULL << 1)
 #define CPU_FEATURE_AVX512F (1ULL << 2)
 
 /**
@@ -151,9 +151,7 @@ static unsigned memchunk_offset = 0;
  *    [out] out    - registers structure to store results of CPUID into
  */
 static void
-lcpuid(const unsigned leaf,
-       const unsigned subleaf,
-       struct cpuid_out *out)
+lcpuid(const unsigned leaf, const unsigned subleaf, struct cpuid_out *out)
 {
         if (out == NULL)
                 return;
@@ -166,9 +164,9 @@ lcpuid(const unsigned leaf,
                      "mov %%ebx, %1\n\t"
                      "mov %%ecx, %2\n\t"
                      "mov %%edx, %3\n\t"
-                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
-                       "=g" (out->edx)
-                     : "g" (leaf), "g" (subleaf)
+                     : "=g"(out->eax), "=g"(out->ebx), "=g"(out->ecx),
+                       "=g"(out->edx)
+                     : "g"(leaf), "g"(subleaf)
                      : "%eax", "%ebx", "%ecx", "%edx");
 #else
         asm volatile("push %%ebx\n\t"
@@ -180,26 +178,29 @@ lcpuid(const unsigned leaf,
                      "mov %%ecx, %2\n\t"
                      "mov %%edx, %3\n\t"
                      "pop %%ebx\n\t"
-                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
-                       "=g" (out->edx)
-                     : "g" (leaf), "g" (subleaf)
+                     : "=g"(out->eax), "=g"(out->ebx), "=g"(out->ecx),
+                       "=g"(out->edx)
+                     : "g"(leaf), "g"(subleaf)
                      : "%eax", "%ecx", "%edx");
 #endif
 }
 
-static uint32_t detect_sse42(void)
+static uint32_t
+detect_sse42(void)
 {
         /* Check presence of SSE4.2 - bit 20 of ECX */
         return (cpuid_1_0.ecx & (1 << 20));
 }
 
-static uint32_t detect_clwb(void)
+static uint32_t
+detect_clwb(void)
 {
         /* Check presence of CLWB - bit 24 of EBX */
         return (cpuid_7_0.ebx & (1 << 24));
 }
 
-static uint32_t detect_avx512f(void)
+static uint32_t
+detect_avx512f(void)
 {
         /* Check presence of AVX512F - bit 16 of EBX */
         return (cpuid_7_0.ebx & (1 << 16));
@@ -210,16 +211,17 @@ static uint32_t detect_avx512f(void)
  *
  * @return Bitmap of supported features
  */
-static uint64_t cpu_feature_detect(void)
+static uint64_t
+cpu_feature_detect(void)
 {
         static const struct {
                 unsigned req_leaf_number;
                 uint64_t feat;
                 uint32_t (*detect_fn)(void);
         } feat_tab[] = {
-                { 1, CPU_FEATURE_SSE4_2, detect_sse42 },
-                { 7, CPU_FEATURE_CLWB, detect_clwb },
-                { 7, CPU_FEATURE_AVX512F, detect_avx512f },
+            {1, CPU_FEATURE_SSE4_2, detect_sse42},
+            {7, CPU_FEATURE_CLWB, detect_clwb},
+            {7, CPU_FEATURE_AVX512F, detect_avx512f},
         };
         struct cpuid_out r;
         unsigned hi_leaf_number = 0;
@@ -237,7 +239,7 @@ static uint64_t cpu_feature_detect(void)
         if (hi_leaf_number >= 7)
                 lcpuid(0x7, 0x0, &cpuid_7_0);
 
-        for (i = 0; i < (sizeof(feat_tab)/sizeof(feat_tab[0])); i++) {
+        for (i = 0; i < (sizeof(feat_tab) / sizeof(feat_tab[0])); i++) {
                 if (hi_leaf_number < feat_tab[i].req_leaf_number)
                         continue;
 
@@ -253,7 +255,8 @@ static uint64_t cpu_feature_detect(void)
  *
  * @param cpuid cpu to bind thread to
  */
-static void set_thread_affinity(const unsigned cpuid)
+static void
+set_thread_affinity(const unsigned cpuid)
 {
 #ifdef __linux__
         cpu_set_t cpuset;
@@ -275,7 +278,6 @@ static void set_thread_affinity(const unsigned cpuid)
 #endif
         if (res != 0)
                 perror("Error setting core affinity ");
-
 }
 
 /**
@@ -286,10 +288,7 @@ static void set_thread_affinity(const unsigned cpuid)
 ALWAYS_INLINE void
 cl_flush(void *p)
 {
-        asm volatile("clflush (%0)\n\t"
-                     :
-                     : "r"(p)
-                     : "memory");
+        asm volatile("clflush (%0)\n\t" : : "r"(p) : "memory");
 }
 
 /**
@@ -298,10 +297,7 @@ cl_flush(void *p)
 ALWAYS_INLINE void
 sb(void)
 {
-        asm volatile("sfence\n\t"
-                     :
-                     :
-                     : "memory");
+        asm volatile("sfence\n\t" : : : "memory");
 }
 
 /**
@@ -312,10 +308,7 @@ sb(void)
 ALWAYS_INLINE void
 cl_wb(void *p)
 {
-        asm volatile("clwb (%0)\n\t"
-                     :
-                     : "r"(p)
-                     : "memory");
+        asm volatile("clwb (%0)\n\t" : : "r"(p) : "memory");
 }
 
 /**
@@ -343,7 +336,8 @@ mem_flush(void *p, size_t s)
  *
  * @retval p allocated memory
  */
-static void *malloc_and_init_memory(size_t s)
+static void *
+malloc_and_init_memory(size_t s)
 {
         void *p = NULL;
         int ret;
@@ -352,7 +346,7 @@ static void *malloc_and_init_memory(size_t s)
 
         if (ret != 0 || p == NULL) {
                 printf("ERROR: Failed to allocate %lu bytes\n",
-                       (unsigned long) s - s % PAGE_SIZE);
+                       (unsigned long)s - s % PAGE_SIZE);
                 stop_loop = 1;
                 return NULL;
         }
@@ -361,7 +355,7 @@ static void *malloc_and_init_memory(size_t s)
         size_t s64 = s / sizeof(uint64_t);
 
         while (s64 > 0) {
-                *p64 = (uint64_t) rand();
+                *p64 = (uint64_t)rand();
                 p64 += (CL_SIZE / sizeof(uint64_t));
                 s64 -= (CL_SIZE / sizeof(uint64_t));
         }
@@ -382,10 +376,7 @@ static void *malloc_and_init_memory(size_t s)
 ALWAYS_INLINE void
 cl_prefetch_t0(void *p)
 {
-        asm volatile("prefetcht0 (%0)\n\t"
-                     :
-                     : "r"(p)
-                     : "memory");
+        asm volatile("prefetcht0 (%0)\n\t" : : "r"(p) : "memory");
 }
 
 /**
@@ -396,10 +387,7 @@ cl_prefetch_t0(void *p)
 ALWAYS_INLINE void
 cl_prefetch_t1(void *p)
 {
-        asm volatile("prefetcht1 (%0)\n\t"
-                     :
-                     : "r"(p)
-                     : "memory");
+        asm volatile("prefetcht1 (%0)\n\t" : : "r"(p) : "memory");
 }
 
 /**
@@ -410,10 +398,7 @@ cl_prefetch_t1(void *p)
 ALWAYS_INLINE void
 cl_prefetch_t2(void *p)
 {
-        asm volatile("prefetcht2 (%0)\n\t"
-                     :
-                     : "r"(p)
-                     : "memory");
+        asm volatile("prefetcht2 (%0)\n\t" : : "r"(p) : "memory");
 }
 
 /**
@@ -424,10 +409,7 @@ cl_prefetch_t2(void *p)
 ALWAYS_INLINE void
 cl_prefetch_nta(void *p)
 {
-        asm volatile("prefetchnta (%0)\n\t"
-                     :
-                     : "r"(p)
-                     : "memory");
+        asm volatile("prefetchnta (%0)\n\t" : : "r"(p) : "memory");
 }
 
 /**
@@ -438,10 +420,7 @@ cl_prefetch_nta(void *p)
 ALWAYS_INLINE void
 cl_prefetch_w(void *p)
 {
-        asm volatile("prefetchw (%0)\n\t"
-                     :
-                     : "r"(p)
-                     : "memory");
+        asm volatile("prefetchw (%0)\n\t" : : "r"(p) : "memory");
 }
 
 /**
@@ -643,7 +622,7 @@ cl_write_nti(void *p, const uint64_t v)
 ALWAYS_INLINE void
 cl_write_nt512(void *p, const uint64_t v)
 {
-       asm volatile("vmovq   %0, %%xmm1\n\t"
+        asm volatile("vmovq   %0, %%xmm1\n\t"
                      "vmovntpd %%zmm1, (%1)\n\t"
                      :
                      : "r"(v), "r"(p)
@@ -775,7 +754,7 @@ cl_read_dqa(void *p)
 ALWAYS_INLINE void
 mem_execute(const unsigned bw, const enum cl_type type)
 {
-        const uint64_t val = (uint64_t) rand();
+        const uint64_t val = (uint64_t)rand();
         char *cp = (char *)memchunk;
         unsigned i = 0;
         const size_t s = MEMCHUNK_SIZE / CL_SIZE; /* mem size in cache lines */
@@ -868,7 +847,8 @@ mem_execute(const unsigned bw, const enum cl_type type)
  *
  * @param argv list of arguments supplied by user
  */
-static void usage(char **argv)
+static void
+usage(char **argv)
 {
         printf("Usage: %s -c <cpu> -b <BW [MB/s]> <operation type>\n"
                "Description:\n"
@@ -889,12 +869,12 @@ static void usage(char **argv)
                "  --write-avx512     AVX512 stores\n"
 #endif
                "  --write-clwb       x86 stores + clwb\n"
-               "  --write-flush      x86 stores & clflush (naturally generates"
-                                    " loads & stores)\n"
+               "  --write-flush      x86 stores & clflush (naturally generates "
+               "loads & stores)\n"
 #ifdef __x86_64__
                "  --write-sse        SSE stores\n"
                "  --write-sse-flush  SSE stores & clflush (naturally generates "
-                                    "loads & stores)\n"
+               "loads & stores)\n"
 #endif
                "  --nt-write         x86 NT stores\n"
                "  --nt-write-avx512  AVX512 NT stores\n"
@@ -902,7 +882,8 @@ static void usage(char **argv)
 #ifdef __x86_64__
                "  --nt-write-sse     SSE NT stores\n"
 #endif
-               , argv[0]);
+               ,
+               argv[0]);
 }
 
 /**
@@ -913,13 +894,13 @@ static void usage(char **argv)
  *
  * @retval long time taken to execute operation
  */
-ALWAYS_INLINE
-long get_usec_diff(struct timeval *tv_s, struct timeval *tv_e)
+ALWAYS_INLINE long
+get_usec_diff(struct timeval *tv_s, struct timeval *tv_e)
 {
         long usec_start, usec_end = 0;
 
-        usec_start = ((long)tv_s->tv_usec) + ((long)tv_s->tv_sec*1000000L);
-        usec_end = ((long)tv_e->tv_usec) + ((long)tv_e->tv_sec*1000000L);
+        usec_start = ((long)tv_s->tv_usec) + ((long)tv_s->tv_sec * 1000000L);
+        usec_end = ((long)tv_e->tv_usec) + ((long)tv_e->tv_sec * 1000000L);
 
         return usec_end - usec_start;
 }
@@ -930,8 +911,8 @@ long get_usec_diff(struct timeval *tv_s, struct timeval *tv_e)
  * @param usec_diff time taken to execute operation
  * @param interval maximum time operation should take
  */
-ALWAYS_INLINE
-void nano_sleep(const long interval, long usec_diff)
+ALWAYS_INLINE void
+nano_sleep(const long interval, long usec_diff)
 {
         struct timespec req, rem;
 
@@ -985,7 +966,8 @@ str_to_uint(const char *str, const unsigned base, unsigned *value)
         return 0;
 }
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
         int cmd = EXIT_SUCCESS;
         enum cl_type type = CL_TYPE_INVALID;
@@ -995,6 +977,7 @@ int main(int argc, char **argv)
         int ret;
         uint64_t features;
 
+        /* clang-format off */
         struct option options[] = {
             {"bandwidth",       required_argument, 0, 'b'},
             {"cpu",             required_argument, 0, 'c'},
@@ -1027,6 +1010,7 @@ int main(int argc, char **argv)
 #endif
             {0, 0, 0, 0}
         };
+        /* clang-format on */
 
         /* Process command line arguments */
         while ((cmd = getopt_long_only(argc, argv, "b:c:", options,
@@ -1072,7 +1056,7 @@ int main(int argc, char **argv)
                 case CL_TYPE_WRITE_NT512:
                 case CL_TYPE_WRITE_NTDQ:
 #endif
-                        type = (enum cl_type) cmd;
+                        type = (enum cl_type)cmd;
                         break;
                 default:
                         usage(argv);
@@ -1082,8 +1066,8 @@ int main(int argc, char **argv)
         }
 
         /* Check if user has supplied all required arguments */
-        if (type == CL_TYPE_INVALID || cpu == UINT_MAX || !mem_bw
-                        || optind < argc) {
+        if (type == CL_TYPE_INVALID || cpu == UINT_MAX || !mem_bw ||
+            optind < argc) {
                 usage(argv);
                 return EXIT_FAILURE;
         }

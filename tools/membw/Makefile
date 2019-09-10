@@ -79,13 +79,26 @@ clean:
 	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
 
 CHECKPATCH?=checkpatch.pl
-.PHONY: style
-style:
+.PHONY: checkpatch
+checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE \
 	--ignore SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE,COMPLEX_MACRO \
 	--ignore STORAGE_CLASS,SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f membw.c
+
+.PHONY: clang-format
+clang-format:
+	@for file in $(wildcard *.[ch]); do \
+		echo "Checking style $$file"; \
+		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		{ echo "ERROR: $$file has style problems"; exit 1; } \
+	done
+
+.PHONY: style
+style:
+	$(MAKE) checkpatch
+	$(MAKE) clang-format
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
