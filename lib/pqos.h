@@ -1259,21 +1259,6 @@ pqos_mon_get_event_value(void *const value,
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Returns all TIDs associated with the specified monitoring group.
- *
- * @param [in] group a monitoring group
- * @param [out] tids an array to store TIDs
- * @param [in] max_num_tids a maximum number of TIDs to be filled in tids array
- * @param [out] num_tids a number of returned TIDs
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-int pqos_mon_tids_get(const struct pqos_mon_data *group,
-                      pid_t *tids,
-                      unsigned max_num_tids,
-                      unsigned *num_tids);
-
 #ifdef __cplusplus
 }
 #endif

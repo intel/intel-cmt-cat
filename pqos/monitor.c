@@ -1328,33 +1328,21 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
         int cores_s_len = 0;
         int comma_len = 1;
         unsigned *cores;
-        int ret;
-        pid_t *tids;
+        const pid_t *tids;
         unsigned num_tids;
         int result = 0;
 
         ASSERT(mon_data != NULL);
         ASSERT(cores_s != NULL);
 
-        tids = calloc(NUM_TIDS_MAX, sizeof(*tids));
-
-        if (tids == NULL) {
-                printf("Error allocating memory\n");
+        num_tids = mon_data->tid_nr;
+        tids = mon_data->tid_map;
+        if (tids == NULL)
                 return -1;
-        }
-
-        ret = pqos_mon_tids_get(mon_data, tids, NUM_TIDS_MAX, &num_tids);
-
-        if (ret != PQOS_RETVAL_OK) {
-                free(tids);
-                return -1;
-        }
 
         cores = calloc(num_tids, sizeof(*cores));
-
         if (cores == NULL) {
                 printf("Error allocating memory\n");
-                free(tids);
                 return -1;
         }
 
@@ -1393,7 +1381,6 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
 
 free_memory:
         free(cores);
-        free(tids);
         return result;
 }
 
