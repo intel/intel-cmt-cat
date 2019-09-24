@@ -34,6 +34,7 @@
 import os
 import logging
 import subprocess
+import psutil
 
 ## @cond
 logging.basicConfig(level=logging.DEBUG)
@@ -121,9 +122,11 @@ class Test:
         if int(pid) < 0:
             return []
 
-        # read procfs /proc/PID/task/PID/children file to get info about PIDs children
         try:
-            children_file = open("/proc/{pid}/task/{pid}/children".format(pid=pid))
-            return children_file.readline().strip().split(' ')
+            children = []
+            process = psutil.Process(int(pid))
+            for child in process.children(recursive=True):
+                children.append(child.pid)
+            return children
         except Exception:
             return []

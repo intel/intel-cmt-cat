@@ -4,3 +4,4 @@ pexpect
 pylint
 jsonschema
 bandit
+psutil
