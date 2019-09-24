@@ -37,6 +37,7 @@ Module handling config file
 
 import json
 from os.path import join, dirname
+import re
 import jsonschema
 
 import caps
@@ -238,7 +239,6 @@ class ConfigStore:
                     ConfigStore.get_app(data, app_id)
 
             if 'cbm' in pool:
-                import re
                 result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['cbm']))
                 if result or pool['cbm'] == 0:
                     raise ValueError("Pool {}, CBM {}/{} is not contiguous."\
