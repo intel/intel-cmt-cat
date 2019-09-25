@@ -3,3 +3,4 @@ pytest-timeout
 pexpect
 pylint
 jsonschema
+bandit
