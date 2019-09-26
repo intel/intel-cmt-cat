@@ -715,7 +715,7 @@ int main(int argc, char **argv)
         const struct pqos_cap *p_cap = NULL;
         const struct pqos_capability *cap_mon = NULL, *cap_l3ca = NULL,
                 *cap_l2ca = NULL, *cap_mba = NULL;
-	unsigned l3cat_id_count, *l3cat_ids = NULL;
+        unsigned l3cat_id_count, *l3cat_ids = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
         int opt_index = 0, pid_flag = 0;
 
@@ -906,8 +906,8 @@ int main(int argc, char **argv)
                 goto error_exit_2;
         }
 
-	l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
-	if (l3cat_ids == NULL) {
+        l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
+        if (l3cat_ids == NULL) {
                 printf("Error retrieving CPU socket information!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
@@ -981,8 +981,8 @@ int main(int argc, char **argv)
                 /**
                  * Show info about allocation config and exit
                  */
-		alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
-				   l3cat_id_count, l3cat_ids, p_cpu,
+                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
+                                   l3cat_id_count, l3cat_ids, p_cpu,
                                    sel_verbose_mode);
                 goto allocation_exit;
         }
@@ -1062,8 +1062,8 @@ int main(int argc, char **argv)
                 free(sel_log_file);
         if (sel_config_file != NULL)
                 free(sel_config_file);
-	if (l3cat_ids != NULL)
-		free(l3cat_ids);
+        if (l3cat_ids != NULL)
+                free(l3cat_ids);
 
         return exit_val;
 }
