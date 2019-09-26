@@ -63,7 +63,6 @@ static struct mba_sc_state *state = NULL;
 static unsigned state_num;
 static int supported = 0;
 
-
 /**
  * @brief Start LMBM monitoring
  *
@@ -93,8 +92,8 @@ mba_sc_mon_start(const cpu_set_t cpumask, struct pqos_mon_data *group)
                 cores[num_cores++] = i;
         }
 
-        ret = pqos_mon_start(num_cores, cores, PQOS_MON_EVENT_LMEM_BW,
-                             NULL, group);
+        ret = pqos_mon_start(num_cores, cores, PQOS_MON_EVENT_LMEM_BW, NULL,
+                             group);
         if (ret != PQOS_RETVAL_OK)
                 ret = -EFAULT;
 
@@ -182,7 +181,7 @@ mba_sc_init(void)
 
         /* Get mon capabilities */
         ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_MON, &m_cap_mon);
-        if  (ret != PQOS_RETVAL_OK) {
+        if (ret != PQOS_RETVAL_OK) {
                 DBG("MBA SC: monitoring not supported.\n");
                 ret = -EFAULT;
                 goto err;
@@ -190,7 +189,7 @@ mba_sc_init(void)
 
         /* Check if LMBM monitoring is supported */
         ret = pqos_cap_get_event(m_cap, PQOS_MON_EVENT_LMEM_BW, &cap_lmbm);
-        if  (ret == PQOS_RETVAL_OK && cap_lmbm != NULL)
+        if (ret == PQOS_RETVAL_OK && cap_lmbm != NULL)
                 supported = 1;
         else {
                 DBG("MBA SC: local BW monitoring not supported.\n");
@@ -201,7 +200,7 @@ mba_sc_init(void)
         supported = 1;
 
         return 0;
- err:
+err:
         /* deallocate all the resources */
         mba_sc_fini();
         return ret;
@@ -319,7 +318,8 @@ mba_sc_mba_set(const cpu_set_t cpumask, struct pqos_mba *mba_cfg)
                 ret = pqos_cpu_get_clusterid(m_cpu, lcore, &cluster_id);
                 if (ret != PQOS_RETVAL_OK) {
                         DBG("MBA SC: error while reading cluster id "
-                            "for lcore %d\n", lcore);
+                            "for lcore %d\n",
+                            lcore);
                         return -EFAULT;
                 }
 
@@ -416,7 +416,7 @@ mba_sc_update(struct mba_sc_state *state)
         } else {
                 if (state->reg_start_time) {
                         DBG(" Max BW %lluMBps, regulation took %.1fs\n",
-                            (unsigned long long) bytes_to_mb(state->max_bw),
+                            (unsigned long long)bytes_to_mb(state->max_bw),
                             (cur_time - state->reg_start_time) / 1000000.0);
                         state->reg_start_time = 0;
                 } else
@@ -487,7 +487,7 @@ mba_sc_main(pid_t pid)
                         mba_sc_update(&state[i]);
         }
 
- err:
+err:
         ret = mba_sc_stop();
 
         return ret;

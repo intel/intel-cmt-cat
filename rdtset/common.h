@@ -44,38 +44,40 @@
 extern "C" {
 #endif
 
-#define RDT_MAX_PIDS    128
-#define MAX_OPTARG_LEN  64
+#define RDT_MAX_PIDS 128
+#define MAX_OPTARG_LEN 64
 
 /**
  * MBA linear max value.
  */
-#define RDT_MAX_MBA	100
+#define RDT_MAX_MBA 100
 
 #ifndef MIN
 /**
  * Macro to return the minimum of two numbers
  */
-#define MIN(a, b) ({ \
-	typeof(a) _a = (a); \
-	typeof(b) _b = (b); \
-	_a < _b ? _a : _b; \
-})
+#define MIN(a, b)                                                              \
+        ({                                                                     \
+                typeof(a) _a = (a);                                            \
+                typeof(b) _b = (b);                                            \
+                _a < _b ? _a : _b;                                             \
+        })
 #endif /* !MIN */
 
 #ifndef MAX
 /**
  * Macro to return the maximum of two numbers
  */
-#define MAX(a, b) ({ \
-	typeof(a) _a = (a); \
-	typeof(b) _b = (b); \
-	_a > _b ? _a : _b; \
-})
+#define MAX(a, b)                                                              \
+        ({                                                                     \
+                typeof(a) _a = (a);                                            \
+                typeof(b) _b = (b);                                            \
+                _a > _b ? _a : _b;                                             \
+        })
 #endif /* !MAX */
 
 #ifndef DIM
-#define DIM(x) (sizeof(x)/sizeof(x[0]))
+#define DIM(x) (sizeof(x) / sizeof(x[0]))
 #endif /* !DIM */
 
 #ifdef __FreeBSD__
@@ -86,13 +88,13 @@ extern "C" {
 #endif /* __FreeBSD__ */
 
 struct rdt_cfg {
-	enum pqos_cap_type type;
-	union {
-		struct pqos_l2ca *l2;
-		struct pqos_l3ca *l3;
-		struct pqos_mba *mba;
-		void *generic_ptr;
-	} u;
+        enum pqos_cap_type type;
+        union {
+                struct pqos_l2ca *l2;
+                struct pqos_l3ca *l3;
+                struct pqos_mba *mba;
+                void *generic_ptr;
+        } u;
 };
 
 /**
@@ -102,13 +104,14 @@ struct rdt_cfg {
  *
  * @return rdt_cfg struct
  */
-static inline struct rdt_cfg wrap_l2ca(struct pqos_l2ca *l2)
+static inline struct rdt_cfg
+wrap_l2ca(struct pqos_l2ca *l2)
 {
-	struct rdt_cfg result;
+        struct rdt_cfg result;
 
-	result.type = PQOS_CAP_TYPE_L2CA;
-	result.u.l2 = l2;
-	return result;
+        result.type = PQOS_CAP_TYPE_L2CA;
+        result.u.l2 = l2;
+        return result;
 }
 
 /**
@@ -118,13 +121,14 @@ static inline struct rdt_cfg wrap_l2ca(struct pqos_l2ca *l2)
  *
  * @return rdt_cfg struct
  */
-static inline struct rdt_cfg wrap_l3ca(struct pqos_l3ca *l3)
+static inline struct rdt_cfg
+wrap_l3ca(struct pqos_l3ca *l3)
 {
-	struct rdt_cfg result;
+        struct rdt_cfg result;
 
-	result.type = PQOS_CAP_TYPE_L3CA;
-	result.u.l3 = l3;
-	return result;
+        result.type = PQOS_CAP_TYPE_L3CA;
+        result.u.l3 = l3;
+        return result;
 }
 
 /**
@@ -134,44 +138,46 @@ static inline struct rdt_cfg wrap_l3ca(struct pqos_l3ca *l3)
  *
  * @return rdt_cfg struct
  */
-static inline struct rdt_cfg wrap_mba(struct pqos_mba *mba)
+static inline struct rdt_cfg
+wrap_mba(struct pqos_mba *mba)
 {
-	struct rdt_cfg result;
+        struct rdt_cfg result;
 
-	result.type = PQOS_CAP_TYPE_MBA;
-	result.u.mba = mba;
-	return result;
+        result.type = PQOS_CAP_TYPE_MBA;
+        result.u.mba = mba;
+        return result;
 }
 
 struct rdt_config {
-	cpu_set_t cpumask;	/**< CPUs bitmask */
-	struct pqos_l3ca l3;	/**< L3 configuration */
-	struct pqos_l2ca l2;	/**< L2 configuration */
-	struct pqos_mba mba;	/**< MBA configuretion */
-        int pid_cfg;            /**< associate PIDs to this cfg */
+        cpu_set_t cpumask;   /**< CPUs bitmask */
+        struct pqos_l3ca l3; /**< L3 configuration */
+        struct pqos_l2ca l2; /**< L2 configuration */
+        struct pqos_mba mba; /**< MBA configuretion */
+        int pid_cfg;         /**< associate PIDs to this cfg */
 };
 
 /* rdtset command line configuration structure */
 struct rdtset {
-	pid_t pids[RDT_MAX_PIDS];	/**< process ID table */
-        unsigned pid_count;             /**< Num of PIDs selected */
-	struct rdt_config config[CPU_SETSIZE];	/**< RDT configuration */
-	unsigned config_count;		/**< Num of RDT config entries */
-	cpu_set_t cpu_aff_cpuset;	/**< CPU affinity configuration */
-	cpu_set_t reset_cpuset;		/**< List of CPUs to reset COS assoc */
-	unsigned sudo_keep:1,		/**< don't drop elevated privileges */
-		 verbose:1,		/**< be verbose */
-		 command:1,		/**< command to be executed detected */
-		 show_version:1;	/**< print library version */
-	enum pqos_interface interface;  /**< pqos interface to use */
+        pid_t pids[RDT_MAX_PIDS];              /**< process ID table */
+        unsigned pid_count;                    /**< Num of PIDs selected */
+        struct rdt_config config[CPU_SETSIZE]; /**< RDT configuration */
+        unsigned config_count;                 /**< Num of RDT config entries */
+        cpu_set_t cpu_aff_cpuset;      /**< CPU affinity configuration */
+        cpu_set_t reset_cpuset;        /**< List of CPUs to reset COS assoc */
+        unsigned sudo_keep : 1,        /**< don't drop elevated privileges */
+            verbose : 1,               /**< be verbose */
+            command : 1,               /**< command to be executed detected */
+            show_version : 1;          /**< print library version */
+        enum pqos_interface interface; /**< pqos interface to use */
 };
 
 struct rdtset g_cfg;
 
-#define DBG(...) do { \
-	if (g_cfg.verbose) \
-		fprintf(stderr, __VA_ARGS__); \
-	} while (0)
+#define DBG(...)                                                               \
+        do {                                                                   \
+                if (g_cfg.verbose)                                             \
+                        fprintf(stderr, __VA_ARGS__);                          \
+        } while (0)
 
 /**
  * @brief Parse CPU set string
@@ -190,8 +196,8 @@ struct rdtset g_cfg;
  * @return number of parsed characters on success
  * @retval -ERRNO on error
  */
-int str_to_cpuset(const char *cpustr, const unsigned cpustr_len,
-		cpu_set_t *cpuset);
+int
+str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset);
 
 /**
  * @brief Converts CPU set (cpu_set_t) to string
@@ -200,8 +206,9 @@ int str_to_cpuset(const char *cpustr, const unsigned cpustr_len,
  * @param [in] cpustr_len max output string len
  * @param [in] cpumask input cpuset
  */
-void cpuset_to_str(char *cpustr, const unsigned cpustr_len,
-		const cpu_set_t *cpumask);
+void cpuset_to_str(char *cpustr,
+                   const unsigned cpustr_len,
+                   const cpu_set_t *cpumask);
 
 /**
  * @brief Converts string of characters representing list of
@@ -222,8 +229,7 @@ void cpuset_to_str(char *cpustr, const unsigned cpustr_len,
  *
  * @return Number of elements placed into \a tab
  */
-unsigned
-strlisttotab(char *s, uint64_t *tab, const unsigned max);
+unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
 
 /**
  * @brief Get time in microseconds
@@ -232,8 +238,7 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max);
  *
  * @return Time un mocroseconds
  */
-uint64_t
-get_time_usec(void);
+uint64_t get_time_usec(void);
 
 /**
  * @brief Scale MB value to bytes
@@ -241,7 +246,8 @@ get_time_usec(void);
  * @param [in] MB value to be scaled
  * @return scaled up value in bytes
  */
-static inline uint64_t mb_to_bytes(const uint64_t mb)
+static inline uint64_t
+mb_to_bytes(const uint64_t mb)
 {
         return mb * 1024 * 1024;
 }
@@ -252,7 +258,8 @@ static inline uint64_t mb_to_bytes(const uint64_t mb)
  * @param [in] bytes value to be scaled up
  * @return scaled value in MB
  */
-static inline uint64_t bytes_to_mb(const uint64_t bytes)
+static inline uint64_t
+bytes_to_mb(const uint64_t bytes)
 {
         return bytes / (1024 * 1024);
 }
