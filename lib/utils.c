@@ -306,6 +306,37 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
         return cores;
 }
 
+unsigned *
+pqos_cpu_get_cores_l3cat_id(const struct pqos_cpuinfo *cpu,
+			    const unsigned l3cat_id,
+			    unsigned *count)
+{
+	unsigned i = 0, l3cat_id_count = 0;
+	unsigned *cores = NULL;
+
+	ASSERT(cpu != NULL);
+	ASSERT(count != NULL);
+
+	if (cpu == NULL || count == NULL)
+		return NULL;
+
+	cores = (unsigned *) malloc(cpu->num_cores * sizeof(cores[0]));
+	if (cores == NULL)
+		return NULL;
+
+	for (i = 0; i < cpu->num_cores; i++)
+		if (cpu->cores[i].l3cat_id == l3cat_id)
+			cores[l3cat_id_count++] = cpu->cores[i].lcore;
+
+	if (!l3cat_id_count) {
+		free(cores);
+		return NULL;
+	}
+
+	*count = l3cat_id_count;
+	return cores;
+}
+
 const struct pqos_coreinfo *
 pqos_cpu_get_core_info(const struct pqos_cpuinfo *cpu, unsigned lcore)
 {

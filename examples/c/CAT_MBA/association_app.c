@@ -124,7 +124,8 @@ print_allocation_config(void)
 		unsigned *lcores = NULL;
 		unsigned lcount = 0, n = 0;
 
-		lcores = pqos_cpu_get_cores(p_cpu, l3cat_ids[i], &lcount);
+		lcores = pqos_cpu_get_cores_l3cat_id(p_cpu, l3cat_ids[i],
+						     &lcount);
 		if (lcores == NULL || lcount == 0) {
 			printf("Error retrieving core information!\n");
                         free(lcores);
