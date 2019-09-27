@@ -1114,10 +1114,10 @@ alloc_validate(void)
 }
 
 /**
- * @brief Gets cores from \a cores set which belong to \a socket
+ * @brief Gets cores from \a cores set which belong to \a l3cat_id
  *
  * @param [in] cores set of cores
- * @param [in] socket_id socket to get cores from
+ * @param [in] l3cat_id to get cores from
  * @param [out] core_num number of cores in \a core_array
  * @param [out] core_array array of cores
  *
@@ -1126,10 +1126,10 @@ alloc_validate(void)
  * @retval negative on error (-errno)
  */
 static int
-get_socket_cores(const cpu_set_t *cores,
-                 const unsigned socket_id,
-                 unsigned *core_num,
-                 unsigned core_array[CPU_SETSIZE])
+get_l3cat_id_cores(const cpu_set_t *cores,
+                   const unsigned l3cat_id,
+                   unsigned *core_num,
+                   unsigned core_array[CPU_SETSIZE])
 {
         unsigned i;
 
@@ -1145,7 +1145,7 @@ get_socket_cores(const cpu_set_t *cores,
         }
 
         for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
-                if (m_cpu->cores[i].socket != socket_id ||
+                if (m_cpu->cores[i].l3cat_id != l3cat_id ||
                     0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
                         continue;
 
@@ -1472,7 +1472,8 @@ cfg_set_cores_os(const unsigned technology,
                 if (technology & (1 << PQOS_CAP_TYPE_L2CA))
                         ret = get_l2id_cores(cores, i, &core_num, core_array);
                 else
-                        ret = get_socket_cores(cores, i, &core_num, core_array);
+                        ret =
+                            get_l3cat_id_cores(cores, i, &core_num, core_array);
                 if (ret != 0)
                         return ret;
 
@@ -1525,7 +1526,8 @@ cfg_set_cores_msr(const unsigned technology,
                 if (technology & (1 << PQOS_CAP_TYPE_L2CA))
                         ret = get_l2id_cores(cores, i, &core_num, core_array);
                 else
-                        ret = get_socket_cores(cores, i, &core_num, core_array);
+                        ret =
+                            get_l3cat_id_cores(cores, i, &core_num, core_array);
                 if (ret != 0)
                         return ret;
 
