@@ -1168,31 +1168,33 @@ get_l3cat_id_cores(const cpu_set_t *cores,
  * @retval negative on error (-errno)
  */
 static int
-get_mba_id_cores(const cpu_set_t *cores, const unsigned mba_id,
-		 unsigned *core_num, unsigned core_array[CPU_SETSIZE])
+get_mba_id_cores(const cpu_set_t *cores,
+                 const unsigned mba_id,
+                 unsigned *core_num,
+                 unsigned core_array[CPU_SETSIZE])
 {
-	unsigned i;
+        unsigned i;
 
-	if (cores == NULL || core_num == NULL || core_array == NULL)
-		return -EINVAL;
+        if (cores == NULL || core_num == NULL || core_array == NULL)
+                return -EINVAL;
 
-	if (m_cpu == NULL)
-		return -EFAULT;
+        if (m_cpu == NULL)
+                return -EFAULT;
 
-	if (CPU_COUNT(cores) == 0) {
-		*core_num = 0;
-		return 0;
-	}
+        if (CPU_COUNT(cores) == 0) {
+                *core_num = 0;
+                return 0;
+        }
 
-	for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
-		if (m_cpu->cores[i].mba_id != mba_id ||
-				0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
-			continue;
+        for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
+                if (m_cpu->cores[i].mba_id != mba_id ||
+                    0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
+                        continue;
 
-		core_array[(*core_num)++] = m_cpu->cores[i].lcore;
-	}
+                core_array[(*core_num)++] = m_cpu->cores[i].lcore;
+        }
 
-	return 0;
+        return 0;
 }
 
 /**
@@ -1367,7 +1369,7 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
         const struct pqos_coreinfo *ci = NULL;
         int ret;
 
-        if (NULL == l2ca || NULL == l3ca || NULL == mba)
+        if (NULL == l2ca && NULL == l3ca && NULL == mba)
                 return -EINVAL;
 
         if (NULL == m_cap_l2ca && NULL == m_cap_l3ca && NULL == m_cap_mba)
@@ -1386,7 +1388,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 return ret;
 
         /* Configure COS */
-        if (m_cap_l3ca != NULL && m_cap_l3ca->u.l3ca->num_classes > cos_id) {
+        if (l3ca != NULL && m_cap_l3ca != NULL &&
+            m_cap_l3ca->u.l3ca->num_classes > cos_id) {
                 const unsigned l3cat_id = ci->l3cat_id;
                 struct pqos_l3ca ca = *l3ca;
 
@@ -1406,7 +1409,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 }
         }
 
-        if (m_cap_l2ca != NULL && m_cap_l2ca->u.l2ca->num_classes > cos_id) {
+        if (l2ca != NULL && m_cap_l2ca != NULL &&
+            m_cap_l2ca->u.l2ca->num_classes > cos_id) {
                 const unsigned l2_id = ci->l2_id;
                 struct pqos_l2ca ca = *l2ca;
 
@@ -1425,7 +1429,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 }
         }
 
-        if (m_cap_mba != NULL && m_cap_mba->u.mba->num_classes > cos_id) {
+        if (mba != NULL && m_cap_mba != NULL &&
+            m_cap_mba->u.mba->num_classes > cos_id) {
                 const unsigned mba_id = ci->mba_id;
                 struct pqos_mba mba_requested = *mba;
                 struct pqos_mba mba_actual;
@@ -1511,8 +1516,8 @@ cfg_set_cores_os(const unsigned technology,
                 /* Get cores on res id i */
                 if (technology & (1 << PQOS_CAP_TYPE_L2CA))
                         ret = get_l2id_cores(cores, i, &core_num, core_array);
-		else if (technology & (1 << PQOS_CAP_TYPE_MBA))
-			ret = get_mba_id_cores(cores, i, &core_num, core_array);
+                else if (technology & (1 << PQOS_CAP_TYPE_MBA))
+                        ret = get_mba_id_cores(cores, i, &core_num, core_array);
                 else
                         ret =
                             get_l3cat_id_cores(cores, i, &core_num, core_array);
@@ -1567,8 +1572,8 @@ cfg_set_cores_msr(const unsigned technology,
                 /* Get cores on res id i */
                 if (technology & (1 << PQOS_CAP_TYPE_L2CA))
                         ret = get_l2id_cores(cores, i, &core_num, core_array);
-		else if (technology & (1 << PQOS_CAP_TYPE_MBA))
-			ret = get_mba_id_cores(cores, i, &core_num, core_array);
+                else if (technology & (1 << PQOS_CAP_TYPE_MBA))
+                        ret = get_mba_id_cores(cores, i, &core_num, core_array);
                 else
                         ret =
                             get_l3cat_id_cores(cores, i, &core_num, core_array);
