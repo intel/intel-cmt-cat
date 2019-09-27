@@ -1795,7 +1795,7 @@ cfg_set_pids(const unsigned technology, const struct pqos_l3ca *l3ca,
                                 break;
 
                         /* Configure COS on res L2 ID i */
-                        ret = cfg_configure_cos(l2ca, l3ca, mba, core, cos_id);
+			ret = cfg_configure_cos(l2ca, NULL, NULL, core, cos_id);
                         if (ret != 0)
                                 break;
                 }
@@ -1803,28 +1803,51 @@ cfg_set_pids(const unsigned technology, const struct pqos_l3ca *l3ca,
         }
 
         /* Set COS definitions across all res L3 IDs */
-        if (technology & (1 << PQOS_CAP_TYPE_L3CA) ||
-            technology & (1 << PQOS_CAP_TYPE_MBA)) {
-                unsigned num_ids, *ids;
+	if (technology & (1 << PQOS_CAP_TYPE_L3CA)) {
+		unsigned num_ids, *ids;
 
-                ids = pqos_cpu_get_sockets(m_cpu, &num_ids);
-                if (ids == NULL)
-                        return -EFAULT;
+		ids = pqos_cpu_get_l3cat_ids(m_cpu, &num_ids);
+		if (ids == NULL)
+			return -EFAULT;
 
-                for (i = 0; i < num_ids; i++) {
-                        unsigned core;
+		for (i = 0; i < num_ids; i++) {
+			unsigned core;
 
-                        ret = pqos_cpu_get_one_core(m_cpu, ids[i], &core);
-                        if (ret != 0)
-                                break;
+			ret = pqos_cpu_get_one_by_l3cat_id(m_cpu, ids[i],
+							   &core);
+			if (ret != 0)
+				break;
 
-                        /* Configure COS on res L3 ID i */
-                        ret = cfg_configure_cos(l2ca, l3ca, mba, core, cos_id);
-                        if (ret != 0)
-                                break;
-                }
-                free(ids);
-        }
+			/* Configure COS on res L3 ID i */
+			ret = cfg_configure_cos(NULL, l3ca, NULL, core, cos_id);
+			if (ret != 0)
+				break;
+		}
+		free(ids);
+	}
+
+	/* Set COS definitions across all res L3 IDs */
+	if (technology & (1 << PQOS_CAP_TYPE_MBA)) {
+		unsigned num_ids, *ids;
+
+		ids = pqos_cpu_get_mba_ids(m_cpu, &num_ids);
+		if (ids == NULL)
+			return -EFAULT;
+
+		for (i = 0; i < num_ids; i++) {
+			unsigned core;
+
+			ret = pqos_cpu_get_one_by_mba_id(m_cpu, ids[i], &core);
+			if (ret != 0)
+				break;
+
+			/* Configure COS on res L3 ID i */
+			ret = cfg_configure_cos(NULL, NULL, mba, core, cos_id);
+			if (ret != 0)
+				break;
+		}
+		free(ids);
+	}
 set_pids_exit:
         if (ret != 0)
                 (void) pqos_alloc_release_pid(p, num_pids);
