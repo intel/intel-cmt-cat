@@ -113,10 +113,10 @@ allocation_get_input(int argc, char *argv[])
 	}
 }
 /**
- * @brief Sets up allocation classes of service on selected CPU sockets
+ * @brief Sets up allocation classes of service on selected L3 CAT ids
  *
- * @param sock_count number of CPU sockets
- * @param sockets arrays with CPU socket id's
+ * @param l3cat_id_count number of CPU l3cat_ids
+ * @param l3cat_ids arrays with CPU l3cat id's
  *
  * @return Number of classes of service set
  * @retval 0 no class of service set (nor selected)
@@ -124,13 +124,13 @@ allocation_get_input(int argc, char *argv[])
  * @retval positive success
  */
 static int
-set_allocation_class(unsigned sock_count,
-                     const unsigned *sockets)
+set_allocation_class(unsigned l3cat_id_count,
+                     const unsigned *l3cat_ids)
 {
 	int ret;
 
-	while (sock_count > 0 && sel_l3ca_cos_num > 0) {
-		ret = pqos_l3ca_set(*sockets,
+        while (l3cat_id_count > 0 && sel_l3ca_cos_num > 0) {
+                ret = pqos_l3ca_set(*l3cat_ids,
                                     sel_l3ca_cos_num,
                                     sel_l3ca_cos_tab);
 		if  (ret != PQOS_RETVAL_OK) {
@@ -138,8 +138,8 @@ set_allocation_class(unsigned sock_count,
                                "service failed!\n");
 			return -1;
 		}
-		sock_count--;
-		sockets++;
+		l3cat_id_count--;
+		l3cat_ids++;
 	}
 	return sel_l3ca_cos_num;
 }
@@ -153,7 +153,7 @@ set_allocation_class(unsigned sock_count,
  */
 static int
 print_allocation_config(const unsigned l3cat_id_count,
-			const unsigned *l3cat_ids)
+                        const unsigned *l3cat_ids)
 {
 	int ret = PQOS_RETVAL_OK;
 	unsigned i;
@@ -167,8 +167,8 @@ print_allocation_config(const unsigned l3cat_id_count,
 		if (ret == PQOS_RETVAL_OK) {
 			unsigned n = 0;
 
-			printf("L3CA COS definitions for Socket %u:\n",
-				l3cat_ids[i]);
+                        printf("L3CA COS definitions for Socket %u:\n",
+                               l3cat_ids[i]);
 			for (n = 0; n < num; n++) {
 				printf("    L3CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
