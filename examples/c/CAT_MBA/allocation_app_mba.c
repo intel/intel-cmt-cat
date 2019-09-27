@@ -166,8 +166,8 @@ set_allocation_class(unsigned sock_count,
  */
 static int
 print_allocation_config(const struct pqos_cap *p_cap,
-                        const unsigned sock_count,
-                        const unsigned *sockets)
+			    const unsigned mba_count,
+			    const unsigned *mba_ids)
 {
         const struct pqos_capability *cap = NULL;
         const struct pqos_cap_mba *mba_cap = NULL;
@@ -180,17 +180,17 @@ print_allocation_config(const struct pqos_cap *p_cap,
                 return ret;
         mba_cap = cap->u.mba;
 
-	for (i = 0; i < sock_count; i++) {
+	for (i = 0; i < mba_count; i++) {
                 struct pqos_mba tab[mba_cap->num_classes];
 	        unsigned num = 0;
 
-		ret = pqos_mba_get(sockets[i], mba_cap->num_classes,
+		ret = pqos_mba_get(mba_ids[i], mba_cap->num_classes,
                                    &num, tab);
 		if (ret == PQOS_RETVAL_OK) {
 			unsigned n = 0;
 
                         printf("MBA COS definitions for Socket %u:\n",
-                               sockets[i]);
+			       mba_ids[i]);
 			for (n = 0; n < num; n++) {
 				printf("    MBA COS%u => %u%% available\n",
                                        tab[n].class_id,

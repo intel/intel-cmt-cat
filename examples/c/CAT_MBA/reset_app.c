@@ -56,9 +56,9 @@
  */
 static void
 print_allocation_config(const struct pqos_capability *cap_l3ca,
-                        const unsigned sock_count,
-                        const unsigned *sockets,
-                        const struct pqos_cpuinfo *cpu_info)
+			      const unsigned l3cat_id_count,
+			      const unsigned *l3cat_ids,
+			      const struct pqos_cpuinfo *cpu_info)
 {
 	int ret;
 	unsigned i;
@@ -66,17 +66,17 @@ print_allocation_config(const struct pqos_capability *cap_l3ca,
 	if (cap_l3ca == NULL)
                 return;
 
-        for (i = 0; i < sock_count; i++) {
+	for (i = 0; i < l3cat_id_count; i++) {
                 struct pqos_l3ca tab[PQOS_MAX_L3CA_COS];
                 unsigned num = 0;
 
-                ret = pqos_l3ca_get(sockets[i], PQOS_MAX_L3CA_COS,
+		ret = pqos_l3ca_get(l3cat_ids[i], PQOS_MAX_L3CA_COS,
                                     &num, tab);
                 if (ret == PQOS_RETVAL_OK) {
                         unsigned n = 0;
 
                         printf("L3CA COS definitions for Socket %u:\n",
-                               sockets[i]);
+				l3cat_ids[i]);
                         for (n = 0; n < num; n++) {
                                 printf("   L3CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
@@ -85,18 +85,18 @@ print_allocation_config(const struct pqos_capability *cap_l3ca,
                 }
         }
 
-	for (i = 0; i < sock_count; i++) {
+	for (i = 0; i < l3cat_id_count; i++) {
 		unsigned *lcores = NULL;
 		unsigned lcount = 0, n = 0;
 
-		lcores = pqos_cpu_get_cores(cpu_info, sockets[i], &lcount);
+		lcores = pqos_cpu_get_cores(cpu_info, l3cat_ids[i], &lcount);
 		if (lcores == NULL || lcount == 0) {
 			printf("Error retrieving core information!\n");
                         free(lcores);
 			return;
 		}
 		printf("Core information for socket %u:\n",
-                       sockets[i]);
+			l3cat_ids[i]);
 		for (n = 0; n < lcount; n++) {
 			unsigned class_id = 0;
 			int ret1 = PQOS_RETVAL_OK;

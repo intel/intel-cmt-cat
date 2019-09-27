@@ -180,6 +180,7 @@ print_allocation_config(const unsigned l2_count,
 	}
 	return ret;
 }
+
 int main(int argc, char *argv[])
 {
 	struct pqos_config cfg;

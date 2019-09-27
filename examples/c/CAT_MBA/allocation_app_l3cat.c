@@ -145,30 +145,30 @@ set_allocation_class(unsigned sock_count,
 }
 /**
  * @brief Prints allocation configuration
- * @param sock_count number of CPU sockets
- * @param sockets arrays with CPU socket id's
+ * @param l3cat_id_count number of CPU l3cat_id
+ * @param l3cat_ids arrays with CPU l3cat id's
  *
  * @return PQOS_RETVAL_OK on success
  * @return error value on failure
  */
 static int
-print_allocation_config(const unsigned sock_count,
-                        const unsigned *sockets)
+print_allocation_config(const unsigned l3cat_id_count,
+			const unsigned *l3cat_ids)
 {
 	int ret = PQOS_RETVAL_OK;
 	unsigned i;
 
-	for (i = 0; i < sock_count; i++) {
+	for (i = 0; i < l3cat_id_count; i++) {
 		struct pqos_l3ca tab[PQOS_MAX_L3CA_COS];
 		unsigned num = 0;
 
-		ret = pqos_l3ca_get(sockets[i], PQOS_MAX_L3CA_COS,
+		ret = pqos_l3ca_get(l3cat_ids[i], PQOS_MAX_L3CA_COS,
                                     &num, tab);
 		if (ret == PQOS_RETVAL_OK) {
 			unsigned n = 0;
 
 			printf("L3CA COS definitions for Socket %u:\n",
-                               sockets[i]);
+				l3cat_ids[i]);
 			for (n = 0; n < num; n++) {
 				printf("    L3CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
@@ -181,6 +181,7 @@ print_allocation_config(const unsigned sock_count,
 	}
 	return ret;
 }
+
 int main(int argc, char *argv[])
 {
 	struct pqos_config cfg;
