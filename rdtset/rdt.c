@@ -1492,45 +1492,125 @@ cfg_set_cores_os(const unsigned technology,
         if (core_num == 0)
                 return -EFAULT;
 
-        /* Assign all cores to single COS */
-        ret = pqos_alloc_assign(technology, core_array, core_num, &cos_id);
-        switch (ret) {
-        case PQOS_RETVAL_OK:
-                break;
-        case PQOS_RETVAL_RESOURCE:
-                fprintf(stderr, "No free COS available!\n");
-                return -EBUSY;
-        default:
-                fprintf(stderr, "Unable to assign COS!\n");
-                return -EFAULT;
+        if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
+                const unsigned l2_technology = 1 << PQOS_CAP_TYPE_L2CA;
+                /* Assign all cores to single COS */
+                ret = pqos_alloc_assign(l2_technology, core_array, core_num,
+                                        &cos_id);
+                switch (ret) {
+                case PQOS_RETVAL_OK:
+                        break;
+                case PQOS_RETVAL_RESOURCE:
+                        fprintf(stderr, "No free COS available!\n");
+                        return -EBUSY;
+                default:
+                        fprintf(stderr, "Unable to assign COS!\n");
+                        return -EFAULT;
+                }
+
+                ret = get_max_res_id(l2_technology, &max_id);
+                if (ret != 0)
+                        return ret;
+
+                /* Set COS definition on necessary sockets/clusters */
+                for (i = 0; i <= max_id; i++) {
+                        memset(core_array, 0, sizeof(core_array));
+
+                        /* Get cores on res id i */
+                        ret = get_l2id_cores(cores, i, &core_num, core_array);
+                        if (ret != 0)
+                                return ret;
+
+                        if (core_num == 0)
+                                continue;
+
+                        /* Configure COS on res ID i */
+                        ret = cfg_configure_cos(l2ca, NULL, NULL, core_array[0],
+                                                cos_id);
+                        if (ret != 0)
+                                return ret;
+                }
         }
 
-        ret = get_max_res_id(technology, &max_id);
-        if (ret != 0)
-                return ret;
+        if (technology & (1 << PQOS_CAP_TYPE_L3CA)) {
+                const unsigned l3_technology = 1 << PQOS_CAP_TYPE_L3CA;
+                /* Assign all cores to single COS */
+                ret = pqos_alloc_assign(l3_technology, core_array, core_num,
+                                        &cos_id);
+                switch (ret) {
+                case PQOS_RETVAL_OK:
+                        break;
+                case PQOS_RETVAL_RESOURCE:
+                        fprintf(stderr, "No free COS available!\n");
+                        return -EBUSY;
+                default:
+                        fprintf(stderr, "Unable to assign COS!\n");
+                        return -EFAULT;
+                }
 
-        /* Set COS definition on necessary sockets/clusters */
-        for (i = 0; i <= max_id; i++) {
-                memset(core_array, 0, sizeof(core_array));
+                ret = get_max_res_id(l3_technology, &max_id);
+                if (ret != 0)
+                        return ret;
 
-                /* Get cores on res id i */
-                if (technology & (1 << PQOS_CAP_TYPE_L2CA))
-                        ret = get_l2id_cores(cores, i, &core_num, core_array);
-                else if (technology & (1 << PQOS_CAP_TYPE_MBA))
-                        ret = get_mba_id_cores(cores, i, &core_num, core_array);
-                else
+                /* Set COS definition on necessary sockets/clusters */
+                for (i = 0; i <= max_id; i++) {
+                        memset(core_array, 0, sizeof(core_array));
+
+                        /* Get cores on res id i */
                         ret =
                             get_l3cat_id_cores(cores, i, &core_num, core_array);
+                        if (ret != 0)
+                                return ret;
+
+                        if (core_num == 0)
+                                continue;
+
+                        /* Configure COS on res ID i */
+                        ret = cfg_configure_cos(NULL, l3ca, NULL, core_array[0],
+                                                cos_id);
+                        if (ret != 0)
+                                return ret;
+                }
+        }
+
+        if (technology & (1 << PQOS_CAP_TYPE_MBA)) {
+                const unsigned mba_technology = 1 << PQOS_CAP_TYPE_MBA;
+                /* Assign all cores to single COS */
+                ret = pqos_alloc_assign(mba_technology, core_array, core_num,
+                                        &cos_id);
+                switch (ret) {
+                case PQOS_RETVAL_OK:
+                        break;
+                case PQOS_RETVAL_RESOURCE:
+                        fprintf(stderr, "No free COS available!\n");
+                        return -EBUSY;
+                default:
+                        fprintf(stderr, "Unable to assign COS!\n");
+                        return -EFAULT;
+                }
+
+                ret = get_max_res_id(mba_technology, &max_id);
                 if (ret != 0)
                         return ret;
 
-                if (core_num == 0)
-                        continue;
+                /* Set COS definition on necessary sockets/clusters */
+                for (i = 0; i <= max_id; i++) {
+                        memset(core_array, 0, sizeof(core_array));
 
-                /* Configure COS on res ID i */
-                ret = cfg_configure_cos(l2ca, l3ca, mba, core_array[0], cos_id);
-                if (ret != 0)
-                        return ret;
+                        /* Get cores on res id i */
+                        ret = get_mba_id_cores(cores, i, &core_num, core_array);
+                        if (ret != 0)
+                                return ret;
+
+                        if (core_num == 0)
+                                continue;
+
+                        /* Configure COS on res ID i */
+                        ret = cfg_configure_cos(NULL, NULL, mba, core_array[0],
+                                                cos_id);
+                        if (ret != 0)
+                                return ret;
+                }
         }
 
         return 0;
