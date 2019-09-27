@@ -240,13 +240,17 @@ nearest_pow2(const unsigned n)
 /**
  * @brief Discovers cache APICID structure information
  *
- * Uses CPUID leaf 0x4 to find L3 and L2 cache APICID information.
+ * Uses CPUID leaf 0x4(or 0x8000001D for AMD) to find L3 and L2 cache
+ * APICID information.
  *
  * Assumes apic->pkg_shift is already set, this is in case
  * L3/LLC is not detected.
  *
  * Fills in information about L2 and L3 caches into \a m_l2 and \a m_l3
  * data structures.
+ *
+ * @param [in] apic structure to be filled in with details
+ * @param [in] CPUID leaf
  *
  * @param [out] apic structure to be filled in with details
  *
@@ -255,7 +259,7 @@ nearest_pow2(const unsigned n)
  * @retval -1 error
  */
 static int
-detect_apic_cache_masks(struct apic_info *apic)
+detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
 {
         unsigned cache_level_shift[4] = {0, 0, 0, 0};
         unsigned subleaf = 0;
@@ -264,14 +268,14 @@ detect_apic_cache_masks(struct apic_info *apic)
         memset(&m_l3, 0, sizeof(m_l3));
 
         for (subleaf = 0; ; subleaf++) {
-                struct cpuid_out leaf4;
+		struct cpuid_out cache_info;
                 struct pqos_cacheinfo ci;
                 unsigned cache_type, cache_level, id, shift;
 
-                lcpuid(0x4, subleaf, &leaf4);
-                cache_type = leaf4.eax & 0x1f;            /* EAX bits 04:00 */
-                cache_level = (leaf4.eax >> 5) & 0x7;     /* EAX bits 07:05 */
-                id = (leaf4.eax >> 14) & 0xfff;           /* EAX bits 25:14 */
+		lcpuid(cpuid_cache, subleaf, &cache_info);
+		cache_type = cache_info.eax & 0x1f;	   /* EAX bits 04:00 */
+		cache_level = (cache_info.eax >> 5) & 0x7; /* EAX bits 07:05 */
+		id = (cache_info.eax >> 14) & 0xfff;       /* EAX bits 25:14 */
                 shift = nearest_pow2(id + 1);
 
                 if (cache_type == 0 || cache_type >= 4)
@@ -286,19 +290,19 @@ detect_apic_cache_masks(struct apic_info *apic)
 
                 memset(&ci, 0, sizeof(ci));
                 ci.detected = 1;
-                ci.num_ways = (leaf4.ebx >> 22) + 1;
-                ci.num_sets = leaf4.ecx + 1;
-                ci.line_size = (leaf4.ebx & 0xfff) + 1;
-                ci.num_partitions = ((leaf4.ebx >> 12) & 0x3ff) + 1;
+		ci.num_ways = (cache_info.ebx >> 22) + 1;
+		ci.num_sets = cache_info.ecx + 1;
+		ci.line_size = (cache_info.ebx & 0xfff) + 1;
+		ci.num_partitions = ((cache_info.ebx >> 12) & 0x3ff) + 1;
                 ci.way_size = ci.num_partitions * ci.num_sets * ci.line_size;
                 ci.total_size = ci.way_size * ci.num_ways;
 
                 LOG_DEBUG("CACHE: %sinclusive, %s, %s%u way(s), "
                           "%u set(s), line size %u, %u partition(s)\n",
-                          (leaf4.edx & 2) ? "" : "not ",
-                          (leaf4.edx & 4) ? "complex cache indexing" :
+			  (cache_info.edx & 2) ? "" : "not ",
+			  (cache_info.edx & 4) ? "complex cache indexing" :
                           "direct mapped",
-                          (leaf4.eax & 0x200) ? "fully associative, " : "",
+			  (cache_info.eax & 0x200) ? "fully associative, " : "",
                           ci.num_ways, ci.num_sets, ci.line_size,
                           ci.num_partitions);
 
@@ -343,7 +347,7 @@ detect_apic_masks(struct apic_info *apic)
         if (detect_apic_core_masks(apic) != 0)
                 return -2;
 
-        if (detect_apic_cache_masks(apic) != 0)
+	if (detect_apic_cache_masks(apic, CPUID_LEAF_CACHE) != 0)
                 return -3;
 
         return 0;
