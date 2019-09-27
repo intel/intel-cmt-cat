@@ -185,6 +185,10 @@ cos_assoc_get(const unsigned lcore, unsigned *class_id)
  * @param [in] technology selection of allocation technologies
  * @param [out] class_id unused COS
  *
+ * NOTE: It is our assumption that mba id and cat ids are same for
+ * a core. In future, if a core can have different mba id and cat ids
+ * then, we need to change this function to handle it.
+ *
  * @return Operation status
  */
 static int
@@ -193,6 +197,7 @@ get_unused_cos(const unsigned id,
                unsigned *class_id)
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+	const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
         unsigned used_classes[PQOS_MAX_L3CA_COS];
         unsigned i, cos;
         unsigned hi_class_id;
@@ -210,14 +215,17 @@ get_unused_cos(const unsigned id,
 
         /* Create a list of COS used on socket/L2 cluster */
         for (i = 0; i < m_cpu->num_cores; i++) {
-
                 if (l2_req) {
                         /* L2 requested so looking in L2 cluster scope */
                         if (m_cpu->cores[i].l2_id != id)
                                 continue;
+		} else if (mba_req) {
+			/* mba requested so looking in mba_id scope */
+			if (m_cpu->cores[i].mba_id != id)
+				continue;
                 } else {
-                        /* L2 not requested so looking at socket scope */
-                        if (m_cpu->cores[i].socket != id)
+			/* looking at l3cat_id scope */
+			if (m_cpu->cores[i].l3cat_id != id)
                                 continue;
                 }
 
@@ -1085,8 +1093,9 @@ hw_alloc_assign(const unsigned technology,
                 unsigned *class_id)
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+	const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+	unsigned l3cat_id = 0, l2id = 0, mba_id = 0;
         unsigned i;
-        unsigned socket = 0, l2id = 0;
         int ret;
 
         ASSERT(core_num > 0);
@@ -1113,20 +1122,29 @@ hw_alloc_assign(const unsigned technology,
                                 goto pqos_alloc_assign_exit;
                         }
                         l2id = pi->l2_id;
-                } else {
-                        if (i != 0 && socket != pi->socket) {
+		} else if (mba_req) {
+			if (i != 0 && mba_id != pi->mba_id) {
+				ret = PQOS_RETVAL_PARAM;
+				goto pqos_alloc_assign_exit;
+			}
+			mba_id = pi->mba_id;
+		} else {
+			if (i != 0 && l3cat_id != pi->l3cat_id) {
                                 ret = PQOS_RETVAL_PARAM;
                                 goto pqos_alloc_assign_exit;
                         }
-                        socket = pi->socket;
+			l3cat_id = pi->l3cat_id;
                 }
         }
 
         /* find an unused class from highest down */
-        if (!l2_req)
-                ret = get_unused_cos(socket, technology, class_id);
-        else
-                ret = get_unused_cos(l2id, technology, class_id);
+	if (l2_req)
+		ret = get_unused_cos(l2id, 1 << PQOS_CAP_TYPE_L2CA, class_id);
+	else if (mba_req)
+		ret = get_unused_cos(mba_id, 1 << PQOS_CAP_TYPE_MBA, class_id);
+	else
+		ret = get_unused_cos(l3cat_id, 1 << PQOS_CAP_TYPE_L3CA,
+				     class_id);
 
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
