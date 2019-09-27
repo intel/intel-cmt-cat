@@ -121,10 +121,10 @@ allocation_get_input(int argc, char *argv[])
         }
 }
 /**
- * @brief Sets up allocation classes of service on selected CPU sockets
+ * @brief Sets up allocation classes of service on selected MBA ids
  *
- * @param sock_count number of CPU sockets
- * @param sockets arrays with CPU socket id's
+ * @param mba_count number of CPU mba ids
+ * @param mba_ids arrays
  *
  * @return Number of classes of service set
  * @retval 0 no class of service set (nor selected)
@@ -132,13 +132,13 @@ allocation_get_input(int argc, char *argv[])
  * @retval positive success
  */
 static int
-set_allocation_class(unsigned sock_count,
-                     const unsigned *sockets)
+set_allocation_class(unsigned mba_count,
+		     const unsigned *mba_ids)
 {
 	int ret;
 
-	while (sock_count > 0 && sel_mba_cos_num > 0) {
-		ret = pqos_mba_set(*sockets,
+	while (mba_count > 0 && sel_mba_cos_num > 0) {
+		ret = pqos_mba_set(*mba_ids,
                                     sel_mba_cos_num,
                                     &mba[REQUESTED],
                                     &mba[ACTUAL]);
@@ -147,11 +147,11 @@ set_allocation_class(unsigned sock_count,
 			return -1;
 		}
                 printf("SKT%u: MBA COS%u => %u%% requested, %u%% applied\n",
-                       *sockets, mba[REQUESTED].class_id,
-                       mba[REQUESTED].mb_max, mba[ACTUAL].mb_max);
+			*mba_ids, mba[REQUESTED].class_id,
+			mba[REQUESTED].mb_max, mba[ACTUAL].mb_max);
 
-		sock_count--;
-		sockets++;
+		mba_count--;
+		mba_ids++;
 	}
 
 	return sel_mba_cos_num;
