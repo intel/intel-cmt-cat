@@ -1347,7 +1347,7 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
 
         /* Configure COS */
         if (m_cap_l3ca != NULL && m_cap_l3ca->u.l3ca->num_classes > cos_id) {
-                const unsigned socket_id = ci->socket;
+                const unsigned l3cat_id = ci->l3cat_id;
                 struct pqos_l3ca ca = *l3ca;
 
                 /* if COS is not configured, set it to default */
@@ -1357,11 +1357,11 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 /* set proper COS id */
                 ca.class_id = cos_id;
 
-                ret = pqos_l3ca_set(socket_id, 1, &ca);
+                ret = pqos_l3ca_set(l3cat_id, 1, &ca);
                 if (ret != PQOS_RETVAL_OK) {
                         fprintf(stderr,
-                                "Error setting L3 CAT COS#%u on socket %u!\n",
-                                cos_id, socket_id);
+                                "Error setting L3 CAT COS#%u on l3cat id %u!\n",
+                                cos_id, l3cat_id);
                         return -EFAULT;
                 }
         }
@@ -1386,7 +1386,7 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
         }
 
         if (m_cap_mba != NULL && m_cap_mba->u.mba->num_classes > cos_id) {
-                const unsigned socket_id = ci->socket;
+                const unsigned mba_id = ci->mba_id;
                 struct pqos_mba mba_requested = *mba;
                 struct pqos_mba mba_actual;
 
@@ -1401,11 +1401,11 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 /* set proper COS id */
                 mba_requested.class_id = cos_id;
 
-                ret = pqos_mba_set(socket_id, 1, &mba_requested, &mba_actual);
+                ret = pqos_mba_set(mba_id, 1, &mba_requested, &mba_actual);
                 if (ret != PQOS_RETVAL_OK) {
                         fprintf(stderr,
-                                "Error setting MBA COS#%u on socket %u!\n",
-                                cos_id, socket_id);
+                                "Error setting MBA COS#%u on mba id %u!\n",
+                                cos_id, mba_id);
                         return -EFAULT;
                 }
         }
