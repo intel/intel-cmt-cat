@@ -1141,6 +1141,46 @@ get_l3cat_id_cores(const cpu_set_t *cores, const unsigned l3cat_id,
 }
 
 /**
+ * @brief Gets cores from \a cores set which belong to \a mab_id
+ *
+ * @param [in] cores set of cores
+ * @param [in] mba_id to get cores from
+ * @param [out] core_num number of cores in \a core_array
+ * @param [out] core_array array of cores
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+get_mba_id_cores(const cpu_set_t *cores, const unsigned mba_id,
+		 unsigned *core_num, unsigned core_array[CPU_SETSIZE])
+{
+	unsigned i;
+
+	if (cores == NULL || core_num == NULL || core_array == NULL)
+		return -EINVAL;
+
+	if (m_cpu == NULL)
+		return -EFAULT;
+
+	if (CPU_COUNT(cores) == 0) {
+		*core_num = 0;
+		return 0;
+	}
+
+	for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
+		if (m_cpu->cores[i].mba_id != mba_id ||
+				0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
+			continue;
+
+		core_array[(*core_num)++] = m_cpu->cores[i].lcore;
+	}
+
+	return 0;
+}
+
+/**
  * @brief Gets cores from \a cores set which belong to \a l2_id
  *
  * @param [in] cores set of cores
@@ -1449,6 +1489,8 @@ cfg_set_cores_os(const unsigned technology, const cpu_set_t *cores,
                 /* Get cores on res id i */
                 if (technology & (1 << PQOS_CAP_TYPE_L2CA))
                         ret = get_l2id_cores(cores, i, &core_num, core_array);
+		else if (technology & (1 << PQOS_CAP_TYPE_MBA))
+			ret = get_mba_id_cores(cores, i, &core_num, core_array);
                 else
 			ret = get_l3cat_id_cores(cores, i, &core_num,
 						 core_array);
@@ -1501,6 +1543,8 @@ cfg_set_cores_msr(const unsigned technology, const cpu_set_t *cores,
                 /* Get cores on res id i */
                 if (technology & (1 << PQOS_CAP_TYPE_L2CA))
                         ret = get_l2id_cores(cores, i, &core_num, core_array);
+		else if (technology & (1 << PQOS_CAP_TYPE_MBA))
+			ret = get_mba_id_cores(cores, i, &core_num, core_array);
                 else
 			ret = get_l3cat_id_cores(cores, i, &core_num,
 						 core_array);
