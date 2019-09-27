@@ -1346,7 +1346,7 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 	const struct pqos_coreinfo *ci = NULL;
 	int ret;
 
-	if (NULL == l2ca || NULL == l3ca || NULL == mba)
+	if (NULL == l2ca && NULL == l3ca && NULL == mba)
 		return -EINVAL;
 
 	if (NULL == m_cap_l2ca && NULL == m_cap_l3ca && NULL == m_cap_mba)
@@ -1366,7 +1366,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 		return ret;
 
 	/* Configure COS */
-	if (m_cap_l3ca != NULL && m_cap_l3ca->u.l3ca->num_classes > cos_id) {
+	if (l3ca != NULL && m_cap_l3ca != NULL &&
+	    m_cap_l3ca->u.l3ca->num_classes > cos_id) {
 		const unsigned l3cat_id = ci->l3cat_id;
 		struct pqos_l3ca ca = *l3ca;
 
@@ -1386,7 +1387,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 		}
 	}
 
-	if (m_cap_l2ca != NULL  && m_cap_l2ca->u.l2ca->num_classes > cos_id) {
+	if (l2ca != NULL && m_cap_l2ca != NULL  &&
+	    m_cap_l2ca->u.l2ca->num_classes > cos_id) {
 		const unsigned l2_id = ci->l2_id;
 		struct pqos_l2ca ca = *l2ca;
 
@@ -1405,7 +1407,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca, const struct pqos_l3ca *l3ca,
 		}
 	}
 
-	if (m_cap_mba != NULL && m_cap_mba->u.mba->num_classes > cos_id) {
+	if (mba != NULL && m_cap_mba != NULL &&
+	    m_cap_mba->u.mba->num_classes > cos_id) {
 		const unsigned mba_id = ci->mba_id;
 		struct pqos_mba mba_requested = *mba;
 		struct pqos_mba mba_actual;
