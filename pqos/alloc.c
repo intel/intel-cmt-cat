@@ -1057,13 +1057,18 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_l2ca,
                         const struct pqos_capability *cap_mba,
-                        const unsigned sock_count,
-                        const unsigned *sockets,
                         const struct pqos_cpuinfo *cpu_info,
                         const int verbose)
 {
         int ret;
         unsigned i;
+	unsigned sock_count, *sockets = NULL;
+
+	sockets = pqos_cpu_get_sockets(cpu_info, &sock_count);
+	if (sockets == NULL) {
+		printf("Error retrieving information for Sockets\n");
+		return;
+	}
 
         print_per_socket_config(cap_l3ca, cap_mba, sock_count, sockets);
 
@@ -1074,7 +1079,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 l2id = pqos_cpu_get_l2ids(cpu_info, &count);
                 if (l2id == NULL) {
                         printf("Error retrieving information for L2\n");
-                        return;
+			goto free_and_return;
                 }
 
                 for (i = 0; i < count; i++) {
@@ -1103,7 +1108,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 lcores = pqos_cpu_get_cores(cpu_info, sockets[i], &lcount);
                 if (lcores == NULL) {
                         printf("Error retrieving core information!\n");
-                        return;
+			goto free_and_return;
                 }
                 printf("Core information for socket %u:\n",
                        sockets[i]);
@@ -1115,7 +1120,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                                 printf("Error retrieving information "
                                        "for core %u!\n", lcores[n]);
                                 free(lcores);
-                                return;
+				goto free_and_return;
                         }
 
                         print_core_assoc((cap_l3ca != NULL) ||
@@ -1127,6 +1132,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 }
                 free(lcores);
         }
+
         if (sel_interface == PQOS_INTER_OS) {
                 unsigned max_cos = UINT_MAX;
 
@@ -1151,7 +1157,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         tasks = pqos_pid_get_pid_assoc(i, &tcount);
                         if (tasks == NULL) {
                                 printf("Error retrieving PID information!\n");
-                                return;
+				goto free_and_return;
                         }
                         printf("    COS%u => ", i);
                         if (tcount == 0)
@@ -1166,6 +1172,11 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         free(tasks);
                 }
         }
+
+free_and_return:
+	if (sockets)
+		free(sockets);
+
 }
 
 int alloc_apply(const struct pqos_capability *cap_l3ca,
