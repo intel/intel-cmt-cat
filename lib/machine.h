@@ -53,6 +53,9 @@ extern "C" {
 #define MACHINE_RETVAL_ERROR        1         /**< generic error */
 #define MACHINE_RETVAL_PARAM        2         /**< parameter error */
 
+/* cpuid leaf for cache topology */
+#define CPUID_LEAF_CACHE	    4
+
 /**
  * Results of CPUID operation are stored in this structure.
  * It consists of 4x32bits IA registers: EAX, EBX, ECX and EDX.
