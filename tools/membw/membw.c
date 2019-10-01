@@ -59,8 +59,6 @@
  * MACROS
  */
 
-#define UNUSED_PARAM(x) (void)(x)
-
 #ifdef __linux__
 #define PAGE_SIZE       (4 * 1024)
 #endif
@@ -103,16 +101,22 @@ enum cl_type {
         CL_TYPE_READ_WB,
         CL_TYPE_READ_WB_DQA,
         CL_TYPE_READ_MOD_WRITE,
+#ifdef __x86_64__
         CL_TYPE_WRITE_DQA,
         CL_TYPE_WRITE_DQA_FLUSH,
+#endif
         CL_TYPE_WRITE_WB,
+#ifdef __x86_64__
         CL_TYPE_WRITE_WB_AVX512,
+#endif
         CL_TYPE_WRITE_WB_CLWB,
         CL_TYPE_WRITE_WB_FLUSH,
         CL_TYPE_WRITE_NTI,
         CL_TYPE_WRITE_NTI_CLWB,
+#ifdef __x86_64__
         CL_TYPE_WRITE_NT512,
         CL_TYPE_WRITE_NTDQ
+#endif
 };
 
 /* structure to store cpuid values */
@@ -462,6 +466,7 @@ cl_read_mod_write(void *p, const uint64_t v)
                      : "memory");
 }
 
+#ifdef __x86_64__
 /**
  * @brief WB store vector version
  *
@@ -509,6 +514,7 @@ cl_write_dqa_flush(void *p, const uint64_t v)
         cl_write_dqa(p, v);
         cl_flush(p);
 }
+#endif
 
 /**
  * @brief Perform write operation to specified cache line
@@ -627,6 +633,7 @@ cl_write_nti(void *p, const uint64_t v)
 #endif
 }
 
+#ifdef __x86_64__
 /**
  * @brief non-temporal store vector version
  *
@@ -642,6 +649,7 @@ cl_write_nt512(void *p, const uint64_t v)
                      : "r"(v), "r"(p)
                      : "%zmm1", "memory");
 }
+#endif
 
 /**
  * @brief Perform write operation to memory giving non-temporal hint with cache
@@ -657,6 +665,7 @@ cl_write_nti_clwb(void *p, const uint64_t v)
         cl_wb(p);
 }
 
+#ifdef __x86_64__
 /**
  * @brief Non temporal store vector version
  *
@@ -675,6 +684,7 @@ cl_write_ntdq(void *p, const uint64_t v)
                      : "r"(v), "r"(p)
                      : "%xmm1", "memory");
 }
+#endif
 
 /**
  * @brief Function to perform non-temporal read operation
@@ -803,18 +813,22 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_READ_MOD_WRITE:
                         cl_read_mod_write(ptr, val);
                         break;
+#ifdef __x86_64__
                 case CL_TYPE_WRITE_DQA:
                         cl_write_dqa(ptr, val);
                         break;
                 case CL_TYPE_WRITE_DQA_FLUSH:
                         cl_write_dqa_flush(ptr, val);
                         break;
+#endif
                 case CL_TYPE_WRITE_WB:
                         cl_write(ptr, val);
                         break;
+#ifdef __x86_64__
                 case CL_TYPE_WRITE_WB_AVX512:
                         cl_write_avx512(ptr, val);
                         break;
+#endif
                 case CL_TYPE_WRITE_WB_CLWB:
                         cl_write_clwb(ptr, val);
                         break;
@@ -824,15 +838,17 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_WRITE_NTI:
                         cl_write_nti(ptr, val);
                         break;
-                case CL_TYPE_WRITE_NT512:
-                        cl_write_nt512(ptr, val);
-                        break;
                 case CL_TYPE_WRITE_NTI_CLWB:
                         cl_write_nti_clwb(ptr, val);
+                        break;
+#ifdef __x86_64__
+                case CL_TYPE_WRITE_NT512:
+                        cl_write_nt512(ptr, val);
                         break;
                 case CL_TYPE_WRITE_NTDQ:
                         cl_write_ntdq(ptr, val);
                         break;
+#endif
                 default:
                         assert(0);
                         break;
@@ -869,18 +885,24 @@ static void usage(char **argv)
                "  --nt-read-sse      SSE NT loads\n"
                "  --read-mod-write   x86 load XOR write\n"
                "  --write            x86 stores\n"
+#ifdef __x86_64__
                "  --write-avx512     AVX512 stores\n"
+#endif
                "  --write-clwb       x86 stores + clwb\n"
                "  --write-flush      x86 stores & clflush (naturally generates"
                                     " loads & stores)\n"
+#ifdef __x86_64__
                "  --write-sse        SSE stores\n"
                "  --write-sse-flush  SSE stores & clflush (naturally generates "
                                     "loads & stores)\n"
+#endif
                "  --nt-write         x86 NT stores\n"
                "  --nt-write-avx512  AVX512 NT stores\n"
                "  --nt-write-clwb    x86 NT stores + clwb\n"
-               "  --nt-write-sse     SSE NT stores\n",
-               argv[0]);
+#ifdef __x86_64__
+               "  --nt-write-sse     SSE NT stores\n"
+#endif
+               , argv[0]);
 }
 
 /**
@@ -986,15 +1008,23 @@ int main(int argc, char **argv)
             {"nt-read-sse",     no_argument, 0, CL_TYPE_READ_NTQ},
             {"read-mod-write",  no_argument, 0, CL_TYPE_READ_MOD_WRITE},
             {"write",           no_argument, 0, CL_TYPE_WRITE_WB},
+#ifdef __x86_64__
             {"write-avx512",    no_argument, 0, CL_TYPE_WRITE_WB_AVX512},
+#endif
             {"write-clwb",      no_argument, 0, CL_TYPE_WRITE_WB_CLWB},
             {"write-flush",     no_argument, 0, CL_TYPE_WRITE_WB_FLUSH},
+#ifdef __x86_64__
             {"write-sse",       no_argument, 0, CL_TYPE_WRITE_DQA},
             {"write-sse-flush", no_argument, 0, CL_TYPE_WRITE_DQA_FLUSH},
+#endif
             {"nt-write",        no_argument, 0, CL_TYPE_WRITE_NTI},
+#ifdef __x86_64__
             {"nt-write-avx512", no_argument, 0, CL_TYPE_WRITE_NT512},
+#endif
             {"nt-write-clwb",   no_argument, 0, CL_TYPE_WRITE_NTI_CLWB},
+#ifdef __x86_64__
             {"nt-write-sse",    no_argument, 0, CL_TYPE_WRITE_NTDQ},
+#endif
             {0, 0, 0, 0}
         };
 
@@ -1026,16 +1056,22 @@ int main(int argc, char **argv)
                 case CL_TYPE_READ_WB:
                 case CL_TYPE_READ_WB_DQA:
                 case CL_TYPE_READ_MOD_WRITE:
+#ifdef __x86_64__
                 case CL_TYPE_WRITE_DQA:
                 case CL_TYPE_WRITE_DQA_FLUSH:
+#endif
                 case CL_TYPE_WRITE_WB:
+#ifdef __x86_64__
                 case CL_TYPE_WRITE_WB_AVX512:
+#endif
                 case CL_TYPE_WRITE_WB_CLWB:
                 case CL_TYPE_WRITE_WB_FLUSH:
                 case CL_TYPE_WRITE_NTI:
-                case CL_TYPE_WRITE_NT512:
                 case CL_TYPE_WRITE_NTI_CLWB:
+#ifdef __x86_64__
+                case CL_TYPE_WRITE_NT512:
                 case CL_TYPE_WRITE_NTDQ:
+#endif
                         type = (enum cl_type) cmd;
                         break;
                 default:
@@ -1056,9 +1092,11 @@ int main(int argc, char **argv)
 
         switch (type) {
         case CL_TYPE_READ_WB_DQA:
+#ifdef __x86_64__
         case CL_TYPE_WRITE_DQA:
         case CL_TYPE_WRITE_DQA_FLUSH:
         case CL_TYPE_WRITE_NTDQ:
+#endif
                 if (!(features & CPU_FEATURE_SSE4_2)) {
                         printf("No CPU support for SSE4.2 instructions!\n");
                         return EXIT_FAILURE;
@@ -1071,6 +1109,7 @@ int main(int argc, char **argv)
                         return EXIT_FAILURE;
                 }
                 break;
+#ifdef __x86_64__
         case CL_TYPE_WRITE_NT512:
         case CL_TYPE_WRITE_WB_AVX512:
                 if (!(features & CPU_FEATURE_AVX512F)) {
@@ -1078,6 +1117,7 @@ int main(int argc, char **argv)
                         return EXIT_FAILURE;
                 }
                 break;
+#endif
         default:
                 break;
         }
