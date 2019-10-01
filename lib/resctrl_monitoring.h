@@ -36,7 +36,6 @@
  * @brief Internal header file for resctrl minitoring functions
  */
 
-
 #ifndef __PQOS_RESCTRL_MON_H__
 #define __PQOS_RESCTRL_MON_H__
 

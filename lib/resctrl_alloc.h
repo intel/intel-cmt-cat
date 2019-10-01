@@ -57,7 +57,7 @@ extern "C" {
  * @retval PQOS_RETVAL_OK success
  */
 int resctrl_alloc_init(const struct pqos_cpuinfo *cpu,
-	               const struct pqos_cap *cap);
+                       const struct pqos_cap *cap);
 
 /**
  * @brief Shuts down resctrl allocation sub-module for OS allocation
@@ -89,8 +89,9 @@ int resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num);
  * @retval Pointer on success
  * @retval NULL on error
  */
-FILE *resctrl_alloc_fopen(const unsigned class_id, const char *name,
-	                  const char *mode);
+FILE *resctrl_alloc_fopen(const unsigned class_id,
+                          const char *name,
+                          const char *mode);
 
 /**
  * @brief Write CPU mask to file
@@ -114,7 +115,7 @@ int resctrl_alloc_cpumask_write(const unsigned class_id,
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_cpumask_read(const unsigned class_id,
-	                       struct resctrl_cpumask *mask);
+                               struct resctrl_cpumask *mask);
 
 /**
  * @brief Read resctrl schemata from file
@@ -126,7 +127,7 @@ int resctrl_alloc_cpumask_read(const unsigned class_id,
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_schemata_read(const unsigned class_id,
-	                        struct resctrl_schemata *schemata);
+                                struct resctrl_schemata *schemata);
 
 /**
  * @brief Write resctrl schemata to file
@@ -138,7 +139,7 @@ int resctrl_alloc_schemata_read(const unsigned class_id,
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_schemata_write(const unsigned class_id,
-	                         const struct resctrl_schemata *schemata);
+                                 const struct resctrl_schemata *schemata);
 
 /**
  * @brief Function to validate if \a task is a valid task ID
@@ -199,7 +200,6 @@ int resctrl_alloc_task_search(unsigned *class_id,
  * @return Operation status
  */
 int resctrl_alloc_task_file_check(const unsigned class_id, unsigned *found);
-
 
 /**
  * @brief Resctrl interface to associate \a lcore
@@ -265,4 +265,3 @@ int resctrl_alloc_get_unused_group(const unsigned grps_num, unsigned *group_id);
 #endif
 
 #endif /* __PQOS_RESCTRL_ALLOC_H__ */
-

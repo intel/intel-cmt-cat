@@ -43,21 +43,20 @@
 extern "C" {
 #endif
 
-#include <limits.h>                     /**< CHAR_BIT*/
+#include <limits.h> /**< CHAR_BIT*/
 
 #ifndef RESCTRL_PATH
 #define RESCTRL_PATH "/sys/fs/resctrl"
 #endif
-#define RESCTRL_PATH_INFO RESCTRL_PATH"/info"
-#define RESCTRL_PATH_INFO_L3_MON RESCTRL_PATH_INFO"/L3_MON"
-#define RESCTRL_PATH_INFO_L3 RESCTRL_PATH_INFO"/L3"
-#define RESCTRL_PATH_INFO_L3CODE RESCTRL_PATH_INFO"/L3CODE"
-#define RESCTRL_PATH_INFO_L3DATA RESCTRL_PATH_INFO"/L3DATA"
-#define RESCTRL_PATH_INFO_L2 RESCTRL_PATH_INFO"/L2"
-#define RESCTRL_PATH_INFO_L2CODE RESCTRL_PATH_INFO"/L2CODE"
-#define RESCTRL_PATH_INFO_L2DATA RESCTRL_PATH_INFO"/L2DATA"
-#define RESCTRL_PATH_INFO_MB RESCTRL_PATH_INFO"/MB"
-
+#define RESCTRL_PATH_INFO RESCTRL_PATH "/info"
+#define RESCTRL_PATH_INFO_L3_MON RESCTRL_PATH_INFO "/L3_MON"
+#define RESCTRL_PATH_INFO_L3 RESCTRL_PATH_INFO "/L3"
+#define RESCTRL_PATH_INFO_L3CODE RESCTRL_PATH_INFO "/L3CODE"
+#define RESCTRL_PATH_INFO_L3DATA RESCTRL_PATH_INFO "/L3DATA"
+#define RESCTRL_PATH_INFO_L2 RESCTRL_PATH_INFO "/L2"
+#define RESCTRL_PATH_INFO_L2CODE RESCTRL_PATH_INFO "/L2CODE"
+#define RESCTRL_PATH_INFO_L2DATA RESCTRL_PATH_INFO "/L2DATA"
+#define RESCTRL_PATH_INFO_MB RESCTRL_PATH_INFO "/MB"
 
 /**
  * Max supported number of CPU's
@@ -121,7 +120,7 @@ int resctrl_umount(void);
  *  - cpus file contains 'ABCD' mask = [ ..., 0xAB, 0xCD ]
  */
 struct resctrl_cpumask {
-        uint8_t tab[RESCTRL_MAX_CPUS / CHAR_BIT];  /**< bit mask table */
+        uint8_t tab[RESCTRL_MAX_CPUS / CHAR_BIT]; /**< bit mask table */
 };
 
 /**

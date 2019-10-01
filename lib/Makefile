@@ -223,7 +223,7 @@ checkpatch:
 
 .PHONY: clang-format
 clang-format:
-	@for file in "pqos.h"; do \
+	@for file in "pqos.h" $(wildcard resctrl*.[ch]); do \
 		echo "Checking style $$file"; \
 		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
