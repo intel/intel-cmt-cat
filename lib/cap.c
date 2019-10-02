@@ -1053,11 +1053,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         struct pqos_cap_mba *det_mba = NULL;
         struct pqos_cap *_cap = NULL;
         unsigned sz = 0;
-        int ret = PQOS_RETVAL_OK;
-
-        if (inter != PQOS_INTER_MSR && inter != PQOS_INTER_OS &&
-            inter != PQOS_INTER_OS_RESCTRL_MON)
-                return PQOS_RETVAL_PARAM;
+        int ret = PQOS_RETVAL_RESOURCE;
 
         /**
          * Monitoring init
@@ -1269,6 +1265,15 @@ pqos_init(const struct pqos_config *config)
         char *environment = NULL;
 
         if (config == NULL)
+                return PQOS_RETVAL_PARAM;
+
+#ifdef __linux__
+        if (config->interface != PQOS_INTER_MSR &&
+            config->interface != PQOS_INTER_OS &&
+            config->interface != PQOS_INTER_OS_RESCTRL_MON)
+#else
+        if (config->interface != PQOS_INTER_MSR)
+#endif
                 return PQOS_RETVAL_PARAM;
 
         environment = getenv("RDT_IFACE");
