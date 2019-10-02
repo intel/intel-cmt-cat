@@ -1094,7 +1094,7 @@ hw_alloc_assign(const unsigned technology,
 {
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
 	const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
-	unsigned l3cat_id = 0, l2id = 0, mba_id = 0;
+	unsigned resource_id = 0;
         unsigned i;
         int ret;
 
@@ -1117,34 +1117,28 @@ hw_alloc_assign(const unsigned technology,
                         /* L2 is requested
                          * The smallest manageable entity is L2 cluster
                          */
-                        if (i != 0 && l2id != pi->l2_id) {
+                        if (i != 0 && resource_id != pi->l2_id) {
                                 ret = PQOS_RETVAL_PARAM;
                                 goto pqos_alloc_assign_exit;
                         }
-                        l2id = pi->l2_id;
+                        resource_id = pi->l2_id;
 		} else if (mba_req) {
-			if (i != 0 && mba_id != pi->mba_id) {
+			if (i != 0 && resource_id != pi->mba_id) {
 				ret = PQOS_RETVAL_PARAM;
 				goto pqos_alloc_assign_exit;
 			}
-			mba_id = pi->mba_id;
+			resource_id = pi->mba_id;
 		} else {
-			if (i != 0 && l3cat_id != pi->l3cat_id) {
+			if (i != 0 && resource_id != pi->l3cat_id) {
                                 ret = PQOS_RETVAL_PARAM;
                                 goto pqos_alloc_assign_exit;
                         }
-			l3cat_id = pi->l3cat_id;
+			resource_id = pi->l3cat_id;
                 }
         }
 
         /* find an unused class from highest down */
-	if (l2_req)
-		ret = get_unused_cos(l2id, 1 << PQOS_CAP_TYPE_L2CA, class_id);
-	else if (mba_req)
-		ret = get_unused_cos(mba_id, 1 << PQOS_CAP_TYPE_MBA, class_id);
-	else
-		ret = get_unused_cos(l3cat_id, 1 << PQOS_CAP_TYPE_L3CA,
-				     class_id);
+	ret = get_unused_cos(resource_id, technology, class_id);
 
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
