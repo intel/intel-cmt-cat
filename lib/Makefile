@@ -192,8 +192,8 @@ clobber:
 	-rm -rf $(DOXY_DIRS)
 
 CHECKPATCH?=checkpatch.pl
-.PHONY: style
-style:
+.PHONY: checkpatch
+checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE,\
@@ -220,6 +220,19 @@ style:
 	-f resctrl_utils.h -f resctrl_utils.c \
 	-f types.h \
 	-f utils.h -f utils.c
+
+.PHONY: clang-format
+clang-format:
+	@for file in "pqos.h"; do \
+		echo "Checking style $$file"; \
+		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		{ echo "ERROR: $$file has style problems"; exit 1; } \
+	done
+
+.PHONY: style
+style:
+	$(MAKE) checkpatch
+	$(MAKE) clang-format
 	$(MAKE) -C python style
 
 CPPCHECK?=cppcheck
