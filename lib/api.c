@@ -86,9 +86,9 @@ int
 pqos_alloc_assoc_set(const unsigned lcore,
                      const unsigned class_id)
 {
-	int ret;
+        int ret;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -96,31 +96,31 @@ pqos_alloc_assoc_set(const unsigned lcore,
                 return ret;
         }
 
-	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_alloc_assoc_set(lcore, class_id);
-	else {
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_alloc_assoc_set(lcore, class_id);
+        else {
 #ifdef __linux__
-		ret = os_alloc_assoc_set(lcore, class_id);
+                ret = os_alloc_assoc_set(lcore, class_id);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
 pqos_alloc_assoc_get(const unsigned lcore,
                      unsigned *class_id)
 {
-	int ret;
+        int ret;
 
-	if (class_id == NULL)
-		return PQOS_RETVAL_PARAM;
+        if (class_id == NULL)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -128,19 +128,19 @@ pqos_alloc_assoc_get(const unsigned lcore,
                 return ret;
         }
 
-	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_alloc_assoc_get(lcore, class_id);
-	else {
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_alloc_assoc_get(lcore, class_id);
+        else {
 #ifdef __linux__
-		ret = os_alloc_assoc_get(lcore, class_id);
+                ret = os_alloc_assoc_get(lcore, class_id);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
@@ -149,7 +149,7 @@ pqos_alloc_assoc_set_pid(const pid_t task,
 {
         int ret;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -173,9 +173,9 @@ pqos_alloc_assoc_set_pid(const pid_t task,
         LOG_INFO("OS interface not supported!\n");
         ret = PQOS_RETVAL_RESOURCE;
 #endif
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 
 }
 
@@ -183,12 +183,12 @@ int
 pqos_alloc_assoc_get_pid(const pid_t task,
                          unsigned *class_id)
 {
-	int ret;
+        int ret;
 
-	if (class_id == NULL)
-		return PQOS_RETVAL_PARAM;
+        if (class_id == NULL)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -212,9 +212,9 @@ pqos_alloc_assoc_get_pid(const pid_t task,
         LOG_INFO("OS interface not supported!\n");
         ret = PQOS_RETVAL_RESOURCE;
 #endif
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
@@ -223,16 +223,16 @@ pqos_alloc_assign(const unsigned technology,
                   const unsigned core_num,
                   unsigned *class_id)
 {
-	int ret;
-	const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-	const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
-	const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+        int ret;
+        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+        const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
+        const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
 
         if (core_num == 0 || core_array == NULL || class_id == NULL ||
             !(l2_req || l3_req || mba_req))
                 return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -245,13 +245,13 @@ pqos_alloc_assign(const unsigned technology,
         else {
 #ifdef __linux__
                 ret = os_alloc_assign(technology, core_array, core_num,
-		                      class_id);
+                                      class_id);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
         return ret;
 }
@@ -260,12 +260,12 @@ int
 pqos_alloc_release(const unsigned *core_array,
                    const unsigned core_num)
 {
-	int ret;
+        int ret;
 
         if (core_num == 0 || core_array == NULL)
                 return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -283,9 +283,9 @@ pqos_alloc_release(const unsigned *core_array,
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
@@ -299,7 +299,7 @@ pqos_alloc_assign_pid(const unsigned technology,
         if (task_array == NULL || task_num == 0 || class_id == NULL)
                 return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -322,9 +322,9 @@ pqos_alloc_assign_pid(const unsigned technology,
         LOG_INFO("OS interface not supported!\n");
         ret = PQOS_RETVAL_RESOURCE;
 #endif
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
@@ -336,7 +336,7 @@ pqos_alloc_release_pid(const pid_t *task_array,
         if (task_array == NULL || task_num == 0)
                 return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -358,9 +358,9 @@ pqos_alloc_release_pid(const pid_t *task_array,
         LOG_INFO("OS interface not supported!\n");
         ret = PQOS_RETVAL_RESOURCE;
 #endif
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
@@ -412,9 +412,9 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 unsigned *
@@ -494,13 +494,13 @@ pqos_l3ca_set(const unsigned l3cat_id,
               const unsigned num_cos,
               const struct pqos_l3ca *ca)
 {
-	int ret;
-	unsigned i;
+        int ret;
+        unsigned i;
 
-	if (ca == NULL || num_cos == 0)
-		return PQOS_RETVAL_PARAM;
+        if (ca == NULL || num_cos == 0)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -508,39 +508,39 @@ pqos_l3ca_set(const unsigned l3cat_id,
                 return ret;
         }
 
-	/**
-	 * Check if class bitmasks are contiguous.
-	 */
-	for (i = 0; i < num_cos; i++) {
-		int is_contig = 0;
+        /**
+         * Check if class bitmasks are contiguous.
+         */
+        for (i = 0; i < num_cos; i++) {
+                int is_contig = 0;
 
-		if (ca[i].cdp) {
-			is_contig = is_contiguous(ca[i].u.s.data_mask) &&
-				is_contiguous(ca[i].u.s.code_mask);
-		} else
-			is_contig = is_contiguous(ca[i].u.ways_mask);
+                if (ca[i].cdp) {
+                        is_contig = is_contiguous(ca[i].u.s.data_mask) &&
+                                is_contiguous(ca[i].u.s.code_mask);
+                } else
+                        is_contig = is_contiguous(ca[i].u.ways_mask);
 
-		if (!is_contig) {
-			LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
-			          ca[i].class_id);
-			_pqos_api_unlock();
-			return PQOS_RETVAL_PARAM;
-		}
-	}
+                if (!is_contig) {
+                        LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
+                                  ca[i].class_id);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
 
-	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_l3ca_set(l3cat_id, num_cos, ca);
-	else {
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_l3ca_set(l3cat_id, num_cos, ca);
+        else {
 #ifdef __linux__
-		ret = os_l3ca_set(l3cat_id, num_cos, ca);
+                ret = os_l3ca_set(l3cat_id, num_cos, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
@@ -549,63 +549,63 @@ pqos_l3ca_get(const unsigned l3cat_id,
               unsigned *num_ca,
               struct pqos_l3ca *ca)
 {
-	int ret;
+        int ret;
 
-	if (num_ca == NULL || ca == NULL || max_num_ca == 0)
-		return PQOS_RETVAL_PARAM;
+        if (num_ca == NULL || ca == NULL || max_num_ca == 0)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
         }
-	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
-	else {
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
+        else {
 #ifdef __linux__
-		ret = os_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
+                ret = os_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
 pqos_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 {
-	int ret;
+        int ret;
 
-	if (min_cbm_bits == NULL)
-		return PQOS_RETVAL_PARAM;
+        if (min_cbm_bits == NULL)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
-	ret = _pqos_check_init(1);
-	if (ret != PQOS_RETVAL_OK) {
-		_pqos_api_unlock();
-		return ret;
-	}
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
 
-	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_l3ca_get_min_cbm_bits(min_cbm_bits);
-	else {
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_l3ca_get_min_cbm_bits(min_cbm_bits);
+        else {
 #ifdef __linux__
-		ret = os_l3ca_get_min_cbm_bits(min_cbm_bits);
+                ret = os_l3ca_get_min_cbm_bits(min_cbm_bits);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
-	}
+        }
 
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 /*
@@ -619,13 +619,13 @@ pqos_l2ca_set(const unsigned l2id,
               const unsigned num_cos,
               const struct pqos_l2ca *ca)
 {
-	int ret;
-	unsigned i;
+        int ret;
+        unsigned i;
 
-	if (ca == NULL || num_cos == 0)
-		return PQOS_RETVAL_PARAM;
+        if (ca == NULL || num_cos == 0)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -633,10 +633,10 @@ pqos_l2ca_set(const unsigned l2id,
                 return ret;
         }
 
-	/**
-	 * Check if class bitmasks are contiguous
-	 */
-	for (i = 0; i < num_cos; i++) {
+        /**
+         * Check if class bitmasks are contiguous
+         */
+        for (i = 0; i < num_cos; i++) {
                 int is_contig = 0;
 
                 if (ca[i].cdp) {
@@ -646,25 +646,25 @@ pqos_l2ca_set(const unsigned l2id,
                         is_contig = is_contiguous(ca[i].u.ways_mask);
 
                 if (!is_contig) {
-			LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
-			          ca[i].class_id);
-			_pqos_api_unlock();
-			return PQOS_RETVAL_PARAM;
-		}
-	}
-	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_l2ca_set(l2id, num_cos, ca);
-	else {
+                        LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
+                                  ca[i].class_id);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_l2ca_set(l2id, num_cos, ca);
+        else {
 #ifdef __linux__
-		ret = os_l2ca_set(l2id, num_cos, ca);
+                ret = os_l2ca_set(l2id, num_cos, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
@@ -673,64 +673,64 @@ pqos_l2ca_get(const unsigned l2id,
               unsigned *num_ca,
               struct pqos_l2ca *ca)
 {
-	int ret;
+        int ret;
 
-	if (num_ca == NULL || ca == NULL || max_num_ca == 0)
-		return PQOS_RETVAL_PARAM;
+        if (num_ca == NULL || ca == NULL || max_num_ca == 0)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
-	ret = _pqos_check_init(1);
-	if (ret != PQOS_RETVAL_OK) {
-		_pqos_api_unlock();
-		return ret;
-	}
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
 
-	if (m_interface == PQOS_INTER_MSR)
-		ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
-	else {
+        if (m_interface == PQOS_INTER_MSR)
+                ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
+        else {
 #ifdef __linux__
-		ret = os_l2ca_get(l2id, max_num_ca, num_ca, ca);
+                ret = os_l2ca_get(l2id, max_num_ca, num_ca, ca);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 int
 pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 {
-	int ret;
+        int ret;
 
-	if (min_cbm_bits == NULL)
-		return PQOS_RETVAL_PARAM;
+        if (min_cbm_bits == NULL)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
-	ret = _pqos_check_init(1);
-	if (ret != PQOS_RETVAL_OK) {
-		_pqos_api_unlock();
-		return ret;
-	}
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
 
-	if (m_interface == PQOS_INTER_MSR)
+        if (m_interface == PQOS_INTER_MSR)
                 ret = hw_l2ca_get_min_cbm_bits(min_cbm_bits);
-	else {
+        else {
 #ifdef __linux__
-		ret = os_l2ca_get_min_cbm_bits(min_cbm_bits);
+                ret = os_l2ca_get_min_cbm_bits(min_cbm_bits);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
-	}
+        }
 
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 /*
@@ -745,25 +745,25 @@ pqos_mba_set(const unsigned mba_id,
              const struct pqos_mba *requested,
              struct pqos_mba *actual)
 {
-	int ret;
-	unsigned i;
+        int ret;
+        unsigned i;
 
-	if (requested == NULL || num_cos == 0)
-		return PQOS_RETVAL_PARAM;
+        if (requested == NULL || num_cos == 0)
+                return PQOS_RETVAL_PARAM;
 
-	/**
-	 * Check if MBA rate is within allowed range
-	 */
-	for (i = 0; i < num_cos; i++)
-		if (requested[i].ctrl == 0 &&
-		    (requested[i].mb_max == 0 ||
-		     requested[i].mb_max > PQOS_MBA_LINEAR_MAX)) {
-			LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
-				   requested[i].class_id, PQOS_MBA_LINEAR_MAX);
-			return PQOS_RETVAL_PARAM;
-		}
+        /**
+         * Check if MBA rate is within allowed range
+         */
+        for (i = 0; i < num_cos; i++)
+                if (requested[i].ctrl == 0 &&
+                    (requested[i].mb_max == 0 ||
+                     requested[i].mb_max > PQOS_MBA_LINEAR_MAX)) {
+                        LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
+                                   requested[i].class_id, PQOS_MBA_LINEAR_MAX);
+                        return PQOS_RETVAL_PARAM;
+                }
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -772,19 +772,19 @@ pqos_mba_set(const unsigned mba_id,
         }
 
         if (m_interface == PQOS_INTER_MSR)
-		ret = hw_mba_set(mba_id, num_cos, requested, actual);
+                ret = hw_mba_set(mba_id, num_cos, requested, actual);
         else {
 #ifdef __linux__
-		ret = os_mba_set(mba_id, num_cos, requested, actual);
+                ret = os_mba_set(mba_id, num_cos, requested, actual);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
 
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 
 }
 
@@ -794,12 +794,12 @@ pqos_mba_get(const unsigned mba_id,
              unsigned *num_cos,
              struct pqos_mba *mba_tab)
 {
-	int ret;
+        int ret;
 
-	if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
-		return PQOS_RETVAL_PARAM;
+        if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
+                return PQOS_RETVAL_PARAM;
 
-	_pqos_api_lock();
+        _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
@@ -808,19 +808,19 @@ pqos_mba_get(const unsigned mba_id,
         }
 
         if (m_interface == PQOS_INTER_MSR)
-		ret = hw_mba_get(mba_id, max_num_cos, num_cos, mba_tab);
+                ret = hw_mba_get(mba_id, max_num_cos, num_cos, mba_tab);
         else {
 #ifdef __linux__
-		ret = os_mba_get(mba_id, max_num_cos, num_cos, mba_tab);
+                ret = os_mba_get(mba_id, max_num_cos, num_cos, mba_tab);
 #else
                 LOG_INFO("OS interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
 #endif
         }
 
-	_pqos_api_unlock();
+        _pqos_api_unlock();
 
-	return ret;
+        return ret;
 }
 
 /*
