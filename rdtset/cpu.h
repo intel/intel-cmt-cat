@@ -52,13 +52,13 @@ typedef cpuset_t cpu_set_t;
 static inline int
 CPU_COUNT(const cpu_set_t *set)
 {
-	int i = 0, count = 0;
+        int i = 0, count = 0;
 
-	for (i = 0; i < CPU_SETSIZE; i++)
-		if (CPU_ISSET(i, set))
-			count++;
+        for (i = 0; i < CPU_SETSIZE; i++)
+                if (CPU_ISSET(i, set))
+                        count++;
 
-	return count;
+        return count;
 }
 #endif /* !CPU_COUNT */
 #endif /* __FreeBSD__ */

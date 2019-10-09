@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <sys/time.h>                                   /**< gettimeofday() */
+#include <sys/time.h> /**< gettimeofday() */
 
 #include "common.h"
 #include "rdt.h"
@@ -44,103 +44,101 @@
 int
 str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 {
-	unsigned idx, min, max;
-	char *buff = malloc(cpustr_len + 1);
-	char *end = NULL;
-	const char *str = buff;
-	int ret = 0;
+        unsigned idx, min, max;
+        char *buff = malloc(cpustr_len + 1);
+        char *end = NULL;
+        const char *str = buff;
+        int ret = 0;
 
-	if (NULL == buff || NULL == cpustr || NULL == cpuset || 0 == cpustr_len)
-		goto err;
+        if (NULL == buff || NULL == cpustr || NULL == cpuset || 0 == cpustr_len)
+                goto err;
 
-	memcpy(buff, cpustr, cpustr_len);
-	buff[cpustr_len] = 0;
-	CPU_ZERO(cpuset);
+        memcpy(buff, cpustr, cpustr_len);
+        buff[cpustr_len] = 0;
+        CPU_ZERO(cpuset);
 
-	while (isblank(*str))
-		str++;
+        while (isblank(*str))
+                str++;
 
-	/* only digit is qualify for start point */
-	if (!isdigit(*str) || *str == '\0')
-		goto err;
+        /* only digit is qualify for start point */
+        if (!isdigit(*str) || *str == '\0')
+                goto err;
 
-	min = CPU_SETSIZE;
-	do {
-		/* go ahead to the first digit */
-		while (isblank(*str))
-			str++;
+        min = CPU_SETSIZE;
+        do {
+                /* go ahead to the first digit */
+                while (isblank(*str))
+                        str++;
 
-		if (!isdigit(*str))
-			goto err;
+                if (!isdigit(*str))
+                        goto err;
 
-		/* get the digit value */
-		errno = 0;
-		idx = strtoul(str, &end, 10);
-		if (errno != 0 || end == NULL || end == str ||
-				idx >= CPU_SETSIZE)
-			goto err;
+                /* get the digit value */
+                errno = 0;
+                idx = strtoul(str, &end, 10);
+                if (errno != 0 || end == NULL || end == str ||
+                    idx >= CPU_SETSIZE)
+                        goto err;
 
-		/* go ahead to separator '-',',' */
-		while (isblank(*end))
-			end++;
+                /* go ahead to separator '-',',' */
+                while (isblank(*end))
+                        end++;
 
-		if (*end == '-') {
-			if (min == CPU_SETSIZE)
-				min = idx;
-			else /* avoid continuous '-' */
-				goto err;
-		} else if (*end == ',' || *end == 0) {
-			max = idx;
+                if (*end == '-') {
+                        if (min == CPU_SETSIZE)
+                                min = idx;
+                        else /* avoid continuous '-' */
+                                goto err;
+                } else if (*end == ',' || *end == 0) {
+                        max = idx;
 
-			if (min == CPU_SETSIZE)
-				min = idx;
+                        if (min == CPU_SETSIZE)
+                                min = idx;
 
-			for (idx = MIN(min, max); idx <= MAX(min, max);
-					idx++)
-				CPU_SET(idx, cpuset);
+                        for (idx = MIN(min, max); idx <= MAX(min, max); idx++)
+                                CPU_SET(idx, cpuset);
 
-			min = CPU_SETSIZE;
-		} else
-			goto err;
+                        min = CPU_SETSIZE;
+                } else
+                        goto err;
 
-		str = end + 1;
-	} while (*end != '\0');
+                str = end + 1;
+        } while (*end != '\0');
 
-	ret = end - buff;
+        ret = end - buff;
 
-	free(buff);
-	return ret;
+        free(buff);
+        return ret;
 
 err:
-	if (buff != NULL)
-		free(buff);
-	return -EINVAL;
+        if (buff != NULL)
+                free(buff);
+        return -EINVAL;
 }
 
 void
-cpuset_to_str(char *cpustr, const unsigned cpustr_len,
-		const cpu_set_t *cpuset)
+cpuset_to_str(char *cpustr, const unsigned cpustr_len, const cpu_set_t *cpuset)
 {
-	unsigned len = 0, j = 0;
+        unsigned len = 0, j = 0;
 
-	memset(cpustr, 0, cpustr_len);
+        memset(cpustr, 0, cpustr_len);
 
-	/* Generate CPU list */
-	for (j = 0; j < CPU_SETSIZE; j++) {
-		if (CPU_ISSET(j, cpuset) != 1)
-			continue;
+        /* Generate CPU list */
+        for (j = 0; j < CPU_SETSIZE; j++) {
+                if (CPU_ISSET(j, cpuset) != 1)
+                        continue;
 
-		len += snprintf(cpustr + len, cpustr_len - len - 1, "%u,", j);
+                len += snprintf(cpustr + len, cpustr_len - len - 1, "%u,", j);
 
-		if (len >= cpustr_len - 1) {
-			len = cpustr_len;
-			memcpy(cpustr + cpustr_len - 4, "...", 3);
-			break;
-		}
-	}
+                if (len >= cpustr_len - 1) {
+                        len = cpustr_len;
+                        memcpy(cpustr + cpustr_len - 4, "...", 3);
+                        break;
+                }
+        }
 
-	/* Remove trailing separator */
-	cpustr[len-1] = 0;
+        /* Remove trailing separator */
+        cpustr[len - 1] = 0;
 }
 
 /**
@@ -235,7 +233,7 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                         uint64_t n, start, end;
                         *p = '\0';
                         start = strtouint64(token);
-                        end = strtouint64(p+1);
+                        end = strtouint64(p + 1);
                         if (start > end) {
                                 /**
                                  * no big deal just swap start with end

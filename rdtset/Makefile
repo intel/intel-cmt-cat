@@ -125,8 +125,8 @@ clean:
 	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
 
 CHECKPATCH?=checkpatch.pl
-.PHONY: style
-style:
+.PHONY: checkpatch
+checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,NEW_TYPEDEFS,\
 	UNSPECIFIED_INT,ARRAY_SIZE,BLOCK_COMMENT_STYLE,CONSTANT_COMPARISON,\
@@ -134,6 +134,20 @@ style:
 	-f rdtset.c -f rdt.c -f rdt.h -f cpu.c -f cpu.h \
 	-f common.c -f common.h \
 	-f mba_sc.h -f mba_sc.c
+
+.PHONY: clang-format
+clang-format:
+	@for file in $(wildcard *.[ch]); do \
+		echo "Checking style $$file"; \
+		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		{ echo "ERROR: $$file has style problems"; exit 1; } \
+	done
+
+.PHONY: style
+style:
+	$(MAKE) checkpatch
+	$(MAKE) clang-format
+
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
