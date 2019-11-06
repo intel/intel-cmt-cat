@@ -39,7 +39,7 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 import unittest
 
-from mock import MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_int, ctypes_build_array

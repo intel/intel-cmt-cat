@@ -1,3 +1,4 @@
+astroid
 pylint
 bandit
 jsonschema
