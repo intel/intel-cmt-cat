@@ -89,6 +89,11 @@ else
 CFLAGS += -g -O2 -D_FORTIFY_SOURCE=2
 endif
 
+# RMID CUSTOM
+ifeq ($(RMID_CUSTOM),y)
+CFLAGS += -DPQOS_RMID_CUSTOM
+endif
+
 # Build targets and dependencies
 SRCS = $(sort $(wildcard *.c))
 OBJS = $(SRCS:.c=.o)

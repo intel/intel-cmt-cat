@@ -126,6 +126,16 @@ enum pqos_interface sel_interface = PQOS_INTER_MSR;
  */
 static int sel_print_version = 0;
 
+#ifdef PQOS_RMID_CUSTOM
+/** rmid table */
+static pqos_rmid_t sel_rmid_map_rmid[PQOS_MAX_CORES];
+/** core table */
+static unsigned sel_rmid_map_core[PQOS_MAX_CORES];
+/** Custom RMID configuration */
+static struct pqos_rmid_config sel_rmid_cfg = {PQOS_RMID_TYPE_DEFAULT,
+        {0, sel_rmid_map_rmid, sel_rmid_map_core} };
+#endif
+
 /**
  * @brief Function to check if a value is already contained in a table
  *
@@ -425,6 +435,67 @@ static void selfn_display_verbose(const char *arg)
 }
 
 /**
+ * @brief Selects custom RMID mapping
+ *
+ * @param arg string passed to --rmid command line option
+ */
+#ifdef PQOS_RMID_CUSTOM
+static void
+selfn_monitor_rmids(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+        char *saveptr = NULL;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        sel_rmid_cfg.type = PQOS_RMID_TYPE_MAP;
+
+        selfn_strdup(&cp, arg);
+
+        for (str = cp; ; str = NULL) {
+                char *token = NULL;
+                char *p = NULL;
+                pqos_rmid_t rmid;
+                unsigned count;
+                uint64_t cores[PQOS_MAX_CORES];
+                unsigned i;
+
+                token = strtok_r(str, ";", &saveptr);
+                if (token == NULL)
+                        break;
+
+                p = strchr(token, '=');
+                if (p == NULL)
+                        parse_error(str, "Invalid RMID association format");
+                *p = '\0';
+
+                rmid = (pqos_rmid_t)strtouint64(token);
+
+                count = strlisttotab(p + 1, cores, DIM(cores));
+                if (count == 0)
+                        return;
+
+                if (sel_rmid_cfg.map.num + count > PQOS_MAX_CORES)
+                        parse_error(p, "too many cores selected for RMID "
+                                    "association");
+
+                for (i = 0; i < count; i++) {
+                        sel_rmid_cfg.map.core[sel_rmid_cfg.map.num] =
+                                (unsigned)cores[i];
+                        sel_rmid_cfg.map.rmid[sel_rmid_cfg.map.num] = rmid;
+                        sel_rmid_cfg.map.num++;
+                }
+        }
+
+        free(cp);
+}
+#endif
+
+/**
  * @brief Selects allocation profile from internal DB
  *
  * @param arg string passed to -c command line option
@@ -485,6 +556,9 @@ parse_config_file(const char *fname)
                 {"alloc-class-select:", selfn_allocation_select }, /**< -c */
                 {"monitor-pids:",       selfn_monitor_pids },      /**< -p */
                 {"monitor-cores:",      selfn_monitor_cores },     /**< -m */
+#ifdef PQOS_RMID_CUSTOM
+                {"monitor-rmid:",       selfn_monitor_rmids },
+#endif
                 {"monitor-time:",       selfn_monitor_time },      /**< -t */
                 {"monitor-interval:",   selfn_monitor_interval },  /**< -i */
                 {"monitor-file:",       selfn_monitor_file },      /**< -o */
@@ -564,6 +638,9 @@ static const char help_printf_short[] =
         "       %s [-d] [--display] [-D] [--display-verbose]\n"
         "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p [EVTPIDS]] "
         "[--mon-pid[=EVTPIDS]]\n"
+#ifdef PQOS_RMID_CUSTOM
+        "       %s [--rmid=RMIDCORES]\n"
+#endif
         "          [-t SECONDS] [--mon-time=SECONDS]\n"
         "          [-i N] [--mon-interval=N]\n"
         "          [-T] [--mon-top]\n"
@@ -617,6 +694,12 @@ static const char help_printf_long[] =
         "          Example: \"all:0,2,4-10;llc:1,3;mbr:11-12\".\n"
         "          Cores can be grouped by enclosing them in square brackets,\n"
         "          example: \"llc:[0-3];all:[4,5,6];mbr:[0-3],7,8\".\n"
+#ifdef PQOS_RMID_CUSTOM
+        "  --rmid=RMIDCORES\n"
+        "          assign RMID for cores\n"
+        "          RMIDCORES format is 'RMID_NUMBER=CORE_LIST'\n"
+        "          Example \"10=0,2,4;11=1,3,5 \"\n"
+#endif
         "  -p [EVTPIDS], --mon-pid[=EVTPIDS]\n"
         "          select top 10 most active (CPU utilizing) process ids to monitor\n"
         "          or select process ids and events to monitor.\n"
@@ -661,6 +744,9 @@ static void print_help(const int is_long)
 {
         printf(help_printf_short,
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
+#ifdef PQOS_RMID_CUSTOM
+               m_cmd_name,
+#endif
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name);
         if (is_long)
                 printf("%s", help_printf_long);
@@ -679,6 +765,10 @@ static void print_lib_version(const struct pqos_cap *p_cap)
 
         printf("PQoS Library version: %d.%d.%d\n", major, minor, patch);
 }
+
+#ifdef PQOS_RMID_CUSTOM
+#define OPTION_RMID 1000
+#endif
 
 static struct option long_cmd_opts[] = {
         {"help",            no_argument,       0, 'h'},
@@ -705,6 +795,9 @@ static struct option long_cmd_opts[] = {
         {"iface-os",        no_argument,       0, 'I'},
         {"percent-llc",     no_argument,       0, 'P'},
         {"version",         no_argument,       0, 'w'},
+#ifdef PQOS_RMID_CUSTOM
+        {"rmid",            required_argument, 0, OPTION_RMID},
+#endif
         {0, 0, 0, 0} /* end */
 };
 
@@ -857,6 +950,11 @@ int main(int argc, char **argv)
                 case 'I':
                         selfn_iface_os(NULL);
                         break;
+#ifdef PQOS_RMID_CUSTOM
+                case OPTION_RMID:
+                        selfn_monitor_rmids(optarg);
+                        break;
+#endif
                 default:
                         printf("Unsupported option: -%c. "
                                "See option -h for help.\n", optopt);
@@ -891,6 +989,10 @@ int main(int argc, char **argv)
                         goto error_exit_1;
                 }
         }
+
+#ifdef PQOS_RMID_CUSTOM
+        cfg.rmid_cfg = sel_rmid_cfg;
+#endif
 
         ret = pqos_init(&cfg);
         if (ret != PQOS_RETVAL_OK) {

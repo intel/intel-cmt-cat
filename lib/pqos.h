@@ -101,6 +101,33 @@ enum pqos_cdp_config {
 };
 
 /**
+ * Resource Monitoring ID (RMID) definition
+ */
+typedef uint32_t pqos_rmid_t;
+
+#ifdef PQOS_RMID_CUSTOM
+/**
+ * RMID initialization types
+ */
+enum pqos_rmid_type {
+        PQOS_RMID_TYPE_DEFAULT = 0, /**< Default sequential init */
+        PQOS_RMID_TYPE_MAP          /**< Custom Core to RMID mapping */
+};
+
+/**
+ * RMID configuration
+ */
+struct pqos_rmid_config {
+        enum pqos_rmid_type type; /**< rmid initialization type */
+        struct {
+                unsigned num;      /**< number of rmid to core mappings */
+                pqos_rmid_t *rmid; /**< rmid table */
+                unsigned *core;    /**< core table */
+        } map;
+};
+#endif
+
+/**
  * PQoS library configuration structure
  *
  * @param fd_log file descriptor to be used as library log
@@ -133,6 +160,9 @@ struct pqos_config {
         void *context_log;
         int verbose;
         enum pqos_interface interface;
+#ifdef PQOS_RMID_CUSTOM
+        struct pqos_rmid_config rmid_cfg;
+#endif
 };
 
 /**
@@ -354,11 +384,6 @@ int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
  * Monitoring
  * =======================================
  */
-
-/**
- * Resource Monitoring ID (RMID) definition
- */
-typedef uint32_t pqos_rmid_t;
 
 /**
  * The structure to store monitoring data for all of the events
