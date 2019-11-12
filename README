@@ -1,7 +1,7 @@
 ========================================================================
 README for Intel(R) RDT Software Package
 
-Jan 2019
+Nov 2019
 
 ========================================================================
 
@@ -112,21 +112,23 @@ Hardware Support
 ================
 
 Table 1. Intel(R) RDT hardware support
-+--------------------------------------------------------------------------------------------+
-|                                            | CMT | MBM | L3 CAT | L3 CDP | L2 CAT | MBA    |
-|--------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor E5 v3            | Yes | No  | Yes (1)| No     | No     | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor D                | Yes | Yes | Yes (2)| No     | No     | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor E3 v4            | No  | No  | Yes (3)| No     | No     | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor E5 v4            | Yes | Yes | Yes (2)| Yes    | No     | No     |
-|--------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) Scalable Processors (6)    | Yes | Yes | Yes (2)| Yes    | No     | Yes (5)|
-|--------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Atom(R) processor for Server C3000 | No  | No  | No     | No     | Yes (4)| No     |
-+--------------------------------------------------------------------------------------------+
++--------------------------------------------------------------------------------------------------------+
+|                                                        | CMT | MBM | L3 CAT | L3 CDP | L2 CAT | MBA    |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor E5 v3                        | Yes | No  | Yes (1)| No     | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor D                            | Yes | Yes | Yes (2)| No     | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor E3 v4                        | No  | No  | Yes (3)| No     | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) processor E5 v4                        | Yes | Yes | Yes (2)| Yes    | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) Scalable Processors (6)                | Yes | Yes | Yes (2)| Yes    | No     | Yes (5)|
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Xeon(R) 2nd Generation Scalable Processors (7) | Yes | Yes | Yes (2)| Yes    | No     | Yes (5)|
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
+|Intel(R) Atom(R) processor for Server C3000             | No  | No  | No     | No     | Yes (4)| No     |
++--------------------------------------------------------------------------------------------------------+
 
 References:
 (1) Selected SKU's only:
@@ -160,6 +162,9 @@ References:
 
 (6) Please find errata for Intel(R) Xeon(R) Processor Scalable Family at:
     https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/xeon-scalable-spec-update.pdf?asset=14615
+
+(7) Please find errata for Second Generation Intel(R) Xeon(R) Scalable Processors at:
+    https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/2nd-gen-xeon-scalable-spec-update.pdf
 
 
 For additional Intel(R) RDT details please refer to the Intel(R)
