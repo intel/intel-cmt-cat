@@ -1325,6 +1325,14 @@ pqos_init(const struct pqos_config *config)
                 goto init_error;
         }
 
+        /* Detect the vendor first */
+        ret = detect_vendor();
+        if (ret != 0) {
+                LOG_ERROR("detect_vendor() error %d\n", ret);
+                ret = PQOS_RETVAL_ERROR;
+                goto log_init_error;
+        }
+
         /**
          * Initialise vendor default values and function pointers
          */

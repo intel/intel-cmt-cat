@@ -47,6 +47,22 @@ extern "C" {
 #endif
 
 /**
+ * Extern variables to provide vendor information
+ */
+extern enum pqos_vendor cpu_vendor;
+
+/**
+ * @brief Detects and returns the CPU vendor
+ *
+ * Sets the vendor identification. See pqos_vendor definitions.
+ *
+ * @return operation status
+ * @retval 0 on success
+ * @retval -EFAULT on error
+ */
+int detect_vendor(void);
+
+/**
  * @brief Initializes CPU information module
  *
  * CPU topology detection method is OS dependent.
