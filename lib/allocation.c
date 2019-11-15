@@ -988,6 +988,50 @@ hw_mba_get(const unsigned mba_id,
         return ret;
 }
 
+int
+hw_mba_get_amd(const unsigned mba_id,
+               const unsigned max_num_cos,
+               unsigned *num_cos,
+               struct pqos_mba *mba_tab)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0, count = 0, core = 0;
+        const struct pqos_cap *cap;
+
+        ASSERT(num_cos != NULL);
+        ASSERT(mba_tab != NULL);
+        ASSERT(max_num_cos != 0);
+
+        _pqos_cap_get(&cap, NULL);
+
+        ret = pqos_mba_get_cos_num(cap, &count);
+        if (ret != PQOS_RETVAL_OK)
+                return ret; /**< no MBA capability */
+
+        if (count > max_num_cos)
+                return PQOS_RETVAL_ERROR;
+
+        ASSERT(m_cpu != NULL);
+        ret = pqos_cpu_get_one_by_mba_id(m_cpu, mba_id, &core);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        for (i = 0; i < count; i++) {
+                const uint32_t reg = PQOS_MSR_MBA_MASK_START_AMD + i;
+                uint64_t val = 0;
+                int retval = msr_read(core, reg, &val);
+
+                if (retval != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                mba_tab[i].ctrl = 0;
+                mba_tab[i].class_id = i;
+                mba_tab[i].mb_max = val;
+        }
+        *num_cos = count;
+
+        return ret;
+}
 /**
  * @brief Sets COS associated to \a lcore
  *
