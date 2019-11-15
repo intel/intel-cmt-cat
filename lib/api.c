@@ -757,9 +757,9 @@ pqos_mba_set(const unsigned mba_id,
         for (i = 0; i < num_cos; i++)
                 if (requested[i].ctrl == 0 &&
                     (requested[i].mb_max == 0 ||
-                     requested[i].mb_max > PQOS_MBA_LINEAR_MAX)) {
+                     requested[i].mb_max > v_config.mba_max)) {
                         LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
-                                   requested[i].class_id, PQOS_MBA_LINEAR_MAX);
+                                  requested[i].class_id, v_config.mba_max);
                         return PQOS_RETVAL_PARAM;
                 }
 
