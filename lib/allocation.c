@@ -1519,7 +1519,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
-                        ret = alloc_cos_reset(PQOS_MSR_MBA_MASK_START,
+                        ret = alloc_cos_reset(v_config.mba_msr_reg,
                                               mba_cap->num_classes, core, 0);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
