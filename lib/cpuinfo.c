@@ -49,10 +49,15 @@
 #include <sched.h>       /* sched affinity */
 #endif
 
+#include "pqos.h"
+
+#include "cpu_registers.h"
 #include "log.h"
 #include "cpuinfo.h"
 #include "types.h"
 #include "machine.h"
+#include "os_allocation.h"
+#include "allocation.h"
 
 /**
  * This structure will be made externally available
@@ -475,6 +480,26 @@ cpuinfo_build_topo(void)
         }
 
         return l_cpu;
+}
+
+/**
+ * Initialize pointers for the vendors
+ */
+int
+init_functions(struct pqos_vendor_config *ptr)
+{
+
+        ptr->cpuid_cache_leaf = 4;
+        ptr->mba_max = PQOS_MBA_LINEAR_MAX;
+        ptr->mba_msr_reg = PQOS_MSR_MBA_MASK_START;
+        ptr->hw_mba_get = hw_mba_get;
+        ptr->hw_mba_set = hw_mba_set;
+#ifdef __linux__
+        ptr->os_mba_get = os_mba_get;
+        ptr->os_mba_set = os_mba_set;
+#endif
+
+        return 0;
 }
 
 /**
