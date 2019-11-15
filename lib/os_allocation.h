@@ -260,6 +260,23 @@ int os_mba_set(const unsigned mba_id,
                struct pqos_mba *actual);
 
 /**
+ * @brief OS interface to set classes of service defined by \a mba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  mba_id MBA resource id
+ * @param [in]  num_cos number of classes of service at \a ca
+ * @param [in]  requested table with class of service definitions
+ * @param [out] actual table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int os_mba_set_amd(const unsigned mba_id,
+                   const unsigned num_cos,
+                   const struct pqos_mba *requested,
+                   struct pqos_mba *actual);
+
+/**
  * @brief OS interface to read MBA from \a mba_id
  *
  * @param [in]  mba_id MBA resource id

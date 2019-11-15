@@ -263,7 +263,7 @@ int hw_mba_set(const unsigned mba_id,
  *        defined by \a requested on \a mba_id
  * @NOTE: This function is specific to AMD
  *
- * @param [in]  MBA id
+ * @param [in]  mba_id
  * @param [in]  num_cos number of classes of service at \a ca
  * @param [in]  requested table with class of service definitions
  * @param [out] actual table with class of service definitions
