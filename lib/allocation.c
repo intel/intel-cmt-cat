@@ -944,6 +944,78 @@ hw_mba_set(const unsigned mba_id,
 }
 
 int
+hw_mba_set_amd(const unsigned mba_id,
+               const unsigned num_cos,
+               const struct pqos_mba *requested,
+               struct pqos_mba *actual)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0, count = 0, core = 0;
+        const struct pqos_capability *mba_cap = NULL;
+
+        ASSERT(requested != NULL);
+        ASSERT(num_cos != 0);
+
+        /**
+         * Check if MBA is supported
+         */
+        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &mba_cap);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_RESOURCE; /* MBA not supported */
+
+        count = mba_cap->u.mba->num_classes;
+
+        /**
+         * Check if class id's are within allowed range
+         * and if a controller is not requested.
+         */
+        for (i = 0; i < num_cos; i++) {
+                if (requested[i].class_id >= count) {
+                        LOG_ERROR("MBA COS%u is out of range (COS%u is max)!\n",
+                                  requested[i].class_id, count - 1);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (requested[i].ctrl != 0) {
+                        LOG_ERROR("MBA controller not supported!\n");
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
+        ASSERT(m_cpu != NULL);
+        ret = pqos_cpu_get_one_by_mba_id(m_cpu, mba_id, &core);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        for (i = 0; i < num_cos; i++) {
+                const uint32_t reg =
+                    requested[i].class_id + PQOS_MSR_MBA_MASK_START_AMD;
+                uint64_t val = requested[i].mb_max;
+                int retval = MACHINE_RETVAL_OK;
+
+                retval = msr_write(core, reg, val);
+                if (retval != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                /**
+                 * If table to store actual values set is passed,
+                 * read MSR values and store in table
+                 */
+                if (actual == NULL)
+                        continue;
+
+                retval = msr_read(core, reg, &val);
+                if (retval != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                actual[i] = requested[i];
+                actual[i].mb_max = val;
+        }
+
+        return ret;
+}
+
+int
 hw_mba_get(const unsigned mba_id,
            const unsigned max_num_cos,
            unsigned *num_cos,
