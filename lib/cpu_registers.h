@@ -54,6 +54,11 @@ extern "C" {
 #define PQOS_MSR_ASSOC_QECOS_MASK  0xffffffff00000000ULL
 #define PQOS_MSR_ASSOC_RMID_MASK   ((1ULL << 10) - 1ULL)
 
+/*
+ * This is a global structure to store all the vendor defines
+ */
+extern struct pqos_vendor_config v_config;
+
 /**
  * Allocation class of service (COS) MSR registers
  */
@@ -137,6 +142,15 @@ struct pqos_vendor_config {
                           const struct pqos_mba *requested,
                           struct pqos_mba *actual);
 };
+
+/**
+ * @brief initializes intel/amd vendor functions
+ *
+ * @param vendor configuration structures
+ * @return Operation status
+ * @retval Success returns 0
+ */
+int init_functions(struct pqos_vendor_config *ptr);
 
 /**
  * MSR's to read instructions retired, unhalted cycles,

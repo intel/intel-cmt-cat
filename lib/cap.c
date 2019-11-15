@@ -76,6 +76,8 @@
 #include "resctrl.h"
 #include "perf_monitoring.h"
 
+struct pqos_vendor_config v_config;
+
 /**
  * ---------------------------------------
  * Local macros
@@ -1321,6 +1323,16 @@ pqos_init(const struct pqos_config *config)
         if (ret != LOG_RETVAL_OK) {
                 fprintf(stderr, "log_init() error\n");
                 goto init_error;
+        }
+
+        /**
+         * Initialise vendor default values and function pointers
+         */
+        ret = init_functions(&v_config);
+        if (ret != 0) {
+                LOG_ERROR("init_pointers() error %d\n", ret);
+                ret = PQOS_RETVAL_ERROR;
+                goto log_init_error;
         }
 
         /**
