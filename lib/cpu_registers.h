@@ -70,6 +70,11 @@ extern struct pqos_vendor_config v_config;
 #define PQOS_MSR_L2CA_MASK_START 0xD10
 #define PQOS_MSR_MBA_MASK_START  0xD50
 
+/**
+ * MBA Allocation class of service (COS) MSR register for AMD
+ */
+#define PQOS_MSR_MBA_MASK_START_AMD 0xC0000200
+
 #define PQOS_MSR_L3_QOS_CFG          0xC81   /**< L3 CAT config register */
 #define PQOS_MSR_L3_QOS_CFG_CDP_EN   1ULL    /**< L3 CDP enable bit */
 
@@ -80,6 +85,11 @@ extern struct pqos_vendor_config v_config;
  * MBA linear max value
  */
 #define PQOS_MBA_LINEAR_MAX 100
+
+/**
+ * MBA max value for AMD
+ */
+#define PQOS_MBA_MAX_AMD 0x800
 
 /**
  * Available types of allocation resource ID's.
