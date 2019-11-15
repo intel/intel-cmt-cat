@@ -1035,6 +1035,67 @@ discover_alloc_mba(struct pqos_cap_mba **r_cap)
 }
 
 /**
+ * @brief Discovers MBA feature for AMD
+ *
+ * @param r_cap place to store MBA capabilities structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_RESOURCE if not supported
+ */
+static int
+discover_alloc_mba_amd(struct pqos_cap_mba **r_cap)
+{
+        struct cpuid_out res;
+        struct pqos_cap_mba *cap = NULL;
+        const unsigned sz = sizeof(*cap);
+        int ret = PQOS_RETVAL_OK;
+
+        cap = (struct pqos_cap_mba *)malloc(sz);
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        ASSERT(cap != NULL);
+
+        memset(cap, 0, sz);
+        cap->mem_size = sz;
+        cap->ctrl = -1;
+        cap->ctrl_on = 0;
+
+        /**
+         * Run CPUID.0x80000008.0 to check
+         * for MBA allocation capability (bit 6 of ebx)
+         */
+        lcpuid(0x80000008, 0x0, &res);
+        if (!(res.ebx & (1 << 6))) {
+                LOG_INFO("CPUID.0x80000008.0: MBA not supported\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * We can go to CPUID.0x10.0 to obtain more info
+         */
+        lcpuid(0x80000020, 0x0, &res);
+        if (!(res.ebx & (1 << 1))) {
+                LOG_INFO("CPUID 0x10.0: MBA not supported!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        lcpuid(0x80000020, 1, &res);
+
+        cap->num_classes = (res.edx & 0xffff) + 1;
+
+        /* AMD does not support throttle_max and is_linear. Set it to 0 */
+        cap->throttle_max = 0;
+        cap->is_linear = 0;
+
+        (*r_cap) = cap;
+        return ret;
+}
+
+/**
  * @brief Runs detection of platform monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
@@ -1146,8 +1207,12 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * Memory bandwidth allocation init
          */
-        if (inter == PQOS_INTER_MSR)
-                ret = discover_alloc_mba(&det_mba);
+        if (inter == PQOS_INTER_MSR) {
+                if (pqos_get_vendor() == PQOS_VENDOR_AMD)
+                        ret = discover_alloc_mba_amd(&det_mba);
+                else
+                        ret = discover_alloc_mba(&det_mba);
+        }
 #ifdef __linux__
         else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_cap_mba_discover(&det_mba, cpu);
