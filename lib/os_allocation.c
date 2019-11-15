@@ -1676,6 +1676,77 @@ os_mba_get(const unsigned mba_id,
 }
 
 int
+os_mba_get_amd(const unsigned mba_id,
+               const unsigned max_num_cos,
+               unsigned *num_cos,
+               struct pqos_mba *mba_tab)
+{
+        int ret;
+        unsigned class_id;
+        unsigned count = 0;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
+        const struct pqos_capability *mba_cap = NULL;
+
+        ASSERT(num_cos != NULL);
+        ASSERT(max_num_cos != 0);
+        ASSERT(mba_tab != NULL);
+
+        _pqos_cap_get(&cap, &cpu);
+
+        /**
+         * Check if MBA is supported
+         */
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &mba_cap);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_RESOURCE; /* MBA not supported */
+
+        ret = resctrl_alloc_get_grps_num(cap, &count);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (count > max_num_cos)
+                return PQOS_RETVAL_ERROR;
+
+        ret = verify_mba_id(mba_id, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_get_exit;
+
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_get_exit;
+
+        for (class_id = 0; class_id < count; class_id++) {
+                struct resctrl_schemata *schmt;
+
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
+
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_read(class_id, schmt);
+
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_schemata_mba_get(schmt, mba_id,
+                                                       &mba_tab[class_id]);
+
+                mba_tab[class_id].class_id = class_id;
+
+                resctrl_schemata_free(schmt);
+
+                if (ret != PQOS_RETVAL_OK)
+                        goto os_mba_get_unlock;
+        }
+        *num_cos = count;
+
+os_mba_get_unlock:
+        resctrl_lock_release();
+
+os_mba_get_exit:
+        return ret;
+}
+
+int
 os_alloc_assoc_set_pid(const pid_t task,
                        const unsigned class_id)
 {
