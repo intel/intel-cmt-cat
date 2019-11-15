@@ -60,6 +60,11 @@
 #include "allocation.h"
 
 /**
+ * This variable will hold the CPU vendor
+ */
+enum pqos_vendor cpu_vendor = PQOS_VENDOR_UNKNOWN;
+
+/**
  * This structure will be made externally available
  * If not NULL then module is initialized.
  */
@@ -480,6 +485,25 @@ cpuinfo_build_topo(void)
         }
 
         return l_cpu;
+}
+
+int
+detect_vendor(void)
+{
+        int ret = 0;
+        struct cpuid_out vendor;
+
+        lcpuid(0x0, 0x0, &vendor);
+        if (vendor.ebx == 0x756e6547 && vendor.edx == 0x49656e69 &&
+            vendor.ecx == 0x6c65746e) {
+                cpu_vendor = PQOS_VENDOR_INTEL;
+        } else if (vendor.ebx == 0x68747541 && vendor.edx == 0x69746E65 &&
+                   vendor.ecx == 0x444D4163) {
+                cpu_vendor = PQOS_VENDOR_AMD;
+        } else {
+                ret = -EFAULT;
+        }
+        return ret;
 }
 
 /**
