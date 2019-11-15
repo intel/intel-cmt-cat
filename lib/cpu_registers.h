@@ -107,6 +107,38 @@ extern "C" {
 #define PQOS_MSR_MON_EVTSEL_EVTID_MASK ((1ULL << 8) - 1ULL)
 
 /**
+ * PQoS vendor value and function pointers
+ * @param cpuid_cache_leaf	: Cache mask leaf
+ * @param default_mba		: default memory bandwidth
+ * @param mba_msr_reg		: MBA mask base register
+ * @param hw_mba_get		: Get MBA mask
+ * @param hw_mba_set		: Set MBA mask with MSR method
+ * @param os_mba_get		: Get MBA mask with OS method
+ * @param os_mba_set		: Set MBA mask with OS method
+ */
+struct pqos_vendor_config {
+        int cpuid_cache_leaf;
+        unsigned mba_max;
+        uint32_t mba_msr_reg;
+        int (*hw_mba_get)(const unsigned mba_id,
+                          const unsigned max_num_cos,
+                          unsigned *num_cos,
+                          struct pqos_mba *mba_tab);
+        int (*hw_mba_set)(const unsigned mba_id,
+                          const unsigned num_cos,
+                          const struct pqos_mba *requested,
+                          struct pqos_mba *actual);
+        int (*os_mba_get)(const unsigned mba_id,
+                          const unsigned max_num_cos,
+                          unsigned *num_cos,
+                          struct pqos_mba *mba_tab);
+        int (*os_mba_set)(const unsigned mba_id,
+                          const unsigned num_cos,
+                          const struct pqos_mba *requested,
+                          struct pqos_mba *actual);
+};
+
+/**
  * MSR's to read instructions retired, unhalted cycles,
  * LLC references and LLC misses.
  * These MSR's are needed to calculate IPC (instructions per clock) and
