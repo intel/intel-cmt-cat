@@ -988,8 +988,11 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                 unit = " MBps";
                                 available = "";
                         } else {
-                                unit = "%";
                                 available = " available";
+                                if (pqos_get_vendor() == PQOS_VENDOR_AMD)
+                                        unit = "";
+                                else
+                                        unit = "%";
                         }
 
                         ret = pqos_mba_get(sockets[i], mba->num_classes,
