@@ -60,7 +60,7 @@ extern enum pqos_vendor cpu_vendor;
  * @retval 0 on success
  * @retval -EFAULT on error
  */
-int detect_vendor(void);
+enum pqos_vendor detect_vendor(void);
 
 /**
  * @brief Initializes CPU information module
@@ -75,7 +75,7 @@ int detect_vendor(void);
  * @retval -EPERM cpuinfo already initialized
  * @retval -EFAULT error building & discovering the topology
  */
-int cpuinfo_init(const struct pqos_cpuinfo **topology);
+int cpuinfo_init(const struct pqos_cpuinfo **topology, enum pqos_vendor vendor);
 
 /**
  * @brief Shuts down CPU information module

@@ -157,10 +157,11 @@ struct pqos_vendor_config {
  * @brief initializes intel/amd vendor functions
  *
  * @param vendor configuration structures
+ * @param vendor identification
  * @return Operation status
  * @retval Success returns 0
  */
-int init_functions(struct pqos_vendor_config *ptr);
+int init_functions(struct pqos_vendor_config *ptr, enum pqos_vendor vendor);
 
 /**
  * MSR's to read instructions retired, unhalted cycles,

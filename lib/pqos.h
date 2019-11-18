@@ -354,12 +354,24 @@ struct pqos_cacheinfo {
 };
 
 /**
+ * =======================================
+ * Vendor values
+ * =======================================
+ */
+enum pqos_vendor {
+        PQOS_VENDOR_UNKNOWN = 0, /**< UNKNOWN */
+        PQOS_VENDOR_INTEL = 1,   /**< INTEL */
+        PQOS_VENDOR_AMD = 2      /**< AMD */
+};
+
+/**
  * CPU topology structure
  */
 struct pqos_cpuinfo {
         unsigned mem_size;        /**< byte size of the structure */
         struct pqos_cacheinfo l2; /**< L2 cache information */
         struct pqos_cacheinfo l3; /**< L3 cache information */
+        enum pqos_vendor vendor;  /**< vendor Intel/AMD */
         unsigned num_cores;       /**< number of cores in the system */
         struct pqos_coreinfo cores[0];
 };
@@ -1251,17 +1263,6 @@ int pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
 int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
                           int *ctrl_supported,
                           int *ctrl_enabled);
-
-/**
- * =======================================
- * Vendor values
- * =======================================
- */
-enum pqos_vendor {
-        PQOS_VENDOR_UNKNOWN = 0, /**< UNKNOWN */
-        PQOS_VENDOR_INTEL = 1,   /**< INTEL */
-        PQOS_VENDOR_AMD = 2      /**< AMD */
-};
 
 /**
  * @brief returns the CPU vendor identification
