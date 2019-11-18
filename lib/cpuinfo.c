@@ -382,7 +382,8 @@ detect_apic_masks(struct apic_info *apic)
 static int
 detect_cpu(const int cpu,
            const struct apic_info *apic,
-           struct pqos_coreinfo *info)
+           struct pqos_coreinfo *info,
+           enum pqos_vendor vendor)
 {
         struct cpuid_out leafB;
         uint32_t apicid;
@@ -405,7 +406,7 @@ detect_cpu(const int cpu,
          * the future.
          */
 
-        if (pqos_get_vendor() == PQOS_VENDOR_AMD) {
+        if (vendor == PQOS_VENDOR_AMD) {
                 info->l3cat_id = info->l3_id;
                 info->mba_id = info->l3_id;
         } else {
@@ -436,7 +437,7 @@ detect_cpu(const int cpu,
  * @retval NULL on error
  */
 static struct pqos_cpuinfo *
-cpuinfo_build_topo(void)
+cpuinfo_build_topo(enum pqos_vendor vendor)
 {
         unsigned i, max_core_count, core_count = 0;
         struct pqos_cpuinfo *l_cpu = NULL;
@@ -471,7 +472,8 @@ cpuinfo_build_topo(void)
         memset(l_cpu, 0, mem_sz);
 
         for (i = 0; i < max_core_count; i++)
-                if (detect_cpu(i, &apic, &l_cpu->cores[core_count]) == 0)
+                if (detect_cpu(i, &apic, &l_cpu->cores[core_count], vendor) ==
+                    0)
                         core_count++;
 
         if (set_affinity_mask(&current_mask) != 0) {
@@ -482,6 +484,7 @@ cpuinfo_build_topo(void)
 
         l_cpu->l2 = m_l2;
         l_cpu->l3 = m_l3;
+        l_cpu->vendor = vendor;
         l_cpu->num_cores = core_count;
         if (core_count == 0) {
                 free(l_cpu);
@@ -491,10 +494,10 @@ cpuinfo_build_topo(void)
         return l_cpu;
 }
 
-int
+enum pqos_vendor
 detect_vendor(void)
 {
-        int ret = 0;
+        enum pqos_vendor cpu_vendor;
         struct cpuid_out vendor;
 
         lcpuid(0x0, 0x0, &vendor);
@@ -505,19 +508,17 @@ detect_vendor(void)
                    vendor.ecx == 0x444D4163) {
                 cpu_vendor = PQOS_VENDOR_AMD;
         } else {
-                ret = -EFAULT;
+                cpu_vendor = PQOS_VENDOR_UNKNOWN;
         }
-        return ret;
+        return cpu_vendor;
 }
 
 /**
  * Initialize pointers for the vendors
  */
 int
-init_functions(struct pqos_vendor_config *ptr)
+init_functions(struct pqos_vendor_config *ptr, enum pqos_vendor vendor)
 {
-        enum pqos_vendor vendor = pqos_get_vendor();
-
         /**
          * Make sure to initialize all the pointers to avoid
          * NULL check while calling
@@ -555,7 +556,7 @@ init_functions(struct pqos_vendor_config *ptr)
  * and their location.
  */
 int
-cpuinfo_init(const struct pqos_cpuinfo **topology)
+cpuinfo_init(const struct pqos_cpuinfo **topology, enum pqos_vendor vendor)
 {
         if (topology == NULL)
                 return -EINVAL;
@@ -563,7 +564,7 @@ cpuinfo_init(const struct pqos_cpuinfo **topology)
         if (m_cpu != NULL)
                 return -EPERM;
 
-        m_cpu = cpuinfo_build_topo();
+        m_cpu = cpuinfo_build_topo(vendor);
         if (m_cpu == NULL) {
                 LOG_ERROR("CPU topology detection error!");
                 return -EFAULT;

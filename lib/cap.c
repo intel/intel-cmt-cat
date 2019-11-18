@@ -1330,6 +1330,7 @@ pqos_init(const struct pqos_config *config)
         unsigned i = 0, max_core = 0;
         int cat_init = 0, mon_init = 0;
         char *environment = NULL;
+        enum pqos_vendor vendor;
 
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -1391,8 +1392,8 @@ pqos_init(const struct pqos_config *config)
         }
 
         /* Detect the vendor first */
-        ret = detect_vendor();
-        if (ret != 0) {
+        vendor = detect_vendor();
+        if (vendor == PQOS_VENDOR_UNKNOWN) {
                 LOG_ERROR("detect_vendor() error %d\n", ret);
                 ret = PQOS_RETVAL_ERROR;
                 goto log_init_error;
@@ -1401,7 +1402,7 @@ pqos_init(const struct pqos_config *config)
         /**
          * Initialise vendor default values and function pointers
          */
-        ret = init_functions(&v_config);
+        ret = init_functions(&v_config, vendor);
         if (ret != 0) {
                 LOG_ERROR("init_pointers() error %d\n", ret);
                 ret = PQOS_RETVAL_ERROR;
@@ -1412,7 +1413,7 @@ pqos_init(const struct pqos_config *config)
          * Topology not provided through config.
          * CPU discovery done through internal mechanism.
          */
-        ret = cpuinfo_init(&m_cpu);
+        ret = cpuinfo_init(&m_cpu, vendor);
         if (ret != 0 || m_cpu == NULL) {
                 LOG_ERROR("cpuinfo_init() error %d\n", ret);
                 ret = PQOS_RETVAL_ERROR;
