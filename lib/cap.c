@@ -1208,7 +1208,7 @@ discover_capabilities(struct pqos_cap **p_cap,
          * Memory bandwidth allocation init
          */
         if (inter == PQOS_INTER_MSR) {
-                if (pqos_get_vendor() == PQOS_VENDOR_AMD)
+                if (cpu->vendor == PQOS_VENDOR_AMD)
                         ret = discover_alloc_mba_amd(&det_mba);
                 else
                         ret = discover_alloc_mba(&det_mba);

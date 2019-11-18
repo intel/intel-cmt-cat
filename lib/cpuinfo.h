@@ -47,11 +47,6 @@ extern "C" {
 #endif
 
 /**
- * Extern variables to provide vendor information
- */
-extern enum pqos_vendor cpu_vendor;
-
-/**
  * @brief Detects and returns the CPU vendor
  *
  * Sets the vendor identification. See pqos_vendor definitions.

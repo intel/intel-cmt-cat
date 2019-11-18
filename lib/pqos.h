@@ -1267,11 +1267,12 @@ int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
 /**
  * @brief returns the CPU vendor identification
  *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
  * @retval 0 if vendor unknown
  * @return 1 if the vendor is Intel
  * @return 2 if the vendor is AMD
  */
-enum pqos_vendor pqos_get_vendor(void);
+enum pqos_vendor pqos_get_vendor(const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Retrieves a monitoring value from a group for a specific event.

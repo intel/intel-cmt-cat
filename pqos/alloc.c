@@ -943,11 +943,15 @@ print_l2ca_config(const struct pqos_l2ca *ca, const int is_error)
 static void
 print_per_socket_config(const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_mba,
+                        const struct pqos_cpuinfo *cpu_info,
                         const unsigned sock_count,
                         const unsigned *sockets)
 {
         int ret;
         unsigned i;
+
+        if (cpu_info == NULL || sockets == NULL)
+                return;
 
         if (cap_l3ca == NULL && cap_mba == NULL)
                 return;
@@ -989,7 +993,7 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                 available = "";
                         } else {
                                 available = " available";
-                                if (pqos_get_vendor() == PQOS_VENDOR_AMD)
+                                if (cpu_info->vendor == PQOS_VENDOR_AMD)
                                         unit = "";
                                 else
                                         unit = "%";
@@ -1073,7 +1077,8 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
 		return;
 	}
 
-        print_per_socket_config(cap_l3ca, cap_mba, sock_count, sockets);
+        print_per_socket_config(cap_l3ca, cap_mba, cpu_info, sock_count,
+                                sockets);
 
         if (cap_l2ca != NULL) {
                 /* Print L2 CAT class definitions per L2 cluster */

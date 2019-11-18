@@ -60,11 +60,6 @@
 #include "allocation.h"
 
 /**
- * This variable will hold the CPU vendor
- */
-enum pqos_vendor cpu_vendor = PQOS_VENDOR_UNKNOWN;
-
-/**
  * This structure will be made externally available
  * If not NULL then module is initialized.
  */
