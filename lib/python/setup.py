@@ -13,4 +13,7 @@ setup(
     license='BSD',
     description='Python interface for PQoS library',
     long_description=long_description,
+    classifiers=[
+        'Programming Language :: Python :: 3 :: Only'
+    ]
 )
