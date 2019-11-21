@@ -252,6 +252,8 @@ class TestApps:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
             {"pool_id": 2, "name":"hello","cores":[2, 3],"pids":[11]},
             {"pool_id": 2, "name":"hello", "pids": [12]}                                    # no cores
@@ -389,6 +391,8 @@ class TestApp_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_put_pool(self):
         def set_config(data):
             for pool in data['pools']:
@@ -407,6 +411,8 @@ class TestApp_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_put_cores(self):
         def set_config(data):
             for app in data['apps']:
@@ -606,6 +612,8 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_put_cbm(self):
         def set_config(data):
             for pool in data['pools']:
@@ -623,6 +631,23 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    def test_put_cbm_unsupported(self):
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
+            response = REST.put("/pools/0", {"cbm": 0x1})
+            func_mock.assert_not_called()
+        data = json.loads(response.data.decode('utf-8'))
+
+        assert response.status_code == 400
+        assert "System does not support CAT" in data["message"]
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_put_mba(self):
         def set_config(data):
             for pool in data['pools']:
@@ -640,19 +665,38 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
-    def test_put_mba_unsupported(self):
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    def test_put_mba_unsupported_pool_id(self):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
             response = REST.put("/pools/15", {"mba": 30})
             func_mock.assert_not_called()
         data = json.loads(response.data.decode('utf-8'))
 
         assert response.status_code == 400
-        assert "does not support requested technologies" in data["message"]
+        assert "Pool 15 does not support MBA" in data["message"]
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
+    def test_put_mba_unsupported(self):
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
+            response = REST.put("/pools/0", {"mba": 30})
+            func_mock.assert_not_called()
+        data = json.loads(response.data.decode('utf-8'))
+
+        assert response.status_code == 400
+        assert "System does not support MBA" in data["message"]
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_put_cores(self):
         def set_config(data):
             for pool in data['pools']:
@@ -670,6 +714,8 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_put_name(self):
         def set_config(data):
             for pool in data['pools']:
@@ -687,6 +733,8 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_put_duplicate_cores(self):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
             response = REST.put("/pools/2", {"cores": [1, 2, 3, 11]})
@@ -724,6 +772,8 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.CONFIG_STORE.get_new_pool_id", mock.MagicMock(return_value=5))
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("pool_config", [
         {"cores":[11, 12], "cbm": "0xf"},                                    # no name
         {"name":"hello", "cores":[13, 17], "cbm": "0xf"},                    # cbm string

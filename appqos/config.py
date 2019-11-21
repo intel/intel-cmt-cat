@@ -243,10 +243,16 @@ class ConfigStore:
                 if result or pool['cbm'] == 0:
                     raise ValueError("Pool {}, CBM {}/{} is not contiguous."\
                     .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
+                if not caps.cat_supported():
+                    raise ValueError("Pool {}, CBM {}/{}, CAT is not supported."\
+                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
 
             if 'mba' in pool:
                 if pool['mba'] > 100 or pool['mba'] <= 0:
                     raise ValueError("Pool {}, MBA rate {} out of range! (1-100)."\
+                    .format(pool['id'], pool['mba']))
+                if not caps.mba_supported():
+                    raise ValueError("Pool {}, MBA rate {}, MBA is not supported."\
                     .format(pool['id'], pool['mba']))
 
 

@@ -77,6 +77,8 @@ class TestPools(object):
     ## @endcond
 
 
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_configure(self):
         def get_attr(attr, pool_id):
             config = {

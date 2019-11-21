@@ -611,16 +611,17 @@ class Pool(Resource):
             response, status code
         """
         def check_alloc_tech(pool_id, json_data):
-            alloc_tech = []
             if 'cbm' in json_data:
-                alloc_tech.append(common.CAT_CAP)
+                if not caps.cat_supported():
+                    raise BadRequest("System does not support CAT!")
+                if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_CAP]):
+                    raise BadRequest("Pool {} does not support CAT".format(pool_id))
+
             if 'mba' in json_data:
-                alloc_tech.append(common.MBA_CAP)
-
-            if not alloc_tech:
-                return True
-
-            return pool_id <= common.PQOS_API.get_max_cos_id(alloc_tech)
+                if not caps.mba_supported():
+                    raise BadRequest("System does not support MBA!")
+                if pool_id > common.PQOS_API.get_max_cos_id([common.MBA_CAP]):
+                    raise BadRequest("Pool {} does not support MBA".format(pool_id))
 
         if not validate_str_int(pool_id):
             raise BadRequest("POOL index {} is invalid.".format(str(pool_id)))
@@ -642,9 +643,7 @@ class Pool(Resource):
             if pool['id'] != int(pool_id):
                 continue
 
-            if not check_alloc_tech(int(pool_id), json_data):
-                raise BadRequest("Pool {} does not support requested technologies!"\
-                    .format(pool_id))
+            check_alloc_tech(int(pool_id), json_data)
 
             # set new cbm
             if 'cbm' in json_data:

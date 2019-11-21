@@ -38,6 +38,7 @@ Provides RDT related helper functions used to configure RDT.
 
 import os
 
+import caps
 import common
 import log
 
@@ -167,15 +168,19 @@ class Pool:
         Configure Pool, based on config content.
         """
         config = common.CONFIG_STORE
-        cores = config.get_pool_attr('cores', self.pool)
-        cbm = config.get_pool_attr('cbm', self.pool)
-        mba = config.get_pool_attr('mba', self.pool)
-        apps = config.get_pool_attr('apps', self.pool)
 
-        self.cbm_set(cbm)
-        self.mba_set(mba)
+        cores = config.get_pool_attr('cores', self.pool)
         self.cores_set(cores)
 
+        if caps.cat_supported():
+            cbm = config.get_pool_attr('cbm', self.pool)
+            self.cbm_set(cbm)
+
+        if caps.mba_supported():
+            mba = config.get_pool_attr('mba', self.pool)
+            self.mba_set(mba)
+
+        apps = config.get_pool_attr('apps', self.pool)
         if apps is not None:
             pids = []
             for app in apps:

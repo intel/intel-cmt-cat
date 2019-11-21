@@ -93,6 +93,50 @@ CONFIG = {
     ]
 }
 
+CONFIG_NO_MBA = {
+    "apps": [
+        {
+            "cores": [1],
+            "id": 1,
+            "name": "app 1",
+            "pids": [1]
+        },
+        {
+            "cores": [3],
+            "id": 2,
+            "name": "app 2",
+            "pids": [2, 3]
+        },
+        {
+            "cores": [3],
+            "id": 3,
+            "name": "app 3",
+            "pids": [4]
+        }
+    ],
+    "auth": {
+        "password": "password",
+        "username": "admin"
+    },
+    "pools": [
+        {
+            "apps": [1],
+            "cbm": 0xf0,
+            "cores": [1],
+            "id": 1,
+            "name": "cat"
+        },
+        {
+            "apps": [2, 3],
+            "cbm": 0xf,
+            "cores": [3],
+            "id": 2,
+            "name": "cat"
+        }
+    ]
+}
+
+
 @mock.patch('config.ConfigStore.get_config')
 @pytest.mark.parametrize("pid, app", [
     (1, 1),
@@ -251,8 +295,8 @@ def test_config_reset():
         mock_get_num_cores.return_value = 16
         mock_get_num_cores.reset_mock()
 
-        # get fresh copy of CONFIG
-        mock_load.return_value = deepcopy(CONFIG)
+        # use CONFIG_NO_MBA this time, as MBA is reported as not supported
+        mock_load.return_value = deepcopy(CONFIG_NO_MBA)
         mock_load.reset_mock()
         mock_mba.return_value = False
 
@@ -271,6 +315,7 @@ def test_config_reset():
 
 class TestConfigValidate:
 
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_core(self):
         def check_core(core):
             return core != 3
@@ -301,10 +346,9 @@ class TestConfigValidate:
                 ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_duplicate_core(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -326,15 +370,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="already assigned to another pool"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="already assigned to another pool"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_same_ids(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -356,15 +398,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="Pool 1, multiple pools with same id"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="Pool 1, multiple pools with same id"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_app(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -389,15 +429,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(KeyError, match="does not exist"):
-                ConfigStore.validate(data)
+        with pytest.raises(KeyError, match="does not exist"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_cbm(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -414,19 +452,65 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="not contiguous"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="not contiguous"):
+            ConfigStore.validate(data)
 
-            data['pools'][0]['cbm'] = 0
-            with pytest.raises(ValueError, match="not contiguous"):
-                ConfigStore.validate(data)
+        data['pools'][0]['cbm'] = 0
+        with pytest.raises(ValueError, match="not contiguous"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+    def test_pool_cat_not_supported(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "apps": [],
+                    "cbm": 0x4,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="CAT is not supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    def test_pool_cat_not_supported_mba(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "apps": [],
+                    "cbm": 0x4,
+                    "mba": 100,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="CAT is not supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_mba(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -442,15 +526,61 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="out of range"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="out of range"):
+            ConfigStore.validate(data)
 
-            data['pools'][0]['mba'] = 0
-            with pytest.raises(ValueError, match="out of range"):
-                ConfigStore.validate(data)
+        data['pools'][0]['mba'] = 0
+        with pytest.raises(ValueError, match="out of range"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
+    def test_pool_mba_not_supported(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "mba": 50,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="MBA is not supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
+    def test_pool_mba_not_supported_cat(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "cbm": 0xf,
+                    "mba": 50,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="MBA is not supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_invalid_core(self):
         def check_core(core):
             return core != 3
@@ -484,6 +614,8 @@ class TestConfigValidate:
                 ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_core_does_not_match_pool(self):
         data = {
             "auth": {
@@ -509,14 +641,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', return_value = True):
-            with pytest.raises(ValueError, match="App 1, cores {3, 4, 5} does not match Pool 1"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="App 1, cores {3, 4, 5} does not match Pool 1"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_without_pool(self):
-        def check_core(core):
-            return True
 
         data = {
             "auth": {
@@ -554,15 +685,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="not assigned to any pool"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="not assigned to any pool"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_without_pool(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -600,15 +729,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="App 1, Assigned to more than one pool"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="App 1, Assigned to more than one pool"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_same_ids(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -639,15 +766,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="App 1, multiple apps with same id"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="App 1, multiple apps with same id"):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_same_pid(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -678,15 +803,13 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match=r"App 2, PIDs \{1} already assigned to another App."):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match=r"App 2, PIDs \{1} already assigned to another App."):
+            ConfigStore.validate(data)
 
 
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_invalid_pid(self):
-        def check_core(core):
-            return True
-
         data = {
             "auth": {
                 "password": "password",
@@ -717,7 +840,6 @@ class TestConfigValidate:
             ]
         }
 
-        with mock.patch('common.PQOS_API.check_core', new=check_core):
-            with pytest.raises(ValueError, match="App 2, PID 99999 is not valid"):
-                ConfigStore.validate(data)
+        with pytest.raises(ValueError, match="App 2, PID 99999 is not valid"):
+            ConfigStore.validate(data)
 
