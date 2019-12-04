@@ -1,4 +1,23 @@
 ========================================================================
+Release  v3.2.0  2019-12-20
+=======================================================================
+
+Contributors (alphabetical order):
+        Adrian Boczkowski <adrianx.boczkowski@intel.com>
+        Axecalever <ahsansyed1992@gmail.com>
+        Babu Moger <babu.moger@amd.com>
+        Khawar Abbasi <khawar.abbasi@intel.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+1. AppQoS:
+        - Added support for Power Profiles
+2. General
+        - Bug fixes
+
+
+========================================================================
 Release  v3.1  2019-08-16
 =======================================================================
 
