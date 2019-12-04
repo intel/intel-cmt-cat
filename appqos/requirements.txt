@@ -10,4 +10,4 @@ flask_restful
 pytest
 pytest-cov
 mock
-git+https://github.com/intel/CommsPowerManagement.git@0.1#egg=pwr&subdirectory=pwr
+git+https://github.com/intel/CommsPowerManagement.git@pwr-v0.2.1#egg=pwr&subdirectory=pwr

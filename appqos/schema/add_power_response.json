@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API add power profile",
+  "description": "POST command response, URI /power_profiles",
+  "type": "object",
+
+  "properties": {
+    "id": {
+      "description": "POWER PROFILE ID",
+      "$ref": "definitions.json#/uint"
+    },
+    "message": {
+      "description": "Message",
+      "$ref": "definitions.json#/string_nonempty"
+    }
+  },
+
+  "required": ["id"],
+  "additionalProperties": false
+}

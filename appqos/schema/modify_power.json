@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API modify a power profile",
+  "description": "PUT command, URI /power_profiles",
+
+  "type": "object",
+
+  "properties": {
+    "name": {
+      "description": "Profile's name",
+      "$ref": "definitions.json#/string_nonempty"
+    },
+    "min_freq": {
+      "description": "Min. frequency",
+      "$ref": "definitions.json#/uint_nonzero"
+    },
+    "max_freq": {
+      "description": "Max. frequency",
+      "$ref": "definitions.json#/uint_nonzero"
+    },
+    "epp": {
+      "description": "Energy Performance Preference",
+      "$ref": "definitions.json#/string_nonempty"
+    },
+    "verify": {
+      "description": "Power Profiles Admission Control",
+      "type": "boolean"
+    }
+  },
+  "anyOf": [
+    { "required": ["name"] },
+    { "required": ["min_freq"] },
+    { "required": ["max_freq"] },
+    { "required": ["epp"] }
+  ],
+  "additionalProperties": false
+}

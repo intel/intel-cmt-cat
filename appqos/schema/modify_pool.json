@@ -26,6 +26,14 @@
     "apps": {
       "description": "APPs assigned to that pool",
       "$ref": "definitions.json#/uint_uniq_array"
+    },
+    "power_profile" : {
+      "description": "Power profile ID",
+      "$ref": "definitions.json#/uint"
+    },
+    "verify": {
+      "description": "Power Profiles Admission Control",
+      "type": "boolean"
     }
   },
   "anyOf": [
@@ -33,7 +41,8 @@
     { "required": ["cbm"] },
     { "required": ["mba"] },
     { "required": ["cores"] },
-    { "required": ["apps"] }
+    { "required": ["apps"] },
+    { "required": ["power_profile"] }
   ],
   "additionalProperties": false
 }

@@ -65,6 +65,23 @@
       },
       "required": ["configured"],
       "additionalProperties": false
+    },
+
+    "power_profiles": {
+      "description": "Power profiles definitions",
+      "type": "array",
+      "items": { "$ref": "definitions.json#/power_profile_cfg" },
+      "uniqueItems": true
+    },
+
+    "power_profiles_verify": {
+      "description": "Verify changes to Power Profiles or Pools with Power Profiles assigned",
+      "type": "boolean"
+    },
+
+    "power_profiles_expert_mode": {
+      "description": "Power Profiles Expert mode, make profiles editable",
+      "type": "boolean"
     }
   },
 

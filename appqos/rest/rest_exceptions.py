@@ -32,89 +32,60 @@
 ################################################################################
 
 """
-System capabilities module
+REST API module
+Exceptions
 """
 
-import common
-import log
-import sstbf
-import power
+from werkzeug.exceptions import HTTPException
 
 
-# System capabilities are detected during the runtime
-SYSTEM_CAPS = {}
-
-
-def caps_init():
+class RestError(HTTPException):
     """
-    Runs supported capabilities detection and logs to console
+    RestError exception base class
     """
-    global SYSTEM_CAPS
-
-    if SYSTEM_CAPS:
-        SYSTEM_CAPS.clear()
-
-    SYSTEM_CAPS = detect_supported_caps()
-    log.info("Supported capabilities:")
-    log.info(SYSTEM_CAPS)
-
-    if (cat_supported() or mba_supported() or sstbf_enabled or epp_enabled())\
-            and common.PQOS_API.is_multicore():
-        return 0
-
-    return -1
 
 
-def cat_supported():
+    def __init__(self, code, description):
+        HTTPException.__init__(self)
+        self.code = code
+        self.description = description
+
+
+class NotFound(RestError):
     """
-    Returns CAT support status
+    NotFound exception
     """
-    return common.CAT_CAP in SYSTEM_CAPS
 
 
-def mba_supported():
+    def __init__(self, description="Not Found"):
+        RestError.__init__(self, 404, description)
+
+
+class BadRequest(RestError):
     """
-    Returns MBA support status
+    BadRequest exception
     """
-    return common.MBA_CAP in SYSTEM_CAPS
 
 
-def sstbf_enabled():
+    def __init__(self, description="Bad Request"):
+        RestError.__init__(self, 400, description)
+
+
+class InternalError(RestError):
     """
-    Returns SST-BF support status
+    InternalError exception
     """
-    return common.SSTBF_CAP in SYSTEM_CAPS
 
 
-def epp_enabled():
+    def __init__(self, description="Internal Server Error"):
+        RestError.__init__(self, 500, description)
+
+
+class MethodNotAllowed(RestError):
     """
-    Returns EPP support status
+    Method Not Allowed exception
     """
-    return common.POWER_CAP in SYSTEM_CAPS
 
 
-def detect_supported_caps():
-    """
-    Generates list of supported caps
-
-    Returns
-        list of supported caps
-    """
-    result = []
-    # generate list of supported capabilities
-
-    # Intel RDT L3 CAT
-    if common.PQOS_API.is_l3_cat_supported():
-        result.append(common.CAT_CAP)
-
-    # Intel RDT MBA
-    if common.PQOS_API.is_mba_supported():
-        result.append(common.MBA_CAP)
-
-    if sstbf.is_sstbf_enabled():
-        result.append(common.SSTBF_CAP)
-
-    if power.is_epp_enabled():
-        result.append(common.POWER_CAP)
-
-    return result
+    def __init__(self, description="Method Not Allowed"):
+        RestError.__init__(self, 405, description)

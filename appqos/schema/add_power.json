@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API add power profile",
+  "description": "POST command, URI /power_profiles",
+
+  "$ref": "definitions.json#/power_api_post"
+}

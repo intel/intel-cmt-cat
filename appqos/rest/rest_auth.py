@@ -32,89 +32,38 @@
 ################################################################################
 
 """
-System capabilities module
+REST API module
+Authentication
 """
 
+from flask_httpauth import HTTPBasicAuth
+
 import common
-import log
-import sstbf
-import power
 
 
-# System capabilities are detected during the runtime
-SYSTEM_CAPS = {}
+# pylint: disable=invalid-name
+auth = HTTPBasicAuth()
 
-
-def caps_init():
+@auth.verify_password
+def verify(username, password):
     """
-    Runs supported capabilities detection and logs to console
+    Authenticate user, HTTP Basic Auth
+
+    Parameters:
+        username: Username
+        password: Password
+
+    Returns:
+        Authentication result (bool)
     """
-    global SYSTEM_CAPS
+    if not (username and password):
+        common.STATS_STORE.general_stats_inc_num_invalid_access()
+        return False
 
-    if SYSTEM_CAPS:
-        SYSTEM_CAPS.clear()
+    if 'auth' in common.CONFIG_STORE.get_config():
+        if username == common.CONFIG_STORE.get_config()['auth']['username'] and \
+            password == common.CONFIG_STORE.get_config()['auth']['password']:
+            return True
 
-    SYSTEM_CAPS = detect_supported_caps()
-    log.info("Supported capabilities:")
-    log.info(SYSTEM_CAPS)
-
-    if (cat_supported() or mba_supported() or sstbf_enabled or epp_enabled())\
-            and common.PQOS_API.is_multicore():
-        return 0
-
-    return -1
-
-
-def cat_supported():
-    """
-    Returns CAT support status
-    """
-    return common.CAT_CAP in SYSTEM_CAPS
-
-
-def mba_supported():
-    """
-    Returns MBA support status
-    """
-    return common.MBA_CAP in SYSTEM_CAPS
-
-
-def sstbf_enabled():
-    """
-    Returns SST-BF support status
-    """
-    return common.SSTBF_CAP in SYSTEM_CAPS
-
-
-def epp_enabled():
-    """
-    Returns EPP support status
-    """
-    return common.POWER_CAP in SYSTEM_CAPS
-
-
-def detect_supported_caps():
-    """
-    Generates list of supported caps
-
-    Returns
-        list of supported caps
-    """
-    result = []
-    # generate list of supported capabilities
-
-    # Intel RDT L3 CAT
-    if common.PQOS_API.is_l3_cat_supported():
-        result.append(common.CAT_CAP)
-
-    # Intel RDT MBA
-    if common.PQOS_API.is_mba_supported():
-        result.append(common.MBA_CAP)
-
-    if sstbf.is_sstbf_enabled():
-        result.append(common.SSTBF_CAP)
-
-    if power.is_epp_enabled():
-        result.append(common.POWER_CAP)
-
-    return result
+    common.STATS_STORE.general_stats_inc_num_invalid_access()
+    return False

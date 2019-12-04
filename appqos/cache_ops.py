@@ -41,6 +41,7 @@ import os
 import caps
 import common
 import log
+import power
 
 class Apps:
     """
@@ -168,7 +169,6 @@ class Pool:
         Configure Pool, based on config content.
         """
         config = common.CONFIG_STORE
-
         cores = config.get_pool_attr('cores', self.pool)
         self.cores_set(cores)
 
@@ -291,6 +291,10 @@ class Pool:
         if removed_cores:
             log.debug("Cores assigned to COS#0 {}".format(removed_cores))
             common.PQOS_API.release(removed_cores)
+
+        # Reset power profile settings
+        if caps.epp_enabled() and removed_cores:
+            power.reset(removed_cores)
 
 
     def cores_get(self):

@@ -313,6 +313,42 @@ def test_config_reset():
         assert config_store.get_pool_attr('mba', 0) is None
 
 
+@mock.patch('config.ConfigStore.get_config')
+@pytest.mark.parametrize("cfg, default, result", [
+    ({}, True, True),
+    ({}, False, False),
+    ({"test": True}, True, True),
+    ({"test": True}, False, False),
+    ({"power_profiles_expert_mode": False}, False, False),
+    ({"power_profiles_expert_mode": False}, True, False),
+    ({"power_profiles_expert_mode": True}, False, True),
+    ({"power_profiles_expert_mode": True}, True, True)
+])
+def test_get_global_attr_power_profiles_expert_mode(mock_get_config, cfg, default, result):
+    mock_get_config.return_value = cfg
+    config_store = ConfigStore()
+
+    assert config_store.get_global_attr('power_profiles_expert_mode', default) == result
+
+
+@mock.patch('config.ConfigStore.get_config')
+@pytest.mark.parametrize("cfg, default, result", [
+    ({}, True, True),
+    ({}, False, False),
+    ({"test": True}, True, True),
+    ({"test": True}, False, False),
+    ({"power_profiles_verify": False}, False, False),
+    ({"power_profiles_verify": False}, True, False),
+    ({"power_profiles_verify": True}, False, True),
+    ({"power_profiles_verify": True}, True, True)
+])
+def test_get_global_attr_power_profiles_verify(mock_get_config, cfg, default, result):
+    mock_get_config.return_value = cfg
+    config_store = ConfigStore()
+
+    assert config_store.get_global_attr('power_profiles_verify', default) == result
+
+
 class TestConfigValidate:
 
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
@@ -843,3 +879,48 @@ class TestConfigValidate:
         with pytest.raises(ValueError, match="App 2, PID 99999 is not valid"):
             ConfigStore.validate(data)
 
+
+    def test_power_profile_expert_mode_invalid(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [],
+            "apps": [],
+            "power_profiles_expert_mode": None
+        }
+
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="None is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+        data['power_profiles_expert_mode'] = 1
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="1 is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+        data['power_profiles_expert_mode'] = []
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="\\[\\] is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+
+    def test_power_profile_verify_invalid(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [],
+            "apps": [],
+            "power_profiles_verify": None
+        }
+
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="None is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+        data['power_profiles_verify'] = 1
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="1 is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+        data['power_profiles_verify'] = []
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="\\[\\] is not of type 'boolean'"):
+            ConfigStore.validate(data)

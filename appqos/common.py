@@ -48,6 +48,7 @@ CONFIG_FILENAME = "appqos.conf"
 CAT_CAP = "cat"
 MBA_CAP = "mba"
 SSTBF_CAP = "sstbf"
+POWER_CAP = "power"
 
 RATE_LIMIT = 10 # rate limit of configuration changes in HZ
 

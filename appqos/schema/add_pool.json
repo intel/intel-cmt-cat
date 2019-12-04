@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
 
-  "title": "REST API add pull",
+  "title": "REST API add pool",
   "description": "POST command, URI /pools",
 
   "$ref": "definitions.json#/pool_api_post"

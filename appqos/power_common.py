@@ -32,89 +32,79 @@
 ################################################################################
 
 """
-System capabilities module
+Power common functions module
 """
 
-import common
-import log
-import sstbf
-import power
+import pwr
 
-
-# System capabilities are detected during the runtime
-SYSTEM_CAPS = {}
-
-
-def caps_init():
+def get_pwr_sys():
     """
-    Runs supported capabilities detection and logs to console
+    Returns list of CPU objects or None on error
     """
-    global SYSTEM_CAPS
+    try:
+        pwr_sys = pwr.get_system()
+    except (IOError, ValueError):
+        return None
 
-    if SYSTEM_CAPS:
-        SYSTEM_CAPS.clear()
-
-    SYSTEM_CAPS = detect_supported_caps()
-    log.info("Supported capabilities:")
-    log.info(SYSTEM_CAPS)
-
-    if (cat_supported() or mba_supported() or sstbf_enabled or epp_enabled())\
-            and common.PQOS_API.is_multicore():
-        return 0
-
-    return -1
+    return pwr_sys
 
 
-def cat_supported():
+def get_pwr_cpus():
     """
-    Returns CAT support status
+    Returns list of CPU objects or None on error
     """
-    return common.CAT_CAP in SYSTEM_CAPS
+    try:
+        cpus = pwr.get_cpus()
+    except (IOError, ValueError):
+        return None
+
+    return cpus
 
 
-def mba_supported():
+def get_pwr_cores():
     """
-    Returns MBA support status
+    Returns list of CORE objects or None on error
     """
-    return common.MBA_CAP in SYSTEM_CAPS
+
+    try:
+        cores = pwr.get_cores()
+    except (IOError, ValueError):
+        return None
+
+    return cores
 
 
-def sstbf_enabled():
+def get_pwr_lowest_freq():
     """
-    Returns SST-BF support status
+    Returns lowest supported freq or None on error
     """
-    return common.SSTBF_CAP in SYSTEM_CAPS
+
+    cpus = get_pwr_cpus()
+    if not cpus:
+        return None
+
+    return cpus[0].lowest_freq
 
 
-def epp_enabled():
+def get_pwr_base_freq():
     """
-    Returns EPP support status
+    Returns base freq or None on error
     """
-    return common.POWER_CAP in SYSTEM_CAPS
+
+    cpus = get_pwr_cpus()
+    if not cpus:
+        return None
+
+    return cpus[0].base_freq
 
 
-def detect_supported_caps():
+def get_pwr_highest_freq():
     """
-    Generates list of supported caps
-
-    Returns
-        list of supported caps
+    Returns highest supported freq or None on error
     """
-    result = []
-    # generate list of supported capabilities
 
-    # Intel RDT L3 CAT
-    if common.PQOS_API.is_l3_cat_supported():
-        result.append(common.CAT_CAP)
+    cpus = get_pwr_cpus()
+    if not cpus:
+        return None
 
-    # Intel RDT MBA
-    if common.PQOS_API.is_mba_supported():
-        result.append(common.MBA_CAP)
-
-    if sstbf.is_sstbf_enabled():
-        result.append(common.SSTBF_CAP)
-
-    if power.is_epp_enabled():
-        result.append(common.POWER_CAP)
-
-    return result
+    return cpus[0].highest_freq

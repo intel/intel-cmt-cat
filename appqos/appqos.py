@@ -45,13 +45,12 @@ import signal
 import syslog
 import time
 
-from jsonschema import ValidationError
-
 import cache_ops
 import caps
 import common
 import log
-import rest
+import power
+from rest import rest_server
 import sstbf
 
 class AppQoS:
@@ -82,8 +81,8 @@ class AppQoS:
             log.error("Error reading from config file {}... ".format(args.config))
             log.error(ex)
             return
-        except (ValueError, ValidationError, KeyError) as ex:
-            log.error("Could not parse config file {}... ".format(args.config))
+        except Exception as ex:
+            log.error("Invalid config file {}... ".format(args.config))
             log.error(ex)
             return
 
@@ -103,11 +102,26 @@ class AppQoS:
                 return
 
             log.info("SST-BF enabled, {}configured.".\
-                format("not " if not sstbf.is_sstbf_enabled() else ""))
+                format("not " if not sstbf.is_sstbf_configured() else ""))
             log.info("SST-BF HP cores: {}".format(sstbf.get_hp_cores()))
             log.info("SST-BF STD cores: {}".format(sstbf.get_std_cores()))
         else:
             log.info("SST-BF not enabled")
+
+        # set initial EPP configuration if SST-BF is not configured
+        if caps.epp_enabled():
+            if sstbf.is_sstbf_configured():
+                log.info("Power Profiles/EPP enabled, not configured, SST-BF is configured")
+            else:
+                log.info("Power Profiles/EPP enabled.")
+                # set initial POWER configuration
+                result = power.configure_power()
+                if result != 0:
+                    log.error("Failed to apply initial Power Profiles configuration,"\
+                        " terminating...")
+                    return
+        else:
+            log.info("Power Profiles/EPP not enabled")
 
         # set initial RDT configuration
         log.info("Configuring RDT")
@@ -118,6 +132,16 @@ class AppQoS:
 
         # set CTRL+C sig handler
         signal.signal(signal.SIGINT, self.signal_handler)
+
+        self.event_handler()
+
+        log.info("Terminating...")
+
+
+    def event_handler(self):
+        """
+        Handles config_changed event
+        """
 
         # rate limiting
         last_cfg_change_ts = 0
@@ -134,16 +158,17 @@ class AppQoS:
 
                 log.info("Configuration changed, processing new config...")
                 result = cache_ops.configure_rdt()
-
-                last_cfg_change_ts = time.time()
-
                 if result != 0:
                     log.error("Failed to apply RDT configuration!")
                     break
 
-        log.info("Terminating...")
+                if caps.epp_enabled() and not sstbf.is_sstbf_configured():
+                    result = power.configure_power()
+                    if result != 0:
+                        log.error("Failed to apply Power Profiles configuration!")
+                        break
 
-        return
+                last_cfg_change_ts = time.time()
 
 
     def signal_handler(self, _signum, _frame):
@@ -188,7 +213,7 @@ def main():
         app_qos = AppQoS()
 
         # start REST API server
-        server = rest.Server()
+        server = rest_server.Server()
         result = server.start("127.0.0.1", cmd_args.port[0], cmd_args.verbose)
         if result == 0:
             # run main logic

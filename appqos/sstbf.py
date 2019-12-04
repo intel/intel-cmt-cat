@@ -35,13 +35,15 @@
 SST-BF module
 """
 
-import pwr
-
 import common
+import power_common
 import log
 
-PWR_CFG_SST_BF_BASE = "sst_bf_base"
+PWR_CFG_SST_BF = "sst_bf"
 PWR_CFG_BASE = "base"
+
+HP_CORES = None
+STD_CORES = None
 
 def init_sstbf():
     """
@@ -56,54 +58,32 @@ def init_sstbf():
             log.info("Configuring SST-BF")
             result = configure_sstbf(sstbf_cfg['configured'])
 
+    _populate_cores()
+
     return result
+
 
 def is_sstbf_enabled():
     """
     Returns SST-BF enabled status
     """
+    sys = power_common.get_pwr_sys()
+    if not sys:
+        return None
 
-    try:
-        cpus = pwr.get_cpus()
-    except IOError:
-        return False
-    except ValueError:
-        return False
-
-    if not cpus:
-        return False
-
-    # check is it enabled on all sockets
-    enabled = True
-    for cpu in cpus:
-        cpu.read_capabilities()  # refresh
-        enabled = enabled & cpu.sst_bf_enabled
-
-    return enabled
+    return sys.sst_bf_enabled
 
 
 def is_sstbf_configured():
     """
     Returns SST-BF configured status
     """
+    sys = power_common.get_pwr_sys()
+    if not sys:
+        return None
 
-    try:
-        cpus = pwr.get_cpus()
-    except IOError:
-        return False
-
-    if not cpus:
-        return False
-
-    # check is it configured on all sockets
-    configured = True
-    for cpu in cpus:
-        for core in cpu.core_list:
-            core.refresh_stats()
-        cpu.refresh_stats()
-        configured = configured & cpu.sst_bf_configured
-
-    return configured
+    sys.refresh_stats()
+    return sys.sst_bf_configured
 
 
 def configure_sstbf(configure):
@@ -111,21 +91,16 @@ def configure_sstbf(configure):
     Configures or unconfigures SST-BF
     """
 
-    try:
-        cores = pwr.get_cores()
-    except IOError:
-        return -1
-
-    if not cores:
+    sys = power_common.get_pwr_sys()
+    if not sys:
         return -1
 
     if configure:
-        new_core_cfg = PWR_CFG_SST_BF_BASE
+        new_core_cfg = PWR_CFG_SST_BF
     else:
         new_core_cfg = PWR_CFG_BASE
 
-    for core in cores:
-        core.commit(new_core_cfg)
+    sys.commit(new_core_cfg)
 
     log.sys("Intel SST-BF {}configured.".format("" if configure else "un"))
 
@@ -136,38 +111,38 @@ def get_hp_cores():
     """
     Returns HP cores
     """
-    try:
-        cores = pwr.get_cores()
-    except IOError:
-        return None
+    if not HP_CORES:
+        _populate_cores()
 
-    if not cores:
-        return None
+    return HP_CORES
 
-    hp_cores = []
-
-    for core in cores:
-        if core.high_priority:
-            hp_cores.append(core.core_id)
-
-    return hp_cores
 
 def get_std_cores():
     """
     Returns standard cores
     """
-    try:
-        cores = pwr.get_cores()
-    except IOError:
-        return None
+    if not STD_CORES:
+        _populate_cores()
 
+    return STD_CORES
+
+
+def _populate_cores():
+    """
+    Gets HP and STD cores from PWR lib
+    """
+    cores = power_common.get_pwr_cores()
     if not cores:
-        return None
+        return
 
-    std_cores = []
+    global HP_CORES
+    global STD_CORES
+
+    HP_CORES = []
+    STD_CORES = []
 
     for core in cores:
-        if not core.high_priority:
-            std_cores.append(core.core_id)
-
-    return std_cores
+        if core.high_priority:
+            HP_CORES.append(core.core_id)
+        else:
+            STD_CORES.append(core.core_id)

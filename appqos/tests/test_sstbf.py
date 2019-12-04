@@ -38,100 +38,76 @@ import sstbf
 
 
 def test_is_sstbf_enabled():
-    class CPU:
+    class SYS:
         def __init__(self, enabled):
             self.sst_bf_enabled = enabled
 
-        def read_capabilities(self, core=None):
-            return
-
-
-    with mock.patch("pwr.get_cpus", return_value=[CPU(True), CPU(True)]) as mock_get_cpus:
+    with mock.patch("pwr.get_system", return_value=SYS(True)) as mock_get_system:
         assert sstbf.is_sstbf_enabled()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
-    with mock.patch("pwr.get_cpus", return_value=[CPU(True), CPU(False)]) as mock_get_cpus:
+    with mock.patch("pwr.get_system", return_value=SYS(False)) as mock_get_system:
         assert not sstbf.is_sstbf_enabled()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
-    with mock.patch("pwr.get_cpus", return_value=[CPU(False), CPU(False)]) as mock_get_cpus:
+    with mock.patch("pwr.get_system", return_value=None) as mock_get_system:
         assert not sstbf.is_sstbf_enabled()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
-    with mock.patch("pwr.get_cpus", return_value=None) as mock_get_cpus:
+    with mock.patch("pwr.get_system", side_effect = IOError('Test')) as mock_get_system:
         assert not sstbf.is_sstbf_enabled()
-        mock_get_cpus.assert_called_once()
-
-    with mock.patch("pwr.get_cpus", return_value=[]) as mock_get_cpus:
-        assert not sstbf.is_sstbf_enabled()
-        mock_get_cpus.assert_called_once()
-
-    with mock.patch("pwr.get_cpus", side_effect = IOError('Test')) as mock_get_cpus:
-        assert not sstbf.is_sstbf_enabled()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
 
 def test_is_sstbf_configured():
-    class CPU:
+    class SYS:
         def __init__(self, configured):
             self.sst_bf_configured = configured
-            self.core_list = []
 
-        def refresh_stats(self, core=None):
+        def refresh_stats(self):
             return
 
-    with mock.patch("pwr.get_cpus", return_value=[CPU(True), CPU(True)]) as mock_get_cpus:
+    with mock.patch("pwr.get_system", return_value=SYS(True)) as mock_get_system:
         assert sstbf.is_sstbf_configured()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
-    with mock.patch("pwr.get_cpus", return_value=[CPU(True), CPU(False)]) as mock_get_cpus:
+    with mock.patch("pwr.get_system", return_value=SYS(False)) as mock_get_system:
         assert not sstbf.is_sstbf_configured()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
-    with mock.patch("pwr.get_cpus", return_value=[CPU(False), CPU(False)]) as mock_get_cpus:
+    with mock.patch("pwr.get_system", return_value=None) as mock_get_system:
         assert not sstbf.is_sstbf_configured()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
-    with mock.patch("pwr.get_cpus", return_value=None) as mock_get_cpus:
+    with mock.patch("pwr.get_system", return_value=[]) as mock_get_system:
         assert not sstbf.is_sstbf_configured()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
-    with mock.patch("pwr.get_cpus", return_value=[]) as mock_get_cpus:
+    with mock.patch("pwr.get_system", side_effect = IOError('Test')) as mock_get_system:
         assert not sstbf.is_sstbf_configured()
-        mock_get_cpus.assert_called_once()
-
-    with mock.patch("pwr.get_cpus", side_effect = IOError('Test')) as mock_get_cpus:
-        assert not sstbf.is_sstbf_configured()
-        mock_get_cpus.assert_called_once()
+        mock_get_system.assert_called_once()
 
 
 def test_configure_sstbf():
 
-    cores = []
-    for i in range(4):
-        core = mock.MagicMock()
-        core.P1_FREQ = 99
-        core.BASE_FREQ = 123
-        core.commit = mock.MagicMock()
-        cores.append(core)
+    sys = mock.MagicMock()
+    sys.commit = mock.MagicMock()
 
-    with mock.patch("pwr.get_cores", return_value=cores) as mock_get_cores:
+    with mock.patch("pwr.get_system", return_value=sys) as mock_get_sys:
         assert 0 == sstbf.configure_sstbf(True)
-
-        for core in cores:
-            core.commit.assert_called_with(sstbf.PWR_CFG_SST_BF_BASE)
+        mock_get_sys.assert_called_once()
+        sys.commit.assert_called_with(sstbf.PWR_CFG_SST_BF)
 
         assert 0 == sstbf.configure_sstbf(False)
-        for core in cores:
-            core.commit.assert_called_with(sstbf.PWR_CFG_BASE)
+        sys.commit.assert_called_with(sstbf.PWR_CFG_BASE)
 
-    for ret_val in [None, []]:
-        with mock.patch("pwr.get_cores", return_value=ret_val) as mock_get_cores:
-            assert 0 != sstbf.configure_sstbf(True)
-
-    with mock.patch("pwr.get_cores", side_effect = IOError('Test')) as mock_get_cores:
+    with mock.patch("pwr.get_system", return_value=None) as mock_get_sys:
         assert 0 != sstbf.configure_sstbf(True)
-        mock_get_cores.assert_called_once()
+        mock_get_sys.assert_called_once()
+
+    with mock.patch("pwr.get_system", side_effect = IOError('Test')) as mock_get_sys:
+        assert 0 != sstbf.configure_sstbf(True)
+        mock_get_sys.assert_called_once()
 
 
 def test_get_hp_cores():
@@ -142,14 +118,17 @@ def test_get_hp_cores():
         core.high_priority = (i % 2 == 1)
         cores.append(core)
 
+    sstbf.HP_CORES = None
     with mock.patch("pwr.get_cores", return_value=cores) as mock_get_cores:
         assert list(range(1, 11, 2)) == sstbf.get_hp_cores()
         mock_get_cores.assert_called_once()
 
     for ret_val in [None, []]:
+        sstbf.HP_CORES = None
         with mock.patch("pwr.get_cores", return_value=ret_val) as mock_get_cores:
             assert sstbf.get_hp_cores() == None
 
+    sstbf.HP_CORES = None
     with mock.patch("pwr.get_cores", side_effect = IOError('Test')) as mock_get_cores:
         assert sstbf.get_hp_cores() == None
         mock_get_cores.assert_called_once()
@@ -163,14 +142,17 @@ def test_get_std_cores():
         core.high_priority = (i % 2 == 1)
         cores.append(core)
 
+    sstbf.STD_CORES = None
     with mock.patch("pwr.get_cores", return_value=cores) as mock_get_cores:
         assert list(range(0, 11, 2)) == sstbf.get_std_cores()
         mock_get_cores.assert_called_once()
 
     for ret_val in [None, []]:
+        sstbf.STD_CORES = None
         with mock.patch("pwr.get_cores", return_value=ret_val) as mock_get_cores:
             assert sstbf.get_std_cores() == None
 
+    sstbf.STD_CORES = None
     with mock.patch("pwr.get_cores", side_effect = IOError('Test')) as mock_get_cores:
         assert sstbf.get_std_cores() == None
         mock_get_cores.assert_called_once()
@@ -179,8 +161,10 @@ def test_get_std_cores():
 def test_init_sstbf():
     for cfgd_value in [True, False]:
         with mock.patch("common.CONFIG_STORE.get_config", return_value={'sstbf' : {'configured' : cfgd_value}}) as mock_get_cfg,\
-             mock.patch("sstbf.configure_sstbf", return_value=0) as mock_cfg:
+             mock.patch("sstbf.configure_sstbf", return_value=0) as mock_cfg,\
+             mock.patch("sstbf._populate_cores") as mock_populate:
 
              assert 0 == sstbf.init_sstbf()
              mock_get_cfg.assert_called_once()
              mock_cfg.assert_called_once_with(cfgd_value)
+             mock_populate.assert_called_once()

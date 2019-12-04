@@ -1,0 +1,8 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get a power profile",
+  "description": "GET single POWER PROFILE results, URI /power_profiles/<profile_id>",
+
+  "$ref": "definitions.json#/power_api_get"
+}

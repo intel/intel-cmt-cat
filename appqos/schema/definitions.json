@@ -128,6 +128,77 @@
     ]
   },
 
+  "power_profile" : {
+    "description": "Power profile definition",
+    "type": "object",
+    "properties": {
+      "id": {
+        "description": "Power profile ID",
+        "$ref": "#uint"
+      },
+      "min_freq": {
+        "description": "Minimum frequency in MHz",
+        "$ref": "#uint"
+      },
+      "max_freq": {
+        "description": "Maximum frequency in MHz",
+        "$ref": "#uint"
+      },
+      "epp" : {
+        "description": "Energy Performance Preference",
+        "$ref": "#string_nonempty"
+      },
+      "name" : {
+        "description": "profile name",
+        "$ref": "#string_nonempty"
+      }
+    },
+    "additionalProperties": false,
+    "anyOf": [
+      { "required": ["min_freq"] },
+      { "required": ["max_freq"] },
+      { "required": ["epp"] },
+      { "required": ["name"] }
+    ]
+  },
+
+  "power_profile_cfg": {
+    "allOf": [
+      { "$ref": "#power_profile" },
+      { "properties": {
+          "id": {},
+          "min_freq": {},
+          "max_freq": {},
+          "epp" : {},
+          "name" : {}
+        },
+        "required": ["min_freq", "max_freq", "epp", "id"],
+        "additionalProperties": false
+      }
+    ]
+  },
+
+  "power_api_get": {
+    "allOf": [
+      { "$ref": "#power_profile" }
+    ]
+  },
+
+  "power_api_post": {
+    "allOf": [
+      { "$ref": "#power_profile" },
+      { "properties": {
+          "min_freq": {},
+          "max_freq": {},
+          "epp": {},
+          "name": {}
+        },
+        "required": ["min_freq", "max_freq", "epp"],
+        "additionalProperties": false
+      }
+    ]
+  },
+
   "pool": {
     "description": "Definition of Pool of APPs",
     "type": "object",
@@ -148,6 +219,10 @@
         "description": "MBA rate",
         "$ref": "#uint"
       },
+      "power_profile" : {
+        "description": "Power profile ID",
+        "$ref": "#uint"
+      },
       "cores": {
         "description": "POOL cores",
         "$ref": "#uint_uniq_nonempty_array"
@@ -160,7 +235,8 @@
     "required": ["cores"],
     "anyOf": [
       { "required": ["cbm"] },
-      { "required": ["mba"] }
+      { "required": ["mba"] },
+      { "required": ["power_profile"] }
     ]
   },
 
@@ -173,7 +249,8 @@
           "cbm": {},
           "mba": {},
           "id": {},
-          "apps": {}
+          "apps": {},
+          "power_profile": {}
         },
         "required": ["cores", "id"],
         "additionalProperties": false
@@ -194,7 +271,12 @@
           "name": {},
           "cores": {},
           "cbm": {},
-          "mba": {}
+          "mba": {},
+          "power_profile" : {},
+          "verify": {
+              "description": "Power Profiles Admission Control",
+              "type": "boolean"
+          }
         },
         "required": ["cores"],
         "additionalProperties": false

@@ -32,89 +32,32 @@
 ################################################################################
 
 """
-System capabilities module
+Unit tests for rest module CAPS
 """
 
+import json
+from jsonschema import validate
+import mock
+import pytest
+
 import common
-import log
-import sstbf
-import power
+import caps
+
+from rest_common import get_config, load_json_schema, REST, Rest, CONFIG_EMPTY
 
 
-# System capabilities are detected during the runtime
-SYSTEM_CAPS = {}
+class TestCaps:
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("caps.SYSTEM_CAPS", ['cat', 'mba', 'sstbf'])
+    def test_get(self):
+        response = REST.get("/caps")
+        data = json.loads(response.data.decode('utf-8'))
 
+        # validate response schema
+        schema, resolver = load_json_schema('get_caps_response.json')
+        validate(data, schema, resolver=resolver)
 
-def caps_init():
-    """
-    Runs supported capabilities detection and logs to console
-    """
-    global SYSTEM_CAPS
-
-    if SYSTEM_CAPS:
-        SYSTEM_CAPS.clear()
-
-    SYSTEM_CAPS = detect_supported_caps()
-    log.info("Supported capabilities:")
-    log.info(SYSTEM_CAPS)
-
-    if (cat_supported() or mba_supported() or sstbf_enabled or epp_enabled())\
-            and common.PQOS_API.is_multicore():
-        return 0
-
-    return -1
-
-
-def cat_supported():
-    """
-    Returns CAT support status
-    """
-    return common.CAT_CAP in SYSTEM_CAPS
-
-
-def mba_supported():
-    """
-    Returns MBA support status
-    """
-    return common.MBA_CAP in SYSTEM_CAPS
-
-
-def sstbf_enabled():
-    """
-    Returns SST-BF support status
-    """
-    return common.SSTBF_CAP in SYSTEM_CAPS
-
-
-def epp_enabled():
-    """
-    Returns EPP support status
-    """
-    return common.POWER_CAP in SYSTEM_CAPS
-
-
-def detect_supported_caps():
-    """
-    Generates list of supported caps
-
-    Returns
-        list of supported caps
-    """
-    result = []
-    # generate list of supported capabilities
-
-    # Intel RDT L3 CAT
-    if common.PQOS_API.is_l3_cat_supported():
-        result.append(common.CAT_CAP)
-
-    # Intel RDT MBA
-    if common.PQOS_API.is_mba_supported():
-        result.append(common.MBA_CAP)
-
-    if sstbf.is_sstbf_enabled():
-        result.append(common.SSTBF_CAP)
-
-    if power.is_epp_enabled():
-        result.append(common.POWER_CAP)
-
-    return result
+        assert response.status_code == 200
+        assert 'cat' in data["capabilities"]
+        assert 'mba' in data["capabilities"]
+        assert 'sstbf' in data["capabilities"]

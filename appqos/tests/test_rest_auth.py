@@ -32,89 +32,40 @@
 ################################################################################
 
 """
-System capabilities module
+Unit tests for rest module AUTH
 """
 
+import mock
+import pytest
+
 import common
-import log
-import sstbf
-import power
+
+from rest_common import get_config, load_json_schema, REST, CONFIG_EMPTY
+
+class TestAuth:
+    def test_invalid_password(self):
+        def get_config():
+            return {
+                "auth": {
+                    "password": "invalid",
+                    "username": "user"
+                    }
+                }
+
+        with mock.patch('common.CONFIG_STORE.get_config', new=get_config):
+            response = REST.get("/pools")
+        assert response.status_code == 401
 
 
-# System capabilities are detected during the runtime
-SYSTEM_CAPS = {}
+    def test_invalid_user(self):
+        def get_config():
+            return {
+                "auth": {
+                    "password": "password",
+                    "username": "invalid"
+                    }
+                }
 
-
-def caps_init():
-    """
-    Runs supported capabilities detection and logs to console
-    """
-    global SYSTEM_CAPS
-
-    if SYSTEM_CAPS:
-        SYSTEM_CAPS.clear()
-
-    SYSTEM_CAPS = detect_supported_caps()
-    log.info("Supported capabilities:")
-    log.info(SYSTEM_CAPS)
-
-    if (cat_supported() or mba_supported() or sstbf_enabled or epp_enabled())\
-            and common.PQOS_API.is_multicore():
-        return 0
-
-    return -1
-
-
-def cat_supported():
-    """
-    Returns CAT support status
-    """
-    return common.CAT_CAP in SYSTEM_CAPS
-
-
-def mba_supported():
-    """
-    Returns MBA support status
-    """
-    return common.MBA_CAP in SYSTEM_CAPS
-
-
-def sstbf_enabled():
-    """
-    Returns SST-BF support status
-    """
-    return common.SSTBF_CAP in SYSTEM_CAPS
-
-
-def epp_enabled():
-    """
-    Returns EPP support status
-    """
-    return common.POWER_CAP in SYSTEM_CAPS
-
-
-def detect_supported_caps():
-    """
-    Generates list of supported caps
-
-    Returns
-        list of supported caps
-    """
-    result = []
-    # generate list of supported capabilities
-
-    # Intel RDT L3 CAT
-    if common.PQOS_API.is_l3_cat_supported():
-        result.append(common.CAT_CAP)
-
-    # Intel RDT MBA
-    if common.PQOS_API.is_mba_supported():
-        result.append(common.MBA_CAP)
-
-    if sstbf.is_sstbf_enabled():
-        result.append(common.SSTBF_CAP)
-
-    if power.is_epp_enabled():
-        result.append(common.POWER_CAP)
-
-    return result
+        with mock.patch('common.CONFIG_STORE.get_config', new=get_config):
+            response = REST.get("/pools")
+        assert response.status_code == 401

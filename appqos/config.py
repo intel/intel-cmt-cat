@@ -43,6 +43,7 @@ import jsonschema
 import caps
 import common
 import pid_ops
+import power
 
 
 class ConfigStore:
@@ -185,7 +186,29 @@ class ConfigStore:
 
 
     @staticmethod
-    def validate(data):
+    def get_power(data, power_id):
+        """
+        Get power
+
+        Parameters
+            data: configuration (dict)
+            id: power profile id
+
+        Return
+            Pool details
+        """
+        if 'power_profiles' not in data:
+            raise KeyError("No power profiles in config")
+
+        for profile in data['power_profiles']:
+            if profile["id"] == power_id:
+                return profile
+
+        raise KeyError(("Power profile {} does not exists").format(power_id))
+
+
+    @staticmethod
+    def validate(data, power_admission_control=False):
         """
         Validate configuration
 
@@ -199,6 +222,7 @@ class ConfigStore:
 
         ConfigStore._validate_pools(data)
         ConfigStore._validate_apps(data)
+        power.validate_power_profiles(data, power_admission_control)
 
 
     @staticmethod
@@ -254,6 +278,10 @@ class ConfigStore:
                 if not caps.mba_supported():
                     raise ValueError("Pool {}, MBA rate {}, MBA is not supported."\
                     .format(pool['id'], pool['mba']))
+
+            # check power profile reference
+            if 'power_profile' in pool:
+                ConfigStore.get_power(data, pool['power_profile'])
 
 
     @staticmethod
@@ -326,7 +354,9 @@ class ConfigStore:
         if not self.is_default_pool_defined(data):
             self.add_default_pool(data)
 
-        self.validate(data)
+        power_admission_check_cfg = data.get('power_profiles_verify', True)
+
+        self.validate(data, power_admission_check_cfg)
 
         self.set_config(data)
 
@@ -460,6 +490,18 @@ class ConfigStore:
         return self.namespace.config
 
 
+    def get_power_profile(self, power_profile_id):
+        """
+        Get power profile configuration
+
+        Parameters:
+            power_profile_id: id of power profile
+        """
+        config = self.get_config()
+
+        return self.get_power(config, power_profile_id)
+
+
     def is_config_changed(self):
         """
         Check was shared configuration marked as changed
@@ -580,3 +622,55 @@ class ConfigStore:
             return new_ids[0]
 
         return app_ids[-1] + 1
+
+
+    def get_new_power_profile_id(self):
+        """
+        Get ID for new Power Profile
+
+        Returns:
+            ID for new Power Profile
+        """
+
+        data = self.get_config()
+
+        # no profile found in config
+        if 'power_profiles' not in data:
+            return 0
+
+        # put all ids into list
+        profile_ids = []
+        for profile in data['power_profiles']:
+            profile_ids.append(profile['id'])
+
+        profile_ids = sorted(profile_ids)
+
+        # no profile found in config
+        if not profile_ids:
+            return 1
+
+        # find first available profile id
+        new_ids = list(set(range(1, profile_ids[-1])) - set(profile_ids))
+        if new_ids:
+            return new_ids[0]
+
+        return profile_ids[-1] + 1
+
+
+    def get_global_attr(self, attr, default):
+        """
+        Get specific global attribute from config
+
+        Parameters:
+            attr: global attribute to be found in config
+
+        Returns:
+            attribute value or None
+        """
+
+        data = self.get_config()
+
+        if attr not in data:
+            return default
+
+        return data[attr]
