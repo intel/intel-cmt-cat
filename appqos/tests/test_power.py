@@ -41,25 +41,26 @@ import sstbf
 class TestRestPowerProfiles:
 
 
-    def test_is_epp_enabled(self):
+    def test_is_sstcp_enabled(self):
         class SYS:
             def __init__(self, enabled):
                 self.epp_enabled = enabled
+                self.sst_bf_enabled = enabled
 
         with mock.patch("pwr.get_system", return_value=SYS(True)) as mock_get_system:
-            assert power.is_epp_enabled()
+            assert power.is_sstcp_enabled()
             mock_get_system.assert_called_once()
 
         with mock.patch("pwr.get_system", return_value=SYS(False)) as mock_get_system:
-            assert not power.is_epp_enabled()
+            assert not power.is_sstcp_enabled()
             mock_get_system.assert_called_once()
 
         with mock.patch("pwr.get_system", return_value=None) as mock_get_system:
-            assert not power.is_epp_enabled()
+            assert not power.is_sstcp_enabled()
             mock_get_system.assert_called_once()
 
         with mock.patch("pwr.get_system", side_effect = IOError('Test')) as mock_get_system:
-            assert not power.is_epp_enabled()
+            assert not power.is_sstcp_enabled()
             mock_get_system.assert_called_once()
 
 

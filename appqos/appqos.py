@@ -108,12 +108,12 @@ class AppQoS:
         else:
             log.info("SST-BF not enabled")
 
-        # set initial EPP configuration if SST-BF is not configured
-        if caps.epp_enabled():
+        # set initial SST-CP configuration if SST-BF is not configured
+        if caps.sstcp_enabled():
             if sstbf.is_sstbf_configured():
-                log.info("Power Profiles/EPP enabled, not configured, SST-BF is configured")
+                log.info("Power Profiles/SST-CP enabled, not configured, SST-BF is configured")
             else:
-                log.info("Power Profiles/EPP enabled.")
+                log.info("Power Profiles/SST-CP enabled.")
                 # set initial POWER configuration
                 result = power.configure_power()
                 if result != 0:
@@ -162,7 +162,7 @@ class AppQoS:
                     log.error("Failed to apply RDT configuration!")
                     break
 
-                if caps.epp_enabled() and not sstbf.is_sstbf_configured():
+                if caps.sstcp_enabled() and not sstbf.is_sstbf_configured():
                     result = power.configure_power()
                     if result != 0:
                         log.error("Failed to apply Power Profiles configuration!")

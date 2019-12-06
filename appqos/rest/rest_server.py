@@ -86,7 +86,7 @@ class Server:
         self.api.add_resource(App, '/apps/<int:app_id>')
         self.api.add_resource(Pools, '/pools')
         self.api.add_resource(Pool, '/pools/<int:pool_id>')
-        if caps.epp_enabled():
+        if caps.sstcp_enabled():
             self.api.add_resource(Powers, '/power_profiles')
             self.api.add_resource(Power, '/power_profiles/<int:profile_id>')
         self.api.add_resource(Stats, '/stats')

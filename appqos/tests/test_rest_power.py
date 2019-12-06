@@ -69,7 +69,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=False))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=False))
     def test_epp_unsupported_get_post(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 404
@@ -80,7 +80,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_existing_profiles_operations_get_del(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 200
@@ -119,7 +119,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_existing_profiles_operations_put(self):
 
         put_profile = CONFIG['power_profiles'][-1]
@@ -163,7 +163,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_nonexisting_profile_operations_get_del_put(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 200
@@ -189,7 +189,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_get_epp_no_profiles_configured(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 404
@@ -205,7 +205,7 @@ class TestRestPowerProfiles:
             assert response.status_code == 404
 
 
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("invalid_id", ["", "a", "test", "-1"])
     def test_invalid_index(self, invalid_id):
@@ -222,7 +222,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("invalid_request", [
             {"id": 0, "min_freq": 1000, "max_freq": 2200, "epp": "performance", "name": "default"},
             {"id": 0},
@@ -254,7 +254,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_operations_post(self):
 
         post_profile = {"min_freq": 1000, "max_freq": 2200, "epp": "performance", "name": "test_profile"}
@@ -288,7 +288,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=False))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_operations_post_expert_mode_disable_post(self):
 
         post_profile = {"min_freq": 1000, "max_freq": 2200, "epp": "performance", "name": "test_profile"}
@@ -306,7 +306,7 @@ class TestRestPowerProfiles:
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG))
     @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=False))
-    @mock.patch("caps.epp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_operations_post_expert_mode_disable_put_del(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 200

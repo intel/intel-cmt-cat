@@ -117,7 +117,7 @@ def reset(cores):
     return 0
 
 
-def is_epp_enabled():
+def is_sstcp_enabled():
     """
     Returns EPP enabled status
     """
@@ -126,7 +126,7 @@ def is_epp_enabled():
     if not pwr_sys:
         return False
 
-    return pwr_sys.epp_enabled
+    return pwr_sys.sst_bf_enabled and pwr_sys.epp_enabled
 
 
 def _is_min_freq_valid(freq):

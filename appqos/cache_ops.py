@@ -293,7 +293,7 @@ class Pool:
             common.PQOS_API.release(removed_cores)
 
         # Reset power profile settings
-        if caps.epp_enabled() and removed_cores:
+        if caps.sstcp_enabled() and removed_cores:
             power.reset(removed_cores)
 
 

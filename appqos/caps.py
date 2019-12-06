@@ -58,7 +58,7 @@ def caps_init():
     log.info("Supported capabilities:")
     log.info(SYSTEM_CAPS)
 
-    if (cat_supported() or mba_supported() or sstbf_enabled() or epp_enabled())\
+    if (cat_supported() or mba_supported() or sstbf_enabled() or sstcp_enabled())\
             and common.PQOS_API.is_multicore():
         return 0
 
@@ -86,9 +86,9 @@ def sstbf_enabled():
     return common.SSTBF_CAP in SYSTEM_CAPS
 
 
-def epp_enabled():
+def sstcp_enabled():
     """
-    Returns EPP support status
+    Returns SST-CP support status
     """
     return common.POWER_CAP in SYSTEM_CAPS
 
@@ -114,7 +114,7 @@ def detect_supported_caps():
     if sstbf.is_sstbf_enabled():
         result.append(common.SSTBF_CAP)
 
-    if power.is_epp_enabled():
+    if power.is_sstcp_enabled():
         result.append(common.POWER_CAP)
 
     return result
