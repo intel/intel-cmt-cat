@@ -58,7 +58,7 @@ def caps_init():
     log.info("Supported capabilities:")
     log.info(SYSTEM_CAPS)
 
-    if (cat_supported() or mba_supported() or sstbf_enabled or epp_enabled())\
+    if (cat_supported() or mba_supported() or sstbf_enabled() or epp_enabled())\
             and common.PQOS_API.is_multicore():
         return 0
 
