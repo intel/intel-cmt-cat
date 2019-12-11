@@ -66,7 +66,8 @@ class CPqosConfig(ctypes.Structure):
         (u"callback_log", LOG_CALLBACK),
         (u"context_log", ctypes.c_void_p),
         (u"verbose", ctypes.c_int),
-        (u"interface", ctypes.c_int)
+        (u"interface", ctypes.c_int),
+        (u"reserved", ctypes.c_int),
     ]
 
 
@@ -186,7 +187,8 @@ class Pqos(object):
 
         config = CPqosConfig(interface=cfg_interface, fd_log=cfg_fd_log,
                              callback_log=cfg_callback_log,
-                             verbose=cfg_verbose, context_log=log_context)
+                             verbose=cfg_verbose, context_log=log_context,
+                             reserved=0)
 
         ret = self.lib.pqos_init(ctypes.byref(config))
         pqos_handle_error(u'pqos_init', ret)
