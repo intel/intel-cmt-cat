@@ -75,6 +75,12 @@ else
 CFLAGS += -g -O2 -D_FORTIFY_SOURCE=2
 endif
 
+# RMID CUSTOM
+ifeq ($(RMID_CUSTOM),y)
+CFLAGS += -DPQOS_RMID_CUSTOM
+endif
+
+
 # Needed by initgroups()
 ifeq ($(shell uname), FreeBSD)
 CFLAGS += -D_BSD_SOURCE
