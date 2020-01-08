@@ -641,6 +641,7 @@ static const char help_printf_short[] =
 #ifdef PQOS_RMID_CUSTOM
         "       %s [--rmid=RMIDCORES]\n"
 #endif
+        "       %s [--disable-mon-ipc] [--disable-mon-llc_miss]"
         "          [-t SECONDS] [--mon-time=SECONDS]\n"
         "          [-i N] [--mon-interval=N]\n"
         "          [-T] [--mon-top]\n"
@@ -700,6 +701,10 @@ static const char help_printf_long[] =
         "          RMIDCORES format is 'RMID_NUMBER=CORE_LIST'\n"
         "          Example \"10=0,2,4;11=1,3,5 \"\n"
 #endif
+        "  --disable-mon-ipc\n"
+        "          Disable IPC monitoring\n"
+        "  --disable-mon-llc_miss\n"
+        "          Disable LLC misses monitoring\n"
         "  -p [EVTPIDS], --mon-pid[=EVTPIDS]\n"
         "          select top 10 most active (CPU utilizing) process ids to monitor\n"
         "          or select process ids and events to monitor.\n"
@@ -747,7 +752,7 @@ static void print_help(const int is_long)
 #ifdef PQOS_RMID_CUSTOM
                m_cmd_name,
 #endif
-               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name);
+               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name);
         if (is_long)
                 printf("%s", help_printf_long);
 }
@@ -769,34 +774,39 @@ static void print_lib_version(const struct pqos_cap *p_cap)
 #ifdef PQOS_RMID_CUSTOM
 #define OPTION_RMID 1000
 #endif
+#define OPTION_DISABLE_MON_IPC 1001
+#define OPTION_DISABLE_MON_LLC_MISS 1002
 
 static struct option long_cmd_opts[] = {
-        {"help",            no_argument,       0, 'h'},
-        {"log-file",        required_argument, 0, 'l'},
-        {"config-file",     required_argument, 0, 'f'},
-        {"show",            no_argument,       0, 's'},
-        {"display",         no_argument,       0, 'd'},
-        {"display-verbose", no_argument,       0, 'D'},
-        {"profile-list",    no_argument,       0, 'H'},
-        {"profile-set",     required_argument, 0, 'c'},
-        {"mon-interval",    required_argument, 0, 'i'},
-        {"mon-pid",         required_argument, 0, 'p'},
-        {"mon-core",        required_argument, 0, 'm'},
-        {"mon-time",        required_argument, 0, 't'},
-        {"mon-top",         no_argument,       0, 'T'},
-        {"mon-file",        required_argument, 0, 'o'},
-        {"mon-file-type",   required_argument, 0, 'u'},
-        {"mon-reset",       no_argument,       0, 'r'},
-        {"alloc-class",     required_argument, 0, 'e'},
-        {"alloc-reset",     required_argument, 0, 'R'},
-        {"alloc-assoc",     required_argument, 0, 'a'},
-        {"verbose",         no_argument,       0, 'v'},
-        {"super-verbose",   no_argument,       0, 'V'},
-        {"iface-os",        no_argument,       0, 'I'},
-        {"percent-llc",     no_argument,       0, 'P'},
-        {"version",         no_argument,       0, 'w'},
+        {"help",                 no_argument,       0, 'h'},
+        {"log-file",             required_argument, 0, 'l'},
+        {"config-file",          required_argument, 0, 'f'},
+        {"show",                 no_argument,       0, 's'},
+        {"display",              no_argument,       0, 'd'},
+        {"display-verbose",      no_argument,       0, 'D'},
+        {"profile-list",         no_argument,       0, 'H'},
+        {"profile-set",          required_argument, 0, 'c'},
+        {"mon-interval",         required_argument, 0, 'i'},
+        {"mon-pid",              required_argument, 0, 'p'},
+        {"mon-core",             required_argument, 0, 'm'},
+        {"mon-time",             required_argument, 0, 't'},
+        {"mon-top",              no_argument,       0, 'T'},
+        {"mon-file",             required_argument, 0, 'o'},
+        {"mon-file-type",        required_argument, 0, 'u'},
+        {"mon-reset",            no_argument,       0, 'r'},
+        {"disable-mon-ipc",      no_argument,       0, OPTION_DISABLE_MON_IPC},
+        {"disable-mon-llc_miss", no_argument,       0,
+         OPTION_DISABLE_MON_LLC_MISS},
+        {"alloc-class",          required_argument, 0, 'e'},
+        {"alloc-reset",          required_argument, 0, 'R'},
+        {"alloc-assoc",          required_argument, 0, 'a'},
+        {"verbose",              no_argument,       0, 'v'},
+        {"super-verbose",        no_argument,       0, 'V'},
+        {"iface-os",             no_argument,       0, 'I'},
+        {"percent-llc",          no_argument,       0, 'P'},
+        {"version",              no_argument,       0, 'w'},
 #ifdef PQOS_RMID_CUSTOM
-        {"rmid",            required_argument, 0, OPTION_RMID},
+        {"rmid",                 required_argument, 0, OPTION_RMID},
 #endif
         {0, 0, 0, 0} /* end */
 };
@@ -949,6 +959,12 @@ int main(int argc, char **argv)
                         break;
                 case 'I':
                         selfn_iface_os(NULL);
+                        break;
+                case OPTION_DISABLE_MON_IPC:
+                        selfn_monitor_disable_ipc(NULL);
+                        break;
+                case OPTION_DISABLE_MON_LLC_MISS:
+                        selfn_monitor_disable_llc_miss(NULL);
                         break;
 #ifdef PQOS_RMID_CUSTOM
                 case OPTION_RMID:

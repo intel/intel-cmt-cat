@@ -16,7 +16,7 @@ test_env:
 
 test: test_env
 	@bash -c "source test_env/bin/activate && \
-		python -m coverage run --source . \
+		python -m coverage run --source pqos \
 			-m unittest discover pqos/test -v; \
 		deactivate"
 

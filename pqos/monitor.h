@@ -111,6 +111,16 @@ void selfn_monitor_cores(const char *arg);
  */
 void selfn_monitor_set_llc_percent(void);
 
+/*
+ * @brief Allows to disable IPC monitoring
+ */
+void selfn_monitor_disable_ipc(const char *arg);
+
+/*
+ * @brief Allows to disable LLC misses monitoring
+ */
+void selfn_monitor_disable_llc_miss(const char *arg);
+
 /**
  * @brief Stops monitoring on selected core(s)/pid(s)
  *

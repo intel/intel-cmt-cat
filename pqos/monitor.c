@@ -90,6 +90,11 @@ static const char *proc_stat_whitelist = "RSD";
  */
 static int sel_monitor_num = 0;
 
+/** Trigger for disabling ipc monitoring */
+static int sel_disable_ipc = 0;
+/** Trigger for disabling llc_miss monitoring */
+static int sel_disable_llc_miss = 0;
+
 /**
  * The mask to tell which events to display
  */
@@ -564,16 +569,13 @@ parse_event(char *str, enum pqos_mon_event *evt)
          * Set event value and sel_event_max which determines
          * what events to display (out of all possible)
          */
-        if (strncasecmp(str, "llc:", 4) == 0) {
+        if (strncasecmp(str, "llc:", 4) == 0)
                 *evt = PQOS_MON_EVENT_L3_OCCUP;
-                sel_events_max |= *evt;
-        } else if (strncasecmp(str, "mbr:", 4) == 0) {
+        else if (strncasecmp(str, "mbr:", 4) == 0)
                 *evt = PQOS_MON_EVENT_RMEM_BW;
-                sel_events_max |= *evt;
-        } else if (strncasecmp(str, "mbl:", 4) == 0) {
+        else if (strncasecmp(str, "mbl:", 4) == 0)
                 *evt = PQOS_MON_EVENT_LMEM_BW;
-                sel_events_max |= *evt;
-        } else if (strncasecmp(str, "all:", 4) == 0 ||
+        else if (strncasecmp(str, "all:", 4) == 0 ||
                    strncasecmp(str, ":", 1) == 0)
                 *evt = (enum pqos_mon_event) PQOS_MON_EVENT_ALL;
         else
@@ -670,6 +672,18 @@ void selfn_monitor_set_llc_percent(void)
         sel_llc_format = LLC_FORMAT_PERCENT;
 }
 
+void selfn_monitor_disable_ipc(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_disable_ipc = 1;
+}
+
+void selfn_monitor_disable_llc_miss(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_disable_llc_miss = 1;
+}
+
 void selfn_monitor_cores(const char *arg)
 {
         char *cp = NULL, *str = NULL;
@@ -695,14 +709,55 @@ void selfn_monitor_cores(const char *arg)
         free(cp);
 }
 
+/**
+ * Update list of events to be monitored
+ *
+ * @param [inout] events List of monitoring events
+ * @param [in] cap_mon monitoring capability
+ */
+static void monitor_setup_events(enum pqos_mon_event *events,
+                                 const struct pqos_capability * const cap_mon)
+{
+        unsigned i;
+        enum pqos_mon_event all_evts = (enum pqos_mon_event)0;
+
+        /**
+         * get all available events on this platform
+         */
+        for (i = 0; i < cap_mon->u.mon->num_events; i++) {
+                struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
+
+                all_evts |= mon->type;
+        }
+
+        /* Disable IPC monitoring */
+        if (sel_disable_ipc)
+                all_evts &= (~PQOS_PERF_EVENT_IPC);
+        /* Disable LLC miss monitoring */
+        if (sel_disable_llc_miss)
+                all_evts &= (~PQOS_PERF_EVENT_LLC_MISS);
+
+        /* check if all available events were selected */
+        if (*events == (enum pqos_mon_event)PQOS_MON_EVENT_ALL) {
+                *events = all_evts;
+
+        /* Start IPC and LLC miss monitoring if available */
+        } else {
+                if (all_evts & PQOS_PERF_EVENT_IPC)
+                        *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
+                if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
+                        *events |= (enum pqos_mon_event)
+                                PQOS_PERF_EVENT_LLC_MISS;
+        }
+
+        sel_events_max |= *events;
+}
+
 int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                   const struct pqos_capability * const cap_mon)
 {
         unsigned i;
         int ret;
-        enum pqos_mon_event all_evts = (enum pqos_mon_event)0;
-        const enum pqos_mon_event evt_all =
-                (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
 
         ASSERT(sel_monitor_num >= 0);
         ASSERT(sel_process_num >= 0);
@@ -750,19 +805,10 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         }
 
         /**
-         * get all available events on this platform
-         */
-        for (i = 0; i < cap_mon->u.mon->num_events; i++) {
-                struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
-
-                all_evts |= mon->type;
-        }
-        /**
          * If no cores and events selected through command line
          * by default let's monitor all cores
          */
         if (sel_monitor_num == 0 && sel_process_num == 0) {
-                sel_events_max = all_evts;
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore  = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
@@ -777,7 +823,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 printf("Core group setup error!\n");
                                 exit(EXIT_FAILURE);
                         }
-                        pg->events = sel_events_max;
+                        pg->events = (enum pqos_mon_event) PQOS_MON_EVENT_ALL;
                         pg->pgrp = malloc(sizeof(*pg->pgrp));
                         if (pg->pgrp == NULL) {
                                 printf("Error with memory allocation!\n");
@@ -798,18 +844,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 for (i = 0; i < (unsigned)sel_monitor_num; i++) {
                         struct core_group *cg = &sel_monitor_core_tab[i];
 
-                        /* check if all available events were selected */
-                        if (cg->events == evt_all) {
-                                cg->events = all_evts;
-                                sel_events_max |= all_evts;
-                        } else {
-                                if (all_evts & PQOS_PERF_EVENT_IPC)
-                                        cg->events |= (enum pqos_mon_event)
-                                                PQOS_PERF_EVENT_IPC;
-                                if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
-                                        cg->events |= (enum pqos_mon_event)
-                                                PQOS_PERF_EVENT_LLC_MISS;
-                        }
+                        monitor_setup_events(&cg->events, cap_mon);
 
                         ret = pqos_mon_start(cg->num_cores, cg->cores,
                                              cg->events, (void *)cg->desc,
@@ -846,18 +881,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 for (i = 0; i < (unsigned)sel_process_num; i++) {
                         struct pid_group *pg = &sel_monitor_pid_tab[i];
 
-                        /* check if all available events were selected */
-                        if (pg->events == evt_all) {
-                                pg->events = all_evts;
-                                sel_events_max |= all_evts;
-                        } else {
-                                if (all_evts & PQOS_PERF_EVENT_IPC)
-                                        pg->events |= (enum pqos_mon_event)
-                                                PQOS_PERF_EVENT_IPC;
-                                if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
-                                        pg->events |= (enum pqos_mon_event)
-                                                PQOS_PERF_EVENT_LLC_MISS;
-                        }
+                        monitor_setup_events(&pg->events, cap_mon);
+
                         ret = pqos_mon_start_pids(pg->num_pids, pg->pids,
                                                   pg->events, (void *)pg->desc,
                                                   pg->pgrp);
@@ -1958,8 +1983,12 @@ static void monitoring_ctrlc(int signo)
  * @return Number of characters added to \a data excluding NULL
  */
 static size_t
-fillin_text_column(const double val, char data[], const size_t sz_data,
-                   const int is_monitored, const int is_column_present)
+fillin_text_column(const char *format,
+                   const double val,
+                   char data[],
+                   const size_t sz_data,
+                   const int is_monitored,
+                   const int is_column_present)
 {
         static const char blank_column[] = "            ";
         size_t offset = 0;
@@ -1971,7 +2000,7 @@ fillin_text_column(const double val, char data[], const size_t sz_data,
                 /**
                  * This is monitored and we have the data
                  */
-                snprintf(data, sz_data - 1, " %11.1f", val);
+                snprintf(data, sz_data - 1, format, val);
                 offset = strlen(data);
         } else if (is_column_present) {
                 /**
@@ -1987,6 +2016,7 @@ fillin_text_column(const double val, char data[], const size_t sz_data,
 /**
  * @brief Fills in single XML column in the monitoring table
  *
+ * @param format numerical value format
  * @param val numerical value to be put into the column
  * @param data place to put formatted column into
  * @param sz_data available size for the column
@@ -1997,18 +2027,26 @@ fillin_text_column(const double val, char data[], const size_t sz_data,
  * @return Number of characters added to \a data excluding NULL
  */
 static size_t
-fillin_xml_column(const double val, char data[], const size_t sz_data,
-                  const int is_monitored, const int is_column_present,
+fillin_xml_column(const char *const format,
+                  const double val,
+                  char data[],
+                  const size_t sz_data,
+                  const int is_monitored,
+                  const int is_column_present,
                   const char node_name[])
 {
         size_t offset = 0;
 
         if (is_monitored) {
+                char formatted_val[16];
+
+                snprintf(formatted_val, 15, format, val);
+
                 /**
                  * This is monitored and we have the data
                  */
-                snprintf(data, sz_data - 1, "\t<%s>%.1f</%s>\n",
-                         node_name, val, node_name);
+                snprintf(data, sz_data - 1, "\t<%s>%s</%s>\n",
+                         node_name, formatted_val, node_name);
                 offset = strlen(data);
         } else if (is_column_present) {
                 /**
@@ -2025,6 +2063,7 @@ fillin_xml_column(const double val, char data[], const size_t sz_data,
 /**
  * @brief Fills in single CSV column in the monitoring table
  *
+ * @param format numerical value format
  * @param val numerical value to be put into the column
  * @param data place to put formatted column into
  * @param sz_data available size for the column
@@ -2034,8 +2073,12 @@ fillin_xml_column(const double val, char data[], const size_t sz_data,
  * @return Number of characters added to \a data excluding NULL
  */
 static size_t
-fillin_csv_column(const double val, char data[], const size_t sz_data,
-                  const int is_monitored, const int is_column_present)
+fillin_csv_column(const char *format,
+                  const double val,
+                  char data[],
+                  const size_t sz_data,
+                  const int is_monitored,
+                  const int is_column_present)
 {
         size_t offset = 0;
 
@@ -2043,7 +2086,7 @@ fillin_csv_column(const double val, char data[], const size_t sz_data,
                 /**
                  * This is monitored and we have the data
                  */
-                snprintf(data, sz_data - 1, ",%.1f", val);
+                snprintf(data, sz_data - 1, format, val);
                 offset = strlen(data);
         } else if (is_column_present) {
                 /**
@@ -2072,7 +2115,7 @@ print_text_row(FILE *fp,
                const double mbr,
                const double mbl)
 {
-        const size_t sz_data = 128;
+        const size_t sz_data = 256;
         char data[sz_data];
         size_t offset = 0;
         char core_list[PQOS_MAX_CORES * 4];
@@ -2083,25 +2126,34 @@ print_text_row(FILE *fp,
 
         memset(data, 0, sz_data);
 
-        offset += fillin_text_column(llc_entry->val, data + offset,
+        offset += fillin_text_column(" %11.2f", mon_data->values.ipc,
+                                     data + offset,
+                                     sz_data - offset,
+                                     mon_data->event & PQOS_PERF_EVENT_IPC,
+                                     sel_events_max & PQOS_PERF_EVENT_IPC);
+
+        offset += fillin_text_column(" %10uk", (unsigned) mon_data->values.ipc,
+                                     data + offset,
+                                     sz_data - offset,
+                                     mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
+                                     sel_events_max & PQOS_PERF_EVENT_LLC_MISS);
+
+        offset += fillin_text_column(" %11.1f", llc_entry->val, data + offset,
                                      sz_data - offset,
                                      mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                      sel_events_max & PQOS_MON_EVENT_L3_OCCUP);
 
-        offset += fillin_text_column(mbl, data + offset, sz_data - offset,
+        offset += fillin_text_column(" %11.1f", mbl, data + offset,
+                                     sz_data - offset,
                                      mon_data->event & PQOS_MON_EVENT_LMEM_BW,
                                      sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        fillin_text_column(mbr, data + offset, sz_data - offset,
+        fillin_text_column(" %11.1f", mbr, data + offset, sz_data - offset,
                            mon_data->event & PQOS_MON_EVENT_RMEM_BW,
                            sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
-                fprintf(fp, "\n%8.8s %5.2f %7uk%s",
-                        (char *)mon_data->context,
-                        mon_data->values.ipc,
-                        (unsigned)mon_data->values.llc_misses_delta/1000,
-                        data);
+                fprintf(fp, "\n%8.8s%s", (char *)mon_data->context, data);
         else {
                 memset(core_list, 0, sizeof(core_list));
 
@@ -2111,11 +2163,8 @@ print_text_row(FILE *fp,
                         strncat(core_list, "err", sizeof(core_list) - 1);
                 }
 
-                fprintf(fp, "\n%8.8s %8.8s %6.2f %7uk%s",
-                        (char *)mon_data->context, core_list,
-                        mon_data->values.ipc,
-                        (unsigned)mon_data->values.llc_misses_delta/1000,
-                        data);
+                fprintf(fp, "\n%8.8s %8.8s%s", (char *)mon_data->context,
+                        core_list, data);
         }
 }
 
@@ -2130,13 +2179,14 @@ print_text_row(FILE *fp,
  * @param mbl local memory bandwidth data
  */
 static void
-print_xml_row(FILE *fp, char *time,
+print_xml_row(FILE *fp,
+              char *time,
               struct pqos_mon_data *mon_data,
               const struct llc_entry_data *llc_entry,
               const double mbr,
               const double mbl)
 {
-        const size_t sz_data = 128;
+        const size_t sz_data = 256;
         char data[sz_data];
         char core_list[PQOS_MAX_CORES * 4];
         size_t offset = 0;
@@ -2149,18 +2199,33 @@ print_xml_row(FILE *fp, char *time,
         const char *l3_text = (llc_entry->format == LLC_FORMAT_KILOBYTES) ?
                 "l3_occupancy_kB" : "l3_occupancy_percent";
 
-        offset += fillin_xml_column(llc_entry->val, data + offset,
+        offset += fillin_xml_column("%.2f", mon_data->values.ipc, data + offset,
+                                    sz_data - offset,
+                                    mon_data->event & PQOS_PERF_EVENT_IPC,
+                                    sel_events_max & PQOS_PERF_EVENT_IPC,
+                                    "ipc");
+
+        offset += fillin_xml_column("%llu", (unsigned long long)
+                                    mon_data->values.llc_misses_delta,
+                                    data + offset,
+                                    sz_data - offset,
+                                    mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
+                                    sel_events_max & PQOS_PERF_EVENT_LLC_MISS,
+                                    "llc_misses");
+
+        offset += fillin_xml_column("%.1f", llc_entry->val, data + offset,
                                     sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                     sel_events_max & PQOS_MON_EVENT_L3_OCCUP,
                                     l3_text);
 
-        offset += fillin_xml_column(mbl, data + offset, sz_data - offset,
+        offset += fillin_xml_column("%.1f", mbl, data + offset,
+                                    sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_LMEM_BW,
                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW,
                                     "mbm_local_MB");
 
-        fillin_xml_column(mbr, data + offset, sz_data - offset,
+        fillin_xml_column("%.1f", mbr, data + offset, sz_data - offset,
                           mon_data->event & PQOS_MON_EVENT_RMEM_BW,
                           sel_events_max & PQOS_MON_EVENT_RMEM_BW,
                           "mbm_remote_MB");
@@ -2170,15 +2235,11 @@ print_xml_row(FILE *fp, char *time,
                         "%s\n"
                         "\t<time>%s</time>\n"
                         "\t<core>%s</core>\n"
-                        "\t<ipc>%.2f</ipc>\n"
-                        "\t<llc_misses>%llu</llc_misses>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
                         time,
                         (char *)mon_data->context,
-                        mon_data->values.ipc,
-                        (unsigned long long)mon_data->values.llc_misses_delta,
                         data,
                         xml_child_close);
         else {
@@ -2195,16 +2256,12 @@ print_xml_row(FILE *fp, char *time,
                         "\t<time>%s</time>\n"
                         "\t<pid>%s</pid>\n"
                         "\t<core>%s</core>\n"
-                        "\t<ipc>%.2f</ipc>\n"
-                        "\t<llc_misses>%llu</llc_misses>\n"
                         "%s"
                         "%s\n",
                         xml_child_open,
                         time,
                         (char *)mon_data->context,
                         core_list,
-                        mon_data->values.ipc,
-                        (unsigned long long)mon_data->values.llc_misses_delta,
                         data,
                         xml_child_close);
         }
@@ -2239,26 +2296,38 @@ print_csv_row(FILE *fp, char *time,
 
         memset(data, 0, sz_data);
 
-        offset += fillin_csv_column(llc_entry->val, data + offset,
+
+        offset += fillin_csv_column(",%.2f", mon_data->values.ipc,
+                                    data + offset,
+                                    sz_data - offset,
+                                    mon_data->event & PQOS_PERF_EVENT_IPC,
+                                    sel_events_max & PQOS_PERF_EVENT_IPC);
+
+        offset += fillin_csv_column(",%llu", (unsigned long long)
+                                    mon_data->values.llc_misses_delta,
+                                    data + offset,
+                                    sz_data - offset,
+                                    mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
+                                    sel_events_max & PQOS_PERF_EVENT_LLC_MISS);
+
+        offset += fillin_csv_column(",%.1f", llc_entry->val, data + offset,
                                     sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                     sel_events_max & PQOS_MON_EVENT_L3_OCCUP);
 
-        offset += fillin_csv_column(mbl, data + offset, sz_data - offset,
+        offset += fillin_csv_column(",%.1f", mbl, data + offset,
+                                    sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_LMEM_BW,
                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        fillin_csv_column(mbr, data + offset, sz_data - offset,
+        fillin_csv_column(",%.1f", mbr, data + offset, sz_data - offset,
                           mon_data->event & PQOS_MON_EVENT_RMEM_BW,
                           sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         if (!process_mode())
                 fprintf(fp,
-                        "%s,\"%s\",%.2f,%llu%s\n",
-                        time, (char *)mon_data->context,
-                        mon_data->values.ipc,
-                        (unsigned long long)mon_data->values.llc_misses_delta,
-                        data);
+                        "%s,\"%s\"%s\n",
+                        time, (char *)mon_data->context, data);
         else {
                 memset(core_list, 0, sizeof(core_list));
 
@@ -2269,11 +2338,8 @@ print_csv_row(FILE *fp, char *time,
                 }
 
                 fprintf(fp,
-                        "%s,\"%s\",%s,%.2f,%llu%s\n",
-                        time, (char *)mon_data->context, core_list,
-                        mon_data->values.ipc,
-                        (unsigned long long)mon_data->values.llc_misses_delta,
-                        data);
+                        "%s,\"%s\",%s%s\n",
+                        time, (char *)mon_data->context, core_list, data);
         }
 }
 
@@ -2302,10 +2368,14 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (istext) {
                 if (!process_mode())
-                        strncpy(hdr, "    CORE   IPC   MISSES", sz_hdr - 1);
+                        strncpy(hdr, "    CORE", sz_hdr - 1);
                 else
-                        strncpy(hdr, "     PID     CORE    IPC   MISSES",
-                                sz_hdr - 1);
+                        strncpy(hdr, "     PID     CORE", sz_hdr - 1);
+
+                if (sel_events_max & PQOS_PERF_EVENT_IPC)
+                        strncat(hdr, "         IPC", sz_hdr - strlen(hdr) - 1);
+                if (sel_events_max & PQOS_PERF_EVENT_LLC_MISS)
+                        strncat(hdr, "      MISSES", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP) {
                         if (format == LLC_FORMAT_KILOBYTES)
                                 strncat(hdr, "     LLC[KB]",
@@ -2322,11 +2392,15 @@ build_header_row(char *hdr, const size_t sz_hdr,
 
         if (iscsv) {
                 if (!process_mode())
-                        strncpy(hdr, "Time,Core,IPC,LLC Misses",
+                        strncpy(hdr, "Time,Core",
                                 sz_hdr - 1);
                 else
-                        strncpy(hdr, "Time,PID,Core,IPC,LLC Misses",
+                        strncpy(hdr, "Time,PID,Core",
                                 sz_hdr - 1);
+                if (sel_events_max & PQOS_PERF_EVENT_IPC)
+                        strncat(hdr, ",IPC", sz_hdr - strlen(hdr) - 1);
+                if (sel_events_max & PQOS_PERF_EVENT_LLC_MISS)
+                        strncat(hdr, ",LLC Misses", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_L3_OCCUP) {
                         if (format == LLC_FORMAT_KILOBYTES)
                                 strncat(hdr, ",LLC[KB]",
