@@ -135,22 +135,14 @@ struct pqos_vendor_config {
         int cpuid_cache_leaf;
         unsigned mba_max;
         uint32_t mba_msr_reg;
-        int (*hw_mba_get)(const unsigned mba_id,
-                          const unsigned max_num_cos,
-                          unsigned *num_cos,
-                          struct pqos_mba *mba_tab);
-        int (*hw_mba_set)(const unsigned mba_id,
-                          const unsigned num_cos,
-                          const struct pqos_mba *requested,
-                          struct pqos_mba *actual);
-        int (*os_mba_get)(const unsigned mba_id,
-                          const unsigned max_num_cos,
-                          unsigned *num_cos,
-                          struct pqos_mba *mba_tab);
-        int (*os_mba_set)(const unsigned mba_id,
-                          const unsigned num_cos,
-                          const struct pqos_mba *requested,
-                          struct pqos_mba *actual);
+        int (*mba_get)(const unsigned mba_id,
+                       const unsigned max_num_cos,
+                       unsigned *num_cos,
+                       struct pqos_mba *mba_tab);
+        int (*mba_set)(const unsigned mba_id,
+                       const unsigned num_cos,
+                       const struct pqos_mba *requested,
+                       struct pqos_mba *actual);
 };
 
 /**
@@ -161,7 +153,9 @@ struct pqos_vendor_config {
  * @return Operation status
  * @retval Success returns 0
  */
-int init_functions(struct pqos_vendor_config *ptr, enum pqos_vendor vendor);
+int init_functions(struct pqos_vendor_config *ptr,
+                   enum pqos_vendor vendor,
+                   int interface);
 
 /**
  * MSR's to read instructions retired, unhalted cycles,
