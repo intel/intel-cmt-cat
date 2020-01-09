@@ -512,7 +512,9 @@ detect_vendor(void)
  * Initialize pointers for the vendors
  */
 int
-init_functions(struct pqos_vendor_config *ptr, enum pqos_vendor vendor)
+init_functions(struct pqos_vendor_config *ptr,
+               enum pqos_vendor vendor,
+               int interface)
 {
         /**
          * Make sure to initialize all the pointers to avoid
@@ -522,21 +524,25 @@ init_functions(struct pqos_vendor_config *ptr, enum pqos_vendor vendor)
                 ptr->cpuid_cache_leaf = 4;
                 ptr->mba_max = PQOS_MBA_LINEAR_MAX;
                 ptr->mba_msr_reg = PQOS_MSR_MBA_MASK_START;
-                ptr->hw_mba_get = hw_mba_get;
-                ptr->hw_mba_set = hw_mba_set;
+                ptr->mba_get = hw_mba_get;
+                ptr->mba_set = hw_mba_set;
 #ifdef __linux__
-                ptr->os_mba_get = os_mba_get;
-                ptr->os_mba_set = os_mba_set;
+                if (interface == PQOS_INTER_OS) {
+                        ptr->mba_get = os_mba_get;
+                        ptr->mba_set = os_mba_set;
+                }
 #endif
         } else if (vendor == PQOS_VENDOR_AMD) {
                 ptr->cpuid_cache_leaf = 0x8000001D;
                 ptr->mba_max = PQOS_MBA_MAX_AMD;
                 ptr->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
-                ptr->hw_mba_get = hw_mba_get_amd;
-                ptr->hw_mba_set = hw_mba_set_amd;
+                ptr->mba_get = hw_mba_get_amd;
+                ptr->mba_set = hw_mba_set_amd;
 #ifdef __linux__
-                ptr->os_mba_get = os_mba_get_amd;
-                ptr->os_mba_set = os_mba_set_amd;
+                if (interface == PQOS_INTER_OS) {
+                        ptr->mba_get = os_mba_get_amd;
+                        ptr->mba_set = os_mba_set_amd;
+                }
 #endif
         } else {
                 LOG_ERROR("init_pointers: init failed!");
