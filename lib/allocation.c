@@ -1455,6 +1455,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
         const struct pqos_cap_mba *mba_cap = NULL;
+        const struct pqos_vendor_config *vconfig;
         int ret = PQOS_RETVAL_OK;
         unsigned max_l3_cos = 0;
         unsigned max_l2_cos = 0;
@@ -1474,6 +1475,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                mba_cfg == PQOS_MBA_ANY);
 
         _pqos_cap_get(&cap, NULL);
+        _pqos_get_vendor_config(&vconfig);
 
         /* Get L3 CAT capabilities */
         (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &alloc_cap);
@@ -1635,7 +1637,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
-                        ret = alloc_cos_reset(v_config.mba_msr_reg,
+                        ret = alloc_cos_reset(vconfig->mba_msr_reg,
                                               mba_cap->num_classes, core, 0);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;

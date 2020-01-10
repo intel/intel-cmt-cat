@@ -58,6 +58,7 @@
 #include "machine.h"
 #include "os_allocation.h"
 #include "allocation.h"
+#include "cap.h"
 
 /**
  * This structure will be made externally available
@@ -342,15 +343,19 @@ detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
 static int
 detect_apic_masks(struct apic_info *apic)
 {
+        const struct pqos_vendor_config *vconfig;
+
         if (apic == NULL)
                 return -1;
+
+        _pqos_get_vendor_config(&vconfig);
 
         memset(apic, 0, sizeof(*apic));
 
         if (detect_apic_core_masks(apic) != 0)
                 return -2;
 
-        if (detect_apic_cache_masks(apic, v_config.cpuid_cache_leaf) != 0)
+        if (detect_apic_cache_masks(apic, vconfig->cpuid_cache_leaf) != 0)
                 return -3;
 
         return 0;
@@ -512,36 +517,44 @@ detect_vendor(void)
  * Initialize pointers for the vendors
  */
 int
-init_vendor_functions(struct pqos_vendor_config *ptr,
+init_vendor_functions(struct pqos_vendor_config **vconfig,
                       enum pqos_vendor vendor,
                       int interface)
 {
+        *vconfig = (struct pqos_vendor_config *)malloc(
+            sizeof(struct pqos_vendor_config));
+        if ((*vconfig) == NULL) {
+                LOG_ERROR("Couldn't allocate pqos_vendor_config structure!");
+                return -EFAULT;
+        }
+        memset(*vconfig, 0, sizeof(struct pqos_vendor_config));
+
         /**
          * Make sure to initialize all the pointers to avoid
          * NULL check while calling
          */
         if (vendor == PQOS_VENDOR_INTEL) {
-                ptr->cpuid_cache_leaf = 4;
-                ptr->mba_max = PQOS_MBA_LINEAR_MAX;
-                ptr->mba_msr_reg = PQOS_MSR_MBA_MASK_START;
-                ptr->mba_get = hw_mba_get;
-                ptr->mba_set = hw_mba_set;
+                (*vconfig)->cpuid_cache_leaf = 4;
+                (*vconfig)->mba_max = PQOS_MBA_LINEAR_MAX;
+                (*vconfig)->mba_msr_reg = PQOS_MSR_MBA_MASK_START;
+                (*vconfig)->mba_get = hw_mba_get;
+                (*vconfig)->mba_set = hw_mba_set;
 #ifdef __linux__
                 if (interface == PQOS_INTER_OS) {
-                        ptr->mba_get = os_mba_get;
-                        ptr->mba_set = os_mba_set;
+                        (*vconfig)->mba_get = os_mba_get;
+                        (*vconfig)->mba_set = os_mba_set;
                 }
 #endif
         } else if (vendor == PQOS_VENDOR_AMD) {
-                ptr->cpuid_cache_leaf = 0x8000001D;
-                ptr->mba_max = PQOS_MBA_MAX_AMD;
-                ptr->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
-                ptr->mba_get = hw_mba_get_amd;
-                ptr->mba_set = hw_mba_set_amd;
+                (*vconfig)->cpuid_cache_leaf = 0x8000001D;
+                (*vconfig)->mba_max = PQOS_MBA_MAX_AMD;
+                (*vconfig)->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
+                (*vconfig)->mba_get = hw_mba_get_amd;
+                (*vconfig)->mba_set = hw_mba_set_amd;
 #ifdef __linux__
                 if (interface == PQOS_INTER_OS) {
-                        ptr->mba_get = os_mba_get_amd;
-                        ptr->mba_set = os_mba_set_amd;
+                        (*vconfig)->mba_get = os_mba_get_amd;
+                        (*vconfig)->mba_set = os_mba_set_amd;
                 }
 #endif
         } else {
