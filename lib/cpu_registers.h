@@ -54,11 +54,6 @@ extern "C" {
 #define PQOS_MSR_ASSOC_QECOS_MASK  0xffffffff00000000ULL
 #define PQOS_MSR_ASSOC_RMID_MASK   ((1ULL << 10) - 1ULL)
 
-/*
- * This is a global structure to store all the vendor defines
- */
-extern struct pqos_vendor_config v_config;
-
 /**
  * Allocation class of service (COS) MSR registers
  */

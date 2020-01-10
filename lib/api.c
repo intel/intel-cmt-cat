@@ -745,8 +745,11 @@ pqos_mba_set(const unsigned mba_id,
              const struct pqos_mba *requested,
              struct pqos_mba *actual)
 {
+        const struct pqos_vendor_config *vconfig;
         int ret;
         unsigned i;
+
+        _pqos_get_vendor_config(&vconfig);
 
         if (requested == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
@@ -757,9 +760,9 @@ pqos_mba_set(const unsigned mba_id,
         for (i = 0; i < num_cos; i++)
                 if (requested[i].ctrl == 0 &&
                     (requested[i].mb_max == 0 ||
-                     requested[i].mb_max > v_config.mba_max)) {
+                     requested[i].mb_max > vconfig->mba_max)) {
                         LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
-                                  requested[i].class_id, v_config.mba_max);
+                                  requested[i].class_id, vconfig->mba_max);
                         return PQOS_RETVAL_PARAM;
                 }
 
@@ -771,7 +774,7 @@ pqos_mba_set(const unsigned mba_id,
                 return ret;
         }
 
-        ret = v_config.mba_set(mba_id, num_cos, requested, actual);
+        ret = vconfig->mba_set(mba_id, num_cos, requested, actual);
 
         _pqos_api_unlock();
 
@@ -785,7 +788,10 @@ pqos_mba_get(const unsigned mba_id,
              unsigned *num_cos,
              struct pqos_mba *mba_tab)
 {
+        const struct pqos_vendor_config *vconfig;
         int ret;
+
+        _pqos_get_vendor_config(&vconfig);
 
         if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
                 return PQOS_RETVAL_PARAM;
@@ -798,7 +804,7 @@ pqos_mba_get(const unsigned mba_id,
                 return ret;
         }
 
-        ret = v_config.mba_get(mba_id, max_num_cos, num_cos, mba_tab);
+        ret = vconfig->mba_get(mba_id, max_num_cos, num_cos, mba_tab);
 
         _pqos_api_unlock();
 

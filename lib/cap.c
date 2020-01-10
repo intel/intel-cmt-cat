@@ -76,7 +76,7 @@
 #include "resctrl.h"
 #include "perf_monitoring.h"
 
-struct pqos_vendor_config v_config;
+static struct pqos_vendor_config *v_config = NULL;
 
 /**
  * ---------------------------------------
@@ -1741,7 +1741,7 @@ _pqos_get_vendor_config(const struct pqos_vendor_config **vconfig)
 {
         if (vconfig != NULL) {
                 ASSERT(v_config != NULL);
-                *vconfig = &v_config;
+                *vconfig = v_config;
         }
 }
 
