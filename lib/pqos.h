@@ -940,6 +940,30 @@ int pqos_mba_get(const unsigned mba_id,
                  unsigned *num_cos,
                  struct pqos_mba *mba_tab);
 
+/**
+ * PQoS vendor value and function pointers
+ * @param cpuid_cache_leaf	: Cache mask leaf
+ * @param default_mba		: default memory bandwidth
+ * @param mba_msr_reg		: MBA mask base register
+ * @param hw_mba_get		: Get MBA mask
+ * @param hw_mba_set		: Set MBA mask with MSR method
+ * @param os_mba_get		: Get MBA mask with OS method
+ * @param os_mba_set		: Set MBA mask with OS method
+ */
+struct pqos_vendor_config {
+        int cpuid_cache_leaf;
+        unsigned mba_max;
+        uint32_t mba_msr_reg;
+        int (*mba_get)(const unsigned mba_id,
+                       const unsigned max_num_cos,
+                       unsigned *num_cos,
+                       struct pqos_mba *mba_tab);
+        int (*mba_set)(const unsigned mba_id,
+                       const unsigned num_cos,
+                       const struct pqos_mba *requested,
+                       struct pqos_mba *actual);
+};
+
 /*
  * =======================================
  * Utility API
