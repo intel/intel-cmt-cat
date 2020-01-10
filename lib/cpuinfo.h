@@ -58,6 +58,18 @@ extern "C" {
 enum pqos_vendor detect_vendor(void);
 
 /**
+ * @brief initializes intel/amd vendor functions
+ *
+ * @param vendor configuration structures
+ * @param vendor identification
+ * @return Operation status
+ * @retval Success returns 0
+ */
+int init_vendor_functions(struct pqos_vendor_config *ptr,
+                          enum pqos_vendor vendor,
+                          int interface);
+
+/**
  * @brief Initializes CPU information module
  *
  * CPU topology detection method is OS dependent.

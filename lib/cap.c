@@ -1402,7 +1402,7 @@ pqos_init(const struct pqos_config *config)
         /**
          * Initialise vendor default values and function pointers
          */
-        ret = init_functions(&v_config, vendor, config->interface);
+        ret = init_vendor_functions(&v_config, vendor, config->interface);
         if (ret != 0) {
                 LOG_ERROR("init_pointers() error %d\n", ret);
                 ret = PQOS_RETVAL_ERROR;
@@ -1733,6 +1733,15 @@ _pqos_cap_get(const struct pqos_cap **cap,
         if (cpu != NULL) {
                 ASSERT(m_cpu != NULL);
                 *cpu = m_cpu;
+        }
+}
+
+void
+_pqos_get_vendor_config(const struct pqos_vendor_config **vconfig)
+{
+        if (vconfig != NULL) {
+                ASSERT(v_config != NULL);
+                *vconfig = &v_config;
         }
 }
 

@@ -512,9 +512,9 @@ detect_vendor(void)
  * Initialize pointers for the vendors
  */
 int
-init_functions(struct pqos_vendor_config *ptr,
-               enum pqos_vendor vendor,
-               int interface)
+init_vendor_functions(struct pqos_vendor_config *ptr,
+                      enum pqos_vendor vendor,
+                      int interface)
 {
         /**
          * Make sure to initialize all the pointers to avoid

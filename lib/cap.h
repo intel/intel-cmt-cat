@@ -109,6 +109,13 @@ void _pqos_cap_get(const struct pqos_cap **cap,
                    const struct pqos_cpuinfo **cpu);
 
 /**
+ * @brief Internal API to retrieve PQoS vendor specific data
+ *
+ * @param [out] cap location to store PQoS vendor specific information at
+ */
+void _pqos_get_vendor_config(const struct pqos_vendor_config **vconfig);
+
+/**
  * @brief Internal API to retrie \a type of capability
  *
  * @param [in] type capability type to look for
