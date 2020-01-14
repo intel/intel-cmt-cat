@@ -44,7 +44,7 @@
 #include "cap.h"
 #include "log.h"
 #include "types.h"
-#include "cpu_registers.h"
+#include "cpuinfo.h"
 
 /**
  * Value marking monitoring group structure as "valid".
@@ -60,19 +60,59 @@
  */
 static int m_interface = PQOS_INTER_MSR;
 
+/**
+ * PQoS API functions
+ */
+static struct pqos_api {
+        /** Set MBA */
+        int (*mba_get)(const unsigned mba_id,
+                       const unsigned max_num_cos,
+                       unsigned *num_cos,
+                       struct pqos_mba *mba_tab);
+        /** Get MBA mask */
+        int (*mba_set)(const unsigned mba_id,
+                       const unsigned num_cos,
+                       const struct pqos_mba *requested,
+                       struct pqos_mba *actual);
+} api;
+
 /*
  * =======================================
  * Init module
  * =======================================
  */
 int
-api_init(int interface)
+api_init(int interface, enum pqos_vendor vendor)
 {
         if (interface != PQOS_INTER_MSR && interface != PQOS_INTER_OS &&
                 interface != PQOS_INTER_OS_RESCTRL_MON)
                 return PQOS_RETVAL_PARAM;
 
         m_interface = interface;
+
+        memset(&api, 0, sizeof(api));
+
+        if (interface == PQOS_INTER_MSR) {
+                if (vendor == PQOS_VENDOR_AMD) {
+                        api.mba_get = hw_mba_get_amd;
+                        api.mba_set = hw_mba_set_amd;
+                } else {
+                        api.mba_get = hw_mba_get;
+                        api.mba_set = hw_mba_set;
+                }
+
+#ifdef __linux__
+        } else if (interface == PQOS_INTER_OS ||
+                   interface == PQOS_INTER_OS_RESCTRL_MON) {
+                if (vendor == PQOS_VENDOR_AMD) {
+                        api.mba_get = os_mba_get_amd;
+                        api.mba_set = os_mba_set_amd;
+                } else {
+                        api.mba_get = os_mba_get;
+                        api.mba_set = os_mba_set;
+                }
+#endif
+        }
 
         return PQOS_RETVAL_OK;
 }
@@ -745,26 +785,11 @@ pqos_mba_set(const unsigned mba_id,
              const struct pqos_mba *requested,
              struct pqos_mba *actual)
 {
-        const struct pqos_vendor_config *vconfig;
         int ret;
         unsigned i;
 
-        _pqos_get_vendor_config(&vconfig);
-
         if (requested == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
-
-        /**
-         * Check if MBA rate is within allowed range
-         */
-        for (i = 0; i < num_cos; i++)
-                if (requested[i].ctrl == 0 &&
-                    (requested[i].mb_max == 0 ||
-                     requested[i].mb_max > vconfig->mba_max)) {
-                        LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
-                                  requested[i].class_id, vconfig->mba_max);
-                        return PQOS_RETVAL_PARAM;
-                }
 
         _pqos_api_lock();
 
@@ -774,7 +799,29 @@ pqos_mba_set(const unsigned mba_id,
                 return ret;
         }
 
-        ret = vconfig->mba_set(mba_id, num_cos, requested, actual);
+        /**
+         * Check if MBA rate is within allowed range
+         */
+        for (i = 0; i < num_cos; i++) {
+                const struct cpuinfo_config *vconfig;
+
+                cpuinfo_get_config(&vconfig);
+                if (requested[i].ctrl == 0 &&
+                    (requested[i].mb_max == 0 ||
+                     requested[i].mb_max > vconfig->mba_max)) {
+                        LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
+                                  requested[i].class_id, vconfig->mba_max);
+                        _pqos_api_unlock();
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
+        if (api.mba_set != NULL)
+                ret = api.mba_set(mba_id, num_cos, requested, actual);
+        else {
+                LOG_INFO("Interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
 
         _pqos_api_unlock();
 
@@ -788,10 +835,7 @@ pqos_mba_get(const unsigned mba_id,
              unsigned *num_cos,
              struct pqos_mba *mba_tab)
 {
-        const struct pqos_vendor_config *vconfig;
         int ret;
-
-        _pqos_get_vendor_config(&vconfig);
 
         if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
                 return PQOS_RETVAL_PARAM;
@@ -804,7 +848,12 @@ pqos_mba_get(const unsigned mba_id,
                 return ret;
         }
 
-        ret = vconfig->mba_get(mba_id, max_num_cos, num_cos, mba_tab);
+        if (api.mba_get != NULL)
+                ret = api.mba_get(mba_id, max_num_cos, num_cos, mba_tab);
+        else {
+                LOG_INFO("Interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
 
         _pqos_api_unlock();
 
@@ -1072,9 +1121,10 @@ pqos_mon_start_pids(const unsigned num_pids,
         return ret;
 }
 
-int pqos_mon_add_pids(const unsigned num_pids,
-                      const pid_t *pids,
-                      struct pqos_mon_data *group)
+int
+pqos_mon_add_pids(const unsigned num_pids,
+                  const pid_t *pids,
+                  struct pqos_mon_data *group)
 {
         int ret;
 
@@ -1111,9 +1161,10 @@ int pqos_mon_add_pids(const unsigned num_pids,
         return ret;
 }
 
-int pqos_mon_remove_pids(const unsigned num_pids,
-                         const pid_t *pids,
-                         struct pqos_mon_data *group)
+int
+pqos_mon_remove_pids(const unsigned num_pids,
+                     const pid_t *pids,
+                     struct pqos_mon_data *group)
 {
         int ret;
 
@@ -1124,7 +1175,7 @@ int pqos_mon_remove_pids(const unsigned num_pids,
                 return PQOS_RETVAL_PARAM;
 
         if (m_interface != PQOS_INTER_OS &&
-                m_interface != PQOS_INTER_OS_RESCTRL_MON) {
+            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
                 LOG_ERROR("Incompatible interface "
                           "selected for task monitoring!\n");
                 return PQOS_RETVAL_ERROR;

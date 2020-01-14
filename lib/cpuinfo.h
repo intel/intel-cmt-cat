@@ -47,27 +47,13 @@ extern "C" {
 #endif
 
 /**
- * @brief Detects and returns the CPU vendor
- *
- * Sets the vendor identification. See pqos_vendor definitions.
- *
- * @return operation status
- * @retval 0 on success
- * @retval -EFAULT on error
+ * CPU vendor configuration value
  */
-enum pqos_vendor detect_vendor(void);
-
-/**
- * @brief initializes intel/amd vendor functions
- *
- * @param vendor configuration structures
- * @param vendor identification
- * @return Operation status
- * @retval Success returns 0
- */
-int init_vendor_functions(struct pqos_vendor_config **vconfig,
-                          enum pqos_vendor vendor,
-                          int interface);
+struct cpuinfo_config {
+        int cpuid_cache_leaf; /**< Cache mask leaf */
+        unsigned mba_max;     /**< default memory bandwidth */
+        uint32_t mba_msr_reg; /**< MBA mask base register */
+};
 
 /**
  * @brief Initializes CPU information module
@@ -82,7 +68,7 @@ int init_vendor_functions(struct pqos_vendor_config **vconfig,
  * @retval -EPERM cpuinfo already initialized
  * @retval -EFAULT error building & discovering the topology
  */
-int cpuinfo_init(const struct pqos_cpuinfo **topology, enum pqos_vendor vendor);
+int cpuinfo_init(const struct pqos_cpuinfo **topology);
 
 /**
  * @brief Shuts down CPU information module
@@ -92,6 +78,13 @@ int cpuinfo_init(const struct pqos_cpuinfo **topology, enum pqos_vendor vendor);
  * @retval -EPERM cpuinfo not initialized
  */
 int cpuinfo_fini(void);
+
+/**
+ * @brief Internal API to retrieve PQoS vendor specific data
+ *
+ * @param [out] config location to store PQoS vendor specific information at
+ */
+void cpuinfo_get_config(const struct cpuinfo_config **config);
 
 #ifdef __cplusplus
 }

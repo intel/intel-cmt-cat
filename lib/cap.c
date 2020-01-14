@@ -76,8 +76,6 @@
 #include "resctrl.h"
 #include "perf_monitoring.h"
 
-static struct pqos_vendor_config *v_config = NULL;
-
 /**
  * ---------------------------------------
  * Local macros
@@ -1330,7 +1328,6 @@ pqos_init(const struct pqos_config *config)
         unsigned i = 0, max_core = 0;
         int cat_init = 0, mon_init = 0;
         char *environment = NULL;
-        enum pqos_vendor vendor;
 
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -1391,29 +1388,11 @@ pqos_init(const struct pqos_config *config)
                 goto init_error;
         }
 
-        /* Detect the vendor first */
-        vendor = detect_vendor();
-        if (vendor == PQOS_VENDOR_UNKNOWN) {
-                LOG_ERROR("detect_vendor() error %d\n", ret);
-                ret = PQOS_RETVAL_ERROR;
-                goto log_init_error;
-        }
-
-        /**
-         * Initialise vendor default values and function pointers
-         */
-        ret = init_vendor_functions(&v_config, vendor, config->interface);
-        if (ret != 0) {
-                LOG_ERROR("init_pointers() error %d\n", ret);
-                ret = PQOS_RETVAL_ERROR;
-                goto log_init_error;
-        }
-
         /**
          * Topology not provided through config.
          * CPU discovery done through internal mechanism.
          */
-        ret = cpuinfo_init(&m_cpu, vendor);
+        ret = cpuinfo_init(&m_cpu);
         if (ret != 0 || m_cpu == NULL) {
                 LOG_ERROR("cpuinfo_init() error %d\n", ret);
                 ret = PQOS_RETVAL_ERROR;
@@ -1459,7 +1438,7 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
-        ret = api_init(config->interface);
+        ret = api_init(config->interface, m_cpu->vendor);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("_pqos_api_init() error %d\n", ret);
                 goto machine_init_error;
@@ -1733,15 +1712,6 @@ _pqos_cap_get(const struct pqos_cap **cap,
         if (cpu != NULL) {
                 ASSERT(m_cpu != NULL);
                 *cpu = m_cpu;
-        }
-}
-
-void
-_pqos_get_vendor_config(const struct pqos_vendor_config **vconfig)
-{
-        if (vconfig != NULL) {
-                ASSERT(v_config != NULL);
-                *vconfig = v_config;
         }
 }
 

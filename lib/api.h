@@ -39,19 +39,21 @@
 extern "C" {
 #endif
 
+#include "pqos.h"
+
 /**
  * @brief Initializes api module
  *
- * @param interface option, MSR or OS
+ * @param[in] interface option, MSR or OS
+ * @param[in] vendor CPU vendor
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int api_init(int interface);
+int api_init(int interface, enum pqos_vendor vendor);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* API_H */
-

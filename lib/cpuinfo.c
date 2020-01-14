@@ -40,13 +40,13 @@
 #include <stdint.h>
 #include <limits.h>
 #include <errno.h>
-#include <unistd.h>      /* sysconf() */
+#include <unistd.h> /* sysconf() */
 #ifdef __FreeBSD__
-#include <sys/param.h>   /* sched affinity */
-#include <sys/cpuset.h>  /* sched affinity */
+#include <sys/param.h>  /* sched affinity */
+#include <sys/cpuset.h> /* sched affinity */
 #endif
 #ifdef __linux__
-#include <sched.h>       /* sched affinity */
+#include <sched.h> /* sched affinity */
 #endif
 
 #include "pqos.h"
@@ -65,6 +65,11 @@
  * If not NULL then module is initialized.
  */
 static struct pqos_cpuinfo *m_cpu = NULL;
+
+/**
+ * intel/amd vendor configuration
+ */
+static struct cpuinfo_config m_config;
 
 /**
  * L2 and L3 cache info structures
@@ -175,7 +180,7 @@ detect_apic_core_masks(struct apic_info *apic)
         int thread_reported = 0;
         unsigned subleaf = 0;
 
-        for (subleaf = 0; ; subleaf++) {
+        for (subleaf = 0;; subleaf++) {
                 struct cpuid_out leafB;
                 unsigned level_type, level_shift;
                 uint32_t mask;
@@ -184,8 +189,8 @@ detect_apic_core_masks(struct apic_info *apic)
                 if (leafB.ebx == 0) /* invalid sub-leaf */
                         break;
 
-                level_type = (leafB.ecx >> 8) & 0xff;     /* ECX bits 15:8 */
-                level_shift = leafB.eax & 0x1f;           /* EAX bits 4:0 */
+                level_type = (leafB.ecx >> 8) & 0xff; /* ECX bits 15:8 */
+                level_shift = leafB.eax & 0x1f;       /* EAX bits 4:0 */
                 mask = ~(UINT32_MAX << level_shift);
 
                 if (level_type == 1) {
@@ -234,7 +239,7 @@ nearest_pow2(const unsigned n)
 {
         unsigned r, p;
 
-	if (n < 2)
+        if (n < 2)
                 return n;
 
         for (r = 1, p = 0; r != 0; r <<= 1, p++)
@@ -271,19 +276,19 @@ detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
         memset(&m_l2, 0, sizeof(m_l2));
         memset(&m_l3, 0, sizeof(m_l3));
 
-        for (subleaf = 0; ; subleaf++) {
+        for (subleaf = 0;; subleaf++) {
                 struct cpuid_out cache_info;
                 struct pqos_cacheinfo ci;
                 unsigned cache_type, cache_level, id, shift;
 
                 lcpuid(cpuid_cache, subleaf, &cache_info);
-                cache_type = cache_info.eax & 0x1f;	   /* EAX bits 04:00 */
+                cache_type = cache_info.eax & 0x1f;        /* EAX bits 04:00 */
                 cache_level = (cache_info.eax >> 5) & 0x7; /* EAX bits 07:05 */
                 id = (cache_info.eax >> 14) & 0xfff;       /* EAX bits 25:14 */
                 shift = nearest_pow2(id + 1);
 
                 if (cache_type == 0 || cache_type >= 4)
-                        break;    /* no more caches or reserved */
+                        break; /* no more caches or reserved */
 
                 if (cache_level < DIM(cache_level_shift))
                         cache_level_shift[cache_level] = shift;
@@ -304,8 +309,8 @@ detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
                 LOG_DEBUG("CACHE: %sinclusive, %s, %s%u way(s), "
                           "%u set(s), line size %u, %u partition(s)\n",
                           (cache_info.edx & 2) ? "" : "not ",
-                          (cache_info.edx & 4) ? "complex cache indexing" :
-                          "direct mapped",
+                          (cache_info.edx & 4) ? "complex cache indexing"
+                                               : "direct mapped",
                           (cache_info.eax & 0x200) ? "fully associative, " : "",
                           ci.num_ways, ci.num_sets, ci.line_size,
                           ci.num_partitions);
@@ -343,19 +348,15 @@ detect_apic_cache_masks(struct apic_info *apic, unsigned cpuid_cache)
 static int
 detect_apic_masks(struct apic_info *apic)
 {
-        const struct pqos_vendor_config *vconfig;
-
         if (apic == NULL)
                 return -1;
-
-        _pqos_get_vendor_config(&vconfig);
 
         memset(apic, 0, sizeof(*apic));
 
         if (detect_apic_core_masks(apic) != 0)
                 return -2;
 
-        if (detect_apic_cache_masks(apic, vconfig->cpuid_cache_leaf) != 0)
+        if (detect_apic_cache_masks(apic, m_config.cpuid_cache_leaf) != 0)
                 return -3;
 
         return 0;
@@ -392,7 +393,7 @@ detect_cpu(const int cpu,
                 return -1;
 
         lcpuid(0xb, 0, &leafB);
-        apicid = leafB.edx;        /* x2APIC ID */
+        apicid = leafB.edx; /* x2APIC ID */
 
         info->lcore = cpu;
         info->socket = (apicid & apic->pkg_mask) >> apic->pkg_shift;
@@ -460,15 +461,15 @@ cpuinfo_build_topo(enum pqos_vendor vendor)
                 return NULL;
         }
 
-        const size_t mem_sz = sizeof(*l_cpu) +
-                (max_core_count * sizeof(struct pqos_coreinfo));
+        const size_t mem_sz =
+            sizeof(*l_cpu) + (max_core_count * sizeof(struct pqos_coreinfo));
 
         l_cpu = (struct pqos_cpuinfo *)malloc(mem_sz);
         if (l_cpu == NULL) {
                 LOG_ERROR("Couldn't allocate CPU topology structure!");
                 return NULL;
         }
-        l_cpu->mem_size = (unsigned) mem_sz;
+        l_cpu->mem_size = (unsigned)mem_sz;
         memset(l_cpu, 0, mem_sz);
 
         for (i = 0; i < max_core_count; i++)
@@ -494,7 +495,14 @@ cpuinfo_build_topo(enum pqos_vendor vendor)
         return l_cpu;
 }
 
-enum pqos_vendor
+/**
+ * @brief Detects and returns the CPU vendor
+ *
+ * Sets the vendor identification. See pqos_vendor definitions.
+ *
+ * @return detected vendor
+ */
+static enum pqos_vendor
 detect_vendor(void)
 {
         enum pqos_vendor cpu_vendor;
@@ -515,50 +523,32 @@ detect_vendor(void)
 
 /**
  * Initialize pointers for the vendors
+ *
+ * @param config configuration structures
+ * @param vendor identification
+ *
+ * @return Operation status
+ * @retval Success returns 0
  */
-int
-init_vendor_functions(struct pqos_vendor_config **vconfig,
-                      enum pqos_vendor vendor,
-                      int interface)
+static int
+init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
 {
-        *vconfig = (struct pqos_vendor_config *)malloc(
-            sizeof(struct pqos_vendor_config));
-        if ((*vconfig) == NULL) {
-                LOG_ERROR("Couldn't allocate pqos_vendor_config structure!");
-                return -EFAULT;
-        }
-        memset(*vconfig, 0, sizeof(struct pqos_vendor_config));
+        memset(config, 0, sizeof(struct cpuinfo_config));
 
         /**
          * Make sure to initialize all the pointers to avoid
          * NULL check while calling
          */
         if (vendor == PQOS_VENDOR_INTEL) {
-                (*vconfig)->cpuid_cache_leaf = 4;
-                (*vconfig)->mba_max = PQOS_MBA_LINEAR_MAX;
-                (*vconfig)->mba_msr_reg = PQOS_MSR_MBA_MASK_START;
-                (*vconfig)->mba_get = hw_mba_get;
-                (*vconfig)->mba_set = hw_mba_set;
-#ifdef __linux__
-                if (interface == PQOS_INTER_OS) {
-                        (*vconfig)->mba_get = os_mba_get;
-                        (*vconfig)->mba_set = os_mba_set;
-                }
-#endif
+                config->cpuid_cache_leaf = 4;
+                config->mba_max = PQOS_MBA_LINEAR_MAX;
+                config->mba_msr_reg = PQOS_MSR_MBA_MASK_START;
         } else if (vendor == PQOS_VENDOR_AMD) {
-                (*vconfig)->cpuid_cache_leaf = 0x8000001D;
-                (*vconfig)->mba_max = PQOS_MBA_MAX_AMD;
-                (*vconfig)->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
-                (*vconfig)->mba_get = hw_mba_get_amd;
-                (*vconfig)->mba_set = hw_mba_set_amd;
-#ifdef __linux__
-                if (interface == PQOS_INTER_OS) {
-                        (*vconfig)->mba_get = os_mba_get_amd;
-                        (*vconfig)->mba_set = os_mba_set_amd;
-                }
-#endif
+                config->cpuid_cache_leaf = 0x8000001D;
+                config->mba_max = PQOS_MBA_MAX_AMD;
+                config->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
         } else {
-                LOG_ERROR("init_pointers: init failed!");
+                LOG_ERROR("init_config: init failed!");
                 return -EFAULT;
         }
 
@@ -570,19 +560,30 @@ init_vendor_functions(struct pqos_vendor_config **vconfig,
  * and their location.
  */
 int
-cpuinfo_init(const struct pqos_cpuinfo **topology, enum pqos_vendor vendor)
+cpuinfo_init(const struct pqos_cpuinfo **topology)
 {
+        int ret;
+        enum pqos_vendor vendor;
+
         if (topology == NULL)
                 return -EINVAL;
 
         if (m_cpu != NULL)
                 return -EPERM;
 
+        vendor = detect_vendor();
+
+        ret = init_config(&m_config, vendor);
+        if (ret != 0)
+                return ret;
+
         m_cpu = cpuinfo_build_topo(vendor);
         if (m_cpu == NULL) {
                 LOG_ERROR("CPU topology detection error!");
                 return -EFAULT;
         }
+
+        m_cpu->vendor = vendor;
 
         *topology = m_cpu;
         return 0;
@@ -596,4 +597,12 @@ cpuinfo_fini(void)
         free(m_cpu);
         m_cpu = NULL;
         return 0;
+}
+
+void
+cpuinfo_get_config(const struct cpuinfo_config **config)
+{
+        ASSERT(config != NULL);
+
+        *config = &m_config;
 }
