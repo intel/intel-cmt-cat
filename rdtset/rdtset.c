@@ -602,15 +602,6 @@ main(int argc, char **argv)
 
         memset(&g_cfg, 0, sizeof(g_cfg));
 
-        /**
-         * parse_args needs vendor information to validate the user
-         * arguments. Move rdtset_init early so that pqos_cpuinfo
-         * structure is initialized before parsing
-         */
-        ret = rdtset_init();
-        if (ret < 0)
-                exit(EXIT_FAILURE);
-
         /* Parse cmd line args */
         ret = parse_args(argc, argv);
         if (ret != 0) {
@@ -639,6 +630,10 @@ main(int argc, char **argv)
                 print_cmd_line_rdt_config();
                 print_cmd_line_cpu_config();
         }
+
+        ret = rdtset_init();
+        if (ret < 0)
+                exit(EXIT_FAILURE);
 
         /* display library version */
         if (0 != g_cfg.show_version) {

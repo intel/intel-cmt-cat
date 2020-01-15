@@ -134,10 +134,6 @@ rdt_cfg_get_type_str(const struct rdt_cfg cfg)
 static int
 rdt_cfg_is_valid(const struct rdt_cfg cfg)
 {
-
-        if (m_cpu == NULL)
-                return 0;
-
         if (cfg.u.generic_ptr == NULL)
                 return 0;
 
@@ -163,13 +159,7 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
                         (cfg.u.l3->cdp == 0 && cfg.u.l3->u.ways_mask != 0));
 
         case PQOS_CAP_TYPE_MBA:
-                return cfg.u.mba != NULL && cfg.u.mba->mb_max > 0 &&
-                       ((cfg.u.mba->ctrl == 0 &&
-                         cfg.u.mba->mb_max <=
-                             ((m_cpu->vendor == PQOS_VENDOR_AMD)
-                                  ? RDT_MAX_MBA_AMD
-                                  : RDT_MAX_MBA)) ||
-                        cfg.u.mba->ctrl == 1);
+                return cfg.u.mba != NULL && cfg.u.mba->mb_max > 0;
 
         default:
                 break;
@@ -461,17 +451,12 @@ rdt_mba_str_to_rate(const char *param, struct rdt_cfg mba)
         uint64_t rate;
         int ret;
 
-        if (m_cpu == NULL)
-                return -EINVAL;
-
         if (PQOS_CAP_TYPE_MBA != mba.type || NULL == mba.u.generic_ptr ||
             NULL == param)
                 return -EINVAL;
 
         ret = str_to_uint64(param, 10, &rate);
-        if (ret < 0 || rate == 0 ||
-            rate > ((m_cpu->vendor == PQOS_VENDOR_AMD) ? RDT_MAX_MBA_AMD
-                                                       : RDT_MAX_MBA))
+        if (ret < 0 || rate == 0)
                 return -EINVAL;
 
         mba.u.mba->ctrl = 0;
@@ -1469,6 +1454,10 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 mba_requested.class_id = cos_id;
 
                 ret = pqos_mba_set(mba_id, 1, &mba_requested, &mba_actual);
+                if (ret == PQOS_RETVAL_PARAM) {
+                        fprintf(stderr, "Invalid RDT parameters!\n");
+                        return -EINVAL;
+                }
                 if (ret != PQOS_RETVAL_OK) {
                         fprintf(stderr,
                                 "Error setting MBA COS#%u on mba id %u!\n",
