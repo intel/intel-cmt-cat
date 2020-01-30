@@ -77,8 +77,8 @@ class PqosCpuInfoMockBuilder(object):
     def build_core_infos(self):  # pylint: disable=no-self-use
         "Builds core information."
 
-        core_info1 = CPqosCoreInfo(lcore=0, socket=0, l3_id=0, l2_id=0)
-        core_info2 = CPqosCoreInfo(lcore=1, socket=0, l3_id=0, l2_id=1)
+        core_info1 = CPqosCoreInfo(lcore=0, socket=0, l3_id=0, l2_id=0, l3cat_id=0, mba_id=0)
+        core_info2 = CPqosCoreInfo(lcore=1, socket=0, l3_id=0, l2_id=1, l3cat_id=0, mba_id=0)
         return [core_info1, core_info2]
 
     def build(self):
@@ -148,6 +148,16 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_get_socketid.assert_called_once()
         lib.pqos_cap_get.assert_called_once()
+
+    @mock_pqos_lib
+    def test_get_vendor(self, lib):
+
+        lib.pqos_cap_get = MagicMock(return_value=0)
+        lib.pqos_get_vendor = MagicMock(return_value=1)
+
+        cpu = PqosCpuInfo()
+
+        self.assertEqual(cpu.get_vendor(), "INTEL")
 
     @mock_pqos_lib
     def test_get_sockets(self, lib):
@@ -265,7 +275,7 @@ class TestPqosCpuInfo(unittest.TestCase):
     def test_get_core_info(self, lib):
         "Tests get_core_info() method."
 
-        coreinfo_mock = CPqosCoreInfo(lcore=1, socket=0, l3_id=1, l2_id=7)
+        coreinfo_mock = CPqosCoreInfo(lcore=1, socket=0, l3_id=1, l2_id=7, l3cat_id=1, mba_id=1)
 
         def pqos_get_core_info_m(_p_cpu, core):
             "Mock pqos_cpu_get_core_info()."

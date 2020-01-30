@@ -49,10 +49,12 @@ class CPqosCoreInfo(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"lcore", ctypes.c_uint),   # Logical core id
-        (u"socket", ctypes.c_uint),  # Socket id in the system
-        (u"l3_id", ctypes.c_uint),   # L3/LLC cluster id
-        (u"l2_id", ctypes.c_uint),   # L2 cluster id
+        (u"lcore", ctypes.c_uint),    # Logical core id
+        (u"socket", ctypes.c_uint),   # Socket id in the system
+        (u"l3_id", ctypes.c_uint),    # L3/LLC cluster id
+        (u"l2_id", ctypes.c_uint),    # L2 cluster id
+        (u"l3cat_id", ctypes.c_uint), # L3 CAT classes id
+        (u"mba_id", ctypes.c_uint),   # MBA id
     ]
 
 
@@ -75,10 +77,15 @@ class CPqosCpuInfo(ctypes.Structure):
     "pqos_cpuinfo structure"
     # pylint: disable=too-few-public-methods
 
+    PQOS_VENDOR_UNKNOWN = 0
+    PQOS_VENDOR_INTEL = 1
+    PQOS_VENDOR_AMD = 2
+
     _fields_ = [
         (u"mem_size", ctypes.c_uint),   # Byte size of the structure
         (u"l2", CPqosCacheInfo),        # L2 cache information
         (u"l3", CPqosCacheInfo),        # L3 cache information
+        (u"vendor", ctypes.c_int),      # CPU vendor
         (u"num_cores", ctypes.c_uint),  # Number of cores in the system
         (u"cores", CPqosCoreInfo * 0)   # Core information
     ]
@@ -88,11 +95,13 @@ class PqosCoreInfo(object):
     "Core information"
     # pylint: disable=too-few-public-methods
 
-    def __init__(self, core, socket, l3_id, l2_id):
+    def __init__(self, core, socket, l3_id, l2_id, l3cat_id, mba_id):
         self.core = core
         self.socket = socket
         self.l3_id = l3_id
         self.l2_id = l2_id
+        self.l3cat_id = l3cat_id
+        self.mba_id = mba_id
 
 
 def _get_array_items(count, p_items):
@@ -174,6 +183,25 @@ class PqosCpuInfo(object):
         pqos_handle_error(func.__name__, ret)
         return result.value
 
+    def get_vendor(self):
+        """
+        Retrieves CPU vendor information from CPU info structure
+
+        Returns:
+            CPU vendor
+        """
+        func = self.pqos.lib.pqos_get_vendor
+        func.restype = ctypes.c_int
+
+        vendor = func(self.p_cpu)
+
+        if vendor == CPqosCpuInfo.PQOS_VENDOR_INTEL:
+            return u"INTEL"
+        elif vendor == CPqosCpuInfo.PQOS_VENDOR_AMD:
+            return u"AMD"
+        else:
+            return u"UNKNOWN"
+
     def get_sockets(self):
         """
         Retrieves socket IDs from CPU info structure.
@@ -244,7 +272,9 @@ class PqosCpuInfo(object):
         coreinfo = PqosCoreInfo(core=coreinfo_struct.lcore,
                                 socket=coreinfo_struct.socket,
                                 l3_id=coreinfo_struct.l3_id,
-                                l2_id=coreinfo_struct.l2_id)
+                                l2_id=coreinfo_struct.l2_id,
+                                l3cat_id=coreinfo_struct.l3cat_id,
+                                mba_id=coreinfo_struct.mba_id)
         return coreinfo
 
     def get_one_core(self, socket):
