@@ -50,9 +50,10 @@ extern "C" {
  * CPU vendor configuration value
  */
 struct cpuinfo_config {
-        int cpuid_cache_leaf; /**< Cache mask leaf */
-        unsigned mba_max;     /**< default memory bandwidth */
-        uint32_t mba_msr_reg; /**< MBA mask base register */
+        int cpuid_cache_leaf;   /**< Cache mask leaf */
+        unsigned mba_max;       /**< default memory bandwidth */
+        unsigned mba_reset_val; /**< Memory bandwidth reset value */
+        uint32_t mba_msr_reg;   /**< MBA mask base register */
 };
 
 /**
