@@ -543,10 +543,12 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
                 config->cpuid_cache_leaf = 4;
                 config->mba_max = PQOS_MBA_LINEAR_MAX;
                 config->mba_msr_reg = PQOS_MSR_MBA_MASK_START;
+                config->mba_default_val = 0;
         } else if (vendor == PQOS_VENDOR_AMD) {
                 config->cpuid_cache_leaf = 0x8000001D;
                 config->mba_max = PQOS_MBA_MAX_AMD;
                 config->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
+                config->mba_default_val = PQOS_MBA_MAX_AMD;
         } else {
                 LOG_ERROR("init_config: init failed!");
                 return -EFAULT;
