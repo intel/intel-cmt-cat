@@ -16,16 +16,16 @@
 .\" .sp <n>    insert n+1 empty lines
 .\" for manpage-specific macros, see man(7)
 .SH NAME
-pqos, pqos-msr, pqos-os \- Intel(R) Resource Director Technology monitoring and control tool
+pqos, pqos-msr, pqos-os \- Intel(R) Resource Director Technology/AMD PQoS monitoring and control tool
 .br
 .SH SYNOPSIS
 .B pqos
 .RI [ OPTIONS ]...
 .SH DESCRIPTION
-Intel(R) Resource Director Technology is designed to monitor and manage cpu
-resources and improve performance of applications and virtual machines.
+Intel(R) Resource Director Technology/AMD PQoS is designed to monitor and manage
+cpu resources and improve performance of applications and virtual machines.
 .PP
-Intel(R) Resource Director Technology includes monitoring and control
+Intel(R) Resource Director Technology/AMD PQoS includes monitoring and control
 technologies. Monitoring technologies include CMT (Cache Monitoring Technology),
 which monitors occupancy of last level cache, and MBM (Memory Bandwidth Monitoring).
 Control technologies include CAT (Cache Allocation Technology), CDP (Code Data
@@ -60,10 +60,10 @@ log messages into selected log FILE
 show the current allocation and monitoring configuration
 .TP
 .B -d, \-\-display
-display supported Intel(R) Resource Director Technology capabilities
+display supported Intel(R) Resource Director Technology/AMD PQoS capabilities
 .TP
 .B -D, \-\-display\-verbose
-display supported Intel(R) Resource Director Technology capabilities in verbose mode
+display supported Intel(R) Resource Director Technology/AMD PQoS capabilities in verbose mode
 .TP
 .B \-f FILE, \-\-config\-file=FILE
 load commands from selected configuration FILE

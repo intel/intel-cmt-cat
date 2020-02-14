@@ -260,6 +260,7 @@ The only dependencies of intel-cmt-cat is access to C and pthreads libraries and
 Enable Intel(R) RDT support in:
 - kernel v4.10 - v4.13 with kernel configuration option CONFIG_INTEL_RDT_A
 - kernel v4.14+ with kernel configuration option CONFIG_INTEL_RDT
+- kernel v5.0+ with kernel configuration option CONFIG_X86_RESCTRL
 
 Note: No kernel configuration options required before v4.10.
 
