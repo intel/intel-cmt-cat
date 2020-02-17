@@ -176,7 +176,7 @@ struct rdtset {
         enum pqos_interface interface; /**< pqos interface to use */
 };
 
-struct rdtset g_cfg;
+extern struct rdtset g_cfg;
 
 #define DBG(...)                                                               \
         do {                                                                   \

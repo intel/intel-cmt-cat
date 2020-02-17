@@ -41,6 +41,8 @@
 #include "common.h"
 #include "rdt.h"
 
+struct rdtset g_cfg;
+
 int
 str_to_cpuset(const char *cpustr, const unsigned cpustr_len, cpu_set_t *cpuset)
 {
