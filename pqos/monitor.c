@@ -2126,6 +2126,15 @@ print_text_row(FILE *fp,
 
         memset(data, 0, sz_data);
 
+#ifdef PQOS_RMID_CUSTOM
+        offset += fillin_text_column(" %4.0f",
+                                     (double)mon_data->poll_ctx[0].rmid,
+                                     data + offset,
+                                     sz_data - offset,
+                                     sel_interface == PQOS_INTER_MSR,
+                                     sel_interface == PQOS_INTER_MSR);
+#endif
+
         offset += fillin_text_column(" %11.2f", mon_data->values.ipc,
                                      data + offset,
                                      sz_data - offset,
@@ -2198,6 +2207,16 @@ print_xml_row(FILE *fp,
 
         const char *l3_text = (llc_entry->format == LLC_FORMAT_KILOBYTES) ?
                 "l3_occupancy_kB" : "l3_occupancy_percent";
+
+#ifdef PQOS_RMID_CUSTOM
+        offset += fillin_xml_column("%.0f",
+                                    (double)mon_data->poll_ctx[0].rmid,
+                                    data + offset,
+                                    sz_data - offset,
+                                    sel_interface == PQOS_INTER_MSR,
+                                    sel_interface == PQOS_INTER_MSR,
+                                    "rmid");
+#endif
 
         offset += fillin_xml_column("%.2f", mon_data->values.ipc, data + offset,
                                     sz_data - offset,
@@ -2296,6 +2315,14 @@ print_csv_row(FILE *fp, char *time,
 
         memset(data, 0, sz_data);
 
+#ifdef PQOS_RMID_CUSTOM
+        offset += fillin_csv_column("%4.0f",
+                                    (double)mon_data->poll_ctx[0].rmid,
+                                    data + offset,
+                                    sz_data - offset,
+                                    sel_interface == PQOS_INTER_MSR,
+                                    sel_interface == PQOS_INTER_MSR);
+#endif
 
         offset += fillin_csv_column(",%.2f", mon_data->values.ipc,
                                     data + offset,
@@ -2367,9 +2394,14 @@ build_header_row(char *hdr, const size_t sz_hdr,
                 return;
 
         if (istext) {
-                if (!process_mode())
+                if (!process_mode()) {
                         strncpy(hdr, "    CORE", sz_hdr - 1);
-                else
+#ifdef PQOS_RMID_CUSTOM
+                        if (sel_interface == PQOS_INTER_MSR)
+                                strncat(hdr, " RMID",
+                                        sz_hdr - strlen(hdr) - 1);
+#endif
+                } else
                         strncpy(hdr, "     PID     CORE", sz_hdr - 1);
 
                 if (sel_events_max & PQOS_PERF_EVENT_IPC)
@@ -2391,12 +2423,15 @@ build_header_row(char *hdr, const size_t sz_hdr,
         }
 
         if (iscsv) {
-                if (!process_mode())
-                        strncpy(hdr, "Time,Core",
-                                sz_hdr - 1);
-                else
-                        strncpy(hdr, "Time,PID,Core",
-                                sz_hdr - 1);
+                if (!process_mode()) {
+                        strncpy(hdr, "Time,Core", sz_hdr - 1);
+#ifdef PQOS_RMID_CUSTOM
+                        if (sel_interface == PQOS_INTER_MSR)
+                                strncat(hdr, ",RMID", sz_hdr - strlen(hdr) - 1);
+#endif
+                } else
+                        strncpy(hdr, "Time,PID,Core", sz_hdr - 1);
+
                 if (sel_events_max & PQOS_PERF_EVENT_IPC)
                         strncat(hdr, ",IPC", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_PERF_EVENT_LLC_MISS)
