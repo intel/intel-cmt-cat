@@ -26,11 +26,19 @@ coverage: test_env
 			--omit test_env/*.py,pqos/test/*.py,setup.py; \
 		deactivate"
 
-style: test_env
+pylint: test_env
 	@bash -c "source test_env/bin/activate && \
 		python -m pylint pqos/*.py pqos/test/*.py && \
-		python -m bandit *.py pqos/*.py; \
 		deactivate"
+
+bandit: test_env
+	@bash -c "source test_env/bin/activate && \
+		python -m bandit *.py pqos/*.py && \
+		deactivate"
+
+style:
+	${MAKE} pylint
+	${MAKE} bandit
 
 clean:
 	@rm -rf test_env

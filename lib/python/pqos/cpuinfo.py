@@ -93,7 +93,7 @@ class CPqosCpuInfo(ctypes.Structure):
 
 class PqosCoreInfo(object):
     "Core information"
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-few-public-methods, too-many-arguments
 
     def __init__(self, core, socket, l3_id, l2_id, l3cat_id, mba_id):
         self.core = core
@@ -197,10 +197,10 @@ class PqosCpuInfo(object):
 
         if vendor == CPqosCpuInfo.PQOS_VENDOR_INTEL:
             return u"INTEL"
-        elif vendor == CPqosCpuInfo.PQOS_VENDOR_AMD:
+        if vendor == CPqosCpuInfo.PQOS_VENDOR_AMD:
             return u"AMD"
-        else:
-            return u"UNKNOWN"
+
+        return u"UNKNOWN"
 
     def get_sockets(self):
         """

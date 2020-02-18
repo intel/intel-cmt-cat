@@ -151,6 +151,7 @@ class TestPqosCpuInfo(unittest.TestCase):
 
     @mock_pqos_lib
     def test_get_vendor(self, lib):
+        "Tests get_vendor() method"
 
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_get_vendor = MagicMock(return_value=1)
