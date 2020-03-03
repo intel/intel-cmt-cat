@@ -414,3 +414,163 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
 
         return ret;
 }
+
+/**
+ * @brief Checks L2 CDP enable status across all CPU clusters
+ *
+ * It also validates if L2 CDP enabling is consistent across
+ * CPU clusters.
+ * At the moment, such scenario is considered as error
+ * that requires CAT reset.
+ *
+ * @param cpu detected CPU topology
+ * @param enabled place to store L2 CDP enabling status
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+l2cdp_is_enabled(const struct pqos_cpuinfo *cpu, int *enabled)
+{
+        unsigned *l2ids = NULL;
+        unsigned l2id_num = 0;
+        unsigned enabled_num = 0, disabled_num = 0;
+        unsigned i;
+        int ret = PQOS_RETVAL_OK;
+
+        /**
+         * Get list of L2 clusters id's
+         */
+        l2ids = pqos_cpu_get_l2ids(cpu, &l2id_num);
+        if (l2ids == NULL || l2id_num == 0) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto l2cdp_is_enabled_exit;
+        }
+
+        for (i = 0; i < l2id_num; i++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_l2id(cpu, l2ids[i], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        goto l2cdp_is_enabled_exit;
+
+                if (msr_read(core, PQOS_MSR_L2_QOS_CFG, &reg) !=
+                    MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto l2cdp_is_enabled_exit;
+                }
+
+                if (reg & PQOS_MSR_L2_QOS_CFG_CDP_EN)
+                        enabled_num++;
+                else
+                        disabled_num++;
+        }
+
+        if (disabled_num > 0 && enabled_num > 0) {
+                LOG_ERROR("Inconsistent L2 CDP settings across clusters."
+                          "Please reset CAT or reboot your system!\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto l2cdp_is_enabled_exit;
+        }
+
+        if (enabled_num > 0)
+                *enabled = 1;
+
+        LOG_INFO("L2 CDP is %s\n", (*enabled) ? "enabled" : "disabled");
+
+l2cdp_is_enabled_exit:
+        if (l2ids != NULL)
+                free(l2ids);
+
+        return ret;
+}
+
+/**
+ * @brief Discovers L2 CAT
+ *
+ * @param r_cap place to store L2 CAT capabilities structure
+ * @param cpu CPU topology structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+int
+hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
+                     const struct pqos_cpuinfo *cpu)
+{
+        struct cpuid_out res;
+        struct pqos_cap_l2ca *cap = NULL;
+        const unsigned sz = sizeof(*cap);
+        unsigned l2_size = 0;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cpu != NULL);
+
+        cap = (struct pqos_cap_l2ca *)malloc(sz);
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        ASSERT(cap != NULL);
+
+        memset(cap, 0, sz);
+        cap->mem_size = sz;
+
+        /**
+         * Run CPUID.0x7.0 to check
+         * for allocation capability (bit 15 of ebx)
+         */
+        lcpuid(0x7, 0x0, &res);
+        if (!(res.ebx & (1 << 15))) {
+                LOG_INFO("CPUID.0x7.0: L2 CAT not supported\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * We can go to CPUID.0x10.0 to obtain more info
+         */
+        lcpuid(0x10, 0x0, &res);
+        if (!(res.ebx & (1 << PQOS_RES_ID_L2_ALLOCATION))) {
+                LOG_INFO("CPUID 0x10.0: L2 CAT not supported!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        lcpuid(0x10, PQOS_RES_ID_L2_ALLOCATION, &res);
+
+        cap->num_classes = res.edx + 1;
+        cap->num_ways = res.eax + 1;
+        cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
+        cap->cdp_on = 0;
+        cap->way_contention = (uint64_t)res.ebx;
+
+        if (cap->cdp) {
+                int cdp_on = 0;
+
+                /*
+                 * Check if L2 CDP is enabled
+                 */
+                ret = l2cdp_is_enabled(cpu, &cdp_on);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("L2 CDP detection error!\n");
+                        free(cap);
+                        return ret;
+                }
+                cap->cdp_on = cdp_on;
+                if (cdp_on)
+                        cap->num_classes = cap->num_classes / 2;
+        }
+
+        ret = get_cache_info(&cpu->l2, NULL, &l2_size);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Error reading L2 info!\n");
+                free(cap);
+                return PQOS_RETVAL_ERROR;
+        }
+        if (cap->num_ways > 0)
+                cap->way_size = l2_size / cap->num_ways;
+
+        (*r_cap) = cap;
+        return ret;
+}

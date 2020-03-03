@@ -52,6 +52,18 @@ extern "C" {
 int hw_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
                          const struct pqos_cpuinfo *cpu);
 
+/**
+ * @brief Discovers HW support of L2 CAT
+ *
+ * @param r_cap place to store L2 CAT capabilities structure
+ * @param cpu CPU topology structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+int hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
+                         const struct pqos_cpuinfo *cpu);
+
 #ifdef __cplusplus
 }
 #endif
