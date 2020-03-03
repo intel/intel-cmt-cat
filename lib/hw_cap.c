@@ -574,3 +574,62 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
         (*r_cap) = cap;
         return ret;
 }
+
+int
+hw_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
+{
+        struct cpuid_out res;
+        struct pqos_cap_mba *cap = NULL;
+        const unsigned sz = sizeof(*cap);
+        int ret = PQOS_RETVAL_OK;
+
+        UNUSED_PARAM(cpu);
+
+        cap = (struct pqos_cap_mba *)malloc(sz);
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        ASSERT(cap != NULL);
+
+        memset(cap, 0, sz);
+        cap->mem_size = sz;
+        cap->ctrl = -1;
+        cap->ctrl_on = 0;
+
+        /**
+         * Run CPUID.0x7.0 to check
+         * for allocation capability (bit 15 of ebx)
+         */
+        lcpuid(0x7, 0x0, &res);
+        if (!(res.ebx & (1 << 15))) {
+                LOG_INFO("CPUID.0x7.0: MBA not supported\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * We can go to CPUID.0x10.0 to obtain more info
+         */
+        lcpuid(0x10, 0x0, &res);
+        if (!(res.ebx & (1 << PQOS_RES_ID_MB_ALLOCATION))) {
+                LOG_INFO("CPUID 0x10.0: MBA not supported!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        lcpuid(0x10, PQOS_RES_ID_MB_ALLOCATION, &res);
+
+        cap->num_classes = (res.edx & 0xffff) + 1;
+        cap->throttle_max = (res.eax & 0xfff) + 1;
+        cap->is_linear = (res.ecx >> 2) & 1;
+        if (cap->is_linear)
+                cap->throttle_step = 100 - cap->throttle_max;
+        else {
+                LOG_WARN("MBA non-linear mode not supported yet!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        (*r_cap) = cap;
+        return ret;
+}
