@@ -76,6 +76,173 @@ get_cache_info(const struct pqos_cacheinfo *cache_info,
 }
 
 /**
+ * @brief Adds new event type to \a mon monitoring structure
+ *
+ * @param mon Monitoring structure which is to be updated with the new
+ *        event type
+ * @param res_id resource id
+ * @param event_type event type
+ * @param max_rmid max RMID for the event
+ * @param scale_factor event specific scale factor
+ * @param max_num_events maximum number of events that \a mon can accommodate
+ */
+static void
+add_monitoring_event(struct pqos_cap_mon *mon,
+                     const unsigned res_id,
+                     const int event_type,
+                     const unsigned max_rmid,
+                     const uint32_t scale_factor,
+                     const unsigned max_num_events)
+{
+        if (mon->num_events >= max_num_events) {
+                LOG_WARN("%s() no space for event type %d (resource id %u)!\n",
+                         __func__, event_type, res_id);
+                return;
+        }
+
+        LOG_DEBUG("Adding monitoring event: resource ID %u, "
+                  "type %d to table index %u\n",
+                  res_id, event_type, mon->num_events);
+
+        mon->events[mon->num_events].type = (enum pqos_mon_event)event_type;
+        mon->events[mon->num_events].max_rmid = max_rmid;
+        mon->events[mon->num_events].scale_factor = scale_factor;
+        mon->num_events++;
+}
+
+/**
+ * @brief Discovers monitoring capabilities
+ *
+ * Runs series of CPUID instructions to discover system CMT
+ * capabilities.
+ * Allocates memory for monitoring structure and
+ * returns it through \a r_mon to the caller.
+ *
+ * @param r_mon place to store created monitoring structure
+ * @param cpu CPU topology structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_RESOURCE monitoring not supported
+ * @retval PQOS_RETVAL_ERROR enumeration error
+ */
+int
+hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
+{
+        struct cpuid_out res, cpuid_0xa;
+        struct cpuid_out cpuid_0xf_1;
+        int ret = PQOS_RETVAL_OK;
+        unsigned sz = 0, max_rmid = 0, l3_size = 0, num_events = 0;
+        struct pqos_cap_mon *mon = NULL;
+
+        ASSERT(r_mon != NULL && cpu != NULL);
+
+        /**
+         * Run CPUID.0x7.0 to check
+         * for quality monitoring capability (bit 12 of ebx)
+         */
+        lcpuid(0x7, 0x0, &res);
+        if (!(res.ebx & (1 << 12))) {
+                LOG_WARN("CPUID.0x7.0: Monitoring capability not supported!\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * We can go to CPUID.0xf.0 for further
+         * exploration of monitoring capabilities
+         */
+        lcpuid(0xf, 0x0, &res);
+        if (!(res.edx & (1 << 1))) {
+                LOG_WARN("CPUID.0xf.0: Monitoring capability not supported!\n");
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * MAX_RMID for the socket
+         */
+        max_rmid = (unsigned)res.ebx + 1;
+        ret = get_cache_info(&cpu->l3, NULL, &l3_size); /**< L3 cache size */
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Error reading L3 information!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        /**
+         * Check number of monitoring events to allocate memory for
+         * Sub-leaf 1 provides information on monitoring.
+         */
+        lcpuid(0xf, 1, &cpuid_0xf_1); /**< query resource monitoring */
+
+        if (cpuid_0xf_1.edx & 1)
+                num_events++; /**< LLC occupancy */
+        if (cpuid_0xf_1.edx & 2)
+                num_events++; /**< total memory bandwidth event */
+        if (cpuid_0xf_1.edx & 4)
+                num_events++; /**< local memory bandwidth event */
+        if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
+                num_events++; /**< remote memory bandwidth virtual event */
+
+        if (!num_events)
+                return PQOS_RETVAL_ERROR;
+
+        /**
+         * Check if IPC can be calculated & supported
+         */
+        lcpuid(0xa, 0x0, &cpuid_0xa);
+        if (((cpuid_0xa.ebx & 3) == 0) && ((cpuid_0xa.edx & 31) > 1))
+                num_events++;
+
+        /**
+         * This means we can program LLC misses too
+         */
+        if (((cpuid_0xa.eax >> 8) & 0xff) > 1)
+                num_events++;
+
+        /**
+         * Allocate memory for detected events and
+         * fill the events in.
+         */
+        sz = (num_events * sizeof(struct pqos_monitor)) + sizeof(*mon);
+        mon = (struct pqos_cap_mon *)malloc(sz);
+        if (mon == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        memset(mon, 0, sz);
+        mon->mem_size = sz;
+        mon->max_rmid = max_rmid;
+        mon->l3_size = l3_size;
+
+        if (cpuid_0xf_1.edx & 1)
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_L3_OCCUP,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
+                                     num_events);
+        if (cpuid_0xf_1.edx & 2)
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_TMEM_BW,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
+                                     num_events);
+        if (cpuid_0xf_1.edx & 4)
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
+                                     num_events);
+
+        if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
+                add_monitoring_event(mon, 1, PQOS_MON_EVENT_RMEM_BW,
+                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
+                                     num_events);
+
+        if (((cpuid_0xa.ebx & 3) == 0) && ((cpuid_0xa.edx & 31) > 1))
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC, 0, 0,
+                                     num_events);
+
+        if (((cpuid_0xa.eax >> 8) & 0xff) > 1)
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS, 0, 0,
+                                     num_events);
+
+        (*r_mon) = mon;
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Checks L3 CDP enable status across all CPU sockets
  *
  * It also validates if L3 CDP enabling is consistent across

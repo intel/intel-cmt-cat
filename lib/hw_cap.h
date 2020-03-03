@@ -41,6 +41,18 @@ extern "C" {
 #include "pqos.h"
 
 /**
+ * @brief Discovers HW monitoring support
+ *
+ * @param r_cap place to store monitoring capabilities structure
+ * @param cpu detected cpu topology
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
+                        const struct pqos_cpuinfo *cpu);
+
+/**
  * @brief Discovers HW support of L3 CAT
  *
  * @param r_cap place to store CAT capabilities structure
