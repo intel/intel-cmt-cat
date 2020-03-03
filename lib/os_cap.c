@@ -64,7 +64,9 @@ static int mba_ctrl = -1; /**< mba ctrl support */
  * @retval PQOS_RETVAL_OK success
  */
 static int
-detect_os_support(const char *fname, const char *str, int check_symlink,
+detect_os_support(const char *fname,
+                  const char *str,
+                  int check_symlink,
                   int *supported)
 {
         FILE *fd;
@@ -132,7 +134,7 @@ readuint64(const char *fname, unsigned base, uint64_t *value)
         *value = strtoull(s, &endptr, base);
 
         if (!((*s != '\0' && *s != '\n') &&
-                (*endptr == '\0' || *endptr == '\n'))) {
+              (*endptr == '\0' || *endptr == '\n'))) {
                 LOG_ERROR("Error converting '%s' to unsigned number!\n", buf);
                 return PQOS_RETVAL_ERROR;
         }
@@ -216,7 +218,8 @@ get_shareable_bits(const char *dir, uint64_t *shareable_bits)
         /* Information not present in info dir */
         if (access(path, F_OK) != 0) {
                 LOG_DEBUG("Unable to obtain ways contention bit-mask, %s file "
-                         "does not exist\n", path);
+                          "does not exist\n",
+                          path);
                 *shareable_bits = 0;
                 return PQOS_RETVAL_OK;
         }
@@ -239,10 +242,9 @@ os_cap_init(const enum pqos_interface inter)
                 LOG_ERROR("Fatal error encountered in resctrl detection!\n");
                 return ret;
         }
-        LOG_INFO("%s\n", res_flag ?
-                 "resctrl detected" :
-                 "resctrl not detected. "
-                 "Kernel version 4.10 or higher required");
+        LOG_INFO("%s\n", res_flag ? "resctrl detected"
+                                  : "resctrl not detected. "
+                                    "Kernel version 4.10 or higher required");
 
         if (res_flag == 0) {
                 LOG_ERROR("OS interface selected but not supported\n");
@@ -252,7 +254,7 @@ os_cap_init(const enum pqos_interface inter)
         /**
          * Mount resctrl with default parameters
          */
-        if (access(RESCTRL_PATH"/cpus", F_OK) != 0) {
+        if (access(RESCTRL_PATH "/cpus", F_OK) != 0) {
                 LOG_INFO("resctrl not mounted\n");
                 /**
                  * Check if it is possible to enable MBA CTRL
@@ -334,15 +336,14 @@ detect_mon_resctrl_support(const enum pqos_mon_event event,
                 break;
         }
 
-        ret = detect_os_support(RESCTRL_PATH_INFO_L3_MON"/mon_features",
-                                 event_name, 1, supported);
+        ret = detect_os_support(RESCTRL_PATH_INFO_L3_MON "/mon_features",
+                                event_name, 1, supported);
 
         if (scale != NULL)
                 *scale = 1;
 
         return ret;
 }
-
 
 /**
  * @brief Reads scale factor of perf monitoring event
@@ -367,31 +368,34 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         ASSERT(event_name != NULL);
 
         /* read scale factor value */
-        snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s.scale",
+        snprintf(path, sizeof(path) - 1, PERF_MON_PATH "/events/%s.scale",
                  event_name);
 
         fd = fopen_check_symlink(path, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s perf monitoring event scale "
-                          "file!\n", event_name);
+                          "file!\n",
+                          event_name);
                 return PQOS_RETVAL_ERROR;
         }
         ret = fscanf(fd, "%10lf", &scale_factor);
         fclose(fd);
         if (ret < 1) {
                 LOG_ERROR("Failed to read %s perf monitoring event scale "
-                          "factor!\n", event_name);
+                          "factor!\n",
+                          event_name);
                 return PQOS_RETVAL_ERROR;
         }
 
         /* read scale factor unit */
-        snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s.unit",
+        snprintf(path, sizeof(path) - 1, PERF_MON_PATH "/events/%s.unit",
                  event_name);
 
         fd = fopen_check_symlink(path, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s perf monitoring event unit "
-                          "file!\n", event_name);
+                          "file!\n",
+                          event_name);
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -467,7 +471,8 @@ detect_mon_perf_support(const enum pqos_mon_event event,
                 break;
         }
 
-        snprintf(path, sizeof(path) - 1, PERF_MON_PATH"/events/%s", event_name);
+        snprintf(path, sizeof(path) - 1, PERF_MON_PATH "/events/%s",
+                 event_name);
         if (stat(path, &st) != 0)
                 return PQOS_RETVAL_OK;
 
@@ -540,8 +545,7 @@ detect_mon_support(const enum pqos_mon_event event,
 }
 
 int
-os_cap_mon_discover(struct pqos_cap_mon **r_cap,
-                    const struct pqos_cpuinfo *cpu)
+os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
 {
         struct pqos_cap_mon *cap = NULL;
         int supported;
@@ -550,12 +554,14 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap,
         unsigned i;
 
         enum pqos_mon_event events[] = {
+            /* clang-format off */
                 PQOS_MON_EVENT_L3_OCCUP,
                 PQOS_MON_EVENT_LMEM_BW,
                 PQOS_MON_EVENT_TMEM_BW,
                 PQOS_MON_EVENT_RMEM_BW,
                 PQOS_PERF_EVENT_LLC_MISS,
                 PQOS_PERF_EVENT_IPC
+            /* clang-format on */
         };
 
         ret = detect_os_support(PROC_CPUINFO, "cqm", 0, &supported);
@@ -567,14 +573,14 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap,
         if (!supported)
                 return PQOS_RETVAL_RESOURCE;
 
-        if (access(RESCTRL_PATH_INFO_L3_MON"/num_rmids", F_OK) == 0) {
-                ret = readuint64(RESCTRL_PATH_INFO_L3_MON"/num_rmids", 10,
+        if (access(RESCTRL_PATH_INFO_L3_MON "/num_rmids", F_OK) == 0) {
+                ret = readuint64(RESCTRL_PATH_INFO_L3_MON "/num_rmids", 10,
                                  &num_rmids);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
         }
 
-        cap = (struct pqos_cap_mon *) malloc(sizeof(*cap));
+        cap = (struct pqos_cap_mon *)malloc(sizeof(*cap));
         if (cap == NULL)
                 return PQOS_RETVAL_RESOURCE;
         memset(cap, 0, sizeof(*cap));
@@ -665,7 +671,7 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
         if (!cdp_on)
                 ret = detect_os_support(PROC_CPUINFO, "cdp_l3", 0, &cap->cdp);
 
- os_cap_l3ca_discover_exit:
+os_cap_l3ca_discover_exit:
         if (ret == PQOS_RETVAL_OK)
                 *r_cap = cap;
         else
@@ -719,7 +725,7 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
         if (!cdp_on)
                 ret = detect_os_support(PROC_CPUINFO, "cdp_l2", 0, &cap->cdp);
 
- os_cap_l2ca_discover_exit:
+os_cap_l2ca_discover_exit:
         if (ret == PQOS_RETVAL_OK)
                 *r_cap = cap;
         else
@@ -747,7 +753,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 return PQOS_RETVAL_OK;
         }
 
-        if (access(RESCTRL_PATH"/cpus", F_OK) != 0)
+        if (access(RESCTRL_PATH "/cpus", F_OK) != 0)
                 *enabled = 0;
 
         /* check mount flags */
@@ -762,20 +768,20 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 unsigned grp;
                 unsigned count = 0;
                 unsigned i;
-		unsigned *mba_ids, mba_id_num;
+                unsigned *mba_ids, mba_id_num;
                 struct resctrl_schemata *schmt;
 
                 ret = resctrl_alloc_get_grps_num(cap, &count);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
-		mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
-		if (mba_ids == NULL)
+                mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+                if (mba_ids == NULL)
                         return PQOS_RETVAL_ERROR;
 
                 schmt = resctrl_schemata_alloc(cap, cpu);
                 if (schmt == NULL) {
-			free(mba_ids);
+                        free(mba_ids);
                         return PQOS_RETVAL_ERROR;
                 }
 
@@ -784,12 +790,11 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                         if (ret != PQOS_RETVAL_OK)
                                 continue;
 
-			for (i = 0; i < mba_id_num; i++) {
+                        for (i = 0; i < mba_id_num; i++) {
                                 struct pqos_mba mba;
 
-				ret = resctrl_schemata_mba_get(schmt,
-							       mba_ids[i],
-							       &mba);
+                                ret = resctrl_schemata_mba_get(
+                                    schmt, mba_ids[i], &mba);
                                 if (ret == PQOS_RETVAL_OK && mba.mb_max > 100) {
                                         *enabled = 1;
                                         break;
@@ -798,7 +803,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 }
 
                 resctrl_schemata_free(schmt);
-		free(mba_ids);
+                free(mba_ids);
         }
 
         /* get free COS and try to write value above 100 */
@@ -845,7 +850,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 resctrl_schemata_free(schmt);
         }
 
- ctrl_support:
+ctrl_support:
         if (*supported != -1)
                 goto ctrl_exit;
 
@@ -864,7 +869,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                         *supported = 0;
         }
 
- ctrl_exit:
+ctrl_exit:
         if (*supported == 0)
                 *enabled = 0;
 
@@ -879,8 +884,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
 }
 
 int
-os_cap_mba_discover(struct pqos_cap_mba **r_cap,
-                    const struct pqos_cpuinfo *cpu)
+os_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
 {
         struct pqos_cap_mba *cap = NULL;
         struct stat st;
@@ -915,25 +919,25 @@ os_cap_mba_discover(struct pqos_cap_mba **r_cap,
         else
                 cap->ctrl = mba_ctrl;
 
-        ret = readuint64(RESCTRL_PATH_INFO_MB"/min_bandwidth", 10, &val);
+        ret = readuint64(RESCTRL_PATH_INFO_MB "/min_bandwidth", 10, &val);
         if (ret != PQOS_RETVAL_OK)
                 goto os_cap_mba_discover_exit;
         else
                 cap->throttle_max = 100 - val;
 
-        ret = readuint64(RESCTRL_PATH_INFO_MB"/bandwidth_gran", 10, &val);
+        ret = readuint64(RESCTRL_PATH_INFO_MB "/bandwidth_gran", 10, &val);
         if (ret != PQOS_RETVAL_OK)
                 goto os_cap_mba_discover_exit;
         else
                 cap->throttle_step = val;
 
-        ret = readuint64(RESCTRL_PATH_INFO_MB"/delay_linear", 10, &val);
+        ret = readuint64(RESCTRL_PATH_INFO_MB "/delay_linear", 10, &val);
         if (ret != PQOS_RETVAL_OK)
                 goto os_cap_mba_discover_exit;
         else
                 cap->is_linear = (val == 1);
 
- os_cap_mba_discover_exit:
+os_cap_mba_discover_exit:
         if (ret == PQOS_RETVAL_OK)
                 *r_cap = cap;
         else

@@ -210,6 +210,7 @@ checkpatch:
 	-f cap.h -f cap.c \
 	-f common.h -f common.c \
 	-f cpuinfo.h -f cpuinfo.c \
+	-f hw_cap.h -f hw_cap.c \
 	-f log.h -f log.c \
 	-f machine.h -f machine.c \
 	-f monitoring.h -f monitoring.c \
@@ -228,7 +229,7 @@ checkpatch:
 
 .PHONY: clang-format
 clang-format:
-	@for file in "pqos.h" "api.h" "cpuinfo.h" "cpuinfo.c" "allocation.h" "allocation.c" $(wildcard resctrl*.[ch]); do \
+	@for file in "pqos.h" "api.h" "cpuinfo.h" "cpuinfo.c" "allocation.h" "allocation.c" $(wildcard *cap*.[ch]) $(wildcard resctrl*.[ch]); do \
 		echo "Checking style $$file"; \
 		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
@@ -251,6 +252,7 @@ cppcheck:
 	log.c log.h types.h machine.c machine.h \
 	utils.c utils.h \
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
+	hw_cap.h hw_cap.c \
 	os_cap.h os_cap.c \
 	os_monitoring.h os_monitoring.c \
 	perf_monitoring.h perf_monitoring.c \

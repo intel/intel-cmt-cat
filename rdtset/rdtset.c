@@ -420,16 +420,16 @@ parse_args(int argc, char **argv)
 
         static const struct option lgopts[] = {
             /* clang-format off */
-		{ "cpu",	required_argument,	0, 'c' },
-		{ "pid",	required_argument,	0, 'p' },
-		{ "reset",	required_argument,	0, 'r' },
-		{ "rdt",	required_argument,	0, 't' },
-		{ "sudokeep",	no_argument,		0, 'k' },
-		{ "verbose",	no_argument,		0, 'v' },
-		{ "iface-os",   no_argument,            0, 'I' },
-		{ "help",	no_argument,		0, 'h' },
-		{ "version",	no_argument,		0, 'w' },
-		{ NULL, 0, 0, 0 }
+                { "cpu",        required_argument,      0, 'c' },
+                { "pid",        required_argument,      0, 'p' },
+                { "reset",      required_argument,      0, 'r' },
+                { "rdt",        required_argument,      0, 't' },
+                { "sudokeep",   no_argument,            0, 'k' },
+                { "verbose",    no_argument,            0, 'v' },
+                { "iface-os",   no_argument,            0, 'I' },
+                { "help",       no_argument,            0, 'h' },
+                { "version",    no_argument,            0, 'w' },
+                { NULL, 0, 0, 0 }
             /* clang-format on */
         };
 
