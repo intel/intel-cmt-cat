@@ -61,7 +61,6 @@
  * ---------------------------------------
  */
 
-
 /**
  * ---------------------------------------
  * Local data types
@@ -88,70 +87,6 @@ static int m_interface = PQOS_INTER_MSR;
  */
 
 /**
- * @brief Gets highest COS id which could be used to configure set technologies
- *
- * @param [in] technology technologies bitmask to get highest common COS id for
- * @param [out] hi_class_id highest common COS id
- *
- * @return Operation status
- */
-static int
-get_hi_cos_id(const unsigned technology,
-              unsigned *hi_class_id)
-{
-        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-        const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
-        const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
-        unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0, num_cos = 0;
-        int ret;
-        const struct pqos_cap *cap;
-
-        ASSERT(l2_req || l3_req || mba_req);
-        if (hi_class_id == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        _pqos_cap_get(&cap, NULL);
-
-        if (l3_req) {
-                ret = pqos_l3ca_get_cos_num(cap, &num_l3_cos);
-                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-                        return ret;
-
-                if (num_l3_cos == 0)
-                        return PQOS_RETVAL_ERROR;
-
-                num_cos = num_l3_cos;
-        }
-
-        if (l2_req) {
-                ret = pqos_l2ca_get_cos_num(cap, &num_l2_cos);
-                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-                        return ret;
-                if (num_l2_cos == 0)
-                        return PQOS_RETVAL_ERROR;
-
-                if (num_cos == 0 || num_l2_cos < num_cos)
-                        num_cos = num_l2_cos;
-        }
-
-        if (mba_req) {
-                ret = pqos_mba_get_cos_num(cap, &num_mba_cos);
-                if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
-                        return ret;
-
-                if (num_mba_cos == 0)
-                        return PQOS_RETVAL_ERROR;
-
-                if (num_cos == 0 || num_mba_cos < num_cos)
-                        num_cos = num_mba_cos;
-        }
-
-        *hi_class_id = num_cos - 1;
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Gets COS associated to \a lcore
  *
  * @param [in] lcore lcore to read COS association from
@@ -172,7 +107,7 @@ cos_assoc_get(const unsigned lcore, unsigned *class_id)
                 return PQOS_RETVAL_ERROR;
 
         val >>= PQOS_MSR_ASSOC_QECOS_SHIFT;
-        *class_id = (unsigned) val;
+        *class_id = (unsigned)val;
 
         return PQOS_RETVAL_OK;
 }
@@ -182,8 +117,10 @@ cos_assoc_get(const unsigned lcore, unsigned *class_id)
  *
  * The lowest acceptable COS is 1, as 0 is a default one
  *
- * @param [in] id socket or L2 cache ID to search for unused COS on
  * @param [in] technology selection of allocation technologies
+ * @param [in] l3cat_id L3 CAT resource id
+ * @param [in] l2cat_id L2 CAT resource id
+ * @param [in] mba_id MBA resource id
  * @param [out] class_id unused COS
  *
  * NOTE: It is our assumption that mba id and cat ids are same for
@@ -193,48 +130,96 @@ cos_assoc_get(const unsigned lcore, unsigned *class_id)
  * @return Operation status
  */
 static int
-get_unused_cos(const unsigned id,
-               const unsigned technology,
+get_unused_cos(const unsigned technology,
+               unsigned l3cat_id,
+               unsigned l2cat_id,
+               unsigned mba_id,
                unsigned *class_id)
 {
-        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-	const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
-        unsigned used_classes[PQOS_MAX_L3CA_COS];
+        unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0;
+        unsigned num_cos = 0;
         unsigned i, cos;
-        unsigned hi_class_id;
         int ret;
+        const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
+        const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
+        const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+        int l2cat_id_set = l2_req;
+        int l3cat_id_set = l3_req;
+        int mba_id_set = mba_req;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
+        unsigned used_classes[PQOS_MAX_COS];
 
         if (class_id == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        /* obtain highest class id for all requested technologies */
-        ret = get_hi_cos_id(technology, &hi_class_id);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
+        _pqos_cap_get(&cap, &cpu);
 
         memset(used_classes, 0, sizeof(used_classes));
 
-        /* Create a list of COS used on socket/L2 cluster */
-        for (i = 0; i < m_cpu->num_cores; i++) {
-                if (l2_req) {
-                        /* L2 requested so looking in L2 cluster scope */
-                        if (m_cpu->cores[i].l2_id != id)
-                                continue;
-		} else if (mba_req) {
-			/* mba requested so looking in mba_id scope */
-			if (m_cpu->cores[i].mba_id != id)
-				continue;
-                } else {
-			/* looking at l3cat_id scope */
-			if (m_cpu->cores[i].l3cat_id != id)
-                                continue;
-                }
+        ret = pqos_l3ca_get_cos_num(cap, &num_l3_cos);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                return ret;
 
-                ret = cos_assoc_get(m_cpu->cores[i].lcore, &cos);
+        ret = pqos_l2ca_get_cos_num(cap, &num_l2_cos);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                return ret;
+
+        ret = pqos_mba_get_cos_num(cap, &num_mba_cos);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                return ret;
+
+        /* Obtain highest COS number for requested technologies */
+        {
+                if (l3_req)
+                        num_cos = num_l3_cos;
+
+                if (l2_req && (num_cos == 0 || num_cos > num_l2_cos))
+                        num_cos = num_l2_cos;
+
+                if (mba_req && (num_cos == 0 || num_cos > num_mba_cos))
+                        num_cos = num_mba_cos;
+
+                if (num_cos == 0)
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        /* Obtain L3 and MBA ids for L2 cluster*/
+        if (l2_req && !l3cat_id_set && !mba_id_set) {
+                for (i = 0; i < cpu->num_cores; i++)
+                        if (cpu->cores[i].l2_id == l2cat_id) {
+
+                                if (num_l3_cos > 0 && !l3cat_id_set) {
+                                        l3cat_id = cpu->cores[i].l3cat_id;
+                                        l3cat_id_set = 1;
+                                        break;
+                                }
+                                if (num_mba_cos > 0 && !mba_id_set) {
+                                        mba_id = cpu->cores[i].mba_id;
+                                        mba_id_set = 1;
+                                        break;
+                                }
+                        }
+        }
+
+        /* Create a list of used COS */
+        for (i = 0; i < cpu->num_cores; i++) {
+                if (l3cat_id_set && cpu->cores[i].l3cat_id != l3cat_id)
+                        continue;
+                if (mba_id_set && cpu->cores[i].mba_id != mba_id)
+                        continue;
+
+                ret = cos_assoc_get(cpu->cores[i].lcore, &cos);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
-                if (cos > hi_class_id)
+                if (cos >= num_cos)
+                        continue;
+
+                /* COS does not support L3CAT and MBA need to check
+                L2 cluster only */
+                if (cos >= num_l3_cos && cos >= num_mba_cos && l2cat_id_set &&
+                    cpu->cores[i].l2_id != l2cat_id)
                         continue;
 
                 /* Mark as used */
@@ -242,7 +227,7 @@ get_unused_cos(const unsigned id,
         }
 
         /* Find unused COS */
-        for (cos = hi_class_id; cos != 0; cos--) {
+        for (cos = num_cos - 1; cos != 0; cos--) {
                 if (used_classes[cos] == 0) {
                         *class_id = cos;
                         return PQOS_RETVAL_OK;
@@ -324,7 +309,7 @@ hw_l3ca_set(const unsigned l3cat_id,
 
         ret = pqos_l3ca_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
-                return ret;             /**< perhaps no L3CA capability */
+                return ret; /**< perhaps no L3CA capability */
 
         if (num_ca > count)
                 return PQOS_RETVAL_ERROR;
@@ -341,7 +326,7 @@ hw_l3ca_set(const unsigned l3cat_id,
         if (cdp_enabled) {
                 for (i = 0; i < num_ca; i++) {
                         uint32_t reg =
-                                (ca[i].class_id*2) + PQOS_MSR_L3CA_MASK_START;
+                            (ca[i].class_id * 2) + PQOS_MSR_L3CA_MASK_START;
                         int retval = MACHINE_RETVAL_OK;
                         uint64_t cmask = 0, dmask = 0;
 
@@ -357,14 +342,14 @@ hw_l3ca_set(const unsigned l3cat_id,
                         if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
 
-                        retval = msr_write(core, reg+1, cmask);
+                        retval = msr_write(core, reg + 1, cmask);
                         if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
                 }
         } else {
                 for (i = 0; i < num_ca; i++) {
                         uint32_t reg =
-                                ca[i].class_id + PQOS_MSR_L3CA_MASK_START;
+                            ca[i].class_id + PQOS_MSR_L3CA_MASK_START;
                         uint64_t val = ca[i].u.ways_mask;
                         int retval = MACHINE_RETVAL_OK;
 
@@ -404,7 +389,7 @@ hw_l3ca_get(const unsigned l3cat_id,
 
         ret = pqos_l3ca_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
-                return ret;             /**< perhaps no L3CA capability */
+                return ret; /**< perhaps no L3CA capability */
 
         ret = pqos_l3ca_cdp_enabled(cap, NULL, &cdp_enabled);
         if (ret != PQOS_RETVAL_OK)
@@ -419,8 +404,8 @@ hw_l3ca_get(const unsigned l3cat_id,
                 return ret;
 
         if (cdp_enabled) {
-                for (i = 0, reg = PQOS_MSR_L3CA_MASK_START;
-                     i < count; i++, reg += 2) {
+                for (i = 0, reg = PQOS_MSR_L3CA_MASK_START; i < count;
+                     i++, reg += 2) {
                         ca[i].cdp = 1;
                         ca[i].class_id = i;
 
@@ -437,8 +422,8 @@ hw_l3ca_get(const unsigned l3cat_id,
                         ca[i].u.s.code_mask = val;
                 }
         } else {
-                for (i = 0, reg = PQOS_MSR_L3CA_MASK_START;
-                     i < count; i++, reg++) {
+                for (i = 0, reg = PQOS_MSR_L3CA_MASK_START; i < count;
+                     i++, reg++) {
                         retval = msr_read(core, reg, &val);
                         if (retval != MACHINE_RETVAL_OK)
                                 return PQOS_RETVAL_ERROR;
@@ -486,7 +471,7 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
          * Find free COS
          */
         for (l3cat_id = 0; l3cat_id < l3cat_id_num; l3cat_id++) {
-                ret = get_unused_cos(l3cat_id, technology, &class_id);
+                ret = get_unused_cos(technology, l3cat_id, 0, 0, &class_id);
                 if (ret == PQOS_RETVAL_OK)
                         break;
 
@@ -529,8 +514,8 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
                 /**
                  * Validate if mask was correctly set
                  */
-                ret = hw_l3ca_get(l3cat_id, PQOS_MAX_L3CA_COS, &num_ca,
-                                  l3ca_tab);
+                ret =
+                    hw_l3ca_get(l3cat_id, PQOS_MAX_L3CA_COS, &num_ca, l3ca_tab);
                 if (ret != PQOS_RETVAL_OK)
                         goto pqos_l3ca_get_min_cbm_bits_restore;
 
@@ -540,9 +525,8 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
                         if (l3ca->class_id != class_id)
                                 continue;
 
-                        if ((l3ca->cdp &&
-                                l3ca->u.s.data_mask == mask &&
-                                l3ca->u.s.code_mask == mask) ||
+                        if ((l3ca->cdp && l3ca->u.s.data_mask == mask &&
+                             l3ca->u.s.code_mask == mask) ||
                             (!l3ca->cdp && l3ca->u.ways_mask == mask)) {
                                 *min_cbm_bits = ways;
                                 ret = PQOS_RETVAL_OK;
@@ -554,7 +538,7 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         /**
          * Restore old settings
          */
- pqos_l3ca_get_min_cbm_bits_restore:
+pqos_l3ca_get_min_cbm_bits_restore:
         for (i = 0; i < l3ca_num; i++) {
                 int ret_val;
 
@@ -570,7 +554,7 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
                 }
         }
 
- pqos_l3ca_get_min_cbm_bits_exit:
+pqos_l3ca_get_min_cbm_bits_exit:
         if (l3cat_ids != NULL)
                 free(l3cat_ids);
 
@@ -626,7 +610,7 @@ hw_l2ca_set(const unsigned l2id,
         for (i = 0; i < num_ca; i++) {
                 if (cdp_enabled) {
                         uint32_t reg =
-                                (ca[i].class_id * 2) + PQOS_MSR_L2CA_MASK_START;
+                            (ca[i].class_id * 2) + PQOS_MSR_L2CA_MASK_START;
                         int retval = MACHINE_RETVAL_OK;
                         uint64_t cmask = 0, dmask = 0;
 
@@ -647,7 +631,7 @@ hw_l2ca_set(const unsigned l2id,
                                 return PQOS_RETVAL_ERROR;
                 } else {
                         uint32_t reg =
-                                ca[i].class_id + PQOS_MSR_L2CA_MASK_START;
+                            ca[i].class_id + PQOS_MSR_L2CA_MASK_START;
                         uint64_t val = ca[i].u.ways_mask;
                         int retval;
 
@@ -759,8 +743,8 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
                 return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
         /**
-        * Get number & list of L2ids in the system
-        */
+         * Get number & list of L2ids in the system
+         */
         l2ids = pqos_cpu_get_l2ids(m_cpu, &l2id_num);
         if (l2ids == NULL || l2id_num == 0) {
                 ret = PQOS_RETVAL_ERROR;
@@ -771,7 +755,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
          * Find free COS
          */
         for (l2id = 0; l2id < l2id_num; l2id++) {
-                ret = get_unused_cos(l2id, technology, &class_id);
+                ret = get_unused_cos(technology, 0, l2id, 0, &class_id);
                 if (ret == PQOS_RETVAL_OK)
                         break;
                 if (ret != PQOS_RETVAL_RESOURCE)
@@ -823,9 +807,8 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
                         if (l2ca->class_id != class_id)
                                 continue;
 
-                        if ((l2ca->cdp &&
-                                l2ca->u.s.data_mask == mask &&
-                                l2ca->u.s.code_mask == mask) ||
+                        if ((l2ca->cdp && l2ca->u.s.data_mask == mask &&
+                             l2ca->u.s.code_mask == mask) ||
                             (!l2ca->cdp && l2ca->u.ways_mask == mask)) {
                                 *min_cbm_bits = ways;
                                 ret = PQOS_RETVAL_OK;
@@ -837,7 +820,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         /**
          * Restore old settings
          */
- hw_l2ca_get_min_cbm_bits_restore:
+hw_l2ca_get_min_cbm_bits_restore:
         for (i = 0; i < l2ca_num; i++) {
                 int ret_val;
 
@@ -853,7 +836,7 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
                 }
         }
 
- hw_l2ca_get_min_cbm_bits_exit:
+hw_l2ca_get_min_cbm_bits_exit:
         if (l2ids != NULL)
                 free(l2ids);
 
@@ -914,9 +897,10 @@ hw_mba_set(const unsigned mba_id,
 
         for (i = 0; i < num_cos; i++) {
                 const uint32_t reg =
-                        requested[i].class_id + PQOS_MSR_MBA_MASK_START;
-                uint64_t val = PQOS_MBA_LINEAR_MAX -
-                        (((requested[i].mb_max + (step/2)) / step) * step);
+                    requested[i].class_id + PQOS_MSR_MBA_MASK_START;
+                uint64_t val =
+                    PQOS_MBA_LINEAR_MAX -
+                    (((requested[i].mb_max + (step / 2)) / step) * step);
                 int retval = MACHINE_RETVAL_OK;
 
                 if (val > mba_cap->u.mba->throttle_max)
@@ -1034,7 +1018,7 @@ hw_mba_get(const unsigned mba_id,
 
         ret = pqos_mba_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
-                return ret;             /**< no MBA capability */
+                return ret; /**< no MBA capability */
 
         if (count > max_num_cos)
                 return PQOS_RETVAL_ERROR;
@@ -1054,7 +1038,7 @@ hw_mba_get(const unsigned mba_id,
 
                 mba_tab[i].ctrl = 0;
                 mba_tab[i].class_id = i;
-                mba_tab[i].mb_max = (unsigned) PQOS_MBA_LINEAR_MAX - val;
+                mba_tab[i].mb_max = (unsigned)PQOS_MBA_LINEAR_MAX - val;
         }
         *num_cos = count;
 
@@ -1125,7 +1109,7 @@ cos_assoc_set(const unsigned lcore, const unsigned class_id)
                 return PQOS_RETVAL_ERROR;
 
         val &= (~PQOS_MSR_ASSOC_QECOS_MASK);
-        val |= (((uint64_t) class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
+        val |= (((uint64_t)class_id) << PQOS_MSR_ASSOC_QECOS_SHIFT);
 
         ret = msr_write(lcore, reg, val);
         if (ret != MACHINE_RETVAL_OK)
@@ -1135,8 +1119,7 @@ cos_assoc_set(const unsigned lcore, const unsigned class_id)
 }
 
 int
-hw_alloc_assoc_set(const unsigned lcore,
-                   const unsigned class_id)
+hw_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned num_l2_cos = 0, num_l3_cos = 0;
@@ -1167,8 +1150,7 @@ hw_alloc_assoc_set(const unsigned lcore,
 }
 
 int
-hw_alloc_assoc_get(const unsigned lcore,
-                   unsigned *class_id)
+hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
         const struct pqos_capability *l3_cap = NULL;
         const struct pqos_capability *l2_cap = NULL;
@@ -1202,16 +1184,16 @@ hw_alloc_assoc_get(const unsigned lcore,
         return ret;
 }
 
-
 int
 hw_alloc_assign(const unsigned technology,
                 const unsigned *core_array,
                 const unsigned core_num,
                 unsigned *class_id)
 {
+        const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
-	const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
-	unsigned resource_id = 0;
+        const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+        unsigned l3cat_id = 0, l2cat_id = 0, mba_id = 0;
         unsigned i;
         int ret;
 
@@ -1230,33 +1212,34 @@ hw_alloc_assign(const unsigned technology,
                         goto pqos_alloc_assign_exit;
                 }
 
-                if (l2_req) {
-                        /* L2 is requested
+                if (l3_req) {
+                        if (i != 0 && l3cat_id != pi->l3cat_id) {
+                                ret = PQOS_RETVAL_PARAM;
+                                goto pqos_alloc_assign_exit;
+                        }
+                        l3cat_id = pi->l3cat_id;
+                }
+                if (mba_req) {
+                        if (i != 0 && mba_id != pi->mba_id) {
+                                ret = PQOS_RETVAL_PARAM;
+                                goto pqos_alloc_assign_exit;
+                        }
+                        mba_id = pi->mba_id;
+                }
+                if (l2_req && !l3_req && !mba_req) {
+                        /* only L2 is requested
                          * The smallest manageable entity is L2 cluster
                          */
-                        if (i != 0 && resource_id != pi->l2_id) {
+                        if (i != 0 && l2cat_id != pi->l2_id) {
                                 ret = PQOS_RETVAL_PARAM;
                                 goto pqos_alloc_assign_exit;
                         }
-                        resource_id = pi->l2_id;
-		} else if (mba_req) {
-			if (i != 0 && resource_id != pi->mba_id) {
-				ret = PQOS_RETVAL_PARAM;
-				goto pqos_alloc_assign_exit;
-			}
-			resource_id = pi->mba_id;
-		} else {
-			if (i != 0 && resource_id != pi->l3cat_id) {
-                                ret = PQOS_RETVAL_PARAM;
-                                goto pqos_alloc_assign_exit;
-                        }
-			resource_id = pi->l3cat_id;
+                        l2cat_id = pi->l2_id;
                 }
         }
 
         /* find an unused class from highest down */
-	ret = get_unused_cos(resource_id, technology, class_id);
-
+        ret = get_unused_cos(technology, l3cat_id, l2cat_id, mba_id, class_id);
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
 
@@ -1267,13 +1250,12 @@ hw_alloc_assign(const unsigned technology,
                         goto pqos_alloc_assign_exit;
         }
 
- pqos_alloc_assign_exit:
+pqos_alloc_assign_exit:
         return ret;
 }
 
 int
-hw_alloc_release(const unsigned *core_array,
-                 const unsigned core_num)
+hw_alloc_release(const unsigned *core_array, const unsigned core_num)
 {
         unsigned i;
         int ret = PQOS_RETVAL_OK;
@@ -1348,9 +1330,7 @@ l3cdp_enable(const unsigned l3cat_id_num,
  * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
  */
 static int
-l2cdp_enable(const unsigned l2id_num,
-           const unsigned *l2ids,
-           const int enable)
+l2cdp_enable(const unsigned l2id_num, const unsigned *l2ids, const int enable)
 {
         unsigned i = 0;
         int ret;
@@ -1471,27 +1451,26 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
                l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
 
-        ASSERT(mba_cfg == PQOS_MBA_DEFAULT ||
-               mba_cfg == PQOS_MBA_CTRL ||
+        ASSERT(mba_cfg == PQOS_MBA_DEFAULT || mba_cfg == PQOS_MBA_CTRL ||
                mba_cfg == PQOS_MBA_ANY);
 
         _pqos_cap_get(&cap, NULL);
         cpuinfo_get_config(&vconfig);
 
         /* Get L3 CAT capabilities */
-        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
 
         /* Get L2 CAT capabilities */
         alloc_cap = NULL;
-        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l2_cap = alloc_cap->u.l2ca;
 
         /* Get MBA capabilities */
         alloc_cap = NULL;
-        (void) _pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &alloc_cap);
+        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &alloc_cap);
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
 
@@ -1577,14 +1556,13 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 for (j = 0; j < l3cat_id_num; j++) {
                         unsigned core = 0;
 
-                        ret = pqos_cpu_get_one_by_l3cat_id(m_cpu,
-                                                           l3cat_ids[j],
+                        ret = pqos_cpu_get_one_by_l3cat_id(m_cpu, l3cat_ids[j],
                                                            &core);
                         if (ret != PQOS_RETVAL_OK)
                                 goto pqos_alloc_reset_exit;
 
                         const uint64_t ways_mask =
-                                (1ULL << l3_cap->num_ways) - 1ULL;
+                            (1ULL << l3_cap->num_ways) - 1ULL;
 
                         ret = alloc_cos_reset(PQOS_MSR_L3CA_MASK_START,
                                               max_l3_cos, core, ways_mask);
@@ -1604,7 +1582,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
 
                 for (j = 0; j < l2id_num; j++) {
                         const uint64_t ways_mask =
-                                (1ULL << l2_cap->num_ways) - 1ULL;
+                            (1ULL << l2_cap->num_ways) - 1ULL;
                         unsigned core = 0;
 
                         ret = pqos_cpu_get_one_by_l2id(m_cpu, l2ids[j], &core);
@@ -1712,7 +1690,7 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 _pqos_cap_l2cdp_change(l2_cdp_cfg);
         }
 
- pqos_alloc_reset_exit:
+pqos_alloc_reset_exit:
         if (l3cat_ids != NULL)
                 free(l3cat_ids);
         if (mba_ids != NULL)

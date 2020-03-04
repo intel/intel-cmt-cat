@@ -74,8 +74,7 @@ int pqos_alloc_fini(void);
  *
  * @return Operations status
  */
-int hw_alloc_assoc_set(const unsigned lcore,
-                       const unsigned class_id);
+int hw_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
 
 /**
  * @brief Hardware interface to read association
@@ -87,8 +86,7 @@ int hw_alloc_assoc_set(const unsigned lcore,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_alloc_assoc_get(const unsigned lcore,
-                       unsigned *class_id);
+int hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 
 /**
  * @brief Hardware interface to assign first available
@@ -124,8 +122,7 @@ int hw_alloc_assign(const unsigned technology,
  *
  * @return Operations status
  */
-int hw_alloc_release(const unsigned *core_array,
-                     const unsigned core_num);
+int hw_alloc_release(const unsigned *core_array, const unsigned core_num);
 
 /**
  * @brief Hardware interface to reset configuration

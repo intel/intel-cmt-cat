@@ -74,6 +74,11 @@ static struct pqos_api {
                        const unsigned num_cos,
                        const struct pqos_mba *requested,
                        struct pqos_mba *actual);
+        /** Assign first available COS */
+        int (*alloc_assign)(const unsigned technology,
+                            const unsigned *core_array,
+                            const unsigned core_num,
+                            unsigned *class_id);
 } api;
 
 /*
@@ -100,6 +105,7 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = hw_mba_get;
                         api.mba_set = hw_mba_set;
                 }
+                api.alloc_assign = hw_alloc_assign;
 
 #ifdef __linux__
         } else if (interface == PQOS_INTER_OS ||
@@ -111,6 +117,7 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = os_mba_get;
                         api.mba_set = os_mba_set;
                 }
+                api.alloc_assign = os_alloc_assign;
 #endif
         }
 
@@ -279,17 +286,13 @@ pqos_alloc_assign(const unsigned technology,
                 _pqos_api_unlock();
                 return ret;
         }
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_alloc_assign(technology, core_array,
-                        core_num, class_id);
-        else {
-#ifdef __linux__
-                ret = os_alloc_assign(technology, core_array, core_num,
+
+        if (api.alloc_assign != NULL)
+                ret = api.alloc_assign(technology, core_array, core_num,
                                       class_id);
-#else
-                LOG_INFO("OS interface not supported!\n");
+        else {
+                LOG_INFO("Interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
-#endif
         }
         _pqos_api_unlock();
 

@@ -1503,28 +1503,26 @@ cfg_set_cores_os(const unsigned technology,
         if (core_num == 0)
                 return -EFAULT;
 
-        if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
-                const unsigned l2_technology = 1 << PQOS_CAP_TYPE_L2CA;
-                /* Assign all cores to single COS */
-                ret = pqos_alloc_assign(l2_technology, core_array, core_num,
-                                        &cos_id);
-                switch (ret) {
-                case PQOS_RETVAL_OK:
-                        break;
-                case PQOS_RETVAL_RESOURCE:
-                        fprintf(stderr, "No free COS available!\n");
-                        return -EBUSY;
-                default:
-                        fprintf(stderr, "Unable to assign COS!\n");
-                        return -EFAULT;
-                }
+        ret = get_max_res_id(technology, &max_id);
+        if (ret != 0)
+                return ret;
 
-                ret = get_max_res_id(l2_technology, &max_id);
-                if (ret != 0)
-                        return ret;
+        /* Assign all cores to single group */
+        ret = pqos_alloc_assign(technology, core_array, core_num, &cos_id);
+        switch (ret) {
+        case PQOS_RETVAL_OK:
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                fprintf(stderr, "No free COS available!\n");
+                return -EBUSY;
+        default:
+                fprintf(stderr, "Unable to assign COS L2!\n");
+                return -EFAULT;
+        }
 
-                /* Set COS definition on necessary sockets/clusters */
-                for (i = 0; i <= max_id; i++) {
+        /* Set COS definition on necessary sockets/clusters */
+        for (i = 0; i <= max_id; i++) {
+                if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
                         memset(core_array, 0, sizeof(core_array));
 
                         /* Get cores on res id i */
@@ -1541,30 +1539,7 @@ cfg_set_cores_os(const unsigned technology,
                         if (ret != 0)
                                 return ret;
                 }
-        }
-
-        if (technology & (1 << PQOS_CAP_TYPE_L3CA)) {
-                const unsigned l3_technology = 1 << PQOS_CAP_TYPE_L3CA;
-                /* Assign all cores to single COS */
-                ret = pqos_alloc_assign(l3_technology, core_array, core_num,
-                                        &cos_id);
-                switch (ret) {
-                case PQOS_RETVAL_OK:
-                        break;
-                case PQOS_RETVAL_RESOURCE:
-                        fprintf(stderr, "No free COS available!\n");
-                        return -EBUSY;
-                default:
-                        fprintf(stderr, "Unable to assign COS!\n");
-                        return -EFAULT;
-                }
-
-                ret = get_max_res_id(l3_technology, &max_id);
-                if (ret != 0)
-                        return ret;
-
-                /* Set COS definition on necessary sockets/clusters */
-                for (i = 0; i <= max_id; i++) {
+                if (technology & (1 << PQOS_CAP_TYPE_L3CA)) {
                         memset(core_array, 0, sizeof(core_array));
 
                         /* Get cores on res id i */
@@ -1582,30 +1557,7 @@ cfg_set_cores_os(const unsigned technology,
                         if (ret != 0)
                                 return ret;
                 }
-        }
-
-        if (technology & (1 << PQOS_CAP_TYPE_MBA)) {
-                const unsigned mba_technology = 1 << PQOS_CAP_TYPE_MBA;
-                /* Assign all cores to single COS */
-                ret = pqos_alloc_assign(mba_technology, core_array, core_num,
-                                        &cos_id);
-                switch (ret) {
-                case PQOS_RETVAL_OK:
-                        break;
-                case PQOS_RETVAL_RESOURCE:
-                        fprintf(stderr, "No free COS available!\n");
-                        return -EBUSY;
-                default:
-                        fprintf(stderr, "Unable to assign COS!\n");
-                        return -EFAULT;
-                }
-
-                ret = get_max_res_id(mba_technology, &max_id);
-                if (ret != 0)
-                        return ret;
-
-                /* Set COS definition on necessary sockets/clusters */
-                for (i = 0; i <= max_id; i++) {
+                if (technology & (1 << PQOS_CAP_TYPE_MBA)) {
                         memset(core_array, 0, sizeof(core_array));
 
                         /* Get cores on res id i */
@@ -1648,33 +1600,37 @@ cfg_set_cores_msr(const unsigned technology,
                   const struct pqos_l3ca *l3ca,
                   const struct pqos_mba *mba)
 {
-        int ret;
-        unsigned i, max_id;
+        int ret = PQOS_RETVAL_OK;
+        unsigned res_id, max_id;
 
         ret = get_max_res_id(technology, &max_id);
         if (ret != 0)
                 return ret;
 
         /* Assign new COS for all applicable res ids */
-        for (i = 0; i <= max_id; i++) {
-                const unsigned l2_technology = 1 << PQOS_CAP_TYPE_L2CA;
+        for (res_id = 0; res_id <= max_id; res_id++) {
                 unsigned core_array[CPU_SETSIZE] = {0};
-                unsigned core_num, cos_id;
+                unsigned core_num = 0, cos_id;
+                unsigned i;
 
                 /* Get cores on res id i */
-                if (technology & (1 << PQOS_CAP_TYPE_L2CA))
-                        ret = get_l2id_cores(cores, i, &core_num, core_array);
-                else
-                        break; /* exit this loop */
-
+                if (technology & (1 << PQOS_CAP_TYPE_L3CA)) {
+                        ret = get_l3cat_id_cores(cores, res_id, &core_num,
+                                                 core_array);
+                } else if (technology & (1 << PQOS_CAP_TYPE_MBA)) {
+                        ret = get_mba_id_cores(cores, res_id, &core_num,
+                                               core_array);
+                } else if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
+                        ret = get_l2id_cores(cores, res_id, &core_num,
+                                             core_array);
+                }
                 if (ret != 0)
                         return ret;
-
                 if (core_num == 0)
                         continue;
 
                 /* Assign COS to those cores */
-                ret = pqos_alloc_assign(l2_technology, core_array, core_num,
+                ret = pqos_alloc_assign(technology, core_array, core_num,
                                         &cos_id);
                 switch (ret) {
                 case PQOS_RETVAL_OK:
@@ -1688,88 +1644,12 @@ cfg_set_cores_msr(const unsigned technology,
                 }
 
                 /* Configure COS on res ID i */
-                ret =
-                    cfg_configure_cos(l2ca, NULL, NULL, core_array[0], cos_id);
-                if (ret != 0)
-                        return ret;
-        }
-
-        /* Assign new COS for all applicable res ids */
-        for (i = 0; i <= max_id; i++) {
-                const unsigned l3_technology = 1 << PQOS_CAP_TYPE_L3CA;
-                unsigned core_array[CPU_SETSIZE] = {0};
-                unsigned core_num, cos_id;
-
-                /* Get cores on res id i */
-                if (technology & (1 << PQOS_CAP_TYPE_L3CA))
-                        ret =
-                            get_l3cat_id_cores(cores, i, &core_num, core_array);
-                else
-                        break; /* exit this loop */
-
-                if (ret != 0)
-                        return ret;
-
-                if (core_num == 0)
-                        continue;
-
-                /* Assign COS to those cores */
-                ret = pqos_alloc_assign(l3_technology, core_array, core_num,
-                                        &cos_id);
-                switch (ret) {
-                case PQOS_RETVAL_OK:
-                        break;
-                case PQOS_RETVAL_RESOURCE:
-                        fprintf(stderr, "No free COS available!\n");
-                        return -EBUSY;
-                default:
-                        fprintf(stderr, "Unable to assign COS!\n");
-                        return -EFAULT;
+                for (i = 0; i < core_num; i++) {
+                        ret = cfg_configure_cos(l2ca, l3ca, mba, core_array[i],
+                                                cos_id);
+                        if (ret != 0)
+                                return ret;
                 }
-
-                /* Configure COS on res ID i */
-                ret =
-                    cfg_configure_cos(NULL, l3ca, NULL, core_array[0], cos_id);
-                if (ret != 0)
-                        return ret;
-        }
-
-        /* Assign new COS for all applicable res ids */
-        for (i = 0; i <= max_id; i++) {
-                const unsigned mba_technology = 1 << PQOS_CAP_TYPE_MBA;
-                unsigned core_array[CPU_SETSIZE] = {0};
-                unsigned core_num, cos_id;
-
-                /* Get cores on res id i */
-                if (technology & (1 << PQOS_CAP_TYPE_MBA))
-                        ret = get_mba_id_cores(cores, i, &core_num, core_array);
-                else
-                        break; /* exit this loop */
-
-                if (ret != 0)
-                        return ret;
-
-                if (core_num == 0)
-                        continue;
-
-                /* Assign COS to those cores */
-                ret = pqos_alloc_assign(mba_technology, core_array, core_num,
-                                        &cos_id);
-                switch (ret) {
-                case PQOS_RETVAL_OK:
-                        break;
-                case PQOS_RETVAL_RESOURCE:
-                        fprintf(stderr, "No free COS available!\n");
-                        return -EBUSY;
-                default:
-                        fprintf(stderr, "Unable to assign COS!\n");
-                        return -EFAULT;
-                }
-
-                /* Configure COS on res ID i */
-                ret = cfg_configure_cos(NULL, NULL, mba, core_array[0], cos_id);
-                if (ret != 0)
-                        return ret;
         }
 
         return 0;
