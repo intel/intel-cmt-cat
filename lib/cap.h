@@ -100,6 +100,13 @@ void _pqos_api_unlock(void);
 int _pqos_check_init(const int expect);
 
 /**
+ * @brief Internal API to retrie PQoS interface
+ *
+ * @return PQoS interface
+ */
+enum pqos_interface _pqos_iface(void);
+
+/**
  * @brief Internal API to retrie PQoS capabilities data
  *
  * @param [out] cap location to store PQoS capabilities information at

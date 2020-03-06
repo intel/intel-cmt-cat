@@ -482,6 +482,7 @@ hw_cap_l3ca_cpuid(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
          * - get more info about it
          */
         lcpuid(0x10, PQOS_RES_ID_L3_ALLOCATION, &res);
+
         cap->num_classes = res.edx + 1;
         cap->num_ways = res.eax + 1;
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
@@ -518,30 +519,24 @@ hw_cap_l3ca_cpuid(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
  *
  * \a cpu is only needed to detect CDP status.
  *
- * @param r_cap place to store CAT capabilities structure
+ * @param cap place to store CAT capabilities structure
  * @param cpu detected cpu topology
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
 int
-hw_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
-                     const struct pqos_cpuinfo *cpu)
+hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
-        struct pqos_cap_l3ca *cap = NULL;
-        const unsigned sz = sizeof(*cap);
         unsigned l3_size = 0;
         int ret = PQOS_RETVAL_OK;
 
-        cap = (struct pqos_cap_l3ca *)malloc(sz);
-        if (cap == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
         ASSERT(cap != NULL);
+        ASSERT(cpu != NULL);
 
-        memset(cap, 0, sz);
-        cap->mem_size = sz;
+        memset(cap, 0, sizeof(*cap));
+        cap->mem_size = sizeof(*cap);
 
         /**
          * Run CPUID.0x7.0 to check
@@ -574,11 +569,6 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
 
         if (cap->num_ways > 0)
                 cap->way_size = l3_size / cap->num_ways;
-
-        if (ret == PQOS_RETVAL_OK)
-                (*r_cap) = cap;
-        else
-                free(cap);
 
         return ret;
 }
@@ -655,25 +645,14 @@ l2cdp_is_enabled_exit:
 }
 
 int
-hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
-                     const struct pqos_cpuinfo *cpu)
+hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
-        struct pqos_cap_l2ca *cap = NULL;
-        const unsigned sz = sizeof(*cap);
         unsigned l2_size = 0;
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(cpu != NULL);
-
-        cap = (struct pqos_cap_l2ca *)malloc(sz);
-        if (cap == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
         ASSERT(cap != NULL);
-
-        memset(cap, 0, sz);
-        cap->mem_size = sz;
 
         /**
          * Run CPUID.0x7.0 to check
@@ -682,7 +661,6 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
         lcpuid(0x7, 0x0, &res);
         if (!(res.ebx & (1 << 15))) {
                 LOG_INFO("CPUID.0x7.0: L2 CAT not supported\n");
-                free(cap);
                 return PQOS_RETVAL_RESOURCE;
         }
 
@@ -692,12 +670,13 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
         lcpuid(0x10, 0x0, &res);
         if (!(res.ebx & (1 << PQOS_RES_ID_L2_ALLOCATION))) {
                 LOG_INFO("CPUID 0x10.0: L2 CAT not supported!\n");
-                free(cap);
                 return PQOS_RETVAL_RESOURCE;
         }
 
         lcpuid(0x10, PQOS_RES_ID_L2_ALLOCATION, &res);
 
+        memset(cap, 0, sizeof(*cap));
+        cap->mem_size = sizeof(*cap);
         cap->num_classes = res.edx + 1;
         cap->num_ways = res.eax + 1;
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
@@ -713,7 +692,6 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
                 ret = l2cdp_is_enabled(cpu, &cdp_on);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("L2 CDP detection error!\n");
-                        free(cap);
                         return ret;
                 }
                 cap->cdp_on = cdp_on;
@@ -724,34 +702,25 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
         ret = get_cache_info(&cpu->l2, NULL, &l2_size);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Error reading L2 info!\n");
-                free(cap);
                 return PQOS_RETVAL_ERROR;
         }
         if (cap->num_ways > 0)
                 cap->way_size = l2_size / cap->num_ways;
 
-        (*r_cap) = cap;
         return ret;
 }
 
 int
-hw_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
+hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
-        struct pqos_cap_mba *cap = NULL;
-        const unsigned sz = sizeof(*cap);
         int ret = PQOS_RETVAL_OK;
 
         UNUSED_PARAM(cpu);
-
-        cap = (struct pqos_cap_mba *)malloc(sz);
-        if (cap == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
         ASSERT(cap != NULL);
 
-        memset(cap, 0, sz);
-        cap->mem_size = sz;
+        memset(cap, 0, sizeof(*cap));
+        cap->mem_size = sizeof(*cap);
         cap->ctrl = -1;
         cap->ctrl_on = 0;
 
@@ -762,7 +731,6 @@ hw_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
         lcpuid(0x7, 0x0, &res);
         if (!(res.ebx & (1 << 15))) {
                 LOG_INFO("CPUID.0x7.0: MBA not supported\n");
-                free(cap);
                 return PQOS_RETVAL_RESOURCE;
         }
 
@@ -772,7 +740,6 @@ hw_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
         lcpuid(0x10, 0x0, &res);
         if (!(res.ebx & (1 << PQOS_RES_ID_MB_ALLOCATION))) {
                 LOG_INFO("CPUID 0x10.0: MBA not supported!\n");
-                free(cap);
                 return PQOS_RETVAL_RESOURCE;
         }
 
@@ -785,33 +752,23 @@ hw_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
                 cap->throttle_step = 100 - cap->throttle_max;
         else {
                 LOG_WARN("MBA non-linear mode not supported yet!\n");
-                free(cap);
                 return PQOS_RETVAL_RESOURCE;
         }
 
-        (*r_cap) = cap;
         return ret;
 }
 
 int
-amd_cap_mba_discover(struct pqos_cap_mba **r_cap,
-                     const struct pqos_cpuinfo *cpu)
+amd_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
-        struct pqos_cap_mba *cap = NULL;
-        const unsigned sz = sizeof(*cap);
         int ret = PQOS_RETVAL_OK;
 
         UNUSED_PARAM(cpu);
-
-        cap = (struct pqos_cap_mba *)malloc(sz);
-        if (cap == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
         ASSERT(cap != NULL);
 
-        memset(cap, 0, sz);
-        cap->mem_size = sz;
+        memset(cap, 0, sizeof(*cap));
+        cap->mem_size = sizeof(*cap);
         cap->ctrl = -1;
         cap->ctrl_on = 0;
 
@@ -844,6 +801,5 @@ amd_cap_mba_discover(struct pqos_cap_mba **r_cap,
         cap->throttle_max = 0;
         cap->is_linear = 0;
 
-        (*r_cap) = cap;
         return ret;
 }

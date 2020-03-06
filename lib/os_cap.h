@@ -80,37 +80,37 @@ int os_cap_mon_discover(struct pqos_cap_mon **r_cap,
 /**
  * @brief Discovers OS support of L3 CAT
  *
- * @param r_cap place to store CAT capabilities structure
+ * @param cap place to store CAT capabilities
  * @param cpu detected cpu topology
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
+int os_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
                          const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers OS support of L2 CAT
  *
- * @param r_cap place to store CAT capabilities structure
+ * @param cap place to store CAT capabilities
  * @param cpu detected cpu topology
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
+int os_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
                          const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers OS support of MBA
  *
- * @param r_cap place to store MBA capabilities structure
+ * @param cap place to store MBA capabilities
  * @param cpu detected cpu topology
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_mba_discover(struct pqos_cap_mba **r_cap,
+int os_cap_mba_discover(struct pqos_cap_mba *cap,
                         const struct pqos_cpuinfo *cpu);
 
 #ifdef __cplusplus

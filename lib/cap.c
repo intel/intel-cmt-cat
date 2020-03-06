@@ -245,6 +245,144 @@ _pqos_check_init(const int expect)
 }
 
 /**
+ * @brief Discovers support of L3 CAT
+ *
+ * @param[out] r_cap place to store L3 CAT capabilities structure
+ * @param[in] cpu detected cpu topology
+ * @param[in] iface Selected interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
+                  const struct pqos_cpuinfo *cpu,
+                  const enum pqos_interface iface)
+{
+        struct pqos_cap_l3ca *cap = NULL;
+        int ret;
+
+        cap = (struct pqos_cap_l3ca *)malloc(sizeof(*cap));
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        switch (iface) {
+        case PQOS_INTER_MSR:
+                ret = hw_cap_l3ca_discover(cap, cpu);
+                break;
+#ifdef __linux__
+        case PQOS_INTER_OS:
+        case PQOS_INTER_OS_RESCTRL_MON:
+                ret = os_cap_l3ca_discover(cap, cpu);
+                break;
+#endif
+        default:
+                ret = PQOS_RETVAL_RESOURCE;
+                break;
+        }
+
+        if (ret == PQOS_RETVAL_OK)
+                *r_cap = cap;
+        else
+                free(cap);
+
+        return ret;
+}
+
+/**
+ * @brief Discovers support of L2 CAT
+ *
+ * @param[out] r_cap place to store L2 CAT capabilities structure
+ * @param[in] cpu detected cpu topology
+ * @param[in] iface Selected interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
+                  const struct pqos_cpuinfo *cpu,
+                  const enum pqos_interface iface)
+{
+        struct pqos_cap_l2ca *cap = NULL;
+        int ret;
+
+        cap = (struct pqos_cap_l2ca *)malloc(sizeof(*cap));
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        switch (iface) {
+        case PQOS_INTER_MSR:
+                ret = hw_cap_l2ca_discover(cap, cpu);
+                break;
+#ifdef __linux__
+        case PQOS_INTER_OS:
+        case PQOS_INTER_OS_RESCTRL_MON:
+                ret = os_cap_l2ca_discover(cap, cpu);
+                break;
+#endif
+        default:
+                ret = PQOS_RETVAL_RESOURCE;
+                break;
+        }
+
+        if (ret == PQOS_RETVAL_OK)
+                *r_cap = cap;
+        else
+                free(cap);
+
+        return ret;
+}
+
+/**
+ * @brief Discovers support of MBA
+ *
+ * @param[out] r_cap place to store MBA capabilities structure
+ * @param[in] cpu detected cpu topology
+ * @param[in] iface Selected interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+cap_mba_discover(struct pqos_cap_mba **r_cap,
+                 const struct pqos_cpuinfo *cpu,
+                 const enum pqos_interface iface)
+{
+        struct pqos_cap_mba *cap = NULL;
+        int ret;
+
+        cap = (struct pqos_cap_mba *)malloc(sizeof(*cap));
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        switch (iface) {
+        case PQOS_INTER_MSR:
+                if (cpu->vendor == PQOS_VENDOR_AMD)
+                        ret = amd_cap_mba_discover(cap, cpu);
+                else
+                        ret = hw_cap_mba_discover(cap, cpu);
+                break;
+#ifdef __linux__
+        case PQOS_INTER_OS:
+        case PQOS_INTER_OS_RESCTRL_MON:
+                ret = os_cap_mba_discover(cap, cpu);
+                break;
+#endif
+        default:
+                ret = PQOS_RETVAL_RESOURCE;
+                break;
+        }
+
+        if (ret == PQOS_RETVAL_OK)
+                *r_cap = cap;
+        else
+                free(cap);
+
+        return ret;
+}
+
+/**
  * @brief Runs detection of platform monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
@@ -293,12 +431,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * L3 Cache allocation init
          */
-        if (inter == PQOS_INTER_MSR)
-                ret = hw_cap_l3ca_discover(&det_l3ca, cpu);
-#ifdef __linux__
-        else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
-                ret = os_cap_l3ca_discover(&det_l3ca, cpu);
-#endif
+        ret = cap_l3ca_discover(&det_l3ca, cpu, inter);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("L3CA capability detected\n");
@@ -325,12 +458,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * L2 Cache allocation init
          */
-        if (inter == PQOS_INTER_MSR)
-                ret = hw_cap_l2ca_discover(&det_l2ca, cpu);
-#ifdef __linux__
-        else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
-                ret = os_cap_l2ca_discover(&det_l2ca, cpu);
-#endif
+        ret = cap_l2ca_discover(&det_l2ca, cpu, inter);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("L2CA capability detected\n");
@@ -357,16 +485,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * Memory bandwidth allocation init
          */
-        if (inter == PQOS_INTER_MSR) {
-                if (cpu->vendor == PQOS_VENDOR_AMD)
-                        ret = amd_cap_mba_discover(&det_mba, cpu);
-                else
-                        ret = hw_cap_mba_discover(&det_mba, cpu);
-        }
-#ifdef __linux__
-        else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
-                ret = os_cap_mba_discover(&det_mba, cpu);
-#endif
+        ret = cap_mba_discover(&det_mba, cpu, inter);
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("MBA capability detected\n");
@@ -755,6 +874,8 @@ void
 _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 {
         struct pqos_cap_l3ca *l3_cap = NULL;
+        struct pqos_cap_l3ca cap;
+        int ret;
         unsigned i;
 
         ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
@@ -770,6 +891,26 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 
         if (l3_cap == NULL)
                 return;
+
+        switch (m_interface) {
+        case PQOS_INTER_MSR:
+                ret = hw_cap_l3ca_discover(&cap, m_cpu);
+                break;
+#ifdef __linux__
+        case PQOS_INTER_OS: /* fall through */
+        case PQOS_INTER_OS_RESCTRL_MON:
+                ret = os_cap_l3ca_discover(&cap, m_cpu);
+                break;
+#endif
+        default:
+                ret = PQOS_RETVAL_RESOURCE;
+                break;
+        }
+
+        if (ret == PQOS_RETVAL_OK) {
+                *l3_cap = cap;
+                return;
+        }
 
         if (cdp == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp_on) {
                 /* turn on */
@@ -788,7 +929,9 @@ void
 _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
 {
         struct pqos_cap_l2ca *l2_cap = NULL;
+        struct pqos_cap_l2ca cap;
         unsigned i;
+        int ret;
 
         ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
                cdp == PQOS_REQUIRE_CDP_ANY);
@@ -803,6 +946,26 @@ _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
 
         if (l2_cap == NULL)
                 return;
+
+        switch (m_interface) {
+        case PQOS_INTER_MSR:
+                ret = hw_cap_l2ca_discover(&cap, m_cpu);
+                break;
+#ifdef __linux__
+        case PQOS_INTER_OS:
+        case PQOS_INTER_OS_RESCTRL_MON:
+                ret = os_cap_l2ca_discover(&cap, m_cpu);
+                break;
+#endif
+        default:
+                ret = PQOS_RETVAL_RESOURCE;
+                break;
+        }
+
+        if (ret == PQOS_RETVAL_OK) {
+                *l2_cap = cap;
+                return;
+        }
 
         if (cdp == PQOS_REQUIRE_CDP_ON && !l2_cap->cdp_on) {
                 /* turn on */
@@ -846,6 +1009,12 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 #endif
                 mba_cap->ctrl_on = 1;
         }
+}
+
+enum pqos_interface
+_pqos_iface(void)
+{
+        return m_interface;
 }
 
 void

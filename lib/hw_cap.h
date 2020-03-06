@@ -55,54 +55,54 @@ int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
 /**
  * @brief Discovers HW support of L3 CAT
  *
- * @param r_cap place to store CAT capabilities structure
+ * @param cap place to store CAT capabilities
  * @param cpu detected cpu topology
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
+int hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
                          const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers HW support of L2 CAT
  *
- * @param r_cap place to store L2 CAT capabilities structure
+ * @param cap place to store L2 CAT capabilities
  * @param cpu CPU topology structure
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
+int hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
                          const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers HW support of MBA
  *
- * @param r_cap place to store MBA capabilities structure
+ * @param cap place to store MBA capabilities
  * @param cpu detected cpu topology
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_cap_mba_discover(struct pqos_cap_mba **r_cap,
+int hw_cap_mba_discover(struct pqos_cap_mba *cap,
                         const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers MBA support for AMD
  *
- * @param r_cap place to store MBA capabilities structure
+ * @param cap place to store MBA capabilities
  * @param cpu detected cpu topology
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  * @retval PQOS_RETVAL_RESOURCE if not supported
  */
-int amd_cap_mba_discover(struct pqos_cap_mba **r_cap,
+int amd_cap_mba_discover(struct pqos_cap_mba *cap,
                          const struct pqos_cpuinfo *cpu);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __PQOS_HOSTCAP_H__ */
+#endif /* __PQOS_HW_CAP_H__ */

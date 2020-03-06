@@ -627,14 +627,14 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
 }
 
 int
-os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
-                     const struct pqos_cpuinfo *cpu)
+os_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
 {
-        struct pqos_cap_l3ca *cap = NULL;
         struct stat st;
         const char *info;
         int cdp_on;
         int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cap != NULL);
 
         if (stat(RESCTRL_PATH_INFO_L3, &st) == 0) {
                 info = RESCTRL_PATH_INFO_L3;
@@ -646,11 +646,7 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
         } else
                 return PQOS_RETVAL_RESOURCE;
 
-        cap = (struct pqos_cap_l3ca *)calloc(1, sizeof(*cap));
-        if (cap == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
-        ASSERT(cap != NULL);
+        memset(cap, 0, sizeof(*cap));
         cap->mem_size = sizeof(*cap);
         cap->cdp = cdp_on;
         cap->cdp_on = cdp_on;
@@ -658,37 +654,31 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
 
         ret = get_num_closids(info, &cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
+                return ret;
 
         ret = get_num_ways(info, &cap->num_ways);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
+                return ret;
 
         ret = get_shareable_bits(info, &cap->way_contention);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l3ca_discover_exit;
+                return ret;
 
         if (!cdp_on)
                 ret = detect_os_support(PROC_CPUINFO, "cdp_l3", 0, &cap->cdp);
-
-os_cap_l3ca_discover_exit:
-        if (ret == PQOS_RETVAL_OK)
-                *r_cap = cap;
-        else
-                free(cap);
 
         return ret;
 }
 
 int
-os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
-                     const struct pqos_cpuinfo *cpu)
+os_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
 {
-        struct pqos_cap_l2ca *cap = NULL;
         struct stat st;
         const char *info;
         int cdp_on;
         int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cap != NULL);
 
         if (stat(RESCTRL_PATH_INFO_L2, &st) == 0) {
                 info = RESCTRL_PATH_INFO_L2;
@@ -700,11 +690,7 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
         } else
                 return PQOS_RETVAL_RESOURCE;
 
-        cap = (struct pqos_cap_l2ca *)calloc(1, sizeof(*cap));
-        if (cap == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
-        ASSERT(cap != NULL);
+        memset(cap, 0, sizeof(*cap));
         cap->mem_size = sizeof(*cap);
         cap->cdp = cdp_on;
         cap->cdp_on = cdp_on;
@@ -712,24 +698,18 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
 
         ret = get_num_closids(info, &cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
+                return ret;
 
         ret = get_num_ways(info, &cap->num_ways);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
+                return ret;
 
         ret = get_shareable_bits(info, &cap->way_contention);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_l2ca_discover_exit;
+                return ret;
 
         if (!cdp_on)
                 ret = detect_os_support(PROC_CPUINFO, "cdp_l2", 0, &cap->cdp);
-
-os_cap_l2ca_discover_exit:
-        if (ret == PQOS_RETVAL_OK)
-                *r_cap = cap;
-        else
-                free(cap);
 
         return ret;
 }
@@ -884,36 +864,32 @@ ctrl_exit:
 }
 
 int
-os_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
+os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
-        struct pqos_cap_mba *cap = NULL;
         struct stat st;
         uint64_t val;
         const char *info = RESCTRL_PATH_INFO_MB;
         int ret = PQOS_RETVAL_OK;
 
         UNUSED_PARAM(cpu);
+        ASSERT(cap != NULL);
 
         if (stat(RESCTRL_PATH_INFO_MB, &st) != 0)
                 return PQOS_RETVAL_RESOURCE;
 
-        cap = (struct pqos_cap_mba *)calloc(1, sizeof(*cap));
-        if (cap == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
-        ASSERT(cap != NULL);
+        memset(cap, 0, sizeof(*cap));
         cap->mem_size = sizeof(*cap);
         cap->ctrl = -1;
         cap->ctrl_on = -1;
 
         ret = get_num_closids(info, &cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_mba_discover_exit;
+                return ret;
 
         /* Detect MBA CTRL status */
         ret = detect_os_support(PROC_MOUNTS, "mba_MBps", 0, &(cap->ctrl_on));
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_mba_discover_exit;
+                return ret;
         if (cap->ctrl_on == 1)
                 cap->ctrl = 1;
         else
@@ -921,27 +897,21 @@ os_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
 
         ret = readuint64(RESCTRL_PATH_INFO_MB "/min_bandwidth", 10, &val);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_mba_discover_exit;
+                return ret;
         else
                 cap->throttle_max = 100 - val;
 
         ret = readuint64(RESCTRL_PATH_INFO_MB "/bandwidth_gran", 10, &val);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_mba_discover_exit;
+                return ret;
         else
                 cap->throttle_step = val;
 
         ret = readuint64(RESCTRL_PATH_INFO_MB "/delay_linear", 10, &val);
         if (ret != PQOS_RETVAL_OK)
-                goto os_cap_mba_discover_exit;
+                return ret;
         else
                 cap->is_linear = (val == 1);
-
-os_cap_mba_discover_exit:
-        if (ret == PQOS_RETVAL_OK)
-                *r_cap = cap;
-        else
-                free(cap);
 
         return ret;
 }
