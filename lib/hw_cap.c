@@ -653,15 +653,6 @@ l2cdp_is_enabled_exit:
         return ret;
 }
 
-/**
- * @brief Discovers L2 CAT
- *
- * @param r_cap place to store L2 CAT capabilities structure
- * @param cpu CPU topology structure
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
 int
 hw_cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
                      const struct pqos_cpuinfo *cpu)
@@ -796,6 +787,61 @@ hw_cap_mba_discover(struct pqos_cap_mba **r_cap, const struct pqos_cpuinfo *cpu)
                 free(cap);
                 return PQOS_RETVAL_RESOURCE;
         }
+
+        (*r_cap) = cap;
+        return ret;
+}
+
+int
+amd_cap_mba_discover(struct pqos_cap_mba **r_cap,
+                     const struct pqos_cpuinfo *cpu)
+{
+        struct cpuid_out res;
+        struct pqos_cap_mba *cap = NULL;
+        const unsigned sz = sizeof(*cap);
+        int ret = PQOS_RETVAL_OK;
+
+        UNUSED_PARAM(cpu);
+
+        cap = (struct pqos_cap_mba *)malloc(sz);
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        ASSERT(cap != NULL);
+
+        memset(cap, 0, sz);
+        cap->mem_size = sz;
+        cap->ctrl = -1;
+        cap->ctrl_on = 0;
+
+        /**
+         * Run CPUID.0x80000008.0 to check
+         * for MBA allocation capability (bit 6 of ebx)
+         */
+        lcpuid(0x80000008, 0x0, &res);
+        if (!(res.ebx & (1 << 6))) {
+                LOG_INFO("CPUID.0x80000008.0: MBA not supported\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        /**
+         * We can go to CPUID.0x10.0 to obtain more info
+         */
+        lcpuid(0x80000020, 0x0, &res);
+        if (!(res.ebx & (1 << 1))) {
+                LOG_INFO("CPUID 0x10.0: MBA not supported!\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        lcpuid(0x80000020, 1, &res);
+
+        cap->num_classes = (res.edx & 0xffff) + 1;
+
+        /* AMD does not support throttle_max and is_linear. Set it to 0 */
+        cap->throttle_max = 0;
+        cap->is_linear = 0;
 
         (*r_cap) = cap;
         return ret;
