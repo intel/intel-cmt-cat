@@ -294,6 +294,7 @@ struct pqos_monitor {
         enum pqos_mon_event type; /**< event type */
         unsigned max_rmid;        /**< max RMID supported for this event */
         uint32_t scale_factor;    /**< factor to scale RMID value to bytes */
+        unsigned counter_length;  /**< counter bit length */
 };
 
 struct pqos_cap_mon {

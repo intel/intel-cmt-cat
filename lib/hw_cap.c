@@ -84,6 +84,7 @@ get_cache_info(const struct pqos_cacheinfo *cache_info,
  * @param event_type event type
  * @param max_rmid max RMID for the event
  * @param scale_factor event specific scale factor
+ * @param counter_length counter bit length for the event
  * @param max_num_events maximum number of events that \a mon can accommodate
  */
 static void
@@ -92,6 +93,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
                      const int event_type,
                      const unsigned max_rmid,
                      const uint32_t scale_factor,
+                     const unsigned counter_length,
                      const unsigned max_num_events)
 {
         if (mon->num_events >= max_num_events) {
@@ -107,6 +109,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
         mon->events[mon->num_events].type = (enum pqos_mon_event)event_type;
         mon->events[mon->num_events].max_rmid = max_rmid;
         mon->events[mon->num_events].scale_factor = scale_factor;
+        mon->events[mon->num_events].counter_length = counter_length;
         mon->num_events++;
 }
 
@@ -212,30 +215,36 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
         mon->max_rmid = max_rmid;
         mon->l3_size = l3_size;
 
-        if (cpuid_0xf_1.edx & 1)
-                add_monitoring_event(mon, 1, PQOS_MON_EVENT_L3_OCCUP,
-                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
-                                     num_events);
-        if (cpuid_0xf_1.edx & 2)
-                add_monitoring_event(mon, 1, PQOS_MON_EVENT_TMEM_BW,
-                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
-                                     num_events);
-        if (cpuid_0xf_1.edx & 4)
-                add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
-                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
-                                     num_events);
+        {
+                const unsigned max_rmid = cpuid_0xf_1.ecx + 1;
+                const uint32_t scale_factor = cpuid_0xf_1.ebx;
+                const unsigned counter_length = (cpuid_0xf_1.eax & 0x7f) + 24;
 
-        if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
-                add_monitoring_event(mon, 1, PQOS_MON_EVENT_RMEM_BW,
-                                     cpuid_0xf_1.ecx + 1, cpuid_0xf_1.ebx,
-                                     num_events);
+                if (cpuid_0xf_1.edx & 1)
+                        add_monitoring_event(mon, 1, PQOS_MON_EVENT_L3_OCCUP,
+                                             max_rmid, scale_factor,
+                                             counter_length, num_events);
+                if (cpuid_0xf_1.edx & 2)
+                        add_monitoring_event(mon, 1, PQOS_MON_EVENT_TMEM_BW,
+                                             max_rmid, scale_factor,
+                                             counter_length, num_events);
+                if (cpuid_0xf_1.edx & 4)
+                        add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
+                                             max_rmid, scale_factor,
+                                             counter_length, num_events);
+
+                if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
+                        add_monitoring_event(mon, 1, PQOS_MON_EVENT_RMEM_BW,
+                                             max_rmid, scale_factor,
+                                             counter_length, num_events);
+        }
 
         if (((cpuid_0xa.ebx & 3) == 0) && ((cpuid_0xa.edx & 31) > 1))
-                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC, 0, 0,
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC, 0, 0, 0,
                                      num_events);
 
         if (((cpuid_0xa.eax >> 8) & 0xff) > 1)
-                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS, 0, 0,
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS, 0, 0, 0,
                                      num_events);
 
         (*r_mon) = mon;

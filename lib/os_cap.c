@@ -608,6 +608,7 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
                 }
 
                 monitor = &(mon->events[mon->num_events]);
+                memset(monitor, 0, sizeof(*monitor));
                 monitor->type = events[i];
                 monitor->max_rmid = num_rmids;
                 monitor->scale_factor = scale;
