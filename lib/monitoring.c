@@ -68,12 +68,6 @@
 #define RMID0 (0)
 
 /**
- * Max value of the memory bandwidth data = 2^24
- * assuming there is 24 bit space available
- */
-#define MBM_MAX_VALUE (1 << 24)
-
-/**
  * ---------------------------------------
  * Local data types
  * ---------------------------------------
@@ -115,8 +109,6 @@ static int mon_read(const unsigned lcore,
 static int pqos_core_poll(struct pqos_mon_data *group);
 
 static unsigned get_event_id(const enum pqos_mon_event event);
-
-static uint64_t get_delta(const uint64_t old_value, const uint64_t new_value);
 
 static uint64_t scale_event(const enum pqos_mon_event event,
                             const uint64_t val);
@@ -627,6 +619,38 @@ mon_read(const unsigned lcore,
 }
 
 /**
+ * @brief Gives the difference between two values with regard to the possible
+ *        overrun and counter length
+ *
+ * @param event event counter length to retrieve
+ * @param old_value previous value
+ * @param new_value current value
+ *
+ * @return difference between the two values
+ */
+static uint64_t
+get_delta(const enum pqos_mon_event event,
+          const uint64_t old_value,
+          const uint64_t new_value)
+{
+        const struct pqos_cap *cap;
+        const struct pqos_monitor *pmon;
+        int ret;
+        uint64_t max_value = 1LLU << 24;
+
+        _pqos_cap_get(&cap, NULL);
+
+        ret = pqos_cap_get_event(cap, event, &pmon);
+        if (ret == PQOS_RETVAL_OK)
+                max_value = 1LLU << pmon->counter_length;
+
+        if (old_value > new_value)
+                return (max_value - old_value) + new_value;
+        else
+                return new_value - old_value;
+}
+
+/**
  * @brief Reads monitoring event data from given core
  *
  * @param p pointer to monitoring structure
@@ -676,7 +700,8 @@ pqos_core_poll(struct pqos_mon_data *p)
                         total += tmp;
                 }
                 pv->mbm_local = total;
-                pv->mbm_local_delta = get_delta(old_value, pv->mbm_local);
+                pv->mbm_local_delta =
+                    get_delta(PQOS_MON_EVENT_LMEM_BW, old_value, pv->mbm_local);
                 pv->mbm_local_delta =
                     scale_event(PQOS_MON_EVENT_LMEM_BW, pv->mbm_local_delta);
         }
@@ -697,7 +722,8 @@ pqos_core_poll(struct pqos_mon_data *p)
                         total += tmp;
                 }
                 pv->mbm_total = total;
-                pv->mbm_total_delta = get_delta(old_value, pv->mbm_total);
+                pv->mbm_total_delta =
+                    get_delta(PQOS_MON_EVENT_TMEM_BW, old_value, pv->mbm_total);
                 pv->mbm_total_delta =
                     scale_event(PQOS_MON_EVENT_TMEM_BW, pv->mbm_total_delta);
         }
@@ -1220,21 +1246,4 @@ get_event_id(const enum pqos_mon_event event)
                 break;
         }
         return 0;
-}
-
-/**
- * @brief Gives the difference between two values with regard to the possible
- *        overrun
- *
- * @param old_value previous value
- * @param new_value current value
- * @return difference between the two values
- */
-static uint64_t
-get_delta(const uint64_t old_value, const uint64_t new_value)
-{
-        if (old_value > new_value)
-                return (MBM_MAX_VALUE - old_value) + new_value;
-        else
-                return new_value - old_value;
 }
