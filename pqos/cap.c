@@ -47,9 +47,8 @@
 #include "main.h"
 #include "cap.h"
 
-#define BUFFER_SIZE 256
+#define BUFFER_SIZE 512
 #define NON_VERBOSE 0
-
 
 /**
  * @brief Print line with indentation
@@ -166,33 +165,41 @@ cap_print_features_mon(const unsigned indent,
                 if (buffer == NULL)
                         continue;
 
-                if (verbose &&
-                        (monitor->scale_factor != 0 || monitor->max_rmid != 0))
-                        snprintf(buffer + strlen(buffer),
-                                 BUFFER_SIZE - strlen(buffer),
-                                 "%*s%s: scale factor %u, max_rmid %u\n",
-                                 indent + 8, "",
-                                 get_mon_event_name(monitor->type),
-                                 monitor->scale_factor, monitor->max_rmid);
-                else
-                        snprintf(buffer + strlen(buffer),
-                                 BUFFER_SIZE - strlen(buffer),
-                                 "%*s%s\n",
-                                 indent + 8, "",
-                                 get_mon_event_name(monitor->type));
+                snprintf(buffer + strlen(buffer), BUFFER_SIZE - strlen(buffer),
+                         "%*s%s\n", indent + 8, "",
+                         get_mon_event_name(monitor->type));
+
+                if (verbose) {
+                        if (monitor->scale_factor != 0)
+                                snprintf(buffer + strlen(buffer),
+                                         BUFFER_SIZE - strlen(buffer),
+                                         "%*s scale factor: %u\n", indent + 12,
+                                         "", monitor->scale_factor);
+                        if (monitor->max_rmid != 0)
+                                snprintf(buffer + strlen(buffer),
+                                         BUFFER_SIZE - strlen(buffer),
+                                         "%*s max rmid: %u\n", indent + 12, "",
+                                         monitor->max_rmid);
+                        if (monitor->counter_length != 0)
+                                snprintf(buffer + strlen(buffer),
+                                         BUFFER_SIZE - strlen(buffer),
+                                         "%*s counter length: %ub\n",
+                                         indent + 12, "",
+                                         monitor->counter_length);
+                }
         }
 
         printf_indent(indent, "Monitoring\n");
 
         if (strlen(buffer_cache) > 0) {
                 printf_indent(indent + 4,
-                        "Cache Monitoring Technology (CMT) events:\n");
+                              "Cache Monitoring Technology (CMT) events:\n");
                 printf("%s", buffer_cache);
         }
 
         if (strlen(buffer_memory) > 0) {
                 printf_indent(indent + 4,
-                        "Memory Bandwidth Monitoring (MBM) events:\n");
+                              "Memory Bandwidth Monitoring (MBM) events:\n");
                 printf("%s", buffer_memory);
         }
 
@@ -220,8 +227,8 @@ cap_print_features_l3ca(const unsigned indent,
 
         printf_indent(indent, "L3 CAT\n");
         printf_indent(indent + 4, "CDP: %s\n",
-                l3ca->cdp ? (l3ca->cdp_on ? "enabled" : "disabled") :
-                "unsupported");
+                      l3ca->cdp ? (l3ca->cdp_on ? "enabled" : "disabled")
+                                : "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l3ca->num_classes);
 
         if (!verbose)
@@ -229,7 +236,7 @@ cap_print_features_l3ca(const unsigned indent,
 
         printf_indent(indent + 4, "Way size: %u bytes\n", l3ca->way_size);
         printf_indent(indent + 4, "Ways contention bit-mask: 0x%lx\n",
-                l3ca->way_contention);
+                      l3ca->way_contention);
         if (pqos_l3ca_get_min_cbm_bits(&min_cbm_bits) != PQOS_RETVAL_OK)
                 printf_indent(indent + 4, "Min CBM bits: unavailable\n");
         else
@@ -256,8 +263,8 @@ cap_print_features_l2ca(const unsigned indent,
 
         printf_indent(indent, "L2 CAT\n");
         printf_indent(indent + 4, "CDP: %s\n",
-                l2ca->cdp ? (l2ca->cdp_on ? "enabled" : "disabled") :
-                "unsupported");
+                      l2ca->cdp ? (l2ca->cdp_on ? "enabled" : "disabled")
+                                : "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l2ca->num_classes);
 
         if (!verbose)
@@ -265,14 +272,13 @@ cap_print_features_l2ca(const unsigned indent,
 
         printf_indent(indent + 4, "Way size: %u bytes\n", l2ca->way_size);
         printf_indent(indent + 4, "Ways contention bit-mask: 0x%lx\n",
-                l2ca->way_contention);
+                      l2ca->way_contention);
         if (pqos_l2ca_get_min_cbm_bits(&min_cbm_bits) != PQOS_RETVAL_OK)
                 printf_indent(indent + 4, "Min CBM bits: unavailable\n");
         else
                 printf_indent(indent + 4, "Min CBM bits: %u\n", min_cbm_bits);
         printf_indent(indent + 4, "Max CBM bits: %u\n", l2ca->num_ways);
 }
-
 
 /**
  * @brief Print MBA capabilities
@@ -311,7 +317,7 @@ cap_print_features_mba(const unsigned indent,
         printf_indent(indent + 4, "Granularity: %u\n", mba->throttle_step);
         printf_indent(indent + 4, "Min B/W: %u\n", 100 - mba->throttle_max);
         printf_indent(indent + 4, "Type: %s\n",
-                mba->is_linear ? "linear" : "nonlinear");
+                      mba->is_linear ? "linear" : "nonlinear");
 }
 
 /**
@@ -330,8 +336,8 @@ cap_print_features_hw(const struct pqos_capability *cap_mon,
                       const struct pqos_capability *cap_mba,
                       const int verbose)
 {
-        if (cap_mon == NULL && cap_l3ca == NULL &&
-            cap_l2ca == NULL && cap_mba == NULL)
+        if (cap_mon == NULL && cap_l3ca == NULL && cap_l2ca == NULL &&
+            cap_mba == NULL)
                 return;
 
         /**

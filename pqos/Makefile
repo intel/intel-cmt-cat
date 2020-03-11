@@ -136,13 +136,27 @@ clean:
 	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
 
 CHECKPATCH?=checkpatch.pl
-.PHONY: style
-style:
+.PHONY: checkpatch
+checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE,\
 	SPDX_LICENSE_TAG,CONST_STRUCT \
 	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h \
 	 -f cap.h -f cap.c -f common.h -f common.c
+
+CLANGFORMAT?=clang-format
+.PHONY: clang-format
+clang-format:
+	@for file in "cap.h" "cap.c"; do \
+		echo "Checking style $$file"; \
+		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		{ echo "ERROR: $$file has style problems"; exit 1; } \
+	done
+
+.PHONY: style
+style:
+	$(MAKE) checkpatch
+	$(MAKE) clang-format
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck

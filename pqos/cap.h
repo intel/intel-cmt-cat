@@ -58,7 +58,6 @@ void cap_print_features(const struct pqos_cap *cap,
                         const struct pqos_cpuinfo *cpu,
                         const int verbose);
 
-
 #ifdef __cplusplus
 }
 #endif
