@@ -47,14 +47,14 @@
 extern "C" {
 #endif
 
-#define MACHINE_DEFAULT_MAX_COREID  255       /**< max core id */
+#define MACHINE_DEFAULT_MAX_COREID 255 /**< max core id */
 
-#define MACHINE_RETVAL_OK           0         /**< everything OK */
-#define MACHINE_RETVAL_ERROR        1         /**< generic error */
-#define MACHINE_RETVAL_PARAM        2         /**< parameter error */
+#define MACHINE_RETVAL_OK    0 /**< everything OK */
+#define MACHINE_RETVAL_ERROR 1 /**< generic error */
+#define MACHINE_RETVAL_PARAM 2 /**< parameter error */
 
 /* cpuid leaf for cache topology */
-#define CPUID_LEAF_CACHE	    4
+#define CPUID_LEAF_CACHE 4
 
 /**
  * Results of CPUID operation are stored in this structure.
@@ -94,10 +94,7 @@ int machine_fini(void);
  * @param [in] subleaf CPUID sub-leaf number
  * @param [out] out structure to write CPUID results into
  */
-void
-lcpuid(const unsigned leaf,
-       const unsigned subleaf,
-       struct cpuid_out *out);
+void lcpuid(const unsigned leaf, const unsigned subleaf, struct cpuid_out *out);
 
 /**
  * @brief Executes RDMSR on \a lcore logical core
@@ -109,10 +106,7 @@ lcpuid(const unsigned leaf,
  * @return Operation status
  * @retval MACHINE_RETVAL_OK on success
  */
-int
-msr_read(const unsigned lcore,
-         const uint32_t reg,
-         uint64_t *value);
+int msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value);
 
 /**
  * @brief Executes WRMSR on \a lcore logical core
@@ -124,10 +118,7 @@ msr_read(const unsigned lcore,
  * @return Operation status
  * @retval MACHINE_RETVAL_OK on success
  */
-int
-msr_write(const unsigned lcore,
-          const uint32_t reg,
-          const uint64_t value);
+int msr_write(const unsigned lcore, const uint32_t reg, const uint64_t value);
 
 #ifdef __cplusplus
 }

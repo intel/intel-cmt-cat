@@ -88,9 +88,11 @@ static const struct pqos_cpuinfo *m_cpu = NULL; /**< cpu topology passed
                                                    from cap */
 static unsigned m_rmid_max = 0;                 /**< max RMID */
 #ifdef PQOS_RMID_CUSTOM
+/* clang-format off */
 /** Custom RMID configuration */
 static struct pqos_rmid_config rmid_cfg = {PQOS_RMID_TYPE_DEFAULT,
                                            {0, NULL, NULL} };
+/* clang-format on */
 #endif
 #ifdef __linux__
 static int m_interface = PQOS_INTER_MSR;
@@ -101,31 +103,23 @@ static int m_interface = PQOS_INTER_MSR;
  * ---------------------------------------
  */
 
-static int
-mon_assoc_set(const unsigned lcore,
-              const pqos_rmid_t rmid);
+static int mon_assoc_set(const unsigned lcore, const pqos_rmid_t rmid);
 
-static int
-mon_assoc_get(const unsigned lcore,
-              pqos_rmid_t *rmid);
+static int mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
 
-static int
-mon_read(const unsigned lcore,
-         const pqos_rmid_t rmid,
-         const enum pqos_mon_event event,
-         uint64_t *value);
+static int mon_read(const unsigned lcore,
+                    const pqos_rmid_t rmid,
+                    const enum pqos_mon_event event,
+                    uint64_t *value);
 
-static int
-pqos_core_poll(struct pqos_mon_data *group);
+static int pqos_core_poll(struct pqos_mon_data *group);
 
-static unsigned
-get_event_id(const enum pqos_mon_event event);
+static unsigned get_event_id(const enum pqos_mon_event event);
 
-static uint64_t
-get_delta(const uint64_t old_value, const uint64_t new_value);
+static uint64_t get_delta(const uint64_t old_value, const uint64_t new_value);
 
-static uint64_t
-scale_event(const enum pqos_mon_event event, const uint64_t val);
+static uint64_t scale_event(const enum pqos_mon_event event,
+                            const uint64_t val);
 
 /*
  * =======================================
@@ -136,7 +130,6 @@ scale_event(const enum pqos_mon_event event, const uint64_t val);
  * =======================================
  * =======================================
  */
-
 
 int
 pqos_mon_init(const struct pqos_cpuinfo *cpu,
@@ -168,7 +161,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
 #ifdef __linux__
         if (cfg->interface == PQOS_INTER_OS ||
-                cfg->interface == PQOS_INTER_OS_RESCTRL_MON)
+            cfg->interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_mon_init(cpu, cap);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
@@ -189,7 +182,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
                 rmid_cfg.map.num = num;
                 rmid_cfg.map.core = (unsigned *)malloc(sizeof(unsigned) * num);
                 rmid_cfg.map.rmid =
-                        (pqos_rmid_t *)malloc(sizeof(pqos_rmid_t) * num);
+                    (pqos_rmid_t *)malloc(sizeof(pqos_rmid_t) * num);
 
                 for (i = 0; i < num; i++) {
                         rmid_cfg.map.core[i] = cfg->rmid_cfg.map.core[i];
@@ -215,7 +208,7 @@ pqos_mon_fini(void)
         m_rmid_max = 0;
 #ifdef __linux__
         if (m_interface == PQOS_INTER_OS ||
-                m_interface == PQOS_INTER_OS_RESCTRL_MON)
+            m_interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_mon_fini();
 #endif
 #ifdef PQOS_RMID_CUSTOM
@@ -281,8 +274,9 @@ rmid_get_event_max(pqos_rmid_t *rmid, const enum pqos_mon_event event)
         for (i = 0; i < mon->num_events; i++)
                 if (event & mon->events[i].type) {
                         mask_found |= mon->events[i].type;
-                        max_rmid = (max_rmid > mon->events[i].max_rmid) ?
-                                    mon->events[i].max_rmid : max_rmid;
+                        max_rmid = (max_rmid > mon->events[i].max_rmid)
+                                       ? mon->events[i].max_rmid
+                                       : max_rmid;
                 }
 
         /**
@@ -357,7 +351,7 @@ rmid_alloc(struct pqos_mon_poll_ctx *ctx, const enum pqos_mon_event event)
                 }
         }
 
- rmid_alloc_error:
+rmid_alloc_error:
         if (rmid_list != NULL)
                 free(rmid_list);
         if (core_list != NULL)
@@ -459,8 +453,7 @@ scale_event(const enum pqos_mon_event event, const uint64_t val)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-mon_assoc_set(const unsigned lcore,
-              const pqos_rmid_t rmid)
+mon_assoc_set(const unsigned lcore, const pqos_rmid_t rmid)
 {
         int ret = 0;
         uint32_t reg = 0;
@@ -492,8 +485,7 @@ mon_assoc_set(const unsigned lcore,
  * @retval PQOS_RETVAL_ERROR on error
  */
 static int
-mon_assoc_get(const unsigned lcore,
-              pqos_rmid_t *rmid)
+mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 {
         int ret = 0;
         uint32_t reg = PQOS_MSR_ASSOC;
@@ -506,14 +498,13 @@ mon_assoc_get(const unsigned lcore,
                 return PQOS_RETVAL_ERROR;
 
         val &= PQOS_MSR_ASSOC_RMID_MASK;
-        *rmid = (pqos_rmid_t) val;
+        *rmid = (pqos_rmid_t)val;
 
         return PQOS_RETVAL_OK;
 }
 
 int
-hw_mon_assoc_get(const unsigned lcore,
-                   pqos_rmid_t *rmid)
+hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 {
         int ret = PQOS_RETVAL_OK;
 
@@ -535,11 +526,12 @@ hw_mon_assoc_get(const unsigned lcore,
 
         ret = mon_assoc_get(lcore, rmid);
 
- pqos_mon_assoc_get__error:
+pqos_mon_assoc_get__error:
         return ret;
 }
 
-int hw_mon_reset(void)
+int
+hw_mon_reset(void)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i;
@@ -556,7 +548,7 @@ int hw_mon_reset(void)
                         ret = retval;
         }
 
- pqos_mon_reset_error:
+pqos_mon_reset_error:
         return ret;
 }
 
@@ -593,19 +585,19 @@ mon_read(const unsigned lcore,
 
         for (retries = 0; retries < 4; retries++) {
                 if (flag_wrt) {
-                        if (msr_write(lcore, PQOS_MSR_MON_EVTSEL,
-                                      val_evtsel) != MACHINE_RETVAL_OK)
+                        if (msr_write(lcore, PQOS_MSR_MON_EVTSEL, val_evtsel) !=
+                            MACHINE_RETVAL_OK)
                                 break;
                 }
-                if (msr_read(lcore, PQOS_MSR_MON_QMC,
-                             &val) != MACHINE_RETVAL_OK)
+                if (msr_read(lcore, PQOS_MSR_MON_QMC, &val) !=
+                    MACHINE_RETVAL_OK)
                         break;
                 if ((val & PQOS_MSR_MON_QMC_ERROR) != 0ULL) {
                         /* Read back IA32_QM_EVTSEL register
                          * to check for content change.
                          */
-                        if (msr_read(lcore, PQOS_MSR_MON_EVTSEL,
-                                     &val) != MACHINE_RETVAL_OK)
+                        if (msr_read(lcore, PQOS_MSR_MON_EVTSEL, &val) !=
+                            MACHINE_RETVAL_OK)
                                 break;
                         if (val != val_evtsel) {
                                 flag_wrt = 1;
@@ -628,8 +620,8 @@ mon_read(const unsigned lcore,
         if (retval == PQOS_RETVAL_OK)
                 *value = (val & PQOS_MSR_MON_QMC_DATA_MASK);
         else
-                LOG_WARN("Error reading event %u on core %u (RMID%u)!\n",
-                         event, lcore, (unsigned) rmid);
+                LOG_WARN("Error reading event %u on core %u (RMID%u)!\n", event,
+                         lcore, (unsigned)rmid);
 
         return retval;
 }
@@ -656,10 +648,9 @@ pqos_core_poll(struct pqos_mon_data *p)
                         uint64_t tmp = 0;
                         int ret;
 
-                        ret = mon_read(p->poll_ctx[i].lcore,
-                                       p->poll_ctx[i].rmid,
-                                       get_event_id(PQOS_MON_EVENT_L3_OCCUP),
-                                       &tmp);
+                        ret = mon_read(
+                            p->poll_ctx[i].lcore, p->poll_ctx[i].rmid,
+                            get_event_id(PQOS_MON_EVENT_L3_OCCUP), &tmp);
                         if (ret != PQOS_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
                                 goto pqos_core_poll__exit;
@@ -675,10 +666,9 @@ pqos_core_poll(struct pqos_mon_data *p)
                         uint64_t tmp = 0;
                         int ret;
 
-                        ret = mon_read(p->poll_ctx[i].lcore,
-                                       p->poll_ctx[i].rmid,
-                                       get_event_id(PQOS_MON_EVENT_LMEM_BW),
-                                       &tmp);
+                        ret = mon_read(
+                            p->poll_ctx[i].lcore, p->poll_ctx[i].rmid,
+                            get_event_id(PQOS_MON_EVENT_LMEM_BW), &tmp);
                         if (ret != PQOS_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
                                 goto pqos_core_poll__exit;
@@ -687,8 +677,8 @@ pqos_core_poll(struct pqos_mon_data *p)
                 }
                 pv->mbm_local = total;
                 pv->mbm_local_delta = get_delta(old_value, pv->mbm_local);
-                pv->mbm_local_delta = scale_event(PQOS_MON_EVENT_LMEM_BW,
-                                                  pv->mbm_local_delta);
+                pv->mbm_local_delta =
+                    scale_event(PQOS_MON_EVENT_LMEM_BW, pv->mbm_local_delta);
         }
         if (p->event & (PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
                 uint64_t total = 0, old_value = pv->mbm_total;
@@ -697,10 +687,9 @@ pqos_core_poll(struct pqos_mon_data *p)
                         uint64_t tmp = 0;
                         int ret;
 
-                        ret = mon_read(p->poll_ctx[i].lcore,
-                                       p->poll_ctx[i].rmid,
-                                       get_event_id(PQOS_MON_EVENT_TMEM_BW),
-                                       &tmp);
+                        ret = mon_read(
+                            p->poll_ctx[i].lcore, p->poll_ctx[i].rmid,
+                            get_event_id(PQOS_MON_EVENT_TMEM_BW), &tmp);
                         if (ret != PQOS_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
                                 goto pqos_core_poll__exit;
@@ -709,8 +698,8 @@ pqos_core_poll(struct pqos_mon_data *p)
                 }
                 pv->mbm_total = total;
                 pv->mbm_total_delta = get_delta(old_value, pv->mbm_total);
-                pv->mbm_total_delta = scale_event(PQOS_MON_EVENT_TMEM_BW,
-                                                  pv->mbm_total_delta);
+                pv->mbm_total_delta =
+                    scale_event(PQOS_MON_EVENT_TMEM_BW, pv->mbm_total_delta);
         }
         if (p->event & PQOS_MON_EVENT_RMEM_BW) {
                 pv->mbm_remote = 0;
@@ -719,7 +708,7 @@ pqos_core_poll(struct pqos_mon_data *p)
                 pv->mbm_remote_delta = 0;
                 if (pv->mbm_total_delta > pv->mbm_local_delta)
                         pv->mbm_remote_delta =
-                                pv->mbm_total_delta - pv->mbm_local_delta;
+                            pv->mbm_total_delta - pv->mbm_local_delta;
         }
         if (p->event & PQOS_PERF_EVENT_IPC) {
                 /**
@@ -755,8 +744,8 @@ pqos_core_poll(struct pqos_mon_data *p)
                 if (pv->ipc_unhalted_delta == 0)
                         pv->ipc = 0.0;
                 else
-                        pv->ipc = (double) pv->ipc_retired_delta /
-                                (double) pv->ipc_unhalted_delta;
+                        pv->ipc = (double)pv->ipc_retired_delta /
+                                  (double)pv->ipc_unhalted_delta;
         }
         if (p->event & PQOS_PERF_EVENT_LLC_MISS) {
                 /**
@@ -768,8 +757,8 @@ pqos_core_poll(struct pqos_mon_data *p)
 
                 for (n = 0; n < p->num_cores; n++) {
                         uint64_t tmp = 0;
-                        int ret = msr_read(p->cores[n],
-                                           IA32_MSR_PMC0, &tmp);
+                        int ret = msr_read(p->cores[n], IA32_MSR_PMC0, &tmp);
+
                         if (ret != MACHINE_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
                                 goto pqos_core_poll__exit;
@@ -787,7 +776,7 @@ pqos_core_poll(struct pqos_mon_data *p)
                 pv->mbm_total_delta = 0;
                 p->valid_mbm_read = 1;
         }
- pqos_core_poll__exit:
+pqos_core_poll__exit:
         return retval;
 }
 
@@ -818,7 +807,7 @@ ia32_perf_counter_start(const unsigned num_cores,
                 global_ctrl_mask |= (0x3ULL << 32); /**< fixed counters 0&1 */
 
         if (event & PQOS_PERF_EVENT_LLC_MISS)
-                global_ctrl_mask |= 0x1ULL;     /**< programmable counter 0 */
+                global_ctrl_mask |= 0x1ULL; /**< programmable counter 0 */
 
         /**
          * Fixed counters are used for IPC calculations.
@@ -856,20 +845,21 @@ ia32_perf_counter_start(const unsigned num_cores,
                         ret = msr_write(cores[i], IA32_MSR_INST_RETIRED_ANY, 0);
                         if (ret != MACHINE_RETVAL_OK)
                                 break;
-                        ret = msr_write(cores[i],
-                                        IA32_MSR_CPU_UNHALTED_THREAD, 0);
+                        ret = msr_write(cores[i], IA32_MSR_CPU_UNHALTED_THREAD,
+                                        0);
                         if (ret != MACHINE_RETVAL_OK)
                                 break;
-                        ret = msr_write(cores[i],
-                                        IA32_MSR_FIXED_CTR_CTRL, fixed_ctrl);
+                        ret = msr_write(cores[i], IA32_MSR_FIXED_CTR_CTRL,
+                                        fixed_ctrl);
                         if (ret != MACHINE_RETVAL_OK)
                                 break;
                 }
 
                 if (event & PQOS_PERF_EVENT_LLC_MISS) {
-                        const uint64_t evtsel0_miss = IA32_EVENT_LLC_MISS_MASK |
-                                (IA32_EVENT_LLC_MISS_UMASK << 8) |
-                                (1ULL << 16) | (1ULL << 17) | (1ULL << 22);
+                        const uint64_t evtsel0_miss =
+                            IA32_EVENT_LLC_MISS_MASK |
+                            (IA32_EVENT_LLC_MISS_UMASK << 8) | (1ULL << 16) |
+                            (1ULL << 17) | (1ULL << 22);
 
                         ret = msr_write(cores[i], IA32_MSR_PMC0, 0);
                         if (ret != MACHINE_RETVAL_OK)
@@ -880,8 +870,8 @@ ia32_perf_counter_start(const unsigned num_cores,
                                 break;
                 }
 
-                ret = msr_write(cores[i],
-                                IA32_MSR_PERF_GLOBAL_CTRL, global_ctrl_mask);
+                ret = msr_write(cores[i], IA32_MSR_PERF_GLOBAL_CTRL,
+                                global_ctrl_mask);
                 if (ret != MACHINE_RETVAL_OK)
                         break;
         }
@@ -954,7 +944,7 @@ hw_mon_start(const unsigned num_cores,
          */
         for (i = 0; i < (sizeof(event) * 8); i++) {
                 const enum pqos_mon_event evt_mask =
-                        (enum pqos_mon_event)(1U << i);
+                    (enum pqos_mon_event)(1U << i);
                 const struct pqos_monitor *ptr = NULL;
 
                 if (!(evt_mask & event))
@@ -996,7 +986,8 @@ hw_mon_start(const unsigned num_cores,
                 if (rmid != RMID0) {
                         /* If not RMID0 then it is already monitored */
                         LOG_INFO("Core %u is already monitored with "
-                                 "RMID%u.\n", lcore, rmid);
+                                 "RMID%u.\n",
+                                 lcore, rmid);
                         retval = PQOS_RETVAL_RESOURCE;
                         goto pqos_mon_start_error1;
                 }
@@ -1014,10 +1005,9 @@ hw_mon_start(const unsigned num_cores,
                                 break;
 
                 if (j >= num_ctxs) {
-                        enum pqos_mon_event ctx_event =
-                                (enum pqos_mon_event)(event &
-                                        (~(PQOS_PERF_EVENT_IPC |
-                                        PQOS_PERF_EVENT_LLC_MISS)));
+                        enum pqos_mon_event ctx_event = (enum pqos_mon_event)(
+                            event & (~(PQOS_PERF_EVENT_IPC |
+                                       PQOS_PERF_EVENT_LLC_MISS)));
 
                         /**
                          * New cluster is found
@@ -1045,14 +1035,14 @@ hw_mon_start(const unsigned num_cores,
          * Fill in the monitoring group structure
          */
         memset(group, 0, sizeof(*group));
-        group->cores = (unsigned *) malloc(sizeof(group->cores[0]) * num_cores);
+        group->cores = (unsigned *)malloc(sizeof(group->cores[0]) * num_cores);
         if (group->cores == NULL) {
                 retval = PQOS_RETVAL_RESOURCE;
                 goto pqos_mon_start_error1;
         }
 
-        group->poll_ctx = (struct pqos_mon_poll_ctx *)
-                malloc(sizeof(group->poll_ctx[0]) * num_ctxs);
+        group->poll_ctx = (struct pqos_mon_poll_ctx *)malloc(
+            sizeof(group->poll_ctx[0]) * num_ctxs);
         if (group->poll_ctx == NULL) {
                 retval = PQOS_RETVAL_RESOURCE;
                 goto pqos_mon_start_error2;
@@ -1098,10 +1088,10 @@ hw_mon_start(const unsigned num_cores,
         group->event = event;
         group->context = context;
 
- pqos_mon_start_error2:
+pqos_mon_start_error2:
         if (retval != PQOS_RETVAL_OK) {
                 for (i = 0; i < num_cores; i++)
-                        (void) mon_assoc_set(cores[i], RMID0);
+                        (void)mon_assoc_set(cores[i], RMID0);
 
                 if (group->poll_ctx != NULL)
                         free(group->poll_ctx);
@@ -1109,7 +1099,7 @@ hw_mon_start(const unsigned num_cores,
                 if (group->cores != NULL)
                         free(group->cores);
         }
- pqos_mon_start_error1:
+pqos_mon_start_error1:
 
         return retval;
 }
@@ -1176,8 +1166,7 @@ hw_mon_stop(struct pqos_mon_data *group)
 }
 
 int
-hw_mon_poll(struct pqos_mon_data **groups,
-              const unsigned num_groups)
+hw_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
 {
         unsigned i = 0;
 
@@ -1189,8 +1178,9 @@ hw_mon_poll(struct pqos_mon_data **groups,
 
                 if (ret != PQOS_RETVAL_OK)
                         LOG_WARN("Failed to read event on "
-                                 "core %u\n", groups[i]->cores[0]);
-	}
+                                 "core %u\n",
+                                 groups[i]->cores[0]);
+        }
         return PQOS_RETVAL_OK;
 }
 /*
@@ -1248,4 +1238,3 @@ get_delta(const uint64_t old_value, const uint64_t new_value)
         else
                 return new_value - old_value;
 }
-

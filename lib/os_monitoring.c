@@ -34,8 +34,8 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>             /**< pid_t */
-#include <dirent.h>             /**< scandir() */
+#include <unistd.h> /**< pid_t */
+#include <dirent.h> /**< scandir() */
 
 #include "pqos.h"
 #include "cap.h"
@@ -55,12 +55,12 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /** List of non virtual events */
 const enum pqos_mon_event os_mon_event[] = {
-        PQOS_MON_EVENT_L3_OCCUP,
-        PQOS_MON_EVENT_LMEM_BW,
-        PQOS_MON_EVENT_TMEM_BW,
-        PQOS_PERF_EVENT_LLC_MISS,
-        (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
-        (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
+    PQOS_MON_EVENT_L3_OCCUP,
+    PQOS_MON_EVENT_LMEM_BW,
+    PQOS_MON_EVENT_TMEM_BW,
+    PQOS_PERF_EVENT_LLC_MISS,
+    (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
+    (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
 
 /**
  * @brief Filter directory filenames
@@ -77,7 +77,7 @@ const enum pqos_mon_event os_mon_event[] = {
 static int
 filter(const struct dirent *dir)
 {
-	return (dir->d_name[0] == '.') ? 0 : 1;
+        return (dir->d_name[0] == '.') ? 0 : 1;
 }
 
 /**
@@ -123,13 +123,13 @@ stop_events(struct pqos_mon_data *group)
                 resctrl_lock_release();
         }
 
- stop_event_error:
+stop_event_error:
         if ((stopped_evts & PQOS_MON_EVENT_LMEM_BW) &&
-                (stopped_evts & PQOS_MON_EVENT_TMEM_BW))
+            (stopped_evts & PQOS_MON_EVENT_TMEM_BW))
                 stopped_evts |= (enum pqos_mon_event)PQOS_MON_EVENT_RMEM_BW;
 
         if ((stopped_evts & PQOS_PERF_EVENT_CYCLES) &&
-                (stopped_evts & PQOS_PERF_EVENT_INSTRUCTIONS))
+            (stopped_evts & PQOS_PERF_EVENT_INSTRUCTIONS))
                 stopped_evts |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
 
         if (group->perf != NULL) {
@@ -188,10 +188,10 @@ start_events(struct pqos_mon_data *group)
 
         if (events & PQOS_MON_EVENT_RMEM_BW)
                 events |= (enum pqos_mon_event)(PQOS_MON_EVENT_LMEM_BW |
-                           PQOS_MON_EVENT_TMEM_BW);
+                                                PQOS_MON_EVENT_TMEM_BW);
         if (events & PQOS_PERF_EVENT_IPC)
                 events |= (enum pqos_mon_event)(PQOS_PERF_EVENT_CYCLES |
-                           PQOS_PERF_EVENT_INSTRUCTIONS);
+                                                PQOS_PERF_EVENT_INSTRUCTIONS);
 
         /**
          * Determine selected events and Perf counters
@@ -238,7 +238,7 @@ start_events(struct pqos_mon_data *group)
          * All events required by RMEM has been started
          */
         if ((started_evts & PQOS_MON_EVENT_LMEM_BW) &&
-                (started_evts & PQOS_MON_EVENT_TMEM_BW)) {
+            (started_evts & PQOS_MON_EVENT_TMEM_BW)) {
                 group->values.mbm_remote = 0;
                 started_evts |= (enum pqos_mon_event)PQOS_MON_EVENT_RMEM_BW;
         }
@@ -246,12 +246,12 @@ start_events(struct pqos_mon_data *group)
          * All events required by IPC has been started
          */
         if ((started_evts & PQOS_PERF_EVENT_CYCLES) &&
-                (started_evts & PQOS_PERF_EVENT_INSTRUCTIONS)) {
+            (started_evts & PQOS_PERF_EVENT_INSTRUCTIONS)) {
                 group->values.ipc = 0;
                 started_evts |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
         }
 
- start_event_error:
+start_event_error:
         /*  Check if all selected events were started */
         if ((group->event & started_evts) != group->event) {
                 stop_events(group);
@@ -314,19 +314,19 @@ poll_events(struct pqos_mon_data *group)
                 if (group->values.mbm_total_delta >
                     group->values.mbm_local_delta)
                         group->values.mbm_remote_delta =
-                                group->values.mbm_total_delta -
-                                group->values.mbm_local_delta;
+                            group->values.mbm_total_delta -
+                            group->values.mbm_local_delta;
         }
         if (group->event & PQOS_PERF_EVENT_IPC) {
                 if (group->values.ipc_unhalted_delta > 0)
                         group->values.ipc =
-                                (double)group->values.ipc_retired_delta /
-                                (double)group->values.ipc_unhalted_delta;
+                            (double)group->values.ipc_retired_delta /
+                            (double)group->values.ipc_unhalted_delta;
                 else
                         group->values.ipc = 0;
         }
 
- poll_events_exit:
+poll_events_exit:
         if (group->resctrl_event != 0)
                 resctrl_lock_release();
 
@@ -341,8 +341,8 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         ASSERT(cpu != NULL);
         ASSERT(cap != NULL);
 
-	if (cpu == NULL || cap == NULL)
-		return PQOS_RETVAL_PARAM;
+        if (cpu == NULL || cap == NULL)
+                return PQOS_RETVAL_PARAM;
 
         ret = perf_mon_init(cpu, cap);
         if (ret == PQOS_RETVAL_RESOURCE)
@@ -351,7 +351,7 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-	m_cpu = cpu;
+        m_cpu = cpu;
 
         return ret;
 }
@@ -424,7 +424,7 @@ os_mon_start(const unsigned num_cores,
          */
         for (i = 0; i < (sizeof(event) * 8); i++) {
                 const enum pqos_mon_event evt_mask =
-                        (enum pqos_mon_event)(1U << i);
+                    (enum pqos_mon_event)(1U << i);
                 const struct pqos_monitor *ptr = NULL;
 
                 if (!(evt_mask & event))
@@ -452,7 +452,7 @@ os_mon_start(const unsigned num_cores,
         memset(group, 0, sizeof(*group));
         group->event = event;
         group->context = context;
-        group->cores = (unsigned *) malloc(sizeof(group->cores[0]) * num_cores);
+        group->cores = (unsigned *)malloc(sizeof(group->cores[0]) * num_cores);
         if (group->cores == NULL)
                 return PQOS_RETVAL_RESOURCE;
 
@@ -558,8 +558,8 @@ tid_find(const pid_t pid, unsigned *tid_nr, pid_t **tid_map)
                 ret = tid_add(pid, tid_nr, tid_map);
         else
                 for (i = 0; i < num_tasks; i++) {
-                        ret = tid_add((pid_t)atoi(namelist[i]->d_name),
-                                      tid_nr, tid_map);
+                        ret = tid_add((pid_t)atoi(namelist[i]->d_name), tid_nr,
+                                      tid_map);
                         if (ret != PQOS_RETVAL_OK)
                                 break;
                 }
@@ -635,7 +635,7 @@ os_mon_start_pids(const unsigned num_pids,
         }
 
         memset(group, 0, sizeof(*group));
-        group->pids = (pid_t *) malloc(sizeof(pid_t) * num_pids);
+        group->pids = (pid_t *)malloc(sizeof(pid_t) * num_pids);
         if (group->pids == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
                 goto os_mon_start_pids_exit;
@@ -652,7 +652,7 @@ os_mon_start_pids(const unsigned num_pids,
 
         ret = start_events(group);
 
- os_mon_start_pids_exit:
+os_mon_start_pids_exit:
         if (ret != PQOS_RETVAL_OK && tid_map != NULL)
                 free(tid_map);
 
@@ -740,8 +740,8 @@ os_mon_add_pids(const unsigned num_pids,
         /**
          * Update mon group
          */
-        ptr = realloc(group->tid_map,
-                sizeof(group->tid_map[0]) * (group->tid_nr + added.tid_nr));
+        ptr = realloc(group->tid_map, sizeof(group->tid_map[0]) *
+                                          (group->tid_nr + added.tid_nr));
         if (ptr == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
                 goto os_mon_add_pids_exit;
@@ -749,7 +749,7 @@ os_mon_add_pids(const unsigned num_pids,
         group->tid_map = ptr;
 
         ctx = realloc(group->perf,
-                sizeof(group->perf[0]) * (group->tid_nr + added.tid_nr));
+                      sizeof(group->perf[0]) * (group->tid_nr + added.tid_nr));
         if (ctx == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
                 goto os_mon_add_pids_exit;
@@ -757,7 +757,7 @@ os_mon_add_pids(const unsigned num_pids,
         group->perf = ctx;
 
         ptr = realloc(group->pids,
-                sizeof(group->pids[0]) * (group->num_pids + num_pids));
+                      sizeof(group->pids[0]) * (group->num_pids + num_pids));
         if (ptr == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
                 goto os_mon_add_pids_exit;
@@ -774,7 +774,7 @@ os_mon_add_pids(const unsigned num_pids,
                 group->num_pids++;
         }
 
- os_mon_add_pids_exit:
+os_mon_add_pids_exit:
         if (added.resctrl_mon_group != NULL) {
                 free(added.resctrl_mon_group);
                 added.resctrl_mon_group = NULL;
@@ -870,10 +870,10 @@ os_mon_remove_pids(const unsigned num_pids,
                 group->perf[i - removed] = group->perf[i];
         }
         group->tid_nr -= removed;
-        group->tid_map = realloc(group->tid_map,
-                                 sizeof(group->tid_map[0]) * group->tid_nr);
-        group->perf = realloc(group->perf,
-                              sizeof(group->perf[0]) * group->tid_nr);
+        group->tid_map =
+            realloc(group->tid_map, sizeof(group->tid_map[0]) * group->tid_nr);
+        group->perf =
+            realloc(group->perf, sizeof(group->perf[0]) * group->tid_nr);
         removed = 0;
         for (i = 0; i < group->num_pids; i++) {
                 if (tid_exists(group->pids[i], num_pids, pids)) {
@@ -884,18 +884,17 @@ os_mon_remove_pids(const unsigned num_pids,
                 group->pids[i - removed] = group->pids[i];
         }
         group->num_pids -= removed;
-        group->pids = realloc(group->pids,
-                sizeof(group->pids[0]) * group->num_pids);
+        group->pids =
+            realloc(group->pids, sizeof(group->pids[0]) * group->num_pids);
 
- os_mon_remove_pids_exit:
+os_mon_remove_pids_exit:
         if (keep_tid_map != NULL)
                 free(keep_tid_map);
         return ret;
 }
 
 int
-os_mon_poll(struct pqos_mon_data **groups,
-              const unsigned num_groups)
+os_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
 {
         unsigned i = 0;
 
@@ -907,7 +906,8 @@ os_mon_poll(struct pqos_mon_data **groups,
 
                 if (ret != PQOS_RETVAL_OK)
                         LOG_WARN("Failed to poll event on "
-                                 "group number %u\n", i);
+                                 "group number %u\n",
+                                 i);
         }
 
         return PQOS_RETVAL_OK;

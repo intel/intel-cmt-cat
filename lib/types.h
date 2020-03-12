@@ -48,7 +48,7 @@ extern "C" {
 #endif
 
 #ifndef DIM
-#define DIM(x) (sizeof(x)/sizeof(x[0]))
+#define DIM(x) (sizeof(x) / sizeof(x[0]))
 #endif
 
 #define UNUSED_PARAM(x) (void)(x)

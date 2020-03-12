@@ -57,8 +57,8 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION 30200 /**< version 3.2.0 */
-#define PQOS_MAX_COS 16    /** 16 x COS */
+#define PQOS_VERSION      30200 /**< version 3.2.0 */
+#define PQOS_MAX_COS      16    /** 16 x COS */
 #define PQOS_MAX_L3CA_COS PQOS_MAX_COS
 #define PQOS_MAX_L2CA_COS PQOS_MAX_COS
 
@@ -67,15 +67,15 @@ extern "C" {
  * Return values
  * =======================================
  */
-#define PQOS_RETVAL_OK 0        /**< everything OK */
-#define PQOS_RETVAL_ERROR 1     /**< generic error */
-#define PQOS_RETVAL_PARAM 2     /**< parameter error */
-#define PQOS_RETVAL_RESOURCE 3  /**< resource error */
-#define PQOS_RETVAL_INIT 4      /**< initialization error */
+#define PQOS_RETVAL_OK        0 /**< everything OK */
+#define PQOS_RETVAL_ERROR     1 /**< generic error */
+#define PQOS_RETVAL_PARAM     2 /**< parameter error */
+#define PQOS_RETVAL_RESOURCE  3 /**< resource error */
+#define PQOS_RETVAL_INIT      4 /**< initialization error */
 #define PQOS_RETVAL_TRANSPORT 5 /**< transport error */
-#define PQOS_RETVAL_PERF_CTR 6  /**< performance counter error */
-#define PQOS_RETVAL_BUSY 7      /**< resource busy error */
-#define PQOS_RETVAL_INTER 8     /**< Interface not supported */
+#define PQOS_RETVAL_PERF_CTR  6 /**< performance counter error */
+#define PQOS_RETVAL_BUSY      7 /**< resource busy error */
+#define PQOS_RETVAL_INTER     8 /**< Interface not supported */
 
 /*
  * =======================================

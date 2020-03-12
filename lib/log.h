@@ -46,24 +46,24 @@
 extern "C" {
 #endif
 
-#define LOG_VER_SILENT          (-1)
-#define LOG_VER_DEFAULT         (0)
-#define LOG_VER_VERBOSE         (1)
-#define LOG_VER_SUPER_VERBOSE   (2)
+#define LOG_VER_SILENT        (-1)
+#define LOG_VER_DEFAULT       (0)
+#define LOG_VER_VERBOSE       (1)
+#define LOG_VER_SUPER_VERBOSE (2)
 
-#define LOG_RETVAL_OK           0         /**< everything OK */
-#define LOG_RETVAL_ERROR        1         /**< generic error */
+#define LOG_RETVAL_OK    0 /**< everything OK */
+#define LOG_RETVAL_ERROR 1 /**< generic error */
 
-#define LOG_OPT_INFO   (1 << 0)
-#define LOG_OPT_WARN   (1 << 1)
-#define LOG_OPT_ERROR  (1 << 2)
-#define LOG_OPT_DEBUG  (1 << 3)
+#define LOG_OPT_INFO  (1 << 0)
+#define LOG_OPT_WARN  (1 << 1)
+#define LOG_OPT_ERROR (1 << 2)
+#define LOG_OPT_DEBUG (1 << 3)
 
-#define LOG_OPT_SILENT          (-1)
-#define LOG_OPT_DEFAULT         (LOG_OPT_WARN|LOG_OPT_ERROR)
-#define LOG_OPT_VERBOSE         (LOG_OPT_WARN|LOG_OPT_ERROR|LOG_OPT_INFO)
-#define LOG_OPT_SUPER_VERBOSE   (LOG_OPT_WARN|LOG_OPT_ERROR|LOG_OPT_INFO| \
-                                 LOG_OPT_DEBUG)
+#define LOG_OPT_SILENT  (-1)
+#define LOG_OPT_DEFAULT (LOG_OPT_WARN | LOG_OPT_ERROR)
+#define LOG_OPT_VERBOSE (LOG_OPT_WARN | LOG_OPT_ERROR | LOG_OPT_INFO)
+#define LOG_OPT_SUPER_VERBOSE                                                  \
+        (LOG_OPT_WARN | LOG_OPT_ERROR | LOG_OPT_INFO | LOG_OPT_DEBUG)
 
 #define LOG_INFO(str...)  log_printf(LOG_OPT_INFO, "INFO: " str)
 #define LOG_WARN(str...)  log_printf(LOG_OPT_WARN, "WARN: " str)
@@ -104,9 +104,9 @@ extern "C" {
  * @retval LOG_RETVAL_OK on success
  */
 int log_init(int fd_log,
-            void (*callback_log)(void *, const size_t, const char *),
-            void *context_log,
-            int verbosity);
+             void (*callback_log)(void *, const size_t, const char *),
+             void *context_log,
+             int verbosity);
 
 /**
  * @brief Shuts down PQoS log module

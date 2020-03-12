@@ -384,7 +384,8 @@ static int
 hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
 {
 #define CPUID_LEAF_BRAND_START 0x80000002UL
-#define CPUID_LEAF_BRAND_END 0x80000004UL
+#define CPUID_LEAF_BRAND_END   0x80000004UL
+
 #define CPUID_LEAF_BRAND_NUM (CPUID_LEAF_BRAND_END - CPUID_LEAF_BRAND_START + 1)
 #define MAX_BRAND_STRING_LEN (CPUID_LEAF_BRAND_NUM * 4 * sizeof(uint32_t))
         static const char *const supported_brands[] = {

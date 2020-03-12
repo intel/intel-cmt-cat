@@ -34,7 +34,7 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <dirent.h>             /**< scandir() */
+#include <dirent.h> /**< scandir() */
 #include <linux/perf_event.h>
 
 #include "pqos.h"
@@ -47,14 +47,14 @@
 /**
  * Event indexes in table of supported events
  */
-#define OS_MON_EVT_IDX_LLC       0
-#define OS_MON_EVT_IDX_LMBM      1
-#define OS_MON_EVT_IDX_TMBM      2
-#define OS_MON_EVT_IDX_RMBM      3
-#define OS_MON_EVT_IDX_INST      4
-#define OS_MON_EVT_IDX_CYC       5
-#define OS_MON_EVT_IDX_IPC       6
-#define OS_MON_EVT_IDX_LLC_MISS  7
+#define OS_MON_EVT_IDX_LLC      0
+#define OS_MON_EVT_IDX_LMBM     1
+#define OS_MON_EVT_IDX_TMBM     2
+#define OS_MON_EVT_IDX_RMBM     3
+#define OS_MON_EVT_IDX_INST     4
+#define OS_MON_EVT_IDX_CYC      5
+#define OS_MON_EVT_IDX_IPC      6
+#define OS_MON_EVT_IDX_LLC_MISS 7
 
 /**
  * ---------------------------------------
@@ -92,42 +92,42 @@ static struct perf_mon_supported_event {
         double scale;
         struct perf_event_attr attrs;
 } events_tab[] = {
-        { .name = "llc_occupancy",
-          .desc = "LLC Occupancy",
-          .event = PQOS_MON_EVENT_L3_OCCUP,
-          .supported = 0,
-          .scale = 1 },
-        { .name = "local_bytes",
-          .desc = "Local Memory B/W",
-          .event = PQOS_MON_EVENT_LMEM_BW,
-          .supported = 0,
-          .scale = 1 },
-        { .name = "total_bytes",
-          .desc = "Total Memory B/W",
-          .event = PQOS_MON_EVENT_TMEM_BW,
-          .supported = 0,
-          .scale = 1 },
-        { .name = "",
-          .desc = "Remote Memory B/W",
-          .event = PQOS_MON_EVENT_RMEM_BW,
-          .supported = 0,
-          .scale = 1 },
-        { .name = "",
-          .desc = "Retired CPU Instructions",
-          .event = (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS,
-          .supported = 1 }, /**< assumed support */
-        { .name = "",
-          .desc = "Unhalted CPU Cycles",
-          .event = (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
-          .supported = 1 }, /**< assumed support */
-        { .name = "",
-          .desc = "Instructions/Cycle",
-          .event = PQOS_PERF_EVENT_IPC,
-          .supported = 1 }, /**< assumed support */
-        { .name = "",
-          .desc = "LLC Misses",
-          .event = PQOS_PERF_EVENT_LLC_MISS,
-          .supported = 1 }, /**< assumed support */
+    {.name = "llc_occupancy",
+     .desc = "LLC Occupancy",
+     .event = PQOS_MON_EVENT_L3_OCCUP,
+     .supported = 0,
+     .scale = 1},
+    {.name = "local_bytes",
+     .desc = "Local Memory B/W",
+     .event = PQOS_MON_EVENT_LMEM_BW,
+     .supported = 0,
+     .scale = 1},
+    {.name = "total_bytes",
+     .desc = "Total Memory B/W",
+     .event = PQOS_MON_EVENT_TMEM_BW,
+     .supported = 0,
+     .scale = 1},
+    {.name = "",
+     .desc = "Remote Memory B/W",
+     .event = PQOS_MON_EVENT_RMEM_BW,
+     .supported = 0,
+     .scale = 1},
+    {.name = "",
+     .desc = "Retired CPU Instructions",
+     .event = (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS,
+     .supported = 1}, /**< assumed support */
+    {.name = "",
+     .desc = "Unhalted CPU Cycles",
+     .event = (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
+     .supported = 1}, /**< assumed support */
+    {.name = "",
+     .desc = "Instructions/Cycle",
+     .event = PQOS_PERF_EVENT_IPC,
+     .supported = 1}, /**< assumed support */
+    {.name = "",
+     .desc = "LLC Misses",
+     .event = PQOS_PERF_EVENT_LLC_MISS,
+     .supported = 1}, /**< assumed support */
 };
 
 /**
@@ -168,9 +168,9 @@ get_supported_event(const enum pqos_mon_event event)
                 return &events_tab[OS_MON_EVT_IDX_TMBM];
         case PQOS_MON_EVENT_RMEM_BW:
                 return &events_tab[OS_MON_EVT_IDX_RMBM];
-        case (enum pqos_mon_event) PQOS_PERF_EVENT_INSTRUCTIONS:
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
                 return &events_tab[OS_MON_EVT_IDX_INST];
-        case (enum pqos_mon_event) PQOS_PERF_EVENT_CYCLES:
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 return &events_tab[OS_MON_EVT_IDX_CYC];
         case PQOS_PERF_EVENT_IPC:
                 return &events_tab[OS_MON_EVT_IDX_IPC];
@@ -208,7 +208,7 @@ set_mon_type(void)
         }
         fclose(fd);
 
-        os_mon_type = (int) strtol(evt, NULL, 0);
+        os_mon_type = (int)strtol(evt, NULL, 0);
         if (os_mon_type == 0) {
                 LOG_ERROR("Failed to convert perf monitoring type!\n");
                 return PQOS_RETVAL_ERROR;
@@ -242,19 +242,18 @@ set_arch_event_attrs(enum pqos_mon_event *events)
         /* Set LLC misses event attributes */
         events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs = attr;
         events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs.config =
-                PERF_COUNT_HW_CACHE_MISSES;
+            PERF_COUNT_HW_CACHE_MISSES;
         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_LLC_MISS;
 
         /* Set retired instructions event attributes */
         events_tab[OS_MON_EVT_IDX_INST].attrs = attr;
         events_tab[OS_MON_EVT_IDX_INST].attrs.config =
-                PERF_COUNT_HW_INSTRUCTIONS;
+            PERF_COUNT_HW_INSTRUCTIONS;
         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS;
 
         /* Set unhalted cycles event attributes */
         events_tab[OS_MON_EVT_IDX_CYC].attrs = attr;
-        events_tab[OS_MON_EVT_IDX_CYC].attrs.config =
-                PERF_COUNT_HW_CPU_CYCLES;
+        events_tab[OS_MON_EVT_IDX_CYC].attrs.config = PERF_COUNT_HW_CPU_CYCLES;
         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES;
 
         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
@@ -310,8 +309,8 @@ set_rdt_event_attrs(const int idx, const char *fname)
         /**
          * Read scale factor from file system
          */
-        snprintf(file, sizeof(file) - 1, "%s%s%s.scale",
-                 PERF_MON_PATH, perf_events, fname);
+        snprintf(file, sizeof(file) - 1, "%s%s%s.scale", PERF_MON_PATH,
+                 perf_events, fname);
         fd = fopen_check_symlink(file, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open OS monitoring event scale file!\n");
@@ -372,12 +371,12 @@ set_mon_events(void)
                  * so, set up event attributes
                  */
                 for (j = 0; j < DIM(events_tab); j++) {
-                        if ((strcmp(events_tab[j].name,
-                                    namelist[i]->d_name)) != 0)
+                        if ((strcmp(events_tab[j].name, namelist[i]->d_name)) !=
+                            0)
                                 continue;
 
-                        if (set_rdt_event_attrs(j, namelist[i]->d_name)
-                            != PQOS_RETVAL_OK) {
+                        if (set_rdt_event_attrs(j, namelist[i]->d_name) !=
+                            PQOS_RETVAL_OK) {
                                 ret = PQOS_RETVAL_ERROR;
                                 goto init_pqos_events_exit;
                         }
@@ -401,7 +400,7 @@ set_mon_events(void)
 
         all_evt_mask |= events;
 
- init_pqos_events_exit:
+init_pqos_events_exit:
         if (files > 0) {
                 for (i = 0; i < files; i++)
                         free(namelist[i]);
@@ -410,7 +409,8 @@ set_mon_events(void)
         return ret;
 }
 
-int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
+int
+perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
         int ret;
         unsigned i;
@@ -433,7 +433,7 @@ int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
- perf_mon_init_exit:
+perf_mon_init_exit:
         for (i = 0; i < DIM(events_tab); i++) {
                 if (!events_tab[i].supported)
                         continue;
@@ -524,7 +524,8 @@ perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
                 ret = perf_setup_counter(&se->attrs, tid, core, -1, 0, fd);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("Failed to start perf "
-                                  "counters for %s\n", se->desc);
+                                  "counters for %s\n",
+                                  se->desc);
                         return PQOS_RETVAL_ERROR;
                 }
         }
@@ -632,31 +633,31 @@ perf_mon_poll(struct pqos_mon_data *group, enum pqos_mon_event event)
                 old_value = group->values.mbm_local;
                 group->values.mbm_local = value;
                 group->values.mbm_local_delta =
-                        get_delta(old_value, group->values.mbm_local);
+                    get_delta(old_value, group->values.mbm_local);
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
                 old_value = group->values.mbm_total;
                 group->values.mbm_total = value;
                 group->values.mbm_total_delta =
-                        get_delta(old_value, group->values.mbm_total);
+                    get_delta(old_value, group->values.mbm_total);
                 break;
         case PQOS_PERF_EVENT_LLC_MISS:
                 old_value = group->values.llc_misses;
                 group->values.llc_misses = value;
                 group->values.llc_misses_delta =
-                        get_delta(old_value, group->values.llc_misses);
+                    get_delta(old_value, group->values.llc_misses);
                 break;
         case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 old_value = group->values.ipc_unhalted;
                 group->values.ipc_unhalted = value;
                 group->values.ipc_unhalted_delta =
-                        get_delta(old_value, group->values.ipc_unhalted);
+                    get_delta(old_value, group->values.ipc_unhalted);
                 break;
         case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
                 old_value = group->values.ipc_retired;
                 group->values.ipc_retired = value;
                 group->values.ipc_retired_delta =
-                        get_delta(old_value, group->values.ipc_retired);
+                    get_delta(old_value, group->values.ipc_retired);
                 break;
         default:
                 return PQOS_RETVAL_ERROR;

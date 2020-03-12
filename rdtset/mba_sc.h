@@ -38,7 +38,7 @@
 #include "common.h"
 
 #define MBA_SC_SAMPLING_INTERVAL 100 /**< Sampling interval in ms */
-#define MBA_SC_DEF_INIT_MBA 100      /**< Default, initial MBA value, 100% */
+#define MBA_SC_DEF_INIT_MBA      100 /**< Default, initial MBA value, 100% */
 
 /**
  * @brief Initializes SW controller module

@@ -95,8 +95,7 @@ int os_alloc_assign(const unsigned technology,
  *
  * @return Operations status
  */
-int os_alloc_release(const unsigned *core_array,
-                     const unsigned core_num);
+int os_alloc_release(const unsigned *core_array, const unsigned core_num);
 
 /**
  * @brief Assign first available COS to tasks in \a task_array
@@ -132,8 +131,7 @@ int os_alloc_assign_pid(const unsigned technology,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_release_pid(const pid_t *task_array,
-                         const unsigned task_num);
+int os_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
 
 /**
  * @brief OS interface to reset configuration of allocation technologies
@@ -320,8 +318,7 @@ int os_mba_get_amd(const unsigned mba_id,
  *
  * @return Operations status
  */
-int os_alloc_assoc_set(const unsigned lcore,
-                       const unsigned class_id);
+int os_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
 
 /**
  * @brief OS interface to read association
@@ -333,8 +330,7 @@ int os_alloc_assoc_set(const unsigned lcore,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_assoc_get(const unsigned lcore,
-                       unsigned *class_id);
+int os_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 
 /**
  * @brief Retrieves task id's from resctrl task file for a given COS
@@ -345,8 +341,7 @@ int os_alloc_assoc_get(const unsigned lcore,
  * @return Allocated task id array
  * @retval NULL on error
  */
-unsigned *
-os_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
+unsigned *os_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
 
 /**
  * @brief OS interface to associate \a task
@@ -358,8 +353,7 @@ os_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_assoc_set_pid(const pid_t task,
-                           const unsigned class_id);
+int os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);
 
 /**
  * @brief OS interface to read association
@@ -371,8 +365,7 @@ int os_alloc_assoc_set_pid(const pid_t task,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_assoc_get_pid(const pid_t task,
-                           unsigned *class_id);
+int os_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
 
 #ifdef __cplusplus
 }

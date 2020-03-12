@@ -56,8 +56,9 @@ extern "C" {
  * @retval A valid pointer to a file or NULL on error (e.g. when the path
  * contains any symbolic links).
  */
-FILE *
-fopen_check_symlink(const char *name, const char *mode);
+/* clang-format off */
+FILE * fopen_check_symlink(const char *name, const char *mode);
+/* clang-format on */
 
 #ifdef __cplusplus
 }

@@ -64,8 +64,8 @@
 #endif
 
 #define MEMCHUNK_SIZE (PAGE_SIZE * 32 * 1024) /* 128MB chunk */
-#define CL_SIZE (64)
-#define CHUNKS (128)
+#define CL_SIZE       (64)
+#define CHUNKS        (128)
 
 #ifdef DEBUG
 #include <assert.h>
@@ -79,8 +79,8 @@
 
 #define MAX_MEM_BW 100 * 1000 /* 100GBps */
 
-#define CPU_FEATURE_SSE4_2 (1ULL << 0)
-#define CPU_FEATURE_CLWB (1ULL << 1)
+#define CPU_FEATURE_SSE4_2  (1ULL << 0)
+#define CPU_FEATURE_CLWB    (1ULL << 1)
 #define CPU_FEATURE_AVX512F (1ULL << 2)
 
 /**

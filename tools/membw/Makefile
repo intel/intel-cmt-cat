@@ -87,11 +87,12 @@ checkpatch:
 	--ignore STORAGE_CLASS,SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f membw.c
 
+CLANGFORMAT?=clang-format
 .PHONY: clang-format
 clang-format:
 	@for file in $(wildcard *.[ch]); do \
 		echo "Checking style $$file"; \
-		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
 	done
 

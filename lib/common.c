@@ -43,7 +43,6 @@
 #include "common.h"
 #include "log.h"
 
-
 /**
  * @brief Checks if a path to a file contains any symbolic links.
  *

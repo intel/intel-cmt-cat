@@ -40,9 +40,6 @@
  */
 #include <stdlib.h>
 #include <string.h>
-#ifdef __linux__
-#include <alloca.h>       /* alloca() */
-#endif /* __linux__ */
 
 #include "pqos.h"
 #include "types.h"
@@ -54,7 +51,6 @@
 #define TOPO_OBJ_L3_CLUSTER 3
 
 static int m_interface = PQOS_INTER_MSR;
-
 
 int
 _pqos_utils_init(int interface)
@@ -68,84 +64,81 @@ _pqos_utils_init(int interface)
 }
 
 unsigned *
-pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu,
-		     unsigned *count)
+pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
 {
-	unsigned mba_id_count = 0, i = 0;
-	unsigned *mba_ids = NULL;
+        unsigned mba_id_count = 0, i = 0;
+        unsigned *mba_ids = NULL;
 
-	ASSERT(cpu != NULL);
-	ASSERT(count != NULL);
-	if (cpu == NULL || count == NULL)
-		return NULL;
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+        if (cpu == NULL || count == NULL)
+                return NULL;
 
-	mba_ids = (unsigned *) malloc(sizeof(mba_ids[0]) * cpu->num_cores);
-	if (mba_ids == NULL)
-		return NULL;
+        mba_ids = (unsigned *)malloc(sizeof(mba_ids[0]) * cpu->num_cores);
+        if (mba_ids == NULL)
+                return NULL;
 
-	for (i = 0; i < cpu->num_cores; i++) {
-		unsigned j = 0;
+        for (i = 0; i < cpu->num_cores; i++) {
+                unsigned j = 0;
 
-		/**
-		 * Check if this mba id is already on the \a mbas list
-		 */
-		for (j = 0; j < mba_id_count && mba_id_count > 0; j++)
-			if (cpu->cores[i].mba_id  == mba_ids[j])
-				break;
+                /**
+                 * Check if this mba id is already on the \a mbas list
+                 */
+                for (j = 0; j < mba_id_count && mba_id_count > 0; j++)
+                        if (cpu->cores[i].mba_id == mba_ids[j])
+                                break;
 
-		if (j >= mba_id_count || mba_id_count == 0) {
-			/**
-			 * This mba_id wasn't reported before
-			 */
-			mba_ids[mba_id_count++] = cpu->cores[i].mba_id;
-		}
-	}
+                if (j >= mba_id_count || mba_id_count == 0) {
+                        /**
+                         * This mba_id wasn't reported before
+                         */
+                        mba_ids[mba_id_count++] = cpu->cores[i].mba_id;
+                }
+        }
 
-	*count = mba_id_count;
-	return mba_ids;
+        *count = mba_id_count;
+        return mba_ids;
 }
 
 unsigned *
-pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu,
-		       unsigned *count)
+pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
 {
-	unsigned l3cat_count = 0, i = 0;
-	unsigned *l3cat_ids = NULL;
+        unsigned l3cat_count = 0, i = 0;
+        unsigned *l3cat_ids = NULL;
 
-	ASSERT(cpu != NULL);
-	ASSERT(count != NULL);
-	if (cpu == NULL || count == NULL)
-		return NULL;
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+        if (cpu == NULL || count == NULL)
+                return NULL;
 
-	l3cat_ids = (unsigned *) malloc(sizeof(l3cat_ids[0]) * cpu->num_cores);
-	if (l3cat_ids == NULL)
-		return NULL;
+        l3cat_ids = (unsigned *)malloc(sizeof(l3cat_ids[0]) * cpu->num_cores);
+        if (l3cat_ids == NULL)
+                return NULL;
 
-	for (i = 0; i < cpu->num_cores; i++) {
-		unsigned j = 0;
+        for (i = 0; i < cpu->num_cores; i++) {
+                unsigned j = 0;
 
-		/**
-		 * Check if this l3cat id is already on the \a l3cat_ids list
-		 */
-		for (j = 0; j < l3cat_count && l3cat_count > 0; j++)
-			if (cpu->cores[i].l3cat_id  == l3cat_ids[j])
-				break;
+                /**
+                 * Check if this l3cat id is already on the \a l3cat_ids list
+                 */
+                for (j = 0; j < l3cat_count && l3cat_count > 0; j++)
+                        if (cpu->cores[i].l3cat_id == l3cat_ids[j])
+                                break;
 
-		if (j >= l3cat_count || l3cat_count == 0) {
-			/**
-			 * This l3cat_id wasn't reported before
-			 */
-			l3cat_ids[l3cat_count++] = cpu->cores[i].l3cat_id;
-		}
-	}
+                if (j >= l3cat_count || l3cat_count == 0) {
+                        /**
+                         * This l3cat_id wasn't reported before
+                         */
+                        l3cat_ids[l3cat_count++] = cpu->cores[i].l3cat_id;
+                }
+        }
 
-	*count = l3cat_count;
-	return l3cat_ids;
+        *count = l3cat_count;
+        return l3cat_ids;
 }
 
 unsigned *
-pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
-                     unsigned *count)
+pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu, unsigned *count)
 {
         unsigned scount = 0, i = 0;
         unsigned *sockets = NULL;
@@ -155,7 +148,7 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
         if (cpu == NULL || count == NULL)
                 return NULL;
 
-        sockets = (unsigned *) malloc(sizeof(sockets[0]) * cpu->num_cores);
+        sockets = (unsigned *)malloc(sizeof(sockets[0]) * cpu->num_cores);
         if (sockets == NULL)
                 return NULL;
 
@@ -182,8 +175,7 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu,
 }
 
 unsigned *
-pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu,
-                   unsigned *count)
+pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu, unsigned *count)
 {
         unsigned l2count = 0, i = 0;
         unsigned *l2ids = NULL;
@@ -193,7 +185,7 @@ pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu,
         if (cpu == NULL || count == NULL)
                 return NULL;
 
-        l2ids = (unsigned *) malloc(sizeof(l2ids[0]) * cpu->num_cores);
+        l2ids = (unsigned *)malloc(sizeof(l2ids[0]) * cpu->num_cores);
         if (l2ids == NULL)
                 return NULL;
 
@@ -247,7 +239,7 @@ __get_cores_per_topology_obj(const struct pqos_cpuinfo *cpu,
         if (cpu == NULL || count == NULL)
                 return NULL;
 
-        core_list = (unsigned *) malloc(cpu->num_cores * sizeof(core_list[0]));
+        core_list = (unsigned *)malloc(cpu->num_cores * sizeof(core_list[0]));
         if (core_list == NULL)
                 return NULL;
 
@@ -269,7 +261,8 @@ __get_cores_per_topology_obj(const struct pqos_cpuinfo *cpu,
 }
 
 unsigned *
-pqos_cpu_get_cores_l3id(const struct pqos_cpuinfo *cpu, const unsigned l3_id,
+pqos_cpu_get_cores_l3id(const struct pqos_cpuinfo *cpu,
+                        const unsigned l3_id,
                         unsigned *count)
 {
         return __get_cores_per_topology_obj(cpu, TOPO_OBJ_L3_CLUSTER, l3_id,
@@ -290,7 +283,7 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
         if (cpu == NULL || count == NULL)
                 return NULL;
 
-        cores = (unsigned *) malloc(cpu->num_cores * sizeof(cores[0]));
+        cores = (unsigned *)malloc(cpu->num_cores * sizeof(cores[0]));
         if (cores == NULL)
                 return NULL;
 
@@ -348,46 +341,46 @@ pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
 
 int
 pqos_cpu_get_one_by_l3cat_id(const struct pqos_cpuinfo *cpu,
-			      const unsigned l3cat_id,
-			      unsigned *lcore)
+                             const unsigned l3cat_id,
+                             unsigned *lcore)
 {
-	unsigned i = 0;
+        unsigned i = 0;
 
-	ASSERT(cpu != NULL);
-	ASSERT(lcore != NULL);
+        ASSERT(cpu != NULL);
+        ASSERT(lcore != NULL);
 
-	if (cpu == NULL || lcore == NULL)
-		return PQOS_RETVAL_PARAM;
+        if (cpu == NULL || lcore == NULL)
+                return PQOS_RETVAL_PARAM;
 
-	for (i = 0; i < cpu->num_cores; i++)
-		if (cpu->cores[i].l3cat_id == l3cat_id) {
-			*lcore = cpu->cores[i].lcore;
-			return PQOS_RETVAL_OK;
-		}
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].l3cat_id == l3cat_id) {
+                        *lcore = cpu->cores[i].lcore;
+                        return PQOS_RETVAL_OK;
+                }
 
-	return PQOS_RETVAL_ERROR;
+        return PQOS_RETVAL_ERROR;
 }
 
 int
 pqos_cpu_get_one_by_mba_id(const struct pqos_cpuinfo *cpu,
-			    const unsigned mba_id,
-			    unsigned *lcore)
+                           const unsigned mba_id,
+                           unsigned *lcore)
 {
-	unsigned i = 0;
+        unsigned i = 0;
 
-	ASSERT(cpu != NULL);
-	ASSERT(lcore != NULL);
+        ASSERT(cpu != NULL);
+        ASSERT(lcore != NULL);
 
-	if (cpu == NULL || lcore == NULL)
-		return PQOS_RETVAL_PARAM;
+        if (cpu == NULL || lcore == NULL)
+                return PQOS_RETVAL_PARAM;
 
-	for (i = 0; i < cpu->num_cores; i++)
-		if (cpu->cores[i].mba_id == mba_id) {
-			*lcore = cpu->cores[i].lcore;
-			return PQOS_RETVAL_OK;
-		}
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].mba_id == mba_id) {
+                        *lcore = cpu->cores[i].lcore;
+                        return PQOS_RETVAL_OK;
+                }
 
-	return PQOS_RETVAL_ERROR;
+        return PQOS_RETVAL_ERROR;
 }
 
 int
@@ -413,8 +406,7 @@ pqos_cpu_get_one_by_l2id(const struct pqos_cpuinfo *cpu,
 }
 
 int
-pqos_cpu_check_core(const struct pqos_cpuinfo *cpu,
-                    const unsigned lcore)
+pqos_cpu_check_core(const struct pqos_cpuinfo *cpu, const unsigned lcore)
 {
         unsigned i = 0;
 
@@ -531,8 +523,7 @@ pqos_cap_get_event(const struct pqos_cap *cap,
 }
 
 int
-pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
-                      unsigned *cos_num)
+pqos_l3ca_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num)
 {
         const struct pqos_capability *item = NULL;
         int ret = PQOS_RETVAL_OK;
@@ -543,7 +534,7 @@ pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                          /**< no L3CA capability */
+                return ret; /**< no L3CA capability */
 
         ASSERT(item != NULL);
         *cos_num = item->u.l3ca->num_classes;
@@ -551,8 +542,7 @@ pqos_l3ca_get_cos_num(const struct pqos_cap *cap,
 }
 
 int
-pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
-                      unsigned *cos_num)
+pqos_l2ca_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num)
 {
         const struct pqos_capability *item = NULL;
         int ret = PQOS_RETVAL_OK;
@@ -563,7 +553,7 @@ pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                          /**< no L2CA capability */
+                return ret; /**< no L2CA capability */
 
         ASSERT(item != NULL);
         *cos_num = item->u.l2ca->num_classes;
@@ -571,8 +561,7 @@ pqos_l2ca_get_cos_num(const struct pqos_cap *cap,
 }
 
 int
-pqos_mba_get_cos_num(const struct pqos_cap *cap,
-                      unsigned *cos_num)
+pqos_mba_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num)
 {
         const struct pqos_capability *item = NULL;
         int ret = PQOS_RETVAL_OK;
@@ -583,7 +572,7 @@ pqos_mba_get_cos_num(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                          /**< no MBA capability */
+                return ret; /**< no MBA capability */
 
         ASSERT(item != NULL);
         *cos_num = item->u.mba->num_classes;
@@ -604,7 +593,7 @@ pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &item);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                          /**< no L3CA capability */
+                return ret; /**< no L3CA capability */
 
         ASSERT(item != NULL);
         if (cdp_supported != NULL)
@@ -630,7 +619,7 @@ pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &l2ca);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                          /**< no L2CA capability */
+                return ret; /**< no L2CA capability */
 
         ASSERT(l2ca != NULL);
         if (cdp_supported != NULL)
@@ -656,7 +645,7 @@ pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &mba_cap);
         if (ret != PQOS_RETVAL_OK)
-                return ret;                           /**< no MBA capability */
+                return ret; /**< no MBA capability */
 
         ASSERT(mba_cap != NULL);
         if (ctrl_supported != NULL)

@@ -56,13 +56,12 @@ extern "C" {
  * @retval positive number on success
  * @retval negative number on error
  */
-int
-perf_setup_counter(struct perf_event_attr *attr,
-                   const pid_t pid,
-                   const int cpu,
-                   const int group_fd,
-                   const unsigned long flags,
-                   int *counter_fd);
+int perf_setup_counter(struct perf_event_attr *attr,
+                       const pid_t pid,
+                       const int cpu,
+                       const int group_fd,
+                       const unsigned long flags,
+                       int *counter_fd);
 
 /**
  * @brief Function to shutdown a perf event counter
@@ -72,8 +71,7 @@ perf_setup_counter(struct perf_event_attr *attr,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int
-perf_shutdown_counter(int counter_fd);
+int perf_shutdown_counter(int counter_fd);
 
 /**
  * @brief Function to start a perf counter
@@ -83,8 +81,7 @@ perf_shutdown_counter(int counter_fd);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int
-perf_start_counter(int counter_fd);
+int perf_start_counter(int counter_fd);
 
 /**
  * @brief Function to stop a perf counter
@@ -94,8 +91,7 @@ perf_start_counter(int counter_fd);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int
-perf_stop_counter(int counter_fd);
+int perf_stop_counter(int counter_fd);
 
 /**
  * @brief Function to read a perf counter
@@ -106,8 +102,7 @@ perf_stop_counter(int counter_fd);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int
-perf_read_counter(int counter_fd, uint64_t *value);
+int perf_read_counter(int counter_fd, uint64_t *value);
 
 #ifdef __cplusplus
 }

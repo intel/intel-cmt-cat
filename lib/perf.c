@@ -53,12 +53,14 @@
  * @retval negative number on error
  */
 static inline int
-perf_event_open(struct perf_event_attr *attr, pid_t pid,
-                int cpu, int group_fd, unsigned long flags)
+perf_event_open(struct perf_event_attr *attr,
+                pid_t pid,
+                int cpu,
+                int group_fd,
+                unsigned long flags)
 {
         attr->size = sizeof(*attr);
-        return syscall(__NR_perf_event_open, attr,
-                       pid, cpu, group_fd, flags);
+        return syscall(__NR_perf_event_open, attr, pid, cpu, group_fd, flags);
 }
 
 int
@@ -149,5 +151,5 @@ perf_read_counter(int counter_fd, uint64_t *value)
                 return PQOS_RETVAL_ERROR;
         }
 
-        return  PQOS_RETVAL_OK;
+        return PQOS_RETVAL_OK;
 }

@@ -80,8 +80,7 @@ int os_mon_reset(void);
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int
-os_mon_stop(struct pqos_mon_data *group);
+int os_mon_stop(struct pqos_mon_data *group);
 
 /**
  * @brief OS interface to start resource monitoring on selected
@@ -118,8 +117,7 @@ int os_mon_start(const unsigned num_cores,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mon_poll(struct pqos_mon_data **groups,
-                const unsigned num_groups);
+int os_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups);
 
 /**
  * @brief OS interface to start monitoring of selected group of \a pids

@@ -47,7 +47,7 @@
 #include "dlock.h"
 
 #define MAX_L3CAT_NUM 16
-#define DIM(x) (sizeof(x)/sizeof(x[0]))
+#define DIM(x) (sizeof(x) / sizeof(x[0]))
 
 static int m_is_chunk_allocated = 0;
 static char *m_chunk_start = NULL;

@@ -227,11 +227,12 @@ checkpatch:
 	-f types.h \
 	-f utils.h -f utils.c
 
+CLANGFORMAT?=clang-format
 .PHONY: clang-format
 clang-format:
-	@for file in "pqos.h" "api.h" "cpuinfo.h" "cpuinfo.c" "allocation.h" "allocation.c" $(wildcard *cap*.[ch]) $(wildcard resctrl*.[ch]); do \
+	@for file in $(wildcard *.[ch]); do \
 		echo "Checking style $$file"; \
-		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
 	done
 

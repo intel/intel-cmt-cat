@@ -6,12 +6,14 @@ BreakBeforeBraces: Linux
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
 UseTab: Never
-#AlignConsecutiveMacros: true
+AlignConsecutiveMacros: true
 AlignTrailingComments: true
 AlwaysBreakAfterReturnType: AllDefinitions
 SortIncludes: false
 BreakBeforeInheritanceComma: true
 AllowAllParametersOfDeclarationOnNextLine: false
 BinPackParameters: false
+BinPackArguments: true
 ReflowComments: true
 SpaceAfterCStyleCast: false
+ColumnLimit: 80

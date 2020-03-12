@@ -55,9 +55,9 @@
 #include "machine.h"
 #include "log.h"
 
-static int *m_msr_fd = NULL;           /**< MSR driver file descriptors table */
-static unsigned m_maxcores = 0;        /**< max number of cores (size of the
-                                          table above too) */
+static int *m_msr_fd = NULL;    /**< MSR driver file descriptors table */
+static unsigned m_maxcores = 0; /**< max number of cores (size of the
+                                   table above too) */
 
 int
 machine_init(const unsigned max_core_id)
@@ -113,9 +113,7 @@ machine_fini(void)
 }
 
 void
-lcpuid(const unsigned leaf,
-       const unsigned subleaf,
-       struct cpuid_out *out)
+lcpuid(const unsigned leaf, const unsigned subleaf, struct cpuid_out *out)
 {
         ASSERT(out != NULL);
         if (out == NULL)
@@ -129,9 +127,9 @@ lcpuid(const unsigned leaf,
                      "mov %%ebx, %1\n\t"
                      "mov %%ecx, %2\n\t"
                      "mov %%edx, %3\n\t"
-                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
-                       "=g" (out->edx)
-                     : "g" (leaf), "g" (subleaf)
+                     : "=g"(out->eax), "=g"(out->ebx), "=g"(out->ecx),
+                       "=g"(out->edx)
+                     : "g"(leaf), "g"(subleaf)
                      : "%eax", "%ebx", "%ecx", "%edx");
 #else
         asm volatile("push %%ebx\n\t"
@@ -143,9 +141,9 @@ lcpuid(const unsigned leaf,
                      "mov %%ecx, %2\n\t"
                      "mov %%edx, %3\n\t"
                      "pop %%ebx\n\t"
-                     : "=g" (out->eax), "=g" (out->ebx), "=g" (out->ecx),
-                       "=g" (out->edx)
-                     : "g" (leaf), "g" (subleaf)
+                     : "=g"(out->eax), "=g"(out->ebx), "=g"(out->ecx),
+                       "=g"(out->edx)
+                     : "g"(leaf), "g"(subleaf)
                      : "%eax", "%ecx", "%edx");
 #endif
 }
@@ -173,12 +171,10 @@ msr_file_open(const unsigned lcore)
 
                 memset(fname, 0, sizeof(fname));
 #ifdef __linux__
-                snprintf(fname, sizeof(fname)-1,
-                         "/dev/cpu/%u/msr", lcore);
+                snprintf(fname, sizeof(fname) - 1, "/dev/cpu/%u/msr", lcore);
 #endif
 #ifdef __FreeBSD__
-                snprintf(fname, sizeof(fname)-1,
-                         "/dev/cpuctl%u", lcore);
+                snprintf(fname, sizeof(fname) - 1, "/dev/cpuctl%u", lcore);
 #endif
                 fd = open(fname, O_RDWR);
                 if (fd < 0)
@@ -191,9 +187,7 @@ msr_file_open(const unsigned lcore)
 }
 
 int
-msr_read(const unsigned lcore,
-         const uint32_t reg,
-         uint64_t *value)
+msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
 {
         int ret = MACHINE_RETVAL_OK;
         int fd = -1;
@@ -241,9 +235,7 @@ msr_read(const unsigned lcore,
 }
 
 int
-msr_write(const unsigned lcore,
-          const uint32_t reg,
-          const uint64_t value)
+msr_write(const unsigned lcore, const uint32_t reg, const uint64_t value)
 {
         int ret = MACHINE_RETVAL_OK;
         int fd = -1;

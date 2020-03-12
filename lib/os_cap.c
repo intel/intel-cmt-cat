@@ -45,9 +45,9 @@
 #include "resctrl_alloc.h"
 #include "perf_monitoring.h"
 
-#define PROC_CPUINFO "/proc/cpuinfo"
+#define PROC_CPUINFO     "/proc/cpuinfo"
 #define PROC_FILESYSTEMS "/proc/filesystems"
-#define PROC_MOUNTS "/proc/mounts"
+#define PROC_MOUNTS      "/proc/mounts"
 
 static int mba_ctrl = -1; /**< mba ctrl support */
 

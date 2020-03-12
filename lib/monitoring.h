@@ -75,8 +75,8 @@ int pqos_mon_fini(void);
  * @retval PQOS_RETVAL_OK success
  */
 int hw_mon_init(const struct pqos_cpuinfo *cpu,
-                  const struct pqos_cap *cap,
-                  const struct pqos_config *cfg);
+                const struct pqos_cap *cap,
+                const struct pqos_config *cfg);
 
 /**
  * @brief Shuts down hardware monitoring sub-module of the library
@@ -102,8 +102,7 @@ int hw_mon_reset(void);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mon_assoc_get(const unsigned lcore,
-                     pqos_rmid_t *rmid);
+int hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
 
 /**
  * @brief Hardware interface to start resource monitoring on selected
@@ -151,8 +150,7 @@ int hw_mon_stop(struct pqos_mon_data *group);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mon_poll(struct pqos_mon_data **groups,
-                const unsigned num_groups);
+int hw_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups);
 
 /*
  * =======================================
@@ -168,8 +166,7 @@ int hw_mon_poll(struct pqos_mon_data **groups,
  *
  * @return Operations status
  */
-int hw_alloc_assoc_set(const unsigned lcore,
-                       const unsigned class_id);
+int hw_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
 
 /**
  * @brief Hardware interface to read association of \a lcore with
@@ -181,8 +178,7 @@ int hw_alloc_assoc_set(const unsigned lcore,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_alloc_assoc_get(const unsigned lcore,
-                       unsigned *class_id);
+int hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 
 #ifdef __cplusplus
 }

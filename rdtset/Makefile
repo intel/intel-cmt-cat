@@ -141,11 +141,12 @@ checkpatch:
 	-f common.c -f common.h \
 	-f mba_sc.h -f mba_sc.c
 
+CLANGFORMAT?=clang-format
 .PHONY: clang-format
 clang-format:
 	@for file in $(wildcard *.[ch]); do \
 		echo "Checking style $$file"; \
-		clang-format -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
 	done
 

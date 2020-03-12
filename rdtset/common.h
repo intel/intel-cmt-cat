@@ -44,7 +44,7 @@
 extern "C" {
 #endif
 
-#define RDT_MAX_PIDS 128
+#define RDT_MAX_PIDS   128
 #define MAX_OPTARG_LEN 64
 
 /**

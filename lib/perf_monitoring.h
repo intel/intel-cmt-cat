@@ -121,7 +121,6 @@ int perf_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event);
  */
 int perf_mon_is_event_supported(const enum pqos_mon_event event);
 
-
 #ifdef __cplusplus
 }
 #endif

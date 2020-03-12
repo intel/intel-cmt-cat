@@ -43,7 +43,6 @@
 extern "C" {
 #endif
 
-
 /**
  * @brief Initializes utils module
  *
@@ -54,10 +53,8 @@ extern "C" {
  */
 int _pqos_utils_init(int interface);
 
-
 #ifdef __cplusplus
 }
 #endif
 
 #endif /* __PQOS_UTULS_H__ */
-
