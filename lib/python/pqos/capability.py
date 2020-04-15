@@ -104,6 +104,7 @@ class CPqosMonitor(ctypes.Structure):
         (u"type", ctypes.c_int),
         (u"max_rmid", ctypes.c_uint),
         (u"scale_factor", ctypes.c_uint32),
+        (u"counter_length", ctypes.c_uint),
     ]
 
 
