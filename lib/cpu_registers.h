@@ -76,6 +76,7 @@ extern "C" {
 #define PQOS_MSR_L2_QOS_CFG        0xC82 /**< L2 CAT config register */
 #define PQOS_MSR_L2_QOS_CFG_CDP_EN 1ULL  /**< L2 CDP enable bit */
 
+#define PQOS_MSR_MBA_CFG 0xC84 /**< MBA config register */
 /**
  * MBA linear max value
  */

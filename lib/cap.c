@@ -130,9 +130,7 @@ static pthread_mutex_t m_apilock_mutex;
  *   1  PQOS_INTER_OS
  *   2  PQOS_INTER_OS_RESCTRL_MON
  */
-#ifdef __linux__
 static int m_interface = PQOS_INTER_MSR;
-#endif
 /**
  * ---------------------------------------
  * Functions for safe multi-threading
@@ -711,9 +709,9 @@ pqos_init(const struct pqos_config *config)
                 LOG_ERROR("_pqos_api_init() error %d\n", ret);
                 goto machine_init_error;
         }
-#ifdef __linux__
+
         m_interface = config->interface;
-#endif
+
         ret = pqos_alloc_init(m_cpu, m_cap, config);
         switch (ret) {
         case PQOS_RETVAL_BUSY:

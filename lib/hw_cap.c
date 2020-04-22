@@ -724,8 +724,10 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
         int ret = PQOS_RETVAL_OK;
+        unsigned version;
+        unsigned mba_thread_ctrl = 0;
 
-        UNUSED_PARAM(cpu);
+        ASSERT(cpu != NULL);
         ASSERT(cap != NULL);
 
         memset(cap, 0, sizeof(*cap));
@@ -762,6 +764,62 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         else {
                 LOG_WARN("MBA non-linear mode not supported yet!\n");
                 return PQOS_RETVAL_RESOURCE;
+        }
+
+        /*
+         * Detect MBA version
+         *  - MBA3.0 introduces per-thread MBA controls
+         *  - MBA2.0 increases number of MBA COS to 15
+         */
+        if (res.ecx & 0x1) {
+                version = 3;
+                mba_thread_ctrl = 1;
+        } else if (cap->num_classes > 8)
+                version = 2;
+        else
+                version = 1;
+
+        LOG_INFO("Detected MBA version %u.0\n", version);
+        LOG_INFO("Detected Per-%s MBA controls\n",
+                 mba_thread_ctrl ? "Thread" : "Core");
+
+        if (version >= 2) {
+                unsigned *mba_ids;
+                unsigned mba_id_num;
+                unsigned i;
+
+                /* mba ids */
+                mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+                if (mba_ids == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+
+                /* Detect MBA configuration */
+                for (i = 0; i < mba_id_num; i++) {
+                        uint64_t reg = 0;
+                        unsigned core = 0;
+
+                        ret =
+                            pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &core);
+                        if (ret != PQOS_RETVAL_OK)
+                                break;
+
+                        if (msr_read(core, PQOS_MSR_MBA_CFG, &reg) !=
+                            MACHINE_RETVAL_OK) {
+                                ret = PQOS_RETVAL_ERROR;
+                                break;
+                        }
+
+                        if (reg & 0x2)
+                                LOG_INFO(
+                                    "MBA Legacy Mode enabled on socket %u\n",
+                                    mba_ids[i]);
+                        if (!mba_thread_ctrl)
+                                LOG_INFO("%s MBA delay enabled on socket %u\n",
+                                         (reg & 0x1) ? "Min" : "Max",
+                                         mba_ids[i]);
+                }
+
+                free(mba_ids);
         }
 
         return ret;
