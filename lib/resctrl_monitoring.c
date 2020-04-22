@@ -335,6 +335,8 @@ resctrl_mon_cpumask_read(const unsigned class_id,
  * @param [in] class_id COS id
  * @param [in] resctrl_group mon group name
  * @param [in] event resctrl mon event
+ * @param [in] l3ids  l3ids to read from
+ * @param [in] l3ids_num number of l3ids
  * @param [out] value counter value
  *
  * @return Operational status
@@ -343,6 +345,8 @@ resctrl_mon_cpumask_read(const unsigned class_id,
 static int
 resctrl_mon_read_counters(const unsigned class_id,
                           const char *resctrl_group,
+                          unsigned *l3ids,
+                          unsigned l3ids_num,
                           const enum pqos_mon_event event,
                           uint64_t *value)
 {
@@ -376,10 +380,15 @@ resctrl_mon_read_counters(const unsigned class_id,
 
         resctrl_mon_group_path(class_id, resctrl_group, NULL, buf, sizeof(buf));
 
-        l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
-        if (l3cat_ids == NULL) {
-                ret = PQOS_RETVAL_ERROR;
-                goto resctrl_mon_read_exit;
+        if (l3ids == NULL) {
+                l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
+                if (l3cat_ids == NULL) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto resctrl_mon_read_exit;
+                }
+        } else {
+                l3cat_ids = l3ids;
+                l3cat_id_num = l3ids_num;
         }
 
         for (l3cat_id = 0; l3cat_id < l3cat_id_num; l3cat_id++) {
@@ -400,7 +409,7 @@ resctrl_mon_read_counters(const unsigned class_id,
         }
 
 resctrl_mon_read_exit:
-        if (l3cat_ids != NULL)
+        if (l3ids == NULL && l3cat_ids != NULL)
                 free(l3cat_ids);
 
         return ret;
@@ -411,6 +420,8 @@ resctrl_mon_read_exit:
  *
  * @param [in] class_id COS id
  * @param [in] resctrl_group mon group name
+ * @param [in] l3id  l3ids to read from
+ * @param [in] l3id_num number of l3ids
  * @param [out] empty 1 when group is empty
  *
  * @return Operational status
@@ -419,6 +430,8 @@ resctrl_mon_read_exit:
 static int
 resctrl_mon_empty(const unsigned class_id,
                   const char *resctrl_group,
+                  unsigned *l3id,
+                  unsigned l3id_num,
                   int *empty)
 {
         int ret;
@@ -471,7 +484,7 @@ resctrl_mon_empty(const unsigned class_id,
         if ((supported_events & PQOS_MON_EVENT_L3_OCCUP) == 0)
                 return PQOS_RETVAL_OK;
 
-        ret = resctrl_mon_read_counters(class_id, resctrl_group,
+        ret = resctrl_mon_read_counters(class_id, resctrl_group, l3id, l3id_num,
                                         PQOS_MON_EVENT_L3_OCCUP, &value);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
@@ -771,10 +784,13 @@ resctrl_mon_start(struct pqos_mon_data *group)
         char buf[128];
         int ret = PQOS_RETVAL_OK;
         unsigned i;
+        const struct pqos_cpuinfo *cpu;
 
         ASSERT(group != NULL);
         ASSERT(group->tid_nr == 0 || group->tid_map != NULL);
         ASSERT(group->num_cores == 0 || group->cores != NULL);
+
+        _pqos_cap_get(NULL, &cpu);
 
         /**
          * Get resctrl monitoring group
@@ -801,6 +817,31 @@ resctrl_mon_start(struct pqos_mon_data *group)
                     resctrl_mon_assoc_set_pid(group->tid_map[i], resctrl_group);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_start_exit;
+        }
+
+        /* List l3ids */
+        for (i = 0; i < group->num_cores; i++) {
+                struct pqos_mon_data_internal *intl = group->intl;
+                unsigned j;
+                const struct pqos_coreinfo *coreinfo =
+                    pqos_cpu_get_core_info(cpu, group->cores[i]);
+
+                for (j = 0; j < intl->resctrl.num_l3id; j++)
+                        if (coreinfo->l3cat_id == intl->resctrl.l3id[j])
+                                break;
+
+                if (j == intl->resctrl.num_l3id) {
+                        intl->resctrl.l3id =
+                            realloc(intl->resctrl.l3id,
+                                    sizeof(*intl->resctrl.l3id) *
+                                        (intl->resctrl.num_l3id + 1));
+                        if (intl->resctrl.l3id == NULL) {
+                                ret = PQOS_RETVAL_ERROR;
+                                goto resctrl_mon_start_exit;
+                        }
+                        intl->resctrl.l3id[intl->resctrl.num_l3id++] =
+                            coreinfo->l3cat_id;
+                }
         }
 
         /**
@@ -949,7 +990,8 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                         continue;
 
                 ret = resctrl_mon_empty(cos, group->intl->resctrl.mon_group,
-                                        &empty);
+                                        group->intl->resctrl.l3id,
+                                        group->intl->resctrl.num_l3id, &empty);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
@@ -960,6 +1002,8 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 if (supported_events & PQOS_MON_EVENT_LMEM_BW) {
                         ret = resctrl_mon_read_counters(
                             cos, group->intl->resctrl.mon_group,
+                            group->intl->resctrl.l3id,
+                            group->intl->resctrl.num_l3id,
                             PQOS_MON_EVENT_LMEM_BW, &value);
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
@@ -968,6 +1012,8 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 if (supported_events & PQOS_MON_EVENT_TMEM_BW) {
                         ret = resctrl_mon_read_counters(
                             cos, group->intl->resctrl.mon_group,
+                            group->intl->resctrl.l3id,
+                            group->intl->resctrl.num_l3id,
                             PQOS_MON_EVENT_TMEM_BW, &value);
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
@@ -1043,7 +1089,9 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                         continue;
 
                 ret = resctrl_mon_read_counters(
-                    cos, group->intl->resctrl.mon_group, event, &val);
+                    cos, group->intl->resctrl.mon_group,
+                    group->intl->resctrl.l3id, group->intl->resctrl.num_l3id,
+                    event, &val);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_poll_exit;
 
