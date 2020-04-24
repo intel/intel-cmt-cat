@@ -41,6 +41,7 @@
 #include "cap.h"
 #include "log.h"
 #include "types.h"
+#include "monitoring.h"
 #include "os_monitoring.h"
 #include "perf_monitoring.h"
 #include "resctrl.h"
@@ -104,21 +105,21 @@ stop_events(struct pqos_mon_data *group)
                 /**
                  * Stop perf event
                  */
-                if (group->perf_event & evt) {
+                if (group->intl->perf.event & evt) {
                         ret = perf_mon_stop(group, evt);
                         if (ret == PQOS_RETVAL_OK)
                                 stopped_evts |= evt;
                 }
         }
 
-        if (group->resctrl_event) {
+        if (group->intl->resctrl.event) {
                 ret = resctrl_lock_exclusive();
                 if (ret != PQOS_RETVAL_OK)
                         goto stop_event_error;
 
                 ret = resctrl_mon_stop(group);
                 if (ret == PQOS_RETVAL_OK)
-                        stopped_evts |= group->resctrl_event;
+                        stopped_evts |= group->intl->resctrl.event;
 
                 resctrl_lock_release();
         }
@@ -132,22 +133,24 @@ stop_event_error:
             (stopped_evts & PQOS_PERF_EVENT_INSTRUCTIONS))
                 stopped_evts |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
 
-        if (group->perf != NULL) {
-                free(group->perf);
-                group->perf = NULL;
+        if (group->intl->perf.ctx != NULL) {
+                free(group->intl->perf.ctx);
+                group->intl->perf.ctx = NULL;
         }
 
-        if ((group->perf_event & stopped_evts) != group->perf_event) {
+        if ((group->intl->perf.event & stopped_evts) !=
+            group->intl->perf.event) {
                 LOG_ERROR("Failed to stop all perf events\n");
                 return PQOS_RETVAL_ERROR;
         }
-        group->perf_event = (enum pqos_mon_event)0;
+        group->intl->perf.event = (enum pqos_mon_event)0;
 
-        if ((group->resctrl_event & stopped_evts) != group->resctrl_event) {
+        if ((group->intl->resctrl.event & stopped_evts) !=
+            group->intl->resctrl.event) {
                 LOG_ERROR("Failed to stop resctrl events\n");
                 return PQOS_RETVAL_ERROR;
         }
-        group->resctrl_event = (enum pqos_mon_event)0;
+        group->intl->resctrl.event = (enum pqos_mon_event)0;
 
         return PQOS_RETVAL_OK;
 }
@@ -179,9 +182,10 @@ start_events(struct pqos_mon_data *group)
                 return PQOS_RETVAL_ERROR;
 
         events = group->event;
-        group->perf_event = (enum pqos_mon_event)0;
-        group->perf = malloc(sizeof(group->perf[0]) * num_ctrs);
-        if (group->perf == NULL) {
+        group->intl->perf.event = (enum pqos_mon_event)0;
+        group->intl->perf.ctx =
+            malloc(sizeof(group->intl->perf.ctx[0]) * num_ctrs);
+        if (group->intl->perf.ctx == NULL) {
                 LOG_ERROR("Memory allocation failed\n");
                 return PQOS_RETVAL_ERROR;
         }
@@ -204,12 +208,12 @@ start_events(struct pqos_mon_data *group)
                                 ret = perf_mon_start(group, evt);
                                 if (ret != PQOS_RETVAL_OK)
                                         goto start_event_error;
-                                group->perf_event |= evt;
+                                group->intl->perf.event |= evt;
                                 continue;
                         }
 
                         if (resctrl_mon_is_event_supported(evt)) {
-                                group->resctrl_event |= evt;
+                                group->intl->resctrl.event |= evt;
                                 continue;
                         }
 
@@ -220,9 +224,9 @@ start_events(struct pqos_mon_data *group)
                         goto start_event_error;
                 }
         }
-        started_evts |= group->perf_event;
+        started_evts |= group->intl->perf.event;
 
-        if (group->resctrl_event != 0) {
+        if (group->intl->resctrl.event != 0) {
                 ret = resctrl_lock_exclusive();
                 if (ret != PQOS_RETVAL_OK)
                         goto start_event_error;
@@ -232,7 +236,7 @@ start_events(struct pqos_mon_data *group)
                 if (ret != PQOS_RETVAL_OK)
                         goto start_event_error;
         }
-        started_evts |= group->resctrl_event;
+        started_evts |= group->intl->resctrl.event;
 
         /**
          * All events required by RMEM has been started
@@ -257,8 +261,8 @@ start_event_error:
                 stop_events(group);
                 LOG_ERROR("Failed to start all selected "
                           "OS monitoring events\n");
-                free(group->perf);
-                group->perf = NULL;
+                free(group->intl->perf.ctx);
+                group->intl->perf.ctx = NULL;
         }
         return ret;
 }
@@ -278,7 +282,7 @@ poll_events(struct pqos_mon_data *group)
         unsigned i;
         int ret = PQOS_RETVAL_OK;
 
-        if (group->resctrl_event != 0) {
+        if (group->intl->resctrl.event != 0) {
                 ret = resctrl_lock_shared();
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
@@ -290,7 +294,7 @@ poll_events(struct pqos_mon_data *group)
                 /**
                  * poll perf event
                  */
-                if (group->perf_event & evt) {
+                if (group->intl->perf.event & evt) {
                         ret = perf_mon_poll(group, evt);
                         if (ret != PQOS_RETVAL_OK)
                                 goto poll_events_exit;
@@ -299,7 +303,7 @@ poll_events(struct pqos_mon_data *group)
                 /**
                  * poll resctrl event
                  */
-                if (group->resctrl_event & evt) {
+                if (group->intl->resctrl.event & evt) {
                         ret = resctrl_mon_poll(group, evt);
                         if (ret != PQOS_RETVAL_OK)
                                 goto poll_events_exit;
@@ -327,7 +331,7 @@ poll_events(struct pqos_mon_data *group)
         }
 
 poll_events_exit:
-        if (group->resctrl_event != 0)
+        if (group->intl->resctrl.event != 0)
                 resctrl_lock_release();
 
         return ret;
@@ -449,7 +453,6 @@ os_mon_start(const unsigned num_cores,
         /**
          * Fill in the monitoring group structure
          */
-        memset(group, 0, sizeof(*group));
         group->event = event;
         group->context = context;
         group->cores = (unsigned *)malloc(sizeof(group->cores[0]) * num_cores);
@@ -634,7 +637,6 @@ os_mon_start_pids(const unsigned num_pids,
                         goto os_mon_start_pids_exit;
         }
 
-        memset(group, 0, sizeof(*group));
         group->pids = (pid_t *)malloc(sizeof(pid_t) * num_pids);
         if (group->pids == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
@@ -725,9 +727,14 @@ os_mon_add_pids(const unsigned num_pids,
         added.tid_map = tid_map;
         added.event = group->event;
         added.num_pids = num_pids;
-        if (group->resctrl_mon_group != NULL) {
-                added.resctrl_mon_group = strdup(group->resctrl_mon_group);
-                if (added.resctrl_mon_group == NULL) {
+        added.intl = malloc(sizeof(*added.intl));
+        if (added.intl == NULL)
+                goto os_mon_add_pids_exit;
+        memset(added.intl, 0, sizeof(*added.intl));
+        if (group->intl->resctrl.mon_group != NULL) {
+                added.intl->resctrl.mon_group =
+                    strdup(group->intl->resctrl.mon_group);
+                if (added.intl->resctrl.mon_group == NULL) {
                         ret = PQOS_RETVAL_RESOURCE;
                         goto os_mon_add_pids_exit;
                 }
@@ -748,13 +755,14 @@ os_mon_add_pids(const unsigned num_pids,
         }
         group->tid_map = ptr;
 
-        ctx = realloc(group->perf,
-                      sizeof(group->perf[0]) * (group->tid_nr + added.tid_nr));
+        ctx =
+            realloc(group->intl->perf.ctx, sizeof(group->intl->perf.ctx[0]) *
+                                               (group->tid_nr + added.tid_nr));
         if (ctx == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
                 goto os_mon_add_pids_exit;
         }
-        group->perf = ctx;
+        group->intl->perf.ctx = ctx;
 
         ptr = realloc(group->pids,
                       sizeof(group->pids[0]) * (group->num_pids + num_pids));
@@ -766,7 +774,7 @@ os_mon_add_pids(const unsigned num_pids,
 
         for (i = 0; i < added.tid_nr; i++) {
                 group->tid_map[group->tid_nr] = added.tid_map[i];
-                group->perf[group->tid_nr] = added.perf[i];
+                group->intl->perf.ctx[group->tid_nr] = added.intl->perf.ctx[i];
                 group->tid_nr++;
         }
         for (i = 0; i < num_pids; i++) {
@@ -775,16 +783,19 @@ os_mon_add_pids(const unsigned num_pids,
         }
 
 os_mon_add_pids_exit:
-        if (added.resctrl_mon_group != NULL) {
-                free(added.resctrl_mon_group);
-                added.resctrl_mon_group = NULL;
+        if (added.intl != NULL && added.intl->resctrl.mon_group != NULL) {
+                free(added.intl->resctrl.mon_group);
+                added.intl->resctrl.mon_group = NULL;
         }
         if (ret == PQOS_RETVAL_RESOURCE) {
                 LOG_ERROR("Memory allocation error!\n");
                 stop_events(&added);
         }
-        if (added.perf != NULL)
-                free(added.perf);
+        if (added.intl != NULL) {
+                if (added.intl->perf.ctx != NULL)
+                        free(added.intl->perf.ctx);
+                free(added.intl);
+        }
         if (tid_map != NULL)
                 free(tid_map);
         return ret;
@@ -807,6 +818,8 @@ os_mon_remove_pids(const unsigned num_pids,
         ASSERT(pids != NULL);
         ASSERT(group != NULL);
 
+        memset(&remove, 0, sizeof(remove));
+
         /**
          * Find TID's for not removed tasks
          */
@@ -824,19 +837,22 @@ os_mon_remove_pids(const unsigned num_pids,
                         goto os_mon_remove_pids_exit;
         }
 
-        memset(&remove, 0, sizeof(remove));
-        remove.perf_event = group->perf_event;
-        remove.resctrl_event = group->resctrl_event;
+        remove.intl =
+            (struct pqos_mon_data_internal *)malloc(sizeof(*remove.intl));
+        if (remove.intl == NULL)
+                goto os_mon_remove_pids_exit;
+        memset(remove.intl, 0, sizeof(*remove.intl));
+        remove.intl->perf.event = group->intl->perf.event;
+        remove.intl->resctrl.event = group->intl->resctrl.event;
         remove.pids = NULL;
         remove.num_pids = num_pids;
         remove.tid_map = malloc(sizeof(remove.tid_map[0]) * group->tid_nr);
         if (remove.tid_map == NULL)
                 goto os_mon_remove_pids_exit;
-        remove.perf = malloc(sizeof(remove.perf[0]) * group->tid_nr);
-        if (remove.perf == NULL) {
-                free(remove.tid_map);
+        remove.intl->perf.ctx =
+            malloc(sizeof(remove.intl->perf.ctx[0]) * group->tid_nr);
+        if (remove.intl->perf.ctx == NULL)
                 goto os_mon_remove_pids_exit;
-        }
 
         /* Add tid's for removal */
         for (i = 0; i < group->tid_nr; i++) {
@@ -845,13 +861,11 @@ os_mon_remove_pids(const unsigned num_pids,
                         continue;
 
                 remove.tid_map[remove.tid_nr] = group->tid_map[i];
-                remove.perf[remove.tid_nr] = group->perf[i];
+                remove.intl->perf.ctx[remove.tid_nr] = group->intl->perf.ctx[i];
                 remove.tid_nr++;
         }
 
         ret = stop_events(&remove);
-        free(remove.perf);
-        free(remove.tid_map);
         if (ret != PQOS_RETVAL_OK)
                 goto os_mon_remove_pids_exit;
 
@@ -867,13 +881,14 @@ os_mon_remove_pids(const unsigned num_pids,
                 }
 
                 group->tid_map[i - removed] = group->tid_map[i];
-                group->perf[i - removed] = group->perf[i];
+                group->intl->perf.ctx[i - removed] = group->intl->perf.ctx[i];
         }
         group->tid_nr -= removed;
         group->tid_map =
             realloc(group->tid_map, sizeof(group->tid_map[0]) * group->tid_nr);
-        group->perf =
-            realloc(group->perf, sizeof(group->perf[0]) * group->tid_nr);
+        group->intl->perf.ctx =
+            realloc(group->intl->perf.ctx,
+                    sizeof(group->intl->perf.ctx[0]) * group->tid_nr);
         removed = 0;
         for (i = 0; i < group->num_pids; i++) {
                 if (tid_exists(group->pids[i], num_pids, pids)) {
@@ -888,6 +903,13 @@ os_mon_remove_pids(const unsigned num_pids,
             realloc(group->pids, sizeof(group->pids[0]) * group->num_pids);
 
 os_mon_remove_pids_exit:
+        if (remove.tid_map != NULL)
+                free(remove.tid_map);
+        if (remove.intl != NULL) {
+                if (remove.intl->perf.ctx)
+                        free(remove.intl->perf.ctx);
+                free(remove.intl);
+        }
         if (keep_tid_map != NULL)
                 free(keep_tid_map);
         return ret;

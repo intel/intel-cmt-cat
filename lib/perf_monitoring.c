@@ -42,6 +42,7 @@
 #include "perf.h"
 #include "log.h"
 #include "types.h"
+#include "monitoring.h"
 #include "perf_monitoring.h"
 
 /**
@@ -483,7 +484,8 @@ perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
         struct perf_mon_supported_event *se;
 
         ASSERT(group != NULL);
-        ASSERT(group->perf != NULL);
+        ASSERT(group->intl != NULL);
+        ASSERT(group->intl->perf.ctx != NULL);
 
         /**
          * Check if monitoring cores/tasks
@@ -504,7 +506,7 @@ perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
          */
         for (i = 0; i < num_ctrs; i++) {
                 int ret;
-                struct pqos_mon_perf_ctx *ctx = &group->perf[i];
+                struct pqos_mon_perf_ctx *ctx = &group->intl->perf.ctx[i];
                 int *fd;
                 int core = -1;
                 pid_t tid = -1;
@@ -539,7 +541,8 @@ perf_mon_stop(struct pqos_mon_data *group, enum pqos_mon_event event)
         int i, num_ctrs;
 
         ASSERT(group != NULL);
-        ASSERT(group->perf != NULL);
+        ASSERT(group->intl != NULL);
+        ASSERT(group->intl->perf.ctx != NULL);
 
         /**
          * Check if monitoring cores/tasks
@@ -555,7 +558,7 @@ perf_mon_stop(struct pqos_mon_data *group, enum pqos_mon_event event)
          * For each counter, close associated file descriptor
          */
         for (i = 0; i < num_ctrs; i++) {
-                struct pqos_mon_perf_ctx *ctx = &group->perf[i];
+                struct pqos_mon_perf_ctx *ctx = &group->intl->perf.ctx[i];
                 int *fd = perf_mon_get_fd(ctx, event);
 
                 if (fd == NULL)
@@ -593,7 +596,8 @@ perf_mon_poll(struct pqos_mon_data *group, enum pqos_mon_event event)
         uint64_t old_value;
 
         ASSERT(group != NULL);
-        ASSERT(group->perf != NULL);
+        ASSERT(group->intl != NULL);
+        ASSERT(group->intl->perf.ctx != NULL);
 
         /**
          * Check if monitoring cores/tasks
@@ -609,7 +613,7 @@ perf_mon_poll(struct pqos_mon_data *group, enum pqos_mon_event event)
          * For each task read counter and sum of all counter values
          */
         for (i = 0; i < num_ctrs; i++) {
-                struct pqos_mon_perf_ctx *ctx = &group->perf[i];
+                struct pqos_mon_perf_ctx *ctx = &group->intl->perf.ctx[i];
                 uint64_t counter_value;
                 int *fd = perf_mon_get_fd(ctx, event);
 

@@ -69,31 +69,6 @@ class CPqosEventValues(ctypes.Structure):
     ]
 
 
-class CPqosMonPollCtx(ctypes.Structure):
-    "pqos_mon_poll_ctx structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        (u'lcore', ctypes.c_uint),
-        (u'cluster', ctypes.c_uint),
-        (u'rmid', RMID_T)
-    ]
-
-
-class CPqosMonPerfCtx(ctypes.Structure):
-    "pqos_mon_perf_ctx structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        (u'fd_llc', ctypes.c_int),
-        (u'fd_mbl', ctypes.c_int),
-        (u'fd_mbt', ctypes.c_int),
-        (u'fd_inst', ctypes.c_int),
-        (u'fd_cyc', ctypes.c_int),
-        (u'fd_llc_misses', ctypes.c_int)
-    ]
-
-
 class CPqosMonData(ctypes.Structure):
     "pqos_mon_data structure"
 
@@ -106,16 +81,9 @@ class CPqosMonData(ctypes.Structure):
         (u'pids', ctypes.POINTER(ctypes.c_uint)),
         (u'tid_nr', ctypes.c_uint),
         (u'tid_map', ctypes.POINTER(ctypes.c_uint)),
-        (u'perf', ctypes.POINTER(CPqosMonPerfCtx)),
-        (u'perf_event', ctypes.c_uint),
-        (u'resctrl_event', ctypes.c_uint),
-        (u'resctrl_mon_group', ctypes.c_char_p),
-        (u'resctrl_values_storage', CPqosEventValues),
-        (u'poll_ctx', ctypes.POINTER(CPqosMonPollCtx)),
-        (u'num_poll_ctx', ctypes.c_uint),
         (u'cores', ctypes.POINTER(ctypes.c_uint)),
         (u'num_cores', ctypes.c_uint),
-        (u'valid_mbm_read', ctypes.c_int)
+        (u'intl', ctypes.c_void_p)
     ]
 
     def __init__(self, *args, **kwargs):

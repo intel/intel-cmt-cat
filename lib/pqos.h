@@ -419,26 +419,7 @@ struct pqos_event_values {
         uint64_t llc_misses_delta;   /**< LLC misses - delta */
 };
 
-/**
- * Core monitoring poll context
- */
-struct pqos_mon_poll_ctx {
-        unsigned lcore;
-        unsigned cluster;
-        pqos_rmid_t rmid;
-};
-
-/**
- * Perf monitoring poll context
- */
-struct pqos_mon_perf_ctx {
-        int fd_llc;
-        int fd_mbl;
-        int fd_mbt;
-        int fd_inst;
-        int fd_cyc;
-        int fd_llc_misses;
-};
+struct pqos_mon_data_internal;
 
 /**
  * Monitoring group data structure
@@ -462,31 +443,12 @@ struct pqos_mon_data {
         pid_t *tid_map;
 
         /**
-         * Perf specific section
-         */
-        struct pqos_mon_perf_ctx *perf; /**< Perf poll context for each
-                                           core/tid */
-        enum pqos_mon_event perf_event; /**< Started perf events */
-
-        /**
-         * Resctrl specific section
-         */
-        enum pqos_mon_event resctrl_event;
-        char *resctrl_mon_group;
-        struct pqos_event_values resctrl_values_storage; /**< stores values
-                                                         of monitoring group
-                                                         that was moved to
-                                                         another COS */
-
-        /**
          * Core specific section
          */
-        struct pqos_mon_poll_ctx *poll_ctx; /**< core, cluster & RMID */
-        unsigned num_poll_ctx;              /**< number of poll contexts */
-        unsigned *cores;                    /**< list of cores in the group */
-        unsigned num_cores;                 /**< number of cores in the group */
-        int valid_mbm_read;                 /**< flag to discard 1st invalid
-                                               read */
+        unsigned *cores;    /**< list of cores in the group */
+        unsigned num_cores; /**< number of cores in the group */
+
+        struct pqos_mon_data_internal *intl; /**< internal data */
 };
 
 /**

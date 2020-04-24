@@ -668,12 +668,12 @@ pqos_core_poll(struct pqos_mon_data *p)
         if (p->event & PQOS_MON_EVENT_L3_OCCUP) {
                 uint64_t total = 0;
 
-                for (i = 0; i < p->num_poll_ctx; i++) {
+                for (i = 0; i < p->intl->hw.num_ctx; i++) {
                         uint64_t tmp = 0;
                         int ret;
 
                         ret = mon_read(
-                            p->poll_ctx[i].lcore, p->poll_ctx[i].rmid,
+                            p->intl->hw.ctx[i].lcore, p->intl->hw.ctx[i].rmid,
                             get_event_id(PQOS_MON_EVENT_L3_OCCUP), &tmp);
                         if (ret != PQOS_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
@@ -686,12 +686,12 @@ pqos_core_poll(struct pqos_mon_data *p)
         if (p->event & (PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
                 uint64_t total = 0, old_value = pv->mbm_local;
 
-                for (i = 0; i < p->num_poll_ctx; i++) {
+                for (i = 0; i < p->intl->hw.num_ctx; i++) {
                         uint64_t tmp = 0;
                         int ret;
 
                         ret = mon_read(
-                            p->poll_ctx[i].lcore, p->poll_ctx[i].rmid,
+                            p->intl->hw.ctx[i].lcore, p->intl->hw.ctx[i].rmid,
                             get_event_id(PQOS_MON_EVENT_LMEM_BW), &tmp);
                         if (ret != PQOS_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
@@ -708,12 +708,12 @@ pqos_core_poll(struct pqos_mon_data *p)
         if (p->event & (PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
                 uint64_t total = 0, old_value = pv->mbm_total;
 
-                for (i = 0; i < p->num_poll_ctx; i++) {
+                for (i = 0; i < p->intl->hw.num_ctx; i++) {
                         uint64_t tmp = 0;
                         int ret;
 
                         ret = mon_read(
-                            p->poll_ctx[i].lcore, p->poll_ctx[i].rmid,
+                            p->intl->hw.ctx[i].lcore, p->intl->hw.ctx[i].rmid,
                             get_event_id(PQOS_MON_EVENT_TMEM_BW), &tmp);
                         if (ret != PQOS_RETVAL_OK) {
                                 retval = PQOS_RETVAL_ERROR;
@@ -795,12 +795,12 @@ pqos_core_poll(struct pqos_mon_data *p)
                 pv->llc_misses_delta = missed - pv->llc_misses;
                 pv->llc_misses = missed;
         }
-        if (!p->valid_mbm_read) {
+        if (!p->intl->valid_mbm_read) {
                 /* Report zero memory bandwidth with first read */
                 pv->mbm_remote_delta = 0;
                 pv->mbm_local_delta = 0;
                 pv->mbm_total_delta = 0;
-                p->valid_mbm_read = 1;
+                p->intl->valid_mbm_read = 1;
         }
 pqos_core_poll__exit:
         return retval;
@@ -1060,16 +1060,15 @@ hw_mon_start(const unsigned num_cores,
         /**
          * Fill in the monitoring group structure
          */
-        memset(group, 0, sizeof(*group));
         group->cores = (unsigned *)malloc(sizeof(group->cores[0]) * num_cores);
         if (group->cores == NULL) {
                 retval = PQOS_RETVAL_RESOURCE;
                 goto pqos_mon_start_error1;
         }
 
-        group->poll_ctx = (struct pqos_mon_poll_ctx *)malloc(
-            sizeof(group->poll_ctx[0]) * num_ctxs);
-        if (group->poll_ctx == NULL) {
+        group->intl->hw.ctx = (struct pqos_mon_poll_ctx *)malloc(
+            sizeof(group->intl->hw.ctx[0]) * num_ctxs);
+        if (group->intl->hw.ctx == NULL) {
                 retval = PQOS_RETVAL_RESOURCE;
                 goto pqos_mon_start_error2;
         }
@@ -1107,9 +1106,9 @@ hw_mon_start(const unsigned num_cores,
                 }
         }
 
-        group->num_poll_ctx = num_ctxs;
+        group->intl->hw.num_ctx = num_ctxs;
         for (i = 0; i < num_ctxs; i++)
-                group->poll_ctx[i] = ctxs[i];
+                group->intl->hw.ctx[i] = ctxs[i];
 
         group->event = event;
         group->context = context;
@@ -1119,8 +1118,8 @@ pqos_mon_start_error2:
                 for (i = 0; i < num_cores; i++)
                         (void)mon_assoc_set(cores[i], RMID0);
 
-                if (group->poll_ctx != NULL)
-                        free(group->poll_ctx);
+                if (group->intl->hw.ctx != NULL)
+                        free(group->intl->hw.ctx);
 
                 if (group->cores != NULL)
                         free(group->cores);
@@ -1140,16 +1139,16 @@ hw_mon_stop(struct pqos_mon_data *group)
         ASSERT(group != NULL);
 
         if (group->num_cores == 0 || group->cores == NULL ||
-            group->num_poll_ctx == 0 || group->poll_ctx == NULL) {
+            group->intl->hw.num_ctx == 0 || group->intl->hw.ctx == NULL) {
                 return PQOS_RETVAL_PARAM;
         }
 
         ASSERT(m_cpu != NULL);
-        for (i = 0; i < group->num_poll_ctx; i++) {
+        for (i = 0; i < group->intl->hw.num_ctx; i++) {
                 /**
                  * Validate core list in the group structure is correct
                  */
-                const unsigned lcore = group->poll_ctx[i].lcore;
+                const unsigned lcore = group->intl->hw.ctx[i].lcore;
                 pqos_rmid_t rmid = RMID0;
 
                 ret = pqos_cpu_check_core(m_cpu, lcore);
@@ -1158,10 +1157,10 @@ hw_mon_stop(struct pqos_mon_data *group)
                 ret = mon_assoc_get(lcore, &rmid);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
-                if (rmid != group->poll_ctx[i].rmid)
+                if (rmid != group->intl->hw.ctx[i].rmid)
                         LOG_WARN("Core %u RMID association changed from %u "
                                  "to %u! The core has been hijacked!\n",
-                                 lcore, group->poll_ctx[i].rmid, rmid);
+                                 lcore, group->intl->hw.ctx[i].rmid, rmid);
         }
 
         for (i = 0; i < group->num_cores; i++) {
@@ -1185,7 +1184,7 @@ hw_mon_stop(struct pqos_mon_data *group)
          * Free poll contexts, core list and clear the group structure
          */
         free(group->cores);
-        free(group->poll_ctx);
+        free(group->intl->hw.ctx);
         memset(group, 0, sizeof(*group));
 
         return retval;

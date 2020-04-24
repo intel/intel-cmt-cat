@@ -335,8 +335,7 @@ static void monitoring_loop(void)
                         return;
                 }
                 if (!process_mode()) {
-                        printf("    CORE     RMID    LLC[KB]"
-                               "    MBL[MB]    MBR[MB]\n");
+                        printf("    CORE    LLC[KB]    MBL[MB]    MBR[MB]\n");
                         for (i = 0; i < sel_monitor_num; i++) {
                                 const struct pqos_event_values *pv =
                                         &m_mon_grps[i]->values;
@@ -344,16 +343,10 @@ static void monitoring_loop(void)
                                 double mbr = bytes_to_mb(pv->mbm_remote_delta);
                                 double mbl = bytes_to_mb(pv->mbm_local_delta);
 
-                                if (interface == PQOS_INTER_OS)
-                                        printf("%8u %s %10.1f %10.1f %10.1f\n",
-                                               m_mon_grps[i]->cores[0],
-                                               "     N/A", llc, mbl, mbr);
-                                else
-                                        printf("%8u %8u %10.1f %10.1f %10.1f\n",
-                                               m_mon_grps[i]->cores[0],
-                                               m_mon_grps[i]->poll_ctx[0].rmid,
-                                               llc, mbl, mbr);
+                                printf("%8u %10.1f %10.1f %10.1f\n",
+                                       m_mon_grps[i]->cores[0], llc, mbl, mbr);
                         }
+
                 } else {
                         printf("PID       LLC[KB]\n");
                         for (i = 0; i < sel_process_num; i++) {

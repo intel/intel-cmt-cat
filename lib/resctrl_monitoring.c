@@ -46,6 +46,7 @@
 #include "types.h"
 #include "cap.h"
 #include "common.h"
+#include "monitoring.h"
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
 #include "resctrl_alloc.h"
@@ -778,7 +779,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
         /**
          * Get resctrl monitoring group
          */
-        if (group->resctrl_mon_group == NULL) {
+        if (group->intl->resctrl.mon_group == NULL) {
                 snprintf(buf, sizeof(buf), "%d-%u", (int)getpid(),
                          resctrl_mon_counter++);
 
@@ -790,7 +791,7 @@ resctrl_mon_start(struct pqos_mon_data *group)
                 }
 
         } else
-                resctrl_group = group->resctrl_mon_group;
+                resctrl_group = group->intl->resctrl.mon_group;
 
         /**
          * Add pids to the resctrl group
@@ -811,10 +812,11 @@ resctrl_mon_start(struct pqos_mon_data *group)
                         goto resctrl_mon_start_exit;
         }
 
-        group->resctrl_mon_group = resctrl_group;
+        group->intl->resctrl.mon_group = resctrl_group;
 
 resctrl_mon_start_exit:
-        if (ret != PQOS_RETVAL_OK && group->resctrl_mon_group != resctrl_group)
+        if (ret != PQOS_RETVAL_OK &&
+            group->intl->resctrl.mon_group != resctrl_group)
                 free(resctrl_group);
 
         return ret;
@@ -845,12 +847,13 @@ resctrl_mon_stop(struct pqos_mon_data *group)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        if (group->resctrl_mon_group != NULL) {
+        if (group->intl->resctrl.mon_group != NULL) {
                 cos = 0;
                 do {
                         char buf[128];
 
-                        resctrl_mon_group_path(cos, group->resctrl_mon_group,
+                        resctrl_mon_group_path(cos,
+                                               group->intl->resctrl.mon_group,
                                                NULL, buf, sizeof(buf));
 
                         ret = resctrl_mon_rmdir(buf);
@@ -861,8 +864,8 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                         }
                 } while (++cos < max_cos);
 
-                free(group->resctrl_mon_group);
-                group->resctrl_mon_group = NULL;
+                free(group->intl->resctrl.mon_group);
+                group->intl->resctrl.mon_group = NULL;
 
         } else if (group->num_pids > 0) {
                 /**
@@ -940,12 +943,13 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 uint64_t value;
                 char buf[128];
 
-                resctrl_mon_group_path(cos, group->resctrl_mon_group, NULL, buf,
-                                       sizeof(buf));
+                resctrl_mon_group_path(cos, group->intl->resctrl.mon_group,
+                                       NULL, buf, sizeof(buf));
                 if (stat(buf, &st) != 0)
                         continue;
 
-                ret = resctrl_mon_empty(cos, group->resctrl_mon_group, &empty);
+                ret = resctrl_mon_empty(cos, group->intl->resctrl.mon_group,
+                                        &empty);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
 
@@ -955,20 +959,20 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 /* store counter values */
                 if (supported_events & PQOS_MON_EVENT_LMEM_BW) {
                         ret = resctrl_mon_read_counters(
-                            cos, group->resctrl_mon_group,
+                            cos, group->intl->resctrl.mon_group,
                             PQOS_MON_EVENT_LMEM_BW, &value);
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
-                        group->resctrl_values_storage.mbm_local += value;
+                        group->intl->resctrl.values_storage.mbm_local += value;
                 }
                 if (supported_events & PQOS_MON_EVENT_TMEM_BW) {
                         ret = resctrl_mon_read_counters(
-                            cos, group->resctrl_mon_group,
+                            cos, group->intl->resctrl.mon_group,
                             PQOS_MON_EVENT_TMEM_BW, &value);
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
 
-                        group->resctrl_values_storage.mbm_total += value;
+                        group->intl->resctrl.values_storage.mbm_total += value;
                 }
 
                 ret = resctrl_mon_rmdir(buf);
@@ -1021,7 +1025,7 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
          */
         for (i = 0; i < group->num_cores; i++) {
                 ret = resctrl_mon_assoc_restore(group->cores[i],
-                                                group->resctrl_mon_group);
+                                                group->intl->resctrl.mon_group);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_poll_exit;
         }
@@ -1033,13 +1037,13 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                 struct stat st;
                 char buf[128];
 
-                resctrl_mon_group_path(cos, group->resctrl_mon_group, NULL, buf,
-                                       sizeof(buf));
+                resctrl_mon_group_path(cos, group->intl->resctrl.mon_group,
+                                       NULL, buf, sizeof(buf));
                 if (stat(buf, &st) != 0)
                         continue;
 
-                ret = resctrl_mon_read_counters(cos, group->resctrl_mon_group,
-                                                event, &val);
+                ret = resctrl_mon_read_counters(
+                    cos, group->intl->resctrl.mon_group, event, &val);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_poll_exit;
 
@@ -1057,14 +1061,14 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         case PQOS_MON_EVENT_LMEM_BW:
                 old_value = group->values.mbm_local;
                 group->values.mbm_local =
-                    value + group->resctrl_values_storage.mbm_local;
+                    value + group->intl->resctrl.values_storage.mbm_local;
                 group->values.mbm_local_delta =
                     get_delta(old_value, group->values.mbm_local);
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
                 old_value = group->values.mbm_total;
                 group->values.mbm_total =
-                    value + group->resctrl_values_storage.mbm_total;
+                    value + group->intl->resctrl.values_storage.mbm_total;
                 group->values.mbm_total_delta =
                     get_delta(old_value, group->values.mbm_total);
                 break;

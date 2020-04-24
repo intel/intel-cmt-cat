@@ -2127,14 +2127,18 @@ print_text_row(FILE *fp,
         memset(data, 0, sz_data);
 
 #ifdef PQOS_RMID_CUSTOM
-        if (sel_interface == PQOS_INTER_MSR)
+        if (sel_interface == PQOS_INTER_MSR) {
+                pqos_rmid_t rmid;
+                int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+
                 offset +=
                     fillin_text_column(" %4.0f",
-                                       (double)mon_data->poll_ctx[0].rmid,
+                                       (double)rmid,
                                        data + offset,
                                        sz_data - offset,
-                                       sel_interface == PQOS_INTER_MSR,
+                                       ret == PQOS_RETVAL_OK,
                                        sel_interface == PQOS_INTER_MSR);
+        }
 #endif
 
         offset += fillin_text_column(" %11.2f", mon_data->values.ipc,
@@ -2211,14 +2215,18 @@ print_xml_row(FILE *fp,
                 "l3_occupancy_kB" : "l3_occupancy_percent";
 
 #ifdef PQOS_RMID_CUSTOM
-        if (sel_interface == PQOS_INTER_MSR)
+        if (sel_interface == PQOS_INTER_MSR) {
+                pqos_rmid_t rmid;
+                int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+
                 offset += fillin_xml_column("%.0f",
-                                            (double)mon_data->poll_ctx[0].rmid,
+                                            rmid,
                                             data + offset,
                                             sz_data - offset,
-                                            sel_interface == PQOS_INTER_MSR,
+                                            ret == PQOS_RETVAL_OK,
                                             sel_interface == PQOS_INTER_MSR,
                                             "rmid");
+        }
 #endif
 
         offset += fillin_xml_column("%.2f", mon_data->values.ipc, data + offset,
@@ -2319,13 +2327,17 @@ print_csv_row(FILE *fp, char *time,
         memset(data, 0, sz_data);
 
 #ifdef PQOS_RMID_CUSTOM
-        if (sel_interface == PQOS_INTER_MSR)
+        if (sel_interface == PQOS_INTER_MSR) {
+                pqos_rmid_t rmid;
+                int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+
                 offset += fillin_csv_column(",%.0f",
-                                            (double)mon_data->poll_ctx[0].rmid,
+                                            rmid,
                                             data + offset,
                                             sz_data - offset,
-                                            sel_interface == PQOS_INTER_MSR,
+                                            ret == PQOS_RETVAL_OK,
                                             sel_interface == PQOS_INTER_MSR);
+        }
 #endif
 
         offset += fillin_csv_column(",%.2f", mon_data->values.ipc,

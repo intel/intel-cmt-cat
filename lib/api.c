@@ -33,6 +33,7 @@
  */
 
 #include <string.h>
+#include <stdlib.h>
 
 #include "pqos.h"
 #include "api.h"
@@ -64,6 +65,21 @@ static int m_interface = PQOS_INTER_MSR;
  * PQoS API functions
  */
 static struct pqos_api {
+        /** Starts resource monitoring on selected group of cores */
+        int (*mon_start)(const unsigned num_cores,
+                         const unsigned *cores,
+                         const enum pqos_mon_event event,
+                         void *context,
+                         struct pqos_mon_data *group);
+        /** Starts resource monitoring of selected pids */
+        int (*mon_start_pids)(const unsigned num_pids,
+                              const pid_t *pids,
+                              const enum pqos_mon_event event,
+                              void *context,
+                              struct pqos_mon_data *group);
+        /*Stops resource monitoring data for selected monitoring group */
+        int (*mon_stop)(struct pqos_mon_data *group);
+
         /** Set MBA */
         int (*mba_get)(const unsigned mba_id,
                        const unsigned max_num_cos,
@@ -98,6 +114,8 @@ api_init(int interface, enum pqos_vendor vendor)
         memset(&api, 0, sizeof(api));
 
         if (interface == PQOS_INTER_MSR) {
+                api.mon_start = hw_mon_start;
+                api.mon_stop = hw_mon_stop;
                 if (vendor == PQOS_VENDOR_AMD) {
                         api.mba_get = hw_mba_get_amd;
                         api.mba_set = hw_mba_set_amd;
@@ -110,6 +128,9 @@ api_init(int interface, enum pqos_vendor vendor)
 #ifdef __linux__
         } else if (interface == PQOS_INTER_OS ||
                    interface == PQOS_INTER_OS_RESCTRL_MON) {
+                api.mon_start = os_mon_start;
+                api.mon_start_pids = os_mon_start_pids;
+                api.mon_stop = os_mon_stop;
                 if (vendor == PQOS_VENDOR_AMD) {
                         api.mba_get = os_mba_get_amd;
                         api.mba_set = os_mba_set_amd;
@@ -952,18 +973,27 @@ pqos_mon_start(const unsigned num_cores,
                 return ret;
         }
 
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_mon_start(num_cores, cores, event, context, group);
-        else {
-#ifdef __linux__
-                ret = os_mon_start(num_cores, cores, event, context, group);
-#else
-                LOG_INFO("OS interface not supported!\n");
+        memset(group, 0, sizeof(*group));
+        group->intl =
+            (struct pqos_mon_data_internal *)malloc(sizeof(*group->intl));
+        if (group->intl == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
-#endif
+                goto pqos_mon_start_exit;
         }
+        memset(group->intl, 0, sizeof(*group->intl));
+
+        if (api.mon_start != NULL)
+                ret = api.mon_start(num_cores, cores, event, context, group);
+        else {
+                LOG_INFO("Interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+pqos_mon_start_exit:
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
+        else if (group->intl != NULL)
+                free(group->intl);
 
         _pqos_api_unlock();
 
@@ -989,16 +1019,17 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 return ret;
         }
 
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_mon_stop(group);
+        if (api.mon_stop != NULL)
+                ret = api.mon_stop(group);
         else {
-#ifdef __linux__
-                ret = os_mon_stop(group);
-#else
-                LOG_INFO("OS interface not supported!\n");
+                LOG_INFO("Interface not supported!\n");
                 ret = PQOS_RETVAL_RESOURCE;
-#endif
         }
+
+        free(group->intl);
+        group->intl = NULL;
+        group->valid = 0;
+
         _pqos_api_unlock();
 
         return ret;
@@ -1097,16 +1128,26 @@ pqos_mon_start_pids(const unsigned num_pids,
                 return ret;
         }
 
-#ifdef __linux__
-        ret = os_mon_start_pids(num_pids, pids, event, context, group);
-#else
-        UNUSED_PARAM(context);
-        LOG_INFO("OS interface not supported!\n");
-        ret = PQOS_RETVAL_RESOURCE;
-#endif
+        memset(group, 0, sizeof(*group));
+        group->intl = malloc(sizeof(*group->intl));
+        if (group->intl == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_mon_start_pids_exit;
+        }
+        memset(group->intl, 0, sizeof(*group->intl));
 
+        if (api.mon_start_pids != NULL)
+                ret = api.mon_start_pids(num_pids, pids, event, context, group);
+        else {
+                LOG_INFO("Interface not supported!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+pqos_mon_start_pids_exit:
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
+        else if (group->intl != NULL)
+                free(group->intl);
 
         _pqos_api_unlock();
 

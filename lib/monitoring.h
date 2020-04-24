@@ -43,6 +43,65 @@
 extern "C" {
 #endif
 
+#include "pqos.h"
+
+/**
+ * Core monitoring poll context
+ */
+struct pqos_mon_poll_ctx {
+        unsigned lcore;
+        unsigned cluster;
+        pqos_rmid_t rmid;
+};
+
+/**
+ * Perf monitoring poll context
+ */
+struct pqos_mon_perf_ctx {
+        int fd_llc;
+        int fd_mbl;
+        int fd_mbt;
+        int fd_inst;
+        int fd_cyc;
+        int fd_llc_misses;
+};
+
+/**
+ * Internal monitoring group data structure
+ */
+struct pqos_mon_data_internal {
+        /**
+         * Perf specific section
+         */
+        struct {
+                enum pqos_mon_event event;     /**< Started perf events */
+                struct pqos_mon_perf_ctx *ctx; /**< Perf poll context for each
+                                                  core/tid */
+        } perf;
+
+        /**
+         * Resctrl specific section
+         */
+        struct {
+                enum pqos_mon_event event; /**< Started resctrl events */
+                char *mon_group;
+                struct pqos_event_values values_storage; /**< stores values
+                                                            of monitoring group
+                                                            that was moved to
+                                                            another COS */
+        } resctrl;
+
+        /**
+         * Hw specific section
+         */
+        struct {
+                struct pqos_mon_poll_ctx *ctx; /**< core, cluster & RMID */
+                unsigned num_ctx;              /**< number of poll contexts */
+        } hw;
+
+        int valid_mbm_read; /**< flag to discard 1st invalid read */
+};
+
 /**
  * @brief Initializes monitoring sub-module of the library (CMT)
  *
