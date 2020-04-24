@@ -51,6 +51,8 @@
 #include "resctrl_monitoring.h"
 #include "resctrl_alloc.h"
 
+#define GROUP_NAME_PREFIX "pqos-"
+
 /**
  * ---------------------------------------
  * Local data structures
@@ -78,6 +80,25 @@ static int
 filter(const struct dirent *dir)
 {
         return (dir->d_name[0] == '.') ? 0 : 1;
+}
+
+/**
+ * @breif Free memory allocated by scandir
+ *
+ * @param namelist structure allocated by scandir
+ * @param count number of files
+ */
+static void
+free_scandir(struct dirent **namelist, int count)
+{
+        int i;
+
+        if (count < 0)
+                return;
+
+        for (i = 0; i < count; i++)
+                free(namelist[i]);
+        free(namelist);
 }
 
 int
@@ -334,28 +355,25 @@ resctrl_mon_cpumask_read(const unsigned class_id,
  *
  * @param [in] class_id COS id
  * @param [in] resctrl_group mon group name
+ * @param [in] l3id l3id to read from
  * @param [in] event resctrl mon event
- * @param [in] l3ids  l3ids to read from
- * @param [in] l3ids_num number of l3ids
  * @param [out] value counter value
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-resctrl_mon_read_counters(const unsigned class_id,
-                          const char *resctrl_group,
-                          unsigned *l3ids,
-                          unsigned l3ids_num,
-                          const enum pqos_mon_event event,
-                          uint64_t *value)
+resctrl_mon_read_counter(const unsigned class_id,
+                         const char *resctrl_group,
+                         const unsigned l3id,
+                         const enum pqos_mon_event event,
+                         uint64_t *value)
 {
-        int ret = PQOS_RETVAL_OK;
-        unsigned *l3cat_ids = NULL;
-        unsigned l3cat_id_num;
-        unsigned l3cat_id;
         char buf[128];
         const char *name;
+        char path[PATH_MAX];
+        FILE *fd;
+        unsigned long long counter;
 
         ASSERT(resctrl_group != NULL);
         ASSERT(value != NULL);
@@ -379,6 +397,49 @@ resctrl_mon_read_counters(const unsigned class_id,
         *value = 0;
 
         resctrl_mon_group_path(class_id, resctrl_group, NULL, buf, sizeof(buf));
+        snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf, l3id,
+                 name);
+        fd = fopen_check_symlink(path, "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        if (fscanf(fd, "%llu", &counter) == 1)
+                *value = counter;
+        fclose(fd);
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Read counter value from requested \a l3ids
+ *
+ * @param [in] class_id COS id
+ * @param [in] resctrl_group mon group name
+ * @param [in] event resctrl mon event
+ * @param [in] l3ids l3ids to read from
+ * @param [in] l3ids_num number of l3ids
+ * @param [in] event monitoring event
+ * @param [out] value counter value
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_read_counters(const unsigned class_id,
+                          const char *resctrl_group,
+                          unsigned *l3ids,
+                          unsigned l3ids_num,
+                          const enum pqos_mon_event event,
+                          uint64_t *value)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned *l3cat_ids = NULL;
+        unsigned l3cat_id_num;
+        unsigned l3cat_id;
+
+        ASSERT(resctrl_group != NULL);
+        ASSERT(value != NULL);
+
+        *value = 0;
 
         if (l3ids == NULL) {
                 l3cat_ids = pqos_cpu_get_l3cat_ids(m_cpu, &l3cat_id_num);
@@ -392,20 +453,15 @@ resctrl_mon_read_counters(const unsigned class_id,
         }
 
         for (l3cat_id = 0; l3cat_id < l3cat_id_num; l3cat_id++) {
-                char path[PATH_MAX];
-                FILE *fd;
-                unsigned long long counter;
+                const unsigned l3id = l3cat_ids[l3cat_id];
+                uint64_t counter;
 
-                snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf,
-                         l3cat_ids[l3cat_id], name);
-                fd = fopen_check_symlink(path, "r");
-                if (fd == NULL) {
-                        ret = PQOS_RETVAL_ERROR;
+                ret = resctrl_mon_read_counter(class_id, resctrl_group, l3id,
+                                               event, &counter);
+                if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_read_exit;
-                }
-                if (fscanf(fd, "%llu", &counter) == 1)
-                        *value += counter;
-                fclose(fd);
+
+                *value += counter;
         }
 
 resctrl_mon_read_exit:
@@ -416,7 +472,62 @@ resctrl_mon_read_exit:
 }
 
 /**
- * @brief Check if mon group is empty (no cores/tasks assigned)
+ * @brief Obtain max threshold occupancy
+ *
+ * @param [out] value max threshold occupancy value
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+restrl_mon_get_max_llc_tresh(unsigned *value)
+{
+        int ret = PQOS_RETVAL_OK;
+        FILE *fd;
+
+        fd = fopen_check_symlink(
+            RESCTRL_PATH "/info/L3_MON/max_threshold_occupancy", "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        if (fscanf(fd, "%u", value) != 1)
+                ret = PQOS_RETVAL_ERROR;
+        fclose(fd);
+
+        return ret;
+}
+
+/**
+ * @brief Check if file is empty
+ *
+ * @param [in] path file path
+ *
+ * @return If file is empty
+ * @retval 1 if file is empty
+ */
+static int
+resctrl_mon_file_empty(const char *path)
+{
+        int empty = 1;
+        char buf[128];
+
+        FILE *fd = fopen_check_symlink(path, "r");
+
+        if (fd == NULL)
+                return -1;
+        memset(buf, 0, sizeof(buf));
+        /* Try to read from file */
+        while (fgets(buf, sizeof(buf), fd) != NULL)
+                if (buf[0] != '\n') {
+                        empty = 0;
+                        break;
+                }
+        fclose(fd);
+
+        return empty;
+}
+
+/**
+ * @brief Check if monitored group is junk (no cores/tasks assigned/low llc)
  *
  * @param [in] class_id COS id
  * @param [in] resctrl_group mon group name
@@ -435,11 +546,8 @@ resctrl_mon_empty(const unsigned class_id,
                   int *empty)
 {
         int ret;
-        FILE *fd;
+        int retval;
         char path[128];
-        char buf[128];
-        struct resctrl_cpumask mask;
-        unsigned i;
         unsigned max_threshold_occupancy;
         uint64_t value;
 
@@ -451,32 +559,28 @@ resctrl_mon_empty(const unsigned class_id,
         /*
          * Some cores are assigned to group?
          */
-        ret = resctrl_mon_cpumask_read(class_id, resctrl_group, &mask);
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
-
-        for (i = 0; i < sizeof(mask.tab); i++)
-                if (mask.tab[i] > 0) {
-                        *empty = 0;
-                        return PQOS_RETVAL_OK;
-                }
+        resctrl_mon_group_path(class_id, resctrl_group, "/cpus_list", path,
+                               sizeof(path));
+        retval = resctrl_mon_file_empty(path);
+        if (retval < 0)
+                return PQOS_RETVAL_ERROR;
+        else if (!retval) {
+                *empty = 0;
+                return PQOS_RETVAL_OK;
+        }
 
         /*
          *Some tasks are assigned to group?
          */
         resctrl_mon_group_path(class_id, resctrl_group, "/tasks", path,
                                sizeof(path));
-        fd = fopen_check_symlink(path, "r");
-        if (fd == NULL)
+        retval = resctrl_mon_file_empty(path);
+        if (retval < 0)
                 return PQOS_RETVAL_ERROR;
-        /* Search tasks file for any task ID */
-        memset(buf, 0, sizeof(buf));
-        if (fgets(buf, sizeof(buf), fd) != NULL) {
+        else if (!retval) {
                 *empty = 0;
-                fclose(fd);
                 return PQOS_RETVAL_OK;
         }
-        fclose(fd);
 
         /*
          * Check if llc occupancy is lower than max_occupancy_threshold
@@ -489,15 +593,11 @@ resctrl_mon_empty(const unsigned class_id,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        fd = fopen_check_symlink(
-            RESCTRL_PATH "/info/L3_MON/max_threshold_occupancy", "r");
-        if (fd == NULL)
-                return PQOS_RETVAL_ERROR;
-        if (fscanf(fd, "%u", &max_threshold_occupancy) != 1)
-                ret = PQOS_RETVAL_ERROR;
-        else if (value > max_threshold_occupancy)
+        ret = restrl_mon_get_max_llc_tresh(&max_threshold_occupancy);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (value > max_threshold_occupancy)
                 *empty = 0;
-        fclose(fd);
 
         return ret;
 }
@@ -588,7 +688,7 @@ resctrl_mon_assoc_get(const unsigned lcore,
         ret = PQOS_RETVAL_RESOURCE;
 
 resctrl_mon_assoc_get_exit:
-        free(namelist);
+        free_scandir(namelist, num_groups);
 
         return ret;
 }
@@ -734,7 +834,7 @@ resctrl_mon_assoc_get_pid(const pid_t task,
         ret = PQOS_RETVAL_RESOURCE;
 
 resctrl_mon_assoc_get_pid_exit:
-        free(namelist);
+        free_scandir(namelist, num_groups);
 
         return ret;
 }
@@ -777,11 +877,282 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
         return PQOS_RETVAL_OK;
 }
 
+#define RESCTRL_CORE_MAX_L3ID 63
+struct resctrl_core_group {
+        char name[32];
+        int valid;
+        uint64_t llc;
+        uint64_t l3ids;
+        time_t mtime;
+};
+
+/**
+ * @brief Parse resctrl core monitoring groups
+ *
+ * @param [out] cgrp Parser monitoring groups
+ * @param [out] cgrp_num Number of groups
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned cos = 0;
+        unsigned ctrl_grps;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
+        const struct pqos_capability *cap_mon;
+        struct resctrl_core_group *grps = NULL;
+        unsigned grps_num = 0;
+        unsigned grps_size;
+
+        _pqos_cap_get(&cap, &cpu);
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &cap_mon);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = resctrl_alloc_get_grps_num(cap, &ctrl_grps);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        grps_size = cap_mon->u.mon->max_rmid;
+        grps = calloc(grps_size, sizeof(*grps));
+        if (grps == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        /* Build list of core monitroing groups */
+        do {
+                struct dirent **namelist = NULL;
+                struct resctrl_cpumask cpumask;
+                int num_groups;
+                char dir[256];
+                int i;
+
+                resctrl_mon_group_path(cos, "", NULL, dir, sizeof(dir));
+                num_groups = scandir(dir, &namelist, filter, NULL);
+                if (num_groups < 0) {
+                        LOG_ERROR(
+                            "Failed to read monitoring groups for COS %u\n",
+                            cos);
+                        ret = PQOS_RETVAL_ERROR;
+                        goto resctrl_mon_parse_exit;
+                }
+
+                for (i = 0; i < num_groups; i++) {
+                        char path[256];
+                        const char *grp_name = namelist[i]->d_name;
+                        struct resctrl_core_group *grp = NULL;
+                        unsigned j;
+                        int retval;
+
+                        /* group not managed by pqos library */
+                        if (strncmp(grp_name, GROUP_NAME_PREFIX, 5) != 0)
+                                continue;
+
+                        /* Check if group already exists */
+                        for (j = 0; j < grps_num; j++)
+                                if (strncmp(grp_name, grps[j].name,
+                                            DIM(grps[j].name)) == 0) {
+                                        grp = &grps[j];
+                                        break;
+                                }
+                        /* new group */
+                        if (grp == NULL) {
+                                if (grps_num + 1 == grps_size) {
+                                        ret = PQOS_RETVAL_ERROR;
+                                        break;
+                                }
+                                grp = &grps[grps_num++];
+                                strncpy(grp->name, grp_name, DIM(grp->name));
+                                grp->valid = 1;
+                        }
+                        if (!grp->valid)
+                                continue;
+
+                        /* Some tasks are assigned to group? */
+                        resctrl_mon_group_path(cos, grp->name, "/tasks", path,
+                                               sizeof(path));
+                        retval = resctrl_mon_file_empty(path);
+                        if (retval < 0) {
+                                ret = PQOS_RETVAL_ERROR;
+                                break;
+                        } else if (!retval) {
+                                grp->valid = 0;
+                                continue;
+                        }
+
+                        /* Cores assigned to group */
+                        ret =
+                            resctrl_mon_cpumask_read(cos, grp->name, &cpumask);
+                        if (ret != PQOS_RETVAL_OK)
+                                break;
+
+                        for (j = 0; j < cpu->num_cores; j++) {
+                                const struct pqos_coreinfo *coreinfo =
+                                    &(cpu->cores[j]);
+
+                                if (resctrl_cpumask_get(coreinfo->lcore,
+                                                        &cpumask)) {
+                                        if (coreinfo->l3cat_id >=
+                                            RESCTRL_CORE_MAX_L3ID) {
+                                                grp->valid = 0;
+                                                break;
+                                        }
+                                        grp->l3ids |=
+                                            (1LLU << coreinfo->l3cat_id);
+                                }
+                        }
+                }
+                free_scandir(namelist, num_groups);
+
+                if (ret != PQOS_RETVAL_OK)
+                        break;
+        } while (++cos < ctrl_grps);
+
+resctrl_mon_parse_exit:
+        if (ret != PQOS_RETVAL_OK)
+                free(grps);
+        else {
+                *cgrp = grps;
+                *cgrp_num = grps_num;
+        }
+
+        return ret;
+}
+
+/**
+ * @brief Assignes resctrl monitoring group
+ *
+ * @param group monitoring structure
+ *
+ * @return Resctrl monitoring group
+ */
+static char *
+resctrl_mon_assign(struct pqos_mon_data *group)
+{
+        char *resctrl_group = group->intl->resctrl.mon_group;
+        struct resctrl_core_group *cgrp = NULL;
+
+        /* search for available core group */
+        if (resctrl_group == NULL && group->tid_nr == 0 &&
+            group->num_cores > 0) {
+                int ret;
+                unsigned i;
+                unsigned l3ids = 0;
+                unsigned cgrp_num;
+                const struct pqos_cpuinfo *cpu;
+                const struct pqos_cap *cap;
+                unsigned max_threshold_occupancy;
+                unsigned max_cos;
+
+                _pqos_cap_get(&cap, &cpu);
+
+                /* list L3IDs for requested cores */
+                for (i = 0; i < group->num_cores; i++) {
+                        const struct pqos_coreinfo *coreinfo =
+                            pqos_cpu_get_core_info(cpu, group->cores[i]);
+
+                        if (coreinfo == NULL)
+                                return NULL;
+                        if (coreinfo->l3cat_id > RESCTRL_CORE_MAX_L3ID)
+                                goto mon_assign_new;
+
+                        l3ids |= (1LLU << coreinfo->l3cat_id);
+                }
+
+                if ((supported_events & PQOS_MON_EVENT_L3_OCCUP) != 0) {
+                        ret = restrl_mon_get_max_llc_tresh(
+                            &max_threshold_occupancy);
+                        if (ret != PQOS_RETVAL_OK)
+                                return NULL;
+                }
+
+                ret = resctrl_alloc_get_grps_num(cap, &max_cos);
+                if (ret != PQOS_RETVAL_OK)
+                        return NULL;
+
+                /* parse existing core monitoring groups */
+                ret = resctrl_mon_parse(&cgrp, &cgrp_num);
+                if (ret != PQOS_RETVAL_OK)
+                        return NULL;
+
+                for (i = 0; i < cgrp_num; i++) {
+                        struct resctrl_core_group *grp = &cgrp[i];
+                        uint64_t llc = 0;
+                        unsigned l3id;
+
+                        if (!grp->valid)
+                                continue;
+
+                        /* L3Ids overlap */
+                        if ((l3ids & grp->l3ids) != 0)
+                                continue;
+
+                        /* check if llc doesn't occupancy threshold */
+                        if ((supported_events & PQOS_MON_EVENT_L3_OCCUP) != 0) {
+                                for (l3id = 0; l3id < RESCTRL_CORE_MAX_L3ID;
+                                     l3id++) {
+                                        unsigned cos = 0;
+
+                                        if ((l3ids & (1LLU << l3id)) == 0)
+                                                continue;
+
+                                        do {
+                                                uint64_t val;
+                                                struct stat st;
+                                                char buf[128];
+
+                                                resctrl_mon_group_path(
+                                                    cos, grp->name, NULL, buf,
+                                                    sizeof(buf));
+                                                if (stat(buf, &st) != 0)
+                                                        continue;
+
+                                                ret = resctrl_mon_read_counter(
+                                                    cos, grp->name, l3id,
+                                                    PQOS_MON_EVENT_L3_OCCUP,
+                                                    &val);
+                                                if (ret != PQOS_RETVAL_OK)
+                                                        goto mon_assign_exit;
+
+                                                llc += val;
+                                        } while (++cos < max_cos);
+                                }
+                                if (llc > max_threshold_occupancy)
+                                        continue;
+                        }
+
+                        resctrl_group = strdup(grp->name);
+                        break;
+                }
+        }
+
+mon_assign_new:
+        /* Create new monitoring group */
+        if (resctrl_group == NULL) {
+                char buf[32];
+
+                snprintf(buf, sizeof(buf), GROUP_NAME_PREFIX "%d-%u",
+                         (int)getpid(), resctrl_mon_counter++);
+
+                resctrl_group = strdup(buf);
+                if (resctrl_group == NULL)
+                        LOG_DEBUG("Memory allocation failed\n");
+        }
+
+mon_assign_exit:
+        if (cgrp != NULL)
+                free(cgrp);
+        return resctrl_group;
+}
+
 int
 resctrl_mon_start(struct pqos_mon_data *group)
 {
         char *resctrl_group = NULL;
-        char buf[128];
         int ret = PQOS_RETVAL_OK;
         unsigned i;
         const struct pqos_cpuinfo *cpu;
@@ -792,39 +1163,17 @@ resctrl_mon_start(struct pqos_mon_data *group)
 
         _pqos_cap_get(NULL, &cpu);
 
-        /**
-         * Get resctrl monitoring group
-         */
-        if (group->intl->resctrl.mon_group == NULL) {
-                snprintf(buf, sizeof(buf), "%d-%u", (int)getpid(),
-                         resctrl_mon_counter++);
-
-                resctrl_group = strdup(buf);
-                if (resctrl_group == NULL) {
-                        LOG_DEBUG("Memory allocation failed\n");
-                        ret = PQOS_RETVAL_ERROR;
-                        goto resctrl_mon_start_exit;
-                }
-
-        } else
-                resctrl_group = group->intl->resctrl.mon_group;
-
-        /**
-         * Add pids to the resctrl group
-         */
-        for (i = 0; i < group->tid_nr; i++) {
-                ret =
-                    resctrl_mon_assoc_set_pid(group->tid_map[i], resctrl_group);
-                if (ret != PQOS_RETVAL_OK)
-                        goto resctrl_mon_start_exit;
-        }
-
         /* List l3ids */
         for (i = 0; i < group->num_cores; i++) {
                 struct pqos_mon_data_internal *intl = group->intl;
                 unsigned j;
                 const struct pqos_coreinfo *coreinfo =
                     pqos_cpu_get_core_info(cpu, group->cores[i]);
+
+                if (coreinfo == NULL) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto resctrl_mon_start_exit;
+                }
 
                 for (j = 0; j < intl->resctrl.num_l3id; j++)
                         if (coreinfo->l3cat_id == intl->resctrl.l3id[j])
@@ -845,6 +1194,23 @@ resctrl_mon_start(struct pqos_mon_data *group)
         }
 
         /**
+         * Get resctrl monitoring group
+         */
+        resctrl_group = resctrl_mon_assign(group);
+        if (resctrl_group == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        /**
+         * Add pids to the resctrl group
+         */
+        for (i = 0; i < group->tid_nr; i++) {
+                ret =
+                    resctrl_mon_assoc_set_pid(group->tid_map[i], resctrl_group);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_start_exit;
+        }
+
+        /**
          * Add cores to the resctrl group
          */
         for (i = 0; i < group->num_cores; i++) {
@@ -856,9 +1222,124 @@ resctrl_mon_start(struct pqos_mon_data *group)
         group->intl->resctrl.mon_group = resctrl_group;
 
 resctrl_mon_start_exit:
-        if (ret != PQOS_RETVAL_OK &&
-            group->intl->resctrl.mon_group != resctrl_group)
-                free(resctrl_group);
+        if (ret != PQOS_RETVAL_OK) {
+                if (group->intl->resctrl.l3id != NULL)
+                        free(group->intl->resctrl.l3id);
+                if (group->intl->resctrl.mon_group != resctrl_group)
+                        free(resctrl_group);
+        }
+
+        return ret;
+}
+
+/**
+ * @brief Remove resctrl monitoring group
+ *
+ * @param [in] resctrl_group group name
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+resctrl_mon_delete(const char *resctrl_group)
+{
+        int ret;
+        unsigned max_cos;
+        unsigned cos = 0;
+        const struct pqos_cap *cap;
+
+        _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        do {
+                char buf[128];
+
+                resctrl_mon_group_path(cos, resctrl_group, NULL, buf,
+                                       sizeof(buf));
+
+                ret = resctrl_mon_rmdir(buf);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to remove resctrl "
+                                  "monitoring group\n");
+                        return PQOS_RETVAL_ERROR;
+                }
+        } while (++cos < max_cos);
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Check if resctrl group is shared between two mon groups
+ *
+ * @param [in] group monitoring structure
+ * @param [out] shared 1 if resctrl is shared
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+static int
+resctrl_mon_shared(struct pqos_mon_data *group, unsigned *shared)
+{
+        unsigned max_cos;
+        unsigned cos;
+        int ret;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
+        const char *mon_group = group->intl->resctrl.mon_group;
+
+        *shared = 0;
+
+        if (group->num_pids > 0)
+                return PQOS_RETVAL_OK;
+
+        _pqos_cap_get(&cap, &cpu);
+
+        ret = resctrl_alloc_get_grps_num(cap, &max_cos);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        cos = 0;
+        do {
+                char path[128];
+                struct stat st;
+                struct resctrl_cpumask mask;
+                unsigned i;
+
+                /* check if group exists */
+                resctrl_mon_group_path(cos, mon_group, NULL, path,
+                                       sizeof(path));
+                if (stat(path, &st) != 0)
+                        continue;
+
+                /* read assigned cores */
+                ret = resctrl_mon_cpumask_read(cos, mon_group, &mask);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                /* check if cores overlap */
+                for (i = 0; i < cpu->num_cores; i++) {
+                        const unsigned lcore = cpu->cores[i].lcore;
+
+                        if (resctrl_cpumask_get(lcore, &mask)) {
+                                unsigned j;
+
+                                *shared = 1;
+                                for (j = 0; j < group->num_cores; j++)
+                                        if (group->cores[i] == lcore) {
+                                                *shared = 0;
+                                                break;
+                                        }
+                        }
+
+                        if (*shared)
+                                return PQOS_RETVAL_OK;
+                }
+
+        } while (++cos < max_cos);
 
         return ret;
 }
@@ -876,7 +1357,6 @@ resctrl_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
         unsigned max_cos;
-        unsigned cos;
         unsigned i;
         const struct pqos_cap *cap;
 
@@ -888,30 +1368,10 @@ resctrl_mon_stop(struct pqos_mon_data *group)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        if (group->intl->resctrl.mon_group != NULL) {
-                cos = 0;
-                do {
-                        char buf[128];
-
-                        resctrl_mon_group_path(cos,
-                                               group->intl->resctrl.mon_group,
-                                               NULL, buf, sizeof(buf));
-
-                        ret = resctrl_mon_rmdir(buf);
-                        if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("Failed to remove resctrl "
-                                          "monitoring group\n");
-                                goto resctrl_mon_stop_exit;
-                        }
-                } while (++cos < max_cos);
-
-                free(group->intl->resctrl.mon_group);
-                group->intl->resctrl.mon_group = NULL;
-
-        } else if (group->num_pids > 0) {
-                /**
-                 * Add pids to the default group
-                 */
+        /*
+         * Add pids back to the default group
+         */
+        if (group->num_pids > 0)
                 for (i = 0; i < group->tid_nr; i++) {
                         const pid_t tid = group->tid_map[i];
 
@@ -927,8 +1387,58 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                                 goto resctrl_mon_stop_exit;
                 }
 
-        } else
-                return PQOS_RETVAL_PARAM;
+        /*
+         * Remove cores from mon group
+         */
+        if (group->num_cores > 0) {
+                const char *mon_group = group->intl->resctrl.mon_group;
+                char path[128];
+                struct stat st;
+                unsigned cos = 0;
+
+                do {
+                        struct resctrl_cpumask cpumask;
+
+                        resctrl_mon_group_path(cos, mon_group, NULL, path,
+                                               sizeof(path));
+                        if (stat(path, &st) != 0)
+                                continue;
+
+                        ret =
+                            resctrl_mon_cpumask_read(cos, mon_group, &cpumask);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto resctrl_mon_stop_exit;
+
+                        for (i = 0; i < group->num_cores; i++) {
+                                const unsigned core = group->cores[i];
+
+                                resctrl_cpumask_unset(core, &cpumask);
+                        }
+
+                        ret =
+                            resctrl_mon_cpumask_write(cos, mon_group, &cpumask);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto resctrl_mon_stop_exit;
+                } while (++cos < max_cos);
+        }
+
+        if (group->intl->resctrl.mon_group != NULL) {
+                unsigned shared;
+
+                ret = resctrl_mon_shared(group, &shared);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_stop_exit;
+
+                if (!shared) {
+                        ret =
+                            resctrl_mon_delete(group->intl->resctrl.mon_group);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto resctrl_mon_stop_exit;
+                }
+
+                free(group->intl->resctrl.mon_group);
+                group->intl->resctrl.mon_group = NULL;
+        }
 
 resctrl_mon_stop_exit:
         return ret;
@@ -967,11 +1477,18 @@ resctrl_mon_purge(struct pqos_mon_data *group)
         unsigned max_cos;
         unsigned cos;
         int ret;
+        unsigned shared;
         const struct pqos_cap *cap;
 
         ASSERT(group != NULL);
 
         _pqos_cap_get(&cap, NULL);
+
+        ret = resctrl_mon_shared(group, &shared);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (shared)
+                return PQOS_RETVAL_OK;
 
         ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -1176,12 +1693,12 @@ resctrl_mon_reset(void)
 
                         ret = resctrl_mon_rmdir(path);
                         if (ret != PQOS_RETVAL_OK) {
-                                free(namelist);
+                                free_scandir(namelist, num_groups);
                                 return ret;
                         }
                 }
 
-                free(namelist);
+                free_scandir(namelist, num_groups);
         } while (++cos < grps);
 
         return ret;
@@ -1223,7 +1740,7 @@ resctrl_mon_active(unsigned *monitoring_status)
 
                 /* check content of mon_groups directory */
                 files_count = scandir(path, &mon_group_files, filter, NULL);
-                free(mon_group_files);
+                free_scandir(mon_group_files, files_count);
 
                 if (files_count < 0) {
                         LOG_ERROR("Could not scan %s directory!\n", path);

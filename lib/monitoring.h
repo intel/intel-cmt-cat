@@ -89,7 +89,7 @@ struct pqos_mon_data_internal {
                                                             of monitoring group
                                                             that was moved to
                                                             another COS */
-                unsigned *l3id;    /**< list of l3ids beening monitored */
+                unsigned *l3id;    /**< list of l3ids being monitored */
                 unsigned num_l3id; /**< Number of l3ids */
 
         } resctrl;

@@ -132,6 +132,14 @@ struct resctrl_cpumask {
 void resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask);
 
 /**
+ * @brief Unset lcore bit in cpu mask
+ *
+ * @param [in] lcore Core number
+ * @param [in] cpumask Modified cpu mask
+ */
+void resctrl_cpumask_unset(const unsigned lcore, struct resctrl_cpumask *mask);
+
+/**
  * @brief Check if lcore is set in cpu mask
  *
  * @param [in] lcore Core number

@@ -44,6 +44,7 @@
 #include "cap.h"
 #include "resctrl_alloc.h"
 #include "resctrl_utils.h"
+#include "resctrl_monitoring.h"
 
 /**
  * ---------------------------------------
@@ -507,8 +508,12 @@ resctrl_alloc_task_file_check(const unsigned class_id, unsigned *found)
 int
 resctrl_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 {
-        int ret;
+        int ret, ret_mon;
         struct resctrl_cpumask mask;
+        char name[32];
+
+        /* check if core is assigned to monitoring group */
+        ret_mon = resctrl_mon_assoc_get(lcore, name, DIM(name));
 
         ret = resctrl_alloc_cpumask_read(class_id, &mask);
         if (ret != PQOS_RETVAL_OK)
@@ -517,6 +522,10 @@ resctrl_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
         resctrl_cpumask_set(lcore, &mask);
 
         ret = resctrl_alloc_cpumask_write(class_id, &mask);
+
+        /* assign core back to monitoring group */
+        if (ret_mon == PQOS_RETVAL_OK)
+                resctrl_mon_assoc_set(lcore, name);
 
         return ret;
 }

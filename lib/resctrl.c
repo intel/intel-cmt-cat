@@ -210,6 +210,17 @@ resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask)
         mask->tab[item] = mask->tab[item] | (1 << bit);
 }
 
+void
+resctrl_cpumask_unset(const unsigned lcore, struct resctrl_cpumask *mask)
+{
+        /* index in mask table */
+        const unsigned item = (sizeof(mask->tab) - 1) - (lcore / CHAR_BIT);
+        const unsigned bit = lcore % CHAR_BIT;
+
+        /* Clear lcore bit in mask table item */
+        mask->tab[item] &= ~(1 << bit);
+}
+
 int
 resctrl_cpumask_get(const unsigned lcore, const struct resctrl_cpumask *mask)
 {
