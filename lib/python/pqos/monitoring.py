@@ -44,7 +44,7 @@ from pqos.pqos import Pqos
 from pqos.capability import CPqosMonitor
 
 
-RMID_T = ctypes.c_uint32
+RmidT = ctypes.c_uint32
 
 
 class CPqosEventValues(ctypes.Structure):
@@ -174,7 +174,7 @@ class PqosMon:
             RMID for a given core
         """
 
-        rmid = RMID_T(0)
+        rmid = RmidT(0)
         rmid_ref = ctypes.byref(rmid)
         ret = self.pqos.lib.pqos_mon_assoc_get(core, rmid_ref)
         pqos_handle_error(u'pqos_mon_assoc_get', ret)
