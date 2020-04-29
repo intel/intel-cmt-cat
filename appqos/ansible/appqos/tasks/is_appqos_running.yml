@@ -32,29 +32,12 @@
 ################################################################################
 
 ---
-- name: Load MSR
-  modprobe:
-    name: msr
-    state: present
+- import_tasks: install_pgrep.yml
 
-- name: Clone AppQoS repo
-  git:
-    repo: https://github.com/intel/intel-cmt-cat
-    version: master
-    dest: "{{ appqos_path }}"
-    update: "yes"
-  register: appqos_cloned
+- name: Get number of AppQoS processes from remote host
+  changed_when: false
+  shell: pgrep -c -f "{{ appqos_proc_regexp }}" || true
+  register: running_processes_num
 
-- name: Check that the libpqos installed
-  stat:
-    path: /usr/lib/libpqos.so
-  register: libpqos_check
-
-- name: Build and install libpqos
-  make:
-    chdir: "{{ appqos_path }}"
-    target: install
-    params:
-      PREFIX: /usr
-  when: libpqos_check.stat.exists == False
-  register: libpqos_installed
+- set_fact:
+    appqos_running: "{{ running_processes_num.stdout|int != 0 }}"

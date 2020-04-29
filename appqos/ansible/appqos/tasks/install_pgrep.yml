@@ -32,38 +32,14 @@
 ################################################################################
 
 ---
-- name: Check that the appqos.conf exists
-  stat:
-    path: "{{ appqos_conf_path }}"
-  register: stat_result
+- name: Install pgrep - RedHat
+  yum:
+    name: procps
+    state: present
+  when: ansible_os_family == 'RedHat'
 
-- name: Create appqos.conf file with minimal required configurations
-  copy:
-    dest: "{{ appqos_conf_path }}"
-    content: "{{ appqos_conf_content }}"
-  when: stat_result.stat.exists == False
-
-- name: Making python3 virtualized env
-  shell:
-    cmd: cd "{{ appqos_dir }}" && make env_"{{ ansible_hostname }}"
-    creates: "{{ appqos_dir }}/env_{{ ansible_hostname }}"
-  args:
-    executable: /bin/bash
-
-- name: Get number of running AppQoS processes from remote host
-  changed_when: false
-  shell: pgrep -c -f "{{ appqos_proc_regexp }}" || true
-  register: running_processes_num
-
-- name: Start AppQoS/REST API server in background
-  shell: >
-    cd "{{ appqos_dir }}";
-    source env_$HOSTNAME/bin/activate &&
-    nohup ./appqos.py -c /tmp/appqos.conf </dev/null >/dev/null 2>&1 &
-  args:
-    executable: /bin/bash
-  when: running_processes_num.stdout|int == 0
-
-- name: Check is AppQoS actually running
-  command: pgrep -c -f "{{ appqos_proc_regexp }}"
-  when: running_processes_num.stdout|int == 0
+- name: Install pgrep - Debian
+  apt:
+    name: procps
+    state: present
+  when: ansible_os_family == 'Debian'

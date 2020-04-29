@@ -32,9 +32,11 @@
 ################################################################################
 
 ---
-# tasks file for AppQoS deployment
+- import_tasks: install_git.yml
 
-- import_tasks: install.yml
-- import_tasks: configure.yml
-- import_tasks: certificates.yml
-- import_tasks: start.yml
+- name: Clone AppQoS repo
+  git:
+    repo: "{{ rdt_repo }}"
+    version: "{{ rdt_repo_version }}"
+    dest: "{{ appqos_path }}"
+    update: "yes"

@@ -32,7 +32,33 @@
 ################################################################################
 
 ---
-- name: Apply role deploy
-  hosts: compute
-  roles:
-    - appqos
+- name: Load MSR
+  modprobe:
+    name: msr
+    state: present
+
+- name: Check that the appqos.conf exists
+  stat:
+    path: "{{ appqos_conf_path }}"
+  register: stat_result
+
+- name: Create appqos.conf file with minimal required configurations
+  copy:
+    dest: "{{ appqos_conf_path }}"
+    content: "{{ appqos_conf_content }}"
+  when: not stat_result.stat.exists
+
+- import_tasks: is_appqos_running.yml
+
+- name: Start AppQoS/REST API server in background
+  shell: >
+    cd "{{ appqos_dir }}";
+    source env_$HOSTNAME/bin/activate &&
+    nohup ./appqos.py -c /tmp/appqos.conf </dev/null >/dev/null 2>&1 &
+  args:
+    executable: /bin/bash
+  when: not appqos_running
+
+- name: Check is AppQoS actually running
+  command: pgrep -c -f "{{ appqos_proc_regexp }}"
+  when: not appqos_running

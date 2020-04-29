@@ -32,8 +32,15 @@
 ################################################################################
 
 ---
-# Appqos config file
-appqos_conf_path: "/tmp/appqos.conf"
+# tasks file for AppQoS deployment
+- import_tasks: install_libpqos.yml
+  tags: libpqos
 
-# Appqos process regexp
-appqos_proc_regexp: '^python.? \./appqos\.py'
+- import_tasks: install_venv.yml
+  tags: appqos
+
+- import_tasks: generate_ssl_key_certs.yml
+  tags: appqos
+
+- import_tasks: start_appqos.yml
+  tags: appqos

@@ -32,7 +32,14 @@
 ################################################################################
 
 ---
-- name: Apply role destroy
-  hosts: all
-  roles:
-    - destroy
+- name: Install GIT - RedHat
+  yum:
+    name: git
+    state: present
+  when: ansible_os_family == 'RedHat'
+
+- name: Install GIT - Debian
+  apt:
+    name: git
+    state: present
+  when: ansible_os_family == 'Debian'

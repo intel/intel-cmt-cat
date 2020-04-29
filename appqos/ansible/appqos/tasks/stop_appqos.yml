@@ -32,38 +32,8 @@
 ################################################################################
 
 ---
-# Directory where RDT/AppQoS repo lands
-appqos_path: "/root/ansible/appqos_repo"
+- import_tasks: is_appqos_running.yml
 
-# Appqos director
-appqos_dir: "{{ appqos_path }}/appqos"
-
-# Appqos KEY file - private key
-appqos_key_file: "{{ appqos_dir }}/appqos.key"
-
-# Appqos CRT file - certificate
-appqos_crt_file: "{{ appqos_dir }}/appqos.crt"
-
-# Appqos CSR file
-appqos_csr_file: "{{ appqos_dir }}/appqos.csr"
-
-# Appqos config file
-appqos_conf_path: "/tmp/appqos.conf"
-
-# Appqos process regexp
-appqos_proc_regexp: '^python.? \./appqos\.py'
-
-# Appqos config file content
-appqos_conf_content: |
- {
-    "apps": [],
-    "auth": {
-        "password": "password",
-        "username": "admin"
-    },
-    "sstbf": {
-        "configured": false
-    },
-    "pools": [],
-    "power_profiles_expert_mode": true
- }
+- name: Stop AppQoS processes
+  command: pkill -9 -f "{{ appqos_proc_regexp }}"
+  when: appqos_running

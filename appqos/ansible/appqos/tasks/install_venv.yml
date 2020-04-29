@@ -32,18 +32,14 @@
 ################################################################################
 
 ---
-- name: Check if the appqos.conf exists
-  stat:
-    path: "{{ appqos_conf_path }}"
-  register: stat_result
+- import_tasks: clone_appqos_repo.yml
+- import_tasks: install_python.yml
 
-- name: Get number of AppQoS processes from remote host
-  shell: pgrep -c -f "{{ appqos_proc_regexp }}" || true
-  register: running_processes_num
-  when: stat_result.stat.exists == True
+- name: Install virtualenv
+  pip:
+    name: ['virtualenv']
 
-- name: Kill AppQoS processes
-  command: pkill -9 -f "{{ appqos_proc_regexp }}"
-  when:
-    - stat_result.stat.exists == True
-    - running_processes_num.stdout|int != 0
+- name: Making python3 virtualized env
+  make:
+    chdir: "{{ appqos_dir }}"
+    target: "env_{{ ansible_hostname }}"

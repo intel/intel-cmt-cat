@@ -32,39 +32,14 @@
 ################################################################################
 
 ---
-galaxy_info:
-  author: Khawar Abbasi, Wojciech Andralojc
-  description: Configures AppQoS on all provided platforms
-  company: Intel Corporation
+- name: Install python - Debian
+  apt:
+    name: python3
+    state: present
+  when: ansible_os_family == 'Debian'
 
-  license: BSD-3-Clause
-
-  min_ansible_version: 2.5.0
-
-  platforms:
-    - name: Fedora
-      versions:
-        - all
-    - name: Ubuntu
-      versions:
-        - all
-    - name: RedHat
-      versions:
-        - 7
-    - name: Centos
-      versions:
-        - 7
-
-  galaxy_tags:
-    - rdt
-    - apqqoS
-    - cache qoS
-    - pqos
-    - mba
-    - cat
-    - mbm
-    - cmt
-    - sst-bf
-    - sst-cp
-
-  dependencies: []
+- name: Install python - RedHat
+  yum:
+    name: python3
+    state: present
+  when: ansible_os_family == 'RedHat'

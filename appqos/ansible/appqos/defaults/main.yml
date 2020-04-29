@@ -32,38 +32,45 @@
 ################################################################################
 
 ---
-- name: Ensuring config directory exist
-  become: true
-  file:
-    path: "{{ appqos_dir }}"
-    state: directory
-    recurse: "yes"
+# By default deploy AppQoS
+state: present
 
-- name: Creating Key
-  become: true
-  command:
-    cmd: openssl genrsa -out "{{ appqos_key_file }}"
-    creates: "{{ appqos_key_file }}"
+# RDT/AppQoS repo details
+rdt_repo: https://github.com/intel/intel-cmt-cat
+rdt_repo_version: master
 
-- name: Setting permissions on key
-  become: true
-  file:
-    path: "{{ appqos_key_file }}"
-    mode: 0600
-    state: file
+# Directory where RDT/AppQoS repo lands
+appqos_path: /root/ansible/appqos_repo
 
-- name: Generate CSR
-  openssl_csr:
-    path: "{{ appqos_csr_file }}"
-    privatekey_path: "{{ appqos_key_file }}"
-    common_name:
-    country_name:
-    email_address:
-    organization_name:
+# Appqos directory
+appqos_dir: "{{ appqos_path }}/appqos"
 
-- name: Generate a self signed certificate
-  openssl_certificate:
-    csr_path: "{{ appqos_csr_file }}"
-    path: "{{ appqos_crt_file }}"
-    privatekey_path: "{{ appqos_key_file }}"
-    provider: selfsigned
+# Appqos KEY file - private key
+appqos_key_file: "{{ appqos_dir }}/appqos.key"
+
+# Appqos CRT file - certificate
+appqos_crt_file: "{{ appqos_dir }}/appqos.crt"
+
+# Appqos CSR file
+appqos_csr_file: "{{ appqos_dir }}/appqos.csr"
+
+# Appqos config file
+appqos_conf_path: /tmp/appqos.conf
+
+# Appqos process regexp
+appqos_proc_regexp: '^python.? \./appqos\.py'
+
+# Appqos config file content
+appqos_conf_content: |
+ {
+    "apps": [],
+    "auth": {
+        "password": "password",
+        "username": "admin"
+    },
+    "sstbf": {
+        "configured": false
+    },
+    "pools": [],
+    "power_profiles_expert_mode": true
+ }

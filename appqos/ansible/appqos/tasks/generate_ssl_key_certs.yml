@@ -31,13 +31,36 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
-[compute]
+---
+- import_tasks: install_python.yml
 
-# These hostname must be resolvable from deployment host
+- name: Install PyOpenSSL
+  pip:
+    name: ['PyOpenSSL']
 
-#compute01
-#compute02
+- name: Creating Key
+  command:
+    cmd: openssl genrsa -out "{{ appqos_key_file }}"
+    creates: "{{ appqos_key_file }}"
 
-# The above can also be specified as follows:
-#compute01                       ansible_python_interpreter=/usr/bin/python3
-#compute02                       ansible_python_interpreter=/usr/bin/python3
+- name: Setting permissions on key
+  file:
+    path: "{{ appqos_key_file }}"
+    mode: 0600
+    state: file
+
+- name: Generate CSR
+  openssl_csr:
+    path: "{{ appqos_csr_file }}"
+    privatekey_path: "{{ appqos_key_file }}"
+    common_name:
+    country_name:
+    email_address:
+    organization_name:
+
+- name: Generate a self signed certificate
+  openssl_certificate:
+    csr_path: "{{ appqos_csr_file }}"
+    path: "{{ appqos_crt_file }}"
+    privatekey_path: "{{ appqos_key_file }}"
+    provider: selfsigned
