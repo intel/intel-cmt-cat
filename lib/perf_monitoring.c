@@ -36,6 +36,7 @@
 #include <string.h>
 #include <dirent.h> /**< scandir() */
 #include <linux/perf_event.h>
+#include <sys/stat.h>
 
 #include "pqos.h"
 #include "common.h"
@@ -67,6 +68,7 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 /**
  * Paths to RDT perf event info
  */
+#define PERF_MON_SUPPORT "/proc/sys/kernel/perf_event_paranoid"
 static const char *perf_events = "events/";
 static const char *perf_type = "type";
 
@@ -116,19 +118,19 @@ static struct perf_mon_supported_event {
     {.name = "",
      .desc = "Retired CPU Instructions",
      .event = (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS,
-     .supported = 1}, /**< assumed support */
+     .supported = 0},
     {.name = "",
      .desc = "Unhalted CPU Cycles",
      .event = (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
-     .supported = 1}, /**< assumed support */
+     .supported = 0},
     {.name = "",
      .desc = "Instructions/Cycle",
      .event = PQOS_PERF_EVENT_IPC,
-     .supported = 1}, /**< assumed support */
+     .supported = 0},
     {.name = "",
      .desc = "LLC Misses",
      .event = PQOS_PERF_EVENT_LLC_MISS,
-     .supported = 1}, /**< assumed support */
+     .supported = 0},
 };
 
 /**
@@ -197,11 +199,8 @@ set_mon_type(void)
 
         snprintf(file, sizeof(file) - 1, "%s%s", PERF_MON_PATH, perf_type);
         fd = fopen_check_symlink(file, "r");
-        if (fd == NULL) {
-                LOG_INFO("Perf monitoring not supported. "
-                         "Kernel version 4.6 or higher required.\n");
+        if (fd == NULL)
                 return PQOS_RETVAL_RESOURCE;
-        }
         if (fgets(evt, sizeof(evt), fd) == NULL) {
                 LOG_ERROR("Failed to read perf monitoring type!\n");
                 fclose(fd);
@@ -415,10 +414,26 @@ perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
         int ret;
         unsigned i;
+        struct stat st;
 
         ASSERT(cpu != NULL);
 
         UNUSED_PARAM(cap);
+
+        /**
+         * Perf monitoring not supported
+         */
+        if (stat(PERF_MON_SUPPORT, &st) != 0) {
+                LOG_INFO("Perf monitoring not supported.");
+                return PQOS_RETVAL_RESOURCE;
+
+        } else {
+                /* basic perf events are supported */
+                events_tab[OS_MON_EVT_IDX_INST].supported = 1;
+                events_tab[OS_MON_EVT_IDX_CYC].supported = 1;
+                events_tab[OS_MON_EVT_IDX_IPC].supported = 1;
+                events_tab[OS_MON_EVT_IDX_LLC_MISS].supported = 1;
+        }
 
         ret = set_arch_event_attrs(&all_evt_mask);
         if (ret != PQOS_RETVAL_OK)

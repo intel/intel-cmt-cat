@@ -48,6 +48,7 @@
 #include "hw_monitoring.h"
 #include "machine.h"
 #include "monitoring.h"
+#include "perf_monitoring.h"
 
 /**
  * ---------------------------------------
@@ -131,11 +132,19 @@ hw_mon_init(const struct pqos_cpuinfo *cpu,
 
         m_rmid_max = item->u.mon->max_rmid;
         if (m_rmid_max == 0) {
-                hw_mon_fini();
-                return PQOS_RETVAL_PARAM;
+                ret = PQOS_RETVAL_PARAM;
+                goto hw_mon_init_exit;
         }
-
         LOG_DEBUG("Max RMID per monitoring cluster is %u\n", m_rmid_max);
+
+#ifdef __linux__
+        ret = perf_mon_init(cpu, cap);
+        /* perf MBM is not supported */
+        if (ret == PQOS_RETVAL_RESOURCE)
+                ret = PQOS_RETVAL_OK;
+        else if (ret != PQOS_RETVAL_OK)
+                goto hw_mon_init_exit;
+#endif
 
 #ifdef PQOS_RMID_CUSTOM
         rmid_cfg.type = cfg->rmid_cfg.type;
@@ -145,8 +154,8 @@ hw_mon_init(const struct pqos_cpuinfo *cpu,
 
                 if (cfg->rmid_cfg.map.core == NULL ||
                     cfg->rmid_cfg.map.rmid == NULL) {
-                        hw_mon_fini();
-                        return PQOS_RETVAL_PARAM;
+                        ret = PQOS_RETVAL_PARAM;
+                        goto hw_mon_init_exit;
                 }
 
                 rmid_cfg.map.num = num;
@@ -162,6 +171,11 @@ hw_mon_init(const struct pqos_cpuinfo *cpu,
 #else
         UNUSED_PARAM(cfg);
 #endif
+
+hw_mon_init_exit:
+        if (ret != PQOS_RETVAL_OK)
+                hw_mon_fini();
+
         return ret;
 }
 
@@ -169,6 +183,10 @@ int
 hw_mon_fini(void)
 {
         m_rmid_max = 0;
+
+#ifdef __linux__
+        perf_mon_fini();
+#endif
 
 #ifdef PQOS_RMID_CUSTOM
         if (rmid_cfg.map.core != NULL)
