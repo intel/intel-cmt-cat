@@ -1050,6 +1050,8 @@ pqos_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
                         return PQOS_RETVAL_PARAM;
                 if (groups[i]->valid != GROUP_VALID_MARKER)
                         return PQOS_RETVAL_PARAM;
+                if (groups[i]->event == 0)
+                        return PQOS_RETVAL_PARAM;
         }
 
         _pqos_api_lock();
@@ -1060,15 +1062,12 @@ pqos_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
                 return ret;
         }
 
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_mon_poll(groups, num_groups);
-        else {
-#ifdef __linux__
-                ret = os_mon_poll(groups, num_groups);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
+        for (i = 0; i < num_groups; i++) {
+                int ret = pqos_mon_poll_events(groups[i]);
+
+                if (ret != PQOS_RETVAL_OK)
+                        LOG_WARN("Failed to poll event on group number %u\n",
+                                 i);
         }
         _pqos_api_unlock();
 

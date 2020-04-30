@@ -99,8 +99,6 @@ static int mon_read(const unsigned lcore,
                     const enum pqos_mon_event event,
                     uint64_t *value);
 
-static int pqos_core_poll(struct pqos_mon_data *group);
-
 static unsigned get_event_id(const enum pqos_mon_event event);
 
 static uint64_t scale_event(const enum pqos_mon_event event,
@@ -628,162 +626,6 @@ get_delta(const enum pqos_mon_event event,
 }
 
 /**
- * @brief Reads monitoring event data from given core
- *
- * @param p pointer to monitoring structure
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-pqos_core_poll(struct pqos_mon_data *p)
-{
-        struct pqos_event_values *pv = &p->values;
-        int retval = PQOS_RETVAL_OK;
-        unsigned i;
-
-        if (p->event & PQOS_MON_EVENT_L3_OCCUP) {
-                uint64_t total = 0;
-
-                for (i = 0; i < p->intl->hw.num_ctx; i++) {
-                        uint64_t tmp = 0;
-                        int ret;
-
-                        ret = mon_read(
-                            p->intl->hw.ctx[i].lcore, p->intl->hw.ctx[i].rmid,
-                            get_event_id(PQOS_MON_EVENT_L3_OCCUP), &tmp);
-                        if (ret != PQOS_RETVAL_OK) {
-                                retval = PQOS_RETVAL_ERROR;
-                                goto pqos_core_poll__exit;
-                        }
-                        total += tmp;
-                }
-                pv->llc = scale_event(PQOS_MON_EVENT_L3_OCCUP, total);
-        }
-        if (p->event & (PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t total = 0, old_value = pv->mbm_local;
-
-                for (i = 0; i < p->intl->hw.num_ctx; i++) {
-                        uint64_t tmp = 0;
-                        int ret;
-
-                        ret = mon_read(
-                            p->intl->hw.ctx[i].lcore, p->intl->hw.ctx[i].rmid,
-                            get_event_id(PQOS_MON_EVENT_LMEM_BW), &tmp);
-                        if (ret != PQOS_RETVAL_OK) {
-                                retval = PQOS_RETVAL_ERROR;
-                                goto pqos_core_poll__exit;
-                        }
-                        total += tmp;
-                }
-                pv->mbm_local = total;
-                pv->mbm_local_delta =
-                    get_delta(PQOS_MON_EVENT_LMEM_BW, old_value, pv->mbm_local);
-                pv->mbm_local_delta =
-                    scale_event(PQOS_MON_EVENT_LMEM_BW, pv->mbm_local_delta);
-        }
-        if (p->event & (PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) {
-                uint64_t total = 0, old_value = pv->mbm_total;
-
-                for (i = 0; i < p->intl->hw.num_ctx; i++) {
-                        uint64_t tmp = 0;
-                        int ret;
-
-                        ret = mon_read(
-                            p->intl->hw.ctx[i].lcore, p->intl->hw.ctx[i].rmid,
-                            get_event_id(PQOS_MON_EVENT_TMEM_BW), &tmp);
-                        if (ret != PQOS_RETVAL_OK) {
-                                retval = PQOS_RETVAL_ERROR;
-                                goto pqos_core_poll__exit;
-                        }
-                        total += tmp;
-                }
-                pv->mbm_total = total;
-                pv->mbm_total_delta =
-                    get_delta(PQOS_MON_EVENT_TMEM_BW, old_value, pv->mbm_total);
-                pv->mbm_total_delta =
-                    scale_event(PQOS_MON_EVENT_TMEM_BW, pv->mbm_total_delta);
-        }
-        if (p->event & PQOS_MON_EVENT_RMEM_BW) {
-                pv->mbm_remote = 0;
-                if (pv->mbm_total > pv->mbm_local)
-                        pv->mbm_remote = pv->mbm_total - pv->mbm_local;
-                pv->mbm_remote_delta = 0;
-                if (pv->mbm_total_delta > pv->mbm_local_delta)
-                        pv->mbm_remote_delta =
-                            pv->mbm_total_delta - pv->mbm_local_delta;
-        }
-        if (p->event & PQOS_PERF_EVENT_IPC) {
-                /**
-                 * If multiple cores monitored in one group
-                 * then we have to accumulate the values in the group.
-                 */
-                uint64_t unhalted = 0, retired = 0;
-                unsigned n;
-
-                for (n = 0; n < p->num_cores; n++) {
-                        uint64_t tmp = 0;
-                        int ret = msr_read(p->cores[n],
-                                           IA32_MSR_INST_RETIRED_ANY, &tmp);
-                        if (ret != MACHINE_RETVAL_OK) {
-                                retval = PQOS_RETVAL_ERROR;
-                                goto pqos_core_poll__exit;
-                        }
-                        retired += tmp;
-
-                        ret = msr_read(p->cores[n],
-                                       IA32_MSR_CPU_UNHALTED_THREAD, &tmp);
-                        if (ret != MACHINE_RETVAL_OK) {
-                                retval = PQOS_RETVAL_ERROR;
-                                goto pqos_core_poll__exit;
-                        }
-                        unhalted += tmp;
-                }
-
-                pv->ipc_unhalted_delta = unhalted - pv->ipc_unhalted;
-                pv->ipc_retired_delta = retired - pv->ipc_retired;
-                pv->ipc_unhalted = unhalted;
-                pv->ipc_retired = retired;
-                if (pv->ipc_unhalted_delta == 0)
-                        pv->ipc = 0.0;
-                else
-                        pv->ipc = (double)pv->ipc_retired_delta /
-                                  (double)pv->ipc_unhalted_delta;
-        }
-        if (p->event & PQOS_PERF_EVENT_LLC_MISS) {
-                /**
-                 * If multiple cores monitored in one group
-                 * then we have to accumulate the values in the group.
-                 */
-                uint64_t missed = 0;
-                unsigned n;
-
-                for (n = 0; n < p->num_cores; n++) {
-                        uint64_t tmp = 0;
-                        int ret = msr_read(p->cores[n], IA32_MSR_PMC0, &tmp);
-
-                        if (ret != MACHINE_RETVAL_OK) {
-                                retval = PQOS_RETVAL_ERROR;
-                                goto pqos_core_poll__exit;
-                        }
-                        missed += tmp;
-                }
-
-                pv->llc_misses_delta = missed - pv->llc_misses;
-                pv->llc_misses = missed;
-        }
-        if (!p->intl->valid_mbm_read) {
-                /* Report zero memory bandwidth with first read */
-                pv->mbm_remote_delta = 0;
-                pv->mbm_local_delta = 0;
-                pv->mbm_total_delta = 0;
-                p->intl->valid_mbm_read = 1;
-        }
-pqos_core_poll__exit:
-        return retval;
-}
-
-/**
  * @brief Sets up IA32 performance counters for IPC and LLC miss ratio events
  *
  * @param num_cores number of cores in \a cores table
@@ -1088,7 +930,15 @@ hw_mon_start(const unsigned num_cores,
                 group->intl->hw.ctx[i] = ctxs[i];
 
         group->event = event;
+        group->intl->hw.event = event;
         group->context = context;
+
+        if (event & PQOS_MON_EVENT_RMEM_BW)
+                group->intl->hw.event |= (enum pqos_mon_event)(
+                    PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_TMEM_BW);
+        if (event & PQOS_PERF_EVENT_IPC)
+                group->intl->hw.event |= (enum pqos_mon_event)(
+                    PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_INSTRUCTIONS);
 
 pqos_mon_start_error2:
         if (retval != PQOS_RETVAL_OK) {
@@ -1169,23 +1019,179 @@ hw_mon_stop(struct pqos_mon_data *group)
         return retval;
 }
 
-int
-hw_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
+/**
+ * @brief Read HW counter
+ *
+ * Reads counters for all events and stores values
+ *
+ * @param group monitoring structure
+ * @param event PQoS event
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+static int
+hw_mon_read_counter(struct pqos_mon_data *group,
+                    const enum pqos_mon_event event)
 {
-        unsigned i = 0;
+        struct pqos_event_values *pv = &group->values;
+        uint64_t value = 0;
+        uint64_t max_value = 1LLU << 24;
+        const struct pqos_cap *cap;
+        const struct pqos_monitor *pmon;
+        unsigned i;
+        int ret;
 
-        ASSERT(groups != NULL);
-        ASSERT(num_groups > 0);
+        ASSERT(event == PQOS_MON_EVENT_L3_OCCUP ||
+               event == PQOS_MON_EVENT_LMEM_BW ||
+               event == PQOS_MON_EVENT_TMEM_BW);
 
-        for (i = 0; i < num_groups; i++) {
-                int ret = pqos_core_poll(groups[i]);
+        _pqos_cap_get(&cap, NULL);
 
-                if (ret != PQOS_RETVAL_OK)
-                        LOG_WARN("Failed to read event on "
-                                 "core %u\n",
-                                 groups[i]->cores[0]);
+        ret = pqos_cap_get_event(cap, event, &pmon);
+        if (ret == PQOS_RETVAL_OK)
+                max_value = 1LLU << pmon->counter_length;
+
+        for (i = 0; i < group->intl->hw.num_ctx; i++) {
+                uint64_t tmp = 0;
+                const unsigned lcore = group->intl->hw.ctx[i].lcore;
+                const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+                int retval;
+
+                retval = mon_read(lcore, rmid, get_event_id(event), &tmp);
+                if (retval != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                value += tmp;
+
+                if (value >= max_value)
+                        value -= max_value;
         }
+
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                pv->llc = scale_event(PQOS_MON_EVENT_L3_OCCUP, value);
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
+                if (group->intl->valid_mbm_read) {
+                        pv->mbm_local_delta =
+                            get_delta(event, pv->mbm_local, value);
+                        pv->mbm_local_delta =
+                            scale_event(event, pv->mbm_local_delta);
+                } else
+                        /* Report zero memory bandwidth with first read */
+                        pv->mbm_local_delta = 0;
+                pv->mbm_local = value;
+                break;
+        case PQOS_MON_EVENT_TMEM_BW:
+                if (group->intl->valid_mbm_read) {
+                        pv->mbm_total_delta =
+                            get_delta(event, pv->mbm_total, value);
+                        pv->mbm_total_delta =
+                            scale_event(event, pv->mbm_total_delta);
+                } else
+                        /* Report zero memory bandwidth with first read */
+                        pv->mbm_total_delta = 0;
+                pv->mbm_total = value;
+                break;
+        default:
+                return PQOS_RETVAL_PARAM;
+        }
+
         return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Read HW perf counter
+ *
+ * @param group monitoring structure
+ * @param event PQoS event
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+static int
+hw_mon_read_perf(struct pqos_mon_data *group, const enum pqos_mon_event event)
+{
+        struct pqos_event_values *pv = &group->values;
+        uint64_t value = 0;
+        unsigned n;
+        uint64_t reg;
+
+        switch (event) {
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
+                reg = IA32_MSR_INST_RETIRED_ANY;
+                break;
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
+                reg = IA32_MSR_CPU_UNHALTED_THREAD;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS:
+                reg = IA32_MSR_PMC0;
+                break;
+        default:
+                return PQOS_RETVAL_PARAM;
+        }
+
+        /**
+         * If multiple cores monitored in one group
+         * then we have to accumulate the values in the group.
+         */
+        for (n = 0; n < group->num_cores; n++) {
+                uint64_t tmp = 0;
+                int ret = msr_read(group->cores[n], reg, &tmp);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+                value += tmp;
+        }
+
+        switch (event) {
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
+                pv->ipc_retired_delta = value - pv->ipc_retired;
+                pv->ipc_retired = value;
+                break;
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
+                pv->ipc_unhalted_delta = value - pv->ipc_unhalted;
+                pv->ipc_unhalted = value;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS:
+                pv->llc_misses_delta = value - pv->llc_misses;
+                pv->llc_misses = value;
+                break;
+        default:
+                return PQOS_RETVAL_PARAM;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+hw_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+        case PQOS_MON_EVENT_LMEM_BW:
+        case PQOS_MON_EVENT_TMEM_BW:
+                ret = hw_mon_read_counter(group, event);
+                if (ret != PQOS_RETVAL_OK)
+                        goto pqos_core_poll__exit;
+                break;
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
+        case PQOS_PERF_EVENT_LLC_MISS:
+                ret = hw_mon_read_perf(group, event);
+                if (ret != PQOS_RETVAL_OK)
+                        goto pqos_core_poll__exit;
+                break;
+        default:
+                ret = PQOS_RETVAL_PARAM;
+        }
+
+pqos_core_poll__exit:
+        return ret;
 }
 /*
  * =======================================

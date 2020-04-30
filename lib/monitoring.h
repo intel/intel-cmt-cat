@@ -95,6 +95,7 @@ struct pqos_mon_data_internal {
          * Hw specific section
          */
         struct {
+                enum pqos_mon_event event;     /**< Started hw events */
                 struct pqos_mon_poll_ctx *ctx; /**< core, cluster & RMID */
                 unsigned num_ctx;              /**< number of poll contexts */
         } hw;
@@ -122,6 +123,16 @@ int pqos_mon_init(const struct pqos_cpuinfo *cpu,
  * @return Operation status
  */
 int pqos_mon_fini(void);
+
+/**
+ * @brief Poll monitoring data from requested groups
+ *
+ * @param group monitoring group pointer to be be updated
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_poll_events(struct pqos_mon_data *group);
 
 #ifdef __cplusplus
 }

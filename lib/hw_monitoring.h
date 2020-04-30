@@ -122,15 +122,18 @@ int hw_mon_start(const unsigned num_cores,
 int hw_mon_stop(struct pqos_mon_data *group);
 
 /**
- * @brief Hardware interface poll monitoring data from requested cores
+ * @brief Hardware interface poll monitoring data
  *
- * @param [in] groups table of monitoring group pointers to be be updated
- * @param [in] num_groups number of monitoring groups in the table
+ * Reads counters for all events and stores values
  *
- * @return Operations status
+ * @param group monitoring structure
+ * @param event PQoS event type
+ *
+ * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int hw_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups);
+int hw_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event);
 
 #ifdef __cplusplus
 }
