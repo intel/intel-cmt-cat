@@ -84,6 +84,11 @@ static struct pqos_rmid_config rmid_cfg = {PQOS_RMID_TYPE_DEFAULT,
 /* clang-format on */
 #endif
 
+/** List of non-virtual perf events */
+static const enum pqos_mon_event perf_event[] = {
+    PQOS_PERF_EVENT_LLC_MISS, (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
+    (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
+
 /**
  * ---------------------------------------
  * Local Functions
@@ -628,20 +633,20 @@ get_delta(const enum pqos_mon_event event,
 /**
  * @brief Sets up IA32 performance counters for IPC and LLC miss ratio events
  *
- * @param num_cores number of cores in \a cores table
- * @param cores table with core id's
+ * @param group monitoring data
  * @param event mask of selected monitoring events
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-ia32_perf_counter_start(const unsigned num_cores,
-                        const unsigned *cores,
+ia32_perf_counter_start(const struct pqos_mon_data *group,
                         const enum pqos_mon_event event)
 {
         uint64_t global_ctrl_mask = 0;
         unsigned i;
+        const unsigned *cores = group->cores;
+        const unsigned num_cores = group->num_cores;
 
         ASSERT(cores != NULL && num_cores > 0);
 
@@ -759,89 +764,149 @@ ia32_perf_counter_stop(const unsigned num_cores,
         return retval;
 }
 
-int
-hw_mon_start(const unsigned num_cores,
-             const unsigned *cores,
-             const enum pqos_mon_event event,
-             void *context,
-             struct pqos_mon_data *group)
+/**
+ * @brief Start perf monitoring counters
+ *
+ * @param group monitoring structure
+ * @param event PQoS event type
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+hw_mon_start_perf(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+        enum pqos_mon_event hw_event = (enum pqos_mon_event)0;
+
+        group->intl->perf.ctx =
+            malloc(sizeof(group->intl->perf.ctx[0]) * group->num_cores);
+        if (group->intl->perf.ctx == NULL) {
+                LOG_ERROR("Memory allocation failed\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        for (i = 0; i < DIM(perf_event); i++) {
+                enum pqos_mon_event evt = perf_event[i];
+
+                if (event & evt) {
+#ifdef __linux__
+                        if (perf_mon_is_event_supported(evt)) {
+                                ret = perf_mon_start(group, evt);
+                                if (ret != PQOS_RETVAL_OK)
+                                        return ret;
+                                group->intl->perf.event |= evt;
+                                continue;
+                        }
+#endif
+                        hw_event |= evt;
+                }
+        }
+
+        if (!group->intl->perf.event) {
+                free(group->intl->perf.ctx);
+                group->intl->perf.ctx = NULL;
+        }
+
+        /* Start IA32 performance counters */
+        if (hw_event) {
+                ret = ia32_perf_counter_start(group, hw_event);
+                if (ret == PQOS_RETVAL_OK)
+                        group->intl->hw.event |= hw_event;
+        }
+
+        return ret;
+}
+
+/**
+ * @brief Stop perf monitoring counters
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+hw_mon_stop_perf(struct pqos_mon_data *group)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+        enum pqos_mon_event hw_event = (enum pqos_mon_event)0;
+
+        for (i = 0; i < DIM(perf_event); i++) {
+                enum pqos_mon_event evt = perf_event[i];
+
+#ifdef __linux__
+                /* Stop perf event */
+                if (group->intl->perf.event & evt) {
+                        ret = perf_mon_stop(group, evt);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+                        continue;
+                }
+#endif
+
+                if (group->intl->hw.event & evt)
+                        hw_event |= evt;
+        }
+
+        /* Stop IA32 performance counters */
+        if (hw_event) {
+                ret = ia32_perf_counter_stop(group->num_cores, group->cores,
+                                             group->event);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_RESOURCE;
+        }
+
+        if (group->intl->perf.ctx != NULL) {
+                free(group->intl->perf.ctx);
+                group->intl->perf.ctx = NULL;
+        }
+
+        return ret;
+}
+
+/**
+ * @brief Start HW monitoring counters
+ *
+ * @param group monitoring structure
+ * @param event PQoS event type
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
+{
+        const unsigned num_cores = group->num_cores;
+        const struct pqos_cpuinfo *cpu;
         unsigned core2cluster[num_cores];
         struct pqos_mon_poll_ctx ctxs[num_cores];
         unsigned num_ctxs = 0;
-        unsigned i = 0;
+        unsigned i;
         int ret = PQOS_RETVAL_OK;
-        int retval = PQOS_RETVAL_OK;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        enum pqos_mon_event ctx_event = (enum pqos_mon_event)(
+            event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                     PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW));
 
-        ASSERT(group != NULL);
-        ASSERT(cores != NULL);
-        ASSERT(num_cores > 0);
-        ASSERT(event > 0);
+        _pqos_cap_get(NULL, &cpu);
 
         memset(ctxs, 0, sizeof(ctxs));
 
-        _pqos_cap_get(&cap, &cpu);
-
-        /**
-         * Validate if event is listed in capabilities
-         */
-        for (i = 0; i < (sizeof(event) * 8); i++) {
-                const enum pqos_mon_event evt_mask =
-                    (enum pqos_mon_event)(1U << i);
-                const struct pqos_monitor *ptr = NULL;
-
-                if (!(evt_mask & event))
-                        continue;
-
-                ret = pqos_cap_get_event(cap, evt_mask, &ptr);
-                if (ret != PQOS_RETVAL_OK || ptr == NULL)
-                        return PQOS_RETVAL_PARAM;
-        }
-
-        /**
-         * Check if all requested cores are valid
-         * and not used by other monitoring processes.
-         *
-         * Check if any of requested cores is already subject to monitoring
-         * within this process.
-         *
+        /*
          * Initialize poll context table:
          * - get core cluster
          * - allocate RMID
          */
-        for (i = 0; i < num_cores; i++) {
-                const unsigned lcore = cores[i];
-                unsigned j, cluster = 0;
-                pqos_rmid_t rmid = RMID0;
-
-                ret = pqos_cpu_check_core(cpu, lcore);
-                if (ret != PQOS_RETVAL_OK) {
-                        retval = PQOS_RETVAL_PARAM;
-                        goto pqos_mon_start_error1;
-                }
-
-                ret = mon_assoc_get(lcore, &rmid);
-                if (ret != PQOS_RETVAL_OK) {
-                        retval = PQOS_RETVAL_PARAM;
-                        goto pqos_mon_start_error1;
-                }
-
-                if (rmid != RMID0) {
-                        /* If not RMID0 then it is already monitored */
-                        LOG_INFO("Core %u is already monitored with "
-                                 "RMID%u.\n",
-                                 lcore, rmid);
-                        retval = PQOS_RETVAL_RESOURCE;
-                        goto pqos_mon_start_error1;
-                }
+        for (i = 0; i < group->num_cores; i++) {
+                const unsigned lcore = group->cores[i];
+                unsigned j;
+                unsigned cluster = 0;
 
                 ret = pqos_cpu_get_clusterid(cpu, lcore, &cluster);
-                if (ret != PQOS_RETVAL_OK) {
-                        retval = PQOS_RETVAL_PARAM;
-                        goto pqos_mon_start_error1;
-                }
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_PARAM;
                 core2cluster[i] = cluster;
 
                 for (j = 0; j < num_ctxs; j++)
@@ -850,10 +915,6 @@ hw_mon_start(const unsigned num_cores,
                                 break;
 
                 if (j >= num_ctxs) {
-                        enum pqos_mon_event ctx_event = (enum pqos_mon_event)(
-                            event & (~(PQOS_PERF_EVENT_IPC |
-                                       PQOS_PERF_EVENT_LLC_MISS)));
-
                         /**
                          * New cluster is found
                          * - save cluster id in the table
@@ -867,36 +928,17 @@ hw_mon_start(const unsigned num_cores,
 #else
                         ret = rmid_alloc(&ctxs[num_ctxs], ctx_event);
 #endif
-                        if (ret != PQOS_RETVAL_OK) {
-                                retval = ret;
-                                goto pqos_mon_start_error1;
-                        }
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
 
                         num_ctxs++;
                 }
         }
 
-        /**
-         * Fill in the monitoring group structure
-         */
-        group->cores = (unsigned *)malloc(sizeof(group->cores[0]) * num_cores);
-        if (group->cores == NULL) {
-                retval = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_error1;
-        }
-
         group->intl->hw.ctx = (struct pqos_mon_poll_ctx *)malloc(
             sizeof(group->intl->hw.ctx[0]) * num_ctxs);
-        if (group->intl->hw.ctx == NULL) {
-                retval = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_error2;
-        }
-
-        ret = ia32_perf_counter_start(num_cores, cores, event);
-        if (ret != PQOS_RETVAL_OK) {
-                retval = ret;
-                goto pqos_mon_start_error2;
-        }
+        if (group->intl->hw.ctx == NULL)
+                return PQOS_RETVAL_RESOURCE;
 
         /**
          * Associate requested cores with
@@ -912,46 +954,166 @@ hw_mon_start(const unsigned num_cores,
                         if (ctxs[j].cluster == cluster)
                                 break;
                 if (j >= num_ctxs) {
-                        retval = PQOS_RETVAL_ERROR;
-                        goto pqos_mon_start_error2;
+                        ret = PQOS_RETVAL_ERROR;
+                        goto hw_mon_start_counter_exit;
                 }
                 rmid = ctxs[j].rmid;
 
-                group->cores[i] = cores[i];
-                ret = mon_assoc_set(cores[i], rmid);
-                if (ret != PQOS_RETVAL_OK) {
-                        retval = ret;
-                        goto pqos_mon_start_error2;
-                }
+                ret = mon_assoc_set(group->cores[i], rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_start_counter_exit;
         }
 
         group->intl->hw.num_ctx = num_ctxs;
         for (i = 0; i < num_ctxs; i++)
                 group->intl->hw.ctx[i] = ctxs[i];
 
-        group->event = event;
-        group->intl->hw.event = event;
-        group->context = context;
+        group->intl->hw.event |= ctx_event;
 
-        if (event & PQOS_MON_EVENT_RMEM_BW)
-                group->intl->hw.event |= (enum pqos_mon_event)(
-                    PQOS_MON_EVENT_LMEM_BW | PQOS_MON_EVENT_TMEM_BW);
-        if (event & PQOS_PERF_EVENT_IPC)
-                group->intl->hw.event |= (enum pqos_mon_event)(
-                    PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_INSTRUCTIONS);
-
-pqos_mon_start_error2:
-        if (retval != PQOS_RETVAL_OK) {
+hw_mon_start_counter_exit:
+        if (ret != PQOS_RETVAL_OK) {
                 for (i = 0; i < num_cores; i++)
-                        (void)mon_assoc_set(cores[i], RMID0);
+                        (void)mon_assoc_set(group->cores[i], RMID0);
 
                 if (group->intl->hw.ctx != NULL)
                         free(group->intl->hw.ctx);
+        }
+
+        return ret;
+}
+
+int
+hw_mon_start(const unsigned num_cores,
+             const unsigned *cores,
+             const enum pqos_mon_event event,
+             void *context,
+             struct pqos_mon_data *group)
+{
+        unsigned i;
+        int ret = PQOS_RETVAL_OK;
+        int retval = PQOS_RETVAL_OK;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
+        enum pqos_mon_event req_events;
+        enum pqos_mon_event started_evts = (enum pqos_mon_event)0;
+
+        ASSERT(group != NULL);
+        ASSERT(cores != NULL);
+        ASSERT(num_cores > 0);
+        ASSERT(event > 0);
+
+        _pqos_cap_get(&cap, &cpu);
+
+        req_events = event;
+
+        if (req_events & PQOS_MON_EVENT_RMEM_BW)
+                req_events |= (enum pqos_mon_event)(PQOS_MON_EVENT_LMEM_BW |
+                                                    PQOS_MON_EVENT_TMEM_BW);
+        if (req_events & PQOS_PERF_EVENT_IPC)
+                req_events |= (enum pqos_mon_event)(
+                    PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_INSTRUCTIONS);
+
+        /**
+         * Validate if event is listed in capabilities
+         */
+        for (i = 0; i < (sizeof(event) * 8); i++) {
+                const enum pqos_mon_event evt_mask =
+                    (enum pqos_mon_event)(1U << i);
+                const struct pqos_monitor *ptr = NULL;
+
+                if (!(evt_mask & event))
+                        continue;
+
+                retval = pqos_cap_get_event(cap, evt_mask, &ptr);
+                if (retval != PQOS_RETVAL_OK || ptr == NULL)
+                        return PQOS_RETVAL_PARAM;
+        }
+
+        /**
+         * Check if all requested cores are valid
+         * and not used by other monitoring processes.
+         *
+         * Check if any of requested cores is already subject to monitoring
+         * within this process.
+         */
+        for (i = 0; i < num_cores; i++) {
+                const unsigned lcore = cores[i];
+                pqos_rmid_t rmid = RMID0;
+
+                ret = pqos_cpu_check_core(cpu, lcore);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_PARAM;
+
+                ret = mon_assoc_get(lcore, &rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_PARAM;
+
+                if (rmid != RMID0) {
+                        /* If not RMID0 then it is already monitored */
+                        LOG_INFO("Core %u is already monitored with "
+                                 "RMID%u.\n",
+                                 lcore, rmid);
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        }
+
+        /**
+         * Fill in the monitoring group structure
+         */
+        group->event = event;
+        group->context = context;
+        group->num_cores = num_cores;
+        group->cores = (unsigned *)malloc(sizeof(group->cores[0]) * num_cores);
+        if (group->cores == NULL)
+                return PQOS_RETVAL_RESOURCE;
+        for (i = 0; i < group->num_cores; i++)
+                group->cores[i] = cores[i];
+
+        /* start perf events */
+        retval = hw_mon_start_perf(group, req_events);
+        if (retval != PQOS_RETVAL_OK)
+                goto pqos_mon_start_error;
+
+        /* start MBM/CMT events */
+        retval = hw_mon_start_counter(group, req_events);
+        if (retval != PQOS_RETVAL_OK)
+                goto pqos_mon_start_error;
+
+        started_evts |= group->intl->perf.event;
+        started_evts |= group->intl->hw.event;
+
+        /**
+         * All events required by RMEM has been started
+         */
+        if ((started_evts & PQOS_MON_EVENT_LMEM_BW) &&
+            (started_evts & PQOS_MON_EVENT_TMEM_BW)) {
+                group->values.mbm_remote = 0;
+                started_evts |= PQOS_MON_EVENT_RMEM_BW;
+        }
+
+        /**
+         * All events required by IPC has been started
+         */
+        if ((started_evts & PQOS_PERF_EVENT_CYCLES) &&
+            (started_evts & PQOS_PERF_EVENT_INSTRUCTIONS)) {
+                group->values.ipc = 0;
+                started_evts |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
+        }
+
+        /*  Check if all selected events were started */
+        if ((group->event & started_evts) != group->event) {
+                LOG_ERROR("Failed to start all selected "
+                          "HW monitoring events\n");
+                retval = PQOS_RETVAL_ERROR;
+        }
+
+pqos_mon_start_error:
+        if (retval != PQOS_RETVAL_OK) {
+                hw_mon_stop_perf(group);
 
                 if (group->cores != NULL)
                         free(group->cores);
         }
-pqos_mon_start_error1:
 
         return retval;
 }
@@ -1001,13 +1163,10 @@ hw_mon_stop(struct pqos_mon_data *group)
                         retval = PQOS_RETVAL_RESOURCE;
         }
 
-        /**
-         * Stop IA32 performance counters
-         */
-        ret = ia32_perf_counter_stop(group->num_cores, group->cores,
-                                     group->event);
+        /* stop perf counters */
+        ret = hw_mon_stop_perf(group);
         if (ret != PQOS_RETVAL_OK)
-                retval = PQOS_RETVAL_RESOURCE;
+                retval = ret;
 
         /**
          * Free poll contexts, core list and clear the group structure
@@ -1116,19 +1275,27 @@ static int
 hw_mon_read_perf(struct pqos_mon_data *group, const enum pqos_mon_event event)
 {
         struct pqos_event_values *pv = &group->values;
-        uint64_t value = 0;
+        uint64_t val = 0;
         unsigned n;
         uint64_t reg;
+        uint64_t *value;
+        uint64_t *delta;
 
         switch (event) {
-        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
-                reg = IA32_MSR_INST_RETIRED_ANY;
-                break;
         case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
+                reg = IA32_MSR_INST_RETIRED_ANY;
+                value = &pv->ipc_retired;
+                delta = &pv->ipc_retired_delta;
+                break;
+        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 reg = IA32_MSR_CPU_UNHALTED_THREAD;
+                value = &pv->ipc_unhalted;
+                delta = &pv->ipc_unhalted_delta;
                 break;
         case PQOS_PERF_EVENT_LLC_MISS:
                 reg = IA32_MSR_PMC0;
+                value = &pv->llc_misses;
+                delta = &pv->llc_misses_delta;
                 break;
         default:
                 return PQOS_RETVAL_PARAM;
@@ -1141,27 +1308,14 @@ hw_mon_read_perf(struct pqos_mon_data *group, const enum pqos_mon_event event)
         for (n = 0; n < group->num_cores; n++) {
                 uint64_t tmp = 0;
                 int ret = msr_read(group->cores[n], reg, &tmp);
+
                 if (ret != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
-                value += tmp;
+                val += tmp;
         }
 
-        switch (event) {
-        case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
-                pv->ipc_retired_delta = value - pv->ipc_retired;
-                pv->ipc_retired = value;
-                break;
-        case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
-                pv->ipc_unhalted_delta = value - pv->ipc_unhalted;
-                pv->ipc_unhalted = value;
-                break;
-        case PQOS_PERF_EVENT_LLC_MISS:
-                pv->llc_misses_delta = value - pv->llc_misses;
-                pv->llc_misses = value;
-                break;
-        default:
-                return PQOS_RETVAL_PARAM;
-        }
+        *delta = val - *value;
+        *value = val;
 
         return PQOS_RETVAL_OK;
 }

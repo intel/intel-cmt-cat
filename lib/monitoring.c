@@ -36,8 +36,8 @@
 #include "monitoring.h"
 #include "os_monitoring.h"
 #include "hw_monitoring.h"
-#ifdef __linux__
 #include "perf_monitoring.h"
+#ifdef __linux__
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
 #endif
@@ -129,9 +129,11 @@ pqos_mon_fini(void)
         if (m_interface == PQOS_INTER_OS ||
             m_interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_mon_fini();
-#endif
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_mon_fini();
+#else
+        ret = hw_mon_fini();
+#endif
 
         return ret;
 }

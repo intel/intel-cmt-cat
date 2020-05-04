@@ -68,7 +68,9 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 /**
  * Paths to RDT perf event info
  */
+#ifndef PERF_MON_SUPPORT
 #define PERF_MON_SUPPORT "/proc/sys/kernel/perf_event_paranoid"
+#endif
 static const char *perf_events = "events/";
 static const char *perf_type = "type";
 
