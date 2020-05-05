@@ -1,0 +1,30 @@
+---
+namespace: intel
+name: appqos
+version: 1.0.1
+
+readme: README.md
+
+authors:
+  - Khawar Abbasi <khawar.abbasi@intel.com>
+  - Wojciech Andralojc <wojciechx.andralojc@intel.com>
+  - Tomasz Kantecki <tomasz.kantecki@intel.com>
+
+description: Collection with single role to deploy and stop AppQoS
+
+license:
+  - BSD-3-Clause
+
+tags:
+  - rdt
+  - appqos
+  - cacheqos
+  - pqos
+  - mba
+  - cat
+  - mbm
+  - cmt
+  - sstbf
+  - sstcp
+
+repository: https://github.com/intel/intel-cmt-cat/tree/master/appqos/ansible

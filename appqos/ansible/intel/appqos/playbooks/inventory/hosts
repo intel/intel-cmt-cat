@@ -31,41 +31,14 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
----
-galaxy_info:
-  role_name: appqos
-  author: Khawar Abbasi, Wojciech Andralojc, Tomasz Kantecki
-  description: Deploys or stops AppQoS
-  company: Intel Corporation
+[compute]
 
-  license: BSD-3-Clause
+# These hostname must be resolvable from deployment host
 
-  min_ansible_version: 2.5.0
+#compute01
+#compute02
 
-  platforms:
-    - name: Fedora
-      versions:
-        - all
-    - name: Ubuntu
-      versions:
-        - all
-    - name: RedHat
-      versions:
-        - 7
-    - name: Centos
-      versions:
-        - 7
+# The above can also be specified as follows:
+#compute01                       ansible_python_interpreter=/usr/bin/python3
+#compute02                       ansible_python_interpreter=/usr/bin/python3
 
-  galaxy_tags:
-    - rdt
-    - appqos
-    - cache qos
-    - pqos
-    - mba
-    - cat
-    - mbm
-    - cmt
-    - sst-bf
-    - sst-cp
-
-  dependencies: []

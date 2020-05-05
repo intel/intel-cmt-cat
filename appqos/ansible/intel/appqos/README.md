@@ -1,13 +1,7 @@
-================================================================================
-README for Ansible Role - appqos
+# README for Ansible Collection - intel.appqos
+April 2020
 
-May 2020
-================================================================================
-
-
-CONTENTS
-========
-
+## CONTENTS
 - Introduction
 - AppQoS Overview
 - Dependencies
@@ -18,19 +12,14 @@ CONTENTS
 - Further Information
 - Legal Disclaimer
 
-
-INTRODUCTION
-============
-
-An Ansible Role that installs AppQoS, an API for
-Intel(R) Resource Director Technology (RDT)
+## INTRODUCTION
+An Ansible Collection with single role that installs AppQoS,
+an API for Intel(R) Resource Director Technology (RDT)
 and Intel(R) Speed Select Technology (SST),
 on RHEL/CentOS/Fedora and Debian/Ubuntu Linux distributions.
 
 
-APPQOS OVERVIEW
-===============
-
+## APPQOS OVERVIEW
 AppQoS is a proof-of-concept software created to demonstrate the use of
 Intel(R) RDT and Intel(R) SST to improve Quality of Service (QoS) for
 applications via partitioning system resources.
@@ -39,9 +28,7 @@ More information can be found in AppQoS README file available at:
 https://github.com/intel/intel-cmt-cat/tree/master/appqos/README
 
 
-DEPENDENCIES
-============
-
+## DEPENDENCIES
 Intel(R) RDT CAT and MBA configuration is done via "libpqos" library:
 https://github.com/intel/intel-cmt-cat
 
@@ -52,9 +39,7 @@ More information can be found in AppQoS README file available at:
 https://github.com/intel/intel-cmt-cat/tree/master/appqos/README
 
 
-CONFIGURATION
-=============
-
+## CONFIGURATION
 AppQoS supports pools of resources, i.e. Pools. In each Pool one or more
 application can be deployed, where application is one or more PIDs.
 
@@ -80,9 +65,7 @@ Apart from installing configuration files, this Ansible script also:
 - Stop/terminate AppQoS running in the background
 
 
-ROLE VARIABLES
-==============
-
+## ROLE VARIABLES
 All variables are stored in main.yml file under role's "default" directory.
 Based on user needs it can be changed.
 
@@ -91,37 +74,32 @@ Based on user needs it can be changed.
 - "stopped" to stop AppQoS instance
 
 
-EXAMPLE PLAYBOOK
-================
-
+## EXAMPLE PLAYBOOK
 Playbook to deploy AppQoS:
-
+```
 - name: Deploy AppQoS
   hosts: compute
   roles:
-    - role: intel.appqos
+    - role: intel.appqos.appqos
       state: present
+```
 
 Playbook to stop AppQoS:
-
+```
 - name: Stop AppQoS
   hosts: compute
   roles:
-    - role: intel.appqos
+    - role: intel.appqos.appqos
       state: stopped
+```
+
+## REQUIREMENTS
+- Python >= 3.6
+- Ansible* >= 2.5
+- msr-tools installed
 
 
-REQUIREMENTS
-============
-
-Python >= 3.6
-Ansible* >= 2.5
-msr-tools installed
-
-
-FURTHER INFORMATION
-===================
-
+## FURTHER INFORMATION
 Intel(R) Resource Directory Technology:
 https://www.intel.com/content/www/us/en/architecture-and-technology/resource-director-technology.html
 
@@ -132,9 +110,7 @@ Intel(R) SST-BF configuration Python script:
 https://github.com/intel/CommsPowerManagement/blob/master/sst_bf.py
 
 
-LEGAL DISCLAIMER
-================
-
+## LEGAL DISCLAIMER
 THIS SOFTWARE IS PROVIDED BY INTEL"AS IS". NO LICENSE, EXPRESS OR
 IMPLIED, BY ESTOPPEL OR OTHERWISE, TO ANY INTELLECTUAL PROPERTY RIGHTS
 ARE GRANTED THROUGH USE. EXCEPT AS PROVIDED IN INTEL'S TERMS AND
