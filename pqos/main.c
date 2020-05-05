@@ -850,6 +850,8 @@ int main(int argc, char **argv)
                         parse_config_file(sel_config_file);
                         break;
                 case 'i':
+                        if (optarg == NULL)
+                                return EXIT_FAILURE;
                         selfn_monitor_interval(optarg);
                         break;
                 case 'p':
@@ -1167,7 +1169,7 @@ int main(int argc, char **argv)
         /**
          * Close file descriptor for message log
          */
-        if (cfg.fd_log > 0 && cfg.fd_log != STDOUT_FILENO)
+        if (sel_log_file != NULL && cfg.fd_log != -1)
                 close(cfg.fd_log);
 
         /**

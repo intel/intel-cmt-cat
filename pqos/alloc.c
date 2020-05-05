@@ -191,6 +191,8 @@ set_l3_cos(const unsigned class_id, const uint64_t mask,
                 unsigned j, num_ca;
                 struct pqos_l3ca ca, sock_l3ca[PQOS_MAX_L3CA_COS];
 
+                memset(&ca, 0, sizeof(ca));
+
                 /* get current L3 definitions for this socket */
                 ret = pqos_l3ca_get(sock_ids[i], DIM(sock_l3ca),
                                     &num_ca, sock_l3ca);
@@ -284,6 +286,8 @@ set_l2_cos(const unsigned class_id,
                 int ret;
                 unsigned j, num_ca;
                 struct pqos_l2ca ca, cluster_l2ca[PQOS_MAX_L2CA_COS];
+
+                memset(&ca, 0, sizeof(ca));
 
                 /* get current L2 definitions for this cluster */
                 ret = pqos_l2ca_get(l2_ids[i], DIM(cluster_l2ca),

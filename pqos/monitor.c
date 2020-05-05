@@ -1194,6 +1194,7 @@ get_pid_stat_val(const char *proc_pid_dir_name, const int column,
                                 return -1;
                         } else {
                                 strncpy(val, token, len_val);
+                                val[len_val - 1] = '\0';
                                 return 0;/*value can be read from *val param*/
                         }
                 }
