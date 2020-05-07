@@ -56,7 +56,7 @@
 #include "monitor.h"
 
 #define PQOS_MAX_PID_MON_GROUPS         256
-#define PQOS_MON_EVENT_ALL    -1
+#define PQOS_MON_EVENT_ALL    ((enum pqos_mon_event)~PQOS_MON_EVENT_TMEM_BW)
 #define PID_COL_STATUS (3) /**< col for process status letter*/
 #define PID_COL_UTIME (14) /**< col for cpu-user time in /proc/pid/stat*/
 #define PID_COL_STIME (15) /**< col for cpu-kernel time in /proc/pid/stat*/
@@ -575,6 +575,8 @@ parse_event(char *str, enum pqos_mon_event *evt)
                 *evt = PQOS_MON_EVENT_RMEM_BW;
         else if (strncasecmp(str, "mbl:", 4) == 0)
                 *evt = PQOS_MON_EVENT_LMEM_BW;
+        else if (strncasecmp(str, "mbt:", 4) == 0)
+                *evt = PQOS_MON_EVENT_TMEM_BW;
         else if (strncasecmp(str, "all:", 4) == 0 ||
                    strncasecmp(str, ":", 1) == 0)
                 *evt = (enum pqos_mon_event) PQOS_MON_EVENT_ALL;
@@ -738,8 +740,8 @@ static void monitor_setup_events(enum pqos_mon_event *events,
                 all_evts &= (~PQOS_PERF_EVENT_LLC_MISS);
 
         /* check if all available events were selected */
-        if (*events == (enum pqos_mon_event)PQOS_MON_EVENT_ALL) {
-                *events = all_evts;
+        if ((*events & PQOS_MON_EVENT_ALL) == PQOS_MON_EVENT_ALL) {
+                *events = all_evts & *events;
 
         /* Start IPC and LLC miss monitoring if available */
         } else {
@@ -2108,13 +2110,15 @@ fillin_csv_column(const char *format,
  * @param llc_entry LLC occupancy data structure
  * @param mbr remote memory bandwidth data
  * @param mbl local memory bandwidth data
+ * @param mbt total memory bandwidth data
  */
 static void
 print_text_row(FILE *fp,
                struct pqos_mon_data *mon_data,
                const struct llc_entry_data *llc_entry,
                const double mbr,
-               const double mbl)
+               const double mbl,
+               const double mbt)
 {
         const size_t sz_data = 256;
         char data[sz_data];
@@ -2164,9 +2168,14 @@ print_text_row(FILE *fp,
                                      mon_data->event & PQOS_MON_EVENT_LMEM_BW,
                                      sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        fillin_text_column(" %11.1f", mbr, data + offset, sz_data - offset,
-                           mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                           sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+        offset += fillin_text_column(" %11.1f", mbr, data + offset,
+                                     sz_data - offset,
+                                     mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                                     sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+
+        fillin_text_column(" %11.1f", mbt, data + offset, sz_data - offset,
+                           mon_data->event & PQOS_MON_EVENT_TMEM_BW,
+                           sel_events_max & PQOS_MON_EVENT_TMEM_BW);
 
         if (!process_mode())
                 fprintf(fp, "\n%8.8s%s", (char *)mon_data->context, data);
@@ -2193,6 +2202,7 @@ print_text_row(FILE *fp,
  * @param llc_entry LLC occupancy data structure
  * @param mbr remote memory bandwidth data
  * @param mbl local memory bandwidth data
+ * @param mbt total memory bandwidth data
  */
 static void
 print_xml_row(FILE *fp,
@@ -2200,7 +2210,8 @@ print_xml_row(FILE *fp,
               struct pqos_mon_data *mon_data,
               const struct llc_entry_data *llc_entry,
               const double mbr,
-              const double mbl)
+              const double mbl,
+              const double mbt)
 {
         const size_t sz_data = 256;
         char data[sz_data];
@@ -2256,10 +2267,16 @@ print_xml_row(FILE *fp,
                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW,
                                     "mbm_local_MB");
 
-        fillin_xml_column("%.1f", mbr, data + offset, sz_data - offset,
-                          mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                          sel_events_max & PQOS_MON_EVENT_RMEM_BW,
-                          "mbm_remote_MB");
+        offset += fillin_xml_column("%.1f", mbr, data + offset,
+                                    sz_data - offset,
+                                    mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                                    sel_events_max & PQOS_MON_EVENT_RMEM_BW,
+                                    "mbm_remote_MB");
+
+        fillin_xml_column("%.1f", mbt, data + offset, sz_data - offset,
+                          mon_data->event & PQOS_MON_EVENT_TMEM_BW,
+                          sel_events_max & PQOS_MON_EVENT_TMEM_BW,
+                          "mbm_total_MB");
 
         if (!process_mode())
                 fprintf(fp,
@@ -2307,13 +2324,15 @@ print_xml_row(FILE *fp,
  * @param llc_entry LLC occupancy data structure
  * @param mbr remote memory bandwidth data
  * @param mbl local memory bandwidth data
+ * @param mbt total memory bandwidth data
  */
 static void
 print_csv_row(FILE *fp, char *time,
               struct pqos_mon_data *mon_data,
               const struct llc_entry_data *llc_entry,
               const double mbr,
-              const double mbl)
+              const double mbl,
+              const double mbt)
 {
         const size_t sz_data = 128;
         char data[sz_data];
@@ -2364,9 +2383,14 @@ print_csv_row(FILE *fp, char *time,
                                     mon_data->event & PQOS_MON_EVENT_LMEM_BW,
                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        fillin_csv_column(",%.1f", mbr, data + offset, sz_data - offset,
-                          mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                          sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+        offset += fillin_csv_column(",%.1f", mbr, data + offset,
+                                    sz_data - offset,
+                                    mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                                    sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+
+        fillin_csv_column(",%.1f", mbt, data + offset, sz_data - offset,
+                          mon_data->event & PQOS_MON_EVENT_TMEM_BW,
+                          sel_events_max & PQOS_MON_EVENT_TMEM_BW);
 
         if (!process_mode())
                 fprintf(fp,
@@ -2437,6 +2461,8 @@ build_header_row(char *hdr, const size_t sz_hdr,
                         strncat(hdr, "   MBL[MB/s]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
                         strncat(hdr, "   MBR[MB/s]", sz_hdr - strlen(hdr) - 1);
+                if (sel_events_max & PQOS_MON_EVENT_TMEM_BW)
+                        strncat(hdr, "   MBT[MB/s]", sz_hdr - strlen(hdr) - 1);
         }
 
         if (iscsv) {
@@ -2465,6 +2491,8 @@ build_header_row(char *hdr, const size_t sz_hdr,
                         strncat(hdr, ",MBL[MB/s]", sz_hdr - strlen(hdr) - 1);
                 if (sel_events_max & PQOS_MON_EVENT_RMEM_BW)
                         strncat(hdr, ",MBR[MB/s]", sz_hdr - strlen(hdr) - 1);
+                if (sel_events_max & PQOS_MON_EVENT_TMEM_BW)
+                        strncat(hdr, ",MBT[MB/s]", sz_hdr - strlen(hdr) - 1);
         }
 }
 
@@ -2742,16 +2770,17 @@ void monitor_loop(void)
 
                         double mbr = bytes_to_mb(pv->mbm_remote_delta) * coeff;
                         double mbl = bytes_to_mb(pv->mbm_local_delta) * coeff;
+                        double mbt = bytes_to_mb(pv->mbm_total_delta) * coeff;
 
                         if (istext)
                                 print_text_row(fp_monitor, mon_data[i],
-                                               &llc_entry, mbr, mbl);
+                                               &llc_entry, mbr, mbl, mbt);
                         if (isxml)
                                 print_xml_row(fp_monitor, cb_time, mon_data[i],
-                                              &llc_entry, mbr, mbl);
+                                              &llc_entry, mbr, mbl, mbt);
                         if (iscsv)
                                 print_csv_row(fp_monitor, cb_time, mon_data[i],
-                                              &llc_entry, mbr, mbl);
+                                              &llc_entry, mbr, mbl, mbt);
                 }
                 if (!istty && istext)
                         fputs("\n", fp_monitor);

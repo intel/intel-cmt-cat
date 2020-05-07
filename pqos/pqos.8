@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH PQOS 8 "January 04, 2019"
+.TH PQOS 8 "May 08, 2020"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -172,7 +172,9 @@ select the cores and events for monitoring, EVTCORES format is "EVENT:CORE_LIST"
 .br
 \- "mbl" for MBL (local memory bandwidth)
 .br
-\- "all" or ""  for all detected event types
+\- "mbt" for MBT (total memory bandwidth)
+.br
+\- "all" or ""  for all detected event types (except MBT)
 .br
 CORE_LIST is comma or dash separated list of cores.
 .br

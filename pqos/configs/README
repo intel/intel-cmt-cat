@@ -130,6 +130,7 @@ Currently supported event type(s):
 - Last Level Cache Occupancy (llc)
 - Local Memory Bandwidth (mbl)
 - Remote Memory Bandwidth (mbr)
+- Total Memory Bandwidth (mbt)
 
 
 Description:    Selects core(s) and events to be monitored
