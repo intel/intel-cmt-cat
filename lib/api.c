@@ -42,6 +42,7 @@
 #include "os_monitoring.h"
 #include "monitoring.h"
 #include "os_monitoring.h"
+#include "hw_monitoring.h"
 #include "cap.h"
 #include "log.h"
 #include "types.h"

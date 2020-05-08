@@ -211,6 +211,7 @@ checkpatch:
 	-f common.h -f common.c \
 	-f cpuinfo.h -f cpuinfo.c \
 	-f hw_cap.h -f hw_cap.c \
+	-f hw_monitoring.h hw_monitoring.c \
 	-f log.h -f log.c \
 	-f machine.h -f machine.c \
 	-f monitoring.h -f monitoring.c \
@@ -254,6 +255,7 @@ cppcheck:
 	utils.c utils.h \
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
 	hw_cap.h hw_cap.c \
+	hw_monitoring.h hw_monitoring.c \
 	os_cap.h os_cap.c \
 	os_monitoring.h os_monitoring.c \
 	perf_monitoring.h perf_monitoring.c \
