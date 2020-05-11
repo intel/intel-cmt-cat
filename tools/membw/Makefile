@@ -55,7 +55,8 @@ IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
 ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
-    -fwrapv
+    -fwrapv \
+    -fno-expensive-optimizations
 endif
 
 SRCS = $(sort $(wildcard *.c))

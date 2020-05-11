@@ -916,15 +916,10 @@ nano_sleep(const long interval, long usec_diff)
 {
         struct timespec req, rem;
 
-        memset(&rem, 0, sizeof(rem));
-        memset(&req, 0, sizeof(req));
         req.tv_sec = (interval - usec_diff) / 1000000L;
         req.tv_nsec = ((interval - usec_diff) % 1000000L) * 1000L;
-        if (nanosleep(&req, &rem) == -1) {
-                req = rem;
-                memset(&rem, 0, sizeof(rem));
-                nanosleep(&req, &rem);
-        }
+        if (nanosleep(&req, &rem) == -1)
+                nanosleep(&rem, NULL);
 }
 
 /**
