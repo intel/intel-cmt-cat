@@ -22,7 +22,7 @@ jobs=1
 
 # List of plugins (as comma separated values of python modules names) to load,
 # usually to register additional checkers.
-load-plugins=
+load-plugins=caniusepython3.pylint_checker
 
 # Pickle collected data for later comparisons.
 persistent=yes

@@ -2,3 +2,4 @@ astroid
 bandit
 pylint
 coverage
+caniusepython3

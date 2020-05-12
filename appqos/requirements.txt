@@ -11,3 +11,4 @@ pytest
 pytest-cov
 mock
 git+https://github.com/intel/CommsPowerManagement.git@pwr-v0.2.1#egg=pwr&subdirectory=pwr
+caniusepython3
