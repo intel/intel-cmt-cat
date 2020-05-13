@@ -1231,7 +1231,7 @@ os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf) - 1, "%s/info/L3/min_cbm_bits", RESCTRL_PATH);
 
-        fd = fopen_check_symlink(buf, "r");
+        fd = pqos_fopen(buf, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -1465,7 +1465,7 @@ os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf) - 1, "%s/info/L2/min_cbm_bits", RESCTRL_PATH);
 
-        fd = fopen_check_symlink(buf, "r");
+        fd = pqos_fopen(buf, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 

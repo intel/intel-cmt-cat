@@ -56,8 +56,7 @@ extern "C" {
  * @retval A valid pointer to a file or NULL on error (e.g. when the path
  * contains any symbolic links).
  */
-FILE *
-fopen_check_symlink(const char *name, const char *mode);
+FILE * pqos_fopen(const char *name, const char *mode);
 
 /**
  * @brief Wrapper around open() that additionally checks if a given path
@@ -71,8 +70,7 @@ fopen_check_symlink(const char *name, const char *mode);
  * @retval A valid file descriptor or -1 on error (e.g. when the path
  * contains any symbolic links).
  */
-int
-open_check_symlink(const char *pathname, int flags, mode_t mode);
+int pqos_open(const char *pathname, int flags, mode_t mode);
 
 #ifdef __cplusplus
 }

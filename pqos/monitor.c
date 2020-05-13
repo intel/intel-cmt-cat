@@ -791,9 +791,9 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         } else {
                 if (strcasecmp(sel_output_type, "xml") == 0 ||
                     strcasecmp(sel_output_type, "csv") == 0)
-                        fp_monitor = fopen_check_symlink(sel_output_file, "w+");
+                        fp_monitor = pqos_fopen(sel_output_file, "w+");
                 else
-                        fp_monitor = fopen_check_symlink(sel_output_file, "a");
+                        fp_monitor = pqos_fopen(sel_output_file, "a");
                 if (fp_monitor == NULL) {
                         perror("Monitoring output file open error:");
                         printf("Error opening '%s' output file!\n",

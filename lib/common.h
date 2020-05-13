@@ -57,7 +57,7 @@ extern "C" {
  * contains any symbolic links).
  */
 /* clang-format off */
-FILE * fopen_check_symlink(const char *name, const char *mode);
+FILE * pqos_fopen(const char *name, const char *mode);
 /* clang-format on */
 
 #ifdef __cplusplus

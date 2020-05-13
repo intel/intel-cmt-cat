@@ -32,106 +32,87 @@
  *
  */
 
-#include <errno.h>
+#include <stdio.h>
+#include <sys/stat.h>
 #include <fcntl.h>
-#include <libgen.h>
-#include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
-
-#include "pqos.h"
 
 #include "common.h"
 
-
-/**
- * @brief Checks if a path to a file contains any symbolic links.
- *
- * @param [in] name a path to a file
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK if the path exists and does not contain any
- * symbolic links.
- */
-static int
-check_symlink(const char *name)
-{
-        int fd;
-        int oflag;
-        char *dir = strdup(name);
-        char *path = dir;
-
-        if (dir == NULL)
-                return PQOS_RETVAL_ERROR;
-
-        oflag = O_RDONLY;
-
-        do {
-                fd = open(path, oflag | O_NOFOLLOW);
-                if (fd == -1) {
-                        if (errno == ELOOP)
-                                printf("File %s is a symlink\n", path);
-
-                        free(dir);
-                        return PQOS_RETVAL_ERROR;
-                }
-
-                oflag = O_RDONLY | O_DIRECTORY;
-                path = dirname(path);
-
-                if (fd != -1)
-                        close(fd);
-        } while ((strcmp(path, ".") != 0) && (strcmp(path, "/") != 0));
-
-        free(dir);
-        return PQOS_RETVAL_OK;
-}
-
 FILE *
-fopen_check_symlink(const char *name, const char *mode)
+pqos_fopen(const char *name, const char *mode)
 {
         int fd;
-        int ret;
-        char *dir;
-        char *file_name;
+        FILE *stream = NULL;
+        struct stat lstat_val;
+        struct stat fstat_val;
 
-        /* If the file will be created, check a parent directory for symlinks */
-        if (mode != NULL && (mode[0] == 'w' || mode[0] == 'a')) {
-                file_name = strdup(name);
+        stream = fopen(name, mode);
+        if (stream == NULL)
+                return stream;
 
-                if (file_name == NULL)
-                        return NULL;
+        fd = fileno(stream);
+        if (fd == -1)
+                goto pqos_fopen_error;
 
-                fd = open(file_name, O_RDONLY);
+        /* collect any link info about the file */
+        if (lstat(name, &lstat_val) == -1)
+                goto pqos_fopen_error;
 
-                if (fd == -1) {
-                        dir = dirname(file_name);
-                        ret = check_symlink(dir);
-                } else {
-                        ret = check_symlink(name);
-                        close(fd);
-                }
+        /* collect info about the opened file */
+        if (fstat(fd, &fstat_val) == -1)
+                goto pqos_fopen_error;
 
-                free(file_name);
-        } else
-                ret = check_symlink(name);
+        /* we should not have followed a symbolic link */
+        if (lstat_val.st_mode != fstat_val.st_mode ||
+            lstat_val.st_ino != fstat_val.st_ino ||
+            lstat_val.st_dev != fstat_val.st_dev) {
+                printf("File %s is a symlink\n", name);
+                goto pqos_fopen_error;
+        }
 
-        if (ret != PQOS_RETVAL_OK)
-                return NULL;
+        return stream;
 
-        return fopen(name, mode);
+pqos_fopen_error:
+        if (stream != NULL)
+                fclose(stream);
+
+        return NULL;
 }
 
 int
-open_check_symlink(const char *pathname, int flags, mode_t mode)
+pqos_open(const char *pathname, int flags, mode_t mode)
 {
-        int ret;
+        int fd = -1;
+        struct stat lstat_val;
+        struct stat fstat_val;
 
-        ret = check_symlink(pathname);
-        if (ret != PQOS_RETVAL_OK) {
-                errno = EACCES;
-                return -1;
+        /* open the file */
+        fd = open(pathname, flags, mode);
+        if (fd == -1)
+                return fd;
+
+        /* collect any link info about the file */
+        if (lstat(pathname, &lstat_val) == -1)
+                goto pqos_open_error;
+
+        /* collect info about the opened file */
+        if (fstat(fd, &fstat_val) == -1)
+                goto pqos_open_error;
+
+        /* we should not have followed a symbolic link */
+        if (lstat_val.st_mode != fstat_val.st_mode ||
+            lstat_val.st_ino != fstat_val.st_ino ||
+            lstat_val.st_dev != fstat_val.st_dev) {
+                printf("File %s is a symlink\n", pathname);
+                goto pqos_open_error;
         }
 
-        return open(pathname, flags, mode);
+        return fd;
+
+pqos_open_error:
+        if (fd != -1)
+                close(fd);
+
+        return -1;
 }

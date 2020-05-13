@@ -76,7 +76,7 @@ detect_os_support(const char *fname,
                 return PQOS_RETVAL_PARAM;
 
         if (check_symlink)
-                fd = fopen_check_symlink(fname, "r");
+                fd = pqos_fopen(fname, "r");
         else
                 fd = fopen(fname, "r");
 
@@ -120,7 +120,7 @@ readuint64(const char *fname, unsigned base, uint64_t *value)
         ASSERT(fname != NULL);
         ASSERT(value != NULL);
 
-        fd = fopen_check_symlink(fname, "r");
+        fd = pqos_fopen(fname, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -371,7 +371,7 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         snprintf(path, sizeof(path) - 1, PERF_MON_PATH "/events/%s.scale",
                  event_name);
 
-        fd = fopen_check_symlink(path, "r");
+        fd = pqos_fopen(path, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s perf monitoring event scale "
                           "file!\n",
@@ -391,7 +391,7 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         snprintf(path, sizeof(path) - 1, PERF_MON_PATH "/events/%s.unit",
                  event_name);
 
-        fd = fopen_check_symlink(path, "r");
+        fd = pqos_fopen(path, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s perf monitoring event unit "
                           "file!\n",

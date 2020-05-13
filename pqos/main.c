@@ -570,7 +570,7 @@ parse_config_file(const char *fname)
         FILE *fp = NULL;
         char cb[256];
 
-        fp = fopen_check_symlink(fname, "r");
+        fp = pqos_fopen(fname, "r");
         if (fp == NULL)
                 parse_error(fname, "cannot open configuration file!");
 

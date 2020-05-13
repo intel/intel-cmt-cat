@@ -155,7 +155,7 @@ resctrl_alloc_fopen(const unsigned class_id, const char *name, const char *mode)
         if (result < 0)
                 return NULL;
 
-        fd = fopen_check_symlink(buf, mode);
+        fd = pqos_fopen(buf, mode);
         if (fd == NULL)
                 LOG_ERROR("Could not open %s file %s for COS %u\n", name, buf,
                           class_id);

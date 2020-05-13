@@ -32,68 +32,50 @@
  *
  */
 
-#include <errno.h>
-#include <fcntl.h>
-#include <libgen.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#include <stdio.h>
+#include <sys/stat.h>
 
 #include "pqos.h"
 #include "common.h"
 #include "log.h"
 
-/**
- * @brief Checks if a path to a file contains any symbolic links.
- *
- * @param [in] name a path to a file
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK if the path exists and does not contain any
- * symbolic links.
- */
-static int
-check_symlink(const char *name)
+FILE *
+pqos_fopen(const char *name, const char *mode)
 {
         int fd;
-        int oflag;
-        char *dir = strdup(name);
-        char *path = dir;
+        FILE *stream = NULL;
+        struct stat lstat_val;
+        struct stat fstat_val;
 
-        if (dir == NULL)
-                return PQOS_RETVAL_ERROR;
+        stream = fopen(name, mode);
+        if (stream == NULL)
+                return stream;
 
-        oflag = O_RDONLY;
+        fd = fileno(stream);
+        if (fd == -1)
+                goto pqos_fopen_error;
 
-        do {
-                fd = open(path, oflag | O_NOFOLLOW);
-                if (fd == -1) {
-                        if (errno == ELOOP)
-                                LOG_ERROR("File %s is a symlink\n", path);
+        /* collect any link info about the file */
+        if (lstat(name, &lstat_val) == -1)
+                goto pqos_fopen_error;
 
-                        free(dir);
-                        return PQOS_RETVAL_ERROR;
-                }
+        /* collect info about the opened file */
+        if (fstat(fd, &fstat_val) == -1)
+                goto pqos_fopen_error;
 
-                oflag = O_RDONLY | O_DIRECTORY;
-                path = dirname(path);
+        /* we should not have followed a symbolic link */
+        if (lstat_val.st_mode != fstat_val.st_mode ||
+            lstat_val.st_ino != fstat_val.st_ino ||
+            lstat_val.st_dev != fstat_val.st_dev) {
+                LOG_ERROR("File %s is a symlink\n", name);
+                goto pqos_fopen_error;
+        }
 
-                if (fd != -1)
-                        close(fd);
-        } while ((strcmp(path, ".") != 0) && (strcmp(path, "/") != 0));
+        return stream;
 
-        free(dir);
-        return PQOS_RETVAL_OK;
-}
+pqos_fopen_error:
+        if (stream != NULL)
+                fclose(stream);
 
-FILE *
-fopen_check_symlink(const char *name, const char *mode)
-{
-        int ret;
-
-        ret = check_symlink(name);
-        if (ret != PQOS_RETVAL_OK)
-                return NULL;
-
-        return fopen(name, mode);
+        return NULL;
 }

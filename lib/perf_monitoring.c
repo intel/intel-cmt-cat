@@ -200,7 +200,7 @@ set_mon_type(void)
         char file[64], evt[8];
 
         snprintf(file, sizeof(file) - 1, "%s%s", PERF_MON_PATH, perf_type);
-        fd = fopen_check_symlink(file, "r");
+        fd = pqos_fopen(file, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_RESOURCE;
         if (fgets(evt, sizeof(evt), fd) == NULL) {
@@ -288,7 +288,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
          */
         snprintf(file, sizeof(file) - 1, "%s%s%s", PERF_MON_PATH, perf_events,
                  fname);
-        fd = fopen_check_symlink(file, "r");
+        fd = pqos_fopen(file, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s!\n", file);
                 return PQOS_RETVAL_ERROR;
@@ -313,7 +313,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
          */
         snprintf(file, sizeof(file) - 1, "%s%s%s.scale", PERF_MON_PATH,
                  perf_events, fname);
-        fd = fopen_check_symlink(file, "r");
+        fd = pqos_fopen(file, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open OS monitoring event scale file!\n");
                 return PQOS_RETVAL_ERROR;
