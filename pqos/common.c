@@ -83,7 +83,7 @@ pqos_fopen_error:
 int
 pqos_open(const char *pathname, int flags, mode_t mode)
 {
-        int fd = -1;
+        int fd;
         struct stat lstat_val;
         struct stat fstat_val;
 
