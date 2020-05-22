@@ -60,6 +60,17 @@ extern "C" {
 FILE * pqos_fopen(const char *name, const char *mode);
 /* clang-format on */
 
+/**
+ * @brief Wrapper around strcat
+ *
+ * @param [out] dst Output buffer
+ * @param [in] src Input buffer
+ * @param [in] size Output buffer size
+ *
+ * @return output buffer
+ */
+char *pqos_strcat(char *dst, const char *src, size_t size);
+
 #ifdef __cplusplus
 }
 #endif

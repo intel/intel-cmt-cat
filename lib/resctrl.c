@@ -44,6 +44,7 @@
 #include "log.h"
 #include "types.h"
 #include "resctrl.h"
+#include "common.h"
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 
@@ -156,23 +157,23 @@ resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
 
         /* l3 cdp mount option */
         if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
-                strcat(buf, "cdp");
+                pqos_strcat(buf, "cdp", sizeof(buf));
                 options = buf;
         }
 
         /* l2 cdp mount option */
         if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON) {
                 if (options != NULL)
-                        strcat(buf, ",");
-                strcat(buf, "cdpl2");
+                        pqos_strcat(buf, ",", sizeof(buf));
+                pqos_strcat(buf, "cdpl2", sizeof(buf));
                 options = buf;
         }
 
         /* mba mount option */
         if (mba_cfg == PQOS_MBA_CTRL) {
                 if (options != NULL)
-                        strcat(buf, ",");
-                strcat(buf, "mba_MBps");
+                        pqos_strcat(buf, ",", sizeof(buf));
+                pqos_strcat(buf, "mba_MBps", sizeof(buf));
                 options = buf;
         }
 

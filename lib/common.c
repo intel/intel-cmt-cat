@@ -34,6 +34,7 @@
 
 #include <stdio.h>
 #include <sys/stat.h>
+#include <string.h>
 
 #include "pqos.h"
 #include "common.h"
@@ -78,4 +79,10 @@ pqos_fopen_error:
                 fclose(stream);
 
         return NULL;
+}
+
+char *
+pqos_strcat(char *dst, const char *src, size_t size)
+{
+        return strncat(dst, src, size - strnlen(dst, size));
 }

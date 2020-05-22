@@ -377,7 +377,7 @@ profile_l3ca_apply(const char *name,
                 unsigned i = 0, offset = 0;
 
                 memset(cb, 0, sizeof(cb));
-                strcpy(cb, "llc:");
+                strncpy(cb, "llc:", sizeof(cb));
                 offset = (unsigned)strlen("llc:");
 
                 for (i = 0; i < cnum; i++) {

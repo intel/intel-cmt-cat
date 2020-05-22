@@ -1397,10 +1397,10 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
                 cores_s_len = strlen(cores_s);
 
                 if (i != 0 && (cores_s_len + str_len + comma_len) < len) {
-                        strcat(cores_s, ",");
-                        strcat(cores_s, core);
+                        strncat(cores_s, ",", len - cores_s_len);
+                        strncat(cores_s, core, len - cores_s_len - comma_len);
                 } else if (i == 0 && (cores_s_len + str_len) < len)
-                        strcat(cores_s, core);
+                        strncat(cores_s, core, len - cores_s_len);
                 else {
                         result = -1;
                         goto free_memory;
