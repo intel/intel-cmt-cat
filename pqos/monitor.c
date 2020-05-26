@@ -734,14 +734,14 @@ static void monitor_setup_events(enum pqos_mon_event *events,
 
         /* Disable IPC monitoring */
         if (sel_disable_ipc)
-                all_evts &= (~PQOS_PERF_EVENT_IPC);
+                all_evts &= (enum pqos_mon_event)(~PQOS_PERF_EVENT_IPC);
         /* Disable LLC miss monitoring */
         if (sel_disable_llc_miss)
-                all_evts &= (~PQOS_PERF_EVENT_LLC_MISS);
+                all_evts &= (enum pqos_mon_event)(~PQOS_PERF_EVENT_LLC_MISS);
 
         /* check if all available events were selected */
         if ((*events & PQOS_MON_EVENT_ALL) == PQOS_MON_EVENT_ALL) {
-                *events = all_evts & *events;
+                *events = (enum pqos_mon_event)(all_evts & *events);
 
         /* Start IPC and LLC miss monitoring if available */
         } else {
@@ -2217,14 +2217,21 @@ print_xml_row(FILE *fp,
         char data[sz_data];
         char core_list[PQOS_MAX_CORES * 4];
         size_t offset = 0;
+        const char *l3_text = NULL;
 
         ASSERT(fp != NULL);
         ASSERT(time != NULL);
         ASSERT(mon_data != NULL);
         ASSERT(llc_entry != NULL);
 
-        const char *l3_text = (llc_entry->format == LLC_FORMAT_KILOBYTES) ?
-                "l3_occupancy_kB" : "l3_occupancy_percent";
+        switch (llc_entry->format) {
+        case LLC_FORMAT_KILOBYTES:
+                l3_text = "l3_occupancy_kB";
+                break;
+        case LLC_FORMAT_PERCENT:
+                l3_text = "l3_occupancy_percent";
+                break;
+        }
 
 #ifdef PQOS_RMID_CUSTOM
         if (sel_interface == PQOS_INTER_MSR) {

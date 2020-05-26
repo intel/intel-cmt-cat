@@ -1088,7 +1088,7 @@ hw_mon_start(const unsigned num_cores,
         if ((started_evts & PQOS_MON_EVENT_LMEM_BW) &&
             (started_evts & PQOS_MON_EVENT_TMEM_BW)) {
                 group->values.mbm_remote = 0;
-                started_evts |= PQOS_MON_EVENT_RMEM_BW;
+                started_evts |= (enum pqos_mon_event)PQOS_MON_EVENT_RMEM_BW;
         }
 
         /**

@@ -130,7 +130,7 @@ static pthread_mutex_t m_apilock_mutex;
  *   1  PQOS_INTER_OS
  *   2  PQOS_INTER_OS_RESCTRL_MON
  */
-static int m_interface = PQOS_INTER_MSR;
+static enum pqos_interface m_interface = PQOS_INTER_MSR;
 /**
  * ---------------------------------------
  * Functions for safe multi-threading
