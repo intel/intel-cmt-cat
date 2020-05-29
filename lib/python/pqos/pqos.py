@@ -39,7 +39,6 @@ to call APIs from PQoS library.
 
 from __future__ import absolute_import, division, print_function
 import ctypes
-from ctypes.util import find_library
 import sys
 
 from pqos.common import pqos_handle_error
@@ -113,12 +112,7 @@ class Pqos(object):
     def __init__(self):
         "Finds PQoS library and constructs a new object."
 
-        libpqos_path = find_library(u'pqos')
-
-        if not libpqos_path:
-            raise Exception(u'Cannot find libpqos')
-
-        self.lib = ctypes.cdll.LoadLibrary(libpqos_path)
+        self.lib = ctypes.cdll.LoadLibrary(u'libpqos.so.4')
 
     def init(self, interface, log_file=None, log_callback=None,
              log_context=None, verbose=u'default'):

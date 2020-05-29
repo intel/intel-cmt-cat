@@ -5,7 +5,7 @@ with open('README.txt', 'r') as long_desc_file:
 
 setup(
     name='pqos',
-    version='3.2.0',
+    version='4.0.0',
     maintainer='Intel',
     maintainer_email='adrianx.boczkowski@intel.com',
     packages=['pqos', 'pqos.test'],

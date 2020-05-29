@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    3.2.0
+%global githubver    4.0.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -119,7 +119,7 @@ install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%
 install -d %{buildroot}/%{_libdir}
 install -s %{_builddir}/%{githubfull}/lib/libpqos.so.* %{buildroot}/%{_libdir}
 cp -a %{_builddir}/%{githubfull}/lib/libpqos.so %{buildroot}/%{_libdir}
-cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.3 %{buildroot}/%{_libdir}
+cp -a %{_builddir}/%{githubfull}/lib/libpqos.so.4 %{buildroot}/%{_libdir}
 
 # Install the header file
 install -d %{buildroot}/%{_includedir}
@@ -173,6 +173,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Fri May 29 2020 Michal Aleksinski <michalx.aleksinski@intel.com> 4.0.0-1
+- New release 4.0.0
+
 * Wed Dec 4 2019 Michal Aleksinski <michalx.aleksinski@intel.com> 3.2.0-1
 - New release 3.2.0
 
@@ -185,7 +188,7 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 * Mon Jan 21 2019 Michal Aleksinski <michalx.aleksinski@intel.com> 3.0.0-1
 - New release 3.0.0
 
-* Fri Oct 11 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 2.1.0-1
+* Thu Oct 11 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 2.1.0-1
 - New release 2.1.0
 
 * Mon Jun 18 2018 Michal Aleksinski <michalx.aleksinski@intel.com> 2.0.0-1
