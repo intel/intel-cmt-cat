@@ -1,4 +1,31 @@
 ========================================================================
+Release  v4.0.0  ....-..-..
+=======================================================================
+
+Contributors (alphabetical order):
+        Adrian Boczkowski <adrianx.boczkowski@intel.com>
+        Babu Moger <babu.moger@amd.com>
+        Colin Ian King <colin.king@canonical.com>
+        Khawar Abbasi <khawar.abbasi@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+        Xiaochen Shen <xiaochen.shen@intel.com>
+
+1. Library:
+        - Use perf for IPC and cache misses monitoring with MSR interface
+        - Detection of MBA2.0 and MBA3.0
+        - 32b MBM counters support
+        - AMD support
+2. AppQoS:
+        - Added ansible scripts
+3. PQoS:
+        - Added option to display MBT column in monitoring output
+        - Added option to disable IPC monitoring
+        - Added option to disable cache misses monitoring
+4. General:
+        - Bug fixes
+
+========================================================================
 Release  v3.2.0  2019-12-20
 =======================================================================
 
@@ -15,7 +42,6 @@ Contributors (alphabetical order):
         - Added support for Power Profiles
 2. General
         - Bug fixes
-
 
 ========================================================================
 Release  v3.1  2019-08-16
@@ -56,7 +82,6 @@ Contributors (alphabetical order):
 Summary:
 1. General
         - Bug fixes
-
 
 =======================================================================
 Release  v3.0  2019-02-14
