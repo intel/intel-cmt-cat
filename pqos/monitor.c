@@ -2152,7 +2152,8 @@ print_text_row(FILE *fp,
                                      mon_data->event & PQOS_PERF_EVENT_IPC,
                                      sel_events_max & PQOS_PERF_EVENT_IPC);
 
-        offset += fillin_text_column(" %10uk", (unsigned) mon_data->values.ipc,
+        offset += fillin_text_column(" %10uk", (unsigned)
+                                     mon_data->values.llc_misses_delta/1000,
                                      data + offset,
                                      sz_data - offset,
                                      mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
