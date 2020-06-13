@@ -2152,7 +2152,7 @@ print_text_row(FILE *fp,
                                      mon_data->event & PQOS_PERF_EVENT_IPC,
                                      sel_events_max & PQOS_PERF_EVENT_IPC);
 
-        offset += fillin_text_column(" %10uk", (unsigned)
+        offset += fillin_text_column(" %10.0fk", (double)
                                      mon_data->values.llc_misses_delta/1000,
                                      data + offset,
                                      sz_data - offset,
@@ -2255,7 +2255,7 @@ print_xml_row(FILE *fp,
                                     sel_events_max & PQOS_PERF_EVENT_IPC,
                                     "ipc");
 
-        offset += fillin_xml_column("%llu", (unsigned long long)
+        offset += fillin_xml_column("%.0f", (double)
                                     mon_data->values.llc_misses_delta,
                                     data + offset,
                                     sz_data - offset,
@@ -2374,7 +2374,7 @@ print_csv_row(FILE *fp, char *time,
                                     mon_data->event & PQOS_PERF_EVENT_IPC,
                                     sel_events_max & PQOS_PERF_EVENT_IPC);
 
-        offset += fillin_csv_column(",%llu", (unsigned long long)
+        offset += fillin_csv_column(",%.0f", (double)
                                     mon_data->values.llc_misses_delta,
                                     data + offset,
                                     sz_data - offset,
