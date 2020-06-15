@@ -50,7 +50,8 @@ else
 CFLAGS += -O3 -g -D_FORTIFY_SOURCE=2
 endif
 
-ifneq ($(CC),icc)
+GCC_AVX512 := $(shell `gcc -march=native -dM -E - < /dev/null | grep "AVX512F"`)
+ifeq ($(GCC_AVX512),"")
 CFLAGS += -mavx512f
 endif
 

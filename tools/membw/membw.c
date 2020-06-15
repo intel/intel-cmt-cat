@@ -75,6 +75,9 @@
 #define ALWAYS_INLINE static inline __attribute__((always_inline))
 #endif
 
+#define GCC_VERSION                                                            \
+        (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
+
 #define MAX_OPTARG_LEN 64
 
 #define MAX_MEM_BW 100 * 1000 /* 100GBps */
@@ -805,8 +808,15 @@ mem_execute(const unsigned bw, const enum cl_type type)
                         break;
 #ifdef __x86_64__
                 case CL_TYPE_WRITE_WB_AVX512:
+/* If gcc version >= 4.9 */
+#if GCC_VERSION >= 40900
                         cl_write_avx512(ptr, val);
                         break;
+#else
+                        printf("No GCC support for AVX512 instructions!\n");
+                        stop_loop = 1;
+                        return;
+#endif
 #endif
                 case CL_TYPE_WRITE_WB_CLWB:
                         cl_write_clwb(ptr, val);
@@ -822,8 +832,15 @@ mem_execute(const unsigned bw, const enum cl_type type)
                         break;
 #ifdef __x86_64__
                 case CL_TYPE_WRITE_NT512:
+/* If gcc version >= 4.9 */
+#if GCC_VERSION >= 40900
                         cl_write_nt512(ptr, val);
                         break;
+#else
+                        printf("No GCC support for AVX512 instructions!\n");
+                        stop_loop = 1;
+                        return;
+#endif
                 case CL_TYPE_WRITE_NTDQ:
                         cl_write_ntdq(ptr, val);
                         break;
