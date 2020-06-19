@@ -75,9 +75,6 @@
 #define ALWAYS_INLINE static inline __attribute__((always_inline))
 #endif
 
-#define GCC_VERSION                                                            \
-        (__GNUC__ * 10000 + __GNUC_MINOR__ * 100 + __GNUC_PATCHLEVEL__)
-
 #define MAX_OPTARG_LEN 64
 
 #define MAX_MEM_BW 100 * 1000 /* 100GBps */
@@ -449,6 +446,7 @@ cl_read_mod_write(void *p, const uint64_t v)
 }
 
 #ifdef __x86_64__
+#ifdef __AVX512F__
 /**
  * @brief WB store vector version
  *
@@ -464,6 +462,7 @@ cl_write_avx512(void *p, const uint64_t v)
                      : "r"(v), "r"(p)
                      : "%zmm1", "memory");
 }
+#endif
 
 /**
  * @brief WB vector version
@@ -542,6 +541,7 @@ cl_write(void *p, const uint64_t v)
 #endif
 }
 
+#ifdef __CLWB__
 /**
  * @brief Perform write operation to specified cache line with clwb
  *
@@ -554,6 +554,7 @@ cl_write_clwb(void *p, const uint64_t v)
         cl_write(p, v);
         cl_wb(p);
 }
+#endif
 
 /**
  * @brief Perform write operation to specified cache line with flush
@@ -615,7 +616,7 @@ cl_write_nti(void *p, const uint64_t v)
 #endif
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && defined(__AVX512F__)
 /**
  * @brief non-temporal store vector version
  *
@@ -633,6 +634,7 @@ cl_write_nt512(void *p, const uint64_t v)
 }
 #endif
 
+#ifdef __CLWB__
 /**
  * @brief Perform write operation to memory giving non-temporal hint with cache
  * line write back
@@ -646,6 +648,7 @@ cl_write_nti_clwb(void *p, const uint64_t v)
         cl_write_nti(p, v);
         cl_wb(p);
 }
+#endif
 
 #ifdef __x86_64__
 /**
@@ -806,40 +809,32 @@ mem_execute(const unsigned bw, const enum cl_type type)
                 case CL_TYPE_WRITE_WB:
                         cl_write(ptr, val);
                         break;
-#ifdef __x86_64__
+#if defined(__x86_64__) && defined(__AVX512F__)
                 case CL_TYPE_WRITE_WB_AVX512:
-/* If gcc version >= 4.9 */
-#if GCC_VERSION >= 40900
                         cl_write_avx512(ptr, val);
                         break;
-#else
-                        printf("No GCC support for AVX512 instructions!\n");
-                        stop_loop = 1;
-                        return;
 #endif
-#endif
+#ifdef __CLWB__
                 case CL_TYPE_WRITE_WB_CLWB:
                         cl_write_clwb(ptr, val);
                         break;
+#endif
                 case CL_TYPE_WRITE_WB_FLUSH:
                         cl_write_flush(ptr, val);
                         break;
                 case CL_TYPE_WRITE_NTI:
                         cl_write_nti(ptr, val);
                         break;
+#ifdef __CLWB__
                 case CL_TYPE_WRITE_NTI_CLWB:
                         cl_write_nti_clwb(ptr, val);
                         break;
+#endif
 #ifdef __x86_64__
+#ifdef __AVX512F__
                 case CL_TYPE_WRITE_NT512:
-/* If gcc version >= 4.9 */
-#if GCC_VERSION >= 40900
                         cl_write_nt512(ptr, val);
                         break;
-#else
-                        printf("No GCC support for AVX512 instructions!\n");
-                        stop_loop = 1;
-                        return;
 #endif
                 case CL_TYPE_WRITE_NTDQ:
                         cl_write_ntdq(ptr, val);
@@ -1100,18 +1095,28 @@ main(int argc, char **argv)
                 break;
         case CL_TYPE_WRITE_NTI_CLWB:
         case CL_TYPE_WRITE_WB_CLWB:
+#ifdef __CLWB__
                 if (!(features & CPU_FEATURE_CLWB)) {
-                        printf("No CPU support for CLWB instruction!\n");
+                        printf("No CPU support for CLWB instructions!\n");
                         return EXIT_FAILURE;
                 }
+#else
+                printf("No compiler support for CLWB instructions!\n");
+                return EXIT_FAILURE;
+#endif
                 break;
 #ifdef __x86_64__
         case CL_TYPE_WRITE_NT512:
         case CL_TYPE_WRITE_WB_AVX512:
+#ifdef __AVX512F__
                 if (!(features & CPU_FEATURE_AVX512F)) {
                         printf("No CPU support for AVX512 instructions!\n");
                         return EXIT_FAILURE;
                 }
+#else
+                printf("No compiler support for AVX512 instructions!\n");
+                return EXIT_FAILURE;
+#endif
                 break;
 #endif
         default:

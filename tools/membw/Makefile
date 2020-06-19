@@ -42,7 +42,7 @@ CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-Winline
+	-Winline -msse4.2
 
 ifeq ($(DEBUG),y)
 CFLAGS += -O0 -g -DDEBUG
@@ -50,9 +50,14 @@ else
 CFLAGS += -O3 -g -D_FORTIFY_SOURCE=2
 endif
 
-GCC_AVX512 := $(shell `gcc -march=native -dM -E - < /dev/null | grep "AVX512F"`)
-ifeq ($(GCC_AVX512),"")
+HAS_AVX512 := $(shell $(CC) -mavx512f -dM -E - < /dev/null 2> /dev/null | grep -c "AVX512F")
+ifeq ($(HAS_AVX512),1)
 CFLAGS += -mavx512f
+endif
+
+HAS_CLWB := $(shell $(CC) -mclwb -dM -E - < /dev/null 2> /dev/null | grep -c "CLWB")
+ifeq ($(HAS_CLWB),1)
+CFLAGS += -mclwb
 endif
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
