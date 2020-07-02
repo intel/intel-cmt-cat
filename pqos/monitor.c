@@ -800,11 +800,11 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                sel_output_file);
                         return -1;
                 }
-                if (strcasecmp(sel_output_type, "xml") == 0)
-                        fprintf(fp_monitor,
-                                "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                                "%s\n", xml_root_open);
         }
+        if (strcasecmp(sel_output_type, "xml") == 0)
+                fprintf(fp_monitor,
+                        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n%s\n",
+                        xml_root_open);
 
         /**
          * If no cores and events selected through command line
