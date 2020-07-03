@@ -40,7 +40,7 @@
 #include "common.h"
 
 FILE *
-pqos_fopen(const char *name, const char *mode)
+safe_fopen(const char *name, const char *mode)
 {
         int fd;
         FILE *stream = NULL;
@@ -53,27 +53,27 @@ pqos_fopen(const char *name, const char *mode)
 
         fd = fileno(stream);
         if (fd == -1)
-                goto pqos_fopen_error;
+                goto safe_fopen_error;
 
         /* collect any link info about the file */
         if (lstat(name, &lstat_val) == -1)
-                goto pqos_fopen_error;
+                goto safe_fopen_error;
 
         /* collect info about the opened file */
         if (fstat(fd, &fstat_val) == -1)
-                goto pqos_fopen_error;
+                goto safe_fopen_error;
 
         /* we should not have followed a symbolic link */
         if (lstat_val.st_mode != fstat_val.st_mode ||
             lstat_val.st_ino != fstat_val.st_ino ||
             lstat_val.st_dev != fstat_val.st_dev) {
                 printf("File %s is a symlink\n", name);
-                goto pqos_fopen_error;
+                goto safe_fopen_error;
         }
 
         return stream;
 
-pqos_fopen_error:
+safe_fopen_error:
         if (stream != NULL)
                 fclose(stream);
 
@@ -81,7 +81,7 @@ pqos_fopen_error:
 }
 
 int
-pqos_open(const char *pathname, int flags, mode_t mode)
+safe_open(const char *pathname, int flags, mode_t mode)
 {
         int fd;
         struct stat lstat_val;
@@ -94,23 +94,23 @@ pqos_open(const char *pathname, int flags, mode_t mode)
 
         /* collect any link info about the file */
         if (lstat(pathname, &lstat_val) == -1)
-                goto pqos_open_error;
+                goto safe_open_error;
 
         /* collect info about the opened file */
         if (fstat(fd, &fstat_val) == -1)
-                goto pqos_open_error;
+                goto safe_open_error;
 
         /* we should not have followed a symbolic link */
         if (lstat_val.st_mode != fstat_val.st_mode ||
             lstat_val.st_ino != fstat_val.st_ino ||
             lstat_val.st_dev != fstat_val.st_dev) {
                 printf("File %s is a symlink\n", pathname);
-                goto pqos_open_error;
+                goto safe_open_error;
         }
 
         return fd;
 
-pqos_open_error:
+safe_open_error:
         if (fd != -1)
                 close(fd);
 
