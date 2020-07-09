@@ -102,8 +102,8 @@ class TestPqosL2Cat(test.Test):
     #
     #  \b Result:
     #  1. Observe in output
-    #     L2ID 0 L2CA COS1 => MASK 0xf
-    #     L2ID 0 L2CA COS2 => MASK 0xf0
+    #     L2CA COS1 => MASK 0xf
+    #     L2CA COS2 => MASK 0xf0
     #     Allocation configuration altered.
     #  2. L2CA COS1 MASK for socket 0 is set to 0xf
     #     L2CA COS2 MASK for socket 0 is set to 0xf0
@@ -112,8 +112,8 @@ class TestPqosL2Cat(test.Test):
     def test_pqos_l2cat_set(self, iface):
         (stdout, _, exitstatus) = self.run_pqos(iface, "-e l2:1=0xf;l2:2=0xf0")
         assert exitstatus == 0
-        assert "L2ID 0 L2CA COS1 => MASK 0xf" in stdout
-        assert "L2ID 0 L2CA COS2 => MASK 0xf0" in stdout
+        assert "L2CA COS1 => MASK 0xf" in stdout
+        assert "L2CA COS2 => MASK 0xf0" in stdout
         assert "Allocation configuration altered" in stdout
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
@@ -165,8 +165,8 @@ class TestPqosL2Cat(test.Test):
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
         assert exitstatus == 0
-        assert re.search("Core 1, L2ID [0-9]+ => COS1", stdout)
-        assert re.search("Core 3, L2ID [0-9]+ => COS1", stdout)
+        assert re.search("Core 1, L2ID [0-9]+(, L3ID [0-9]+)? => COS1", stdout)
+        assert re.search("Core 3, L2ID [0-9]+(, L3ID [0-9]+)? => COS1", stdout)
 
 
     ## PQOS - L2 CAT Set COS association (core) - Negative
