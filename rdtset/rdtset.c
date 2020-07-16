@@ -56,6 +56,8 @@ static pid_t child = -1;
  *
  * @status exit status
  */
+static void _exit_flush(int status) __attribute__((noreturn));
+
 static void
 _exit_flush(int status)
 {
