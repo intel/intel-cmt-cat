@@ -59,7 +59,7 @@
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /**
- * @brief Function to mount the resctrl file system with CDP option
+ * @brief Function to mount the resctrl file system with CDP or MBps options
  *
  * @param l3_cdp_cfg L3 CDP option
  * @param l2_cdp_cfg L2 CDP option
@@ -77,6 +77,9 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_cap_l2ca *l2_cap = NULL;
         const struct pqos_cap_mba *mba_cap = NULL;
         const struct pqos_capability *alloc_cap = NULL;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
+        int ret;
 
         if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
             l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF) {
@@ -95,22 +98,24 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
                 return PQOS_RETVAL_PARAM;
         }
 
+        _pqos_cap_get(&cap, &cpu);
+
         if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF &&
             l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF && mba_cfg == PQOS_MBA_DEFAULT)
                 goto mount;
 
         /* Get L3 CAT capabilities */
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
 
         /* Get L2 CAT capabilities */
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l2_cap = alloc_cap->u.l2ca;
 
         /* Get MBA capabilities */
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &alloc_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
 
@@ -135,7 +140,43 @@ os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
         }
 
 mount:
-        return resctrl_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = resctrl_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /*
+         * Verify if mba ctrl is enabled
+         * Some kernel versions resctrl mount parameters are not verified
+         */
+        if (mba_cfg == PQOS_MBA_CTRL) {
+                struct resctrl_schemata *schmt;
+                struct pqos_mba mba;
+
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto unmount;
+                }
+
+                ret = resctrl_alloc_schemata_read(0, schmt);
+                if (ret != PQOS_RETVAL_OK) {
+                        resctrl_schemata_free(schmt);
+                        goto unmount;
+                }
+
+                ret = resctrl_schemata_mba_get(schmt, 0, &mba);
+                if (ret == PQOS_RETVAL_OK && mba.mb_max <= 100) {
+                        LOG_ERROR("MBA CTRL not enabled\n");
+                        ret = PQOS_RETVAL_ERROR;
+                }
+
+                resctrl_schemata_free(schmt);
+        }
+
+unmount:
+        if (ret != PQOS_RETVAL_OK)
+                resctrl_umount();
+        return ret;
 }
 
 /**

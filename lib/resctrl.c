@@ -45,8 +45,6 @@
 #include "types.h"
 #include "resctrl.h"
 #include "common.h"
-#include "cap.h"
-#include "resctrl_alloc.h"
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 
@@ -150,7 +148,6 @@ resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
 {
         const char *options = NULL;
         char buf[32] = "";
-        int ret = PQOS_RETVAL_OK;
 
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF);
@@ -183,41 +180,7 @@ resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
         if (mount("resctrl", RESCTRL_PATH, "resctrl", 0, options) != 0)
                 return PQOS_RETVAL_ERROR;
 
-        /* Check if mba ctrl is enabled */
-        if (mba_cfg == PQOS_MBA_CTRL) {
-                const struct pqos_cap *cap;
-                const struct pqos_cpuinfo *cpu;
-                struct resctrl_schemata *schmt;
-                struct pqos_mba mba;
-
-                _pqos_cap_get(&cap, &cpu);
-
-                schmt = resctrl_schemata_alloc(cap, cpu);
-                if (schmt == NULL) {
-                        ret = PQOS_RETVAL_ERROR;
-                        goto resctrl_mount_exit;
-                }
-
-                ret = resctrl_alloc_schemata_read(0, schmt);
-                if (ret != PQOS_RETVAL_OK) {
-                        resctrl_schemata_free(schmt);
-                        goto resctrl_mount_exit;
-                }
-
-                ret = resctrl_schemata_mba_get(schmt, 0, &mba);
-                if (ret == PQOS_RETVAL_OK && mba.mb_max <= 100) {
-                        LOG_ERROR("MBA CTRL not enabled\n");
-                        ret = PQOS_RETVAL_ERROR;
-                }
-
-                resctrl_schemata_free(schmt);
-        }
-
-resctrl_mount_exit:
-        if (ret != PQOS_RETVAL_OK)
-                resctrl_umount();
-
-        return ret;
+        return PQOS_RETVAL_OK;
 }
 
 int

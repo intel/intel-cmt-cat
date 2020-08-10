@@ -986,7 +986,7 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 
         ASSERT(cfg == PQOS_MBA_DEFAULT || cfg == PQOS_MBA_CTRL ||
                cfg == PQOS_MBA_ANY);
-        ASSERT(m_cap == NULL);
+        ASSERT(m_cap != NULL);
 
         if (m_cap == NULL)
                 return;
