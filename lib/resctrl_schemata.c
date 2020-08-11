@@ -38,6 +38,7 @@
 #include "resctrl_schemata.h"
 #include "resctrl_utils.h"
 #include "types.h"
+#include "log.h"
 
 /*
  * @brief Structure to hold parsed schemata
@@ -567,50 +568,23 @@ resctrl_schemata_read_exit:
 int
 resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata)
 {
+        resctrl_schemata_l2ca_write(fd, schemata);
+        resctrl_schemata_l3ca_write(fd, schemata);
+        resctrl_schemata_mba_write(fd, schemata);
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_schemata_l3ca_write(FILE *fd, const struct resctrl_schemata *schemata)
+{
         unsigned i;
 
-        /* L2 without CDP */
-        if (schemata->l2ca != NULL && !schemata->l2ca[0].cdp) {
-                fprintf(fd, "L2:");
-                for (i = 0; i < schemata->l2ids_num; i++) {
-                        unsigned id = schemata->l2ids[i];
-                        unsigned long long mask =
-                            (unsigned long long)schemata->l2ca[i].u.ways_mask;
-
-                        if (i > 0)
-                                fprintf(fd, ";");
-                        fprintf(fd, "%u=%llx", id, mask);
-                }
-                fprintf(fd, "\n");
-        }
-
-        /* L2 with CDP */
-        if (schemata->l2ca != NULL && schemata->l2ca[0].cdp) {
-                fprintf(fd, "L2CODE:");
-                for (i = 0; i < schemata->l2ids_num; i++) {
-                        unsigned id = schemata->l2ids[i];
-                        unsigned long long mask =
-                            (unsigned long long)schemata->l2ca[i].u.s.code_mask;
-
-                        if (i > 0)
-                                fprintf(fd, ";");
-                        fprintf(fd, "%u=%llx", id, mask);
-                }
-                fprintf(fd, "\nL2DATA:");
-                for (i = 0; i < schemata->l2ids_num; i++) {
-                        unsigned id = schemata->l2ids[i];
-                        unsigned long long mask =
-                            (unsigned long long)schemata->l2ca[i].u.s.data_mask;
-
-                        if (i > 0)
-                                fprintf(fd, ";");
-                        fprintf(fd, "%u=%llx", id, mask);
-                }
-                fprintf(fd, "\n");
-        }
+        if (schemata->l3ca == NULL)
+                return PQOS_RETVAL_OK;
 
         /* L3 without CDP */
-        if (schemata->l3ca != NULL && !schemata->l3ca[0].cdp) {
+        if (!schemata->l3ca[0].cdp) {
                 fprintf(fd, "L3:");
                 for (i = 0; i < schemata->l3ids_num; i++) {
                         unsigned id = schemata->l3ids[i];
@@ -625,7 +599,7 @@ resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata)
         }
 
         /* L3 with CDP */
-        if (schemata->l3ca != NULL && schemata->l3ca[0].cdp) {
+        if (schemata->l3ca[0].cdp) {
                 fprintf(fd, "L3CODE:");
                 for (i = 0; i < schemata->l3ids_num; i++) {
                         unsigned id = schemata->l3ids[i];
@@ -649,18 +623,77 @@ resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata)
                 fprintf(fd, "\n");
         }
 
-        /* MBA */
-        if (schemata->mba != NULL) {
-                fprintf(fd, "MB:");
-                for (i = 0; i < schemata->mbaids_num; i++) {
-                        unsigned id = schemata->mbaids[i];
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_schemata_l2ca_write(FILE *fd, const struct resctrl_schemata *schemata)
+{
+        unsigned i;
+
+        if (schemata->l2ca == NULL)
+                return PQOS_RETVAL_OK;
+
+        /* L2 without CDP */
+        if (!schemata->l2ca[0].cdp) {
+                fprintf(fd, "L2:");
+                for (i = 0; i < schemata->l2ids_num; i++) {
+                        unsigned id = schemata->l2ids[i];
+                        unsigned long long mask =
+                            (unsigned long long)schemata->l2ca[i].u.ways_mask;
 
                         if (i > 0)
                                 fprintf(fd, ";");
-                        fprintf(fd, "%u=%u", id, schemata->mba[i].mb_max);
+                        fprintf(fd, "%u=%llx", id, mask);
                 }
                 fprintf(fd, "\n");
         }
+
+        /* L2 with CDP */
+        if (schemata->l2ca[0].cdp) {
+                fprintf(fd, "L2CODE:");
+                for (i = 0; i < schemata->l2ids_num; i++) {
+                        unsigned id = schemata->l2ids[i];
+                        unsigned long long mask =
+                            (unsigned long long)schemata->l2ca[i].u.s.code_mask;
+
+                        if (i > 0)
+                                fprintf(fd, ";");
+                        fprintf(fd, "%u=%llx", id, mask);
+                }
+                fprintf(fd, "\nL2DATA:");
+                for (i = 0; i < schemata->l2ids_num; i++) {
+                        unsigned id = schemata->l2ids[i];
+                        unsigned long long mask =
+                            (unsigned long long)schemata->l2ca[i].u.s.data_mask;
+
+                        if (i > 0)
+                                fprintf(fd, ";");
+                        fprintf(fd, "%u=%llx", id, mask);
+                }
+                fprintf(fd, "\n");
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_schemata_mba_write(FILE *fd, const struct resctrl_schemata *schemata)
+{
+        unsigned i;
+
+        if (schemata->mba == NULL)
+                return PQOS_RETVAL_OK;
+
+        fprintf(fd, "MB:");
+        for (i = 0; i < schemata->mbaids_num; i++) {
+                unsigned id = schemata->mbaids[i];
+
+                if (i > 0)
+                        fprintf(fd, ";");
+                fprintf(fd, "%u=%u", id, schemata->mba[i].mb_max);
+        }
+        fprintf(fd, "\n");
 
         return PQOS_RETVAL_OK;
 }

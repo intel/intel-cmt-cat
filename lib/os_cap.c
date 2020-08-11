@@ -36,7 +36,7 @@
 #include <sys/stat.h>
 
 #include "pqos.h"
-
+#include "allocation.h"
 #include "common.h"
 #include "os_cap.h"
 #include "types.h"
@@ -821,7 +821,8 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                         }
                         /* restore MBA configuration */
                         if (*enabled == 1) {
-                                ret = resctrl_alloc_schemata_write(grp, schmt);
+                                ret = resctrl_alloc_schemata_write(
+                                    grp, PQOS_TECHNOLOGY_MBA, schmt);
                                 if (ret != PQOS_RETVAL_OK)
                                         LOG_WARN("Unable to restore MBA "
                                                  "settings\n");

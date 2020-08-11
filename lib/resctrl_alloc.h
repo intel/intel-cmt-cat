@@ -133,12 +133,15 @@ int resctrl_alloc_schemata_read(const unsigned class_id,
  * @brief Write resctrl schemata to file
  *
  * @param [in] class_id COS id
+ * @param [in] technology bit mask selecting technologies
+ *             (1 << enum pqos_cap_type)
  * @param [in] schemata Schemata to write
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
 int resctrl_alloc_schemata_write(const unsigned class_id,
+                                 const unsigned technology,
                                  const struct resctrl_schemata *schemata);
 
 /**

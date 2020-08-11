@@ -185,6 +185,42 @@ int resctrl_schemata_read(FILE *fd, struct resctrl_schemata *schemata);
  */
 int resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata);
 
+/**
+ * @brief Write l3ca schemata to file
+ *
+ * @param [in] fd write file descriptor
+ * @param [in] schemata schemata to write
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_schemata_l3ca_write(FILE *fd,
+                                const struct resctrl_schemata *schemata);
+
+/**
+ * @brief Write l2ca schemata to file
+ *
+ * @param [in] fd write file descriptor
+ * @param [in] schemata schemata to write
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_schemata_l2ca_write(FILE *fd,
+                                const struct resctrl_schemata *schemata);
+
+/**
+ * @brief Write mba schemata to file
+ *
+ * @param [in] fd write file descriptor
+ * @param [in] schemata schemata to write
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int resctrl_schemata_mba_write(FILE *fd,
+                               const struct resctrl_schemata *schemata);
+
 #ifdef __cplusplus
 }
 #endif

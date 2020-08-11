@@ -43,6 +43,18 @@
 extern "C" {
 #endif
 
+#include "pqos.h"
+
+/**
+ * Types of possible PQoS allocation technologies
+ */
+enum pqos_technology {
+        PQOS_TECHNOLOGY_L3CA = 1 << PQOS_CAP_TYPE_L3CA,
+        PQOS_TECHNOLOGY_L2CA = 1 << PQOS_CAP_TYPE_L2CA,
+        PQOS_TECHNOLOGY_MBA = 1 << PQOS_CAP_TYPE_MBA,
+        PQOS_TECHNOLOGY_ALL = -1
+};
+
 /**
  * @brief Initializes allocation sub-module of PQoS library
  *

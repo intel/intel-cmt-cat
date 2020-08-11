@@ -39,6 +39,7 @@
 #include <dirent.h>
 
 #include "common.h"
+#include "allocation.h"
 #include "log.h"
 #include "types.h"
 #include "cap.h"
@@ -268,6 +269,7 @@ resctrl_alloc_schemata_read_exit:
 
 int
 resctrl_alloc_schemata_write(const unsigned class_id,
+                             const unsigned technology,
                              const struct resctrl_schemata *schemata)
 {
         int ret = PQOS_RETVAL_OK;
@@ -295,7 +297,18 @@ resctrl_alloc_schemata_write(const unsigned class_id,
                 goto resctrl_alloc_schemata_write_exit;
         }
 
-        ret = resctrl_schemata_write(fd, schemata);
+        if ((technology & PQOS_TECHNOLOGY_L3CA) == PQOS_TECHNOLOGY_L3CA) {
+                ret = resctrl_schemata_l3ca_write(fd, schemata);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_alloc_schemata_write_exit;
+        }
+        if ((technology & PQOS_TECHNOLOGY_L2CA) == PQOS_TECHNOLOGY_L2CA) {
+                ret = resctrl_schemata_l2ca_write(fd, schemata);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_alloc_schemata_write_exit;
+        }
+        if ((technology & PQOS_TECHNOLOGY_MBA) == PQOS_TECHNOLOGY_MBA)
+                ret = resctrl_schemata_mba_write(fd, schemata);
 
 resctrl_alloc_schemata_write_exit:
 

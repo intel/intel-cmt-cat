@@ -42,6 +42,7 @@
 #include <dirent.h> /**< scandir() */
 
 #include "pqos.h"
+#include "allocation.h"
 #include "os_allocation.h"
 #include "cap.h"
 #include "common.h"
@@ -578,7 +579,8 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
 
                 ret = resctrl_schemata_reset(schmt, l3_cap, l2_cap, mba_cap);
                 if (ret == PQOS_RETVAL_OK)
-                        ret = resctrl_alloc_schemata_write(i, schmt);
+                        ret = resctrl_alloc_schemata_write(
+                            i, PQOS_TECHNOLOGY_ALL, schmt);
 
                 resctrl_schemata_free(schmt);
 
@@ -1169,8 +1171,8 @@ os_l3ca_set(const unsigned l3cat_id,
 
                 /* write schemata */
                 if (ret == PQOS_RETVAL_OK)
-                        ret =
-                            resctrl_alloc_schemata_write(ca[i].class_id, schmt);
+                        ret = resctrl_alloc_schemata_write(
+                            ca[i].class_id, PQOS_TECHNOLOGY_L3CA, schmt);
 
                 resctrl_schemata_free(schmt);
 
@@ -1402,8 +1404,8 @@ os_l2ca_set(const unsigned l2id,
                 }
 
                 if (ret == PQOS_RETVAL_OK)
-                        ret =
-                            resctrl_alloc_schemata_write(ca[i].class_id, schmt);
+                        ret = resctrl_alloc_schemata_write(
+                            ca[i].class_id, PQOS_TECHNOLOGY_L2CA, schmt);
 
                 resctrl_schemata_free(schmt);
 
@@ -1617,7 +1619,7 @@ os_mba_set(const unsigned mba_id,
                 /* write schemata */
                 if (ret == PQOS_RETVAL_OK)
                         ret = resctrl_alloc_schemata_write(
-                            requested[i].class_id, schmt);
+                            requested[i].class_id, PQOS_TECHNOLOGY_MBA, schmt);
 
                 if (actual != NULL) {
                         /* read actual schemata */
@@ -1731,7 +1733,7 @@ os_mba_set_amd(const unsigned mba_id,
                 /* write schemata */
                 if (ret == PQOS_RETVAL_OK)
                         ret = resctrl_alloc_schemata_write(
-                            requested[i].class_id, schmt);
+                            requested[i].class_id, PQOS_TECHNOLOGY_MBA, schmt);
 
                 if (actual != NULL) {
                         /* read actual schemata */
