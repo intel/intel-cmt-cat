@@ -69,7 +69,7 @@ def get_supported_events():
     Returns a list of supported monitoring events.
 
     Returns:
-        a list of supproted monitoring events
+        a list of supported monitoring events
     """
 
     cap = PqosCap()

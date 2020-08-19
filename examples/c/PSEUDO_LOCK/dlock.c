@@ -32,22 +32,22 @@
  */
 
 #define _GNU_SOURCE
-#include <stdint.h>   /* uint64_t etc. */
-#include <stdlib.h>   /* malloc() */
-#include <string.h>   /* memcpy() */
-#include <types.h>    /* ASSERT() */
+#include <stdint.h> /* uint64_t etc. */
+#include <stdlib.h> /* malloc() */
+#include <string.h> /* memcpy() */
+#include <types.h>  /* ASSERT() */
 #include <pqos.h>
 #ifdef __linux__
-#include <sched.h>    /* sched_setaffinity() */
+#include <sched.h> /* sched_setaffinity() */
 #endif
 #ifdef __FreeBSD__
-#include <sys/param.h>   /* sched affinity */
-#include <sys/cpuset.h>  /* sched affinity */
+#include <sys/param.h>  /* sched affinity */
+#include <sys/cpuset.h> /* sched affinity */
 #endif
 #include "dlock.h"
 
 #define MAX_L3CAT_NUM 16
-#define DIM(x) (sizeof(x) / sizeof(x[0]))
+#define DIM(x)        (sizeof(x) / sizeof(x[0]))
 
 static int m_is_chunk_allocated = 0;
 static char *m_chunk_start = NULL;
@@ -64,7 +64,8 @@ static struct {
  * @param p pointer to memory block
  * @param s size of memory block in bytes
  */
-static void mem_flush(const void *p, const size_t s)
+static void
+mem_flush(const void *p, const size_t s)
 {
         const size_t cache_line = 64;
         const char *cp = (const char *)p;
@@ -73,17 +74,10 @@ static void mem_flush(const void *p, const size_t s)
         if (p == NULL || s <= 0)
                 return;
 
-        for (i = 0; i < s; i += cache_line) {
-                asm volatile("clflush (%0)\n\t"
-                             :
-                             : "r"(&cp[i])
-                             : "memory");
-        }
+        for (i = 0; i < s; i += cache_line)
+                asm volatile("clflush (%0)\n\t" : : "r"(&cp[i]) : "memory");
 
-        asm volatile("sfence\n\t"
-                     :
-                     :
-                     : "memory");
+        asm volatile("sfence\n\t" : : : "memory");
 }
 
 /**
@@ -92,7 +86,8 @@ static void mem_flush(const void *p, const size_t s)
  * @param p pointer to memory block
  * @param s size of memory block in bytes
  */
-static void mem_read(const void *p, const size_t s)
+static void
+mem_read(const void *p, const size_t s)
 {
         register size_t i;
 
@@ -102,14 +97,14 @@ static void mem_read(const void *p, const size_t s)
         for (i = 0; i < (s / sizeof(uint32_t)); i++) {
                 asm volatile("xor (%0,%1,4), %%eax\n\t"
                              :
-                             : "r" (p), "r" (i)
+                             : "r"(p), "r"(i)
                              : "%eax", "memory");
         }
 
         for (i = s & (~(sizeof(uint32_t) - 1)); i < s; i++) {
                 asm volatile("xorb (%0,%1,1), %%al\n\t"
                              :
-                             : "r" (p), "r" (i)
+                             : "r"(p), "r"(i)
                              : "%al", "memory");
         }
 }
@@ -122,7 +117,8 @@ static void mem_read(const void *p, const size_t s)
  * @param p pointer to memory block
  * @param s size of memory block in bytes
  */
-static void mem_init(void *p, const size_t s)
+static void
+mem_init(void *p, const size_t s)
 {
         char *cp = (char *)p;
         size_t i;
@@ -131,7 +127,7 @@ static void mem_init(void *p, const size_t s)
                 return;
 
         for (i = 0; i < s; i++)
-                cp[i] = (char) rand();
+                cp[i] = (char)rand();
 }
 
 /**
@@ -145,8 +141,10 @@ static void mem_init(void *p, const size_t s)
  * @retval 0 OK
  * @retval <0 error
  */
-static int bytes_to_cache_ways(const struct pqos_capability *cat_cap,
-                               const size_t bytes, size_t *ways)
+static int
+bytes_to_cache_ways(const struct pqos_capability *cat_cap,
+                    const size_t bytes,
+                    size_t *ways)
 {
         size_t llc_size = 0, num_ways = 0;
         const struct pqos_cap_l3ca *cat = NULL;
@@ -173,7 +171,8 @@ static int bytes_to_cache_ways(const struct pqos_capability *cat_cap,
         return 0;
 }
 
-int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
+int
+dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
 {
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
@@ -338,7 +337,7 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                         goto dlock_init_error2;
                 }
                 memcpy(m_l3cat_cos[i].cos_tab, cos,
-                                m_num_clos * sizeof(cos[0]));
+                       m_num_clos * sizeof(cos[0]));
 
                 /**
                  * Modify the classes in the following way:
@@ -417,7 +416,7 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                 goto dlock_init_error2;
         }
 
- dlock_init_error2:
+dlock_init_error2:
         for (i = 0; (i < DIM(m_l3cat_cos)) && (ret != 0); i++)
                 if (m_l3cat_cos[i].cos_tab != NULL)
                         free(m_l3cat_cos[i].cos_tab);
@@ -435,7 +434,7 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
                 perror(err_buf);
         }
 
- dlock_init_error1:
+dlock_init_error1:
         if (m_is_chunk_allocated && ret != 0)
                 free(m_chunk_start);
 
@@ -451,7 +450,8 @@ int dlock_init(void *ptr, const size_t size, const int clos, const int cpuid)
         return ret;
 }
 
-int dlock_exit(void)
+int
+dlock_exit(void)
 {
         int ret = 0;
         unsigned i;

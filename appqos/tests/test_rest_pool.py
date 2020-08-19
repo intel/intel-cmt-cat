@@ -390,7 +390,7 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     def test_post_unknown_param(self):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
-            response = REST.post("/pools", {"cores":[20], "cbm": "0xf", "unknonw": 1})
+            response = REST.post("/pools", {"cores":[20], "cbm": "0xf", "unknown": 1})
             func_mock.assert_not_called()
 
         assert response.status_code == 400

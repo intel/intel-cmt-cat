@@ -124,7 +124,7 @@ class Pqos(object):
             log_file: a file object where logs will be written to or None,
                       if None is given, then sys.stdout is used (default None)
             log_callback: a callback invoked for each log message (default None)
-            log_context: an additonal information given to a log callback
+            log_context: an additional information given to a log callback
                          (default None)
             verbose: log verbosity level, available options: silent,
                      default (or None), verbose and super (default 'default')

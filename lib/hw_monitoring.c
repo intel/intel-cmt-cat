@@ -272,7 +272,7 @@ rmid_get_event_max(pqos_rmid_t *rmid, const enum pqos_mon_event event)
 /**
  * @brief Get used RMIDs on ctx->cluster
  *
- * @param [inout] ctx poll context
+ * @param [in,out] ctx poll context
  * @param [in] event Monitoring event type
  *
  * @return Operations status
@@ -341,7 +341,7 @@ rmid_alloc_error:
 /**
  * @brief Gets RMID value based on information stored in rmid_cfg
  *
- * @param [inout] ctx poll context
+ * @param [in,out] ctx poll context
  * @param [in] event Monitoring event type
  * @param [in] rmid_cfg rmid configuration parameters
  *

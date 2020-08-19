@@ -101,7 +101,7 @@ int resctrl_schemata_l2ca_get(const struct resctrl_schemata *schemata,
 /*
  * @brief Updates L2 class of service in schemata
  *
- * @param [inout] schemata Schemata structure
+ * @param [in,out] schemata Schemata structure
  * @param [in] resource_id unique L2 cache identifier
  * @param [in] ca class of service definition
  *
@@ -127,7 +127,7 @@ int resctrl_schemata_l3ca_get(const struct resctrl_schemata *schemata,
 /*
  * @brief Updates L3 class of service in schemata
  *
- * @param [inout] schemata Schemata structure
+ * @param [in,out] schemata Schemata structure
  * @param [in] resource_id unique L3 cache identifier
  * @param [in] ca class of service definition
  *
@@ -153,7 +153,7 @@ int resctrl_schemata_mba_get(const struct resctrl_schemata *schemata,
 /*
  * @brief Updates MBA class of service in schemata
  *
- * @param [inout] schemata Schemata structure
+ * @param [in,out] schemata Schemata structure
  * @param [in] resource_id unique L3 cache identifier
  * @param [in] ca class of service definition
  *

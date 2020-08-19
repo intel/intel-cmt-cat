@@ -85,8 +85,10 @@ class TestRdtsetL2Cat(test.Test):
         else:
             last_cos = Resctrl.get_ctrl_group_count() - 1
 
-        assert re.search("Core 5, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) is not None
-        assert re.search("Core 6, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) is not None
+        assert re.search("Core 5, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
+                is not None
+        assert re.search("Core 6, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
+                is not None
         assert "L2CA COS%d => MASK 0xf" % last_cos in stdout
 
         self.run("killall memtester")

@@ -70,8 +70,7 @@ print_allocation_config(const struct pqos_capability *cap_l3ca,
                 struct pqos_l3ca tab[PQOS_MAX_L3CA_COS];
                 unsigned num = 0;
 
-                ret = pqos_l3ca_get(l3cat_ids[i], PQOS_MAX_L3CA_COS,
-                                    &num, tab);
+                ret = pqos_l3ca_get(l3cat_ids[i], PQOS_MAX_L3CA_COS, &num, tab);
                 if (ret == PQOS_RETVAL_OK) {
                         unsigned n = 0;
 
@@ -85,89 +84,88 @@ print_allocation_config(const struct pqos_capability *cap_l3ca,
                 }
         }
 
-	for (i = 0; i < l3cat_id_count; i++) {
-		unsigned *lcores = NULL;
-		unsigned lcount = 0, n = 0;
+        for (i = 0; i < l3cat_id_count; i++) {
+                unsigned *lcores = NULL;
+                unsigned lcount = 0, n = 0;
 
-		lcores = pqos_cpu_get_cores(cpu_info, l3cat_ids[i], &lcount);
-		if (lcores == NULL || lcount == 0) {
-			printf("Error retrieving core information!\n");
+                lcores = pqos_cpu_get_cores(cpu_info, l3cat_ids[i], &lcount);
+                if (lcores == NULL || lcount == 0) {
+                        printf("Error retrieving core information!\n");
                         free(lcores);
-			return;
-		}
-		printf("Core information for socket %u:\n",
-			l3cat_ids[i]);
-		for (n = 0; n < lcount; n++) {
-			unsigned class_id = 0;
-			int ret1 = PQOS_RETVAL_OK;
+                        return;
+                }
+                printf("Core information for socket %u:\n", l3cat_ids[i]);
+                for (n = 0; n < lcount; n++) {
+                        unsigned class_id = 0;
+                        int ret1 = PQOS_RETVAL_OK;
 
-			if (cap_l3ca != NULL)
-				ret1 = pqos_alloc_assoc_get(lcores[n],
-                                                            &class_id);
-			if (ret1 == PQOS_RETVAL_OK)
-				printf("    Core %u => COS%u\n",
-                                       lcores[n], class_id);
-			else
-				printf("    Core %u => ERROR\n",
-                                       lcores[n]);
-		}
+                        if (cap_l3ca != NULL)
+                                ret1 =
+                                    pqos_alloc_assoc_get(lcores[n], &class_id);
+                        if (ret1 == PQOS_RETVAL_OK)
+                                printf("    Core %u => COS%u\n", lcores[n],
+                                       class_id);
+                        else
+                                printf("    Core %u => ERROR\n", lcores[n]);
+                }
                 free(lcores);
-	}
+        }
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
         struct pqos_config cfg;
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
         const struct pqos_capability *cap_l3ca = NULL;
-	unsigned l3cat_id_count, *l3cat_ids = NULL;
+        unsigned l3cat_id_count, *l3cat_ids = NULL;
         int ret, exit_val = EXIT_SUCCESS;
 
-	memset(&cfg, 0, sizeof(cfg));
+        memset(&cfg, 0, sizeof(cfg));
         cfg.fd_log = STDOUT_FILENO;
         cfg.verbose = 0;
-	/* PQoS Initialization - Check and initialize CAT and CMT capability */
-	ret = pqos_init(&cfg);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error initializing PQoS library!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get CMT capability and CPU info pointer */
-	ret = pqos_cap_get(&p_cap, &p_cpu);
+        /* PQoS Initialization - Check and initialize CAT and CMT capability */
+        ret = pqos_init(&cfg);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error initializing PQoS library!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Get CMT capability and CPU info pointer */
+        ret = pqos_cap_get(&p_cap, &p_cpu);
         if (ret != PQOS_RETVAL_OK) {
                 printf("Error retrieving PQoS capabilities!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit;
         }
-	if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H"))) {
-		printf("Usage: %s\n\n", argv[0]);
-		goto error_exit;
-	}
-	/* Reset Api */
+        if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H"))) {
+                printf("Usage: %s\n\n", argv[0]);
+                goto error_exit;
+        }
+        /* Reset Api */
         ret = pqos_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
                                PQOS_MBA_ANY);
-	if (ret != PQOS_RETVAL_OK)
-		printf("CAT reset failed!\n");
-	else
-		printf("CAT reset successful\n");
-	/* Get CPU l3cat_id information to set COS */
-	l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
-	if (l3cat_ids == NULL) {
+        if (ret != PQOS_RETVAL_OK)
+                printf("CAT reset failed!\n");
+        else
+                printf("CAT reset successful\n");
+        /* Get CPU l3cat_id information to set COS */
+        l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
+        if (l3cat_ids == NULL) {
                 printf("Error retrieving CPU socket information!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit;
         }
-	(void) pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
-	/* Print COS and associated cores */
-	print_allocation_config(cap_l3ca, l3cat_id_count, l3cat_ids, p_cpu);
- error_exit:
-	/* reset and deallocate all the resources */
-	ret = pqos_fini();
-	if (ret != PQOS_RETVAL_OK)
-		printf("Error shutting down PQoS library!\n");
-	if (l3cat_ids != NULL)
-		free(l3cat_ids);
-	return exit_val;
+        (void)pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
+        /* Print COS and associated cores */
+        print_allocation_config(cap_l3ca, l3cat_id_count, l3cat_ids, p_cpu);
+error_exit:
+        /* reset and deallocate all the resources */
+        ret = pqos_fini();
+        if (ret != PQOS_RETVAL_OK)
+                printf("Error shutting down PQoS library!\n");
+        if (l3cat_ids != NULL)
+                free(l3cat_ids);
+        return exit_val;
 }

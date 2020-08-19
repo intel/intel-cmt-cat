@@ -66,7 +66,7 @@ class PqosCapMockBuilder(object):
     def build_monitoring_capability(self):
         """
         Builds mock CPqosCapabilityMonitoring object. Might be overwritten
-        in a subclass if neccessary.
+        in a subclass if necessary.
         """
         # pylint: disable=no-self-use
 
@@ -79,7 +79,7 @@ class PqosCapMockBuilder(object):
     def build_l3ca_capability(self):
         """
         Builds mock CPqosCapabilityL3 object. Might be overwritten
-        in a subclass if neccessary.
+        in a subclass if necessary.
         """
         # pylint: disable=no-self-use
 
@@ -91,7 +91,7 @@ class PqosCapMockBuilder(object):
     def build_l2ca_capability(self):
         """
         Builds mock CPqosCapabilityL2 object. Might be overwritten
-        in a subclass if neccessary.
+        in a subclass if necessary.
         """
         # pylint: disable=no-self-use
 
@@ -103,7 +103,7 @@ class PqosCapMockBuilder(object):
     def build_mba_capability(self):
         """
         Builds mock CPqosCapabilityMBA object. Might be overwritten
-        in a subclass if neccessary.
+        in a subclass if necessary.
         """
         # pylint: disable=no-self-use
 
@@ -114,7 +114,7 @@ class PqosCapMockBuilder(object):
 
     def build_capabilities(self):
         """
-        Builds capabilites for monitoring, L3/L2 cache allocation and
+        Builds capabilities for monitoring, L3/L2 cache allocation and
         memory bandwidth allocation.
         """
 
@@ -124,7 +124,7 @@ class PqosCapMockBuilder(object):
         self.mba = self.build_mba_capability()
 
     def build_capability_array(self):
-        "Build capabilites array (ctypes array of CPqosCapability objects)."
+        "Build capabilities array (ctypes array of CPqosCapability objects)."
 
         capabilities = []
 

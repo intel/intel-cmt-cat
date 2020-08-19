@@ -138,7 +138,7 @@ static enum pqos_interface m_interface = PQOS_INTER_MSR;
  */
 
 /**
- * @brief Initalizes API locks
+ * @brief Initializes API locks
  *
  * @return Operation status
  * @retval 0 success

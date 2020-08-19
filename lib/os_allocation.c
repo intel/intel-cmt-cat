@@ -609,7 +609,7 @@ os_alloc_reset_light_schematas_exit:
  *
  * @param[in] dir scandir dirent entry
  *
- * @retval 0 for entires to be skipped
+ * @retval 0 for entries to be skipped
  * @retval 1 otherwise
  */
 static int
@@ -712,7 +712,7 @@ os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
 /**
  * @brief updates CDP for l2 cache capability
  *
- * @param [in] l2_cdp_cfg requsted l2 cdp configuration
+ * @param [in] l2_cdp_cfg requested l2 cdp configuration
  * @param [in] l2_cap l2 capability
  * @param [out] l2_cdp id of default COS
  *
@@ -751,7 +751,7 @@ l2_cdp_update(const enum pqos_cdp_config l2_cdp_cfg,
 /**
  * @brief updates CDP for l3 cache capability
  *
- * @param [in] l3_cdp_cfg requsted l3 cdp configuration
+ * @param [in] l3_cdp_cfg requested l3 cdp configuration
  * @param [in] l3_cap l3 capability
  * @param [out] l3_cdp id of default COS
  *
@@ -790,7 +790,7 @@ l3_cdp_update(const enum pqos_cdp_config l3_cdp_cfg,
 /**
  * @brief updates MBA configuration for MBA capability
  *
- * @param [in] mba_cfg requsted MBA configuration
+ * @param [in] mba_cfg requested MBA configuration
  * @param [in] mba_cap MBA capability
  * @param [out] mba_ctrl updated MBA config
  *

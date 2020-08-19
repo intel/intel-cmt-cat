@@ -157,7 +157,7 @@ struct rdt_config {
         cpu_set_t cpumask;   /**< CPUs bitmask */
         struct pqos_l3ca l3; /**< L3 configuration */
         struct pqos_l2ca l2; /**< L2 configuration */
-        struct pqos_mba mba; /**< MBA configuretion */
+        struct pqos_mba mba; /**< MBA configuration */
         int pid_cfg;         /**< associate PIDs to this cfg */
 };
 

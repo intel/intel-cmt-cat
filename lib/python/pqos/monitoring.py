@@ -188,7 +188,7 @@ class PqosMon:
             cores: a list of core IDs
             events: a list of events, available options: 'l3_occup', 'lmem_bw',
                     'tmem_bw', 'rmem_bw', 'perf_llc_miss', 'perf_ipc'
-            context: a pointer to additional information, by defualt None
+            context: a pointer to additional information, by default None
 
         Returns:
             CPqosMonData monitoring data
@@ -212,7 +212,7 @@ class PqosMon:
             pids: a list of process IDs
             events: a list of events, available options: 'l3_occup', 'lmem_bw',
                     'tmem_bw', 'rmem_bw', 'perf_llc_miss', 'perf_ipc'
-            context: a pointer to additional information, by defualt None
+            context: a pointer to additional information, by default None
 
         Returns:
             CPqosMonData monitoring data

@@ -179,7 +179,7 @@ struct proc_stats {
 };
 
 /**
- * Mantains single linked list implementation
+ * Maintains single linked list implementation
  */
 struct slist {
         void *data; /**< abstract data that is hold by a list element */
@@ -714,7 +714,7 @@ void selfn_monitor_cores(const char *arg)
 /**
  * Update list of events to be monitored
  *
- * @param [inout] events List of monitoring events
+ * @param [in,out] events List of monitoring events
  * @param [in] cap_mon monitoring capability
  */
 static void monitor_setup_events(enum pqos_mon_event *events,

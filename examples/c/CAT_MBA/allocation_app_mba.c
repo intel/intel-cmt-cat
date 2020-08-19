@@ -50,11 +50,7 @@
 /**
  * MBA struct type
  */
-enum mba_type {
-        REQUESTED = 0,
-        ACTUAL,
-        MAX_MBA_TYPES
-};
+enum mba_type { REQUESTED = 0, ACTUAL, MAX_MBA_TYPES };
 /**
  * Maintains number of MBA COS to be set
  */
@@ -107,16 +103,16 @@ strtouint64(const char *s)
 static void
 allocation_get_input(int argc, char *argv[])
 {
-	if (argc < 2)
-		sel_mba_cos_num = 0;
-	else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H")) {
-		printf("Usage: %s [<COS#> <Available BW>]\n", argv[0]);
-		printf("Example: %s 1 80\n\n", argv[0]);
-		sel_mba_cos_num = 0;
-	} else {
+        if (argc < 2)
+                sel_mba_cos_num = 0;
+        else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H")) {
+                printf("Usage: %s [<COS#> <Available BW>]\n", argv[0]);
+                printf("Example: %s 1 80\n\n", argv[0]);
+                sel_mba_cos_num = 0;
+        } else {
                 mba[REQUESTED].class_id = (unsigned)atoi(argv[1]);
                 mba[REQUESTED].mb_max = strtouint64(argv[2]);
-		mba[REQUESTED].ctrl = 0;
+                mba[REQUESTED].ctrl = 0;
                 sel_mba_cos_num = 1;
         }
 }
@@ -132,23 +128,20 @@ allocation_get_input(int argc, char *argv[])
  * @retval positive success
  */
 static int
-set_allocation_class(unsigned mba_count,
-                     const unsigned *mba_ids)
+set_allocation_class(unsigned mba_count, const unsigned *mba_ids)
 {
         int ret;
 
         while (mba_count > 0 && sel_mba_cos_num > 0) {
-                ret = pqos_mba_set(*mba_ids,
-                                   sel_mba_cos_num,
-                                   &mba[REQUESTED],
+                ret = pqos_mba_set(*mba_ids, sel_mba_cos_num, &mba[REQUESTED],
                                    &mba[ACTUAL]);
-                if  (ret != PQOS_RETVAL_OK) {
+                if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to set MBA!\n");
                         return -1;
                 }
                 printf("SKT%u: MBA COS%u => %u%% requested, %u%% applied\n",
-                       *mba_ids, mba[REQUESTED].class_id,
-                       mba[REQUESTED].mb_max, mba[ACTUAL].mb_max);
+                       *mba_ids, mba[REQUESTED].class_id, mba[REQUESTED].mb_max,
+                       mba[ACTUAL].mb_max);
 
                 mba_count--;
                 mba_ids++;
@@ -173,92 +166,92 @@ print_allocation_config(const struct pqos_cap *p_cap,
         const struct pqos_cap_mba *mba_cap = NULL;
 
         int ret = PQOS_RETVAL_OK;
-	unsigned i;
+        unsigned i;
 
         ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MBA, &cap);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         mba_cap = cap->u.mba;
 
-	for (i = 0; i < mba_count; i++) {
+        for (i = 0; i < mba_count; i++) {
                 struct pqos_mba tab[mba_cap->num_classes];
-	        unsigned num = 0;
+                unsigned num = 0;
 
-		ret = pqos_mba_get(mba_ids[i], mba_cap->num_classes,
-                                   &num, tab);
-		if (ret == PQOS_RETVAL_OK) {
-			unsigned n = 0;
+                ret = pqos_mba_get(mba_ids[i], mba_cap->num_classes, &num, tab);
+                if (ret == PQOS_RETVAL_OK) {
+                        unsigned n = 0;
 
                         printf("MBA COS definitions for Socket %u:\n",
                                mba_ids[i]);
-			for (n = 0; n < num; n++) {
-				printf("    MBA COS%u => %u%% available\n",
-                                       tab[n].class_id,
-                                       tab[n].mb_max);
-			}
-		} else {
-			printf("Error:%d", ret);
-			return ret;
-		}
-	}
-	return ret;
+                        for (n = 0; n < num; n++) {
+                                printf("    MBA COS%u => %u%% available\n",
+                                       tab[n].class_id, tab[n].mb_max);
+                        }
+                } else {
+                        printf("Error:%d", ret);
+                        return ret;
+                }
+        }
+        return ret;
 }
-int main(int argc, char *argv[])
-{
-	struct pqos_config cfg;
-	const struct pqos_cpuinfo *p_cpu = NULL;
-	const struct pqos_cap *p_cap = NULL;
-	unsigned mba_id_count, *p_mba_ids = NULL;
-	int ret, exit_val = EXIT_SUCCESS;
 
-	memset(&cfg, 0, sizeof(cfg));
+int
+main(int argc, char *argv[])
+{
+        struct pqos_config cfg;
+        const struct pqos_cpuinfo *p_cpu = NULL;
+        const struct pqos_cap *p_cap = NULL;
+        unsigned mba_id_count, *p_mba_ids = NULL;
+        int ret, exit_val = EXIT_SUCCESS;
+
+        memset(&cfg, 0, sizeof(cfg));
         cfg.fd_log = STDOUT_FILENO;
         cfg.verbose = 0;
-	/* PQoS Initialization - Check and initialize MBA capability */
-	ret = pqos_init(&cfg);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error initializing PQoS library!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get capability and CPU info pointers */
-	ret = pqos_cap_get(&p_cap, &p_cpu);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error retrieving PQoS capabilities!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get CPU mba_id information to set COS */
-	p_mba_ids = pqos_cpu_get_mba_ids(p_cpu, &mba_id_count);
-	if (p_mba_ids == NULL) {
-		printf("Error retrieving MBA ID information!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get input from user	*/
-	allocation_get_input(argc, argv);
-	if (sel_mba_cos_num != 0) {
-		/* Set delay value for MBA COS allocation */
-		ret = set_allocation_class(mba_id_count, p_mba_ids);
-		if (ret < 0) {
-			printf("Allocation configuration error!\n");
-			goto error_exit;
-		}
-		printf("Allocation configuration altered.\n");
-	}
-	/* Print COS definition */
-	ret = print_allocation_config(p_cap, mba_id_count, p_mba_ids);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Allocation capability not detected!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
- error_exit:
-	/* reset and deallocate all the resources */
-	ret = pqos_fini();
-	if (ret != PQOS_RETVAL_OK)
-		printf("Error shutting down PQoS library!\n");
-	if (p_mba_ids != NULL)
-		free(p_mba_ids);
-	return exit_val;
+        /* PQoS Initialization - Check and initialize MBA capability */
+        ret = pqos_init(&cfg);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error initializing PQoS library!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Get capability and CPU info pointers */
+        ret = pqos_cap_get(&p_cap, &p_cpu);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error retrieving PQoS capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Get CPU mba_id information to set COS */
+        p_mba_ids = pqos_cpu_get_mba_ids(p_cpu, &mba_id_count);
+        if (p_mba_ids == NULL) {
+                printf("Error retrieving MBA ID information!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Get input from user  */
+        allocation_get_input(argc, argv);
+        if (sel_mba_cos_num != 0) {
+                /* Set delay value for MBA COS allocation */
+                ret = set_allocation_class(mba_id_count, p_mba_ids);
+                if (ret < 0) {
+                        printf("Allocation configuration error!\n");
+                        goto error_exit;
+                }
+                printf("Allocation configuration altered.\n");
+        }
+        /* Print COS definition */
+        ret = print_allocation_config(p_cap, mba_id_count, p_mba_ids);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Allocation capability not detected!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+error_exit:
+        /* reset and deallocate all the resources */
+        ret = pqos_fini();
+        if (ret != PQOS_RETVAL_OK)
+                printf("Error shutting down PQoS library!\n");
+        if (p_mba_ids != NULL)
+                free(p_mba_ids);
+        return exit_val;
 }

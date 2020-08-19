@@ -130,7 +130,7 @@ class TestReport:
         if report.when != "call":
             return
 
-        # We are intersted only on executed tests
+        # We are interested only on executed tests
         if report.outcome != "passed" and report.outcome != "failed":
             return
 

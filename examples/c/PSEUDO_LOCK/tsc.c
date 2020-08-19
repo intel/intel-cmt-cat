@@ -31,15 +31,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>   /* vsnprintf() */
-#include <stdarg.h>  /* va_start(), va_end() */
-#include <limits.h>  /* ULONG_MAX */
-#include <string.h>  /* memset() */
+#include <stdio.h>  /* vsnprintf() */
+#include <stdarg.h> /* va_start(), va_end() */
+#include <limits.h> /* ULONG_MAX */
+#include <string.h> /* memset() */
 #include "tsc.h"
 
 static const double __measurement_cost = 0;
 
-void tsc_init(struct tsc_prof *p, const char *name, ...)
+void
+tsc_init(struct tsc_prof *p, const char *name, ...)
 {
         va_list ap;
 
@@ -52,16 +53,17 @@ void tsc_init(struct tsc_prof *p, const char *name, ...)
         p->clk_avgc = 0;
         p->clk_result = 0.0;
         p->clk_max = 0.0;
-        p->clk_min = (double) ULONG_MAX;
+        p->clk_min = (double)ULONG_MAX;
         p->cost = __measurement_cost;
 }
 
-void tsc_print(struct tsc_prof *p)
+void
+tsc_print(struct tsc_prof *p)
 {
         tsc_get_avg(p);
 
         printf("[%s] work items %llu; cycles per work item: "
                "avg=%.3f min=%.3f max=%.3f jitter=%.3f\n",
-               p->name, (unsigned long long)p->clk_avgc,
-               p->clk_result, p->clk_min, p->clk_max, p->clk_max - p->clk_min);
+               p->name, (unsigned long long)p->clk_avgc, p->clk_result,
+               p->clk_min, p->clk_max, p->clk_max - p->clk_min);
 }

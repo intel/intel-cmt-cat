@@ -76,7 +76,7 @@ void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
 
 /**
- * @brief Aquires lock for PQoS API use
+ * @brief Acquires lock for PQoS API use
  *
  * Only one thread at a time is allowed to use the API.
  * Each PQoS API need to use api_lock and api_unlock functions.

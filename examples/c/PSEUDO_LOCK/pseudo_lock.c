@@ -49,8 +49,8 @@
 #include "dlock.h"
 #include "tsc.h"
 
-#define DIM(x) (sizeof(x)/sizeof(x[0]))
-#define MB (1024 * 1024)
+#define DIM(x) (sizeof(x) / sizeof(x[0]))
+#define MB     (1024 * 1024)
 
 static void *timer_data_ptr = NULL;
 static const size_t timer_data_size = 2 * MB;
@@ -76,7 +76,8 @@ static timer_t timerid;
  *
  * @return Pointer to allocated memory block
  */
-static void *init_memory(const size_t sz)
+static void *
+init_memory(const size_t sz)
 {
         char *p = NULL;
         size_t i;
@@ -84,12 +85,12 @@ static void *init_memory(const size_t sz)
         if (sz <= 0)
                 return NULL;
 
-        p = (char *) malloc(sz);
+        p = (char *)malloc(sz);
         if (p == NULL)
                 return NULL;
 
         for (i = 0; i < sz; i += 32)
-                p[i] = (char) rand();
+                p[i] = (char)rand();
 
         return (void *)p;
 }
@@ -104,7 +105,8 @@ static void *init_memory(const size_t sz)
  *
  * @return Random number value
  */
-static int timer_rand(void)
+static int
+timer_rand(void)
 {
         static int _rand_tab[8192]; /* size has to be power of 2 */
         static int _rand_idx = -1;
@@ -136,16 +138,17 @@ static int timer_rand(void)
  * @param si UNUSED
  * @param uc UNUSED
  */
-static void timer_handler(int sig, siginfo_t *si, void *uc)
+static void
+timer_handler(int sig, siginfo_t *si, void *uc)
 {
         const int num_iterations = 5000;
-        int *p = (int *) timer_data_ptr;
+        int *p = (int *)timer_data_ptr;
         const size_t sz = timer_data_size / sizeof(int);
         int m;
 
-        (void) (sig);
-        (void) (si);
-        (void) (uc);
+        (void)(sig);
+        (void)(si);
+        (void)(uc);
 
         tsc_start(&timer_prof);
         /* START - "latency sensitive" code */
@@ -174,7 +177,8 @@ static void timer_handler(int sig, siginfo_t *si, void *uc)
  * @retval 0 OK
  * @retval <0 error
  */
-static int init_timer(const long long freq_nanosecs)
+static int
+init_timer(const long long freq_nanosecs)
 {
         sigset_t mask;
         struct sigaction sa;
@@ -182,7 +186,7 @@ static int init_timer(const long long freq_nanosecs)
         struct itimerspec its;
 
         /* this will initialize the table with random numbers */
-        (void) timer_rand();
+        (void)timer_rand();
 
         /* Block timer signal temporarily */
         sigemptyset(&mask);
@@ -237,7 +241,8 @@ static int init_timer(const long long freq_nanosecs)
  * @retval 0 OK
  * @retval <0 error
  */
-static int close_timer(void)
+static int
+close_timer(void)
 {
         if (timer_delete(timerid) == -1) {
                 printf("Error deleting the timer!\n");
@@ -257,7 +262,8 @@ static int close_timer(void)
  * @retval 0 OK
  * @retval <0 error
  */
-static int init_pqos(void)
+static int
+init_pqos(void)
 {
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
@@ -300,7 +306,8 @@ static int init_pqos(void)
  * @retval 0 OK
  * @retval <0 error
  */
-static int close_pqos(void)
+static int
+close_pqos(void)
 {
         int ret_val = 0;
 
@@ -320,7 +327,8 @@ static int close_pqos(void)
  * @param p pointer to memory block on which the workload is to be run
  * @param size size of the memory block
  */
-static void main_thread(char *p, const size_t size)
+static void
+main_thread(char *p, const size_t size)
 {
         const size_t half_size = size / 2;
         const unsigned loop_iter = 10000000;
@@ -349,7 +357,8 @@ static void main_thread(char *p, const size_t size)
  *
  * @return Process exit code
  */
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
         const long long freq_nanosecs = freq_ms * 1000LL * 1000LL;
         int core_id, lock_data = 1, exit_val = EXIT_SUCCESS;
@@ -385,8 +394,8 @@ int main(int argc, char *argv[])
                 }
 
                 /* lock the timer data */
-                if (dlock_init(timer_data_ptr,
-                               timer_data_size, 1 /* CLOS */, core_id) != 0) {
+                if (dlock_init(timer_data_ptr, timer_data_size, 1 /* CLOS */,
+                               core_id) != 0) {
                         printf("Pseudo data lock error!\n");
                         exit_val = EXIT_FAILURE;
                         goto error_exit1;
@@ -403,17 +412,17 @@ int main(int argc, char *argv[])
 
         main_thread((char *)main_data_ptr, main_data_size);
 
-        (void) close_timer();
+        (void)close_timer();
 
         tsc_print(&timer_prof);
 
- error_exit2:
+error_exit2:
         if (lock_data)
                 dlock_exit();
 
- error_exit1:
+error_exit1:
         if (lock_data)
-                (void) close_pqos();
+                (void)close_pqos();
 
         if (main_data_ptr != NULL)
                 free(main_data_ptr);

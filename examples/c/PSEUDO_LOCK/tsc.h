@@ -44,14 +44,14 @@ extern "C" {
  * TSC profile structure
  */
 struct tsc_prof {
-        uint64_t clk_start;           /**< start TSC of an iteration */
-        uint64_t clk_avgc;            /**< count to calculate an average */
-        double clk_min;               /**< min cycle cost recorded */
-        double clk_max;               /**< max cycle cost recorded */
-        double clk_avg;               /**< cumulative sum to
-                                         calculate an average */
-        double clk_result;            /**< avg cycles cost */
-        double cost;                  /**< cost of measurement */
+        uint64_t clk_start; /**< start TSC of an iteration */
+        uint64_t clk_avgc;  /**< count to calculate an average */
+        double clk_min;     /**< min cycle cost recorded */
+        double clk_max;     /**< max cycle cost recorded */
+        double clk_avg;     /**< cumulative sum to
+                               calculate an average */
+        double clk_result;  /**< avg cycles cost */
+        double cost;        /**< cost of measurement */
         char name[128];
 };
 
@@ -72,7 +72,8 @@ struct tsc_prof {
  *
  * @return TSC value
  */
-static __attribute__((always_inline)) inline uint64_t __tsc_start(void)
+static __attribute__((always_inline)) inline uint64_t
+__tsc_start(void)
 {
         uint32_t cycles_high, cycles_low;
 
@@ -81,17 +82,19 @@ static __attribute__((always_inline)) inline uint64_t __tsc_start(void)
                      "rdtscp\n\t"
                      "mov %%edx, %0\n\t"
                      "mov %%eax, %1\n\t"
-                     : "=r" (cycles_high), "=r" (cycles_low)
-                     : : "%rax", "%rdx");
+                     : "=r"(cycles_high), "=r"(cycles_low)
+                     :
+                     : "%rax", "%rdx");
 #else
         asm volatile("lfence\n\t"
                      "rdtscp\n\t"
                      "mov %%edx, %0\n\t"
                      "mov %%eax, %1\n\t"
-                     : "=r" (cycles_high), "=r" (cycles_low)
-                     : : "%eax", "%edx");
+                     : "=r"(cycles_high), "=r"(cycles_low)
+                     :
+                     : "%eax", "%edx");
 #endif
-        return(((uint64_t)cycles_high << 32) | cycles_low);
+        return (((uint64_t)cycles_high << 32) | cycles_low);
 }
 
 /**
@@ -102,7 +105,8 @@ static __attribute__((always_inline)) inline uint64_t __tsc_start(void)
  *
  * @return TSC value
  */
-static __attribute__((always_inline)) inline uint64_t __tsc_end(void)
+static __attribute__((always_inline)) inline uint64_t
+__tsc_end(void)
 {
         uint32_t cycles_high, cycles_low;
 
@@ -110,14 +114,16 @@ static __attribute__((always_inline)) inline uint64_t __tsc_end(void)
         asm volatile("rdtscp\n\t"
                      "mov %%edx, %0\n\t"
                      "mov %%eax, %1\n\t"
-                     : "=r" (cycles_high), "=r" (cycles_low)
-                     : : "%rax", "%rdx");
+                     : "=r"(cycles_high), "=r"(cycles_low)
+                     :
+                     : "%rax", "%rdx");
 #else
         asm volatile("rdtscp\n\t"
                      "mov %%edx, %0\n\t"
                      "mov %%eax, %1\n\t"
-                     : "=r" (cycles_high), "=r" (cycles_low)
-                     : : "%eax", "%edx");
+                     : "=r"(cycles_high), "=r"(cycles_low)
+                     :
+                     : "%eax", "%edx");
 #endif
         return ((uint64_t)cycles_high << 32) | cycles_low;
 }
@@ -148,12 +154,12 @@ tsc_start(struct tsc_prof *p)
 static __attribute__((always_inline)) inline void
 tsc_end_ex(struct tsc_prof *p, const unsigned inc, const uint64_t clk_start)
 {
-        double clk_diff = (double) (__tsc_end() - clk_start);
+        double clk_diff = (double)(__tsc_end() - clk_start);
 
         p->clk_avgc += inc;
         p->clk_avg += (clk_diff - p->cost);
 
-        clk_diff = clk_diff / (double) inc;
+        clk_diff = clk_diff / (double)inc;
 
         if (clk_diff < p->clk_min)
                 p->clk_min = clk_diff;
@@ -183,13 +189,13 @@ tsc_end(struct tsc_prof *p, const unsigned inc)
  * @return Calculated average cycle cost per work item
  * @retval NAN if no code measurement done so far
  */
-static __attribute__((always_inline)) inline
-double tsc_get_avg(struct tsc_prof *p)
+static __attribute__((always_inline)) inline double
+tsc_get_avg(struct tsc_prof *p)
 {
         double avg_c = 0.0;
 
         if (p->clk_avgc > 0)
-                avg_c = (p->clk_avg / ((double) p->clk_avgc));
+                avg_c = (p->clk_avg / ((double)p->clk_avgc));
         p->clk_result = avg_c;
         return avg_c;
 }

@@ -83,7 +83,7 @@ filter(const struct dirent *dir)
 }
 
 /**
- * @breif Free memory allocated by scandir
+ * @brief Free memory allocated by scandir
  *
  * @param namelist structure allocated by scandir
  * @param count number of files
@@ -1023,7 +1023,7 @@ resctrl_mon_parse_exit:
 }
 
 /**
- * @brief Assignes resctrl monitoring group
+ * @brief Assigns resctrl monitoring group
  *
  * @param group monitoring structure
  *

@@ -710,7 +710,7 @@ static const char help_printf_long[] =
         "          or select process ids and events to monitor.\n"
         "          EVTPIDS format is 'EVENT:PID_LIST'.\n"
         "          Examples: 'llc:22,25673' or 'all:892,4588-4592'\n"
-        "          Process' IDs can be grouped by enclosing them in square brackets,\n"
+        "          Process's IDs can be grouped by enclosing them in square brackets,\n"
         "          Examples: 'llc:[22,25673]' or 'all:892,[4588-4592]'\n"
         "          Note:\n"
         "               Requires Linux and kernel versions 4.10 and newer.\n"

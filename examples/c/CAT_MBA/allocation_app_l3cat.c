@@ -97,20 +97,20 @@ strtouint64(const char *s)
 static void
 allocation_get_input(int argc, char *argv[])
 {
-	uint64_t mask = 0;
+        uint64_t mask = 0;
 
-	if (argc < 2)
-		sel_l3ca_cos_num = 0;
-	else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H")) {
-		printf("Usage: %s [<COS#> <COS bitmask>]\n", argv[0]);
-		printf("Example: %s 1 0xff\n\n", argv[0]);
-		sel_l3ca_cos_num = 0;
-	} else {
-		sel_l3ca_cos_tab[0].class_id = (unsigned)atoi(argv[1]);
-		mask = strtouint64(argv[2]);
-		sel_l3ca_cos_tab[0].u.ways_mask = mask;
-		sel_l3ca_cos_num = 1;
-	}
+        if (argc < 2)
+                sel_l3ca_cos_num = 0;
+        else if (!strcmp(argv[1], "-h") || !strcmp(argv[1], "-H")) {
+                printf("Usage: %s [<COS#> <COS bitmask>]\n", argv[0]);
+                printf("Example: %s 1 0xff\n\n", argv[0]);
+                sel_l3ca_cos_num = 0;
+        } else {
+                sel_l3ca_cos_tab[0].class_id = (unsigned)atoi(argv[1]);
+                mask = strtouint64(argv[2]);
+                sel_l3ca_cos_tab[0].u.ways_mask = mask;
+                sel_l3ca_cos_num = 1;
+        }
 }
 /**
  * @brief Sets up allocation classes of service on selected L3 CAT ids
@@ -124,24 +124,22 @@ allocation_get_input(int argc, char *argv[])
  * @retval positive success
  */
 static int
-set_allocation_class(unsigned l3cat_id_count,
-                     const unsigned *l3cat_ids)
+set_allocation_class(unsigned l3cat_id_count, const unsigned *l3cat_ids)
 {
-	int ret;
+        int ret;
 
         while (l3cat_id_count > 0 && sel_l3ca_cos_num > 0) {
-                ret = pqos_l3ca_set(*l3cat_ids,
-                                    sel_l3ca_cos_num,
+                ret = pqos_l3ca_set(*l3cat_ids, sel_l3ca_cos_num,
                                     sel_l3ca_cos_tab);
-		if  (ret != PQOS_RETVAL_OK) {
-			printf("Setting up cache allocation class of "
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Setting up cache allocation class of "
                                "service failed!\n");
-			return -1;
-		}
-		l3cat_id_count--;
-		l3cat_ids++;
-	}
-	return sel_l3ca_cos_num;
+                        return -1;
+                }
+                l3cat_id_count--;
+                l3cat_ids++;
+        }
+        return sel_l3ca_cos_num;
 }
 /**
  * @brief Prints allocation configuration
@@ -155,89 +153,89 @@ static int
 print_allocation_config(const unsigned l3cat_id_count,
                         const unsigned *l3cat_ids)
 {
-	int ret = PQOS_RETVAL_OK;
-	unsigned i;
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
 
-	for (i = 0; i < l3cat_id_count; i++) {
-		struct pqos_l3ca tab[PQOS_MAX_L3CA_COS];
-		unsigned num = 0;
+        for (i = 0; i < l3cat_id_count; i++) {
+                struct pqos_l3ca tab[PQOS_MAX_L3CA_COS];
+                unsigned num = 0;
 
-		ret = pqos_l3ca_get(l3cat_ids[i], PQOS_MAX_L3CA_COS,
-                                    &num, tab);
-		if (ret == PQOS_RETVAL_OK) {
-			unsigned n = 0;
+                ret = pqos_l3ca_get(l3cat_ids[i], PQOS_MAX_L3CA_COS, &num, tab);
+                if (ret == PQOS_RETVAL_OK) {
+                        unsigned n = 0;
 
                         printf("L3CA COS definitions for Socket %u:\n",
                                l3cat_ids[i]);
-			for (n = 0; n < num; n++) {
-				printf("    L3CA COS%u => MASK 0x%llx\n",
+                        for (n = 0; n < num; n++) {
+                                printf("    L3CA COS%u => MASK 0x%llx\n",
                                        tab[n].class_id,
                                        (unsigned long long)tab[n].u.ways_mask);
-			}
-		} else {
-			printf("Error:%d", ret);
-			return ret;
-		}
-	}
-	return ret;
+                        }
+                } else {
+                        printf("Error:%d", ret);
+                        return ret;
+                }
+        }
+        return ret;
 }
 
-int main(int argc, char *argv[])
+int
+main(int argc, char *argv[])
 {
-	struct pqos_config cfg;
-	const struct pqos_cpuinfo *p_cpu = NULL;
-	const struct pqos_cap *p_cap = NULL;
-	unsigned l3cat_id_count, *p_l3cat_ids = NULL;
-	int ret, exit_val = EXIT_SUCCESS;
+        struct pqos_config cfg;
+        const struct pqos_cpuinfo *p_cpu = NULL;
+        const struct pqos_cap *p_cap = NULL;
+        unsigned l3cat_id_count, *p_l3cat_ids = NULL;
+        int ret, exit_val = EXIT_SUCCESS;
 
-	memset(&cfg, 0, sizeof(cfg));
+        memset(&cfg, 0, sizeof(cfg));
         cfg.fd_log = STDOUT_FILENO;
         cfg.verbose = 0;
-	/* PQoS Initialization - Check and initialize CAT and CMT capability */
-	ret = pqos_init(&cfg);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error initializing PQoS library!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get CMT capability and CPU info pointer */
-	ret = pqos_cap_get(&p_cap, &p_cpu);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Error retrieving PQoS capabilities!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get CPU l3cat id information to set COS */
-	p_l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
-	if (p_l3cat_ids == NULL) {
-		printf("Error retrieving CPU socket information!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
-	/* Get input from user	*/
-	allocation_get_input(argc, argv);
-	if (sel_l3ca_cos_num != 0) {
-		/* Set bit mask for COS allocation */
-		ret = set_allocation_class(l3cat_id_count, p_l3cat_ids);
-		if (ret < 0) {
-			printf("Allocation configuration error!\n");
-			goto error_exit;
-		}
-		printf("Allocation configuration altered.\n");
-	}
-	/* Print COS and associated bit mask */
-	ret = print_allocation_config(l3cat_id_count, p_l3cat_ids);
-	if (ret != PQOS_RETVAL_OK) {
-		printf("Allocation capability not detected!\n");
-		exit_val = EXIT_FAILURE;
-		goto error_exit;
-	}
- error_exit:
-	/* reset and deallocate all the resources */
-	ret = pqos_fini();
-	if (ret != PQOS_RETVAL_OK)
-		printf("Error shutting down PQoS library!\n");
-	if (p_l3cat_ids != NULL)
-		free(p_l3cat_ids);
-	return exit_val;
+        /* PQoS Initialization - Check and initialize CAT and CMT capability */
+        ret = pqos_init(&cfg);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error initializing PQoS library!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Get CMT capability and CPU info pointer */
+        ret = pqos_cap_get(&p_cap, &p_cpu);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error retrieving PQoS capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Get CPU l3cat id information to set COS */
+        p_l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
+        if (p_l3cat_ids == NULL) {
+                printf("Error retrieving CPU socket information!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+        /* Get input from user  */
+        allocation_get_input(argc, argv);
+        if (sel_l3ca_cos_num != 0) {
+                /* Set bit mask for COS allocation */
+                ret = set_allocation_class(l3cat_id_count, p_l3cat_ids);
+                if (ret < 0) {
+                        printf("Allocation configuration error!\n");
+                        goto error_exit;
+                }
+                printf("Allocation configuration altered.\n");
+        }
+        /* Print COS and associated bit mask */
+        ret = print_allocation_config(l3cat_id_count, p_l3cat_ids);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Allocation capability not detected!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit;
+        }
+error_exit:
+        /* reset and deallocate all the resources */
+        ret = pqos_fini();
+        if (ret != PQOS_RETVAL_OK)
+                printf("Error shutting down PQoS library!\n");
+        if (p_l3cat_ids != NULL)
+                free(p_l3cat_ids);
+        return exit_val;
 }

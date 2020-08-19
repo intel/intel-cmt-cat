@@ -36,8 +36,8 @@
 # OS interface wrapper script
 # ----------------------------
 #
-# PQoS utilty wrapper script to use the library OS/Kernel interface.
+# PQoS utility wrapper script to use the library OS/Kernel interface.
 # This will cause the library to read/write to the resctrl filesystem.
 
-# Run pqos utilty passing CL args
+# Run pqos utility passing CL args
 pqos -I $@
