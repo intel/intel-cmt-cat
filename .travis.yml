@@ -7,6 +7,8 @@ before_script:
     - wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/spelling.txt
     - wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/const_structs.checkpatch
 script:
+    - wget -P https://launchpad.net/ubuntu/+archive/primary/+files/codespell_1.17.1-1_all.deb
+    - sudo dpkg -i codespell_1.17.1-1_all.deb
     - make cppcheck
     - make style CHECKPATCH=/tmp/checkpatch.pl CLANGFORMAT=clang-format-9
     - make

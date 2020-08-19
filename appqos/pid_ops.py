@@ -40,7 +40,6 @@ import common
 import log
 
 # list of valid PIDs' status, (R)unning, (S)leeping, (D)isk wait
-# (c)onnfig unning
 PID_VALID_STATUS = set('RSD')
 
 
