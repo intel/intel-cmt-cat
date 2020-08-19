@@ -77,12 +77,32 @@ clean:
 	-rm -f $(MONITORAPP) ./*.o
 
 CHECKPATCH?=checkpatch.pl
-.PHONY: style
-style:
+.PHONY: checkpatch
+checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT \
 	--ignore SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f monitor_app.c
+
+CLANGFORMAT?=clang-format
+.PHONY: clang-format
+clang-format:
+	@for file in $(wildcard *.[ch]); do \
+		echo "Checking style $$file"; \
+		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		{ echo "ERROR: $$file has style problems"; exit 1; } \
+	done
+
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . -q 2
+
+.PHONY: style
+style:
+	$(MAKE) checkpatch
+	$(MAKE) clang-format
+	$(MAKE) codespell
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck

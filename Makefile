@@ -67,6 +67,7 @@ clean:
 	$(MAKE) -C examples/c/CMT_MBM clean
 	$(MAKE) -C examples/c/PSEUDO_LOCK clean
 	$(MAKE) -C tests clean
+	$(MAKE) -C appqos clean
 
 style:
 	$(MAKE) -C lib style

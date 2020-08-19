@@ -32,7 +32,7 @@ To setup virtual environment:
 
 Environment File
 ===============
-In order to run unit tests, it is required to crerate enviroment file describing
+In order to run unit tests, it is required to crerate environment file describing
 hardware features. Please, follow schema env.json for full documentation.
 
 The example.json contains example environment file for Intel(R) Xeon(R) Gold 6252N CPU.
@@ -40,7 +40,7 @@ The example.json contains example environment file for Intel(R) Xeon(R) Gold 625
 
 Running tests
 =============
-It is assummed that pqos library will be installed in the system.
+It is assumed that pqos library will be installed in the system.
 
 Run tests without virtualenv:
 	sudo py.test --env=example.json testcases

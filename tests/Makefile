@@ -21,9 +21,22 @@ clean:
 	@rm -rf plugins/__pycache__
 	@rm -rf plugins/*.pyc
 
-
-style: test_env
+pylint: test_env
 	@bash -c "source $(CURDIR)/test_env/bin/activate && \
 		python -m pylint *.py plugins/*.py testcases/*.py testlib/*.py && \
+		deactivate"
+
+bandit: test_env
+	@bash -c "source $(CURDIR)/test_env/bin/activate && \
 		python -m bandit -s B101,B404,B603 *.py plugins/*.py testcases/*.py testlib/*.py; \
 		deactivate"
+
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . --skip ./test_env -q 2
+
+style:
+	${MAKE} pylint
+	${MAKE} bandit
+	${MAKE} codespell

@@ -85,13 +85,33 @@ clean:
 	-rm -f $(ALLOCAPP_L2CAT) $(ALLOCAPP_L3CAT) $(ALLOCAPP_MBA) $(ASSOCAPP) $(RESETAPP) *.o
 
 CHECKPATCH?=checkpatch.pl
-.PHONY: style
-style:
+.PHONY: checkpatch
+checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT \
 	--ignore SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f allocation_app_l2cat.c allocation_app_l3cat.c -f allocation_app_mba.c \
         -f association_app.c -f reset_app.c
+
+CLANGFORMAT?=clang-format
+.PHONY: clang-format
+clang-format:
+	@for file in $(wildcard *.[ch]); do \
+		echo "Checking style $$file"; \
+		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		{ echo "ERROR: $$file has style problems"; exit 1; } \
+	done
+
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . -q 2 -L clos
+
+.PHONY: style
+style:
+	$(MAKE) checkpatch
+	$(MAKE) clang-format
+	$(MAKE) codespell
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck

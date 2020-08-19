@@ -78,12 +78,32 @@ clean:
 	-rm -f $(APP) $(OBJS) *.o
 
 CHECKPATCH?=checkpatch.pl
-.PHONY: style
-style:
+.PHONY: checkpatch
+checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,\
 	ARRAY_SIZE,BLOCK_COMMENT_STYLE,SPDX_LICENSE_TAG,CONST_STRUCT \
 	-f pseudo_lock.c -f tsc.c -f tsc.h -f dlock.c -f dlock.h
+
+CLANGFORMAT?=clang-format
+.PHONY: clang-format
+clang-format:
+	@for file in $(wildcard *.[ch]); do \
+		echo "Checking style $$file"; \
+		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
+		{ echo "ERROR: $$file has style problems"; exit 1; } \
+	done
+
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . -q 2 -L clos
+
+.PHONY: style
+style:
+	$(MAKE) checkpatch
+	$(MAKE) clang-format
+	$(MAKE) codespell
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck

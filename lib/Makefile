@@ -237,10 +237,16 @@ clang-format:
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
 	done
 
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . --skip python -q 2
+
 .PHONY: style
 style:
 	$(MAKE) checkpatch
 	$(MAKE) clang-format
+	$(MAKE) codespell
 	$(MAKE) -C python style
 
 CPPCHECK?=cppcheck

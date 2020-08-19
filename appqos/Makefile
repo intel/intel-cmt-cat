@@ -57,13 +57,30 @@ $(VENV_DIR): requirements.txt
 		rm -rf $(CURDIR)/pqos*.whl && \
 		deactivate"
 
-style: $(VENV_DIR)
+pylint: $(VENV_DIR)
 	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
 		python -m pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
+		deactivate"
+
+bandit: $(VENV_DIR)
+	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
 		python -m bandit *.py &&\
 		deactivate"
+
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . --skip 'env_*' -L unning -q 2
+
+style:
+	${MAKE} pylint
+	${MAKE} bandit
+	${MAKE} codespell
 
 run: $(VENV_DIR)
 	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
 		./appqos.py && \
 		deactivate"
+
+clean:
+	rm -rf $(VENV_DIR)

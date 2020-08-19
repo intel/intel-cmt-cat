@@ -150,10 +150,17 @@ clang-format:
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
 	done
 
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . -q 2
+
+
 .PHONY: style
 style:
 	$(MAKE) checkpatch
 	$(MAKE) clang-format
+	$(MAKE) codespell
 
 
 CPPCHECK?=cppcheck

@@ -36,9 +36,15 @@ bandit: test_env
 		python -m bandit *.py pqos/*.py && \
 		deactivate"
 
+CODESPELL?=codespell
+.PHONY: codespell
+codespell:
+	$(CODESPELL) . --skip ./test_env -q 2
+
 style:
 	${MAKE} pylint
 	${MAKE} bandit
+	${MAKE} codespell
 
 clean:
 	@rm -rf test_env
