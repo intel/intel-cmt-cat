@@ -725,6 +725,4 @@ main(int argc, char **argv)
                 rdtset_fini();
                 _exit_flush(EXIT_SUCCESS);
         }
-
-        exit(EXIT_FAILURE);
 }
