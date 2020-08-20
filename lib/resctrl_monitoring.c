@@ -847,8 +847,6 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
         char path[128];
         FILE *fd;
 
-        ASSERT(name != NULL);
-
         ret = alloc_assoc_get_pid(task, &class_id);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
