@@ -87,7 +87,7 @@ class CPqosMonData(ctypes.Structure):
     ]
 
     def __init__(self, *args, **kwargs):
-        super(CPqosMonData, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.pqos = Pqos()
 
     def stop(self):
