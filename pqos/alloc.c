@@ -656,7 +656,6 @@ set_allocation_assoc(void)
         for (i = 0; i < sel_assoc_core_num; i++) {
                 ret = pqos_alloc_assoc_set(sel_assoc_tab[i].core,
                                            sel_assoc_tab[i].class_id);
-                ASSERT(ret == PQOS_RETVAL_OK);
                 if (ret == PQOS_RETVAL_PARAM) {
                         printf("Core number or class id is out of bounds!\n");
                         return -1;
@@ -670,7 +669,6 @@ set_allocation_assoc(void)
         for (i = 0; i < sel_assoc_pid_num; i++) {
                 ret = pqos_alloc_assoc_set_pid(sel_assoc_pid_tab[i].task_id,
                                                sel_assoc_pid_tab[i].class_id);
-                ASSERT(ret == PQOS_RETVAL_OK);
                 if (ret == PQOS_RETVAL_PARAM) {
                         printf("Task ID number or class id is out of "
                                "bounds!\n");
