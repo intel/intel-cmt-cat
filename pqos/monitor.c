@@ -2414,7 +2414,7 @@ print_csv_row(FILE *fp, char *time,
                 }
 
                 fprintf(fp,
-                        "%s,\"%s\",%s%s\n",
+                        "%s,\"%s\",\"%s\"%s\n",
                         time, (char *)mon_data->context, core_list, data);
         }
 }
