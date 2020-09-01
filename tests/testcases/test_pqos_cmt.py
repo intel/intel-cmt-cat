@@ -43,9 +43,9 @@ class TestPqosCMT(test.Test):
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self, request):
-        super(TestPqosCMT, self).init(request)
+        super().init(request)
         yield
-        super(TestPqosCMT, self).fini()
+        super().fini()
     ## @endcond
 
 

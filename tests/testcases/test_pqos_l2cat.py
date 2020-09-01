@@ -42,9 +42,9 @@ class TestPqosL2Cat(test.Test):
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self, request):
-        super(TestPqosL2Cat, self).init(request)
+        super().init(request)
         yield
-        super(TestPqosL2Cat, self).fini()
+        super().fini()
     ## @endcond
 
     ## PQOS - L2 CAT Detection - Negative

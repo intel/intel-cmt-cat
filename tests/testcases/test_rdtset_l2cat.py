@@ -45,9 +45,9 @@ class TestRdtsetL2Cat(test.Test):
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self, request):
-        super(TestRdtsetL2Cat, self).init(request)
+        super().init(request)
         yield
-        super(TestRdtsetL2Cat, self).fini()
+        super().fini()
     ## @endcond
 
 

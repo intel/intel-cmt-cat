@@ -45,9 +45,9 @@ class TestRdtsetMba(test.Test):
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self, request):
-        super(TestRdtsetMba, self).init(request)
+        super().init(request)
         yield
-        super(TestRdtsetMba, self).fini()
+        super().fini()
     ## @endcond
 
 

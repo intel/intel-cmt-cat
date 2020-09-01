@@ -41,9 +41,9 @@ class TestPqosMba(test.Test):
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self, request):
-        super(TestPqosMba, self).init(request)
+        super().init(request)
         yield
-        super(TestPqosMba, self).fini()
+        super().fini()
     ## @endcond
 
 

@@ -42,9 +42,9 @@ class TestRdtsetAffinity(test.Test):
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self, request):
-        super(TestRdtsetAffinity, self).init(request)
+        super().init(request)
         yield
-        super(TestRdtsetAffinity, self).fini()
+        super().fini()
     ## @endcond
 
 

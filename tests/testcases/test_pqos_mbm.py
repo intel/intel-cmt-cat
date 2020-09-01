@@ -43,9 +43,9 @@ class TestPqosMBM(test.Test):
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self, request):
-        super(TestPqosMBM, self).init(request)
+        super().init(request)
         yield
-        super(TestPqosMBM, self).fini()
+        super().fini()
     ## @endcond
 
 
