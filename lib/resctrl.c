@@ -237,12 +237,18 @@ int
 resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
 {
         unsigned i;
+        unsigned found_nonzero = 0;
 
         ASSERT(fd != NULL);
         ASSERT(mask != NULL);
 
         for (i = 0; i < sizeof(mask->tab); i++) {
                 const unsigned value = (unsigned)mask->tab[i];
+
+                /* skip leading 0 */
+                if (!found_nonzero && value == 0x0)
+                        continue;
+                found_nonzero = 1;
 
                 if (fprintf(fd, "%02x", value) < 0) {
                         LOG_ERROR("Failed to write cpu mask\n");
@@ -254,6 +260,8 @@ resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
                                 break;
                         }
         }
+        if (!found_nonzero)
+                fprintf(fd, "0");
 
         /* check if error occurred in loop */
         if (i < sizeof(mask->tab))
