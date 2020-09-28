@@ -140,16 +140,13 @@ perf_stop_counter(int counter_fd)
 int
 perf_read_counter(int counter_fd, uint64_t *value)
 {
-        size_t res;
-
         if (counter_fd <= 0 || value == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        res = read(counter_fd, value, sizeof(*value));
-        if (res != sizeof(uint64_t)) {
-                LOG_ERROR("Failed to read perf counter!\n");
-                return PQOS_RETVAL_ERROR;
-        }
+        if ((read(counter_fd, value, sizeof(*value)) == sizeof(value)) &&
+            *value <= UINT64_MAX)
+                return PQOS_RETVAL_OK;
 
-        return PQOS_RETVAL_OK;
+        LOG_ERROR("Failed to read perf counter!\n");
+        return PQOS_RETVAL_ERROR;
 }
