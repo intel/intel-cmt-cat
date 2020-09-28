@@ -193,6 +193,10 @@ os_alloc_check(void)
         const struct pqos_capability *l3_cap;
         const struct pqos_capability *l2_cap;
         const struct pqos_capability *mba_cap;
+        enum pqos_cdp_config l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
+        enum pqos_cdp_config l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
+        enum pqos_mba_config mba_mount = PQOS_MBA_DEFAULT;
+        struct stat st;
 
         (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &l3_cap);
         (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &l2_cap);
@@ -204,34 +208,29 @@ os_alloc_check(void)
         if (l3_cap == NULL && l2_cap == NULL && mba_cap == NULL)
                 return PQOS_RETVAL_OK;
 
+        /* Check L3 CAT capabilities */
+        if (l3_cap != NULL && l3_cap->u.l3ca->cdp_on)
+                l3_cdp_mount = PQOS_REQUIRE_CDP_ON;
+
+        /* Check L2 CAT capabilities */
+        if (l2_cap != NULL && l2_cap->u.l2ca->cdp_on)
+                l2_cdp_mount = PQOS_REQUIRE_CDP_ON;
+
+        /* Check MBA capabilities */
+        if (mba_cap != NULL && mba_cap->u.mba->ctrl_on)
+                mba_mount = PQOS_MBA_CTRL;
+
         /**
-         * Check if resctrl is mounted
+         * Resctrl is mounted
          */
-        if (access(RESCTRL_PATH "/cpus", F_OK) != 0) {
-                enum pqos_cdp_config l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
-                enum pqos_cdp_config l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
-                enum pqos_mba_config mba_mount = PQOS_MBA_DEFAULT;
+        if (stat(RESCTRL_PATH "/cpus", &st) == 0)
+                return PQOS_RETVAL_OK;
 
-                /* Check L3 CAT capabilities */
-                if (l3_cap != NULL && l3_cap->u.l3ca->cdp_on)
-                        l3_cdp_mount = PQOS_REQUIRE_CDP_ON;
+        ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount, mba_mount);
+        if (ret != PQOS_RETVAL_OK)
+                LOG_INFO("Unable to mount resctrl\n");
 
-                /* Check L2 CAT capabilities */
-                if (l2_cap != NULL && l2_cap->u.l2ca->cdp_on)
-                        l2_cdp_mount = PQOS_REQUIRE_CDP_ON;
-
-                /* Check MBA capabilities */
-                if (mba_cap != NULL && mba_cap->u.mba->ctrl_on)
-                        mba_mount = PQOS_MBA_CTRL;
-
-                ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount, mba_mount);
-                if (ret != PQOS_RETVAL_OK) {
-                        LOG_INFO("Unable to mount resctrl\n");
-                        return PQOS_RETVAL_RESOURCE;
-                }
-        }
-
-        return PQOS_RETVAL_OK;
+        return ret;
 }
 
 /**

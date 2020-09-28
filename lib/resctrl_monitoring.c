@@ -402,7 +402,7 @@ resctrl_mon_read_counter(const unsigned class_id,
         fd = pqos_fopen(path, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
-        if (fscanf(fd, "%llu", &counter) == 1)
+        if (fscanf(fd, "%llu", &counter) == 1 && counter < UINT64_MAX)
                 *value = counter;
         fclose(fd);
 
