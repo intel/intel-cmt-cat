@@ -953,6 +953,8 @@ void selfn_monitor_time(const char *arg)
 void selfn_monitor_interval(const char *arg)
 {
         sel_mon_interval = (int) strtouint64(arg);
+        if (sel_mon_interval < 1)
+                parse_error(arg, "Invalid interval value!\n");
 }
 
 void selfn_monitor_top_like(const char *arg)

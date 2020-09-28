@@ -632,7 +632,7 @@ parse_config_file(const char *fname)
 static const char *m_cmd_name = "pqos";                     /**< command name */
 static const char help_printf_short[] =
         "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
-        "       %s [-w] [--version]\n"
+        "       %s [--version]\n"
         "          [-l FILE] [--log-file=FILE] [-I] [--iface-os]\n"
         "       %s [-s] [--show]\n"
         "       %s [-d] [--display] [-D] [--display-verbose]\n"
@@ -661,7 +661,7 @@ static const char help_printf_long[] =
         "  -h, --help                  help page\n"
         "  -v, --verbose               verbose mode\n"
         "  -V, --super-verbose         super-verbose mode\n"
-        "  -w, --version               show PQoS library version\n"
+        "  --version                   show PQoS library version\n"
         "  -s, --show                  show current PQoS configuration\n"
         "  -d, --display               display supported capabilities\n"
         "  -D, --display-verbose       display supported capabilities in verbose mode\n"
@@ -776,6 +776,7 @@ static void print_lib_version(const struct pqos_cap *p_cap)
 #endif
 #define OPTION_DISABLE_MON_IPC 1001
 #define OPTION_DISABLE_MON_LLC_MISS 1002
+#define OPTION_VERSION 1003
 
 static struct option long_cmd_opts[] = {
         {"help",                 no_argument,       0, 'h'},
@@ -804,7 +805,7 @@ static struct option long_cmd_opts[] = {
         {"super-verbose",        no_argument,       0, 'V'},
         {"iface-os",             no_argument,       0, 'I'},
         {"percent-llc",          no_argument,       0, 'P'},
-        {"version",              no_argument,       0, 'w'},
+        {"version",              no_argument,       0, OPTION_VERSION},
 #ifdef PQOS_RMID_CUSTOM
         {"rmid",                 required_argument, 0, OPTION_RMID},
 #endif
@@ -828,7 +829,7 @@ int main(int argc, char **argv)
         memset(&cfg, 0, sizeof(cfg));
 
         while ((cmd = getopt_long(argc, argv,
-                                  ":Hhwf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIPR:",
+                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIPR:",
                                   long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
@@ -837,7 +838,7 @@ int main(int argc, char **argv)
                 case 'H':
                         profile_l3ca_list();
                         return EXIT_SUCCESS;
-                case 'w':
+                case OPTION_VERSION:
                         selfn_print_version(NULL);
                         break;
                 case 'f':
@@ -846,6 +847,8 @@ int main(int argc, char **argv)
                                        "accepted!\n");
                                 return EXIT_FAILURE;
                         }
+                        if (optarg == NULL)
+                                return EXIT_FAILURE;
                         selfn_strdup(&sel_config_file, optarg);
                         parse_config_file(sel_config_file);
                         break;
@@ -884,6 +887,8 @@ int main(int argc, char **argv)
                         selfn_monitor_top_like(NULL);
                         break;
                 case 'l':
+                        if (optarg == NULL)
+                                return EXIT_FAILURE;
                         selfn_log_file(optarg);
                         break;
                 case 'o':
