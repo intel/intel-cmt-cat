@@ -42,6 +42,8 @@
 extern "C" {
 #endif
 
+#include "pqos.h"
+
 /**
  * @brief Initializes Perf structures used for OS monitoring interface
  *

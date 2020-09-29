@@ -284,11 +284,11 @@ get_max_res_id(unsigned technology, unsigned *max_res_id)
 }
 
 /**
- * @brief Converts string \a str to UINT
+ * @brief Converts string \a str to UINT64
  *
  * @param [in] str string
  * @param [in] base numerical base
- * @param [out] value INT value
+ * @param [out] value parsed value
  *
  * @return number of parsed characters
  * @retval positive on success
@@ -299,6 +299,7 @@ str_to_uint64(const char *str, int base, uint64_t *value)
 {
         const char *str_start = str;
         char *str_end = NULL;
+        unsigned long long val;
 
         if (NULL == str || NULL == value)
                 return -EINVAL;
@@ -313,9 +314,13 @@ str_to_uint64(const char *str, int base, uint64_t *value)
                 return -EINVAL;
 
         errno = 0;
-        *value = strtoull(str_start, &str_end, base);
+        val = strtoull(str_start, &str_end, base);
         if (errno != 0 || str_end == NULL || str_end == str_start)
                 return -EINVAL;
+        if (val > UINT64_MAX)
+                return -EINVAL;
+
+        *value = val;
 
         return str_end - str;
 }

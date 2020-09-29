@@ -70,7 +70,7 @@ bandit: $(VENV_DIR)
 CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . --skip 'env_*' -L unning -q 2
+	$(CODESPELL) . --skip 'env_*' -L unning -L uint -q 2
 
 style:
 	${MAKE} pylint

@@ -36,6 +36,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "common.h"
 
@@ -46,17 +47,26 @@ safe_fopen(const char *name, const char *mode)
         FILE *stream = NULL;
         struct stat lstat_val;
         struct stat fstat_val;
+        int new_file = 0;
+
+        /* collect any link info about the file */
+        /* coverity[fs_check_call] */
+        if (lstat(name, &lstat_val) == -1) {
+                if (errno != ENOENT)
+                        return NULL;
+                else
+                        new_file = 1;
+        }
 
         stream = fopen(name, mode);
         if (stream == NULL)
                 return stream;
 
-        fd = fileno(stream);
-        if (fd == -1)
+        if (new_file && lstat(name, &lstat_val) == -1)
                 goto safe_fopen_error;
 
-        /* collect any link info about the file */
-        if (lstat(name, &lstat_val) == -1)
+        fd = fileno(stream);
+        if (fd == -1)
                 goto safe_fopen_error;
 
         /* collect info about the opened file */
@@ -87,32 +97,30 @@ safe_open(const char *pathname, int flags, mode_t mode)
         struct stat lstat_val;
         struct stat fstat_val;
 
+        /* collect any link info about the file */
+        /* coverity[fs_check_call] */
+        if (lstat(pathname, &lstat_val) == -1)
+                return -1;
+
         /* open the file */
         fd = open(pathname, flags, mode);
         if (fd == -1)
-                return fd;
-
-        /* collect any link info about the file */
-        if (lstat(pathname, &lstat_val) == -1)
-                goto safe_open_error;
+                return -1;
 
         /* collect info about the opened file */
-        if (fstat(fd, &fstat_val) == -1)
-                goto safe_open_error;
+        if (fstat(fd, &fstat_val) == -1) {
+                close(fd);
+                return -1;
+        }
 
         /* we should not have followed a symbolic link */
         if (lstat_val.st_mode != fstat_val.st_mode ||
             lstat_val.st_ino != fstat_val.st_ino ||
             lstat_val.st_dev != fstat_val.st_dev) {
                 printf("File %s is a symlink\n", pathname);
-                goto safe_open_error;
+                close(fd);
+                return -1;
         }
 
         return fd;
-
-safe_open_error:
-        if (fd != -1)
-                close(fd);
-
-        return -1;
 }

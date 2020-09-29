@@ -1004,8 +1004,8 @@ int main(int argc, char **argv)
         if (sel_log_file == NULL) {
                 cfg.fd_log = STDOUT_FILENO;
         } else {
-                cfg.fd_log = open(sel_log_file, O_WRONLY|O_CREAT,
-                                  FILE_READ_WRITE);
+                cfg.fd_log = safe_open(sel_log_file, O_WRONLY|O_CREAT,
+                                       FILE_READ_WRITE);
                 if (cfg.fd_log == -1) {
                         printf("Error opening %s log file!\n", sel_log_file);
                         exit_val = EXIT_FAILURE;

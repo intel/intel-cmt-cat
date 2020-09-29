@@ -35,6 +35,8 @@
 #include <stdio.h>
 #include <sys/stat.h>
 #include <string.h>
+#include <stdlib.h>
+#include <ctype.h>
 
 #include "pqos.h"
 #include "common.h"
@@ -48,16 +50,17 @@ pqos_fopen(const char *name, const char *mode)
         struct stat lstat_val;
         struct stat fstat_val;
 
+        /* collect any link info about the file */
+        /* coverity[fs_check_call] */
+        if (lstat(name, &lstat_val) == -1)
+                return NULL;
+
         stream = fopen(name, mode);
         if (stream == NULL)
                 return stream;
 
         fd = fileno(stream);
         if (fd == -1)
-                goto pqos_fopen_error;
-
-        /* collect any link info about the file */
-        if (lstat(name, &lstat_val) == -1)
                 goto pqos_fopen_error;
 
         /* collect info about the opened file */
@@ -85,4 +88,42 @@ char *
 pqos_strcat(char *dst, const char *src, size_t size)
 {
         return strncat(dst, src, size - strnlen(dst, size));
+}
+
+char *
+pqos_fgets(char *s, int n, FILE *stream)
+{
+        char *line = NULL;
+        size_t line_len = 0;
+        ssize_t line_read;
+        unsigned i;
+
+        line_read = getline(&line, &line_len, stream);
+        if (line_read != -1) {
+                char *p = strchr(line, '\n');
+
+                if (p == NULL)
+                        goto pqos_fgets_error;
+                *p = '\0';
+
+                if ((ssize_t)strlen(line) != line_read - 1)
+                        goto pqos_fgets_error;
+                if (line_read > n)
+                        goto pqos_fgets_error;
+                for (i = 0; i < line_read - 1; ++i)
+                        if (!isascii(line[i]))
+                                goto pqos_fgets_error;
+
+                strncpy(s, line, n - 1);
+                s[n - 1] = '\0';
+
+                free(line);
+                return s;
+        }
+
+pqos_fgets_error:
+        if (line != NULL)
+                free(line);
+
+        return NULL;
 }

@@ -86,7 +86,7 @@ detect_os_support(const char *fname,
                 return PQOS_RETVAL_OK;
         }
 
-        while (fgets(temp, sizeof(temp), fd) != NULL) {
+        while (pqos_fgets(temp, sizeof(temp), fd) != NULL) {
                 if (strstr(temp, str) != NULL) {
                         *supported = 1;
                         fclose(fd);
@@ -103,7 +103,7 @@ detect_os_support(const char *fname,
  *
  * @param [in] fname name of the file
  * @param [in] base numerical base
- * @param [out] value UINT value
+ * @param [out] value parsed value
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
@@ -116,6 +116,7 @@ readuint64(const char *fname, unsigned base, uint64_t *value)
         char *s = buf;
         char *endptr = NULL;
         size_t bytes;
+        unsigned long long val;
 
         ASSERT(fname != NULL);
         ASSERT(value != NULL);
@@ -131,13 +132,17 @@ readuint64(const char *fname, unsigned base, uint64_t *value)
         }
         fclose(fd);
 
-        *value = strtoull(s, &endptr, base);
+        val = strtoull(s, &endptr, base);
 
         if (!((*s != '\0' && *s != '\n') &&
               (*endptr == '\0' || *endptr == '\n'))) {
                 LOG_ERROR("Error converting '%s' to unsigned number!\n", buf);
                 return PQOS_RETVAL_ERROR;
         }
+        if (val > UINT64_MAX)
+                return PQOS_RETVAL_ERROR;
+
+        *value = val;
 
         return PQOS_RETVAL_OK;
 }
@@ -186,15 +191,19 @@ get_num_ways(const char *dir, unsigned *num_ways)
         snprintf(path, sizeof(path) - 1, "%s/cbm_mask", dir);
 
         ret = readuint64(path, 16, &val);
-        if (ret == PQOS_RETVAL_OK) {
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (val > 0 && val <= UINT64_MAX) {
                 *num_ways = 0;
                 while (val > 0) {
                         (*num_ways)++;
                         val = val >> 1;
                 }
+                return PQOS_RETVAL_OK;
         }
 
-        return ret;
+        return PQOS_RETVAL_ERROR;
 }
 
 /**
@@ -363,6 +372,7 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         unsigned unit = 1;
         int ret;
         FILE *fd;
+        int result = PQOS_RETVAL_OK;
 
         ASSERT(scale != NULL);
         ASSERT(event_name != NULL);
@@ -380,7 +390,7 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         }
         ret = fscanf(fd, "%10lf", &scale_factor);
         fclose(fd);
-        if (ret < 1) {
+        if (ret < 1 || scale_factor <= 0.0) {
                 LOG_ERROR("Failed to read %s perf monitoring event scale "
                           "factor!\n",
                           event_name);
@@ -399,25 +409,24 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
                 return PQOS_RETVAL_ERROR;
         }
 
-        if (fgets(buf, sizeof(buf), fd) != NULL) {
+        if (pqos_fgets(buf, sizeof(buf), fd) != NULL) {
                 if (strncmp(buf, "Bytes", sizeof(buf)) == 0)
                         unit = 1;
                 else if (strncmp(buf, "MB", sizeof(buf)) == 0)
                         unit = 1000000;
                 else {
                         LOG_ERROR("Unknown \"%s\" scale factor unit", buf);
-                        fclose(fd);
-                        return PQOS_RETVAL_ERROR;
+                        result = PQOS_RETVAL_ERROR;
                 }
         } else {
                 LOG_ERROR("Failed to read %s perf monitoring event unit!\n",
                           event_name);
-                fclose(fd);
-                return PQOS_RETVAL_ERROR;
+                result = PQOS_RETVAL_ERROR;
         }
         fclose(fd);
 
-        *scale = (uint32_t)(scale_factor * unit);
+        if (result == PQOS_RETVAL_OK)
+                *scale = (uint32_t)(scale_factor * unit);
 
         return PQOS_RETVAL_OK;
 }

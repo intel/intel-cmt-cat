@@ -34,7 +34,7 @@ bandit: test_env
 CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . --skip ./test_env -q 2
+	$(CODESPELL) . --skip ./test_env -L uint -q 2
 
 style:
 	${MAKE} pylint

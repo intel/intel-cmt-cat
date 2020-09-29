@@ -1112,7 +1112,7 @@ open_proc_stat_file(const char *proc_pid_dir_name)
         snprintf(path_buf, sizeof(path_buf) - 1, proc_stat_path_fmt,
                  proc_pids_dir, proc_pid_dir_name);
 
-        return fopen(path_buf, "r");
+        return safe_fopen(path_buf, "r");
 }
 
 /**
@@ -1238,6 +1238,7 @@ get_pid_cputicks(const char *proc_pid_dir_name, uint64_t *cputicks)
         for (i = 0; i < DIM(col_val); i++) {
                 char time_str[64];
                 char *tmp;
+                unsigned long long time;
                 uint64_t time_int = 0;
                 int time_success = 0;
 
@@ -1261,7 +1262,10 @@ get_pid_cputicks(const char *proc_pid_dir_name, uint64_t *cputicks)
                                 continue;
                 }
 
-                time_int = (uint64_t)strtoull(time_str, &tmp, 10);
+                time = strtoull(time_str, &tmp, 10);
+                if (time > UINT64_MAX)
+                        return -1;
+                time_int = (uint64_t)time;
                 /* Check to make sure string converted
                  * to int correctly
                  */

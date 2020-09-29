@@ -71,6 +71,11 @@ FILE * pqos_fopen(const char *name, const char *mode);
  */
 char *pqos_strcat(char *dst, const char *src, size_t size);
 
+/**
+ * @brief Wrapper around fgets
+ */
+char *pqos_fgets(char *s, int n, FILE *stream);
+
 #ifdef __cplusplus
 }
 #endif

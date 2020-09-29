@@ -935,11 +935,11 @@ nano_sleep(const long interval, long usec_diff)
 }
 
 /**
- * @brief Converts string str to UINT
+ * @brief Converts string str to UINT64
  *
  * @param [in] str string
  * @param [in] base numerical base
- * @param [out] value UINT value
+ * @param [out] value parsed value
  *
  * @return number of parsed characters
  * @retval positive on success
