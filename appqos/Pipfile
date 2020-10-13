@@ -1,0 +1,31 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+jsonschema = "*"
+pexpect = "*"
+flask = "*"
+flask-httpauth = "*"
+flask-restful = "*"
+
+[dev-packages]
+bandit = "*"
+pylint = "*"
+pytest = "*"
+pytest-cov = "*"
+mock = "*"
+caniusepython3 = "*"
+requests = "*"
+codespell = "*"
+
+[packages.pwr]
+git = "https://github.com/intel/CommsPowerManagement.git"
+ref = "pwr-v0.2.1"
+subdirectory = "pwr"
+
+[packages.pqos]
+path = "./../lib/python"
+editable = true
+

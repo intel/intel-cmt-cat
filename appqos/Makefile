@@ -34,43 +34,34 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
-VENV_DIR=env_$(shell hostname)
+VENV_DIR?=../venv/appqos_$(shell hostname)
 
-.PHONY: test cov style run
+.PHONY: test cov style run setup setup-dev
+
+$(VENV_DIR): Pipfile
+	WORKON_HOME=$(VENV_DIR) pipenv install --skip-lock
+
+setup:
+	$(MAKE) $(VENV_DIR)
+
+setup-dev: Pipfile
+	WORKON_HOME=$(VENV_DIR) pipenv install --dev --skip-lock
 
 test: $(VENV_DIR)
-	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		python -m pytest tests/ && \
-		deactivate"
+	WORKON_HOME=$(VENV_DIR) pipenv run python -m pytest tests
 
 cov: $(VENV_DIR)
-	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		python -m pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/ && \
-		deactivate"
+	WORKON_HOME=$(VENV_DIR) pipenv run python -m pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/
 
-$(VENV_DIR): requirements.txt
-	@bash -c "virtualenv -p python3 $(CURDIR)/$(VENV_DIR)"
-	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		python -m pip install -r $(CURDIR)/requirements.txt && \
-		python -m pip wheel --wheel-dir=$(CURDIR) $(CURDIR)/../lib/python && \
-		python -m pip install --no-index --find-links=$(CURDIR) pqos && \
-		rm -rf $(CURDIR)/pqos*.whl && \
-		deactivate"
+pylint:
+	WORKON_HOME=$(VENV_DIR) pipenv run python -m pylint --rcfile=$(CURDIR)/.pylintrc *.py
 
-pylint: $(VENV_DIR)
-	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		python -m pylint --rcfile=$(CURDIR)/.pylintrc *.py && \
-		deactivate"
+bandit:
+	WORKON_HOME=$(VENV_DIR) pipenv run python -m bandit *.py
 
-bandit: $(VENV_DIR)
-	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		python -m bandit *.py &&\
-		deactivate"
-
-CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . --skip 'env_*' -L unning -L uint -q 2
+	$WORKON_HOME=$(VENV_DIR) pipenv run codespell -L unning -L unit -q 2
 
 style:
 	${MAKE} pylint
@@ -78,9 +69,8 @@ style:
 	${MAKE} codespell
 
 run: $(VENV_DIR)
-	@bash -c "source $(CURDIR)/$(VENV_DIR)/bin/activate && \
-		./appqos.py && \
-		deactivate"
+	WORKON_HOME=$(VENV_DIR) pipenv run ./appqos.py
 
 clean:
-	rm -rf $(VENV_DIR)
+	@rm -rf __pycache__
+	@rm -rf .pytest_cache

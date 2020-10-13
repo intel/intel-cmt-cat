@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+
+[dev-packages]
+bandit = "*"
+pylint = ">=2.5.0"
+coverage = "*"
+caniusepython3 = "*"
+
+[requires]

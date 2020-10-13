@@ -41,6 +41,9 @@ it is required to setup virtual environment first. All of the following commands
 will setup it if it has not been created yet. The virtual environment
 will be created in test_env/.
 
+To setup test environment
+        make setup-dev
+
 To run unit tests:
         make test
 

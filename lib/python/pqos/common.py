@@ -37,6 +37,7 @@ Common module which defines functions used in other modules.
 
 from __future__ import absolute_import, division, print_function
 import ctypes
+import ctypes.util
 
 from pqos.error import ERRORS, PqosError
 

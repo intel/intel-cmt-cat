@@ -1,18 +1,23 @@
 
 
 
-.PHONY: setup build run run.os run.msr style
+.PHONY: setup build run run-os run-msr style setup setup-dev
 
-test_env: requirements.txt
-	@bash -c "virtualenv -p python3 $(CURDIR)/test_env"
-	@bash -c "source $(CURDIR)/test_env/bin/activate && \
-		python -m pip install -r $(CURDIR)/requirements.txt && \
-		deactivate"
+TEST_ENV?=$(shell_hostname).json
+VENV_DIR?=../venv/test_$(shell hostname)
+
+$(VENV_DIR): Pipfile
+	WORKON_HOME=$(VENV_DIR) pipenv install --skip-lock
+
+setup:
+	${MAKE} $(VENV_DIR)
+
+setup-dev:
+	WORKON_HOME=$(VENV_DIR) pipenv install --skip-lock --dev
 
 build: test_env
 
 clean:
-	@rm -rf test_env
 	@rm -rf __pycache__
 	@rm -rf test/__pycache__
 	@rm -rf test/*.pyc
@@ -21,22 +26,28 @@ clean:
 	@rm -rf plugins/__pycache__
 	@rm -rf plugins/*.pyc
 
-pylint: test_env
-	@bash -c "source $(CURDIR)/test_env/bin/activate && \
-		python -m pylint *.py plugins/*.py testcases/*.py testlib/*.py && \
-		deactivate"
+pylint:
+	WORKON_HOME=$(VENV_DIR) pipenv run python -m pylint *.py plugins/*.py testcases/*.py testlib/*.py
 
-bandit: test_env
-	@bash -c "source $(CURDIR)/test_env/bin/activate && \
-		python -m bandit -s B101,B404,B603 *.py plugins/*.py testcases/*.py testlib/*.py; \
-		deactivate"
+bandit:
+	WORKON_HOME=$(VENV_DIR) pipenv run python -m bandit -s B101,B404,B603 *.py plugins/*.py testcases/*.py testlib/*.py;
 
-CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . --skip ./test_env -L uint -q 2
+	WORKON_HOME=$(VENV_DIR) pipenv run codespell . -L unit -q 2
 
 style:
 	${MAKE} pylint
 	${MAKE} bandit
 	${MAKE} codespell
+
+run:
+	WORKON_HOME=$(VENV_DIR) pipenv run pytest --env=$(TEST_ENV)
+
+run-os:
+	WORKON_HOME=$(VENV_DIR) pipenv run pytest --env=$(TEST_ENV) --iface-os
+
+run-msr:
+	WORKON_HOME=$(VENV_DIR) pipenv run pytest --env=$(TEST_ENV) --iface-msr
+
+	

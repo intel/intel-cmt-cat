@@ -22,8 +22,12 @@ tools/membw/membw
 appqos/appqos.crt
 appqos/appqos.key
 appqos/env_*
+appqos/venv_*
 
 lib/python/.coverage
 lib/python/test_env
+lib/python/venv_*
 
 bat/test_env
+
+venv

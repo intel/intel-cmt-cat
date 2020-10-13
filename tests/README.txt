@@ -16,7 +16,7 @@ Contents
 Dependencies
 =============
   - python 3.6
-  - pip
+  - pipenv
   - pytest
   - python-pexpect
   - memtester
@@ -27,7 +27,7 @@ To run tests without installation of additional python packages it is possible
 to use virtual environment.
 
 To setup virtual environment:
-	make test_env
+	make setup
 
 
 Environment File
@@ -46,8 +46,7 @@ Run tests without virtualenv:
 	sudo py.test --env=example.json testcases
 
 Run tests using virtualenv:
-	sudo bash -c "source test_env/bin/activate && py.test --env=example.json testcases; deactivate"
-
+	sudo TEST_ENV=example.json make run
 
 Additional Parameters
 =====================
