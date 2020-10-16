@@ -42,6 +42,11 @@ $ sudo make install
 "make" compiles all software components of the package.
 "sudo make install" installs compiled files into system directories.
 
+By default make builds shared library.
+"make" accepts extra options e.g.:
+"SHARED=n" - for static library
+"STATIC_BINARY=y" - for static binaries
+
 By default, files are installed below /usr/local but it can be changed
 with use of PREFIX to install files below /some/where:
 $ sudo make install PREFIX=/some/where

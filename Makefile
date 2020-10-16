@@ -47,6 +47,10 @@ ifdef SHARED
 export SHARED
 endif
 
+ifdef STATIC_BINARY
+export STATIC_BINARY
+endif
+
 .PHONY: all clean TAGS install uninstall style cppcheck
 
 all:

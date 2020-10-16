@@ -38,6 +38,7 @@ LIB = libpqos
 VERSION = 4.0.0
 SO_VERSION = 4
 SHARED ?= y
+STATIC_BINARY ?= n
 LDFLAGS = -L. -lpthread -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ -D_GNU_SOURCE \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
@@ -50,6 +51,10 @@ CFLAGS += $(EXTRA_CFLAGS)
 endif
 ifneq ($(EXTRA_LDFLAGS),)
 LDFLAGS += $(EXTRA_LDFLAGS)
+endif
+
+ifeq ($(STATIC_BINARY),y)
+SHARED = n
 endif
 
 DOXY_DIRS = doc_api doc_lib

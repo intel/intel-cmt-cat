@@ -36,7 +36,8 @@
 ###############################################################################
 
 LIBDIR ?= ../lib
-LDFLAGS = -L$(LIBDIR) -pie -z noexecstack -z relro -z now
+STATIC_BINARY ?= n
+LDFLAGS = -L$(LIBDIR)  -z noexecstack -z relro -z now
 LDLIBS = -lpqos -lpthread
 CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
@@ -50,6 +51,12 @@ CFLAGS += $(EXTRA_CFLAGS)
 endif
 ifneq ($(EXTRA_LDFLAGS),)
 LDFLAGS += $(EXTRA_LDFLAGS)
+endif
+
+ifeq ($(STATIC_BINARY),y)
+LDFLAGS += -static
+else
+LDFLAGS += -pie
 endif
 
 # ICC and GCC options
