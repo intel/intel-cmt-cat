@@ -145,7 +145,7 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
         int ret = PQOS_RETVAL_OK;
 
         /** List of non virtual events */
-        const enum pqos_mon_event mon_event[] = {
+        static const enum pqos_mon_event mon_event[] = {
             PQOS_MON_EVENT_L3_OCCUP,
             PQOS_MON_EVENT_LMEM_BW,
             PQOS_MON_EVENT_TMEM_BW,
