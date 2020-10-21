@@ -758,6 +758,18 @@ static void print_help(const int is_long)
 }
 
 /**
+ * @brief Displays PQoS tool version
+ */
+static void print_tool_version(void)
+{
+        int major = PQOS_VERSION / 10000;
+        int minor = (PQOS_VERSION % 10000) / 100;
+        int patch = PQOS_VERSION % 100;
+
+        printf("PQoS Tool version: %d.%d.%d\n", major, minor, patch);
+}
+
+/**
  * @brief Displays PQoS library version
  *
  * @param [in] p_cap platform capabilities
@@ -1012,6 +1024,9 @@ int main(int argc, char **argv)
                         goto error_exit_1;
                 }
         }
+
+        if (sel_print_version)
+                print_tool_version();
 
 #ifdef PQOS_RMID_CUSTOM
         cfg.rmid_cfg = sel_rmid_cfg;
