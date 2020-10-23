@@ -73,6 +73,7 @@ clean:
 	$(MAKE) -C examples/c/PSEUDO_LOCK clean
 	$(MAKE) -C tests clean
 	$(MAKE) -C appqos clean
+	$(MAKE) -C unit-test clean
 
 style:
 	$(MAKE) -C lib style

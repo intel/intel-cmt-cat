@@ -483,16 +483,18 @@ pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         if (count == NULL)
                 return NULL;
 
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task association!\n");
-                return NULL;
-        }
         _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return NULL;
+        }
+
+        if (m_interface != PQOS_INTER_OS &&
+            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task association!\n");
                 _pqos_api_unlock();
                 return NULL;
         }
@@ -557,14 +559,6 @@ pqos_l3ca_set(const unsigned l3cat_id,
         if (ca == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
         /**
          * Check if class bitmasks are contiguous.
          */
@@ -580,9 +574,16 @@ pqos_l3ca_set(const unsigned l3cat_id,
                 if (!is_contig) {
                         LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
                                   ca[i].class_id);
-                        _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
+        }
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
         }
 
         if (m_interface == PQOS_INTER_MSR)
@@ -682,14 +683,6 @@ pqos_l2ca_set(const unsigned l2id,
         if (ca == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
         /**
          * Check if class bitmasks are contiguous
          */
@@ -705,10 +698,18 @@ pqos_l2ca_set(const unsigned l2id,
                 if (!is_contig) {
                         LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
                                   ca[i].class_id);
-                        _pqos_api_unlock();
                         return PQOS_RETVAL_PARAM;
                 }
         }
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
         if (m_interface == PQOS_INTER_MSR)
                 ret = hw_l2ca_set(l2id, num_cos, ca);
         else {
@@ -916,6 +917,9 @@ pqos_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 {
         int ret;
 
+        if (rmid == NULL)
+                return PQOS_RETVAL_PARAM;
+
         _pqos_api_lock();
 
         ret = _pqos_check_init(1);
@@ -1098,13 +1102,6 @@ pqos_mon_start_pids(const unsigned num_pids,
         if (group->valid == GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task monitoring!\n");
-                return PQOS_RETVAL_ERROR;
-        }
-
         /**
          * Validate event parameter
          * - only combinations of events allowed
@@ -1126,6 +1123,14 @@ pqos_mon_start_pids(const unsigned num_pids,
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
+        }
+
+        if (m_interface != PQOS_INTER_OS &&
+            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task monitoring!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
         }
 
         memset(group, 0, sizeof(*group));
@@ -1167,19 +1172,20 @@ pqos_mon_add_pids(const unsigned num_pids,
         if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task monitoring!\n");
-                return PQOS_RETVAL_ERROR;
-        }
-
         _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
+        }
+
+        if (m_interface != PQOS_INTER_OS &&
+            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task monitoring!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
         }
 
 #ifdef __linux__
@@ -1207,19 +1213,20 @@ pqos_mon_remove_pids(const unsigned num_pids,
         if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task monitoring!\n");
-                return PQOS_RETVAL_ERROR;
-        }
-
         _pqos_api_lock();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 _pqos_api_unlock();
                 return ret;
+        }
+
+        if (m_interface != PQOS_INTER_OS &&
+            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
+                LOG_ERROR("Incompatible interface "
+                          "selected for task monitoring!\n");
+                _pqos_api_unlock();
+                return PQOS_RETVAL_ERROR;
         }
 
 #ifdef __linux__

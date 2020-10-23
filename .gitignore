@@ -31,3 +31,7 @@ lib/python/venv_*
 bat/test_env
 
 venv
+
+unit-test/lib/obj
+unit-test/lib/test_api
+unit-test/lib/test_hw_allocation
