@@ -63,4 +63,16 @@ extern "C" {
 }
 #endif
 
+#if __GNUC__ >= 4
+#ifndef PQOS_API
+#define PQOS_API __attribute__((visibility("default")))
+#endif
+#ifndef PQOS_LOCAL
+#define PQOS_LOCAL __attribute__((visibility("hidden")))
+#endif
+#else
+#define PQOS_API
+#define PQOS_LOCAL
+#endif
+
 #endif /* __PQOS_TYPES_H__ */

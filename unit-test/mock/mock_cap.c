@@ -66,3 +66,21 @@ __wrap__pqos_cap_get(const struct pqos_cap **cap,
         if (cpu != NULL)
                 *cpu = mock_ptr_type(struct pqos_cpuinfo *);
 }
+
+void
+__wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
+{
+	check_expected(cdp);
+}
+
+void
+__wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
+{
+	check_expected(cdp);
+}
+
+void
+__wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg)
+{
+	check_expected(cfg);
+}

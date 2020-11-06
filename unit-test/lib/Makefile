@@ -4,8 +4,11 @@ OBJ_DIR = obj
 LIB_SRCS = $(sort $(wildcard $(LIB_DIR)/*.c))
 LIB_OBJS = $(LIB_SRCS:$(LIB_DIR)/%.c=$(OBJ_DIR)/%.o)
 LIB_DEPS = $(LIB_SRCS:$(LIB_DIR)/%.c=$(OBJ_DIR)/%.d)
+
 MOCK_DIR = ../mock
 MOCK_SRCS = $(sort $(wildcard $(MOCK_DIR)*.c))
+MOCK_OBJS += $(OBJ_DIR)/hw_alloc_assoc_write.o
+MOCK_OBJS += $(OBJ_DIR)/hw_alloc_assoc_read.o
 
 TESTS_SRCS = $(sort $(wildcard test_*.c))
 TESTS = $(TESTS_SRCS:.c=)
@@ -17,12 +20,30 @@ CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
 	-Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector \
-	-Wunreachable-code -Wsign-compare -Wno-endif-labels
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
+	-D'PQOS_LOCAL=' -D'PQOS_API='
 
 all: $(TESTS)
 
-$(LIB_OBJS): $(OBJ_DIR)/%.o : $(LIB_DIR)/%.c $(OBJ_DIR)/%.d
+$(OBJ_DIR)/%.o: $(LIB_DIR)/%.c $(OBJ_DIR)/%.d
 	$(CC) $(CFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=hw_alloc_assoc_write --weaken-symbol=hw_alloc_assoc_write \
+		--globalize-symbol=hw_alloc_assoc_read --weaken-symbol=hw_alloc_assoc_read \
+		--globalize-symbol=hw_alloc_reset_cos --weaken-symbol=hw_alloc_reset_cos \
+		--globalize-symbol=hw_alloc_reset_l2cdp --weaken-symbol=hw_alloc_reset_l2cdp \
+		--globalize-symbol=hw_alloc_reset_l3cdp --weaken-symbol=hw_alloc_reset_l3cdp \
+		--globalize-symbol=hw_alloc_reset_assoc --weaken-symbol=hw_alloc_reset_assoc \
+		--globalize-symbol=hw_alloc_assoc_unused --weaken-symbol=hw_alloc_assoc_unused \
+		--globalize-symbol=hw_l3ca_set --weaken-symbol=hw_l3ca_set \
+		--globalize-symbol=hw_l3ca_set --weaken-symbol=hw_l3ca_set \
+		--globalize-symbol=hw_l3ca_get --weaken-symbol=hw_l3ca_get \
+		--globalize-symbol=hw_l2ca_set --weaken-symbol=hw_l2ca_set \
+		--globalize-symbol=hw_l2ca_get --weaken-symbol=hw_l2ca_get \
+		$@
 
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 	mkdir -p $(OBJ_DIR)
@@ -92,7 +113,79 @@ test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
-		-Wl,--start-group $(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+		-Wl,--wrap=cpuinfo_get_config \
+		-Wl,--wrap=_pqos_cap_l3cdp_change \
+		-Wl,--wrap=_pqos_cap_l2cdp_change \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_assoc_write: test_hw_alloc_assoc_write.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_assoc_read: test_hw_alloc_assoc_read.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_reset_l3cdp: test_hw_alloc_reset_l3cdp.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_reset_l2cdp: test_hw_alloc_reset_l2cdp.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_reset_assoc: test_hw_alloc_reset_assoc.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_assoc_unused: test_hw_alloc_assoc_unused.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_l3ca_get_min_cbm_bits: test_hw_l3ca_get_min_cbm_bits.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_l2ca_get_min_cbm_bits: test_hw_l2ca_get_min_cbm_bits.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_reset_cos: test_hw_alloc_reset_cos.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_alloc_assign: test_hw_alloc_assign.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
 .PHONY: run
 run: $(TESTS)

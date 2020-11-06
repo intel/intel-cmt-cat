@@ -31,18 +31,50 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MOCK_CAP_H_
-#define MOCK_CAP_H_
+#include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
 
-#include "pqos.h"
+#include "test.h"
+#include "mock_machine.h"
 
-int __wrap__pqos_check_init(const int expect);
-void __wrap__pqos_api_lock(void);
-void __wrap__pqos_api_unlock(void);
-void __wrap__pqos_cap_get(const struct pqos_cap **cap,
-                          const struct pqos_cpuinfo **cpu);
-void __wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
-void __wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
-void __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg);
+#include "allocation.h"
 
-#endif /* MOCK_CAP_H_ */
+/* ======== hw_alloc_reset_cos ======== */
+
+static void
+test_hw_alloc_reset_cos(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned msr_start = 0xf0;
+        unsigned msr_num = 3;
+        unsigned coreid = 1;
+        unsigned msr_val = 0xf;
+        unsigned i;
+
+        for (i = 0; i < msr_num; ++i) {
+                expect_value(__wrap_msr_write, lcore, coreid);
+                expect_value(__wrap_msr_write, reg, msr_start + i);
+                expect_value(__wrap_msr_write, value, msr_val);
+                will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+        }
+
+        ret = hw_alloc_reset_cos(msr_start, msr_num, coreid, msr_val);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+int
+main(void)
+{
+        int result = 0;
+
+        const struct CMUnitTest tests[] = {
+            cmocka_unit_test(test_hw_alloc_reset_cos)};
+
+        result += cmocka_run_group_tests(tests, test_init_l3ca, test_fini);
+
+        return result;
+}

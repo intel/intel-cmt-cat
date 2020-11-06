@@ -43,6 +43,7 @@
 extern "C" {
 #endif
 
+#include "types.h"
 #include "pqos.h"
 
 /**
@@ -78,6 +79,50 @@ int pqos_alloc_init(const struct pqos_cpuinfo *cpu,
 int pqos_alloc_fini(void);
 
 /**
+ * @brief Writes class of service associated to \a lcore
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [in] class_id class of service
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int hw_alloc_assoc_write(const unsigned lcore,
+                                    const unsigned class_id);
+
+/**
+ * @brief Reads class of service associated to \a lcore
+ *
+ * @param [in] lcore CPU logical core id
+ * @param [out] class_id class of service
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id);
+
+/**
+ * @brief Gets unused COS on a socket or L2 cluster
+ *
+ * The lowest acceptable COS is 1, as 0 is a default one
+ *
+ * @param [in] technology selection of allocation technologies
+ * @param [in] l3cat_id L3 CAT resource id
+ * @param [in] l2cat_id L2 CAT resource id
+ * @param [in] mba_id MBA resource id
+ * @param [out] class_id unused COS
+ *
+ * NOTE: It is our assumption that mba id and cat ids are same for
+ * a core. In future, if a core can have different mba id and cat ids
+ * then, we need to change this function to handle it.
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int hw_alloc_assoc_unused(const unsigned technology,
+                                     unsigned l3cat_id,
+                                     unsigned l2cat_id,
+                                     unsigned mba_id,
+                                     unsigned *class_id);
+
+/**
  * @brief Hardware interface to associate \a lcore
  *        with given class of service
  *
@@ -86,7 +131,8 @@ int pqos_alloc_fini(void);
  *
  * @return Operations status
  */
-int hw_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
+PQOS_LOCAL int hw_alloc_assoc_set(const unsigned lcore,
+                                  const unsigned class_id);
 
 /**
  * @brief Hardware interface to read association
@@ -98,7 +144,7 @@ int hw_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
+PQOS_LOCAL int hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 
 /**
  * @brief Hardware interface to assign first available
@@ -120,10 +166,10 @@ int hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
  *
  * @return Operations status
  */
-int hw_alloc_assign(const unsigned technology,
-                    const unsigned *core_array,
-                    const unsigned core_num,
-                    unsigned *class_id);
+PQOS_LOCAL int hw_alloc_assign(const unsigned technology,
+                               const unsigned *core_array,
+                               const unsigned core_num,
+                               unsigned *class_id);
 
 /**
  * @brief Hardware interface to reassign cores
@@ -134,7 +180,8 @@ int hw_alloc_assign(const unsigned technology,
  *
  * @return Operations status
  */
-int hw_alloc_release(const unsigned *core_array, const unsigned core_num);
+PQOS_LOCAL int hw_alloc_release(const unsigned *core_array,
+                                const unsigned core_num);
 
 /**
  * @brief Hardware interface to reset configuration
@@ -154,9 +201,69 @@ int hw_alloc_release(const unsigned *core_array, const unsigned core_num);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                   const enum pqos_cdp_config l2_cdp_cfg,
-                   const enum pqos_mba_config mba_cfg);
+PQOS_LOCAL int hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+                              const enum pqos_cdp_config l2_cdp_cfg,
+                              const enum pqos_mba_config mba_cfg);
+
+/**
+ * @brief Enables or disables CDP across selected CPU sockets
+ *
+ * @param [in] sockets_num dimension of \a sockets array
+ * @param [in] sockets array with socket ids to change CDP config on
+ * @param [in] enable CDP enable/disable flag, 1 - enable, 0 - disable
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ */
+PQOS_LOCAL int hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
+                                    const unsigned *l3cat_ids,
+                                    const int enable);
+
+/**
+ * @brief Enables or disables CDP across selected CPU clusters
+ *
+ * @param [in] l2id_num dimension of \a l2ids array
+ * @param [in] l2ids array with clusters ids to change CDP config on
+ * @param [in] enable CDP enable/disable flag, 1 - enable, 0 - disable
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ */
+PQOS_LOCAL int hw_alloc_reset_l2cdp(const unsigned l2id_num,
+                                    const unsigned *l2ids,
+                                    const int enable);
+
+/**
+ * @brief Associates each of the cores with COS0
+ *
+ * Operates on m_cpu structure.
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on MSR write error
+ */
+PQOS_LOCAL int hw_alloc_reset_assoc(void);
+
+/**
+ * @brief Writes range of MBA/CAT COS MSR's with \a msr_val value
+ *
+ * Used as part of CAT/MBA reset process.
+ *
+ * @param [in] msr_start First MSR to be written
+ * @param [in] msr_num Number of MSR's to be written
+ * @param [in] coreid Core ID to be used for MSR write operations
+ * @param [in] msr_val Value to be written to MSR's
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on MSR write error
+ */
+PQOS_LOCAL int hw_alloc_reset_cos(const unsigned msr_start,
+                                  const unsigned msr_num,
+                                  const unsigned coreid,
+                                  const uint64_t msr_val);
 
 /**
  * @brief Hardware interface to set classes of service
@@ -169,9 +276,9 @@ int hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_l3ca_set(const unsigned l3cat_id,
-                const unsigned num_ca,
-                const struct pqos_l3ca *ca);
+PQOS_LOCAL int hw_l3ca_set(const unsigned l3cat_id,
+                           const unsigned num_ca,
+                           const struct pqos_l3ca *ca);
 
 /**
  * @brief Hardware interface to read classes of service from \a l3cat id
@@ -185,10 +292,10 @@ int hw_l3ca_set(const unsigned l3cat_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_l3ca_get(const unsigned l3cat_id,
-                const unsigned max_num_ca,
-                unsigned *num_ca,
-                struct pqos_l3ca *ca);
+PQOS_LOCAL int hw_l3ca_get(const unsigned l3cat_id,
+                           const unsigned max_num_ca,
+                           unsigned *num_ca,
+                           struct pqos_l3ca *ca);
 
 /**
  * @brief Probe hardware for minimum number of bits that must be set
@@ -202,7 +309,7 @@ int hw_l3ca_get(const unsigned l3cat_id,
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_RESOURCE when no free COS found
  */
-int hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
+PQOS_LOCAL int hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
 
 /**
  * @brief Hardware interface to set classes of
@@ -215,9 +322,9 @@ int hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_l2ca_set(const unsigned l2id,
-                const unsigned num_cos,
-                const struct pqos_l2ca *ca);
+PQOS_LOCAL int hw_l2ca_set(const unsigned l2id,
+                           const unsigned num_cos,
+                           const struct pqos_l2ca *ca);
 
 /**
  * @brief Hardware interface to read classes of service from \a l2id
@@ -231,10 +338,10 @@ int hw_l2ca_set(const unsigned l2id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_l2ca_get(const unsigned l2id,
-                const unsigned max_num_ca,
-                unsigned *num_ca,
-                struct pqos_l2ca *ca);
+PQOS_LOCAL int hw_l2ca_get(const unsigned l2id,
+                           const unsigned max_num_ca,
+                           unsigned *num_ca,
+                           struct pqos_l2ca *ca);
 
 /**
  * @brief Probe hardware for minimum number of bits that must be set
@@ -248,7 +355,7 @@ int hw_l2ca_get(const unsigned l2id,
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_RESOURCE when no free COS found
  */
-int hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
+PQOS_LOCAL int hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
 
 /**
  * @brief Hardware interface to set classes of service
@@ -262,10 +369,10 @@ int hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mba_set(const unsigned mba_id,
-               const unsigned num_cos,
-               const struct pqos_mba *requested,
-               struct pqos_mba *actual);
+PQOS_LOCAL int hw_mba_set(const unsigned mba_id,
+                          const unsigned num_cos,
+                          const struct pqos_mba *requested,
+                          struct pqos_mba *actual);
 
 /**
  * @brief Hardware interface to set classes of service
@@ -280,10 +387,10 @@ int hw_mba_set(const unsigned mba_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mba_set_amd(const unsigned mba_id,
-                   const unsigned num_cos,
-                   const struct pqos_mba *requested,
-                   struct pqos_mba *actual);
+PQOS_LOCAL int hw_mba_set_amd(const unsigned mba_id,
+                              const unsigned num_cos,
+                              const struct pqos_mba *requested,
+                              struct pqos_mba *actual);
 
 /**
  * @brief Hardware interface to read MBA from \a mba_id
@@ -297,10 +404,10 @@ int hw_mba_set_amd(const unsigned mba_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mba_get(const unsigned mba_id,
-               const unsigned max_num_cos,
-               unsigned *num_cos,
-               struct pqos_mba *mba_tab);
+PQOS_LOCAL int hw_mba_get(const unsigned mba_id,
+                          const unsigned max_num_cos,
+                          unsigned *num_cos,
+                          struct pqos_mba *mba_tab);
 
 /**
  * @brief Hardware interface to read MBA from \a mba_id
@@ -315,10 +422,10 @@ int hw_mba_get(const unsigned mba_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mba_get_amd(const unsigned mba_id,
-                   const unsigned max_num_cos,
-                   unsigned *num_cos,
-                   struct pqos_mba *mba_tab);
+PQOS_LOCAL int hw_mba_get_amd(const unsigned mba_id,
+                              const unsigned max_num_cos,
+                              unsigned *num_cos,
+                              struct pqos_mba *mba_tab);
 
 #ifdef __cplusplus
 }

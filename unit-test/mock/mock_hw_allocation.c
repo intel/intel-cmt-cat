@@ -185,3 +185,21 @@ __wrap_hw_mba_get(const unsigned mba_id,
 
         return mock_type(int);
 }
+
+int
+__wrap_hw_alloc_assoc_write(const unsigned lcore, const unsigned class_id)
+{
+        check_expected(lcore);
+        check_expected(class_id);
+
+        return mock_type(int);
+}
+
+int
+__wrap_hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id)
+{
+        check_expected(lcore);
+        *class_id = mock_type(int);
+
+        return mock_type(int);
+}

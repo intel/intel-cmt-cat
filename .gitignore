@@ -35,3 +35,14 @@ venv
 unit-test/lib/obj
 unit-test/lib/test_api
 unit-test/lib/test_hw_allocation
+unit-test/lib/test_hw_alloc_assign
+unit-test/lib/test_hw_alloc_assoc_read
+unit-test/lib/test_hw_alloc_assoc_unused
+unit-test/lib/test_hw_alloc_assoc_write
+unit-test/lib/test_hw_alloc_reset_assoc
+unit-test/lib/test_hw_alloc_reset_cos
+unit-test/lib/test_hw_alloc_reset_l2cdp
+unit-test/lib/test_hw_alloc_reset_l3cdp
+unit-test/lib/test_hw_l2ca_get_min_cbm_bits
+unit-test/lib/test_hw_l3ca_get_min_cbm_bits
+
