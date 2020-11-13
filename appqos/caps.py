@@ -78,6 +78,19 @@ def mba_supported():
     """
     return common.MBA_CAP in SYSTEM_CAPS
 
+def mba_bw_supported():
+    """
+    Returns MBA support status
+    """
+    # Remember to implement MBA BW support check
+    return mba_supported() and False
+
+def mba_bw_enabled():
+    """
+    Returns MBA enabled status
+    """
+    # Remember to implement MBA BW enabled check
+    return mba_bw_supported() and False
 
 def sstbf_enabled():
     """

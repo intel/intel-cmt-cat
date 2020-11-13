@@ -18,6 +18,22 @@
     "exclusiveMinimum": true
   },
 
+  "percentage_nonzero": {
+    "allOf": [
+      { "$ref": "#uint_nonzero" },
+      { "maximum": 100 }
+    ]
+  },
+
+  "mbps_nonzero": {
+    "allOf": [
+      { "$ref": "#uint_nonzero" },
+      { "maximum": 4294967296,
+        "exclusiveMaximum": true
+      }
+    ]
+  },
+
   "uint_uniq_nonempty_array": {
     "description": "Non-empty array of unique Unsigned Integers",
     "type": "array",
@@ -216,8 +232,12 @@
         "$ref": "#string_hex"
       },
       "mba": {
-        "description": "MBA rate",
-        "$ref": "#uint"
+        "description": "MBA rate %",
+        "$ref": "#percentage_nonzero"
+      },
+      "mba_bw": {
+        "description": "MBA rate MBps",
+        "$ref": "#mbps_nonzero"
       },
       "power_profile" : {
         "description": "Power profile ID",
@@ -236,8 +256,15 @@
     "anyOf": [
       { "required": ["cbm"] },
       { "required": ["mba"] },
+      { "required": ["mba_bw"] },
       { "required": ["power_profile"] }
-    ]
+    ],
+    "dependencies": {
+      "mba": {
+          "type": "object",
+          "not": { "required": [ "mba_bw" ] }
+      }
+    }
   },
 
   "pool_cfg": {
@@ -248,6 +275,7 @@
           "cores": {},
           "cbm": {},
           "mba": {},
+          "mba_bw": {},
           "id": {},
           "apps": {},
           "power_profile": {}
@@ -272,6 +300,7 @@
           "cores": {},
           "cbm": {},
           "mba": {},
+          "mba_bw": {},
           "power_profile" : {},
           "verify": {
               "description": "Power Profiles Admission Control",

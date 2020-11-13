@@ -67,6 +67,35 @@
       "additionalProperties": false
     },
 
+    "rdt_iface": {
+      "description": "RDT configuration - libpqos interface",
+      "type": "object",
+      "properties": {
+        "interface": {
+          "description": "libpqos interface",
+          "type": "string",
+          "enum": ["msr", "os"],
+          "default": "msr"
+        }
+      },
+      "required": ["interface"],
+      "additionalProperties": false
+    },
+
+    "mba_ctrl": {
+      "description": "MBA SW CTRL configuration",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "MBA SW CTRL status",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "required": ["enabled"],
+      "additionalProperties": false
+    },
+
     "power_profiles": {
       "description": "Power profiles definitions",
       "type": "array",

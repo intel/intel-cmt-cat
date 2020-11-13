@@ -47,6 +47,7 @@ import power
 
 
 class ConfigStore:
+#pylint: disable=too-many-public-methods
     """
     Class to handle config file operations
     """
@@ -111,6 +112,36 @@ class ConfigStore:
                     return app[attr]
 
         return None
+
+    def get_rdt_iface(self):
+        """
+        Get RDT interface from config
+
+        Returns:
+            configured RDT interface or "msr" by default
+        """
+
+        data = self.get_config()
+
+        if 'rdt_iface' in data:
+            return data['rdt_iface']['interface']
+
+        return "msr"
+
+    def get_mba_ctrl_enabled(self):
+        """
+        Get RDT MBA CTRL Enabled from config
+
+        Returns:
+            configured RDT MBA CTRL Enabled value or "false" by default
+        """
+
+        data = self.get_config()
+
+        if 'mba_ctrl' in data:
+            return data['mba_ctrl']['enabled']
+
+        return False
 
 
     def set_path(self, path):
@@ -222,6 +253,7 @@ class ConfigStore:
 
         ConfigStore._validate_pools(data)
         ConfigStore._validate_apps(data)
+        ConfigStore._validate_rdt(data)
         power.validate_power_profiles(data, power_admission_control)
 
 
@@ -261,23 +293,6 @@ class ConfigStore:
             if 'apps' in pool:
                 for app_id in pool['apps']:
                     ConfigStore.get_app(data, app_id)
-
-            if 'cbm' in pool:
-                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['cbm']))
-                if result or pool['cbm'] == 0:
-                    raise ValueError("Pool {}, CBM {}/{} is not contiguous."\
-                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
-                if not caps.cat_supported():
-                    raise ValueError("Pool {}, CBM {}/{}, CAT is not supported."\
-                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
-
-            if 'mba' in pool:
-                if pool['mba'] > 100 or pool['mba'] <= 0:
-                    raise ValueError("Pool {}, MBA rate {} out of range! (1-100)."\
-                    .format(pool['id'], pool['mba']))
-                if not caps.mba_supported():
-                    raise ValueError("Pool {}, MBA rate {}, MBA is not supported."\
-                    .format(pool['id'], pool['mba']))
 
             # check power profile reference
             if 'power_profile' in pool:
@@ -340,6 +355,56 @@ class ConfigStore:
 
             pids |= set(app['pids'])
 
+    @staticmethod
+    def _validate_rdt(data):
+        """
+        Validate RDT configuration (including MBA CTRL) configuration
+
+        Parameters
+            data: configuration (dict)
+        """
+
+        if 'mba_ctrl' in data and data['mba_ctrl']['enabled']\
+                and (not 'rdt_iface' in data or data['rdt_iface']['interface'] != "os"):
+            raise ValueError("RDT Configuration. MBA CTRL requires RDT OS interface!")
+
+        if not 'pools' in data:
+            return
+
+        mba_pool_ids = []
+        mba_bw_pool_ids = []
+
+        for pool in data['pools']:
+
+            if 'cbm' in pool:
+                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['cbm']))
+                if result or pool['cbm'] == 0:
+                    raise ValueError("Pool {}, CBM {}/{} is not contiguous."\
+                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
+                if not caps.cat_supported():
+                    raise ValueError("Pool {}, CBM {}/{}, CAT is not supported."\
+                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
+
+            if 'mba' in pool:
+                mba_pool_ids.append(pool['id'])
+
+            if 'mba_bw' in pool:
+                mba_bw_pool_ids.append(pool['id'])
+
+        if mba_bw_pool_ids and mba_pool_ids:
+            raise ValueError("It is not allowed to mix MBA (Pools: {}) "\
+                "and MBA BW (Pools {}), configurations."\
+                .format(mba_pool_ids, mba_bw_pool_ids))
+
+        if (mba_pool_ids or mba_bw_pool_ids) and not caps.mba_supported():
+            raise ValueError("Pools {}, MBA is not supported."\
+                .format(mba_pool_ids + mba_bw_pool_ids))
+
+        if mba_bw_pool_ids and not caps.mba_bw_enabled():
+            raise ValueError("Pools {}, MBA BW is not enabled/supported."\
+                .format(mba_bw_pool_ids))
+
+        return
 
     def from_file(self, path):
         """
@@ -545,7 +610,10 @@ class ConfigStore:
         default_pool['id'] = 0
 
         if caps.mba_supported():
-            default_pool['mba'] = 100
+            if caps.mba_bw_enabled():
+                default_pool['mba_bw'] = 2**32 - 1
+            else:
+                default_pool['mba'] = 100
 
         if caps.cat_supported():
             default_pool['cbm'] = common.PQOS_API.get_max_l3_cat_cbm()

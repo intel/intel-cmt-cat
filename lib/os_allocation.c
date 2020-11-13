@@ -1610,7 +1610,8 @@ os_mba_set(const unsigned mba_id,
                                      step);
                                 if (mba.mb_max == 0)
                                         mba.mb_max = step;
-                        }
+                        } else if (mba.mb_max > UINT32_MAX - step)
+                                mba.mb_max -= mba.mb_max % step;
 
                         ret = resctrl_schemata_mba_set(schmt, mba_id, &mba);
                 }

@@ -37,7 +37,10 @@ import common
 import jsonschema
 import mock
 
-from config import *
+from config import ConfigStore
+import caps
+
+from copy import deepcopy
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -218,6 +221,106 @@ def test_config_default_pool(mock_get_num_cores):
     assert not config_store.is_default_pool_defined(config)
 
 
+@mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
+@mock.patch('common.PQOS_API.get_max_l3_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
+@mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+@mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
+def test_config_default_pool_cat():
+    config_store = ConfigStore()
+    config = deepcopy(CONFIG)
+
+    # just in case, remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config_store.is_default_pool_defined(config)
+
+    # add default pool to config
+    config_store.add_default_pool(config)
+    assert config_store.is_default_pool_defined(config)
+
+    pool_cbm = None
+
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            assert 'cbm' in pool
+            assert not 'mba' in pool
+            assert not 'mba_bw' in pool
+            pool_cbm = pool['cbm']
+            break
+
+    assert pool_cbm == 0xDEADBEEF
+
+
+@mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
+@mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+@mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+@mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=False))
+def test_config_default_pool_mba():
+    config_store = ConfigStore()
+    config = deepcopy(CONFIG)
+
+    # just in case, remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config_store.is_default_pool_defined(config)
+
+    # add default pool to config
+    config_store.add_default_pool(config)
+    assert config_store.is_default_pool_defined(config)
+
+    pool_mba = None
+
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            assert not 'cat' in pool
+            assert not 'mba_bw' in pool
+            pool_mba = pool['mba']
+            break
+
+    assert pool_mba == 100
+
+
+@mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
+@mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+@mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
+@mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+def test_config_default_pool_mba_bw():
+    config_store = ConfigStore()
+    config = deepcopy(CONFIG)
+
+    # just in case, remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config_store.is_default_pool_defined(config)
+
+    # add default pool to config
+    config_store.add_default_pool(config)
+    assert config_store.is_default_pool_defined(config)
+
+    pool_mba_bw = None
+
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            assert not 'mba' in pool
+            assert not 'cbm' in pool
+            pool_mba_bw = pool['mba_bw']
+            break
+
+    assert pool_mba_bw == 2**32 - 1
+
+
 CONFIG_POOLS = {
     "pools": [
         {
@@ -289,6 +392,9 @@ def test_config_reset():
         assert len(config_store.get_pool_attr('cores', None)) == 8
         assert config_store.get_pool_attr('cbm', 0) == 0xFFF
         assert config_store.get_pool_attr('mba', 0) == 100
+
+        # test get_pool_attr
+        assert config_store.get_pool_attr('non_exisiting_key', None) == None
 
         # reset mock and change return values
         # more cores this time (8 vs. 16)
@@ -562,11 +668,11 @@ class TestConfigValidate:
             ]
         }
 
-        with pytest.raises(ValueError, match="out of range"):
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="Failed validating 'maximum' in schema"):
             ConfigStore.validate(data)
 
         data['pools'][0]['mba'] = 0
-        with pytest.raises(ValueError, match="out of range"):
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="Failed validating 'minimum' in schema"):
             ConfigStore.validate(data)
 
 
@@ -594,6 +700,30 @@ class TestConfigValidate:
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=False))
+    def test_pool_mba_bw_not_supported(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "mba_bw": 5000,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="MBA BW is not enabled/supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_not_supported_cat(self):
         data = {
@@ -613,6 +743,63 @@ class TestConfigValidate:
         }
 
         with pytest.raises(ValueError, match="MBA is not supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=False))
+    def test_pool_mba_bw_not_supported_cat(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "cbm": 0xf,
+                    "mba_bw": 5000,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="MBA BW is not enabled/supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
+    def test_pool_mba_and_mba_bw_mix(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [
+                {
+                    "cbm": 0xf,
+                    "mba_bw": 5000,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                },
+                {
+                    "cbm": 0xf,
+                    "mba": 50,
+                    "cores": [2],
+                    "id": 2,
+                    "name": "pool 2"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="It is not allowed to mix MBA"):
             ConfigStore.validate(data)
 
 
@@ -924,3 +1111,101 @@ class TestConfigValidate:
         data['power_profiles_verify'] = []
         with pytest.raises(jsonschema.exceptions.ValidationError, match="\\[\\] is not of type 'boolean'"):
             ConfigStore.validate(data)
+
+
+    def test_rdt_iface_invalid(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [],
+            "apps": [],
+            "rdt_iface": "os"
+        }
+
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="'os' is not of type 'object'"):
+            ConfigStore.validate(data)
+
+        data['rdt_iface'] = {}
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="'interface' is a required property"):
+            ConfigStore.validate(data)
+
+        data['rdt_iface']['interface'] = None
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="None is not of type 'string'"):
+            ConfigStore.validate(data)
+
+        data['rdt_iface']['interface'] = 2
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="2 is not of type 'string'"):
+            ConfigStore.validate(data)
+
+        data['rdt_iface']['interface'] = "test_string"
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="'test_string' is not one of \\['msr', 'os'\\]"):
+            ConfigStore.validate(data)
+
+
+    def test_mba_ctrl_invalid(self):
+        data = {
+            "auth": {
+                "password": "password",
+                "username": "admin"
+            },
+            "pools": [],
+            "apps": [],
+            "mba_ctrl": True
+        }
+
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="True is not of type 'object'"):
+            ConfigStore.validate(data)
+
+        data['mba_ctrl'] = {}
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="'enabled' is a required property"):
+            ConfigStore.validate(data)
+
+        data['mba_ctrl']['enabled'] = None
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="None is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+        data['mba_ctrl']['enabled'] = 2
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="2 is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+        data['mba_ctrl']['enabled'] = "test_string"
+        with pytest.raises(jsonschema.exceptions.ValidationError, match="'test_string' is not of type 'boolean'"):
+            ConfigStore.validate(data)
+
+        data['mba_ctrl']['enabled'] = True
+        with pytest.raises(ValueError, match="MBA CTRL requires RDT OS interface"):
+            ConfigStore.validate(data)
+
+        data['rdt_iface'] = {"interface": "msr"}
+        with pytest.raises(ValueError, match="MBA CTRL requires RDT OS interface"):
+            ConfigStore.validate(data)
+
+
+@mock.patch('config.ConfigStore.get_config')
+@pytest.mark.parametrize("cfg, result", [
+    ({}, "msr"),
+    ({"rdt_iface": {"interface": "msr"}}, "msr"),
+    ({"rdt_iface": {"interface": "msr_test"}}, "msr_test"),
+    ({"rdt_iface": {"interface": "os_test"}}, "os_test"),
+    ({"rdt_iface": {"interface": "os"}}, "os")
+])
+def test_get_rdt_iface(mock_get_config, cfg, result):
+    mock_get_config.return_value = cfg
+    config_store = ConfigStore()
+
+    assert config_store.get_rdt_iface() == result
+
+
+@mock.patch('config.ConfigStore.get_config')
+@pytest.mark.parametrize("cfg, result", [
+    ({}, False),
+    ({"mba_ctrl": {"enabled": True}}, True),
+    ({"mba_ctrl": {"enabled": False}}, False)
+])
+def test_get_mba_ctrl_enabled(mock_get_config, cfg, result):
+    mock_get_config.return_value = cfg
+    config_store = ConfigStore()
+
+    assert config_store.get_mba_ctrl_enabled() == result
