@@ -35,52 +35,58 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "mock_cap.h"
+
+#include "mock_perf_monitoring.h"
 
 int
-__wrap__pqos_check_init(const int expect)
+__wrap_perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
-        check_expected(expect);
+        check_expected_ptr(cpu);
+        check_expected_ptr(cap);
 
         return mock_type(int);
 }
 
-void
-__wrap__pqos_api_lock(void)
+int
+__wrap_perf_mon_fini(void)
 {
-        function_called();
+        return mock_type(int);
 }
 
-void
-__wrap__pqos_api_unlock(void)
+int
+__wrap_perf_mon_start(struct pqos_mon_data *group,
+                      const enum pqos_mon_event event)
 {
-        function_called();
+        assert_non_null(group);
+        check_expected(event);
+
+        return mock_type(int);
 }
 
-void
-__wrap__pqos_cap_get(const struct pqos_cap **cap,
-                     const struct pqos_cpuinfo **cpu)
+int
+__wrap_perf_mon_stop(struct pqos_mon_data *group,
+                     const enum pqos_mon_event event)
 {
-        if (cap != NULL)
-                *cap = mock_ptr_type(struct pqos_cap *);
-        if (cpu != NULL)
-                *cpu = mock_ptr_type(struct pqos_cpuinfo *);
+        assert_non_null(group);
+        check_expected(event);
+
+        return mock_type(int);
 }
 
-void
-__wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
+int
+__wrap_perf_mon_poll(struct pqos_mon_data *group,
+                     const enum pqos_mon_event event)
 {
-        check_expected(cdp);
+        assert_non_null(group);
+        check_expected(event);
+
+        return mock_type(int);
 }
 
-void
-__wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
+int
+__wrap_perf_mon_is_event_supported(const enum pqos_mon_event event)
 {
-        check_expected(cdp);
-}
+        check_expected(event);
 
-void
-__wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg)
-{
-        check_expected(cfg);
+        return mock_type(int);
 }

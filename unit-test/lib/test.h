@@ -42,6 +42,7 @@ struct test_data {
         struct pqos_cap_l3ca cap_l3ca;
         struct pqos_cap_l2ca cap_l2ca;
         struct pqos_cap_mba cap_mba;
+        struct pqos_cap_mon *cap_mon;
 };
 
 static inline int
@@ -140,6 +141,36 @@ test_cap_init(struct test_data *data, unsigned technology)
                 ++cap_num;
         }
 
+        if (technology & (1 << PQOS_CAP_TYPE_MON)) {
+                unsigned num_events = 6;
+                unsigned i;
+                struct pqos_cap_mon *mon =
+                    malloc(num_events * sizeof(struct pqos_monitor) +
+                           sizeof(struct pqos_cap_mon));
+
+                mon->events[0].type = PQOS_MON_EVENT_L3_OCCUP;
+                mon->events[1].type = PQOS_MON_EVENT_TMEM_BW;
+                mon->events[2].type = PQOS_MON_EVENT_LMEM_BW;
+                mon->events[3].type = PQOS_MON_EVENT_RMEM_BW;
+                mon->events[4].type = PQOS_PERF_EVENT_IPC;
+                mon->events[5].type = PQOS_PERF_EVENT_LLC_MISS;
+
+                for (i = 0; i < num_events; ++i) {
+                        mon->events[i].max_rmid = 32;
+                        mon->events[i].scale_factor = i;
+                        mon->events[i].counter_length = 24;
+                }
+
+                mon->num_events = num_events;
+                mon->max_rmid = 32;
+
+                data->cap_mon = mon;
+
+                cap->capabilities[cap_num].type = PQOS_CAP_TYPE_MON;
+                cap->capabilities[cap_num].u.mon = mon;
+                ++cap_num;
+        }
+
         cap->num_cap = cap_num;
 
         data->cap = cap;
@@ -208,6 +239,8 @@ test_fini(void **state)
                         free(data->cpu);
                 if (data->cap != NULL)
                         free(data->cap);
+                if (data->cap_mon != NULL)
+                        free(data->cap_mon);
                 free(data);
         }
 

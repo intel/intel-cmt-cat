@@ -31,56 +31,59 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "mock_cap.h"
+
+#include "hw_monitoring.h"
+#include "perf_monitoring.h"
+
+static void
+test_hw_mon_start_perf(void **state __attribute__((unused)))
+{
+        unsigned num_cores = 1;
+        unsigned cores[] = {1};
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        enum pqos_mon_event event =
+            PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_IPC;
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        group.num_cores = num_cores;
+        group.cores = cores;
+
+        expect_value(__wrap_perf_mon_is_event_supported, event,
+                     PQOS_PERF_EVENT_CYCLES);
+        will_return_always(__wrap_perf_mon_is_event_supported, 1);
+
+        expect_value(__wrap_perf_mon_start, event, PQOS_PERF_EVENT_CYCLES);
+        will_return(__wrap_perf_mon_start, PQOS_RETVAL_OK);
+
+        ret = hw_mon_start_perf(&group, event);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(group.intl->perf.event, PQOS_PERF_EVENT_CYCLES);
+
+        expect_value(__wrap_perf_mon_stop, event, PQOS_PERF_EVENT_CYCLES);
+        will_return(__wrap_perf_mon_stop, PQOS_RETVAL_OK);
+
+        ret = hw_mon_stop_perf(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
 
 int
-__wrap__pqos_check_init(const int expect)
+main(void)
 {
-        check_expected(expect);
+        int result = 0;
 
-        return mock_type(int);
-}
+        const struct CMUnitTest tests[] = {
+            cmocka_unit_test(test_hw_mon_start_perf)};
 
-void
-__wrap__pqos_api_lock(void)
-{
-        function_called();
-}
+        result += cmocka_run_group_tests(tests, NULL, NULL);
 
-void
-__wrap__pqos_api_unlock(void)
-{
-        function_called();
-}
-
-void
-__wrap__pqos_cap_get(const struct pqos_cap **cap,
-                     const struct pqos_cpuinfo **cpu)
-{
-        if (cap != NULL)
-                *cap = mock_ptr_type(struct pqos_cap *);
-        if (cpu != NULL)
-                *cpu = mock_ptr_type(struct pqos_cpuinfo *);
-}
-
-void
-__wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
-{
-        check_expected(cdp);
-}
-
-void
-__wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
-{
-        check_expected(cdp);
-}
-
-void
-__wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg)
-{
-        check_expected(cfg);
+        return result;
 }

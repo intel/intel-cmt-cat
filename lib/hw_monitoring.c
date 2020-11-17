@@ -95,15 +95,6 @@ static const enum pqos_mon_event perf_event[] = {
  * ---------------------------------------
  */
 
-static int mon_assoc_set(const unsigned lcore, const pqos_rmid_t rmid);
-
-static int mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
-
-static int mon_read(const unsigned lcore,
-                    const pqos_rmid_t rmid,
-                    const enum pqos_mon_event event,
-                    uint64_t *value);
-
 static unsigned get_event_id(const enum pqos_mon_event event);
 
 static uint64_t scale_event(const enum pqos_mon_event event,
@@ -214,13 +205,16 @@ hw_mon_fini(void)
 /**
  * @brief Gets max RMID number for given \a event
  *
+ * @param [in] cap capabilities structure
  * @param [out] rmid resource monitoring id
  * @param [in] event Monitoring event type
  *
  * @return Operations status
  */
 static int
-rmid_get_event_max(pqos_rmid_t *rmid, const enum pqos_mon_event event)
+rmid_get_event_max(const struct pqos_cap *cap,
+                   pqos_rmid_t *rmid,
+                   const enum pqos_mon_event event)
 {
         pqos_rmid_t max_rmid = m_rmid_max;
         const struct pqos_capability *item = NULL;
@@ -241,7 +235,7 @@ rmid_get_event_max(pqos_rmid_t *rmid, const enum pqos_mon_event event)
          * - look for the \a event in the event list
          * - find max RMID matching the \a event
          */
-        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_MON, &item);
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &item);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         ASSERT(item != NULL);
@@ -277,10 +271,12 @@ rmid_get_event_max(pqos_rmid_t *rmid, const enum pqos_mon_event event)
  *
  * @return Operations status
  */
-static int
-rmid_alloc(struct pqos_mon_poll_ctx *ctx, const enum pqos_mon_event event)
+int
+hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
+                    const enum pqos_mon_event event)
 {
         const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap;
         int ret = PQOS_RETVAL_OK;
         unsigned max_rmid = 0;
         unsigned *core_list = NULL;
@@ -289,10 +285,10 @@ rmid_alloc(struct pqos_mon_poll_ctx *ctx, const enum pqos_mon_event event)
 
         ASSERT(ctx != NULL);
 
-        _pqos_cap_get(NULL, &cpu);
+        _pqos_cap_get(&cap, &cpu);
 
         /* Getting max RMID for given event */
-        ret = rmid_get_event_max(&max_rmid, event);
+        ret = rmid_get_event_max(cap, &max_rmid, event);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -310,7 +306,7 @@ rmid_alloc(struct pqos_mon_poll_ctx *ctx, const enum pqos_mon_event event)
         }
 
         for (i = 0; i < core_count; i++) {
-                ret = mon_assoc_get(core_list[i], &rmid_list[i]);
+                ret = hw_mon_assoc_read(core_list[i], &rmid_list[i]);
                 if (ret != PQOS_RETVAL_OK)
                         goto rmid_alloc_error;
         }
@@ -349,15 +345,15 @@ rmid_alloc_error:
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-rmid_alloc_custom(struct pqos_mon_poll_ctx *ctx,
-                  const enum pqos_mon_event event,
-                  const struct pqos_rmid_config *rmid_cfg)
+hw_mon_assoc_unused_custom(struct pqos_mon_poll_ctx *ctx,
+                           const enum pqos_mon_event event,
+                           const struct pqos_rmid_config *rmid_cfg)
 {
         if (ctx == NULL)
                 return PQOS_RETVAL_PARAM;
 
         if (rmid_cfg == NULL || rmid_cfg->type == PQOS_RMID_TYPE_DEFAULT) {
-                return rmid_alloc(ctx, event);
+                return hw_mon_assoc_unused(ctx, event);
         } else if (rmid_cfg->type == PQOS_RMID_TYPE_MAP) {
                 unsigned i;
 
@@ -420,20 +416,8 @@ scale_event(const enum pqos_mon_event event, const uint64_t val)
                 return val * pmon->scale_factor;
 }
 
-/**
- * @brief Associates core with RMID at register level
- *
- * This function doesn't acquire API lock
- * and can be used internally when lock is already taken.
- *
- * @param lcore logical core id
- * @param rmid resource monitoring ID
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-mon_assoc_set(const unsigned lcore, const pqos_rmid_t rmid)
+int
+hw_mon_assoc_write(const unsigned lcore, const pqos_rmid_t rmid)
 {
         int ret = 0;
         uint32_t reg = 0;
@@ -454,18 +438,8 @@ mon_assoc_set(const unsigned lcore, const pqos_rmid_t rmid)
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Reads \a lcore to RMID association
- *
- * @param lcore logical core id
- * @param rmid place to store RMID \a lcore is assigned to
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- * @retval PQOS_RETVAL_ERROR on error
- */
-static int
-mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
+int
+hw_mon_assoc_read(const unsigned lcore, pqos_rmid_t *rmid)
 {
         int ret = 0;
         uint32_t reg = PQOS_MSR_ASSOC;
@@ -494,13 +468,11 @@ hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 
         _pqos_cap_get(NULL, &cpu);
 
-        ASSERT(cpu != NULL);
-
         ret = pqos_cpu_check_core(cpu, lcore);
         if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_PARAM;
 
-        ret = mon_assoc_get(lcore, rmid);
+        ret = hw_mon_assoc_read(lcore, rmid);
 
         return ret;
 }
@@ -515,7 +487,7 @@ hw_mon_reset(void)
         _pqos_cap_get(NULL, &cpu);
 
         for (i = 0; i < cpu->num_cores; i++) {
-                int retval = mon_assoc_set(cpu->cores[i].lcore, RMID0);
+                int retval = hw_mon_assoc_write(cpu->cores[i].lcore, RMID0);
 
                 if (retval != PQOS_RETVAL_OK)
                         ret = retval;
@@ -524,24 +496,11 @@ hw_mon_reset(void)
         return ret;
 }
 
-/**
- * @brief Reads monitoring event data from given core
- *
- * This function doesn't acquire API lock.
- *
- * @param lcore logical core id
- * @param rmid RMID to be read
- * @param event monitoring event
- * @param value place to store read value
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-mon_read(const unsigned lcore,
-         const pqos_rmid_t rmid,
-         const unsigned event,
-         uint64_t *value)
+int
+hw_mon_read(const unsigned lcore,
+            const pqos_rmid_t rmid,
+            const unsigned event,
+            uint64_t *value)
 {
         int retries = 0, retval = PQOS_RETVAL_ERROR;
         uint64_t val = 0;
@@ -764,16 +723,7 @@ ia32_perf_counter_stop(const unsigned num_cores,
         return retval;
 }
 
-/**
- * @brief Start perf monitoring counters
- *
- * @param group monitoring structure
- * @param event PQoS event type
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 hw_mon_start_perf(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
         int ret = PQOS_RETVAL_OK;
@@ -819,15 +769,7 @@ hw_mon_start_perf(struct pqos_mon_data *group, enum pqos_mon_event event)
         return ret;
 }
 
-/**
- * @brief Stop perf monitoring counters
- *
- * @param group monitoring structure
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 hw_mon_stop_perf(struct pqos_mon_data *group)
 {
         int ret = PQOS_RETVAL_OK;
@@ -867,16 +809,7 @@ hw_mon_stop_perf(struct pqos_mon_data *group)
         return ret;
 }
 
-/**
- * @brief Start HW monitoring counters
- *
- * @param group monitoring structure
- * @param event PQoS event type
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
         const unsigned num_cores = group->num_cores;
@@ -923,10 +856,10 @@ hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
                         ctxs[num_ctxs].lcore = lcore;
                         ctxs[num_ctxs].cluster = cluster;
 #ifdef PQOS_RMID_CUSTOM
-                        ret = rmid_alloc_custom(&ctxs[num_ctxs], ctx_event,
-                                                &rmid_cfg);
+                        ret = hw_mon_assoc_unused_custom(&ctxs[num_ctxs],
+                                                         ctx_event, &rmid_cfg);
 #else
-                        ret = rmid_alloc(&ctxs[num_ctxs], ctx_event);
+                        ret = hw_mon_assoc_unused(&ctxs[num_ctxs], ctx_event);
 #endif
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
@@ -935,8 +868,8 @@ hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
                 }
         }
 
-        group->intl->hw.ctx = (struct pqos_mon_poll_ctx *)malloc(
-            sizeof(group->intl->hw.ctx[0]) * num_ctxs);
+        group->intl->hw.ctx = (struct pqos_mon_poll_ctx *)calloc(
+            num_ctxs, sizeof(group->intl->hw.ctx[0]));
         if (group->intl->hw.ctx == NULL)
                 return PQOS_RETVAL_RESOURCE;
 
@@ -959,7 +892,7 @@ hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
                 }
                 rmid = ctxs[j].rmid;
 
-                ret = mon_assoc_set(group->cores[i], rmid);
+                ret = hw_mon_assoc_write(group->cores[i], rmid);
                 if (ret != PQOS_RETVAL_OK)
                         goto hw_mon_start_counter_exit;
         }
@@ -973,7 +906,7 @@ hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
 hw_mon_start_counter_exit:
         if (ret != PQOS_RETVAL_OK) {
                 for (i = 0; i < num_cores; i++)
-                        (void)mon_assoc_set(group->cores[i], RMID0);
+                        (void)hw_mon_assoc_write(group->cores[i], RMID0);
 
                 if (group->intl->hw.ctx != NULL)
                         free(group->intl->hw.ctx);
@@ -1044,7 +977,7 @@ hw_mon_start(const unsigned num_cores,
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
 
-                ret = mon_assoc_get(lcore, &rmid);
+                ret = hw_mon_assoc_read(lcore, &rmid);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
 
@@ -1145,7 +1078,7 @@ hw_mon_stop(struct pqos_mon_data *group)
                 ret = pqos_cpu_check_core(cpu, lcore);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
-                ret = mon_assoc_get(lcore, &rmid);
+                ret = hw_mon_assoc_read(lcore, &rmid);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
                 if (rmid != group->intl->hw.ctx[i].rmid)
@@ -1158,7 +1091,7 @@ hw_mon_stop(struct pqos_mon_data *group)
                 /**
                  * Associate cores from the group back with RMID0
                  */
-                ret = mon_assoc_set(group->cores[i], RMID0);
+                ret = hw_mon_assoc_write(group->cores[i], RMID0);
                 if (ret != PQOS_RETVAL_OK)
                         retval = PQOS_RETVAL_RESOURCE;
         }
@@ -1178,19 +1111,7 @@ hw_mon_stop(struct pqos_mon_data *group)
         return retval;
 }
 
-/**
- * @brief Read HW counter
- *
- * Reads counters for all events and stores values
- *
- * @param group monitoring structure
- * @param event PQoS event
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- * @retval PQOS_RETVAL_ERROR if error occurs
- */
-static int
+int
 hw_mon_read_counter(struct pqos_mon_data *group,
                     const enum pqos_mon_event event)
 {
@@ -1218,7 +1139,7 @@ hw_mon_read_counter(struct pqos_mon_data *group,
                 const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
                 int retval;
 
-                retval = mon_read(lcore, rmid, get_event_id(event), &tmp);
+                retval = hw_mon_read(lcore, rmid, get_event_id(event), &tmp);
                 if (retval != MACHINE_RETVAL_OK)
                         return PQOS_RETVAL_ERROR;
 

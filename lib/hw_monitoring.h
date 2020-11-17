@@ -42,7 +42,9 @@
 extern "C" {
 #endif
 
+#include "types.h"
 #include "pqos.h"
+#include "monitoring.h"
 
 /**
  * @brief Initializes hardware monitoring sub-module of the library (CMT)
@@ -54,16 +56,16 @@ extern "C" {
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_mon_init(const struct pqos_cpuinfo *cpu,
-                const struct pqos_cap *cap,
-                const struct pqos_config *cfg);
+PQOS_LOCAL int hw_mon_init(const struct pqos_cpuinfo *cpu,
+                           const struct pqos_cap *cap,
+                           const struct pqos_config *cfg);
 
 /**
  * @brief Shuts down hardware monitoring sub-module of the library
  *
  * @return Operation status
  */
-int hw_mon_fini(void);
+PQOS_LOCAL int hw_mon_fini(void);
 
 /**
  * @brief Hardware interface to reset monitoring by binding all cores with RMID0
@@ -71,7 +73,44 @@ int hw_mon_fini(void);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mon_reset(void);
+PQOS_LOCAL int hw_mon_reset(void);
+
+/**
+ * @brief Writes \a lcore to RMID association
+ *
+ * This function doesn't acquire API lock
+ * and can be used internally when lock is already taken.
+ *
+ * @param lcore logical core id
+ * @param rmid resource monitoring ID
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_assoc_write(const unsigned lcore, const pqos_rmid_t rmid);
+
+/**
+ * @brief Reads \a lcore to RMID association
+ *
+ * @param lcore logical core id
+ * @param rmid place to store RMID \a lcore is assigned to
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_ERROR on error
+ */
+PQOS_LOCAL int hw_mon_assoc_read(const unsigned lcore, pqos_rmid_t *rmid);
+
+/**
+ * @brief Get used RMIDs on ctx->cluster
+ *
+ * @param [in,out] ctx poll context
+ * @param [in] event Monitoring event type
+ *
+ * @return Operations status
+ */
+PQOS_LOCAL int hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
+                                   const enum pqos_mon_event event);
 
 /**
  * @brief Hardware interface to read RMID association of the \a lcore
@@ -82,7 +121,41 @@ int hw_mon_reset(void);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
+PQOS_LOCAL int hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
+
+/**
+ * @brief Start perf monitoring counters
+ *
+ * @param group monitoring structure
+ * @param event PQoS event type
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_start_perf(struct pqos_mon_data *group,
+                                 enum pqos_mon_event event);
+
+/**
+ * @brief Stop perf monitoring counters
+ *
+ * @param group monitoring structure
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_stop_perf(struct pqos_mon_data *group);
+
+/**
+ * @brief Start HW monitoring counters
+ *
+ * @param group monitoring structure
+ * @param event PQoS event type
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_start_counter(struct pqos_mon_data *group,
+                                    enum pqos_mon_event event);
 
 /**
  * @brief Hardware interface to start resource monitoring on selected
@@ -104,11 +177,11 @@ int hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mon_start(const unsigned num_cores,
-                 const unsigned *cores,
-                 const enum pqos_mon_event event,
-                 void *context,
-                 struct pqos_mon_data *group);
+PQOS_LOCAL int hw_mon_start(const unsigned num_cores,
+                            const unsigned *cores,
+                            const enum pqos_mon_event event,
+                            void *context,
+                            struct pqos_mon_data *group);
 
 /**
  * @brief Hardware interface to stop resource monitoring data for selected
@@ -119,7 +192,40 @@ int hw_mon_start(const unsigned num_cores,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int hw_mon_stop(struct pqos_mon_data *group);
+PQOS_LOCAL int hw_mon_stop(struct pqos_mon_data *group);
+
+/**
+ * @brief Reads monitoring event data from given core
+ *
+ * This function doesn't acquire API lock.
+ *
+ * @param lcore logical core id
+ * @param rmid RMID to be read
+ * @param event monitoring event
+ * @param value place to store read value
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_read(const unsigned lcore,
+                           const pqos_rmid_t rmid,
+                           const unsigned event,
+                           uint64_t *value);
+
+/**
+ * @brief Read HW counter
+ *
+ * Reads counters for all events and stores values
+ *
+ * @param group monitoring structure
+ * @param event PQoS event
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR if error occurs
+ */
+PQOS_LOCAL int hw_mon_read_counter(struct pqos_mon_data *group,
+                                   const enum pqos_mon_event event);
 
 /**
  * @brief Hardware interface poll monitoring data
@@ -133,7 +239,8 @@ int hw_mon_stop(struct pqos_mon_data *group);
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int hw_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event);
+PQOS_LOCAL int hw_mon_poll(struct pqos_mon_data *group,
+                           const enum pqos_mon_event event);
 
 #ifdef __cplusplus
 }

@@ -71,10 +71,8 @@ int __wrap_hw_mba_get(const unsigned mba_id,
                       const unsigned max_num_cos,
                       unsigned *num_cos,
                       struct pqos_mba *mba_tab);
-int __wrap_hw_alloc_assoc_write(const unsigned lcore,
-                                const unsigned class_id);
-int __real_hw_alloc_assoc_write(const unsigned lcore,
-                                const unsigned class_id);
+int __wrap_hw_alloc_assoc_write(const unsigned lcore, const unsigned class_id);
+int __real_hw_alloc_assoc_write(const unsigned lcore, const unsigned class_id);
 int __wrap_hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id);
 int __real_hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id);
 

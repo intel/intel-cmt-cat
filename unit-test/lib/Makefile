@@ -23,6 +23,8 @@ CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
 	-D'PQOS_LOCAL=' -D'PQOS_API='
 
+CFLAGS += -g -ggdb -O0
+
 all: $(TESTS)
 
 $(OBJ_DIR)/%.o: $(LIB_DIR)/%.c $(OBJ_DIR)/%.d
@@ -43,6 +45,19 @@ $(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
 		--globalize-symbol=hw_l3ca_get --weaken-symbol=hw_l3ca_get \
 		--globalize-symbol=hw_l2ca_set --weaken-symbol=hw_l2ca_set \
 		--globalize-symbol=hw_l2ca_get --weaken-symbol=hw_l2ca_get \
+		$@
+
+$(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=hw_mon_assoc_write --weaken-symbol=hw_mon_assoc_write \
+		--globalize-symbol=hw_mon_assoc_read --weaken-symbol=hw_mon_assoc_read \
+		--globalize-symbol=hw_mon_assoc_unused --weaken-symbol=hw_mon_assoc_unused \
+		--globalize-symbol=hw_mon_read --weaken-symbol=hw_mon_read \
+		--globalize-symbol=hw_mon_start_perf --weaken-symbol=hw_mon_start_perf \
+		--globalize-symbol=hw_mon_stop_perf --weaken-symbol=hw_mon_stop_perf \
+		--globalize-symbol=hw_mon_start_counter --weaken-symbol=hw_mon_start_counter \
+		--globalize-symbol=hw_mon_read_counter --weaken-symbol=hw_mon_read_counter \
 		$@
 
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
@@ -184,6 +199,76 @@ test_hw_alloc_reset_cos: test_hw_alloc_reset_cos.c $(LIB_OBJS)
 test_hw_alloc_assign: test_hw_alloc_assign.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_mon_assoc_write: test_hw_mon_assoc_write.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_mon_assoc_read: test_hw_mon_assoc_read.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_mon_assoc_unused: test_hw_mon_assoc_unused.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_mon_read: test_hw_mon_read.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_mon_read_counter: test_hw_mon_read_counter.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_mon_start_perf: test_hw_mon_start_perf.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=perf_mon_is_event_supported \
+		-Wl,--wrap=perf_mon_start \
+		-Wl,--wrap=perf_mon_stop \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_mon_start_counter: test_hw_mon_start_counter.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=perf_mon_is_event_supported \
+		-Wl,--wrap=perf_mon_start \
+		-Wl,--wrap=perf_mon_stop \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

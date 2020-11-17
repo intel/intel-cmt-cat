@@ -1,0 +1,176 @@
+/*
+ * BSD LICENSE
+ *
+ * Copyright(c) 2020 Intel Corporation. All rights reserved.
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in
+ *     the documentation and/or other materials provided with the
+ *     distribution.
+ *   * Neither the name of Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <string.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <setjmp.h>
+#include <cmocka.h>
+
+#include "machine.h"
+#include "hw_monitoring.h"
+#include "cpu_registers.h"
+
+/* ======== hw_mon_read ======== */
+
+static void
+test_hw_mon_read(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_rmid_t rmid = 1;
+        unsigned lcore = 2;
+        unsigned event = 3;
+        uint64_t value;
+        uint64_t evtsel = 0;
+
+        evtsel = ((uint64_t)rmid) & PQOS_MSR_MON_EVTSEL_RMID_MASK;
+        evtsel <<= PQOS_MSR_MON_EVTSEL_RMID_SHIFT;
+        evtsel |= ((uint64_t)event) & PQOS_MSR_MON_EVTSEL_EVTID_MASK;
+
+        /* select event */
+        expect_value(__wrap_msr_write, lcore, lcore);
+        expect_value(__wrap_msr_write, reg, PQOS_MSR_MON_EVTSEL);
+        expect_value(__wrap_msr_write, value, evtsel);
+        will_return(__wrap_msr_write, MACHINE_RETVAL_OK);
+
+        /* read */
+        expect_value(__wrap_msr_read, lcore, lcore);
+        expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
+        will_return(__wrap_msr_read, 5);
+        will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+
+        ret = hw_mon_read(lcore, rmid, event, &value);
+        assert_int_equal(ret, MACHINE_RETVAL_OK);
+        assert_int_equal(value, 5);
+}
+
+static void
+test_hw_mon_read_unavailable(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_rmid_t rmid = 1;
+        unsigned lcore = 2;
+        unsigned event = 3;
+        uint64_t value;
+        uint64_t evtsel = 0;
+
+        evtsel = ((uint64_t)rmid) & PQOS_MSR_MON_EVTSEL_RMID_MASK;
+        evtsel <<= PQOS_MSR_MON_EVTSEL_RMID_SHIFT;
+        evtsel |= ((uint64_t)event) & PQOS_MSR_MON_EVTSEL_EVTID_MASK;
+
+        /* select event */
+        expect_value(__wrap_msr_write, lcore, lcore);
+        expect_value(__wrap_msr_write, reg, PQOS_MSR_MON_EVTSEL);
+        expect_value(__wrap_msr_write, value, evtsel);
+        will_return(__wrap_msr_write, MACHINE_RETVAL_OK);
+
+        /* QMC unavailable */
+        expect_value(__wrap_msr_read, lcore, lcore);
+        expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
+        will_return(__wrap_msr_read, PQOS_MSR_MON_QMC_UNAVAILABLE);
+        will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+
+        /* retry read */
+        expect_value(__wrap_msr_read, lcore, lcore);
+        expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
+        will_return(__wrap_msr_read, 5);
+        will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+
+        ret = hw_mon_read(lcore, rmid, event, &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 5);
+}
+
+static void
+test_hw_mon_read_error(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_rmid_t rmid = 1;
+        unsigned lcore = 2;
+        unsigned event = 3;
+        uint64_t value;
+        uint64_t evtsel = 0;
+
+        evtsel = ((uint64_t)rmid) & PQOS_MSR_MON_EVTSEL_RMID_MASK;
+        evtsel <<= PQOS_MSR_MON_EVTSEL_RMID_SHIFT;
+        evtsel |= ((uint64_t)event) & PQOS_MSR_MON_EVTSEL_EVTID_MASK;
+
+        /* select event */
+        expect_value(__wrap_msr_write, lcore, lcore);
+        expect_value(__wrap_msr_write, reg, PQOS_MSR_MON_EVTSEL);
+        expect_value(__wrap_msr_write, value, evtsel);
+        will_return(__wrap_msr_write, MACHINE_RETVAL_OK);
+
+        /* QMC error */
+        expect_value(__wrap_msr_read, lcore, lcore);
+        expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
+        will_return(__wrap_msr_read, PQOS_MSR_MON_QMC_ERROR);
+        will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+
+        expect_value(__wrap_msr_read, lcore, lcore);
+        expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_EVTSEL);
+        will_return(__wrap_msr_read, 0);
+        will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+
+        /* select event */
+        expect_value(__wrap_msr_write, lcore, lcore);
+        expect_value(__wrap_msr_write, reg, PQOS_MSR_MON_EVTSEL);
+        expect_value(__wrap_msr_write, value, evtsel);
+        will_return(__wrap_msr_write, MACHINE_RETVAL_OK);
+
+        /* retry read */
+        expect_value(__wrap_msr_read, lcore, lcore);
+        expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
+        will_return(__wrap_msr_read, 5);
+        will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+
+        ret = hw_mon_read(lcore, rmid, event, &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 5);
+}
+
+int
+main(void)
+{
+        int result = 0;
+
+        const struct CMUnitTest tests[] = {
+            cmocka_unit_test(test_hw_mon_read),
+            cmocka_unit_test(test_hw_mon_read_unavailable),
+            cmocka_unit_test(test_hw_mon_read_error)};
+
+        result += cmocka_run_group_tests(tests, NULL, NULL);
+
+        return result;
+}

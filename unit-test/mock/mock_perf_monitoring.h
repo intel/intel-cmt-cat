@@ -31,56 +31,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include "mock_cap.h"
+#ifndef MOCK_PERF_MONITORING_H_
+#define MOCK_PERF_MONITORING_H_
 
-int
-__wrap__pqos_check_init(const int expect)
-{
-        check_expected(expect);
+#include "hw_monitoring.h"
 
-        return mock_type(int);
-}
+int __wrap_perf_mon_init(const struct pqos_cpuinfo *cpu,
+                         const struct pqos_cap *cap);
+int __wrap_perf_mon_fini(void);
+int __wrap_perf_mon_start(struct pqos_mon_data *group,
+                          const enum pqos_mon_event event);
+int __wrap_perf_mon_stop(struct pqos_mon_data *group,
+                         const enum pqos_mon_event event);
+int __wrap_perf_mon_poll(struct pqos_mon_data *group,
+                         const enum pqos_mon_event event);
+int __wrap_perf_mon_is_event_supported(const enum pqos_mon_event event);
 
-void
-__wrap__pqos_api_lock(void)
-{
-        function_called();
-}
-
-void
-__wrap__pqos_api_unlock(void)
-{
-        function_called();
-}
-
-void
-__wrap__pqos_cap_get(const struct pqos_cap **cap,
-                     const struct pqos_cpuinfo **cpu)
-{
-        if (cap != NULL)
-                *cap = mock_ptr_type(struct pqos_cap *);
-        if (cpu != NULL)
-                *cpu = mock_ptr_type(struct pqos_cpuinfo *);
-}
-
-void
-__wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
-{
-        check_expected(cdp);
-}
-
-void
-__wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
-{
-        check_expected(cdp);
-}
-
-void
-__wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg)
-{
-        check_expected(cfg);
-}
+#endif /* MOCK_PERF_MONITORING_H_ */
