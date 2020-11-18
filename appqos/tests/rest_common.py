@@ -153,6 +153,21 @@ CONFIG_EMPTY = {
 def get_config():
     return deepcopy(CONFIG)
 
+
+def get_config_empty():
+    return deepcopy(CONFIG_EMPTY)
+
+
+def get_config_mba_bw():
+    mba_bw_config = deepcopy(CONFIG)
+
+    for pool in mba_bw_config['pools']:
+        if 'mba' in pool:
+            pool['mba_bw'] = pool.pop('mba') * 100
+
+    return mba_bw_config
+
+
 def get_max_cos_id(alloc_tech):
     if 'mba' in alloc_tech:
         return 8

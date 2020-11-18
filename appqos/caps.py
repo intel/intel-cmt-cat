@@ -80,17 +80,15 @@ def mba_supported():
 
 def mba_bw_supported():
     """
-    Returns MBA support status
+    Returns MBA BW support status
     """
-    # Remember to implement MBA BW support check
-    return mba_supported() and False
+    return False
 
 def mba_bw_enabled():
     """
-    Returns MBA enabled status
+    Returns MBA BW enabled status
     """
-    # Remember to implement MBA BW enabled check
-    return mba_bw_supported() and False
+    return False
 
 def sstbf_enabled():
     """
@@ -131,3 +129,21 @@ def detect_supported_caps():
         result.append(common.POWER_CAP)
 
     return result
+
+def rdt_iface():
+    """
+    Returns current RDT interface type
+
+    Returns
+        current RDT interface type
+    """
+    return "msr"
+
+def rdt_iface_supported():
+    """
+    Returns supported RDT interface types
+
+    Returns
+        list of supported RDT interface types
+    """
+    return ["msr"]

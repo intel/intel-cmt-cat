@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API modify RDT Interface",
+  "description": "PUT command, URI /caps/rdt_iface",
+
+  "type": "object",
+
+  "properties": {
+    "interface": {
+      "description": "RDT Interface",
+      "type": "string",
+      "enum": ["msr", "os"]
+    }
+  },
+  "required": ["interface"],
+  "additionalProperties": false
+}

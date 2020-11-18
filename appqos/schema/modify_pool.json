@@ -16,8 +16,12 @@
       "$ref": "definitions.json#/string_hex"
     },
     "mba": {
-      "description": "MBA rate",
-      "$ref": "definitions.json#/uint_nonzero"
+      "description": "MBA rate %",
+      "$ref": "definitions.json#/percentage_nonzero"
+    },
+    "mba_bw": {
+      "description": "MBA rate MBps",
+      "$ref": "definitions.json#/mbps_nonzero"
     },
     "cores": {
       "description": "POOL cores",
@@ -40,6 +44,7 @@
     { "required": ["name"] },
     { "required": ["cbm"] },
     { "required": ["mba"] },
+    { "required": ["mba_bw"] },
     { "required": ["cores"] },
     { "required": ["apps"] },
     { "required": ["power_profile"] }

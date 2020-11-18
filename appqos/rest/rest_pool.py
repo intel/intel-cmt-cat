@@ -145,11 +145,18 @@ class Pool(Resource):
                 if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_CAP]):
                     raise BadRequest("Pool {} does not support CAT".format(pool_id))
 
-            if 'mba' in json_data:
+            if 'mba' in json_data or 'mba_bw' in json_data:
                 if not caps.mba_supported():
                     raise BadRequest("System does not support MBA!")
                 if pool_id > common.PQOS_API.get_max_cos_id([common.MBA_CAP]):
                     raise BadRequest("Pool {} does not support MBA".format(pool_id))
+
+            if 'mba_bw' in json_data and not caps.mba_bw_enabled():
+                    raise BadRequest("MBA CTRL is not {}!"\
+                        .format("enabled" if caps.mba_bw_supported() else "supported"))
+
+            if 'mba' in json_data and caps.mba_bw_enabled():
+                    raise BadRequest("MBA RATE is disabled! Disable MBA CTRL and try again.")
 
         json_data = request.get_json()
 
@@ -181,13 +188,9 @@ class Pool(Resource):
 
                 pool['cbm'] = cbm
 
-            # set new mba
-            if 'mba' in json_data:
-                pool['mba'] = json_data['mba']
-
-            # set new cores
-            if 'cores' in json_data:
-                pool['cores'] = json_data['cores']
+            for feature in ['mba', 'mba_bw', 'cores']:
+                if feature in json_data:
+                    pool[feature] = json_data[feature]
 
             if 'apps' in pool and pool['apps']:
                 for app_id in pool['apps']:

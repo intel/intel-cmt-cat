@@ -72,7 +72,7 @@
       "type": "object",
       "properties": {
         "interface": {
-          "description": "libpqos interface",
+          "description": "RDT interface",
           "type": "string",
           "enum": ["msr", "os"],
           "default": "msr"

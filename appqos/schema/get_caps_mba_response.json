@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get caps/mba",
+  "description": "GET Pool MBA caps result, URI /caps/mba",
+
+  "type": "object",
+
+  "properties": {
+    "mba_enabled": {
+      "description": "Pool supports MBA percentage",
+      "type": "boolean"
+    },
+    "mba_bw_enabled": {
+      "description": "Pool supports MBA BW",
+      "type": "boolean"
+    }
+  },
+  "required": ["mba_enabled", "mba_bw_enabled"],
+  "additionalProperties": false
+}

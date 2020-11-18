@@ -585,6 +585,20 @@ class ConfigStore:
         return result
 
 
+    def is_any_pool_defined(self):
+        """
+        Check if there is at least one pool defined
+
+        Returns:
+            result
+        """
+        config = self.get_config()
+        if 'pools' in config:
+            return len(config['pools']) > 0
+
+        return False
+
+
     @staticmethod
     def is_default_pool_defined(data):
         """

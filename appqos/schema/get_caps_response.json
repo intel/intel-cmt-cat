@@ -15,5 +15,6 @@
       "minItems": 1
     }
   },
-  "required": ["capabilities"]
+  "required": ["capabilities"],
+  "additionalProperties": false
 }

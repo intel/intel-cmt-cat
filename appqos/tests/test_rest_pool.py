@@ -42,25 +42,30 @@ import pytest
 
 import common
 
-from rest_common import get_config, load_json_schema, get_max_cos_id, REST, CONFIG, CONFIG_EMPTY
+from rest_common import get_config, get_config_mba_bw, load_json_schema, get_max_cos_id, REST, CONFIG, CONFIG_EMPTY
 
 
 class TestPools:
 
-    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     def test_get(self):
-        response = REST.get("/pools")
-        data = json.loads(response.data.decode('utf-8'))
 
-        assert response.status_code == 200
+        def get_pools():
+            response = REST.get("/pools")
 
-        # validate get all pools response schema
-        schema, resolver = load_json_schema('get_pool_all_response.json')
-        validate(data, schema, resolver=resolver)
+            data = json.loads(response.data.decode('utf-8'))
+            assert response.status_code == 200
 
-        # assert 4 pools are returned
-        # structure, types and required fields are validated using schema
-        assert len(data) == len(CONFIG['pools'])
+            # validate get all pools response schema
+            schema, resolver = load_json_schema('get_pool_all_response.json')
+            validate(data, schema, resolver=resolver)
+
+            # assert 4 pools are returned
+            # structure, types and required fields are validated using schema
+            assert len(data) == len(CONFIG['pools'])
+
+        for get_config_mock in [get_config, get_config_mba_bw]:
+            with mock.patch('common.CONFIG_STORE.get_config', new=get_config_mock):
+                get_pools()
 
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
@@ -84,18 +89,23 @@ class TestPools:
 class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     def test_get(self):
-        response = REST.get("/pools/3")
-        data = json.loads(response.data.decode('utf-8'))
+        def get_pool_3():
+            response = REST.get("/pools/3")
+            data = json.loads(response.data.decode('utf-8'))
 
-        assert response.status_code == 200
+            assert response.status_code == 200
 
-        # validate get 1 pool response schema
-        schema, resolver = load_json_schema('get_pool_response.json')
-        validate(data, schema, resolver=resolver)
+            # validate get 1 pool response schema
+            schema, resolver = load_json_schema('get_pool_response.json')
+            validate(data, schema, resolver=resolver)
 
-        # assert 1 pool is returned
-        # structure, types and required fields are validated using schema
-        assert data['id'] == 3
+            # assert 1 pool is returned
+            # structure, types and required fields are validated using schema
+            assert data['id'] == 3
+
+        for get_config_mock in [get_config, get_config_mba_bw]:
+            with mock.patch('common.CONFIG_STORE.get_config', new=get_config_mock):
+                get_pool_3()
 
 
     @mock.patch("common.CONFIG_STORE.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
@@ -249,14 +259,83 @@ class TestPool_2:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
-    def test_put_mba_unsupported(self):
+    @pytest.mark.parametrize("pool_config", [
+        {"mba": 30},        # MBA not supported
+        {"mba_bw": 3000}    # MBA not supported
+    ])
+    def test_put_mba_unsupported(self, pool_config):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
-            response = REST.put("/pools/0", {"mba": 30})
+            response = REST.put("/pools/0", pool_config)
             func_mock.assert_not_called()
         data = json.loads(response.data.decode('utf-8'))
 
         assert response.status_code == 400
         assert "System does not support MBA" in data["message"]
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    def test_put_mba_mba_bw_enabled(self):
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
+            response = REST.put("/pools/0", {"mba": 50})
+            func_mock.assert_not_called()
+        data = json.loads(response.data.decode('utf-8'))
+
+        assert response.status_code == 400
+        assert "MBA RATE is disabled" in data["message"]
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config_mba_bw)
+    @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    def test_put_mba_bw(self):
+        def set_config(data):
+            for pool in data['pools']:
+                if pool['id'] == 2:
+                    assert pool['mba_bw'] == 5000
+
+        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
+            response = REST.put("/pools/2", {"mba_bw": 5000})
+            func_mock.assert_called_once()
+
+        assert response.status_code == 200
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=False))
+    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("mba_bw_supported", [
+        True,
+        False
+    ])
+    def test_put_mba_bw_mba_bw_disabled(self, mba_bw_supported):
+
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock,\
+                mock.patch("caps.mba_bw_supported", return_value=mba_bw_supported):
+            response = REST.put("/pools/0", {"mba_bw": 3000})
+            func_mock.assert_not_called()
+
+            data = json.loads(response.data.decode('utf-8'))
+            assert response.status_code == 400
+
+            if not mba_bw_supported:
+                assert "MBA CTRL is not supported" in data["message"]
+            else:
+                assert "MBA CTRL is not enabled" in data["message"]
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
@@ -366,6 +445,55 @@ class TestPool_2:
         assert data['id'] == 5
 
 
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config_mba_bw)
+    @mock.patch("common.CONFIG_STORE.get_new_pool_id", mock.MagicMock(return_value=5))
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("pool_config", [
+        {"name":"hello_mba", "cores":[6, 7], "mba_bw": 5000},                     # mba_bw
+        {"name":"hello_mba_cbm", "cores":[14, 18], "mba_bw": 5000, "cbm": "0xf0"} # cbm & mba_bw
+    ])
+    def test_post_mba_bw(self, pool_config):
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
+            response = REST.post("/pools", pool_config)
+            func_mock.assert_called_once()
+        data = json.loads(response.data.decode('utf-8'))
+
+        #validate add pool response schema
+        schema, resolver = load_json_schema('add_pool_response.json')
+        validate(data, schema, resolver=resolver)
+
+        assert response.status_code == 201
+        assert data['id'] == 5
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("common.CONFIG_STORE.get_new_pool_id", mock.MagicMock(return_value=5))
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=False))
+    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("pool_config", [
+        {"name":"hello_mba", "cores":[6, 7], "mba_bw": 5000},                     # mba_bw
+        {"name":"hello_mba_cbm", "cores":[14, 18], "mba_bw": 5000, "cbm": "0xf0"} # cbm & mba_bw
+    ])
+    def test_post_mba_bw_mba_bw_disabled(self, pool_config):
+        with mock.patch('common.CONFIG_STORE.set_config') as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
+            response = REST.post("/pools", pool_config)
+            func_mock.assert_not_called()
+        data = json.loads(response.data.decode('utf-8'))
+
+        assert response.status_code == 400
+
+
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.CONFIG_STORE.get_new_pool_id", mock.MagicMock(return_value=None))
     def test_post_exceed_max_number(self):
@@ -400,7 +528,8 @@ class TestPool_2:
     @pytest.mark.parametrize("pool_config", [
         {"cores": "invalid", "cbm": "0xf"},
         {"cores": [20], "cbm": "invalid"},
-        {"cores": [20], "mba": "invalid"}
+        {"cores": [20], "mba": "invalid"},
+        {"cores": [20], "mba_bw": "invalid"}
     ])
     def test_post_invalid_value(self, pool_config):
         with mock.patch('common.CONFIG_STORE.set_config') as func_mock:
@@ -413,9 +542,12 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @pytest.mark.parametrize("no_req_fields_json", [
         {"mba": 10},                                # missing cores
+        {"mba_bw": 10},                             # missing cores
         {"cbm": "0xf"},                             # missing cores
         {"mba": 10, "cbm": "0xf"},                  # missing cores
+        {"mba_bw": 1000, "cbm": "0xf"},             # missing cores
         {"name":"hello", "mba": 10, "cbm": "0xf"},  # missing cores
+        {"name":"el", "mba_bw": 1000, "cbm": "0xf"},# missing cores
         {"name":"hello", "cbm": "0xf"},             # missing cores
 
         {"cores":[3, 10]},                  # missing at least one alloc technology

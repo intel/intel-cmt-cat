@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get caps/mba_ctrl",
+  "description": "GET MBA CTRL caps result, URI /caps/mba_ctrl",
+
+  "type": "object",
+
+  "properties": {
+    "supported": {
+      "description": "MBA CTRL supported status",
+      "type": "boolean"
+    },
+    "enabled": {
+      "description": "MBA CTRL enabled status",
+      "type": "boolean"
+    }
+  },
+  "required": ["supported", "enabled"],
+  "additionalProperties": false
+}

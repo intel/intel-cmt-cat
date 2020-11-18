@@ -55,6 +55,7 @@ from rest.rest_power import Power, Powers
 from rest.rest_app import App, Apps
 from rest.rest_pool import Pool, Pools
 from rest.rest_misc import Stats, Caps, Sstbf, Reset
+from rest.rest_rdt import CapsRdtIface, CapsMba, CapsMbaCtrl
 
 
 TLS_CERT_FILE = 'appqos.crt'
@@ -93,6 +94,10 @@ class Server:
         self.api.add_resource(Caps, '/caps')
         if caps.sstbf_enabled():
             self.api.add_resource(Sstbf, '/caps/sstbf')
+        self.api.add_resource(CapsRdtIface, '/caps/rdt_iface')
+        if caps.mba_supported():
+           self.api.add_resource(CapsMba, '/caps/mba')
+           self.api.add_resource(CapsMbaCtrl, '/caps/mba_ctrl')
         self.api.add_resource(Reset, '/reset')
 
         self.app.register_error_handler(HTTPException, Server.error_handler)
