@@ -301,6 +301,16 @@ test_hw_cap_l2ca_cdp: test_hw_cap_l2ca_cdp.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+test_resctrl_schemata: test_resctrl_schemata.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=fread \
+		-Wl,--wrap=fgets \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=fwrite \
+		-Wl,--wrap=fputc \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 .PHONY: run
 run: $(TESTS)
 	@echo "Running Library Unit Tests"
