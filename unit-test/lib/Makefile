@@ -60,6 +60,13 @@ $(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.
 		--globalize-symbol=hw_mon_read_counter --weaken-symbol=hw_mon_read_counter \
 		$@
 
+$(OBJ_DIR)/hw_cap.o: $(LIB_DIR)/hw_cap.c $(OBJ_DIR)/hw_cap.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=hw_cap_l3ca_cdp --weaken-symbol=hw_cap_l3ca_cdp \
+		--globalize-symbol=hw_cap_l2ca_cdp --weaken-symbol=hw_cap_l2ca_cdp \
+		$@
+
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 	mkdir -p $(OBJ_DIR)
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
@@ -269,6 +276,28 @@ test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
 		-Wl,--wrap=perf_mon_is_event_supported \
 		-Wl,--wrap=perf_mon_start \
 		-Wl,--wrap=perf_mon_stop \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_cap: test_hw_cap.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=lcpuid \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=msr_write \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_cap_l3ca_cdp: test_hw_cap_l3ca_cdp.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=msr_write \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+test_hw_cap_l2ca_cdp: test_hw_cap_l2ca_cdp.c $(LIB_OBJS)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=msr_write \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

@@ -251,33 +251,16 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Checks L3 CDP enable status across all CPU sockets
- *
- * It also validates if L3 CDP enabling is consistent across
- * CPU sockets.
- * At the moment, such scenario is considered as error
- * that requires CAT reset.
- *
- * @param cpu detected CPU topology
- * @param enabled place to store L3 CDP enabling status
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-l3cdp_is_enabled(const struct pqos_cpuinfo *cpu, int *enabled)
+int
+hw_cap_l3ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled)
 {
         unsigned *l3cat_ids = NULL;
         unsigned l3cat_id_num = 0, j = 0;
         unsigned enabled_num = 0, disabled_num = 0;
         int ret = PQOS_RETVAL_OK;
 
-        ASSERT(enabled != NULL && cpu != NULL);
         if (enabled == NULL || cpu == NULL)
                 return PQOS_RETVAL_PARAM;
-
-        *enabled = 0;
 
         /**
          * Get list of l3cat id's
@@ -315,6 +298,8 @@ l3cdp_is_enabled(const struct pqos_cpuinfo *cpu, int *enabled)
 
         if (enabled_num > 0)
                 *enabled = 1;
+        else
+                *enabled = 0;
 
         LOG_INFO("L3 CDP is %s\n", (*enabled) ? "enabled" : "disabled");
 
@@ -504,7 +489,7 @@ hw_cap_l3ca_cpuid(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                  */
                 int cdp_on = 0;
 
-                ret = l3cdp_is_enabled(cpu, &cdp_on);
+                ret = hw_cap_l3ca_cdp(cpu, &cdp_on);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("L3 CDP detection error!\n");
                         return ret;
@@ -582,28 +567,17 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         return ret;
 }
 
-/**
- * @brief Checks L2 CDP enable status across all CPU clusters
- *
- * It also validates if L2 CDP enabling is consistent across
- * CPU clusters.
- * At the moment, such scenario is considered as error
- * that requires CAT reset.
- *
- * @param cpu detected CPU topology
- * @param enabled place to store L2 CDP enabling status
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-l2cdp_is_enabled(const struct pqos_cpuinfo *cpu, int *enabled)
+int
+hw_cap_l2ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled)
 {
         unsigned *l2ids = NULL;
         unsigned l2id_num = 0;
         unsigned enabled_num = 0, disabled_num = 0;
         unsigned i;
         int ret = PQOS_RETVAL_OK;
+
+        if (enabled == NULL || cpu == NULL)
+                return PQOS_RETVAL_PARAM;
 
         /**
          * Get list of L2 clusters id's
@@ -643,6 +617,8 @@ l2cdp_is_enabled(const struct pqos_cpuinfo *cpu, int *enabled)
 
         if (enabled_num > 0)
                 *enabled = 1;
+        else
+                *enabled = 0;
 
         LOG_INFO("L2 CDP is %s\n", (*enabled) ? "enabled" : "disabled");
 
@@ -698,7 +674,7 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
                 /*
                  * Check if L2 CDP is enabled
                  */
-                ret = l2cdp_is_enabled(cpu, &cdp_on);
+                ret = hw_cap_l2ca_cdp(cpu, &cdp_on);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("L2 CDP detection error!\n");
                         return ret;

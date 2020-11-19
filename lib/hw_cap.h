@@ -38,6 +38,7 @@
 extern "C" {
 #endif
 
+#include "types.h"
 #include "pqos.h"
 
 /**
@@ -49,8 +50,24 @@ extern "C" {
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
-                        const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
+                                   const struct pqos_cpuinfo *cpu);
+
+/**
+ * @brief Checks L3 CDP enable status across all CPU sockets
+ *
+ * It also validates if L3 CDP enabling is consistent across
+ * CPU sockets.
+ * At the moment, such scenario is considered as error
+ * that requires CAT reset.
+ *
+ * @param cpu detected CPU topology
+ * @param enabled place to store L3 CDP enabling status
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_cap_l3ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled);
 
 /**
  * @brief Discovers HW support of L3 CAT
@@ -61,8 +78,24 @@ int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
-                         const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
+                                    const struct pqos_cpuinfo *cpu);
+
+/**
+ * @brief Checks L2 CDP enable status across all CPU clusters
+ *
+ * It also validates if L2 CDP enabling is consistent across
+ * CPU clusters.
+ * At the moment, such scenario is considered as error
+ * that requires CAT reset.
+ *
+ * @param cpu detected CPU topology
+ * @param enabled place to store L2 CDP enabling status
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_cap_l2ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled);
 
 /**
  * @brief Discovers HW support of L2 CAT
@@ -73,8 +106,8 @@ int hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
-                         const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
+                                    const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers HW support of MBA
@@ -85,8 +118,8 @@ int hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int hw_cap_mba_discover(struct pqos_cap_mba *cap,
-                        const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int hw_cap_mba_discover(struct pqos_cap_mba *cap,
+                                   const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers MBA support for AMD
@@ -98,8 +131,8 @@ int hw_cap_mba_discover(struct pqos_cap_mba *cap,
  * @retval PQOS_RETVAL_OK success
  * @retval PQOS_RETVAL_RESOURCE if not supported
  */
-int amd_cap_mba_discover(struct pqos_cap_mba *cap,
-                         const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int amd_cap_mba_discover(struct pqos_cap_mba *cap,
+                                    const struct pqos_cpuinfo *cpu);
 
 #ifdef __cplusplus
 }

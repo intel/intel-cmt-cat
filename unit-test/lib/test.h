@@ -74,8 +74,8 @@ test_cpuinfo_init(struct test_data *data)
         cpu->l3.num_ways = 16;
 
         /* L2 cache info */
-        cpu->l3.detected = 1;
-        cpu->l3.num_ways = 12;
+        cpu->l2.detected = 1;
+        cpu->l2.num_ways = 12;
 
         data->cpu = cpu;
 
