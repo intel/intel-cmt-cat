@@ -65,24 +65,16 @@ class AppQoS:
     def __init__(self):
         self.stop_event = multiprocessing.Event()
 
-
-    def run(self, args):
+    def run(self):
         """
         Runs main loop.
-
-        Parameters:
-            args: command line arguments
         """
 
-        # load config file
+        # process/validate already loaded config file
         try:
-            common.CONFIG_STORE.from_file(args.config)
-        except IOError as ex:
-            log.error("Error reading from config file {}... ".format(args.config))
-            log.error(ex)
-            return
+            common.CONFIG_STORE.process_config()
         except Exception as ex:
-            log.error("Invalid config file {}... ".format(args.config))
+            log.error("Invalid config file... ")
             log.error(ex)
             return
 
@@ -179,6 +171,23 @@ class AppQoS:
         print("CTRL+C...")
         self.stop_event.set()
 
+def load_config(config_file):
+    """
+    Loads config file.
+
+    Parameters:
+        config_file: config file path
+    """
+
+    # load config file
+    try:
+        common.CONFIG_STORE.from_file(config_file)
+    except IOError as ex:
+        log.error("Error reading from config file {}... ".format(config_file))
+        log.error(ex)
+        return -1
+
+    return 0
 
 def main():
     """
@@ -200,8 +209,16 @@ def main():
     if cmd_args.verbose:
         log.enable_verbose()
 
+    # detect supported RDT interfaces
+    common.PQOS_API.detect_supported_ifaces()
+
+    # Load config file
+    if load_config(cmd_args.config):
+        log.error("Failed to load config file, Terminating...")
+        return
+
     # initialize libpqos/Intel RDT interface
-    result = common.PQOS_API.init()
+    result = common.PQOS_API.init(common.CONFIG_STORE.get_rdt_iface())
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
         return
@@ -217,7 +234,7 @@ def main():
         result = server.start("127.0.0.1", cmd_args.port[0], cmd_args.verbose)
         if result == 0:
             # run main logic
-            app_qos.run(cmd_args)
+            app_qos.run()
 
             # stop REST API server
             server.terminate()

@@ -129,21 +129,3 @@ def detect_supported_caps():
         result.append(common.POWER_CAP)
 
     return result
-
-def rdt_iface():
-    """
-    Returns current RDT interface type
-
-    Returns
-        current RDT interface type
-    """
-    return "msr"
-
-def rdt_iface_supported():
-    """
-    Returns supported RDT interface types
-
-    Returns
-        list of supported RDT interface types
-    """
-    return ["msr"]

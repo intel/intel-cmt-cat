@@ -36,6 +36,7 @@ import pytest
 
 import common
 import caps
+import pqos_api
 
 def test_caps_init():
     with mock.patch('caps.detect_supported_caps', return_value=[common.CAT_CAP, common.MBA_CAP, common.SSTBF_CAP]) as mock_detect_caps,\

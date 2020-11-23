@@ -321,6 +321,29 @@ def test_config_default_pool_mba_bw():
     assert pool_mba_bw == 2**32 - 1
 
 
+@pytest.mark.parametrize("def_pool_def", [True, False])
+def test_config_recreate_default_pool(def_pool_def):
+    config_store = ConfigStore()
+
+    with mock.patch('config.ConfigStore.get_config') as mock_get_cfg,\
+         mock.patch('config.ConfigStore.is_default_pool_defined', mock.MagicMock(return_value=def_pool_def)) as mock_is_def_pool_def,\
+         mock.patch('config.ConfigStore.remove_default_pool') as mock_rm_def_pool,\
+         mock.patch('config.ConfigStore.add_default_pool') as mock_add_def_pool,\
+         mock.patch('config.ConfigStore.set_config') as mock_set_cfg:
+
+        config_store.recreate_default_pool()
+
+        mock_get_cfg.assert_called_once()
+
+        if def_pool_def:
+            mock_rm_def_pool.assert_called_once()
+        else:
+            mock_rm_def_pool.assert_not_called()
+
+        mock_add_def_pool.assert_called_once()
+        mock_set_cfg.assert_called_once()
+
+
 CONFIG_POOLS = {
     "pools": [
         {
@@ -346,6 +369,55 @@ CONFIG_POOLS = {
         }
     ]
 }
+
+
+def test_config_is_default_pool_defined():
+    config = deepcopy(CONFIG_POOLS)
+
+    # FUT, default pool in config
+    assert ConfigStore.is_default_pool_defined(config) == True
+
+    # remove default pool from config
+    for pool in config['pools'][:]:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # FUT, no default pool in config
+    assert not ConfigStore.is_default_pool_defined(config)
+
+
+def test_config_remove_default_pool():
+    config = deepcopy(CONFIG_POOLS)
+
+    # default pool in config
+    assert ConfigStore.is_default_pool_defined(config) == True
+
+    # FUT
+    ConfigStore.remove_default_pool(config)
+
+    # no default pool in config
+    assert not ConfigStore.is_default_pool_defined(config)
+
+
+@mock.patch('config.ConfigStore.get_config')
+def test_config_is_any_pool_defined(mock_get_config):
+
+    config_store = ConfigStore()
+    config = deepcopy(CONFIG_POOLS)
+
+    mock_get_config.return_value = config
+    assert config_store.is_any_pool_defined() == True
+
+    for pool in config['pools'][:]:
+        print(pool)
+        if not pool['id'] == 0:
+            config['pools'].remove(pool)
+
+    print(config)
+
+    mock_get_config.return_value = config
+    assert not config_store.is_any_pool_defined()
 
 
 @mock.patch('config.ConfigStore.get_config')
@@ -388,6 +460,7 @@ def test_config_reset():
 
         config_store = ConfigStore()
         config_store.from_file("/tmp/appqos_test.config")
+        config_store.process_config()
 
         assert len(config_store.get_pool_attr('cores', None)) == 8
         assert config_store.get_pool_attr('cbm', 0) == 0xFFF

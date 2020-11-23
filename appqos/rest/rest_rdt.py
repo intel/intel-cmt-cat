@@ -129,14 +129,14 @@ class CapsRdtIface(Resource):
     def get():
         """
         Handles HTTP /caps/rdt_iface request.
-        Retrieve MBA CTRL capability and current state details
+        Retrieve RDT current and supported interface types
 
         Returns:
             response, status code
         """
         res = {
-            'interface': caps.rdt_iface(),
-            'interface_supported': caps.rdt_iface_supported()
+            'interface': common.PQOS_API.current_iface(),
+            'interface_supported': common.PQOS_API.supported_iface()
         }
         return res, 200
 
@@ -160,11 +160,17 @@ class CapsRdtIface(Resource):
         except jsonschema.ValidationError as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
-        if not json_data['interface'] in caps.rdt_iface_supported():
+        if not json_data['interface'] in common.PQOS_API.supported_iface():
             raise BadRequest("RDT interface '%s' not supported!" % (json_data['interface']))
 
         if common.CONFIG_STORE.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409
 
-        return {'message': "Not Implemented"}, 501
+        if not common.PQOS_API.init(json_data['interface']) == 0:
+            raise InternalError("Failed to configure RDT interface.")
+
+        common.CONFIG_STORE.recreate_default_pool()
+
+        res = {'message': "RDT Interface modified"}
+        return res, 200
 

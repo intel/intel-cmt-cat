@@ -36,6 +36,8 @@ PQoS API module.
 Provides RDT related helper functions used to configure RDT.
 """
 
+import os
+
 from pqos import Pqos
 from pqos.capability import PqosCap
 from pqos.l3ca import PqosCatL3
@@ -48,6 +50,7 @@ import log
 
 
 class PqosApi:
+# pylint: disable=too-many-instance-attributes
     """
     Wrapper for libpqos wrapper.
     """
@@ -60,9 +63,26 @@ class PqosApi:
         self.mba = None
         self.alloc = None
         self.cpuinfo = None
+        self._supported_iface = []
+        self._current_iface = None
 
 
-    def init(self):
+    def detect_supported_ifaces(self):
+        """
+        Detects supported RDT interfaces
+        """
+        for iface in ["msr","os"]:
+            try:
+                self.pqos.init(iface.upper())
+                self.pqos.fini()
+                self._supported_iface.append(iface)
+            except Exception as ex:
+                log.debug("Supported RDT interfaces detection: " + str(ex))
+
+        log.info("Supported RDT interfaces: " + str(self.supported_iface()))
+
+
+    def init(self, iface):
         """
         Initializes libpqos
 
@@ -71,8 +91,24 @@ class PqosApi:
             -1 otherwise
         """
 
+        if not iface in self.supported_iface():
+            log.error("RDT does not support '%s' interface!" % (iface))
+            return -1
+
+        # deinitialize lib first
+        if self._current_iface:
+            self.fini()
+
+        # umount restcrl to improve caps detection
+        if iface == "os":
+            result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
+            if result:
+                log.error("Failed to umount resctrl fs! status code: %d"\
+                     % (os.WEXITSTATUS(result)))
+                return -1
+
         try:
-            self.pqos.init('MSR')
+            self.pqos.init(iface.upper())
             self.cap = PqosCap()
             self.l3ca = PqosCatL3()
             self.mba = PqosMba()
@@ -82,7 +118,30 @@ class PqosApi:
             log.error(str(ex))
             return -1
 
+        log.info("RDT initialized with '%s' interface" % (iface))
+        self._current_iface = iface
         return 0
+
+
+    def current_iface(self):
+        """
+        Returns current RDT interface
+
+        Returns:
+            interface name on success
+            None when libpqos is not initialized
+        """
+        return self._current_iface
+
+
+    def supported_iface(self):
+        """
+        Returns list of supported RDT interfaces
+
+        Returns:
+            list of supported interfaces
+        """
+        return self._supported_iface
 
 
     def fini(self):
@@ -90,6 +149,7 @@ class PqosApi:
         De-initializes libpqos
         """
         self.pqos.fini()
+        self._current_iface = None
 
         return 0
 

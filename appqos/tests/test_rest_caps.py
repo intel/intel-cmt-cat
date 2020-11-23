@@ -217,8 +217,8 @@ class TestCaps:
     @pytest.mark.parametrize("rdt_iface_supported", [["msr"], ["msr", "os"]])
     def test_caps_rdt_iface_get(self, rdt_iface, rdt_iface_supported):
 
-        with mock.patch("caps.rdt_iface", return_value=rdt_iface),\
-                mock.patch("caps.rdt_iface_supported", return_value=rdt_iface_supported):
+        with mock.patch("common.PQOS_API.current_iface", return_value=rdt_iface),\
+                mock.patch("common.PQOS_API.supported_iface", return_value=rdt_iface_supported):
             response = Rest().get("/caps/rdt_iface")
             assert response.status_code == 200
 
@@ -238,7 +238,7 @@ class TestCaps:
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
-    @mock.patch("caps.rdt_iface_supported", mock.MagicMock(return_value=["msr", "os"]))
+    @mock.patch("common.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr", "os"]))
     @pytest.mark.parametrize("valid_request", [
             {"interface": "msr"},
             {"interface": "os"}
@@ -250,7 +250,7 @@ class TestCaps:
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config_empty)
-    @mock.patch("caps.rdt_iface_supported", mock.MagicMock(return_value=["msr"]))
+    @mock.patch("common.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr"]))
     def test_caps_rdt_iface_not_supported_put(self):
         response = Rest().put("/caps/rdt_iface", {"interface": "os"})
         # No pool configured, but requested RDT interface not supported
@@ -258,20 +258,22 @@ class TestCaps:
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config_empty)
-    @mock.patch("caps.rdt_iface_supported", mock.MagicMock(return_value=["msr", "os"]))
-    @pytest.mark.parametrize("valid_request", [
-            {"interface": "msr"},
-            {"interface": "os"}
-    ])
-    def test_caps_rdt_iface_put(self, valid_request):
-        response = Rest().put("/caps/rdt_iface", valid_request)
-        # All OK, Requested RDT interface supported and no pool configured
-        # HTTP OK 200 Expected here, but getting 501 Not Implemented for now
-        assert response.status_code == 501
+    @mock.patch("common.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr", "os"]))
+    @pytest.mark.parametrize("iface", ["msr", "os"])
+    def test_caps_rdt_iface_put(self, iface):
+        with mock.patch("common.PQOS_API.init", mock.MagicMock(return_value=0)) as mock_init,\
+                mock.patch("common.CONFIG_STORE.recreate_default_pool", mock.MagicMock()) as mock_recreate:
+
+            response = Rest().put("/caps/rdt_iface", {"interface": iface})
+
+            # All OK, Requested RDT interface supported and no pool configured
+            mock_init.assert_called_with(iface)
+            mock_recreate.assert_called()
+            assert response.status_code == 200
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
-    @mock.patch("caps.rdt_iface_supported", mock.MagicMock(return_value=["msr", "os"]))
+    @mock.patch("common.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr", "os"]))
     @pytest.mark.parametrize("invalid_request", [
             {},
             {"interface": 1},

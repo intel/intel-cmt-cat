@@ -170,6 +170,7 @@ class ConfigStore:
         """
 
         self.from_file(self.get_path())
+        self.process_config()
 
 
     @staticmethod
@@ -414,7 +415,14 @@ class ConfigStore:
             path: path to config file
         """
         self.set_path(path)
-        data = self.load(path)
+        self.namespace.config = self.load(path)
+
+
+    def process_config(self):
+        """
+        Processes/validates config
+        """
+        data = self.get_config()
 
         if not self.is_default_pool_defined(data):
             self.add_default_pool(data)
@@ -588,15 +596,35 @@ class ConfigStore:
     def is_any_pool_defined(self):
         """
         Check if there is at least one pool defined
+        (other than "default" #0 one)
 
         Returns:
             result
         """
         config = self.get_config()
-        if 'pools' in config:
-            return len(config['pools']) > 0
+
+        if 'pools' not in config:
+            return False
+
+        for pool in config['pools']:
+            if not pool['id'] == 0:
+                return True
 
         return False
+
+
+    def recreate_default_pool(self):
+        """
+        Recreate Default pool
+        """
+        config = self.get_config()
+
+        if ConfigStore.is_default_pool_defined(config):
+            ConfigStore.remove_default_pool(config)
+
+        ConfigStore.add_default_pool(config)
+
+        self.set_config(config)
 
 
     @staticmethod
@@ -612,6 +640,7 @@ class ConfigStore:
                 return True
 
         return False
+
 
     @staticmethod
     def add_default_pool(data):
@@ -641,6 +670,17 @@ class ConfigStore:
                 [core for core in default_pool['cores'] if core not in pool['cores']]
 
         data['pools'].append(default_pool)
+
+
+    @staticmethod
+    def remove_default_pool(data):
+        """
+        Remove Default pool
+        """
+        for pool in data['pools'][:]:
+            if pool['id'] == 0:
+                data['pools'].remove(pool)
+                break
 
 
     def get_new_pool_id(self, new_pool_data):
