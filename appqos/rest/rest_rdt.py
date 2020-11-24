@@ -35,7 +35,7 @@
 REST API module
 RDT related requests.
 """
-
+from copy import deepcopy
 from flask_restful import Resource, request
 
 import jsonschema
@@ -116,7 +116,20 @@ class CapsMbaCtrl(Resource):
         if common.CONFIG_STORE.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409
 
-        return {'message': "Not Implemented"}, 501
+        data = deepcopy(common.CONFIG_STORE.get_config())
+
+        CapsMbaCtrl.set_mba_ctrl_enabled(data, json_data['enabled'])
+
+        common.CONFIG_STORE.set_config(data)
+
+        return {'message': "MBA CTRL status changed."}, 200
+
+    @staticmethod
+    def set_mba_ctrl_enabled(data, enabled):
+        if 'mba_ctrl' not in data:
+            data['mba_ctrl'] = {}
+
+        data['mba_ctrl']['enabled'] = enabled
 
 
 class CapsRdtIface(Resource):
@@ -166,11 +179,15 @@ class CapsRdtIface(Resource):
         if common.CONFIG_STORE.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409
 
-        if not common.PQOS_API.init(json_data['interface']) == 0:
-            raise InternalError("Failed to configure RDT interface.")
+        data = deepcopy(common.CONFIG_STORE.get_config())
 
-        common.CONFIG_STORE.recreate_default_pool()
+        if 'rdt_iface' not in data:
+            data['rdt_iface'] = {}
+
+        data['rdt_iface']['interface'] = json_data['interface']
+        CapsMbaCtrl.set_mba_ctrl_enabled(data, False)
+
+        common.CONFIG_STORE.set_config(data)
 
         res = {'message': "RDT Interface modified"}
         return res, 200
-

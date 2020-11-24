@@ -222,6 +222,7 @@ def main():
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
         return
+    log.info("RDT initialized with '%s' interface" % (common.PQOS_API.current_iface()))
 
     # initialize capabilities
     result = caps.caps_init()

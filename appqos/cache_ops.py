@@ -164,6 +164,26 @@ class Pool:
         return Pool.pools[self.pool].get('mba')
 
 
+    def mba_bw_set(self, mba_bw):
+        """
+        Set mba_bw value for the pool
+
+        Parameters:
+            mba_bw: new mba_bw value
+        """
+        Pool.pools[self.pool]['mba_bw'] = mba_bw
+
+
+    def mba_bw_get(self):
+        """
+        Get mba_bw value for the pool
+
+        Returns:
+            mba_bw value, 0 on error
+        """
+        return Pool.pools[self.pool].get('mba_bw')
+
+
     def configure(self):
         """
         Configure Pool, based on config content.
@@ -177,8 +197,10 @@ class Pool:
             self.cbm_set(cbm)
 
         if caps.mba_supported():
-            mba = config.get_pool_attr('mba', self.pool)
-            self.mba_set(mba)
+            if caps.mba_bw_enabled():
+                self.mba_bw_set(config.get_pool_attr('mba_bw', self.pool))
+            else:
+                self.mba_set(config.get_pool_attr('mba', self.pool))
 
         apps = config.get_pool_attr('apps', self.pool)
         if apps is not None:
@@ -325,7 +347,14 @@ class Pool:
 
         pool = Pool(pool_id)
         cbm = pool.cbm_get()
-        mba = pool.mba_get()
+
+        mba = None
+        ctrl = common.CONFIG_STORE.get_mba_ctrl_enabled()
+        if ctrl:
+            mba = pool.mba_bw_get()
+        else:
+            mba = pool.mba_get()
+
         cores = pool.cores_get()
 
         # Apply same RDT configuration on all sockets in the system
@@ -341,7 +370,7 @@ class Pool:
                 return -1
 
         if mba:
-            if common.PQOS_API.mba_set(sockets, pool_id, mba) != 0:
+            if common.PQOS_API.mba_set(sockets, pool_id, mba, ctrl) != 0:
                 log.error("Failed to apply MBA configuration!")
                 return -1
 
@@ -369,6 +398,27 @@ def configure_rdt():
         0 on success
     """
     result = 0
+
+    # Change RDT interface if needed
+    cfg_rdt_iface = common.CONFIG_STORE.get_rdt_iface()
+    if cfg_rdt_iface != common.PQOS_API.current_iface():
+        if common.PQOS_API.init(cfg_rdt_iface):
+            log.error("Failed to initialize RDT interface!")
+            return -1
+
+        log.info("RDT initialized with %s interface."\
+            % (common.CONFIG_STORE.get_rdt_iface().upper()))
+
+    # Change MBA BW/CTRL state if needed
+    cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
+    if cfg_mba_ctrl_enabled != common.PQOS_API.is_mba_bw_enabled():
+        if common.PQOS_API.enable_mba_bw(cfg_mba_ctrl_enabled):
+            log.error("Failed to change MBA BW state!")
+            return -1
+
+        log.info("RDT MBA BW %sabled." % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
+        # On MBA BW state change it is needed to recreate Default Pool #0
+        common.CONFIG_STORE.recreate_default_pool()
 
     # detect removed pools
     old_pools = Pool.pools.copy()

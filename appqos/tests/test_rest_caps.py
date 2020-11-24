@@ -206,10 +206,20 @@ class TestCaps:
             {"enabled": False}
     ])
     def test_caps_mba_ctrl_put(self, valid_request):
-        response = Rest().put("/caps/mba_ctrl", valid_request)
-        # All OK, MBA BW/CTRL supported and no pool configured
-        # HTTP OK 200 Expected here, but getting 501 Not Implemented for now
-        assert response.status_code == 501
+        called = False
+
+        def set_config(data):
+            nonlocal called
+            called = True
+            assert 'mba_ctrl' in data
+            assert 'enabled' in data['mba_ctrl']
+            assert data['mba_ctrl']['enabled'] == valid_request['enabled']
+
+        with mock.patch("common.CONFIG_STORE.set_config", new=set_config) as mock_set_config:
+            response = Rest().put("/caps/mba_ctrl", valid_request)
+            # All OK, MBA BW/CTRL supported and no pool configured
+            assert response.status_code == 200
+            assert called
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
@@ -261,15 +271,21 @@ class TestCaps:
     @mock.patch("common.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr", "os"]))
     @pytest.mark.parametrize("iface", ["msr", "os"])
     def test_caps_rdt_iface_put(self, iface):
-        with mock.patch("common.PQOS_API.init", mock.MagicMock(return_value=0)) as mock_init,\
-                mock.patch("common.CONFIG_STORE.recreate_default_pool", mock.MagicMock()) as mock_recreate:
+        called = False
 
+        def set_config(data):
+            nonlocal called
+            called = True
+            assert 'rdt_iface' in data
+            assert 'interface' in data['rdt_iface']
+            assert data['rdt_iface']['interface'] == iface
+
+        with mock.patch("common.CONFIG_STORE.set_config", new=set_config) as mock_set_config:
             response = Rest().put("/caps/rdt_iface", {"interface": iface})
 
             # All OK, Requested RDT interface supported and no pool configured
-            mock_init.assert_called_with(iface)
-            mock_recreate.assert_called()
             assert response.status_code == 200
+            assert called
 
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)

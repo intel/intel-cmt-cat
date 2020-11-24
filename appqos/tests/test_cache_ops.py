@@ -52,7 +52,10 @@ def test_configure_rdt():
     with mock.patch('common.CONFIG_STORE.get_pool_attr', return_value=[1]) as mock_get_pool_attr,\
          mock.patch('cache_ops.Pool.cores_set') as mock_cores_set,\
          mock.patch('cache_ops.Pool.configure', return_value=0) as mock_pool_configure,\
-         mock.patch('cache_ops.Apps.configure', return_value=0) as mock_apps_configure:
+         mock.patch('cache_ops.Apps.configure', return_value=0) as mock_apps_configure,\
+         mock.patch('common.PQOS_API.init', return_value=0),\
+         mock.patch('common.PQOS_API.enable_mba_bw', return_value=0),\
+         mock.patch('common.CONFIG_STORE.recreate_default_pool', return_value=0):
 
         assert not configure_rdt()
 
@@ -225,7 +228,8 @@ class TestPools(object):
     @mock.patch('common.PQOS_API.l3ca_set')
     @mock.patch('common.PQOS_API.alloc_assoc_set')
     @mock.patch('common.PQOS_API.get_sockets')
-    def test_apply(self, mock_get_socket, mock_alloc_assoc_set, mock_l3ca_set, mock_mba_set):
+    @mock.patch('common.CONFIG_STORE.get_mba_ctrl_enabled')
+    def test_apply(self, mock_get_mba_ctrl_enabled, mock_get_socket, mock_alloc_assoc_set, mock_l3ca_set, mock_mba_set):
         Pool.pools[2] = {}
         Pool.pools[2]['cores'] = [1]
         Pool.pools[2]['cbm'] = 0xc00
@@ -240,14 +244,15 @@ class TestPools(object):
         mock_mba_set.return_value = 0
         mock_l3ca_set.return_value = 0
         mock_get_socket.return_value = [0, 2]
+        mock_get_mba_ctrl_enabled.return_value = False
 
         result = Pool.apply(2)
         assert result == 0
         result = Pool.apply(1)
         assert result == 0
 
-        mock_mba_set.assert_any_call([0, 2], 2, 99)
-        mock_mba_set.assert_any_call([0, 2], 1, 11)
+        mock_mba_set.assert_any_call([0, 2], 2, 99, False)
+        mock_mba_set.assert_any_call([0, 2], 1, 11, False)
         mock_l3ca_set.assert_any_call([0, 2], 2, 0xc00)
         mock_l3ca_set.assert_any_call([0, 2], 1, 0x300)
         mock_alloc_assoc_set.assert_any_call([1], 2)

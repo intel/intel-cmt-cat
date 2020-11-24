@@ -364,9 +364,9 @@ class ConfigStore:
         Parameters
             data: configuration (dict)
         """
-
-        if 'mba_ctrl' in data and data['mba_ctrl']['enabled']\
-                and (not 'rdt_iface' in data or data['rdt_iface']['interface'] != "os"):
+        mba_ctrl_enabled = 'mba_ctrl' in data and data['mba_ctrl']['enabled']
+        rdt_iface = not 'rdt_iface' in data or data['rdt_iface']['interface'] != "os"
+        if mba_ctrl_enabled and rdt_iface:
             raise ValueError("RDT Configuration. MBA CTRL requires RDT OS interface!")
 
         if not 'pools' in data:
@@ -392,11 +392,6 @@ class ConfigStore:
             if 'mba_bw' in pool:
                 mba_bw_pool_ids.append(pool['id'])
 
-        if mba_bw_pool_ids and mba_pool_ids:
-            raise ValueError("It is not allowed to mix MBA (Pools: {}) "\
-                "and MBA BW (Pools {}), configurations."\
-                .format(mba_pool_ids, mba_bw_pool_ids))
-
         if (mba_pool_ids or mba_bw_pool_ids) and not caps.mba_supported():
             raise ValueError("Pools {}, MBA is not supported."\
                 .format(mba_pool_ids + mba_bw_pool_ids))
@@ -404,6 +399,10 @@ class ConfigStore:
         if mba_bw_pool_ids and not caps.mba_bw_enabled():
             raise ValueError("Pools {}, MBA BW is not enabled/supported."\
                 .format(mba_bw_pool_ids))
+
+        if mba_pool_ids and caps.mba_bw_enabled():
+            raise ValueError("Pools {}, MBA % is not enabled. Disable MBA BW and try again."\
+                .format(mba_pool_ids))
 
         return
 
@@ -617,14 +616,16 @@ class ConfigStore:
         """
         Recreate Default pool
         """
-        config = self.get_config()
+        # not using get_config/set_config pair
+        # not to trigger "changed_event"
+        config = self.namespace.config
 
         if ConfigStore.is_default_pool_defined(config):
             ConfigStore.remove_default_pool(config)
 
         ConfigStore.add_default_pool(config)
 
-        self.set_config(config)
+        self.namespace.config = config
 
 
     @staticmethod

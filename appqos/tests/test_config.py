@@ -325,15 +325,11 @@ def test_config_default_pool_mba_bw():
 def test_config_recreate_default_pool(def_pool_def):
     config_store = ConfigStore()
 
-    with mock.patch('config.ConfigStore.get_config') as mock_get_cfg,\
-         mock.patch('config.ConfigStore.is_default_pool_defined', mock.MagicMock(return_value=def_pool_def)) as mock_is_def_pool_def,\
+    with mock.patch('config.ConfigStore.is_default_pool_defined', mock.MagicMock(return_value=def_pool_def)) as mock_is_def_pool_def,\
          mock.patch('config.ConfigStore.remove_default_pool') as mock_rm_def_pool,\
-         mock.patch('config.ConfigStore.add_default_pool') as mock_add_def_pool,\
-         mock.patch('config.ConfigStore.set_config') as mock_set_cfg:
+         mock.patch('config.ConfigStore.add_default_pool') as mock_add_def_pool:
 
         config_store.recreate_default_pool()
-
-        mock_get_cfg.assert_called_once()
 
         if def_pool_def:
             mock_rm_def_pool.assert_called_once()
@@ -341,7 +337,6 @@ def test_config_recreate_default_pool(def_pool_def):
             mock_rm_def_pool.assert_not_called()
 
         mock_add_def_pool.assert_called_once()
-        mock_set_cfg.assert_called_once()
 
 
 CONFIG_POOLS = {
@@ -848,7 +843,8 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
-    def test_pool_mba_and_mba_bw_mix(self):
+    @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
+    def test_pool_mba_mba_bw_enabled(self):
         data = {
             "auth": {
                 "password": "password",
@@ -857,14 +853,14 @@ class TestConfigValidate:
             "pools": [
                 {
                     "cbm": 0xf,
-                    "mba_bw": 5000,
+                    "mba": 50,
                     "cores": [1, 3],
                     "id": 1,
                     "name": "pool 1"
                 },
                 {
                     "cbm": 0xf,
-                    "mba": 50,
+                    "mba": 70,
                     "cores": [2],
                     "id": 2,
                     "name": "pool 2"
@@ -872,7 +868,7 @@ class TestConfigValidate:
             ]
         }
 
-        with pytest.raises(ValueError, match="It is not allowed to mix MBA"):
+        with pytest.raises(ValueError, match="MBA % is not enabled. Disable MBA BW and try again"):
             ConfigStore.validate(data)
 
 

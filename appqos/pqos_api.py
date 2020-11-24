@@ -64,7 +64,13 @@ class PqosApi:
         self.alloc = None
         self.cpuinfo = None
         self._supported_iface = []
-        self._current_iface = None
+
+        # dict to share interface type and MBA BW status
+        # between REST API process and "backend"
+        self.shared_dict = common.MANAGER.dict()
+        self.shared_dict['current_iface'] = None
+        self.shared_dict['mba_bw_supported'] = None
+        self.shared_dict['mba_bw_enabled'] = None
 
 
     def detect_supported_ifaces(self):
@@ -72,17 +78,16 @@ class PqosApi:
         Detects supported RDT interfaces
         """
         for iface in ["msr","os"]:
-            try:
-                self.pqos.init(iface.upper())
-                self.pqos.fini()
+            if not self.init(iface, True):
+                log.info("Interface %s, MBA BW: %ssupported."\
+                        % (iface.upper(), "un" if not self.is_mba_bw_supported() else ""))
+                self.fini()
                 self._supported_iface.append(iface)
-            except Exception as ex:
-                log.debug("Supported RDT interfaces detection: " + str(ex))
 
         log.info("Supported RDT interfaces: " + str(self.supported_iface()))
 
 
-    def init(self, iface):
+    def init(self, iface, force_iface = False):
         """
         Initializes libpqos
 
@@ -91,22 +96,22 @@ class PqosApi:
             -1 otherwise
         """
 
-        if not iface in self.supported_iface():
+        if not force_iface and not iface in self.supported_iface():
             log.error("RDT does not support '%s' interface!" % (iface))
             return -1
 
         # deinitialize lib first
-        if self._current_iface:
+        if self.shared_dict['current_iface']:
             self.fini()
 
         # umount restcrl to improve caps detection
-        if iface == "os":
-            result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
-            if result:
-                log.error("Failed to umount resctrl fs! status code: %d"\
-                     % (os.WEXITSTATUS(result)))
-                return -1
+        result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
+        if result:
+            log.error("Failed to umount resctrl fs! status code: %d"\
+                    % (os.WEXITSTATUS(result)))
+            return -1
 
+        # attempt to initialize libpqos
         try:
             self.pqos.init(iface.upper())
             self.cap = PqosCap()
@@ -118,8 +123,36 @@ class PqosApi:
             log.error(str(ex))
             return -1
 
-        log.info("RDT initialized with '%s' interface" % (iface))
-        self._current_iface = iface
+        # save current interface type in shared dict
+        self.shared_dict['current_iface'] = iface
+
+        # Reread MBA BW status from libpqos
+        self.refresh_mba_bw_status()
+
+        return 0
+
+
+    def refresh_mba_bw_status(self):
+        """
+        Reads MBA BW status from libpqos
+        and save results in shared dict
+
+        Returns:
+            0 on success
+            -1 otherwise
+        """
+        try:
+            supported, enabled = self.cap.is_mba_ctrl_enabled()
+            # convert None to False
+            supported = bool(supported)
+
+            self.shared_dict['mba_bw_supported'] = supported
+            self.shared_dict['mba_bw_enabled'] = enabled
+        except Exception as ex:
+            log.error("libpqos is_mba_ctrl_enabled(..) call failed!")
+            log.error(str(ex))
+            return -1
+
         return 0
 
 
@@ -131,7 +164,7 @@ class PqosApi:
             interface name on success
             None when libpqos is not initialized
         """
-        return self._current_iface
+        return self.shared_dict['current_iface']
 
 
     def supported_iface(self):
@@ -141,7 +174,51 @@ class PqosApi:
         Returns:
             list of supported interfaces
         """
+        # no need to keep it in shared dict as it does not changed
+        # during runtime.
         return self._supported_iface
+
+
+    def is_mba_bw_supported(self):
+        """
+        Returns MBA BW support status
+
+        Returns:
+            MBA BW support status
+        """
+        return self.shared_dict['mba_bw_supported']
+
+
+    def is_mba_bw_enabled(self):
+        """
+        Returns MBA BW enabled status
+
+        Returns:
+            MBA BW enabled status
+        """
+        return self.shared_dict['mba_bw_enabled']
+
+
+    def enable_mba_bw(self, enable):
+        """
+        Change MBA BW enabled status
+
+        Returns:
+            0 on success
+            -1 otherwise
+        """
+        try:
+            # call libpqos alloc reset
+            self.alloc.reset("any", "any", "ctrl" if enable else "default")
+        except Exception as ex:
+            log.error("libpqos reset(..) call failed!")
+            log.error(str(ex))
+            return -1
+
+        # Reread MBA BW status from libpqos
+        self.refresh_mba_bw_status()
+
+        return 0
 
 
     def fini(self):
@@ -149,7 +226,7 @@ class PqosApi:
         De-initializes libpqos
         """
         self.pqos.fini()
-        self._current_iface = None
+        self.shared_dict['current_iface'] = None
 
         return 0
 
@@ -226,7 +303,7 @@ class PqosApi:
         return 0
 
 
-    def mba_set(self, sockets, cos_id, mb_max):
+    def mba_set(self, sockets, cos_id, mb_max, ctrl=False):
         """
         Configures MBA rate for CoS
 
@@ -240,7 +317,7 @@ class PqosApi:
             -1 otherwise
         """
         try:
-            cos = self.mba.COS(cos_id, mb_max)
+            cos = self.mba.COS(cos_id, mb_max, ctrl)
             for socket in sockets:
                 self.mba.set(socket, [cos])
         except Exception as ex:

@@ -52,6 +52,7 @@ class TestPqosApi(object):
 
         self.Pqos_api.alloc = mock.MagicMock()
         self.Pqos_api.alloc.release = mock.MagicMock()
+        self.Pqos_api.alloc.reset = mock.MagicMock()
         self.Pqos_api.alloc.assoc_set = mock.MagicMock()
 
         self.Pqos_api.l3ca = mock.MagicMock()
@@ -179,7 +180,7 @@ class TestPqosApi(object):
     def test_mba_set(self):
         self.Pqos_api.mba.COS.return_value = 0xDEADBEEF
         assert 0 == self.Pqos_api.mba_set([0], 1, 44)
-        self.Pqos_api.mba.COS.assert_called_once_with(1, 44)
+        self.Pqos_api.mba.COS.assert_called_once_with(1, 44, False)
         self.Pqos_api.mba.set.assert_called_once_with(0, [0xDEADBEEF])
 
         self.Pqos_api.mba.set.mock_reset()
@@ -221,6 +222,7 @@ class TestPqosApi(object):
 
         self.Pqos_api.l3ca.set.side_effect = Exception('Test')
         assert -1 == self.Pqos_api.l3ca_set([0], 1, 0xff)
+
 
     @mock.patch("os.system", mock.MagicMock(return_value=0))
     @pytest.mark.parametrize("iface, supp_iface", [
@@ -322,3 +324,47 @@ class TestPqosApi(object):
        assert None == self.Pqos_api.get_max_cos_id([common.MBA_CAP])
        assert None == self.Pqos_api.get_max_cos_id([common.CAT_CAP])
        assert None == self.Pqos_api.get_max_cos_id([])
+
+
+    @mock.patch("pqos_api.PqosApi.is_mba_bw_supported", mock.MagicMock(return_value=False))
+    @mock.patch("pqos_api.PqosApi.fini", mock.MagicMock(return_value=0))
+    @pytest.mark.parametrize("supp_iface", [
+        (["msr"]),
+        (["os"]),
+        (["msr", "os"])
+    ])
+    def test_detect_supported_ifaces(self, supp_iface):
+        def mock_init(self, iface, force):
+            assert force
+            return 0 if iface in supp_iface else -1
+
+        with mock.patch('pqos_api.PqosApi.init', new=mock_init):
+            self.Pqos_api.detect_supported_ifaces()
+            assert self.Pqos_api.supported_iface() == supp_iface
+
+
+    @pytest.mark.parametrize("mba_ctrl_supp", [True, False])
+    @pytest.mark.parametrize("mba_ctrl_en", [True, False])
+    def test_refresh_mba_bw_status(self, mba_ctrl_supp, mba_ctrl_en):
+        self.Pqos_api.cap.is_mba_ctrl_enabled.return_value = (mba_ctrl_supp, mba_ctrl_en)
+
+        self.Pqos_api.refresh_mba_bw_status()
+
+        assert self.Pqos_api.shared_dict['mba_bw_supported'] == mba_ctrl_supp
+        assert self.Pqos_api.is_mba_bw_supported() == mba_ctrl_supp
+
+        assert self.Pqos_api.shared_dict['mba_bw_enabled'] == mba_ctrl_en
+        assert self.Pqos_api.is_mba_bw_enabled() == mba_ctrl_en
+
+
+    @mock.patch("pqos_api.PqosApi.refresh_mba_bw_status", mock.MagicMock(return_value=0))
+    @pytest.mark.parametrize("enabled_mba_bw", [True, False])
+    def test_enable_mba_bw(self, enabled_mba_bw):
+
+        # All OK!
+        assert 0 == self.Pqos_api.enable_mba_bw(enabled_mba_bw)
+        self.Pqos_api.alloc.reset.assert_called_once_with("any", "any", "ctrl" if enabled_mba_bw else "default")
+
+        # Alloc Reset fails
+        self.Pqos_api.alloc.reset.side_effect = Exception("test")
+        assert -1 == self.Pqos_api.enable_mba_bw(enabled_mba_bw)

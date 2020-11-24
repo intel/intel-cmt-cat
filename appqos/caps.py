@@ -78,17 +78,20 @@ def mba_supported():
     """
     return common.MBA_CAP in SYSTEM_CAPS
 
+
 def mba_bw_supported():
     """
     Returns MBA BW support status
     """
-    return False
+    return common.PQOS_API.is_mba_bw_supported()
+
 
 def mba_bw_enabled():
     """
     Returns MBA BW enabled status
     """
-    return False
+    return common.PQOS_API.is_mba_bw_enabled()
+
 
 def sstbf_enabled():
     """
