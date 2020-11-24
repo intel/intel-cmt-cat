@@ -86,7 +86,7 @@ detect_os_support(const char *fname,
                 return PQOS_RETVAL_OK;
         }
 
-        while (pqos_fgets(temp, sizeof(temp), fd) != NULL) {
+        while (fgets(temp, sizeof(temp), fd) != NULL) {
                 if (strstr(temp, str) != NULL) {
                         *supported = 1;
                         fclose(fd);
