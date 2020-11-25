@@ -39,6 +39,7 @@
 #ifndef __PQOS_RESCTRL_ALLOC_H__
 #define __PQOS_RESCTRL_ALLOC_H__
 
+#include "types.h"
 #include "pqos.h"
 #include "resctrl.h"
 #include "resctrl_schemata.h"
@@ -56,8 +57,8 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int resctrl_alloc_init(const struct pqos_cpuinfo *cpu,
-                       const struct pqos_cap *cap);
+PQOS_LOCAL int resctrl_alloc_init(const struct pqos_cpuinfo *cpu,
+                                  const struct pqos_cap *cap);
 
 /**
  * @brief Shuts down resctrl allocation sub-module for OS allocation
@@ -65,7 +66,7 @@ int resctrl_alloc_init(const struct pqos_cpuinfo *cpu,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int resctrl_alloc_fini(void);
+PQOS_LOCAL int resctrl_alloc_fini(void);
 
 /**
  * @brief Retrieves number of resctrl groups allowed
@@ -76,7 +77,8 @@ int resctrl_alloc_fini(void);
  *
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num);
+PQOS_LOCAL int resctrl_alloc_get_grps_num(const struct pqos_cap *cap,
+                                          unsigned *grps_num);
 
 /**
  * @brief Opens COS file in resctl filesystem
@@ -89,9 +91,19 @@ int resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num);
  * @retval Pointer on success
  * @retval NULL on error
  */
-FILE *resctrl_alloc_fopen(const unsigned class_id,
-                          const char *name,
-                          const char *mode);
+PQOS_LOCAL FILE *resctrl_alloc_fopen(const unsigned class_id,
+                                     const char *name,
+                                     const char *mode);
+
+/**
+ * @brief Closes COS file in resctl filesystem
+ *
+ * @param[in] fd File descriptor
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int resctrl_alloc_fclose(FILE *fd);
 
 /**
  * @brief Write CPU mask to file
@@ -102,8 +114,8 @@ FILE *resctrl_alloc_fopen(const unsigned class_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_cpumask_write(const unsigned class_id,
-                                const struct resctrl_cpumask *mask);
+PQOS_LOCAL int resctrl_alloc_cpumask_write(const unsigned class_id,
+                                           const struct resctrl_cpumask *mask);
 
 /**
  * @brief Read CPU mask from file
@@ -114,8 +126,8 @@ int resctrl_alloc_cpumask_write(const unsigned class_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_cpumask_read(const unsigned class_id,
-                               struct resctrl_cpumask *mask);
+PQOS_LOCAL int resctrl_alloc_cpumask_read(const unsigned class_id,
+                                          struct resctrl_cpumask *mask);
 
 /**
  * @brief Read resctrl schemata from file
@@ -126,8 +138,8 @@ int resctrl_alloc_cpumask_read(const unsigned class_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_schemata_read(const unsigned class_id,
-                                struct resctrl_schemata *schemata);
+PQOS_LOCAL int resctrl_alloc_schemata_read(const unsigned class_id,
+                                           struct resctrl_schemata *schemata);
 
 /**
  * @brief Write resctrl schemata to file
@@ -140,9 +152,10 @@ int resctrl_alloc_schemata_read(const unsigned class_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_schemata_write(const unsigned class_id,
-                                 const unsigned technology,
-                                 const struct resctrl_schemata *schemata);
+PQOS_LOCAL int
+resctrl_alloc_schemata_write(const unsigned class_id,
+                             const unsigned technology,
+                             const struct resctrl_schemata *schemata);
 
 /**
  * @brief Function to validate if \a task is a valid task ID
@@ -152,7 +165,7 @@ int resctrl_alloc_schemata_write(const unsigned class_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_task_validate(const pid_t task);
+PQOS_LOCAL int resctrl_alloc_task_validate(const pid_t task);
 
 /**
  * @brief Function to write task ID to resctrl COS tasks file
@@ -164,7 +177,8 @@ int resctrl_alloc_task_validate(const pid_t task);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_task_write(const unsigned class_id, const pid_t task);
+PQOS_LOCAL int resctrl_alloc_task_write(const unsigned class_id,
+                                        const pid_t task);
 
 /**
  * @brief Reads task id's from resctrl task file for a given COS
@@ -175,7 +189,8 @@ int resctrl_alloc_task_write(const unsigned class_id, const pid_t task);
  * @return Allocated task id array
  * @retval NULL on error
  */
-unsigned *resctrl_alloc_task_read(unsigned class_id, unsigned *count);
+PQOS_LOCAL unsigned *resctrl_alloc_task_read(unsigned class_id,
+                                             unsigned *count);
 
 /**
  * @brief Function to search a COS tasks file for a task ID
@@ -188,9 +203,9 @@ unsigned *resctrl_alloc_task_read(unsigned class_id, unsigned *count);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_task_search(unsigned *class_id,
-                              const struct pqos_cap *cap,
-                              const pid_t task);
+PQOS_LOCAL int resctrl_alloc_task_search(unsigned *class_id,
+                                         const struct pqos_cap *cap,
+                                         const pid_t task);
 
 /**
  * @brief Function to search a COS tasks file and check if this file is blank
@@ -202,7 +217,8 @@ int resctrl_alloc_task_search(unsigned *class_id,
  *
  * @return Operation status
  */
-int resctrl_alloc_task_file_check(const unsigned class_id, unsigned *found);
+PQOS_LOCAL int resctrl_alloc_task_file_check(const unsigned class_id,
+                                             unsigned *found);
 
 /**
  * @brief Resctrl interface to associate \a lcore
@@ -213,7 +229,8 @@ int resctrl_alloc_task_file_check(const unsigned class_id, unsigned *found);
  *
  * @return Operations status
  */
-int resctrl_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
+PQOS_LOCAL int resctrl_alloc_assoc_set(const unsigned lcore,
+                                       const unsigned class_id);
 
 /**
  * @brief Resctrl interface to read association
@@ -225,7 +242,8 @@ int resctrl_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
+PQOS_LOCAL int resctrl_alloc_assoc_get(const unsigned lcore,
+                                       unsigned *class_id);
 
 /**
  * @brief Resctrl interface to associate \a task
@@ -237,7 +255,8 @@ int resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);
+PQOS_LOCAL int resctrl_alloc_assoc_set_pid(const pid_t task,
+                                           const unsigned class_id);
 
 /**
  * @brief Resctrl interface to read association
@@ -249,7 +268,8 @@ int resctrl_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
+PQOS_LOCAL int resctrl_alloc_assoc_get_pid(const pid_t task,
+                                           unsigned *class_id);
 
 /**
  * @brief Gets unused resctrl group
@@ -261,7 +281,8 @@ int resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
  *
  * @return Operation status
  */
-int resctrl_alloc_get_unused_group(const unsigned grps_num, unsigned *group_id);
+PQOS_LOCAL int resctrl_alloc_get_unused_group(const unsigned grps_num,
+                                              unsigned *group_id);
 
 #ifdef __cplusplus
 }

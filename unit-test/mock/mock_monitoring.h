@@ -37,5 +37,6 @@
 #include "monitoring.h"
 
 int __wrap_pqos_mon_poll_events(struct pqos_mon_data *group);
+int __wrap_resctrl_mon_active(unsigned *monitoring_status);
 
 #endif MOCK_MONITORING_H_

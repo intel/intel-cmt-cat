@@ -206,7 +206,7 @@ PQOS_LOCAL int hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                               const enum pqos_mba_config mba_cfg);
 
 /**
- * @brief Enables or disables CDP across selected CPU sockets
+ * @brief Enables or disables L3 CDP across selected CPU sockets
  *
  * @param [in] sockets_num dimension of \a sockets array
  * @param [in] sockets array with socket ids to change CDP config on
@@ -221,7 +221,7 @@ PQOS_LOCAL int hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
                                     const int enable);
 
 /**
- * @brief Enables or disables CDP across selected CPU clusters
+ * @brief Enables or disables L2 CDP across selected CPU clusters
  *
  * @param [in] l2id_num dimension of \a l2ids array
  * @param [in] l2ids array with clusters ids to change CDP config on

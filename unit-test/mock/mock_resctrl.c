@@ -35,23 +35,69 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "mock_monitoring.h"
+#include <string.h>
+
+#include "mock_resctrl.h"
 
 int
-__wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
+__wrap_resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)
 {
-        check_expected_ptr(group);
+        assert_non_null(fd);
+        assert_non_null(mask);
 
         return mock_type(int);
 }
 
 int
-__wrap_resctrl_mon_active(unsigned *monitoring_status)
+__wrap_resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
 {
-        int ret = mock_type(int);
+        assert_non_null(fd);
+        assert_non_null(mask);
 
-        if (ret == PQOS_RETVAL_OK)
-                *monitoring_status = mock_type(int);
+        memset(mask, 0, sizeof(*mask));
 
-        return ret;
+        return mock_type(int);
+}
+
+void
+__wrap_resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask)
+{
+        assert_non_null(mask);
+        check_expected(lcore);
+}
+
+int
+__wrap_resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
+                     const enum pqos_cdp_config l2_cdp_cfg,
+                     const enum pqos_mba_config mba_cfg)
+{
+        check_expected(l3_cdp_cfg);
+        check_expected(l2_cdp_cfg);
+        check_expected(mba_cfg);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_umount(void)
+{
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_lock_shared(void)
+{
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_lock_exclusive(void)
+{
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_lock_release(void)
+{
+        return mock_type(int);
 }

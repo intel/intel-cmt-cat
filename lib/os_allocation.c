@@ -51,28 +51,12 @@
 #include "resctrl.h"
 #include "resctrl_alloc.h"
 #include "resctrl_monitoring.h"
+#include "resctrl_utils.h"
 
-/**
- * ---------------------------------------
- * Local data structures
- * ---------------------------------------
- */
-static const struct pqos_cpuinfo *m_cpu = NULL;
-
-/**
- * @brief Function to mount the resctrl file system with CDP or MBps options
- *
- * @param l3_cdp_cfg L3 CDP option
- * @param l2_cdp_cfg L2 CDP option
- * @param mba_cfg requested MBA config
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-os_interface_mount(const enum pqos_cdp_config l3_cdp_cfg,
-                   const enum pqos_cdp_config l2_cdp_cfg,
-                   const enum pqos_mba_config mba_cfg)
+int
+os_alloc_mount(const enum pqos_cdp_config l3_cdp_cfg,
+               const enum pqos_cdp_config l2_cdp_cfg,
+               const enum pqos_mba_config mba_cfg)
 {
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
@@ -187,7 +171,7 @@ unmount:
  * @return Operational status
  */
 static int
-os_alloc_check(void)
+os_alloc_check(const struct pqos_cap *cap)
 {
         int ret;
         const struct pqos_capability *l3_cap;
@@ -196,11 +180,10 @@ os_alloc_check(void)
         enum pqos_cdp_config l3_cdp_mount = PQOS_REQUIRE_CDP_OFF;
         enum pqos_cdp_config l2_cdp_mount = PQOS_REQUIRE_CDP_OFF;
         enum pqos_mba_config mba_mount = PQOS_MBA_DEFAULT;
-        struct stat st;
 
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &l3_cap);
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &l2_cap);
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &mba_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &l3_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &mba_cap);
 
         /**
          * Check if resctrl is supported
@@ -223,10 +206,10 @@ os_alloc_check(void)
         /**
          * Resctrl is mounted
          */
-        if (stat(RESCTRL_PATH "/cpus", &st) == 0)
+        if (resctrl_utils_file_exists(RESCTRL_PATH "/cpus"))
                 return PQOS_RETVAL_OK;
 
-        ret = os_interface_mount(l3_cdp_mount, l2_cdp_mount, mba_mount);
+        ret = os_alloc_mount(l3_cdp_mount, l2_cdp_mount, mba_mount);
         if (ret != PQOS_RETVAL_OK)
                 LOG_INFO("Unable to mount resctrl\n");
 
@@ -257,7 +240,6 @@ os_alloc_prep(void)
          */
         for (i = 1; i < num_grps; i++) {
                 char buf[128];
-                struct stat st;
 
                 memset(buf, 0, sizeof(buf));
                 if (snprintf(buf, sizeof(buf) - 1, "%s/COS%d", RESCTRL_PATH,
@@ -265,7 +247,7 @@ os_alloc_prep(void)
                         return PQOS_RETVAL_ERROR;
 
                 /* if resctrl group doesn't exist - create it */
-                if (stat(buf, &st) == 0) {
+                if (resctrl_utils_file_exists(buf)) {
                         LOG_DEBUG("resctrl group COS%d detected\n", i);
                         continue;
                 }
@@ -288,9 +270,7 @@ os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (cpu == NULL || cap == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        m_cpu = cpu;
-
-        ret = os_alloc_check();
+        ret = os_alloc_check(cap);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -306,10 +286,7 @@ os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 int
 os_alloc_fini(void)
 {
-        int ret = PQOS_RETVAL_OK;
-
-        m_cpu = NULL;
-        return ret;
+        return resctrl_alloc_fini();
 }
 
 int
@@ -373,11 +350,13 @@ int
 os_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
         int ret;
+        const struct pqos_cpuinfo *cpu;
 
         ASSERT(class_id != NULL);
-        ASSERT(m_cpu != NULL);
 
-        ret = pqos_cpu_check_core(m_cpu, lcore);
+        _pqos_cap_get(NULL, &cpu);
+
+        ret = pqos_cpu_check_core(cpu, lcore);
         if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_PARAM;
 
@@ -469,9 +448,11 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
         int ret;
         unsigned i, cos0 = 0;
         struct resctrl_cpumask mask;
+        const struct pqos_cpuinfo *cpu;
 
-        ASSERT(m_cpu != NULL);
         ASSERT(core_num > 0 && core_array != NULL);
+
+        _pqos_cap_get(NULL, &cpu);
 
         ret = resctrl_lock_exclusive();
         if (ret != PQOS_RETVAL_OK)
@@ -484,7 +465,7 @@ os_alloc_release(const unsigned *core_array, const unsigned core_num)
         if (ret != PQOS_RETVAL_OK)
                 goto os_alloc_release_unlock;
         for (i = 0; i < core_num; i++) {
-                if (core_array[i] >= m_cpu->num_cores) {
+                if (core_array[i] >= cpu->num_cores) {
                         ret = PQOS_RETVAL_ERROR;
                         goto os_alloc_release_unlock;
                 }
@@ -501,18 +482,16 @@ os_alloc_release_unlock:
         return ret;
 }
 
-/**
- * @brief Moves all cores to COS0 (default)
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_cores(void)
 {
         const unsigned default_cos = 0;
         struct resctrl_cpumask mask;
         unsigned i;
         int ret;
+        const struct pqos_cpuinfo *cpu;
+
+        _pqos_cap_get(NULL, &cpu);
 
         LOG_INFO("OS alloc reset - core assoc\n");
 
@@ -520,8 +499,8 @@ os_alloc_reset_cores(void)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        for (i = 0; i < m_cpu->num_cores; i++)
-                resctrl_cpumask_set(m_cpu->cores[i].lcore, &mask);
+        for (i = 0; i < cpu->num_cores; i++)
+                resctrl_cpumask_set(cpu->cores[i].lcore, &mask);
 
         ret = resctrl_alloc_cpumask_write(default_cos, &mask);
         if (ret != PQOS_RETVAL_OK)
@@ -530,16 +509,7 @@ os_alloc_reset_cores(void)
         return ret;
 }
 
-/**
- * @brief Resets L3, L2 and MBA schematas to default value
- *
- * @param [in] l3_cap l3 cache capability
- * @param [in] l2_cap l2 cache capability
- * @param [in] mba_cap mba capability
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
                          const struct pqos_cap_l2ca *l2_cap,
                          const struct pqos_cap_mba *mba_cap)
@@ -548,10 +518,11 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
         unsigned i;
         int ret;
         const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
 
         LOG_INFO("OS alloc reset - schematas\n");
 
-        _pqos_cap_get(&cap, NULL);
+        _pqos_cap_get(&cap, &cpu);
 
         ret = resctrl_lock_exclusive();
         if (ret != PQOS_RETVAL_OK)
@@ -567,7 +538,7 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
         for (i = 0; i < grps; i++) {
                 struct resctrl_schemata *schmt;
 
-                schmt = resctrl_schemata_alloc(cap, m_cpu);
+                schmt = resctrl_schemata_alloc(cap, cpu);
                 if (schmt == NULL) {
                         ret = PQOS_RETVAL_ERROR;
                         LOG_ERROR("Error on schemata memory allocation "
@@ -627,12 +598,7 @@ filter_pids(const struct dirent *dir)
         return 1;
 }
 
-/**
- * @brief Move all tasks to COS0 (default)
- *
- * @return Operation status
- */
-static int
+int
 os_alloc_reset_tasks(void)
 {
         struct dirent **pids_list = NULL;
@@ -878,7 +844,7 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
                  l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ? "on" : "off",
                  mba_cfg == PQOS_MBA_CTRL ? "on" : "off");
 
-        ret = os_interface_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = os_alloc_mount(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Mount OS interface error!\n");
                 goto os_alloc_reset_full_exit;
@@ -917,6 +883,7 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         int l2_cdp_changed = 0;
         int mba_changed = 0;
         int ret;
+        const struct pqos_cap *cap;
 
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
@@ -929,20 +896,22 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         ASSERT(mba_cfg == PQOS_MBA_DEFAULT || mba_cfg == PQOS_MBA_CTRL ||
                mba_cfg == PQOS_MBA_ANY);
 
+        _pqos_cap_get(&cap, NULL);
+
         /* Get L3 CAT capabilities */
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &alloc_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l3_cap = alloc_cap->u.l3ca;
 
         /* Get L2 CAT capabilities */
         alloc_cap = NULL;
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &alloc_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &alloc_cap);
         if (alloc_cap != NULL)
                 l2_cap = alloc_cap->u.l2ca;
 
         /* Get MBA capabilities */
         alloc_cap = NULL;
-        (void)_pqos_cap_get_type(PQOS_CAP_TYPE_MBA, &alloc_cap);
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
 
@@ -1610,8 +1579,7 @@ os_mba_set(const unsigned mba_id,
                                      step);
                                 if (mba.mb_max == 0)
                                         mba.mb_max = step;
-                        } else if (mba.mb_max > UINT32_MAX - step)
-                                mba.mb_max -= mba.mb_max % step;
+                        }
 
                         ret = resctrl_schemata_mba_set(schmt, mba_id, &mba);
                 }

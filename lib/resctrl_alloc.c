@@ -47,13 +47,6 @@
 #include "resctrl_utils.h"
 #include "resctrl_monitoring.h"
 
-/**
- * ---------------------------------------
- * Local data structures
- * ---------------------------------------
- */
-static const struct pqos_cpuinfo *m_cpu = NULL;
-
 /*
  * COS file names on resctrl file system
  */
@@ -67,15 +60,12 @@ resctrl_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (cpu == NULL || cap == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        m_cpu = cpu;
-
         return PQOS_RETVAL_OK;
 }
 
 int
 resctrl_alloc_fini(void)
 {
-        m_cpu = NULL;
         return PQOS_RETVAL_OK;
 }
 
@@ -164,15 +154,7 @@ resctrl_alloc_fopen(const unsigned class_id, const char *name, const char *mode)
         return fd;
 }
 
-/**
- * @brief Closes COS file in resctl filesystem
- *
- * @param[in] fd File descriptor
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
+int
 resctrl_alloc_fclose(FILE *fd)
 {
         if (fd == NULL)

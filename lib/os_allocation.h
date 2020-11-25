@@ -43,6 +43,9 @@
 extern "C" {
 #endif
 
+#include "types.h"
+#include "pqos.h"
+
 /**
  * @brief Initializes resctrl file system used for OS allocation interface
  *
@@ -52,7 +55,8 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
+PQOS_LOCAL int os_alloc_init(const struct pqos_cpuinfo *cpu,
+                             const struct pqos_cap *cap);
 
 /**
  * @brief Shuts down allocation sub-module for OS allocation
@@ -60,7 +64,21 @@ int os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_alloc_fini(void);
+PQOS_LOCAL int os_alloc_fini(void);
+
+/**
+ * @brief Function to mount the resctrl file system with CDP or MBps options
+ *
+ * @param l3_cdp_cfg L3 CDP option
+ * @param l2_cdp_cfg L2 CDP option
+ * @param mba_cfg requested MBA config
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int os_alloc_mount(const enum pqos_cdp_config l3_cdp_cfg,
+                              const enum pqos_cdp_config l2_cdp_cfg,
+                              const enum pqos_mba_config mba_cfg);
 
 /**
  * @brief OS interface to assign first available
@@ -81,10 +99,10 @@ int os_alloc_fini(void);
  *
  * @return Operations status
  */
-int os_alloc_assign(const unsigned technology,
-                    const unsigned *core_array,
-                    const unsigned core_num,
-                    unsigned *class_id);
+PQOS_LOCAL int os_alloc_assign(const unsigned technology,
+                               const unsigned *core_array,
+                               const unsigned core_num,
+                               unsigned *class_id);
 
 /**
  * @brief OS interface to reassign cores
@@ -95,7 +113,8 @@ int os_alloc_assign(const unsigned technology,
  *
  * @return Operations status
  */
-int os_alloc_release(const unsigned *core_array, const unsigned core_num);
+PQOS_LOCAL int os_alloc_release(const unsigned *core_array,
+                                const unsigned core_num);
 
 /**
  * @brief Assign first available COS to tasks in \a task_array
@@ -117,10 +136,10 @@ int os_alloc_release(const unsigned *core_array, const unsigned core_num);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_assign_pid(const unsigned technology,
-                        const pid_t *task_array,
-                        const unsigned task_num,
-                        unsigned *class_id);
+PQOS_LOCAL int os_alloc_assign_pid(const unsigned technology,
+                                   const pid_t *task_array,
+                                   const unsigned task_num,
+                                   unsigned *class_id);
 
 /**
  * @brief Reassign tasks in \a task_array to default COS#0
@@ -131,7 +150,35 @@ int os_alloc_assign_pid(const unsigned technology,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
+PQOS_LOCAL int os_alloc_release_pid(const pid_t *task_array,
+                                    const unsigned task_num);
+
+/**
+ * @brief Moves all cores to COS0 (default)
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int os_alloc_reset_cores(void);
+
+/**
+ * @brief Resets L3, L2 and MBA schematas to default value
+ *
+ * @param [in] l3_cap l3 cache capability
+ * @param [in] l2_cap l2 cache capability
+ * @param [in] mba_cap mba capability
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
+                                        const struct pqos_cap_l2ca *l2_cap,
+                                        const struct pqos_cap_mba *mba_cap);
+
+/**
+ * @brief Move all tasks to COS0 (default)
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int os_alloc_reset_tasks(void);
 
 /**
  * @brief OS interface to reset configuration of allocation technologies
@@ -152,9 +199,9 @@ int os_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                   const enum pqos_cdp_config l2_cdp_cfg,
-                   const enum pqos_mba_config mba_cfg);
+PQOS_LOCAL int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+                              const enum pqos_cdp_config l2_cdp_cfg,
+                              const enum pqos_mba_config mba_cfg);
 
 /**
  * @brief OS interface to set classes of service
@@ -167,9 +214,9 @@ int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l3ca_set(const unsigned l3cat_id,
-                const unsigned num_cos,
-                const struct pqos_l3ca *ca);
+PQOS_LOCAL int os_l3ca_set(const unsigned l3cat_id,
+                           const unsigned num_cos,
+                           const struct pqos_l3ca *ca);
 
 /**
  * @brief OS interface to read classes of service from \a l3cat_id
@@ -183,10 +230,10 @@ int os_l3ca_set(const unsigned l3cat_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l3ca_get(const unsigned l3cat_id,
-                const unsigned max_num_ca,
-                unsigned *num_ca,
-                struct pqos_l3ca *ca);
+PQOS_LOCAL int os_l3ca_get(const unsigned l3cat_id,
+                           const unsigned max_num_ca,
+                           unsigned *num_ca,
+                           struct pqos_l3ca *ca);
 
 /**
  * @brief Check minimum cbm bits accepted by OS interface for L3 CAT
@@ -196,7 +243,7 @@ int os_l3ca_get(const unsigned l3cat_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
+PQOS_LOCAL int os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
 
 /**
  * @brief OS interface to set classes of
@@ -209,9 +256,9 @@ int os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l2ca_set(const unsigned l2id,
-                const unsigned num_cos,
-                const struct pqos_l2ca *ca);
+PQOS_LOCAL int os_l2ca_set(const unsigned l2id,
+                           const unsigned num_cos,
+                           const struct pqos_l2ca *ca);
 
 /**
  * @brief OS interface to read classes of service from \a l2id
@@ -225,10 +272,10 @@ int os_l2ca_set(const unsigned l2id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l2ca_get(const unsigned l2id,
-                const unsigned max_num_ca,
-                unsigned *num_ca,
-                struct pqos_l2ca *ca);
+PQOS_LOCAL int os_l2ca_get(const unsigned l2id,
+                           const unsigned max_num_ca,
+                           unsigned *num_ca,
+                           struct pqos_l2ca *ca);
 
 /**
  * @brief Check minimum cbm bits accepted by OS interface for L2 CAT
@@ -238,7 +285,7 @@ int os_l2ca_get(const unsigned l2id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
+PQOS_LOCAL int os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
 
 /**
  * @brief OS interface to set classes of service
@@ -252,10 +299,10 @@ int os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mba_set(const unsigned mba_id,
-               const unsigned num_cos,
-               const struct pqos_mba *requested,
-               struct pqos_mba *actual);
+PQOS_LOCAL int os_mba_set(const unsigned mba_id,
+                          const unsigned num_cos,
+                          const struct pqos_mba *requested,
+                          struct pqos_mba *actual);
 
 /**
  * @brief OS interface to set classes of service defined by \a mba_id
@@ -269,10 +316,10 @@ int os_mba_set(const unsigned mba_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mba_set_amd(const unsigned mba_id,
-                   const unsigned num_cos,
-                   const struct pqos_mba *requested,
-                   struct pqos_mba *actual);
+PQOS_LOCAL int os_mba_set_amd(const unsigned mba_id,
+                              const unsigned num_cos,
+                              const struct pqos_mba *requested,
+                              struct pqos_mba *actual);
 
 /**
  * @brief OS interface to read MBA from \a mba_id
@@ -286,10 +333,10 @@ int os_mba_set_amd(const unsigned mba_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mba_get(const unsigned mba_id,
-               const unsigned max_num_cos,
-               unsigned *num_cos,
-               struct pqos_mba *mba_tab);
+PQOS_LOCAL int os_mba_get(const unsigned mba_id,
+                          const unsigned max_num_cos,
+                          unsigned *num_cos,
+                          struct pqos_mba *mba_tab);
 
 /**
  * @brief OS interface to read MBA from \a mba_id
@@ -304,10 +351,10 @@ int os_mba_get(const unsigned mba_id,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mba_get_amd(const unsigned mba_id,
-                   const unsigned max_num_cos,
-                   unsigned *num_cos,
-                   struct pqos_mba *mba_tab);
+PQOS_LOCAL int os_mba_get_amd(const unsigned mba_id,
+                              const unsigned max_num_cos,
+                              unsigned *num_cos,
+                              struct pqos_mba *mba_tab);
 
 /**
  * @brief OS interface to associate \a lcore
@@ -318,7 +365,8 @@ int os_mba_get_amd(const unsigned mba_id,
  *
  * @return Operations status
  */
-int os_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
+PQOS_LOCAL int os_alloc_assoc_set(const unsigned lcore,
+                                  const unsigned class_id);
 
 /**
  * @brief OS interface to read association
@@ -330,7 +378,7 @@ int os_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
+PQOS_LOCAL int os_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 
 /**
  * @brief Retrieves task id's from resctrl task file for a given COS
@@ -341,7 +389,8 @@ int os_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
  * @return Allocated task id array
  * @retval NULL on error
  */
-unsigned *os_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
+PQOS_LOCAL unsigned *os_pid_get_pid_assoc(const unsigned class_id,
+                                          unsigned *count);
 
 /**
  * @brief OS interface to associate \a task
@@ -353,7 +402,8 @@ unsigned *os_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);
+PQOS_LOCAL int os_alloc_assoc_set_pid(const pid_t task,
+                                      const unsigned class_id);
 
 /**
  * @brief OS interface to read association
@@ -365,7 +415,7 @@ int os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
+PQOS_LOCAL int os_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
 
 #ifdef __cplusplus
 }

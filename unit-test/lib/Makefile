@@ -1,6 +1,7 @@
 
 LIB_DIR = ../../lib
-OBJ_DIR = obj
+OBJ_DIR = ./obj
+BIN_DIR = ./bin
 LIB_SRCS = $(sort $(wildcard $(LIB_DIR)/*.c))
 LIB_OBJS = $(LIB_SRCS:$(LIB_DIR)/%.c=$(OBJ_DIR)/%.o)
 LIB_DEPS = $(LIB_SRCS:$(LIB_DIR)/%.c=$(OBJ_DIR)/%.d)
@@ -11,7 +12,8 @@ MOCK_OBJS += $(OBJ_DIR)/hw_alloc_assoc_write.o
 MOCK_OBJS += $(OBJ_DIR)/hw_alloc_assoc_read.o
 
 TESTS_SRCS = $(sort $(wildcard test_*.c))
-TESTS = $(TESTS_SRCS:.c=)
+TESTS = $(TESTS_SRCS:%.c=$(BIN_DIR)/%)
+
 
 LDFLAGS = -L$(MOCK_DIR) -lpthread -lcmocka -lpqosmock -z noexecstack -z relro -z now
 CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
@@ -67,6 +69,26 @@ $(OBJ_DIR)/hw_cap.o: $(LIB_DIR)/hw_cap.c $(OBJ_DIR)/hw_cap.d
 		--globalize-symbol=hw_cap_l2ca_cdp --weaken-symbol=hw_cap_l2ca_cdp \
 		$@
 
+$(OBJ_DIR)/resctrl_alloc.o: $(LIB_DIR)/resctrl_alloc.c $(OBJ_DIR)/resctrl_alloc.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=resctrl_alloc_fopen --weaken-symbol=resctrl_alloc_fopen \
+		--globalize-symbol=resctrl_alloc_fclose --weaken-symbol=resctrl_alloc_fclose \
+		$@
+
+$(OBJ_DIR)/os_allocation.o: $(LIB_DIR)/os_allocation.c $(OBJ_DIR)/os_allocation.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=os_alloc_assoc_set --weaken-symbol=os_alloc_assoc_set \
+		--globalize-symbol=os_alloc_assoc_get --weaken-symbol=os_alloc_assoc_get \
+		--globalize-symbol=os_alloc_assoc_set_pid --weaken-symbol=os_alloc_assoc_set_pid \
+		--globalize-symbol=os_alloc_assoc_get_pid --weaken-symbol=os_alloc_assoc_get_pid \
+		--globalize-symbol=os_alloc_reset_cores --weaken-symbol=os_alloc_reset_cores \
+		--globalize-symbol=os_alloc_reset_schematas --weaken-symbol=os_alloc_reset_schematas \
+		--globalize-symbol=os_alloc_reset_tasks --weaken-symbol=os_alloc_reset_tasks \
+		--globalize-symbol=os_alloc_mount --weaken-symbol=os_alloc_mount \
+		$@
+
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 	mkdir -p $(OBJ_DIR)
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
@@ -76,7 +98,8 @@ $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 %.d: %.c
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
 
-test_api: test_api.c $(LIB_OBJS)
+$(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--start-group \
 		-Wl,--wrap=_pqos_check_init \
@@ -130,7 +153,8 @@ test_api: test_api.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_get \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=msr_write \
@@ -141,29 +165,24 @@ test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_alloc_assoc_write: test_hw_alloc_assoc_write.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_alloc_assoc_write: test_hw_alloc_assoc_write.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_alloc_assoc_read: test_hw_alloc_assoc_read.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_alloc_assoc_read: test_hw_alloc_assoc_read.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_alloc_reset_l3cdp: test_hw_alloc_reset_l3cdp.c $(LIB_OBJS)
-	$(CC) $(CFLAGS) \
-		-Wl,--wrap=msr_write \
-		-Wl,--wrap=msr_read \
-		-Wl,--wrap=_pqos_cap_get \
-		-Wl,--start-group \
-		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
-
-test_hw_alloc_reset_l2cdp: test_hw_alloc_reset_l2cdp.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_alloc_reset_l3cdp: test_hw_alloc_reset_l3cdp.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
@@ -171,7 +190,8 @@ test_hw_alloc_reset_l2cdp: test_hw_alloc_reset_l2cdp.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_alloc_reset_assoc: test_hw_alloc_reset_assoc.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_alloc_reset_l2cdp: test_hw_alloc_reset_l2cdp.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
@@ -179,37 +199,52 @@ test_hw_alloc_reset_assoc: test_hw_alloc_reset_assoc.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_alloc_assoc_unused: test_hw_alloc_assoc_unused.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_alloc_reset_assoc: test_hw_alloc_reset_assoc.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_hw_alloc_assoc_unused: test_hw_alloc_assoc_unused.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_l3ca_get_min_cbm_bits: test_hw_l3ca_get_min_cbm_bits.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_l3ca_get_min_cbm_bits: test_hw_l3ca_get_min_cbm_bits.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_l2ca_get_min_cbm_bits: test_hw_l2ca_get_min_cbm_bits.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_l2ca_get_min_cbm_bits: test_hw_l2ca_get_min_cbm_bits.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_alloc_reset_cos: test_hw_alloc_reset_cos.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_alloc_reset_cos: test_hw_alloc_reset_cos.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_alloc_assign: test_hw_alloc_assign.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_alloc_assign: test_hw_alloc_assign.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_mon_assoc_write: test_hw_mon_assoc_write.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_mon_assoc_write: test_hw_mon_assoc_write.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
@@ -218,7 +253,8 @@ test_hw_mon_assoc_write: test_hw_mon_assoc_write.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_mon_assoc_read: test_hw_mon_assoc_read.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_mon_assoc_read: test_hw_mon_assoc_read.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
@@ -227,7 +263,8 @@ test_hw_mon_assoc_read: test_hw_mon_assoc_read.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_mon_assoc_unused: test_hw_mon_assoc_unused.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_mon_assoc_unused: test_hw_mon_assoc_unused.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=perf_mon_init \
@@ -235,14 +272,16 @@ test_hw_mon_assoc_unused: test_hw_mon_assoc_unused.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_mon_read: test_hw_mon_read.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_mon_read: test_hw_mon_read.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_mon_read_counter: test_hw_mon_read_counter.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_mon_read_counter: test_hw_mon_read_counter.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=perf_mon_init \
@@ -250,27 +289,9 @@ test_hw_mon_read_counter: test_hw_mon_read_counter.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_mon_start_perf: test_hw_mon_start_perf.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_mon_start_perf: test_hw_mon_start_perf.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
-		-Wl,--wrap=perf_mon_init \
-		-Wl,--wrap=perf_mon_fini \
-		-Wl,--wrap=perf_mon_is_event_supported \
-		-Wl,--wrap=perf_mon_start \
-		-Wl,--wrap=perf_mon_stop \
-		-Wl,--start-group \
-		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
-
-test_hw_mon_start_counter: test_hw_mon_start_counter.c $(LIB_OBJS)
-	$(CC) $(CFLAGS) \
-		-Wl,--wrap=_pqos_cap_get \
-		-Wl,--wrap=perf_mon_init \
-		-Wl,--wrap=perf_mon_fini \
-		-Wl,--start-group \
-		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
-
-test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
-	$(CC) $(CFLAGS) \
-		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \
 		-Wl,--wrap=perf_mon_is_event_supported \
@@ -279,7 +300,29 @@ test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_cap: test_hw_cap.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_mon_start_counter: test_hw_mon_start_counter.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=perf_mon_init \
+		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=perf_mon_is_event_supported \
+		-Wl,--wrap=perf_mon_start \
+		-Wl,--wrap=perf_mon_stop \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_hw_cap: test_hw_cap.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=lcpuid \
 		-Wl,--wrap=msr_read \
@@ -287,27 +330,123 @@ test_hw_cap: test_hw_cap.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_cap_l3ca_cdp: test_hw_cap_l3ca_cdp.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_cap_l3ca_cdp: test_hw_cap_l3ca_cdp.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_read \
 		-Wl,--wrap=msr_write \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_hw_cap_l2ca_cdp: test_hw_cap_l2ca_cdp.c $(LIB_OBJS)
+$(BIN_DIR)/test_hw_cap_l2ca_cdp: test_hw_cap_l2ca_cdp.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_read \
 		-Wl,--wrap=msr_write \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-test_resctrl_schemata: test_resctrl_schemata.c $(LIB_OBJS)
+$(BIN_DIR)/test_resctrl_schemata: test_resctrl_schemata.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=fread \
 		-Wl,--wrap=fgets \
 		-Wl,--wrap=fprintf \
 		-Wl,--wrap=fwrite \
 		-Wl,--wrap=fputc \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_resctrl_alloc: test_resctrl_alloc.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=setvbuf \
+		-Wl,--wrap=kill \
+		-Wl,--wrap=resctrl_cpumask_write \
+		-Wl,--wrap=resctrl_cpumask_read \
+		-Wl,--wrap=resctrl_cpumask_set \
+		-Wl,--wrap=resctrl_schemata_read \
+		-Wl,--wrap=resctrl_schemata_l3ca_write \
+		-Wl,--wrap=resctrl_schemata_l2ca_write \
+		-Wl,--wrap=resctrl_schemata_mba_write \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_os_alloc_mount: test_os_alloc_mount.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=resctrl_mount \
+		-Wl,--wrap=resctrl_umount \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+
+$(BIN_DIR)/test_os_allocation: test_os_allocation.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=resctrl_mount \
+		-Wl,--wrap=resctrl_umount \
+		-Wl,--wrap=resctrl_lock_exclusive \
+		-Wl,--wrap=resctrl_lock_release \
+		-Wl,--wrap=resctrl_lock_shared \
+		-Wl,--wrap=resctrl_alloc_init \
+		-Wl,--wrap=resctrl_alloc_fini \
+		-Wl,--wrap=resctrl_alloc_assoc_set \
+		-Wl,--wrap=resctrl_alloc_assoc_get \
+		-Wl,--wrap=resctrl_alloc_assoc_get_pid \
+		-Wl,--wrap=resctrl_alloc_get_unused_group \
+		-Wl,--wrap=resctrl_alloc_cpumask_read \
+		-Wl,--wrap=resctrl_alloc_cpumask_write \
+		-Wl,--wrap=resctrl_alloc_schemata_read \
+		-Wl,--wrap=resctrl_alloc_schemata_write \
+		-Wl,--wrap=resctrl_alloc_task_write \
+		-Wl,--wrap=resctrl_cpumask_set \
+		-Wl,--wrap=resctrl_schemata_l3ca_set \
+		-Wl,--wrap=resctrl_schemata_l3ca_get \
+		-Wl,--wrap=resctrl_schemata_l2ca_set \
+		-Wl,--wrap=resctrl_schemata_l2ca_get \
+		-Wl,--wrap=resctrl_schemata_mba_set \
+		-Wl,--wrap=resctrl_schemata_mba_get \
+		-Wl,--wrap=_pqos_cap_l3cdp_change \
+		-Wl,--wrap=_pqos_cap_l2cdp_change \
+		-Wl,--wrap=_pqos_cap_mba_change \
+		-Wl,--wrap=mkdir \
+		-Wl,--wrap=resctrl_utils_file_exists \
+		-Wl,--wrap=resctrl_mon_active \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_os_alloc_assoc_set: test_os_alloc_assoc_set.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=resctrl_lock_exclusive \
+		-Wl,--wrap=resctrl_lock_release \
+		-Wl,--wrap=resctrl_lock_shared \
+		-Wl,--wrap=resctrl_alloc_assoc_set \
+		-Wl,--wrap=resctrl_mon_assoc_set \
+		-Wl,--wrap=resctrl_mon_assoc_get \
+		-Wl,--wrap=resctrl_mon_assoc_get_pid \
+		-Wl,--wrap=resctrl_mon_assoc_set_pid \
+		-Wl,--wrap=resctrl_alloc_assoc_set_pid \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_os_alloc_reset: test_os_alloc_reset.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=resctrl_mount \
+		-Wl,--wrap=resctrl_umount \
+		-Wl,--wrap=resctrl_lock_exclusive \
+		-Wl,--wrap=resctrl_lock_release \
+		-Wl,--wrap=resctrl_lock_shared \
+		-Wl,--wrap=resctrl_cpumask_set \
+		-Wl,--wrap=resctrl_alloc_cpumask_read \
+		-Wl,--wrap=resctrl_alloc_cpumask_write \
+		-Wl,--wrap=resctrl_alloc_schemata_write \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -350,5 +489,5 @@ style:
 	$(MAKE) codespell
 
 clean:
-	rm -f $(TESTS)
+	rm -rf $(BIN_DIR)
 	rm -rf $(OBJ_DIR)

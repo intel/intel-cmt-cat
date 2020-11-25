@@ -964,8 +964,7 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                                         break;
                                 }
                                 grp = &grps[grps_num++];
-                                strncpy(grp->name, grp_name,
-                                        sizeof(grp->name) - 1);
+                                strncpy(grp->name, grp_name, sizeof(grp->name));
                                 grp->name[sizeof(grp->name) - 1] = '\0';
                                 grp->valid = 1;
                         }

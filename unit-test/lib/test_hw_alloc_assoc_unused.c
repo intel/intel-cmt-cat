@@ -43,18 +43,6 @@
 
 #include "allocation.h"
 
-static int
-test_init_all(void **state)
-{
-        unsigned technology = 0;
-
-        technology |= 1 << PQOS_CAP_TYPE_MBA;
-        technology |= 1 << PQOS_CAP_TYPE_L3CA;
-        technology |= 1 << PQOS_CAP_TYPE_L2CA;
-
-        return test_init(state, technology);
-}
-
 /* ======== mock ======== */
 
 int

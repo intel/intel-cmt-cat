@@ -34,6 +34,7 @@
 
 #include <string.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 #include "resctrl_utils.h"
 #include "pqos.h"
 #include "types.h"
@@ -59,4 +60,12 @@ resctrl_utils_strtouint64(const char *s, int base, uint64_t *value)
         *value = val;
 
         return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_utils_file_exists(const char *path)
+{
+        struct stat st;
+
+        return stat(path, &st) == 0;
 }

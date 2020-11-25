@@ -43,6 +43,8 @@
 extern "C" {
 #endif
 
+#include "pqos.h"
+
 /**
  * @brief Initializes resctrl structures used for OS monitoring interface
  *

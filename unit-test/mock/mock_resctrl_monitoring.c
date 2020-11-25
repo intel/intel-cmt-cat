@@ -35,23 +35,47 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "mock_monitoring.h"
+
+#include "mock_resctrl_monitoring.h"
 
 int
-__wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
+__wrap_resctrl_mon_assoc_get(const unsigned lcore,
+                             char *name,
+                             const unsigned name_size)
 {
-        check_expected_ptr(group);
+        check_expected(lcore);
+        assert_non_null(name);
+        assert_int_not_equal(name_size, 0);
 
         return mock_type(int);
 }
 
 int
-__wrap_resctrl_mon_active(unsigned *monitoring_status)
+__wrap_resctrl_mon_assoc_set(const unsigned lcore, const char *name)
 {
-        int ret = mock_type(int);
+        check_expected(lcore);
+        assert_non_null(name);
 
-        if (ret == PQOS_RETVAL_OK)
-                *monitoring_status = mock_type(int);
+        return mock_type(int);
+}
 
-        return ret;
+int
+__wrap_resctrl_mon_assoc_get_pid(const pid_t task,
+                                 char *name,
+                                 const unsigned name_size)
+{
+        check_expected(task);
+        assert_non_null(name);
+        assert_int_not_equal(name_size, 0);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
+{
+        check_expected(task);
+        assert_non_null(name);
+
+        return mock_type(int);
 }

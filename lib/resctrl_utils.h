@@ -59,6 +59,17 @@ extern "C" {
  */
 int resctrl_utils_strtouint64(const char *s, int base, uint64_t *value);
 
+/**
+ * @brief Checks if file exists
+ *
+ * @param [in] path file path
+ *
+ * @return If file exists
+ * @retval 1 if file exists
+ * @retval 0 if file not exists
+ */
+int resctrl_utils_file_exists(const char *path);
+
 #ifdef __cplusplus
 }
 #endif

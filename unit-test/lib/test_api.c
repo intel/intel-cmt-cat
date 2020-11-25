@@ -174,9 +174,11 @@ test_pqos_alloc_assoc_get_hw(void **state __attribute__((unused)))
         expect_value(__wrap_hw_alloc_assoc_get, lcore, 0);
         expect_value(__wrap_hw_alloc_assoc_get, class_id, &id);
         will_return(__wrap_hw_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_hw_alloc_assoc_get, 5);
 
         ret = pqos_alloc_assoc_get(0, &id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(id, 5);
 }
 
 static void
@@ -190,9 +192,11 @@ test_pqos_alloc_assoc_get_os(void **state __attribute__((unused)))
         expect_value(__wrap_os_alloc_assoc_get, lcore, 0);
         expect_value(__wrap_os_alloc_assoc_get, class_id, &id);
         will_return(__wrap_os_alloc_assoc_get, PQOS_RETVAL_OK);
+        will_return(__wrap_os_alloc_assoc_get, 5);
 
         ret = pqos_alloc_assoc_get(0, &id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(id, 5);
 }
 
 /* ======== pqos_alloc_assoc_set_pid ======== */
@@ -284,9 +288,11 @@ test_pqos_alloc_assoc_get_pid_os(void **state __attribute__((unused)))
         expect_value(__wrap_os_alloc_assoc_get_pid, task, 1);
         expect_value(__wrap_os_alloc_assoc_get_pid, class_id, &id);
         will_return(__wrap_os_alloc_assoc_get_pid, PQOS_RETVAL_OK);
+        will_return(__wrap_os_alloc_assoc_get_pid, 5);
 
         ret = pqos_alloc_assoc_get_pid(1, &id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(id, 5);
 }
 #endif
 
@@ -373,9 +379,11 @@ test_pqos_alloc_assign_hw(void **state __attribute__((unused)))
         expect_value(__wrap_hw_alloc_assign, core_num, core_num);
         expect_value(__wrap_hw_alloc_assign, class_id, &class_id);
         will_return(__wrap_hw_alloc_assign, PQOS_RETVAL_OK);
+        will_return(__wrap_hw_alloc_assign, 3);
 
         ret = pqos_alloc_assign(technology, core_array, core_num, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(class_id, 3);
 }
 
 static void
@@ -394,9 +402,11 @@ test_pqos_alloc_assign_os(void **state __attribute__((unused)))
         expect_value(__wrap_os_alloc_assign, core_num, core_num);
         expect_value(__wrap_os_alloc_assign, class_id, &class_id);
         will_return(__wrap_os_alloc_assign, PQOS_RETVAL_OK);
+        will_return(__wrap_os_alloc_assign, 3);
 
         ret = pqos_alloc_assign(technology, core_array, core_num, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(class_id, 3);
 }
 
 /* ======== test_pqos_alloc_release ======== */
@@ -512,10 +522,12 @@ test_pqos_alloc_assign_pid_os(void **state __attribute__((unused)))
         expect_value(__wrap_os_alloc_assign_pid, task_num, task_num);
         expect_value(__wrap_os_alloc_assign_pid, class_id, &class_id);
         will_return(__wrap_os_alloc_assign_pid, PQOS_RETVAL_OK);
+        will_return(__wrap_os_alloc_assign_pid, 3);
 
         ret =
             pqos_alloc_assign_pid(technology, task_array, task_num, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(class_id, 3);
 }
 
 static void

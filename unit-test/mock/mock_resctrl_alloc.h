@@ -31,27 +31,32 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include "mock_monitoring.h"
+#ifndef MOCK_RESCTRL_ALLOC_H_
+#define MOCK_RESCTRL_ALLOC_H_
 
+#include "resctrl_alloc.h"
+
+int __wrap_resctrl_alloc_init(const struct pqos_cpuinfo *cpu,
+                              const struct pqos_cap *cap);
+int __wrap_resctrl_alloc_fini(void);
+int __wrap_resctrl_alloc_assoc_set(const unsigned lcore,
+                                   const unsigned class_id);
+int __wrap_resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
+int __wrap_resctrl_alloc_assoc_set_pid(const pid_t task,
+                                       const unsigned class_id);
+int __wrap_resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id);
+int __wrap_resctrl_alloc_get_unused_group(const unsigned grps_num,
+                                          unsigned *group_id);
+int __wrap_resctrl_alloc_cpumask_write(const unsigned class_id,
+                                       const struct resctrl_cpumask *mask);
+int __wrap_resctrl_alloc_cpumask_read(const unsigned class_id,
+                                      struct resctrl_cpumask *mask);
+int __wrap_resctrl_alloc_schemata_read(const unsigned class_id,
+                                       struct resctrl_schemata *schemata);
 int
-__wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
-{
-        check_expected_ptr(group);
+__wrap_resctrl_alloc_schemata_write(const unsigned class_id,
+                                    const unsigned technology,
+                                    const struct resctrl_schemata *schemata);
+int __wrap_resctrl_alloc_task_write(const unsigned class_id, const pid_t task);
 
-        return mock_type(int);
-}
-
-int
-__wrap_resctrl_mon_active(unsigned *monitoring_status)
-{
-        int ret = mock_type(int);
-
-        if (ret == PQOS_RETVAL_OK)
-                *monitoring_status = mock_type(int);
-
-        return ret;
-}
+#endif /* MOCK_RESCTRL_ALLOC_H_ */

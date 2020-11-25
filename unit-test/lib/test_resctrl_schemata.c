@@ -331,7 +331,7 @@ test_resctrl_schemata_read_l2(void **state)
         struct resctrl_schemata *schmt;
         struct pqos_l2ca ca;
         const char *l2_data = "L2:0=f;1=ff;2=f0;3=1";
-        FILE *fd;
+        FILE *fd = (FILE *)1;
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
@@ -372,7 +372,7 @@ test_resctrl_schemata_read_l2cdp(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l2ca ca;
-        FILE *fd;
+        FILE *fd = (FILE *)fd;
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
@@ -400,7 +400,7 @@ test_resctrl_schemata_read_l3(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l3ca ca;
-        FILE *fd;
+        FILE *fd = (FILE *)1;
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);

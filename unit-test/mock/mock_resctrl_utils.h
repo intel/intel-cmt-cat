@@ -31,27 +31,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include "mock_monitoring.h"
+#ifndef MOCK_RESCTRL_UTILS_H_
+#define MOCK_RESCTRL_UTILS_H_
 
-int
-__wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
-{
-        check_expected_ptr(group);
+#include "resctrl_utils.h"
 
-        return mock_type(int);
-}
+int __wrap_resctrl_utils_file_exists(const char *path);
 
-int
-__wrap_resctrl_mon_active(unsigned *monitoring_status)
-{
-        int ret = mock_type(int);
-
-        if (ret == PQOS_RETVAL_OK)
-                *monitoring_status = mock_type(int);
-
-        return ret;
-}
+#endif /* MOCK_RESCTRL_UTILS_H_ */

@@ -49,10 +49,16 @@ __wrap_os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 int
 __wrap_os_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
+        int ret;
+
         check_expected(lcore);
         check_expected_ptr(class_id);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *class_id = mock_type(int);
+
+        return ret;
 }
 
 int
@@ -67,10 +73,16 @@ __wrap_os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
 int
 __wrap_os_alloc_assoc_get_pid(const pid_t task, unsigned *class_id)
 {
+        int ret;
+
         check_expected(task);
         check_expected_ptr(class_id);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *class_id = mock_type(int);
+
+        return ret;
 }
 
 int
@@ -79,12 +91,18 @@ __wrap_os_alloc_assign(const unsigned technology,
                        const unsigned core_num,
                        unsigned *class_id)
 {
+        int ret;
+
         check_expected(technology);
         check_expected_ptr(core_array);
         check_expected(core_num);
         check_expected_ptr(class_id);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *class_id = mock_type(int);
+
+        return ret;
 }
 
 int
@@ -102,12 +120,18 @@ __wrap_os_alloc_assign_pid(const unsigned technology,
                            const unsigned task_num,
                            unsigned *class_id)
 {
+        int ret;
+
         check_expected(technology);
         check_expected_ptr(task_array);
         check_expected(task_num);
         check_expected_ptr(class_id);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *class_id = mock_type(int);
+
+        return ret;
 }
 
 int

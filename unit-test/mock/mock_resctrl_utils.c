@@ -35,23 +35,14 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "mock_monitoring.h"
+#include <string.h>
+
+#include "mock_resctrl_utils.h"
 
 int
-__wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
+__wrap_resctrl_utils_file_exists(const char *path)
 {
-        check_expected_ptr(group);
+        check_expected(path);
 
         return mock_type(int);
-}
-
-int
-__wrap_resctrl_mon_active(unsigned *monitoring_status)
-{
-        int ret = mock_type(int);
-
-        if (ret == PQOS_RETVAL_OK)
-                *monitoring_status = mock_type(int);
-
-        return ret;
 }
