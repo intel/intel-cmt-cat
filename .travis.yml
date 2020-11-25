@@ -2,13 +2,14 @@ sudo: required
 dist: focal
 before_script:
     - sudo apt-get -q update
-    - sudo apt-get install -y swig cppcheck wget python3-virtualenv python3-pip clang-format-9 codespell
+    - sudo apt-get install -y swig cppcheck wget python3-virtualenv python3-pip clang-format codespell
     - sudo python3 -m pip install pipenv
     - wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/checkpatch.pl && chmod a+x /tmp/checkpatch.pl
     - wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/spelling.txt
     - wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/const_structs.checkpatch
 script:
     - make cppcheck
+    - make setup-dev
     - make style CHECKPATCH=/tmp/checkpatch.pl CLANGFORMAT=clang-format-9
     - make
     - sudo make install
