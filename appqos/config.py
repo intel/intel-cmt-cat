@@ -364,10 +364,19 @@ class ConfigStore:
         Parameters
             data: configuration (dict)
         """
-        mba_ctrl_enabled = 'mba_ctrl' in data and data['mba_ctrl']['enabled']
-        rdt_iface = not 'rdt_iface' in data or data['rdt_iface']['interface'] != "os"
-        if mba_ctrl_enabled and rdt_iface:
+
+        # if data to be validated does not contain RDT iface and/or MBA CTRL info
+        # get missing info from current configuration
+        rdt_iface = data['rdt_iface']['interface'] if 'rdt_iface' in data\
+            else common.CONFIG_STORE.get_rdt_iface()
+        mba_ctrl_enabled = data['mba_ctrl']['enabled'] if 'mba_ctrl' in data\
+            else common.CONFIG_STORE.get_mba_ctrl_enabled()
+
+        if mba_ctrl_enabled and rdt_iface != "os":
             raise ValueError("RDT Configuration. MBA CTRL requires RDT OS interface!")
+
+        if mba_ctrl_enabled and not caps.mba_bw_supported():
+            raise ValueError("RDT Configuration. MBA CTRL requested but not supported!")
 
         if not 'pools' in data:
             return
@@ -396,11 +405,11 @@ class ConfigStore:
             raise ValueError("Pools {}, MBA is not supported."\
                 .format(mba_pool_ids + mba_bw_pool_ids))
 
-        if mba_bw_pool_ids and not caps.mba_bw_enabled():
+        if mba_bw_pool_ids and not mba_ctrl_enabled:
             raise ValueError("Pools {}, MBA BW is not enabled/supported."\
                 .format(mba_bw_pool_ids))
 
-        if mba_pool_ids and caps.mba_bw_enabled():
+        if mba_pool_ids and mba_ctrl_enabled:
             raise ValueError("Pools {}, MBA % is not enabled. Disable MBA BW and try again."\
                 .format(mba_pool_ids))
 

@@ -117,6 +117,14 @@ class AppQoS:
 
         # set initial RDT configuration
         log.info("Configuring RDT")
+
+        # Configure MBA CTRL
+        result = common.PQOS_API.enable_mba_bw(common.CONFIG_STORE.get_mba_ctrl_enabled())
+        if result != 0:
+            log.error("libpqos MBA CTRL initialization failed, Terminating...")
+            return
+        log.info("RDT MBA CTRL %sabled" % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
+
         result = cache_ops.configure_rdt()
         if result != 0:
             log.error("Failed to apply initial RDT configuration, terminating...")
@@ -184,6 +192,10 @@ def load_config(config_file):
         common.CONFIG_STORE.from_file(config_file)
     except IOError as ex:
         log.error("Error reading from config file {}... ".format(config_file))
+        log.error(ex)
+        return -1
+    except Exception as ex:
+        log.error("Invalid config file... ")
         log.error(ex)
         return -1
 

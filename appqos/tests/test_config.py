@@ -843,13 +843,14 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
     def test_pool_mba_mba_bw_enabled(self):
         data = {
             "auth": {
                 "password": "password",
                 "username": "admin"
             },
+            "rdt_iface": {"interface": "os"},
+            "mba_ctrl": {"enabled": True},
             "pools": [
                 {
                     "cbm": 0xf,

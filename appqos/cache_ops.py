@@ -398,6 +398,7 @@ def configure_rdt():
         0 on success
     """
     result = 0
+    recreate_default = False
 
     # Change RDT interface if needed
     cfg_rdt_iface = common.CONFIG_STORE.get_rdt_iface()
@@ -406,6 +407,7 @@ def configure_rdt():
             log.error("Failed to initialize RDT interface!")
             return -1
 
+        recreate_default = True
         log.info("RDT initialized with %s interface."\
             % (common.CONFIG_STORE.get_rdt_iface().upper()))
 
@@ -416,8 +418,11 @@ def configure_rdt():
             log.error("Failed to change MBA BW state!")
             return -1
 
+        recreate_default = True
         log.info("RDT MBA BW %sabled." % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
-        # On MBA BW state change it is needed to recreate Default Pool #0
+
+    if recreate_default:
+        # On interface or MBA BW state change it is needed to recreate Default Pool #0
         common.CONFIG_STORE.recreate_default_pool()
 
     # detect removed pools
