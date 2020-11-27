@@ -333,18 +333,22 @@ class TestPqosL2Cat(test.Test):
     #
     #  \b Instruction:
     #  Run "pqos [-I] -R l2cdp-on" to enable L2 CDP.
-    #  Run "pqos [-I] -e l2:2=0xe" to set both code and data cbm.
+    #  Select valid COS
+    #  Run "pqos [-I] -e l2:{COS}=0xe" to set both code and data cbm.
     #
     #  \b Result:
-    #  Observe the following in output "L2ID 1 L2CA COS2 => DATA 0xe,CODE 0xe"
+    #  Observe the following in output "L2ID 1 L2CA COS{COS} => DATA 0xe,CODE 0xe"
     @PRIORITY_MEDIUM
     @pytest.mark.rdt_supported("cdp_l2")
     def test_pqos_l2cat_set_code_and_data(self, iface):
         self.run_pqos(iface, "-R l2cdp-on")
 
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-e l2:2=0xe")
+        max_cdp_cos = Env().get('cat', 'l2', 'cos') // 2 - 1
+        cos = max_cdp_cos // 2
+
+        (stdout, _, exitstatus) = self.run_pqos(iface, f"-e l2:{cos}=0xe")
         assert exitstatus == 0
-        assert "L2ID 1 L2CA COS2 => DATA 0xe,CODE 0xe" in stdout
+        assert f"L2ID 1 L2CA COS{cos} => DATA 0xe,CODE 0xe" in stdout
 
 
     ## PQOS - L2 CDP Set COS definition - Code only
@@ -356,20 +360,23 @@ class TestPqosL2Cat(test.Test):
     #
     #  \b Instruction:
     #  Run "pqos [-I] -R l2cdp-on" to enable L2 CDP.
-    #  Run "pqos [-I] -e l2:4c=0xf" to set both code and data cbm.
+    #  Select valid COS
+    #  Run "pqos [-I] -e l2:{COS}c=0xf" to set both code and data cbm.
     #
     #  \b Result:
-    #  Observe the following in output "L2ID 1 L2CA COS4 => DATA 0x7ff,CODE 0xf"
+    #  Observe the following in output "L2ID 1 L2CA COS{COS} => DATA 0x7ff,CODE 0xf"
     @PRIORITY_MEDIUM
     @pytest.mark.rdt_supported("cdp_l2")
     def test_pqos_l2cat_set_code(self, iface):
         self.run_pqos(iface, "-R l2cdp-on")
 
         default_mask = (1 << Env().get('cat', 'l2', 'ways')) - 1
+        max_cdp_cos = Env().get('cat', 'l2', 'cos') // 2 - 1
+        cos = max_cdp_cos
 
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-e l2:4c=0xf")
+        (stdout, _, exitstatus) = self.run_pqos(iface, f"-e l2:{cos}c=0xf")
         assert exitstatus == 0
-        assert ("L2ID 1 L2CA COS4 => DATA {},CODE 0xf").format(hex(default_mask)) in stdout
+        assert f"L2ID 1 L2CA COS{cos} => DATA {hex(default_mask)},CODE 0xf" in stdout
 
 
     ## PQOS - L2 CDP Set COS definition - Data only
@@ -381,17 +388,20 @@ class TestPqosL2Cat(test.Test):
     #
     #  \b Instruction:
     #  Run "pqos [-I] -R l2cdp-on" to enable L2 CDP.
-    #  Run "pqos [-I] -e l2:3d=0xf" to set both code and data cbm.
+    #  Select valid COS
+    #  Run "pqos [-I] -e l2:{COS}d=0xf" to set both code and data cbm.
     #
     #  \b Result:
-    #  Observe the following in output "L2ID 1 L2CA COS3 => DATA 0xf,CODE 0x7ff"
+    #  Observe the following in output "L2ID 1 L2CA COS{COS} => DATA 0xf,CODE 0x7ff"
     @PRIORITY_MEDIUM
     @pytest.mark.rdt_supported("cdp_l2")
     def test_pqos_l2cat_set_data(self, iface):
         self.run_pqos(iface, "-R l2cdp-on")
 
         default_mask = (1 << Env().get('cat', 'l2', 'ways')) - 1
+        max_cdp_cos = Env().get('cat', 'l2', 'cos') // 2 - 1
+        cos = (max_cdp_cos // 2 + max_cdp_cos) // 2
 
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-e l2:3d=0xf")
+        (stdout, _, exitstatus) = self.run_pqos(iface, f"-e l2:{cos}d=0xf")
         assert exitstatus == 0
-        assert ("L2ID 1 L2CA COS3 => DATA 0xf,CODE {}").format(hex(default_mask)) in stdout
+        assert f"L2ID 1 L2CA COS{cos} => DATA 0xf,CODE {hex(default_mask)}" in stdout
