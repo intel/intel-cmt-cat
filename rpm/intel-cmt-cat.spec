@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    4.0.0
+%global githubver    4.1.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -173,6 +173,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Mon Nov 30 2020 Michal Aleksinski <michalx.aleksinski@intel.com> 4.1.0-1
+- New release 4.1.0
+
 * Fri May 29 2020 Michal Aleksinski <michalx.aleksinski@intel.com> 4.0.0-1
 - New release 4.0.0
 
