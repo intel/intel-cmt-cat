@@ -206,7 +206,7 @@ os_alloc_check(const struct pqos_cap *cap)
         /**
          * Resctrl is mounted
          */
-        if (resctrl_utils_file_exists(RESCTRL_PATH "/cpus"))
+        if (pqos_file_exists(RESCTRL_PATH "/cpus"))
                 return PQOS_RETVAL_OK;
 
         ret = os_alloc_mount(l3_cdp_mount, l2_cdp_mount, mba_mount);
@@ -247,7 +247,7 @@ os_alloc_prep(void)
                         return PQOS_RETVAL_ERROR;
 
                 /* if resctrl group doesn't exist - create it */
-                if (resctrl_utils_file_exists(buf)) {
+                if (pqos_dir_exists(buf)) {
                         LOG_DEBUG("resctrl group COS%d detected\n", i);
                         continue;
                 }
@@ -1228,28 +1228,26 @@ os_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         int ret = PQOS_RETVAL_OK;
         char buf[128];
         const struct pqos_capability *l3_cap = NULL;
-        FILE *fd;
+        uint64_t value;
+        const struct pqos_cap *cap;
 
         ASSERT(min_cbm_bits != NULL);
+
+        _pqos_cap_get(&cap, NULL);
 
         /**
          * Get L3 CAT capabilities
          */
-        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, &l3_cap);
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &l3_cap);
         if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_RESOURCE; /* L3 CAT not supported */
 
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf) - 1, "%s/info/L3/min_cbm_bits", RESCTRL_PATH);
 
-        fd = pqos_fopen(buf, "r");
-        if (fd == NULL)
-                return PQOS_RETVAL_ERROR;
-
-        if (fscanf(fd, "%u", min_cbm_bits) != 1)
-                ret = PQOS_RETVAL_ERROR;
-
-        fclose(fd);
+        ret = pqos_fread_uint64(buf, 10, &value);
+        if (ret == PQOS_RETVAL_OK)
+                *min_cbm_bits = (unsigned)value;
 
         return ret;
 }
@@ -1462,28 +1460,26 @@ os_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         int ret;
         char buf[128];
         const struct pqos_capability *l2_cap = NULL;
-        FILE *fd;
+        const struct pqos_cap *cap;
+        uint64_t value;
 
         ASSERT(min_cbm_bits != NULL);
+
+        _pqos_cap_get(&cap, NULL);
 
         /**
          * Get L2 CAT capabilities
          */
-        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, &l2_cap);
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L2CA, &l2_cap);
         if (ret != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_RESOURCE; /* L2 CAT not supported */
 
         memset(buf, 0, sizeof(buf));
         snprintf(buf, sizeof(buf) - 1, "%s/info/L2/min_cbm_bits", RESCTRL_PATH);
 
-        fd = pqos_fopen(buf, "r");
-        if (fd == NULL)
-                return PQOS_RETVAL_ERROR;
-
-        if (fscanf(fd, "%u", min_cbm_bits) != 1)
-                ret = PQOS_RETVAL_ERROR;
-
-        fclose(fd);
+        ret = pqos_fread_uint64(buf, 10, &value);
+        if (ret == PQOS_RETVAL_OK)
+                *min_cbm_bits = (unsigned)value;
 
         return ret;
 }

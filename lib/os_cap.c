@@ -52,102 +52,6 @@
 static int mba_ctrl = -1; /**< mba ctrl support */
 
 /**
- * @brief Checks file fname to detect str and sets a flag
- *
- * @param [in] fname name of the file to be searched
- * @param [in] str string being searched for
- * @param [in] check_symlink a flag indicating if a path must be checked
- *             against symlinks
- * @param [out] supported pointer to os_supported flag
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-detect_os_support(const char *fname,
-                  const char *str,
-                  int check_symlink,
-                  int *supported)
-{
-        FILE *fd;
-        char temp[1024];
-
-        if (fname == NULL || str == NULL || supported == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        if (check_symlink)
-                fd = pqos_fopen(fname, "r");
-        else
-                fd = fopen(fname, "r");
-
-        if (fd == NULL) {
-                LOG_DEBUG("%s not found.\n", fname);
-                *supported = 0;
-                return PQOS_RETVAL_OK;
-        }
-
-        while (fgets(temp, sizeof(temp), fd) != NULL) {
-                if (strstr(temp, str) != NULL) {
-                        *supported = 1;
-                        fclose(fd);
-                        return PQOS_RETVAL_OK;
-                }
-        }
-
-        fclose(fd);
-        return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Read uint64 from file
- *
- * @param [in] fname name of the file
- * @param [in] base numerical base
- * @param [out] value parsed value
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-readuint64(const char *fname, unsigned base, uint64_t *value)
-{
-        FILE *fd;
-        char buf[16] = "\0";
-        char *s = buf;
-        char *endptr = NULL;
-        size_t bytes;
-        unsigned long long val;
-
-        ASSERT(fname != NULL);
-        ASSERT(value != NULL);
-
-        fd = pqos_fopen(fname, "r");
-        if (fd == NULL)
-                return PQOS_RETVAL_ERROR;
-
-        bytes = fread(buf, sizeof(buf) - 1, 1, fd);
-        if (bytes == 0 && !feof(fd)) {
-                fclose(fd);
-                return PQOS_RETVAL_ERROR;
-        }
-        fclose(fd);
-
-        val = strtoull(s, &endptr, base);
-
-        if (!((*s != '\0' && *s != '\n') &&
-              (*endptr == '\0' || *endptr == '\n'))) {
-                LOG_ERROR("Error converting '%s' to unsigned number!\n", buf);
-                return PQOS_RETVAL_ERROR;
-        }
-        if (val > UINT64_MAX)
-                return PQOS_RETVAL_ERROR;
-
-        *value = val;
-
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Retrieves number of closids
  *
  * @param [in] dir path to info directory
@@ -165,7 +69,7 @@ get_num_closids(const char *dir, unsigned *num_closids)
 
         snprintf(path, sizeof(path) - 1, "%s/num_closids", dir);
 
-        ret = readuint64(path, 10, &val);
+        ret = pqos_fread_uint64(path, 10, &val);
         if (ret == PQOS_RETVAL_OK)
                 *num_closids = val;
 
@@ -190,7 +94,7 @@ get_num_ways(const char *dir, unsigned *num_ways)
 
         snprintf(path, sizeof(path) - 1, "%s/cbm_mask", dir);
 
-        ret = readuint64(path, 16, &val);
+        ret = pqos_fread_uint64(path, 16, &val);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -225,7 +129,7 @@ get_shareable_bits(const char *dir, uint64_t *shareable_bits)
         snprintf(path, sizeof(path) - 1, "%s/shareable_bits", dir);
 
         /* Information not present in info dir */
-        if (access(path, F_OK) != 0) {
+        if (!pqos_file_exists(path)) {
                 LOG_DEBUG("Unable to obtain ways contention bit-mask, %s file "
                           "does not exist\n",
                           path);
@@ -233,7 +137,7 @@ get_shareable_bits(const char *dir, uint64_t *shareable_bits)
                 return PQOS_RETVAL_OK;
         }
 
-        return readuint64(path, 16, shareable_bits);
+        return pqos_fread_uint64(path, 16, shareable_bits);
 }
 
 int
@@ -241,12 +145,11 @@ os_cap_init(const enum pqos_interface inter)
 {
         int ret;
         int res_flag = 0;
-        struct stat st;
 
         /**
          * resctrl detection
          */
-        ret = detect_os_support(PROC_FILESYSTEMS, "resctrl", 0, &res_flag);
+        ret = pqos_file_contains(PROC_FILESYSTEMS, "resctrl", &res_flag);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Fatal error encountered in resctrl detection!\n");
                 return ret;
@@ -263,7 +166,7 @@ os_cap_init(const enum pqos_interface inter)
         /**
          * Mount resctrl with default parameters
          */
-        if (access(RESCTRL_PATH "/cpus", F_OK) != 0) {
+        if (!pqos_file_exists(RESCTRL_PATH "/cpus")) {
                 LOG_INFO("resctrl not mounted\n");
                 /**
                  * Check if it is possible to enable MBA CTRL
@@ -295,7 +198,7 @@ os_cap_init(const enum pqos_interface inter)
         }
 
         if (inter == PQOS_INTER_OS_RESCTRL_MON &&
-            stat(RESCTRL_PATH_INFO_L3_MON, &st) != 0) {
+            !pqos_dir_exists(RESCTRL_PATH_INFO_L3_MON)) {
                 LOG_ERROR("Resctrl monitoring selected but not supported\n");
                 return PQOS_RETVAL_INTER;
         }
@@ -303,22 +206,11 @@ os_cap_init(const enum pqos_interface inter)
         return ret;
 }
 
-/**
- * @brief Checks if event is supported by resctrl monitoring
- *
- * @param [in] event monitoring event type
- * @param [out] supported set to 1 if resctrl support is present
- * @param [out] scale scale factor
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-detect_mon_resctrl_support(const enum pqos_mon_event event,
+int
+os_cap_mon_resctrl_support(const enum pqos_mon_event event,
                            int *supported,
                            uint32_t *scale)
 {
-        struct stat st;
         const char *event_name = NULL;
         int ret;
 
@@ -327,7 +219,7 @@ detect_mon_resctrl_support(const enum pqos_mon_event event,
         *supported = 0;
 
         /* resctrl monitoring is not supported */
-        if (stat(RESCTRL_PATH_INFO_L3_MON, &st) != 0)
+        if (!pqos_dir_exists(RESCTRL_PATH_INFO_L3_MON))
                 return PQOS_RETVAL_OK;
 
         switch (event) {
@@ -345,8 +237,8 @@ detect_mon_resctrl_support(const enum pqos_mon_event event,
                 break;
         }
 
-        ret = detect_os_support(RESCTRL_PATH_INFO_L3_MON "/mon_features",
-                                event_name, 1, supported);
+        ret = pqos_file_contains(RESCTRL_PATH_INFO_L3_MON "/mon_features",
+                                 event_name, supported);
 
         if (scale != NULL)
                 *scale = 1;
@@ -431,23 +323,12 @@ get_mon_perf_scale_factor(const char *event_name, uint32_t *scale)
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Checks if event is supported by perf
- *
- * @param [in] event monitoring event type
- * @param [out] supported set to 1 if perf support is present
- * @param [out] scale scale factor
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-detect_mon_perf_support(const enum pqos_mon_event event,
+int
+os_cap_mon_perf_support(const enum pqos_mon_event event,
                         int *supported,
                         uint32_t *scale)
 {
         char path[128];
-        struct stat st;
         const char *event_name = NULL;
         int ret;
         static int warn = 1;
@@ -482,7 +363,7 @@ detect_mon_perf_support(const enum pqos_mon_event event,
 
         snprintf(path, sizeof(path) - 1, PERF_MON_PATH "/events/%s",
                  event_name);
-        if (stat(path, &st) != 0)
+        if (!pqos_file_exists(path))
                 return PQOS_RETVAL_OK;
 
         *supported = 1;
@@ -536,7 +417,7 @@ detect_mon_support(const enum pqos_mon_event event,
                 return PQOS_RETVAL_OK;
         }
 
-        ret = detect_mon_resctrl_support(event, supported, scale);
+        ret = os_cap_mon_resctrl_support(event, supported, scale);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Fatal error encountered while checking for resctrl "
                           "monitoring support\n");
@@ -545,7 +426,7 @@ detect_mon_support(const enum pqos_mon_event event,
         if (*supported)
                 return ret;
 
-        ret = detect_mon_perf_support(event, supported, scale);
+        ret = os_cap_mon_perf_support(event, supported, scale);
         if (ret != PQOS_RETVAL_OK)
                 LOG_ERROR("Fatal error encountered while checking for perf "
                           "monitoring support\n");
@@ -573,7 +454,7 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
             /* clang-format on */
         };
 
-        ret = detect_os_support(PROC_CPUINFO, "cqm", 0, &supported);
+        ret = pqos_file_contains(PROC_CPUINFO, "cqm", &supported);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Fatal error encountered in"
                           " OS detection!\n");
@@ -582,9 +463,9 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
         if (!supported)
                 return PQOS_RETVAL_RESOURCE;
 
-        if (access(RESCTRL_PATH_INFO_L3_MON "/num_rmids", F_OK) == 0) {
-                ret = readuint64(RESCTRL_PATH_INFO_L3_MON "/num_rmids", 10,
-                                 &num_rmids);
+        if (pqos_file_exists(RESCTRL_PATH_INFO_L3_MON "/num_rmids")) {
+                ret = pqos_fread_uint64(RESCTRL_PATH_INFO_L3_MON "/num_rmids",
+                                        10, &num_rmids);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
         }
@@ -639,18 +520,17 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
 int
 os_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
 {
-        struct stat st;
         const char *info;
         int cdp_on;
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(cap != NULL);
 
-        if (stat(RESCTRL_PATH_INFO_L3, &st) == 0) {
+        if (pqos_dir_exists(RESCTRL_PATH_INFO_L3)) {
                 info = RESCTRL_PATH_INFO_L3;
                 cdp_on = 0;
-        } else if (stat(RESCTRL_PATH_INFO_L3CODE, &st) == 0 &&
-                   stat(RESCTRL_PATH_INFO_L3DATA, &st) == 0) {
+        } else if (pqos_dir_exists(RESCTRL_PATH_INFO_L3CODE) &&
+                   pqos_dir_exists(RESCTRL_PATH_INFO_L3DATA)) {
                 info = RESCTRL_PATH_INFO_L3CODE;
                 cdp_on = 1;
         } else
@@ -675,7 +555,7 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                 return ret;
 
         if (!cdp_on)
-                ret = detect_os_support(PROC_CPUINFO, "cdp_l3", 0, &cap->cdp);
+                ret = pqos_file_contains(PROC_CPUINFO, "cdp_l3", &cap->cdp);
 
         return ret;
 }
@@ -683,18 +563,17 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
 int
 os_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
 {
-        struct stat st;
         const char *info;
         int cdp_on;
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(cap != NULL);
 
-        if (stat(RESCTRL_PATH_INFO_L2, &st) == 0) {
+        if (pqos_dir_exists(RESCTRL_PATH_INFO_L2)) {
                 info = RESCTRL_PATH_INFO_L2;
                 cdp_on = 0;
-        } else if (stat(RESCTRL_PATH_INFO_L2CODE, &st) == 0 &&
-                   stat(RESCTRL_PATH_INFO_L2DATA, &st) == 0) {
+        } else if (pqos_dir_exists(RESCTRL_PATH_INFO_L2CODE) &&
+                   pqos_dir_exists(RESCTRL_PATH_INFO_L2DATA)) {
                 info = RESCTRL_PATH_INFO_L2CODE;
                 cdp_on = 1;
         } else
@@ -719,7 +598,7 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
                 return ret;
 
         if (!cdp_on)
-                ret = detect_os_support(PROC_CPUINFO, "cdp_l2", 0, &cap->cdp);
+                ret = pqos_file_contains(PROC_CPUINFO, "cdp_l2", &cap->cdp);
 
         return ret;
 }
@@ -743,12 +622,12 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 return PQOS_RETVAL_OK;
         }
 
-        if (access(RESCTRL_PATH "/cpus", F_OK) != 0)
+        if (!pqos_file_exists(RESCTRL_PATH "/cpus"))
                 *enabled = 0;
 
         /* check mount flags */
         if (*enabled == -1) {
-                ret = detect_os_support(PROC_MOUNTS, "mba_MBps", 0, enabled);
+                ret = pqos_file_contains(PROC_MOUNTS, "mba_MBps", enabled);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
         }
@@ -852,7 +731,7 @@ ctrl_support:
         else {
                 int mbl = 0;
 
-                ret = detect_mon_resctrl_support(PQOS_MON_EVENT_LMEM_BW, &mbl,
+                ret = os_cap_mon_resctrl_support(PQOS_MON_EVENT_LMEM_BW, &mbl,
                                                  NULL);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
@@ -877,7 +756,6 @@ ctrl_exit:
 int
 os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
-        struct stat st;
         uint64_t val;
         const char *info = RESCTRL_PATH_INFO_MB;
         int ret = PQOS_RETVAL_OK;
@@ -885,7 +763,7 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         UNUSED_PARAM(cpu);
         ASSERT(cap != NULL);
 
-        if (stat(RESCTRL_PATH_INFO_MB, &st) != 0)
+        if (!pqos_dir_exists(RESCTRL_PATH_INFO_MB))
                 return PQOS_RETVAL_RESOURCE;
 
         memset(cap, 0, sizeof(*cap));
@@ -898,7 +776,7 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
                 return ret;
 
         /* Detect MBA CTRL status */
-        ret = detect_os_support(PROC_MOUNTS, "mba_MBps", 0, &(cap->ctrl_on));
+        ret = pqos_file_contains(PROC_MOUNTS, "mba_MBps", &(cap->ctrl_on));
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         if (cap->ctrl_on == 1)
@@ -906,19 +784,21 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         else
                 cap->ctrl = mba_ctrl;
 
-        ret = readuint64(RESCTRL_PATH_INFO_MB "/min_bandwidth", 10, &val);
+        ret =
+            pqos_fread_uint64(RESCTRL_PATH_INFO_MB "/min_bandwidth", 10, &val);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         else
                 cap->throttle_max = 100 - val;
 
-        ret = readuint64(RESCTRL_PATH_INFO_MB "/bandwidth_gran", 10, &val);
+        ret =
+            pqos_fread_uint64(RESCTRL_PATH_INFO_MB "/bandwidth_gran", 10, &val);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         else
                 cap->throttle_step = val;
 
-        ret = readuint64(RESCTRL_PATH_INFO_MB "/delay_linear", 10, &val);
+        ret = pqos_fread_uint64(RESCTRL_PATH_INFO_MB "/delay_linear", 10, &val);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
         else

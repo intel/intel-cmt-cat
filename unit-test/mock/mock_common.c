@@ -35,83 +35,54 @@
 #include <stddef.h>
 #include <setjmp.h>
 #include <cmocka.h>
-#include "mock_os_monitoring.h"
+
+#include "pqos.h"
+
+#include "mock_common.h"
 
 int
-__wrap_os_mon_reset(void)
+__wrap_pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
 {
-        return mock_type(int);
+        int ret;
+
+        check_expected(fname);
+        check_expected(base);
+        assert_non_null(value);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *value = mock_type(uint64_t);
+
+        return ret;
 }
 
 int
-__wrap_os_mon_start(const unsigned num_cores,
-                    const unsigned *cores,
-                    const enum pqos_mon_event event,
-                    void *context,
-                    struct pqos_mon_data *group)
+__wrap_pqos_file_exists(const char *path)
 {
-        check_expected(num_cores);
-        check_expected_ptr(cores);
-        check_expected(event);
-        check_expected_ptr(context);
-        check_expected_ptr(group);
-
-        return mock_type(int);
-}
-
-int
-__wrap_os_mon_stop(struct pqos_mon_data *group)
-{
-        check_expected_ptr(group);
-
-        return mock_type(int);
-}
-
-int
-__wrap_os_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
-{
-        check_expected_ptr(group);
-        check_expected(event);
+        check_expected(path);
 
         return mock_type(int);
 }
 
 int
-__wrap_os_mon_start_pids(const unsigned num_pids,
-                         const pid_t *pids,
-                         const enum pqos_mon_event event,
-                         void *context,
-                         struct pqos_mon_data *group)
+__wrap_pqos_dir_exists(const char *path)
 {
-        check_expected(num_pids);
-        assert_non_null(pids);
-        check_expected(event);
-        check_expected_ptr(context);
-        check_expected_ptr(group);
+        check_expected(path);
 
         return mock_type(int);
 }
 
 int
-__wrap_os_mon_add_pids(const unsigned num_pids,
-                       const pid_t *pids,
-                       struct pqos_mon_data *group)
+__wrap_pqos_file_contains(const char *fname, const char *str, int *found)
 {
-        check_expected(num_pids);
-        check_expected_ptr(pids);
-        check_expected_ptr(group);
+        int ret;
 
-        return mock_type(int);
-}
+        check_expected(fname);
+        check_expected(str);
 
-int
-__wrap_os_mon_remove_pids(const unsigned num_pids,
-                          const pid_t *pids,
-                          struct pqos_mon_data *group)
-{
-        check_expected(num_pids);
-        check_expected_ptr(pids);
-        check_expected_ptr(group);
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *found = mock_type(int);
 
-        return mock_type(int);
+        return ret;
 }

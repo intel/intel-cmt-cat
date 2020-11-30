@@ -1932,7 +1932,6 @@ test_pqos_mon_start_pids_os(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         expect_value(__wrap_os_mon_start_pids, num_pids, num_pids);
-        expect_value(__wrap_os_mon_start_pids, pids, pids);
         expect_value(__wrap_os_mon_start_pids, event, event);
         expect_value(__wrap_os_mon_start_pids, context, context);
         expect_value(__wrap_os_mon_start_pids, group, &group);
@@ -2002,6 +2001,51 @@ test_pqos_mon_start_pids_param(void **state __attribute__((unused)))
         ret = pqos_mon_start_pids(num_pids, pids, PQOS_PERF_EVENT_LLC_MISS,
                                   context, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_mon_start_pid ======== */
+
+static void
+test_pqos_mon_start_pid_os(void **state __attribute__((unused)))
+{
+        int ret;
+        pid_t pid = 1;
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data group;
+
+        memset(&group, 0, sizeof(group));
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_os_mon_start_pids, num_pids, 1);
+        expect_value(__wrap_os_mon_start_pids, event, event);
+        expect_value(__wrap_os_mon_start_pids, context, context);
+        expect_value(__wrap_os_mon_start_pids, group, &group);
+        will_return(__wrap_os_mon_start_pids, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_start_pid(pid, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        if (group.intl != NULL)
+                free(group.intl);
+}
+
+static void
+test_pqos_mon_start_pid_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        pid_t pid = 1;
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data group;
+
+        memset(&group, 0, sizeof(group));
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_start_pid(pid, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
 /* ======== pqos_mon_add_pids ======== */
@@ -2258,6 +2302,7 @@ main(void)
             cmocka_unit_test(test_pqos_mon_stop_hw),
             cmocka_unit_test(test_pqos_mon_poll),
             cmocka_unit_test(test_pqos_mon_start_pids_hw),
+            cmocka_unit_test(test_pqos_mon_start_pid_hw),
             cmocka_unit_test(test_pqos_mon_add_pids_hw),
             cmocka_unit_test(test_pqos_mon_remove_pids_hw)};
 
@@ -2288,6 +2333,7 @@ main(void)
             cmocka_unit_test(test_pqos_mon_stop_os),
             cmocka_unit_test(test_pqos_mon_poll),
             cmocka_unit_test(test_pqos_mon_start_pids_os),
+            cmocka_unit_test(test_pqos_mon_start_pid_os),
             cmocka_unit_test(test_pqos_mon_add_pids_os),
             cmocka_unit_test(test_pqos_mon_remove_pids_os)};
 #endif

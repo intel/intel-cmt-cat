@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2014-2020 Intel Corporation. All rights reserved.
+ * Copyright(c) 2020 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -110,6 +110,7 @@ test_cap_init(struct test_data *data, unsigned technology)
                 data->cap_l3ca.num_ways = 16;
                 data->cap_l3ca.cdp = 0;
                 data->cap_l3ca.cdp_on = 0;
+                data->cap_l3ca.way_contention = 0xc000;
 
                 cap->capabilities[cap_num].type = PQOS_CAP_TYPE_L3CA;
                 cap->capabilities[cap_num].u.l3ca = &data->cap_l3ca;
@@ -121,6 +122,7 @@ test_cap_init(struct test_data *data, unsigned technology)
                 data->cap_l2ca.num_ways = 8;
                 data->cap_l2ca.cdp = 0;
                 data->cap_l2ca.cdp_on = 0;
+                data->cap_l2ca.way_contention = 0xc0;
 
                 cap->capabilities[cap_num].type = PQOS_CAP_TYPE_L2CA;
                 cap->capabilities[cap_num].u.l2ca = &data->cap_l2ca;

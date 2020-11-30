@@ -106,9 +106,7 @@ pqos_fgets(char *s, int n, FILE *stream)
                         goto pqos_fgets_error;
                 *p = '\0';
 
-                if ((ssize_t)strlen(line) != line_read - 1)
-                        goto pqos_fgets_error;
-                if (line_read > n)
+                if ((ssize_t)strlen(line) != line_read - 1 || line_read > n)
                         goto pqos_fgets_error;
                 for (i = 0; i < line_read - 1; ++i)
                         if (!isascii(line[i]))
@@ -126,4 +124,101 @@ pqos_fgets_error:
                 free(line);
 
         return NULL;
+}
+
+int
+pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
+{
+        FILE *fd;
+        char buf[16] = "\0";
+        char *s = buf;
+        char *endptr = NULL;
+        size_t bytes;
+        unsigned long long val;
+
+        ASSERT(fname != NULL);
+        ASSERT(value != NULL);
+
+        fd = pqos_fopen(fname, "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        bytes = fread(buf, sizeof(buf) - 1, 1, fd);
+        if (bytes == 0 && !feof(fd)) {
+                fclose(fd);
+                return PQOS_RETVAL_ERROR;
+        }
+        fclose(fd);
+
+        val = strtoull(s, &endptr, base);
+
+        if (!((*s != '\0' && *s != '\n') &&
+              (*endptr == '\0' || *endptr == '\n'))) {
+                LOG_ERROR("Error converting '%s' to unsigned number!\n", buf);
+                return PQOS_RETVAL_ERROR;
+        }
+        if (val < UINT64_MAX) {
+                *value = val;
+                return PQOS_RETVAL_OK;
+        }
+
+        return PQOS_RETVAL_ERROR;
+}
+
+int
+pqos_file_exists(const char *path)
+{
+        return access(path, F_OK) == 0;
+}
+
+/**
+ * @brief Checks if directory exists
+ *
+ * @param [in] path file path
+ *
+ * @return If file exists
+ * @retval 1 if file exists
+ * @retval 0 if file not exists
+ */
+int
+pqos_dir_exists(const char *path)
+{
+        struct stat st;
+
+        return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+int
+pqos_file_contains(const char *fname, const char *str, int *found)
+{
+        FILE *fd;
+        char temp[1024];
+        int check_symlink = 1;
+
+        if (fname == NULL || str == NULL || found == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (strncmp(fname, "/proc/", 6) == 0)
+                check_symlink = 0;
+
+        if (check_symlink)
+                fd = pqos_fopen(fname, "r");
+        else
+                fd = fopen(fname, "r");
+
+        if (fd == NULL) {
+                LOG_DEBUG("%s not found.\n", fname);
+                *found = 0;
+                return PQOS_RETVAL_OK;
+        }
+
+        while (fgets(temp, sizeof(temp), fd) != NULL) {
+                if (strstr(temp, str) != NULL) {
+                        *found = 1;
+                        break;
+                }
+        }
+
+        fclose(fd);
+        return PQOS_RETVAL_OK;
 }

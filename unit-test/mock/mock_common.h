@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2019-2020 Intel Corporation. All rights reserved.
+ * Copyright(c) 2020 Intel Corporation. All rights reserved.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,39 +28,17 @@
  * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
  * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.O
- *
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/**
- * @brief Internal header file for resctrl utility functions
- */
+#ifndef MOCK_COMMON_H_
+#define MOCK_COMMON_H_
 
-#ifndef __PQOS_RESCTRL_UTILS_H__
-#define __PQOS_RESCTRL_UTILS_H__
+#include "common.h"
 
-#include <stdint.h>
+int __wrap_pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value);
+int __wrap_pqos_file_exists(const char *path);
+int __wrap_pqos_dir_exists(const char *path);
+int __wrap_pqos_file_contains(const char *fname, const char *str, int *found);
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-/**
- * @brief Converts string into 64-bit unsigned number.
- *
- * Numbers can be in decimal or hexadecimal format.
- *
- * @param [in] s string to be converted into 64-bit unsigned number
- * @param [in] base Numerical base
- * @param [out] Numeric value of the string representing the number
- *
- * @return Operational status
- * @retval PQOS_RETVAL_OK on success
- */
-int resctrl_utils_strtouint64(const char *s, int base, uint64_t *value);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __PQOS_RESCTRL_UTILS_H__ */
+#endif /* MOCK_COMMON_H_ */

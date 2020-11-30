@@ -44,6 +44,9 @@ extern "C" {
 #endif
 
 #include <stdio.h>
+#include <stdint.h>
+
+#include "types.h"
 
 /**
  * @brief Wrapper around fopen() that additionally checks if a given path
@@ -57,7 +60,7 @@ extern "C" {
  * contains any symbolic links).
  */
 /* clang-format off */
-FILE * pqos_fopen(const char *name, const char *mode);
+PQOS_LOCAL FILE * pqos_fopen(const char *name, const char *mode);
 /* clang-format on */
 
 /**
@@ -69,12 +72,60 @@ FILE * pqos_fopen(const char *name, const char *mode);
  *
  * @return output buffer
  */
-char *pqos_strcat(char *dst, const char *src, size_t size);
+PQOS_LOCAL char *pqos_strcat(char *dst, const char *src, size_t size);
 
 /**
  * @brief Wrapper around fgets
  */
-char *pqos_fgets(char *s, int n, FILE *stream);
+PQOS_LOCAL char *pqos_fgets(char *s, int n, FILE *stream);
+
+/**
+ * @brief Read uint64 from file
+ *
+ * @param [in] fname name of the file
+ * @param [in] base numerical base
+ * @param [out] value UINT value
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL int
+pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value);
+
+/**
+ * @brief Checks if file exists
+ *
+ * @param [in] path file path
+ *
+ * @return If file exists
+ * @retval 1 if file exists
+ * @retval 0 if file not exists
+ */
+PQOS_LOCAL int pqos_file_exists(const char *path);
+
+/**
+ * @brief Checks if directory exists
+ *
+ * @param [in] path directory path
+ *
+ * @return If file exists
+ * @retval 1 if directory exists
+ * @retval 0 if directory not exists
+ */
+PQOS_LOCAL int pqos_dir_exists(const char *path);
+
+/**
+ * @brief Checks file fname to detect str and sets a flag
+ *
+ * @param [in] fname name of the file to be searched
+ * @param [in] str string being searched for
+ * @param [out] found pointer to search result
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL int
+pqos_file_contains(const char *fname, const char *str, int *found);
 
 #ifdef __cplusplus
 }

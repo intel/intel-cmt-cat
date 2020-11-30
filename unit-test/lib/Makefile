@@ -89,6 +89,13 @@ $(OBJ_DIR)/os_allocation.o: $(LIB_DIR)/os_allocation.c $(OBJ_DIR)/os_allocation.
 		--globalize-symbol=os_alloc_mount --weaken-symbol=os_alloc_mount \
 		$@
 
+$(OBJ_DIR)/os_cap.o: $(LIB_DIR)/os_cap.c $(OBJ_DIR)/os_cap.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=os_cap_mon_resctrl_support --weaken-symbol=os_cap_mon_resctrl_support \
+		--globalize-symbol=os_cap_mon_perf_support --weaken-symbol=os_cap_mon_perf_support \
+		$@
+
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 	mkdir -p $(OBJ_DIR)
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
@@ -101,7 +108,6 @@ $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
-		-Wl,--start-group \
 		-Wl,--wrap=_pqos_check_init \
 		-Wl,--wrap=_pqos_api_lock \
 		-Wl,--wrap=_pqos_api_unlock \
@@ -151,6 +157,7 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 		-Wl,--wrap=os_mon_add_pids \
 		-Wl,--wrap=os_mon_remove_pids \
 		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
 $(BIN_DIR)/test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
@@ -413,8 +420,10 @@ $(BIN_DIR)/test_os_allocation: test_os_allocation.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_l2cdp_change \
 		-Wl,--wrap=_pqos_cap_mba_change \
 		-Wl,--wrap=mkdir \
-		-Wl,--wrap=resctrl_utils_file_exists \
+		-Wl,--wrap=pqos_file_exists \
+		-Wl,--wrap=pqos_dir_exists \
 		-Wl,--wrap=resctrl_mon_active \
+		-Wl,--wrap=pqos_fread_uint64 \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -447,6 +456,33 @@ $(BIN_DIR)/test_os_alloc_reset: test_os_alloc_reset.c $(LIB_OBJS)
 		-Wl,--wrap=resctrl_alloc_cpumask_read \
 		-Wl,--wrap=resctrl_alloc_cpumask_write \
 		-Wl,--wrap=resctrl_alloc_schemata_write \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_os_cap: test_os_cap.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=resctrl_mount \
+		-Wl,--wrap=resctrl_umount \
+		-Wl,--wrap=resctrl_lock_exclusive \
+		-Wl,--wrap=resctrl_lock_release \
+		-Wl,--wrap=resctrl_lock_shared \
+		-Wl,--wrap=pqos_dir_exists \
+		-Wl,--wrap=pqos_file_exists \
+		-Wl,--wrap=pqos_file_contains \
+		-Wl,--wrap=pqos_fread_uint64 \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_os_cap_mon: test_os_cap_mon.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=pqos_dir_exists \
+		-Wl,--wrap=pqos_file_exists \
+		-Wl,--wrap=pqos_file_contains \
+		-Wl,--wrap=pqos_fread_uint64 \
+		-Wl,--wrap=resctrl_mount \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

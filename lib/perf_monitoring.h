@@ -43,7 +43,7 @@
 extern "C" {
 #endif
 
-#define PERF_MON_PATH "/sys/devices/intel_cqm/"
+#define PERF_MON_PATH "/sys/devices/intel_cqm"
 
 /**
  * Local monitor event types

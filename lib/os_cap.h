@@ -38,6 +38,9 @@
 extern "C" {
 #endif
 
+#include "types.h"
+#include "pqos.h"
+
 /**
  * @brief Retrieves MBA controller configuration status
  *
@@ -50,10 +53,10 @@ extern "C" {
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_cap_get_mba_ctrl(const struct pqos_cap *cap,
-                        const struct pqos_cpuinfo *cpu,
-                        int *supported,
-                        int *enabled);
+PQOS_LOCAL int os_cap_get_mba_ctrl(const struct pqos_cap *cap,
+                                   const struct pqos_cpuinfo *cpu,
+                                   int *supported,
+                                   int *enabled);
 
 /**
  * @brief Initializes os capabilities
@@ -63,7 +66,36 @@ int os_cap_get_mba_ctrl(const struct pqos_cap *cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_init(const enum pqos_interface inter);
+PQOS_LOCAL int os_cap_init(const enum pqos_interface inter);
+
+/**
+ * @brief Checks if event is supported by resctrl monitoring
+ *
+ * @param [in] event monitoring event type
+ * @param [out] supported set to 1 if resctrl support is present
+ * @param [out] scale scale factor
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL int os_cap_mon_resctrl_support(const enum pqos_mon_event event,
+                                          int *supported,
+                                          uint32_t *scale);
+
+/**
+ * @brief Checks if event is supported by perf
+ *
+ * @param [in] event monitoring event type
+ * @param [out] supported set to 1 if perf support is present
+ * @param [out] scale scale factor
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+
+PQOS_LOCAL int os_cap_mon_perf_support(const enum pqos_mon_event event,
+                                       int *supported,
+                                       uint32_t *scale);
 
 /**
  * @brief Discovers OS monitoring support
@@ -74,8 +106,8 @@ int os_cap_init(const enum pqos_interface inter);
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_mon_discover(struct pqos_cap_mon **r_cap,
-                        const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int os_cap_mon_discover(struct pqos_cap_mon **r_cap,
+                                   const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers OS support of L3 CAT
@@ -86,8 +118,8 @@ int os_cap_mon_discover(struct pqos_cap_mon **r_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
-                         const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int os_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
+                                    const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers OS support of L2 CAT
@@ -98,8 +130,8 @@ int os_cap_l3ca_discover(struct pqos_cap_l3ca *cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
-                         const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int os_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
+                                    const struct pqos_cpuinfo *cpu);
 
 /**
  * @brief Discovers OS support of MBA
@@ -110,8 +142,8 @@ int os_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_cap_mba_discover(struct pqos_cap_mba *cap,
-                        const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL int os_cap_mba_discover(struct pqos_cap_mba *cap,
+                                   const struct pqos_cpuinfo *cpu);
 
 #ifdef __cplusplus
 }

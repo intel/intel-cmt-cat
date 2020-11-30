@@ -40,6 +40,7 @@
 
 #include "test.h"
 #include "mock_cap.h"
+#include "mock_common.h"
 #include "mock_resctrl.h"
 #include "mock_resctrl_alloc.h"
 #include "mock_resctrl_schemata.h"
@@ -1097,25 +1098,25 @@ test_os_alloc_reset_prep(struct test_data *data)
         will_return(__wrap__pqos_cap_get, data->cap);
 
         if (num_grps > 1) {
-                expect_string(__wrap_resctrl_utils_file_exists, path,
+                expect_string(__wrap_pqos_dir_exists, path,
                               "/sys/fs/resctrl/COS1");
-                will_return(__wrap_resctrl_utils_file_exists, 0);
+                will_return(__wrap_pqos_dir_exists, 0);
                 expect_string(__wrap_mkdir, path, "/sys/fs/resctrl/COS1");
                 expect_value(__wrap_mkdir, mode, 0755);
                 will_return(__wrap_mkdir, 0);
         }
         if (num_grps > 2) {
-                expect_string(__wrap_resctrl_utils_file_exists, path,
+                expect_string(__wrap_pqos_dir_exists, path,
                               "/sys/fs/resctrl/COS2");
-                will_return(__wrap_resctrl_utils_file_exists, 0);
+                will_return(__wrap_pqos_dir_exists, 0);
                 expect_string(__wrap_mkdir, path, "/sys/fs/resctrl/COS2");
                 expect_value(__wrap_mkdir, mode, 0755);
                 will_return(__wrap_mkdir, 0);
         }
         if (num_grps > 3) {
-                expect_string(__wrap_resctrl_utils_file_exists, path,
+                expect_string(__wrap_pqos_dir_exists, path,
                               "/sys/fs/resctrl/COS3");
-                will_return(__wrap_resctrl_utils_file_exists, 0);
+                will_return(__wrap_pqos_dir_exists, 0);
                 expect_string(__wrap_mkdir, path, "/sys/fs/resctrl/COS3");
                 expect_value(__wrap_mkdir, mode, 0755);
                 will_return(__wrap_mkdir, 0);
@@ -1349,28 +1350,27 @@ test_os_alloc_init_mounted(void **state)
         int ret;
         unsigned num_grps;
 
-        expect_string(__wrap_resctrl_utils_file_exists, path,
-                      "/sys/fs/resctrl/cpus");
-        will_return(__wrap_resctrl_utils_file_exists, 1);
+        expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
+        will_return(__wrap_pqos_file_exists, 1);
 
         will_return(__wrap__pqos_cap_get, data->cap);
 
         resctrl_alloc_get_grps_num(data->cap, &num_grps);
 
         if (num_grps >= 1) {
-                expect_string(__wrap_resctrl_utils_file_exists, path,
+                expect_string(__wrap_pqos_dir_exists, path,
                               "/sys/fs/resctrl/COS1");
-                will_return(__wrap_resctrl_utils_file_exists, 1);
+                will_return(__wrap_pqos_dir_exists, 1);
         }
         if (num_grps >= 2) {
-                expect_string(__wrap_resctrl_utils_file_exists, path,
+                expect_string(__wrap_pqos_dir_exists, path,
                               "/sys/fs/resctrl/COS2");
-                will_return(__wrap_resctrl_utils_file_exists, 1);
+                will_return(__wrap_pqos_dir_exists, 1);
         }
         if (num_grps >= 3) {
-                expect_string(__wrap_resctrl_utils_file_exists, path,
+                expect_string(__wrap_pqos_dir_exists, path,
                               "/sys/fs/resctrl/COS3");
-                will_return(__wrap_resctrl_utils_file_exists, 1);
+                will_return(__wrap_pqos_dir_exists, 1);
         }
 
         will_return(__wrap_resctrl_alloc_init, PQOS_RETVAL_OK);
@@ -1390,9 +1390,8 @@ test_os_alloc_init_unmounted(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
-        expect_string(__wrap_resctrl_utils_file_exists, path,
-                      "/sys/fs/resctrl/cpus");
-        will_return(__wrap_resctrl_utils_file_exists, 0);
+        expect_string(__wrap_pqos_file_exists, path, "/sys/fs/resctrl/cpus");
+        will_return(__wrap_pqos_file_exists, 0);
 
         expect_value(os_alloc_mount, l3_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
         expect_value(os_alloc_mount, l2_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
@@ -1410,6 +1409,76 @@ test_os_alloc_init_unmounted(void **state)
 
         ret = os_alloc_fini();
         assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+/* ======== os_l3ca_get_min_cbm_bits ======== */
+
+static void
+test_os_l3ca_get_min_cbm_bits(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned min_cbm_bits = 0;
+
+        will_return(__wrap__pqos_cap_get, data->cap);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/L3/min_cbm_bits");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_fread_uint64, 2);
+
+        ret = os_l3ca_get_min_cbm_bits(&min_cbm_bits);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(min_cbm_bits, 2);
+}
+
+static void
+test_os_l3ca_get_min_cbm_bits_unsupported(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned min_cbm_bits;
+
+        will_return(__wrap__pqos_cap_get, data->cap);
+
+        ret = os_l3ca_get_min_cbm_bits(&min_cbm_bits);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+/* ======== os_l2ca_get_min_cbm_bits ======== */
+
+static void
+test_os_l2ca_get_min_cbm_bits(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned min_cbm_bits = 0;
+
+        will_return(__wrap__pqos_cap_get, data->cap);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/L2/min_cbm_bits");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_fread_uint64, 2);
+
+        ret = os_l2ca_get_min_cbm_bits(&min_cbm_bits);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(min_cbm_bits, 2);
+}
+
+static void
+test_os_l2ca_get_min_cbm_bits_unsupported(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        unsigned min_cbm_bits;
+
+        will_return(__wrap__pqos_cap_get, data->cap);
+
+        ret = os_l2ca_get_min_cbm_bits(&min_cbm_bits);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 int
@@ -1432,7 +1501,9 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_l3cdp_disable),
             cmocka_unit_test(test_os_alloc_reset_l3cdp_mon),
             cmocka_unit_test(test_os_alloc_init_mounted),
-            cmocka_unit_test(test_os_alloc_init_unmounted)};
+            cmocka_unit_test(test_os_alloc_init_unmounted),
+            cmocka_unit_test(test_os_l3ca_get_min_cbm_bits),
+            cmocka_unit_test(test_os_l2ca_get_min_cbm_bits_unsupported)};
 
         const struct CMUnitTest tests_l2ca[] = {
             cmocka_unit_test(test_os_l2ca_set_param),
@@ -1447,7 +1518,9 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_light),
             cmocka_unit_test(test_os_alloc_reset_l2cdp_enable),
             cmocka_unit_test(test_os_alloc_reset_l2cdp_disable),
-            cmocka_unit_test(test_os_alloc_reset_l2cdp_mon)};
+            cmocka_unit_test(test_os_alloc_reset_l2cdp_mon),
+            cmocka_unit_test(test_os_l3ca_get_min_cbm_bits_unsupported),
+            cmocka_unit_test(test_os_l2ca_get_min_cbm_bits)};
 
         const struct CMUnitTest tests_mba[] = {
             cmocka_unit_test(test_os_mba_set_param),
@@ -1462,7 +1535,9 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_light),
             cmocka_unit_test(test_os_alloc_reset_mba_ctrl_enable),
             cmocka_unit_test(test_os_alloc_reset_mba_ctrl_disable),
-            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_mon)};
+            cmocka_unit_test(test_os_alloc_reset_mba_ctrl_mon),
+            cmocka_unit_test(test_os_l3ca_get_min_cbm_bits_unsupported),
+            cmocka_unit_test(test_os_l2ca_get_min_cbm_bits_unsupported)};
 
         const struct CMUnitTest tests_all[] = {
             cmocka_unit_test(test_os_alloc_assoc_get),

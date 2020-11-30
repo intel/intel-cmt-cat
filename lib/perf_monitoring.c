@@ -199,7 +199,7 @@ set_mon_type(void)
         FILE *fd;
         char file[64], evt[8];
 
-        snprintf(file, sizeof(file) - 1, "%s%s", PERF_MON_PATH, perf_type);
+        snprintf(file, sizeof(file) - 1, "%s/%s", PERF_MON_PATH, perf_type);
         fd = pqos_fopen(file, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_RESOURCE;
@@ -286,7 +286,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
         /**
          * Read event type from file system
          */
-        snprintf(file, sizeof(file) - 1, "%s%s%s", PERF_MON_PATH, perf_events,
+        snprintf(file, sizeof(file) - 1, "%s/%s%s", PERF_MON_PATH, perf_events,
                  fname);
         fd = pqos_fopen(file, "r");
         if (fd == NULL) {
@@ -311,7 +311,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
         /**
          * Read scale factor from file system
          */
-        snprintf(file, sizeof(file) - 1, "%s%s%s.scale", PERF_MON_PATH,
+        snprintf(file, sizeof(file) - 1, "%s/%s%s.scale", PERF_MON_PATH,
                  perf_events, fname);
         fd = pqos_fopen(file, "r");
         if (fd == NULL) {
@@ -357,7 +357,7 @@ set_mon_events(void)
         /**
          * Read and store event data in table
          */
-        snprintf(dir, sizeof(dir) - 1, "%s%s", PERF_MON_PATH, perf_events);
+        snprintf(dir, sizeof(dir) - 1, "%s/%s", PERF_MON_PATH, perf_events);
         files = scandir(dir, &namelist, filter, NULL);
         if (files <= 0) {
                 LOG_ERROR("Failed to read perf monitoring events directory!\n");
