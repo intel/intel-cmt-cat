@@ -1,4 +1,21 @@
-========================================================================
+=======================================================================
+Release  v4.1.0  ....-..-..
+=======================================================================
+
+Contributors (alphabetical order):
+        Adrian Boczkowski <adrianx.boczkowski@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+1. AppQoS:
+        - Added OS interface support
+        - Added MBA CTRL support
+2. PQoS:
+        - Added option to display PQoS tool version
+3. General:
+        - Bug fixes
+
+=======================================================================
 Release  v4.0.0  2020-06-26
 =======================================================================
 
