@@ -96,7 +96,7 @@ pqos_fgets(char *s, int n, FILE *stream)
         char *line = NULL;
         size_t line_len = 0;
         ssize_t line_read;
-        unsigned i;
+        ssize_t i;
 
         line_read = getline(&line, &line_len, stream);
         if (line_read != -1) {
