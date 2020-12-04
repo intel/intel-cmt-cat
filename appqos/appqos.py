@@ -119,11 +119,13 @@ class AppQoS:
         log.info("Configuring RDT")
 
         # Configure MBA CTRL
-        result = common.PQOS_API.enable_mba_bw(common.CONFIG_STORE.get_mba_ctrl_enabled())
-        if result != 0:
-            log.error("libpqos MBA CTRL initialization failed, Terminating...")
-            return
-        log.info("RDT MBA CTRL %sabled" % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
+        if caps.mba_supported():
+            result = common.PQOS_API.enable_mba_bw(common.CONFIG_STORE.get_mba_ctrl_enabled())
+            if result != 0:
+                log.error("libpqos MBA CTRL initialization failed, Terminating...")
+                return
+            log.info("RDT MBA CTRL %sabled"\
+                % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
 
         result = cache_ops.configure_rdt()
         if result != 0:

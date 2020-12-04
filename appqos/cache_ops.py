@@ -412,14 +412,16 @@ def configure_rdt():
             % (common.CONFIG_STORE.get_rdt_iface().upper()))
 
     # Change MBA BW/CTRL state if needed
-    cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
-    if cfg_mba_ctrl_enabled != common.PQOS_API.is_mba_bw_enabled():
-        if common.PQOS_API.enable_mba_bw(cfg_mba_ctrl_enabled):
-            log.error("Failed to change MBA BW state!")
-            return -1
+    if caps.mba_supported():
+        cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
+        if cfg_mba_ctrl_enabled != common.PQOS_API.is_mba_bw_enabled():
+            if common.PQOS_API.enable_mba_bw(cfg_mba_ctrl_enabled):
+                log.error("Failed to change MBA BW state!")
+                return -1
 
-        recreate_default = True
-        log.info("RDT MBA BW %sabled." % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
+            recreate_default = True
+            log.info("RDT MBA BW %sabled."\
+                % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
 
     if recreate_default:
         # On interface or MBA BW state change it is needed to recreate Default Pool #0
