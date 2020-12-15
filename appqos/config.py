@@ -702,7 +702,7 @@ class ConfigStore:
         """
         # get max cos id for combination of allocation technologies
         alloc_type = []
-        if 'mba' in new_pool_data:
+        if 'mba' in new_pool_data or 'mba_bw' in new_pool_data:
             alloc_type.append(common.MBA_CAP)
         if 'cbm' in new_pool_data:
             alloc_type.append(common.CAT_CAP)
