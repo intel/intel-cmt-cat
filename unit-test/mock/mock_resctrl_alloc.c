@@ -168,3 +168,15 @@ __wrap_resctrl_alloc_task_write(const unsigned class_id, const pid_t task)
 
         return mock_type(int);
 }
+
+int
+__wrap_resctrl_alloc_get_num_closids(unsigned *num_closids)
+{
+        int ret;
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *num_closids = mock_type(int);
+
+        return ret;
+}

@@ -472,6 +472,7 @@ $(BIN_DIR)/test_os_cap: test_os_cap.c $(LIB_OBJS)
 		-Wl,--wrap=pqos_file_exists \
 		-Wl,--wrap=pqos_file_contains \
 		-Wl,--wrap=pqos_fread_uint64 \
+		-Wl,--wrap=resctrl_alloc_get_num_closids \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

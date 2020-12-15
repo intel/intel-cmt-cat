@@ -125,6 +125,66 @@ resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num)
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Filter directory filenames
+ *
+ * This function is used by the scandir function
+ * to filter hidden (dot) files
+ *
+ * @param dir dirent structure containing directory info
+ *
+ * @return if directory entry should be included in scandir() output list
+ * @retval 0 means don't include the entry  ("." in our case)
+ * @retval 1 means include the entry
+ */
+static int
+filter(const struct dirent *dir)
+{
+        return (dir->d_name[0] == '.') ? 0 : 1;
+}
+
+int
+resctrl_alloc_get_num_closids(unsigned *num_closids)
+{
+        int ret = PQOS_RETVAL_OK;
+        struct dirent **namelist = NULL;
+        int i;
+        int num_info;
+
+        *num_closids = 0;
+
+        num_info = scandir(RESCTRL_PATH_INFO, &namelist, filter, NULL);
+        if (num_info <= 0) {
+                LOG_ERROR("Failed to read resctrl info dir!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        for (i = 0; i < num_info; ++i) {
+                char path[512];
+
+                snprintf(path, sizeof(path) - 1, "%s/%s/num_closids",
+                         RESCTRL_PATH_INFO, namelist[i]->d_name);
+
+                if (pqos_file_exists(path)) {
+                        uint64_t num;
+
+                        ret = pqos_fread_uint64(path, 10, &num);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+
+                        if (num < *num_closids || *num_closids == 0)
+                                *num_closids = num;
+                }
+        }
+
+        for (i = 0; i < num_info; i++)
+                free(namelist[i]);
+
+        free(namelist);
+
+        return ret;
+}
+
 FILE *
 resctrl_alloc_fopen(const unsigned class_id, const char *name, const char *mode)
 {

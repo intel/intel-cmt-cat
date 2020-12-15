@@ -111,6 +111,7 @@ test_os_cap_l3ca_discover_cdp_off(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_l3ca cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/L3");
@@ -123,11 +124,8 @@ test_os_cap_l3ca_discover_cdp_off(void **state)
         will_return(__wrap_pqos_file_contains, 1);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/L3/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_l3ca.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* read number of ways */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -152,7 +150,7 @@ test_os_cap_l3ca_discover_cdp_off(void **state)
         assert_int_equal(cap.cdp, 1);
         assert_int_equal(cap.cdp_on, 0);
         assert_int_equal(cap.way_size, data->cpu->l3.way_size);
-        assert_int_equal(cap.num_classes, data->cap_l3ca.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.num_ways, data->cap_l3ca.num_ways);
         assert_int_equal(cap.way_contention, data->cap_l3ca.way_contention);
 }
@@ -162,6 +160,7 @@ test_os_cap_l3ca_discover_cdp_on(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_l3ca cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/L3");
@@ -174,11 +173,8 @@ test_os_cap_l3ca_discover_cdp_on(void **state)
         will_return(__wrap_pqos_dir_exists, 1);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/L3CODE/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_l3ca.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* read number of ways */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -198,7 +194,7 @@ test_os_cap_l3ca_discover_cdp_on(void **state)
         assert_int_equal(cap.cdp, 1);
         assert_int_equal(cap.cdp_on, 1);
         assert_int_equal(cap.way_size, data->cpu->l3.way_size);
-        assert_int_equal(cap.num_classes, data->cap_l3ca.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.num_ways, data->cap_l3ca.num_ways);
         assert_int_equal(cap.way_contention, 0x0);
 }
@@ -208,6 +204,7 @@ test_os_cap_l3ca_discover_cdp_unsupported(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_l3ca cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/L3");
@@ -220,11 +217,8 @@ test_os_cap_l3ca_discover_cdp_unsupported(void **state)
         will_return(__wrap_pqos_file_contains, 0);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/L3/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_l3ca.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* read number of ways */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -249,7 +243,7 @@ test_os_cap_l3ca_discover_cdp_unsupported(void **state)
         assert_int_equal(cap.cdp, 0);
         assert_int_equal(cap.cdp_on, 0);
         assert_int_equal(cap.way_size, data->cpu->l3.way_size);
-        assert_int_equal(cap.num_classes, data->cap_l3ca.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.num_ways, data->cap_l3ca.num_ways);
         assert_int_equal(cap.way_contention, data->cap_l3ca.way_contention);
 }
@@ -278,6 +272,7 @@ test_os_cap_l2ca_discover_cdp_off(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_l2ca cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/L2");
@@ -290,11 +285,8 @@ test_os_cap_l2ca_discover_cdp_off(void **state)
         will_return(__wrap_pqos_file_contains, 1);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/L2/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_l2ca.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* read number of ways */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -319,7 +311,7 @@ test_os_cap_l2ca_discover_cdp_off(void **state)
         assert_int_equal(cap.cdp, 1);
         assert_int_equal(cap.cdp_on, 0);
         assert_int_equal(cap.way_size, data->cpu->l2.way_size);
-        assert_int_equal(cap.num_classes, data->cap_l2ca.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.num_ways, data->cap_l2ca.num_ways);
         assert_int_equal(cap.way_contention, data->cap_l2ca.way_contention);
 }
@@ -329,6 +321,7 @@ test_os_cap_l2ca_discover_cdp_on(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_l2ca cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/L2");
@@ -341,11 +334,8 @@ test_os_cap_l2ca_discover_cdp_on(void **state)
         will_return(__wrap_pqos_dir_exists, 1);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/L2CODE/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_l2ca.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* read number of ways */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -365,7 +355,7 @@ test_os_cap_l2ca_discover_cdp_on(void **state)
         assert_int_equal(cap.cdp, 1);
         assert_int_equal(cap.cdp_on, 1);
         assert_int_equal(cap.way_size, data->cpu->l2.way_size);
-        assert_int_equal(cap.num_classes, data->cap_l2ca.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.num_ways, data->cap_l2ca.num_ways);
         assert_int_equal(cap.way_contention, 0x0);
 }
@@ -375,6 +365,7 @@ test_os_cap_l2ca_discover_cdp_unsupported(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_l2ca cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/L2");
@@ -387,11 +378,8 @@ test_os_cap_l2ca_discover_cdp_unsupported(void **state)
         will_return(__wrap_pqos_file_contains, 0);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/L2/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_l2ca.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* read number of ways */
         expect_string(__wrap_pqos_fread_uint64, fname,
@@ -416,7 +404,7 @@ test_os_cap_l2ca_discover_cdp_unsupported(void **state)
         assert_int_equal(cap.cdp, 0);
         assert_int_equal(cap.cdp_on, 0);
         assert_int_equal(cap.way_size, data->cpu->l2.way_size);
-        assert_int_equal(cap.num_classes, data->cap_l2ca.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.num_ways, data->cap_l2ca.num_ways);
         assert_int_equal(cap.way_contention, data->cap_l2ca.way_contention);
 }
@@ -442,17 +430,15 @@ test_os_cap_mba_discover_default(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_mba cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
         will_return(__wrap_pqos_dir_exists, 1);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/MB/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_mba.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* check if ctrl is enabled */
         expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
@@ -483,7 +469,7 @@ test_os_cap_mba_discover_default(void **state)
 
         ret = os_cap_mba_discover(&cap, data->cpu);
         assert_int_equal(ret, PQOS_RETVAL_OK);
-        assert_int_equal(cap.num_classes, data->cap_mba.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.throttle_max, data->cap_mba.throttle_max);
         assert_int_equal(cap.throttle_step, data->cap_mba.throttle_step);
         assert_int_equal(cap.is_linear, 1);
@@ -494,17 +480,15 @@ test_os_cap_mba_discover_ctrl(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_mba cap;
+        unsigned num_grps = 5;
         int ret;
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
         will_return(__wrap_pqos_dir_exists, 1);
 
         /* read number of classes */
-        expect_string(__wrap_pqos_fread_uint64, fname,
-                      "/sys/fs/resctrl/info/MB/num_closids");
-        expect_value(__wrap_pqos_fread_uint64, base, 10);
-        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
-        will_return(__wrap_pqos_fread_uint64, data->cap_mba.num_classes);
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
 
         /* check if ctrl is enabled */
         expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
@@ -535,7 +519,7 @@ test_os_cap_mba_discover_ctrl(void **state)
 
         ret = os_cap_mba_discover(&cap, data->cpu);
         assert_int_equal(ret, PQOS_RETVAL_OK);
-        assert_int_equal(cap.num_classes, data->cap_mba.num_classes);
+        assert_int_equal(cap.num_classes, num_grps);
         assert_int_equal(cap.throttle_max, data->cap_mba.throttle_max);
         assert_int_equal(cap.throttle_step, data->cap_mba.throttle_step);
         assert_int_equal(cap.is_linear, 1);

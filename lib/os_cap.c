@@ -52,31 +52,6 @@
 static int mba_ctrl = -1; /**< mba ctrl support */
 
 /**
- * @brief Retrieves number of closids
- *
- * @param [in] dir path to info directory
- * @param [out] num_closids place to store retrieved value
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-get_num_closids(const char *dir, unsigned *num_closids)
-{
-        char path[128];
-        int ret;
-        uint64_t val;
-
-        snprintf(path, sizeof(path) - 1, "%s/num_closids", dir);
-
-        ret = pqos_fread_uint64(path, 10, &val);
-        if (ret == PQOS_RETVAL_OK)
-                *num_closids = val;
-
-        return ret;
-}
-
-/**
  * @brief Retrieves number of ways
  *
  * @param [in] dir path to info directory
@@ -542,7 +517,7 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         cap->cdp_on = cdp_on;
         cap->way_size = cpu->l3.way_size;
 
-        ret = get_num_closids(info, &cap->num_classes);
+        ret = resctrl_alloc_get_num_closids(&cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -585,7 +560,7 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
         cap->cdp_on = cdp_on;
         cap->way_size = cpu->l2.way_size;
 
-        ret = get_num_closids(info, &cap->num_classes);
+        ret = resctrl_alloc_get_num_closids(&cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -757,7 +732,6 @@ int
 os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
         uint64_t val;
-        const char *info = RESCTRL_PATH_INFO_MB;
         int ret = PQOS_RETVAL_OK;
 
         UNUSED_PARAM(cpu);
@@ -771,7 +745,7 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         cap->ctrl = -1;
         cap->ctrl_on = -1;
 
-        ret = get_num_closids(info, &cap->num_classes);
+        ret = resctrl_alloc_get_num_closids(&cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 

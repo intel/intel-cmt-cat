@@ -321,135 +321,6 @@ cap_print_features_mba(const unsigned indent,
 }
 
 /**
- * @brief Print HW capabilities
- *
- * @param [in] cap_mon monitoring capability structure
- * @param [in] cap_l3ca L3 CAT capability structures
- * @param [in] cap_l2ca L2 CAT capability structures
- * @param [in] cap_mba MBA capability structures
- * @param [in] verbose verbose mode
- */
-static void
-cap_print_features_hw(const struct pqos_capability *cap_mon,
-                      const struct pqos_capability *cap_l3ca,
-                      const struct pqos_capability *cap_l2ca,
-                      const struct pqos_capability *cap_mba,
-                      const int verbose)
-{
-        if (cap_mon == NULL && cap_l3ca == NULL && cap_l2ca == NULL &&
-            cap_mba == NULL)
-                return;
-
-        /**
-         * Print out supported capabilities information
-         */
-        printf("Hardware capabilities\n");
-
-        /**
-         * Monitoring capabilities
-         */
-        if (cap_mon != NULL)
-                cap_print_features_mon(4, cap_mon->u.mon, verbose);
-
-        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL)
-                printf_indent(4, "Allocation\n");
-
-        /**
-         * Cache Allocation capabilities
-         */
-        if (cap_l3ca != NULL || cap_l2ca != NULL)
-                printf_indent(8, "Cache Allocation Technology (CAT)\n");
-
-        if (cap_l3ca != NULL)
-                cap_print_features_l3ca(12, cap_l3ca->u.l3ca, verbose);
-
-        if (cap_l2ca != NULL)
-                cap_print_features_l2ca(12, cap_l2ca->u.l2ca, verbose);
-
-        /**
-         * Memory Bandwidth Allocation capabilities
-         */
-        if (cap_mba != NULL)
-                cap_print_features_mba(8, cap_mba->u.mba, verbose);
-}
-
-#ifdef __linux__
-/**
- * @brief Print OS capabilities
- *
- * @param [in] cap_mon monitoring capability structure
- * @param [in] cap_l3ca L3 CAT capability structures
- * @param [in] cap_l2ca L2 CAT capability structures
- * @param [in] cap_mba MBA capability structures
- * @param [in] verbose verbose mode
- */
-static void
-cap_print_features_os(const struct pqos_capability *cap_mon,
-                      const struct pqos_capability *cap_l3ca,
-                      const struct pqos_capability *cap_l2ca,
-                      const struct pqos_capability *cap_mba,
-                      const int verbose)
-{
-        unsigned min_num_cos = 0;
-        struct utsname name;
-
-        /**
-         * Get min. number of COS
-         */
-        if (cap_l3ca != NULL)
-                min_num_cos = cap_l3ca->u.l3ca->num_classes;
-
-        if (cap_l2ca != NULL)
-                if (min_num_cos == 0 ||
-                    min_num_cos > cap_l2ca->u.l2ca->num_classes)
-                        min_num_cos = cap_l2ca->u.l2ca->num_classes;
-
-        if (cap_mba != NULL)
-                if (min_num_cos == 0 ||
-                    min_num_cos > cap_mba->u.mba->num_classes)
-                        min_num_cos = cap_mba->u.mba->num_classes;
-
-        printf("OS capabilities");
-        if (uname(&name) >= 0)
-                printf(" (%s kernel %s)", name.sysname, name.release);
-        printf("\n");
-
-        if (cap_mon != NULL)
-                cap_print_features_mon(4, cap_mon->u.mon, verbose);
-
-        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL)
-                printf_indent(4, "Allocation\n");
-
-        if (cap_l3ca != NULL || cap_l2ca != NULL)
-                printf_indent(8, "Cache Allocation Technology (CAT)\n");
-
-        if (cap_l3ca != NULL) {
-                struct pqos_cap_l3ca l3ca = *cap_l3ca->u.l3ca;
-
-                l3ca.num_classes = min_num_cos;
-
-                cap_print_features_l3ca(12, &l3ca, verbose);
-        }
-
-        if (cap_l2ca != NULL) {
-                struct pqos_cap_l2ca l2ca = *cap_l2ca->u.l2ca;
-
-                l2ca.num_classes = min_num_cos;
-
-                cap_print_features_l2ca(12, &l2ca, verbose);
-        }
-
-        if (cap_mba != NULL) {
-                struct pqos_cap_mba mba = *cap_mba->u.mba;
-
-                mba.num_classes = min_num_cos;
-
-                cap_print_features_mba(8, &mba, verbose);
-        }
-}
-#endif
-
-/**
  * @brief Print capabilities
  *
  * @param [in] cap system capability structure
@@ -488,14 +359,50 @@ cap_print_features(const struct pqos_cap *cap,
                         break;
                 }
 
+        if (cap_mon == NULL && cap_l3ca == NULL && cap_l2ca == NULL &&
+            cap_mba == NULL)
+                return;
+
         if (sel_interface == PQOS_INTER_MSR)
-                cap_print_features_hw(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
-                                      verbose);
+                printf("Hardware capabilities\n");
+
 #ifdef __linux__
-        else
-                cap_print_features_os(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
-                                      verbose);
+        else {
+                struct utsname name;
+
+                printf("OS capabilities");
+                if (uname(&name) >= 0)
+                        printf(" (%s kernel %s)", name.sysname, name.release);
+                printf("\n");
+        }
 #endif
+
+        /**
+         * Monitoring capabilities
+         */
+        if (cap_mon != NULL)
+                cap_print_features_mon(4, cap_mon->u.mon, verbose);
+
+        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL)
+                printf_indent(4, "Allocation\n");
+
+        /**
+         * Cache Allocation capabilities
+         */
+        if (cap_l3ca != NULL || cap_l2ca != NULL)
+                printf_indent(8, "Cache Allocation Technology (CAT)\n");
+
+        if (cap_l3ca != NULL)
+                cap_print_features_l3ca(12, cap_l3ca->u.l3ca, verbose);
+
+        if (cap_l2ca != NULL)
+                cap_print_features_l2ca(12, cap_l2ca->u.l2ca, verbose);
+
+        /**
+         * Memory Bandwidth Allocation capabilities
+         */
+        if (cap_mba != NULL)
+                cap_print_features_mba(8, cap_mba->u.mba, verbose);
 
         if (!verbose)
                 return;

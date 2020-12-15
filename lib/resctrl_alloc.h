@@ -69,6 +69,16 @@ PQOS_LOCAL int resctrl_alloc_init(const struct pqos_cpuinfo *cpu,
 PQOS_LOCAL int resctrl_alloc_fini(void);
 
 /**
+ * @brief Retrieves number of resctrl closids
+ *
+ * @param [out] num_closids place to store retrieved value
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int resctrl_alloc_get_num_closids(unsigned *num_closids);
+
+/**
  * @brief Retrieves number of resctrl groups allowed
  *
  * @param [in] cap platform QoS capabilities structure

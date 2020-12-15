@@ -58,5 +58,6 @@ __wrap_resctrl_alloc_schemata_write(const unsigned class_id,
                                     const unsigned technology,
                                     const struct resctrl_schemata *schemata);
 int __wrap_resctrl_alloc_task_write(const unsigned class_id, const pid_t task);
+int __wrap_resctrl_alloc_get_num_closids(unsigned *num_closids);
 
 #endif /* MOCK_RESCTRL_ALLOC_H_ */
