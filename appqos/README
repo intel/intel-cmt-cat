@@ -61,8 +61,7 @@ and external components:
  - Intel pwr library (github.com, CommsPowerManagement)
 
 NOTE:
-All required dependencies are installed and AppQoS is executed in virtualenv
-when started via "make run" command.
+To install mentioned dependencies in virtualenv please use "make setup" command.
 
 Intel(R) RDT CAT and MBA configuration is done via libpqos using MSR
 or OS/resctrl interfaces (user configurable), for more information please see
@@ -183,8 +182,7 @@ non-default location:
 sudo ./appqos.py -c /tmp/appqos.conf -V
 
 NOTE:
-All required dependencies are installed and AppQoS is executed in virtualenv
-when started via "make run" command.
+To run AppQoS in virtualenv please use "make run" command.
 
 For more information about configuration file please see CONFIGURATION paragraph,
 for information about runtime configuration please see REST API paragraph.
