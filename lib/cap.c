@@ -70,6 +70,7 @@
 #include "api.h"
 #include "utils.h"
 #include "resctrl.h"
+#include "resctrl_alloc.h"
 
 /**
  * ---------------------------------------
@@ -997,6 +998,17 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 
         if (mba_cap == NULL)
                 return;
+
+        /* refresh number of classes */
+        if (m_interface == PQOS_INTER_OS ||
+            m_interface == PQOS_INTER_OS_RESCTRL_MON) {
+                int ret;
+                unsigned num_classes;
+
+                ret = resctrl_alloc_get_num_closids(&num_classes);
+                if (ret == PQOS_RETVAL_OK)
+                        mba_cap->num_classes = num_classes;
+        }
 
         if (cfg == PQOS_MBA_DEFAULT)
                 mba_cap->ctrl_on = 0;
