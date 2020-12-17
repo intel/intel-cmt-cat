@@ -999,6 +999,7 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
         if (mba_cap == NULL)
                 return;
 
+#ifdef __linux__
         /* refresh number of classes */
         if (m_interface == PQOS_INTER_OS ||
             m_interface == PQOS_INTER_OS_RESCTRL_MON) {
@@ -1009,6 +1010,7 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
                 if (ret == PQOS_RETVAL_OK)
                         mba_cap->num_classes = num_classes;
         }
+#endif
 
         if (cfg == PQOS_MBA_DEFAULT)
                 mba_cap->ctrl_on = 0;
