@@ -84,7 +84,7 @@ PQOS_LOCAL char *pqos_fgets(char *s, int n, FILE *stream);
  *
  * @param [in] fname name of the file
  * @param [in] base numerical base
- * @param [out] value UINT value
+ * @param [out] value uint64 value
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
