@@ -10,7 +10,7 @@ before_script:
 script:
     - make cppcheck
     - make setup-dev
-    - make style CHECKPATCH=/tmp/checkpatch.pl CLANGFORMAT=clang-format-9
+    - make style CHECKPATCH=/tmp/checkpatch.pl
     - make
     - sudo make install
     - LD_LIBRARY_PATH=`pwd`/lib make -C lib/python test
