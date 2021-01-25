@@ -41,6 +41,7 @@
 
 #include <errno.h>
 #include "pqos.h"
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -69,7 +70,7 @@ struct cpuinfo_config {
  * @retval -EPERM cpuinfo already initialized
  * @retval -EFAULT error building & discovering the topology
  */
-int cpuinfo_init(const struct pqos_cpuinfo **topology);
+PQOS_LOCAL int cpuinfo_init(const struct pqos_cpuinfo **topology);
 
 /**
  * @brief Shuts down CPU information module
@@ -78,14 +79,14 @@ int cpuinfo_init(const struct pqos_cpuinfo **topology);
  * @retval 0 success
  * @retval -EPERM cpuinfo not initialized
  */
-int cpuinfo_fini(void);
+PQOS_LOCAL int cpuinfo_fini(void);
 
 /**
  * @brief Internal API to retrieve PQoS vendor specific data
  *
  * @param [out] config location to store PQoS vendor specific information at
  */
-void cpuinfo_get_config(const struct cpuinfo_config **config);
+PQOS_LOCAL void cpuinfo_get_config(const struct cpuinfo_config **config);
 
 #ifdef __cplusplus
 }
