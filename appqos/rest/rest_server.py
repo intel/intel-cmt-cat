@@ -45,6 +45,7 @@ import ssl
 from time import sleep
 from flask import Flask
 from flask_restful import Api
+from gevent.pywsgi import WSGIServer
 from werkzeug.exceptions import HTTPException
 
 import caps
@@ -144,13 +145,17 @@ class Server:
             log.error("CA certificate file, {}".format(str(ex)))
             return -1
 
-        self.process = multiprocessing.Process(target=self.app.run,
-                                               kwargs={'host': host,
-                                                       'port': port,
-                                                       'ssl_context': self.context,
-                                                       'debug': debug,
-                                                       'use_reloader': False,
-                                                       'processes': 1})
+        self.http_server = WSGIServer((host, port), self.app, ssl_context=self.context, spawn=1)
+        def handle_gevent_stop(signum, frame):
+            log.info("Stopping gevent server loop")
+            self.http_server.stop()
+            self.http_server.close()
+
+        # dedicated handler for gevent server is needed to stop it gracefully
+        # before process will be terminated
+        signal.signal(signal.SIGINT, handle_gevent_stop)
+
+        self.process = multiprocessing.Process(target=self.http_server.serve_forever)
         self.process.start()
         return 0
 

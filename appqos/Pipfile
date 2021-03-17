@@ -8,6 +8,7 @@ jsonschema = "*"
 pexpect = "*"
 flask = "*"
 flask-restful = "*"
+gevent = "*"
 
 [dev-packages]
 bandit = "*"
