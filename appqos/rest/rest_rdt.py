@@ -44,7 +44,6 @@ import caps
 import common
 
 from rest.rest_exceptions import BadRequest, InternalError
-from rest.rest_auth import auth
 
 from config import ConfigStore
 
@@ -54,7 +53,6 @@ class CapsMba(Resource):
     """
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles GET /caps/mba request.
@@ -75,7 +73,6 @@ class CapsMbaCtrl(Resource):
     """
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP /caps/mba_ctrl request.
@@ -92,7 +89,6 @@ class CapsMbaCtrl(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def put():
         """
         Handles PUT /caps/mba_ctrl request.
@@ -138,7 +134,6 @@ class CapsRdtIface(Resource):
     """
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP /caps/rdt_iface request.
@@ -155,7 +150,6 @@ class CapsRdtIface(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def put():
         """
         Handles PUT /caps/rdt_iface request.

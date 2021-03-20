@@ -46,7 +46,6 @@ import common
 import sstbf
 
 from rest.rest_exceptions import NotFound, BadRequest, InternalError
-from rest.rest_auth import auth
 
 from config import ConfigStore
 
@@ -58,7 +57,6 @@ class Pool(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def get(pool_id):
         """
         Handles HTTP GET /pools/<pool_id> request.
@@ -85,7 +83,6 @@ class Pool(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def delete(pool_id):
         """
         Handles HTTP DELETE /pool/<pull_id> request.
@@ -124,7 +121,6 @@ class Pool(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def put(pool_id):
         # pylint: disable=too-many-branches
         """
@@ -229,7 +225,6 @@ class Pools(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP GET /pools request.
@@ -247,7 +242,6 @@ class Pools(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def post():
         """
         Handles HTTP POST /pools request.

@@ -47,7 +47,6 @@ import pid_ops
 from power import AdmissionControlError
 
 from rest.rest_exceptions import NotFound, BadRequest
-from rest.rest_auth import auth
 
 from config import ConfigStore
 
@@ -59,7 +58,6 @@ class App(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def get(app_id):
         """
         Handles HTTP GET /apps/<app_id> request.
@@ -87,7 +85,6 @@ class App(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def delete(app_id):
         """
         Handles HTTP DELETE /apps/<app_id> request.
@@ -129,7 +126,6 @@ class App(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def put(app_id):
         # pylint: disable=too-many-branches
 
@@ -217,7 +213,6 @@ class Apps(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP GET /apps request.
@@ -240,7 +235,6 @@ class Apps(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def post():
         # pylint: disable=too-many-branches
         """

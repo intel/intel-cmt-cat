@@ -44,7 +44,6 @@ import jsonschema
 from power import AdmissionControlError
 
 from rest.rest_exceptions import NotFound, BadRequest, MethodNotAllowed
-from rest.rest_auth import auth
 
 import sstbf
 
@@ -76,7 +75,6 @@ class Power(Resource):
     method_decorators = {'delete': [check_allowed], 'put' : [check_allowed]}
 
     @staticmethod
-    @auth.login_required
     def get(profile_id):
         """
         Handles HTTP GET /power_profiles/<profile_id> request.
@@ -104,7 +102,6 @@ class Power(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def delete(profile_id):
         """
         Handles HTTP DELETE /power_profiles/<profile_id> request.
@@ -145,7 +142,6 @@ class Power(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def put(profile_id):
         # pylint: disable=too-many-branches
         """
@@ -203,7 +199,6 @@ class Powers(Resource):
     method_decorators = {'post': [check_allowed]}
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP GET /power_profiles request.
@@ -221,7 +216,6 @@ class Powers(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def post():
         """
         Handles HTTP POST /power_profiles request.

@@ -8,26 +8,6 @@
 
   "properties": {
 
-    "auth": {
-      "description": "Authentication data for REST API",
-      "type": "object",
-      "properties": {
-        "username": {
-          "description": "Username",
-          "type": "string",
-          "minLength": 3,
-          "maxLength": 64
-        },
-        "password": {
-          "description": "Password",
-          "minLength": 8,
-          "maxLength": 64
-        }
-      },
-      "required": ["username", "password"],
-      "additionalProperties": false
-    },
-
     "apps": {
       "description": "APP definitions",
       "type": "array",
@@ -114,6 +94,6 @@
     }
   },
 
-  "required": ["auth", "pools"],
+  "required": ["pools"],
   "additionalProperties": false
 }

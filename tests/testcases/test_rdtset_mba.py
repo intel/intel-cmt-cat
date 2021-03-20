@@ -33,7 +33,6 @@
 
 import subprocess
 import re
-import time
 import test
 import pytest
 from testlib.resctrl import Resctrl
@@ -72,7 +71,7 @@ class TestRdtsetMba(test.Test):
         command = self.cmd_rdtset(iface, "-t mba=50;cpu=5-6 -c 5-6 memtester 10M")
         rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-        time.sleep(0.1)
+        self.stdout_wait(rdtset, b"memtester version")
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
         assert exitstatus == 0

@@ -75,10 +75,6 @@ CONFIG = {
             "pids": [4]
         }
     ],
-    "auth": {
-        "password": "password",
-        "username": "user"
-    },
     "pools": [
         {
             "cores": [20, 21, 22],
@@ -143,10 +139,6 @@ CONFIG = {
 
 
 CONFIG_EMPTY = {
-    "auth": {
-        "password": "password",
-        "username": "user"
-    }
 }
 
 

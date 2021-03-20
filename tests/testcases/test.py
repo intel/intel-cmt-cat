@@ -116,6 +116,14 @@ class Test:
 
         return self.run(command)
 
+    ## Wait for line in the output
+    def stdout_wait(self, process, line):
+        while True:
+            stdout = process.stdout.readline()
+            assert stdout != '' or process.poll() is None
+            if line in stdout:
+                break
+
 
     @staticmethod
     def get_pid_children(pid):

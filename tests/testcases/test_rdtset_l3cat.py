@@ -32,7 +32,6 @@
 ################################################################################
 
 import subprocess
-import time
 import test
 import re
 import pytest
@@ -76,7 +75,7 @@ class TestRdtsetL3Cat(test.Test):
         rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE,
                                   stdout=subprocess.PIPE)
 
-        time.sleep(0.1)
+        self.stdout_wait(rdtset, b"memtester version")
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
         assert exitstatus == 0

@@ -35,9 +35,9 @@ Intel(R) RDT CAT and MBA configuration is done via "libpqos" library and
 Intel(R) SST BF and CP configuration via external "Intel pwr" library.
 
 AppQoS provides simple, local, REST API management interface secured
-with HTTPS and "Basic HTTP Auth". REST API management interface allows
-user to manage Apps and Pools. An App controlled by AppQoS could be
-a process, a container or a VNF.
+with HTTPS and mTLS. REST API management interface allows user to
+manage Apps and Pools. An App controlled by AppQoS could be a process,
+a container or a VNF.
 
 AppQoS is reference code written in Python. It is fully configurable and
 can be easily modified to suit other use cases and allow remote management.
@@ -55,7 +55,6 @@ AppQoS requires Python v3.x and depends on the following Python modules
 and external components:
  - pqos (libqos Python wrapper)
  - flask
- - flask_httpauth
  - flask_restful
  - jsonschema
  - Intel pwr library (github.com, CommsPowerManagement)
@@ -108,7 +107,6 @@ EXAMPLE CONFIG
           {"id": 2, "cores": [4, 5, 6], "name": "MP", "mba": 50, "cbm": "0xC", "apps": [2, 3]},
           {"id": 3, "cores": [7, 8, 9], "name": "LP", "mba": 10, "cbm": "0x3", "apps": []}],
 "power_profiles": [{"id": 1, "min_freq": 2500, "max_freq": 2500, "epp": "performance", "name": "HP"}],
-"auth": {"username": "admin", "password": "password"},
 "sstbf": {"configured": false},
 "power_profiles_expert_mode": false,
 "power_profiles_verify": true
@@ -145,10 +143,6 @@ EXAMPLE CONFIG
  - "min_freq" - min. frequency [MHz]
  - "max_freq" - max. frequency [MHz]
  - "epp" - Energy Performance Preference
-
-"auth" section, REST API username and password.
- - "username" - username
- - "password" - password
 
 "sstbf" section, Intel(R) SST-BF configuration.
  - "configured" - SST-BF requested state
@@ -202,15 +196,13 @@ The REST API allows to:
 
 NOTE: None of configuration changes made via REST API are saved to configuration file.
 
-As REST API uses HTTPS, it requires SSL certificate,
-please see HOW TO GENERATE SELF-SIGNED SSL CERTIFICATE paragraph for more info.
+AppQoS REST API uses HTTPS and mutual TLS (mTLS) for authorization and authentication.
+AppQoS certificate and client certificate are signed using CA certificate - please see
+HOW TO GENERATE APPQOS AND CLIENT CERTIFICATE paragraph for more info.
 
-The REST API uses "Basic HTTP Auth", username and password are stored in appqos.conf.
-To set your own username and password please modify the following section of appqos.conf:
-
-"auth": {"username": "admin", "password": "password"}
-
-NOTE: If using curl to do REST API calls, add --user admin:password to command line
+For curl, parameters for client cert, client key and cacert, need to be passed in
+command-line:
+$ curl --cert client_appqos.crt --key client_appqos.key --cacert ca.crt <REQUEST_URL>
 
 REST API URIs
 -------------
@@ -333,8 +325,8 @@ protect performance of high priority application.
 
 SETUP
 
-Get self-signed SSL certificate (for more info please see
-HOW TO GENERATE SELF-SIGNED SSL CERTIFICATE paragraph).
+Get mTLS certificates for AppQoS CA, AppQoS and REST client (for more
+info please see HOW TO GENERATE APPQOS AND CLIENT CERTIFICATE paragraph).
 
 Create appqos.conf file (for more info please see Configuration).
 
@@ -342,11 +334,6 @@ cat /tmp/appqos.conf
 {
     "apps": [
     ],
-
-    "auth": {
-        "password": "password",
-        "username": "admin"
-    },
 
     "sstbf": {
         "configured": true
@@ -365,7 +352,6 @@ cat /tmp/appqos.conf
 }
 
 Empty config file with essential configuration only:
- - REST API Authentication details,
  - RDT interface and MBA mode configuration
  - SST-BF configuration
  - option to enable Power Profile "Expert Mode" to allow us to
@@ -413,7 +399,7 @@ INFO  Configuration changed, processing new config...
 VERIFY INITIAL CONFIGURATION
 
 List all Pools
-curl https://localhost:5000/pools -X GET --user admin:password -k | jq
+curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq
 
   {
     "id": 0,
@@ -439,7 +425,7 @@ NOTE: "Default" pool automatically created (id=0).
 Pool takes all cores (48), 100% of MBA and full CAT CBM (all cache ways).
 
 List all Apps
-curl https://localhost:5000/apps -X GET --user admin:password -k | jq
+curl https://localhost:5000/apps -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq
 
 {
     "message": "No apps in config file"
@@ -448,7 +434,7 @@ curl https://localhost:5000/apps -X GET --user admin:password -k | jq
 NOTE: No Apps defined.
 
 List capabilities
-curl https://localhost:5000/caps -X GET --user admin:password -k | jq
+curl https://localhost:5000/caps -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq
 
 {
     "capabilities": [
@@ -463,7 +449,7 @@ NOTE: Detected capabilities listed,
 Intel(R) RDT CAT, MBA and Intel(R) SST BF, CP technologies supported.
 
 List RDT interface configuration details
-curl https://localhost:5000/caps/rdt_iface -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/rdt_iface -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"interface": "msr",
  "interface_supported": ["msr", "os"]
@@ -471,14 +457,14 @@ curl https://localhost:5000/caps/rdt_iface -X GET --user admin:password -k | jq 
 NOTE: MSR interface is used (as per config file). System supports both MSR and OS interfaces.
 
 List MBA CTRL/MBA details
-curl https://localhost:5000/caps/mba_ctrl -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/mba_ctrl -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"enabled": false,
  "supported": false
 }
 NOTE: MBA CTRL not supported for MSR interface.
 
-curl https://localhost:5000/caps/mba -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/mba -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"mba_enabled": true,
  "mba_bw_enabled": false}
@@ -489,7 +475,7 @@ If MBA CTRL would be enabled, user would use "mba_bw" to configure "pools" MBA i
 Error 404 will be returned when MBA is not supported.
 
 List Intel(R) SST-BF details
-curl https://localhost:5000/caps/sstbf -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/sstbf -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"configured":true
  "hp_cores": [2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40],
@@ -517,7 +503,7 @@ NOTE: HP cores' frequencies are set to 2800MHz, STD cores' to 2100MHz
 
 Unconfigure SST-BF
 
-curl https://localhost:5000/caps/sstbf -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"configured": false}'
+curl https://localhost:5000/caps/sstbf -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"configured": false}'
 
 {
     "message": "SST-BF caps modified"
@@ -557,7 +543,7 @@ pid 13886's current affinity list: 0-47
 
 Create App, specify cores
 
-curl https://localhost:5000/apps -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "APP1", "cores": [0,1,2,3], "pids": [13894, 13892]}'
+curl https://localhost:5000/apps -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "APP1", "cores": [0,1,2,3], "pids": [13894, 13892]}'
 
 {
     "id": 1
@@ -565,7 +551,8 @@ curl https://localhost:5000/apps -X POST --user admin:password -k -H "Content-Ty
 
 Verify App's creation (list ALL apps)
 
-curl https://localhost:5000/apps -X GET --user admin:password -k
+curl https://localhost:5000/apps -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
+
 [
     {
         "name": " APP1",
@@ -597,7 +584,7 @@ pid 13886's current affinity list: 0-47
 
 Create App, specify destination Pool ID
 
-curl https://localhost:5000/apps -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "APP2", "pool_id": 0, "pids": [13890]}'
+curl https://localhost:5000/apps -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "APP2", "pool_id": 0, "pids": [13890]}'
 
 {
     "id": 2
@@ -605,7 +592,7 @@ curl https://localhost:5000/apps -X POST --user admin:password -k -H "Content-Ty
 
 Verify App's creation (get specific App)
 
-curl https://localhost:5000/apps/2 -X GET --user admin:password -k
+curl https://localhost:5000/apps/2 -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 {
     "name": "APP2",
@@ -633,18 +620,18 @@ MODIFY "DEFAULT" POOL
 
 List SST-BF's STD cores
 
-curl https://localhost:5000/caps/sstbf -X GET --user admin:password -k | jq .std_cores -c
+curl https://localhost:5000/caps/sstbf -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq .std_cores -c
  [0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47]
 
 Modify "Default" pool to exclude HP cores, assign 50% of MBA and 4 LLC CWs (CBM: 0xF/15)
 
-curl https://localhost:5000/pools/0 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"cores": [0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47], "mba": 50, "cbm": "0xf"}'
+curl https://localhost:5000/pools/0 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"cores": [0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47], "mba": 50, "cbm": "0xf"}'
 
 "POOL 0 updated"
 
 Check new "Default" pool configuration
 
-curl https://localhost:5000/pools/0 -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/pools/0 -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"id":0,
 "mba":50,
@@ -655,7 +642,7 @@ curl https://localhost:5000/pools/0 -X GET --user admin:password -k | jq -c
 
 Check how does "Default" pool modification has affected Apps in that pool
 
-curl https://localhost:5000/apps -X GET --user admin:password -k
+curl https://localhost:5000/apps -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 [
     {
@@ -693,12 +680,12 @@ CREATE HP POOL
 
 Get list of HP cores
 
-curl https://localhost:5000/caps/sstbf -X GET --user admin:password -k | jq .hp_cores -c
+curl https://localhost:5000/caps/sstbf -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq .hp_cores -c
 [2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40]
 
 Create HP Pool, with 7 (isolated) LLC CWs allocated and 100% of MBA
 
-curl https://localhost:5000/pools -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "HP", "cores": [2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40], "cbm": "0x7F0", "mba": 100}'
+curl https://localhost:5000/pools -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "HP", "cores": [2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40], "cbm": "0x7F0", "mba": 100}'
 
 {
     "id": 7
@@ -708,7 +695,7 @@ NOTE: Pool with "id=7" was created.
 
 Get All Pools to verify creation of new HP Pool(#7)
 
-curl https://localhost:5000/pools -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 [{"id":0,
 "mba":50,
@@ -726,7 +713,7 @@ DEFINE AND APPLY POWER PROFILES
 
 Define HP power profile
 
-curl https://localhost:5000/power_profiles -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "PP HP", "min_freq": 3000, "max_freq": 3000, "epp": "performance"}'
+curl https://localhost:5000/power_profiles -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "PP HP", "min_freq": 3000, "max_freq": 3000, "epp": "performance"}'
 
 {
   "id": 0,
@@ -735,7 +722,7 @@ curl https://localhost:5000/power_profiles -X POST --user admin:password -k -H "
 
 Define STD power profile
 
-curl https://localhost:5000/power_profiles -X POST --user admin:password -k -H "Content-Type: application/json" -d '{"name": "PP STD", "min_freq": 1500, "max_freq": 1500, "epp": "power"}'
+curl https://localhost:5000/power_profiles -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "PP STD", "min_freq": 1500, "max_freq": 1500, "epp": "power"}'
 
 {
   "id": 1,
@@ -744,7 +731,7 @@ curl https://localhost:5000/power_profiles -X POST --user admin:password -k -H "
 
 Get All Power Profiles to verify creation of new Power Profiles
 
-curl https://localhost:5000/power_profiles -X GET --user admin:password -k | jq
+curl https://localhost:5000/power_profiles -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq
 
 [
   {
@@ -765,7 +752,7 @@ curl https://localhost:5000/power_profiles -X GET --user admin:password -k | jq
 
 Apply power profiles
 
-curl https://localhost:5000/pools/7 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"power_profile": 0}'
+curl https://localhost:5000/pools/7 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"power_profile": 0}'
 
 {
   "message": "POOL 7 not updated, Power Profiles configuration would cause CPU to be oversubscribed."
@@ -778,13 +765,13 @@ as a result of that, order in which power profile are applied is important.
 
 Lets apply the STD power profile first.
 
-curl https://localhost:5000/pools/0 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"power_profile": 1}'
+curl https://localhost:5000/pools/0 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"power_profile": 1}'
 
 {
   "message": "POOL 0 updated"
 }
 
-curl https://localhost:5000/pools/7 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"power_profile": 0}'
+curl https://localhost:5000/pools/7 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"power_profile": 0}'
 
 {
   "message": "POOL 7 updated"
@@ -813,13 +800,13 @@ MOVE APP#2
 
 Move App#2 to HP Pool(#7)
 
-curl https://localhost:5000/apps/2 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"pool_id": 7}'
+curl https://localhost:5000/apps/2 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"pool_id": 7}'
 
 "APP 2 moved to new pool"
 
 Verify new configuration, list all apps
 
-curl https://localhost:5000/apps -X GET --user admin:password -k
+curl https://localhost:5000/apps -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 [
     {
@@ -843,7 +830,7 @@ curl https://localhost:5000/apps -X GET --user admin:password -k
 
 Verify new configuration, list pools
 
-curl https://localhost:5000/pools -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 [{"id":0,
 "mba":50,
@@ -872,13 +859,13 @@ MODIFY APP#2
 
 Modify App core affinity and name
 
-curl https://localhost:5000/apps/2 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"cores": [2,11,13], "name": "APP2 HP"}'
+curl https://localhost:5000/apps/2 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"cores": [2,11,13], "name": "APP2 HP"}'
 
 "APP 2 moved to new pool"
 
 Verify new configuration, get App#2 details
 
-curl https://localhost:5000/apps/2 -X GET --user admin:password -k
+curl https://localhost:5000/apps/2 -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 {
     "name": "APP2 HP",
@@ -908,13 +895,13 @@ REMOVE APP#2
 
 Remove App#2
 
-curl https://localhost:5000/apps/2 -X DELETE --user admin:password -k
+curl https://localhost:5000/apps/2 -X DELETE --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 "APP 2 deleted"
 
 Verify new configuration, get App#2 and all Apps details
 
-curl https://localhost:5000/apps/2 -X GET --user admin:password -k
+curl https://localhost:5000/apps/2 -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 {
     "message": "APP 2 not found in config"
@@ -922,7 +909,8 @@ curl https://localhost:5000/apps/2 -X GET --user admin:password -k
 
 NOTE: App#2 not found
 
-curl https://localhost:5000/apps -X GET --user admin:password -k
+curl https://localhost:5000/apps -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
+
 [
     {
         "name": "stress-ng",
@@ -952,13 +940,13 @@ REMOVE HP POOL
 
 Remove HP Pool (#7)
 
-curl https://localhost:5000/pools/7 -X DELETE --user admin:password -k
+curl https://localhost:5000/pools/7 -X DELETE --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 "POOL 7 deleted"
 
 Verify new configuration, get Pool#7 and all  pools details
 
-curl https://localhost:5000/pools/7 -X GET --user admin:password -k
+curl https://localhost:5000/pools/7 -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 {
     "message": "POOL 7 not found in config"
@@ -966,7 +954,7 @@ curl https://localhost:5000/pools/7 -X GET --user admin:password -k
 
 NOTE: Pool#7 not found
 
-curl https://localhost:5000/pools -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 [{"id":0,
 "mba":50,
@@ -981,13 +969,13 @@ RESET CONFIGURATION
 
 Perform configuration reset.
 
-curl https://localhost:5000/reset -X POST --user admin:password -k
+curl https://localhost:5000/reset -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt
 
 "Reset performed. Configuration reloaded."
 
 Verify configuration after reset
 
-curl https://localhost:5000/apps -X GET --user admin:password -k
+curl https://localhost:5000/apps -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -k
 
 {
     "message": "No apps in config file"
@@ -995,7 +983,7 @@ curl https://localhost:5000/apps -X GET --user admin:password -k
 
 NOTE: No Apps configured
 
-curl https://localhost:5000/pools -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 [{"id":0,
 "mba":100,
@@ -1010,7 +998,7 @@ ENABLE RDT OS INTERFACE
 
 Verify that RDT OS interface is supported.
 
-curl https://localhost:5000/caps/rdt_iface -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/rdt_iface -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"interface": "msr",
  "interface_supported": ["msr", "os"]
@@ -1020,7 +1008,7 @@ NOTE: RDT "os" interface is supported but NOT enabled.
 
 Enable RDT OS interface.
 
-curl https://localhost:5000/caps/rdt_iface -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"interface": "os"}'
+curl https://localhost:5000/caps/rdt_iface -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"interface": "os"}'
 
 {"message": "RDT Interface modified"}
 
@@ -1030,7 +1018,7 @@ NOTE: Can be done ONLY when there are no Pools configured (other than "default" 
 
 List RDT configuration details
 
-curl https://localhost:5000/caps/rdt_iface -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/rdt_iface -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"interface": "os",
  "interface_supported": ["msr", "os"]
@@ -1042,7 +1030,7 @@ ENABLE MBA CTRL
 
 Verify MBA CTRL status.
 
-curl https://localhost:5000/caps/mba_ctrl -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/mba_ctrl -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"enabled": false,
  "supported": true
@@ -1052,7 +1040,7 @@ NOTE: MBA CTRL is supported but NOT enabled.
 
 Enable RDT MBA CTRL 
 
-curl https://localhost:5000/caps/mba_ctrl -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"enabled": true}'
+curl https://localhost:5000/caps/mba_ctrl -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"enabled": true}'
 
 {"message": "MBA CTRL status changed."}
 
@@ -1068,13 +1056,13 @@ resctrl on /sys/fs/resctrl type resctrl (rw,relatime,mba_MBps)
 
 NOTE: resctrl fs mounted with "mba_MBps" option, MBA CTRL is enabled.
 
-curl https://localhost:5000/caps/mba_ctrl -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/mba_ctrl -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"enabled": true,
  "supported": true
 }
 
-curl https://localhost:5000/caps/mba -X GET --user admin:password -k | jq -c
+curl https://localhost:5000/caps/mba -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq -c
 
 {"mba_bw_enabled": true
  "mba_enabled": false}
@@ -1084,7 +1072,7 @@ User can use "mba_bw" to configure pool's MBA allocation.
 
 Verify MBA configuration for "Default" Pool
 
-curl https://localhost:5000/pools -X GET --user admin:password -k | jq
+curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq
 
 [
   {
@@ -1107,13 +1095,13 @@ NOTE: MBA for Pool #0 set to maximum value 4294967295MBps (~2^32MBps).
 
 Limit Pool #0 MBA to ~5GBps
 
-curl https://localhost:5000/pools/0 -X PUT --user admin:password -k -H "Content-Type: application/json" -d '{"mba_bw": 5000}'
+curl https://localhost:5000/pools/0 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"mba_bw": 5000}'
 
 {"message": "POOL 0 updated"}
 
 Verify new Pool #0 MBA configuration.
 
-curl https://localhost:5000/pools/0 -X GET --user admin:password -k | jq
+curl https://localhost:5000/pools/0 -X GET --cert client_appqos.crt --key client_appqos.key --cacert ca.crt | jq
 
 {
   "id": 0,
@@ -1140,19 +1128,34 @@ cat /sys/fs/resctrl/schemata
 NOTE: Resctrl shows new MBA configuration for Pool #0.
 
 
-HOW TO GENERATE SELF-SIGNED SSL CERTIFICATE
-===========================================
+HOW TO GENERATE APPQOS AND CLIENT CERTIFICATE
+=============================================
 
-NOTE: just for example purposes, please obtain proper certificate !
+AppQoS uses mutual TLS - both AppQoS and client certificates need to
+be signed using the same root ca certificate.
 
-It is needed to generate self-signed SSL certificate
-(e.g.: using the OpenSSL toolkit) to enable HTTPS connections.
+appqos/ca/ directory contains sample script called 'gen_certs.sh' - it
+can be used for generating certifacates for the AppQoS and the
+client (e.g: curl)
 
-To generate a self-signed SSL certificate using the OpenSSL, run:
+$ cd appqos/ca
+$ ./gen_certs.sh
 
-openssl req -x509 -sha256 -nodes -days 365 -newkey rsa:2048 -keyout appqos.key -out appqos.crt
+This script will create:
+- ca certificate
+- appqos certificate
+- client certificate
 
-NOTE: The filenames are hardcoded to "appqos.key" and "appqos.crt"
+AppQoS REST clients, in order to connect to AppQoS, need to have access to
+client_appqos.crt, client_appqos.key and ca.crt files.
+
+Certificate files can be also created and delivered out of band - if
+you want to deliver certificates to AppQoS this way, keep in mind that
+AppQoS expects certain names of CA certificate, AppQoS certificate and associated
+private key:
+- ca.crt - contains the CA certificate, that will be used to authenticate clients and AppQoS during mTLS
+- appqos.crt - contains AppqQoS certificate, it need to be signed using ca.crt
+- appqos.key - contains private key for the AppQoS certificate
 
 
 Legal Disclaimer

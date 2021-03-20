@@ -46,7 +46,6 @@ import power
 import sstbf
 
 from rest.rest_exceptions import BadRequest, InternalError
-from rest.rest_auth import auth
 
 from config import ConfigStore
 from stats import StatsStore
@@ -59,7 +58,6 @@ class Stats(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP GET /stats request.
@@ -83,7 +81,6 @@ class Caps(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP GET /caps request.
@@ -103,7 +100,6 @@ class Sstbf(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def get():
         """
         Handles HTTP GET /caps/sstbf request.
@@ -121,7 +117,6 @@ class Sstbf(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def put():
         """
         Handles HTTP PUT /caps/sstbf request.
@@ -156,7 +151,6 @@ class Reset(Resource):
 
 
     @staticmethod
-    @auth.login_required
     def post():
         """
         Handles HTTP POST /reset request.

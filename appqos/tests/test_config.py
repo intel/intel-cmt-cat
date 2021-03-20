@@ -67,10 +67,6 @@ CONFIG = {
             "pids": [4]
         }
     ],
-    "auth": {
-        "password": "password",
-        "username": "admin"
-    },
     "pools": [
         {
             "apps": [1],
@@ -117,10 +113,6 @@ CONFIG_NO_MBA = {
             "pids": [4]
         }
     ],
-    "auth": {
-        "password": "password",
-        "username": "admin"
-    },
     "pools": [
         {
             "apps": [1],
@@ -531,10 +523,6 @@ class TestConfigValidate:
             return core != 3
 
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "cbm": 0xf0,
@@ -560,10 +548,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_duplicate_core(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "cbm": 0xf0,
@@ -588,10 +572,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_same_ids(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "cbm": 0xf0,
@@ -616,10 +596,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_app(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1, 3],
@@ -647,10 +623,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_cbm(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [],
@@ -674,10 +646,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
     def test_pool_cat_not_supported(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [],
@@ -698,10 +666,6 @@ class TestConfigValidate:
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_pool_cat_not_supported_mba(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [],
@@ -722,10 +686,6 @@ class TestConfigValidate:
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_mba(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "mba": 101,
@@ -748,10 +708,6 @@ class TestConfigValidate:
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_not_supported(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "mba": 50,
@@ -772,10 +728,6 @@ class TestConfigValidate:
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_bw_not_supported(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "mba_bw": 5000,
@@ -795,10 +747,6 @@ class TestConfigValidate:
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_not_supported_cat(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "cbm": 0xf,
@@ -820,10 +768,6 @@ class TestConfigValidate:
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_bw_not_supported_cat(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "cbm": 0xf,
@@ -845,10 +789,6 @@ class TestConfigValidate:
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
     def test_pool_mba_mba_bw_enabled(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "rdt_iface": {"interface": "os"},
             "mba_ctrl": {"enabled": True},
             "pools": [
@@ -879,10 +819,6 @@ class TestConfigValidate:
             return core != 3
 
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1],
@@ -911,10 +847,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_core_does_not_match_pool(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1],
@@ -943,10 +875,6 @@ class TestConfigValidate:
     def test_app_without_pool(self):
 
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1],
@@ -986,10 +914,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_without_pool(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1],
@@ -1030,10 +954,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_same_ids(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1],
@@ -1067,10 +987,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_same_pid(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1, 2],
@@ -1104,10 +1020,6 @@ class TestConfigValidate:
     @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
     def test_app_invalid_pid(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [
                 {
                     "apps": [1, 2],
@@ -1139,10 +1051,6 @@ class TestConfigValidate:
 
     def test_power_profile_expert_mode_invalid(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [],
             "apps": [],
             "power_profiles_expert_mode": None
@@ -1162,10 +1070,6 @@ class TestConfigValidate:
 
     def test_power_profile_verify_invalid(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [],
             "apps": [],
             "power_profiles_verify": None
@@ -1185,10 +1089,6 @@ class TestConfigValidate:
 
     def test_rdt_iface_invalid(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [],
             "apps": [],
             "rdt_iface": "os"
@@ -1216,10 +1116,6 @@ class TestConfigValidate:
 
     def test_mba_ctrl_invalid(self):
         data = {
-            "auth": {
-                "password": "password",
-                "username": "admin"
-            },
             "pools": [],
             "apps": [],
             "mba_ctrl": True

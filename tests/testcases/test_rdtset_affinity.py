@@ -32,7 +32,6 @@
 ################################################################################
 
 import subprocess
-import time
 import test
 import pytest
 from priority import PRIORITY_HIGH
@@ -68,7 +67,7 @@ class TestRdtsetAffinity(test.Test):
         command = self.cmd_rdtset(iface, "-c 4 memtester 10M")
         rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-        time.sleep(0.1)
+        self.stdout_wait(rdtset, b"memtester version")
 
         child = self.get_pid_children(rdtset.pid)
         assert len(child) == 1
@@ -101,7 +100,7 @@ class TestRdtsetAffinity(test.Test):
         command = self.cmd_rdtset(iface, "-c 4-5 memtester 10M")
         rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
 
-        time.sleep(0.1)
+        self.stdout_wait(rdtset, b"memtester version")
 
         child = self.get_pid_children(rdtset.pid)
         assert len(child) == 1

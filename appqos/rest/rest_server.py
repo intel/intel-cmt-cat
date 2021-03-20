@@ -57,10 +57,15 @@ from rest.rest_pool import Pool, Pools
 from rest.rest_misc import Stats, Caps, Sstbf, Reset
 from rest.rest_rdt import CapsRdtIface, CapsMba, CapsMbaCtrl
 
+TLS_CERT_FILE = 'ca/appqos.crt'
+TLS_KEY_FILE = 'ca/appqos.key'
+TLS_CA_CERT_FILE = 'ca/ca.crt'
 
-TLS_CERT_FILE = 'appqos.crt'
-TLS_KEY_FILE = 'appqos.key'
-
+TLS_CIPHERS = [
+    'AES128-GCM-SHA256',
+    'AES256-GCM-SHA384',
+    'ECDHE-RSA-AES128-GCM-SHA256',
+]
 
 class Server:
     """
@@ -75,7 +80,9 @@ class Server:
         self.api = Api(self.app)
 
         # initialize SSL context
-        self.context = ssl.SSLContext(ssl.PROTOCOL_TLS)
+        self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        self.context.verify_mode = ssl.CERT_REQUIRED
+        self.context.set_ciphers(':'.join(TLS_CIPHERS))
 
         # allow TLS 1.2 and later
         self.context.options |= ssl.OP_NO_SSLv2
@@ -125,6 +132,16 @@ class Server:
             self.context.load_cert_chain(TLS_CERT_FILE, TLS_KEY_FILE)
         except (FileNotFoundError, PermissionError) as ex:
             log.error("SSL cert or key file, {}".format(str(ex)))
+            return -1
+
+        # loading CA crt file - it is needed for mTLS verification of client certificates
+        try:
+            with open(TLS_CA_CERT_FILE, opener=common.check_link):
+                pass
+            self.context.load_verify_locations(cafile=TLS_CA_CERT_FILE)
+
+        except (FileNotFoundError, PermissionError) as ex:
+            log.error("CA certificate file, {}".format(str(ex)))
             return -1
 
         self.process = multiprocessing.Process(target=self.app.run,
