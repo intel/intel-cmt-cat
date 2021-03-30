@@ -40,12 +40,10 @@ import unittest
 
 from unittest.mock import MagicMock, patch
 
-from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_int, ctypes_build_array
 
-from pqos.cpuinfo import (
-    PqosCpuInfo, CPqosCacheInfo, CPqosCoreInfo, CPqosCpuInfo
-)
+from pqos.cpuinfo import PqosCpuInfo
+from pqos.native_struct import CPqosCacheInfo, CPqosCoreInfo, CPqosCpuInfo
 from pqos.error import PqosError
 
 
@@ -110,8 +108,8 @@ class PqosCpuInfoMockBuilder(object):
 class TestPqosCpuInfo(unittest.TestCase):
     "Tests for PqosCpuInfo class."
 
-    @mock_pqos_lib
-    def test_init(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_init(self, pqos_mock_cls):
         """
         Tests if the pointer to CPU information object given
         to PQoS library APIs is the same returned from pqos_cap_get() API during
@@ -136,6 +134,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             self.assertEqual(cpu_ref_addr, p_cpu_addr)
             return 1
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(side_effect=pqos_cap_get_mock)
         lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_socketid_m,
                                               __name__='pqos_cpu_get_socketid')
@@ -148,10 +147,11 @@ class TestPqosCpuInfo(unittest.TestCase):
         lib.pqos_cpu_get_socketid.assert_called_once()
         lib.pqos_cap_get.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_vendor(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_vendor(self, pqos_mock_cls):
         "Tests get_vendor() method"
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_get_vendor = MagicMock(return_value=1)
 
@@ -159,8 +159,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         self.assertEqual(cpu.get_vendor(), "INTEL")
 
-    @mock_pqos_lib
-    def test_get_sockets(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_sockets(self, pqos_mock_cls):
         "Tests get_sockets() method."
 
         sockets_mock = [ctypes.c_uint(socket) for socket in [0, 1, 2, 3]]
@@ -172,6 +172,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(count_ref, len(sockets_arr))
             return ctypes.cast(sockets_arr, ctypes.POINTER(ctypes.c_uint))
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_sockets = MagicMock(side_effect=pqos_cpu_get_sockets_m)
 
@@ -186,8 +187,8 @@ class TestPqosCpuInfo(unittest.TestCase):
         self.assertEqual(sockets[2], 2)
         self.assertEqual(sockets[3], 3)
 
-    @mock_pqos_lib
-    def test_get_l2ids(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_l2ids(self, pqos_mock_cls):
         "Tests get_l2ids() method."
 
         l2ids_mock = [ctypes.c_uint(l2id) for l2id in [7, 2, 3, 5]]
@@ -199,6 +200,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(count_ref, len(l2ids_arr))
             return ctypes.cast(l2ids_arr, ctypes.POINTER(ctypes.c_uint))
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_l2ids = MagicMock(side_effect=pqos_cpu_get_l2ids_m)
 
@@ -213,8 +215,8 @@ class TestPqosCpuInfo(unittest.TestCase):
         self.assertEqual(l2ids[2], 3)
         self.assertEqual(l2ids[3], 5)
 
-    @mock_pqos_lib
-    def test_get_cores_l3id(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_cores_l3id(self, pqos_mock_cls):
         "Tests get_cores_l3id() method."
 
         cores_mock = [ctypes.c_uint(core) for core in [4, 2, 5]]
@@ -227,6 +229,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(count_ref, len(cores_arr))
             return ctypes.cast(cores_arr, ctypes.POINTER(ctypes.c_uint))
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_cores_l3id = MagicMock(side_effect=pqos_cores_l3id_m)
 
@@ -242,8 +245,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_get_cores_l3id.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_cores(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_cores(self, pqos_mock_cls):
         "Tests get_cores() method."
 
         cores_mock = [ctypes.c_uint(core) for core in [8, 7, 3]]
@@ -256,6 +259,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(count_ref, len(cores_arr))
             return ctypes.cast(cores_arr, ctypes.POINTER(ctypes.c_uint))
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_cores = MagicMock(side_effect=pqos_cpu_get_cores_m)
 
@@ -271,8 +275,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_get_cores.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_core_info(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_core_info(self, pqos_mock_cls):
         "Tests get_core_info() method."
 
         coreinfo_mock = CPqosCoreInfo(lcore=1, socket=0, l3_id=1, l2_id=7, l3cat_id=1, mba_id=1)
@@ -283,6 +287,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             self.assertEqual(core, 1)
             return ctypes.pointer(coreinfo_mock)
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_core_info = MagicMock(side_effect=pqos_get_core_info_m)
 
@@ -296,8 +301,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_get_core_info.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_one_core(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_one_core(self, pqos_mock_cls):
         "Tests get_one_core() method."
 
         def pqos_get_one_core_m(_p_cpu, socket, core_ref):
@@ -307,6 +312,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(core_ref, 5)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_one_core = MagicMock(side_effect=pqos_get_one_core_m,
                                               __name__='pqos_cpu_get_one_core')
@@ -318,8 +324,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_get_one_core.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_one_by_l2id(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_one_by_l2id(self, pqos_mock_cls):
         "Tests get_one_by_l2id() method."
 
         def pqos_get_by_l2id_m(_p_cpu, l2_id, core_ref):
@@ -329,6 +335,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(core_ref, 15)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         func_mock = MagicMock(side_effect=pqos_get_by_l2id_m,
                               __name__='pqos_cpu_get_one_by_l2id')
@@ -341,8 +348,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_get_one_by_l2id.assert_called_once()
 
-    @mock_pqos_lib
-    def test_check_core_valid(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_check_core_valid(self, pqos_mock_cls):
         "Tests check_core() method when the given core is valid."
 
         def pqos_cpu_check_core_m(_p_cpu, core):
@@ -351,6 +358,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             self.assertEqual(core, 4)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_check_core = MagicMock(side_effect=pqos_cpu_check_core_m)
 
@@ -361,8 +369,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_check_core.assert_called_once()
 
-    @mock_pqos_lib
-    def test_check_core_invalid(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_check_core_invalid(self, pqos_mock_cls):
         "Tests check_core() method when the given core is invalid."
 
         def pqos_cpu_check_core_m(_p_cpu, core):
@@ -371,6 +379,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             self.assertEqual(core, 99999)
             return 1
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_check_core = MagicMock(side_effect=pqos_cpu_check_core_m)
 
@@ -381,8 +390,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_check_core.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_socketid(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_socketid(self, pqos_mock_cls):
         "Tests get_socketid() method."
 
         def pqos_get_socketid_m(_p_cpu, core, socket_ref):
@@ -392,6 +401,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(socket_ref, 4)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_get_socketid_m,
                                               __name__='pqos_cpu_get_socketid')
@@ -403,8 +413,8 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cpu_get_socketid.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_clusterid(self, lib):
+    @patch('pqos.cpuinfo.Pqos')
+    def test_get_clusterid(self, pqos_mock_cls):
         "Tests get_clusterid() method."
 
         def pqos_get_clusterid_m(_p_cpu, core, cluster_ref):
@@ -414,6 +424,7 @@ class TestPqosCpuInfo(unittest.TestCase):
             ctypes_ref_set_int(cluster_ref, 0)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         func_mock = MagicMock(side_effect=pqos_get_clusterid_m,
                               __name__='pqos_cpu_get_clusterid')

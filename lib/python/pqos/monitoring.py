@@ -39,37 +39,17 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 
 from pqos.common import pqos_handle_error
+from pqos.native_struct import (
+    CPqosEventValues, CPqosMonitor, RmidT
+)
 from pqos.pqos import Pqos
-from pqos.capability import CPqosMonitor
-
-
-RmidT = ctypes.c_uint32
-
-
-class CPqosEventValues(ctypes.Structure):
-    "pqos_event_values structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('llc', ctypes.c_uint64),
-        ('mbm_local', ctypes.c_uint64),
-        ('mbm_total', ctypes.c_uint64),
-        ('mbm_remote', ctypes.c_uint64),
-        ('mbm_local_delta', ctypes.c_uint64),
-        ('mbm_total_delta', ctypes.c_uint64),
-        ('mbm_remote_delta', ctypes.c_uint64),
-        ('ipc_retired', ctypes.c_uint64),
-        ('ipc_retired_delta', ctypes.c_uint64),
-        ('ipc_unhalted', ctypes.c_uint64),
-        ('ipc_unhalted_delta', ctypes.c_uint64),
-        ('ipc', ctypes.c_double),
-        ('llc_misses', ctypes.c_uint64),
-        ('llc_misses_delta', ctypes.c_uint64),
-    ]
-
 
 class CPqosMonData(ctypes.Structure):
-    "pqos_mon_data structure"
+    """
+    pqos_mon_data structure
+    This class is not in native_struct.py because it has additional methods
+    that requires Pqos() - avoiding circular dependency.
+    """
 
     _fields_ = [
         ('valid', ctypes.c_int),
@@ -127,6 +107,32 @@ class CPqosMonData(ctypes.Structure):
         """
 
         return ctypes.pointer(self)
+
+    def get_event_value(self, event):
+        """
+        Returns counter value for a given event.
+
+        Parameters:
+            event: an event identifier
+
+        Returns:
+            counter value
+        """
+
+        event_counter_map = {
+            'l3_occup': 'llc',
+            'lmem_bw': 'mbm_local_delta',
+            'tmem_bw': 'mbm_total_delta',
+            'rmem_bw': 'mbm_remote_delta',
+            'perf_ipc': 'ipc',
+            'perf_llc_miss': 'llc_misses_delta'
+        }
+
+        counter = event_counter_map.get(event)
+        if not counter:
+            return None
+
+        return getattr(self.values, counter, None)
 
 
 def _get_event_mask(events):

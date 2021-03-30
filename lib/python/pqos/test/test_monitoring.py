@@ -37,21 +37,17 @@ Unit tests for monitoring module.
 from __future__ import absolute_import, division, print_function
 import ctypes
 import unittest
-
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from pqos.test.helper import ctypes_ref_set_uint
-from pqos.test.mock_pqos import mock_pqos_lib
-
-from pqos.capability import CPqosMonitor
-from pqos.monitoring import PqosMon, CPqosEventValues, CPqosMonData
-
+from pqos.monitoring import PqosMon, CPqosMonData
+from pqos.native_struct import CPqosEventValues, CPqosMonitor
 
 class TestPqosMon(unittest.TestCase):
     "Tests for PqosMon class."
 
-    @mock_pqos_lib
-    def test_reset(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_reset(self, pqos_mock_cls):
         "Tests reset() method."
         # pylint: disable=no-self-use
 
@@ -60,6 +56,7 @@ class TestPqosMon(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_reset_mock)
         lib.pqos_mon_reset = func_mock
 
@@ -68,8 +65,8 @@ class TestPqosMon(unittest.TestCase):
 
         lib.pqos_mon_reset.assert_called_once()
 
-    @mock_pqos_lib
-    def test_assoc_get(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_assoc_get(self, pqos_mock_cls):
         "Tests assoc_get() method."
 
         def pqos_mon_assoc_get_mock(core, rmid_ref):
@@ -79,6 +76,7 @@ class TestPqosMon(unittest.TestCase):
             ctypes_ref_set_uint(rmid_ref, 7)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_assoc_get_mock)
         lib.pqos_mon_assoc_get = func_mock
 
@@ -89,8 +87,8 @@ class TestPqosMon(unittest.TestCase):
 
         lib.pqos_mon_assoc_get.assert_called_once()
 
-    @mock_pqos_lib
-    def test_start(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_start(self, pqos_mock_cls):
         "Tests start() method."
 
         values = CPqosEventValues(llc=123, mbm_local=456, mbm_total=789,
@@ -112,6 +110,7 @@ class TestPqosMon(unittest.TestCase):
                            ctypes.sizeof(group_mock))
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_start_mock)
         lib.pqos_mon_start = func_mock
 
@@ -123,8 +122,8 @@ class TestPqosMon(unittest.TestCase):
         self.assertEqual(group.values.llc, 123)
         self.assertEqual(group.values.mbm_local, 456)
 
-    @mock_pqos_lib
-    def test_start_pids(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_start_pids(self, pqos_mock_cls):
         "Tests start_pids() method."
         values = CPqosEventValues(llc=678, mbm_local=653, mbm_total=721,
                                   mbm_remote=68, mbm_local_delta=653,
@@ -146,6 +145,7 @@ class TestPqosMon(unittest.TestCase):
                            ctypes.sizeof(group_mock))
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_start_pids_mock)
         lib.pqos_mon_start_pids = func_mock
 
@@ -158,8 +158,8 @@ class TestPqosMon(unittest.TestCase):
         self.assertEqual(group.values.mbm_local, 653)
         self.assertAlmostEqual(group.values.ipc, 0.98, places=5)
 
-    @mock_pqos_lib
-    def test_poll(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_poll(self, pqos_mock_cls):
         "Tests poll() method."
         values = CPqosEventValues(llc=678, mbm_local=653, mbm_total=721,
                                   mbm_remote=68, mbm_local_delta=653,
@@ -182,6 +182,7 @@ class TestPqosMon(unittest.TestCase):
                            ctypes.sizeof(group_mock2))
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_poll_mock)
         lib.pqos_mon_poll = func_mock
 
@@ -196,8 +197,8 @@ class TestPqosMon(unittest.TestCase):
 class TestCPqosMonData(unittest.TestCase):
     "Tests for CPqosMonData class."
 
-    @mock_pqos_lib
-    def test_stop(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_stop(self, pqos_mock_cls):
         "Tests stop() method."
 
         values = CPqosEventValues(llc=123, mbm_local=456, mbm_total=789,
@@ -214,6 +215,7 @@ class TestCPqosMonData(unittest.TestCase):
             self.assertEqual(group_ptr_addr, mock_addr)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_stop_mock)
         lib.pqos_mon_stop = func_mock
 
@@ -221,8 +223,8 @@ class TestCPqosMonData(unittest.TestCase):
 
         lib.pqos_mon_stop.assert_called_once()
 
-    @mock_pqos_lib
-    def test_add_pids(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_add_pids(self, pqos_mock_cls):
         "Tests add_pids() method."
 
         values = CPqosEventValues(llc=123, mbm_local=456, mbm_total=789,
@@ -245,6 +247,7 @@ class TestCPqosMonData(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_add_pids_mock)
         lib.pqos_mon_add_pids = func_mock
 
@@ -252,8 +255,8 @@ class TestCPqosMonData(unittest.TestCase):
 
         lib.pqos_mon_add_pids.assert_called_once()
 
-    @mock_pqos_lib
-    def test_remove_pids(self, lib):
+    @patch('pqos.monitoring.Pqos')
+    def test_remove_pids(self, pqos_mock_cls):
         "Tests remove_pids() method."
 
         values = CPqosEventValues(llc=123, mbm_local=456, mbm_total=789,
@@ -277,6 +280,7 @@ class TestCPqosMonData(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_mon_remove_pids_mock)
         lib.pqos_mon_remove_pids = func_mock
 

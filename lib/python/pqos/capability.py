@@ -39,127 +39,7 @@ import ctypes
 
 from pqos.common import pqos_handle_error
 from pqos.pqos import Pqos
-
-
-class CPqosCapabilityL3(ctypes.Structure):
-    "pqos_cap_l3ca structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('num_classes', ctypes.c_uint),
-        ('num_ways', ctypes.c_uint),
-        ('way_size', ctypes.c_uint),
-        ('way_contention', ctypes.c_uint64),
-        ('cdp', ctypes.c_int),
-        ('cdp_on', ctypes.c_int),
-    ]
-
-
-class CPqosCapabilityL2(ctypes.Structure):
-    "pqos_cap_l2ca structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('num_classes', ctypes.c_uint),
-        ('num_ways', ctypes.c_uint),
-        ('way_size', ctypes.c_uint),
-        ('way_contention', ctypes.c_uint64),
-        ('cdp', ctypes.c_int),
-        ('cdp_on', ctypes.c_int),
-    ]
-
-
-class CPqosCapabilityMBA(ctypes.Structure):
-    "pqos_cap_mba structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('num_classes', ctypes.c_uint),
-        ('throttle_max', ctypes.c_uint),
-        ('throttle_step', ctypes.c_uint),
-        ('is_linear', ctypes.c_int),
-        ('ctrl', ctypes.c_int),
-        ('ctrl_on', ctypes.c_int),
-    ]
-
-
-class CPqosMonitor(ctypes.Structure):
-    "pqos_monitor structure"
-    # pylint: disable=too-few-public-methods
-
-    PQOS_MON_EVENT_L3_OCCUP = 1
-    PQOS_MON_EVENT_LMEM_BW = 2
-    PQOS_MON_EVENT_TMEM_BW = 4
-    PQOS_MON_EVENT_RMEM_BW = 8
-    RESERVED1 = 0x1000
-    RESERVED2 = 0x2000
-    PQOS_PERF_EVENT_LLC_MISS = 0x4000
-    PQOS_PERF_EVENT_IPC = 0x8000
-
-    _fields_ = [
-        ('type', ctypes.c_int),
-        ('max_rmid', ctypes.c_uint),
-        ('scale_factor', ctypes.c_uint32),
-        ('counter_length', ctypes.c_uint),
-    ]
-
-
-class CPqosCapabilityMonitoring(ctypes.Structure):
-    "pqos_cap_mon structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('max_rmid', ctypes.c_uint),
-        ('l3_size', ctypes.c_uint),
-        ('num_events', ctypes.c_uint),
-        ('events', CPqosMonitor * 0),
-    ]
-
-
-class CPqosCapabilityUnion(ctypes.Union):
-    "Union from pqos_capability structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('mon', ctypes.POINTER(CPqosCapabilityMonitoring)),
-        ('l3ca', ctypes.POINTER(CPqosCapabilityL3)),
-        ('l2ca', ctypes.POINTER(CPqosCapabilityL2)),
-        ('mba', ctypes.POINTER(CPqosCapabilityMBA)),
-        ('generic_ptr', ctypes.c_void_p),
-    ]
-
-
-class CPqosCapability(ctypes.Structure):
-    "pqos_capability structure"
-    # pylint: disable=too-few-public-methods
-
-    PQOS_CAP_TYPE_MON = 0
-    PQOS_CAP_TYPE_L3CA = 1
-    PQOS_CAP_TYPE_L2CA = 2
-    PQOS_CAP_TYPE_MBA = 3
-    PQOS_CAP_TYPE_NUMOF = 4
-
-    _fields_ = [
-        ('type', ctypes.c_int),
-        ('u', CPqosCapabilityUnion)
-    ]
-
-
-class CPqosCap(ctypes.Structure):
-    "pqos_cap structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('version', ctypes.c_uint),
-        ('num_cap', ctypes.c_uint),
-        ('capabilities', CPqosCapability * 0)
-    ]
-
+from pqos.native_struct import CPqosCap, CPqosCapability, CPqosMonitor
 
 class PqosCapabilityMonitoring(object):
     "PQoS monitoring capability"
@@ -324,18 +204,24 @@ class PqosCap(object):
 
     def __init__(self):
         "Initializes capabilities, calls pqos_cap_get."
+
         self.pqos = Pqos()
         self.p_cap = ctypes.POINTER(CPqosCap)()
         ret = self.pqos.lib.pqos_cap_get(ctypes.byref(self.p_cap), None)
         pqos_handle_error('pqos_cap_get', ret)
 
     def get_type(self, type_str):
-        """Retrieves a type of capability from a cap structure.
+        """
+        Retrieves a type of capability from a cap structure.
 
         Parameters:
             type_str: a string indicating a type of capability, available
                       options: mon, l3ca, l2ca and mba
+
+        Returns:
+            capabilities
         """
+
         type_enum = pqos_get_type_enum(type_str)
         p_cap_item = ctypes.POINTER(CPqosCapability)()
         ret = self.pqos.lib.pqos_cap_get_type(self.p_cap, type_enum,
@@ -350,7 +236,11 @@ class PqosCap(object):
         """
         Retrieves number of L3 allocation classes of service from
         a cap structure.
+
+        Returns:
+            a number of L3 allocation classes
         """
+
         cos_num = ctypes.c_uint(0)
         ret = self.pqos.lib.pqos_l3ca_get_cos_num(self.p_cap,
                                                   ctypes.byref(cos_num))
@@ -361,7 +251,11 @@ class PqosCap(object):
         """
         Retrieves number of L2 allocation classes of service from
         a cap structure.
+
+        Returns:
+            a number of L2 allocation classes
         """
+
         cos_num = ctypes.c_uint(0)
         ret = self.pqos.lib.pqos_l2ca_get_cos_num(self.p_cap,
                                                   ctypes.byref(cos_num))
@@ -372,7 +266,11 @@ class PqosCap(object):
         """
         Retrieves number of memory B/W allocation classes of service from
         a cap structure.
+
+        Returns:
+            a number of memory B/W allocation classes
         """
+
         cos_num = ctypes.c_uint(0)
         ret = self.pqos.lib.pqos_mba_get_cos_num(self.p_cap,
                                                  ctypes.byref(cos_num))
@@ -380,7 +278,14 @@ class PqosCap(object):
         return cos_num.value
 
     def is_l3ca_cdp_enabled(self):
-        "Retrieves L3 CDP status."
+        """
+        Retrieves L3 CDP status.
+
+        Returns:
+            a tuple of two values: supported (True, False or None)
+              and enabled (True, False or None)
+        """
+
         supported = ctypes.c_int(0)
         enabled = ctypes.c_int(0)
         ret = self.pqos.lib.pqos_l3ca_cdp_enabled(self.p_cap,
@@ -391,7 +296,14 @@ class PqosCap(object):
                 _get_tristate_bool(enabled.value))
 
     def is_l2ca_cdp_enabled(self):
-        "Retrieves L2 CDP status."
+        """
+        Retrieves L2 CDP status.
+
+        Returns:
+            a tuple of two values: supported (True, False or None)
+              and enabled (True, False or None)
+        """
+
         supported = ctypes.c_int(0)
         enabled = ctypes.c_int(0)
         ret = self.pqos.lib.pqos_l2ca_cdp_enabled(self.p_cap,
@@ -402,7 +314,14 @@ class PqosCap(object):
                 _get_tristate_bool(enabled.value))
 
     def is_mba_ctrl_enabled(self):
-        "Retrieves MBA CTRL status."
+        """
+        Retrieves MBA CTRL status.
+
+        Returns:
+            a tuple of two values: supported (True, False or None)
+              and enabled (True, False or None)
+        """
+
         supported = ctypes.c_int(0)
         enabled = ctypes.c_int(0)
         ret = self.pqos.lib.pqos_mba_ctrl_enabled(self.p_cap,

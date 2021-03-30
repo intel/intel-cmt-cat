@@ -40,10 +40,10 @@ import unittest
 
 from unittest.mock import MagicMock, patch
 
-from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_int, ctypes_build_array
 
-from pqos.l3ca import PqosCatL3, CPqosL3Ca, CPqosL3CaMask
+from pqos.l3ca import PqosCatL3
+from pqos.native_struct import CPqosL3Ca, CPqosL3CaMask
 
 
 
@@ -56,8 +56,8 @@ class TestPqosCatL3(unittest.TestCase):
         with self.assertRaises(ValueError):
             PqosCatL3.COS(1)
 
-    @mock_pqos_lib
-    def test_set(self, lib):
+    @patch('pqos.l3ca.Pqos')
+    def test_set(self, pqos_mock_cls):
         "Tests set() method."
 
         def pqos_l3ca_set_mock(socket, num_ca, l3_ca_arr):
@@ -74,6 +74,7 @@ class TestPqosCatL3(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_l3ca_set = MagicMock(side_effect=pqos_l3ca_set_mock)
 
         l3ca = PqosCatL3()
@@ -82,8 +83,8 @@ class TestPqosCatL3(unittest.TestCase):
 
         lib.pqos_l3ca_set.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get(self, lib):
+    @patch('pqos.l3ca.Pqos')
+    def test_get(self, pqos_mock_cls):
         "Tests get() method."
         # pylint: disable=invalid-name
 
@@ -102,7 +103,7 @@ class TestPqosCatL3(unittest.TestCase):
 
             return 0
 
-
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_l3ca_get = MagicMock(side_effect=pqos_l3ca_get_mock)
 
         l3ca = PqosCatL3()
@@ -119,8 +120,8 @@ class TestPqosCatL3(unittest.TestCase):
         self.assertEqual(coses[1].class_id, 1)
         self.assertEqual(coses[1].mask, 0x003f)
 
-    @mock_pqos_lib
-    def test_get_min_cbm_bits(self, lib):
+    @patch('pqos.l3ca.Pqos')
+    def test_get_min_cbm_bits(self, pqos_mock_cls):
         "Tests get_min_cbm_bits() method."
 
         def pqos_l3ca_get_min_cbm_bits_mock(min_cbm_bits_ref):
@@ -129,6 +130,7 @@ class TestPqosCatL3(unittest.TestCase):
             ctypes_ref_set_int(min_cbm_bits_ref, 2)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_l3ca_get_min_cbm_bits_mock)
         lib.pqos_l3ca_get_min_cbm_bits = func_mock
 

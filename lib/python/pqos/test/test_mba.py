@@ -36,20 +36,17 @@ Unit tests for MBA module.
 
 from __future__ import absolute_import, division, print_function
 import unittest
+from unittest.mock import MagicMock, patch
 
-from unittest.mock import MagicMock
-
-from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_int
-
 from pqos.mba import PqosMba
 
 
 class TestPqosMba(unittest.TestCase):
     "Tests for PqosMba class."
 
-    @mock_pqos_lib
-    def test_set(self, lib):
+    @patch('pqos.mba.Pqos')
+    def test_set(self, pqos_mock_cls):
         "Tests set() method."
 
         def pqos_mba_set_mock(socket, num_cos, cos_arr, actual_arr):
@@ -69,6 +66,7 @@ class TestPqosMba(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_mba_set = MagicMock(side_effect=pqos_mba_set_mock)
 
         mba = PqosMba()
@@ -82,15 +80,10 @@ class TestPqosMba(unittest.TestCase):
 
         lib.pqos_mba_set.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get(self, lib):
+    @patch('pqos.mba.PqosCap')
+    @patch('pqos.mba.Pqos')
+    def test_get(self, pqos_mock_cls, pqos_cap_mock_cls):
         "Tests get() method."
-
-        def pqos_mba_cos_num_mock(_p_cap, num_cos_ref):
-            "Mock pqos_mba_get_cos_num()."
-
-            ctypes_ref_set_int(num_cos_ref, 2)
-            return 0
 
         def pqos_mba_get_mock(socket, max_num_cos, num_cos_ref, cos_arr):
             "Mock pqos_mba_get()."
@@ -111,8 +104,8 @@ class TestPqosMba(unittest.TestCase):
 
             return 0
 
-        lib.pqos_cap_get = MagicMock(return_value=0)
-        lib.pqos_mba_get_cos_num = MagicMock(side_effect=pqos_mba_cos_num_mock)
+        lib = pqos_mock_cls.return_value.lib
+        pqos_cap_mock_cls.return_value.get_mba_cos_num = MagicMock(return_value=2)
         lib.pqos_mba_get = MagicMock(side_effect=pqos_mba_get_mock)
 
         mba = PqosMba()
@@ -129,4 +122,4 @@ class TestPqosMba(unittest.TestCase):
         self.assertTrue(coses[1].ctrl)
 
         lib.pqos_mba_get.assert_called_once()
-        lib.pqos_mba_get_cos_num.assert_called_once()
+        pqos_cap_mock_cls.return_value.get_mba_cos_num.assert_called_once()

@@ -38,16 +38,15 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 import unittest
 
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_int, ctypes_build_array
 
-from pqos.capability import (
-    PqosCap, CPqosMonitor, CPqosCapabilityMonitoring, CPqosCapabilityL3,
+from pqos.capability import PqosCap
+from pqos.native_struct import (
+    CPqosMonitor, CPqosCapabilityMonitoring, CPqosCapabilityL3,
     CPqosCapabilityL2, CPqosCapabilityMBA, CPqosCapabilityUnion,
-    CPqosCapability, CPqosCap
-)
+    CPqosCapability, CPqosCap)
 from pqos.error import PqosError
 
 
@@ -202,8 +201,8 @@ def _prepare_get_type(lib, cap):
 class TestPqosCap(unittest.TestCase):
     "Tests for PqosCap class."
 
-    @mock_pqos_lib
-    def test_init(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_init(self, pqos_mock_cls):
         """
         Tests if the pointer to capabilities object given to PQoS library APIs
         is the same returned from pqos_cap_get() API during
@@ -228,6 +227,7 @@ class TestPqosCap(unittest.TestCase):
             self.assertEqual(cap_ref_addr, p_cap_addr)
             return 1
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(side_effect=pqos_cap_get_mock)
         lib.pqos_cap_get_type = MagicMock(side_effect=pqos_cap_get_type_mock)
 
@@ -236,8 +236,8 @@ class TestPqosCap(unittest.TestCase):
         with self.assertRaises(PqosError):
             pqos_cap.get_type('mba')
 
-    @mock_pqos_lib
-    def test_get_type_l3ca(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_get_type_l3ca(self, pqos_mock_cls):
         "Tests get_type() method for L3 cache allocation."
         l3ca = CPqosCapabilityL3(mem_size=ctypes.sizeof(CPqosCapabilityL3),
                                  num_classes=2, num_ways=8, way_size=1024*1024,
@@ -246,6 +246,7 @@ class TestPqosCap(unittest.TestCase):
         l3ca_cap = CPqosCapability(type=CPqosCapability.PQOS_CAP_TYPE_L3CA,
                                    u=l3ca_u)
 
+        lib = pqos_mock_cls.return_value.lib
         _prepare_get_type(lib, l3ca_cap)
 
         pqos_cap = PqosCap()
@@ -258,8 +259,8 @@ class TestPqosCap(unittest.TestCase):
         self.assertEqual(l3ca_capability.cdp, True)
         self.assertEqual(l3ca_capability.cdp_on, False)
 
-    @mock_pqos_lib
-    def test_get_type_l2ca(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_get_type_l2ca(self, pqos_mock_cls):
         "Tests get_type() method for L2 cache allocation."
         l2ca = CPqosCapabilityL2(mem_size=ctypes.sizeof(CPqosCapabilityL2),
                                  num_classes=4, num_ways=16,
@@ -269,6 +270,7 @@ class TestPqosCap(unittest.TestCase):
         l2ca_cap = CPqosCapability(type=CPqosCapability.PQOS_CAP_TYPE_L2CA,
                                    u=l2ca_u)
 
+        lib = pqos_mock_cls.return_value.lib
         _prepare_get_type(lib, l2ca_cap)
 
         pqos_cap = PqosCap()
@@ -281,8 +283,8 @@ class TestPqosCap(unittest.TestCase):
         self.assertEqual(l2ca_capability.cdp, True)
         self.assertEqual(l2ca_capability.cdp_on, False)
 
-    @mock_pqos_lib
-    def test_get_type_mba(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_get_type_mba(self, pqos_mock_cls):
         "Tests get_type() method for MBA."
 
         mba = CPqosCapabilityMBA(mem_size=ctypes.sizeof(CPqosCapabilityMBA),
@@ -293,6 +295,7 @@ class TestPqosCap(unittest.TestCase):
         mba_cap = CPqosCapability(type=CPqosCapability.PQOS_CAP_TYPE_MBA,
                                   u=mba_u)
 
+        lib = pqos_mock_cls.return_value.lib
         _prepare_get_type(lib, mba_cap)
 
         pqos_cap = PqosCap()
@@ -305,8 +308,8 @@ class TestPqosCap(unittest.TestCase):
         self.assertEqual(mba_capability.ctrl, True)
         self.assertEqual(mba_capability.ctrl_on, False)
 
-    @mock_pqos_lib
-    def test_get_l3ca_cos_num(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_get_l3ca_cos_num(self, pqos_mock_cls):
         "Tests get_l3ca_cos_num() method."
 
         def pqos_l3ca_cos_num_m(_cap_ref, cos_num_ref):
@@ -315,6 +318,7 @@ class TestPqosCap(unittest.TestCase):
             ctypes_ref_set_int(cos_num_ref, 3)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_l3ca_get_cos_num = MagicMock(side_effect=pqos_l3ca_cos_num_m)
 
@@ -323,8 +327,8 @@ class TestPqosCap(unittest.TestCase):
 
         self.assertEqual(cos_num, 3)
 
-    @mock_pqos_lib
-    def test_get_l2ca_cos_num(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_get_l2ca_cos_num(self, pqos_mock_cls):
         "Tests get_l2ca_cos_num() method."
 
         def pqos_l2ca_cos_num_m(_cap_ref, cos_num_ref):
@@ -333,6 +337,7 @@ class TestPqosCap(unittest.TestCase):
             ctypes_ref_set_int(cos_num_ref, 4)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_l2ca_get_cos_num = MagicMock(side_effect=pqos_l2ca_cos_num_m)
 
@@ -341,8 +346,8 @@ class TestPqosCap(unittest.TestCase):
 
         self.assertEqual(cos_num, 4)
 
-    @mock_pqos_lib
-    def test_get_mba_cos_num(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_get_mba_cos_num(self, pqos_mock_cls):
         "Tests get_mba_cos_num() method."
 
         def pqos_mba_cos_num_m(_cap_ref, cos_num_ref):
@@ -351,6 +356,7 @@ class TestPqosCap(unittest.TestCase):
             ctypes_ref_set_int(cos_num_ref, 9)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_mba_get_cos_num = MagicMock(side_effect=pqos_mba_cos_num_m)
 
@@ -359,8 +365,8 @@ class TestPqosCap(unittest.TestCase):
 
         self.assertEqual(cos_num, 9)
 
-    @mock_pqos_lib
-    def test_is_l3ca_cdp_enabled(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_is_l3ca_cdp_enabled(self, pqos_mock_cls):
         "Tests is_l3ca_cdp_enabled() method."
 
         def pqos_l3cdp_enabled_m(_cap_ref, supported_ref, enabled_ref):
@@ -370,6 +376,7 @@ class TestPqosCap(unittest.TestCase):
             ctypes_ref_set_int(enabled_ref, 0)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_l3ca_cdp_enabled = MagicMock(side_effect=pqos_l3cdp_enabled_m)
 
@@ -379,8 +386,8 @@ class TestPqosCap(unittest.TestCase):
         self.assertEqual(supported, True)
         self.assertEqual(enabled, False)
 
-    @mock_pqos_lib
-    def test_is_l2ca_cdp_enabled(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_is_l2ca_cdp_enabled(self, pqos_mock_cls):
         "Tests is_l2ca_cdp_enabled() method."
 
         def pqos_l2cdp_enabled_m(_cap_ref, supported_ref, enabled_ref):
@@ -390,6 +397,7 @@ class TestPqosCap(unittest.TestCase):
             ctypes_ref_set_int(enabled_ref, 1)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_l2ca_cdp_enabled = MagicMock(side_effect=pqos_l2cdp_enabled_m)
 
@@ -399,8 +407,8 @@ class TestPqosCap(unittest.TestCase):
         self.assertEqual(supported, False)
         self.assertEqual(enabled, True)
 
-    @mock_pqos_lib
-    def test_is_mba_ctrl_enabled(self, lib):
+    @patch('pqos.capability.Pqos')
+    def test_is_mba_ctrl_enabled(self, pqos_mock_cls):
         "Tests is_mba_ctrl_enabled() method."
 
         def pqos_mba_ct_enabled_m(_cap_ref, supported_ref, enabled_ref):
@@ -410,6 +418,7 @@ class TestPqosCap(unittest.TestCase):
             ctypes_ref_set_int(enabled_ref, -1)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_mba_ctrl_enabled = MagicMock(side_effect=pqos_mba_ct_enabled_m)
 

@@ -39,52 +39,9 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 
 from pqos.capability import PqosCap
-from pqos.common import (
-    pqos_handle_error, convert_from_cos, convert_to_cos, COSBase
-)
+from pqos.common import pqos_handle_error, COSBase
+from pqos.native_struct import CPqosL3Ca
 from pqos.pqos import Pqos
-
-
-class CPqosL3CaMaskCDP(ctypes.Structure):
-    "CDP structure from union from pqos_l3ca structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('data_mask', ctypes.c_uint64),
-        ('code_mask', ctypes.c_uint64),
-    ]
-
-
-class CPqosL3CaMask(ctypes.Union):
-    "Union from pqos_l3ca structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('ways_mask', ctypes.c_uint64),
-        ('s', CPqosL3CaMaskCDP)
-    ]
-
-
-class CPqosL3Ca(ctypes.Structure):
-    "pqos_l3ca structure"
-
-    _fields_ = [
-        ('class_id', ctypes.c_uint),
-        ('cdp', ctypes.c_int),
-        ('u', CPqosL3CaMask),
-    ]
-
-    @classmethod
-    def from_cos(cls, cos):
-        "Creates CPqosL3Ca object from PqosCatL3.COS object."
-
-        return convert_from_cos(cos, cls)
-
-    def to_cos(self, cls):
-        "Creates PqosCatL3.COS object from CPqosL3Ca object."
-
-        return convert_to_cos(self, cls)
-
 
 class PqosCatL3(object):
     "PQoS L3 Cache Allocation Technology"

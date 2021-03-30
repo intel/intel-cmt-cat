@@ -40,21 +40,23 @@ import unittest
 
 from unittest.mock import MagicMock, patch
 
-from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_uint, ctypes_build_array
 
 from pqos.allocation import PqosAlloc
-from pqos.capability import CPqosCapability
+from pqos.native_struct import (
+    CPqosAllocConfig, CPqosCapability, CPqosCdpConfig, CPqosMbaConfig
+)
 
 
 class TestPqosAlloc(unittest.TestCase):
     "Tests for PqosAlloc class."
 
-    @mock_pqos_lib
-    def test_assoc_set(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_set(self, pqos_mock_cls):
         "Tests assoc_set() method."
         # pylint: disable=no-self-use
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_alloc_assoc_set = MagicMock(return_value=0)
 
         alloc = PqosAlloc()
@@ -62,8 +64,8 @@ class TestPqosAlloc(unittest.TestCase):
 
         lib.pqos_alloc_assoc_set.assert_called_once_with(3, 7)
 
-    @mock_pqos_lib
-    def test_assoc_get(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_get(self, pqos_mock_cls):
         "Tests assoc_get() method."
 
         def pqos_allc_assoc_get_m(core, class_id_ref):
@@ -73,6 +75,7 @@ class TestPqosAlloc(unittest.TestCase):
             ctypes_ref_set_uint(class_id_ref, 5)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_alloc_assoc_get = MagicMock(side_effect=pqos_allc_assoc_get_m)
 
         alloc = PqosAlloc()
@@ -81,11 +84,12 @@ class TestPqosAlloc(unittest.TestCase):
         lib.pqos_alloc_assoc_get.assert_called_once()
         self.assertEqual(class_id, 5)
 
-    @mock_pqos_lib
-    def test_assoc_set_pid(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_set_pid(self, pqos_mock_cls):
         "Tests assoc_set_pid() method."
         # pylint: disable=no-self-use
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_alloc_assoc_set_pid = MagicMock(return_value=0)
 
         alloc = PqosAlloc()
@@ -93,8 +97,8 @@ class TestPqosAlloc(unittest.TestCase):
 
         lib.pqos_alloc_assoc_set_pid.assert_called_once_with(2, 1)
 
-    @mock_pqos_lib
-    def test_assoc_get_pid(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_get_pid(self, pqos_mock_cls):
         "Tests assoc_get_pid() method."
 
         def pqos_allc_assoc_get_pid_m(pid, class_id_ref):
@@ -104,6 +108,7 @@ class TestPqosAlloc(unittest.TestCase):
             ctypes_ref_set_uint(class_id_ref, 1)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_allc_assoc_get_pid_m)
         lib.pqos_alloc_assoc_get_pid = func_mock
 
@@ -113,8 +118,8 @@ class TestPqosAlloc(unittest.TestCase):
         lib.pqos_alloc_assoc_get_pid.assert_called_once()
         self.assertEqual(class_id, 1)
 
-    @mock_pqos_lib
-    def test_assign(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_assign(self, pqos_mock_cls):
         "Tests assign() method."
 
         def pqos_alloc_assign_m(mask, core_array, core_array_len, class_id_ref):
@@ -133,6 +138,7 @@ class TestPqosAlloc(unittest.TestCase):
             ctypes_ref_set_uint(class_id_ref, 3)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_alloc_assign_m)
         lib.pqos_alloc_assign = func_mock
 
@@ -142,8 +148,8 @@ class TestPqosAlloc(unittest.TestCase):
         lib.pqos_alloc_assign.assert_called_once()
         self.assertEqual(class_id, 3)
 
-    @mock_pqos_lib
-    def test_release(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_release(self, pqos_mock_cls):
         "Tests release() method."
 
         def pqos_alloc_release_m(core_array, core_array_len):
@@ -156,6 +162,7 @@ class TestPqosAlloc(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_alloc_release_m)
         lib.pqos_alloc_release = func_mock
 
@@ -164,8 +171,8 @@ class TestPqosAlloc(unittest.TestCase):
 
         lib.pqos_alloc_release.assert_called_once()
 
-    @mock_pqos_lib
-    def test_assign_pid(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_assign_pid(self, pqos_mock_cls):
         "Tests assign_pid() method."
 
         def pqos_alloc_assign_pid_m(mask, pid_array, pid_array_len,
@@ -185,6 +192,7 @@ class TestPqosAlloc(unittest.TestCase):
             ctypes_ref_set_uint(class_id_ref, 3)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_alloc_assign_pid_m)
         lib.pqos_alloc_assign_pid = func_mock
 
@@ -194,8 +202,8 @@ class TestPqosAlloc(unittest.TestCase):
         lib.pqos_alloc_assign_pid.assert_called_once()
         self.assertEqual(class_id, 3)
 
-    @mock_pqos_lib
-    def test_release_pid(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_release_pid(self, pqos_mock_cls):
         "Tests release_pid() method."
 
         def pqos_alloc_release_pid_m(pid_array, pid_array_len):
@@ -209,6 +217,7 @@ class TestPqosAlloc(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_alloc_release_pid_m)
         lib.pqos_alloc_release_pid = func_mock
 
@@ -217,8 +226,8 @@ class TestPqosAlloc(unittest.TestCase):
 
         lib.pqos_alloc_release_pid.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get_pids(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_get_pids(self, pqos_mock_cls):
         "Tests get_pids() method."
 
         pids_uint = [ctypes.c_uint(pid) for pid in [1000, 1500, 3000, 5600]]
@@ -232,6 +241,7 @@ class TestPqosAlloc(unittest.TestCase):
             ctypes_ref_set_uint(count_ref, len(pid_array))
             return ctypes.cast(pid_array, ctypes.POINTER(ctypes.c_uint))
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_pid_get_pid_assoc_m)
         lib.pqos_pid_get_pid_assoc = func_mock
 
@@ -248,8 +258,8 @@ class TestPqosAlloc(unittest.TestCase):
         self.assertEqual(pids[2], 3000)
         self.assertEqual(pids[3], 5600)
 
-    @mock_pqos_lib
-    def test_reset(self, lib):
+    @patch('pqos.allocation.Pqos')
+    def test_reset(self, pqos_mock_cls):
         "Tests reset() method."
 
         def pqos_alloc_reset_m(l3_cdp_cfg, l2_cdp_cfg, mba_cfg):
@@ -261,6 +271,7 @@ class TestPqosAlloc(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_alloc_reset_m)
         lib.pqos_alloc_reset = func_mock
 
@@ -268,3 +279,35 @@ class TestPqosAlloc(unittest.TestCase):
         alloc.reset('on', 'any', 'ctrl')
 
         lib.pqos_alloc_reset.assert_called_once()
+
+    @patch('pqos.allocation.Pqos')
+    def test_reset_config(self, pqos_mock_cls):
+        "Tests reset_config() method."
+
+        def pqos_alloc_reset_cfg_m(config):
+            "Mock pqos_alloc_reset_config()."
+
+            cfg = config.contents
+            self.assertEqual(cfg.l3_cdp, CPqosCdpConfig.PQOS_REQUIRE_CDP_ANY)
+            self.assertEqual(cfg.l2_cdp, CPqosCdpConfig.PQOS_REQUIRE_CDP_OFF)
+            self.assertEqual(cfg.mba, CPqosMbaConfig.PQOS_MBA_CTRL)
+
+            return 0
+
+        # Setup mock function
+        lib = pqos_mock_cls.return_value.lib
+        func_mock = MagicMock(side_effect=pqos_alloc_reset_cfg_m)
+        lib.pqos_alloc_reset_config = func_mock
+
+        # Build reset configuration
+        cfg = CPqosAllocConfig()
+        cfg.set_l3_cdp('any')
+        cfg.set_l2_cdp('off')
+        cfg.set_mba('ctrl')
+
+        # Reset using configuration
+        alloc = PqosAlloc()
+        alloc.reset_config(cfg)
+
+        # Ensure mock function has been called
+        lib.pqos_alloc_reset_config.assert_called_once()

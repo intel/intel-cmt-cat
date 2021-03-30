@@ -40,11 +40,10 @@ import unittest
 
 from unittest.mock import MagicMock, patch
 
-from pqos.test.mock_pqos import mock_pqos_lib
 from pqos.test.helper import ctypes_ref_set_int, ctypes_build_array
 
-from pqos.l2ca import PqosCatL2, CPqosL2Ca, CPqosL2CaMask
-
+from pqos.l2ca import PqosCatL2
+from pqos.native_struct import CPqosL2Ca, CPqosL2CaMask
 
 
 class TestPqosCatL2(unittest.TestCase):
@@ -56,8 +55,8 @@ class TestPqosCatL2(unittest.TestCase):
         with self.assertRaises(ValueError):
             PqosCatL2.COS(1)
 
-    @mock_pqos_lib
-    def test_set(self, lib):
+    @patch('pqos.l2ca.Pqos')
+    def test_set(self, pqos_mock_cls):
         "Tests set() method."
 
         def pqos_l2ca_set_mock(socket, num_ca, l2_ca_arr):
@@ -74,6 +73,7 @@ class TestPqosCatL2(unittest.TestCase):
 
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_l2ca_set = MagicMock(side_effect=pqos_l2ca_set_mock)
 
         l2ca = PqosCatL2()
@@ -82,8 +82,8 @@ class TestPqosCatL2(unittest.TestCase):
 
         lib.pqos_l2ca_set.assert_called_once()
 
-    @mock_pqos_lib
-    def test_get(self, lib):
+    @patch('pqos.l2ca.Pqos')
+    def test_get(self, pqos_mock_cls):
         "Tests get() method."
         # pylint: disable=invalid-name
 
@@ -102,7 +102,7 @@ class TestPqosCatL2(unittest.TestCase):
 
             return 0
 
-
+        lib = pqos_mock_cls.return_value.lib
         lib.pqos_l2ca_get = MagicMock(side_effect=pqos_l2ca_get_mock)
 
         l2ca = PqosCatL2()
@@ -119,8 +119,8 @@ class TestPqosCatL2(unittest.TestCase):
         self.assertEqual(coses[1].class_id, 1)
         self.assertEqual(coses[1].mask, 0x007f)
 
-    @mock_pqos_lib
-    def test_get_min_cbm_bits(self, lib):
+    @patch('pqos.l2ca.Pqos')
+    def test_get_min_cbm_bits(self, pqos_mock_cls):
         "Tests get_min_cbm_bits() method."
 
         def pqos_l2ca_get_min_cbm_bits_mock(min_cbm_bits_ref):
@@ -129,6 +129,7 @@ class TestPqosCatL2(unittest.TestCase):
             ctypes_ref_set_int(min_cbm_bits_ref, 2)
             return 0
 
+        lib = pqos_mock_cls.return_value.lib
         func_mock = MagicMock(side_effect=pqos_l2ca_get_min_cbm_bits_mock)
         lib.pqos_l2ca_get_min_cbm_bits = func_mock
 

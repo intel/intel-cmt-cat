@@ -37,16 +37,15 @@ Unit tests for main (pqos) module.
 from __future__ import absolute_import, division, print_function
 import ctypes
 import unittest
-
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from pqos import Pqos, CPqosConfig
-
 
 class TestPqos(unittest.TestCase):
     "Tests for Pqos class."
 
-    def test_singleton(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_singleton(self, _load_lib):
         "Tests if the same object is constructed each time Pqos() is invoked."
 
         pqos = Pqos()
@@ -54,7 +53,8 @@ class TestPqos(unittest.TestCase):
 
         self.assertIs(pqos, pqos2)
 
-    def test_init(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_init(self, _load_lib):
         "Tests library initialization."
         # pylint: disable=no-self-use
 
@@ -71,7 +71,8 @@ class TestPqos(unittest.TestCase):
 
         pqos.lib.pqos_init.assert_called_once()
 
-    def test_fini(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_fini(self, _load_lib):
         "Tests library finalization."
         # pylint: disable=no-self-use
 
@@ -117,22 +118,27 @@ class TestPqos(unittest.TestCase):
 
         pqos.lib.pqos_init.assert_called_once()
 
-    def test_init_verbose_silent(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_init_verbose_silent(self, _load_lib):
         "Tests if 'silent' verbosity level is properly handled."
         self._test_init_verbose('silent', CPqosConfig.LOG_VER_SILENT)
 
-    def test_init_verbose_default(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_init_verbose_default(self, _load_lib):
         "Tests if 'default' verbosity level is properly handled."
         self._test_init_verbose('default', CPqosConfig.LOG_VER_DEFAULT)
 
-    def test_init_verbose_none(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_init_verbose_none(self, _load_lib):
         "Tests if None as verbosity level is properly handled."
         self._test_init_verbose(None, CPqosConfig.LOG_VER_DEFAULT)
 
-    def test_init_verbose_verbose(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_init_verbose_verbose(self, _load_lib):
         "Tests if 'verbose' verbosity level is properly handled."
         self._test_init_verbose('verbose', CPqosConfig.LOG_VER_VERBOSE)
 
-    def test_init_verbose_super(self):
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_init_verbose_super(self, _load_lib):
         "Tests if 'super' verbosity level is properly handled."
         self._test_init_verbose('super', CPqosConfig.LOG_VER_SUPER_VERBOSE)

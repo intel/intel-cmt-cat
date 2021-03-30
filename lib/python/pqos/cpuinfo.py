@@ -39,56 +39,9 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 
 from pqos.common import pqos_handle_error, free_memory
-from pqos.error import PqosError, PqosErrorParam, PqosErrorResource
+from pqos.error import PqosError, PqosErrorResource, PqosErrorParam
+from pqos.native_struct import CPqosCpuInfo, CPqosCoreInfo
 from pqos.pqos import Pqos
-
-
-class CPqosCoreInfo(ctypes.Structure):
-    "pqos_coreinfo structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ('lcore', ctypes.c_uint),    # Logical core id
-        ('socket', ctypes.c_uint),   # Socket id in the system
-        ('l3_id', ctypes.c_uint),    # L3/LLC cluster id
-        ('l2_id', ctypes.c_uint),    # L2 cluster id
-        ('l3cat_id', ctypes.c_uint), # L3 CAT classes id
-        ('mba_id', ctypes.c_uint),   # MBA id
-    ]
-
-
-class CPqosCacheInfo(ctypes.Structure):
-    "pqos_cacheinfo structure"
-    # pylint: disable=too-few-public-methods
-
-    _fields_ = [
-        ("detected", ctypes.c_int),         # Indicates cache detected & valid
-        ("num_ways", ctypes.c_uint),        # Number of cache ways
-        ("num_sets", ctypes.c_uint),        # Number of sets
-        ("num_partitions", ctypes.c_uint),  # Number of partitions
-        ("line_size", ctypes.c_uint),       # Cache line size in bytes
-        ("total_size", ctypes.c_uint),      # Total cache size in bytes
-        ("way_size", ctypes.c_uint),        # Cache way size in bytes
-    ]
-
-
-class CPqosCpuInfo(ctypes.Structure):
-    "pqos_cpuinfo structure"
-    # pylint: disable=too-few-public-methods
-
-    PQOS_VENDOR_UNKNOWN = 0
-    PQOS_VENDOR_INTEL = 1
-    PQOS_VENDOR_AMD = 2
-
-    _fields_ = [
-        ("mem_size", ctypes.c_uint),   # Byte size of the structure
-        ("l2", CPqosCacheInfo),        # L2 cache information
-        ("l3", CPqosCacheInfo),        # L3 cache information
-        ("vendor", ctypes.c_int),      # CPU vendor
-        ("num_cores", ctypes.c_uint),  # Number of cores in the system
-        ("cores", CPqosCoreInfo * 0)   # Core information
-    ]
-
 
 class PqosCoreInfo(object):
     "Core information"
@@ -172,7 +125,7 @@ class PqosCpuInfo(object):
         if not p_items:
             return []
 
-        items = [p_items[i] for i in range(count.value)] if count.value else []
+        items = [p_items[i] for i in range(count.value)] if count.value > 0 else []
         free_memory(p_items)
         return items
 

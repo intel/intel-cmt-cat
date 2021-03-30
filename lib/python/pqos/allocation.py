@@ -289,3 +289,15 @@ class PqosAlloc(object):
         ret = self.pqos.lib.pqos_alloc_reset(l3_cdp_cfg_enum, l2_cdp_cfg_enum,
                                              mba_cfg_enum)
         pqos_handle_error('pqos_alloc_reset', ret)
+
+    def reset_config(self, cfg):
+        """
+        Resets configuration of allocation technologies.
+
+        Parameters:
+            cfg: allocation configuration (CPqosAllocConfig)
+        """
+
+        cfg_ptr = ctypes.pointer(cfg)
+        ret = self.pqos.lib.pqos_alloc_reset_config(cfg_ptr)
+        pqos_handle_error('pqos_alloc_reset_config', ret)

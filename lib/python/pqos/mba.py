@@ -40,31 +40,8 @@ import ctypes
 
 from pqos.capability import PqosCap
 from pqos.common import pqos_handle_error
+from pqos.native_struct import CPqosMba
 from pqos.pqos import Pqos
-
-
-class CPqosMba(ctypes.Structure):
-    "pqos_mba structure"
-
-    _fields_ = [
-        ('class_id', ctypes.c_uint),
-        ('mb_max', ctypes.c_uint),
-        ('ctrl', ctypes.c_int)
-    ]
-
-    @classmethod
-    def from_cos(cls, cos):
-        "Creates CPqosMba object from PqosMba.COS object."
-
-        ctrl = 1 if cos.ctrl else 0
-        return cls(class_id=cos.class_id, mb_max=cos.mb_max, ctrl=ctrl)
-
-    def to_cos(self, cls):
-        "Creates PqosMba.COS object from CPqosMba object."
-
-        ctrl = bool(self.ctrl)
-        return cls(self.class_id, self.mb_max, ctrl)
-
 
 class PqosMba(object):
     "PQoS Memory Bandwidth Allocation"

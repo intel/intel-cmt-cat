@@ -41,34 +41,7 @@ import ctypes
 import sys
 
 from pqos.common import pqos_handle_error
-
-
-class CPqosConfig(ctypes.Structure):
-    "pqos_config structure"
-    # pylint: disable=too-few-public-methods
-
-    PQOS_INTER_MSR = 0
-    PQOS_INTER_OS = 1
-    PQOS_INTER_OS_RESCTRL_MON = 2
-    PQOS_INTER_AUTO = 3
-
-    LOG_VER_SILENT = -1
-    LOG_VER_DEFAULT = 0
-    LOG_VER_VERBOSE = 1
-    LOG_VER_SUPER_VERBOSE = 2
-
-    LOG_CALLBACK = ctypes.CFUNCTYPE(None, ctypes.c_void_p, ctypes.c_size_t,
-                                    ctypes.c_char_p)
-
-    _fields_ = [
-        ('fd_log', ctypes.c_int),
-        ('callback_log', LOG_CALLBACK),
-        ('context_log', ctypes.c_void_p),
-        ('verbose', ctypes.c_int),
-        ('interface', ctypes.c_int),
-        ('reserved', ctypes.c_int),
-    ]
-
+from pqos.native_struct import CPqosConfig
 
 class Pqos(object):
     """
