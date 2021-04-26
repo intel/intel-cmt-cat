@@ -37,6 +37,7 @@ Provides RDT related helper functions used to configure RDT.
 """
 
 import os
+import platform
 
 from pqos import Pqos
 from pqos.capability import PqosCap
@@ -105,7 +106,10 @@ class PqosApi:
             self.fini()
 
         # umount restcrl to improve caps detection
-        result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
+        if platform.system() == 'FreeBSD':
+            result = os.system("/sbin/umount -a -t resctrl") # nosec - string literal
+        else:
+            result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
         if result:
             log.error("Failed to umount resctrl fs! status code: %d"\
                     % (os.WEXITSTATUS(result)))

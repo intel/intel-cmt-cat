@@ -9,6 +9,7 @@ pexpect = "*"
 flask = "*"
 flask-restful = "*"
 gevent = "*"
+psutil = "*"
 
 [dev-packages]
 bandit = "*"

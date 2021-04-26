@@ -36,12 +36,13 @@ PIDs ops module
 Provides PIDs related helper functions
 """
 
-import common
+import os
+import psutil
 import log
 
-# list of valid PIDs' status, (R)unning, (S)leeping, (D)isk wait
-PID_VALID_STATUS = set('RSD')
-
+# list of valid PIDs' status, Running, Sleeping, Disk wait
+PID_VALID_STATUS = {psutil.STATUS_RUNNING, psutil.STATUS_SLEEPING,
+                    psutil.STATUS_DISK_SLEEP}
 
 def get_pid_status(pid):
     """
@@ -53,42 +54,24 @@ def get_pid_status(pid):
     Returns:
         (bool) test result
     """
-    if pid != 0:
-        pid_str = pid
-    else:
-        pid_str = 'self'
+    if pid == 0:
+        pid = os.getpid()
 
     try:
-        state, pid_name = _read_pid_state(pid_str)
-        return state, state in PID_VALID_STATUS, pid_name
-    except PermissionError as ex:
-        log.error("procfs file, {}".format(str(ex)))
-    except OSError as ex:
+        process = psutil.Process(pid)
+        status = process.status()
+        pid_name = process.name()
+        return status, status in PID_VALID_STATUS, pid_name
+
+    except psutil.ZombieProcess:
+        return psutil.STATUS_ZOMBIE, False, ''
+    except psutil.NoSuchProcess as ex:
         # handle silently, most likely PID has terminated
         pass
+    except psutil.Error as ex:
+        log.error("psutil, {}".format(str(ex)))
 
-    return 'E', False, ''
-
-
-def _read_pid_state(pid_str):
-    """
-    Reads PID's /proc/PID/stat file for state and process name
-
-    Parameters:
-        pid_str: PID to be tested (number or 'self')
-
-    Returns:
-        state, pid_name
-    """
-    # read procfs /proc/PID/stat file to get PID status
-    with open("/proc/{}/stat".format(pid_str), opener=common.check_link) as stat_file:
-        # split by '(' and ')' needed
-        # as processes/threads could have spaces in the name
-        line_split = stat_file.readline().strip().split(')')
-        pid_name = line_split[0].split('(')[1]
-        state = line_split[1].strip().split(' ')[0]
-        return state, pid_name
-
+    return 'Error', False, ''
 
 def is_pid_valid(pid):
     """
@@ -101,3 +84,21 @@ def is_pid_valid(pid):
         (bool) test result
     """
     return get_pid_status(pid)[1]
+
+
+def set_affinity(pids, cores):
+    """
+    Sets PIDs' core affinity
+
+    Parameters:
+    pids: PIDs to set core affinity for
+    cores: cores to set to
+    """
+
+    # set core affinity for each PID,
+    # even if operation fails for one PID, continue with other PIDs
+    for pid in pids:
+        try:
+            psutil.Process(pid).cpu_affinity(cores)
+        except psutil.Error:
+            log.error("Failed to set {} PID affinity".format(pid))

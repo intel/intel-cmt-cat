@@ -176,12 +176,15 @@ class TestPools(object):
         Pool.pools[30]['pids'] = [3, 30, 3030]
 
         with mock.patch('common.CONFIG_STORE.get_pool_attr', return_value=[1, 44, 66]),\
-             mock.patch('os.sched_setaffinity') as set_aff_mock:
+             mock.patch('cache_ops.set_affinity') as set_aff_mock:
             Pool(1).pids_set([1, 10])
+
+            set_aff_mock.assert_called_once_with([1010], [1, 44, 66])
+            set_aff_mock.reset_mock()
+
             Pool(30).pids_set([30, 3030])
 
-            set_aff_mock.assert_any_call(1010, [1, 44, 66])
-            set_aff_mock.assert_any_call(3, [1, 44, 66])
+            set_aff_mock.assert_called_once_with([3], [1, 44, 66])
 
 
     def test_cores_get(self):
@@ -339,7 +342,7 @@ class TestApps(object):
         with mock.patch('common.CONFIG_STORE.get_config', return_value={}),\
              mock.patch('common.CONFIG_STORE.app_to_pool') as atp_mock,\
              mock.patch('common.CONFIG_STORE.get_pool_attr') as gpa_mock,\
-             mock.patch('cache_ops.Apps.set_affinity') as sa_mock:
+             mock.patch('cache_ops.set_affinity') as sa_mock:
 
                 Apps.configure()
 
@@ -351,7 +354,7 @@ class TestApps(object):
         with mock.patch('common.CONFIG_STORE.get_config', return_value=CONFIG),\
              mock.patch('common.CONFIG_STORE.app_to_pool', return_value=1),\
              mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_pool_attr),\
-             mock.patch('cache_ops.Apps.set_affinity') as set_aff_mock:
+             mock.patch('cache_ops.set_affinity') as set_aff_mock:
 
                 Apps.configure()
 
@@ -359,13 +362,3 @@ class TestApps(object):
                 set_aff_mock.assert_any_call([2, 22], [2])
                 set_aff_mock.assert_any_call([10], [1, 2, 3, 4])
 
-
-    def test_apps_set_affinity(self):
-        with mock.patch('os.sched_setaffinity') as set_aff_mock:
-            Apps.set_affinity([1000, 1001, 1002], [0,1,2,3])
-            set_aff_mock.assert_any_call(1000, [0,1,2,3])
-            set_aff_mock.assert_any_call(1001, [0,1,2,3])
-            set_aff_mock.assert_any_call(1002, [0,1,2,3])
-
-        with mock.patch('os.sched_setaffinity', side_effect=OSError()):
-            Apps.set_affinity([1000, 1001, 1002], [0,1,2,3])
