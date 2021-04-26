@@ -1127,36 +1127,36 @@ cat /sys/fs/resctrl/schemata
 
 NOTE: Resctrl shows new MBA configuration for Pool #0.
 
-
-HOW TO GENERATE APPQOS AND CLIENT CERTIFICATE
-=============================================
-
+APPQOS AND CLIENT CERTIFICATE
+=============================
 AppQoS uses mutual TLS - both AppQoS and client certificates need to
 be signed using the same root ca certificate.
 
-appqos/ca/ directory contains sample script called 'gen_certs.sh' - it
+It is the user responsibility to deliver certificate and key files for AppQoS.
+AppQoS expects certain names of CA certificate, AppQoS certificate and associated
+private key - files need to be located in 'appqos/ca' directory:
+- ca.crt - contains the CA certificate, that will be used to authenticate clients and AppQoS during mTLS
+- appqos.crt - contains AppqQoS certificate, it needs to be signed using ca.crt
+- appqos.key - contains private key for the AppQoS certificate
+
+AppQoS REST Client certificate needs to be signed by the same CA as AppQoS
+certificate. In this instruction we assume that client certificate will be named
+'client_appqos.crt' and client will have access to 'ca.crt' CA certificate.
+
+HOW TO GENERATE TEST APPQOS AND CLIENT CERTIFICATE
+==================================================
+
+appqos/ca/ directory contains sample script called 'gen_test_certs.sh' - it
 can be used for generating certifacates for the AppQoS and the
-client (e.g: curl)
+client (e.g: curl) for testing purposes only
 
 $ cd appqos/ca
-$ ./gen_certs.sh
+$ ./gen_test_certs.sh
 
 This script will create:
 - ca certificate
 - appqos certificate
 - client certificate
-
-AppQoS REST clients, in order to connect to AppQoS, need to have access to
-client_appqos.crt, client_appqos.key and ca.crt files.
-
-Certificate files can be also created and delivered out of band - if
-you want to deliver certificates to AppQoS this way, keep in mind that
-AppQoS expects certain names of CA certificate, AppQoS certificate and associated
-private key:
-- ca.crt - contains the CA certificate, that will be used to authenticate clients and AppQoS during mTLS
-- appqos.crt - contains AppqQoS certificate, it need to be signed using ca.crt
-- appqos.key - contains private key for the AppQoS certificate
-
 
 Legal Disclaimer
 ================

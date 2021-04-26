@@ -1,7 +1,7 @@
 ################################################################################
 # BSD LICENSE
 #
-# Copyright(c) 2020 Intel Corporation. All rights reserved.
+# Copyright(c) 2021 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,35 +32,53 @@
 ################################################################################
 
 ---
-- import_tasks: install_python.yml
+- name: Verify that 'cert_dir' variable is defined
+  assert:
+    that: cert_dir is defined
+    fail_msg: >-
+      Please provide cert_dir variable using --extra-vars 'cert_dir=<CERT_DIR>'
+      where CERT_DIR points to directory with AppQoS mTLS certificates. Please
+      read README.md for more info about AppQoS certificates
 
-- name: Install PyOpenSSL
-  pip:
-    name: ['PyOpenSSL']
+- name: Check provided 'cert_dir={{ cert_dir }}' with stat
+  stat:
+    path: "{{ cert_dir }}"
+  register: stat_cert_dir
 
-- name: Creating Key
-  command:
-    cmd: openssl genrsa -out "{{ appqos_key_file }}"
-    creates: "{{ appqos_key_file }}"
+- name: Verify that 'cert_dir={{ cert_dir }}' exists
+  assert:
+    that: stat_cert_dir.stat.exists
+    fail_msg: >-
+      Provided 'cert_dir={{ cert_dir }}' does not exists
 
-- name: Setting permissions on key
+- name: Verify that 'cert_dir={{ cert_dir }}' is a directory
+  assert:
+    that: stat_cert_dir.stat.isdir
+    fail_msg: >-
+      Provided 'cert_dir={{ cert_dir }}' is not a directory
+
+- name: Get stat for files in  'cert_dir={{ cert_dir }}'
+  stat:
+    path: "{{ cert_dir }}/{{ item }}"
+  register: stat_cert_dir_content_items
+  with_items: "{{ appqos_ca_required_content }}"
+
+- name: Check if all needed cert/key files exists in 'cert_dir={{ cert_dir }}'
+  assert:
+    that: item.stat.exists
+    fail_msg: >-
+      AppQoS cert_dir={{ cert_dir }} should contain files: {{ appqos_ca_required_content }}
+  with_items: "{{ stat_cert_dir_content_items.results }}"
+
+- name: Copy certificates and key
+  copy:
+    src: "{{ cert_dir }}/{{ item }}"
+    dest: "{{ appqos_ca_dir }}/"
+    mode: preserve
+    owner: "{{ ansible_user_id }}"
+  with_items: "{{ appqos_ca_required_content }}"
+
+- name: Set limited permissions to AppQoS key
   file:
-    path: "{{ appqos_key_file }}"
-    mode: 0600
-    state: file
-
-- name: Generate CSR
-  openssl_csr:
-    path: "{{ appqos_csr_file }}"
-    privatekey_path: "{{ appqos_key_file }}"
-    common_name:
-    country_name:
-    email_address:
-    organization_name:
-
-- name: Generate a self signed certificate
-  openssl_certificate:
-    csr_path: "{{ appqos_csr_file }}"
-    path: "{{ appqos_crt_file }}"
-    privatekey_path: "{{ appqos_key_file }}"
-    provider: selfsigned
+    path: "{{ appqos_ca_dir }}/{{ appqos_key_file }}"
+    mode: '0400'

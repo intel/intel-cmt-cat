@@ -34,15 +34,14 @@
 ---
 - import_tasks: clone_appqos_repo.yml
 
-- name: Check that the libpqos installed
-  stat:
-    path: /usr/lib/libpqos.so
-  register: libpqos_check
+- name: Import libpqos build dependencies
+  import_tasks: install_build_dependencies.yml
 
+# Always re-installing libpqos to make sure that AppQoS will match correct
+# library version
 - name: Build and install libpqos
   make:
     chdir: "{{ appqos_path }}"
     target: install
     params:
       PREFIX: /usr
-  when: not libpqos_check.stat.exists

@@ -39,7 +39,7 @@
 - import_tasks: install_venv.yml
   tags: appqos
 
-- import_tasks: generate_ssl_key_certs.yml
+- import_tasks: copy_mtls_key_certs.yml
   tags: appqos
 
 - import_tasks: start_appqos.yml

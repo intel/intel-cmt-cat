@@ -32,14 +32,18 @@
 ################################################################################
 
 ---
-- name: Install python - Debian
+- name: Install python and pip - Debian
   apt:
-    name: python3
+    name:
+      - python3
+      - python3-pip
     state: present
   when: ansible_os_family == 'Debian'
 
-- name: Install python - RedHat
+- name: Install python and pip - RedHat
   yum:
-    name: python3
+    name:
+      - python3
+      - python3-pip
     state: present
   when: ansible_os_family == 'RedHat'

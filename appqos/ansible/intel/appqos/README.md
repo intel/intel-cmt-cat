@@ -59,11 +59,12 @@ Example Intel(R) Xeon(R) 2nd Generation SP is available in appqos.conf
 
 Apart from installing configuration files, this Ansible script also:
 - Installs required packages and dependencies including libpqos
-- Generates self-signed certificate for SSL/TLS i.e. appqos.key and appqos.crt
+- Generates mTLS certificates
 - Creates appqos configuration file with minimal resources (mentioned above)
 - Start AppQoS in the background
 - Stop/terminate AppQoS running in the background
 
+It is assumed that intel.appqos.appqos ansible role will be ran directly as root user.
 
 ## ROLE VARIABLES
 All variables are stored in main.yml file under role's "default" directory.
@@ -92,6 +93,37 @@ Playbook to stop AppQoS:
     - role: intel.appqos.appqos
       state: stopped
 ```
+
+## USAGE EXAMPLES
+
+1. Download intel.appqos.appqos role from Ansible-galaxy
+
+$ ansible-galaxy collection install intel.appqos
+
+2. Go to /root/.ansible/collections/ansible_collections/intel/appqos/playbooks/ directory
+
+$ cd /root/.ansible/collections/ansible_collections/intel/appqos/playbooks/
+
+3. Run ansible-playbook command for deploying AppQoS (on localhost by default)
+
+$ ansible-playbook -i inventory/hosts deploy.yml --extra-vars "cert_dir=/CERT_DIR"
+... where 'CERT_DIR' is a directory where 'ca.crt', 'appqos.crt' and 'appqos.key'
+are located
+
+Ansible scripts need CA certificate and a AppQoS certificate located in a given
+directory - those files will be copied to AppQoS 'ca/' sub-directory in place where
+AppQoS has been installed. More info about certificate for the AppQoS can be
+found at https://github.com/intel/intel-cmt-cat/blob/master/appqos/README in
+section 'APPQOS AND CLIENT CERTIFICATE'.
+
+By default, AppQoS is installed in '/opt/intel/appqos_workspace/appqos/'. At the
+end of the playbook, AppQoS should be up and running, listening on port 5000.
+Note that AppQoS server supports one client at a time.
+
+To stop the AppQoS service, launch the 'stop.yml' playbook:
+
+$ ansible-playbook -i inventory/hosts stop.yml
+
 
 ## REQUIREMENTS
 - Python >= 3.6

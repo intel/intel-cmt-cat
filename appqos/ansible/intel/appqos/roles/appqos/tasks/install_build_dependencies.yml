@@ -1,7 +1,7 @@
 ################################################################################
 # BSD LICENSE
 #
-# Copyright(c) 2020 Intel Corporation. All rights reserved.
+# Copyright(c) 2021 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -32,38 +32,19 @@
 ################################################################################
 
 ---
-- name: Load MSR
-  modprobe:
-    name: msr
+- name: Install pqos build dependencies - Debian
+  apt:
+    name:
+      - make
+      - gcc
     state: present
+    update_cache: true
+  when: ansible_os_family == 'Debian'
 
-- name: Check that the appqos.conf exists
-  stat:
-    path: "{{ appqos_conf_path }}"
-  register: stat_result
-
-- name: Create appqos.conf file with minimal required configurations
-  copy:
-    dest: "{{ appqos_conf_path }}"
-    content: "{{ appqos_conf_content }}"
-  when: not stat_result.stat.exists
-
-- import_tasks: is_appqos_running.yml
-
-- name: Start AppQoS/REST API server in background
-  shell: >
-    cd "{{ appqos_dir }}";
-    {{ appqos_cmd }}
-  args:
-    executable: /bin/bash
-  when: not appqos_running
-
-- name: Wait for AppQoS port '{{ appqos_port }}' to be active
-  wait_for:
-    port: "{{ appqos_port }}"
-    delay: 5  # delay to wait for RDT error checks during initialization
-    timeout: 30  # waiting up to 30 seconds
-
-- name: Check is AppQoS process is actually running
-  command: pgrep -c -f "{{ appqos_proc_regexp }}"
-  when: not appqos_running
+- name: Install pqos build dependencies - RedHat
+  yum:
+    name:
+      - make
+      - gcc
+    state: present
+  when: ansible_os_family == 'RedHat'

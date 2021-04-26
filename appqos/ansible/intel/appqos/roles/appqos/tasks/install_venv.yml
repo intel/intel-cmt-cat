@@ -35,6 +35,10 @@
 - import_tasks: clone_appqos_repo.yml
 - import_tasks: install_python.yml
 
+- name: Install pipenv
+  pip:
+    name: ['pipenv']
+
 - name: Install virtualenv
   pip:
     name: ['virtualenv']
@@ -42,4 +46,4 @@
 - name: Making python3 virtualized env
   make:
     chdir: "{{ appqos_dir }}"
-    target: "env_{{ ansible_hostname }}"
+    target: setup

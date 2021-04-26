@@ -40,21 +40,37 @@ rdt_repo: https://github.com/intel/intel-cmt-cat
 rdt_repo_version: master
 
 # Directory where RDT/AppQoS repo lands
-appqos_path: /root/ansible/appqos_repo
+appqos_path: /opt/intel/appqos_workspace
+
+# Default appqos port
+appqos_port: 5000
+
+# Appqos run command
+appqos_cmd: "WORKON_HOME=../venv/appqos_$HOSTNAME nohup pipenv run ./appqos.py \
+-c /tmp/appqos.conf --port {{ appqos_port }} > appqos.log 2>&1 &"
 
 # Appqos directory
 appqos_dir: "{{ appqos_path }}/appqos"
 
+# Appqos ca directory
+appqos_ca_dir: "{{ appqos_dir }}/ca"
+
 # Appqos KEY file - private key
-appqos_key_file: "{{ appqos_dir }}/appqos.key"
+appqos_key_file: appqos.key
 
 # Appqos CRT file - certificate
-appqos_crt_file: "{{ appqos_dir }}/appqos.crt"
+appqos_crt_file: appqos.crt
 
-# Appqos CSR file
-appqos_csr_file: "{{ appqos_dir }}/appqos.csr"
+# Appqos CA crt file
+appqos_ca_crt_file: ca.crt
 
-# Appqos config file
+# Cert/key files required for running appqos
+appqos_ca_required_content:
+  - "{{ appqos_key_file }}"
+  - "{{ appqos_crt_file }}"
+  - "{{ appqos_ca_crt_file }}"
+
+  # Appqos config file
 appqos_conf_path: /tmp/appqos.conf
 
 # Appqos process regexp
@@ -64,10 +80,6 @@ appqos_proc_regexp: '^python.? \./appqos\.py'
 appqos_conf_content: |
  {
     "apps": [],
-    "auth": {
-        "password": "password",
-        "username": "admin"
-    },
     "sstbf": {
         "configured": false
     },
