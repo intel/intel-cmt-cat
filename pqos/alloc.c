@@ -49,25 +49,20 @@
 /**
  * Defines used to identify CAT mask definitions
  */
-#define CAT_UPDATE_SCOPE_BOTH 0    /**< update COS code & data masks */
-#define CAT_UPDATE_SCOPE_DATA 1    /**< update COS data mask */
-#define CAT_UPDATE_SCOPE_CODE 2    /**< update COS code mask */
+#define CAT_UPDATE_SCOPE_BOTH 0 /**< update COS code & data masks */
+#define CAT_UPDATE_SCOPE_DATA 1 /**< update COS data mask */
+#define CAT_UPDATE_SCOPE_CODE 2 /**< update COS code mask */
 
 /**
  * Length of max unit64_t value in DEC string
  * + single char for code or data + '\0'
  */
-#define MAX_COS_MASK_STR_LEN  22
+#define MAX_COS_MASK_STR_LEN 22
 
 /**
  * Allocation type selected
  */
-enum sel_alloc_type {
-        L3CA,
-        L2CA,
-        MBA,
-        MBA_CTRL
-};
+enum sel_alloc_type { L3CA, L2CA, MBA, MBA_CTRL };
 
 /**
  * Array to store allocation options
@@ -109,7 +104,6 @@ static struct {
         pid_t task_id;
         unsigned class_id;
 } sel_assoc_pid_tab[128];
-
 
 /**
  * Maintains alloc option - allocate cores or task id's
@@ -156,7 +150,7 @@ parse_cos_mask_type(char *str, int *scope, unsigned *id)
         } else {
                 *scope = CAT_UPDATE_SCOPE_BOTH;
         }
-        *id = (unsigned) strtouint64(str);
+        *id = (unsigned)strtouint64(str);
 }
 
 /**
@@ -172,8 +166,10 @@ parse_cos_mask_type(char *str, int *scope, unsigned *id)
  * @retval -1 on error
  */
 static int
-set_l3_cos(const unsigned class_id, const uint64_t mask,
-           const unsigned *sock_ids, const unsigned sock_num,
+set_l3_cos(const unsigned class_id,
+           const uint64_t mask,
+           const unsigned *sock_ids,
+           const unsigned sock_num,
            const unsigned scope)
 {
         unsigned i, set = 0;
@@ -194,11 +190,12 @@ set_l3_cos(const unsigned class_id, const uint64_t mask,
                 memset(&ca, 0, sizeof(ca));
 
                 /* get current L3 definitions for this socket */
-                ret = pqos_l3ca_get(sock_ids[i], DIM(sock_l3ca),
-                                    &num_ca, sock_l3ca);
+                ret = pqos_l3ca_get(sock_ids[i], DIM(sock_l3ca), &num_ca,
+                                    sock_l3ca);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to retrieve socket %u "
-                               "L3 classes!\n", sock_ids[i]);
+                               "L3 classes!\n",
+                               sock_ids[i]);
                         break;
                 }
                 /* find selected class in array */
@@ -214,7 +211,8 @@ set_l3_cos(const unsigned class_id, const uint64_t mask,
                 /* check if CDP is selected but disabled */
                 if (!ca.cdp && scope != CAT_UPDATE_SCOPE_BOTH) {
                         printf("Failed to set L3 class on socket %u, "
-                               "CDP not enabled!\n", sock_ids[i]);
+                               "CDP not enabled!\n",
+                               sock_ids[i]);
                         break;
                 }
                 /* if CDP is enabled */
@@ -232,19 +230,18 @@ set_l3_cos(const unsigned class_id, const uint64_t mask,
                 /* set new L3 class definition */
                 ret = pqos_l3ca_set(sock_ids[i], 1, &ca);
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("SOCKET %u L3CA COS%u - FAILED!\n",
-                               sock_ids[i], ca.class_id);
+                        printf("SOCKET %u L3CA COS%u - FAILED!\n", sock_ids[i],
+                               ca.class_id);
                         break;
                 }
                 if (ca.cdp)
                         printf("SOCKET %u L3CA COS%u => DATA 0x%lx,CODE "
-                               "0x%lx\n", sock_ids[i], ca.class_id,
-                               (long) ca.u.s.data_mask,
-                               (long) ca.u.s.code_mask);
+                               "0x%lx\n",
+                               sock_ids[i], ca.class_id, (long)ca.u.s.data_mask,
+                               (long)ca.u.s.code_mask);
                 else
                         printf("SOCKET %u L3CA COS%u => MASK 0x%lx\n",
-                               sock_ids[i], ca.class_id,
-                               (long) ca.u.ways_mask);
+                               sock_ids[i], ca.class_id, (long)ca.u.ways_mask);
                 set++;
         }
         sel_alloc_mod += set;
@@ -290,8 +287,8 @@ set_l2_cos(const unsigned class_id,
                 memset(&ca, 0, sizeof(ca));
 
                 /* get current L2 definitions for this cluster */
-                ret = pqos_l2ca_get(l2_ids[i], DIM(cluster_l2ca),
-                                    &num_ca, cluster_l2ca);
+                ret = pqos_l2ca_get(l2_ids[i], DIM(cluster_l2ca), &num_ca,
+                                    cluster_l2ca);
                 if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to retrieve cluster %u L2 classes!\n",
                                l2_ids[i]);
@@ -310,7 +307,8 @@ set_l2_cos(const unsigned class_id,
                 /* check if CDP is selected but disabled */
                 if (!ca.cdp && scope != CAT_UPDATE_SCOPE_BOTH) {
                         printf("Failed to set L2 class on cluster %u, "
-                               "CDP not enabled!\n", l2_ids[i]);
+                               "CDP not enabled!\n",
+                               l2_ids[i]);
                         break;
                 }
                 /* if CDP is enabled */
@@ -328,19 +326,17 @@ set_l2_cos(const unsigned class_id,
                 /* set new L2 class definition */
                 ret = pqos_l2ca_set(l2_ids[i], 1, &ca);
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("L2ID %u L2CA COS%u - FAILED!\n",
-                               l2_ids[i], ca.class_id);
+                        printf("L2ID %u L2CA COS%u - FAILED!\n", l2_ids[i],
+                               ca.class_id);
                         break;
                 }
                 if (ca.cdp)
                         printf("L2ID %u L2CA COS%u => DATA 0x%lx,CODE 0x%lx\n",
-                               l2_ids[i], ca.class_id,
-                               (long) ca.u.s.data_mask,
-                               (long) ca.u.s.code_mask);
+                               l2_ids[i], ca.class_id, (long)ca.u.s.data_mask,
+                               (long)ca.u.s.code_mask);
                 else
-                        printf("L2ID %u L2CA COS%u => MASK 0x%lx\n",
-                               l2_ids[i], ca.class_id,
-                               (long) ca.u.ways_mask);
+                        printf("L2ID %u L2CA COS%u => MASK 0x%lx\n", l2_ids[i],
+                               ca.class_id, (long)ca.u.ways_mask);
                 set++;
         }
         sel_alloc_mod += set;
@@ -363,8 +359,11 @@ set_l2_cos(const unsigned class_id,
  * @retval -1 on error
  */
 static int
-set_mba_cos(const unsigned class_id, const uint64_t available_bw,
-            const unsigned *sock_ids, const unsigned sock_num, int ctrl)
+set_mba_cos(const unsigned class_id,
+            const uint64_t available_bw,
+            const unsigned *sock_ids,
+            const unsigned sock_num,
+            int ctrl)
 {
         unsigned i, set = 0;
         struct pqos_mba mba, actual;
@@ -384,8 +383,8 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
                 int ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
 
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("SOCKET %u MBA COS%u - FAILED!\n",
-                               sock_ids[i], mba.class_id);
+                        printf("SOCKET %u MBA COS%u - FAILED!\n", sock_ids[i],
+                               mba.class_id);
                         break;
                 }
 
@@ -394,8 +393,8 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
                 if (ctrl == 1)
                         printf("%u MBps\n", mba.mb_max);
                 else
-                        printf("%u%% requested, %u%% applied\n",
-                               mba.mb_max, actual.mb_max);
+                        printf("%u%% requested, %u%% applied\n", mba.mb_max,
+                               actual.mb_max);
 
                 set++;
         }
@@ -422,7 +421,8 @@ set_mba_cos(const unsigned class_id, const uint64_t available_bw,
  * @retval Negative on error
  */
 static int
-set_allocation_cos(char *str, unsigned *res_ids,
+set_allocation_cos(char *str,
+                   unsigned *res_ids,
                    const unsigned res_num,
                    const enum sel_alloc_type type,
                    const struct pqos_cpuinfo *cpu)
@@ -441,7 +441,7 @@ set_allocation_cos(char *str, unsigned *res_ids,
         *p = '\0';
 
         parse_cos_mask_type(str, &update_scope, &class_id);
-        mask = strtouint64(p+1);
+        mask = strtouint64(p + 1);
 
         /* if MBA selected, set MBA classes */
         if (type == MBA || type == MBA_CTRL) {
@@ -563,7 +563,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
         /**
          * Parse COS masks and apply to selected res_ids
          */
-        for (++p; ; p = NULL) {
+        for (++p;; p = NULL) {
                 char *token = NULL;
 
                 token = strtok_r(p, ",", &saveptr);
@@ -613,7 +613,8 @@ set_alloc(const struct pqos_cpuinfo *cpu)
         return (int)sel_alloc_mod;
 }
 
-void selfn_allocation_class(const char *arg)
+void
+selfn_allocation_class(const char *arg)
 {
         char *cp = NULL, *str = NULL;
         char *saveptr = NULL;
@@ -626,12 +627,16 @@ void selfn_allocation_class(const char *arg)
 
         selfn_strdup(&cp, arg);
 
-        for (str = cp; ; str = NULL) {
+        for (str = cp;; str = NULL) {
                 char *token = NULL;
 
                 token = strtok_r(str, ";", &saveptr);
                 if (token == NULL)
                         break;
+
+                if (sel_alloc_opt_num >= DIM(alloc_opts))
+                        parse_error(arg, "Too many allocation options!");
+
                 selfn_strdup(&alloc_opts[sel_alloc_opt_num++], token);
         }
 
@@ -703,27 +708,25 @@ fill_core_tab(char *str)
 
         p = strchr(str, '=');
         if (p == NULL)
-                parse_error(str,
-                            "Invalid allocation class of service "
-                            "association format");
+                parse_error(str, "Invalid allocation class of service "
+                                 "association format");
         *p = '\0';
 
-        cos = (unsigned) strtouint64(str);
+        cos = (unsigned)strtouint64(str);
 
-        n = strlisttotab(p+1, cores, DIM(cores));
+        n = strlisttotab(p + 1, cores, DIM(cores));
         if (n == 0)
                 return;
 
         if (sel_assoc_core_num <= 0) {
                 for (i = 0; i < n; i++) {
                         if (i >= DIM(sel_assoc_tab))
-                                parse_error(str,
-                                            "too many cores selected for "
-                                            "allocation association");
-                        sel_assoc_tab[i].core = (unsigned) cores[i];
+                                parse_error(str, "too many cores selected for "
+                                                 "allocation association");
+                        sel_assoc_tab[i].core = (unsigned)cores[i];
                         sel_assoc_tab[i].class_id = cos;
                 }
-                sel_assoc_core_num = (int) n;
+                sel_assoc_core_num = (int)n;
                 return;
         }
 
@@ -731,7 +734,7 @@ fill_core_tab(char *str)
                 int j;
 
                 for (j = 0; j < sel_assoc_core_num; j++)
-                        if (sel_assoc_tab[j].core == (unsigned) cores[i])
+                        if (sel_assoc_tab[j].core == (unsigned)cores[i])
                                 break;
 
                 if (j < sel_assoc_core_num) {
@@ -740,21 +743,20 @@ fill_core_tab(char *str)
                          * - update COS but warn about it
                          */
                         printf("warn: updating COS for core %u from %u to %u\n",
-                               (unsigned) cores[i],
-                               sel_assoc_tab[j].class_id, cos);
+                               (unsigned)cores[i], sel_assoc_tab[j].class_id,
+                               cos);
                         sel_assoc_tab[j].class_id = cos;
                 } else {
                         /**
                          * New core is selected - extend the list
                          */
-                        unsigned k = (unsigned) sel_assoc_core_num;
+                        unsigned k = (unsigned)sel_assoc_core_num;
 
                         if (k >= DIM(sel_assoc_tab))
-                                parse_error(str,
-                                            "too many cores selected for "
-                                            "allocation association");
+                                parse_error(str, "too many cores selected for "
+                                                 "allocation association");
 
-                        sel_assoc_tab[k].core = (unsigned) cores[i];
+                        sel_assoc_tab[k].core = (unsigned)cores[i];
                         sel_assoc_tab[k].class_id = cos;
                         sel_assoc_core_num++;
                 }
@@ -777,27 +779,25 @@ fill_pid_tab(char *str)
         str += strlen("pid:");
         p = strchr(str, '=');
         if (p == NULL)
-                parse_error(str,
-                            "Invalid allocation class of service "
-                            "association format");
+                parse_error(str, "Invalid allocation class of service "
+                                 "association format");
         *p = '\0';
 
-        cos = (unsigned) strtouint64(str);
+        cos = (unsigned)strtouint64(str);
 
-        n = strlisttotab(p+1, tasks, DIM(tasks));
+        n = strlisttotab(p + 1, tasks, DIM(tasks));
         if (n == 0)
                 return;
 
         if (sel_assoc_pid_num <= 0) {
                 for (i = 0; i < n; i++) {
                         if (i >= DIM(sel_assoc_pid_tab))
-                                parse_error(str,
-                                            "too many tasks selected for "
-                                            "allocation association");
-                        sel_assoc_pid_tab[i].task_id = (pid_t) tasks[i];
+                                parse_error(str, "too many tasks selected for "
+                                                 "allocation association");
+                        sel_assoc_pid_tab[i].task_id = (pid_t)tasks[i];
                         sel_assoc_pid_tab[i].class_id = cos;
                 }
-                sel_assoc_pid_num = (int) n;
+                sel_assoc_pid_num = (int)n;
                 return;
         }
 
@@ -805,7 +805,7 @@ fill_pid_tab(char *str)
                 int j;
 
                 for (j = 0; j < sel_assoc_pid_num; j++)
-                        if (sel_assoc_pid_tab[j].task_id == (pid_t) tasks[i])
+                        if (sel_assoc_pid_tab[j].task_id == (pid_t)tasks[i])
                                 break;
 
                 if (j < sel_assoc_pid_num) {
@@ -814,21 +814,20 @@ fill_pid_tab(char *str)
                          * - update COS but warn about it
                          */
                         printf("warn: updating COS for task %u from %u to %u\n",
-                               (unsigned) tasks[i],
+                               (unsigned)tasks[i],
                                sel_assoc_pid_tab[j].class_id, cos);
                         sel_assoc_pid_tab[j].class_id = cos;
                 } else {
                         /**
                          * New task is selected - extend the list
                          */
-                        unsigned k = (unsigned) sel_assoc_pid_num;
+                        unsigned k = (unsigned)sel_assoc_pid_num;
 
                         if (k >= DIM(sel_assoc_pid_tab))
-                                parse_error(str,
-                                            "too many tasks selected for "
-                                            "allocation association");
+                                parse_error(str, "too many tasks selected for "
+                                                 "allocation association");
 
-                        sel_assoc_pid_tab[k].task_id = (pid_t) tasks[i];
+                        sel_assoc_pid_tab[k].task_id = (pid_t)tasks[i];
                         sel_assoc_pid_tab[k].class_id = cos;
                         sel_assoc_pid_num++;
                 }
@@ -844,7 +843,7 @@ static void
 parse_allocation_assoc(char *str)
 {
         if ((strncasecmp(str, "llc:", 4) == 0) ||
-             (strncasecmp(str, "core:", 5) == 0)) {
+            (strncasecmp(str, "core:", 5) == 0)) {
                 alloc_pid_flag = 0;
                 fill_core_tab(str);
         } else if (strncasecmp(str, "pid:", 4) == 0) {
@@ -852,10 +851,10 @@ parse_allocation_assoc(char *str)
                 fill_pid_tab(str);
         } else
                 parse_error(str, "Unrecognized allocation type");
-
 }
 
-void selfn_allocation_assoc(const char *arg)
+void
+selfn_allocation_assoc(const char *arg)
 {
         char *cp = NULL, *str = NULL;
         char *saveptr = NULL;
@@ -868,7 +867,7 @@ void selfn_allocation_assoc(const char *arg)
 
         selfn_strdup(&cp, arg);
 
-        for (str = cp; ; str = NULL) {
+        for (str = cp;; str = NULL) {
                 char *token = NULL;
 
                 token = strtok_r(str, ";", &saveptr);
@@ -896,12 +895,10 @@ print_l3ca_config(const struct pqos_l3ca *ca, const int is_error)
 
         if (ca->cdp) {
                 printf("    L3CA COS%u => DATA 0x%llx, CODE 0x%llx\n",
-                       ca->class_id,
-                       (unsigned long long)ca->u.s.data_mask,
+                       ca->class_id, (unsigned long long)ca->u.s.data_mask,
                        (unsigned long long)ca->u.s.code_mask);
         } else {
-                printf("    L3CA COS%u => MASK 0x%llx\n",
-                       ca->class_id,
+                printf("    L3CA COS%u => MASK 0x%llx\n", ca->class_id,
                        (unsigned long long)ca->u.ways_mask);
         }
 }
@@ -922,12 +919,10 @@ print_l2ca_config(const struct pqos_l2ca *ca, const int is_error)
 
         if (ca->cdp) {
                 printf("    L2CA COS%u => DATA 0x%llx, CODE 0x%llx\n",
-                       ca->class_id,
-                       (unsigned long long)ca->u.s.data_mask,
+                       ca->class_id, (unsigned long long)ca->u.s.data_mask,
                        (unsigned long long)ca->u.s.code_mask);
         } else {
-                printf("    L2CA COS%u => MASK 0x%llx\n",
-                       ca->class_id,
+                printf("    L2CA COS%u => MASK 0x%llx\n", ca->class_id,
                        (unsigned long long)ca->u.ways_mask);
         }
 }
@@ -963,8 +958,7 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                 printf("%s%s%s COS definitions for Socket %u:\n",
                        cap_l3ca != NULL ? "L3CA" : "",
                        (cap_l3ca != NULL && cap_mba != NULL) ? "/" : "",
-                       cap_mba != NULL ? "MBA" : "",
-                       sockets[i]);
+                       cap_mba != NULL ? "MBA" : "", sockets[i]);
 
                 if (cap_l3ca != NULL) {
                         const struct pqos_cap_l3ca *l3ca = cap_l3ca->u.l3ca;
@@ -972,8 +966,8 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                         unsigned num = 0;
                         unsigned n = 0;
 
-                        ret = pqos_l3ca_get(sockets[i], l3ca->num_classes,
-                                            &num, tab);
+                        ret = pqos_l3ca_get(sockets[i], l3ca->num_classes, &num,
+                                            tab);
                         if (ret != PQOS_RETVAL_OK)
                                 num = l3ca->num_classes;
 
@@ -1001,8 +995,8 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                         unit = "%";
                         }
 
-                        ret = pqos_mba_get(sockets[i], mba->num_classes,
-                                           &num, tab);
+                        ret = pqos_mba_get(sockets[i], mba->num_classes, &num,
+                                           tab);
                         if (ret != PQOS_RETVAL_OK)
                                 num = mba->num_classes;
 
@@ -1028,7 +1022,9 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
  * @param [in] ci core info structure with all topology details
  */
 static void
-print_core_assoc(const int is_alloc, const int is_l3, const int is_mon,
+print_core_assoc(const int is_alloc,
+                 const int is_l3,
+                 const int is_mon,
                  const struct pqos_coreinfo *ci)
 {
         unsigned class_id = 0;
@@ -1047,8 +1043,8 @@ print_core_assoc(const int is_alloc, const int is_l3, const int is_mon,
         }
 
         if (is_l3)
-                printf("    Core %u, L2ID %u, L3ID %u => ",
-                       ci->lcore, ci->l2_id, ci->l3_id);
+                printf("    Core %u, L2ID %u, L3ID %u => ", ci->lcore,
+                       ci->l2_id, ci->l3_id);
         else
                 printf("    Core %u, L2ID %u => ", ci->lcore, ci->l2_id);
 
@@ -1056,28 +1052,28 @@ print_core_assoc(const int is_alloc, const int is_l3, const int is_mon,
                 printf("COS%u", class_id);
 
         if (is_mon && sel_interface == PQOS_INTER_MSR)
-                printf("%sRMID%u\n", is_alloc ? ", " : "", (unsigned) rmid);
+                printf("%sRMID%u\n", is_alloc ? ", " : "", (unsigned)rmid);
         else
                 printf("\n");
 }
 
-
-void alloc_print_config(const struct pqos_capability *cap_mon,
-                        const struct pqos_capability *cap_l3ca,
-                        const struct pqos_capability *cap_l2ca,
-                        const struct pqos_capability *cap_mba,
-                        const struct pqos_cpuinfo *cpu_info,
-                        const int verbose)
+void
+alloc_print_config(const struct pqos_capability *cap_mon,
+                   const struct pqos_capability *cap_l3ca,
+                   const struct pqos_capability *cap_l2ca,
+                   const struct pqos_capability *cap_mba,
+                   const struct pqos_cpuinfo *cpu_info,
+                   const int verbose)
 {
         int ret;
         unsigned i;
-	unsigned sock_count, *sockets = NULL;
+        unsigned sock_count, *sockets = NULL;
 
-	sockets = pqos_cpu_get_sockets(cpu_info, &sock_count);
-	if (sockets == NULL) {
-		printf("Error retrieving information for Sockets\n");
-		return;
-	}
+        sockets = pqos_cpu_get_sockets(cpu_info, &sock_count);
+        if (sockets == NULL) {
+                printf("Error retrieving information for Sockets\n");
+                return;
+        }
 
         print_per_socket_config(cap_l3ca, cap_mba, cpu_info, sock_count,
                                 sockets);
@@ -1089,20 +1085,19 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 l2id = pqos_cpu_get_l2ids(cpu_info, &count);
                 if (l2id == NULL) {
                         printf("Error retrieving information for L2\n");
-			goto free_and_return;
+                        goto free_and_return;
                 }
 
                 for (i = 0; i < count; i++) {
                         struct pqos_l2ca tab[PQOS_MAX_L2CA_COS];
                         unsigned num = 0, n = 0;
 
-                        ret = pqos_l2ca_get(l2id[i], PQOS_MAX_L2CA_COS,
-                                            &num, tab);
+                        ret = pqos_l2ca_get(l2id[i], PQOS_MAX_L2CA_COS, &num,
+                                            tab);
                         if (ret != PQOS_RETVAL_OK)
                                 continue;
 
-                        printf("L2CA COS definitions for L2ID %u:\n",
-                               l2id[i]);
+                        printf("L2CA COS definitions for L2ID %u:\n", l2id[i]);
                         for (n = 0; n < num; n++)
                                 print_l2ca_config(&tab[n],
                                                   (ret != PQOS_RETVAL_OK));
@@ -1118,27 +1113,26 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 lcores = pqos_cpu_get_cores(cpu_info, sockets[i], &lcount);
                 if (lcores == NULL) {
                         printf("Error retrieving core information!\n");
-			goto free_and_return;
+                        goto free_and_return;
                 }
-                printf("Core information for socket %u:\n",
-                       sockets[i]);
+                printf("Core information for socket %u:\n", sockets[i]);
                 for (n = 0; n < lcount; n++) {
                         const struct pqos_coreinfo *core_info = NULL;
 
                         core_info = pqos_cpu_get_core_info(cpu_info, lcores[n]);
                         if (core_info == NULL) {
                                 printf("Error retrieving information "
-                                       "for core %u!\n", lcores[n]);
+                                       "for core %u!\n",
+                                       lcores[n]);
                                 free(lcores);
-				goto free_and_return;
+                                goto free_and_return;
                         }
 
-                        print_core_assoc((cap_l3ca != NULL) ||
-                                         (cap_l2ca != NULL) ||
-                                         (cap_mba != NULL) /* is_alloc */,
-                                         cpu_info->l3.detected /* is_l3 */,
-                                         (cap_mon != NULL) /* is_mon */,
-                                         core_info);
+                        print_core_assoc(
+                            (cap_l3ca != NULL) || (cap_l2ca != NULL) ||
+                                (cap_mba != NULL) /* is_alloc */,
+                            cpu_info->l3.detected /* is_l3 */,
+                            (cap_mon != NULL) /* is_mon */, core_info);
                 }
                 free(lcores);
         }
@@ -1147,14 +1141,17 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                 unsigned max_cos = UINT_MAX;
 
                 if (cap_l2ca != NULL)
-                        max_cos = max_cos < cap_l2ca->u.l2ca->num_classes ?
-                                  max_cos : cap_l2ca->u.l2ca->num_classes;
+                        max_cos = max_cos < cap_l2ca->u.l2ca->num_classes
+                                      ? max_cos
+                                      : cap_l2ca->u.l2ca->num_classes;
                 if (cap_l3ca != NULL)
-                        max_cos = max_cos < cap_l3ca->u.l3ca->num_classes ?
-                                  max_cos : cap_l3ca->u.l3ca->num_classes;
+                        max_cos = max_cos < cap_l3ca->u.l3ca->num_classes
+                                      ? max_cos
+                                      : cap_l3ca->u.l3ca->num_classes;
                 if (cap_mba != NULL)
-                        max_cos = max_cos < cap_mba->u.mba->num_classes ?
-                                  max_cos : cap_mba->u.mba->num_classes;
+                        max_cos = max_cos < cap_mba->u.mba->num_classes
+                                      ? max_cos
+                                      : cap_mba->u.mba->num_classes;
 
                 ASSERT(max_cos < UINT_MAX);
 
@@ -1167,7 +1164,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         tasks = pqos_pid_get_pid_assoc(i, &tcount);
                         if (tasks == NULL) {
                                 printf("Error retrieving PID information!\n");
-				goto free_and_return;
+                                goto free_and_return;
                         }
                         printf("    COS%u => ", i);
                         if (tcount == 0)
@@ -1184,15 +1181,15 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
         }
 
 free_and_return:
-	if (sockets)
-		free(sockets);
-
+        if (sockets)
+                free(sockets);
 }
 
-int alloc_apply(const struct pqos_capability *cap_l3ca,
-                const struct pqos_capability *cap_l2ca,
-                const struct pqos_capability *cap_mba,
-                const struct pqos_cpuinfo *cpu)
+int
+alloc_apply(const struct pqos_capability *cap_l3ca,
+            const struct pqos_capability *cap_l2ca,
+            const struct pqos_capability *cap_mba,
+            const struct pqos_cpuinfo *cpu)
 {
         if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL) {
                 /**
