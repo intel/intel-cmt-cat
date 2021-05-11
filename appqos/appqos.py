@@ -215,6 +215,8 @@ def main():
     parser.add_argument('--port', metavar=("PORT"), default=[5000], type=int, nargs=1,
                         help="REST API port")
     parser.add_argument('-V', '--verbose', action='store_true', help="Verbose mode")
+    parser.add_argument('-a', '--address', metavar="INET_ADDRESS", default=common.DEFAULT_ADDRESS,
+                        help="AppQoS inet address")
     cmd_args = parser.parse_args()
 
     # configure syslog output
@@ -246,7 +248,7 @@ def main():
 
         # start REST API server
         server = rest_server.Server()
-        result = server.start("127.0.0.1", cmd_args.port[0], cmd_args.verbose)
+        result = server.start(cmd_args.address, cmd_args.port[0], cmd_args.verbose)
         if result == 0:
             # run main logic
             app_qos.run()
