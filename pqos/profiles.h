@@ -64,7 +64,6 @@ void profile_l3ca_list(void);
 int profile_l3ca_apply(const char *name,
                        const struct pqos_capability *cap_l3ca);
 
-
 #ifdef __cplusplus
 }
 #endif

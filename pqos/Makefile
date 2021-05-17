@@ -147,7 +147,7 @@ checkpatch:
 CLANGFORMAT?=clang-format
 .PHONY: clang-format
 clang-format:
-	@for file in "cap.c" "cap.h" "common.c" "alloc.c"; do \
+	@for file in "cap.c" "cap.h" "common.c" "alloc.c" "profiles.c" "profiles.h" "main.h"; do \
 		echo "Checking style $$file"; \
 		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \

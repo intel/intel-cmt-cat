@@ -47,126 +47,77 @@
 /**
  * 11-cache ways
  */
-static const char * const classes_way11_overlapN_equalY[] = {
-        "0=0x007",
-        "1=0x038",
-        "2=0x1C0",
-        "3=0x600"
-};
+static const char *const classes_way11_overlapN_equalY[] = {
+    "0=0x007", "1=0x038", "2=0x1C0", "3=0x600"};
 
-static const char * const classes_way11_overlapN_equalN[] = {
-        "0=0x01F",
-        "1=0x060",
-        "2=0x180",
-        "3=0x600"
-};
+static const char *const classes_way11_overlapN_equalN[] = {
+    "0=0x01F", "1=0x060", "2=0x180", "3=0x600"};
 
-static const char * const classes_way11_overlapP0_equalN[] = {
-        "0=0x7FF",
-        "1=0x060",
-        "2=0x180",
-        "3=0x600"
-};
+static const char *const classes_way11_overlapP0_equalN[] = {
+    "0=0x7FF", "1=0x060", "2=0x180", "3=0x600"};
 
-static const char * const classes_way11_overlapY_equalN[] = {
-        "0=0x7FF",
-        "1=0x7F0",
-        "2=0x700",
-        "3=0x600"
-};
+static const char *const classes_way11_overlapY_equalN[] = {
+    "0=0x7FF", "1=0x7F0", "2=0x700", "3=0x600"};
 
 /**
  * 12-cache ways
  */
-static const char * const classes_way12_overlapN_equalY[] = {
-        "0=0x007",
-        "1=0x038",
-        "2=0x1C0",
-        "3=0xE00"
-};
+static const char *const classes_way12_overlapN_equalY[] = {
+    "0=0x007", "1=0x038", "2=0x1C0", "3=0xE00"};
 
-static const char * const classes_way12_overlapN_equalN[] = {
-        "0=0x03F",
-        "1=0x0C0",
-        "2=0x300",
-        "3=0xC00"
-};
+static const char *const classes_way12_overlapN_equalN[] = {
+    "0=0x03F", "1=0x0C0", "2=0x300", "3=0xC00"};
 
-static const char * const classes_way12_overlapP0_equalN[] = {
-        "0=0xFFF",
-        "1=0x0C0",
-        "2=0x300",
-        "3=0xC00"
-};
+static const char *const classes_way12_overlapP0_equalN[] = {
+    "0=0xFFF", "1=0x0C0", "2=0x300", "3=0xC00"};
 
-static const char * const classes_way12_overlapY_equalN[] = {
-        "0=0xFFF",
-        "1=0xFF0",
-        "2=0xF00",
-        "3=0xC00"
-};
+static const char *const classes_way12_overlapY_equalN[] = {
+    "0=0xFFF", "1=0xFF0", "2=0xF00", "3=0xC00"};
+
+/**
+ * 15-cache ways
+ */
+static const char *const classes_way15_overlapN_equalY[] = {
+    "0=0x000F", "1=0x00F0", "2=0x0F00", "3=0x7000"};
+
+static const char *const classes_way15_overlapN_equalN[] = {
+    "0=0x01FF", "1=0x0600", "2=0x1800", "3=0x6000"};
+
+static const char *const classes_way15_overlapP0_equalN[] = {
+    "0=0x7FFF", "1=0x0600", "2=0x1800", "3=0x6000"};
+
+static const char *const classes_way15_overlapY_equalN[] = {
+    "0=0x7FFF", "1=0x7F00", "2=0x7000", "3=0x6000"};
 
 /**
  * 16-cache ways
  */
-static const char * const classes_way16_overlapN_equalY[] = {
-        "0=0x000F",
-        "1=0x00F0",
-        "2=0x0F00",
-        "3=0xF000"
-};
+static const char *const classes_way16_overlapN_equalY[] = {
+    "0=0x000F", "1=0x00F0", "2=0x0F00", "3=0xF000"};
 
-static const char * const classes_way16_overlapN_equalN[] = {
-        "0=0x03FF",
-        "1=0x0C00",
-        "2=0x3000",
-        "3=0xC000"
-};
+static const char *const classes_way16_overlapN_equalN[] = {
+    "0=0x03FF", "1=0x0C00", "2=0x3000", "3=0xC000"};
 
-static const char * const classes_way16_overlapP0_equalN[] = {
-        "0=0xFFFF",
-        "1=0x0C00",
-        "2=0x3000",
-        "3=0xC000"
-};
+static const char *const classes_way16_overlapP0_equalN[] = {
+    "0=0xFFFF", "1=0x0C00", "2=0x3000", "3=0xC000"};
 
-static const char * const classes_way16_overlapY_equalN[] = {
-        "0=0xFFFF",
-        "1=0xFF00",
-        "2=0xF000",
-        "3=0xC000"
-};
+static const char *const classes_way16_overlapY_equalN[] = {
+    "0=0xFFFF", "1=0xFF00", "2=0xF000", "3=0xC000"};
 
 /**
  * 20-cache ways
  */
-static const char * const classes_way20_overlapN_equalY[] = {
-        "0=0x0001F",
-        "1=0x003E0",
-        "2=0x07C00",
-        "3=0xF8000"
-};
+static const char *const classes_way20_overlapN_equalY[] = {
+    "0=0x0001F", "1=0x003E0", "2=0x07C00", "3=0xF8000"};
 
-static const char * const classes_way20_overlapN_equalN[] = {
-        "0=0x000FF",
-        "1=0x00F00",
-        "2=0x0F000",
-        "3=0xF000"
-};
+static const char *const classes_way20_overlapN_equalN[] = {
+    "0=0x000FF", "1=0x00F00", "2=0x0F000", "3=0xF0000"};
 
-static const char * const classes_way20_overlapP0_equalN[] = {
-        "0=0xFFFFF",
-        "1=0x0C000",
-        "2=0x30000",
-        "3=0xC0000"
-};
+static const char *const classes_way20_overlapP0_equalN[] = {
+    "0=0xFFFFF", "1=0x0C000", "2=0x30000", "3=0xC0000"};
 
-static const char * const classes_way20_overlapY_equalN[] = {
-        "0=0xFFFFF",
-        "1=0xFF000",
-        "2=0xF0000",
-        "3=0xC0000"
-};
+static const char *const classes_way20_overlapY_equalN[] = {
+    "0=0xFFFFF", "1=0xFF000", "2=0xF0000", "3=0xC0000"};
 
 /**
  * meat and potatoes now :)
@@ -174,83 +125,119 @@ static const char * const classes_way20_overlapY_equalN[] = {
 struct llc_allocation_config {
         unsigned num_ways;
         unsigned num_classes;
-        const char * const *tab;
+        const char *const *tab;
 };
 
 static const struct llc_allocation_config config_cfg0[] = {
-        { .num_ways = 11,
-          .num_classes = 4,
-          .tab = classes_way11_overlapN_equalY,
-        },
-        { .num_ways = 12,
-          .num_classes = 4,
-          .tab = classes_way12_overlapN_equalY,
-        },
-        { .num_ways = 16,
-          .num_classes = 4,
-          .tab = classes_way16_overlapN_equalY,
-        },
-        { .num_ways = 20,
-          .num_classes = 4,
-          .tab = classes_way20_overlapN_equalY,
-        }
+    {
+        .num_ways = 11,
+        .num_classes = 4,
+        .tab = classes_way11_overlapN_equalY,
+    },
+    {
+        .num_ways = 12,
+        .num_classes = 4,
+        .tab = classes_way12_overlapN_equalY,
+    },
+    {
+        .num_ways = 15,
+        .num_classes = 4,
+        .tab = classes_way15_overlapN_equalY,
+    },
+    {
+        .num_ways = 16,
+        .num_classes = 4,
+        .tab = classes_way16_overlapN_equalY,
+    },
+    {
+        .num_ways = 20,
+        .num_classes = 4,
+        .tab = classes_way20_overlapN_equalY,
+    },
 };
 
 static const struct llc_allocation_config config_cfg1[] = {
-        { .num_ways = 11,
-          .num_classes = 4,
-          .tab = classes_way11_overlapN_equalN,
-        },
-        { .num_ways = 12,
-          .num_classes = 4,
-          .tab = classes_way12_overlapN_equalN,
-        },
-        { .num_ways = 16,
-          .num_classes = 4,
-          .tab = classes_way16_overlapN_equalN,
-        },
-        { .num_ways = 20,
-          .num_classes = 4,
-          .tab = classes_way20_overlapN_equalN,
-        }
+    {
+        .num_ways = 11,
+        .num_classes = 4,
+        .tab = classes_way11_overlapN_equalN,
+    },
+    {
+        .num_ways = 12,
+        .num_classes = 4,
+        .tab = classes_way12_overlapN_equalN,
+    },
+    {
+        .num_ways = 15,
+        .num_classes = 4,
+        .tab = classes_way15_overlapN_equalN,
+    },
+    {
+        .num_ways = 16,
+        .num_classes = 4,
+        .tab = classes_way16_overlapN_equalN,
+    },
+    {
+        .num_ways = 20,
+        .num_classes = 4,
+        .tab = classes_way20_overlapN_equalN,
+    },
 };
 
 static const struct llc_allocation_config config_cfg2[] = {
-        { .num_ways = 11,
-          .num_classes = 4,
-          .tab = classes_way11_overlapP0_equalN,
-        },
-        { .num_ways = 12,
-          .num_classes = 4,
-          .tab = classes_way12_overlapP0_equalN,
-        },
-        { .num_ways = 16,
-          .num_classes = 4,
-          .tab = classes_way16_overlapP0_equalN,
-        },
-        { .num_ways = 20,
-          .num_classes = 4,
-          .tab = classes_way20_overlapP0_equalN,
-        },
+    {
+        .num_ways = 11,
+        .num_classes = 4,
+        .tab = classes_way11_overlapP0_equalN,
+    },
+    {
+        .num_ways = 12,
+        .num_classes = 4,
+        .tab = classes_way12_overlapP0_equalN,
+    },
+    {
+        .num_ways = 15,
+        .num_classes = 4,
+        .tab = classes_way15_overlapP0_equalN,
+    },
+    {
+        .num_ways = 16,
+        .num_classes = 4,
+        .tab = classes_way16_overlapP0_equalN,
+    },
+    {
+        .num_ways = 20,
+        .num_classes = 4,
+        .tab = classes_way20_overlapP0_equalN,
+    },
 };
 
 static const struct llc_allocation_config config_cfg3[] = {
-        { .num_ways = 11,
-          .num_classes = 4,
-          .tab = classes_way11_overlapY_equalN,
-        },
-        { .num_ways = 12,
-          .num_classes = 4,
-          .tab = classes_way12_overlapY_equalN,
-        },
-        { .num_ways = 16,
-          .num_classes = 4,
-          .tab = classes_way16_overlapY_equalN,
-        },
-        { .num_ways = 20,
-          .num_classes = 4,
-          .tab = classes_way20_overlapY_equalN,
-        },
+    {
+        .num_ways = 11,
+        .num_classes = 4,
+        .tab = classes_way11_overlapY_equalN,
+    },
+    {
+        .num_ways = 12,
+        .num_classes = 4,
+        .tab = classes_way12_overlapY_equalN,
+    },
+    {
+        .num_ways = 15,
+        .num_classes = 4,
+        .tab = classes_way15_overlapY_equalN,
+    },
+    {
+        .num_ways = 16,
+        .num_classes = 4,
+        .tab = classes_way16_overlapY_equalN,
+    },
+    {
+        .num_ways = 20,
+        .num_classes = 4,
+        .tab = classes_way20_overlapY_equalN,
+    },
 };
 
 struct llc_allocation {
@@ -261,31 +248,36 @@ struct llc_allocation {
 };
 
 static const struct llc_allocation allocation_tab[] = {
-        { .id = "CFG0",
-          .descr = "non-overlapping, ways equally divided",
-          .num_config = DIM(config_cfg0),
-          .config = config_cfg0,
-        },
-        { .id = "CFG1",
-          .descr = "non-overlapping, ways unequally divided",
-          .num_config = DIM(config_cfg1),
-          .config = config_cfg1,
-        },
-        { .id = "CFG2",
-          .descr = "overlapping, ways unequally divided, "
-          "class 0 can access all ways",
-          .num_config = DIM(config_cfg2),
-          .config = config_cfg2,
-        },
-        { .id = "CFG3",
-          .descr = "ways unequally divided, overlapping access "
-          "for higher classes",
-          .num_config = DIM(config_cfg3),
-          .config = config_cfg3,
-        },
+    {
+        .id = "CFG0",
+        .descr = "non-overlapping, ways equally divided",
+        .num_config = DIM(config_cfg0),
+        .config = config_cfg0,
+    },
+    {
+        .id = "CFG1",
+        .descr = "non-overlapping, ways unequally divided",
+        .num_config = DIM(config_cfg1),
+        .config = config_cfg1,
+    },
+    {
+        .id = "CFG2",
+        .descr = "overlapping, ways unequally divided, "
+                 "class 0 can access all ways",
+        .num_config = DIM(config_cfg2),
+        .config = config_cfg2,
+    },
+    {
+        .id = "CFG3",
+        .descr = "ways unequally divided, overlapping access "
+                 "for higher classes",
+        .num_config = DIM(config_cfg3),
+        .config = config_cfg3,
+    },
 };
 
-void profile_l3ca_list(void)
+void
+profile_l3ca_list(void)
 {
         unsigned i = 0;
 
@@ -297,12 +289,12 @@ void profile_l3ca_list(void)
                        "      Config ID: %s\n"
                        "    Description: %s\n"
                        " Configurations:\n",
-                       i+1, ap->id, ap->descr);
+                       i + 1, ap->id, ap->descr);
                 for (j = 0; j < ap->num_config; j++) {
                         printf("\tnumber of classes = %u,"
                                " number of cache ways = %u\n",
-                               (unsigned) ap->config[j].num_classes,
-                               (unsigned) ap->config[j].num_ways);
+                               (unsigned)ap->config[j].num_classes,
+                               (unsigned)ap->config[j].num_ways);
                 }
         }
 }
@@ -320,8 +312,10 @@ void profile_l3ca_list(void)
  * @retval PQOS_RETVAL_OK on success
  */
 static int
-profile_l3ca_get(const char *id, const struct pqos_cap_l3ca *l3ca,
-                 unsigned *p_num, const char * const **p_tab)
+profile_l3ca_get(const char *id,
+                 const struct pqos_cap_l3ca *l3ca,
+                 unsigned *p_num,
+                 const char *const **p_tab)
 {
         unsigned i = 0, j = 0;
 
@@ -355,15 +349,13 @@ profile_l3ca_get(const char *id, const struct pqos_cap_l3ca *l3ca,
 }
 
 int
-profile_l3ca_apply(const char *name,
-                   const struct pqos_capability *cap_l3ca)
+profile_l3ca_apply(const char *name, const struct pqos_capability *cap_l3ca)
 {
         unsigned cnum = 0;
-        const char * const *cptr = NULL;
+        const char *const *cptr = NULL;
 
-        if (cap_l3ca != NULL &&
-            profile_l3ca_get(name, cap_l3ca->u.l3ca, &cnum,
-                             &cptr) == PQOS_RETVAL_OK) {
+        if (cap_l3ca != NULL && profile_l3ca_get(name, cap_l3ca->u.l3ca, &cnum,
+                                                 &cptr) == PQOS_RETVAL_OK) {
                 /**
                  * All profile classes are defined as strings
                  * in format that is command line friendly.
@@ -381,8 +373,7 @@ profile_l3ca_apply(const char *name,
                 offset = (unsigned)strlen("llc:");
 
                 for (i = 0; i < cnum; i++) {
-                        strncpy(cb+offset, cptr[i],
-                                sizeof(cb)-1-offset);
+                        strncpy(cb + offset, cptr[i], sizeof(cb) - 1 - offset);
                         selfn_allocation_class(cb);
                 }
         } else {
