@@ -391,7 +391,7 @@ class ConfigStore:
                 if result or pool['cbm'] == 0:
                     raise ValueError("Pool {}, CBM {}/{} is not contiguous."\
                     .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
-                if not caps.cat_supported():
+                if not caps.cat_l3_supported():
                     raise ValueError("Pool {}, CBM {}/{}, CAT is not supported."\
                     .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
 
@@ -668,7 +668,7 @@ class ConfigStore:
             else:
                 default_pool['mba'] = 100
 
-        if caps.cat_supported():
+        if caps.cat_l3_supported():
             default_pool['cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
 
         default_pool['name'] = "Default"
@@ -705,7 +705,7 @@ class ConfigStore:
         if 'mba' in new_pool_data or 'mba_bw' in new_pool_data:
             alloc_type.append(common.MBA_CAP)
         if 'cbm' in new_pool_data:
-            alloc_type.append(common.CAT_CAP)
+            alloc_type.append(common.CAT_L3_CAP)
         max_cos_id = common.PQOS_API.get_max_cos_id(alloc_type)
 
         data = self.get_config()

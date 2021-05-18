@@ -215,7 +215,7 @@ def test_config_default_pool(mock_get_num_cores):
 
 @mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
 @mock.patch('common.PQOS_API.get_max_l3_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
-@mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
 @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
 def test_config_default_pool_cat():
     config_store = ConfigStore()
@@ -249,7 +249,7 @@ def test_config_default_pool_cat():
 
 @mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
 @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
-@mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
 @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=False))
 def test_config_default_pool_mba():
     config_store = ConfigStore()
@@ -283,7 +283,7 @@ def test_config_default_pool_mba():
 @mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
 @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
 @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
-@mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
 def test_config_default_pool_mba_bw():
     config_store = ConfigStore()
     config = deepcopy(CONFIG)
@@ -437,7 +437,7 @@ def test_config_reset():
     with mock.patch('common.PQOS_API.get_num_cores') as mock_get_num_cores,\
          mock.patch('config.ConfigStore.load') as mock_load,\
          mock.patch('caps.mba_supported', return_value = True) as mock_mba,\
-         mock.patch('caps.cat_supported', return_value = True),\
+         mock.patch('caps.cat_l3_supported', return_value = True),\
          mock.patch('common.PQOS_API.get_max_l3_cat_cbm', return_value = 0xFFF),\
          mock.patch('common.PQOS_API.check_core', return_value = True),\
          mock.patch('pid_ops.is_pid_valid', return_value = True):
@@ -517,7 +517,7 @@ def test_get_global_attr_power_profiles_verify(mock_get_config, cfg, default, re
 
 class TestConfigValidate:
 
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_core(self):
         def check_core(core):
             return core != 3
@@ -545,7 +545,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_pool_duplicate_core(self):
         data = {
             "pools": [
@@ -569,7 +569,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_pool_same_ids(self):
         data = {
             "pools": [
@@ -593,7 +593,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_app(self):
         data = {
             "pools": [
@@ -620,7 +620,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_pool_invalid_cbm(self):
         data = {
             "pools": [
@@ -643,7 +643,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
     def test_pool_cat_not_supported(self):
         data = {
             "pools": [
@@ -662,7 +662,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=False))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_pool_cat_not_supported_mba(self):
         data = {
@@ -723,7 +723,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_bw_not_supported(self):
@@ -743,7 +743,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_not_supported_cat(self):
         data = {
@@ -763,7 +763,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=False))
     def test_pool_mba_bw_not_supported_cat(self):
@@ -784,7 +784,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
     def test_pool_mba_mba_bw_enabled(self):
@@ -813,7 +813,7 @@ class TestConfigValidate:
             ConfigStore.validate(data)
 
 
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_app_invalid_core(self):
         def check_core(core):
             return core != 3
@@ -844,7 +844,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_app_core_does_not_match_pool(self):
         data = {
             "pools": [
@@ -871,7 +871,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_app_without_pool(self):
 
         data = {
@@ -911,7 +911,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_app_without_pool(self):
         data = {
             "pools": [
@@ -951,7 +951,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_app_same_ids(self):
         data = {
             "pools": [
@@ -984,7 +984,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_app_same_pid(self):
         data = {
             "pools": [
@@ -1017,7 +1017,7 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_app_invalid_pid(self):
         data = {
             "pools": [

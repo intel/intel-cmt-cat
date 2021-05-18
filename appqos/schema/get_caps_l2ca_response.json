@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "title": "REST API get caps/l2ca",
+  "description": "GET Pool L2 CAT caps result, URI /caps/l2ca",
+
+  "type": "object",
+
+  "properties": {
+    "cache_size": {
+      "description": "L2 cache size",
+      "type": "integer"
+    },
+    "cw_size": {
+      "description": "L2 cache way size",
+      "type": "integer"
+    },
+    "cw_num": {
+      "description": "A number of L2 cache ways",
+      "type": "integer"
+    },
+    "clos_num": {
+      "description": "A number of supported classes of service",
+      "type": "integer"
+    },
+    "cdp_supported": {
+      "description": "L2 CDP support",
+      "type": "boolean"
+    },
+    "cdp_enabled": {
+      "description": "L2 CDP status (enabled/disabled)",
+      "type": "boolean"
+    }
+  },
+  "required": ["cache_size", "cw_size", "cw_num", "clos_num", "cdp_supported", "cdp_enabled"],
+  "additionalProperties": false
+}

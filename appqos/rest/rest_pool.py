@@ -136,9 +136,9 @@ class Pool(Resource):
         """
         def check_alloc_tech(pool_id, json_data):
             if 'cbm' in json_data:
-                if not caps.cat_supported():
+                if not caps.cat_l3_supported():
                     raise BadRequest("System does not support CAT!")
-                if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_CAP]):
+                if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
                     raise BadRequest("Pool {} does not support CAT".format(pool_id))
 
             if 'mba' in json_data or 'mba_bw' in json_data:

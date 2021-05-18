@@ -58,18 +58,32 @@ def caps_init():
     log.info("Supported capabilities:")
     log.info(SYSTEM_CAPS)
 
-    if (cat_supported() or mba_supported() or sstbf_enabled() or sstcp_enabled())\
-            and common.PQOS_API.is_multicore():
+    features = [
+        cat_l3_supported(),
+        cat_l2_supported(),
+        mba_supported(),
+        sstbf_enabled(),
+        sstcp_enabled()
+    ]
+
+    if any(features) and common.PQOS_API.is_multicore():
         return 0
 
     return -1
 
 
-def cat_supported():
+def cat_l3_supported():
     """
-    Returns CAT support status
+    Returns L3 CAT support status
     """
-    return common.CAT_CAP in SYSTEM_CAPS
+    return common.CAT_L3_CAP in SYSTEM_CAPS
+
+
+def cat_l2_supported():
+    """
+    Returns L2 CAT support status
+    """
+    return common.CAT_L2_CAP in SYSTEM_CAPS
 
 
 def mba_supported():
@@ -119,7 +133,11 @@ def detect_supported_caps():
 
     # Intel RDT L3 CAT
     if common.PQOS_API.is_l3_cat_supported():
-        result.append(common.CAT_CAP)
+        result.append(common.CAT_L3_CAP)
+
+    # Intel RDT L2 CAT
+    if common.PQOS_API.is_l2_cat_supported():
+        result.append(common.CAT_L2_CAP)
 
     # Intel RDT MBA
     if common.PQOS_API.is_mba_supported():
@@ -132,3 +150,91 @@ def detect_supported_caps():
         result.append(common.POWER_CAP)
 
     return result
+
+
+def mba_info():
+    """
+    Returns MBA information:
+    * a number of supported classes of service
+    * MBA status (enabled/disabled)
+    * MBA CTRL status (enabled/disabled)
+
+    Returns:
+        MBA information
+    """
+
+    info = {
+        'clos_num': common.PQOS_API.get_mba_num_cos(),
+        'enabled': not mba_bw_enabled(),
+        'ctrl_enabled': mba_bw_enabled()
+    }
+    return info
+
+
+def mba_ctrl_info():
+    """
+    Returns MBA CTRL information:
+    * MBA CTRL support
+    * MBA CTRL status (enabled/disabled)
+
+    Returns:
+        MBA CTRL information
+    """
+
+    info = {
+        'supported': mba_bw_supported(),
+        'enabled': mba_bw_enabled()
+    }
+    return info
+
+
+def l3ca_info():
+    """
+    Returns L3 cache allocation information:
+    * L3 cache size
+    * L3 cache way size
+    * a number of L3 cache ways
+    * a number of supported classes of service
+    * L3 CDP support
+    * L3 CDP status (enabled/disabled)
+
+    Returns:
+        L3 cache allocation information
+    """
+
+    rdt_api = common.PQOS_API
+    info = {
+        'cache_size': rdt_api.get_l3_cache_size(),
+        'cache_way_size': rdt_api.get_l3_cache_way_size(),
+        'cache_ways_num': rdt_api.get_l3_num_cache_ways(),
+        'clos_num': rdt_api.get_l3ca_num_cos(),
+        'cdp_supported': rdt_api.is_l3_cdp_supported(),
+        'cdp_enabled': rdt_api.is_l3_cdp_enabled()
+    }
+    return info
+
+
+def l2ca_info():
+    """
+    Returns L2 cache allocation information:
+    * L2 cache size
+    * L2 cache way size
+    * a number of L2 cache ways
+    * a number of supported classes of service
+    * L2 CDP support
+    * L2 CDP status (enabled/disabled)
+
+    Returns:
+        L2 cache allocation information
+    """
+
+    rdt_api = common.PQOS_API
+    info = {
+        'cache_size': rdt_api.get_l2_cache_size(),
+        'cache_way_size': rdt_api.get_l2_cache_way_size(),
+        'cache_ways_num': rdt_api.get_l2_num_cache_ways(),
+        'clos_num': rdt_api.get_l2ca_num_cos(),
+        'cdp_supported': rdt_api.is_l2_cdp_supported(),
+        'cdp_enabled': rdt_api.is_l2_cdp_enabled()
+    }
+    return info

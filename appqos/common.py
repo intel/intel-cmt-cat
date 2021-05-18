@@ -45,7 +45,8 @@ import stats # pylint: disable=cyclic-import
 
 
 CONFIG_FILENAME = "appqos.conf"
-CAT_CAP = "cat"
+CAT_L3_CAP = "l3cat"
+CAT_L2_CAP = "l2cat"
 MBA_CAP = "mba"
 SSTBF_CAP = "sstbf"
 POWER_CAP = "power"

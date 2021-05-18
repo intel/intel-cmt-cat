@@ -7,6 +7,10 @@
   "type": "object",
 
   "properties": {
+    "clos_num": {
+      "description": "A number of classes of service that the pool supports for MBA",
+      "type": "integer"
+    },
     "mba_enabled": {
       "description": "Pool supports MBA percentage",
       "type": "boolean"
@@ -16,6 +20,6 @@
       "type": "boolean"
     }
   },
-  "required": ["mba_enabled", "mba_bw_enabled"],
+  "required": ["clos_num", "mba_enabled", "mba_bw_enabled"],
   "additionalProperties": false
 }

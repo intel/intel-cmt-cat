@@ -33,6 +33,8 @@
 
 import pytest
 import mock
+from pqos.capability import PqosCapabilityL2Ca, PqosCapabilityL3Ca
+from pqos.error import PqosErrorResource
 
 import common
 
@@ -47,6 +49,7 @@ class TestPqosApi(object):
 
         self.Pqos_api.cap = mock.MagicMock()
         self.Pqos_api.cap.get_l3ca_cos_num = mock.MagicMock()
+        self.Pqos_api.cap.get_l2ca_cos_num = mock.MagicMock()
         self.Pqos_api.cap.get_mba_cos_num = mock.MagicMock()
         self.Pqos_api.cap.get_type = mock.MagicMock()
 
@@ -308,21 +311,21 @@ class TestPqosApi(object):
        self.Pqos_api.cap.get_l3ca_cos_num.return_value = 16
        self.Pqos_api.cap.get_mba_cos_num.return_value = 8
 
-       assert 7 == self.Pqos_api.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert 7 == self.Pqos_api.get_max_cos_id([common.CAT_L3_CAP, common.MBA_CAP])
        assert 7 == self.Pqos_api.get_max_cos_id([common.MBA_CAP])
-       assert 15 == self.Pqos_api.get_max_cos_id([common.CAT_CAP])
+       assert 15 == self.Pqos_api.get_max_cos_id([common.CAT_L3_CAP])
        assert None == self.Pqos_api.get_max_cos_id([])
 
        self.Pqos_api.cap.get_l3ca_cos_num.return_value = 0
-       assert None == self.Pqos_api.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert None == self.Pqos_api.get_max_cos_id([common.CAT_L3_CAP, common.MBA_CAP])
        assert 7 == self.Pqos_api.get_max_cos_id([common.MBA_CAP])
-       assert None == self.Pqos_api.get_max_cos_id([common.CAT_CAP])
+       assert None == self.Pqos_api.get_max_cos_id([common.CAT_L3_CAP])
        assert None == self.Pqos_api.get_max_cos_id([])
 
        self.Pqos_api.cap.get_mba_cos_num.return_value = 0
-       assert None == self.Pqos_api.get_max_cos_id([common.CAT_CAP, common.MBA_CAP])
+       assert None == self.Pqos_api.get_max_cos_id([common.CAT_L3_CAP, common.MBA_CAP])
        assert None == self.Pqos_api.get_max_cos_id([common.MBA_CAP])
-       assert None == self.Pqos_api.get_max_cos_id([common.CAT_CAP])
+       assert None == self.Pqos_api.get_max_cos_id([common.CAT_L3_CAP])
        assert None == self.Pqos_api.get_max_cos_id([])
 
 
@@ -368,3 +371,180 @@ class TestPqosApi(object):
         # Alloc Reset fails
         self.Pqos_api.alloc.reset.side_effect = Exception("test")
         assert -1 == self.Pqos_api.enable_mba_bw(enabled_mba_bw)
+
+
+    def test_is_l2_cat_supported(self):
+        self.Pqos_api.cap.get_type.side_effect = PqosErrorResource('error', 3)
+        assert False == self.Pqos_api.is_l2_cat_supported()
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+
+        self.Pqos_api.cap.get_type.reset_mock()
+        self.Pqos_api.cap.get_type.side_effect = None
+        self.Pqos_api.cap.get_type.return_value = 0
+        assert True == self.Pqos_api.is_l2_cat_supported()
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+
+        self.Pqos_api.cap.get_type.reset_mock()
+        self.Pqos_api.cap.get_type.side_effect = Exception('Test')
+        assert False == self.Pqos_api.is_l2_cat_supported()
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+
+
+    def test_get_l2ca_num_cos(self):
+        self.Pqos_api.cap.get_l2ca_cos_num.return_value = 28
+        assert 28 == self.Pqos_api.get_l2ca_num_cos()
+        self.Pqos_api.cap.get_l2ca_cos_num.assert_called_once()
+
+        self.Pqos_api.cap.get_l2ca_cos_num.side_effect = Exception('Test')
+        assert None == self.Pqos_api.get_l2ca_num_cos()
+
+    def test_get_l3_cache_size(self):
+        l3ca_caps = PqosCapabilityL3Ca()
+        l3ca_caps.num_ways = 10
+        l3ca_caps.way_size = 1024 * 1024
+        self.Pqos_api.cap.get_type.return_value = l3ca_caps
+
+        cache_size = self.Pqos_api.get_l3_cache_size()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l3ca')
+        assert cache_size == 10 * 1024 * 1024
+    
+    def test_get_l3_cache_way_size(self):
+        l3ca_caps = PqosCapabilityL3Ca()
+        l3ca_caps.way_size = 8 * 1024 * 1024
+        self.Pqos_api.cap.get_type.return_value = l3ca_caps
+
+        cache_way_size = self.Pqos_api.get_l3_cache_way_size()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l3ca')
+        assert cache_way_size == 8 * 1024 * 1024
+
+    def test_get_l3_num_cache_ways(self):
+        l3ca_caps = PqosCapabilityL3Ca()
+        l3ca_caps.num_ways = 30
+        self.Pqos_api.cap.get_type.return_value = l3ca_caps
+
+        num_cache_ways = self.Pqos_api.get_l3_num_cache_ways()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l3ca')
+        assert num_cache_ways == 30
+
+    @pytest.mark.parametrize("cdp", [True, False, None])
+    def test_is_l3_cdp_supported(self, cdp):
+        l3ca_caps = PqosCapabilityL3Ca()
+        l3ca_caps.cdp = cdp
+        self.Pqos_api.cap.get_type.return_value = l3ca_caps
+
+        cdp_supported = self.Pqos_api.is_l3_cdp_supported()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l3ca')
+        assert cdp_supported == cdp
+
+    @pytest.mark.parametrize("cdp_on", [True, False])
+    def test_is_l3_cdp_enabled(self, cdp_on):
+        l3ca_caps = PqosCapabilityL3Ca()
+        l3ca_caps.cdp_on = cdp_on
+        self.Pqos_api.cap.get_type.return_value = l3ca_caps
+
+        cdp_enabled = self.Pqos_api.is_l3_cdp_enabled()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l3ca')
+        assert cdp_enabled == cdp_on
+
+    def test_l2_cache_size(self):
+        l2ca_caps = PqosCapabilityL2Ca()
+        l2ca_caps.num_ways = 20
+        l2ca_caps.way_size = 16 * 1024
+        self.Pqos_api.cap.get_type.return_value = l2ca_caps
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=True)
+
+        cache_size = self.Pqos_api.get_l2_cache_size()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+        assert cache_size == 20 * 16 * 1024
+
+        self.Pqos_api.cap.get_type.reset_mock()
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=False)
+
+        cache_size = self.Pqos_api.get_l2_cache_size()
+        assert cache_size is None
+
+        self.Pqos_api.cap.get_type.assert_not_called()
+
+    def test_get_l2_cache_way_size(self):
+        l2ca_caps = PqosCapabilityL2Ca()
+        l2ca_caps.way_size = 128 * 1024
+        self.Pqos_api.cap.get_type.return_value = l2ca_caps
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=True)
+
+        cache_way_size = self.Pqos_api.get_l2_cache_way_size()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+        assert cache_way_size == 128 * 1024
+
+        self.Pqos_api.cap.get_type.reset_mock()
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=False)
+
+        cache_way_size = self.Pqos_api.get_l2_cache_way_size()
+        assert cache_way_size is None
+
+        self.Pqos_api.cap.get_type.assert_not_called()
+
+    def test_get_l2_num_cache_ways(self):
+        l2ca_caps = PqosCapabilityL2Ca()
+        l2ca_caps.num_ways = 22
+        self.Pqos_api.cap.get_type.return_value = l2ca_caps
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=True)
+
+        num_cache_ways = self.Pqos_api.get_l2_num_cache_ways()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+        assert num_cache_ways == 22
+
+        self.Pqos_api.cap.get_type.reset_mock()
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=False)
+
+        num_cache_ways = self.Pqos_api.get_l2_num_cache_ways()
+        assert num_cache_ways is None
+
+        self.Pqos_api.cap.get_type.assert_not_called()
+
+    @pytest.mark.parametrize("cdp", [True, False, None])
+    def test_is_l2_cdp_supported(self, cdp):
+        l2ca_caps = PqosCapabilityL2Ca()
+        l2ca_caps.cdp = cdp
+        self.Pqos_api.cap.get_type.return_value = l2ca_caps
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=True)
+
+        cdp_supported = self.Pqos_api.is_l2_cdp_supported()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+        assert cdp_supported == cdp
+
+        self.Pqos_api.cap.get_type.reset_mock()
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=False)
+
+        cdp_supported = self.Pqos_api.is_l2_cdp_supported()
+        assert cdp_supported is None
+
+        self.Pqos_api.cap.get_type.assert_not_called()
+
+    @pytest.mark.parametrize("cdp_on", [True, False])
+    def test_is_l2_cdp_enabled(self, cdp_on):
+        l2ca_caps = PqosCapabilityL2Ca()
+        l2ca_caps.cdp_on = cdp_on
+        self.Pqos_api.cap.get_type.return_value = l2ca_caps
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=True)
+
+        cdp_enabled = self.Pqos_api.is_l2_cdp_enabled()
+
+        self.Pqos_api.cap.get_type.assert_called_once_with('l2ca')
+        assert cdp_enabled == cdp_on
+
+        self.Pqos_api.cap.get_type.reset_mock()
+        self.Pqos_api.is_l2_cat_supported = mock.MagicMock(return_value=False)
+
+        cdp_enabled = self.Pqos_api.is_l2_cdp_enabled()
+        assert cdp_enabled is None
+
+        self.Pqos_api.cap.get_type.assert_not_called()

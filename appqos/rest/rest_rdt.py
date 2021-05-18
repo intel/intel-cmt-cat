@@ -60,9 +60,13 @@ class CapsMba(Resource):
         Returns:
             response, status code
         """
+
+        mba_info = caps.mba_info()
+
         res = {
-            'mba_enabled': not caps.mba_bw_enabled(),
-            'mba_bw_enabled': caps.mba_bw_enabled()
+            'clos_num': mba_info['clos_num'],
+            'mba_enabled': mba_info['enabled'],
+            'mba_bw_enabled': mba_info['ctrl_enabled']
         }
         return res, 200
 
@@ -81,9 +85,12 @@ class CapsMbaCtrl(Resource):
         Returns:
             response, status code
         """
+
+        mba_ctrl_info = caps.mba_ctrl_info()
+
         res = {
-            'supported': caps.mba_bw_supported(),
-            'enabled': caps.mba_bw_enabled()
+            'supported': mba_ctrl_info['supported'],
+            'enabled': mba_ctrl_info['enabled']
         }
         return res, 200
 
@@ -184,4 +191,58 @@ class CapsRdtIface(Resource):
         common.CONFIG_STORE.set_config(data)
 
         res = {'message': "RDT Interface modified"}
+        return res, 200
+
+
+class CapsL3ca(Resource):
+    """
+    Handles /caps/l3ca requests
+    """
+
+    @staticmethod
+    def get():
+        """
+        Handles GET /caps/l3ca request.
+
+        Returns:
+            response, status code
+        """
+
+        l3ca_info = caps.l3ca_info()
+
+        res = {
+            'cache_size': l3ca_info['cache_size'],
+            'cw_size': l3ca_info['cache_way_size'],
+            'cw_num': l3ca_info['cache_ways_num'],
+            'clos_num': l3ca_info['clos_num'],
+            'cdp_supported': l3ca_info['cdp_supported'],
+            'cdp_enabled': l3ca_info['cdp_enabled']
+        }
+        return res, 200
+
+
+class CapsL2ca(Resource):
+    """
+    Handles /caps/l2ca requests
+    """
+
+    @staticmethod
+    def get():
+        """
+        Handles GET /caps/l2ca request.
+
+        Returns:
+            response, status code
+        """
+
+        l2ca_info = caps.l2ca_info()
+
+        res = {
+            'cache_size': l2ca_info['cache_size'],
+            'cw_size': l2ca_info['cache_way_size'],
+            'cw_num': l2ca_info['cache_ways_num'],
+            'clos_num': l2ca_info['clos_num'],
+            'cdp_supported': l2ca_info['cdp_supported'],
+            'cdp_enabled': l2ca_info['cdp_enabled']
+        }
         return res, 200

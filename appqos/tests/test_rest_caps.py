@@ -78,6 +78,7 @@ class TestCaps:
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
+    @mock.patch("common.PQOS_API.get_mba_num_cos", mock.MagicMock(return_value=8))
     @pytest.mark.parametrize("mba_bw_enabled", [True, False])
     def test_caps_mba_get(self, mba_bw_enabled):
 
@@ -92,11 +93,12 @@ class TestCaps:
             schema, resolver = load_json_schema('get_caps_mba_response.json')
             validate(data, schema, resolver=resolver)
 
-            params = ['mba_enabled', 'mba_bw_enabled']
+            params = ['clos_num', 'mba_enabled', 'mba_bw_enabled']
             assert len(data) == len(params)
             for param in params:
                 assert param in data
 
+            assert data['clos_num'] == 8
             assert not data['mba_enabled'] == mba_bw_enabled
             assert data['mba_bw_enabled'] == mba_bw_enabled
 
@@ -305,3 +307,86 @@ class TestCaps:
         response = Rest().put("/caps/rdt_iface", invalid_request)
         assert response.status_code == 400
 
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    def test_caps_l3ca_get(self):
+        info = {
+            'cache_size': 10 * 100000,
+            'cache_way_size': 100000,
+            'cache_ways_num': 10,
+            'clos_num': 6,
+            'cdp_supported': True,
+            'cdp_enabled': False
+        }
+
+        with mock.patch("caps.l3ca_info", return_value=info):
+            response = Rest().get("/caps/l3cat")
+            assert response.status_code == 200
+
+            data = json.loads(response.data.decode('utf-8'))
+
+            # Validate response schema
+            schema, resolver = load_json_schema('get_caps_l3ca_response.json')
+            validate(data, schema, resolver=resolver)
+
+            params = [
+                'cache_size',
+                'cw_size',
+                'cw_num',
+                'clos_num',
+                'cdp_supported',
+                'cdp_enabled'
+            ]
+            assert len(data) == len(params)
+            for param in params:
+                assert param in data
+
+            assert data['cache_size'] == 10 * 100000
+            assert data['cw_size'] == 100000
+            assert data['cw_num'] == 10
+            assert data['clos_num'] == 6
+            assert data['cdp_supported']
+            assert not data['cdp_enabled']
+
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    def test_caps_l2ca_get(self):
+        info = {
+            'cache_size': 20 * 2000,
+            'cache_way_size': 2000,
+            'cache_ways_num': 20,
+            'clos_num': 14,
+            'cdp_supported': True,
+            'cdp_enabled': True
+        }
+
+        with mock.patch("caps.l2ca_info", return_value=info):
+            response = Rest().get("/caps/l2cat")
+            assert response.status_code == 200
+
+            data = json.loads(response.data.decode('utf-8'))
+
+            # Validate response schema
+            schema, resolver = load_json_schema('get_caps_l2ca_response.json')
+            validate(data, schema, resolver=resolver)
+
+            params = [
+                'cache_size',
+                'cw_size',
+                'cw_num',
+                'clos_num',
+                'cdp_supported',
+                'cdp_enabled'
+            ]
+            assert len(data) == len(params)
+            for param in params:
+                assert param in data
+
+            assert data['cache_size'] == 20 * 2000
+            assert data['cw_size'] == 2000
+            assert data['cw_num'] == 20
+            assert data['clos_num'] == 14
+            assert data['cdp_supported']
+            assert data['cdp_enabled']

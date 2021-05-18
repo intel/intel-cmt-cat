@@ -56,7 +56,7 @@ from rest.rest_power import Power, Powers
 from rest.rest_app import App, Apps
 from rest.rest_pool import Pool, Pools
 from rest.rest_misc import Stats, Caps, Sstbf, Reset
-from rest.rest_rdt import CapsRdtIface, CapsMba, CapsMbaCtrl
+from rest.rest_rdt import CapsRdtIface, CapsMba, CapsMbaCtrl, CapsL3ca, CapsL2ca
 
 TLS_CERT_FILE = 'ca/appqos.crt'
 TLS_KEY_FILE = 'ca/appqos.key'
@@ -78,6 +78,7 @@ class Server:
         self.process = None
         self.app = Flask(__name__)
         self.app.config['MAX_CONTENT_LENGTH'] = 2 * 1024
+        self.app.url_map.strict_slashes = False
         self.api = Api(self.app)
 
         # initialize SSL context
@@ -91,21 +92,42 @@ class Server:
         self.context.options |= ssl.OP_NO_TLSv1
         self.context.options |= ssl.OP_NO_TLSv1_1
 
+        # Apps and Pools API
         self.api.add_resource(Apps, '/apps')
         self.api.add_resource(App, '/apps/<int:app_id>')
         self.api.add_resource(Pools, '/pools')
         self.api.add_resource(Pool, '/pools/<int:pool_id>')
+
+        # SST-CP API
         if caps.sstcp_enabled():
             self.api.add_resource(Powers, '/power_profiles')
             self.api.add_resource(Power, '/power_profiles/<int:profile_id>')
+
+        # Stats and Capabilities API
         self.api.add_resource(Stats, '/stats')
         self.api.add_resource(Caps, '/caps')
+
+        # SST-BF API
         if caps.sstbf_enabled():
             self.api.add_resource(Sstbf, '/caps/sstbf')
+
+        # RDT interface API
         self.api.add_resource(CapsRdtIface, '/caps/rdt_iface')
+
+        # MBA API
         if caps.mba_supported():
            self.api.add_resource(CapsMba, '/caps/mba')
            self.api.add_resource(CapsMbaCtrl, '/caps/mba_ctrl')
+
+        # L3 CAT API
+        if caps.cat_l3_supported():
+            self.api.add_resource(CapsL3ca, '/caps/' + common.CAT_L3_CAP)
+
+        # L2 CAT API
+        if caps.cat_l2_supported():
+            self.api.add_resource(CapsL2ca, '/caps/' + common.CAT_L2_CAP)
+
+        # Reset API
         self.api.add_resource(Reset, '/reset')
 
         self.app.register_error_handler(HTTPException, Server.error_handler)

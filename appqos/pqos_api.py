@@ -40,6 +40,7 @@ import os
 import platform
 
 from pqos import Pqos
+from pqos.error import PqosErrorResource
 from pqos.capability import PqosCap
 from pqos.l3ca import PqosCatL3
 from pqos.mba import PqosMba
@@ -51,7 +52,7 @@ import log
 
 
 class PqosApi:
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes,too-many-public-methods
     """
     Wrapper for libpqos wrapper.
     """
@@ -361,6 +362,27 @@ class PqosApi:
             return False
 
 
+    def is_l2_cat_supported(self):
+        """
+        Checks for L2 CAT support
+
+        Returns:
+            True if supported
+            False otherwise
+        """
+        try:
+            self.cap.get_type("l2ca")
+            # L2 CAT capabilities obtained successfully
+            # So L2 CAT is supported
+            return True
+        except PqosErrorResource:
+            # No L2 CAT resources, L2 CAT is not supported
+            return False
+        except Exception as ex:
+            log.error(str(ex))
+            return False
+
+
     def is_multicore(self):
         """
         Checks if system is multicore
@@ -437,6 +459,21 @@ class PqosApi:
             return None
 
 
+    def get_l2ca_num_cos(self):
+        """
+        Gets number of COS for L2 CAT
+
+        Returns:
+            num of COS for L2 CAT
+            None otherwise
+        """
+        try:
+            return self.cap.get_l2ca_cos_num()
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+
     def get_mba_num_cos(self):
         """
         Gets number of COS for MBA
@@ -464,16 +501,16 @@ class PqosApi:
         max_cos_cat = self.get_l3ca_num_cos()
         max_cos_mba = self.get_mba_num_cos()
 
-        if common.CAT_CAP not in alloc_type and common.MBA_CAP not in alloc_type:
+        if common.CAT_L3_CAP not in alloc_type and common.MBA_CAP not in alloc_type:
             return None
 
-        if common.CAT_CAP in alloc_type and not max_cos_cat:
+        if common.CAT_L3_CAP in alloc_type and not max_cos_cat:
             return None
 
         if common.MBA_CAP in alloc_type and not max_cos_mba:
             return None
 
-        if common.CAT_CAP in alloc_type:
+        if common.CAT_L3_CAP in alloc_type:
             max_cos_num = max_cos_cat
 
         if common.MBA_CAP in alloc_type:
@@ -500,6 +537,210 @@ class PqosApi:
         try:
             l3ca_caps = self.cap.get_type("l3ca")
             return 2**l3ca_caps.num_ways - 1
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def get_l3_cache_size(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L3 cache size (in bytes)
+
+        Returns:
+            L3 cache size in bytes
+            or None on error
+        """
+
+        if not self.is_l3_cat_supported():
+            return None
+
+        try:
+            l3ca_caps = self.cap.get_type("l3ca")
+            num_ways = l3ca_caps.num_ways
+            way_size = l3ca_caps.way_size
+            return num_ways * way_size
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def get_l3_cache_way_size(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L3 cache way size (in bytes)
+
+        Returns:
+            L3 cache way size in bytes
+            or None on error
+        """
+
+        if not self.is_l3_cat_supported():
+            return None
+
+        try:
+            l3ca_caps = self.cap.get_type("l3ca")
+            return l3ca_caps.way_size
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def get_l3_num_cache_ways(self):
+        # pylint: disable=no-self-use
+        """
+        Gets a number of L3 cache ways
+
+        Returns:
+            a number of L3 cache ways
+            or None on error
+        """
+
+        if not self.is_l3_cat_supported():
+            return None
+
+        try:
+            l3ca_caps = self.cap.get_type("l3ca")
+            return l3ca_caps.num_ways
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def is_l3_cdp_supported(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L3 CDP support
+
+        Returns:
+            True if L3 CDP is supported, False if it is not supported
+            or None on error
+        """
+
+        if not self.is_l3_cat_supported():
+            return None
+
+        try:
+            l3ca_caps = self.cap.get_type("l3ca")
+            return l3ca_caps.cdp
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def is_l3_cdp_enabled(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L3 CDP status
+
+        Returns:
+            True if L3 CDP is enabled, False if it is not enabled
+            or None on error
+        """
+
+        if not self.is_l3_cat_supported():
+            return None
+
+        try:
+            l3ca_caps = self.cap.get_type("l3ca")
+            return l3ca_caps.cdp_on
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def get_l2_cache_size(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L2 cache size (in bytes)
+
+        Returns:
+            L2 cache size in bytes
+            or None on error
+        """
+
+        if not self.is_l2_cat_supported():
+            return None
+
+        try:
+            l2ca_caps = self.cap.get_type("l2ca")
+            num_ways = l2ca_caps.num_ways
+            way_size = l2ca_caps.way_size
+            return num_ways * way_size
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def get_l2_cache_way_size(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L2 cache way size (in bytes)
+
+        Returns:
+            L2 cache way size in bytes
+            or None on error
+        """
+
+        if not self.is_l2_cat_supported():
+            return None
+
+        try:
+            l2ca_caps = self.cap.get_type("l2ca")
+            return l2ca_caps.way_size
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def get_l2_num_cache_ways(self):
+        # pylint: disable=no-self-use
+        """
+        Gets a number of L2 cache ways
+
+        Returns:
+            a number of L2 cache ways
+            or None on error
+        """
+
+        if not self.is_l2_cat_supported():
+            return None
+
+        try:
+            l2ca_caps = self.cap.get_type("l2ca")
+            return l2ca_caps.num_ways
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def is_l2_cdp_supported(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L2 CDP support
+
+        Returns:
+            True if L2 CDP is supported, False if it is not supported
+            or None on error
+        """
+
+        if not self.is_l2_cat_supported():
+            return None
+
+        try:
+            l2ca_caps = self.cap.get_type("l2ca")
+            return l2ca_caps.cdp
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def is_l2_cdp_enabled(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L2 CDP status
+
+        Returns:
+            True if L2 CDP is enabled, False if it is not enabled
+            or None on error
+        """
+
+        if not self.is_l2_cat_supported():
+            return None
+
+        try:
+            l2ca_caps = self.cap.get_type("l2ca")
+            return l2ca_caps.cdp_on
         except Exception as ex:
             log.error(str(ex))
             return None

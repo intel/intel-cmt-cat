@@ -171,6 +171,7 @@ class AppQoS:
                         break
 
                 last_cfg_change_ts = time.time()
+                log.info("New configuration processed")
 
 
     def signal_handler(self, _signum, _frame):

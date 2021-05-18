@@ -172,7 +172,7 @@ class Pool:
         cores = config.get_pool_attr('cores', self.pool)
         self.cores_set(cores)
 
-        if caps.cat_supported():
+        if caps.cat_l3_supported():
             cbm = config.get_pool_attr('cbm', self.pool)
             self.cbm_set(cbm)
 
