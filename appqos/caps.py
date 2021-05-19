@@ -60,7 +60,6 @@ def caps_init():
 
     features = [
         cat_l3_supported(),
-        cat_l2_supported(),
         mba_supported(),
         sstbf_enabled(),
         sstcp_enabled()
