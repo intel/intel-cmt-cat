@@ -4,7 +4,7 @@
 # @par
 # BSD LICENSE
 #
-# Copyright(c) 2019-2020 Intel Corporation. All rights reserved.
+# Copyright(c) 2019-2021 Intel Corporation. All rights reserved.
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -69,7 +69,7 @@ style:
 	${MAKE} codespell
 
 run: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run ./appqos.py
+	WORKON_HOME=$(VENV_DIR) pipenv run ./appqos.py -c /tmp/appqos.conf -V
 
 clean:
 	@rm -rf __pycache__
