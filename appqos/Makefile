@@ -69,7 +69,7 @@ style:
 	${MAKE} codespell
 
 run: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run ./appqos.py -c /tmp/appqos.conf -V
+	WORKON_HOME=$(VENV_DIR) pipenv run ./appqos.py
 
 clean:
 	@rm -rf __pycache__
