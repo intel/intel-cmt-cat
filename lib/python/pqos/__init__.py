@@ -1,11 +1,7 @@
 ################################################################################
 # BSD LICENSE
 #
-<<<<<<< HEAD
 # Copyright(c) 2019-2021 Intel Corporation. All rights reserved.
-=======
-# Copyright(c) 2019-2020 Intel Corporation. All rights reserved.
->>>>>>> d69cbab712f7aea5e9a60af732d75a6917bef637
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
