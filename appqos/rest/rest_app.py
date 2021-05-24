@@ -147,7 +147,7 @@ class App(Resource):
         try:
             schema, resolver = ConfigStore.load_json_schema('modify_app.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         data = deepcopy(common.CONFIG_STORE.get_config())
@@ -251,7 +251,7 @@ class Apps(Resource):
         try:
             schema, resolver = ConfigStore.load_json_schema('add_app.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         data = deepcopy(common.CONFIG_STORE.get_config())

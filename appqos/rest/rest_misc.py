@@ -131,7 +131,7 @@ class Sstbf(Resource):
         try:
             schema, resolver = ConfigStore.load_json_schema('modify_sstbf.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         if not sstbf.configure_sstbf(json_data['configured']) == 0:

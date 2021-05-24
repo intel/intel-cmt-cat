@@ -160,7 +160,7 @@ class Pool(Resource):
         try:
             schema, resolver = ConfigStore.load_json_schema('modify_pool.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         admission_control_check = json_data.pop('verify', True) and\
@@ -257,7 +257,7 @@ class Pools(Resource):
         try:
             schema, resolver = ConfigStore.load_json_schema('add_pool.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         admission_control_check = json_data.pop('verify', True) and\

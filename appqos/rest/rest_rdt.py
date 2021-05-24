@@ -110,7 +110,7 @@ class CapsMbaCtrl(Resource):
         try:
             schema, resolver = ConfigStore.load_json_schema('modify_mba_ctrl.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         if not caps.mba_bw_supported():
@@ -171,7 +171,7 @@ class CapsRdtIface(Resource):
         try:
             schema, resolver = ConfigStore.load_json_schema('modify_rdt_iface.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         if not json_data['interface'] in common.PQOS_API.supported_iface():

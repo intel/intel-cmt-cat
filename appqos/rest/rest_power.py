@@ -162,7 +162,7 @@ class Power(Resource):
         try:
             schema, resolver = common.CONFIG_STORE.load_json_schema('modify_power.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         admission_control_check = json_data.pop('verify', True)
@@ -232,7 +232,7 @@ class Powers(Resource):
         try:
             schema, resolver = common.CONFIG_STORE.load_json_schema('add_power.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
-        except jsonschema.ValidationError as error:
+        except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed - %s" % (str(error)))
 
         json_data['id'] = common.CONFIG_STORE.get_new_power_profile_id()
