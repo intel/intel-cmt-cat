@@ -67,7 +67,8 @@
   assert:
     that: item.stat.exists
     fail_msg: >-
-      AppQoS cert_dir={{ cert_dir }} should contain files: {{ appqos_ca_required_content }}
+      AppQoS cert_dir={{ cert_dir }} should contain files:
+      {{ appqos_ca_required_content }}
   with_items: "{{ stat_cert_dir_content_items.results }}"
 
 - name: Copy certificates and key

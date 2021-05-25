@@ -1,9 +1,9 @@
 # README for Ansible Collection - intel.appqos
-April 2020
+May 2021
 
 ## CONTENTS
 - Introduction
-- AppQoS Overview
+- App QoS Overview
 - Dependencies
 - Configuration
 - Role Variables
@@ -13,18 +13,19 @@ April 2020
 - Legal Disclaimer
 
 ## INTRODUCTION
-An Ansible Collection with single role that installs AppQoS,
-an API for Intel(R) Resource Director Technology (RDT)
+An Ansible Collection with single role that installs
+Application Quality of Service (App QoS) an API for
+Intel(R) Resource Director Technology (RDT)
 and Intel(R) Speed Select Technology (SST),
 on RHEL/CentOS/Fedora and Debian/Ubuntu Linux distributions.
 
 
-## APPQOS OVERVIEW
-AppQoS is a proof-of-concept software created to demonstrate the use of
+## APP QOS OVERVIEW
+App QoS is a proof-of-concept software created to demonstrate the use of
 Intel(R) RDT and Intel(R) SST to improve Quality of Service (QoS) for
 applications via partitioning system resources.
 
-More information can be found in AppQoS README file available at:
+More information can be found in App QoS README file available at:
 https://github.com/intel/intel-cmt-cat/tree/master/appqos/README
 
 
@@ -35,17 +36,17 @@ https://github.com/intel/intel-cmt-cat
 Intel(R) SST BF and CP configuration via external "Intel pwr" library:
 https://github.com/intel/CommsPowerManagement
 
-More information can be found in AppQoS README file available at:
+More information can be found in App QoS README file available at:
 https://github.com/intel/intel-cmt-cat/tree/master/appqos/README
 
 
 ## CONFIGURATION
-AppQoS supports pools of resources, i.e. Pools. In each Pool one or more
+App QoS supports pools of resources, i.e. Pools. In each Pool one or more
 application can be deployed, where application is one or more PIDs.
 
 Cache Allocation, Memory Bandwidth Allocation (via CAT and MBA),
 Base Frequency, Core Power (via SST BF and CP) and affinity are configured
-by AppQoS on per core basis.
+by App QoS on per core basis.
 
 All configurations are pre-defined in appqos.conf file which is
 "Read-Only" by default. No runtime changes are saved in the configuration file.
@@ -60,9 +61,9 @@ Example Intel(R) Xeon(R) 2nd Generation SP is available in appqos.conf
 Apart from installing configuration files, this Ansible script also:
 - Installs required packages and dependencies including libpqos
 - Generates mTLS certificates
-- Creates appqos configuration file with minimal resources (mentioned above)
-- Start AppQoS in the background
-- Stop/terminate AppQoS running in the background
+- Creates appqos.conf configuration file with minimal resources (mentioned above)
+- Start App QoS in the background
+- Stop/terminate App QoS running in the background
 
 It is assumed that intel.appqos.appqos ansible role will be ran directly as root user.
 
@@ -72,22 +73,22 @@ Based on user needs it can be changed.
 
 "state" variable controls action of the role:
 - "present" (default) to deploy
-- "stopped" to stop AppQoS instance
+- "stopped" to stop App QoS instance
 
 
 ## EXAMPLE PLAYBOOK
-Playbook to deploy AppQoS:
+Playbook to deploy App QoS:
 ```
-- name: Deploy AppQoS
+- name: Deploy App QoS
   hosts: compute
   roles:
     - role: intel.appqos.appqos
       state: present
 ```
 
-Playbook to stop AppQoS:
+Playbook to stop App QoS:
 ```
-- name: Stop AppQoS
+- name: Stop App QoS
   hosts: compute
   roles:
     - role: intel.appqos.appqos
@@ -104,23 +105,23 @@ $ ansible-galaxy collection install intel.appqos
 
 $ cd /root/.ansible/collections/ansible_collections/intel/appqos/playbooks/
 
-3. Run ansible-playbook command for deploying AppQoS (on localhost by default)
+3. Run ansible-playbook command for deploying App QoS (on localhost by default)
 
 $ ansible-playbook -i inventory/hosts deploy.yml --extra-vars "cert_dir=/CERT_DIR"
 ... where 'CERT_DIR' is a directory where 'ca.crt', 'appqos.crt' and 'appqos.key'
 are located
 
-Ansible scripts need CA certificate and a AppQoS certificate located in a given
-directory - those files will be copied to AppQoS 'ca/' sub-directory in place where
-AppQoS has been installed. More info about certificate for the AppQoS can be
+Ansible scripts need CA certificate and a App QoS certificate located in a given
+directory - those files will be copied to App QoS 'ca/' sub-directory in place where
+App QoS has been installed. More info about certificate for the App QoS can be
 found at https://github.com/intel/intel-cmt-cat/blob/master/appqos/README in
-section 'APPQOS AND CLIENT CERTIFICATE'.
+section 'APP QOS AND CLIENT CERTIFICATE'.
 
-By default, AppQoS is installed in '/opt/intel/appqos_workspace/appqos/'. At the
-end of the playbook, AppQoS should be up and running, listening on port 5000.
-Note that AppQoS server supports one client at a time.
+By default, App QoS is installed in '/opt/intel/appqos_workspace/appqos/'. At the
+end of the playbook, App QoS should be up and running, listening on port 5000.
+Note that App QoS server supports one client at a time.
 
-To stop the AppQoS service, launch the 'stop.yml' playbook:
+To stop the App QoS service, launch the 'stop.yml' playbook:
 
 $ ansible-playbook -i inventory/hosts stop.yml
 
