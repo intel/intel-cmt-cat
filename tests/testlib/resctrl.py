@@ -82,16 +82,16 @@ class Resctrl:
         self.root = RESCTRL_ROOT_PATH
 
     def run_cmd(self, command):
-        child = subprocess.Popen(command.split(), stdin=subprocess.PIPE,
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        (stdout, stderr) = child.communicate()
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE) as child:
+            (stdout, stderr) = child.communicate()
 
-        if stdout is not None:
-            stdout = stdout.decode("utf-8")
-        if stderr is not None:
-            stderr = stderr.decode("utf-8")
+            if stdout is not None:
+                stdout = stdout.decode("utf-8")
+            if stderr is not None:
+                stderr = stderr.decode("utf-8")
 
-        return stdout, stderr, child.returncode
+            return stdout, stderr, child.returncode
 
     def is_mounted(self):
         command = "mount -t resctrl"

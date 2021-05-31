@@ -65,19 +65,20 @@ class TestRdtsetAffinity(test.Test):
     @pytest.mark.rdt_supported("rdt_a")
     def test_rdtset_affinity_command_single_core(self, iface):
         command = self.cmd_rdtset(iface, "-c 4 memtester 10M")
-        rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as rdtset:
 
-        self.stdout_wait(rdtset, b"memtester version")
+            self.stdout_wait(rdtset, b"memtester version")
 
-        child = self.get_pid_children(rdtset.pid)
-        assert len(child) == 1
+            child = self.get_pid_children(rdtset.pid)
+            assert len(child) == 1
 
-        (stdout, _, exitstatus) = self.run("taskset -p %s" % child[0])
-        assert exitstatus == 0
-        assert "current affinity mask: 10" in stdout
+            (stdout, _, exitstatus) = self.run("taskset -p %s" % child[0])
+            assert exitstatus == 0
+            assert "current affinity mask: 10" in stdout
 
-        self.run("killall memtester")
-        rdtset.communicate()
+            self.run("killall memtester")
+            rdtset.communicate()
 
 
     ## RDTSET - Set CPU affinity multiple cores (command)
@@ -98,19 +99,20 @@ class TestRdtsetAffinity(test.Test):
     @pytest.mark.rdt_supported("rdt_a")
     def test_rdtset_affinity_command_multiple_cores(self, iface):
         command = self.cmd_rdtset(iface, "-c 4-5 memtester 10M")
-        rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as rdtset:
 
-        self.stdout_wait(rdtset, b"memtester version")
+            self.stdout_wait(rdtset, b"memtester version")
 
-        child = self.get_pid_children(rdtset.pid)
-        assert len(child) == 1
+            child = self.get_pid_children(rdtset.pid)
+            assert len(child) == 1
 
-        (stdout, _, exitstatus) = self.run("taskset -p %s" % child[0])
-        assert exitstatus == 0
-        assert "current affinity mask: 30" in stdout
+            (stdout, _, exitstatus) = self.run("taskset -p %s" % child[0])
+            assert exitstatus == 0
+            assert "current affinity mask: 30" in stdout
 
-        self.run("killall memtester")
-        rdtset.communicate()
+            self.run("killall memtester")
+            rdtset.communicate()
 
 
     ## RDTSET - Set CPU affinity single core (task)

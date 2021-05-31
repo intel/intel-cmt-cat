@@ -72,26 +72,26 @@ class TestRdtsetL3Cat(test.Test):
     def test_rdtset_l3cat_set_command(self, iface):
         param = "-t l3=0xf;cpu=5-6 -c 5-6 memtester 10M"
         command = self.cmd_rdtset(iface, param)
-        rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as rdtset:
 
-        self.stdout_wait(rdtset, b"memtester version")
+            self.stdout_wait(rdtset, b"memtester version")
 
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
-        assert exitstatus == 0
-        if iface == "MSR":
-            last_cos = Env().get('cat', 'l3', 'cos') - 1
-        else:
-            last_cos = Resctrl.get_ctrl_group_count() - 1
+            (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
+            assert exitstatus == 0
+            if iface == "MSR":
+                last_cos = Env().get('cat', 'l3', 'cos') - 1
+            else:
+                last_cos = Resctrl.get_ctrl_group_count() - 1
 
-        assert re.search("Core 5, L2ID [0-9]+, L3ID [0-9]+ => COS%d" % last_cos, stdout) \
-               is not None
-        assert re.search("Core 6, L2ID [0-9]+, L3ID [0-9]+ => COS%d" % last_cos, stdout) \
-               is not None
-        assert "L3CA COS%d => MASK 0xf" % last_cos in stdout
+            assert re.search("Core 5, L2ID [0-9]+, L3ID [0-9]+ => COS%d" % last_cos, stdout) \
+                   is not None
+            assert re.search("Core 6, L2ID [0-9]+, L3ID [0-9]+ => COS%d" % last_cos, stdout) \
+                   is not None
+            assert "L3CA COS%d => MASK 0xf" % last_cos in stdout
 
-        self.run("killall memtester")
-        rdtset.communicate()
+            self.run("killall memtester")
+            rdtset.communicate()
 
 
 

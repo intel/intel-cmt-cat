@@ -161,19 +161,21 @@ class TestPqosMBM(test.Test):
             return mbl, mbr
 
         command = "taskset -c 4 memtester 100M"
-        memtester = subprocess.Popen(command.split(), stdin=subprocess.PIPE,
-                                     stdout=subprocess.PIPE)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as memtester:
 
-        time.sleep(2)
+            time.sleep(2)
 
-        (stdout, _, exitcode) = self.run_pqos(iface,
-                                              "-p mbl:1 -p mbl:%d -p mbr:1 -p mbr:%d -t 1" % \
-                                              (memtester.pid, memtester.pid))
-        assert exitcode == 0
-        assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*MBL\[MB/s\]\s*MBR\[MB/s\]", stdout) \
-            is not None
+            (stdout, _, exitcode) = self.run_pqos(iface,
+                                                "-p mbl:1 -p mbl:%d -p mbr:1 -p mbr:%d -t 1" % \
+                                                (memtester.pid, memtester.pid))
+            assert exitcode == 0
+            assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*MBL\[MB/s\]\s*MBR\[MB/s\]", stdout) \
+                is not None
 
-        (mbl, _) = get_mbm(stdout, memtester.pid)
-        assert mbl > 100
-        (mbl, _) = get_mbm(stdout, 1)
-        assert mbl < 10
+            (mbl, _) = get_mbm(stdout, memtester.pid)
+            assert mbl > 100
+            (mbl, _) = get_mbm(stdout, 1)
+            assert mbl < 10
+
+            memtester.kill()

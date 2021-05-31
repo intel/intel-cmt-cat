@@ -31,6 +31,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
+from collections import defaultdict
 import subprocess
 import test
 import re
@@ -69,30 +70,118 @@ class TestRdtsetL2Cat(test.Test):
     #  L2CA COS7 => MASK 0xf
     @PRIORITY_HIGH
     @pytest.mark.rdt_supported("cat_l2")
+    @pytest.mark.rdt_unsupported("cat_l3", "mba")
     def test_rdtset_l2cat_set_command(self, iface):
         param = "-t l2=0xf;cpu=5-6 -c 5-6 memtester 10M"
         command = self.cmd_rdtset(iface, param)
-        rdtset = subprocess.Popen(command.split(), stdin=subprocess.PIPE,
-                                  stdout=subprocess.PIPE)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as rdtset:
 
-        self.stdout_wait(rdtset, b"memtester version")
+            self.stdout_wait(rdtset, b"memtester version")
 
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
+            (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
+            assert exitstatus == 0
+            if iface == "MSR":
+                last_cos = Env().get('cat', 'l2', 'cos') - 1
+            else:
+                last_cos = Resctrl.get_ctrl_group_count() - 1
+
+            assert re.search("Core 5, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
+                    is not None
+            assert re.search("Core 6, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
+                    is not None
+            assert "L2CA COS%d => MASK 0xf" % last_cos in stdout
+
+            self.run("killall memtester")
+            rdtset.communicate()
+
+
+    ## RDTSET - L2 CAT Set COS definition (command)
+    #
+    #  \b Priority: High
+    #
+    #  \b Objective:
+    #  Run command with provided L2 CAT mask for cores on the same socket but different clusters
+    #
+    #  \b Instruction:
+    #  1. Select two cores from the same socket and different clusters
+    #  2. Run the "rdtset [-I] -t 'l2=0xf;cpu=<core1>,<core2>' -c <core1>,<core2> memtester 10M"
+    #     to set cache allocation
+    #  3. Verify cache allocation with "pqos [-I] -s" command
+    #  4. Terminate memtester process
+    #
+    #  \b Result:
+    #  Observe in pqos output
+    #  Core <core1>, L2ID <l2id>, L3ID <l3id> => COS7
+    #  Core <core2>, L2ID <l2id>, L3ID <l3id> => COS6
+    #  L2CA COS6 => MASK 0xf
+    #  L2CA COS7 => MASK 0xf
+    @PRIORITY_HIGH
+    @pytest.mark.rdt_supported("cat_l2", "cat_l3")
+    def test_rdtset_l2cat_set_command_same_l3id_diff_l2id(self, iface):
+        # Get cache topology
+        stdout, _, exitstatus  = self.run_pqos(iface, '-s')
         assert exitstatus == 0
-        if iface == "MSR":
-            last_cos = Env().get('cat', 'l2', 'cos') - 1
-        else:
-            last_cos = Resctrl.get_ctrl_group_count() - 1
+        regex = r"Core (\d+), L2ID (\d+), L3ID (\d+) => COS(\d+)(, RMID\d+)?"
+        match_iter = re.finditer(regex, stdout)
+        topology = defaultdict(lambda: {'l2ids': defaultdict(lambda: [])})
 
-        assert re.search("Core 5, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
-                is not None
-        assert re.search("Core 6, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
-                is not None
-        assert "L2CA COS%d => MASK 0xf" % last_cos in stdout
+        for match in match_iter:
+            core = int(match.group(1))
+            l2id = int(match.group(2))
+            l3id = int(match.group(3))
 
-        self.run("killall memtester")
-        rdtset.communicate()
+            topology[l3id]['l2ids'][l2id].append(core)
 
+        if len(topology) < 2:
+            pytest.skip('Test applies for machines with at least 2 sockets')
+
+        # Get cores from the same socket, but different cluster
+        # The same L3 ID (MBA ID or socket), different L2 ID (cluster)
+        cores = []
+        for _, l3id_info in topology.items():
+            for l2id, l2id_cores in l3id_info['l2ids'].items():
+                if len(cores) >= 2:
+                    break
+
+                core = l2id_cores[len(l2id_cores) // 3]
+                self.log.debug('Found core %d, L2 ID %d', core, l2id)
+                cores.append(core)
+
+            if len(cores) >= 2:
+                break
+
+        assert len(cores) >= 2
+
+        self.log.debug('Selected cores: %s', cores)
+
+        param = f"-t l2=0xf;cpu={cores[0]},{cores[1]} -c {cores[0]},{cores[1]} memtester 10M"
+        command = self.cmd_rdtset(iface, param)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as rdtset:
+
+            self.stdout_wait(rdtset, b"memtester version")
+
+            (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
+            assert exitstatus == 0
+            if iface == "MSR":
+                last_cos = Env().get('cat', 'l2', 'cos') - 1
+            else:
+                last_cos = Resctrl.get_ctrl_group_count() - 1
+
+            assert last_cos > 0
+
+            # Assigned two different COS
+            regex_tpl = "Core %d, L2ID [0-9]+(, L3ID [0-9]+)? => COS(%d|%d)"
+            regex1 = regex_tpl % (cores[0], last_cos, last_cos - 1)
+            regex2 = regex_tpl % (cores[1], last_cos, last_cos - 1)
+            assert re.search(regex1, stdout) is not None
+            assert re.search(regex2, stdout) is not None
+            assert "L2CA COS%d => MASK 0xf" % (last_cos - 1) in stdout
+            assert "L2CA COS%d => MASK 0xf" % last_cos in stdout
+
+            self.run("killall memtester")
+            rdtset.communicate()
 
 
     ## RDTSET - L2 CAT Set COS definition (command) - Negative

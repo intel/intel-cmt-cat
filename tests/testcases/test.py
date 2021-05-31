@@ -64,9 +64,9 @@ class Test:
 
     ## Runs command and adds output to log
     def run(self, command, quiet=False):
-        child = subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE)
-        (stdout, stderr) = child.communicate()
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                              stderr=subprocess.PIPE) as child:
+            stdout, stderr = child.communicate()
 
         if stdout is not None:
             stdout = stdout.decode("utf-8")
