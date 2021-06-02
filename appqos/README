@@ -1,6 +1,6 @@
 
 ================================================================================
-README for AppQoS
+README for App QoS
 
 December 2020
 ================================================================================
@@ -21,37 +21,37 @@ CONTENTS
 INTRODUCTION
 ============
 
-AppQoS is a proof-of-concept software created to demonstrate the use of
+Application Quality of Service (App QoS) is a proof-of-concept software created to demonstrate the use of
 Intel(R) RDT technologies (CAT, MBA) and Intel(R) SST technologies
 Base Frequency (BF), Core Power (CP) to improve QoS for applications
 via partitioning system resources.
-AppQoS allows to assign Apps to Pools with different resources.
+App QoS allows to assign Apps to Pools with different resources.
 In current version each of the Pools (group of cores) has fixed amount of
 cache and memory bandwidth allocated. Thanks to Intel(R) SST BF and CP support,
-AppQoS allows the CPU to be deployed with an asymmetric core frequency
+App QoS allows the CPU to be deployed with an asymmetric core frequency
 configuration. Amount of resources allocated and cores frequency
 configuration could depend on Pool's priority.
 Intel(R) RDT CAT and MBA configuration is done via "libpqos" library and
 Intel(R) SST BF and CP configuration via external "Intel pwr" library.
 
-AppQoS provides simple, local, REST API management interface secured
+App QoS provides simple, local, REST API management interface secured
 with HTTPS and mTLS. REST API management interface allows user to
-manage Apps and Pools. An App controlled by AppQoS could be a process,
+manage Apps and Pools. An App controlled by App QoS could be a process,
 a container or a VNF.
 
-AppQoS is reference code written in Python. It is fully configurable and
+App QoS is reference code written in Python. It is fully configurable and
 can be easily modified to suit other use cases and allow remote management.
 
 
 REQUIREMENTS AND INSTALLATION
 =============================
 
-AppQoS requires minimum Linux kernel v4.20 (for Intel(R) RDT L3 CAT and MBA)
+App QoS requires minimum Linux kernel v4.20 (for Intel(R) RDT L3 CAT and MBA)
 however, for support of Intel(R) SST BF and CP Linux kernel v5.2 is required.
-AppQoS is a part of Intel(R) RDT Software Package, it is located in "appqos"
+App QoS is a part of Intel(R) RDT Software Package, it is located in "appqos"
 directory.
 
-AppQoS requires Python v3.x and depends on the following Python modules
+App QoS requires Python v3.x and depends on the following Python modules
 and external components:
  - pqos (libqos Python wrapper)
  - flask
@@ -75,22 +75,22 @@ please see https://github.com/intel/CommsPowerManagement .
 CONFIGURATION
 =============
 
-AppQoS supports Pools of Apps, each with defined cores, cache and memory
+App QoS supports Pools of Apps, each with defined cores, cache and memory
 bandwidth allocation. Each App describes a single app, with one or more PIDs.
 
 Cache Allocation, Memory Bandwidth Allocation (via CAT and MBA), Base Frequency,
-Core Power (via SST BF and CP) and affinity are configured by AppQoS on per core
+Core Power (via SST BF and CP) and affinity are configured by App QoS on per core
 basis.
 
 NOTE: make sure that cores are isolated via "isolcpu=" kernel param.
 
-AppQoS config is stored in JSON format in file "./appqos.conf" for which
+App QoS config is stored in JSON format in file "./appqos.conf" for which
 JSON Schema file is available in "./schema" directory.
 
 Configuration file is "Read-Only", no runtime changes are saved.
 
 If there is no "Default" pool (with "id" equal to 0) defined in config file,
-AppQoS will dynamically create one on start-up.
+App QoS will dynamically create one on start-up.
 All unassigned cores will be assigned to "Default" pool,
 MBA will be configured to "no throttling" (100% (default) or ~2^32MBps (MBA CTRL enabled))
 and CAT CBM to all cache ways.
@@ -160,23 +160,23 @@ Global options:
 USAGE
 =====
 
-AppQoS is a Python script accepting the following, optional,
+App QoS is a Python script accepting the following, optional,
 command line options:
  - -h, --help, show this help message and exit
  - -c PATH, --config PATH, Configuration file path
  - --port PORT, REST API port (default: 5000)
  - -V, --verbose, Verbose mode
 
-NOTE: AppQoS requires root privileges.
+NOTE: App QoS requires root privileges.
 
 By default it will attempt to read from "appqos.conf" file from current folder.
-Example command line to run AppQoS in verbose mode and config file in
+Example command line to run App QoS in verbose mode and config file in
 non-default location:
 
 sudo ./appqos.py -c /tmp/appqos.conf -V
 
 NOTE:
-To run AppQoS in virtualenv please use "make run" command.
+To run App QoS in virtualenv please use "make run" command.
 
 For more information about configuration file please see CONFIGURATION paragraph,
 for information about runtime configuration please see REST API paragraph.
@@ -187,7 +187,7 @@ REST API
 ========
 
 The REST API is a local (but can be easily modified to allow remote access),
-secured interface that allows the user to control AppQoS.
+secured interface that allows the user to control App QoS.
 The REST API allows to:
  - add, remove or move App between Pools,
  - add, remove or modify Pools,
@@ -196,9 +196,9 @@ The REST API allows to:
 
 NOTE: None of configuration changes made via REST API are saved to configuration file.
 
-AppQoS REST API uses HTTPS and mutual TLS (mTLS) for authorization and authentication.
-AppQoS certificate and client certificate are signed using CA certificate - please see
-HOW TO GENERATE APPQOS AND CLIENT CERTIFICATE paragraph for more info.
+App QoS REST API uses HTTPS and mutual TLS (mTLS) for authorization and authentication.
+App QoS certificate and client certificate are signed using CA certificate - please see
+HOW TO GENERATE APP QOS AND CLIENT CERTIFICATE paragraph for more info.
 
 For curl, parameters for client cert, client key and cacert, need to be passed in
 command-line:
@@ -316,17 +316,17 @@ JSON Schema files for REST API commands and responses are available in "./schema
 USAGE SCENARIO
 ==============
 
-AppQoS, leveraging Intel(R) RDT (CAT, MBA) and SST (BF, CP) Technologies,
+App QoS, leveraging Intel(R) RDT (CAT, MBA) and SST (BF, CP) Technologies,
 is to be used to prioritize and protect performance of high priority applications.
 
-Please see below for complete step-by-step guide to configure AppQoS to
+Please see below for complete step-by-step guide to configure App QoS to
 leverage Intel(R) RDT (CAT, MBA) and SST-BF Technologies to prioritize and
 protect performance of high priority application.
 
 SETUP
 
-Get mTLS certificates for AppQoS CA, AppQoS and REST client (for more
-info please see HOW TO GENERATE APPQOS AND CLIENT CERTIFICATE paragraph).
+Get mTLS certificates for App QoS CA, App QoS and REST client (for more
+info please see HOW TO GENERATE APP QOS AND CLIENT CERTIFICATE paragraph).
 
 Create appqos.conf file (for more info please see Configuration).
 
@@ -357,7 +357,7 @@ Empty config file with essential configuration only:
  - option to enable Power Profile "Expert Mode" to allow us to
    add power profiles via REST API
 
-AppQoS command line parameters (for more info please see USAGE paragraph)
+App QoS command line parameters (for more info please see USAGE paragraph)
 
 ./appqos.py --help
 usage: appqos.py [-h] [-c PATH] [--port PORT] [-V]
@@ -371,7 +371,7 @@ optional arguments:
 
 NOTE: REST API port (5000 by default) can be set via "--port"
 
-START APPQOS
+START APP QOS
 
 sudo make run
 
@@ -759,7 +759,7 @@ curl https://localhost:5000/pools/7 -X PUT --cert client_appqos.crt --key client
 }
 
 NOTE:
-AppQoS supports Admission Control feature, which protects CPU from being oversubscribed,
+App QoS supports Admission Control feature, which protects CPU from being oversubscribed,
 as a result of that, order in which power profile are applied is important.
 (Configuration change can be forced by setting "verify" flag to "false" for a request)
 
@@ -1127,27 +1127,27 @@ cat /sys/fs/resctrl/schemata
 
 NOTE: Resctrl shows new MBA configuration for Pool #0.
 
-APPQOS AND CLIENT CERTIFICATE
+APP QOS AND CLIENT CERTIFICATE
 =============================
-AppQoS uses mutual TLS - both AppQoS and client certificates need to
+App QoS uses mutual TLS - both App QoS and client certificates need to
 be signed using the same root ca certificate.
 
-It is the user responsibility to deliver certificate and key files for AppQoS.
-AppQoS expects certain names of CA certificate, AppQoS certificate and associated
+It is the user responsibility to deliver certificate and key files for App QoS.
+App QoS expects certain names of CA certificate, App QoS certificate and associated
 private key - files need to be located in 'appqos/ca' directory:
-- ca.crt - contains the CA certificate, that will be used to authenticate clients and AppQoS during mTLS
-- appqos.crt - contains AppqQoS certificate, it needs to be signed using ca.crt
-- appqos.key - contains private key for the AppQoS certificate
+- ca.crt - contains the CA certificate, that will be used to authenticate clients and App QoS during mTLS
+- appqos.crt - contains App QoS certificate, it needs to be signed using ca.crt
+- appqos.key - contains private key for the App QoS certificate
 
-AppQoS REST Client certificate needs to be signed by the same CA as AppQoS
+App QoS REST Client certificate needs to be signed by the same CA as App QoS
 certificate. In this instruction we assume that client certificate will be named
 'client_appqos.crt' and client will have access to 'ca.crt' CA certificate.
 
-HOW TO GENERATE TEST APPQOS AND CLIENT CERTIFICATE
+HOW TO GENERATE TEST APP QOS AND CLIENT CERTIFICATE
 ==================================================
 
 appqos/ca/ directory contains sample script called 'gen_test_certs.sh' - it
-can be used for generating certifacates for the AppQoS and the
+can be used for generating certifacates for the App QoS and the
 client (e.g: curl) for testing purposes only
 
 $ cd appqos/ca
