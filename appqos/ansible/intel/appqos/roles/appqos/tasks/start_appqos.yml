@@ -46,6 +46,7 @@
   copy:
     dest: "{{ appqos_conf_path }}"
     content: "{{ appqos_conf_content }}"
+    mode: '0600'
   when: not stat_result.stat.exists
 
 - import_tasks: is_appqos_running.yml
