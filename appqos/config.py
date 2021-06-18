@@ -673,7 +673,7 @@ class ConfigStore:
         default_pool['name'] = "Default"
 
         # Use all unallocated cores
-        default_pool['cores'] = list(range(common.PQOS_API.get_num_cores()))
+        default_pool['cores'] = common.PQOS_API.get_cores()
         for pool in data['pools']:
             default_pool['cores'] = \
                 [core for core in default_pool['cores'] if core not in pool['cores']]

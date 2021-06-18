@@ -177,9 +177,9 @@ def test_config_pid_to_pool(mock_get_config, pid, pool_id):
     assert config_store.pid_to_pool(pid) == pool_id
 
 
-@mock.patch('common.PQOS_API.get_num_cores')
-def test_config_default_pool(mock_get_num_cores):
-    mock_get_num_cores.return_value = 16
+@mock.patch('common.PQOS_API.get_cores')
+def test_config_default_pool(mock_get_cores):
+    mock_get_cores.return_value = range(16)
     config_store = ConfigStore()
     config = CONFIG.copy()
 
@@ -197,7 +197,7 @@ def test_config_default_pool(mock_get_num_cores):
     assert config_store.is_default_pool_defined(config)
 
     # test that config now contains all cores (cores configured + default pool cores)
-    all_cores = range(common.PQOS_API.get_num_cores())
+    all_cores = range(16)
     for pool in config['pools']:
         all_cores = [core for core in all_cores if core not in pool['cores']]
     assert not all_cores
@@ -212,7 +212,7 @@ def test_config_default_pool(mock_get_num_cores):
     assert not config_store.is_default_pool_defined(config)
 
 
-@mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
+@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
 @mock.patch('common.PQOS_API.get_max_l3_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
 @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
 @mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
@@ -246,7 +246,7 @@ def test_config_default_pool_cat():
     assert pool_cbm == 0xDEADBEEF
 
 
-@mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
+@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
 @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
 @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
 @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=False))
@@ -279,7 +279,7 @@ def test_config_default_pool_mba():
     assert pool_mba == 100
 
 
-@mock.patch('common.PQOS_API.get_num_cores', mock.MagicMock(return_value=8))
+@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
 @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
 @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
 @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
@@ -433,7 +433,7 @@ def test_config_get_new_pool_id(mock_get_config):
 def test_config_reset():
     from copy import deepcopy
 
-    with mock.patch('common.PQOS_API.get_num_cores') as mock_get_num_cores,\
+    with mock.patch('common.PQOS_API.get_cores') as mock_get_cores,\
          mock.patch('config.ConfigStore.load') as mock_load,\
          mock.patch('caps.mba_supported', return_value = True) as mock_mba,\
          mock.patch('caps.cat_l3_supported', return_value = True),\
@@ -442,7 +442,7 @@ def test_config_reset():
          mock.patch('pid_ops.is_pid_valid', return_value = True):
 
         mock_load.return_value = deepcopy(CONFIG)
-        mock_get_num_cores.return_value = 8
+        mock_get_cores.return_value = range(8)
 
         config_store = ConfigStore()
         config_store.from_file("/tmp/appqos_test.config")
@@ -457,8 +457,8 @@ def test_config_reset():
 
         # reset mock and change return values
         # more cores this time (8 vs. 16)
-        mock_get_num_cores.return_value = 16
-        mock_get_num_cores.reset_mock()
+        mock_get_cores.return_value = range(16)
+        mock_get_cores.reset_mock()
 
         # use CONFIG_NO_MBA this time, as MBA is reported as not supported
         mock_load.return_value = deepcopy(CONFIG_NO_MBA)
@@ -471,7 +471,7 @@ def test_config_reset():
         config_store.reset()
 
         mock_load.assert_called_once_with("/tmp/appqos_test.config")
-        mock_get_num_cores.assert_called_once()
+        mock_get_cores.assert_called_once()
 
         assert len(config_store.get_pool_attr('cores', None)) == 16
         assert config_store.get_pool_attr('cbm', 0) == 0xFFF

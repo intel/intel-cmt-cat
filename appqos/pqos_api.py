@@ -443,6 +443,23 @@ class PqosApi:
             return None
 
 
+    def get_cores(self):
+        """
+        Gets list of cores
+
+        Returns:
+            cores list,
+            None otherwise
+        """
+        try:
+            sockets = self.cpuinfo.get_sockets()
+            socket_cores = [self.cpuinfo.get_cores(socket) for socket in sockets]
+            return [core for cores in socket_cores for core in cores]
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+
     def get_l3ca_num_cos(self):
         """
         Gets number of COS for L3 CAT
