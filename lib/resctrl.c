@@ -38,6 +38,7 @@
 #include <sys/mount.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h>
 
 #include "pqos.h"
 #include "log.h"
