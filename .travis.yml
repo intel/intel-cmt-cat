@@ -10,6 +10,7 @@ before_script:
 script:
     - make cppcheck
     - make setup-dev
+    - clang-format --version
     - make style CHECKPATCH=/tmp/checkpatch.pl
     - make
     - sudo make install
