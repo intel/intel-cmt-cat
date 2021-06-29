@@ -110,9 +110,10 @@ class PqosApi:
             result = os.system("/sbin/umount -a -t resctrl") # nosec - string literal
         else:
             result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
+
         if result:
             log.error("Failed to umount resctrl fs! status code: %d"\
-                    % (os.WEXITSTATUS(result)))
+                      % (os.WEXITSTATUS(result)))
             return -1
 
         # attempt to initialize libpqos
