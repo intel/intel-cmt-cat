@@ -24,13 +24,12 @@ and libpqos installed in the system. The package is named 'pqos'.
 Installation
 ============
 
-To install the package run:
-        make install
+To build the package:
+        pip install build
+        python -m build
 
-This will install the package using `python -m pip`.
-
-To uninstall the 'pqos' package run:
-        make uninstall
+Once the package is built, it can be installed by running:
+        pip install dist/pqos-<VERSION>.tar.gz
 
 
 Running tests
@@ -41,7 +40,7 @@ it is required to setup virtual environment first. All of the following commands
 will setup it if it has not been created yet. The virtual environment
 will be created in test_env/.
 
-To setup test environment
+To setup test environment:
         make setup-dev
 
 To run unit tests:
