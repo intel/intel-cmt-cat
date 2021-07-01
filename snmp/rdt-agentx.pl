@@ -474,7 +474,7 @@ sub handle_core_prop {
 
 	if (MODE_GET == $mode) {
 		if (exists $data_core_prop{$oid}) {
-			$request->setValue(ASN_UNSIGNED, $data_core_prop{$oid});
+			$request->setValue(ASN_UNSIGNED, "$data_core_prop{$oid}");
 		}
 
 		return;
@@ -485,7 +485,7 @@ sub handle_core_prop {
 			$_ = NetSNMP::OID->new($_);
 			if ($oid < $_) {
 				$request->setOID($_);
-				$request->setValue(ASN_UNSIGNED, $data_core_prop{$_});
+				$request->setValue(ASN_UNSIGNED, "$data_core_prop{$_}");
 				last;
 			}
 		}
@@ -638,7 +638,7 @@ sub handle_mon_ctrl {
 
 	if (MODE_GET == $mode) {
 		if (exists $data_mon_ctrl{$oid}) {
-			$request->setValue(ASN_UNSIGNED, $data_mon_ctrl{$oid});
+			$request->setValue(ASN_UNSIGNED, "$data_mon_ctrl{$oid}");
 		}
 
 		return;
@@ -649,7 +649,7 @@ sub handle_mon_ctrl {
 			$_ = NetSNMP::OID->new($_);
 			if ($oid < $_) {
 				$request->setOID($_);
-				$request->setValue(ASN_UNSIGNED, $data_mon_ctrl{$_});
+				$request->setValue(ASN_UNSIGNED, "$data_mon_ctrl{$_}");
 				last;
 			}
 		}
