@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    4.1.0
+%global githubver    4.2.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -160,7 +160,7 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 
 %files -n intel-cmt-cat-devel
 %{_libdir}/libpqos.so
-%{_libdir}/libpqos.so.3
+%{_libdir}/libpqos.so.4
 %{_includedir}/pqos.h
 %{_usrsrc}/%{githubfull}/c/CAT_MBA/Makefile
 %{_usrsrc}/%{githubfull}/c/CAT_MBA/reset_app.c
@@ -173,6 +173,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Mon Jul 05 2021 Michal Aleksinski <michalx.aleksinski@intel.com> 4.2.0-1
+- New release 4.1.0
+
 * Mon Nov 30 2020 Michal Aleksinski <michalx.aleksinski@intel.com> 4.1.0-1
 - New release 4.1.0
 

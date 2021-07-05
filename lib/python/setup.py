@@ -5,7 +5,7 @@ with open('README.txt', 'r') as readme_file:
 
 setup(
     name='pqos',
-    version='4.1.0',
+    version='4.2.0',
     author='Khawar Abbasi',
     author_email='khawar.abbasi@intel.com',
     description='Python interface for PQoS library',
