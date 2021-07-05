@@ -1,4 +1,23 @@
 =======================================================================
+Release  v4.2.0  ....-..-..
+=======================================================================
+
+Contributors (alphabetical order):
+        Adrian Boczkowski <adrianx.boczkowski@intel.com>
+        Khawar Abbasi <khawar.abbasi@intel.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+        Radoslaw Jablonski <radoslawx.jablonski@intel.com>
+        Tim Gates <tim.gates@iress.com>
+        Wojciech Andralojc <wojciechx.andralojc@intel.com>
+
+1. App QoS:
+        - Added mTLS support
+        - Extended capability information
+	- Support for running AppQoS in docker container
+2. General:
+        - Bug fixes
+
+=======================================================================
 Release  v4.1.0  2020-12-18
 =======================================================================
 
