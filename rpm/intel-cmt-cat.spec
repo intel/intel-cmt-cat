@@ -174,7 +174,7 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 
 %changelog
 * Mon Jul 05 2021 Michal Aleksinski <michalx.aleksinski@intel.com> 4.2.0-1
-- New release 4.1.0
+- New release 4.2.0
 
 * Mon Nov 30 2020 Michal Aleksinski <michalx.aleksinski@intel.com> 4.1.0-1
 - New release 4.1.0
