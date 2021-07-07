@@ -240,7 +240,7 @@ unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
  *
  * @param tv pointer to timeval structure to be converted
  *
- * @return Time un mocroseconds
+ * @return Time in microseconds
  */
 uint64_t get_time_usec(void);
 
