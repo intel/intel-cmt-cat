@@ -1,6 +1,6 @@
 
 ================================================================================
-README for AppQoS Docker container
+README for App QoS Docker container
 
 June 2021
 ================================================================================
@@ -14,7 +14,7 @@ CONTENTS
 BUILDING
 ========
 
-Run ./build_docker.sh script to build AppQoS docker container locally
+Run ./build_docker.sh script to build App QoS docker container locally
 
 $ sudo ./build_docker.sh
 ...
@@ -24,7 +24,7 @@ Successfully tagged appqos:latest
 USAGE
 =====
 
-At first, prepare directory with AppQoS config and certificate - this directory will be shared with
+At first, prepare directory with App QoS config and certificate - this directory will be shared with
 the running container. Name of this directory and location doesn't really matter but make sure that
 it will be accessible only to the 'root' user:
 
@@ -39,12 +39,12 @@ $ cat > appqos.conf <<EOF
 EOF
 
 Now it is time to copy ca.crt, appqos.crt and appqos.key files for mutual TLS connection to
-directory that we have just created. Instructions for creating certificate files for AppQoS mTLS
+directory that we have just created. Instructions for creating certificate files for App QoS mTLS
 connection can be found at: https://github.com/intel/intel-cmt-cat/blob/master/appqos/README in
 section 'HOW TO GENERATE TEST APPQOS AND CLIENT CERTIFICATE'
 
 When configuration file is prepared and certificate files are in place, the directory is ready to
-be shared with the appqos container:
+be shared with the App QoS container:
 
 $ ls -l
 total 16
@@ -71,10 +71,12 @@ $ sudo docker run --privileged --env APPQOS_PORT=5000 --expose 5000 \
 2021-06-25 11:34:36,278 INFO  Configuration changed, processing new config...
 2021-06-25 11:34:36,284 INFO  New configuration processed
 
+Note: For security reasons the container should not be exposed to any external network interfaces.
+
 Explanation of options used:
 --privileged - run container in privileged mode to get access to device drivers
---env APPQOS_PORT=5000 --expose 5000 - run APPQOS on port 5000 and expose that port outside of the container
--v /opt/intel/appqos_ca/:/appqos_workspace/appqos/ca - shared volume with AppQoS configuration and mTLS certificates
+--env APPQOS_PORT=5000 --expose 5000 - run App QoS on port 5000 and expose that port outside of the container
+-v /opt/intel/appqos_ca/:/appqos_workspace/appqos/ca - shared volume with App QoS configuration and mTLS certificates
 --mount type=bind,bind-propagation=shared,source=/sys/fs,target=/sys/fs - share fs directory with container for resctrl interface
 --pid=host - needed for access to host processes from container
 --network=host - (optional) map container exposed ports to localhost port
