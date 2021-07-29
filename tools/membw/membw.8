@@ -1,0 +1,105 @@
+.\"                                      Hey, EMACS: -*- nroff -*-
+.\" First parameter, NAME, should be all caps
+.\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
+.\" other parameters are allowed: see man(7), man(1)
+.TH MEMBW 8 "Jul 29, 2021"
+.\" Please adjust this date whenever revising the manpage.
+.\"
+.\" Some roff macros, for reference:
+.\" .nh        disable hyphenation
+.\" .hy        enable hyphenation
+.\" .ad l      left justify
+.\" .ad b      justify to both left and right margins
+.\" .nf        disable filling
+.\" .fi        enable filling
+.\" .br        insert line break
+.\" .sp <n>    insert n+1 empty lines
+.\" for manpage-specific macros, see man(7)
+.SH NAME
+membw - tool for generating memory bandwidth
+.br
+.SH SYNOPSIS
+.B membw
+.RI [ OPTIONS ] [ OPERATION ]
+.SH DESCRIPTION
+The membw software tool provides a way to stress local and remote memory
+bandwidth using a variety of memory operations. The tool allows the user
+to choose an operation to generate a specified amount of memory bandwidth
+on a selected core.
+.SH OPTIONS
+membw options are as follow:
+.TP
+.B \-\-help
+show help
+.TP
+.B \-c, \-\-cpu
+cpu to generate B/W
+.TP
+.B \-b, \-\-bandwidth
+memory B/W specified in MBps
+.SH OPERATION
+.TP
+.B \-\-prefetch-t0
+prefetcht0
+.TP
+.B \-\-prefetch-t1
+prefetcht1
+.TP
+.B \-\-prefetch-t2
+prefetcht2
+.TP
+.B \-\-prefetch-nta
+prefetchtnta
+.TP
+.B \-\-prefetch-w
+prefetchw
+.TP
+.B \-\-read
+x86 loads
+.TP
+.B \-\-read-sse
+SSE loads
+.TP
+.B \-\-nt-read-sse
+SSE NT loads
+.TP
+.B \-\-read-mod-write
+x86 load XOR write
+.TP
+.B \-\-write
+x86 stores
+.TP
+.B \-\-write-avx512
+AVX512 stores
+.TP
+.B \-\-write-clwb
+x86 stores + clwb
+.TP
+.B \-\-write-flush
+x86 stores & clflush (naturally generates loads & stores)
+.TP
+.B \-\-write-sse
+SSE stores
+.TP
+.B \-\-write-sse-flush
+SSE stores & clflush (naturally generates loads & stores)
+.TP
+.B \-\-nt-write
+x86 NT stores
+.TP
+.B \-\-nt-write-avx512
+AVX512 NT stores
+.TP
+.B \-\-nt-write-clwb
+x86 NT stores + clwb
+.TP
+.B \-\-nt-write-sse
+SSE NT stores
+.SH AUTHOR
+membw was written by Michal Aleksinski <michalx.aleksinski@intel.com>,
+Adrian Boczkowski <adrianx.boczkowski@intel.com>
+Wojciech Andralojc <wojciechx.andralojc@intel.com>,
+Marcel Cornu <marcel.d.cornu@intel.com>,
+.P
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

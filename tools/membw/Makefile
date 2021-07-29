@@ -35,6 +35,12 @@
 ###############################################################################
 
 APP = membw
+MAN = membw.8
+
+# XXX: modify as desired
+PREFIX ?= /usr/local
+BIN_DIR = $(PREFIX)/sbin
+MAN_DIR = $(PREFIX)/man/man8
 
 CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
@@ -83,8 +89,24 @@ $(APP): $(OBJS)
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
 	cat $@ | sed 's/$(@:.d=.o)/$@/' >> $@
 
-.PHONY: clean
 
+install: $(APP) $(MAN)
+ifeq ($(shell uname), FreeBSD)
+	install -d $(BIN_DIR)
+	install -d $(MAN_DIR)
+	install -s $(APP) $(BIN_DIR)
+	install -m 0444 $(MAN) $(MAN_DIR)
+else
+	install -D -s $(APP) $(BIN_DIR)/$(APP)
+	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
+endif
+
+uninstall:
+	-rm $(BIN_DIR)/$(APP)
+	-rm $(MAN_DIR)/$(MAN)
+
+
+.PHONY: clean
 clean:
 	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
 
@@ -123,7 +145,6 @@ CPPCHECK?=cppcheck
 cppcheck:
 	$(CPPCHECK) enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 --template=gcc membw.c
-
 
 # if target not clean then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

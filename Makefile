@@ -98,11 +98,13 @@ install:
 	$(MAKE) -C lib install
 	$(MAKE) -C pqos install
 	$(MAKE) -C rdtset install
+	$(MAKE) -C tools/membw install
 
 uninstall:
 	$(MAKE) -C lib uninstall
 	$(MAKE) -C pqos uninstall
 	$(MAKE) -C rdtset uninstall
+	$(MAKE) -C tools/membw uninstall
 
 TAGS:
 	find ./ -name "*.[ch]" -print | etags -
