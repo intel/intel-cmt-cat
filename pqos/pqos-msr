@@ -39,4 +39,4 @@
 # This will cause the library to read/write directly to MSR's.
 
 # Run pqos utility passing CL args
-pqos $@
+pqos "$@"
