@@ -99,8 +99,10 @@ $(APP): $(OBJS)
 %.o: %.c %.d
 
 %.d: %.c
-	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
-	cat $@ | sed 's/$(@:.d=.o)/$@/' >> $@
+	set -e; rm -f $@; \
+	$(CC) -MM -MP -MF $@ $(CFLAGS) $< > $@.$$$$; \
+	sed 's/$(@:.d=.o)/$@/' < $@.$$$$ > $@; \
+	rm -f $@.$$$$
 
 .PHONY: clean install uninstall
 
