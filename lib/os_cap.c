@@ -43,6 +43,7 @@
 #include "resctrl.h"
 #include "resctrl_alloc.h"
 #include "perf_monitoring.h"
+#include "cpuinfo.h"
 
 #define PROC_CPUINFO     "/proc/cpuinfo"
 #define PROC_FILESYSTEMS "/proc/filesystems"
@@ -583,6 +584,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                     int *supported,
                     int *enabled)
 {
+        const struct cpuinfo_config *vconfig;
         int ret;
 
         ret = pqos_mba_ctrl_enabled(cap, supported, enabled);
@@ -606,7 +608,9 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                         return ret;
         }
 
-        /* check for values above 100 */
+        cpuinfo_get_config(&vconfig);
+
+        /* check for values above mba_max */
         if (*enabled == -1) {
                 unsigned grp;
                 unsigned count = 0;
@@ -638,7 +642,8 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
 
                                 ret = resctrl_schemata_mba_get(
                                     schmt, mba_ids[i], &mba);
-                                if (ret == PQOS_RETVAL_OK && mba.mb_max > 100) {
+                                if (ret == PQOS_RETVAL_OK &&
+                                    mba.mb_max > vconfig->mba_max) {
                                         *enabled = 1;
                                         break;
                                 }
@@ -649,7 +654,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 free(mba_ids);
         }
 
-        /* get free COS and try to write value above 100 */
+        /* get free COS and try to write value over the mba_max */
         if (*enabled == -1) {
                 unsigned grp;
                 unsigned count = 0;
@@ -675,7 +680,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 if (ret == PQOS_RETVAL_OK) {
                         fd = resctrl_alloc_fopen(grp, "schemata", "w");
                         if (fd != NULL) {
-                                fprintf(fd, "MB:0=2000\n");
+                                fprintf(fd, "MB:0=%d\n", vconfig->mba_max * 2);
                                 if (fclose(fd) == 0)
                                         *enabled = 1;
                                 else
