@@ -395,7 +395,7 @@ set_mba_cos(const unsigned class_id,
                         package = "Core Complex";
                         unit = "";
                 } else {
-                        package = "SOCKET ";
+                        package = "SOCKET";
                         unit = "%";
                 }
 
