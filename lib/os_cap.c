@@ -680,7 +680,7 @@ os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                 if (ret == PQOS_RETVAL_OK) {
                         fd = resctrl_alloc_fopen(grp, "schemata", "w");
                         if (fd != NULL) {
-                                fprintf(fd, "MB:0=%d\n", vconfig->mba_max * 2);
+                                fprintf(fd, "MB:0=%u\n", vconfig->mba_max * 2);
                                 if (fclose(fd) == 0)
                                         *enabled = 1;
                                 else
