@@ -392,7 +392,7 @@ set_mba_cos(const unsigned class_id,
                 int ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
 
                 if (cpu->vendor == PQOS_VENDOR_AMD) {
-                        package = "Core Complex ";
+                        package = "Core Complex";
                         unit = "";
                 } else {
                         package = "SOCKET ";
