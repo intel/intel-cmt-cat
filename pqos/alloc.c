@@ -231,7 +231,7 @@ set_l3_cos(const unsigned class_id,
                 /* set new L3 class definition */
                 ret = pqos_l3ca_set(sock_ids[i], 1, &ca);
                 if (cpu->vendor == PQOS_VENDOR_AMD)
-                        package = "Core Complex ";
+                        package = "Core Complex";
                 else
                         package = "SOCKET ";
 
