@@ -758,7 +758,7 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         LOG_INFO("Detected Per-%s MBA controls\n",
                  mba_thread_ctrl ? "Thread" : "Core");
 
-        if (version >= 2) {
+        if (version == 2) {
                 unsigned *mba_ids;
                 unsigned mba_id_num;
                 unsigned i;
