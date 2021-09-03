@@ -233,7 +233,7 @@ set_l3_cos(const unsigned class_id,
                 if (cpu->vendor == PQOS_VENDOR_AMD)
                         package = "Core Complex";
                 else
-                        package = "SOCKET ";
+                        package = "SOCKET";
 
                 if (ret != PQOS_RETVAL_OK) {
                         printf("%s %u L3CA COS%u - FAILED!\n", package,
