@@ -34,6 +34,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include "cpuinfo.h"
 #include "resctrl_schemata.h"
 #include "resctrl_utils.h"
 #include "types.h"
@@ -194,7 +195,11 @@ resctrl_schemata_reset(struct resctrl_schemata *schmt,
 
         /* Reset MBA */
         if (mba_cap != NULL) {
-                uint32_t default_mba = 100;
+                const struct cpuinfo_config *vconfig;
+                uint32_t default_mba;
+
+                cpuinfo_get_config(&vconfig);
+                default_mba = vconfig->mba_max;
 
                 /* kernel always rounds up value to MBA granularity */
                 if (mba_cap->ctrl_on)
