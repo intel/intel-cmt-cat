@@ -51,6 +51,7 @@
 #include "resctrl_alloc.h"
 #include "resctrl_monitoring.h"
 #include "resctrl_utils.h"
+#include "cpuinfo.h"
 
 int
 os_alloc_mount(const enum pqos_cdp_config l3_cdp_cfg,
@@ -63,6 +64,7 @@ os_alloc_mount(const enum pqos_cdp_config l3_cdp_cfg,
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap *cap;
         const struct pqos_cpuinfo *cpu;
+        const struct cpuinfo_config *vconfig;
         int ret;
 
         if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
@@ -83,6 +85,7 @@ os_alloc_mount(const enum pqos_cdp_config l3_cdp_cfg,
         }
 
         _pqos_cap_get(&cap, &cpu);
+        cpuinfo_get_config(&vconfig);
 
         if (l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF &&
             l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF && mba_cfg == PQOS_MBA_DEFAULT)
@@ -149,7 +152,7 @@ mount:
                 }
 
                 ret = resctrl_schemata_mba_get(schmt, 0, &mba);
-                if (ret == PQOS_RETVAL_OK && mba.mb_max <= 100) {
+                if (ret == PQOS_RETVAL_OK && mba.mb_max <= vconfig->mba_max) {
                         LOG_ERROR("MBA CTRL not enabled\n");
                         ret = PQOS_RETVAL_ERROR;
                 }
