@@ -169,9 +169,11 @@ set_l3_cos(const unsigned class_id,
            const uint64_t mask,
            const unsigned *sock_ids,
            const unsigned sock_num,
-           const unsigned scope)
+           const unsigned scope,
+           const struct pqos_cpuinfo *cpu)
 {
         unsigned i, set = 0;
+        const char *package;
 
         if (sock_ids == NULL || mask == 0) {
                 printf("Failed to set L3 CAT configuration!\n");
@@ -228,18 +230,23 @@ set_l3_cos(const unsigned class_id,
 
                 /* set new L3 class definition */
                 ret = pqos_l3ca_set(sock_ids[i], 1, &ca);
+                if (cpu->vendor == PQOS_VENDOR_AMD)
+                        package = "Core Complex";
+                else
+                        package = "SOCKET";
+
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("SOCKET %u L3CA COS%u - FAILED!\n", sock_ids[i],
-                               ca.class_id);
+                        printf("%s %u L3CA COS%u - FAILED!\n", package,
+                               sock_ids[i], ca.class_id);
                         break;
                 }
                 if (ca.cdp)
-                        printf("SOCKET %u L3CA COS%u => DATA 0x%lx,CODE "
+                        printf("%s %u L3CA COS%u => DATA 0x%lx,CODE "
                                "0x%lx\n",
-                               sock_ids[i], ca.class_id, (long)ca.u.s.data_mask,
-                               (long)ca.u.s.code_mask);
+                               package, sock_ids[i], ca.class_id,
+                               (long)ca.u.s.data_mask, (long)ca.u.s.code_mask);
                 else
-                        printf("SOCKET %u L3CA COS%u => MASK 0x%lx\n",
+                        printf("%s %u L3CA COS%u => MASK 0x%lx\n", package,
                                sock_ids[i], ca.class_id, (long)ca.u.ways_mask);
                 set++;
         }
@@ -362,7 +369,8 @@ set_mba_cos(const unsigned class_id,
             const uint64_t available_bw,
             const unsigned *sock_ids,
             const unsigned sock_num,
-            int ctrl)
+            int ctrl,
+            const struct pqos_cpuinfo *cpu)
 {
         unsigned i, set = 0;
         struct pqos_mba mba, actual;
@@ -379,21 +387,32 @@ set_mba_cos(const unsigned class_id,
          * Set all selected classes
          */
         for (i = 0; i < sock_num; i++) {
+                const char *unit;
+                const char *package;
                 int ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
 
+                if (cpu->vendor == PQOS_VENDOR_AMD) {
+                        package = "Core Complex";
+                        unit = "";
+                } else {
+                        package = "SOCKET";
+                        unit = "%";
+                }
+
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("SOCKET %u MBA COS%u - FAILED!\n", sock_ids[i],
-                               mba.class_id);
+                        printf("%s %u MBA COS%u - FAILED!\n", package,
+                               sock_ids[i], mba.class_id);
                         break;
                 }
 
-                printf("SOCKET %u MBA COS%u => ", sock_ids[i], actual.class_id);
+                printf("%s %u MBA COS%u => ", package, sock_ids[i],
+                       actual.class_id);
 
                 if (ctrl == 1)
                         printf("%u MBps\n", mba.mb_max);
                 else
-                        printf("%u%% requested, %u%% applied\n", mba.mb_max,
-                               actual.mb_max);
+                        printf("%u%s requested, %u%s applied\n", mba.mb_max,
+                               unit, actual.mb_max, unit);
 
                 set++;
         }
@@ -452,7 +471,7 @@ set_allocation_cos(char *str,
                         printf("Failed to retrieve socket info!\n");
                         return -1;
                 }
-                ret = set_mba_cos(class_id, mask, ids, n, ctrl);
+                ret = set_mba_cos(class_id, mask, ids, n, ctrl, cpu);
                 if (res_ids == NULL && ids != NULL)
                         free(ids);
                 return ret;
@@ -478,7 +497,7 @@ set_allocation_cos(char *str,
                 printf("Failed to retrieve socket info!\n");
                 return -1;
         }
-        ret = set_l3_cos(class_id, mask, ids, n, update_scope);
+        ret = set_l3_cos(class_id, mask, ids, n, update_scope, cpu);
         if (res_ids == NULL && ids != NULL)
                 free(ids);
 
