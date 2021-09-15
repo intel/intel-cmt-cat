@@ -541,7 +541,7 @@ tid_find(const pid_t pid, unsigned *tid_nr, pid_t **tid_map)
         pid_t tid;
         int num_tasks, i;
         struct dirent **namelist = NULL;
-        int ret;
+        int ret = PQOS_RETVAL_OK;
 
         snprintf(buf, sizeof(buf) - 1, "/proc/%d/task", (int)pid);
         num_tasks = scandir(buf, &namelist, filter, NULL);
@@ -665,7 +665,7 @@ os_mon_add_pids(const unsigned num_pids,
                 const pid_t *pids,
                 struct pqos_mon_data *group)
 {
-        int ret;
+        int ret = PQOS_RETVAL_OK;
         unsigned i;
         pid_t *tid_map = NULL;
         pid_t *ptr;

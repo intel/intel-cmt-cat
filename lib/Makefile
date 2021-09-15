@@ -83,7 +83,7 @@ endif
 
 # DEBUG build
 ifeq ($(DEBUG),y)
-CFLAGS += -g -ggdb -O0 -DDEBUG
+CFLAGS += -g -ggdb -Og -DDEBUG
 else
 CFLAGS += -g -O2 -D_FORTIFY_SOURCE=2
 endif
