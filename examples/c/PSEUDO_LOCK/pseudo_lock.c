@@ -205,6 +205,7 @@ init_timer(const long long freq_nanosecs)
         }
 
         /* Create the timer */
+        memset(&sev, 0, sizeof(sev));
         sev.sigev_notify = SIGEV_SIGNAL;
         sev.sigev_signo = SIGRTMIN;
         sev.sigev_value.sival_ptr = &timerid;
