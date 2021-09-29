@@ -679,6 +679,7 @@ static const char help_printf_long[] =
         "  -a CLASS2ID, --alloc-assoc=CLASS2ID\n"
         "          associate cores/tasks with an allocation class.\n"
         "          CLASS2ID format is 'TYPE:ID=CORE_LIST/TASK_LIST'.\n"
+        "          Example 'cos:0=0,2,4,6-10;llc:1=1',\n"
         "          Example 'llc:0=0,2,4,6-10;llc:1=1'.\n"
         "          Example 'core:0=0,2,4,6-10;core:1=1'.\n"
         "          Example 'pid:0=3543,7643,4556;pid:1=7644'.\n"

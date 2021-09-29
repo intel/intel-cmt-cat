@@ -120,13 +120,15 @@ Note:
 .RE
 .TP
 .B \-a CLASS2ID, \-\-alloc\-assoc=CLASS2ID
-associate allocation classes with cores. CLASS2ID format is "TYPE:ID=CORE_LIST;..." or "TYPE:ID=TASK_LIST;...".
+associate allocation classes with cores or processes. CLASS2ID format is "TYPE:ID=CORE_LIST;..." or "TYPE:ID=TASK_LIST;...".
 .br
-For CAT, TYPE is "llc", "core" or "pid" and ID is a class number. CORE_LIST is comma or dash separated list of cores. TASK_LIST is comma or dash separated list of process/task ID's.
+For COS association required for CAT or MBA, TYPE is "cos", "llc", "core" (for COS-core association) or "pid" (for COS-process association) and ID is a class number. CORE_LIST is comma or dash separated list of cores. TASK_LIST is comma or dash separated list of process/task ID's.
 .br
 For example:
 .RS
 .RS
+.br
+"\-a cos:0=0,2,4,6-10;cos:1=1;" associates cores 0, 2, 4, 6, 7, 8, 9, 10 with CAT class 0 and core 1 with class 1.
 .br
 "\-a llc:0=0,2,4,6-10;llc:1=1;" associates cores 0, 2, 4, 6, 7, 8, 9, 10 with CAT class 0 and core 1 with class 1.
 .br
@@ -135,8 +137,10 @@ For example:
 "\-I \-a pid:0=3543,7643,4556;pid:1=7644;" associates process ID 3543, 7643, 4556 with CAT class 0 and process ID 7644 with class 1.
 .RE
 .br
-Note:
+Notes:
 .RS
+.br
+"llc" TYPE label is considered deprecated, please use "cos" or "core" instead.
 .br
 The \-I option must be used for PID association.
 .RE

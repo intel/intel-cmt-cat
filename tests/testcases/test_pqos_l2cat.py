@@ -150,15 +150,16 @@ class TestPqosL2Cat(test.Test):
     #  Allocate COS for the given cores
     #
     #  \b Instruction:
-    #  Run "pqos [-I] -a llc:1=1,3" to set core association. Verify core association with
+    #  Run "pqos [-I] -a cos:1=1,3" to set core association. Verify core association with
     #  "pqos [-I] -s".
     #
     #  \b Result:
     #  Observe "Allocation configuration altered." in output. Cores 1 and 3 are assigned to COS 1.
     @PRIORITY_MEDIUM
     @pytest.mark.rdt_supported("cat_l2")
-    def test_pqos_l2cat_association_core(self, iface):
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-a llc:1=1,3")
+    @pytest.mark.parametrize("type_id", ["cos", "llc", "core"])
+    def test_pqos_l2cat_association_core(self, iface, type_id):
+        (stdout, _, exitstatus) = self.run_pqos(iface, f"-a {type_id}:1=1,3")
         assert exitstatus == 0
         assert "Allocation configuration altered." in stdout
 
@@ -176,14 +177,15 @@ class TestPqosL2Cat(test.Test):
     #  Unable to allocate COS for the unknown/offline cores
     #
     #  \b Instruction:
-    #  Run "pqos [-I] -a llc:1=1000" to set core association.
+    #  Run "pqos [-I] -a cos:1=1000" to set core association.
     #
     #  \b Result:
     #  Observe "Core number or class id is out of bounds!" in output.
     @PRIORITY_MEDIUM
     @pytest.mark.rdt_supported("cat_l2")
-    def test_pqos_l2cat_association_core_negative(self, iface):
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-a llc:1=1000")
+    @pytest.mark.parametrize("type_id", ["cos", "llc", "core"])
+    def test_pqos_l2cat_association_core_negative(self, iface, type_id):
+        (stdout, _, exitstatus) = self.run_pqos(iface, f"-a {type_id}:1=1000")
         assert exitstatus == 1
         assert "Core number or class id is out of bounds!" in stdout
 

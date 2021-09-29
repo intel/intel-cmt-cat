@@ -719,7 +719,9 @@ fill_core_tab(char *str)
         unsigned i = 0, n = 0, cos = 0;
         char *p = NULL;
 
-        if (strncasecmp(str, "llc:", 4) == 0)
+        if (strncasecmp(str, "cos:", 4) == 0)
+                str += strlen("cos:");
+        else if (strncasecmp(str, "llc:", 4) == 0)
                 str += strlen("llc:");
         else
                 str += strlen("core:");
@@ -860,7 +862,8 @@ fill_pid_tab(char *str)
 static void
 parse_allocation_assoc(char *str)
 {
-        if ((strncasecmp(str, "llc:", 4) == 0) ||
+        if ((strncasecmp(str, "cos:", 4) == 0) ||
+            (strncasecmp(str, "llc:", 4) == 0) ||
             (strncasecmp(str, "core:", 5) == 0)) {
                 alloc_pid_flag = 0;
                 fill_core_tab(str);
