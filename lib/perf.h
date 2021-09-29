@@ -41,6 +41,8 @@ extern "C" {
 #include <unistd.h>
 #include <linux/perf_event.h>
 
+#include "types.h"
+
 /**
  * @brief Function to setup perf event counters
  *
@@ -55,12 +57,12 @@ extern "C" {
  * @retval positive number on success
  * @retval negative number on error
  */
-int perf_setup_counter(struct perf_event_attr *attr,
-                       const pid_t pid,
-                       const int cpu,
-                       const int group_fd,
-                       const unsigned long flags,
-                       int *counter_fd);
+PQOS_LOCAL int perf_setup_counter(struct perf_event_attr *attr,
+                                  const pid_t pid,
+                                  const int cpu,
+                                  const int group_fd,
+                                  const unsigned long flags,
+                                  int *counter_fd);
 
 /**
  * @brief Function to shutdown a perf event counter
@@ -70,7 +72,7 @@ int perf_setup_counter(struct perf_event_attr *attr,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_shutdown_counter(int counter_fd);
+PQOS_LOCAL int perf_shutdown_counter(int counter_fd);
 
 /**
  * @brief Function to start a perf counter
@@ -80,7 +82,7 @@ int perf_shutdown_counter(int counter_fd);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_start_counter(int counter_fd);
+PQOS_LOCAL int perf_start_counter(int counter_fd);
 
 /**
  * @brief Function to stop a perf counter
@@ -90,7 +92,7 @@ int perf_start_counter(int counter_fd);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_stop_counter(int counter_fd);
+PQOS_LOCAL int perf_stop_counter(int counter_fd);
 
 /**
  * @brief Function to read a perf counter
@@ -101,7 +103,7 @@ int perf_stop_counter(int counter_fd);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_read_counter(int counter_fd, uint64_t *value);
+PQOS_LOCAL int perf_read_counter(int counter_fd, uint64_t *value);
 
 #ifdef __cplusplus
 }

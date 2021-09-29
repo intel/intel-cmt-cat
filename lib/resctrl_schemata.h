@@ -44,6 +44,8 @@
 extern "C" {
 #endif
 
+#include "types.h"
+
 /*
  * @brief Structure to hold schemata
  */
@@ -59,15 +61,16 @@ struct resctrl_schemata;
  * @return Operational status
  * @retval pointer to allocated data
  */
-struct resctrl_schemata *resctrl_schemata_alloc(const struct pqos_cap *cap,
-                                                const struct pqos_cpuinfo *cpu);
+PQOS_LOCAL struct resctrl_schemata *
+resctrl_schemata_alloc(const struct pqos_cap *cap,
+                       const struct pqos_cpuinfo *cpu);
 
 /*
  * @brief Deallocate memory of schemata struct
  *
  * @param[in] schemata Schemata structure
  */
-void resctrl_schemata_free(struct resctrl_schemata *schemata);
+PQOS_LOCAL void resctrl_schemata_free(struct resctrl_schemata *schemata);
 
 /*
  * @brief Reset schemata to default values
@@ -79,10 +82,10 @@ void resctrl_schemata_free(struct resctrl_schemata *schemata);
  *
  * @return Operation status
  */
-int resctrl_schemata_reset(struct resctrl_schemata *schemata,
-                           const struct pqos_cap_l3ca *l3ca_cap,
-                           const struct pqos_cap_l2ca *l2ca_cap,
-                           const struct pqos_cap_mba *mba_cap);
+PQOS_LOCAL int resctrl_schemata_reset(struct resctrl_schemata *schemata,
+                                      const struct pqos_cap_l3ca *l3ca_cap,
+                                      const struct pqos_cap_l2ca *l2ca_cap,
+                                      const struct pqos_cap_mba *mba_cap);
 
 /*
  * @brief Reads L2 class of service from schemata
@@ -93,9 +96,10 @@ int resctrl_schemata_reset(struct resctrl_schemata *schemata,
  *
  * @return Operation status
  */
-int resctrl_schemata_l2ca_get(const struct resctrl_schemata *schemata,
-                              unsigned resource_id,
-                              struct pqos_l2ca *ca);
+PQOS_LOCAL int
+resctrl_schemata_l2ca_get(const struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          struct pqos_l2ca *ca);
 
 /*
  * @brief Updates L2 class of service in schemata
@@ -106,9 +110,9 @@ int resctrl_schemata_l2ca_get(const struct resctrl_schemata *schemata,
  *
  * @return Operation status
  */
-int resctrl_schemata_l2ca_set(struct resctrl_schemata *schemata,
-                              unsigned resource_id,
-                              const struct pqos_l2ca *ca);
+PQOS_LOCAL int resctrl_schemata_l2ca_set(struct resctrl_schemata *schemata,
+                                         unsigned resource_id,
+                                         const struct pqos_l2ca *ca);
 
 /*
  * @brief Reads L3 class of service from schemata
@@ -119,9 +123,10 @@ int resctrl_schemata_l2ca_set(struct resctrl_schemata *schemata,
  *
  * @return Operation status
  */
-int resctrl_schemata_l3ca_get(const struct resctrl_schemata *schemata,
-                              unsigned resource_id,
-                              struct pqos_l3ca *ca);
+PQOS_LOCAL int
+resctrl_schemata_l3ca_get(const struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          struct pqos_l3ca *ca);
 
 /*
  * @brief Updates L3 class of service in schemata
@@ -132,9 +137,9 @@ int resctrl_schemata_l3ca_get(const struct resctrl_schemata *schemata,
  *
  * @return Operation status
  */
-int resctrl_schemata_l3ca_set(struct resctrl_schemata *schemata,
-                              unsigned resource_id,
-                              const struct pqos_l3ca *ca);
+PQOS_LOCAL int resctrl_schemata_l3ca_set(struct resctrl_schemata *schemata,
+                                         unsigned resource_id,
+                                         const struct pqos_l3ca *ca);
 
 /*
  * @brief Reads MBA class of service from schemata
@@ -145,9 +150,9 @@ int resctrl_schemata_l3ca_set(struct resctrl_schemata *schemata,
  *
  * @return Operation status
  */
-int resctrl_schemata_mba_get(const struct resctrl_schemata *schemata,
-                             unsigned resource_id,
-                             struct pqos_mba *ca);
+PQOS_LOCAL int resctrl_schemata_mba_get(const struct resctrl_schemata *schemata,
+                                        unsigned resource_id,
+                                        struct pqos_mba *ca);
 
 /*
  * @brief Updates MBA class of service in schemata
@@ -158,9 +163,9 @@ int resctrl_schemata_mba_get(const struct resctrl_schemata *schemata,
  *
  * @return Operation status
  */
-int resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
-                             unsigned resource_id,
-                             const struct pqos_mba *ca);
+PQOS_LOCAL int resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
+                                        unsigned resource_id,
+                                        const struct pqos_mba *ca);
 
 /**
  * @brief Read schemata from file
@@ -171,7 +176,8 @@ int resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_schemata_read(FILE *fd, struct resctrl_schemata *schemata);
+PQOS_LOCAL int resctrl_schemata_read(FILE *fd,
+                                     struct resctrl_schemata *schemata);
 
 /**
  * @brief Write schemata to file
@@ -182,7 +188,8 @@ int resctrl_schemata_read(FILE *fd, struct resctrl_schemata *schemata);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata);
+PQOS_LOCAL int resctrl_schemata_write(FILE *fd,
+                                      const struct resctrl_schemata *schemata);
 
 /**
  * @brief Write l3ca schemata to file
@@ -193,8 +200,8 @@ int resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_schemata_l3ca_write(FILE *fd,
-                                const struct resctrl_schemata *schemata);
+PQOS_LOCAL int
+resctrl_schemata_l3ca_write(FILE *fd, const struct resctrl_schemata *schemata);
 
 /**
  * @brief Write l2ca schemata to file
@@ -205,8 +212,8 @@ int resctrl_schemata_l3ca_write(FILE *fd,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_schemata_l2ca_write(FILE *fd,
-                                const struct resctrl_schemata *schemata);
+PQOS_LOCAL int
+resctrl_schemata_l2ca_write(FILE *fd, const struct resctrl_schemata *schemata);
 
 /**
  * @brief Write mba schemata to file
@@ -217,8 +224,8 @@ int resctrl_schemata_l2ca_write(FILE *fd,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_schemata_mba_write(FILE *fd,
-                               const struct resctrl_schemata *schemata);
+PQOS_LOCAL int
+resctrl_schemata_mba_write(FILE *fd, const struct resctrl_schemata *schemata);
 
 #ifdef __cplusplus
 }

@@ -54,7 +54,7 @@
 static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /** List of non virtual events */
-const enum pqos_mon_event os_mon_event[] = {
+static const enum pqos_mon_event os_mon_event[] = {
     PQOS_MON_EVENT_L3_OCCUP,
     PQOS_MON_EVENT_LMEM_BW,
     PQOS_MON_EVENT_TMEM_BW,

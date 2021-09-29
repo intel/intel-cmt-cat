@@ -42,6 +42,8 @@
 extern "C" {
 #endif
 
+#include "types.h"
+
 #define PERF_MON_PATH "/sys/devices/intel_cqm"
 
 /**
@@ -61,7 +63,8 @@ enum perf_mon_event {
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
+PQOS_LOCAL int perf_mon_init(const struct pqos_cpuinfo *cpu,
+                             const struct pqos_cap *cap);
 
 /**
  * @brief Shuts down monitoring sub-module for perf monitoring
@@ -69,7 +72,7 @@ int perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int perf_mon_fini(void);
+PQOS_LOCAL int perf_mon_fini(void);
 
 /**
  * @brief This function starts Perf pqos event counters
@@ -83,8 +86,8 @@ int perf_mon_fini(void);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_mon_start(struct pqos_mon_data *group,
-                   const enum pqos_mon_event event);
+PQOS_LOCAL int perf_mon_start(struct pqos_mon_data *group,
+                              const enum pqos_mon_event event);
 
 /**
  * @brief Function to stop Perf event counters
@@ -95,7 +98,8 @@ int perf_mon_start(struct pqos_mon_data *group,
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int perf_mon_stop(struct pqos_mon_data *group, const enum pqos_mon_event event);
+PQOS_LOCAL int perf_mon_stop(struct pqos_mon_data *group,
+                             const enum pqos_mon_event event);
 
 /**
  * @brief This function polls all perf counters
@@ -109,7 +113,8 @@ int perf_mon_stop(struct pqos_mon_data *group, const enum pqos_mon_event event);
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int perf_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event);
+PQOS_LOCAL int perf_mon_poll(struct pqos_mon_data *group,
+                             const enum pqos_mon_event event);
 
 /**
  * @brief Check if event is supported by perf
@@ -118,7 +123,7 @@ int perf_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event);
  *
  * @retval 0 if not supported
  */
-int perf_mon_is_event_supported(const enum pqos_mon_event event);
+PQOS_LOCAL int perf_mon_is_event_supported(const enum pqos_mon_event event);
 
 #ifdef __cplusplus
 }

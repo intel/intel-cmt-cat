@@ -42,6 +42,7 @@ extern "C" {
 #endif
 
 #include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Initializes Perf structures used for OS monitoring interface
@@ -52,7 +53,8 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
+PQOS_LOCAL int os_mon_init(const struct pqos_cpuinfo *cpu,
+                           const struct pqos_cap *cap);
 
 /**
  * @brief Shuts down monitoring sub-module for OS monitoring
@@ -60,7 +62,7 @@ int os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap);
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int os_mon_fini(void);
+PQOS_LOCAL int os_mon_fini(void);
 
 /**
  * @brief OS interface to reset monitoring
@@ -68,7 +70,7 @@ int os_mon_fini(void);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mon_reset(void);
+PQOS_LOCAL int os_mon_reset(void);
 
 /*
  * @brief This function stops all perf counters
@@ -81,7 +83,7 @@ int os_mon_reset(void);
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int os_mon_stop(struct pqos_mon_data *group);
+PQOS_LOCAL int os_mon_stop(struct pqos_mon_data *group);
 
 /**
  * @brief OS interface to start resource monitoring on selected
@@ -103,11 +105,11 @@ int os_mon_stop(struct pqos_mon_data *group);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mon_start(const unsigned num_cores,
-                 const unsigned *cores,
-                 const enum pqos_mon_event event,
-                 void *context,
-                 struct pqos_mon_data *group);
+PQOS_LOCAL int os_mon_start(const unsigned num_cores,
+                            const unsigned *cores,
+                            const enum pqos_mon_event event,
+                            void *context,
+                            struct pqos_mon_data *group);
 
 /**
  * @brief OS interface to poll monitoring data from requested groups
@@ -118,7 +120,8 @@ int os_mon_start(const unsigned num_cores,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups);
+PQOS_LOCAL int os_mon_poll(struct pqos_mon_data **groups,
+                           const unsigned num_groups);
 
 /**
  * @brief OS interface to start monitoring of selected group of \a pids
@@ -133,11 +136,11 @@ int os_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mon_start_pids(const unsigned num_pids,
-                      const pid_t *pids,
-                      const enum pqos_mon_event event,
-                      void *context,
-                      struct pqos_mon_data *group);
+PQOS_LOCAL int os_mon_start_pids(const unsigned num_pids,
+                                 const pid_t *pids,
+                                 const enum pqos_mon_event event,
+                                 void *context,
+                                 struct pqos_mon_data *group);
 
 /**
  * @brief OS interface to add \a pids to the monitoring group
@@ -149,9 +152,9 @@ int os_mon_start_pids(const unsigned num_pids,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mon_add_pids(const unsigned num_pids,
-                    const pid_t *pids,
-                    struct pqos_mon_data *group);
+PQOS_LOCAL int os_mon_add_pids(const unsigned num_pids,
+                               const pid_t *pids,
+                               struct pqos_mon_data *group);
 
 /**
  * @brief OS interface to remove \a pids from the monitoring group
@@ -163,9 +166,9 @@ int os_mon_add_pids(const unsigned num_pids,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int os_mon_remove_pids(const unsigned num_pids,
-                       const pid_t *pids,
-                       struct pqos_mon_data *group);
+PQOS_LOCAL int os_mon_remove_pids(const unsigned num_pids,
+                                  const pid_t *pids,
+                                  struct pqos_mon_data *group);
 
 #ifdef __cplusplus
 }

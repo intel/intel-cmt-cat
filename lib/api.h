@@ -39,6 +39,7 @@ extern "C" {
 #endif
 
 #include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Initializes api module
@@ -49,7 +50,7 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int api_init(int interface, enum pqos_vendor vendor);
+PQOS_LOCAL int api_init(int interface, enum pqos_vendor vendor);
 
 #ifdef __cplusplus
 }

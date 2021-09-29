@@ -43,6 +43,7 @@ extern "C" {
 #endif
 
 #include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Modifies L3 CAT capability structure upon CDP config change
@@ -52,7 +53,7 @@ extern "C" {
  *
  * @param [in] cdp L3 cdp configuration
  */
-void _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
+PQOS_LOCAL void _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
 
 /**
  * @brief Modifies L2 CAT capability structure upon CDP config change
@@ -62,7 +63,7 @@ void _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
  *
  * @param [in] cdp L2 cdp configuration
  */
-void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
+PQOS_LOCAL void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 
 /**
  * @brief Modifies MBA capability structure upon MBA CTRL config change
@@ -72,7 +73,7 @@ void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
  *
  * @param [in] cfg MBA CTRL configuration
  */
-void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
+PQOS_LOCAL void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
 
 /**
  * @brief Acquires lock for PQoS API use
@@ -80,12 +81,12 @@ void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
  * Only one thread at a time is allowed to use the API.
  * Each PQoS API need to use api_lock and api_unlock functions.
  */
-void _pqos_api_lock(void);
+PQOS_LOCAL void _pqos_api_lock(void);
 
 /**
  * @brief Symmetric operation to \a _pqos_api_lock to release the lock
  */
-void _pqos_api_unlock(void);
+PQOS_LOCAL void _pqos_api_unlock(void);
 
 /**
  * @brief Checks library initialization state
@@ -96,14 +97,14 @@ void _pqos_api_unlock(void);
  * @retval PQOS_RETVAL_OK state as expected
  * @retval PQOS_RETVA_ERROR state different than expected
  */
-int _pqos_check_init(const int expect);
+PQOS_LOCAL int _pqos_check_init(const int expect);
 
 /**
  * @brief Internal API to retrie PQoS interface
  *
  * @return PQoS interface
  */
-enum pqos_interface _pqos_iface(void);
+PQOS_LOCAL enum pqos_interface _pqos_iface(void);
 
 /**
  * @brief Internal API to retrie PQoS capabilities data
@@ -111,8 +112,8 @@ enum pqos_interface _pqos_iface(void);
  * @param [out] cap location to store PQoS capabilities information at
  * @param [out] cpu location to store CPU information at
  */
-void _pqos_cap_get(const struct pqos_cap **cap,
-                   const struct pqos_cpuinfo **cpu);
+PQOS_LOCAL void _pqos_cap_get(const struct pqos_cap **cap,
+                              const struct pqos_cpuinfo **cpu);
 
 /**
  * @brief Internal API to retrie \a type of capability
@@ -123,8 +124,8 @@ void _pqos_cap_get(const struct pqos_cap **cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int _pqos_cap_get_type(const enum pqos_cap_type type,
-                       const struct pqos_capability **cap_item);
+PQOS_LOCAL int _pqos_cap_get_type(const enum pqos_cap_type type,
+                                  const struct pqos_capability **cap_item);
 
 #ifdef __cplusplus
 }

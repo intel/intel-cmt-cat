@@ -44,6 +44,8 @@
 extern "C" {
 #endif
 
+#include "types.h"
+
 /**
  * @brief Converts string into 64-bit unsigned number.
  *
@@ -56,7 +58,8 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_utils_strtouint64(const char *s, int base, uint64_t *value);
+PQOS_LOCAL int
+resctrl_utils_strtouint64(const char *s, int base, uint64_t *value);
 
 #ifdef __cplusplus
 }

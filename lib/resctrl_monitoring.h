@@ -43,6 +43,7 @@ extern "C" {
 #endif
 
 #include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Initializes resctrl structures used for OS monitoring interface
@@ -53,8 +54,8 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int resctrl_mon_init(const struct pqos_cpuinfo *cpu,
-                     const struct pqos_cap *cap);
+PQOS_LOCAL int resctrl_mon_init(const struct pqos_cpuinfo *cpu,
+                                const struct pqos_cap *cap);
 
 /**
  * @brief Shuts down monitoring sub-module for resctrl monitoring
@@ -62,7 +63,7 @@ int resctrl_mon_init(const struct pqos_cpuinfo *cpu,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-int resctrl_mon_fini(void);
+PQOS_LOCAL int resctrl_mon_fini(void);
 
 /**
  * @brief This function starts resctrl event counters
@@ -72,7 +73,7 @@ int resctrl_mon_fini(void);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_start(struct pqos_mon_data *group);
+PQOS_LOCAL int resctrl_mon_start(struct pqos_mon_data *group);
 
 /**
  * @brief Function to stop resctrl event counters
@@ -82,7 +83,7 @@ int resctrl_mon_start(struct pqos_mon_data *group);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_stop(struct pqos_mon_data *group);
+PQOS_LOCAL int resctrl_mon_stop(struct pqos_mon_data *group);
 
 /**
  * @brief This function polls all resctrl counters
@@ -95,8 +96,8 @@ int resctrl_mon_stop(struct pqos_mon_data *group);
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int resctrl_mon_poll(struct pqos_mon_data *group,
-                     const enum pqos_mon_event event);
+PQOS_LOCAL int resctrl_mon_poll(struct pqos_mon_data *group,
+                                const enum pqos_mon_event event);
 
 /**
  * @brief Reset of resctrl monitoring
@@ -105,7 +106,7 @@ int resctrl_mon_poll(struct pqos_mon_data *group,
  * @return PQOS_RETVAL_RESOURCE when resctrl monitoring is not supported
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_reset(void);
+PQOS_LOCAL int resctrl_mon_reset(void);
 
 /**
  * @brief Check if event is supported by resctrl
@@ -114,7 +115,7 @@ int resctrl_mon_reset(void);
  *
  * @retval 0 if not supported
  */
-int resctrl_mon_is_event_supported(const enum pqos_mon_event event);
+PQOS_LOCAL int resctrl_mon_is_event_supported(const enum pqos_mon_event event);
 
 /**
  * @brief Read association of \a lcore with monitoring group
@@ -128,9 +129,9 @@ int resctrl_mon_is_event_supported(const enum pqos_mon_event event);
  *         group
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_assoc_get(const unsigned lcore,
-                          char *name,
-                          const unsigned name_size);
+PQOS_LOCAL int resctrl_mon_assoc_get(const unsigned lcore,
+                                     char *name,
+                                     const unsigned name_size);
 
 /**
  * @brief Set association of \a lcore to monitoring group
@@ -141,7 +142,7 @@ int resctrl_mon_assoc_get(const unsigned lcore,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_assoc_set(const unsigned lcore, const char *name);
+PQOS_LOCAL int resctrl_mon_assoc_set(const unsigned lcore, const char *name);
 
 /**
  * @brief Read association of \a task with monitoring group
@@ -155,9 +156,9 @@ int resctrl_mon_assoc_set(const unsigned lcore, const char *name);
  *         group or monitoring is not supported
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_assoc_get_pid(const pid_t task,
-                              char *name,
-                              const unsigned name_size);
+PQOS_LOCAL int resctrl_mon_assoc_get_pid(const pid_t task,
+                                         char *name,
+                                         const unsigned name_size);
 
 /**
  * @brief Set association of \a task to monitoring group
@@ -168,7 +169,7 @@ int resctrl_mon_assoc_get_pid(const pid_t task,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
+PQOS_LOCAL int resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
 
 /**
  * @brief Check if resctrl monitoring is active
@@ -178,7 +179,7 @@ int resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mon_active(unsigned *monitoring_status);
+PQOS_LOCAL int resctrl_mon_active(unsigned *monitoring_status);
 
 #ifdef __cplusplus
 }

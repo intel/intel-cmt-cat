@@ -42,6 +42,8 @@
 extern "C" {
 #endif
 
+#include "types.h"
+
 /**
  * @brief Initializes utils module
  *
@@ -50,7 +52,7 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-int _pqos_utils_init(int interface);
+PQOS_LOCAL int _pqos_utils_init(int interface);
 
 #ifdef __cplusplus
 }

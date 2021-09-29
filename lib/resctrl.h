@@ -44,6 +44,8 @@ extern "C" {
 
 #include <limits.h> /**< CHAR_BIT*/
 
+#include "types.h"
+
 #ifndef RESCTRL_PATH
 #define RESCTRL_PATH "/sys/fs/resctrl"
 #endif
@@ -68,7 +70,7 @@ extern "C" {
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_lock_shared(void);
+PQOS_LOCAL int resctrl_lock_shared(void);
 
 /**
  * @brief Obtain exclusive lock on resctrl filesystem
@@ -76,7 +78,7 @@ int resctrl_lock_shared(void);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_lock_exclusive(void);
+PQOS_LOCAL int resctrl_lock_exclusive(void);
 
 /**
  * @brief Release lock on resctrl filesystem
@@ -84,7 +86,7 @@ int resctrl_lock_exclusive(void);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_lock_release(void);
+PQOS_LOCAL int resctrl_lock_release(void);
 
 /**
  * @brief Mount the resctrl file system with given CDP option
@@ -96,9 +98,9 @@ int resctrl_lock_release(void);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
-                  const enum pqos_cdp_config l2_cdp_cfg,
-                  const enum pqos_mba_config mba_cfg);
+PQOS_LOCAL int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
+                             const enum pqos_cdp_config l2_cdp_cfg,
+                             const enum pqos_mba_config mba_cfg);
 
 /**
  * @brief Unmount the resctrl file system
@@ -106,7 +108,7 @@ int resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_umount(void);
+PQOS_LOCAL int resctrl_umount(void);
 
 /**
  * @brief Structure to hold parsed cpu mask
@@ -128,7 +130,8 @@ struct resctrl_cpumask {
  * @param [in] lcore Core number
  * @param [in] cpumask Modified cpu mask
  */
-void resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask);
+PQOS_LOCAL void resctrl_cpumask_set(const unsigned lcore,
+                                    struct resctrl_cpumask *mask);
 
 /**
  * @brief Unset lcore bit in cpu mask
@@ -136,7 +139,8 @@ void resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask);
  * @param [in] lcore Core number
  * @param [in] cpumask Modified cpu mask
  */
-void resctrl_cpumask_unset(const unsigned lcore, struct resctrl_cpumask *mask);
+PQOS_LOCAL void resctrl_cpumask_unset(const unsigned lcore,
+                                      struct resctrl_cpumask *mask);
 
 /**
  * @brief Check if lcore is set in cpu mask
@@ -148,8 +152,8 @@ void resctrl_cpumask_unset(const unsigned lcore, struct resctrl_cpumask *mask);
  * @retval 1 if cpu bit is set in mask
  * @retval 0 if cpu bit is not set in mask
  */
-int resctrl_cpumask_get(const unsigned lcore,
-                        const struct resctrl_cpumask *mask);
+PQOS_LOCAL int resctrl_cpumask_get(const unsigned lcore,
+                                   const struct resctrl_cpumask *mask);
 
 /**
  * @brief Write CPU mask to file
@@ -160,7 +164,8 @@ int resctrl_cpumask_get(const unsigned lcore,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask);
+PQOS_LOCAL int resctrl_cpumask_write(FILE *fd,
+                                     const struct resctrl_cpumask *mask);
 
 /**
  * @brief Read CPU mask from file
@@ -171,7 +176,7 @@ int resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask);
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-int resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask);
+PQOS_LOCAL int resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask);
 
 #ifdef __cplusplus
 }

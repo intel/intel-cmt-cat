@@ -45,6 +45,8 @@
 extern "C" {
 #endif
 
+#include "types.h"
+
 #define LOG_VER_SILENT        (-1)
 #define LOG_VER_DEFAULT       (0)
 #define LOG_VER_VERBOSE       (1)
@@ -102,10 +104,11 @@ extern "C" {
  * @return Operation status
  * @retval LOG_RETVAL_OK on success
  */
-int log_init(int fd_log,
-             void (*callback_log)(void *, const size_t, const char *),
-             void *context_log,
-             int verbosity);
+PQOS_LOCAL int
+log_init(int fd_log,
+         void (*callback_log)(void *, const size_t, const char *),
+         void *context_log,
+         int verbosity);
 
 /**
  * @brief Shuts down PQoS log module
@@ -113,7 +116,7 @@ int log_init(int fd_log,
  * @return Operation status
  * @retval LOG_RETVAL_OK on success
  */
-int log_fini(void);
+PQOS_LOCAL int log_fini(void);
 
 /**
  * @brief PQoS log function
@@ -122,7 +125,7 @@ int log_fini(void);
  * @param [in] str format string compatible with printf().
  *             Variadic arguments to follow depending on \a str.
  */
-void log_printf(int type, const char *str, ...);
+PQOS_LOCAL void log_printf(int type, const char *str, ...);
 
 #ifdef __cplusplus
 }
