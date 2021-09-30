@@ -2693,6 +2693,8 @@ void monitor_loop(void)
                 printf("Failed to catch SIGINT!\n");
         if (signal(SIGHUP, monitoring_ctrlc) == SIG_ERR)
                 printf("Failed to catch SIGHUP!\n");
+        if (signal(SIGTERM, monitoring_ctrlc) == SIG_ERR)
+                printf("Failed to catch SIGTERM!\n");
 
         if (istty) {
                 struct winsize w;
