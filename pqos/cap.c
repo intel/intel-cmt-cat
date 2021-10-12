@@ -336,6 +336,8 @@ cap_print_features(const struct pqos_cap *cap,
         const struct pqos_capability *cap_l3ca = NULL;
         const struct pqos_capability *cap_l2ca = NULL;
         const struct pqos_capability *cap_mba = NULL;
+        enum pqos_interface interface;
+        int ret;
 
         if (cap == NULL || cpu == NULL)
                 return;
@@ -362,7 +364,11 @@ cap_print_features(const struct pqos_cap *cap,
             cap_mba == NULL)
                 return;
 
-        if (sel_interface == PQOS_INTER_MSR)
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK)
+                return;
+
+        if (interface == PQOS_INTER_MSR)
                 printf("Hardware capabilities\n");
 
 #ifdef __linux__

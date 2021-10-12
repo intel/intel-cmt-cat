@@ -82,9 +82,10 @@ extern "C" {
  * =======================================
  */
 enum pqos_interface {
-        PQOS_INTER_MSR = 0,           /**< MSR */
-        PQOS_INTER_OS = 1,            /**< OS */
-        PQOS_INTER_OS_RESCTRL_MON = 2 /**< OS with resctrl monitoring */
+        PQOS_INTER_MSR = 0,            /**< MSR */
+        PQOS_INTER_OS = 1,             /**< OS */
+        PQOS_INTER_OS_RESCTRL_MON = 2, /**< OS with resctrl monitoring */
+        PQOS_INTER_AUTO = 3            /**< Auto detection */
 };
 
 /*
@@ -391,6 +392,16 @@ struct pqos_cpuinfo {
  * @retval PQOS_RETVAL_OK on success
  */
 int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
+
+/**
+ * @brief Retrieves PQoS interface
+ *
+ * @param [out] interface PQoS interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success, error code otherwise
+ */
+int pqos_inter_get(enum pqos_interface *interface);
 
 /*
  * =======================================

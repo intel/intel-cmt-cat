@@ -55,16 +55,13 @@
 #define GROUP_VALID_MARKER (0x00DEAD00)
 
 /**
- * Flag used to determine what interface to use:
- *      - MSR is 0
- *      - OS is 1
- */
-static int m_interface = PQOS_INTER_MSR;
-
-/**
  * PQoS API functions
  */
 static struct pqos_api {
+        /** Resets monitoring */
+        int (*mon_reset)(void);
+        /** Reads RMID association lcore */
+        int (*mon_assoc_get)(const unsigned lcore, pqos_rmid_t *rmid);
         /** Starts resource monitoring on selected group of cores */
         int (*mon_start)(const unsigned num_cores,
                          const unsigned *cores,
@@ -77,8 +74,69 @@ static struct pqos_api {
                               const enum pqos_mon_event event,
                               void *context,
                               struct pqos_mon_data *group);
+        /** Adds pids to the resource monitoring grpup */
+        int (*mon_add_pids)(const unsigned num_pids,
+                            const pid_t *pids,
+                            struct pqos_mon_data *group);
+        /**  Remove pids from the resource monitoring group */
+        int (*mon_remove_pids)(const unsigned num_pids,
+                               const pid_t *pids,
+                               struct pqos_mon_data *group);
         /*Stops resource monitoring data for selected monitoring group */
         int (*mon_stop)(struct pqos_mon_data *group);
+
+        /** Associates lcore with given class of service */
+        int (*alloc_assoc_set)(const unsigned lcore, const unsigned class_id);
+        /** Reads association of lcore with class of service */
+        int (*alloc_assoc_get)(const unsigned lcore, unsigned *class_id);
+        /** Associate task with given class of service */
+        int (*alloc_assoc_set_pid)(const pid_t task, const unsigned class_id);
+        /** Read association of task with class of service */
+        int (*alloc_assoc_get_pid)(const pid_t task, unsigned *class_id);
+        /** Assign first available COS */
+        int (*alloc_assign)(const unsigned technology,
+                            const unsigned *core_array,
+                            const unsigned core_num,
+                            unsigned *class_id);
+        /** Reassign cores to default COS */
+        int (*alloc_release)(const unsigned *core_array,
+                             const unsigned core_num);
+        /** Assign first available COS to tasks */
+        int (*alloc_assign_pid)(const unsigned technology,
+                                const pid_t *task_array,
+                                const unsigned task_num,
+                                unsigned *class_id);
+        /** Reassign tasks to default COS */
+        int (*alloc_release_pid)(const pid_t *task_array,
+                                 const unsigned task_num);
+        /** Resets configuration of allocation technologies */
+        int (*alloc_reset)(const enum pqos_cdp_config l3_cdp_cfg,
+                           const enum pqos_cdp_config l2_cdp_cfg,
+                           const enum pqos_mba_config mba_cfg);
+
+        /** Sets L3 classes of service */
+        int (*l3ca_set)(const unsigned l3cat_id,
+                        const unsigned num_cos,
+                        const struct pqos_l3ca *ca);
+        /** Reads L3 classes of service */
+        int (*l3ca_get)(const unsigned l3cat_id,
+                        const unsigned max_num_ca,
+                        unsigned *num_ca,
+                        struct pqos_l3ca *ca);
+        /** Get minimum L3 CBM bits */
+        int (*l3ca_get_min_cbm_bits)(unsigned *min_cbm_bits);
+
+        /** Sets L2 classes of service */
+        int (*l2ca_set)(const unsigned l2id,
+                        const unsigned num_cos,
+                        const struct pqos_l2ca *ca);
+        /** Reads L2 classes of service */
+        int (*l2ca_get)(const unsigned l2id,
+                        const unsigned max_num_ca,
+                        unsigned *num_ca,
+                        struct pqos_l2ca *ca);
+        /** Get minimum L2 CBM bits */
+        int (*l2ca_get_min_cbm_bits)(unsigned *min_cbm_bits);
 
         /** Set MBA */
         int (*mba_get)(const unsigned mba_id,
@@ -90,11 +148,11 @@ static struct pqos_api {
                        const unsigned num_cos,
                        const struct pqos_mba *requested,
                        struct pqos_mba *actual);
-        /** Assign first available COS */
-        int (*alloc_assign)(const unsigned technology,
-                            const unsigned *core_array,
-                            const unsigned core_num,
-                            unsigned *class_id);
+
+        /** Retrieves tasks associated with COS */
+        unsigned *(*pid_get_pid_assoc)(const unsigned class_id,
+                                       unsigned *count);
+
 } api;
 
 /*
@@ -109,13 +167,24 @@ api_init(int interface, enum pqos_vendor vendor)
             interface != PQOS_INTER_OS_RESCTRL_MON)
                 return PQOS_RETVAL_PARAM;
 
-        m_interface = interface;
-
         memset(&api, 0, sizeof(api));
 
         if (interface == PQOS_INTER_MSR) {
+                api.mon_reset = hw_mon_reset;
+                api.mon_assoc_get = hw_mon_assoc_get;
                 api.mon_start = hw_mon_start;
                 api.mon_stop = hw_mon_stop;
+                api.alloc_assoc_set = hw_alloc_assoc_set;
+                api.alloc_assoc_get = hw_alloc_assoc_get;
+                api.alloc_assign = hw_alloc_assign;
+                api.alloc_release = hw_alloc_release;
+                api.alloc_reset = hw_alloc_reset;
+                api.l3ca_set = hw_l3ca_set;
+                api.l3ca_get = hw_l3ca_get;
+                api.l3ca_get_min_cbm_bits = hw_l3ca_get_min_cbm_bits;
+                api.l2ca_set = hw_l2ca_set;
+                api.l2ca_get = hw_l2ca_get;
+                api.l2ca_get_min_cbm_bits = hw_l2ca_get_min_cbm_bits;
                 if (vendor == PQOS_VENDOR_AMD) {
                         api.mba_get = hw_mba_get_amd;
                         api.mba_set = hw_mba_set_amd;
@@ -123,14 +192,31 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = hw_mba_get;
                         api.mba_set = hw_mba_set;
                 }
-                api.alloc_assign = hw_alloc_assign;
 
 #ifdef __linux__
         } else if (interface == PQOS_INTER_OS ||
                    interface == PQOS_INTER_OS_RESCTRL_MON) {
+                api.mon_reset = os_mon_reset;
                 api.mon_start = os_mon_start;
                 api.mon_start_pids = os_mon_start_pids;
+                api.mon_add_pids = os_mon_add_pids;
+                api.mon_remove_pids = os_mon_remove_pids;
                 api.mon_stop = os_mon_stop;
+                api.alloc_assoc_set = os_alloc_assoc_set;
+                api.alloc_assoc_get = os_alloc_assoc_get;
+                api.alloc_assoc_set_pid = os_alloc_assoc_set_pid;
+                api.alloc_assoc_get_pid = os_alloc_assoc_get_pid;
+                api.alloc_assign = os_alloc_assign;
+                api.alloc_release = os_alloc_release;
+                api.alloc_assign_pid = os_alloc_assign_pid;
+                api.alloc_release_pid = os_alloc_release_pid;
+                api.alloc_reset = os_alloc_reset;
+                api.l3ca_set = os_l3ca_set;
+                api.l3ca_get = os_l3ca_get;
+                api.l3ca_get_min_cbm_bits = os_l3ca_get_min_cbm_bits;
+                api.l2ca_set = os_l2ca_set;
+                api.l2ca_get = os_l2ca_get;
+                api.l2ca_get_min_cbm_bits = os_l2ca_get_min_cbm_bits;
                 if (vendor == PQOS_VENDOR_AMD) {
                         api.mba_get = os_mba_get_amd;
                         api.mba_set = os_mba_set_amd;
@@ -138,12 +224,36 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = os_mba_get;
                         api.mba_set = os_mba_set;
                 }
-                api.alloc_assign = os_alloc_assign;
+                api.pid_get_pid_assoc = os_pid_get_pid_assoc;
 #endif
         }
 
         return PQOS_RETVAL_OK;
 }
+
+#define UNSUPPORTED_INTERFACE "Interface not supported!\n"
+
+#define API_CALL(API, PARAMS...)                                               \
+        ({                                                                     \
+                int ret;                                                       \
+                                                                               \
+                _pqos_api_lock();                                              \
+                do {                                                           \
+                        ret = _pqos_check_init(1);                             \
+                        if (ret != PQOS_RETVAL_OK)                             \
+                                break;                                         \
+                                                                               \
+                        if (api.API != NULL)                                   \
+                                ret = api.API(PARAMS);                         \
+                        else {                                                 \
+                                LOG_INFO(UNSUPPORTED_INTERFACE);               \
+                                ret = PQOS_RETVAL_RESOURCE;                    \
+                        }                                                      \
+                } while (0);                                                   \
+                _pqos_api_unlock();                                            \
+                                                                               \
+                ret;                                                           \
+        })
 
 /*
  * =======================================
@@ -153,131 +263,31 @@ api_init(int interface, enum pqos_vendor vendor)
 int
 pqos_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 {
-        int ret;
-
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_alloc_assoc_set(lcore, class_id);
-        else {
-#ifdef __linux__
-                ret = os_alloc_assoc_set(lcore, class_id);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_assoc_set, lcore, class_id);
 }
 
 int
 pqos_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
-        int ret;
-
         if (class_id == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_alloc_assoc_get(lcore, class_id);
-        else {
-#ifdef __linux__
-                ret = os_alloc_assoc_get(lcore, class_id);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_assoc_get, lcore, class_id);
 }
 
 int
 pqos_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
 {
-        int ret;
-
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task association!\n");
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-#ifdef __linux__
-        ret = os_alloc_assoc_set_pid(task, class_id);
-#else
-        UNUSED_PARAM(task);
-        UNUSED_PARAM(class_id);
-        LOG_INFO("OS interface not supported!\n");
-        ret = PQOS_RETVAL_RESOURCE;
-#endif
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_assoc_set_pid, task, class_id);
 }
 
 int
 pqos_alloc_assoc_get_pid(const pid_t task, unsigned *class_id)
 {
-        int ret;
-
         if (class_id == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task association!\n");
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-#ifdef __linux__
-        ret = os_alloc_assoc_get_pid(task, class_id);
-#else
-        UNUSED_PARAM(task);
-        UNUSED_PARAM(class_id);
-        LOG_INFO("OS interface not supported!\n");
-        ret = PQOS_RETVAL_RESOURCE;
-#endif
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_assoc_get_pid, task, class_id);
 }
 
 int
@@ -286,7 +296,6 @@ pqos_alloc_assign(const unsigned technology,
                   const unsigned core_num,
                   unsigned *class_id)
 {
-        int ret;
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
         const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
@@ -295,55 +304,17 @@ pqos_alloc_assign(const unsigned technology,
             !(l2_req || l3_req || mba_req))
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (api.alloc_assign != NULL)
-                ret = api.alloc_assign(technology, core_array, core_num,
-                                       class_id);
-        else {
-                LOG_INFO("Interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_assign, technology, core_array, core_num,
+                        class_id);
 }
 
 int
 pqos_alloc_release(const unsigned *core_array, const unsigned core_num)
 {
-        int ret;
-
         if (core_num == 0 || core_array == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_alloc_release(core_array, core_num);
-        else {
-#ifdef __linux__
-                ret = os_alloc_release(core_array, core_num);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_release, core_array, core_num);
 }
 
 int
@@ -352,72 +323,20 @@ pqos_alloc_assign_pid(const unsigned technology,
                       const unsigned task_num,
                       unsigned *class_id)
 {
-        int ret;
-
         if (task_array == NULL || task_num == 0 || class_id == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task association!\n");
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-#ifdef __linux__
-        ret = os_alloc_assign_pid(technology, task_array, task_num, class_id);
-#else
-        UNUSED_PARAM(technology);
-        LOG_INFO("OS interface not supported!\n");
-        ret = PQOS_RETVAL_RESOURCE;
-#endif
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_assign_pid, technology, task_array, task_num,
+                        class_id);
 }
 
 int
 pqos_alloc_release_pid(const pid_t *task_array, const unsigned task_num)
 {
-        int ret;
-
         if (task_array == NULL || task_num == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task association!\n");
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-#ifdef __linux__
-        ret = os_alloc_release_pid(task_array, task_num);
-#else
-        LOG_INFO("OS interface not supported!\n");
-        ret = PQOS_RETVAL_RESOURCE;
-#endif
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_release_pid, task_array, task_num);
 }
 
 int
@@ -425,8 +344,6 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                  const enum pqos_cdp_config l2_cdp_cfg,
                  const enum pqos_mba_config mba_cfg)
 {
-        int ret;
-
         if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
             l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
             l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
@@ -450,34 +367,14 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                 return PQOS_RETVAL_PARAM;
         }
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
-        else {
-#ifdef __linux__
-                ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(alloc_reset, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 }
 
 unsigned *
 pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
 {
-        unsigned *tasks = NULL;
         int ret;
+        unsigned *tasks = NULL;
 
         if (count == NULL)
                 return NULL;
@@ -490,22 +387,12 @@ pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
                 return NULL;
         }
 
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task association!\n");
-                _pqos_api_unlock();
-                return NULL;
-        }
-
-#ifdef __linux__
-        tasks = os_pid_get_pid_assoc(class_id, count);
-        if (tasks == NULL)
-                LOG_ERROR("Error retrieving task information!\n");
-#else
-        UNUSED_PARAM(class_id);
-        LOG_INFO("OS interface not supported!\n");
-#endif
+        if (api.pid_get_pid_assoc != NULL) {
+                tasks = api.pid_get_pid_assoc(class_id, count);
+                if (tasks == NULL)
+                        LOG_ERROR("Error retrieving task information!\n");
+        } else
+                LOG_INFO(UNSUPPORTED_INTERFACE);
 
         _pqos_api_unlock();
 
@@ -552,7 +439,6 @@ pqos_l3ca_set(const unsigned l3cat_id,
               const unsigned num_cos,
               const struct pqos_l3ca *ca)
 {
-        int ret;
         unsigned i;
 
         if (ca == NULL || num_cos == 0)
@@ -577,27 +463,7 @@ pqos_l3ca_set(const unsigned l3cat_id,
                 }
         }
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_l3ca_set(l3cat_id, num_cos, ca);
-        else {
-#ifdef __linux__
-                ret = os_l3ca_set(l3cat_id, num_cos, ca);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(l3ca_set, l3cat_id, num_cos, ca);
 }
 
 int
@@ -606,63 +472,19 @@ pqos_l3ca_get(const unsigned l3cat_id,
               unsigned *num_ca,
               struct pqos_l3ca *ca)
 {
-        int ret;
-
         if (num_ca == NULL || ca == NULL || max_num_ca == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
-        else {
-#ifdef __linux__
-                ret = os_l3ca_get(l3cat_id, max_num_ca, num_ca, ca);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(l3ca_get, l3cat_id, max_num_ca, num_ca, ca);
 }
 
 int
 pqos_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 {
-        int ret;
-
         if (min_cbm_bits == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_l3ca_get_min_cbm_bits(min_cbm_bits);
-        else {
-#ifdef __linux__
-                ret = os_l3ca_get_min_cbm_bits(min_cbm_bits);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(l3ca_get_min_cbm_bits, min_cbm_bits);
 }
 
 /*
@@ -676,7 +498,6 @@ pqos_l2ca_set(const unsigned l2id,
               const unsigned num_cos,
               const struct pqos_l2ca *ca)
 {
-        int ret;
         unsigned i;
 
         if (ca == NULL || num_cos == 0)
@@ -701,27 +522,7 @@ pqos_l2ca_set(const unsigned l2id,
                 }
         }
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_l2ca_set(l2id, num_cos, ca);
-        else {
-#ifdef __linux__
-                ret = os_l2ca_set(l2id, num_cos, ca);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(l2ca_set, l2id, num_cos, ca);
 }
 
 int
@@ -730,64 +531,19 @@ pqos_l2ca_get(const unsigned l2id,
               unsigned *num_ca,
               struct pqos_l2ca *ca)
 {
-        int ret;
-
         if (num_ca == NULL || ca == NULL || max_num_ca == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_l2ca_get(l2id, max_num_ca, num_ca, ca);
-        else {
-#ifdef __linux__
-                ret = os_l2ca_get(l2id, max_num_ca, num_ca, ca);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(l2ca_get, l2id, max_num_ca, num_ca, ca);
 }
 
 int
 pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 {
-        int ret;
-
         if (min_cbm_bits == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_l2ca_get_min_cbm_bits(min_cbm_bits);
-        else {
-#ifdef __linux__
-                ret = os_l2ca_get_min_cbm_bits(min_cbm_bits);
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(l2ca_get_min_cbm_bits, min_cbm_bits);
 }
 
 /*
@@ -836,7 +592,7 @@ pqos_mba_set(const unsigned mba_id,
         if (api.mba_set != NULL)
                 ret = api.mba_set(mba_id, num_cos, requested, actual);
         else {
-                LOG_INFO("Interface not supported!\n");
+                LOG_INFO(UNSUPPORTED_INTERFACE);
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
@@ -851,29 +607,10 @@ pqos_mba_get(const unsigned mba_id,
              unsigned *num_cos,
              struct pqos_mba *mba_tab)
 {
-        int ret;
-
         if (num_cos == NULL || mba_tab == NULL || max_num_cos == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (api.mba_get != NULL)
-                ret = api.mba_get(mba_id, max_num_cos, num_cos, mba_tab);
-        else {
-                LOG_INFO("Interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-        }
-
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(mba_get, mba_id, max_num_cos, num_cos, mba_tab);
 }
 
 /*
@@ -885,58 +622,16 @@ pqos_mba_get(const unsigned mba_id,
 int
 pqos_mon_reset(void)
 {
-        int ret;
-
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_mon_reset();
-        else {
-#ifdef __linux__
-                ret = os_mon_reset();
-#else
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-#endif
-        }
-
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(mon_reset);
 }
 
 int
 pqos_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 {
-        int ret;
-
         if (rmid == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface == PQOS_INTER_MSR)
-                ret = hw_mon_assoc_get(lcore, rmid);
-        else {
-                LOG_INFO("OS interface not supported!\n");
-                ret = PQOS_RETVAL_RESOURCE;
-        }
-
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(mon_assoc_get, lcore, rmid);
 }
 
 int
@@ -989,7 +684,7 @@ pqos_mon_start(const unsigned num_cores,
         if (api.mon_start != NULL)
                 ret = api.mon_start(num_cores, cores, event, context, group);
         else {
-                LOG_INFO("Interface not supported!\n");
+                LOG_INFO(UNSUPPORTED_INTERFACE);
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
@@ -1026,7 +721,7 @@ pqos_mon_stop(struct pqos_mon_data *group)
         if (api.mon_stop != NULL)
                 ret = api.mon_stop(group);
         else {
-                LOG_INFO("Interface not supported!\n");
+                LOG_INFO(UNSUPPORTED_INTERFACE);
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
@@ -1124,14 +819,6 @@ pqos_mon_start_pids(const unsigned num_pids,
                 return ret;
         }
 
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task monitoring!\n");
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
         memset(group, 0, sizeof(*group));
         group->intl = malloc(sizeof(*group->intl));
         if (group->intl == NULL) {
@@ -1143,7 +830,7 @@ pqos_mon_start_pids(const unsigned num_pids,
         if (api.mon_start_pids != NULL)
                 ret = api.mon_start_pids(num_pids, pids, event, context, group);
         else {
-                LOG_INFO("Interface not supported!\n");
+                LOG_INFO(UNSUPPORTED_INTERFACE);
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
@@ -1163,40 +850,13 @@ pqos_mon_add_pids(const unsigned num_pids,
                   const pid_t *pids,
                   struct pqos_mon_data *group)
 {
-        int ret;
-
         if (num_pids == 0 || pids == NULL || group == NULL)
                 return PQOS_RETVAL_PARAM;
 
         if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task monitoring!\n");
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-#ifdef __linux__
-        ret = os_mon_add_pids(num_pids, pids, group);
-#else
-        LOG_INFO("OS interface not supported!\n");
-        ret = PQOS_RETVAL_RESOURCE;
-#endif
-
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(mon_add_pids, num_pids, pids, group);
 }
 
 int
@@ -1204,38 +864,11 @@ pqos_mon_remove_pids(const unsigned num_pids,
                      const pid_t *pids,
                      struct pqos_mon_data *group)
 {
-        int ret;
-
         if (num_pids == 0 || pids == NULL || group == NULL)
                 return PQOS_RETVAL_PARAM;
 
         if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                return ret;
-        }
-
-        if (m_interface != PQOS_INTER_OS &&
-            m_interface != PQOS_INTER_OS_RESCTRL_MON) {
-                LOG_ERROR("Incompatible interface "
-                          "selected for task monitoring!\n");
-                _pqos_api_unlock();
-                return PQOS_RETVAL_ERROR;
-        }
-
-#ifdef __linux__
-        ret = os_mon_remove_pids(num_pids, pids, group);
-#else
-        LOG_INFO("OS interface not supported!\n");
-        ret = PQOS_RETVAL_RESOURCE;
-#endif
-
-        _pqos_api_unlock();
-
-        return ret;
+        return API_CALL(mon_remove_pids, num_pids, pids, group);
 }

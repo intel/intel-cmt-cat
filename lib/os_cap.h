@@ -148,4 +148,4 @@ PQOS_LOCAL int os_cap_mba_discover(struct pqos_cap_mba *cap,
 }
 #endif
 
-#endif /* __PQOS_HOSTCAP_H__ */
+#endif /* __PQOS_OS_CAP_H__ */

@@ -206,15 +206,17 @@ static void
 print_usage(char *prgname, unsigned short_usage)
 {
         printf("Usage: %s -t <feature=value;...cpu=cpulist>... -c <cpulist> "
-               "[-I] (-p <pidlist> | [-k] cmd [<args>...])\n"
+               "[-I | --iface <interface>] "
+               "(-p <pidlist> | [-k] cmd [<args>...])\n"
                "       %s -r <cpulist> -t <feature=value;...cpu=cpulist>... "
-               "-c <cpulist> [-I] (-p <pidlist> | [-k] cmd [<args>...])\n"
+               "-c <cpulist> [-I | --iface <interface>] "
+               "(-p <pidlist> | [-k] cmd [<args>...])\n"
                "       %s -r <cpulist> -c <cpulist> "
                "(-p <pidlist> | [-k] cmd [<args>...])\n"
                "       %s -r <cpulist> -t <feature=value;...cpu=cpulist>... "
-               "[-I] -p <pidlist>\n"
-               "       %s -t <feature=value> -I [-c <cpulist>] "
-               "(-p <pidlist> | [-k] cmd [<args>...])\n\n",
+               "[-I | --iface <interface>] -p <pidlist>\n"
+               "       %s -t <feature=value> (-I | --iface <interface>) "
+               "[-c <cpulist>] (-p <pidlist> | [-k] cmd [<args>...])\n\n",
                prgname, prgname, prgname, prgname, prgname);
 
         printf("Options:\n"
@@ -239,7 +241,25 @@ print_usage(char *prgname, unsigned short_usage)
                "set the library interface to use the kernel implementation\n"
                "                                       "
                "If not set the default implementation"
-               " is to program the MSR's directly\n"
+               " is to detect the interface automatically (MSR or kernel)\n"
+               " -F <interface>, --iface <interface>               "
+               "set the library interface to automatically detected one\n"
+               "                                       "
+               "('auto'), MSR ('msr') or kernel interface ('os').\n"
+               "                                       "
+               "<interface> can be set to either 'auto' (default), 'msr'\n"
+               "                                       "
+               "or 'os'. If automatic detection is selected ('auto'), it:\n"
+               "                                       "
+               "    1) Takes RDT_IFACE environment variable\n"
+               "                                       "
+               "       into account if this variable is set\n"
+               "                                       "
+               "    2) Selects OS interface if the kernel interface\n"
+               "                                       "
+               "       is supported\n"
+               "                                       "
+               "    3) Selects MSR interface otherwise\n"
                " -h, --help                            "
                "display help\n"
                " -w, --version                         "
@@ -297,9 +317,9 @@ print_usage(char *prgname, unsigned short_usage)
             "on core 1\n\n");
 
         printf("Example PID configuration strings:\n"
-               "    -I -t 'l3=0xf' -p 23187,567-570\n"
+               "    --iface os -t 'l3=0xf' -p 23187,567-570\n"
                "        Specified processes use four L3 cache-ways (mask 0xf)\n"
-               "    -I -t 'mba=50' -k memtester 10M\n"
+               "    --iface os -t 'mba=50' -k memtester 10M\n"
                "        Restrict memory B/W availability to 50%% for the "
                "memtester application (using PID allocation)\n\n");
 
@@ -428,13 +448,14 @@ parse_args(int argc, char **argv)
                 { "sudokeep",   no_argument,            0, 'k' },
                 { "verbose",    no_argument,            0, 'v' },
                 { "iface-os",   no_argument,            0, 'I' },
+                { "iface",      required_argument,      0, 'F' },
                 { "help",       no_argument,            0, 'h' },
                 { "version",    no_argument,            0, 'w' },
                 { NULL, 0, 0, 0 }
             /* clang-format on */
         };
 
-        while ((opt = getopt_long(argc, argvopt, "+c:p:r:t:kvIhw", lgopts,
+        while ((opt = getopt_long(argc, argvopt, "+c:p:r:t:kvIhwF:", lgopts,
                                   NULL)) != -1) {
                 switch (opt) {
                 case 'c':
@@ -476,6 +497,14 @@ parse_args(int argc, char **argv)
                         goto exit;
                 case 'I':
                         g_cfg.interface = PQOS_INTER_OS;
+                        break;
+                case 'F':
+                        retval = parse_iface(optarg);
+                        if (retval != 0) {
+                                fprintf(stderr,
+                                        "Invalid interface parameter!\n");
+                                goto exit;
+                        }
                         break;
                 case 'h':
                         retval = -EAGAIN;
@@ -602,6 +631,7 @@ main(int argc, char **argv)
         int ret = 0;
 
         memset(&g_cfg, 0, sizeof(g_cfg));
+        g_cfg.interface = PQOS_INTER_AUTO;
 
         /* Parse cmd line args */
         ret = parse_args(argc, argv);

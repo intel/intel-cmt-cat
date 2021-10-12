@@ -61,9 +61,7 @@
  * Local data structures
  * ---------------------------------------
  */
-#ifdef __linux__
-static int m_interface = PQOS_INTER_MSR;
-#endif
+
 /**
  * ---------------------------------------
  * Local Functions
@@ -87,6 +85,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 {
         const struct pqos_capability *item = NULL;
         int ret;
+        enum pqos_interface interface = _pqos_get_inter();
 
         ASSERT(cfg != NULL);
         /**
@@ -103,19 +102,16 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         ASSERT(item != NULL);
 
 #ifdef __linux__
-        if (cfg->interface == PQOS_INTER_OS ||
-            cfg->interface == PQOS_INTER_OS_RESCTRL_MON)
+        if (interface == PQOS_INTER_OS ||
+            interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_mon_init(cpu, cap);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 #endif
-        if (cfg->interface == PQOS_INTER_MSR)
+        if (interface == PQOS_INTER_MSR)
                 ret = hw_mon_init(cpu, cap, cfg);
 
 pqos_mon_init_exit:
-#ifdef __linux__
-        m_interface = cfg->interface;
-#endif
         return ret;
 }
 
@@ -123,12 +119,13 @@ int
 pqos_mon_fini(void)
 {
         int ret = PQOS_RETVAL_OK;
-
 #ifdef __linux__
-        if (m_interface == PQOS_INTER_OS ||
-            m_interface == PQOS_INTER_OS_RESCTRL_MON)
+        enum pqos_interface interface = _pqos_get_inter();
+
+        if (interface == PQOS_INTER_OS ||
+            interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_mon_fini();
-        if (m_interface == PQOS_INTER_MSR)
+        if (interface == PQOS_INTER_MSR)
                 ret = hw_mon_fini();
 #else
         ret = hw_mon_fini();

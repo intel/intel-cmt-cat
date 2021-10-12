@@ -50,6 +50,7 @@ class CPqosConfig(ctypes.Structure):
     PQOS_INTER_MSR = 0
     PQOS_INTER_OS = 1
     PQOS_INTER_OS_RESCTRL_MON = 2
+    PQOS_INTER_AUTO = 3
 
     LOG_VER_SILENT = -1
     LOG_VER_DEFAULT = 0
@@ -135,10 +136,12 @@ class Pqos(object):
             cfg_interface = CPqosConfig.PQOS_INTER_OS
         elif interface.upper() == u'OS_RESCTRL_MON':
             cfg_interface = CPqosConfig.PQOS_INTER_OS_RESCTRL_MON
+        elif interface.upper() == u'AUTO':
+            cfg_interface = CPqosConfig.PQOS_INTER_AUTO
         else:
             raise ValueError(u'Unknown interface selected: %s.'
                              u' Available options: MSR, OS,'
-                             u' OS_RESCTRL_MON' % interface)
+                             u' OS_RESCTRL_MON, AUTO' % interface)
 
         if not log_file and not log_callback:
             log_file = sys.stdout

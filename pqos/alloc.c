@@ -1051,11 +1051,16 @@ print_core_assoc(const int is_alloc,
         unsigned class_id = 0;
         pqos_rmid_t rmid = 0;
         int ret = PQOS_RETVAL_OK;
+        enum pqos_interface interface;
+
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK)
+                return;
 
         if (is_alloc)
                 ret = pqos_alloc_assoc_get(ci->lcore, &class_id);
 
-        if (is_mon && ret == PQOS_RETVAL_OK && sel_interface == PQOS_INTER_MSR)
+        if (is_mon && ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MSR)
                 ret = pqos_mon_assoc_get(ci->lcore, &rmid);
 
         if (ret != PQOS_RETVAL_OK) {
@@ -1072,7 +1077,7 @@ print_core_assoc(const int is_alloc,
         if (is_alloc)
                 printf("COS%u", class_id);
 
-        if (is_mon && sel_interface == PQOS_INTER_MSR)
+        if (is_mon && interface == PQOS_INTER_MSR)
                 printf("%sRMID%u\n", is_alloc ? ", " : "", (unsigned)rmid);
         else
                 printf("\n");

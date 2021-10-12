@@ -44,10 +44,7 @@
 #include "resctrl_alloc.h"
 #include "perf_monitoring.h"
 #include "cpuinfo.h"
-
-#define PROC_CPUINFO     "/proc/cpuinfo"
-#define PROC_FILESYSTEMS "/proc/filesystems"
-#define PROC_MOUNTS      "/proc/mounts"
+#include "os_common.h"
 
 static int mba_ctrl = -1; /**< mba ctrl support */
 
@@ -118,22 +115,12 @@ get_shareable_bits(const char *dir, uint64_t *shareable_bits)
 int
 os_cap_init(const enum pqos_interface inter)
 {
-        int ret;
-        int res_flag = 0;
+        int ret = PQOS_RETVAL_OK;
 
         /**
          * resctrl detection
          */
-        ret = pqos_file_contains(PROC_FILESYSTEMS, "resctrl", &res_flag);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("Fatal error encountered in resctrl detection!\n");
-                return ret;
-        }
-        LOG_INFO("%s\n", res_flag ? "resctrl detected"
-                                  : "resctrl not detected. "
-                                    "Kernel version 4.10 or higher required");
-
-        if (res_flag == 0) {
+        if (resctrl_is_supported() != PQOS_RETVAL_OK) {
                 LOG_ERROR("OS interface selected but not supported\n");
                 return PQOS_RETVAL_INTER;
         }

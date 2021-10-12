@@ -579,6 +579,107 @@ error_exit:
         return ret;
 }
 
+/**
+ * @brief Detects interface
+ *
+ * @param requested_interface requested interface
+ * @param interface detected interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+discover_interface(enum pqos_interface requested_interface,
+                   enum pqos_interface *interface)
+{
+        char *environment = NULL;
+
+#ifdef __linux__
+        if (requested_interface != PQOS_INTER_MSR &&
+            requested_interface != PQOS_INTER_OS &&
+            requested_interface != PQOS_INTER_OS_RESCTRL_MON &&
+            requested_interface != PQOS_INTER_AUTO)
+#else
+        if (requested_interface != PQOS_INTER_MSR &&
+            requested_interface != PQOS_INTER_AUTO)
+#endif
+                return PQOS_RETVAL_PARAM;
+
+        environment = getenv("RDT_IFACE");
+        if (environment != NULL) {
+                if (strncasecmp(environment, "OS", 2) == 0) {
+                        if (requested_interface != PQOS_INTER_OS &&
+                            requested_interface != PQOS_INTER_AUTO) {
+                                fprintf(stderr,
+                                        "Interface initialization error!\n"
+                                        "Your system has been restricted "
+                                        "to use the OS interface only!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        *interface = PQOS_INTER_OS;
+                        return PQOS_RETVAL_OK;
+                } else if (strncasecmp(environment, "MSR", 3) == 0) {
+                        if (requested_interface != PQOS_INTER_MSR &&
+                            requested_interface != PQOS_INTER_AUTO) {
+                                fprintf(stderr,
+                                        "Interface initialization error!\n"
+                                        "Your system has been restricted "
+                                        "to use the MSR interface only!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        *interface = PQOS_INTER_MSR;
+                        return PQOS_RETVAL_OK;
+                } else {
+                        fprintf(stderr,
+                                "Interface initialization error!\n"
+                                "Invalid interface enforcement selection.\n");
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+
+#ifdef __linux__
+        if (requested_interface == PQOS_INTER_AUTO &&
+            resctrl_is_supported() == PQOS_RETVAL_OK) {
+                *interface = PQOS_INTER_OS;
+                return PQOS_RETVAL_OK;
+        }
+#endif
+
+        if (requested_interface == PQOS_INTER_AUTO) {
+                *interface = PQOS_INTER_MSR;
+                return PQOS_RETVAL_OK;
+        }
+
+        *interface = requested_interface;
+        return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Converts enumeration value into string
+ *
+ * @param interface interface
+ *
+ * @return converted enumeration value into string
+ */
+static const char *
+interface_to_string(enum pqos_interface interface)
+{
+        switch (interface) {
+        case PQOS_INTER_MSR:
+                return "MSR";
+        case PQOS_INTER_OS:
+                return "OS";
+        case PQOS_INTER_OS_RESCTRL_MON:
+                return "OS_RESCTRL_MON";
+        case PQOS_INTER_AUTO:
+                return "AUTO";
+        default:
+                return "Unknown";
+        }
+}
+
 /*
  * =======================================
  * =======================================
@@ -594,44 +695,16 @@ pqos_init(const struct pqos_config *config)
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, max_core = 0;
         int cat_init = 0, mon_init = 0;
-        char *environment = NULL;
+        enum pqos_interface interface;
 
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
 
-#ifdef __linux__
-        if (config->interface != PQOS_INTER_MSR &&
-            config->interface != PQOS_INTER_OS &&
-            config->interface != PQOS_INTER_OS_RESCTRL_MON)
-#else
-        if (config->interface != PQOS_INTER_MSR)
-#endif
-                return PQOS_RETVAL_PARAM;
-
-        environment = getenv("RDT_IFACE");
-        if (environment != NULL) {
-                if (strncasecmp(environment, "OS", 2) == 0) {
-                        if (config->interface != PQOS_INTER_OS) {
-                                fprintf(stderr,
-                                        "Interface initialization error!\n"
-                                        "Your system has been restricted "
-                                        "to use the OS interface only!\n");
-                                return PQOS_RETVAL_ERROR;
-                        }
-                } else if (strncasecmp(environment, "MSR", 3) == 0) {
-                        if (config->interface != PQOS_INTER_MSR) {
-                                fprintf(stderr,
-                                        "Interface initialization error!\n"
-                                        "Your system has been restricted "
-                                        "to use the MSR interface only!\n");
-                                return PQOS_RETVAL_ERROR;
-                        }
-                } else {
-                        fprintf(stderr,
-                                "Interface initialization error!\n"
-                                "Invalid interface enforcement selection.\n");
-                        return PQOS_RETVAL_ERROR;
-                }
+        ret = discover_interface(config->interface, &interface);
+        if (ret != PQOS_RETVAL_OK) {
+                fprintf(stderr, "Interface initialization error!\n"
+                                "Cannot select the interface!\n");
+                return PQOS_RETVAL_INTER;
         }
 
         if (_pqos_api_init() != 0) {
@@ -653,6 +726,10 @@ pqos_init(const struct pqos_config *config)
                 fprintf(stderr, "log_init() error\n");
                 goto init_error;
         }
+
+        LOG_INFO("Requested interface: %s\n",
+                 interface_to_string(config->interface));
+        LOG_INFO("Selected interface: %s\n", interface_to_string(interface));
 
         /**
          * Topology not provided through config.
@@ -679,9 +756,9 @@ pqos_init(const struct pqos_config *config)
         }
 
 #ifdef __linux__
-        if (config->interface == PQOS_INTER_OS ||
-            config->interface == PQOS_INTER_OS_RESCTRL_MON) {
-                ret = os_cap_init(config->interface);
+        if (interface == PQOS_INTER_OS ||
+            interface == PQOS_INTER_OS_RESCTRL_MON) {
+                ret = os_cap_init(interface);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("os_cap_init() error %d\n", ret);
                         goto machine_init_error;
@@ -692,25 +769,25 @@ pqos_init(const struct pqos_config *config)
                          "and cause unexpected behaviour\n");
 #endif
 
-        ret = discover_capabilities(&m_cap, m_cpu, config->interface);
+        ret = discover_capabilities(&m_cap, m_cpu, interface);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("discover_capabilities() error %d\n", ret);
                 goto machine_init_error;
         }
 
-        ret = _pqos_utils_init(config->interface);
+        ret = _pqos_utils_init(interface);
         if (ret != PQOS_RETVAL_OK) {
                 fprintf(stderr, "Utils initialization error!\n");
                 goto machine_init_error;
         }
 
-        ret = api_init(config->interface, m_cpu->vendor);
+        ret = api_init(interface, m_cpu->vendor);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("_pqos_api_init() error %d\n", ret);
                 goto machine_init_error;
         }
 
-        m_interface = config->interface;
+        m_interface = interface;
 
         ret = pqos_alloc_init(m_cpu, m_cap, config);
         switch (ret) {
@@ -875,6 +952,7 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
         struct pqos_cap_l3ca cap;
         int ret;
         unsigned i;
+        enum pqos_interface interface = _pqos_get_inter();
 
         ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
                cdp == PQOS_REQUIRE_CDP_ANY);
@@ -890,7 +968,7 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
         if (l3_cap == NULL)
                 return;
 
-        switch (m_interface) {
+        switch (interface) {
         case PQOS_INTER_MSR:
                 ret = hw_cap_l3ca_discover(&cap, m_cpu);
                 break;
@@ -930,6 +1008,7 @@ _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
         struct pqos_cap_l2ca cap;
         unsigned i;
         int ret;
+        enum pqos_interface interface = _pqos_get_inter();
 
         ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
                cdp == PQOS_REQUIRE_CDP_ANY);
@@ -945,7 +1024,7 @@ _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
         if (l2_cap == NULL)
                 return;
 
-        switch (m_interface) {
+        switch (interface) {
         case PQOS_INTER_MSR:
                 ret = hw_cap_l2ca_discover(&cap, m_cpu);
                 break;
@@ -983,6 +1062,9 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 {
         struct pqos_cap_mba *mba_cap = NULL;
         unsigned i;
+#ifdef __linux__
+        enum pqos_interface interface = _pqos_get_inter();
+#endif
 
         ASSERT(cfg == PQOS_MBA_DEFAULT || cfg == PQOS_MBA_CTRL ||
                cfg == PQOS_MBA_ANY);
@@ -1000,8 +1082,8 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 
 #ifdef __linux__
         /* refresh number of classes */
-        if (m_interface == PQOS_INTER_OS ||
-            m_interface == PQOS_INTER_OS_RESCTRL_MON) {
+        if (interface == PQOS_INTER_OS ||
+            interface == PQOS_INTER_OS_RESCTRL_MON) {
                 int ret;
                 unsigned num_classes;
 
@@ -1015,17 +1097,11 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
                 mba_cap->ctrl_on = 0;
         else if (cfg == PQOS_MBA_CTRL) {
 #ifdef __linux__
-                if (m_interface != PQOS_INTER_MSR)
+                if (interface != PQOS_INTER_MSR)
                         mba_cap->ctrl = 1;
 #endif
                 mba_cap->ctrl_on = 1;
         }
-}
-
-enum pqos_interface
-_pqos_iface(void)
-{
-        return m_interface;
 }
 
 void
@@ -1047,4 +1123,42 @@ _pqos_cap_get_type(const enum pqos_cap_type type,
                    const struct pqos_capability **cap_item)
 {
         return pqos_cap_get_type(m_cap, type, cap_item);
+}
+
+/**
+ * =======================================
+ * =======================================
+ *
+ * interface
+ *
+ * =======================================
+ * =======================================
+ */
+
+int
+pqos_inter_get(enum pqos_interface *interface)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        if (interface == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        *interface = _pqos_get_inter();
+
+        _pqos_api_unlock();
+        return PQOS_RETVAL_OK;
+}
+
+enum pqos_interface
+_pqos_get_inter(void)
+{
+        return m_interface;
 }

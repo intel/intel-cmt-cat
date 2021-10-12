@@ -218,6 +218,7 @@ checkpatch:
 	-f monitoring.h -f monitoring.c \
 	-f os_allocation.h -f os_allocation.c \
 	-f os_cap.h -f os_cap.c \
+	-f os_common.h \
 	-f os_monitoring.h os_monitoring.c \
 	-f perf.h -f perf.c \
 	-f perf_monitoring.h -f perf_monitoring.c \
@@ -264,6 +265,7 @@ cppcheck:
 	hw_cap.h hw_cap.c \
 	hw_monitoring.h hw_monitoring.c \
 	os_cap.h os_cap.c \
+	os_common.h \
 	os_monitoring.h os_monitoring.c \
 	perf_monitoring.h perf_monitoring.c \
 	resctrl_alloc.h resctrl_alloc.c \

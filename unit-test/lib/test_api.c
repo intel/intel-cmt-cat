@@ -44,6 +44,7 @@
 #include "mock_hw_monitoring.h"
 #include "pqos.h"
 #include "api.h"
+#include "test.h"
 
 #ifndef DIM
 #define DIM(x) (sizeof(x) / sizeof(x[0]))
@@ -71,8 +72,15 @@ setup_hw(void **state __attribute__((unused)))
 }
 
 static int
-setup_os(void **state __attribute__((unused)))
+setup_os(void **state)
 {
+        struct test_data *data;
+
+        test_init_all(state);
+
+        data = (struct test_data *)*state;
+        data->interface = PQOS_INTER_OS;
+
         int ret = api_init(PQOS_INTER_OS, PQOS_VENDOR_INTEL);
 
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -81,8 +89,15 @@ setup_os(void **state __attribute__((unused)))
 }
 
 static int
-setup_os_resctrl_mon(void **state __attribute__((unused)))
+setup_os_resctrl_mon(void **state)
 {
+        struct test_data *data;
+
+        test_init_all(state);
+
+        data = (struct test_data *)*state;
+        data->interface = PQOS_INTER_OS_RESCTRL_MON;
+
         int ret = api_init(PQOS_INTER_OS_RESCTRL_MON, PQOS_VENDOR_INTEL);
 
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -219,7 +234,7 @@ test_pqos_alloc_assoc_set_pid_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         ret = pqos_alloc_assoc_set_pid(1, 2);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 #ifdef __linux__
@@ -272,7 +287,7 @@ test_pqos_alloc_assoc_get_pid_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         ret = pqos_alloc_assoc_get_pid(1, &id);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 #ifdef __linux__
@@ -502,7 +517,7 @@ test_pqos_alloc_assign_pid_hw(void **state __attribute__((unused)))
 
         ret =
             pqos_alloc_assign_pid(technology, task_array, task_num, &class_id);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 static void
@@ -587,7 +602,7 @@ test_pqos_alloc_release_pid_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         ret = pqos_alloc_release_pid(task_array, task_num);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 static void
@@ -1958,7 +1973,7 @@ test_pqos_mon_start_pids_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         ret = pqos_mon_start_pids(num_pids, pids, event, context, &group);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 static void
@@ -2044,7 +2059,7 @@ test_pqos_mon_start_pid_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         ret = pqos_mon_start_pid(pid, event, context, &group);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 /* ======== pqos_mon_add_pids ======== */
@@ -2102,7 +2117,7 @@ test_pqos_mon_add_pids_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         ret = pqos_mon_add_pids(num_pids, pids, &group);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 static void
@@ -2185,7 +2200,7 @@ test_pqos_mon_remove_pids_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         ret = pqos_mon_remove_pids(num_pids, pids, &group);
-        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 static void
@@ -2341,8 +2356,8 @@ main(void)
         result += cmocka_run_group_tests(tests_param, NULL, NULL);
         result += cmocka_run_group_tests(tests_hw, setup_hw, NULL);
 #ifdef __linux__
-        result += cmocka_run_group_tests(tests_os, setup_os, NULL);
-        result += cmocka_run_group_tests(tests_os, setup_os_resctrl_mon, NULL);
+        result += cmocka_run_group_tests(tests_os, setup_os, test_fini);
+        result += cmocka_run_group_tests(tests_os, setup_os_resctrl_mon, test_fini);
 #endif
 
         return result;

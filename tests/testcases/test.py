@@ -50,11 +50,12 @@ class Test:
         self.rdtset = request.config.rdtset
         self.pqos = request.config.pqos
         if os.path.isdir("/sys/fs/resctrl/info"):
-            self.run(self.pqos + " -I -R l3cdp-off", True)
+            self.run(self.pqos + " --iface=os -R l3cdp-off", True)
+            self.run(self.pqos + " --iface=os -R l2cdp-off", True)
             self.run("umount /sys/fs/resctrl", True)
-        self.run(self.pqos + " -R l3cdp-off", True)
-        self.run(self.pqos + " -R l2cdp-off", True)
-        self.run(self.pqos + " -r -t 0", True)
+        self.run(self.pqos + " --iface=msr -R l3cdp-off", True)
+        self.run(self.pqos + " --iface=msr -R l2cdp-off", True)
+        self.run(self.pqos + " --iface=msr -r -t 0", True)
 
 
     def fini(self):
@@ -88,7 +89,9 @@ class Test:
     def cmd(iface, app, params):
         command = app
         if iface == "OS":
-            command = command + " -I"
+            command = command + " --iface=os"
+        elif iface == "MSR":
+            command = command + " --iface=msr"
         command = command + " " + params
 
         return command

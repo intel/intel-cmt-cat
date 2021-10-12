@@ -253,6 +253,16 @@ select a PROFILE from predefined allocation classes, use \-H to list available p
 .TP
 .B \-I, \-\-iface\-os
 set the library interface to use the kernel implementation. If not set the default implementation is to program the MSR's directly.
+.TP
+.B \-\-iface\=INTERFACE
+set the library interface to automatically detected one ('auto'), MSR ('msr') or kernel interface ('os').
+INTERFACE can be set to either 'auto' (default), 'msr' or 'os'. If automatic detection is selected ('auto'), it:
+.br
+1) Takes RDT_IFACE environment variable into account if this variable is set\n
+.br
+2) Selects OS interface if the kernel interface is supported
+.br
+3) Selects MSR interface otherwise
 .SH NOTES
 .PP
 CMT, MBM and CAT are configured using Model Specific Registers (MSRs). The pqos software

@@ -97,6 +97,17 @@ int parse_reset(const char *cpu);
  */
 int parse_rdt(char *rdtstr);
 
+/**
+ * @brief Parses -F/--iface params
+ *
+ * @param [in] iface interface string
+ *
+ * @return parse status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+int parse_iface(const char *iface);
+
 /*
  * @brief Checks if it's possible to fulfill requested COS configuration
  *        and then configures system.

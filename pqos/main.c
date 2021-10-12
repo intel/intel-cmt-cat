@@ -118,7 +118,12 @@ static int sel_display_verbose = 0;
 /**
  * Selected library interface
  */
-enum pqos_interface sel_interface = PQOS_INTER_MSR;
+enum pqos_interface sel_interface = PQOS_INTER_AUTO;
+
+/**
+ * Selected library interface explicitly
+ */
+static int sel_interface_selected = 0;
 
 /**
  * Enable displaying library version
@@ -515,6 +520,37 @@ selfn_iface_os(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_interface = PQOS_INTER_OS;
+        sel_interface_selected = 1;
+}
+
+/**
+ * @brief Selects library interface
+ *
+ * @param arg "auto", "msr" or "os" that sets the interface automatically,
+ *            MSR interface or OS interface respectively
+ */
+static void
+selfn_iface(const char *arg)
+{
+        if (arg == NULL) {
+                parse_error(arg, "NULL pointer!\n");
+                return;
+        }
+
+        if (strcasecmp(arg, "auto") == 0)
+                sel_interface = PQOS_INTER_AUTO;
+        else if (strcasecmp(arg, "msr") == 0)
+                sel_interface = PQOS_INTER_MSR;
+        else if (strcasecmp(arg, "os") == 0)
+                sel_interface = PQOS_INTER_OS;
+        else {
+                parse_error(arg,
+                            "Unknown interface! "
+                            "Available options: auto, msr, os\n");
+                return;
+        }
+
+        sel_interface_selected = 1;
 }
 
 /**
@@ -565,6 +601,7 @@ parse_config_file(const char *fname)
                 {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
                 {"reset-cat:",          selfn_reset_alloc },       /**< -R */
                 {"iface-os:",           selfn_iface_os },          /**< -I */
+		{"iface:",              selfn_iface },
         };
         FILE *fp = NULL;
         char cb[256];
@@ -633,6 +670,7 @@ static const char help_printf_short[] =
         "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
         "       %s [--version]\n"
         "          [-l FILE] [--log-file=FILE] [-I] [--iface-os]\n"
+        "          [--iface=INTERFACE]\n"
         "       %s [-s] [--show]\n"
         "       %s [-d] [--display] [-D] [--display-verbose]\n"
         "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p [EVTPIDS]] "
@@ -737,8 +775,17 @@ static const char help_printf_long[] =
         "  -I, --iface-os\n"
         "          set the library interface to use the kernel\n"
         "          implementation. If not set the default implementation is\n"
-        "          to program the MSR's directly.\n";
-
+        "          to program the MSR's directly.\n"
+        "  --iface=INTERFACE\n"
+        "          set the library interface to automatically detected one\n"
+        "          ('auto'), MSR ('msr') or kernel interface ('os').\n"
+        "          INTERFACE can be set to either 'auto' (default), 'msr' or 'os'.\n"
+        "          If automatic detection is selected ('auto'), it:\n"
+        "                  1) Takes RDT_IFACE environment variable\n"
+        "                     into account if this variable is set\n"
+        "                  2) Selects OS interface if the kernel interface\n"
+        "                     is supported\n"
+        "                  3) Selects MSR interface otherwise\n";
 /**
  * @brief Displays help information
  *
@@ -789,6 +836,7 @@ static void print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_DISABLE_MON_IPC 1001
 #define OPTION_DISABLE_MON_LLC_MISS 1002
 #define OPTION_VERSION 1003
+#define OPTION_INTERFACE 1004
 
 static struct option long_cmd_opts[] = {
         {"help",                 no_argument,       0, 'h'},
@@ -816,6 +864,7 @@ static struct option long_cmd_opts[] = {
         {"verbose",              no_argument,       0, 'v'},
         {"super-verbose",        no_argument,       0, 'V'},
         {"iface-os",             no_argument,       0, 'I'},
+        {"iface",                required_argument, 0, OPTION_INTERFACE},
         {"percent-llc",          no_argument,       0, 'P'},
         {"version",              no_argument,       0, OPTION_VERSION},
 #ifdef PQOS_RMID_CUSTOM
@@ -977,7 +1026,22 @@ int main(int argc, char **argv)
                         selfn_super_verbose_mode(NULL);
                         break;
                 case 'I':
+                        if (sel_interface_selected) {
+                                printf("Only single interface selection "
+                                       "argument is accepted!\n");
+                                return EXIT_FAILURE;
+                        }
                         selfn_iface_os(NULL);
+                        break;
+                case OPTION_INTERFACE:
+                        if (sel_interface_selected) {
+                                printf("Only single interface selection "
+                                       "argument is accepted!\n");
+                                return EXIT_FAILURE;
+                        }
+                        if (optarg == NULL)
+                                return EXIT_FAILURE;
+                        selfn_iface(optarg);
                         break;
                 case OPTION_DISABLE_MON_IPC:
                         selfn_monitor_disable_ipc(NULL);
@@ -1037,6 +1101,13 @@ int main(int argc, char **argv)
                 printf("Error initializing PQoS library!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_1;
+        }
+
+        ret = pqos_inter_get(&sel_interface);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Error retrieving PQoS interface!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_2;
         }
 
         ret = pqos_cap_get(&p_cap, &p_cpu);

@@ -648,6 +648,23 @@ parse_rdt(char *rdtstr)
         return 0;
 }
 
+int
+parse_iface(const char *iface)
+{
+        if (strcasecmp(iface, "auto") == 0)
+                g_cfg.interface = PQOS_INTER_AUTO;
+        else if (strcasecmp(iface, "msr") == 0)
+                g_cfg.interface = PQOS_INTER_MSR;
+        else if (strcasecmp(iface, "os") == 0)
+                g_cfg.interface = PQOS_INTER_OS;
+        else {
+                fprintf(stderr, "Invalid interface: \"%s\"\n", iface);
+                return -EINVAL;
+        }
+
+        return 0;
+}
+
 /**
  * @brief Checks if configured CPU sets are overlapping
  *
@@ -1934,6 +1951,15 @@ alloc_init(void)
         if (ret != PQOS_RETVAL_OK) {
                 fprintf(stderr, "Allocation: Error initializing PQoS "
                                 "library!\n");
+                ret = -EFAULT;
+                goto err;
+        }
+
+        /* Obtain interface */
+        ret = pqos_inter_get(&g_cfg.interface);
+        if (ret != PQOS_RETVAL_OK) {
+                fprintf(stderr, "Allocation: Error retrieving PQoS "
+                                "interface!\n");
                 ret = -EFAULT;
                 goto err;
         }

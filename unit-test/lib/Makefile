@@ -157,6 +157,7 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 		-Wl,--wrap=os_mon_add_pids \
 		-Wl,--wrap=os_mon_remove_pids \
 		-Wl,--wrap=_pqos_cap_get \
+		-Wl,--wrap=_pqos_inter_get \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

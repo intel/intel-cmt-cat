@@ -45,6 +45,7 @@
 #include "types.h"
 #include "resctrl.h"
 #include "common.h"
+#include "os_common.h"
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 
@@ -318,6 +319,31 @@ resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask)
                 }
                 hex_offset ^= 1;
         }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_is_supported(void)
+{
+        int ret;
+        int resctrl = 0;
+
+        ret = pqos_file_contains(PROC_FILESYSTEMS, "resctrl", &resctrl);
+        if (ret != PQOS_RETVAL_OK) {
+                /* The log message below may not appear if log module
+                   is not initialized */
+                LOG_ERROR("Fatal error encountered in resctrl detection!\n");
+                return ret;
+        }
+        /* The log message below may not appear if log module
+           is not initialized */
+        LOG_INFO("%s\n", resctrl ? "resctrl detected"
+                                 : "resctrl not detected. "
+                                   "Kernel version 4.10 or higher required");
+
+        if (resctrl == 0)
+                return PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;
 }

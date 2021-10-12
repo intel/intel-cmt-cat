@@ -100,14 +100,14 @@ PQOS_LOCAL void _pqos_api_unlock(void);
 PQOS_LOCAL int _pqos_check_init(const int expect);
 
 /**
- * @brief Internal API to retrie PQoS interface
+ * @brief Internal API to retrieve PQoS interface
  *
  * @return PQoS interface
  */
-PQOS_LOCAL enum pqos_interface _pqos_iface(void);
+PQOS_LOCAL enum pqos_interface _pqos_get_inter(void);
 
 /**
- * @brief Internal API to retrie PQoS capabilities data
+ * @brief Internal API to retrieve PQoS capabilities data
  *
  * @param [out] cap location to store PQoS capabilities information at
  * @param [out] cpu location to store CPU information at
@@ -116,7 +116,7 @@ PQOS_LOCAL void _pqos_cap_get(const struct pqos_cap **cap,
                               const struct pqos_cpuinfo **cpu);
 
 /**
- * @brief Internal API to retrie \a type of capability
+ * @brief Internal API to retrieve \a type of capability
  *
  * @param [in] type capability type to look for
  * @param [out] cap_item place to store pointer to selected capability

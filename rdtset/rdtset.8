@@ -62,7 +62,20 @@ Show help
 Verbose mode
 .TP
 .B \-I, \-\-iface-os
-Set the library to use the kernel implementation. If not set the default implementation is to program the MSR's directly.
+Set the library to use the kernel implementation. If not set the default implementation is to detect the interface automatically (MSR or kernel).
+.TP
+.B \-F <interface>, \-\-iface <interface>
+Set the library interface to automatically detected one ('auto'), MSR ('msr') or kernel interface ('os').
+.br
+<interface> can be set to either 'auto' (default), 'msr' or 'os'.
+.br
+If automatic detection is selected ('auto'), it:
+.br
+1) Takes RDT_IFACE environment variable into account if this variable is set
+.br
+2) Selects OS interface if the kernel interface is supported
+.br
+3) Selects MSR interface otherwise
 .TP
 .B \-t\, \-\-rdt\ feature=value;...cpu=cpulist
 Specify Intel(R) RDT configuration, single class configuration per -t, multiple -t options allowed.
@@ -151,9 +164,10 @@ In order to reconfigure allocation, it is needed to reset current configuration
 Do not drop sudo elevated privileges
 .SH NOTES
 .PP
-Without --iface-os (-I) parameter, CAT and MBA are configured using
-Model Specific Registers (MSRs) to set up the class of service masks and manage
-the association of the cores/logical threads to a class of service.
+If kernel interface is not selected neither manually (e.g. --iface=msr)
+nor automatically, CAT and MBA are configured using Model Specific Registers
+(MSRs) to set up the class of service masks and manage the association
+of the cores/logical threads to a class of service.
 The rdtset software executes in user space, and access to the MSRs is
 obtained through a standard Linux*/FreeBSD* interface.
 Under Linux, the virtual file system structure /dev/cpu/CPUNUM/msr provides

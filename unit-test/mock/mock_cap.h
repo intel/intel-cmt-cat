@@ -43,5 +43,6 @@ void __wrap__pqos_cap_get(const struct pqos_cap **cap,
 void __wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg);
+void __wrap__pqos_inter_get(enum pqos_interface *interface);
 
 #endif /* MOCK_CAP_H_ */

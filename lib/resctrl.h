@@ -178,6 +178,14 @@ PQOS_LOCAL int resctrl_cpumask_write(FILE *fd,
  */
 PQOS_LOCAL int resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask);
 
+/**
+ * @brief Check if resctrl is supported
+ *
+ * @return Support status
+ * @retval PQOS_RETVAL_OK if supported, error code otherwise
+ */
+int resctrl_is_supported(void);
+
 #ifdef __cplusplus
 }
 #endif

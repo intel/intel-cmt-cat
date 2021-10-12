@@ -71,7 +71,7 @@
  * Local data structures
  * ---------------------------------------
  */
-static int m_interface = PQOS_INTER_MSR;
+
 /**
  * ---------------------------------------
  * External data
@@ -243,20 +243,20 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu,
                 const struct pqos_config *cfg)
 {
         int ret = PQOS_RETVAL_OK;
+#ifdef __linux__
+        enum pqos_interface interface = _pqos_get_inter();
+#endif
 
 #ifndef __linux__
         UNUSED_PARAM(cpu);
         UNUSED_PARAM(cap);
 #endif
 
-        if (cfg == NULL)
-                m_interface = PQOS_INTER_MSR;
-        else if (cfg->interface == PQOS_INTER_OS_RESCTRL_MON)
-                m_interface = PQOS_INTER_OS;
-        else
-                m_interface = cfg->interface;
+        UNUSED_PARAM(cfg);
+
 #ifdef __linux__
-        if (m_interface == PQOS_INTER_OS)
+        if (interface == PQOS_INTER_OS ||
+            interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_alloc_init(cpu, cap);
 #endif
         return ret;
@@ -266,9 +266,11 @@ int
 pqos_alloc_fini(void)
 {
         int ret = PQOS_RETVAL_OK;
-
 #ifdef __linux__
-        if (m_interface == PQOS_INTER_OS)
+        enum pqos_interface interface = _pqos_get_inter();
+
+        if (interface == PQOS_INTER_OS ||
+            interface == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_alloc_fini();
 #endif
         return ret;

@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2020-2021 Intel Corporation. All rights reserved.
+ * Copyright(c) 2021 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,63 +30,19 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include "mock_cap.h"
+#ifndef __PQOS_OS_COMMON_H__
+#define __PQOS_OS_COMMON_H__
 
-int
-__wrap__pqos_check_init(const int expect)
-{
-        check_expected(expect);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-        return mock_type(int);
+#define PROC_CPUINFO     "/proc/cpuinfo"
+#define PROC_FILESYSTEMS "/proc/filesystems"
+#define PROC_MOUNTS      "/proc/mounts"
+
+#ifdef __cplusplus
 }
+#endif
 
-void
-__wrap__pqos_api_lock(void)
-{
-        function_called();
-}
-
-void
-__wrap__pqos_api_unlock(void)
-{
-        function_called();
-}
-
-void
-__wrap__pqos_cap_get(const struct pqos_cap **cap,
-                     const struct pqos_cpuinfo **cpu)
-{
-        if (cap != NULL)
-                *cap = mock_ptr_type(struct pqos_cap *);
-        if (cpu != NULL)
-                *cpu = mock_ptr_type(struct pqos_cpuinfo *);
-}
-
-void
-__wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
-{
-        check_expected(cdp);
-}
-
-void
-__wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
-{
-        check_expected(cdp);
-}
-
-void
-__wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg)
-{
-        check_expected(cfg);
-}
-
-void
-__wrap__pqos_inter_get(enum pqos_interface *interface)
-{
-        if (interface != NULL)
-                *interface = mock_type(enum pqos_interface);
-}
+#endif /* __PQOS_OS_COMMON_H__ */

@@ -42,6 +42,7 @@ struct test_data {
         struct pqos_cap_l2ca cap_l2ca;
         struct pqos_cap_mba cap_mba;
         struct pqos_cap_mon *cap_mon;
+        enum pqos_interface interface;
 };
 
 static inline int
@@ -180,6 +181,14 @@ test_cap_init(struct test_data *data, unsigned technology)
 }
 
 static inline int
+test_interface_init(struct test_data *data)
+{
+        data->interface = PQOS_INTER_MSR;
+
+        return 0;
+}
+
+static inline int
 test_init(void **state, unsigned technology)
 {
         int ret;
@@ -198,6 +207,10 @@ test_init(void **state, unsigned technology)
                 return ret;
 
         ret = test_config_init(data);
+        if (ret != 0)
+                return ret;
+
+        ret = test_interface_init(data);
         if (ret != 0)
                 return ret;
 

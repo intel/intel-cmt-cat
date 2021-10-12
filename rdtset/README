@@ -59,11 +59,11 @@ Run "make clean" to clean the build files.
 USAGE
 =====
 
-Usage: rdtset -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I] (-p <pidlist> | [-k] cmd [<args>...])
-       rdtset -r <cpulist> -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I] (-p <pidlist> | [-k] cmd [<args>...])
+Usage: rdtset -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I | --iface <interface>] (-p <pidlist> | [-k] cmd [<args>...])
+       rdtset -r <cpulist> -t <feature=value;...cpu=cpulist>... -c <cpulist> [-I | --iface <interface>] (-p <pidlist> | [-k] cmd [<args>...])
        rdtset -r <cpulist> -c <cpulist> (-p <pidlist> | [-k] cmd [<args>...])
-       rdtset -r <cpulist> -t <feature=value;...cpu=cpulist>... [-I] -p <pidlist>
-       rdtset -t <feature=value> -I [-c <cpulist>] (-p <pidlist> | [-k] cmd [<args>...])
+       rdtset -r <cpulist> -t <feature=value;...cpu=cpulist>... [-I | --iface <interface>] -p <pidlist>
+       rdtset -t <feature=value> (-I | --iface <interface>) [-c <cpulist>] (-p <pidlist> | [-k] cmd [<args>...])
 
 Options:
  -t/--rdt feature=value;...cpu=cpulist specify RDT configuration
@@ -79,7 +79,20 @@ Options:
  -v, --verbose                         prints out additional logging information
  -I, --iface-os                        set the library interface to use the kernel
                                        implementation. If not set the default
-				       implementation is to program the MSR's directly
+                                       implementation is to detect the interface
+                                       automatically (MSR or kernel)
+ -F <interface>, --iface <interface>   set the library interface to automatically
+                                       detected one ('auto'), MSR ('msr')
+                                       or kernel interface ('os').
+                                       <interface> can be set to either
+                                       'auto' (default), 'msr' or 'os'.
+                                       If automatic detection is selected
+                                       ('auto'), it:
+                                       1) Takes RDT_IFACE environment variable
+                                          into account if this variable is set
+                                       2) Selects OS interface if the kernel
+                                          interface is supported
+                                       3) Selects MSR interface otherwise
  -h, --help                            display help
 
 Run "id" command on CPU 1 using four L3 cache-ways (mask 0xf),
@@ -120,7 +133,7 @@ Example allocation configuration strings:
     -t 'mba_max=2000;cpu=1'
         Use SW controller to limit local memory B/W to 2000MBps on core 1
 
-Example PID type allocation configuration string (requires -I option):
+Example PID type allocation configuration string (requires '--iface os' option):
     -t 'l3=0xf'
         Allocate four L3 (mask 0xf) cache-ways to specified PIDs (-p option) or command
 
@@ -155,7 +168,7 @@ Example usage of MBA SW controller:
  $ sudo rdtset -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 -k id
 
 1.1 OS interface:
- $ sudo rdtset -I -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 -k id
+ $ sudo rdtset --iface os -t 'l3=0xf;cpu=0-2' -t 'l3=0xf0;cpu=3,4,5' -c 0-3,4,5 -k id
 
 2. Show current proc status to verify CPU affinity:
 2.1 Linux:
@@ -199,10 +212,10 @@ Example usage of MBA SW controller:
  $ sudo pqos -s
 
 5. Configuring allocation on a PID basis (Linux kernel 4.10+ required)
- $ sudo rdtset -I -t 'l3=0xf' -p 23434-23442,34531,5642
+ $ sudo rdtset --iface os -t 'l3=0xf' -p 23434-23442,34531,5642
  Allocate 4 cache-ways for specified range of processes
 
- $ sudo rdtset -I -t 'mba=50' -k memtester 10M
+ $ sudo rdtset --iface os -t 'mba=50' -k memtester 10M
  Restrict memory B/W availability to 50% for the memtester application (using PID allocation)
 
  Note: Currently the max allowed PID's to configure allocation for is 128.

@@ -49,15 +49,10 @@
 #define TOPO_OBJ_L2_CLUSTER 2
 #define TOPO_OBJ_L3_CLUSTER 3
 
-static int m_interface = PQOS_INTER_MSR;
-
 int
 _pqos_utils_init(int interface)
 {
-        if (interface == PQOS_INTER_OS_RESCTRL_MON)
-                m_interface = PQOS_INTER_OS;
-        else
-                m_interface = interface;
+        UNUSED_PARAM(interface);
 
         return PQOS_RETVAL_OK;
 }
