@@ -104,6 +104,7 @@ OBJS := $(filter-out perf.o \
 	os_allocation.o \
 	os_cap.o \
 	os_monitoring.o \
+	os_cpuinfo.o \
 	resctrl.o \
 	resctrl_alloc.o \
 	resctrl_monitoring.o \

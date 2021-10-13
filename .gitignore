@@ -28,6 +28,15 @@ lib/python/.coverage
 lib/python/test_env
 lib/python/venv_*
 
+lib/perl/Makefile
+lib/perl/Makefile.old
+lib/perl/pqos.bs
+lib/perl/pqos_wrap.c
+lib/perl/blib
+lib/perl/MYMETA.json
+lib/perl/MYMETA.yml
+lib/perl/pm_to_blib
+
 bat/test_env
 
 venv

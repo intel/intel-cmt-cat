@@ -58,6 +58,7 @@
 #include "os_allocation.h"
 #include "allocation.h"
 #include "cap.h"
+#include "os_cpuinfo.h"
 
 /**
  * This structure will be made externally available
@@ -382,8 +383,7 @@ detect_apic_masks(struct apic_info *apic)
 static int
 detect_cpu(const int cpu,
            const struct apic_info *apic,
-           struct pqos_coreinfo *info,
-           enum pqos_vendor vendor)
+           struct pqos_coreinfo *info)
 {
         struct cpuid_out leafB;
         uint32_t apicid;
@@ -398,21 +398,6 @@ detect_cpu(const int cpu,
         info->socket = (apicid & apic->pkg_mask) >> apic->pkg_shift;
         info->l3_id = apicid >> apic->l3_shift;
         info->l2_id = apicid >> apic->l2_shift;
-
-        /*
-         * Update l3cat_id and mba_id. For Intel, CAT and MBA ids are
-         * initialized to socket id. AMD uses l3_id for both CAT and MBA
-         * ids. Right now, both these ids are same. This could change in
-         * the future.
-         */
-
-        if (vendor == PQOS_VENDOR_AMD) {
-                info->l3cat_id = info->l3_id;
-                info->mba_id = info->l3_id;
-        } else {
-                info->l3cat_id = info->socket;
-                info->mba_id = info->socket;
-        }
 
         LOG_DEBUG("Detected core %u, socket %u, "
                   "L2 ID %u, L3 ID %u, APICID %u\n",
@@ -433,16 +418,18 @@ detect_cpu(const int cpu,
  *      - retrieve package & cluster data from the APICID
  * - restores initial task CPU affinity
  *
+ * @param [in] apic information about APICID structure
+ *
  * @return Pointer to CPU topology structure
  * @retval NULL on error
  */
 static struct pqos_cpuinfo *
-cpuinfo_build_topo(enum pqos_vendor vendor)
+cpuinfo_build_topo(struct apic_info *apic)
 {
-        unsigned i, max_core_count, core_count = 0;
+        int i, max_core_count;
+        unsigned core_count = 0;
         struct pqos_cpuinfo *l_cpu = NULL;
         cpu_set_t current_mask;
-        struct apic_info apic;
 
         if (get_affinity(&current_mask) != 0) {
                 LOG_ERROR("Error retrieving CPU affinity mask!");
@@ -450,13 +437,8 @@ cpuinfo_build_topo(enum pqos_vendor vendor)
         }
 
         max_core_count = sysconf(_SC_NPROCESSORS_CONF);
-        if (max_core_count == 0) {
+        if (max_core_count <= 0) {
                 LOG_ERROR("Zero processors in the system!");
-                return NULL;
-        }
-
-        if (detect_apic_masks(&apic) != 0) {
-                LOG_ERROR("Couldn't retrieve APICID structure information!");
                 return NULL;
         }
 
@@ -471,9 +453,8 @@ cpuinfo_build_topo(enum pqos_vendor vendor)
         l_cpu->mem_size = (unsigned)mem_sz;
         memset(l_cpu, 0, mem_sz);
 
-        for (i = 0; i < max_core_count; i++)
-                if (detect_cpu(i, &apic, &l_cpu->cores[core_count], vendor) ==
-                    0)
+        for (i = 0; i < max_core_count; ++i)
+                if (detect_cpu(i, apic, &l_cpu->cores[core_count]) == 0)
                         core_count++;
 
         if (set_affinity_mask(&current_mask) != 0) {
@@ -482,9 +463,6 @@ cpuinfo_build_topo(enum pqos_vendor vendor)
                 return NULL;
         }
 
-        l_cpu->l2 = m_l2;
-        l_cpu->l3 = m_l3;
-        l_cpu->vendor = vendor;
         l_cpu->num_cores = core_count;
         if (core_count == 0) {
                 free(l_cpu);
@@ -561,10 +539,13 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
  * and their location.
  */
 int
-cpuinfo_init(const struct pqos_cpuinfo **topology)
+cpuinfo_init(enum pqos_interface interface,
+             const struct pqos_cpuinfo **topology)
 {
         int ret;
         enum pqos_vendor vendor;
+        unsigned i;
+        struct apic_info apic;
 
         if (topology == NULL)
                 return -EINVAL;
@@ -578,13 +559,46 @@ cpuinfo_init(const struct pqos_cpuinfo **topology)
         if (ret != 0)
                 return ret;
 
-        m_cpu = cpuinfo_build_topo(vendor);
+        if (detect_apic_masks(&apic) != 0) {
+                LOG_ERROR("Couldn't retrieve APICID structure information!\n");
+                return -EFAULT;
+        }
+
+        if (interface == PQOS_INTER_MSR)
+                m_cpu = cpuinfo_build_topo(&apic);
+#ifdef __linux__
+        else if (interface == PQOS_INTER_OS ||
+                 interface == PQOS_INTER_OS_RESCTRL_MON)
+                m_cpu = os_cpuinfo_topology();
+#endif
+        else
+                return -EINVAL;
         if (m_cpu == NULL) {
-                LOG_ERROR("CPU topology detection error!");
+                LOG_ERROR("CPU topology detection error!\n");
                 return -EFAULT;
         }
 
         m_cpu->vendor = vendor;
+        m_cpu->l2 = m_l2;
+        m_cpu->l3 = m_l3;
+
+        /*
+         * Update l3cat_id and mba_id. For Intel, CAT and MBA ids are
+         * initialized to socket id. AMD uses l3_id for both CAT and MBA
+         * ids. Right now, both these ids are same. This could change in
+         * the future.
+         */
+        for (i = 0; i < m_cpu->num_cores; ++i) {
+                struct pqos_coreinfo *info = &m_cpu->cores[i];
+
+                if (vendor == PQOS_VENDOR_AMD) {
+                        info->l3cat_id = info->l3_id;
+                        info->mba_id = info->l3_id;
+                } else {
+                        info->l3cat_id = info->socket;
+                        info->mba_id = info->socket;
+                }
+        }
 
         *topology = m_cpu;
         return 0;
