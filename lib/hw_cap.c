@@ -382,8 +382,12 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
 #define CPUID_LEAF_BRAND_NUM (CPUID_LEAF_BRAND_END - CPUID_LEAF_BRAND_START + 1)
 #define MAX_BRAND_STRING_LEN (CPUID_LEAF_BRAND_NUM * 4 * sizeof(uint32_t))
         static const char *const supported_brands[] = {
-            "E5-2658 v3",  "E5-2648L v3", "E5-2628L v3", "E5-2618L v3",
-            "E5-2608L v3", "E5-2658A v3", "E3-1258L v4", "E3-1278L v4"};
+            "E5-2658 v3", "E5-2648L v3", "E5-2628L v3", "E5-2618L v3",
+            "E5-2608L v3", "E5-2658A v3", "E3-1258L v4", "E3-1278L v4",
+            /* Tiger Lake and Elkhart Lake brand strings */
+            "i3-1115GRE", "i5-1145GRE", "i7-1185GRE", "x6212RE", "x6414RE",
+            "x6425RE", "x6427FE", "x6200FE", "W-11865MRE", "W-11865MLE",
+            "W-11555MRE", "W-11555MLE", "W-11155MRE", "W-11155MLE"};
         struct cpuid_out res;
         int ret = PQOS_RETVAL_OK;
         int match_found = 0;
@@ -523,6 +527,7 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
         unsigned l3_size = 0;
+        unsigned check_brand_str = 0;
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(cap != NULL);
@@ -543,17 +548,24 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                  */
                 LOG_INFO("CPUID.0x7.0: L3 CAT supported\n");
                 ret = hw_cap_l3ca_cpuid(cap, cpu);
-                if (ret == PQOS_RETVAL_OK)
+                if (ret == PQOS_RETVAL_RESOURCE) {
+                        LOG_INFO("CPUID.0x10.0: L3 CAT not detected. "
+                                 "Checking brand string...\n");
+                        check_brand_str = 1;
+                } else if (ret == PQOS_RETVAL_OK)
                         ret = get_cache_info(&cpu->l3, NULL, &l3_size);
         } else {
+                LOG_INFO("CPUID.0x7.0: L3 CAT not detected. "
+                         "Checking brand string...\n");
+                check_brand_str = 2;
+        }
+        if (check_brand_str) {
                 /**
                  * Use brand string matching method 1st.
                  * If it fails then try register probing.
                  */
-                LOG_INFO("CPUID.0x7.0: L3 CAT not detected. "
-                         "Checking brand string...\n");
                 ret = hw_cap_l3ca_brandstr(cap);
-                if (ret != PQOS_RETVAL_OK)
+                if (ret != PQOS_RETVAL_OK && check_brand_str > 1)
                         ret = hw_cap_l3ca_probe(cap, cpu);
                 if (ret == PQOS_RETVAL_OK)
                         ret =

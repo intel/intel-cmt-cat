@@ -112,23 +112,33 @@ Hardware Support
 ================
 
 Table 1. Intel(R) RDT hardware support
-+--------------------------------------------------------------------------------------------------------+
-|                                                        | CMT | MBM | L3 CAT | L3 CDP | L2 CAT | MBA    |
-|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor E5 v3                        | Yes | No  | Yes (1)| No     | No     | No     |
-|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor D                            | Yes | Yes | Yes (2)| No     | No     | No     |
-|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor E3 v4                        | No  | No  | Yes (3)| No     | No     | No     |
-|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) processor E5 v4                        | Yes | Yes | Yes (2)| Yes    | No     | No     |
-|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) Scalable Processors (6)                | Yes | Yes | Yes (2)| Yes    | No     | Yes (5)|
-|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Xeon(R) 2nd Generation Scalable Processors (7) | Yes | Yes | Yes (2)| Yes    | No     | Yes (5)|
-|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|
-|Intel(R) Atom(R) processor for Server C3000             | No  | No  | No     | No     | Yes (4)| No     |
-+--------------------------------------------------------------------------------------------------------+
++-----------------------------------------------------------------------------------------------------------------+
+|                                                        | CMT | MBM | L3 CAT | L3 CDP | L2 CAT | L2 CDP | MBA    |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Xeon(R) processor E5 v3                        | Yes | No  | Yes (1)| No     | No     | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Xeon(R) processor D                            | Yes | Yes | Yes (2)| No     | No     | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Xeon(R) processor E3 v4                        | No  | No  | Yes (3)| No     | No     | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Xeon(R) processor E5 v4                        | Yes | Yes | Yes (2)| Yes    | No     | No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Xeon(R) Scalable Processors (6)                | Yes | Yes | Yes (2)| Yes    | No     | No     | Yes (5)|
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Xeon(R) 2nd Generation Scalable Processors (7) | Yes | Yes | Yes (2)| Yes    | No     | No     | Yes (5)|
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Atom(R) processor for Server C3000             | No  | No  | No     | No     | Yes (4)| No     | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|11th Generation Intel(R) Core(TM) i3 Processors (8)     | No  | No  | Yes    | No     | Yes    | Yes    | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|11th Generation Intel(R) Core(TM) i5 Processors (8)     | No  | No  | Yes    | No     | Yes    | Yes    | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|11th Generation Intel(R) Core(TM) i7 Processors (8)     | No  | No  | Yes    | No     | Yes    | Yes    | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Atom(R) Processor X Series (9)                 | No  | No  | Yes    | No     | Yes    | Yes    | No     |
+|--------------------------------------------------------+-----+-----+--------+--------+--------+--------|--------|
+|Intel(R) Xeon(R) W Processors (8)                       | No  | No  | Yes    | No     | Yes    | Yes    | No     |
++-----------------------------------------------------------------------------------------------------------------+
 
 References:
 (1) Selected SKU's only:
@@ -166,6 +176,29 @@ References:
 (7) Please find errata for Second Generation Intel(R) Xeon(R) Scalable Processors at:
     https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/2nd-gen-xeon-scalable-spec-update.pdf
 
+(8) Selected SKU's only:
+        11th Generation Intel(R) Core(TM) i3-1115GRE Processor
+        11th Generation Intel(R) Core(TM) i5-1145GRE Processor
+        11th Generation Intel(R) Core(TM) i7-1185GRE Processor
+        Intel(R) Xeon(R) W-11865MRE
+        Intel(R) Xeon(R) W-11865MLE
+        Intel(R) Xeon(R) W-11555MRE
+        Intel(R) Xeon(R) W-11555MLE
+        Intel(R) Xeon(R) W-11155MRE
+        Intel(R) Xeon(R) W-11155MLE
+    Four L3 CAT classes of service (CLOS).
+    Eight L2 CAT classes of service (CLOS) per L2 cluster.
+    CLOS to hardware thread association can be changed at run time.
+
+(9) Selected SKU's only:
+        Intel(R) Atom(R) x6200FE Processor
+        Intel(R) Atom(R) x6212RE Processor
+        Intel(R) Atom(R) x6414RE Processor
+        Intel(R) Atom(R) x6425RE Processor
+        Intel(R) Atom(R) x6427FE Processor
+    Four L3 CAT classes of service (CLOS).
+    Sixteen L2 CAT classes of service (CLOS) per L2 cluster.
+    CLOS to hardware thread association can be changed at run time.
 
 For additional Intel(R) RDT details please refer to the Intel(R)
 Architecture Software Development Manuals available at:
