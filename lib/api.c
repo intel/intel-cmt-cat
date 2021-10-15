@@ -761,11 +761,13 @@ pqos_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
         }
 
         for (i = 0; i < num_groups; i++) {
-                int ret = pqos_mon_poll_events(groups[i]);
+                int retval = pqos_mon_poll_events(groups[i]);
 
-                if (ret != PQOS_RETVAL_OK)
+                if (retval != PQOS_RETVAL_OK) {
                         LOG_WARN("Failed to poll event on group number %u\n",
                                  i);
+                        ret = retval;
+                }
         }
         _pqos_api_unlock();
 

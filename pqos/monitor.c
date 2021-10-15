@@ -39,14 +39,14 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
-#include <ctype.h>                                      /**< isspace() */
-#include <sys/types.h>                                  /**< open() */
+#include <ctype.h>     /**< isspace() */
+#include <sys/types.h> /**< open() */
 #include <sys/stat.h>
-#include <sys/ioctl.h>                                  /**< terminal ioctl */
-#include <sys/time.h>                                   /**< gettimeofday() */
-#include <time.h>                                       /**< localtime() */
+#include <sys/ioctl.h> /**< terminal ioctl */
+#include <sys/time.h>  /**< gettimeofday() */
+#include <time.h>      /**< localtime() */
 #include <fcntl.h>
-#include <dirent.h>                                     /**< for dir list*/
+#include <dirent.h> /**< for dir list*/
 
 #include "pqos.h"
 
@@ -54,15 +54,17 @@
 #include "main.h"
 #include "monitor.h"
 
-#define PQOS_MAX_PID_MON_GROUPS         256
-#define PQOS_MON_EVENT_ALL    ((enum pqos_mon_event)~PQOS_MON_EVENT_TMEM_BW)
-#define PID_COL_STATUS (3) /**< col for process status letter*/
-#define PID_COL_UTIME (14) /**< col for cpu-user time in /proc/pid/stat*/
-#define PID_COL_STIME (15) /**< col for cpu-kernel time in /proc/pid/stat*/
-#define PID_COL_CORE  (39) /**< col for core number in /proc/pid/stat*/
+#define PQOS_MAX_PID_MON_GROUPS 256
+#define PQOS_MON_EVENT_ALL      ((enum pqos_mon_event) ~PQOS_MON_EVENT_TMEM_BW)
 #define PID_CPU_TIME_DELAY_USEC (1200000) /**< delay for cpu stats */
-#define TOP_PROC_MAX (10) /**< maximum number of top-pids to be handled*/
+
+#define TOP_PROC_MAX (10)  /**< maximum number of top-pids to be handled */
 #define NUM_TIDS_MAX (128) /**< maximum number of TIDs */
+
+#define PID_COL_STATUS (3)  /**< col for process status letter */
+#define PID_COL_UTIME  (14) /**< col for cpu-user time in /proc/pid/stat */
+#define PID_COL_STIME  (15) /**< col for cpu-kernel time in /proc/pid/stat */
+#define PID_COL_CORE   (39) /**< col for core number in /proc/pid/stat */
 
 /**
  * Local data structures
@@ -171,9 +173,9 @@ static FILE *fp_monitor = NULL;
  * in top-pid monitoring mode.
  */
 struct proc_stats {
-        pid_t pid; /**< process pid */
+        pid_t pid;                 /**< process pid */
         unsigned long ticks_delta; /**< current cpu_time - previous ticks */
-        double cpu_avg_ratio; /**< cpu usage/running time ratio*/
+        double cpu_avg_ratio;      /**< cpu usage/running time ratio*/
         int valid; /**< marks if statistics are fully processed */
 };
 
@@ -181,7 +183,7 @@ struct proc_stats {
  * Maintains single linked list implementation
  */
 struct slist {
-        void *data; /**< abstract data that is hold by a list element */
+        void *data;         /**< abstract data that is hold by a list element */
         struct slist *next; /**< ptr to next list element */
 };
 
@@ -208,7 +210,8 @@ struct llc_entry_data {
  * @param bytes value to be scaled up
  * @return scaled up value in KB's
  */
-static inline double bytes_to_kb(const double bytes)
+static inline double
+bytes_to_kb(const double bytes)
 {
         return bytes / 1024.0;
 }
@@ -219,7 +222,8 @@ static inline double bytes_to_kb(const double bytes)
  * @param bytes value to be scaled up
  * @return scaled up value in MB's
  */
-static inline double bytes_to_mb(const double bytes)
+static inline double
+bytes_to_mb(const double bytes)
 {
         return bytes / (1024.0 * 1024.0);
 }
@@ -231,7 +235,8 @@ static inline double bytes_to_mb(const double bytes)
  * @retval 0 monitoring cores
  * @retval 1 monitoring processes
  */
-static inline int process_mode(void)
+static inline int
+process_mode(void)
 {
         return (sel_process_num <= 0) ? 0 : 1;
 }
@@ -271,7 +276,8 @@ uinttostr_noalloc(char *buf, const int buf_len, const unsigned val)
  *
  * @return Pointer to allocated string
  */
-static char *uinttostr(const unsigned val)
+static char *
+uinttostr(const unsigned val)
 {
         char buf[16], *str = NULL;
 
@@ -294,8 +300,10 @@ static char *uinttostr(const unsigned val)
  * @retval -1 on error
  */
 static int
-set_cgrp(struct core_group *cg, char *desc,
-         const uint64_t *cores, const int num_cores)
+set_cgrp(struct core_group *cg,
+         char *desc,
+         const uint64_t *cores,
+         const int num_cores)
 {
         int i;
 
@@ -305,7 +313,7 @@ set_cgrp(struct core_group *cg, char *desc,
         ASSERT(num_cores > 0);
 
         cg->desc = desc;
-        cg->cores = malloc(sizeof(unsigned)*num_cores);
+        cg->cores = malloc(sizeof(unsigned) * num_cores);
         if (cg->cores == NULL) {
                 printf("Error allocating core group table\n");
                 return -1;
@@ -334,8 +342,10 @@ set_cgrp(struct core_group *cg, char *desc,
  * @retval -1 on error
  */
 static int
-set_pgrp(struct pid_group *pg, char *desc,
-         const uint64_t *pids, const int num_pids)
+set_pgrp(struct pid_group *pg,
+         char *desc,
+         const uint64_t *pids,
+         const int num_pids)
 {
         int i;
 
@@ -401,8 +411,8 @@ strtogrps(char *s,
                          * group so strlisttotab result is treated as the
                          * number of new groups
                          */
-                        unsigned new_groups_count = strlisttotab(
-                                        non_grp, cbuf, DIM(cbuf));
+                        unsigned new_groups_count =
+                            strlisttotab(non_grp, cbuf, DIM(cbuf));
 
                         if (group_count + new_groups_count > max)
                                 return -1;
@@ -413,11 +423,11 @@ strtogrps(char *s,
                                 int ret;
 
                                 if (ctab != NULL)
-                                        ret = set_cgrp(&ctab[group_count],
-                                                       desc, &cbuf[i], 1);
+                                        ret = set_cgrp(&ctab[group_count], desc,
+                                                       &cbuf[i], 1);
                                 else
-                                        ret = set_pgrp(&ptab[group_count],
-                                                       desc, &cbuf[i], 1);
+                                        ret = set_pgrp(&ptab[group_count], desc,
+                                                       &cbuf[i], 1);
                                 if (ret < 0) {
                                         free(desc);
                                         return -1;
@@ -478,8 +488,7 @@ strtogrps(char *s,
  * @retval -1 if some but not all cores match
  */
 static int
-cmp_cgrps(const struct core_group *cg_a,
-          const struct core_group *cg_b)
+cmp_cgrps(const struct core_group *cg_a, const struct core_group *cg_b)
 {
         int i, found = 0;
 
@@ -522,8 +531,7 @@ cmp_cgrps(const struct core_group *cg_a,
  * @retval -1 if some but not all pids match
  */
 static int
-cmp_pgrps(const struct pid_group *pg_a,
-          const struct pid_group *pg_b)
+cmp_pgrps(const struct pid_group *pg_a, const struct pid_group *pg_b)
 {
         int i, found = 0;
 
@@ -577,8 +585,8 @@ parse_event(char *str, enum pqos_mon_event *evt)
         else if (strncasecmp(str, "mbt:", 4) == 0)
                 *evt = PQOS_MON_EVENT_TMEM_BW;
         else if (strncasecmp(str, "all:", 4) == 0 ||
-                   strncasecmp(str, ":", 1) == 0)
-                *evt = (enum pqos_mon_event) PQOS_MON_EVENT_ALL;
+                 strncasecmp(str, ":", 1) == 0)
+                *evt = (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
         else
                 parse_error(str, "Unrecognized monitoring event type");
 }
@@ -618,10 +626,11 @@ parse_monitor_cores(char *str)
         for (i = 0; i < n; i++) {
                 int j, found = 0;
 
-                for (j = 0; j < sel_monitor_num &&
-                             j < (int)DIM(sel_monitor_core_tab); j++) {
-                        found = cmp_cgrps(&sel_monitor_core_tab[j],
-                                          &cgrp_tab[i]);
+                for (j = 0;
+                     j < sel_monitor_num && j < (int)DIM(sel_monitor_core_tab);
+                     j++) {
+                        found =
+                            cmp_cgrps(&sel_monitor_core_tab[j], &cgrp_tab[i]);
                         if (found < 0) {
                                 printf("Error: cannot monitor same "
                                        "cores in different groups\n");
@@ -633,9 +642,9 @@ parse_monitor_cores(char *str)
                         }
                 }
                 if (!found &&
-                    sel_monitor_num < (int) DIM(sel_monitor_core_tab)) {
+                    sel_monitor_num < (int)DIM(sel_monitor_core_tab)) {
                         struct core_group *cg =
-                                &sel_monitor_core_tab[sel_monitor_num];
+                            &sel_monitor_core_tab[sel_monitor_num];
                         *cg = cgrp_tab[i];
                         cg->events = evt;
                         cg->pgrp = malloc(sizeof(struct pqos_mon_data));
@@ -658,34 +667,40 @@ error_exit:
         exit(EXIT_FAILURE);
 }
 
-void selfn_monitor_file_type(const char *arg)
+void
+selfn_monitor_file_type(const char *arg)
 {
         selfn_strdup(&sel_output_type, arg);
 }
 
-void selfn_monitor_file(const char *arg)
+void
+selfn_monitor_file(const char *arg)
 {
         selfn_strdup(&sel_output_file, arg);
 }
 
-void selfn_monitor_set_llc_percent(void)
+void
+selfn_monitor_set_llc_percent(void)
 {
         sel_llc_format = LLC_FORMAT_PERCENT;
 }
 
-void selfn_monitor_disable_ipc(const char *arg)
+void
+selfn_monitor_disable_ipc(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_disable_ipc = 1;
 }
 
-void selfn_monitor_disable_llc_miss(const char *arg)
+void
+selfn_monitor_disable_llc_miss(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_disable_llc_miss = 1;
 }
 
-void selfn_monitor_cores(const char *arg)
+void
+selfn_monitor_cores(const char *arg)
 {
         char *cp = NULL, *str = NULL;
         char *saveptr = NULL;
@@ -698,7 +713,7 @@ void selfn_monitor_cores(const char *arg)
 
         selfn_strdup(&cp, arg);
 
-        for (str = cp; ; str = NULL) {
+        for (str = cp;; str = NULL) {
                 char *token = NULL;
 
                 token = strtok_r(str, ";", &saveptr);
@@ -716,8 +731,9 @@ void selfn_monitor_cores(const char *arg)
  * @param [in,out] events List of monitoring events
  * @param [in] cap_mon monitoring capability
  */
-static void monitor_setup_events(enum pqos_mon_event *events,
-                                 const struct pqos_capability * const cap_mon)
+static void
+monitor_setup_events(enum pqos_mon_event *events,
+                     const struct pqos_capability *const cap_mon)
 {
         unsigned i;
         enum pqos_mon_event all_evts = (enum pqos_mon_event)0;
@@ -742,20 +758,21 @@ static void monitor_setup_events(enum pqos_mon_event *events,
         if ((*events & PQOS_MON_EVENT_ALL) == PQOS_MON_EVENT_ALL) {
                 *events = (enum pqos_mon_event)(all_evts & *events);
 
-        /* Start IPC and LLC miss monitoring if available */
+                /* Start IPC and LLC miss monitoring if available */
         } else {
                 if (all_evts & PQOS_PERF_EVENT_IPC)
                         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
                 if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
-                        *events |= (enum pqos_mon_event)
-                                PQOS_PERF_EVENT_LLC_MISS;
+                        *events |=
+                            (enum pqos_mon_event)PQOS_PERF_EVENT_LLC_MISS;
         }
 
         sel_events_max |= *events;
 }
 
-int monitor_setup(const struct pqos_cpuinfo *cpu_info,
-                  const struct pqos_capability * const cap_mon)
+int
+monitor_setup(const struct pqos_cpuinfo *cpu_info,
+              const struct pqos_capability *const cap_mon)
 {
         unsigned i;
         int ret;
@@ -811,12 +828,12 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
          */
         if (sel_monitor_num == 0 && sel_process_num == 0) {
                 for (i = 0; i < cpu_info->num_cores; i++) {
-                        unsigned lcore  = cpu_info->cores[i].lcore;
+                        unsigned lcore = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
                         struct core_group *pg =
-                                &sel_monitor_core_tab[sel_monitor_num];
+                            &sel_monitor_core_tab[sel_monitor_num];
 
-                        if ((unsigned) sel_monitor_num >=
+                        if ((unsigned)sel_monitor_num >=
                             DIM(sel_monitor_core_tab))
                                 break;
                         ret = set_cgrp(pg, uinttostr(lcore), &core, 1);
@@ -824,7 +841,7 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 printf("Core group setup error!\n");
                                 exit(EXIT_FAILURE);
                         }
-                        pg->events = (enum pqos_mon_event) PQOS_MON_EVENT_ALL;
+                        pg->events = (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
                         pg->pgrp = malloc(sizeof(*pg->pgrp));
                         if (pg->pgrp == NULL) {
                                 printf("Error with memory allocation!\n");
@@ -847,9 +864,9 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
 
                         monitor_setup_events(&cg->events, cap_mon);
 
-                        ret = pqos_mon_start(cg->num_cores, cg->cores,
-                                             cg->events, (void *)cg->desc,
-                                             cg->pgrp);
+                        ret =
+                            pqos_mon_start(cg->num_cores, cg->cores, cg->events,
+                                           (void *)cg->desc, cg->pgrp);
                         ASSERT(ret == PQOS_RETVAL_OK);
                         /**
                          * The error raised also if two instances of PQoS
@@ -912,7 +929,8 @@ int monitor_setup(const struct pqos_cpuinfo *cpu_info,
         return 0;
 }
 
-void monitor_stop(void)
+void
+monitor_stop(void)
 {
         int i;
 
@@ -938,7 +956,8 @@ void monitor_stop(void)
                 }
 }
 
-void selfn_monitor_time(const char *arg)
+void
+selfn_monitor_time(const char *arg)
 {
         if (arg == NULL)
                 parse_error(arg, "NULL monitor time argument!");
@@ -946,22 +965,23 @@ void selfn_monitor_time(const char *arg)
         if (!strcasecmp(arg, "inf") || !strcasecmp(arg, "infinite"))
                 sel_timeout = -1; /**< infinite timeout */
         else
-                sel_timeout = (int) strtouint64(arg);
+                sel_timeout = (int)strtouint64(arg);
 }
 
-void selfn_monitor_interval(const char *arg)
+void
+selfn_monitor_interval(const char *arg)
 {
-        sel_mon_interval = (int) strtouint64(arg);
+        sel_mon_interval = (int)strtouint64(arg);
         if (sel_mon_interval < 1)
                 parse_error(arg, "Invalid interval value!\n");
 }
 
-void selfn_monitor_top_like(const char *arg)
+void
+selfn_monitor_top_like(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_mon_top_like = 1;
 }
-
 
 /**
  * @brief Adds pids for monitoring in pids monitoring mode
@@ -984,8 +1004,8 @@ add_pids_for_monitoring(const struct pid_group *pgrp,
          *  - update the entry
          *  - else - add it to the sel_monitor_pid_tab
          */
-        for (j = 0; j < sel_process_num &&
-                     j < (int)DIM(sel_monitor_pid_tab); j++) {
+        for (j = 0; j < sel_process_num && j < (int)DIM(sel_monitor_pid_tab);
+             j++) {
                 found = cmp_pgrps(&sel_monitor_pid_tab[j], pgrp);
                 if (found < 0) {
                         printf("Error: cannot monitor same "
@@ -997,8 +1017,7 @@ add_pids_for_monitoring(const struct pid_group *pgrp,
                         break;
                 }
         }
-        if (!found &&
-            sel_process_num < (int) DIM(sel_monitor_pid_tab)) {
+        if (!found && sel_process_num < (int)DIM(sel_monitor_pid_tab)) {
                 struct pid_group *pg = &sel_monitor_pid_tab[sel_process_num];
                 *pg = *pgrp;
                 pg->events = evt;
@@ -1015,7 +1034,6 @@ add_pids_for_monitoring(const struct pid_group *pgrp,
         return 0;
 }
 
-
 /**
  * @brief Verifies and translates monitoring config string into
  *        internal monitoring configuration.
@@ -1027,8 +1045,8 @@ parse_monitor_pids(char *str)
 {
         int i = 0, n = 0;
         enum pqos_mon_event evt = (enum pqos_mon_event)0;
-        struct pid_group *pgrp_tab = calloc(PQOS_MAX_PID_MON_GROUPS,
-                                            sizeof(*pgrp_tab));
+        struct pid_group *pgrp_tab =
+            calloc(PQOS_MAX_PID_MON_GROUPS, sizeof(*pgrp_tab));
 
         if (pgrp_tab == NULL) {
                 printf("Error with memory allocation!\n");
@@ -1054,7 +1072,7 @@ parse_monitor_pids(char *str)
         free(pgrp_tab);
         return;
 
- error_exit:
+error_exit:
         free(pgrp_tab);
         exit(EXIT_FAILURE);
 }
@@ -1079,7 +1097,7 @@ selfn_monitor_pids(const char *arg)
 
         selfn_strdup(&cp, arg);
 
-        for (str = cp; ; str = NULL) {
+        for (str = cp;; str = NULL) {
                 char *token = NULL;
 
                 token = strtok_r(str, ";", &saveptr);
@@ -1153,22 +1171,24 @@ is_str_conversion_ok(const char *str_remainder)
  * @retval -1 in case of error
  */
 static int
-get_pid_stat_val(const char *proc_pid_dir_name, const int column,
-                 const unsigned len_val, char *val)
+get_pid_stat_val(const char *proc_pid_dir_name,
+                 const int column,
+                 const unsigned len_val,
+                 char *val)
 {
         FILE *fproc_pid_stats;
-        char buf[512];/* line in /proc/PID/stat is quite lengthy*/
+        char buf[512]; /* line in /proc/PID/stat is quite lengthy*/
         const char *delim = " ";
         size_t n_read;
         char *token, *saveptr;
-        int col_idx = 1;/*starts from '1' like indexes on 'stat' man-page*/
+        int col_idx = 1; /*starts from '1' like indexes on 'stat' man-page*/
 
         if (proc_pid_dir_name == NULL || val == NULL)
                 return -1;
 
         /*open /proc/<pid>/stat file for reading*/
         fproc_pid_stats = open_proc_stat_file(proc_pid_dir_name);
-        if (fproc_pid_stats == NULL)/*failure in reading if file is empty*/
+        if (fproc_pid_stats == NULL) /*failure in reading if file is empty*/
                 return -1;
 
         memset(buf, 0, sizeof(buf));
@@ -1193,18 +1213,18 @@ get_pid_stat_val(const char *proc_pid_dir_name, const int column,
         do {
                 if (col_idx == column) {
                         /*check to see if value will fit in users buffer*/
-                        if (len_val <= (strlen(token)+1)) {
+                        if (len_val <= (strlen(token) + 1)) {
                                 return -1;
                         } else {
                                 strncpy(val, token, len_val);
                                 val[len_val - 1] = '\0';
-                                return 0;/*value can be read from *val param*/
+                                return 0; /*value can be read from *val param*/
                         }
                 }
                 col_idx++;
-        /* Loop continues until value is found
-         * or until there is nothing left in the buffer
-         */
+                /* Loop continues until value is found
+                 * or until there is nothing left in the buffer
+                 */
         } while ((token = strtok_r(NULL, delim, &saveptr)) != NULL);
 
         return -1; /*error if while loop finishes and nothing left in buffer*/
@@ -1241,11 +1261,10 @@ get_pid_cputicks(const char *proc_pid_dir_name, uint64_t *cputicks)
                 uint64_t time_int = 0;
                 int time_success = 0;
 
-                memset(time_str, 0, sizeof(time_str));/*set time buffer to 0*/
+                memset(time_str, 0, sizeof(time_str)); /*set time buffer to 0*/
 
-                time_success = get_pid_stat_val(proc_pid_dir_name,
-                                                col_val[i], sizeof(time_str),
-                                                time_str);
+                time_success = get_pid_stat_val(proc_pid_dir_name, col_val[i],
+                                                sizeof(time_str), time_str);
                 if (time_success != 0)
                         return -1;
 
@@ -1352,7 +1371,8 @@ unsigned_cmp(const void *a, const void *b)
  * @param retval 0 in case of success, -1 for error
  */
 static int
-get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
+get_pid_cores(const struct pqos_mon_data *mon_data,
+              char *cores_s,
               const int len)
 {
         char core[16];
@@ -1390,7 +1410,7 @@ get_pid_cores(const struct pqos_mon_data *mon_data, char *cores_s,
         for (i = 0; i < num_tids; i++) {
 
                 /* check for duplicate cores and skips them*/
-                if (i != 0 && cores[i] == cores[i-1])
+                if (i != 0 && cores[i] == cores[i - 1])
                         continue;
 
                 str_len = uinttostr_noalloc(core, sizeof(core), cores[i]);
@@ -1429,8 +1449,7 @@ free_memory:
 static struct slist *
 slist_create_elem(void *data)
 {
-        struct slist *node = (struct slist *)
-                malloc(sizeof(struct slist));
+        struct slist *node = (struct slist *)malloc(sizeof(struct slist));
 
         if (node == NULL) {
                 printf("Error with memory allocation for slist element!");
@@ -1463,7 +1482,6 @@ find_proc_stats_by_pid(const struct slist *pslist, const pid_t pid)
 
                 if (pstats->pid == pid)
                         return pstats;
-
         }
 
         return NULL;
@@ -1507,8 +1525,10 @@ fill_cpu_avg_ratio(struct proc_stats *pstat, const time_t proc_start_time)
  * @return pointer to beginning of process statistics slist
  */
 static struct slist *
-add_proc_cpu_stat(struct slist *pslist, const pid_t pid,
-                  const unsigned long cputicks, const time_t proc_start_time)
+add_proc_cpu_stat(struct slist *pslist,
+                  const pid_t pid,
+                  const unsigned long cputicks,
+                  const time_t proc_start_time)
 {
         /* have to allocate new proc_stats struct */
         struct proc_stats *pstat = malloc(sizeof(struct proc_stats));
@@ -1546,7 +1566,8 @@ add_proc_cpu_stat(struct slist *pslist, const pid_t pid,
  * @param cputicks cputicks spent by this process
  */
 static void
-update_proc_cpu_stat(const struct slist *pslist, const pid_t pid,
+update_proc_cpu_stat(const struct slist *pslist,
+                     const pid_t pid,
                      const unsigned long cputicks)
 {
         /* at first we have to look for previous stats for a given PID*/
@@ -1630,7 +1651,7 @@ static int
 get_pid_num_from_dir(DIR *proc_dir, const char *pid_dir_name, pid_t *pid)
 {
         struct stat p_dir_stat;
-        char *tmp_end;/* used for strtoul error check*/
+        char *tmp_end; /* used for strtoul error check*/
         int ret;
 
         if (pid == NULL || pid_dir_name == NULL)
@@ -1704,10 +1725,11 @@ get_proc_pids_stats(struct slist **pslist)
                         err = get_proc_start_time(proc_dir, file->d_name,
                                                   &start_time);
                         if (err)
-                        /* start time for given pid is needed for correct CPU
-                         * usage statistics - without that we have to ignore
-                         * problematic pid entry and move on
-                         */
+                                /* start time for given pid is needed for
+                                 * correct CPU usage statistics - without that
+                                 * we have to ignore problematic pid entry and
+                                 * move on
+                                 */
                                 continue;
 
                         *pslist = add_proc_cpu_stat(*pslist, pid, cputicks,
@@ -1770,7 +1792,8 @@ proc_stats_cmp(const void *a, const void *b)
  *         this will equal to max_size)
  */
 static int
-fill_top_procs(const struct slist *pslist, struct pid_group *top_procs,
+fill_top_procs(const struct slist *pslist,
+               struct pid_group *top_procs,
                const int max_size)
 {
         const struct slist *it = NULL;
@@ -1899,8 +1922,8 @@ selfn_monitor_top_pids(void)
          * order
          */
         for (i = (top_size - 1); i >= 0; --i)
-                add_pids_for_monitoring(&top_procs[i],
-                        (enum pqos_mon_event)PQOS_MON_EVENT_ALL);
+                add_pids_for_monitoring(
+                    &top_procs[i], (enum pqos_mon_event)PQOS_MON_EVENT_ALL);
 
 cleanup_pslist:
         /* cleaning list of all processes stats */
@@ -1929,16 +1952,16 @@ static int
 mon_qsort_llc_cmp_desc(const void *a, const void *b)
 {
         const struct pqos_mon_data *const *app =
-                (const struct pqos_mon_data * const *)a;
+            (const struct pqos_mon_data *const *)a;
         const struct pqos_mon_data *const *bpp =
-                (const struct pqos_mon_data * const *)b;
+            (const struct pqos_mon_data *const *)b;
         const struct pqos_mon_data *ap = *app;
         const struct pqos_mon_data *bp = *bpp;
         /**
          * This (b-a) is to get descending order
          * otherwise it would be (a-b)
          */
-        return (int) (((int64_t)bp->values.llc) - ((int64_t)ap->values.llc));
+        return (int)(((int64_t)bp->values.llc) - ((int64_t)ap->values.llc));
 }
 
 /**
@@ -1955,17 +1978,17 @@ mon_qsort_llc_cmp_desc(const void *a, const void *b)
 static int
 mon_qsort_coreid_cmp_asc(const void *a, const void *b)
 {
-        const struct pqos_mon_data * const *app =
-                (const struct pqos_mon_data * const *)a;
-        const struct pqos_mon_data * const *bpp =
-                (const struct pqos_mon_data * const *)b;
+        const struct pqos_mon_data *const *app =
+            (const struct pqos_mon_data *const *)a;
+        const struct pqos_mon_data *const *bpp =
+            (const struct pqos_mon_data *const *)b;
         const struct pqos_mon_data *ap = *app;
         const struct pqos_mon_data *bp = *bpp;
         /**
          * This (a-b) is to get ascending order
          * otherwise it would be (b-a)
          */
-        return (int) (((unsigned)ap->cores[0]) - ((unsigned)bp->cores[0]));
+        return (int)(((unsigned)ap->cores[0]) - ((unsigned)bp->cores[0]));
 }
 
 /**
@@ -1973,7 +1996,8 @@ mon_qsort_coreid_cmp_asc(const void *a, const void *b)
  *
  * @param signo signal number
  */
-static void monitoring_ctrlc(int signo)
+static void
+monitoring_ctrlc(int signo)
 {
         UNUSED_ARG(signo);
         stop_monitoring_loop = 1;
@@ -2053,15 +2077,15 @@ fillin_xml_column(const char *const format,
                 /**
                  * This is monitored and we have the data
                  */
-                snprintf(data, sz_data - 1, "\t<%s>%s</%s>\n",
-                         node_name, formatted_val, node_name);
+                snprintf(data, sz_data - 1, "\t<%s>%s</%s>\n", node_name,
+                         formatted_val, node_name);
                 offset = strlen(data);
         } else if (is_column_present) {
                 /**
                  * The column exists though there's no data
                  */
-                snprintf(data, sz_data - 1, "\t<%s></%s>\n",
-                         node_name, node_name);
+                snprintf(data, sz_data - 1, "\t<%s></%s>\n", node_name,
+                         node_name);
                 offset = strlen(data);
         }
 
@@ -2141,43 +2165,37 @@ print_text_row(FILE *fp,
                 pqos_rmid_t rmid;
                 int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
 
-                offset +=
-                    fillin_text_column(" %4.0f",
-                                       (double)rmid,
-                                       data + offset,
-                                       sz_data - offset,
-                                       ret == PQOS_RETVAL_OK,
-                                       sel_interface == PQOS_INTER_MSR);
+                offset += fillin_text_column(
+                    " %4.0f", (double)rmid, data + offset, sz_data - offset,
+                    ret == PQOS_RETVAL_OK, sel_interface == PQOS_INTER_MSR);
         }
 #endif
 
         offset += fillin_text_column(" %11.2f", mon_data->values.ipc,
-                                     data + offset,
-                                     sz_data - offset,
+                                     data + offset, sz_data - offset,
                                      mon_data->event & PQOS_PERF_EVENT_IPC,
                                      sel_events_max & PQOS_PERF_EVENT_IPC);
 
-        offset += fillin_text_column(" %10.0fk", (double)
-                                     mon_data->values.llc_misses_delta/1000,
-                                     data + offset,
-                                     sz_data - offset,
-                                     mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
-                                     sel_events_max & PQOS_PERF_EVENT_LLC_MISS);
+        offset += fillin_text_column(
+            " %10.0fk", (double)mon_data->values.llc_misses_delta / 1000,
+            data + offset, sz_data - offset,
+            mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
+            sel_events_max & PQOS_PERF_EVENT_LLC_MISS);
 
         offset += fillin_text_column(" %11.1f", llc_entry->val, data + offset,
                                      sz_data - offset,
                                      mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                      sel_events_max & PQOS_MON_EVENT_L3_OCCUP);
 
-        offset += fillin_text_column(" %11.1f", mbl, data + offset,
-                                     sz_data - offset,
-                                     mon_data->event & PQOS_MON_EVENT_LMEM_BW,
-                                     sel_events_max & PQOS_MON_EVENT_LMEM_BW);
+        offset +=
+            fillin_text_column(" %11.1f", mbl, data + offset, sz_data - offset,
+                               mon_data->event & PQOS_MON_EVENT_LMEM_BW,
+                               sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        offset += fillin_text_column(" %11.1f", mbr, data + offset,
-                                     sz_data - offset,
-                                     mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                                     sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+        offset +=
+            fillin_text_column(" %11.1f", mbr, data + offset, sz_data - offset,
+                               mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                               sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         fillin_text_column(" %11.1f", mbt, data + offset, sz_data - offset,
                            mon_data->event & PQOS_MON_EVENT_TMEM_BW,
@@ -2188,8 +2206,8 @@ print_text_row(FILE *fp,
         else {
                 memset(core_list, 0, sizeof(core_list));
 
-                if (get_pid_cores(mon_data, core_list,
-                                  sizeof(core_list)) == -1) {
+                if (get_pid_cores(mon_data, core_list, sizeof(core_list)) ==
+                    -1) {
                         memset(core_list, 0, sizeof(core_list));
                         strncat(core_list, "err", sizeof(core_list) - 1);
                 }
@@ -2244,47 +2262,37 @@ print_xml_row(FILE *fp,
                 pqos_rmid_t rmid;
                 int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
 
-                offset += fillin_xml_column("%.0f",
-                                            rmid,
-                                            data + offset,
-                                            sz_data - offset,
-                                            ret == PQOS_RETVAL_OK,
-                                            sel_interface == PQOS_INTER_MSR,
-                                            "rmid");
+                offset +=
+                    fillin_xml_column("%.0f", rmid, data + offset,
+                                      sz_data - offset, ret == PQOS_RETVAL_OK,
+                                      sel_interface == PQOS_INTER_MSR, "rmid");
         }
 #endif
 
-        offset += fillin_xml_column("%.2f", mon_data->values.ipc, data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_PERF_EVENT_IPC,
-                                    sel_events_max & PQOS_PERF_EVENT_IPC,
-                                    "ipc");
+        offset += fillin_xml_column(
+            "%.2f", mon_data->values.ipc, data + offset, sz_data - offset,
+            mon_data->event & PQOS_PERF_EVENT_IPC,
+            sel_events_max & PQOS_PERF_EVENT_IPC, "ipc");
 
-        offset += fillin_xml_column("%.0f", (double)
-                                    mon_data->values.llc_misses_delta,
-                                    data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
-                                    sel_events_max & PQOS_PERF_EVENT_LLC_MISS,
-                                    "llc_misses");
+        offset += fillin_xml_column(
+            "%.0f", (double)mon_data->values.llc_misses_delta, data + offset,
+            sz_data - offset, mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
+            sel_events_max & PQOS_PERF_EVENT_LLC_MISS, "llc_misses");
 
-        offset += fillin_xml_column("%.1f", llc_entry->val, data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
-                                    sel_events_max & PQOS_MON_EVENT_L3_OCCUP,
-                                    l3_text);
+        offset += fillin_xml_column(
+            "%.1f", llc_entry->val, data + offset, sz_data - offset,
+            mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
+            sel_events_max & PQOS_MON_EVENT_L3_OCCUP, l3_text);
 
-        offset += fillin_xml_column("%.1f", mbl, data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_MON_EVENT_LMEM_BW,
-                                    sel_events_max & PQOS_MON_EVENT_LMEM_BW,
-                                    "mbm_local_MB");
+        offset += fillin_xml_column(
+            "%.1f", mbl, data + offset, sz_data - offset,
+            mon_data->event & PQOS_MON_EVENT_LMEM_BW,
+            sel_events_max & PQOS_MON_EVENT_LMEM_BW, "mbm_local_MB");
 
-        offset += fillin_xml_column("%.1f", mbr, data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                                    sel_events_max & PQOS_MON_EVENT_RMEM_BW,
-                                    "mbm_remote_MB");
+        offset += fillin_xml_column(
+            "%.1f", mbr, data + offset, sz_data - offset,
+            mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+            sel_events_max & PQOS_MON_EVENT_RMEM_BW, "mbm_remote_MB");
 
         fillin_xml_column("%.1f", mbt, data + offset, sz_data - offset,
                           mon_data->event & PQOS_MON_EVENT_TMEM_BW,
@@ -2298,16 +2306,13 @@ print_xml_row(FILE *fp,
                         "\t<core>%s</core>\n"
                         "%s"
                         "%s\n",
-                        xml_child_open,
-                        time,
-                        (char *)mon_data->context,
-                        data,
+                        xml_child_open, time, (char *)mon_data->context, data,
                         xml_child_close);
         else {
                 memset(core_list, 0, sizeof(core_list));
 
-                if (get_pid_cores(mon_data, core_list,
-                                  sizeof(core_list)) == -1) {
+                if (get_pid_cores(mon_data, core_list, sizeof(core_list)) ==
+                    -1) {
                         memset(core_list, 0, sizeof(core_list));
                         strncat(core_list, "err", sizeof(core_list) - 1);
                 }
@@ -2319,12 +2324,8 @@ print_xml_row(FILE *fp,
                         "\t<core>%s</core>\n"
                         "%s"
                         "%s\n",
-                        xml_child_open,
-                        time,
-                        (char *)mon_data->context,
-                        core_list,
-                        data,
-                        xml_child_close);
+                        xml_child_open, time, (char *)mon_data->context,
+                        core_list, data, xml_child_close);
         }
 }
 
@@ -2340,7 +2341,8 @@ print_xml_row(FILE *fp,
  * @param mbt total memory bandwidth data
  */
 static void
-print_csv_row(FILE *fp, char *time,
+print_csv_row(FILE *fp,
+              char *time,
               struct pqos_mon_data *mon_data,
               const struct llc_entry_data *llc_entry,
               const double mbr,
@@ -2364,63 +2366,55 @@ print_csv_row(FILE *fp, char *time,
                 pqos_rmid_t rmid;
                 int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
 
-                offset += fillin_csv_column(",%.0f",
-                                            rmid,
-                                            data + offset,
-                                            sz_data - offset,
-                                            ret == PQOS_RETVAL_OK,
-                                            sel_interface == PQOS_INTER_MSR);
+                offset += fillin_csv_column(
+                    ",%.0f", rmid, data + offset, sz_data - offset,
+                    ret == PQOS_RETVAL_OK, sel_interface == PQOS_INTER_MSR);
         }
 #endif
 
         offset += fillin_csv_column(",%.2f", mon_data->values.ipc,
-                                    data + offset,
-                                    sz_data - offset,
+                                    data + offset, sz_data - offset,
                                     mon_data->event & PQOS_PERF_EVENT_IPC,
                                     sel_events_max & PQOS_PERF_EVENT_IPC);
 
-        offset += fillin_csv_column(",%.0f", (double)
-                                    mon_data->values.llc_misses_delta,
-                                    data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
-                                    sel_events_max & PQOS_PERF_EVENT_LLC_MISS);
+        offset += fillin_csv_column(
+            ",%.0f", (double)mon_data->values.llc_misses_delta, data + offset,
+            sz_data - offset, mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
+            sel_events_max & PQOS_PERF_EVENT_LLC_MISS);
 
         offset += fillin_csv_column(",%.1f", llc_entry->val, data + offset,
                                     sz_data - offset,
                                     mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
                                     sel_events_max & PQOS_MON_EVENT_L3_OCCUP);
 
-        offset += fillin_csv_column(",%.1f", mbl, data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_MON_EVENT_LMEM_BW,
-                                    sel_events_max & PQOS_MON_EVENT_LMEM_BW);
+        offset +=
+            fillin_csv_column(",%.1f", mbl, data + offset, sz_data - offset,
+                              mon_data->event & PQOS_MON_EVENT_LMEM_BW,
+                              sel_events_max & PQOS_MON_EVENT_LMEM_BW);
 
-        offset += fillin_csv_column(",%.1f", mbr, data + offset,
-                                    sz_data - offset,
-                                    mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-                                    sel_events_max & PQOS_MON_EVENT_RMEM_BW);
+        offset +=
+            fillin_csv_column(",%.1f", mbr, data + offset, sz_data - offset,
+                              mon_data->event & PQOS_MON_EVENT_RMEM_BW,
+                              sel_events_max & PQOS_MON_EVENT_RMEM_BW);
 
         fillin_csv_column(",%.1f", mbt, data + offset, sz_data - offset,
                           mon_data->event & PQOS_MON_EVENT_TMEM_BW,
                           sel_events_max & PQOS_MON_EVENT_TMEM_BW);
 
         if (!process_mode())
-                fprintf(fp,
-                        "%s,\"%s\"%s\n",
-                        time, (char *)mon_data->context, data);
+                fprintf(fp, "%s,\"%s\"%s\n", time, (char *)mon_data->context,
+                        data);
         else {
                 memset(core_list, 0, sizeof(core_list));
 
-                if (get_pid_cores(mon_data, core_list,
-                                  sizeof(core_list)) == -1) {
+                if (get_pid_cores(mon_data, core_list, sizeof(core_list)) ==
+                    -1) {
                         memset(core_list, 0, sizeof(core_list));
                         strncat(core_list, "err", sizeof(core_list) - 1);
                 }
 
-                fprintf(fp,
-                        "%s,\"%s\",\"%s\"%s\n",
-                        time, (char *)mon_data->context, core_list, data);
+                fprintf(fp, "%s,\"%s\",\"%s\"%s\n", time,
+                        (char *)mon_data->context, core_list, data);
         }
 }
 
@@ -2435,7 +2429,8 @@ print_csv_row(FILE *fp, char *time,
  * @param format llc_format representation mode (kilobytes or percent)
  */
 static void
-build_header_row(char *hdr, const size_t sz_hdr,
+build_header_row(char *hdr,
+                 const size_t sz_hdr,
                  const int isxml,
                  const int istext,
                  const int iscsv,
@@ -2452,8 +2447,7 @@ build_header_row(char *hdr, const size_t sz_hdr,
                         strncpy(hdr, "    CORE", sz_hdr - 1);
 #ifdef PQOS_RMID_CUSTOM
                         if (sel_interface == PQOS_INTER_MSR)
-                                strncat(hdr, " RMID",
-                                        sz_hdr - strlen(hdr) - 1);
+                                strncat(hdr, " RMID", sz_hdr - strlen(hdr) - 1);
 #endif
                 } else
                         strncpy(hdr, "     PID     CORE", sz_hdr - 1);
@@ -2525,17 +2519,16 @@ build_header_row(char *hdr, const size_t sz_hdr,
  * @return Number of elements in each of the tables
  */
 static unsigned
-get_mon_arrays(struct pqos_mon_data ***parray1,
-               struct pqos_mon_data ***parray2)
+get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
 {
         unsigned mon_number, i;
         struct pqos_mon_data **p1, **p2;
 
         ASSERT(parray1 != NULL && parray2 != NULL);
         if (!process_mode())
-                mon_number = (unsigned) sel_monitor_num;
+                mon_number = (unsigned)sel_monitor_num;
         else
-                mon_number = (unsigned) sel_process_num;
+                mon_number = (unsigned)sel_process_num;
         p1 = malloc(sizeof(p1[0]) * mon_number);
         p2 = malloc(sizeof(p2[0]) * mon_number);
         if (p1 == NULL || p2 == NULL) {
@@ -2561,27 +2554,29 @@ get_mon_arrays(struct pqos_mon_data ***parray1,
 }
 
 /**
- * @brief Converts microseconds into timeval structure
- *
- * @param tv pointer to timeval structure to be filled in
- * @param usec microseconds to be used to fill in \a tv
- */
-static void usec_to_timeval(struct timeval *tv, const long usec)
-{
-        tv->tv_sec = usec / 1000000L;
-        tv->tv_usec = usec % 1000000L;
-}
-
-/**
  * @brief Converts timeval structure into microseconds
  *
  * @param tv pointer to timeval structure to be converted
  *
  * @return Number of microseconds corresponding to \a tv
  */
-static long timeval_to_usec(const struct timeval *tv)
+static long
+timeval_to_usec(const struct timeval *tv)
 {
         return ((long)tv->tv_usec) + ((long)tv->tv_sec * 1000000L);
+}
+
+/**
+ * @brief Adds usec to timeval
+ *
+ * @param tv pointer to timeval structure
+ * @param usec microseconds to be added
+ */
+static void
+timeval_add_usec(struct timeval *tv, const long usec)
+{
+        tv->tv_sec += (usec + tv->tv_usec) / 1000000L;
+        tv->tv_usec = (tv->tv_usec + usec) % 1000000L;
 }
 
 /**
@@ -2592,7 +2587,8 @@ static long timeval_to_usec(const struct timeval *tv)
  *
  * @return PQOS_RETVAL_OK on success or error code in case of failure
  */
-static int get_cache_size(unsigned *p_cache_size)
+static int
+get_cache_size(unsigned *p_cache_size)
 {
         const struct pqos_cpuinfo *p_cpu = NULL;
         int ret;
@@ -2627,10 +2623,11 @@ static int get_cache_size(unsigned *p_cache_size)
  *
  * @return PQOS_RETVAL_OK on success or error code otherwise
  */
-static int get_llc_entry(struct llc_entry_data *llc_entry,
-                         uint64_t llc_bytes,
-                         unsigned cache_total,
-                         enum llc_format format)
+static int
+get_llc_entry(struct llc_entry_data *llc_entry,
+              uint64_t llc_bytes,
+              unsigned cache_total,
+              enum llc_format format)
 {
         if (llc_entry == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -2643,7 +2640,7 @@ static int get_llc_entry(struct llc_entry_data *llc_entry,
                 llc_entry->val = bytes_to_kb(llc_bytes);
                 break;
         case LLC_FORMAT_PERCENT:
-                llc_entry->val = llc_bytes*100/cache_total;
+                llc_entry->val = llc_bytes * 100 / cache_total;
                 break;
         default:
                 printf("Incorrect llc_format: %i\n", format);
@@ -2655,13 +2652,41 @@ static int get_llc_entry(struct llc_entry_data *llc_entry,
         return PQOS_RETVAL_OK;
 }
 
-void monitor_loop(void)
+/**
+ * @brief Sleep
+ *
+ * @param[in] usec time in microseconds
+ */
+static inline void
+monitor_usleep(long usec)
+{
+        struct timespec req, rem;
+
+        memset(&rem, 0, sizeof(rem));
+        memset(&req, 0, sizeof(req));
+
+        req.tv_sec = usec / 1000000L;
+        req.tv_nsec = (usec % 1000000L) * 1000L;
+        if (nanosleep(&req, &rem) == -1) {
+                /**
+                 * nanosleep() interrupted by a signal
+                 */
+                if (stop_monitoring_loop)
+                        return;
+                req = rem;
+                memset(&rem, 0, sizeof(rem));
+                nanosleep(&req, &rem);
+        }
+}
+
+void
+monitor_loop(void)
 {
 #define TERM_MIN_NUM_LINES 3
 
         const long interval =
-                (long)sel_mon_interval * 100000LL; /* interval in [us] units */
-        struct timeval tv_start, tv_s;
+            (long)sel_mon_interval * 100000LL; /* interval in [us] units */
+        struct timeval tv_start, tv_s, tv_e;
         const int istty = isatty(fileno(fp_monitor));
         const int istext = !strcasecmp(sel_output_type, "text");
         const int isxml = !strcasecmp(sel_output_type, "xml");
@@ -2672,7 +2697,7 @@ void monitor_loop(void)
         unsigned mon_number = 0, display_num = 0;
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
 
-        if ((!istext)  && (!isxml) && (!iscsv)) {
+        if ((!istext) && (!isxml) && (!iscsv)) {
                 printf("Invalid selection of output file type '%s'!\n",
                        sel_output_type);
                 return;
@@ -2704,7 +2729,6 @@ void monitor_loop(void)
                         max_lines = w.ws_row;
                         if (max_lines < TERM_MIN_NUM_LINES)
                                 max_lines = TERM_MIN_NUM_LINES;
-
                 }
                 if ((display_num + TERM_MIN_NUM_LINES - 1) > max_lines)
                         display_num = max_lines - TERM_MIN_NUM_LINES + 1;
@@ -2725,23 +2749,38 @@ void monitor_loop(void)
                 fprintf(fp_monitor, "%s\n", header);
 
         gettimeofday(&tv_start, NULL);
-        tv_s = tv_start;
 
-        while (!stop_monitoring_loop) {
-                struct timeval tv_e;
+        for (tv_s = tv_start, tv_e = tv_start; !stop_monitoring_loop;
+             timeval_add_usec(&tv_s, interval)) {
                 struct tm *ptm = NULL;
                 unsigned i = 0;
                 long usec_start = 0, usec_end = 0, usec_diff = 0;
                 char cb_time[64];
                 int ret;
 
+                /**
+                 * Calculate microseconds to the nearest measurement interval
+                 */
+                usec_start = timeval_to_usec(&tv_s);
+                usec_end = timeval_to_usec(&tv_e);
+                usec_diff = usec_start - usec_end;
+
+                if (usec_diff > 0)
+                        monitor_usleep(usec_diff < interval ? usec_diff
+                                                            : interval);
+
                 ret = pqos_mon_poll(mon_grps, mon_number);
-                if (ret != PQOS_RETVAL_OK) {
+                gettimeofday(&tv_e, NULL);
+                if (ret == PQOS_RETVAL_OVERFLOW) {
+                        printf("MBM counter overflow\n");
+                        continue;
+                } else if (ret != PQOS_RETVAL_OK) {
                         printf("Failed to poll monitoring data!\n");
                         free(mon_grps);
                         free(mon_data);
                         return;
                 }
+
                 memcpy(mon_data, mon_grps, mon_number * sizeof(mon_grps[0]));
 
                 if (sel_mon_top_like)
@@ -2763,19 +2802,18 @@ void monitor_loop(void)
 
                 if (istty && istext)
                         fprintf(fp_monitor,
-                                "\033[2J"      /* Clear screen */
-                                "\033[0;0H");  /* move to position 0:0 */
+                                "\033[2J"     /* Clear screen */
+                                "\033[0;0H"); /* move to position 0:0 */
 
                 if (istext)
                         fprintf(fp_monitor, "TIME %s\n%s", cb_time, header);
 
                 for (i = 0; i < display_num; i++) {
                         const struct pqos_event_values *pv =
-                                 &mon_data[i]->values;
+                            &mon_data[i]->values;
 
                         struct llc_entry_data llc_entry;
-                        int ret = get_llc_entry(&llc_entry, pv->llc,
-                                                cache_size,
+                        int ret = get_llc_entry(&llc_entry, pv->llc, cache_size,
                                                 sel_llc_format);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Could not fill llc_entry data!\n");
@@ -2802,47 +2840,12 @@ void monitor_loop(void)
 
                 fflush(fp_monitor);
 
-                gettimeofday(&tv_e, NULL);
-
                 if (stop_monitoring_loop)
                         break;
 
-                /**
-                 * Calculate microseconds to the nearest measurement interval
-                 */
-                usec_start = timeval_to_usec(&tv_s);
-                usec_end = timeval_to_usec(&tv_e);
-                usec_diff = usec_end - usec_start;
-
-                if (usec_diff < interval && usec_diff > 0) {
-                        struct timespec req, rem;
-
-                        memset(&rem, 0, sizeof(rem));
-                        memset(&req, 0, sizeof(req));
-
-                        req.tv_sec = (interval - usec_diff) / 1000000L;
-                        req.tv_nsec =
-                                ((interval - usec_diff) % 1000000L) * 1000L;
-                        if (nanosleep(&req, &rem) == -1) {
-                                /**
-                                 * nanosleep() interrupted by a signal
-                                 */
-                                if (stop_monitoring_loop)
-                                        break;
-                                req = rem;
-                                memset(&rem, 0, sizeof(rem));
-                                nanosleep(&req, &rem);
-                        }
-                }
-
-                /* move tv_s to the next interval */
-                usec_to_timeval(&tv_s, usec_start + interval);
-
-                if (sel_timeout >= 0) {
-                        gettimeofday(&tv_e, NULL);
-                        if ((tv_e.tv_sec - tv_start.tv_sec) > sel_timeout)
-                                break;
-                }
+                /* timeout */
+                if ((tv_e.tv_sec - tv_start.tv_sec) >= sel_timeout)
+                        break;
         }
         if (isxml)
                 fprintf(fp_monitor, "%s\n", xml_root_close);
@@ -2854,7 +2857,8 @@ void monitor_loop(void)
         free(mon_data);
 }
 
-void monitor_cleanup(void)
+void
+monitor_cleanup(void)
 {
         /**
          * Close file descriptor for monitoring output

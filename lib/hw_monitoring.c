@@ -1153,6 +1153,8 @@ hw_mon_read_counter(struct pqos_mon_data *group,
                 pv->llc = scale_event(PQOS_MON_EVENT_L3_OCCUP, value);
                 break;
         case PQOS_MON_EVENT_LMEM_BW:
+                if (pmon->counter_length == 32 && pv->mbm_local > value)
+                        ret = PQOS_RETVAL_OVERFLOW;
                 if (group->intl->valid_mbm_read) {
                         pv->mbm_local_delta =
                             get_delta(event, pv->mbm_local, value);
@@ -1164,6 +1166,8 @@ hw_mon_read_counter(struct pqos_mon_data *group,
                 pv->mbm_local = value;
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
+                if (pmon->counter_length == 32 && pv->mbm_local > value)
+                        ret = PQOS_RETVAL_OVERFLOW;
                 if (group->intl->valid_mbm_read) {
                         pv->mbm_total_delta =
                             get_delta(event, pv->mbm_total, value);
@@ -1178,7 +1182,15 @@ hw_mon_read_counter(struct pqos_mon_data *group,
                 return PQOS_RETVAL_PARAM;
         }
 
-        return PQOS_RETVAL_OK;
+        if (ret == PQOS_RETVAL_OVERFLOW) {
+                LOG_WARN(
+                    "Counter overflow reading event %u on core %u (RMID%u)!\n",
+                    event, group->intl->hw.ctx[0].lcore,
+                    (unsigned)group->intl->hw.ctx[0].rmid);
+                group->intl->valid_mbm_read = 0;
+        }
+
+        return ret;
 }
 
 /**

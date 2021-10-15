@@ -75,6 +75,7 @@ extern "C" {
 #define PQOS_RETVAL_PERF_CTR  6 /**< performance counter error */
 #define PQOS_RETVAL_BUSY      7 /**< resource busy error */
 #define PQOS_RETVAL_INTER     8 /**< Interface not supported */
+#define PQOS_RETVAL_OVERFLOW  9 /**< Data overflow */
 
 /*
  * =======================================
@@ -589,6 +590,7 @@ int pqos_mon_stop(struct pqos_mon_data *group);
  * @param [in] num_groups number of monitoring groups in the table
  *
  * @return Operations status
+ * @retval PQOS_RETVAL_OVERFLOW MBM counter overflow
  * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups);
