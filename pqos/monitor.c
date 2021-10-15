@@ -66,6 +66,7 @@
 #define PID_COL_STIME  (15) /**< col for cpu-kernel time in /proc/pid/stat */
 #define PID_COL_CORE   (39) /**< col for core number in /proc/pid/stat */
 
+#define TIMEOUT_INFINITE ((unsigned)-1)
 /**
  * Local data structures
  *
@@ -146,7 +147,7 @@ static int sel_mon_top_like = 0;
  * Maintains monitoring time that is selected in config string for
  * monitoring L3 occupancy
  */
-static int sel_timeout = -1;
+static unsigned sel_timeout = TIMEOUT_INFINITE;
 
 /**
  * Maintains selected monitoring output file name
@@ -963,7 +964,7 @@ selfn_monitor_time(const char *arg)
                 parse_error(arg, "NULL monitor time argument!");
 
         if (!strcasecmp(arg, "inf") || !strcasecmp(arg, "infinite"))
-                sel_timeout = -1; /**< infinite timeout */
+                sel_timeout = TIMEOUT_INFINITE;
         else
                 sel_timeout = (int)strtouint64(arg);
 }
@@ -2844,7 +2845,8 @@ monitor_loop(void)
                         break;
 
                 /* timeout */
-                if ((tv_e.tv_sec - tv_start.tv_sec) >= sel_timeout)
+                if (sel_timeout != TIMEOUT_INFINITE &&
+                    (tv_e.tv_sec - tv_start.tv_sec) >= sel_timeout)
                         break;
         }
         if (isxml)
