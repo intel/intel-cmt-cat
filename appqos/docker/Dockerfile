@@ -42,6 +42,7 @@ RUN pip3 uninstall -y pipenv && \
     dpkg --force-depends -r libsqlite3-0 && \
     rm -rf /usr/bin/iconv && \
     rm -rf /usr/bin/nscd && \
+    rm -rf /usr/sbin/chroot && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /appqos_workspace/appqos
