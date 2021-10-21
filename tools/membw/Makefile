@@ -39,7 +39,7 @@ MAN = membw.8
 
 # XXX: modify as desired
 PREFIX ?= /usr/local
-BIN_DIR = $(PREFIX)/sbin
+BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
 
 CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \

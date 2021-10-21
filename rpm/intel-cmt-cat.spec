@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    4.2.0
+%global githubver    4.3.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -112,6 +112,12 @@ install -s %{_builddir}/%{githubfull}/rdtset/rdtset %{buildroot}/%{_bindir}
 install -d %{buildroot}/%{_mandir}/man8
 install -m 0644 %{_builddir}/%{githubfull}/rdtset/rdtset.8  %{buildroot}/%{_mandir}/man8
 
+install -d %{buildroot}/%{_bindir}
+install -s %{_builddir}/%{githubfull}/tools/membw/membw %{buildroot}/%{_bindir}
+
+install -d %{buildroot}/%{_mandir}/man8
+install -m 0644 %{_builddir}/%{githubfull}/tools/membw/membw.8  %{buildroot}/%{_mandir}/man8
+
 install -d %{buildroot}/%{_licensedir}/%{name}-%{version}
 install -m 0644 %{_builddir}/%{githubfull}/LICENSE %{buildroot}/%{_licensedir}/%{name}-%{version}
 
@@ -152,7 +158,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %{_mandir}/man8/pqos-msr.8.gz
 %{_bindir}/rdtset
 %{_mandir}/man8/rdtset.8.gz
-%{_libdir}/libpqos.so.*
+%{_bindir}/membw
+%{_mandir}/man8/membw.8.gz
+{_libdir}/libpqos.so.*
 
 %{!?_licensedir:%global license %%doc}
 %license %{_licensedir}/%{name}-%{version}/LICENSE
@@ -173,6 +181,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Thu Oct 21 2021  Michal Aleksinski <michalx.aleksinski@intel.com> 4.3.0-1
+- New release 4.3.0
+
 * Mon Jul 05 2021 Michal Aleksinski <michalx.aleksinski@intel.com> 4.2.0-1
 - New release 4.2.0
 
