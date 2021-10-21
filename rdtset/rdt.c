@@ -376,6 +376,38 @@ err:
         return -EINVAL;
 }
 
+/**
+ * @brief This function displays cores association
+ *
+ * @param [in] cos_id class of service (COS) identifier
+ * @param [in] core_num number of cores
+ * @param [in] core_array array with cores identifiers
+ */
+static void
+print_core_association(const unsigned int cos_id,
+                       const unsigned int core_num,
+                       const unsigned int *core_array)
+{
+        for (unsigned int i = 0; i < core_num; i++)
+                printf("Core %u => COS%u\n", core_array[i], cos_id);
+}
+
+/**
+ * @brief This function displays process identifier (PID) association
+ *
+ * @param [in] cos_id class of service identifier (COS)
+ * @param [in] pid_num number of process identifier (PID)
+ * @param [in] pid_array array with process identifiers (PID)
+ */
+static void
+print_pid_association(const unsigned int cos_id,
+                      const unsigned int pid_num,
+                      const pid_t *pid_array)
+{
+        for (unsigned int i = 0; i < pid_num; i++)
+                printf("PID %i => COS%u\n", pid_array[i], cos_id);
+}
+
 int
 parse_reset(const char *cpustr)
 {
@@ -1433,6 +1465,24 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                                 cos_id, l3cat_id);
                         return -EFAULT;
                 }
+                if (g_cfg.verbose) {
+                        const char *package;
+
+                        if (m_cpu->vendor == PQOS_VENDOR_AMD)
+                                package = "Core Complex";
+                        else
+                                package = "SOCKET";
+                        if (ca.cdp)
+                                printf("%s %u L3CA COS%u => DATA 0x%lx,CODE "
+                                       "0x%lx\n",
+                                       package, l3cat_id, ca.class_id,
+                                       (long)ca.u.s.data_mask,
+                                       (long)ca.u.s.code_mask);
+                        else
+                                printf("%s %u L3CA COS%u => MASK 0x%lx\n",
+                                       package, l3cat_id, ca.class_id,
+                                       ca.u.ways_mask);
+                }
         }
 
         if (l2ca != NULL && m_cap_l2ca != NULL &&
@@ -1452,6 +1502,18 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                                 "Error setting L2 CAT COS#%u on L2ID %u!\n",
                                 cos_id, l2_id);
                         return -EFAULT;
+                }
+                if (g_cfg.verbose) {
+                        if (ca.cdp)
+                                printf("L2ID %u L2CA COS%u => DATA 0x%lx"
+                                       " CODE 0x%lx\n",
+                                       l2_id, ca.class_id,
+                                       (long)ca.u.s.data_mask,
+                                       (long)ca.u.s.code_mask);
+                        else
+                                printf("L2ID %u L2CA COS%u => MASK 0x%lx\n",
+                                       l2_id, ca.class_id,
+                                       (long)ca.u.ways_mask);
                 }
         }
 
@@ -1484,6 +1546,27 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                                 "Error setting MBA COS#%u on mba id %u!\n",
                                 cos_id, mba_id);
                         return -EFAULT;
+                }
+                if (g_cfg.verbose) {
+                        const char *unit;
+                        const char *package;
+
+                        if (m_cpu->vendor == PQOS_VENDOR_AMD) {
+                                package = "Core Complex";
+                                unit = "";
+                        } else {
+                                package = "SOCKET";
+                                unit = "%";
+                        }
+                        printf("%s %u MBA COS%u => ", package, mba_id,
+                               mba_actual.class_id);
+
+                        if (mba_requested.ctrl == 1)
+                                printf("%u MBps\n", mba_requested.mb_max);
+                        else
+                                printf("%u%s requested, %u%s applied\n",
+                                       mba_requested.mb_max, unit,
+                                       mba_actual.mb_max, unit);
                 }
         }
 
@@ -1532,6 +1615,8 @@ cfg_set_cores_os(const unsigned technology,
         ret = pqos_alloc_assign(technology, core_array, core_num, &cos_id);
         switch (ret) {
         case PQOS_RETVAL_OK:
+                if (g_cfg.verbose)
+                        print_core_association(cos_id, core_num, core_array);
                 break;
         case PQOS_RETVAL_RESOURCE:
                 fprintf(stderr, "No free COS available!\n");
@@ -1655,6 +1740,9 @@ cfg_set_cores_msr(const unsigned technology,
                                         &cos_id);
                 switch (ret) {
                 case PQOS_RETVAL_OK:
+                        if (g_cfg.verbose)
+                                print_core_association(cos_id, core_num,
+                                                       core_array);
                         break;
                 case PQOS_RETVAL_RESOURCE:
                         fprintf(stderr, "No free COS available!\n");
@@ -1707,6 +1795,8 @@ cfg_set_pids(const unsigned technology,
         ret = pqos_alloc_assign_pid(technology, p, num_pids, &cos_id);
         switch (ret) {
         case PQOS_RETVAL_OK:
+                if (g_cfg.verbose)
+                        print_pid_association(cos_id, num_pids, p);
                 break;
         case PQOS_RETVAL_RESOURCE:
                 fprintf(stderr, "No free COS available!.\n");
