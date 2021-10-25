@@ -1,4 +1,27 @@
 =======================================================================
+Release  v4.3.0  ____-__-__
+=======================================================================
+
+Contributors (alphabetical order):
+        Adrian Boczkowski <adrianx.boczkowski@intel.com>
+        Andrzej Dziarnik <andrzejx.dziarnik@intel.com>
+        Babu Moger <babu.moger@amd.com>
+        Michal Aleksinski <michalx.aleksinski@intel.com>
+
+1. Library:
+        - Added Elkhart Lake and Tiger Lake support
+        - Improved CPU topology detection for OS interface
+        - Automatic interface detection
+2. PQoS
+        - Improved library interface selection
+3. rdtset
+        - Improved library interface selection
+4. membw
+        - Added membw to the package
+5. General:
+        - Bug fixes
+
+=======================================================================
 Release  v4.2.0  2021-07-16
 =======================================================================
 
