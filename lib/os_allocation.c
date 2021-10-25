@@ -255,7 +255,7 @@ os_alloc_prep(void)
                 }
 
                 if (mkdir(buf, 0755) == -1) {
-                        LOG_DEBUG("Failed to create resctrl group %s!\n", buf);
+                        LOG_ERROR("Failed to create resctrl group %s!\n", buf);
                         return PQOS_RETVAL_BUSY;
                 }
                 LOG_DEBUG("resctrl group COS%d created\n", i);
