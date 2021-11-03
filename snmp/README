@@ -3,7 +3,7 @@
 ========================================================================
 README for rdt-agentx.pl Perl script
 
-April 2016
+October 2021
 ========================================================================
 
 
@@ -84,7 +84,7 @@ Or run snmpd from command line (e.g. for debugging purposes):
         sudo snmpd -f -Dagentx -Lo -C --rwcommunity=pqos --master=agentx
 
 And then run the rdt-agentx.pl script followed by the interface argument
-    -I [--iface-os] for OS interface 
+    -I [--iface-os] for OS interface
      No argument needed for MSR interface:
         "sudo ./rdt-agentx.pl -I"
         "sudo ./rdt-agentx.pl --iface-os"

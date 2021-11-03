@@ -44,11 +44,11 @@ License:            BSD
 Group:              Development/Tools
 ExclusiveArch:      x86_64 i686 i586
 %if %{defined githubsubver}
-Source:             https://github.com/01org/%{githubname}/archive/v%{githubver}.%{githubsubver}.tar.gz
+Source:             https://github.com/intel/%{githubname}/archive/v%{githubver}.%{githubsubver}.tar.gz
 %else
-Source:             https://github.com/01org/%{githubname}/archive/v%{githubver}.tar.gz
+Source:             https://github.com/intel/%{githubname}/archive/v%{githubver}.tar.gz
 %endif
-URL:                https://github.com/01org/%{githubname}
+URL:                https://github.com/intel/%{githubname}
 BuildRequires:      gcc, make
 
 %description
@@ -80,7 +80,7 @@ and Code Data Prioratization (CDP).
 The package includes library, header file and sample code.
 
 For additional information please refer to:
-https://github.com/01org/%{githubname}
+https://github.com/intel/%{githubname}
 
 %prep
 %autosetup -n %{githubfull}

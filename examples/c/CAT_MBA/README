@@ -1,7 +1,7 @@
 ================================================================================
 README for CAT and MBA Sample Applications
 
-August 2018
+October 2021
 ================================================================================
 
 CONTENTS
@@ -19,7 +19,7 @@ OVERVIEW
 This is example code to demonstrate the use of PQoS/Intel(R) Resource Director
 Technology (Intel(R) RDT) library APIs to manage Cache Allocation Technology
 (CAT) and Memory Bandwidth Allocation (MBA).
-Refer to https://github.com/01org/intel-cmt-cat/blob/master/README table 1
+Refer to https://github.com/intel/intel-cmt-cat/blob/master/README table 1
 for a list of processors supporting CAT and MBA. Each sample application
 build will create five targets as follows:
 1. allocation_app_l2cat - Demonstrates usage of PQoS/Intel(R) RDT library APIs

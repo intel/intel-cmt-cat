@@ -2,7 +2,7 @@
 ================================================================================
 README for App QoS Docker container
 
-June 2021
+October 2021
 ================================================================================
 
 CONTENTS
@@ -40,8 +40,8 @@ EOF
 
 Now it is time to copy ca.crt, appqos.crt and appqos.key files for mutual TLS connection to
 directory that we have just created. Instructions for creating certificate files for App QoS mTLS
-connection can be found at: https://github.com/intel/intel-cmt-cat/blob/master/appqos/README in
-section 'HOW TO GENERATE TEST APPQOS AND CLIENT CERTIFICATE'
+connection can be found at: https://github.com/intel/intel-cmt-cat/blob/master/appqos/README.md in
+section 'Creating evaluation mTLS certificate for testing'
 
 When configuration file is prepared and certificate files are in place, the directory is ready to
 be shared with the App QoS container:

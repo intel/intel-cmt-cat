@@ -1,5 +1,5 @@
 # README for Ansible Collection - intel.appqos
-May 2021
+October 2021
 
 ## CONTENTS
 - Introduction
@@ -26,7 +26,7 @@ Intel(R) RDT and Intel(R) SST to improve Quality of Service (QoS) for
 applications via partitioning system resources.
 
 More information can be found in App QoS README file available at:
-https://github.com/intel/intel-cmt-cat/tree/master/appqos/README
+https://github.com/intel/intel-cmt-cat/tree/master/appqos/README.md
 
 
 ## DEPENDENCIES
@@ -114,8 +114,8 @@ are located
 Ansible scripts need CA certificate and a App QoS certificate located in a given
 directory - those files will be copied to App QoS 'ca/' sub-directory in place where
 App QoS has been installed. More info about certificate for the App QoS can be
-found at https://github.com/intel/intel-cmt-cat/blob/master/appqos/README in
-section 'APP QOS AND CLIENT CERTIFICATE'.
+found at https://github.com/intel/intel-cmt-cat/blob/master/appqos/README.md in
+section 'Creating evaluation mTLS certificate for testing'.
 
 By default, App QoS is installed in '/opt/intel/appqos_workspace/appqos/'. At the
 end of the playbook, App QoS should be up and running, listening on port 5000.
