@@ -580,83 +580,6 @@ error_exit:
 }
 
 /**
- * @brief Detects interface
- *
- * @param requested_interface requested interface
- * @param interface detected interface
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK success
- */
-static int
-discover_interface(enum pqos_interface requested_interface,
-                   enum pqos_interface *interface)
-{
-        char *environment = NULL;
-
-#ifdef __linux__
-        if (requested_interface != PQOS_INTER_MSR &&
-            requested_interface != PQOS_INTER_OS &&
-            requested_interface != PQOS_INTER_OS_RESCTRL_MON &&
-            requested_interface != PQOS_INTER_AUTO)
-#else
-        if (requested_interface != PQOS_INTER_MSR &&
-            requested_interface != PQOS_INTER_AUTO)
-#endif
-                return PQOS_RETVAL_PARAM;
-
-        environment = getenv("RDT_IFACE");
-        if (environment != NULL) {
-                if (strncasecmp(environment, "OS", 2) == 0) {
-                        if (requested_interface != PQOS_INTER_OS &&
-                            requested_interface != PQOS_INTER_AUTO) {
-                                fprintf(stderr,
-                                        "Interface initialization error!\n"
-                                        "Your system has been restricted "
-                                        "to use the OS interface only!\n");
-                                return PQOS_RETVAL_ERROR;
-                        }
-
-                        *interface = PQOS_INTER_OS;
-                        return PQOS_RETVAL_OK;
-                } else if (strncasecmp(environment, "MSR", 3) == 0) {
-                        if (requested_interface != PQOS_INTER_MSR &&
-                            requested_interface != PQOS_INTER_AUTO) {
-                                fprintf(stderr,
-                                        "Interface initialization error!\n"
-                                        "Your system has been restricted "
-                                        "to use the MSR interface only!\n");
-                                return PQOS_RETVAL_ERROR;
-                        }
-
-                        *interface = PQOS_INTER_MSR;
-                        return PQOS_RETVAL_OK;
-                } else {
-                        fprintf(stderr,
-                                "Interface initialization error!\n"
-                                "Invalid interface enforcement selection.\n");
-                        return PQOS_RETVAL_ERROR;
-                }
-        }
-
-#ifdef __linux__
-        if (requested_interface == PQOS_INTER_AUTO &&
-            resctrl_is_supported() == PQOS_RETVAL_OK) {
-                *interface = PQOS_INTER_OS;
-                return PQOS_RETVAL_OK;
-        }
-#endif
-
-        if (requested_interface == PQOS_INTER_AUTO) {
-                *interface = PQOS_INTER_MSR;
-                return PQOS_RETVAL_OK;
-        }
-
-        *interface = requested_interface;
-        return PQOS_RETVAL_OK;
-}
-
-/**
  * @brief Converts enumeration value into string
  *
  * @param interface interface
@@ -680,6 +603,82 @@ interface_to_string(enum pqos_interface interface)
         }
 }
 
+/**
+ * @brief Detects interface
+ *
+ * @param requested_interface requested interface
+ * @param interface detected interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+discover_interface(enum pqos_interface requested_interface,
+                   enum pqos_interface *interface)
+{
+        char *environment = NULL;
+
+        LOG_INFO("Requested interface: %s\n",
+                 interface_to_string(requested_interface));
+
+#ifdef __linux__
+        if (requested_interface != PQOS_INTER_MSR &&
+            requested_interface != PQOS_INTER_OS &&
+            requested_interface != PQOS_INTER_OS_RESCTRL_MON &&
+            requested_interface != PQOS_INTER_AUTO)
+#else
+        if (requested_interface != PQOS_INTER_MSR &&
+            requested_interface != PQOS_INTER_AUTO)
+#endif
+                return PQOS_RETVAL_PARAM;
+
+        environment = getenv("RDT_IFACE");
+        if (environment != NULL) {
+                if (strncasecmp(environment, "OS", 2) == 0) {
+                        if (requested_interface != PQOS_INTER_OS &&
+                            requested_interface != PQOS_INTER_AUTO) {
+                                LOG_ERROR("Interface initialization error!\n"
+                                          "Your system has been restricted "
+                                          "to use the OS interface only!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        *interface = PQOS_INTER_OS;
+                        return PQOS_RETVAL_OK;
+                } else if (strncasecmp(environment, "MSR", 3) == 0) {
+                        if (requested_interface != PQOS_INTER_MSR &&
+                            requested_interface != PQOS_INTER_AUTO) {
+                                LOG_ERROR("Interface initialization error!\n"
+                                          "Your system has been restricted "
+                                          "to use the MSR interface only!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+
+                        *interface = PQOS_INTER_MSR;
+                        return PQOS_RETVAL_OK;
+                } else {
+                        LOG_ERROR("Interface initialization error!\n"
+                                  "Invalid interface enforcement selection.\n");
+                        return PQOS_RETVAL_ERROR;
+                }
+        }
+
+#ifdef __linux__
+        if (requested_interface == PQOS_INTER_AUTO &&
+            resctrl_is_supported() == PQOS_RETVAL_OK)
+                *interface = PQOS_INTER_OS;
+#else
+        if (requested_interface == PQOS_INTER_AUTO)
+                *interface = PQOS_INTER_MSR;
+
+#endif
+        else
+                *interface = requested_interface;
+
+        LOG_INFO("Selected interface: %s\n", interface_to_string(*interface));
+        return PQOS_RETVAL_OK;
+}
+
 /*
  * =======================================
  * =======================================
@@ -699,13 +698,6 @@ pqos_init(const struct pqos_config *config)
 
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
-
-        ret = discover_interface(config->interface, &interface);
-        if (ret != PQOS_RETVAL_OK) {
-                fprintf(stderr, "Interface initialization error!\n"
-                                "Cannot select the interface!\n");
-                return PQOS_RETVAL_INTER;
-        }
 
         if (_pqos_api_init() != 0) {
                 fprintf(stderr, "API lock initialization error!\n");
@@ -727,9 +719,11 @@ pqos_init(const struct pqos_config *config)
                 goto init_error;
         }
 
-        LOG_INFO("Requested interface: %s\n",
-                 interface_to_string(config->interface));
-        LOG_INFO("Selected interface: %s\n", interface_to_string(interface));
+        ret = discover_interface(config->interface, &interface);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Cannot select the interface!\n");
+                goto log_init_error;
+        }
 
         /**
          * Topology not provided through config.
