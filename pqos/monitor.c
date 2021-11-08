@@ -2845,8 +2845,11 @@ monitor_loop(void)
                         break;
 
                 /* timeout */
-                if (sel_timeout != TIMEOUT_INFINITE &&
-                    (tv_e.tv_sec - tv_start.tv_sec) >= sel_timeout)
+                if (sel_timeout == TIMEOUT_INFINITE)
+                        continue;
+                if ((tv_e.tv_sec - tv_start.tv_sec) * 1000 +
+                        (tv_e.tv_usec - tv_start.tv_usec) / 1000 >=
+                    sel_timeout * 1000)
                         break;
         }
         if (isxml)
