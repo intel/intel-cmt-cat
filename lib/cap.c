@@ -644,7 +644,6 @@ discover_interface(enum pqos_interface requested_interface,
                         }
 
                         *interface = PQOS_INTER_OS;
-                        return PQOS_RETVAL_OK;
                 } else if (strncasecmp(environment, "MSR", 3) == 0) {
                         if (requested_interface != PQOS_INTER_MSR &&
                             requested_interface != PQOS_INTER_AUTO) {
@@ -655,25 +654,24 @@ discover_interface(enum pqos_interface requested_interface,
                         }
 
                         *interface = PQOS_INTER_MSR;
-                        return PQOS_RETVAL_OK;
                 } else {
                         LOG_ERROR("Interface initialization error!\n"
                                   "Invalid interface enforcement selection.\n");
                         return PQOS_RETVAL_ERROR;
                 }
-        }
-
+        } else {
 #ifdef __linux__
-        if (requested_interface == PQOS_INTER_AUTO &&
-            resctrl_is_supported() == PQOS_RETVAL_OK)
-                *interface = PQOS_INTER_OS;
+                if (requested_interface == PQOS_INTER_AUTO &&
+                    resctrl_is_supported() == PQOS_RETVAL_OK)
+                        *interface = PQOS_INTER_OS;
 #else
-        if (requested_interface == PQOS_INTER_AUTO)
-                *interface = PQOS_INTER_MSR;
+                if (requested_interface == PQOS_INTER_AUTO)
+                        *interface = PQOS_INTER_MSR;
 
 #endif
-        else
-                *interface = requested_interface;
+                else
+                        *interface = requested_interface;
+        }
 
         LOG_INFO("Selected interface: %s\n", interface_to_string(*interface));
         return PQOS_RETVAL_OK;
