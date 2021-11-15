@@ -1,5 +1,5 @@
-PQoS Library Python Wrapper
-===========================
+Python interface for Intel(R) RDT PQoS library
+==============================================
 
 [![Coverity Status](https://scan.coverity.com/projects/intel-cmt-cat/badge.svg)](https://scan.coverity.com/projects/intel-cmt-cat)
 [![License](https://img.shields.io/badge/Licence-BSD%203--Clause-blue)](https://github.com/intel/intel-cmt-cat/blob/master/lib/python/LICENSE)
