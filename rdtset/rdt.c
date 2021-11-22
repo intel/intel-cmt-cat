@@ -388,7 +388,9 @@ print_core_association(const unsigned int cos_id,
                        const unsigned int core_num,
                        const unsigned int *core_array)
 {
-        for (unsigned int i = 0; i < core_num; i++)
+        unsigned i;
+
+        for (i = 0; i < core_num; i++)
                 printf("Core %u => COS%u\n", core_array[i], cos_id);
 }
 
@@ -404,7 +406,9 @@ print_pid_association(const unsigned int cos_id,
                       const unsigned int pid_num,
                       const pid_t *pid_array)
 {
-        for (unsigned int i = 0; i < pid_num; i++)
+        unsigned i;
+
+        for (i = 0; i < pid_num; i++)
                 printf("PID %i => COS%u\n", pid_array[i], cos_id);
 }
 
