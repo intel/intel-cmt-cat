@@ -370,7 +370,7 @@ class TestPqosL3Cat(test.Test):
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-e llc:4c=0xf")
         assert exitstatus == 0
-        assert ("SOCKET 0 L3CA COS4 => DATA {},CODE 0xf").format(hex(default_mask)) in stdout
+        assert f"SOCKET 0 L3CA COS4 => DATA {hex(default_mask)},CODE 0xf" in stdout
 
 
     ## PQOS - L3 CDP Set COS definition - Data only
@@ -395,4 +395,4 @@ class TestPqosL3Cat(test.Test):
 
         (stdout, _, exitstatus) = self.run_pqos(iface, "-e llc:3d=0xf")
         assert exitstatus == 0
-        assert ("SOCKET 0 L3CA COS3 => DATA 0xf,CODE {}").format(hex(default_mask)) in stdout
+        assert f"SOCKET 0 L3CA COS3 => DATA 0xf,CODE {hex(default_mask)}" in stdout

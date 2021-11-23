@@ -64,7 +64,7 @@ def get_pid_status(pid):
 
     except psutil.ZombieProcess:
         return psutil.STATUS_ZOMBIE, False, ''
-    except psutil.NoSuchProcess as ex:
+    except psutil.NoSuchProcess:
         # handle silently, most likely PID has terminated
         pass
     except psutil.Error as ex:

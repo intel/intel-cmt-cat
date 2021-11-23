@@ -80,8 +80,8 @@ class PqosApi:
         """
         for iface in ["msr","os"]:
             if not self.init(iface, True):
-                log.info("Interface %s, MBA BW: %ssupported."\
-                        % (iface.upper(), "un" if not self.is_mba_bw_supported() else ""))
+                log.info("Interface {}, MBA BW: {}supported."\
+                        .format(iface.upper(), "un" if not self.is_mba_bw_supported() else ""))
                 self.fini()
                 self._supported_iface.append(iface)
 
@@ -98,7 +98,7 @@ class PqosApi:
         """
 
         if not force_iface and not iface in self.supported_iface():
-            log.error("RDT does not support '%s' interface!" % (iface))
+            log.error(f"RDT does not support '{iface}' interface!")
             return -1
 
         # deinitialize lib first
@@ -112,8 +112,8 @@ class PqosApi:
             result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
 
         if result:
-            log.error("Failed to umount resctrl fs! status code: %d"\
-                      % (os.WEXITSTATUS(result)))
+            log.error("Failed to umount resctrl fs! status code: {}"\
+                      .format(os.WEXITSTATUS(result)))
             return -1
 
         # attempt to initialize libpqos

@@ -138,7 +138,7 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cap_get = MagicMock(side_effect=pqos_cap_get_mock)
         lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_socketid_m,
-                                              __name__=u'pqos_cpu_get_socketid')
+                                              __name__='pqos_cpu_get_socketid')
 
         pqos_cpu = PqosCpuInfo()
 
@@ -309,7 +309,7 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_one_core = MagicMock(side_effect=pqos_get_one_core_m,
-                                              __name__=u'pqos_cpu_get_one_core')
+                                              __name__='pqos_cpu_get_one_core')
 
         cpu = PqosCpuInfo()
         core = cpu.get_one_core(1)
@@ -331,7 +331,7 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cap_get = MagicMock(return_value=0)
         func_mock = MagicMock(side_effect=pqos_get_by_l2id_m,
-                              __name__=u'pqos_cpu_get_one_by_l2id')
+                              __name__='pqos_cpu_get_one_by_l2id')
         lib.pqos_cpu_get_one_by_l2id = func_mock
 
         cpu = PqosCpuInfo()
@@ -394,7 +394,7 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cap_get = MagicMock(return_value=0)
         lib.pqos_cpu_get_socketid = MagicMock(side_effect=pqos_get_socketid_m,
-                                              __name__=u'pqos_cpu_get_socketid')
+                                              __name__='pqos_cpu_get_socketid')
 
         cpu = PqosCpuInfo()
         socket = cpu.get_socketid(3)
@@ -416,7 +416,7 @@ class TestPqosCpuInfo(unittest.TestCase):
 
         lib.pqos_cap_get = MagicMock(return_value=0)
         func_mock = MagicMock(side_effect=pqos_get_clusterid_m,
-                              __name__=u'pqos_cpu_get_clusterid')
+                              __name__='pqos_cpu_get_clusterid')
         lib.pqos_cpu_get_clusterid = func_mock
 
         cpu = PqosCpuInfo()

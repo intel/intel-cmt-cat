@@ -72,7 +72,7 @@ class TestRdtsetAffinity(test.Test):
             child = self.get_pid_children(rdtset.pid)
             assert len(child) == 1
 
-            (stdout, _, exitstatus) = self.run("taskset -p %s" % child[0])
+            (stdout, _, exitstatus) = self.run(f"taskset -p {child[0]}")
             assert exitstatus == 0
             assert "current affinity mask: 10" in stdout
 
@@ -106,7 +106,7 @@ class TestRdtsetAffinity(test.Test):
             child = self.get_pid_children(rdtset.pid)
             assert len(child) == 1
 
-            (stdout, _, exitstatus) = self.run("taskset -p %s" % child[0])
+            (stdout, _, exitstatus) = self.run(f"taskset -p {child[0]}")
             assert exitstatus == 0
             assert "current affinity mask: 30" in stdout
 

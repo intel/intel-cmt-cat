@@ -103,7 +103,7 @@ class PqosAlloc(object):
         """
 
         ret = self.pqos.lib.pqos_alloc_assoc_set(core, class_id)
-        pqos_handle_error(u'pqos_alloc_assoc_set', ret)
+        pqos_handle_error('pqos_alloc_assoc_set', ret)
 
     def assoc_get(self, core):
         """
@@ -118,7 +118,7 @@ class PqosAlloc(object):
 
         class_id = ctypes.c_uint(0)
         ret = self.pqos.lib.pqos_alloc_assoc_get(core, ctypes.byref(class_id))
-        pqos_handle_error(u'pqos_alloc_assoc_get', ret)
+        pqos_handle_error('pqos_alloc_assoc_get', ret)
         return class_id.value
 
     def assoc_set_pid(self, pid, class_id):
@@ -131,7 +131,7 @@ class PqosAlloc(object):
         """
 
         ret = self.pqos.lib.pqos_alloc_assoc_set_pid(pid, class_id)
-        pqos_handle_error(u'pqos_alloc_assoc_set_pid', ret)
+        pqos_handle_error('pqos_alloc_assoc_set_pid', ret)
 
     def assoc_get_pid(self, pid):
         """
@@ -147,7 +147,7 @@ class PqosAlloc(object):
         class_id = ctypes.c_uint(0)
         class_id_ref = ctypes.byref(class_id)
         ret = self.pqos.lib.pqos_alloc_assoc_get_pid(pid, class_id_ref)
-        pqos_handle_error(u'pqos_alloc_assoc_get_pid', ret)
+        pqos_handle_error('pqos_alloc_assoc_get_pid', ret)
         return class_id.value
 
     def assign(self, technologies, cores):
@@ -178,7 +178,7 @@ class PqosAlloc(object):
         core_array = _get_list_of_cores(cores)
         ret = self.pqos.lib.pqos_alloc_assign(mask, core_array, core_array_len,
                                               class_id_ref)
-        pqos_handle_error(u'pqos_alloc_assign', ret)
+        pqos_handle_error('pqos_alloc_assign', ret)
         return class_id.value
 
     def release(self, cores):
@@ -192,7 +192,7 @@ class PqosAlloc(object):
         core_array_len = len(cores)
         core_array = _get_list_of_cores(cores)
         ret = self.pqos.lib.pqos_alloc_release(core_array, core_array_len)
-        pqos_handle_error(u'pqos_alloc_release', ret)
+        pqos_handle_error('pqos_alloc_release', ret)
 
     def assign_pid(self, technologies, pids):
         """
@@ -222,7 +222,7 @@ class PqosAlloc(object):
         class_id_ref = ctypes.byref(class_id)
         ret = self.pqos.lib.pqos_alloc_assign_pid(mask, pid_array,
                                                   pid_array_len, class_id_ref)
-        pqos_handle_error(u'pqos_alloc_assign_pid', ret)
+        pqos_handle_error('pqos_alloc_assign_pid', ret)
         return class_id.value
 
     def release_pid(self, pids):
@@ -236,7 +236,7 @@ class PqosAlloc(object):
         pid_array = _get_list_of_cores(pids)
         pid_array_len = len(pid_array)
         ret = self.pqos.lib.pqos_alloc_release_pid(pid_array, pid_array_len)
-        pqos_handle_error(u'pqos_alloc_release_pid', ret)
+        pqos_handle_error('pqos_alloc_release_pid', ret)
 
     def get_pids(self, class_id):
         """
@@ -288,4 +288,4 @@ class PqosAlloc(object):
 
         ret = self.pqos.lib.pqos_alloc_reset(l3_cdp_cfg_enum, l2_cdp_cfg_enum,
                                              mba_cfg_enum)
-        pqos_handle_error(u'pqos_alloc_reset', ret)
+        pqos_handle_error('pqos_alloc_reset', ret)

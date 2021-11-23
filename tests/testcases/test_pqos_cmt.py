@@ -99,21 +99,20 @@ class TestPqosCMT(test.Test):
             return cmt
 
         command = "taskset -c 4 memtester 100M"
-        subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE):
+            time.sleep(2)
 
-        time.sleep(2)
+            (stdout, _, exitcode) = self.run_pqos(iface, "-m llc:0-15 -t 1")
+            assert exitcode == 0
+            assert re.search(r"CORE\s*IPC\s*MISSES\s*LLC\[KB\]", stdout)
 
-        (stdout, _, exitcode) = self.run_pqos(iface, "-m llc:0-15 -t 1")
-        assert exitcode == 0
-        assert re.search(r"CORE\s*IPC\s*MISSES\s*LLC\[KB\]", stdout)
+            cmt = get_cmt(stdout, 4)
+            assert cmt > 1000
 
-        cmt = get_cmt(stdout, 4)
-        assert cmt > 1000
-
-        for core in range(15):
-            if core == 4:
-                continue
-            assert get_cmt(stdout, core) < cmt / 2
+            for core in range(15):
+                if core == 4:
+                    continue
+                assert get_cmt(stdout, core) < cmt / 2
 
 
     ## PQOS - CMT Monitor LLC occupancy (tasks)
@@ -153,7 +152,7 @@ class TestPqosCMT(test.Test):
 
             time.sleep(2)
 
-            (stdout, _, exitcode) = self.run_pqos(iface, "-p llc:1 -p llc:%d -t 1" % memtester.pid)
+            (stdout, _, exitcode) = self.run_pqos(iface, f"-p llc:1 -p llc:{memtester.pid} -t 1")
             assert exitcode == 0
             assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*LLC\[KB\]", stdout) is not None
 
@@ -205,7 +204,7 @@ class TestPqosCMT(test.Test):
             time.sleep(2)
 
             (stdout, _, exitcode) = self.run_pqos(iface,
-                                                "-p llc:1 -p llc:%d -t 2 -P" % memtester.pid)
+                                                  f"-p llc:1 -p llc:{memtester.pid} -t 2 -P")
             assert exitcode == 0
             assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*LLC\[%\]", stdout) is not None
 

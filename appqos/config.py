@@ -457,7 +457,7 @@ class ConfigStore:
         absolute_path = join(dirname(__file__), relative_path)
         # path to all schema files
         schema_path = 'file:' + str(join(dirname(__file__), 'schema')) + '/'
-        with open(absolute_path, opener=common.check_link) as schema_file:
+        with open(absolute_path, opener=common.check_link, encoding='UTF-8') as schema_file:
             # add resolver for python to find all schema files
             schema = json.loads(schema_file.read())
             return schema, jsonschema.RefResolver(schema_path, schema)
@@ -474,7 +474,7 @@ class ConfigStore:
         Returns:
             schema validated configuration
         """
-        with open(path, 'r', opener=common.check_link) as fd:
+        with open(path, 'r', opener=common.check_link, encoding='UTF-8') as fd:
             raw_data = fd.read()
             data = json.loads(raw_data.replace('\r\n', '\\r\\n'))
 

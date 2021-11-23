@@ -77,7 +77,7 @@ class TestPqosCatL3(unittest.TestCase):
         lib.pqos_l3ca_set = MagicMock(side_effect=pqos_l3ca_set_mock)
 
         l3ca = PqosCatL3()
-        cos = l3ca.COS(4, data_mask=u'0x0f', code_mask=0x1f)
+        cos = l3ca.COS(4, data_mask='0x0f', code_mask=0x1f)
         l3ca.set(0, [cos])
 
         lib.pqos_l3ca_set.assert_called_once()

@@ -56,6 +56,7 @@ class Env:
         absolute_path = join(dirname(__file__), relative_path)
         # path to all schema files
         schema_path = 'file:' + str(join(dirname(__file__), '../schema')) + '/'
+        # pylint: disable=unspecified-encoding
         with open(absolute_path) as schema_file:
             # add resolver for python to find all schema files
             schema = json.loads(schema_file.read())
@@ -63,6 +64,7 @@ class Env:
 
 
     def load(self, path):
+        # pylint: disable=unspecified-encoding
         with open(path) as fd:
             data = json.load(fd)
 

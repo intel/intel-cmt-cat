@@ -77,7 +77,7 @@ class TestPqosCatL2(unittest.TestCase):
         lib.pqos_l2ca_set = MagicMock(side_effect=pqos_l2ca_set_mock)
 
         l2ca = PqosCatL2()
-        cos = l2ca.COS(1, data_mask=u'0x1f', code_mask=0x0f)
+        cos = l2ca.COS(1, data_mask='0x1f', code_mask=0x0f)
         l2ca.set(0, [cos])
 
         lib.pqos_l2ca_set.assert_called_once()

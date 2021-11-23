@@ -47,6 +47,7 @@ class ResctrlSchemata:
 
     def parse(self):
         # Open file and fill each line into a list
+        # pylint: disable=unspecified-encoding
         with open(self.path, 'r') as schema_file:
             lines = schema_file.readlines()
 
@@ -111,7 +112,7 @@ class Resctrl:
         if options:
             options_str = ' -o ' + ','.join(options)
 
-        command = "sudo mount -t resctrl resctrl%s %s" % (options_str, self.root)
+        command = f"sudo mount -t resctrl resctrl{options_str} {self.root}"
         self.run_cmd(command)
         return self.is_mounted()
 
@@ -129,6 +130,7 @@ class Resctrl:
         if not os.path.exists(mon_feat_path):
             return []
 
+        # pylint: disable=unspecified-encoding
         with open(mon_feat_path, 'r') as feat_file:
             lines = feat_file.readlines()
 
@@ -138,7 +140,7 @@ class Resctrl:
         if cos == 0:
             return os.path.join(self.root, "schemata")
 
-        return os.path.join(self.root, "COS%s" % str(cos), "schemata")
+        return os.path.join(self.root, f"COS{str(cos)}", "schemata")
 
     def get_schemata(self, cos=0):
         path = self.get_schemata_path(cos)
@@ -149,13 +151,13 @@ class Resctrl:
     def get_ctrl_group_count():
         ctrl_group_count = 0
 
-        command = 'bash -c "ls %s"' % RESCTRL_ROOT_PATH
+        command = f'bash -c "ls {RESCTRL_ROOT_PATH}"'
         output, exit_code = pexpect.run(command, withexitstatus=True)
 
         if exit_code == 0:
             ctrl_group_count = 1
 
-            command = 'bash -c "ls %s | grep COS | wc -l"' % RESCTRL_ROOT_PATH
+            command = f'bash -c "ls {RESCTRL_ROOT_PATH} | grep COS | wc -l"'
             output = pexpect.run(command)
             ctrl_group_count += int(output)
 

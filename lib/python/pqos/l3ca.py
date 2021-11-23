@@ -50,8 +50,8 @@ class CPqosL3CaMaskCDP(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"data_mask", ctypes.c_uint64),
-        (u"code_mask", ctypes.c_uint64),
+        ('data_mask', ctypes.c_uint64),
+        ('code_mask', ctypes.c_uint64),
     ]
 
 
@@ -60,8 +60,8 @@ class CPqosL3CaMask(ctypes.Union):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"ways_mask", ctypes.c_uint64),
-        (u"s", CPqosL3CaMaskCDP)
+        ('ways_mask', ctypes.c_uint64),
+        ('s', CPqosL3CaMaskCDP)
     ]
 
 
@@ -69,9 +69,9 @@ class CPqosL3Ca(ctypes.Structure):
     "pqos_l3ca structure"
 
     _fields_ = [
-        (u"class_id", ctypes.c_uint),
-        (u"cdp", ctypes.c_int),
-        (u"u", CPqosL3CaMask),
+        ('class_id', ctypes.c_uint),
+        ('cdp', ctypes.c_int),
+        ('u', CPqosL3CaMask),
     ]
 
     @classmethod
@@ -109,7 +109,7 @@ class PqosCatL3(object):
         pqos_l3_ca_arr = (CPqosL3Ca * len(pqos_l3_cas))(*pqos_l3_cas)
         ret = self.pqos.lib.pqos_l3ca_set(socket, len(pqos_l3_cas),
                                           pqos_l3_ca_arr)
-        pqos_handle_error(u'pqos_l3ca_set', ret)
+        pqos_handle_error('pqos_l3ca_set', ret)
 
     def get(self, socket):
         """
@@ -126,7 +126,7 @@ class PqosCatL3(object):
         num_ca = ctypes.c_uint(0)
         num_ca_ref = ctypes.byref(num_ca)
         ret = self.pqos.lib.pqos_l3ca_get(socket, cos_num, num_ca_ref, l3cas)
-        pqos_handle_error(u'pqos_l3ca_get', ret)
+        pqos_handle_error('pqos_l3ca_get', ret)
 
         coses = [l3ca.to_cos(self.COS) for l3ca in l3cas[:num_ca.value]]
         return coses
@@ -138,5 +138,5 @@ class PqosCatL3(object):
         min_cbm_bits = ctypes.c_uint(0)
         min_cbm_bits_ref = ctypes.byref(min_cbm_bits)
         ret = self.pqos.lib.pqos_l3ca_get_min_cbm_bits(min_cbm_bits_ref)
-        pqos_handle_error(u'pqos_l3ca_get_min_cbm_bits', ret)
+        pqos_handle_error('pqos_l3ca_get_min_cbm_bits', ret)
         return min_cbm_bits.value

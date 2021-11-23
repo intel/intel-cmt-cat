@@ -47,7 +47,7 @@ class PqosError(Exception):
 
     def __init__(self, message, *args, **kwargs):
         super().__init__(message, *args, **kwargs)
-        code = args[0] if args else kwargs.get(u'code')
+        code = args[0] if args else kwargs.get('code')
         self.code = code or self.CODE
 
 

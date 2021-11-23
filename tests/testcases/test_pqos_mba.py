@@ -84,10 +84,9 @@ class TestPqosMba(test.Test):
     @pytest.mark.rdt_supported("mba")
     @pytest.mark.parametrize("rate", [20, 50, 90])
     def test_pqos_mba_set(self, iface, rate):
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-e mba:2=%d" % rate)
+        (stdout, _, exitstatus) = self.run_pqos(iface, f"-e mba:2={rate}")
         assert exitstatus == 0
-        assert ("SOCKET 0 MBA COS2 => {rate}% requested, {rate}% applied").format(rate=rate) \
-            in stdout
+        assert f"SOCKET 0 MBA COS2 => {rate}% requested, {rate}% applied" in stdout
 
 
     ## PQOS - MBA Set COS definition - Negative

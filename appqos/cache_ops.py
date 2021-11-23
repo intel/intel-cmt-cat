@@ -207,6 +207,7 @@ class Pool:
         removed_pids = [pid for pid in old_pids if pid not in pids]
 
         # skip pids assigned to any pool e.g.: apps moved to other pool
+        # pylint: disable=consider-using-dict-items
         for pool_id in Pool.pools:
             if pool_id == self.pool:
                 continue
@@ -215,6 +216,7 @@ class Pool:
 
         # remove pid form old pool
         if old_pids:
+            # pylint: disable=consider-using-dict-items
             for pool_id in Pool.pools:
                 if pool_id == self.pool:
                     continue
@@ -271,6 +273,7 @@ class Pool:
         common.PQOS_API.alloc_assoc_set(cores, self.pool)
 
         # process list of removed cores
+        # pylint: disable=consider-using-dict-items
         for pool_id in Pool.pools:
             if pool_id == self.pool:
                 continue

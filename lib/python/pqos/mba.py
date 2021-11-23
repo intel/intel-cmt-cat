@@ -47,9 +47,9 @@ class CPqosMba(ctypes.Structure):
     "pqos_mba structure"
 
     _fields_ = [
-        (u"class_id", ctypes.c_uint),
-        (u"mb_max", ctypes.c_uint),
-        (u"ctrl", ctypes.c_int)
+        ('class_id', ctypes.c_uint),
+        ('mb_max', ctypes.c_uint),
+        ('ctrl', ctypes.c_int)
     ]
 
     @classmethod
@@ -102,7 +102,7 @@ class PqosMba(object):
         actual_arr = (CPqosMba * num_cos)()
 
         ret = self.pqos.lib.pqos_mba_set(socket, num_cos, cos_arr, actual_arr)
-        pqos_handle_error(u'pqos_mba_set', ret)
+        pqos_handle_error('pqos_mba_set', ret)
 
         actual = [cos.to_cos(self.COS) for cos in actual_arr]
         return actual
@@ -127,7 +127,7 @@ class PqosMba(object):
 
         ret = self.pqos.lib.pqos_mba_get(socket, max_num_cos,
                                          ctypes.byref(num_cos), cos_arr)
-        pqos_handle_error(u'pqos_mba_get', ret)
+        pqos_handle_error('pqos_mba_get', ret)
 
         coses = [cos_arr[i].to_cos(self.COS) for i in range(num_cos.value)]
         return coses

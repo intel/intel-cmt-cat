@@ -83,11 +83,11 @@ class TestRdtsetL3Cat(test.Test):
             else:
                 last_cos = Resctrl.get_ctrl_group_count() - 1
 
-            assert re.search("Core 5, L2ID [0-9]+, L3ID [0-9]+ => COS%d" % last_cos, stdout) \
+            assert re.search(f"Core 5, L2ID [0-9]+, L3ID [0-9]+ => COS{last_cos}", stdout) \
                    is not None
-            assert re.search("Core 6, L2ID [0-9]+, L3ID [0-9]+ => COS%d" % last_cos, stdout) \
+            assert re.search(f"Core 6, L2ID [0-9]+, L3ID [0-9]+ => COS{last_cos}", stdout) \
                    is not None
-            assert "L3CA COS%d => MASK 0xf" % last_cos in stdout
+            assert f"L3CA COS{last_cos} => MASK 0xf" in stdout
 
             self.run("killall memtester")
             rdtset.communicate()
@@ -144,8 +144,8 @@ class TestRdtsetL3Cat(test.Test):
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
         assert exitstatus == 0
         last_cos = Resctrl.get_ctrl_group_count() - 1
-        assert ("COS{} => 1").format(last_cos) in stdout
-        assert ("L3CA COS{} => MASK 0xf").format(last_cos) in stdout
+        assert f"COS{last_cos} => 1" in stdout
+        assert f"L3CA COS{last_cos} => MASK 0xf" in stdout
 
 
     ## RDTSET - L3 CAT Set COS definition (task) - Negative

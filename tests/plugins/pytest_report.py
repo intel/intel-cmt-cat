@@ -93,21 +93,23 @@ class TestReport:
 
     def report(self, terminalreporter):
         terminalreporter.write_sep('=', 'Test Report')
-        terminalreporter.write_line('%-45s | Priority | Result    | Comment/Defect ID' %
-                                    ('Test Case Identifier'))
+        # pylint: disable=consider-using-f-string
+        terminalreporter.write_line('{:45} | Priority | Result    | Comment/Defect ID'\
+                                    .format('Test Case Identifier'))
         terminalreporter.write_sep('=')
 
         for test in sorted(self.results):
             if self.results[test].result == 'PASS':
                 markup = {'green': True}
-            elif self.results[test].result == 'FAIL' or self.results[test].result == 'XFAIL':
+            elif self.results[test].result in ('FAIL', 'XFAIL'):
                 markup = {'red': True}
             else:
                 markup = {'yellow': True}
 
-            terminalreporter.write('%-45s | %-8s | ' \
-                % (self.results[test].nodeid,
-                   self.results[test].priority if self.results[test].priority else ""))
+            # pylint: disable=consider-using-f-string
+            terminalreporter.write('{:45} | {:8} | '\
+                .format(self.results[test].nodeid,
+                        self.results[test].priority if self.results[test].priority else ""))
             terminalreporter.write('%-10s' % (self.results[test].result), **markup)
             terminalreporter.write('|')
             terminalreporter.write_line("")
@@ -130,7 +132,7 @@ class TestReport:
             return
 
         # We are interested only on executed tests
-        if report.outcome != "passed" and report.outcome != "failed":
+        if report.outcome in ("passed", "failed"):
             return
 
         nodeid = report.nodeid

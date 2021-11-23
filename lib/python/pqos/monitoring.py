@@ -51,20 +51,20 @@ class CPqosEventValues(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u'llc', ctypes.c_uint64),
-        (u'mbm_local', ctypes.c_uint64),
-        (u'mbm_total', ctypes.c_uint64),
-        (u'mbm_remote', ctypes.c_uint64),
-        (u'mbm_local_delta', ctypes.c_uint64),
-        (u'mbm_total_delta', ctypes.c_uint64),
-        (u'mbm_remote_delta', ctypes.c_uint64),
-        (u'ipc_retired', ctypes.c_uint64),
-        (u'ipc_retired_delta', ctypes.c_uint64),
-        (u'ipc_unhalted', ctypes.c_uint64),
-        (u'ipc_unhalted_delta', ctypes.c_uint64),
-        (u'ipc', ctypes.c_double),
-        (u'llc_misses', ctypes.c_uint64),
-        (u'llc_misses_delta', ctypes.c_uint64),
+        ('llc', ctypes.c_uint64),
+        ('mbm_local', ctypes.c_uint64),
+        ('mbm_total', ctypes.c_uint64),
+        ('mbm_remote', ctypes.c_uint64),
+        ('mbm_local_delta', ctypes.c_uint64),
+        ('mbm_total_delta', ctypes.c_uint64),
+        ('mbm_remote_delta', ctypes.c_uint64),
+        ('ipc_retired', ctypes.c_uint64),
+        ('ipc_retired_delta', ctypes.c_uint64),
+        ('ipc_unhalted', ctypes.c_uint64),
+        ('ipc_unhalted_delta', ctypes.c_uint64),
+        ('ipc', ctypes.c_double),
+        ('llc_misses', ctypes.c_uint64),
+        ('llc_misses_delta', ctypes.c_uint64),
     ]
 
 
@@ -72,17 +72,17 @@ class CPqosMonData(ctypes.Structure):
     "pqos_mon_data structure"
 
     _fields_ = [
-        (u'valid', ctypes.c_int),
-        (u'event', ctypes.c_uint),
-        (u'context', ctypes.c_void_p),
-        (u'values', CPqosEventValues),
-        (u'num_pids', ctypes.c_uint),
-        (u'pids', ctypes.POINTER(ctypes.c_uint)),
-        (u'tid_nr', ctypes.c_uint),
-        (u'tid_map', ctypes.POINTER(ctypes.c_uint)),
-        (u'cores', ctypes.POINTER(ctypes.c_uint)),
-        (u'num_cores', ctypes.c_uint),
-        (u'intl', ctypes.c_void_p)
+        ('valid', ctypes.c_int),
+        ('event', ctypes.c_uint),
+        ('context', ctypes.c_void_p),
+        ('values', CPqosEventValues),
+        ('num_pids', ctypes.c_uint),
+        ('pids', ctypes.POINTER(ctypes.c_uint)),
+        ('tid_nr', ctypes.c_uint),
+        ('tid_map', ctypes.POINTER(ctypes.c_uint)),
+        ('cores', ctypes.POINTER(ctypes.c_uint)),
+        ('num_cores', ctypes.c_uint),
+        ('intl', ctypes.c_void_p)
     ]
 
     def __init__(self, *args, **kwargs):
@@ -96,7 +96,7 @@ class CPqosMonData(ctypes.Structure):
 
         ref = self.get_ref()
         ret = self.pqos.lib.pqos_mon_stop(ref)
-        pqos_handle_error(u'pqos_mon_stop', ret)
+        pqos_handle_error('pqos_mon_stop', ret)
 
     def add_pids(self, pids):
         """
@@ -106,7 +106,7 @@ class CPqosMonData(ctypes.Structure):
         num_pids = len(pids)
         pids_arr = (ctypes.c_uint * num_pids)(*pids)
         ret = self.pqos.lib.pqos_mon_add_pids(num_pids, pids_arr, ref)
-        pqos_handle_error(u'pqos_mon_add_pids', ret)
+        pqos_handle_error('pqos_mon_add_pids', ret)
 
     def remove_pids(self, pids):
         """
@@ -116,7 +116,7 @@ class CPqosMonData(ctypes.Structure):
         num_pids = len(pids)
         pids_arr = (ctypes.c_uint * num_pids)(*pids)
         ret = self.pqos.lib.pqos_mon_remove_pids(num_pids, pids_arr, ref)
-        pqos_handle_error(u'pqos_mon_remove_pids', ret)
+        pqos_handle_error('pqos_mon_remove_pids', ret)
 
     def get_ref(self):
         """
@@ -160,7 +160,7 @@ class PqosMon:
         """
 
         ret = self.pqos.lib.pqos_mon_reset()
-        pqos_handle_error(u'pqos_mon_reset', ret)
+        pqos_handle_error('pqos_mon_reset', ret)
 
     def assoc_get(self, core):
         """
@@ -176,7 +176,7 @@ class PqosMon:
         rmid = RmidT(0)
         rmid_ref = ctypes.byref(rmid)
         ret = self.pqos.lib.pqos_mon_assoc_get(core, rmid_ref)
-        pqos_handle_error(u'pqos_mon_assoc_get', ret)
+        pqos_handle_error('pqos_mon_assoc_get', ret)
         return rmid.value
 
     def start(self, cores, events, context=None):
@@ -200,7 +200,7 @@ class PqosMon:
         event = _get_event_mask(events)
         ret = self.pqos.lib.pqos_mon_start(num_cores, cores_arr, event, context,
                                            group_ref)
-        pqos_handle_error(u'pqos_mon_start', ret)
+        pqos_handle_error('pqos_mon_start', ret)
         return group
 
     def start_pids(self, pids, events, context=None):
@@ -224,7 +224,7 @@ class PqosMon:
         event = _get_event_mask(events)
         ret = self.pqos.lib.pqos_mon_start_pids(num_pids, pids_arr, event,
                                                 context, group_ref)
-        pqos_handle_error(u'pqos_mon_start_pids', ret)
+        pqos_handle_error('pqos_mon_start_pids', ret)
         return group
 
     def poll(self, groups):
@@ -239,4 +239,4 @@ class PqosMon:
         num_groups = len(groups)
         groups_arr = (ctypes.POINTER(CPqosMonData) * num_groups)(*refs)
         ret = self.pqos.lib.pqos_mon_poll(groups_arr, num_groups)
-        pqos_handle_error(u'pqos_mon_poll', ret)
+        pqos_handle_error('pqos_mon_poll', ret)

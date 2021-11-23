@@ -61,12 +61,12 @@ class CPqosConfig(ctypes.Structure):
                                     ctypes.c_char_p)
 
     _fields_ = [
-        (u"fd_log", ctypes.c_int),
-        (u"callback_log", LOG_CALLBACK),
-        (u"context_log", ctypes.c_void_p),
-        (u"verbose", ctypes.c_int),
-        (u"interface", ctypes.c_int),
-        (u"reserved", ctypes.c_int),
+        ('fd_log', ctypes.c_int),
+        ('callback_log', LOG_CALLBACK),
+        ('context_log', ctypes.c_void_p),
+        ('verbose', ctypes.c_int),
+        ('interface', ctypes.c_int),
+        ('reserved', ctypes.c_int),
     ]
 
 
@@ -112,10 +112,10 @@ class Pqos(object):
     def __init__(self):
         "Finds PQoS library and constructs a new object."
 
-        self.lib = ctypes.cdll.LoadLibrary(u'libpqos.so.4')
+        self.lib = ctypes.cdll.LoadLibrary('libpqos.so.4')
 
     def init(self, interface, log_file=None, log_callback=None,
-             log_context=None, verbose=u'default'):
+             log_context=None, verbose='default'):
         """Initializes PQoS library.
 
         Parameters:
@@ -130,18 +130,17 @@ class Pqos(object):
                      default (or None), verbose and super (default 'default')
         """
 
-        if interface.upper() == u'MSR':
+        if interface.upper() == 'MSR':
             cfg_interface = CPqosConfig.PQOS_INTER_MSR
-        elif interface.upper() == u'OS':
+        elif interface.upper() == 'OS':
             cfg_interface = CPqosConfig.PQOS_INTER_OS
-        elif interface.upper() == u'OS_RESCTRL_MON':
+        elif interface.upper() == 'OS_RESCTRL_MON':
             cfg_interface = CPqosConfig.PQOS_INTER_OS_RESCTRL_MON
-        elif interface.upper() == u'AUTO':
+        elif interface.upper() == 'AUTO':
             cfg_interface = CPqosConfig.PQOS_INTER_AUTO
         else:
-            raise ValueError(u'Unknown interface selected: %s.'
-                             u' Available options: MSR, OS,'
-                             u' OS_RESCTRL_MON, AUTO' % interface)
+            raise ValueError(f'Unknown interface selected: {interface}.'
+                              ' Available options: MSR, OS, OS_RESCTRL_MON, AUTO')
 
         if not log_file and not log_callback:
             log_file = sys.stdout
@@ -168,18 +167,17 @@ class Pqos(object):
         else:
             cfg_callback_log = CPqosConfig.LOG_CALLBACK(0)
 
-        if verbose is None or verbose.lower() == u'default':
+        if verbose is None or verbose.lower() == 'default':
             cfg_verbose = CPqosConfig.LOG_VER_DEFAULT
-        elif verbose.lower() == u'silent':
+        elif verbose.lower() == 'silent':
             cfg_verbose = CPqosConfig.LOG_VER_SILENT
-        elif verbose.lower() == u'verbose':
+        elif verbose.lower() == 'verbose':
             cfg_verbose = CPqosConfig.LOG_VER_VERBOSE
-        elif verbose.lower() == u'super':
+        elif verbose.lower() == 'super':
             cfg_verbose = CPqosConfig.LOG_VER_SUPER_VERBOSE
         else:
-            raise ValueError(u'Unknown verbosity level selected: %s.'
-                             u' Available options: silent, default (or None),'
-                             u' verbose, super' % interface)
+            raise ValueError(f'Unknown verbosity level selected: {interface}.'
+                             ' Available options: silent, default (or None), verbose, super')
 
         config = CPqosConfig(interface=cfg_interface, fd_log=cfg_fd_log,
                              callback_log=cfg_callback_log,
@@ -187,10 +185,10 @@ class Pqos(object):
                              reserved=0)
 
         ret = self.lib.pqos_init(ctypes.byref(config))
-        pqos_handle_error(u'pqos_init', ret)
+        pqos_handle_error('pqos_init', ret)
 
     def fini(self):
         "Finalizes PQoS library."
 
         ret = self.lib.pqos_fini()
-        pqos_handle_error(u'pqos_fini', ret)
+        pqos_handle_error('pqos_fini', ret)

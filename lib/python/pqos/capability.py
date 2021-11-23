@@ -46,13 +46,13 @@ class CPqosCapabilityL3(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"mem_size", ctypes.c_uint),
-        (u"num_classes", ctypes.c_uint),
-        (u"num_ways", ctypes.c_uint),
-        (u"way_size", ctypes.c_uint),
-        (u"way_contention", ctypes.c_uint64),
-        (u"cdp", ctypes.c_int),
-        (u"cdp_on", ctypes.c_int),
+        ('mem_size', ctypes.c_uint),
+        ('num_classes', ctypes.c_uint),
+        ('num_ways', ctypes.c_uint),
+        ('way_size', ctypes.c_uint),
+        ('way_contention', ctypes.c_uint64),
+        ('cdp', ctypes.c_int),
+        ('cdp_on', ctypes.c_int),
     ]
 
 
@@ -61,13 +61,13 @@ class CPqosCapabilityL2(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"mem_size", ctypes.c_uint),
-        (u"num_classes", ctypes.c_uint),
-        (u"num_ways", ctypes.c_uint),
-        (u"way_size", ctypes.c_uint),
-        (u"way_contention", ctypes.c_uint64),
-        (u"cdp", ctypes.c_int),
-        (u"cdp_on", ctypes.c_int),
+        ('mem_size', ctypes.c_uint),
+        ('num_classes', ctypes.c_uint),
+        ('num_ways', ctypes.c_uint),
+        ('way_size', ctypes.c_uint),
+        ('way_contention', ctypes.c_uint64),
+        ('cdp', ctypes.c_int),
+        ('cdp_on', ctypes.c_int),
     ]
 
 
@@ -76,13 +76,13 @@ class CPqosCapabilityMBA(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"mem_size", ctypes.c_uint),
-        (u"num_classes", ctypes.c_uint),
-        (u"throttle_max", ctypes.c_uint),
-        (u"throttle_step", ctypes.c_uint),
-        (u"is_linear", ctypes.c_int),
-        (u"ctrl", ctypes.c_int),
-        (u"ctrl_on", ctypes.c_int),
+        ('mem_size', ctypes.c_uint),
+        ('num_classes', ctypes.c_uint),
+        ('throttle_max', ctypes.c_uint),
+        ('throttle_step', ctypes.c_uint),
+        ('is_linear', ctypes.c_int),
+        ('ctrl', ctypes.c_int),
+        ('ctrl_on', ctypes.c_int),
     ]
 
 
@@ -100,10 +100,10 @@ class CPqosMonitor(ctypes.Structure):
     PQOS_PERF_EVENT_IPC = 0x8000
 
     _fields_ = [
-        (u"type", ctypes.c_int),
-        (u"max_rmid", ctypes.c_uint),
-        (u"scale_factor", ctypes.c_uint32),
-        (u"counter_length", ctypes.c_uint),
+        ('type', ctypes.c_int),
+        ('max_rmid', ctypes.c_uint),
+        ('scale_factor', ctypes.c_uint32),
+        ('counter_length', ctypes.c_uint),
     ]
 
 
@@ -112,11 +112,11 @@ class CPqosCapabilityMonitoring(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"mem_size", ctypes.c_uint),
-        (u"max_rmid", ctypes.c_uint),
-        (u"l3_size", ctypes.c_uint),
-        (u"num_events", ctypes.c_uint),
-        (u"events", CPqosMonitor * 0),
+        ('mem_size', ctypes.c_uint),
+        ('max_rmid', ctypes.c_uint),
+        ('l3_size', ctypes.c_uint),
+        ('num_events', ctypes.c_uint),
+        ('events', CPqosMonitor * 0),
     ]
 
 
@@ -125,11 +125,11 @@ class CPqosCapabilityUnion(ctypes.Union):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"mon", ctypes.POINTER(CPqosCapabilityMonitoring)),
-        (u"l3ca", ctypes.POINTER(CPqosCapabilityL3)),
-        (u"l2ca", ctypes.POINTER(CPqosCapabilityL2)),
-        (u"mba", ctypes.POINTER(CPqosCapabilityMBA)),
-        (u"generic_ptr", ctypes.c_void_p),
+        ('mon', ctypes.POINTER(CPqosCapabilityMonitoring)),
+        ('l3ca', ctypes.POINTER(CPqosCapabilityL3)),
+        ('l2ca', ctypes.POINTER(CPqosCapabilityL2)),
+        ('mba', ctypes.POINTER(CPqosCapabilityMBA)),
+        ('generic_ptr', ctypes.c_void_p),
     ]
 
 
@@ -144,8 +144,8 @@ class CPqosCapability(ctypes.Structure):
     PQOS_CAP_TYPE_NUMOF = 4
 
     _fields_ = [
-        (u"type", ctypes.c_int),
-        (u"u", CPqosCapabilityUnion)
+        ('type', ctypes.c_int),
+        ('u', CPqosCapabilityUnion)
     ]
 
 
@@ -154,10 +154,10 @@ class CPqosCap(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"mem_size", ctypes.c_uint),
-        (u"version", ctypes.c_uint),
-        (u"num_cap", ctypes.c_uint),
-        (u"capabilities", CPqosCapability * 0)
+        ('mem_size', ctypes.c_uint),
+        ('version', ctypes.c_uint),
+        ('num_cap', ctypes.c_uint),
+        ('capabilities', CPqosCapability * 0)
     ]
 
 
@@ -327,7 +327,7 @@ class PqosCap(object):
         self.pqos = Pqos()
         self.p_cap = ctypes.POINTER(CPqosCap)()
         ret = self.pqos.lib.pqos_cap_get(ctypes.byref(self.p_cap), None)
-        pqos_handle_error(u'pqos_cap_get', ret)
+        pqos_handle_error('pqos_cap_get', ret)
 
     def get_type(self, type_str):
         """Retrieves a type of capability from a cap structure.
@@ -340,7 +340,7 @@ class PqosCap(object):
         p_cap_item = ctypes.POINTER(CPqosCapability)()
         ret = self.pqos.lib.pqos_cap_get_type(self.p_cap, type_enum,
                                               ctypes.byref(p_cap_item))
-        pqos_handle_error(u'pqos_cap_get_type', ret)
+        pqos_handle_error('pqos_cap_get_type', ret)
 
         cap_item = p_cap_item.contents
         capability = _get_capability(cap_item, type_str)
@@ -354,7 +354,7 @@ class PqosCap(object):
         cos_num = ctypes.c_uint(0)
         ret = self.pqos.lib.pqos_l3ca_get_cos_num(self.p_cap,
                                                   ctypes.byref(cos_num))
-        pqos_handle_error(u'pqos_l3ca_get_cos_num', ret)
+        pqos_handle_error('pqos_l3ca_get_cos_num', ret)
         return cos_num.value
 
     def get_l2ca_cos_num(self):
@@ -365,7 +365,7 @@ class PqosCap(object):
         cos_num = ctypes.c_uint(0)
         ret = self.pqos.lib.pqos_l2ca_get_cos_num(self.p_cap,
                                                   ctypes.byref(cos_num))
-        pqos_handle_error(u'pqos_l2ca_get_cos_num', ret)
+        pqos_handle_error('pqos_l2ca_get_cos_num', ret)
         return cos_num.value
 
     def get_mba_cos_num(self):
@@ -376,7 +376,7 @@ class PqosCap(object):
         cos_num = ctypes.c_uint(0)
         ret = self.pqos.lib.pqos_mba_get_cos_num(self.p_cap,
                                                  ctypes.byref(cos_num))
-        pqos_handle_error(u'pqos_mba_get_cos_num', ret)
+        pqos_handle_error('pqos_mba_get_cos_num', ret)
         return cos_num.value
 
     def is_l3ca_cdp_enabled(self):
@@ -386,7 +386,7 @@ class PqosCap(object):
         ret = self.pqos.lib.pqos_l3ca_cdp_enabled(self.p_cap,
                                                   ctypes.byref(supported),
                                                   ctypes.byref(enabled))
-        pqos_handle_error(u'pqos_l3ca_cdp_enabled', ret)
+        pqos_handle_error('pqos_l3ca_cdp_enabled', ret)
         return (_get_tristate_bool(supported.value),
                 _get_tristate_bool(enabled.value))
 
@@ -397,7 +397,7 @@ class PqosCap(object):
         ret = self.pqos.lib.pqos_l2ca_cdp_enabled(self.p_cap,
                                                   ctypes.byref(supported),
                                                   ctypes.byref(enabled))
-        pqos_handle_error(u'pqos_l2ca_cdp_enabled', ret)
+        pqos_handle_error('pqos_l2ca_cdp_enabled', ret)
         return (_get_tristate_bool(supported.value),
                 _get_tristate_bool(enabled.value))
 
@@ -408,6 +408,6 @@ class PqosCap(object):
         ret = self.pqos.lib.pqos_mba_ctrl_enabled(self.p_cap,
                                                   ctypes.byref(supported),
                                                   ctypes.byref(enabled))
-        pqos_handle_error(u'pqos_mba_ctrl_enabled', ret)
+        pqos_handle_error('pqos_mba_ctrl_enabled', ret)
         return (_get_tristate_bool(supported.value),
                 _get_tristate_bool(enabled.value))

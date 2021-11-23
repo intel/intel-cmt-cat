@@ -48,12 +48,12 @@ class CPqosCoreInfo(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"lcore", ctypes.c_uint),    # Logical core id
-        (u"socket", ctypes.c_uint),   # Socket id in the system
-        (u"l3_id", ctypes.c_uint),    # L3/LLC cluster id
-        (u"l2_id", ctypes.c_uint),    # L2 cluster id
-        (u"l3cat_id", ctypes.c_uint), # L3 CAT classes id
-        (u"mba_id", ctypes.c_uint),   # MBA id
+        ('lcore', ctypes.c_uint),    # Logical core id
+        ('socket', ctypes.c_uint),   # Socket id in the system
+        ('l3_id', ctypes.c_uint),    # L3/LLC cluster id
+        ('l2_id', ctypes.c_uint),    # L2 cluster id
+        ('l3cat_id', ctypes.c_uint), # L3 CAT classes id
+        ('mba_id', ctypes.c_uint),   # MBA id
     ]
 
 
@@ -62,13 +62,13 @@ class CPqosCacheInfo(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        (u"detected", ctypes.c_int),         # Indicates cache detected & valid
-        (u"num_ways", ctypes.c_uint),        # Number of cache ways
-        (u"num_sets", ctypes.c_uint),        # Number of sets
-        (u"num_partitions", ctypes.c_uint),  # Number of partitions
-        (u"line_size", ctypes.c_uint),       # Cache line size in bytes
-        (u"total_size", ctypes.c_uint),      # Total cache size in bytes
-        (u"way_size", ctypes.c_uint),        # Cache way size in bytes
+        ("detected", ctypes.c_int),         # Indicates cache detected & valid
+        ("num_ways", ctypes.c_uint),        # Number of cache ways
+        ("num_sets", ctypes.c_uint),        # Number of sets
+        ("num_partitions", ctypes.c_uint),  # Number of partitions
+        ("line_size", ctypes.c_uint),       # Cache line size in bytes
+        ("total_size", ctypes.c_uint),      # Total cache size in bytes
+        ("way_size", ctypes.c_uint),        # Cache way size in bytes
     ]
 
 
@@ -81,12 +81,12 @@ class CPqosCpuInfo(ctypes.Structure):
     PQOS_VENDOR_AMD = 2
 
     _fields_ = [
-        (u"mem_size", ctypes.c_uint),   # Byte size of the structure
-        (u"l2", CPqosCacheInfo),        # L2 cache information
-        (u"l3", CPqosCacheInfo),        # L3 cache information
-        (u"vendor", ctypes.c_int),      # CPU vendor
-        (u"num_cores", ctypes.c_uint),  # Number of cores in the system
-        (u"cores", CPqosCoreInfo * 0)   # Core information
+        ("mem_size", ctypes.c_uint),   # Byte size of the structure
+        ("l2", CPqosCacheInfo),        # L2 cache information
+        ("l3", CPqosCacheInfo),        # L3 cache information
+        ("vendor", ctypes.c_int),      # CPU vendor
+        ("num_cores", ctypes.c_uint),  # Number of cores in the system
+        ("cores", CPqosCoreInfo * 0)   # Core information
     ]
 
 
@@ -131,7 +131,7 @@ class PqosCpuInfo(object):
 
         self.p_cpu = ctypes.POINTER(CPqosCpuInfo)()
         ret = self.pqos.lib.pqos_cap_get(None, ctypes.byref(self.p_cpu))
-        pqos_handle_error(u'pqos_cap_get', ret)
+        pqos_handle_error('pqos_cap_get', ret)
 
     def _call_func_array(self, func, arg=None, use_arg=False):
         """
@@ -195,11 +195,11 @@ class PqosCpuInfo(object):
         vendor = func(self.p_cpu)
 
         if vendor == CPqosCpuInfo.PQOS_VENDOR_INTEL:
-            return u"INTEL"
+            return "INTEL"
         if vendor == CPqosCpuInfo.PQOS_VENDOR_AMD:
-            return u"AMD"
+            return "AMD"
 
-        return u"UNKNOWN"
+        return "UNKNOWN"
 
     def get_sockets(self):
         """
@@ -265,7 +265,7 @@ class PqosCpuInfo(object):
         p_coreinfo = self.pqos.lib.pqos_cpu_get_core_info(self.p_cpu, core)
 
         if not p_coreinfo:
-            raise PqosError(u'Core information not found')
+            raise PqosError('Core information not found')
 
         coreinfo_struct = p_coreinfo.contents
         coreinfo = PqosCoreInfo(core=coreinfo_struct.lcore,

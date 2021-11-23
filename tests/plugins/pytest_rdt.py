@@ -124,9 +124,9 @@ def pytest_pyfunc_call(pyfuncitem):
     # skip if feature requested but not supported
     for req in reqs_supported:
         if req not in features:
-            pytest.skip("%s requirement not met" % req)
+            pytest.skip(f"{req} requirement not met")
 
     # skip if feature requested to be unsupported but it is supported
     for req in reqs_unsupported:
         if req in features:
-            pytest.skip("%s requirement met" % req)
+            pytest.skip(f"{req} requirement met")

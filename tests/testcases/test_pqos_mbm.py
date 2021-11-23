@@ -105,23 +105,23 @@ class TestPqosMBM(test.Test):
             return mbl, mbr
 
         command = "taskset -c 4 memtester 100M"
-        subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        with subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE):
+            time.sleep(2)
 
-        time.sleep(2)
+            (stdout, _, exitcode) = self.run_pqos(iface, "-m mbl:0-15 -m mbr:0-15 -t 1")
+            assert exitcode == 0
+            assert re.search(r"CORE\s*IPC\s*MISSES\s*MBL\[MB/s\]\s*MBR\[MB/s\]", stdout) \
+                is not None
 
-        (stdout, _, exitcode) = self.run_pqos(iface, "-m mbl:0-15 -m mbr:0-15 -t 1")
-        assert exitcode == 0
-        assert re.search(r"CORE\s*IPC\s*MISSES\s*MBL\[MB/s\]\s*MBR\[MB/s\]", stdout) is not None
+            (mbl, _) = get_mbm(stdout, 4)
+            assert mbl > 100
 
-        (mbl, _) = get_mbm(stdout, 4)
-        assert mbl > 100
+            for core in range(15):
+                if core == 4:
+                    continue
 
-        for core in range(15):
-            if core == 4:
-                continue
-
-            (mbl_core, _) = get_mbm(stdout, core)
-            assert mbl_core < mbl / 10
+                (mbl_core, _) = get_mbm(stdout, core)
+                assert mbl_core < mbl / 10
 
 
     ## PQOS - MBM Monitor MBL and MBR (tasks)
@@ -165,9 +165,9 @@ class TestPqosMBM(test.Test):
 
             time.sleep(2)
 
-            (stdout, _, exitcode) = self.run_pqos(iface,
-                                                "-p mbl:1 -p mbl:%d -p mbr:1 -p mbr:%d -t 1" % \
-                                                (memtester.pid, memtester.pid))
+            (stdout, _, exitcode) = self.run_pqos(iface, \
+                f"-p mbl:1 -p mbl:{memtester.pid} -p mbr:1 -p mbr:{memtester.pid} -t 1")
+
             assert exitcode == 0
             assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*MBL\[MB/s\]\s*MBR\[MB/s\]", stdout) \
                 is not None

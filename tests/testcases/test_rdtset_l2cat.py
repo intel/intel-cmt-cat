@@ -85,11 +85,11 @@ class TestRdtsetL2Cat(test.Test):
             else:
                 last_cos = Resctrl.get_ctrl_group_count() - 1
 
-            assert re.search("Core 5, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
+            assert re.search(f"Core 5, L2ID [0-9]+(, L3ID [0-9]+)? => COS{last_cos}", stdout) \
                     is not None
-            assert re.search("Core 6, L2ID [0-9]+(, L3ID [0-9]+)? => COS%d" % last_cos, stdout) \
+            assert re.search(f"Core 6, L2ID [0-9]+(, L3ID [0-9]+)? => COS{last_cos}", stdout) \
                     is not None
-            assert "L2CA COS%d => MASK 0xf" % last_cos in stdout
+            assert f"L2CA COS{last_cos} => MASK 0xf" in stdout
 
             self.run("killall memtester")
             rdtset.communicate()
@@ -176,8 +176,8 @@ class TestRdtsetL2Cat(test.Test):
             regex2 = regex_tpl % (cores[1], last_cos, last_cos - 1)
             assert re.search(regex1, stdout) is not None
             assert re.search(regex2, stdout) is not None
-            assert "L2CA COS%d => MASK 0xf" % (last_cos - 1) in stdout
-            assert "L2CA COS%d => MASK 0xf" % last_cos in stdout
+            assert f"L2CA COS{last_cos - 1} => MASK 0xf" in stdout
+            assert f"L2CA COS{last_cos} => MASK 0xf" in stdout
 
             self.run("killall memtester")
             rdtset.communicate()
@@ -233,8 +233,8 @@ class TestRdtsetL2Cat(test.Test):
         (stdout, _, exitstatus) = self.run_pqos(iface, "-s")
         assert exitstatus == 0
         last_cos = Resctrl.get_ctrl_group_count() - 1
-        assert ("COS{} => 1").format(last_cos) in stdout
-        assert ("L2CA COS{} => MASK 0xf").format(last_cos) in stdout
+        assert f"COS{last_cos} => 1" in stdout
+        assert f"L2CA COS{last_cos} => MASK 0xf" in stdout
 
 
     ## RDTSET - L2 CAT Set COS definition (task) - Negative

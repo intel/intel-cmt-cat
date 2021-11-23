@@ -51,14 +51,14 @@ def pqos_handle_error(func_name, retval, expected=0):
         return
 
     pqos_error_cls = ERRORS.get(retval, PqosError)
-    err = pqos_error_cls(u'%s returned %d' % (func_name, retval), retval)
+    err = pqos_error_cls(f'{func_name} returned {retval}', retval)
     raise err
 
 
 def get_mask_int(mask):
     "Returns a bitmask as an integer."
 
-    if isinstance(mask, type(u'')):
+    if isinstance(mask, type('')):
         if mask.lower().startswith('0x'):
             return int(mask.lower(), 16)
 
@@ -70,8 +70,7 @@ def get_mask_int(mask):
     if mask is None:
         return 0
 
-    raise ValueError(u'Please specify mask as either a string,' \
-                     u' an integer or None')
+    raise ValueError('Please specify mask as either a string, an integer or None')
 
 
 class COSBase(object):
@@ -96,8 +95,7 @@ class COSBase(object):
                        (default None)
         """
         if not mask and (not code_mask or not data_mask):
-            raise ValueError(u'Please specify mask or code mask'
-                             u' and data mask')
+            raise ValueError('Please specify mask or code mask and data mask')
 
         self.class_id = class_id
         self.mask = get_mask_int(mask)
@@ -107,10 +105,8 @@ class COSBase(object):
                    data_mask is not None)
 
     def __repr__(self):
-        params = (self.class_id, repr(self.mask), repr(self.code_mask),
-                  repr(self.data_mask))
-        return u'COS(class_id=%s, mask=%s, code_mask=%s,' \
-               u' data_mask=%s)' % params
+        return f'COS(class_id={self.class_id}, mask={repr(self.mask)}, ' \
+               f'code_mask={repr(self.code_mask)}, data_mask={repr(self.data_mask)})'
 
 
 def convert_from_cos(cos, cls):
@@ -147,10 +143,10 @@ def convert_to_cos(ctypes_cos, cls):
 def free_memory(ptr):
     "Releases memory allocated by the library."
 
-    libc_path = ctypes.util.find_library(u'c')
+    libc_path = ctypes.util.find_library('c')
 
     if not libc_path:
-        raise Exception(u'Cannot find libc')
+        raise Exception('Cannot find libc')
 
     libc = ctypes.cdll.LoadLibrary(libc_path)
     libc.free(ptr)
