@@ -42,9 +42,9 @@
 #include <ctype.h>     /**< isspace() */
 #include <sys/types.h> /**< open() */
 #include <sys/stat.h>
-#include <sys/ioctl.h> /**< terminal ioctl */
-#include <sys/time.h>  /**< gettimeofday() */
-#include <time.h>      /**< localtime() */
+#include <sys/ioctl.h>   /**< terminal ioctl */
+#include <time.h>        /**< localtime() */
+#include <sys/timerfd.h> /**< timerfd_create() */
 #include <fcntl.h>
 #include <dirent.h> /**< for dir list*/
 
@@ -2555,32 +2555,6 @@ get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
 }
 
 /**
- * @brief Converts timeval structure into microseconds
- *
- * @param tv pointer to timeval structure to be converted
- *
- * @return Number of microseconds corresponding to \a tv
- */
-static long
-timeval_to_usec(const struct timeval *tv)
-{
-        return ((long)tv->tv_usec) + ((long)tv->tv_sec * 1000000L);
-}
-
-/**
- * @brief Adds usec to timeval
- *
- * @param tv pointer to timeval structure
- * @param usec microseconds to be added
- */
-static void
-timeval_add_usec(struct timeval *tv, const long usec)
-{
-        tv->tv_sec += (usec + tv->tv_usec) / 1000000L;
-        tv->tv_usec = (tv->tv_usec + usec) % 1000000L;
-}
-
-/**
  * @brief Gets total l3 cache value
  *
  * @param[in] p_cache_size pointer to cache-size value to be filled.
@@ -2653,41 +2627,11 @@ get_llc_entry(struct llc_entry_data *llc_entry,
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Sleep
- *
- * @param[in] usec time in microseconds
- */
-static inline void
-monitor_usleep(long usec)
-{
-        struct timespec req, rem;
-
-        memset(&rem, 0, sizeof(rem));
-        memset(&req, 0, sizeof(req));
-
-        req.tv_sec = usec / 1000000L;
-        req.tv_nsec = (usec % 1000000L) * 1000L;
-        if (nanosleep(&req, &rem) == -1) {
-                /**
-                 * nanosleep() interrupted by a signal
-                 */
-                if (stop_monitoring_loop)
-                        return;
-                req = rem;
-                memset(&rem, 0, sizeof(rem));
-                nanosleep(&req, &rem);
-        }
-}
-
 void
 monitor_loop(void)
 {
 #define TERM_MIN_NUM_LINES 3
 
-        const long interval =
-            (long)sel_mon_interval * 100000LL; /* interval in [us] units */
-        struct timeval tv_start, tv_s, tv_e;
         const int istty = isatty(fileno(fp_monitor));
         const int istext = !strcasecmp(sel_output_type, "text");
         const int isxml = !strcasecmp(sel_output_type, "xml");
@@ -2697,6 +2641,10 @@ monitor_loop(void)
         char header[sz_header];
         unsigned mon_number = 0, display_num = 0;
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
+        long runtime = 0;
+        int tfd;
+        int retval;
+        struct itimerspec timer_spec;
 
         if ((!istext) && (!isxml) && (!iscsv)) {
                 printf("Invalid selection of output file type '%s'!\n",
@@ -2706,6 +2654,12 @@ monitor_loop(void)
 
         if (get_cache_size(&cache_size) != PQOS_RETVAL_OK) {
                 printf("Error during getting L3 cache size\n");
+                return;
+        }
+
+        tfd = timerfd_create(CLOCK_MONOTONIC, 0);
+        if (tfd == -1) {
+                fprintf(stderr, "Failed to create timer\n");
                 return;
         }
 
@@ -2749,29 +2703,26 @@ monitor_loop(void)
         if (iscsv)
                 fprintf(fp_monitor, "%s\n", header);
 
-        gettimeofday(&tv_start, NULL);
+        timer_spec.it_interval.tv_sec = sel_mon_interval / 10l;
+        timer_spec.it_interval.tv_nsec =
+            sel_mon_interval % 10l * 100l * 1000000l;
+        timer_spec.it_value.tv_sec = timer_spec.it_interval.tv_sec;
+        timer_spec.it_value.tv_nsec = timer_spec.it_interval.tv_nsec;
+        retval = timerfd_settime(tfd, 0, &timer_spec, 0);
+        if (retval == -1) {
+                fprintf(stderr, "Failed to setup timer\n");
+                stop_monitoring_loop = 1;
+        }
 
-        for (tv_s = tv_start, tv_e = tv_start; !stop_monitoring_loop;
-             timeval_add_usec(&tv_s, interval)) {
+        while (!stop_monitoring_loop) {
                 struct tm *ptm = NULL;
                 unsigned i = 0;
-                long usec_start = 0, usec_end = 0, usec_diff = 0;
                 char cb_time[64];
                 int ret;
-
-                /**
-                 * Calculate microseconds to the nearest measurement interval
-                 */
-                usec_start = timeval_to_usec(&tv_s);
-                usec_end = timeval_to_usec(&tv_e);
-                usec_diff = usec_start - usec_end;
-
-                if (usec_diff > 0)
-                        monitor_usleep(usec_diff < interval ? usec_diff
-                                                            : interval);
+                uint64_t timer_count = 0;
+                time_t curr_time;
 
                 ret = pqos_mon_poll(mon_grps, mon_number);
-                gettimeofday(&tv_e, NULL);
                 if (ret == PQOS_RETVAL_OVERFLOW) {
                         printf("MBM counter overflow\n");
                         continue;
@@ -2794,7 +2745,8 @@ monitor_loop(void)
                 /**
                  * Get time string
                  */
-                ptm = localtime(&tv_s.tv_sec);
+                curr_time = time(0);
+                ptm = localtime(&curr_time);
                 if (ptm != NULL)
                         strftime(cb_time, sizeof(cb_time) - 1,
                                  "%Y-%m-%d %H:%M:%S", ptm);
@@ -2845,12 +2797,16 @@ monitor_loop(void)
                         break;
 
                 /* timeout */
-                if (sel_timeout == TIMEOUT_INFINITE)
-                        continue;
-                if ((tv_e.tv_sec - tv_start.tv_sec) * 1000 +
-                        (tv_e.tv_usec - tv_start.tv_usec) / 1000 >=
-                    sel_timeout * 1000)
+                if (sel_timeout != TIMEOUT_INFINITE &&
+                    runtime / 1000l >= sel_timeout)
                         break;
+
+                retval = read(tfd, &timer_count, sizeof(timer_count));
+                if (retval < 0 || timer_count < 1 || timer_count > 100) {
+                        fprintf(stderr, "Failed to read timer\n");
+                        break;
+                }
+                runtime += timer_count * sel_mon_interval * 100l;
         }
         if (isxml)
                 fprintf(fp_monitor, "%s\n", xml_root_close);
