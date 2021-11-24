@@ -117,10 +117,10 @@ install: $(APP) $(MAN)
 ifeq ($(shell uname), FreeBSD)
 	install -d $(BIN_DIR)
 	install -d $(MAN_DIR)
-	install -s $(APP) $(BIN_DIR)
+	install $(APP) $(BIN_DIR)
 	install -m 0444 $(MAN) $(MAN_DIR)
 else
-	install -D -s $(APP) $(BIN_DIR)/$(APP)
+	install -D $(APP) $(BIN_DIR)/$(APP)
 	install -m 0444 $(MAN) -D $(MAN_DIR)/$(MAN)
 endif
 

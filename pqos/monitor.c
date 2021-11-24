@@ -45,6 +45,7 @@
 #include <sys/ioctl.h> /**< terminal ioctl */
 #include <sys/time.h>  /**< gettimeofday() */
 #include <time.h>      /**< localtime() */
+#include <sys/timerfd.h> /**< timerfd_create() */
 #include <fcntl.h>
 #include <dirent.h> /**< for dir list*/
 
@@ -2554,31 +2555,6 @@ get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
         return mon_number;
 }
 
-/**
- * @brief Converts timeval structure into microseconds
- *
- * @param tv pointer to timeval structure to be converted
- *
- * @return Number of microseconds corresponding to \a tv
- */
-static long
-timeval_to_usec(const struct timeval *tv)
-{
-        return ((long)tv->tv_usec) + ((long)tv->tv_sec * 1000000L);
-}
-
-/**
- * @brief Adds usec to timeval
- *
- * @param tv pointer to timeval structure
- * @param usec microseconds to be added
- */
-static void
-timeval_add_usec(struct timeval *tv, const long usec)
-{
-        tv->tv_sec += (usec + tv->tv_usec) / 1000000L;
-        tv->tv_usec = (tv->tv_usec + usec) % 1000000L;
-}
 
 /**
  * @brief Gets total l3 cache value
@@ -2685,9 +2661,7 @@ monitor_loop(void)
 {
 #define TERM_MIN_NUM_LINES 3
 
-        const long interval =
-            (long)sel_mon_interval * 100000LL; /* interval in [us] units */
-        struct timeval tv_start, tv_s, tv_e;
+        const long interval_100ms = sel_mon_interval;
         const int istty = isatty(fileno(fp_monitor));
         const int istext = !strcasecmp(sel_output_type, "text");
         const int isxml = !strcasecmp(sel_output_type, "xml");
@@ -2697,6 +2671,7 @@ monitor_loop(void)
         char header[sz_header];
         unsigned mon_number = 0, display_num = 0;
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
+        long runtime_100ms = 0;
 
         if ((!istext) && (!isxml) && (!iscsv)) {
                 printf("Invalid selection of output file type '%s'!\n",
@@ -2749,29 +2724,40 @@ monitor_loop(void)
         if (iscsv)
                 fprintf(fp_monitor, "%s\n", header);
 
-        gettimeofday(&tv_start, NULL);
 
-        for (tv_s = tv_start, tv_e = tv_start; !stop_monitoring_loop;
-             timeval_add_usec(&tv_s, interval)) {
+        int tfd = timerfd_create(CLOCK_MONOTONIC, 0);
+        if (tfd == -1) {
+            perror("timerfd_create");
+            return;
+        }
+        struct itimerspec spec = {
+            .it_interval = { .tv_sec  = interval_100ms / 10l,
+                             .tv_nsec = interval_100ms % 10l * 100l * 1000000l },
+            .it_value    = { .tv_sec  = interval_100ms / 10l,
+                             .tv_nsec = interval_100ms % 10l * 100l * 1000000l }
+        };
+        int r = timerfd_settime(tfd, 0, &spec,  0);
+        if (r == -1) {
+            perror("timerfd_settime");
+            return;
+        }
+
+        while (!stop_monitoring_loop) {
                 struct tm *ptm = NULL;
                 unsigned i = 0;
-                long usec_start = 0, usec_end = 0, usec_diff = 0;
                 char cb_time[64];
                 int ret;
 
-                /**
-                 * Calculate microseconds to the nearest measurement interval
-                 */
-                usec_start = timeval_to_usec(&tv_s);
-                usec_end = timeval_to_usec(&tv_e);
-                usec_diff = usec_start - usec_end;
 
-                if (usec_diff > 0)
-                        monitor_usleep(usec_diff < interval ? usec_diff
-                                                            : interval);
+                uint64_t n = 0;
+                ssize_t l = read(tfd, &n, sizeof n);
+                if (l == -1) {
+                    perror("read timerfd");
+                    return;
+                }
+                runtime_100ms += l * interval_100ms;
 
                 ret = pqos_mon_poll(mon_grps, mon_number);
-                gettimeofday(&tv_e, NULL);
                 if (ret == PQOS_RETVAL_OVERFLOW) {
                         printf("MBM counter overflow\n");
                         continue;
@@ -2794,7 +2780,8 @@ monitor_loop(void)
                 /**
                  * Get time string
                  */
-                ptm = localtime(&tv_s.tv_sec);
+                time_t t = time(0);
+                ptm = localtime(&t);
                 if (ptm != NULL)
                         strftime(cb_time, sizeof(cb_time) - 1,
                                  "%Y-%m-%d %H:%M:%S", ptm);
@@ -2847,10 +2834,8 @@ monitor_loop(void)
                 /* timeout */
                 if (sel_timeout == TIMEOUT_INFINITE)
                         continue;
-                if ((tv_e.tv_sec - tv_start.tv_sec) * 1000 +
-                        (tv_e.tv_usec - tv_start.tv_usec) / 1000 >=
-                    sel_timeout * 1000)
-                        break;
+                if (runtime_100ms > 10 * sel_timeout)
+                    break;
         }
         if (isxml)
                 fprintf(fp_monitor, "%s\n", xml_root_close);
