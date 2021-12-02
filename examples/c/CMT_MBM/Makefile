@@ -108,4 +108,5 @@ CPPCHECK?=cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
+	--suppress=missingIncludeSystem \
 	monitor_app.c

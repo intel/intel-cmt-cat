@@ -117,5 +117,6 @@ CPPCHECK?=cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
+	--suppress=missingIncludeSystem \
 	allocation_app_l2cat.c allocation_app_l3cat.c allocation_app_mba.c association_app.c \
         reset_app.c

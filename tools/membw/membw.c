@@ -346,7 +346,7 @@ malloc_and_init_memory(size_t s)
 
         if (ret != 0 || p == NULL) {
                 printf("ERROR: Failed to allocate %lu bytes\n",
-                       (unsigned long)s - s % PAGE_SIZE);
+                       (unsigned long)(s - s % PAGE_SIZE));
                 stop_loop = 1;
                 return NULL;
         }

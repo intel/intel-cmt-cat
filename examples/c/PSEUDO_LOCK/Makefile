@@ -109,4 +109,5 @@ CPPCHECK?=cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
+	--suppress=missingIncludeSystem \
 	pseudo_lock.c dlock.c dlock.h tsc.c tsc.h

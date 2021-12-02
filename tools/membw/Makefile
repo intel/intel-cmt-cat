@@ -143,8 +143,10 @@ style:
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
 cppcheck:
-	$(CPPCHECK) enable=warning,portability,performance,unusedFunction,missingInclude \
-	--std=c99 --template=gcc membw.c
+	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
+	--suppress=missingIncludeSystem \
+	--std=c99 --template=gcc \
+	membw.c
 
 # if target not clean then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

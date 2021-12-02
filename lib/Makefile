@@ -258,6 +258,7 @@ cppcheck:
 	$(CPPCHECK) \
 	--enable=warning,portability,performance,missingInclude \
 	--std=c99 --template=gcc \
+	--suppress=missingIncludeSystem \
 	api.c api.h cap.c cap.h common.h common.c allocation.c perf.c perf.h \
 	allocation.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \

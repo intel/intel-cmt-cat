@@ -171,6 +171,7 @@ CPPCHECK?=cppcheck
 cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
+	--suppress=missingIncludeSystem \
 	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h \
 	cap.h cap.c common.h common.c
 
