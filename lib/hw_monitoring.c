@@ -215,7 +215,7 @@ rmid_get_event_max(const struct pqos_cap *cap,
                    pqos_rmid_t *rmid,
                    const enum pqos_mon_event event)
 {
-        pqos_rmid_t max_rmid = m_rmid_max;
+        pqos_rmid_t max_rmid;
         const struct pqos_capability *item = NULL;
         const struct pqos_cap_mon *mon = NULL;
         unsigned mask_found = 0;
