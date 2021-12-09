@@ -2209,8 +2209,7 @@ print_text_row(FILE *fp,
 
                 if (get_pid_cores(mon_data, core_list, sizeof(core_list)) ==
                     -1) {
-                        memset(core_list, 0, sizeof(core_list));
-                        strncat(core_list, "err", sizeof(core_list) - 1);
+                        strncpy(core_list, "err", sizeof(core_list) - 1);
                 }
 
                 fprintf(fp, "\n%8.8s %8.8s%s", (char *)mon_data->context,
@@ -2314,8 +2313,7 @@ print_xml_row(FILE *fp,
 
                 if (get_pid_cores(mon_data, core_list, sizeof(core_list)) ==
                     -1) {
-                        memset(core_list, 0, sizeof(core_list));
-                        strncat(core_list, "err", sizeof(core_list) - 1);
+                        strncpy(core_list, "err", sizeof(core_list) - 1);
                 }
 
                 fprintf(fp,
@@ -2410,8 +2408,7 @@ print_csv_row(FILE *fp,
 
                 if (get_pid_cores(mon_data, core_list, sizeof(core_list)) ==
                     -1) {
-                        memset(core_list, 0, sizeof(core_list));
-                        strncat(core_list, "err", sizeof(core_list) - 1);
+                        strncpy(core_list, "err", sizeof(core_list) - 1);
                 }
 
                 fprintf(fp, "%s,\"%s\",\"%s\"%s\n", time,
