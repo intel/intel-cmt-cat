@@ -38,7 +38,7 @@
 
 Summary:            Provides command line interface to CMT, MBM, CAT, CDP and MBA technologies
 Name:               %{githubname}
-Release:            1%{?dist}
+Release:            2%{?dist}
 Version:            %{githubver}
 License:            BSD
 Group:              Development/Tools
@@ -160,11 +160,11 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %{_mandir}/man8/rdtset.8.gz
 %{_bindir}/membw
 %{_mandir}/man8/membw.8.gz
-{_libdir}/libpqos.so.*
+%{_libdir}/libpqos.so.*
 
 %{!?_licensedir:%global license %%doc}
 %license %{_licensedir}/%{name}-%{version}/LICENSE
-%doc ChangeLog README
+%doc ChangeLog README.md
 
 %files -n intel-cmt-cat-devel
 %{_libdir}/libpqos.so
@@ -181,6 +181,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Mon Dec 20 2021  Chen Guanqiao <chen.chenchacha@foxmail.com> 4.3.0-2
+- Spec file bug fixes
+
 * Thu Oct 21 2021  Michal Aleksinski <michalx.aleksinski@intel.com> 4.3.0-1
 - New release 4.3.0
 
