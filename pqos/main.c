@@ -267,6 +267,10 @@ parse_error(const char *arg, const char *note)
 void selfn_strdup(char **sel, const char *arg)
 {
         ASSERT(sel != NULL && arg != NULL);
+        if (arg == NULL) {
+                printf("String duplicate error!\n");
+                exit(EXIT_FAILURE);
+        }
         if (*sel != NULL) {
                 free(*sel);
                 *sel = NULL;

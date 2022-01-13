@@ -670,14 +670,17 @@ resctrl_mon_assoc_get(const unsigned lcore,
 
         for (i = 0; i < num_groups; i++) {
                 struct resctrl_cpumask mask;
+                const char *d_name = namelist[i]->d_name;
 
-                ret = resctrl_mon_cpumask_read(class_id, namelist[i]->d_name,
-                                               &mask);
+                if (d_name == NULL)
+                        continue;
+
+                ret = resctrl_mon_cpumask_read(class_id, d_name, &mask);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_assoc_get_exit;
 
                 if (resctrl_cpumask_get(lcore, &mask)) {
-                        strncpy(name, namelist[i]->d_name, name_size);
+                        strncpy(name, d_name, name_size);
                         ret = PQOS_RETVAL_OK;
                         goto resctrl_mon_assoc_get_exit;
                 }
@@ -799,9 +802,13 @@ resctrl_mon_assoc_get_pid(const pid_t task,
                 char path[256];
                 char buf[128];
                 FILE *fd;
+                const char *d_name = namelist[i]->d_name;
 
-                resctrl_mon_group_path(class_id, namelist[i]->d_name, "/tasks",
-                                       path, sizeof(path));
+                if (d_name == NULL)
+                        continue;
+
+                resctrl_mon_group_path(class_id, d_name, "/tasks", path,
+                                       sizeof(path));
 
                 fd = pqos_fopen(path, "r");
                 if (fd == NULL)
@@ -819,7 +826,7 @@ resctrl_mon_assoc_get_pid(const pid_t task,
                         }
 
                         if (value == task) {
-                                strncpy(name, namelist[i]->d_name, name_size);
+                                strncpy(name, d_name, name_size);
                                 ret = PQOS_RETVAL_OK;
                                 fclose(fd);
                                 goto resctrl_mon_assoc_get_pid_exit;
