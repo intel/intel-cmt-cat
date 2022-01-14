@@ -1,0 +1,29 @@
+name: github/style
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  style:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Install dependencies
+      run: |
+        sudo apt install clang-format codespell
+        python -m pip install --upgrade pip
+        pip install pipenv
+        make setup-dev
+        wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/checkpatch.pl && chmod a+x /tmp/checkpatch.pl
+        wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/spelling.txt
+        wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/const_structs.checkpatch
+    - name: Style check
+      run: |
+        make style CHECKPATCH=/tmp/checkpatch.pl

@@ -9,6 +9,7 @@
 - [ ] library
 - [ ] pqos utility
 - [ ] rdtset utility
+- [ ] App QoS
 - [ ] other: (please specify)
 
 ## Motivation and Context

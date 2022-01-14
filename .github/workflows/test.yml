@@ -1,0 +1,58 @@
+name: github/unit-test
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  unit-test:
+    name: Execute C unit tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Dependencies
+      run: sudo apt install gcc libcmocka-dev
+    - name: Build
+      run: make -C unit-test
+    - name: Execute
+      run: make -C unit-test run
+
+  python:
+    name: Execute python wrapper unit tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Install Dependencies
+      run: |
+        sudo apt install gcc
+        python -m pip install --upgrade pip
+        pip install pipenv
+        make -C lib/python setup-dev
+    - name: Build
+      run: make -C lib
+    - name: Execute
+      run: LD_LIBRARY_PATH=`pwd`/lib make -C lib/python test
+
+  appqos:
+    name: Execute App QoS unit tests
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions/setup-python@v2
+      with:
+        python-version: '3.x'
+    - name: Install Dependencies
+      run: |
+        sudo apt install gcc
+        python -m pip install --upgrade pip
+        pip install pipenv
+        make -C appqos setup-dev
+    - name: Build
+      run: make -C lib
+    - name: Execute
+      run: LD_LIBRARY_PATH=`pwd`/lib make -C appqos test

@@ -1,0 +1,47 @@
+name: github/build
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build-gcc:
+    name: Build with gcc
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Dependencies
+      run: sudo apt install gcc
+    - name: Build gcc
+      run: make
+    - name: Install
+      run: sudo make install
+    - name: Build gcc debug
+      run: make DEBUG=y clean all
+
+
+  build-clang:
+    name: Build with clang
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Dependencies
+      run: sudo apt install clang
+    - name: Build clang
+      run: CC=clang make clean all
+
+
+  scan-build:
+    name: scan-build - Clang static analyzer
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install Dependencies
+      run: sudo apt install clang-tools
+    - name: Scan Build
+      run: scan-build --status-bugs make
+
+
+
