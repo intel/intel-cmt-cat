@@ -37,8 +37,8 @@
 #include <sched.h>
 #endif
 #ifdef __FreeBSD__
-#include <sys/param.h>
 #include <sys/cpuset.h>
+#include <sys/param.h>
 #endif
 
 #ifdef __cplusplus

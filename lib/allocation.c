@@ -38,21 +38,18 @@
  * Module operate directly on CAT registers.
  */
 
-#include <stdlib.h>
-#include <string.h>
-#include <pthread.h>
-
-#include "pqos.h"
+#include "allocation.h"
 
 #include "cap.h"
-#include "allocation.h"
-#include "os_allocation.h"
-
-#include "machine.h"
-#include "types.h"
-#include "log.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "log.h"
+#include "machine.h"
+#include "os_allocation.h"
+
+#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * ---------------------------------------

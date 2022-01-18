@@ -31,15 +31,15 @@
  *
  */
 
-#include <stdio.h>
-#include <sys/stat.h>
-#include <string.h>
-#include <stdlib.h>
-#include <ctype.h>
-
-#include "pqos.h"
 #include "common.h"
+
 #include "log.h"
+#include "pqos.h"
+
+#include <ctype.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 FILE *
 pqos_fopen(const char *name, const char *mode)

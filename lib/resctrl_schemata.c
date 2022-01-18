@@ -31,14 +31,15 @@
  *
  */
 
+#include "resctrl_schemata.h"
+
+#include "cpuinfo.h"
+#include "log.h"
+#include "resctrl_utils.h"
+
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include "cpuinfo.h"
-#include "resctrl_schemata.h"
-#include "resctrl_utils.h"
-#include "types.h"
-#include "log.h"
 
 /*
  * @brief Structure to hold parsed schemata

@@ -31,19 +31,18 @@
  *
  */
 
-#include <stdlib.h>
-#include <string.h>
+#include "perf_monitoring.h"
+
+#include "common.h"
+#include "log.h"
+#include "monitoring.h"
+#include "perf.h"
+
 #include <dirent.h> /**< scandir() */
 #include <linux/perf_event.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/stat.h>
-
-#include "pqos.h"
-#include "common.h"
-#include "perf.h"
-#include "log.h"
-#include "types.h"
-#include "monitoring.h"
-#include "perf_monitoring.h"
 
 /**
  * Event indexes in table of supported events

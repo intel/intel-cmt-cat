@@ -34,9 +34,10 @@
  * Allocation profiles API
  */
 
+#include "pqos.h"
+
 #include <stdint.h>
 #include <stdio.h>
-#include "pqos.h"
 
 #ifndef __PROFILES_H__
 #define __PROFILES_H__

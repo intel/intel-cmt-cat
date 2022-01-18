@@ -35,15 +35,14 @@
  * @brief Library operations logger for info, warnings and errors.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <unistd.h>
-#include <errno.h>
+#include "log.h"
 
 #include "types.h"
-#include "log.h"
+
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 /**
  * ---------------------------------------

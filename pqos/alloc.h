@@ -34,16 +34,17 @@
  * Allocation module
  */
 
-#include <stdint.h>
-#include <stdio.h>
-#include "pqos.h"
-
 #ifndef __ALLOCATION_H__
 #define __ALLOCATION_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#include "pqos.h"
+
+#include <stdint.h>
+#include <stdio.h>
 
 /**
  * @brief Defines allocation class of service
@@ -94,7 +95,6 @@ int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_capability *cap_l2ca,
                 const struct pqos_capability *cap_mba,
                 const struct pqos_cpuinfo *cpu);
-
 
 #ifdef __cplusplus
 }

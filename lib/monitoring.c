@@ -30,19 +30,18 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "pqos.h"
-#include "cap.h"
 #include "monitoring.h"
-#include "os_monitoring.h"
+
+#include "cap.h"
 #include "hw_monitoring.h"
+#include "log.h"
+#include "os_monitoring.h"
 #include "perf_monitoring.h"
+#include "types.h"
 #ifdef __linux__
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
 #endif
-
-#include "types.h"
-#include "log.h"
 
 /**
  * ---------------------------------------

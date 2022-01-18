@@ -30,6 +30,12 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "rdt.h"
+
+#include "cpu.h"
+#include "mba_sc.h"
+#include "pqos.h"
+
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -39,12 +45,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <pqos.h>
-
-#include "mba_sc.h"
-#include "rdt.h"
-#include "cpu.h"
 
 static const struct pqos_cap *m_cap = NULL;
 static const struct pqos_cpuinfo *m_cpu = NULL;

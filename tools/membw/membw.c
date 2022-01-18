@@ -33,26 +33,26 @@
 #define _GNU_SOURCE
 #include <ctype.h>
 #include <errno.h>
+#include <getopt.h>
 #include <limits.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
-#include <stdarg.h>
 #include <string.h>
-#include <unistd.h>
-#include <signal.h>
 #include <sys/time.h>
-#include <pthread.h>
-#include <getopt.h>
+#include <unistd.h>
 
 #ifdef __linux__
-#include <sched.h>
 #include <cpuid.h>
+#include <sched.h>
 #endif
 
 #ifdef __FreeBSD__
-#include <sys/param.h>
 #include <sys/cpuset.h>
+#include <sys/param.h>
 #endif
 
 /**

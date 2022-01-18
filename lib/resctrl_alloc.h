@@ -38,10 +38,10 @@
 #ifndef __PQOS_RESCTRL_ALLOC_H__
 #define __PQOS_RESCTRL_ALLOC_H__
 
-#include "types.h"
 #include "pqos.h"
 #include "resctrl.h"
 #include "resctrl_schemata.h"
+#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {

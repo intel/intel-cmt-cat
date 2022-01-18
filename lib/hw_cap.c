@@ -33,14 +33,15 @@
 /**
  * @brief HW implementation of PQoS API / capabilities.
  */
-#include <stdlib.h>
-#include <string.h>
+
+#include "hw_cap.h"
 
 #include "cpu_registers.h"
-#include "hw_cap.h"
 #include "log.h"
 #include "machine.h"
-#include "types.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * @brief Retrieves cache size and number of ways

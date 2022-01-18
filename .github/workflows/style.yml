@@ -17,7 +17,7 @@ jobs:
         python-version: '3.x'
     - name: Install dependencies
       run: |
-        sudo apt install clang-format codespell
+        sudo apt install clang-format-11 codespell
         python -m pip install --upgrade pip
         pip install pipenv
         make setup-dev
@@ -26,4 +26,4 @@ jobs:
         wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/const_structs.checkpatch
     - name: Style check
       run: |
-        make style CHECKPATCH=/tmp/checkpatch.pl
+        make style CLANGFORMAT=clang-format-11 CHECKPATCH=/tmp/checkpatch.pl

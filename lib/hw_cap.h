@@ -37,8 +37,8 @@
 extern "C" {
 #endif
 
-#include "types.h"
 #include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Discovers HW monitoring support

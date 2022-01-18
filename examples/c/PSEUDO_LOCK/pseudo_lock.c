@@ -31,22 +31,22 @@
  */
 
 #define _GNU_SOURCE
+#include "dlock.h"
+#include "pqos.h"
+#include "tsc.h"
+
+#include <assert.h>
+#include <ctype.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
 #include <string.h>
-#include <unistd.h>
-#include <ctype.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/types.h>
 #include <time.h>
-#include <signal.h>
-#include <assert.h>
-
-#include <pqos.h>
-#include "dlock.h"
-#include "tsc.h"
+#include <unistd.h>
 
 #define DIM(x) (sizeof(x) / sizeof(x[0]))
 #define MB     (1024 * 1024)

@@ -31,24 +31,22 @@
  *
  */
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <dirent.h>
-#include <string.h>
-#include <time.h>
-#include <errno.h>
+#include "resctrl_monitoring.h"
 
-#include "pqos.h"
-#include "log.h"
-#include "types.h"
 #include "cap.h"
 #include "common.h"
+#include "log.h"
 #include "monitoring.h"
 #include "resctrl.h"
-#include "resctrl_monitoring.h"
 #include "resctrl_alloc.h"
+
+#include <dirent.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
 
 #define GROUP_NAME_PREFIX "pqos-"
 

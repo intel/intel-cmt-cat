@@ -37,11 +37,11 @@
 extern "C" {
 #endif
 
+#include "types.h"
+
+#include <linux/perf_event.h>
 #include <stdint.h>
 #include <unistd.h>
-#include <linux/perf_event.h>
-
-#include "types.h"
 
 /**
  * @brief Function to setup perf event counters

@@ -31,19 +31,22 @@
  */
 
 #define _GNU_SOURCE
+
+#include "dlock.h"
+
+#include "pqos.h"
+
 #include <stdint.h> /* uint64_t etc. */
 #include <stdlib.h> /* malloc() */
 #include <string.h> /* memcpy() */
 #include <types.h>  /* ASSERT() */
-#include <pqos.h>
 #ifdef __linux__
 #include <sched.h> /* sched_setaffinity() */
 #endif
 #ifdef __FreeBSD__
-#include <sys/param.h>  /* sched affinity */
 #include <sys/cpuset.h> /* sched affinity */
+#include <sys/param.h>  /* sched affinity */
 #endif
-#include "dlock.h"
 
 #define MAX_L3CAT_NUM 16
 #define DIM(x)        (sizeof(x) / sizeof(x[0]))

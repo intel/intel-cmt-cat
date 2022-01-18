@@ -30,21 +30,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "os_cap.h"
+
+#include "allocation.h"
+#include "common.h"
+#include "cpuinfo.h"
+#include "log.h"
+#include "os_common.h"
+#include "perf_monitoring.h"
+#include "resctrl.h"
+#include "resctrl_alloc.h"
+
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
-
-#include "pqos.h"
-#include "allocation.h"
-#include "common.h"
-#include "os_cap.h"
-#include "types.h"
-#include "log.h"
-#include "resctrl.h"
-#include "resctrl_alloc.h"
-#include "perf_monitoring.h"
-#include "cpuinfo.h"
-#include "os_common.h"
 
 static int mba_ctrl = -1; /**< mba ctrl support */
 

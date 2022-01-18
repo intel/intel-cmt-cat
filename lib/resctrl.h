@@ -42,9 +42,10 @@
 extern "C" {
 #endif
 
-#include <limits.h> /**< CHAR_BIT*/
-
+#include "pqos.h"
 #include "types.h"
+
+#include <limits.h> /**< CHAR_BIT*/
 
 #ifndef RESCTRL_PATH
 #define RESCTRL_PATH "/sys/fs/resctrl"

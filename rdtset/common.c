@@ -30,15 +30,16 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
+
+#include "rdt.h"
+
 #include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <sys/time.h> /**< gettimeofday() */
-
-#include "common.h"
-#include "rdt.h"
 
 struct rdtset g_cfg;
 

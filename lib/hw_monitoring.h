@@ -41,9 +41,9 @@
 extern "C" {
 #endif
 
-#include "types.h"
-#include "pqos.h"
 #include "monitoring.h"
+#include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Initializes hardware monitoring sub-module of the library (CMT)

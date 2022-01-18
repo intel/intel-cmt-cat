@@ -37,8 +37,8 @@
 extern "C" {
 #endif
 
-#include "types.h"
 #include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Retrieves MBA controller configuration status

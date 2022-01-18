@@ -30,6 +30,11 @@
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common.h"
+#include "cpu.h"
+#include "mba_sc.h"
+#include "rdt.h"
+
 #include <errno.h>
 #include <getopt.h>
 #include <grp.h>
@@ -38,15 +43,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-
 #include <sys/types.h>
 #include <sys/wait.h>
-
-#include "rdt.h"
-#include "common.h"
-#include "cpu.h"
-#include "mba_sc.h"
+#include <unistd.h>
 
 static pid_t child = -1;
 

@@ -42,8 +42,8 @@
 extern "C" {
 #endif
 
-#include "types.h"
 #include "pqos.h"
+#include "types.h"
 
 /**
  * @brief Initializes resctrl file system used for OS allocation interface

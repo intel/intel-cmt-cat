@@ -34,9 +34,10 @@
  * @brief Capability module
  */
 
+#include "pqos.h"
+
 #include <stdint.h>
 #include <stdio.h>
-#include "pqos.h"
 
 #ifndef __CAP_H__
 #define __CAP_H__

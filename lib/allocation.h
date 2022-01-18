@@ -42,8 +42,8 @@
 extern "C" {
 #endif
 
-#include "types.h"
 #include "pqos.h"
+#include "types.h"
 
 /**
  * Types of possible PQoS allocation technologies

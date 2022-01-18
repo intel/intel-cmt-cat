@@ -43,6 +43,7 @@ extern "C" {
 #endif
 
 #include <stdio.h>
+#include <sys/stat.h>
 
 /**
  * @brief Wrapper around fopen() that additionally checks if a given path
@@ -55,7 +56,9 @@ extern "C" {
  * @retval A valid pointer to a file or NULL on error (e.g. when the path
  * contains any symbolic links).
  */
+/* clang-format off */
 FILE * safe_fopen(const char *name, const char *mode);
+/* clang-format on */
 
 /**
  * @brief Wrapper around open() that additionally checks if a given path

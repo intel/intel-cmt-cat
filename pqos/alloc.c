@@ -34,16 +34,17 @@
  * @brief Platform QoS utility - allocation module
  *
  */
+
+#include "alloc.h"
+
+#include "main.h"
+#include "pqos.h"
+
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
-#include <limits.h>
-
-#include "pqos.h"
-
-#include "main.h"
-#include "alloc.h"
 
 /**
  * Defines used to identify CAT mask definitions

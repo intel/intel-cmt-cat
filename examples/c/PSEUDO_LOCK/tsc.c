@@ -30,11 +30,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdio.h>  /* vsnprintf() */
-#include <stdarg.h> /* va_start(), va_end() */
-#include <limits.h> /* ULONG_MAX */
-#include <string.h> /* memset() */
 #include "tsc.h"
+
+#include <limits.h> /* ULONG_MAX */
+#include <stdarg.h> /* va_start(), va_end() */
+#include <stdio.h>  /* vsnprintf() */
+#include <string.h> /* memset() */
 
 static const double __measurement_cost = 0;
 

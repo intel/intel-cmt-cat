@@ -30,13 +30,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/syscall.h>
-#include <sys/ioctl.h>
-
-#include "types.h"
-#include "pqos.h"
 #include "perf.h"
+
 #include "log.h"
+#include "pqos.h"
+#include "types.h"
+
+#include <sys/ioctl.h>
+#include <sys/syscall.h>
 
 /**
  * @brief Function to request a file descriptor to read perf counters

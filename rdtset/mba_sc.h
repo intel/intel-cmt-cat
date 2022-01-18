@@ -33,8 +33,9 @@
 #ifndef _MBA_SC_H
 #define _MBA_SC_H
 
-#include <unistd.h>
 #include "common.h"
+
+#include <unistd.h>
 
 #define MBA_SC_SAMPLING_INTERVAL 100 /**< Sampling interval in ms */
 #define MBA_SC_DEF_INIT_MBA      100 /**< Default, initial MBA value, 100% */

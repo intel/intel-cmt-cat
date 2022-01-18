@@ -38,9 +38,10 @@
 #ifndef __PQOS_MACHINE_H__
 #define __PQOS_MACHINE_H__
 
+#include "types.h"
+
 #include <stdint.h>
 #include <stdlib.h>
-#include "types.h"
 
 #ifdef __cplusplus
 extern "C" {

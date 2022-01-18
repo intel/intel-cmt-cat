@@ -42,6 +42,7 @@
 extern "C" {
 #endif
 
+#include "pqos.h"
 #include "types.h"
 
 #define PERF_MON_PATH "/sys/devices/intel_cqm"

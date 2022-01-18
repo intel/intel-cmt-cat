@@ -41,6 +41,8 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
+
 /**
  * @brief Initializes data pseudo lock module
  *

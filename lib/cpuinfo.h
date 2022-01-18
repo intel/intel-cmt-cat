@@ -38,9 +38,10 @@
 #ifndef __PQOS_CPUINFO_H__
 #define __PQOS_CPUINFO_H__
 
-#include <errno.h>
 #include "pqos.h"
 #include "types.h"
+
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {

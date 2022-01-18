@@ -33,13 +33,15 @@
 /**
  * @brief  Set of utility functions to list and retrieve L3CA setting profiles
  */
-#include <stdio.h>
-#include <string.h>
 
 #include "profiles.h"
-#include "pqos.h"
-#include "main.h"
+
 #include "alloc.h"
+#include "main.h"
+#include "pqos.h"
+
+#include <stdio.h>
+#include <string.h>
 
 #define PROFILES_MIN_COS 4
 

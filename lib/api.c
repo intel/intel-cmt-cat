@@ -31,21 +31,19 @@
  *
  */
 
-#include <string.h>
-#include <stdlib.h>
-
-#include "pqos.h"
 #include "api.h"
+
 #include "allocation.h"
+#include "cap.h"
+#include "cpuinfo.h"
+#include "hw_monitoring.h"
+#include "log.h"
+#include "monitoring.h"
 #include "os_allocation.h"
 #include "os_monitoring.h"
-#include "monitoring.h"
-#include "os_monitoring.h"
-#include "hw_monitoring.h"
-#include "cap.h"
-#include "log.h"
-#include "types.h"
-#include "cpuinfo.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * Value marking monitoring group structure as "valid".

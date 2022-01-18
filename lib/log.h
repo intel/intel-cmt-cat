@@ -38,8 +38,8 @@
 #ifndef __PQOS_LOG_H__
 #define __PQOS_LOG_H__
 
-#include <stdio.h>
 #include <stdarg.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {

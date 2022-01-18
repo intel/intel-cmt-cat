@@ -50,26 +50,26 @@
  *   technology.
  */
 
-#include <stdlib.h>
-#include <string.h>
-#include <fcntl.h>    /* O_CREAT */
-#include <unistd.h>   /* usleep(), lockf() */
-#include <sys/stat.h> /* S_Ixxx */
-#include <pthread.h>
-
 #include "cap.h"
-#include "os_cap.h"
-#include "hw_cap.h"
+
 #include "allocation.h"
-#include "monitoring.h"
-#include "cpuinfo.h"
-#include "machine.h"
-#include "types.h"
-#include "log.h"
 #include "api.h"
-#include "utils.h"
+#include "cpuinfo.h"
+#include "hw_cap.h"
+#include "log.h"
+#include "machine.h"
+#include "monitoring.h"
+#include "os_cap.h"
 #include "resctrl.h"
 #include "resctrl_alloc.h"
+#include "utils.h"
+
+#include <fcntl.h> /* O_CREAT */
+#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h> /* S_Ixxx */
+#include <unistd.h>   /* usleep(), lockf() */
 
 /**
  * ---------------------------------------

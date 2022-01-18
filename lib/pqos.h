@@ -41,10 +41,10 @@
 #ifndef __PQOS_H__
 #define __PQOS_H__
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <math.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,7 +57,7 @@ extern "C" {
  */
 
 #define PQOS_VERSION      40300 /**< version 4.3.0 */
-#define PQOS_MAX_COS      16    /** 16 x COS */
+#define PQOS_MAX_COS      16    /**< 16 x COS */
 #define PQOS_MAX_L3CA_COS PQOS_MAX_COS
 #define PQOS_MAX_L2CA_COS PQOS_MAX_COS
 

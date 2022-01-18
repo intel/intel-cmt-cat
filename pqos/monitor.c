@@ -34,25 +34,25 @@
  * @brief Platform QoS utility - monitoring module
  *
  */
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <signal.h>
-#include <ctype.h>     /**< isspace() */
-#include <sys/types.h> /**< open() */
-#include <sys/stat.h>
-#include <sys/ioctl.h>   /**< terminal ioctl */
-#include <time.h>        /**< localtime() */
-#include <sys/timerfd.h> /**< timerfd_create() */
-#include <fcntl.h>
-#include <dirent.h> /**< for dir list*/
-
-#include "pqos.h"
+#include "monitor.h"
 
 #include "common.h"
 #include "main.h"
-#include "monitor.h"
+#include "pqos.h"
+
+#include <ctype.h>  /**< isspace() */
+#include <dirent.h> /**< for dir list*/
+#include <fcntl.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h> /**< terminal ioctl */
+#include <sys/stat.h>
+#include <sys/timerfd.h> /**< timerfd_create() */
+#include <sys/types.h>   /**< open() */
+#include <time.h>        /**< localtime() */
+#include <unistd.h>
 
 #define PQOS_MAX_PID_MON_GROUPS 256
 #define PQOS_MON_EVENT_ALL      ((enum pqos_mon_event) ~PQOS_MON_EVENT_TMEM_BW)

@@ -33,11 +33,10 @@
 #ifndef _COMMON_H
 #define _COMMON_H
 
-#include <stdint.h>
-
-#include <pqos.h>
-
 #include "cpu.h"
+#include "pqos.h"
+
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

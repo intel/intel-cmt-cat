@@ -31,27 +31,26 @@
  *
  */
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <string.h>
-#include <stdio.h>
-#include <ctype.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <dirent.h> /**< scandir() */
-
-#include "pqos.h"
-#include "allocation.h"
 #include "os_allocation.h"
+
+#include "allocation.h"
 #include "cap.h"
 #include "common.h"
+#include "cpuinfo.h"
 #include "log.h"
-#include "types.h"
 #include "resctrl.h"
 #include "resctrl_alloc.h"
 #include "resctrl_monitoring.h"
 #include "resctrl_utils.h"
-#include "cpuinfo.h"
+
+#include <ctype.h>
+#include <dirent.h> /**< scandir() */
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
 int
 os_alloc_mount(const enum pqos_cdp_config l3_cdp_cfg,

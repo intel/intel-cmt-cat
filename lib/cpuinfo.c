@@ -35,30 +35,28 @@
  * @brief CPU sockets and cores enumeration module.
  */
 
-#include <string.h>
-#include <stdint.h>
-#include <limits.h>
+#include "cpuinfo.h"
+
+#include "allocation.h"
+#include "cap.h"
+#include "cpu_registers.h"
+#include "log.h"
+#include "machine.h"
+#include "os_allocation.h"
+#include "os_cpuinfo.h"
+
 #include <errno.h>
+#include <limits.h>
+#include <stdint.h>
+#include <string.h>
 #include <unistd.h> /* sysconf() */
 #ifdef __FreeBSD__
-#include <sys/param.h>  /* sched affinity */
 #include <sys/cpuset.h> /* sched affinity */
+#include <sys/param.h>  /* sched affinity */
 #endif
 #ifdef __linux__
 #include <sched.h> /* sched affinity */
 #endif
-
-#include "pqos.h"
-
-#include "cpu_registers.h"
-#include "log.h"
-#include "cpuinfo.h"
-#include "types.h"
-#include "machine.h"
-#include "os_allocation.h"
-#include "allocation.h"
-#include "cap.h"
-#include "os_cpuinfo.h"
 
 /**
  * This structure will be made externally available

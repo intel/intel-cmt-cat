@@ -38,13 +38,13 @@
 #ifndef __PQOS_RESCTRL_UTILS_H__
 #define __PQOS_RESCTRL_UTILS_H__
 
-#include <stdint.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 #include "types.h"
+
+#include <stdint.h>
 
 /**
  * @brief Converts string into 64-bit unsigned number.

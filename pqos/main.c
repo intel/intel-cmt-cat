@@ -34,24 +34,24 @@
  * @brief Platform QoS utility - main module
  *
  */
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <ctype.h>                                      /**< isspace() */
-#include <sys/types.h>                                  /**< open() */
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <getopt.h>                                     /**< getopt_long() */
-
-#include "pqos.h"
-
 #include "main.h"
-#include "profiles.h"
-#include "monitor.h"
+
 #include "alloc.h"
 #include "cap.h"
 #include "common.h"
+#include "monitor.h"
+#include "pqos.h"
+#include "profiles.h"
+
+#include <ctype.h> /**< isspace() */
+#include <fcntl.h>
+#include <getopt.h> /**< getopt_long() */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h> /**< open() */
+#include <unistd.h>
 
 #define FILE_READ_WRITE (0600)
 
@@ -136,8 +136,9 @@ static pqos_rmid_t sel_rmid_map_rmid[PQOS_MAX_CORES];
 /** core table */
 static unsigned sel_rmid_map_core[PQOS_MAX_CORES];
 /** Custom RMID configuration */
-static struct pqos_rmid_config sel_rmid_cfg = {PQOS_RMID_TYPE_DEFAULT,
-        {0, sel_rmid_map_rmid, sel_rmid_map_core} };
+static struct pqos_rmid_config sel_rmid_cfg = {
+    PQOS_RMID_TYPE_DEFAULT,
+    {0, sel_rmid_map_rmid, sel_rmid_map_core}};
 #endif
 
 /**
@@ -162,7 +163,8 @@ isdup(const uint64_t *tab, const unsigned size, const uint64_t val)
         return 0;
 }
 
-uint64_t strtouint64(const char *s)
+uint64_t
+strtouint64(const char *s)
 {
         const char *str = s;
         int base = 10;
@@ -186,7 +188,8 @@ uint64_t strtouint64(const char *s)
         return n;
 }
 
-unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max)
+unsigned
+strlisttotab(char *s, uint64_t *tab, const unsigned max)
 {
         unsigned index = 0;
         char *saveptr = NULL;
@@ -219,7 +222,7 @@ unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max)
                         uint64_t n, start, end;
                         *p = '\0';
                         start = strtouint64(token);
-                        end = strtouint64(p+1);
+                        end = strtouint64(p + 1);
                         if (start > end) {
                                 /**
                                  * no big deal just swap start with end
@@ -255,16 +258,16 @@ unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max)
         return index;
 }
 
-__attribute__ ((noreturn)) void
+__attribute__((noreturn)) void
 parse_error(const char *arg, const char *note)
 {
         printf("Error parsing \"%s\" command line argument. %s\n",
-               arg ? arg : "<null>",
-               note ? note : "");
+               arg ? arg : "<null>", note ? note : "");
         exit(EXIT_FAILURE);
 }
 
-void selfn_strdup(char **sel, const char *arg)
+void
+selfn_strdup(char **sel, const char *arg)
 {
         ASSERT(sel != NULL && arg != NULL);
         if (arg == NULL) {
@@ -337,7 +340,8 @@ selfn_super_verbose_mode(const char *arg)
  * @param [in] arg optional configuration string
  *             if NULL or zero length  then configuration check is skipped
  */
-static void selfn_reset_alloc(const char *arg)
+static void
+selfn_reset_alloc(const char *arg)
 {
         if (arg != NULL && *arg != '\0') {
                 unsigned i;
@@ -351,22 +355,27 @@ static void selfn_reset_alloc(const char *arg)
                         const char *name;
                         enum pqos_cdp_config cdp;
                 } patternsl3[] = {
-                        {"l3cdp-on",  PQOS_REQUIRE_CDP_ON},
-                        {"l3cdp-off", PQOS_REQUIRE_CDP_OFF},
-                        {"l3cdp-any", PQOS_REQUIRE_CDP_ANY},
-                }, patternsl2[] = {
-                        {"l2cdp-on",  PQOS_REQUIRE_CDP_ON},
-                        {"l2cdp-off", PQOS_REQUIRE_CDP_OFF},
-                        {"l2cdp-any", PQOS_REQUIRE_CDP_ANY},
+                    {"l3cdp-on", PQOS_REQUIRE_CDP_ON},
+                    {"l3cdp-off", PQOS_REQUIRE_CDP_OFF},
+                    {"l3cdp-any", PQOS_REQUIRE_CDP_ANY},
+                };
+
+                const struct {
+                        const char *name;
+                        enum pqos_cdp_config cdp;
+                } patternsl2[] = {
+                    {"l2cdp-on", PQOS_REQUIRE_CDP_ON},
+                    {"l2cdp-off", PQOS_REQUIRE_CDP_OFF},
+                    {"l2cdp-any", PQOS_REQUIRE_CDP_ANY},
                 };
 
                 const struct {
                         const char *name;
                         enum pqos_mba_config mba;
                 } patternsmb[] = {
-                        {"mbaCtrl-on", PQOS_MBA_CTRL},
-                        {"mbaCtrl-off", PQOS_MBA_DEFAULT},
-                        {"mbaCtrl-any", PQOS_MBA_ANY},
+                    {"mbaCtrl-on", PQOS_MBA_CTRL},
+                    {"mbaCtrl-off", PQOS_MBA_DEFAULT},
+                    {"mbaCtrl-any", PQOS_MBA_ANY},
                 };
 
                 tok = s;
@@ -396,7 +405,8 @@ static void selfn_reset_alloc(const char *arg)
 
                         if (!valid) {
                                 printf("Unrecognized '%s' allocation "
-                                       "reset option!\n", tok);
+                                       "reset option!\n",
+                                       tok);
                                 free(s);
                                 exit(EXIT_FAILURE);
                         }
@@ -414,7 +424,8 @@ static void selfn_reset_alloc(const char *arg)
  *
  * @param arg not used
  */
-static void selfn_show_allocation(const char *arg)
+static void
+selfn_show_allocation(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_show_allocation_config = 1;
@@ -425,7 +436,8 @@ static void selfn_show_allocation(const char *arg)
  *
  * @param arg not used
  */
-static void selfn_display(const char *arg)
+static void
+selfn_display(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_display = 1;
@@ -436,7 +448,8 @@ static void selfn_display(const char *arg)
  *
  * @param arg not used
  */
-static void selfn_display_verbose(const char *arg)
+static void
+selfn_display_verbose(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_display_verbose = 1;
@@ -464,7 +477,7 @@ selfn_monitor_rmids(const char *arg)
 
         selfn_strdup(&cp, arg);
 
-        for (str = cp; ; str = NULL) {
+        for (str = cp;; str = NULL) {
                 char *token = NULL;
                 char *p = NULL;
                 pqos_rmid_t rmid;
@@ -488,12 +501,12 @@ selfn_monitor_rmids(const char *arg)
                         return;
 
                 if (sel_rmid_cfg.map.num + count > PQOS_MAX_CORES)
-                        parse_error(p, "too many cores selected for RMID "
-                                    "association");
+                        parse_error(
+                            p, "too many cores selected for RMID association");
 
                 for (i = 0; i < count; i++) {
                         sel_rmid_cfg.map.core[sel_rmid_cfg.map.num] =
-                                (unsigned)cores[i];
+                            (unsigned)cores[i];
                         sel_rmid_cfg.map.rmid[sel_rmid_cfg.map.num] = rmid;
                         sel_rmid_cfg.map.num++;
                 }
@@ -548,9 +561,9 @@ selfn_iface(const char *arg)
         else if (strcasecmp(arg, "os") == 0)
                 sel_interface = PQOS_INTER_OS;
         else {
-                parse_error(arg,
-                            "Unknown interface! "
-                            "Available options: auto, msr, os\n");
+                parse_error(
+                    arg,
+                    "Unknown interface! Available options: auto, msr, os\n");
                 return;
         }
 
@@ -584,28 +597,30 @@ parse_config_file(const char *fname)
                 const char *option;
                 void (*fn)(const char *arg);
         } optab[] = {
-                {"show-alloc:",         selfn_show_allocation },   /**< -s */
-                {"display:",            selfn_display },           /**< -d */
-                {"display-verbose:",    selfn_display_verbose },   /**< -D */
-                {"log-file:",           selfn_log_file },          /**< -l */
-                {"verbose-mode:",       selfn_verbose_mode },      /**< -v */
-                {"super-verbose-mode:", selfn_super_verbose_mode },/**< -V */
-                {"alloc-class-set:",    selfn_allocation_class },  /**< -e */
-                {"alloc-assoc-set:",    selfn_allocation_assoc },  /**< -a */
-                {"alloc-class-select:", selfn_allocation_select }, /**< -c */
-                {"monitor-pids:",       selfn_monitor_pids },      /**< -p */
-                {"monitor-cores:",      selfn_monitor_cores },     /**< -m */
+            /* clang-format off */
+            {"show-alloc:",         selfn_show_allocation },   /**< -s */
+            {"display:",            selfn_display },           /**< -d */
+            {"display-verbose:",    selfn_display_verbose },   /**< -D */
+            {"log-file:",           selfn_log_file },          /**< -l */
+            {"verbose-mode:",       selfn_verbose_mode },      /**< -v */
+            {"super-verbose-mode:", selfn_super_verbose_mode },/**< -V */
+            {"alloc-class-set:",    selfn_allocation_class },  /**< -e */
+            {"alloc-assoc-set:",    selfn_allocation_assoc },  /**< -a */
+            {"alloc-class-select:", selfn_allocation_select }, /**< -c */
+            {"monitor-pids:",       selfn_monitor_pids },      /**< -p */
+            {"monitor-cores:",      selfn_monitor_cores },     /**< -m */
 #ifdef PQOS_RMID_CUSTOM
-                {"monitor-rmid:",       selfn_monitor_rmids },
+            {"monitor-rmid:",       selfn_monitor_rmids },
 #endif
-                {"monitor-time:",       selfn_monitor_time },      /**< -t */
-                {"monitor-interval:",   selfn_monitor_interval },  /**< -i */
-                {"monitor-file:",       selfn_monitor_file },      /**< -o */
-                {"monitor-file-type:",  selfn_monitor_file_type }, /**< -u */
-                {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
-                {"reset-cat:",          selfn_reset_alloc },       /**< -R */
-                {"iface-os:",           selfn_iface_os },          /**< -I */
-		{"iface:",              selfn_iface },
+            {"monitor-time:",       selfn_monitor_time },      /**< -t */
+            {"monitor-interval:",   selfn_monitor_interval },  /**< -i */
+            {"monitor-file:",       selfn_monitor_file },      /**< -o */
+            {"monitor-file-type:",  selfn_monitor_file_type }, /**< -u */
+            {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
+            {"reset-cat:",          selfn_reset_alloc },       /**< -R */
+            {"iface-os:",           selfn_iface_os },          /**< -I */
+	    {"iface:",              selfn_iface },
+            /* clang-format on */
         };
         FILE *fp = NULL;
         char cb[256];
@@ -616,32 +631,32 @@ parse_config_file(const char *fname)
 
         memset(cb, 0, sizeof(cb));
 
-        while (fgets(cb, sizeof(cb)-1, fp) != NULL) {
+        while (fgets(cb, sizeof(cb) - 1, fp) != NULL) {
                 int i, j, remain;
                 char *cp = NULL;
 
-                for (j = 0; j < (int)sizeof(cb)-1; j++)
+                for (j = 0; j < (int)sizeof(cb) - 1; j++)
                         if (!isspace(cb[j]))
                                 break;
 
-                if (j >= (int)(sizeof(cb)-1))
+                if (j >= (int)(sizeof(cb) - 1))
                         continue; /**< blank line */
 
-                if (strlen(cb+j) == 0)
+                if (strlen(cb + j) == 0)
                         continue; /**< blank line */
 
                 if (cb[j] == '#')
                         continue; /**< comment */
 
-                cp = cb+j;
+                cp = cb + j;
                 remain = (int)strlen(cp);
 
                 /**
                  * remove trailing white spaces
                  */
-                for (i = (int)strlen(cp)-1; i > 0; i--)
+                for (i = (int)strlen(cp) - 1; i > 0; i--)
                         if (!isspace(cp[i])) {
-                                cp[i+1] = '\0';
+                                cp[i + 1] = '\0';
                                 break;
                         }
 
@@ -657,7 +672,7 @@ parse_config_file(const char *fname)
                         while (isspace(cp[len]))
                                 len++; /**< skip space characters */
 
-                        optab[i].fn(cp+len);
+                        optab[i].fn(cp + len);
                         break;
                 }
 
@@ -669,137 +684,143 @@ parse_config_file(const char *fname)
         fclose(fp);
 }
 
-static const char *m_cmd_name = "pqos";                     /**< command name */
+static const char *m_cmd_name = "pqos"; /**< command name */
 static const char help_printf_short[] =
-        "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
-        "       %s [--version]\n"
-        "          [-l FILE] [--log-file=FILE] [-I] [--iface-os]\n"
-        "          [--iface=INTERFACE]\n"
-        "       %s [-s] [--show]\n"
-        "       %s [-d] [--display] [-D] [--display-verbose]\n"
-        "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p [EVTPIDS]] "
-        "[--mon-pid[=EVTPIDS]]\n"
+    "Usage: %s [-h] [--help] [-v] [--verbose] [-V] [--super-verbose]\n"
+    "       %s [--version]\n"
+    "          [-l FILE] [--log-file=FILE] [-I] [--iface-os]\n"
+    "          [--iface=INTERFACE]\n"
+    "       %s [-s] [--show]\n"
+    "       %s [-d] [--display] [-D] [--display-verbose]\n"
+    "       %s [-m EVTCORES] [--mon-core=EVTCORES] | [-p [EVTPIDS]] "
+    "[--mon-pid[=EVTPIDS]]\n"
 #ifdef PQOS_RMID_CUSTOM
-        "       %s [--rmid=RMIDCORES]\n"
+    "       %s [--rmid=RMIDCORES]\n"
 #endif
-        "       %s [--disable-mon-ipc] [--disable-mon-llc_miss]"
-        "          [-t SECONDS] [--mon-time=SECONDS]\n"
-        "          [-i N] [--mon-interval=N]\n"
-        "          [-T] [--mon-top]\n"
-        "          [-o FILE] [--mon-file=FILE]\n"
-        "          [-u TYPE] [--mon-file-type=TYPE]\n"
-        "          [-r] [--mon-reset]\n"
-        "          [-P] [--percent-llc]\n"
-        "       %s [-e CLASSDEF] [--alloc-class=CLASSDEF]\n"
-        "          [-a CLASS2ID] [--alloc-assoc=CLASS2ID]\n"
-        "       %s [-R] [--alloc-reset]\n"
-        "       %s [-H] [--profile-list] | [-c PROFILE] "
-        "[--profile-set=PROFILE]\n"
-        "       %s [-f FILE] [--config-file=FILE]\n";
+    "       %s [--disable-mon-ipc] [--disable-mon-llc_miss]"
+    "          [-t SECONDS] [--mon-time=SECONDS]\n"
+    "          [-i N] [--mon-interval=N]\n"
+    "          [-T] [--mon-top]\n"
+    "          [-o FILE] [--mon-file=FILE]\n"
+    "          [-u TYPE] [--mon-file-type=TYPE]\n"
+    "          [-r] [--mon-reset]\n"
+    "          [-P] [--percent-llc]\n"
+    "       %s [-e CLASSDEF] [--alloc-class=CLASSDEF]\n"
+    "          [-a CLASS2ID] [--alloc-assoc=CLASS2ID]\n"
+    "       %s [-R] [--alloc-reset]\n"
+    "       %s [-H] [--profile-list] | [-c PROFILE] "
+    "[--profile-set=PROFILE]\n"
+    "       %s [-f FILE] [--config-file=FILE]\n";
 
 static const char help_printf_long[] =
-        "Description:\n"
-        "  -h, --help                  help page\n"
-        "  -v, --verbose               verbose mode\n"
-        "  -V, --super-verbose         super-verbose mode\n"
-        "  --version                   show PQoS library version\n"
-        "  -s, --show                  show current PQoS configuration\n"
-        "  -d, --display               display supported capabilities\n"
-        "  -D, --display-verbose       display supported capabilities in verbose mode\n"
-        "  -f FILE, --config-file=FILE load commands from selected file\n"
-        "  -l FILE, --log-file=FILE    log messages into selected file\n"
-        "  -e CLASSDEF, --alloc-class=CLASSDEF\n"
-        "          define allocation classes.\n"
-        "          CLASSDEF format is 'TYPE:ID=DEFINITION;'.\n"
-        "          To specify specific resources 'TYPE[@RESOURCE_ID]:ID=DEFINITION;'.\n"
-        "          Examples: 'llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00',\n"
-        "                    'llc:0d=0xfff;llc:0c=0xfff00',\n"
-        "                    'l2:2=0x3f;l2@2:1=0xf',\n"
-        "                    'l2:2d=0xf;l2:2c=0xc',\n"
-        "                    'mba:1=30;mba@1:3=80',\n"
-        "                    'mba_max:1=4000;mba_max@1:3=6000'.\n"
-        "  -a CLASS2ID, --alloc-assoc=CLASS2ID\n"
-        "          associate cores/tasks with an allocation class.\n"
-        "          CLASS2ID format is 'TYPE:ID=CORE_LIST/TASK_LIST'.\n"
-        "          Example 'cos:0=0,2,4,6-10;llc:1=1',\n"
-        "          Example 'llc:0=0,2,4,6-10;llc:1=1'.\n"
-        "          Example 'core:0=0,2,4,6-10;core:1=1'.\n"
-        "          Example 'pid:0=3543,7643,4556;pid:1=7644'.\n"
-        "  -R [CONFIG[,CONFIG]], --alloc-reset[=CONFIG[,CONFIG]]\n"
-        "          reset allocation configuration (L2/L3 CAT & MBA)\n"
-        "          CONFIG can be: l3cdp-on, l3cdp-off, l3cdp-any,\n"
-        "                         l2cdp-on, l2cdp-off, l2cdp-any,\n"
-        "                         mbaCtrl-on, mbaCtrl-off, mbaCtrl-any\n"
-        "          (default l3cdp-any,l2cdp-any,mbaCtrl-any).\n"
-        "  -m EVTCORES, --mon-core=EVTCORES\n"
-        "          select cores and events for monitoring.\n"
-        "          EVTCORES format is 'EVENT:CORE_LIST'.\n"
-        "          Example: \"all:0,2,4-10;llc:1,3;mbr:11-12\".\n"
-        "          Cores can be grouped by enclosing them in square brackets,\n"
-        "          example: \"llc:[0-3];all:[4,5,6];mbr:[0-3],7,8\".\n"
+    "Description:\n"
+    "  -h, --help                  help page\n"
+    "  -v, --verbose               verbose mode\n"
+    "  -V, --super-verbose         super-verbose mode\n"
+    "  --version                   show PQoS library version\n"
+    "  -s, --show                  show current PQoS configuration\n"
+    "  -d, --display               display supported capabilities\n"
+    "  -D, --display-verbose       display supported capabilities in verbose "
+    "mode\n"
+    "  -f FILE, --config-file=FILE load commands from selected file\n"
+    "  -l FILE, --log-file=FILE    log messages into selected file\n"
+    "  -e CLASSDEF, --alloc-class=CLASSDEF\n"
+    "          define allocation classes.\n"
+    "          CLASSDEF format is 'TYPE:ID=DEFINITION;'.\n"
+    "          To specify specific resources "
+    "'TYPE[@RESOURCE_ID]:ID=DEFINITION;'.\n"
+    "          Examples: 'llc:0=0xffff;llc:1=0x00ff;llc@0-1:2=0xff00',\n"
+    "                    'llc:0d=0xfff;llc:0c=0xfff00',\n"
+    "                    'l2:2=0x3f;l2@2:1=0xf',\n"
+    "                    'l2:2d=0xf;l2:2c=0xc',\n"
+    "                    'mba:1=30;mba@1:3=80',\n"
+    "                    'mba_max:1=4000;mba_max@1:3=6000'.\n"
+    "  -a CLASS2ID, --alloc-assoc=CLASS2ID\n"
+    "          associate cores/tasks with an allocation class.\n"
+    "          CLASS2ID format is 'TYPE:ID=CORE_LIST/TASK_LIST'.\n"
+    "          Example 'cos:0=0,2,4,6-10;llc:1=1',\n"
+    "          Example 'llc:0=0,2,4,6-10;llc:1=1'.\n"
+    "          Example 'core:0=0,2,4,6-10;core:1=1'.\n"
+    "          Example 'pid:0=3543,7643,4556;pid:1=7644'.\n"
+    "  -R [CONFIG[,CONFIG]], --alloc-reset[=CONFIG[,CONFIG]]\n"
+    "          reset allocation configuration (L2/L3 CAT & MBA)\n"
+    "          CONFIG can be: l3cdp-on, l3cdp-off, l3cdp-any,\n"
+    "                         l2cdp-on, l2cdp-off, l2cdp-any,\n"
+    "                         mbaCtrl-on, mbaCtrl-off, mbaCtrl-any\n"
+    "          (default l3cdp-any,l2cdp-any,mbaCtrl-any).\n"
+    "  -m EVTCORES, --mon-core=EVTCORES\n"
+    "          select cores and events for monitoring.\n"
+    "          EVTCORES format is 'EVENT:CORE_LIST'.\n"
+    "          Example: \"all:0,2,4-10;llc:1,3;mbr:11-12\".\n"
+    "          Cores can be grouped by enclosing them in square brackets,\n"
+    "          example: \"llc:[0-3];all:[4,5,6];mbr:[0-3],7,8\".\n"
 #ifdef PQOS_RMID_CUSTOM
-        "  --rmid=RMIDCORES\n"
-        "          assign RMID for cores\n"
-        "          RMIDCORES format is 'RMID_NUMBER=CORE_LIST'\n"
-        "          Example \"10=0,2,4;11=1,3,5 \"\n"
+    "  --rmid=RMIDCORES\n"
+    "          assign RMID for cores\n"
+    "          RMIDCORES format is 'RMID_NUMBER=CORE_LIST'\n"
+    "          Example \"10=0,2,4;11=1,3,5 \"\n"
 #endif
-        "  --disable-mon-ipc\n"
-        "          Disable IPC monitoring\n"
-        "  --disable-mon-llc_miss\n"
-        "          Disable LLC misses monitoring\n"
-        "  -p [EVTPIDS], --mon-pid[=EVTPIDS]\n"
-        "          select top 10 most active (CPU utilizing) process ids to monitor\n"
-        "          or select process ids and events to monitor.\n"
-        "          EVTPIDS format is 'EVENT:PID_LIST'.\n"
-        "          Examples: 'llc:22,25673' or 'all:892,4588-4592'\n"
-        "          Process's IDs can be grouped by enclosing them in square brackets,\n"
-        "          Examples: 'llc:[22,25673]' or 'all:892,[4588-4592]'\n"
-        "          Note:\n"
-        "               Requires Linux and kernel versions 4.10 and newer.\n"
-        "               The -I option must be used for PID monitoring.\n"
-        "               Processes and cores cannot be monitored together.\n"
-        "  -P, --percent-llc\n"
-        "         Displays LLC as percentage value (by default LLC is displayed\n"
-        "         in kilobytes if this parameter is not used)\n"
-        "  -o FILE, --mon-file=FILE    output monitored data in a FILE\n"
-        "  -u TYPE, --mon-file-type=TYPE\n"
-        "          select output file format type for monitored data.\n"
-        "          TYPE is one of: text (default), xml or csv.\n"
-        "  -i N, --mon-interval=N      set sampling interval to Nx100ms,\n"
-        "                              default 10 = 10 x 100ms = 1s.\n"
-        "  -T, --mon-top               top like monitoring output\n"
-        "  -t SECONDS, --mon-time=SECONDS\n"
-        "          set monitoring time in seconds. Use 'inf' or 'infinite'\n"
-        "          for infinite monitoring. CTRL+C stops monitoring.\n"
-        "  -r, --mon-reset             monitoring reset, claim all RMID's\n"
-        "  -H, --profile-list          list supported allocation profiles\n"
-        "  -c PROFILE, --profile-set=PROFILE\n"
-        "          select a PROFILE of predefined allocation classes.\n"
-        "          Use -H to list available profiles.\n"
-        "  -I, --iface-os\n"
-        "          set the library interface to use the kernel\n"
-        "          implementation. If not set the default implementation is\n"
-        "          to program the MSR's directly.\n"
-        "  --iface=INTERFACE\n"
-        "          set the library interface to automatically detected one\n"
-        "          ('auto'), MSR ('msr') or kernel interface ('os').\n"
-        "          INTERFACE can be set to either 'auto' (default), 'msr' or 'os'.\n"
-        "          If automatic detection is selected ('auto'), it:\n"
-        "                  1) Takes RDT_IFACE environment variable\n"
-        "                     into account if this variable is set\n"
-        "                  2) Selects OS interface if the kernel interface\n"
-        "                     is supported\n"
-        "                  3) Selects MSR interface otherwise\n";
+    "  --disable-mon-ipc\n"
+    "          Disable IPC monitoring\n"
+    "  --disable-mon-llc_miss\n"
+    "          Disable LLC misses monitoring\n"
+    "  -p [EVTPIDS], --mon-pid[=EVTPIDS]\n"
+    "          select top 10 most active (CPU utilizing) process ids to "
+    "monitor\n"
+    "          or select process ids and events to monitor.\n"
+    "          EVTPIDS format is 'EVENT:PID_LIST'.\n"
+    "          Examples: 'llc:22,25673' or 'all:892,4588-4592'\n"
+    "          Process's IDs can be grouped by enclosing them in square "
+    "brackets,\n"
+    "          Examples: 'llc:[22,25673]' or 'all:892,[4588-4592]'\n"
+    "          Note:\n"
+    "               Requires Linux and kernel versions 4.10 and newer.\n"
+    "               The -I option must be used for PID monitoring.\n"
+    "               Processes and cores cannot be monitored together.\n"
+    "  -P, --percent-llc\n"
+    "         Displays LLC as percentage value (by default LLC is displayed\n"
+    "         in kilobytes if this parameter is not used)\n"
+    "  -o FILE, --mon-file=FILE    output monitored data in a FILE\n"
+    "  -u TYPE, --mon-file-type=TYPE\n"
+    "          select output file format type for monitored data.\n"
+    "          TYPE is one of: text (default), xml or csv.\n"
+    "  -i N, --mon-interval=N      set sampling interval to Nx100ms,\n"
+    "                              default 10 = 10 x 100ms = 1s.\n"
+    "  -T, --mon-top               top like monitoring output\n"
+    "  -t SECONDS, --mon-time=SECONDS\n"
+    "          set monitoring time in seconds. Use 'inf' or 'infinite'\n"
+    "          for infinite monitoring. CTRL+C stops monitoring.\n"
+    "  -r, --mon-reset             monitoring reset, claim all RMID's\n"
+    "  -H, --profile-list          list supported allocation profiles\n"
+    "  -c PROFILE, --profile-set=PROFILE\n"
+    "          select a PROFILE of predefined allocation classes.\n"
+    "          Use -H to list available profiles.\n"
+    "  -I, --iface-os\n"
+    "          set the library interface to use the kernel\n"
+    "          implementation. If not set the default implementation is\n"
+    "          to program the MSR's directly.\n"
+    "  --iface=INTERFACE\n"
+    "          set the library interface to automatically detected one\n"
+    "          ('auto'), MSR ('msr') or kernel interface ('os').\n"
+    "          INTERFACE can be set to either 'auto' (default), 'msr' or "
+    "'os'.\n"
+    "          If automatic detection is selected ('auto'), it:\n"
+    "                  1) Takes RDT_IFACE environment variable\n"
+    "                     into account if this variable is set\n"
+    "                  2) Selects OS interface if the kernel interface\n"
+    "                     is supported\n"
+    "                  3) Selects MSR interface otherwise\n";
 /**
  * @brief Displays help information
  *
  * @param is_long print long help version or a short one
  *
  */
-static void print_help(const int is_long)
+static void
+print_help(const int is_long)
 {
-        printf(help_printf_short,
-               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
+        printf(help_printf_short, m_cmd_name, m_cmd_name, m_cmd_name,
+               m_cmd_name, m_cmd_name,
 #ifdef PQOS_RMID_CUSTOM
                m_cmd_name,
 #endif
@@ -811,7 +832,8 @@ static void print_help(const int is_long)
 /**
  * @brief Displays PQoS tool version
  */
-static void print_tool_version(void)
+static void
+print_tool_version(void)
 {
         int major = PQOS_VERSION / 10000;
         int minor = (PQOS_VERSION % 10000) / 100;
@@ -825,7 +847,8 @@ static void print_tool_version(void)
  *
  * @param [in] p_cap platform capabilities
  */
-static void print_lib_version(const struct pqos_cap *p_cap)
+static void
+print_lib_version(const struct pqos_cap *p_cap)
 {
         int major = p_cap->version / 10000;
         int minor = (p_cap->version % 10000) / 100;
@@ -837,53 +860,57 @@ static void print_lib_version(const struct pqos_cap *p_cap)
 #ifdef PQOS_RMID_CUSTOM
 #define OPTION_RMID 1000
 #endif
-#define OPTION_DISABLE_MON_IPC 1001
+#define OPTION_DISABLE_MON_IPC      1001
 #define OPTION_DISABLE_MON_LLC_MISS 1002
-#define OPTION_VERSION 1003
-#define OPTION_INTERFACE 1004
+#define OPTION_VERSION              1003
+#define OPTION_INTERFACE            1004
 
 static struct option long_cmd_opts[] = {
-        {"help",                 no_argument,       0, 'h'},
-        {"log-file",             required_argument, 0, 'l'},
-        {"config-file",          required_argument, 0, 'f'},
-        {"show",                 no_argument,       0, 's'},
-        {"display",              no_argument,       0, 'd'},
-        {"display-verbose",      no_argument,       0, 'D'},
-        {"profile-list",         no_argument,       0, 'H'},
-        {"profile-set",          required_argument, 0, 'c'},
-        {"mon-interval",         required_argument, 0, 'i'},
-        {"mon-pid",              required_argument, 0, 'p'},
-        {"mon-core",             required_argument, 0, 'm'},
-        {"mon-time",             required_argument, 0, 't'},
-        {"mon-top",              no_argument,       0, 'T'},
-        {"mon-file",             required_argument, 0, 'o'},
-        {"mon-file-type",        required_argument, 0, 'u'},
-        {"mon-reset",            no_argument,       0, 'r'},
-        {"disable-mon-ipc",      no_argument,       0, OPTION_DISABLE_MON_IPC},
-        {"disable-mon-llc_miss", no_argument,       0,
-         OPTION_DISABLE_MON_LLC_MISS},
-        {"alloc-class",          required_argument, 0, 'e'},
-        {"alloc-reset",          required_argument, 0, 'R'},
-        {"alloc-assoc",          required_argument, 0, 'a'},
-        {"verbose",              no_argument,       0, 'v'},
-        {"super-verbose",        no_argument,       0, 'V'},
-        {"iface-os",             no_argument,       0, 'I'},
-        {"iface",                required_argument, 0, OPTION_INTERFACE},
-        {"percent-llc",          no_argument,       0, 'P'},
-        {"version",              no_argument,       0, OPTION_VERSION},
+    /* clang-format off */
+    {"help",                 no_argument,       0, 'h'},
+    {"log-file",             required_argument, 0, 'l'},
+    {"config-file",          required_argument, 0, 'f'},
+    {"show",                 no_argument,       0, 's'},
+    {"display",              no_argument,       0, 'd'},
+    {"display-verbose",      no_argument,       0, 'D'},
+    {"profile-list",         no_argument,       0, 'H'},
+    {"profile-set",          required_argument, 0, 'c'},
+    {"mon-interval",         required_argument, 0, 'i'},
+    {"mon-pid",              required_argument, 0, 'p'},
+    {"mon-core",             required_argument, 0, 'm'},
+    {"mon-time",             required_argument, 0, 't'},
+    {"mon-top",              no_argument,       0, 'T'},
+    {"mon-file",             required_argument, 0, 'o'},
+    {"mon-file-type",        required_argument, 0, 'u'},
+    {"mon-reset",            no_argument,       0, 'r'},
+    {"disable-mon-ipc",      no_argument,       0, OPTION_DISABLE_MON_IPC},
+    {"disable-mon-llc_miss", no_argument,       0, OPTION_DISABLE_MON_LLC_MISS},
+    {"alloc-class",          required_argument, 0, 'e'},
+    {"alloc-reset",          required_argument, 0, 'R'},
+    {"alloc-assoc",          required_argument, 0, 'a'},
+    {"verbose",              no_argument,       0, 'v'},
+    {"super-verbose",        no_argument,       0, 'V'},
+    {"iface-os",             no_argument,       0, 'I'},
+    {"iface",                required_argument, 0, OPTION_INTERFACE},
+    {"percent-llc",          no_argument,       0, 'P'},
+    {"version",              no_argument,       0, OPTION_VERSION},
 #ifdef PQOS_RMID_CUSTOM
-        {"rmid",                 required_argument, 0, OPTION_RMID},
+    {"rmid",                 required_argument, 0, OPTION_RMID},
 #endif
-        {0, 0, 0, 0} /* end */
+    {0, 0, 0, 0} /* end */
+    /* clang-format on */
 };
 
-int main(int argc, char **argv)
+int
+main(int argc, char **argv)
 {
         struct pqos_config cfg;
         const struct pqos_cpuinfo *p_cpu = NULL;
         const struct pqos_cap *p_cap = NULL;
-        const struct pqos_capability *cap_mon = NULL, *cap_l3ca = NULL,
-                *cap_l2ca = NULL, *cap_mba = NULL;
+        const struct pqos_capability *cap_mon = NULL;
+        const struct pqos_capability *cap_l3ca = NULL;
+        const struct pqos_capability *cap_l2ca = NULL;
+        const struct pqos_capability *cap_mba = NULL;
         unsigned l3cat_id_count, *l3cat_ids = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
         int opt_index = 0, pid_flag = 0;
@@ -1003,7 +1030,8 @@ int main(int argc, char **argv)
                                 pid_flag = 1;
                         } else {
                                 printf("Option -%c is missing required "
-                                       "argument\n", optopt);
+                                       "argument\n",
+                                       optopt);
                                 return EXIT_FAILURE;
                         }
                         break;
@@ -1060,7 +1088,8 @@ int main(int argc, char **argv)
 #endif
                 default:
                         printf("Unsupported option: -%c. "
-                               "See option -h for help.\n", optopt);
+                               "See option -h for help.\n",
+                               optopt);
                         return EXIT_FAILURE;
                         break;
                 case '?':
@@ -1084,7 +1113,7 @@ int main(int argc, char **argv)
         if (sel_log_file == NULL) {
                 cfg.fd_log = STDOUT_FILENO;
         } else {
-                cfg.fd_log = safe_open(sel_log_file, O_WRONLY|O_CREAT,
+                cfg.fd_log = safe_open(sel_log_file, O_WRONLY | O_CREAT,
                                        FILE_READ_WRITE);
                 if (cfg.fd_log == -1) {
                         printf("Error opening %s log file!\n", sel_log_file);
@@ -1182,8 +1211,7 @@ int main(int argc, char **argv)
                 /**
                  * Reset allocation configuration to after-reset state and exit
                  */
-                ret = pqos_alloc_reset(selfn_l3cdp_config,
-                                       selfn_l2cdp_config,
+                ret = pqos_alloc_reset(selfn_l3cdp_config, selfn_l2cdp_config,
                                        selfn_mba_config);
                 if (ret != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
@@ -1196,8 +1224,8 @@ int main(int argc, char **argv)
                 /**
                  * Show info about allocation config and exit
                  */
-                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
-                                   p_cpu, sel_verbose_mode);
+                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba, p_cpu,
+                                   sel_verbose_mode);
                 goto allocation_exit;
         }
 
@@ -1251,14 +1279,14 @@ int main(int argc, char **argv)
         monitor_loop();
         monitor_stop();
 
- allocation_exit:
- error_exit_2:
+allocation_exit:
+error_exit_2:
         ret = pqos_fini();
         ASSERT(ret == PQOS_RETVAL_OK);
         if (ret != PQOS_RETVAL_OK)
                 printf("Error shutting down PQoS library!\n");
 
- error_exit_1:
+error_exit_1:
         monitor_cleanup();
 
         /**

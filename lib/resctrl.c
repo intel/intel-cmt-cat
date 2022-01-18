@@ -31,21 +31,20 @@
  *
  */
 
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/file.h>
-#include <signal.h>
-#include <sys/mount.h>
-#include <errno.h>
-#include <string.h>
-#include <fcntl.h>
-
-#include "pqos.h"
-#include "log.h"
-#include "types.h"
 #include "resctrl.h"
+
 #include "common.h"
+#include "log.h"
 #include "os_common.h"
+
+#include <errno.h>
+#include <fcntl.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/file.h>
+#include <sys/mount.h>
+#include <unistd.h>
 
 static int resctrl_lock_fd = -1; /**< File descriptor to the lockfile */
 

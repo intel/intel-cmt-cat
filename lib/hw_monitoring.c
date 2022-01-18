@@ -38,16 +38,17 @@
  *
  */
 
-#include <stdlib.h>
-#include <string.h>
+#include "hw_monitoring.h"
 
 #include "cap.h"
 #include "cpu_registers.h"
 #include "log.h"
-#include "hw_monitoring.h"
 #include "machine.h"
 #include "monitoring.h"
 #include "perf_monitoring.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 /**
  * ---------------------------------------

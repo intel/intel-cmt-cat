@@ -42,10 +42,11 @@
 extern "C" {
 #endif
 
-#include <stdio.h>
-#include <stdint.h>
-
 #include "types.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <sys/stat.h>
 
 /**
  * @brief Wrapper around fopen() that additionally checks if a given path

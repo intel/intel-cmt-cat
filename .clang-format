@@ -8,6 +8,7 @@ IndentCaseLabels: false
 UseTab: Never
 AlignConsecutiveMacros: true
 AlignTrailingComments: true
+AlignConsecutiveMacros: true
 AlwaysBreakAfterReturnType: AllDefinitions
 SortIncludes: false
 BreakBeforeInheritanceComma: true
@@ -16,4 +17,6 @@ BinPackParameters: false
 BinPackArguments: true
 ReflowComments: true
 SpaceAfterCStyleCast: false
+IncludeBlocks: Regroup
+SortIncludes: true
 ColumnLimit: 80

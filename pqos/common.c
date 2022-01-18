@@ -31,13 +31,13 @@
  *
  */
 
+#include "common.h"
+
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <errno.h>
-
-#include "common.h"
 
 FILE *
 safe_fopen(const char *name, const char *mode)

@@ -31,20 +31,20 @@
  *
  */
 
+#include "resctrl_alloc.h"
+
+#include "allocation.h"
+#include "cap.h"
+#include "common.h"
+#include "log.h"
+#include "resctrl_monitoring.h"
+#include "resctrl_utils.h"
+
+#include <dirent.h>
+#include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <dirent.h>
-
-#include "common.h"
-#include "allocation.h"
-#include "log.h"
-#include "types.h"
-#include "cap.h"
-#include "resctrl_alloc.h"
-#include "resctrl_utils.h"
-#include "resctrl_monitoring.h"
 
 /*
  * COS file names on resctrl file system

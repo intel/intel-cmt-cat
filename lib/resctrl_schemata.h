@@ -38,12 +38,11 @@
 #ifndef __PQOS_RESCTRL_SCHEMATA_H__
 #define __PQOS_RESCTRL_SCHEMATA_H__
 
-#include "pqos.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#include "pqos.h"
 #include "types.h"
 
 /*

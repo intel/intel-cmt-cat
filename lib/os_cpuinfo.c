@@ -31,16 +31,17 @@
  *
  */
 
+#include "os_cpuinfo.h"
+
+#include "common.h"
+#include "log.h"
+
 #include <dirent.h> /**< scandir() */
+#include <errno.h>
 #include <fnmatch.h>
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
-#include <limits.h>
-
-#include "os_cpuinfo.h"
-#include "log.h"
-#include "common.h"
 
 #define SYSTEM_CPU "/sys/devices/system/cpu"
 

@@ -39,20 +39,21 @@
 #define _WITH_DPRINTF
 #endif /* __FreeBSD__ */
 
+#include "machine.h"
+
+#include "log.h"
+
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/types.h>
+#include <unistd.h>
 #ifdef __FreeBSD__
 #include <sys/cpuctl.h>
 #include <sys/ioctl.h>
 #endif
-
-#include "machine.h"
-#include "log.h"
 
 static int *m_msr_fd = NULL;    /**< MSR driver file descriptors table */
 static unsigned m_maxcores = 0; /**< max number of cores (size of the

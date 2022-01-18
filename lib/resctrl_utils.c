@@ -31,11 +31,12 @@
  *
  */
 
-#include <string.h>
-#include <stdlib.h>
 #include "resctrl_utils.h"
+
 #include "pqos.h"
-#include "types.h"
+
+#include <stdlib.h>
+#include <string.h>
 
 int
 resctrl_utils_strtouint64(const char *s, int base, uint64_t *value)

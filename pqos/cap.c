@@ -34,6 +34,12 @@
  * @brief Platform QoS utility - capability module
  *
  */
+
+#include "cap.h"
+
+#include "main.h"
+#include "pqos.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,10 +47,6 @@
 #ifdef __linux__
 #include <sys/utsname.h>
 #endif
-#include "pqos.h"
-
-#include "main.h"
-#include "cap.h"
 
 #define BUFFER_SIZE 512
 #define NON_VERBOSE 0

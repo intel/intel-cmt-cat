@@ -31,15 +31,16 @@
  */
 
 #include "mba_sc.h"
+
 #include "common.h"
 
+#include <errno.h>
+#include <sched.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sched.h>
-#include <errno.h>
 #include <string.h>
 #include <sys/wait.h>
-#include <signal.h>
 
 static const struct pqos_cap *m_cap;
 static const struct pqos_cpuinfo *m_cpu;

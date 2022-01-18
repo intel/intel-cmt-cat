@@ -31,20 +31,19 @@
  *
  */
 
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h> /**< pid_t */
-#include <dirent.h> /**< scandir() */
+#include "os_monitoring.h"
 
-#include "pqos.h"
 #include "cap.h"
 #include "log.h"
-#include "types.h"
 #include "monitoring.h"
-#include "os_monitoring.h"
 #include "perf_monitoring.h"
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
+
+#include <dirent.h> /**< scandir() */
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h> /**< pid_t */
 
 /**
  * ---------------------------------------

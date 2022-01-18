@@ -37,13 +37,14 @@
  * These functions need no synchronization mechanisms.
  *
  */
+
+#include "utils.h"
+
+#include "cpuinfo.h"
+#include "pqos.h"
+
 #include <stdlib.h>
 #include <string.h>
-
-#include "pqos.h"
-#include "types.h"
-#include "utils.h"
-#include "cpuinfo.h"
 
 #define TOPO_OBJ_SOCKET     0
 #define TOPO_OBJ_L2_CLUSTER 2
