@@ -110,13 +110,14 @@ static int
 set_affinity_mask(const cpu_set_t *p_set)
 {
         if (p_set == NULL)
-                return -EFAULT;
-#ifdef __linux__
+                return -EINVAL;
+#if defined(__linux__)
         return sched_setaffinity(0, sizeof(*p_set), p_set);
-#endif
-#ifdef __FreeBSD__
+#elif defined(__FreeBSD__)
         return cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
                                   sizeof(*p_set), p_set);
+#else
+        return -EFAULT;
 #endif
 }
 
