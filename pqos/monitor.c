@@ -1192,10 +1192,9 @@ get_pid_stat_val(const char *proc_pid_dir_name,
         if (fproc_pid_stats == NULL) /*failure in reading if file is empty*/
                 return -1;
 
-        memset(buf, 0, sizeof(buf));
-
         /*put file into buffer to parse values from*/
         n_read = fread(buf, sizeof(char), sizeof(buf) - 1, fproc_pid_stats);
+        buf[n_read] = '\0';
 
         /*close file as its not needed*/
         fclose(fproc_pid_stats);
