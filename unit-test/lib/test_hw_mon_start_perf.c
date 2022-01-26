@@ -51,6 +51,7 @@ test_hw_mon_start_perf(void **state __attribute__((unused)))
             PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_IPC;
         int ret;
 
+        memset(&intl, 0, sizeof(intl));
         memset(&group, 0, sizeof(struct pqos_mon_data));
         group.intl = &intl;
         group.num_cores = num_cores;

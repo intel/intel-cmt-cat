@@ -340,7 +340,7 @@ test_pqos_alloc_assign_param_technology(void **state __attribute__((unused)))
 {
         int ret;
         unsigned id;
-        unsigned core[1];
+        unsigned core[1] = { 0 };
 
         ret = pqos_alloc_assign(0, core, 1, &id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -361,7 +361,7 @@ test_pqos_alloc_assign_param_core_num(void **state __attribute__((unused)))
 {
         int ret;
         unsigned id;
-        unsigned core[1];
+        unsigned core[1] = { 0 };
 
         ret = pqos_alloc_assign(1 << PQOS_CAP_TYPE_L3CA, core, 0, &id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -371,7 +371,7 @@ static void
 test_pqos_alloc_assign_param_id_null(void **state __attribute__((unused)))
 {
         int ret;
-        unsigned core[1];
+        unsigned core[1] = { 0 };
 
         ret = pqos_alloc_assign(1 << PQOS_CAP_TYPE_L3CA, core, 1, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -442,7 +442,7 @@ static void
 test_pqos_alloc_release_param(void **state __attribute__((unused)))
 {
         int ret;
-        unsigned core_array[1];
+        unsigned core_array[1] = { 0 };
         unsigned core_num = 1;
 
         ret = pqos_alloc_release(core_array, 0);
@@ -550,7 +550,7 @@ test_pqos_alloc_assign_pid_param(void **state __attribute__((unused)))
         int ret;
         unsigned technology = 1 << PQOS_CAP_TYPE_L3CA;
         unsigned class_id;
-        pid_t task_array[1];
+        pid_t task_array[1] = { 1 };
         unsigned task_num = 1;
 
         ret = pqos_alloc_assign_pid(technology, NULL, task_num, &class_id);
@@ -569,7 +569,7 @@ static void
 test_pqos_alloc_release_pid_init(void **state __attribute__((unused)))
 {
         int ret;
-        pid_t task_array[1];
+        pid_t task_array[1] = { 1 };
         unsigned task_num = 1;
 
         wrap_check_init(1, PQOS_RETVAL_INIT);
@@ -582,7 +582,7 @@ static void
 test_pqos_alloc_release_pid_param(void **state __attribute__((unused)))
 {
         int ret;
-        pid_t task_array[1];
+        pid_t task_array[1] = { 1 };
         unsigned task_num = 1;
 
         ret = pqos_alloc_release_pid(task_array, 0);
@@ -895,6 +895,8 @@ test_pqos_l3ca_set_param(void **state __attribute__((unused)))
         unsigned num_cos = 1;
         struct pqos_l3ca ca[1];
 
+        memset(ca, 0, sizeof(*ca));
+
         ret = pqos_l3ca_set(l3cat_id, 0, ca);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
@@ -1162,6 +1164,8 @@ test_pqos_l2ca_set_param(void **state __attribute__((unused)))
         unsigned l2id = 1;
         unsigned num_cos = 1;
         struct pqos_l2ca ca[1];
+
+        memset(ca, 0, sizeof(*ca));
 
         ret = pqos_l2ca_set(l2id, 0, ca);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
