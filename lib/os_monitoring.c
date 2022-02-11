@@ -442,10 +442,19 @@ os_mon_start(const unsigned num_cores,
          */
         for (i = 0; i < num_cores; i++) {
                 const unsigned lcore = cores[i];
+                char name[16];
 
                 ret = pqos_cpu_check_core(cpu, lcore);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
+
+                ret = resctrl_mon_assoc_get(lcore, name, sizeof(name));
+                if (ret == PQOS_RETVAL_OK) {
+                        LOG_ERROR("Monitoring on core %u is already started\n",
+                                  lcore);
+                        return PQOS_RETVAL_RESOURCE;
+                } else if (ret != PQOS_RETVAL_RESOURCE)
+                        return ret;
         }
 
         /**
