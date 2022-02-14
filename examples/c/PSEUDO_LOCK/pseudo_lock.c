@@ -81,9 +81,6 @@ init_memory(const size_t sz)
         char *p = NULL;
         size_t i;
 
-        if (sz <= 0)
-                return NULL;
-
         p = (char *)malloc(sz);
         if (p == NULL)
                 return NULL;
