@@ -157,7 +157,7 @@ cpu_online(unsigned lcore)
         unsigned online = 0;
         int retval;
 
-        snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%d/online", lcore);
+        snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%u/online", lcore);
         retval = fread_uint(buf, &online);
         /* online file does not exists for cpu 0 */
         if (retval == PQOS_RETVAL_RESOURCE)
@@ -184,7 +184,7 @@ cpu_node(unsigned lcore, unsigned *node)
         int count;
         int ret = PQOS_RETVAL_ERROR;
 
-        snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%d", lcore);
+        snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%u", lcore);
         count = scandir(buf, &namelist, filter_node, NULL);
         if (count == 1)
                 ret = parse_uint(namelist[0]->d_name + 4, node);
@@ -215,20 +215,20 @@ cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2)
         int count;
         int ret = PQOS_RETVAL_ERROR;
 
-        snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%d/cache", lcore);
+        snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%u/cache", lcore);
         count = scandir(buf, &namelist, filter_index, NULL);
         for (i = 0; i < count; ++i) {
                 unsigned level;
                 unsigned id;
 
                 snprintf(buf, sizeof(buf) - 1,
-                         SYSTEM_CPU "/cpu%d/cache/%s/level", lcore,
+                         SYSTEM_CPU "/cpu%u/cache/%s/level", lcore,
                          namelist[i]->d_name);
                 ret = fread_uint(buf, &level);
                 if (ret != PQOS_RETVAL_OK)
                         break;
 
-                snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%d/cache/%s/id",
+                snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%u/cache/%s/id",
                          lcore, namelist[i]->d_name);
                 ret = fread_uint(buf, &id);
                 if (ret != PQOS_RETVAL_OK)
