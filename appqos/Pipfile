@@ -10,6 +10,8 @@ flask = "*"
 flask-restful = "*"
 gevent = "*"
 psutil = "*"
+pqos = {path = "../lib/python"}
+pwr = {git = "https://github.com/intel/CommsPowerManagement.git", ref = "pwr-v0.2.1", subdirectory = "pwr"}
 
 [dev-packages]
 bandit = "*"
@@ -20,13 +22,4 @@ mock = "*"
 caniusepython3 = "*"
 requests = "*"
 codespell = "*"
-
-[packages.pwr]
-git = "https://github.com/intel/CommsPowerManagement.git"
-ref = "pwr-v0.2.1"
-subdirectory = "pwr"
-
-[packages.pqos]
-path = "./../lib/python"
-editable = true
 
