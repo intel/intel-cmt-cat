@@ -6,11 +6,8 @@
 TEST_ENV?=$(shell_hostname).json
 VENV_DIR?=../venv/test_$(shell hostname)
 
-$(VENV_DIR): Pipfile
-	WORKON_HOME=$(VENV_DIR) pipenv install --skip-lock
-
 setup:
-	${MAKE} $(VENV_DIR)
+	WORKON_HOME=$(VENV_DIR) pipenv install --skip-lock
 
 setup-dev:
 	WORKON_HOME=$(VENV_DIR) pipenv install --skip-lock --dev
@@ -50,4 +47,4 @@ run-os:
 run-msr:
 	WORKON_HOME=$(VENV_DIR) pipenv run pytest --env=$(TEST_ENV) --iface-msr
 
-	
+
