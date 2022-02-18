@@ -66,6 +66,10 @@ CFLAGS += -fno-strict-overflow \
     -fwrapv
 endif
 
+ifeq ($(shell uname), FreeBSD)
+LDLIBS += -lrt
+endif
+
 # DEBUG build
 ifeq ($(DEBUG),y)
 CFLAGS += -g -ggdb -O0 -DDEBUG

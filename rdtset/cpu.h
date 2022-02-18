@@ -37,8 +37,12 @@
 #include <sched.h>
 #endif
 #ifdef __FreeBSD__
+/* clang-format off */
+#include <sys/cdefs.h>
+#include <sys/types.h>
 #include <sys/cpuset.h>
 #include <sys/param.h>
+/* clang-format on */
 #endif
 
 #ifdef __cplusplus

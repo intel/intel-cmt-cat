@@ -49,9 +49,11 @@
 #include <string.h>
 #include <sys/ioctl.h> /**< terminal ioctl */
 #include <sys/stat.h>
+#ifdef __linux__
 #include <sys/timerfd.h> /**< timerfd_create() */
-#include <sys/types.h>   /**< open() */
-#include <time.h>        /**< localtime() */
+#endif
+#include <sys/types.h> /**< open() */
+#include <time.h>      /**< localtime() */
 #include <unistd.h>
 
 #define PQOS_MAX_PID_MON_GROUPS 256
@@ -2638,7 +2640,13 @@ monitor_loop(void)
         unsigned mon_number = 0, display_num = 0;
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
         long runtime = 0;
+#ifdef __linux__
         int tfd;
+#else
+        timer_t timerid;
+        struct sigevent sev;
+        sigset_t sigset;
+#endif
         int retval;
         struct itimerspec timer_spec;
 
@@ -2653,8 +2661,19 @@ monitor_loop(void)
                 return;
         }
 
+#ifdef __linux__
         tfd = timerfd_create(CLOCK_MONOTONIC, 0);
         if (tfd == -1) {
+#else
+        sigemptyset(&sigset);
+        sigaddset(&sigset, SIGUSR1);
+        sigprocmask(SIG_BLOCK, &sigset, NULL);
+
+        sev.sigev_notify = SIGEV_SIGNAL;
+        sev.sigev_signo = SIGUSR1;
+        sev.sigev_value.sigval_ptr = &timerid;
+        if (timer_create(CLOCK_MONOTONIC, &sev, &timerid) == -1) {
+#endif
                 fprintf(stderr, "Failed to create timer\n");
                 return;
         }
@@ -2704,7 +2723,12 @@ monitor_loop(void)
             sel_mon_interval % 10l * 100l * 1000000l;
         timer_spec.it_value.tv_sec = timer_spec.it_interval.tv_sec;
         timer_spec.it_value.tv_nsec = timer_spec.it_interval.tv_nsec;
-        retval = timerfd_settime(tfd, 0, &timer_spec, 0);
+#ifdef __linux__
+        retval = timerfd_settime(tfd, 0, &timer_spec, NULL);
+#else
+        retval = timer_settime(timerid, 0, &timer_spec, NULL);
+#endif
+
         if (retval == -1) {
                 fprintf(stderr, "Failed to setup timer\n");
                 stop_monitoring_loop = 1;
@@ -2797,7 +2821,13 @@ monitor_loop(void)
                     runtime / 1000l >= sel_timeout)
                         break;
 
+#ifdef __linux__
                 retval = read(tfd, &timer_count, sizeof(timer_count));
+#else
+                sigwaitinfo(&sigset, NULL);
+                retval = timer_getoverrun(timerid);
+                timer_count = retval + 1;
+#endif
                 if (retval < 0 || timer_count < 1 || timer_count > 100) {
                         fprintf(stderr, "Failed to read timer\n");
                         break;
