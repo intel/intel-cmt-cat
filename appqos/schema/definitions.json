@@ -227,6 +227,10 @@
         "description": "Pool's name",
         "$ref": "#string_nonempty"
       },
+      "l2cbm": {
+        "description": "L2 CAT cache bit mask",
+        "$ref": "#string_hex"
+      },
       "cbm": {
         "description": "L3 CAT cache bit mask",
         "$ref": "#string_hex"
@@ -255,6 +259,7 @@
     "required": ["cores"],
     "anyOf": [
       { "required": ["cbm"] },
+      { "required": ["l2cbm"] },
       { "required": ["mba"] },
       { "required": ["mba_bw"] },
       { "required": ["power_profile"] }
@@ -273,6 +278,7 @@
       { "properties": {
           "name": {},
           "cores": {},
+          "l2cbm":{},
           "cbm": {},
           "mba": {},
           "mba_bw": {},
@@ -298,6 +304,7 @@
       { "properties": {
           "name": {},
           "cores": {},
+          "l2cbm": {},
           "cbm": {},
           "mba": {},
           "mba_bw": {},

@@ -200,6 +200,7 @@ class TestPool_2:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_cbm(self):
@@ -215,6 +216,26 @@ class TestPool_2:
 
         assert response.status_code == 200
 
+
+    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
+    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    def test_put_l2cbm(self):
+        def set_config(data):
+            for pool in data['pools']:
+                if pool['id'] == 1:
+                    assert pool['l2cbm'] == 0xff
+
+        with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock,\
+             mock.patch('pid_ops.is_pid_valid', return_value=True):
+            response = REST.put("/pools/1", {"l2cbm": "0xff"})
+            func_mock.assert_called_once()
+
+        assert response.status_code == 200
 
     @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
@@ -236,6 +257,7 @@ class TestPool_2:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_mba(self):
@@ -294,6 +316,7 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_mba_ctrl_enabled", mock.MagicMock(return_value=True))
     @mock.patch("common.CONFIG_STORE.get_rdt_iface", mock.MagicMock(return_value="os"))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
@@ -343,6 +366,7 @@ class TestPool_2:
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_cores(self):
@@ -363,6 +387,7 @@ class TestPool_2:
     @mock.patch("common.PQOS_API.get_max_cos_id", new=get_max_cos_id)
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_name(self):
@@ -422,10 +447,12 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_new_pool_id", mock.MagicMock(return_value=5))
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("pool_config", [
-        {"cores":[11, 12], "cbm": "0xf"},                                    # no name
+        {"cores":[11, 12], "cbm": "0xf"},
+        {"cores":[11, 12], "l2cbm": "0xf"},                                    # no name
         {"name":"hello", "cores":[13, 17], "cbm": "0xf"},                    # cbm string
         {"name":"hello", "cores":[11, 16], "cbm": 3},                        # cbm int
         {"name":"hello_mba", "cores":[6, 7], "mba": 50},                     # mba
@@ -452,6 +479,7 @@ class TestPool_2:
     @mock.patch("common.CONFIG_STORE.get_rdt_iface", mock.MagicMock(return_value="os"))
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_bw_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))

@@ -77,6 +77,7 @@ class TestApps:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
@@ -220,6 +221,7 @@ class TestApp_2:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_pool(self):
@@ -241,6 +243,7 @@ class TestApp_2:
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_cores(self):

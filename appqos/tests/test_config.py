@@ -70,6 +70,7 @@ CONFIG = {
         {
             "apps": [1],
             "cbm": 0xf0,
+            "l2cbm": 0xf,
             "cores": [1],
             "id": 1,
             "mba": 20,
@@ -78,6 +79,7 @@ CONFIG = {
         {
             "apps": [2, 3],
             "cbm": 0xf,
+            "l2cbm": 0xf0,
             "cores": [3],
             "id": 2,
             "name": "cat"
@@ -244,6 +246,42 @@ def test_config_default_pool_cat():
             break
 
     assert pool_cbm == 0xDEADBEEF
+
+
+@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
+@mock.patch('common.PQOS_API.get_max_l2_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
+@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
+@mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
+def test_config_default_pool_l2cat():
+    config_store = ConfigStore()
+    config = deepcopy(CONFIG)
+
+    # just in case, remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config_store.is_default_pool_defined(config)
+
+    # add default pool to config
+    config_store.add_default_pool(config)
+    assert config_store.is_default_pool_defined(config)
+
+    pool_l2cbm = None
+
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            assert 'l2cbm' in pool
+            assert not 'cbm' in pool
+            assert not 'mba' in pool
+            assert not 'mba_bw' in pool
+            pool_l2cbm = pool['l2cbm']
+            break
+
+    assert pool_l2cbm == 0xDEADBEEF
 
 
 @mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
@@ -423,11 +461,16 @@ def test_config_get_new_pool_id(mock_get_config):
         assert 9 == config_store.get_new_pool_id({"mba":10})
         assert 9 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
         assert 31 == config_store.get_new_pool_id({"cbm":"0xff"})
+        assert 31 == config_store.get_new_pool_id({"l2cbm":"0xff"})
+        assert 31 == config_store.get_new_pool_id({"l2cbm":"0xff"})
+        assert 31 == config_store.get_new_pool_id({"l2cbm":"0xff", "cbm":"0xf0"})
 
         mock_get_config.return_value = CONFIG_POOLS
         assert 8 == config_store.get_new_pool_id({"mba":10})
         assert 8 == config_store.get_new_pool_id({"mba":20, "cbm":"0xf0"})
         assert 30 == config_store.get_new_pool_id({"cbm":"0xff"})
+        assert 30 == config_store.get_new_pool_id({"l2cbm":"0xff"})
+        assert 30 == config_store.get_new_pool_id({"l2cbm":"0xff", "cbm":"0xf0"})
 
 
 def test_config_reset():
@@ -437,7 +480,9 @@ def test_config_reset():
          mock.patch('config.ConfigStore.load') as mock_load,\
          mock.patch('caps.mba_supported', return_value = True) as mock_mba,\
          mock.patch('caps.cat_l3_supported', return_value = True),\
+         mock.patch('caps.cat_l2_supported', return_value = True),\
          mock.patch('common.PQOS_API.get_max_l3_cat_cbm', return_value = 0xFFF),\
+         mock.patch('common.PQOS_API.get_max_l2_cat_cbm', return_value = 0xFF),\
          mock.patch('common.PQOS_API.check_core', return_value = True),\
          mock.patch('pid_ops.is_pid_valid', return_value = True):
 
@@ -450,6 +495,7 @@ def test_config_reset():
 
         assert len(config_store.get_pool_attr('cores', None)) == 8
         assert config_store.get_pool_attr('cbm', 0) == 0xFFF
+        assert config_store.get_pool_attr('l2cbm', 0) == 0xFF
         assert config_store.get_pool_attr('mba', 0) == 100
 
         # test get_pool_attr
@@ -517,6 +563,7 @@ def test_get_global_attr_power_profiles_verify(mock_get_config, cfg, default, re
 class TestConfigValidate:
 
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=False))
     def test_pool_invalid_core(self):
         def check_core(core):
             return core != 3
@@ -642,6 +689,29 @@ class TestConfigValidate:
 
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    def test_pool_invalid_l2cbm(self):
+        data = {
+            "pools": [
+                {
+                    "apps": [],
+                    "l2cbm": 0x5,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="not contiguous"):
+            ConfigStore.validate(data)
+
+        data['pools'][0]['l2cbm'] = 0
+        with pytest.raises(ValueError, match="not contiguous"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
     def test_pool_cat_not_supported(self):
         data = {
@@ -657,6 +727,25 @@ class TestConfigValidate:
         }
 
         with pytest.raises(ValueError, match="CAT is not supported"):
+            ConfigStore.validate(data)
+
+
+    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=False))
+    def test_pool_l2cat_not_supported(self):
+        data = {
+            "pools": [
+                {
+                    "apps": [],
+                    "l2cbm": 0x4,
+                    "cores": [1, 3],
+                    "id": 1,
+                    "name": "pool 1"
+                }
+            ]
+        }
+
+        with pytest.raises(ValueError, match="L2 CAT is not supported"):
             ConfigStore.validate(data)
 
 

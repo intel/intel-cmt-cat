@@ -544,7 +544,6 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
         cap->mem_size = sizeof(*cap);
         cap->cdp = cdp_on;
         cap->cdp_on = cdp_on;
-        cap->way_size = cpu->l2.way_size;
 
         ret = resctrl_alloc_get_num_closids(&cap->num_classes);
         if (ret != PQOS_RETVAL_OK)
@@ -557,6 +556,8 @@ os_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
         ret = get_shareable_bits(info, &cap->way_contention);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
+
+        cap->way_size = cpu->l2.way_size * cpu->l2.num_ways / cap->num_ways;
 
         if (!cdp_on)
                 ret = pqos_file_contains(PROC_CPUINFO, "cdp_l2", &cap->cdp);

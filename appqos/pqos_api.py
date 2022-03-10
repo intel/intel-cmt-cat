@@ -42,6 +42,7 @@ from pqos import Pqos
 from pqos.error import PqosErrorResource
 from pqos.capability import PqosCap
 from pqos.l3ca import PqosCatL3
+from pqos.l2ca import PqosCatL2
 from pqos.mba import PqosMba
 from pqos.allocation import PqosAlloc
 from pqos.cpuinfo import PqosCpuInfo
@@ -61,6 +62,7 @@ class PqosApi:
         self.pqos = Pqos()
         self.cap = None
         self.l3ca = None
+        self.l2ca = None
         self.mba = None
         self.alloc = None
         self.cpuinfo = None
@@ -121,6 +123,7 @@ class PqosApi:
             self.pqos.init(iface.upper())
             self.cap = PqosCap()
             self.l3ca = PqosCatL3()
+            self.l2ca = PqosCatL2()
             self.mba = PqosMba()
             self.alloc = PqosAlloc()
             self.cpuinfo = PqosCpuInfo()
@@ -307,6 +310,28 @@ class PqosApi:
 
         return 0
 
+    def l2ca_set(self, l2ids, cos_id, ways_mask):
+        """
+        Configures L2 CAT for CoS
+
+        Parameters:
+            l2ids: L2 cache identifiers list on which to configure L2 CAT
+            cos_id: Class of Service
+            ways_mask: L2 CAT CBM to set
+
+        Returns:
+            0 on success
+            -1 otherwise
+        """
+        try:
+            cos = self.l2ca.COS(cos_id, ways_mask)
+            for l2id in l2ids:
+                self.l2ca.set(l2id, [cos])
+        except Exception as ex:
+            log.error(str(ex))
+            return -1
+
+        return 0
 
     def mba_set(self, sockets, cos_id, mb_max, ctrl=False):
         """
@@ -427,6 +452,20 @@ class PqosApi:
             log.error(str(ex))
             return None
 
+    def get_l2ids(self):
+        """
+        Gets list of L2 IDs
+
+        Returns:
+            L2 IDs list,
+            None otherwise
+        """
+
+        try:
+            return self.cpuinfo.get_l2ids()
+        except Exception as ex:
+            log.error(str(ex))
+            return None
 
     def get_sockets(self):
         """
@@ -514,11 +553,16 @@ class PqosApi:
             Available COS# to be used
             None otherwise
         """
-        max_cos_num = None
+        max_cos_l2cat = self.get_l2ca_num_cos()
         max_cos_cat = self.get_l3ca_num_cos()
         max_cos_mba = self.get_mba_num_cos()
+        cos_nums = []
 
-        if common.CAT_L3_CAP not in alloc_type and common.MBA_CAP not in alloc_type:
+        if common.CAT_L2_CAP not in alloc_type and common.CAT_L3_CAP not in alloc_type and\
+        common.MBA_CAP not in alloc_type:
+            return None
+
+        if common.CAT_L2_CAP in alloc_type and not max_cos_l2cat:
             return None
 
         if common.CAT_L3_CAP in alloc_type and not max_cos_cat:
@@ -527,17 +571,38 @@ class PqosApi:
         if common.MBA_CAP in alloc_type and not max_cos_mba:
             return None
 
+        if common.CAT_L2_CAP in alloc_type:
+            cos_nums.append(max_cos_l2cat)
+
         if common.CAT_L3_CAP in alloc_type:
-            max_cos_num = max_cos_cat
+            cos_nums.append(max_cos_cat)
 
         if common.MBA_CAP in alloc_type:
-            if max_cos_num is not None:
-                max_cos_num = min(max_cos_mba, max_cos_num)
-            else:
-                max_cos_num = max_cos_mba
+            cos_nums.append(max_cos_mba)
 
-        return max_cos_num - 1
+        if not cos_nums:
+            return None
 
+        return min(cos_nums) - 1
+
+    def get_max_l2_cat_cbm(self):
+        """
+        Gets Max L2 CAT CBM
+
+        Returns:
+            Max L2 CAT CBM
+            None otherwise
+        """
+
+        if not self.is_l2_cat_supported():
+            return None
+
+        try:
+            l2ca_caps = self.cap.get_type("l2ca")
+            return 2**l2ca_caps.num_ways - 1
+        except Exception as ex:
+            log.error(str(ex))
+            return None
 
     def get_max_l3_cat_cbm(self):
         """

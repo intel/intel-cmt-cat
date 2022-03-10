@@ -95,28 +95,28 @@ class PqosCatL2(object):
     def __init__(self):
         self.pqos = Pqos()
 
-    def set(self, socket, coses):
+    def set(self, l2id, coses):
         """
-        Sets class of service on a specified socket.
+        Sets class of service on a specified l2id.
 
         Parameters:
-            socket: a socket number
+            l2id: L2 cache identifier
             coses: a list of PqosCatL2.COS objects, class of service
                    configuration
         """
 
         pqos_l2_cas = [CPqosL2Ca.from_cos(cos) for cos in coses]
         pqos_l2_ca_arr = (CPqosL2Ca * len(pqos_l2_cas))(*pqos_l2_cas)
-        ret = self.pqos.lib.pqos_l2ca_set(socket, len(pqos_l2_cas),
+        ret = self.pqos.lib.pqos_l2ca_set(l2id, len(pqos_l2_cas),
                                           pqos_l2_ca_arr)
         pqos_handle_error('pqos_l2ca_set', ret)
 
-    def get(self, socket):
+    def get(self, l2id):
         """
-        Reads classes of service from a socket.
+        Reads classes of service from a L2 ID.
 
         Parameters:
-            socket: a socket number
+            l2id: L2 cache identifier
         """
 
         cap = PqosCap()
@@ -125,7 +125,7 @@ class PqosCatL2(object):
         l2cas = (CPqosL2Ca * cos_num)()
         num_ca = ctypes.c_uint(0)
         num_ca_ref = ctypes.byref(num_ca)
-        ret = self.pqos.lib.pqos_l2ca_get(socket, cos_num, num_ca_ref, l2cas)
+        ret = self.pqos.lib.pqos_l2ca_get(l2id, cos_num, num_ca_ref, l2cas)
         pqos_handle_error('pqos_l2ca_get', ret)
 
         coses = [l2ca.to_cos(self.COS) for l2ca in l2cas[:num_ca.value]]

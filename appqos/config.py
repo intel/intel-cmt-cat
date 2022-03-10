@@ -385,6 +385,15 @@ class ConfigStore:
 
         for pool in data['pools']:
 
+            if 'l2cbm' in pool:
+                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['l2cbm']))
+                if result or pool['l2cbm'] == 0:
+                    raise ValueError("Pool {}, L2 CBM {}/{} is not contiguous."\
+                    .format(pool['id'], hex(pool['l2cbm']), bin(pool['l2cbm'])))
+                if not caps.cat_l2_supported():
+                    raise ValueError("Pool {}, L2 CBM {}/{}, L2 CAT is not supported."\
+                    .format(pool['id'], hex(pool['l2cbm']), bin(pool['l2cbm'])))
+
             if 'cbm' in pool:
                 result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['cbm']))
                 if result or pool['cbm'] == 0:
@@ -486,6 +495,8 @@ class ConfigStore:
             for pool in data['pools']:
                 if 'cbm' in pool and not isinstance(pool['cbm'], int):
                     pool['cbm'] = int(pool['cbm'], 16)
+                if 'l2cbm' in pool and not isinstance(pool['l2cbm'], int):
+                    pool['l2cbm'] = int(pool['l2cbm'], 16)
 
             return data
 
@@ -670,6 +681,8 @@ class ConfigStore:
         if caps.cat_l3_supported():
             default_pool['cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
 
+        if caps.cat_l2_supported():
+            default_pool['l2cbm'] = common.PQOS_API.get_max_l2_cat_cbm()
         default_pool['name'] = "Default"
 
         # Use all unallocated cores
@@ -703,6 +716,8 @@ class ConfigStore:
         alloc_type = []
         if 'mba' in new_pool_data or 'mba_bw' in new_pool_data:
             alloc_type.append(common.MBA_CAP)
+        if 'l2cbm' in new_pool_data:
+            alloc_type.append(common.CAT_L2_CAP)
         if 'cbm' in new_pool_data:
             alloc_type.append(common.CAT_L3_CAP)
         max_cos_id = common.PQOS_API.get_max_cos_id(alloc_type)

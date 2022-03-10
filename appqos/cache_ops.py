@@ -102,6 +102,14 @@ class Pool:
             Pool.pools[self.pool]['apps'] = []
             Pool.pools[self.pool]['pids'] = []
 
+    def l2cbm_set(self, l2cbm):
+        """
+        Set l2cbm mask for the pool
+
+        Parameters:
+            l2cbm: new l2cbm mask
+        """
+        Pool.pools[self.pool]['l2cbm'] = l2cbm
 
     def cbm_set(self, cbm):
         """
@@ -122,6 +130,14 @@ class Pool:
         """
         return Pool.pools[self.pool].get('cbm')
 
+    def l2cbm_get(self):
+        """
+        Get cbm mask for the pool
+
+        Returns:
+            cbm mask, 0 on error
+        """
+        return Pool.pools[self.pool].get('l2cbm')
 
     def mba_set(self, mba):
         """
@@ -170,6 +186,10 @@ class Pool:
         config = common.CONFIG_STORE
         cores = config.get_pool_attr('cores', self.pool)
         self.cores_set(cores)
+
+        if caps.cat_l2_supported():
+            l2cbm = config.get_pool_attr('l2cbm', self.pool)
+            self.l2cbm_set(l2cbm)
 
         if caps.cat_l3_supported():
             cbm = config.get_pool_attr('cbm', self.pool)
@@ -309,6 +329,7 @@ class Pool:
 
     @staticmethod
     def apply(pool_id):
+        # pylint: disable=too-many-return-statements
         """
         Apply RDT configuration for Pool
 
@@ -325,6 +346,7 @@ class Pool:
 
         pool = Pool(pool_id)
         cbm = pool.cbm_get()
+        l2cbm = pool.l2cbm_get()
 
         mba = None
         ctrl = common.CONFIG_STORE.get_mba_ctrl_enabled()
@@ -342,6 +364,11 @@ class Pool:
             return -1
 
         # pool id to COS, 1:1 mapping
+        if l2cbm:
+            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, l2cbm) != 0:
+                log.error("Failed to apply L2 CAT configuration!")
+                return -1
+
         if cbm:
             if common.PQOS_API.l3ca_set(sockets, pool_id, cbm) != 0:
                 log.error("Failed to apply CAT configuration!")

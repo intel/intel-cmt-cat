@@ -80,12 +80,14 @@ class TestPools(object):
 
 
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_configure(self):
         def get_attr(attr, pool_id):
             config = {
                 'cores': [1, 2],
                 'cbm': 15,
+                'l2cbm': 7,
                 'mba': 88,
                 'apps': [1],
                 'pids': [11, 22]
@@ -99,6 +101,7 @@ class TestPools(object):
         with mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_attr),\
              mock.patch('common.CONFIG_STORE.get_app_attr', new=get_attr),\
              mock.patch('cache_ops.Pool.cbm_set') as mock_cbm_set,\
+             mock.patch('cache_ops.Pool.l2cbm_set') as mock_l2cbm_set,\
              mock.patch('cache_ops.Pool.mba_set') as mock_mba_set,\
              mock.patch('cache_ops.Pool.cores_set') as mock_cores_set,\
              mock.patch('cache_ops.Pool.pids_set') as mock_pids_set,\
@@ -107,6 +110,7 @@ class TestPools(object):
              Pool(1).configure()
 
              mock_cbm_set.assert_called_once_with(15)
+             mock_l2cbm_set.assert_called_once_with(7)
              mock_mba_set.assert_called_once_with(88)
              mock_cores_set.assert_called_once_with([1,2])
              mock_pids_set.assert_called_once_with([11,22])
@@ -131,6 +135,16 @@ class TestPools(object):
         Pool(3).cbm_set(0x1)
 
         assert 0x1 == Pool.pools[3]['cbm']
+
+
+    def test_l2cbm_set(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l2cbm'] = 0xf
+        Pool.pools[1] = {}
+
+        Pool(3).l2cbm_set(0x1)
+
+        assert 0x1 == Pool.pools[3]['l2cbm']
 
 
     def test_mba_get(self):
@@ -227,25 +241,32 @@ class TestPools(object):
 
 
     @mock.patch('common.PQOS_API.mba_set')
+    @mock.patch('common.PQOS_API.l2ca_set')
     @mock.patch('common.PQOS_API.l3ca_set')
     @mock.patch('common.PQOS_API.alloc_assoc_set')
     @mock.patch('common.PQOS_API.get_sockets')
+    @mock.patch('common.PQOS_API.get_l2ids')
     @mock.patch('common.CONFIG_STORE.get_mba_ctrl_enabled')
-    def test_apply(self, mock_get_mba_ctrl_enabled, mock_get_socket, mock_alloc_assoc_set, mock_l3ca_set, mock_mba_set):
+    def test_apply(self, mock_get_mba_ctrl_enabled, mock_get_l2ids, mock_get_socket, \
+        mock_alloc_assoc_set, mock_l3ca_set, mock_l2ca_set, mock_mba_set):
         Pool.pools[2] = {}
         Pool.pools[2]['cores'] = [1]
         Pool.pools[2]['cbm'] = 0xc00
+        Pool.pools[2]['l2cbm'] = 0xf
         Pool.pools[2]['mba'] = 99
 
         Pool.pools[1] = {}
         Pool.pools[1]['cores'] = [2, 3]
         Pool.pools[1]['cbm'] = 0x300
+        Pool.pools[1]['l2cbm'] = 0xff
         Pool.pools[1]['mba'] = 11
 
         mock_alloc_assoc_set.return_value = 0
         mock_mba_set.return_value = 0
         mock_l3ca_set.return_value = 0
+        mock_l2ca_set.return_value = 0
         mock_get_socket.return_value = [0, 2]
+        mock_get_l2ids.return_value = [0, 1]
         mock_get_mba_ctrl_enabled.return_value = False
 
         result = Pool.apply(2)
@@ -257,6 +278,8 @@ class TestPools(object):
         mock_mba_set.assert_any_call([0, 2], 1, 11, False)
         mock_l3ca_set.assert_any_call([0, 2], 2, 0xc00)
         mock_l3ca_set.assert_any_call([0, 2], 1, 0x300)
+        mock_l2ca_set.assert_any_call([0, 1], 1, 0xff)
+        mock_l2ca_set.assert_any_call([0, 1], 2, 0xf)
         mock_alloc_assoc_set.assert_any_call([1], 2)
         mock_alloc_assoc_set.assert_any_call([2, 3], 1)
 
@@ -289,6 +312,14 @@ class TestPools(object):
         result = Pool.apply(1)
         assert result != 0
 
+        mock_l2ca_set.return_value = -1
+        mock_mba_set.return_value = 0
+        result = Pool.apply(2)
+        assert result != 0
+        result = Pool.apply(1)
+        assert result != 0
+
+        mock_l2ca_set.return_value = 0
         mock_alloc_assoc_set.return_value = -1
         mock_l3ca_set.return_value = -1
         result = Pool.apply(2)

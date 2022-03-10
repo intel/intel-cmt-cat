@@ -58,6 +58,7 @@ def caps_init():
     log.info(SYSTEM_CAPS)
 
     features = [
+        cat_l2_supported(),
         cat_l3_supported(),
         mba_supported(),
         sstbf_enabled(),

@@ -104,6 +104,12 @@ CONFIG = {
             "cores": [4]
         },
         {
+            "id": 4,
+            "l2cbm": 0xf,
+            "cores": [8],
+            "name": "l2cat"
+        },
+        {
             "id": 15,
             "mba": 30,
             "name": "mba",

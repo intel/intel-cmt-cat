@@ -11,6 +11,10 @@
       "description": "Pool's name",
       "$ref": "definitions.json#/string_nonempty"
     },
+    "l2cbm": {
+      "description": "L2 CAT cache bit mask",
+      "$ref": "definitions.json#/string_hex"
+    },
     "cbm": {
       "description": "L3 CAT cache bit mask",
       "$ref": "definitions.json#/string_hex"
@@ -42,6 +46,7 @@
   },
   "anyOf": [
     { "required": ["name"] },
+    { "required": ["l2cbm"] },
     { "required": ["cbm"] },
     { "required": ["mba"] },
     { "required": ["mba_bw"] },

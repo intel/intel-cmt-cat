@@ -77,7 +77,6 @@ class Pool(Resource):
             pool = common.CONFIG_STORE.get_pool(data, int(pool_id))
         except:
             raise NotFound("POOL " + str(pool_id) + " not found in config")
-
         return pool, 200
 
 
@@ -175,6 +174,14 @@ class Pool(Resource):
 
             check_alloc_tech(int(pool_id), json_data)
 
+            # set new l2cbm
+            if 'l2cbm' in json_data:
+                l2cbm = json_data['l2cbm']
+                if not isinstance(l2cbm, int):
+                    l2cbm = int(l2cbm, 16)
+
+                pool['l2cbm'] = l2cbm
+
             # set new cbm
             if 'cbm' in json_data:
                 cbm = json_data['cbm']
@@ -267,6 +274,14 @@ class Pools(Resource):
         if post_data['id'] is None:
             raise InternalError("New POOL not added, maximum number of POOLS"\
                 " reached for requested allocation combination")
+
+        # convert l2cbm from string to int
+        if 'l2cbm' in post_data:
+            l2cbm = post_data['l2cbm']
+            if not isinstance(l2cbm, int):
+                l2cbm = int(l2cbm, 16)
+
+            post_data['l2cbm'] = l2cbm
 
         # convert cbm from string to int
         if 'cbm' in post_data:
