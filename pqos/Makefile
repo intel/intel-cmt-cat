@@ -147,7 +147,11 @@ checkpatch:
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE,\
 	SPDX_LICENSE_TAG,CONST_STRUCT \
 	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h \
-	 -f cap.h -f cap.c -f common.h -f common.c
+	 -f cap.h -f cap.c -f common.h -f common.c \
+	 -f monitor_csv.c -f monitor_csv.h \
+	 -f monitor_text.c -f monitor_text.h \
+	 -f monitor_utils.c -f monitor_utils.h \
+	 -f monitor_xml.c -f monitor_xml.h
 
 CLANGFORMAT?=clang-format
 .PHONY: clang-format
@@ -177,7 +181,11 @@ cppcheck:
 	--std=c99 -I$(LIBDIR) --template=gcc \
 	--suppress=missingIncludeSystem \
 	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h \
-	cap.h cap.c common.h common.c
+	cap.h cap.c common.h common.c \
+	monitor_csv.c monitor_csv.h \
+	monitor_text.c monitor_text.h \
+	monitor_utils.c monitor_utils.h \
+	monitor_xml.c monitor_xml.h
 
 # if target not clean then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

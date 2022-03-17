@@ -30,17 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
 #include "mock_common.h"
-
 #include "os_cap.h"
+#include "test.h"
 
 /* ======== mock ======== */
 
@@ -602,6 +594,7 @@ test_os_cap_mon_discover_resctrl(struct test_data *data,
         detect_mon_support(PQOS_MON_EVENT_RMEM_BW,
                            event == PQOS_MON_EVENT_RMEM_BW, 0);
         detect_mon_support(PQOS_PERF_EVENT_LLC_MISS, 0, 0);
+        detect_mon_support(PQOS_PERF_EVENT_LLC_REF, 0, 0);
         detect_mon_support(PQOS_PERF_EVENT_IPC, 0, 0);
 
         ret = os_cap_mon_discover(&cap, data->cpu);
@@ -643,6 +636,8 @@ test_os_cap_mon_discover_perf(struct test_data *data,
                            event == PQOS_MON_EVENT_RMEM_BW);
         detect_mon_support(PQOS_PERF_EVENT_LLC_MISS, 0,
                            event == PQOS_PERF_EVENT_LLC_MISS);
+        detect_mon_support(PQOS_PERF_EVENT_LLC_REF, 0,
+                           event == PQOS_PERF_EVENT_LLC_REF);
         detect_mon_support(PQOS_PERF_EVENT_IPC, 0,
                            event == PQOS_PERF_EVENT_IPC);
 

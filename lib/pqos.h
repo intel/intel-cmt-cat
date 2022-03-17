@@ -278,6 +278,7 @@ enum pqos_mon_event {
         RESERVED2 = 0x2000,
         PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC misses */
         PQOS_PERF_EVENT_IPC = 0x8000,      /**< instructions per clock */
+        PQOS_PERF_EVENT_LLC_REF = 0x10000, /**< LLC references */
 };
 
 /**
@@ -428,6 +429,10 @@ struct pqos_event_values {
         double ipc;                  /**< retired instructions / cycles */
         uint64_t llc_misses;         /**< LLC misses - reading */
         uint64_t llc_misses_delta;   /**< LLC misses - delta */
+#if PQOS_VERSION >= 50000
+        uint64_t llc_references;       /**< LLC references - reading */
+        uint64_t llc_references_delta; /**< LLC references - delta */
+#endif
 };
 
 struct pqos_mon_data_internal;
@@ -1250,15 +1255,23 @@ int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
  */
 enum pqos_vendor pqos_get_vendor(const struct pqos_cpuinfo *cpu);
 
+#if PQOS_VERSION < 50000
 /**
  * @brief Retrieves a monitoring value from a group for a specific event.
  * @param [out] value monitoring value
  * @param [in] event_id event being monitored
  * @param [in] group monitoring group
  *
+ * @deprecated Will be removed in 5.0.0 release
+ * @see pqos_mon_get_value
+ * @see pqos_mon_get_ipc
+ *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
+#ifndef SWIG
+__attribute__((deprecated))
+#endif
 static inline int
 pqos_mon_get_event_value(void *const value,
                          const enum pqos_mon_event event_id,
@@ -1295,6 +1308,38 @@ pqos_mon_get_event_value(void *const value,
 
         return PQOS_RETVAL_OK;
 }
+#endif
+
+/*
+ * @brief Retrieves a monitoring value from a group for a specific event.
+ *
+ * @note Update event values using \a pqos_mon_poll
+ *
+ * @param [in] group monitoring group
+ * @param [in] event_id event being monitored
+ * @param [out] value monitoring counter value
+ * @param [out] delta monitoring counter delta
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_get_value(const struct pqos_mon_data *const group,
+                       const enum pqos_mon_event event_id,
+                       uint64_t *value,
+                       uint64_t *delta);
+
+/*
+ * @brief Retrieves a IPC value from a monitoring group.
+ *
+ * @note Update event values using \a pqos_mon_poll
+ *
+ * @param [in] group monitoring group
+ * @param [out] value IPC value
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value);
 
 #ifdef __cplusplus
 }

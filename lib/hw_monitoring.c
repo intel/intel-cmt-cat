@@ -86,7 +86,8 @@ static struct pqos_rmid_config rmid_cfg = {PQOS_RMID_TYPE_DEFAULT,
 
 /** List of non-virtual perf events */
 static const enum pqos_mon_event perf_event[] = {
-    PQOS_PERF_EVENT_LLC_MISS, (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
+    PQOS_PERF_EVENT_LLC_MISS, PQOS_PERF_EVENT_LLC_REF,
+    (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
     (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
 
 /**
@@ -609,14 +610,18 @@ ia32_perf_counter_start(const struct pqos_mon_data *group,
 
         ASSERT(cores != NULL && num_cores > 0);
 
-        if (!(event & (PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_IPC)))
+        if (!(event & (PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_LLC_REF |
+                       PQOS_PERF_EVENT_IPC)))
                 return PQOS_RETVAL_OK;
 
         if (event & PQOS_PERF_EVENT_IPC)
-                global_ctrl_mask |= (0x3ULL << 32); /**< fixed counters 0&1 */
+                global_ctrl_mask |= (0x3ULL << 32); /* fixed counters 0&1 */
 
         if (event & PQOS_PERF_EVENT_LLC_MISS)
-                global_ctrl_mask |= 0x1ULL; /**< programmable counter 0 */
+                global_ctrl_mask |= 0x1ULL; /* programmable counter 0 */
+
+        if (event & PQOS_PERF_EVENT_LLC_REF)
+                global_ctrl_mask |= (0x1ULL << 1); /* programmable counter 1 */
 
         /**
          * Fixed counters are used for IPC calculations.
@@ -679,6 +684,21 @@ ia32_perf_counter_start(const struct pqos_mon_data *group,
                                 break;
                 }
 
+                if (event & PQOS_PERF_EVENT_LLC_REF) {
+                        const uint64_t evtsel0_ref =
+                            IA32_EVENT_LLC_REF_MASK |
+                            (IA32_EVENT_LLC_REF_UMASK << 8) | (1ULL << 16) |
+                            (1ULL << 17) | (1ULL << 22);
+
+                        ret = msr_write(cores[i], IA32_MSR_PMC1, 0);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                        ret = msr_write(cores[i], IA32_MSR_PERFEVTSEL1,
+                                        evtsel0_ref);
+                        if (ret != MACHINE_RETVAL_OK)
+                                break;
+                }
+
                 ret = msr_write(cores[i], IA32_MSR_PERF_GLOBAL_CTRL,
                                 global_ctrl_mask);
                 if (ret != MACHINE_RETVAL_OK)
@@ -711,7 +731,8 @@ ia32_perf_counter_stop(const unsigned num_cores,
 
         ASSERT(cores != NULL && num_cores > 0);
 
-        if (!(event & (PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_IPC)))
+        if (!(event & (PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_LLC_REF |
+                       PQOS_PERF_EVENT_IPC)))
                 return retval;
 
         for (i = 0; i < num_cores; i++) {
@@ -1207,7 +1228,7 @@ hw_mon_read_counter(struct pqos_mon_data *group,
 static int
 hw_mon_read_perf(struct pqos_mon_data *group, const enum pqos_mon_event event)
 {
-        struct pqos_event_values *pv = &group->values;
+        struct pqos_event_values *values = &group->values;
         uint64_t val = 0;
         unsigned n;
         uint64_t reg;
@@ -1217,18 +1238,28 @@ hw_mon_read_perf(struct pqos_mon_data *group, const enum pqos_mon_event event)
         switch (event) {
         case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
                 reg = IA32_MSR_INST_RETIRED_ANY;
-                value = &pv->ipc_retired;
-                delta = &pv->ipc_retired_delta;
+                value = &values->ipc_retired;
+                delta = &values->ipc_retired_delta;
                 break;
         case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 reg = IA32_MSR_CPU_UNHALTED_THREAD;
-                value = &pv->ipc_unhalted;
-                delta = &pv->ipc_unhalted_delta;
+                value = &values->ipc_unhalted;
+                delta = &values->ipc_unhalted_delta;
                 break;
         case PQOS_PERF_EVENT_LLC_MISS:
                 reg = IA32_MSR_PMC0;
-                value = &pv->llc_misses;
-                delta = &pv->llc_misses_delta;
+                value = &values->llc_misses;
+                delta = &values->llc_misses_delta;
+                break;
+        case PQOS_PERF_EVENT_LLC_REF:
+                reg = IA32_MSR_PMC1;
+#if PQOS_VERSION < 50000
+                value = &group->intl->values.llc_references;
+                delta = &group->intl->values.llc_references_delta;
+#else
+                value = &values->llc_references;
+                delta = &values->llc_references_delta;
+#endif
                 break;
         default:
                 return PQOS_RETVAL_PARAM;
@@ -1269,6 +1300,7 @@ hw_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
         case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
         case PQOS_PERF_EVENT_LLC_MISS:
+        case PQOS_PERF_EVENT_LLC_REF:
                 ret = hw_mon_read_perf(group, event);
                 if (ret != PQOS_RETVAL_OK)
                         goto pqos_core_poll__exit;

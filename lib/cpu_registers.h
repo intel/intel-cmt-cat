@@ -127,10 +127,14 @@ extern "C" {
 #define IA32_MSR_FIXED_CTR_CTRL      0x38D
 #define IA32_MSR_PERF_GLOBAL_CTRL    0x38F
 #define IA32_MSR_PMC0                0x0C1
+#define IA32_MSR_PMC1                0x0C2
 #define IA32_MSR_PERFEVTSEL0         0x186
+#define IA32_MSR_PERFEVTSEL1         0x187
 
 #define IA32_EVENT_LLC_MISS_MASK  0x2EULL
 #define IA32_EVENT_LLC_MISS_UMASK 0x41ULL
+#define IA32_EVENT_LLC_REF_MASK   0x2EULL
+#define IA32_EVENT_LLC_REF_UMASK  0x4FULL
 
 #ifdef __cplusplus
 }

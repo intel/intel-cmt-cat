@@ -30,17 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
-
 #include "hw_cap.h"
 #include "machine.h"
+#include "test.h"
 
 #define MAX_CPUID_LEAFS 20
 
@@ -343,11 +335,39 @@ test_hw_cap_mon_discover_llc_miss(void **state)
         ret = hw_cap_mon_discover(&cap_mon, data->cpu);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
-        assert_int_equal(cap_mon->num_events, 2);
+        assert_int_equal(cap_mon->num_events, 3);
         assert_int_equal(cap_mon->events[1].type, PQOS_PERF_EVENT_LLC_MISS);
         assert_int_equal(cap_mon->events[1].max_rmid, 0);
         assert_int_equal(cap_mon->events[1].scale_factor, 0);
         assert_int_equal(cap_mon->events[1].counter_length, 0);
+
+        free(cap_mon);
+}
+
+static void
+test_hw_cap_mon_discover_llc_ref(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mon *cap_mon = NULL;
+        int ret;
+        uint32_t max_rmid = 10;
+        uint32_t scale_factor = 128;
+        uint32_t counter_length = 24;
+
+        _lcpuid_add(0x7, 0x0, 0x0, 0x1000, 0x0, 0x0);
+        _lcpuid_add(0xf, 0x0, 0x0, max_rmid - 1, 0x0, 0x2);
+        _lcpuid_add(0xf, 0x1, counter_length - 24, scale_factor, max_rmid - 1,
+                    0x4);
+        _lcpuid_add(0xa, 0x0, 0x7300803, 0x0, 0x0, 0x0);
+
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_non_null(cap_mon);
+        assert_int_equal(cap_mon->num_events, 3);
+        assert_int_equal(cap_mon->events[2].type, PQOS_PERF_EVENT_LLC_REF);
+        assert_int_equal(cap_mon->events[2].max_rmid, 0);
+        assert_int_equal(cap_mon->events[2].scale_factor, 0);
+        assert_int_equal(cap_mon->events[2].counter_length, 0);
 
         free(cap_mon);
 }
@@ -626,6 +646,7 @@ main(void)
             cmocka_unit_test_setup(test_hw_cap_mon_discover_rmem, _init),
             cmocka_unit_test_setup(test_hw_cap_mon_discover_ipc, _init),
             cmocka_unit_test_setup(test_hw_cap_mon_discover_llc_miss, _init),
+            cmocka_unit_test_setup(test_hw_cap_mon_discover_llc_ref, _init),
             cmocka_unit_test_setup(test_hw_cap_l3ca_discover_unsupported,
                                    _init),
             cmocka_unit_test_setup(test_hw_cap_l3ca_discover, _init),

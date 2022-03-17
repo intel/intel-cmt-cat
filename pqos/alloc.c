@@ -37,6 +37,7 @@
 
 #include "alloc.h"
 
+#include "common.h"
 #include "main.h"
 #include "pqos.h"
 

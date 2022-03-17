@@ -103,7 +103,7 @@ add_monitoring_event(struct pqos_cap_mon *mon,
         }
 
         LOG_DEBUG("Adding monitoring event: resource ID %u, "
-                  "type %d to table index %u\n",
+                  "type %x to table index %u\n",
                   res_id, event_type, mon->num_events);
 
         mon->events[mon->num_events].type = (enum pqos_mon_event)event_type;
@@ -196,10 +196,10 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                 num_events++;
 
         /**
-         * This means we can program LLC misses too
+         * This means we can program LLC misses and references too
          */
         if (((cpuid_0xa.eax >> 8) & 0xff) > 1)
-                num_events++;
+                num_events += 2;
 
         /**
          * Allocate memory for detected events and
@@ -243,9 +243,12 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC, 0, 0, 0,
                                      num_events);
 
-        if (((cpuid_0xa.eax >> 8) & 0xff) > 1)
+        if (((cpuid_0xa.eax >> 8) & 0xff) > 1) {
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS, 0, 0, 0,
                                      num_events);
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_REF, 0, 0, 0,
+                                     num_events);
+        }
 
         (*r_mon) = mon;
         return PQOS_RETVAL_OK;

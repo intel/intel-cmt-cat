@@ -37,6 +37,7 @@
 
 #include "cap.h"
 
+#include "common.h"
 #include "main.h"
 #include "pqos.h"
 
@@ -109,6 +110,8 @@ get_mon_event_name(int event)
                 return "Remote Memory Bandwidth (RMEM) (calculated)";
         case PQOS_PERF_EVENT_LLC_MISS:
                 return "LLC misses";
+        case PQOS_PERF_EVENT_LLC_REF:
+                return "LLC references";
         case PQOS_PERF_EVENT_IPC:
                 return "Instructions/Clock (IPC)";
         default:
@@ -155,6 +158,7 @@ cap_print_features_mon(const unsigned indent,
                         break;
 
                 case PQOS_PERF_EVENT_LLC_MISS:
+                case PQOS_PERF_EVENT_LLC_REF:
                 case PQOS_PERF_EVENT_IPC:
                         buffer = buffer_other;
                         break;

@@ -30,20 +30,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
+#include "cpu_registers.h"
+#include "hw_monitoring.h"
 #include "mock_cap.h"
 #include "mock_perf_monitoring.h"
-
 #include "perf_monitoring.h"
-#include "hw_monitoring.h"
-#include "cpu_registers.h"
+#include "test.h"
 
 /* ======== init ======== */
 
@@ -121,7 +113,7 @@ hw_mon_start_perf(struct pqos_mon_data *group, enum pqos_mon_event event)
 
         group->intl->perf.event =
             event & (PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_INSTRUCTIONS |
-                     PQOS_PERF_EVENT_LLC_MISS);
+                     PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_LLC_REF);
 
         return mock_type(int);
 }

@@ -30,9 +30,19 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "pqos.h"
-#include "cpuinfo.h"
 #include "cpu_registers.h"
+#include "cpuinfo.h"
+#include "pqos.h"
+
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* clang-format off */
+#include <cmocka.h>
+/* clang-format on */
 
 struct test_data {
         struct pqos_cpuinfo *cpu;
@@ -144,7 +154,7 @@ test_cap_init(struct test_data *data, unsigned technology)
         }
 
         if (technology & (1 << PQOS_CAP_TYPE_MON)) {
-                unsigned num_events = 6;
+                unsigned num_events = 7;
                 unsigned i;
                 struct pqos_cap_mon *mon =
                     malloc(num_events * sizeof(struct pqos_monitor) +
@@ -156,6 +166,7 @@ test_cap_init(struct test_data *data, unsigned technology)
                 mon->events[3].type = PQOS_MON_EVENT_RMEM_BW;
                 mon->events[4].type = PQOS_PERF_EVENT_IPC;
                 mon->events[5].type = PQOS_PERF_EVENT_LLC_MISS;
+                mon->events[6].type = PQOS_PERF_EVENT_LLC_REF;
 
                 for (i = 0; i < num_events; ++i) {
                         mon->events[i].max_rmid = 32;

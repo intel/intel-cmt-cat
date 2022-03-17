@@ -30,16 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
-
 #include "resctrl_schemata.h"
+#include "test.h"
 
 static const unsigned _buffer_size = 1024;
 static char _buffer[1024];

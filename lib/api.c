@@ -654,13 +654,17 @@ pqos_mon_start(const unsigned num_cores,
          */
         if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                        PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)))
+                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                       PQOS_PERF_EVENT_LLC_REF)))
                 return PQOS_RETVAL_PARAM;
 
         if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) != 0)
+            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+                LOG_ERROR("Only PMU events selected for monitoring\n");
                 return PQOS_RETVAL_PARAM;
+        }
 
         _pqos_api_lock();
 
@@ -803,13 +807,17 @@ pqos_mon_start_pids(const unsigned num_pids,
          */
         if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                        PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)))
+                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                       PQOS_PERF_EVENT_LLC_REF)))
                 return PQOS_RETVAL_PARAM;
 
         if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS)) != 0)
+            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+                LOG_ERROR("Only PMU events selected for monitoring\n");
                 return PQOS_RETVAL_PARAM;
+        }
 
         _pqos_api_lock();
 
@@ -871,4 +879,116 @@ pqos_mon_remove_pids(const unsigned num_pids,
                 return PQOS_RETVAL_PARAM;
 
         return API_CALL(mon_remove_pids, num_pids, pids, group);
+}
+
+int
+pqos_mon_get_value(const struct pqos_mon_data *const group,
+                   const enum pqos_mon_event event_id,
+                   uint64_t *value,
+                   uint64_t *delta)
+{
+        int ret;
+        uint64_t _value;
+        uint64_t _delta;
+
+        if (event_id == PQOS_PERF_EVENT_IPC) {
+                LOG_ERROR("PQOS_PERF_EVENT_IPC is unsupported, please use "
+                          "pqos_mon_get_ipc function");
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (group == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid != GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
+        if ((group->event & event_id) == 0)
+                return PQOS_RETVAL_PARAM;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        switch (event_id) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                if (delta != NULL)
+                        LOG_WARN("Counter delta is undefined for "
+                                 "PQOS_MON_EVENT_L3_OCCUP\n");
+                _value = group->values.llc;
+                _delta = 0;
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
+                _value = group->values.mbm_local;
+                _delta = group->values.mbm_local_delta;
+                break;
+        case PQOS_MON_EVENT_TMEM_BW:
+                _value = group->values.mbm_total;
+                _delta = group->values.mbm_total_delta;
+                break;
+        case PQOS_MON_EVENT_RMEM_BW:
+                _value = group->values.mbm_remote;
+                _delta = group->values.mbm_remote_delta;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS:
+                _value = group->values.llc_misses;
+                _delta = group->values.llc_misses_delta;
+                break;
+        case PQOS_PERF_EVENT_LLC_REF:
+#if PQOS_VERSION >= 50000
+                _value = group->values.llc_references;
+                _delta = group->values.llc_references_delta;
+#else
+                _value = group->intl->values.llc_references;
+                _delta = group->intl->values.llc_references_delta;
+#endif
+                break;
+        default:
+                LOG_ERROR("Unknown event %x\n", event_id);
+                ret = PQOS_RETVAL_PARAM;
+        }
+
+        if (ret == PQOS_RETVAL_OK) {
+                if (value != NULL)
+                        *value = _value;
+                if (delta != NULL)
+                        *delta = _delta;
+        }
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
+int
+pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value)
+{
+        int ret;
+
+        if (group == NULL || value == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid != GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
+        if ((group->event & PQOS_PERF_EVENT_IPC) == 0)
+                return PQOS_RETVAL_PARAM;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        *value = group->values.ipc;
+
+        _pqos_api_unlock();
+
+        return ret;
 }

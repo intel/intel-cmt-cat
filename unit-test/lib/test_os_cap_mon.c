@@ -30,17 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
 #include "mock_common.h"
-
 #include "os_cap.h"
+#include "test.h"
 
 /* ======== os_cap_mon_resctrl_support ======== */
 
@@ -238,6 +230,20 @@ test_os_cap_mon_perf_support_llc_miss(void **state __attribute__((unused)))
 }
 
 static void
+test_os_cap_mon_perf_support_llc_ref(void **state __attribute__((unused)))
+{
+        int ret;
+        int supported;
+        uint32_t scale;
+
+        ret = os_cap_mon_perf_support(PQOS_PERF_EVENT_LLC_REF, &supported,
+                                      &scale);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(supported, 1);
+        assert_int_equal(scale, 1);
+}
+
+static void
 test_os_cap_mon_perf_support_ipc(void **state __attribute__((unused)))
 {
         int ret;
@@ -317,6 +323,7 @@ main(void)
             cmocka_unit_test(test_os_cap_mon_resctrl_support_tmem),
             cmocka_unit_test(test_os_cap_mon_resctrl_support_tmem_unsupported),
             cmocka_unit_test(test_os_cap_mon_perf_support_llc_miss),
+            cmocka_unit_test(test_os_cap_mon_perf_support_llc_ref),
             cmocka_unit_test(test_os_cap_mon_perf_support_ipc),
             cmocka_unit_test(test_os_cap_mon_perf_support_llc_unsupported),
             cmocka_unit_test(test_os_cap_mon_perf_support_lmem_unsupported),

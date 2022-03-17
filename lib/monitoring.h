@@ -63,12 +63,23 @@ struct pqos_mon_perf_ctx {
         int fd_inst;
         int fd_cyc;
         int fd_llc_misses;
+        int fd_llc_references;
 };
 
 /**
  * Internal monitoring group data structure
  */
 struct pqos_mon_data_internal {
+#if PQOS_VERSION < 50000
+        /**
+         * The structure to store monitoring data
+         */
+        struct {
+                uint64_t llc_references;       /**< LLC references - reading */
+                uint64_t llc_references_delta; /**< LLC references - delta */
+        } values;
+#endif
+
         /**
          * Perf specific section
          */

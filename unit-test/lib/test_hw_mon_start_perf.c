@@ -30,15 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
 #include "hw_monitoring.h"
 #include "perf_monitoring.h"
+#include "test.h"
 
 static void
 test_hw_mon_start_perf(void **state __attribute__((unused)))

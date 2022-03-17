@@ -30,15 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "hw_monitoring.h"
 #include "cpu_registers.h"
+#include "hw_monitoring.h"
+#include "test.h"
 
 /* ======== hw_mon_assoc_read ======== */
 

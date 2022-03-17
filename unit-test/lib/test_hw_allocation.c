@@ -30,21 +30,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
-#include "mock_cap.h"
-#include "mock_machine.h"
-#include "mock_hw_allocation.h"
-
-#include "cpu_registers.h"
 #include "allocation.h"
+#include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "mock_cap.h"
+#include "mock_hw_allocation.h"
+#include "mock_machine.h"
+#include "test.h"
 
 /* ======== mock ======== */
 

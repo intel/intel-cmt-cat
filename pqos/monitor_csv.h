@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2019-2022 Intel Corporation. All rights reserved.
+ * Copyright(c) 2022 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,63 +31,51 @@
  *
  */
 
-/**
- * @brief Internal header file for common functions
- */
+#ifndef __MONITOR_CSV_H__
+#define __MONITOR_CSV_H__
 
-#ifndef __PQOS_COMMON_H__
-#define __PQOS_COMMON_H__
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#ifdef DEBUG
-#include <assert.h>
-#endif
-
-#include <stdio.h>
-#include <sys/stat.h>
-
-#ifdef DEBUG
-#define ASSERT assert
-#else
-#define ASSERT(x)
-#endif
-
-#define UNUSED_ARG(_x) ((void)(_x))
+#include "pqos.h"
 
 /**
- * @brief Wrapper around fopen() that additionally checks if a given path
- * contains any symbolic links and fails if it does.
+ * @brief Start CSV output
  *
- * @param [in] name a path to a file
- * @param [in] mode a file access mode
- *
- * @return Pointer to a file
- * @retval A valid pointer to a file or NULL on error (e.g. when the path
- * contains any symbolic links).
+ * @param fp file descriptor
  */
 /* clang-format off */
-FILE *safe_fopen(const char *name, const char *mode);
+void monitor_csv_begin(FILE * fp);
 /* clang-format on */
 
 /**
- * @brief Wrapper around open() that additionally checks if a given path
- * contains any symbolic links and fails if it does.
+ * @brief Print CSV header
  *
- * @param [in] pathname a path to a file
- * @param [in] flags file access flags
- * @param [in] mode file mode bits
- *
- * @return A file descriptor
- * @retval A valid file descriptor or -1 on error (e.g. when the path
- * contains any symbolic links).
+ * @param fp file descriptor
+ * @param [in] timestamp data timestamp
  */
-int safe_open(const char *pathname, int flags, mode_t mode);
+void monitor_csv_header(FILE *fp, const char *timestamp);
 
-#ifdef __cplusplus
-}
-#endif
+/**
+ * @brief Print monitoring data in CSV format
+ *
+ * @param fp file descriptor
+ * @param [in] timestamp data timestamp
+ * @param [in] data monitoring data
+ */
+void monitor_csv_row(FILE *fp,
+                     const char *timestamp,
+                     const struct pqos_mon_data *data);
 
-#endif /* __PQOS_COMMON_H__ */
+/**
+ * @brief Print CSV footer
+ *
+ * @param fp file descriptor
+ */
+void monitor_csv_footer(FILE *fp);
+
+/**
+ * @brief Finalize xml output
+ *
+ * @param fp file descriptor
+ */
+void monitor_csv_end(FILE *fp);
+
+#endif /* #define __MONITOR_CSV_H__ */

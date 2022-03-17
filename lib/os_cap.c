@@ -313,6 +313,7 @@ os_cap_mon_perf_support(const enum pqos_mon_event event,
          * Assume support of perf events
          */
         case PQOS_PERF_EVENT_LLC_MISS:
+        case PQOS_PERF_EVENT_LLC_REF:
         case PQOS_PERF_EVENT_IPC:
                 *supported = 1;
                 return PQOS_RETVAL_OK;
@@ -411,6 +412,7 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
                 PQOS_MON_EVENT_TMEM_BW,
                 PQOS_MON_EVENT_RMEM_BW,
                 PQOS_PERF_EVENT_LLC_MISS,
+                PQOS_PERF_EVENT_LLC_REF,
                 PQOS_PERF_EVENT_IPC
             /* clang-format on */
         };

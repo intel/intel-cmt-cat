@@ -145,6 +145,7 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
             PQOS_MON_EVENT_LMEM_BW,
             PQOS_MON_EVENT_TMEM_BW,
             PQOS_PERF_EVENT_LLC_MISS,
+            PQOS_PERF_EVENT_LLC_REF,
             (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
             (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
 

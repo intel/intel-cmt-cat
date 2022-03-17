@@ -37,10 +37,6 @@
 #ifndef __MAIN_H__
 #define __MAIN_H__
 
-#ifdef DEBUG
-#include <assert.h>
-#endif
-
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -64,14 +60,6 @@ extern "C" {
                 _a > _b ? _a : _b;                                             \
         })
 #endif /* !MAX */
-
-#ifdef DEBUG
-#define ASSERT assert
-#else
-#define ASSERT(x)
-#endif
-
-#define UNUSED_ARG(_x) ((void)(_x))
 
 #define PQOS_MAX_SOCKETS      8
 #define PQOS_MAX_SOCKET_CORES 128

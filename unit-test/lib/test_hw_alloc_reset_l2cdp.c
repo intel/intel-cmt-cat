@@ -30,19 +30,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
+#include "allocation.h"
+#include "cpu_registers.h"
 #include "mock_cap.h"
 #include "mock_machine.h"
-
-#include "cpu_registers.h"
-#include "allocation.h"
+#include "test.h"
 
 /* ======== hw_alloc_reset_l2cdp ======== */
 

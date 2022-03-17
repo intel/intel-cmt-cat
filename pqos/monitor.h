@@ -122,8 +122,16 @@ void selfn_monitor_disable_ipc(const char *arg);
 void selfn_monitor_disable_llc_miss(const char *arg);
 
 /**
- * @brief Stops monitoring on selected core(s)/pid(s)
+ * @brief Check to determine if processes or cores are monitored
  *
+ * @return Process monitoring mode status
+ * @retval 0 monitoring cores
+ * @retval 1 monitoring processes
+ */
+int monitor_process_mode(void);
+
+/**
+ * @brief Stops monitoring on selected core(s)/pid(s)
  */
 void monitor_stop(void);
 
@@ -150,6 +158,28 @@ void monitor_cleanup(void);
  * @brief Monitors resources and writes data into selected stream.
  */
 void monitor_loop(void);
+
+/**
+ * @brief Retrieve monitoring interval
+ *
+ * @return monitoring interval
+ */
+int monitor_get_interval(void);
+
+/**
+ * @brief List of events being monitored
+ *
+ * @return monitoring events
+ */
+enum pqos_mon_event monitor_get_events(void);
+
+/** Monitor LLC format */
+enum monitor_llc_format {
+        LLC_FORMAT_KILOBYTES = 0, /**< LLC in kB */
+        LLC_FORMAT_PERCENT        /**< LLC in percent */
+};
+
+enum monitor_llc_format monitor_get_llc_format(void);
 
 #ifdef __cplusplus
 }

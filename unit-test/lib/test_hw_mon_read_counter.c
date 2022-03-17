@@ -30,18 +30,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "test.h"
+#include "hw_monitoring.h"
 #include "mock_cap.h"
 #include "mock_perf_monitoring.h"
-
-#include "hw_monitoring.h"
+#include "test.h"
 
 static int
 test_init_mon(void **state)

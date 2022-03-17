@@ -30,20 +30,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
+#include "api.h"
 #include "mock_cap.h"
 #include "mock_cpuinfo.h"
-#include "mock_os_allocation.h"
 #include "mock_hw_allocation.h"
-#include "mock_os_monitoring.h"
 #include "mock_hw_monitoring.h"
+#include "mock_os_allocation.h"
+#include "mock_os_monitoring.h"
 #include "pqos.h"
-#include "api.h"
 #include "test.h"
 
 #ifndef DIM
@@ -340,7 +334,7 @@ test_pqos_alloc_assign_param_technology(void **state __attribute__((unused)))
 {
         int ret;
         unsigned id;
-        unsigned core[1] = { 0 };
+        unsigned core[1] = {0};
 
         ret = pqos_alloc_assign(0, core, 1, &id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -361,7 +355,7 @@ test_pqos_alloc_assign_param_core_num(void **state __attribute__((unused)))
 {
         int ret;
         unsigned id;
-        unsigned core[1] = { 0 };
+        unsigned core[1] = {0};
 
         ret = pqos_alloc_assign(1 << PQOS_CAP_TYPE_L3CA, core, 0, &id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -371,7 +365,7 @@ static void
 test_pqos_alloc_assign_param_id_null(void **state __attribute__((unused)))
 {
         int ret;
-        unsigned core[1] = { 0 };
+        unsigned core[1] = {0};
 
         ret = pqos_alloc_assign(1 << PQOS_CAP_TYPE_L3CA, core, 1, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -442,7 +436,7 @@ static void
 test_pqos_alloc_release_param(void **state __attribute__((unused)))
 {
         int ret;
-        unsigned core_array[1] = { 0 };
+        unsigned core_array[1] = {0};
         unsigned core_num = 1;
 
         ret = pqos_alloc_release(core_array, 0);
@@ -550,7 +544,7 @@ test_pqos_alloc_assign_pid_param(void **state __attribute__((unused)))
         int ret;
         unsigned technology = 1 << PQOS_CAP_TYPE_L3CA;
         unsigned class_id;
-        pid_t task_array[1] = { 1 };
+        pid_t task_array[1] = {1};
         unsigned task_num = 1;
 
         ret = pqos_alloc_assign_pid(technology, NULL, task_num, &class_id);
@@ -569,7 +563,7 @@ static void
 test_pqos_alloc_release_pid_init(void **state __attribute__((unused)))
 {
         int ret;
-        pid_t task_array[1] = { 1 };
+        pid_t task_array[1] = {1};
         unsigned task_num = 1;
 
         wrap_check_init(1, PQOS_RETVAL_INIT);
@@ -582,7 +576,7 @@ static void
 test_pqos_alloc_release_pid_param(void **state __attribute__((unused)))
 {
         int ret;
-        pid_t task_array[1] = { 1 };
+        pid_t task_array[1] = {1};
         unsigned task_num = 1;
 
         ret = pqos_alloc_release_pid(task_array, 0);
@@ -1770,6 +1764,10 @@ test_pqos_mon_start_param(void **state __attribute__((unused)))
         ret = pqos_mon_start(num_cores, cores, PQOS_PERF_EVENT_LLC_MISS,
                              context, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start(num_cores, cores, PQOS_PERF_EVENT_LLC_REF, context,
+                             &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
 /* ======== pqos_mon_stop ======== */
@@ -2232,6 +2230,202 @@ test_pqos_mon_remove_pids_param(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+/* ======== pqos_mon_get_value ======== */
+
+static void
+test_pqos_mon_get_value_init(void **state __attribute__((unused)))
+{
+        int ret;
+        uint64_t value;
+        uint64_t delta;
+        struct pqos_mon_data group;
+
+        memset(&group, 0, sizeof(group));
+        group.valid = 0x00DEAD00;
+        group.event = PQOS_MON_EVENT_LMEM_BW;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_mon_get_value_param(void **state __attribute__((unused)))
+{
+        int ret;
+        uint64_t value;
+        uint64_t delta;
+        struct pqos_mon_data group;
+
+        ret = pqos_mon_get_value(NULL, PQOS_MON_EVENT_LMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        memset(&group, 0, sizeof(group));
+
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        group.valid = 0x00DEAD00;
+
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_IPC, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_pqos_mon_get_value(void **state __attribute__((unused)))
+{
+        int ret;
+        uint64_t value;
+        uint64_t delta;
+        struct pqos_mon_data group;
+
+        memset(&group, 0, sizeof(group));
+        group.valid = 0x00DEAD00;
+        group.values.llc = 1;
+        group.values.mbm_local = 2;
+        group.values.mbm_local_delta = 3;
+        group.values.mbm_total = 4;
+        group.values.mbm_total_delta = 5;
+        group.values.mbm_remote = 6;
+        group.values.mbm_remote_delta = 7;
+        group.values.llc_misses = 8;
+        group.values.llc_misses_delta = 9;
+#if PQOS_VERSION >= 50000
+        group.values.llc_references = 10;
+        group.values.llc_references_delta = 11;
+#endif
+
+        group.event = PQOS_MON_EVENT_L3_OCCUP;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_MON_EVENT_L3_OCCUP, &value, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.llc);
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_L3_OCCUP, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.llc);
+        assert_int_equal(delta, 0);
+
+        group.event = PQOS_MON_EVENT_LMEM_BW;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.mbm_local);
+        assert_int_equal(delta, group.values.mbm_local_delta);
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, &value, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.mbm_local);
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, NULL, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(delta, group.values.mbm_local_delta);
+
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_TMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.mbm_total);
+        assert_int_equal(delta, group.values.mbm_total_delta);
+
+        group.event = PQOS_MON_EVENT_RMEM_BW;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_RMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.mbm_remote);
+        assert_int_equal(delta, group.values.mbm_remote_delta);
+
+        group.event = PQOS_PERF_EVENT_LLC_MISS;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_MISS, &value,
+                                 &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.llc_misses);
+        assert_int_equal(delta, group.values.llc_misses_delta);
+
+#if PQOS_VERSION >= 50000
+        group.event = PQOS_PERF_EVENT_LLC_REF;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret =
+            pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_REF, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.llc_references);
+        assert_int_equal(value, group.values.llc_references_delta);
+#endif
+}
+
+/* ======== pqos_mon_get_ipc ======== */
+
+static void
+test_pqos_mon_get_ipc_init(void **state __attribute__((unused)))
+{
+        int ret;
+        double value;
+        struct pqos_mon_data group;
+
+        memset(&group, 0, sizeof(group));
+        group.valid = 0x00DEAD00;
+        group.event = PQOS_PERF_EVENT_IPC;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_mon_get_ipc(&group, &value);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_mon_get_ipc_param(void **state __attribute__((unused)))
+{
+        int ret;
+        double value;
+        struct pqos_mon_data group;
+
+        ret = pqos_mon_get_ipc(NULL, &value);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_get_ipc(&group, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        memset(&group, 0, sizeof(group));
+
+        ret = pqos_mon_get_ipc(&group, &value);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        group.valid = 0x00DEAD00;
+
+        ret = pqos_mon_get_ipc(&group, &value);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_pqos_mon_get_ipc(void **state __attribute__((unused)))
+{
+        int ret;
+        double value;
+        struct pqos_mon_data group;
+
+        memset(&group, 0, sizeof(group));
+        group.valid = 0x00DEAD00;
+        group.values.ipc = 1;
+
+        group.event = PQOS_PERF_EVENT_IPC;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_ipc(&group, &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.values.ipc);
+}
+
 int
 main(void)
 {
@@ -2263,7 +2457,9 @@ main(void)
             cmocka_unit_test(test_pqos_mon_poll_init),
             cmocka_unit_test(test_pqos_mon_start_pids_init),
             cmocka_unit_test(test_pqos_mon_add_pids_init),
-            cmocka_unit_test(test_pqos_mon_remove_pids_init)};
+            cmocka_unit_test(test_pqos_mon_remove_pids_init),
+            cmocka_unit_test(test_pqos_mon_get_value_init),
+            cmocka_unit_test(test_pqos_mon_get_ipc_init)};
 
         const struct CMUnitTest tests_param[] = {
             cmocka_unit_test(test_pqos_alloc_assoc_get_param_id_null),
@@ -2291,7 +2487,9 @@ main(void)
             cmocka_unit_test(test_pqos_mon_poll_param),
             cmocka_unit_test(test_pqos_mon_start_pids_param),
             cmocka_unit_test(test_pqos_mon_add_pids_param),
-            cmocka_unit_test(test_pqos_mon_remove_pids_param)};
+            cmocka_unit_test(test_pqos_mon_remove_pids_param),
+            cmocka_unit_test(test_pqos_mon_get_value_param),
+            cmocka_unit_test(test_pqos_mon_get_ipc_param)};
 
         const struct CMUnitTest tests_hw[] = {
             cmocka_unit_test(test_pqos_alloc_assoc_set_hw),
@@ -2322,7 +2520,9 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_pids_hw),
             cmocka_unit_test(test_pqos_mon_start_pid_hw),
             cmocka_unit_test(test_pqos_mon_add_pids_hw),
-            cmocka_unit_test(test_pqos_mon_remove_pids_hw)};
+            cmocka_unit_test(test_pqos_mon_remove_pids_hw),
+            cmocka_unit_test(test_pqos_mon_get_value),
+            cmocka_unit_test(test_pqos_mon_get_ipc)};
 
 #ifdef __linux__
         const struct CMUnitTest tests_os[] = {
@@ -2361,7 +2561,8 @@ main(void)
         result += cmocka_run_group_tests(tests_hw, setup_hw, NULL);
 #ifdef __linux__
         result += cmocka_run_group_tests(tests_os, setup_os, test_fini);
-        result += cmocka_run_group_tests(tests_os, setup_os_resctrl_mon, test_fini);
+        result +=
+            cmocka_run_group_tests(tests_os, setup_os_resctrl_mon, test_fini);
 #endif
 
         return result;
