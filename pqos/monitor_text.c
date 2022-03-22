@@ -234,7 +234,7 @@ monitor_text_footer(FILE *fp)
 {
         ASSERT(fp != NULL);
 
-        if (isatty(fileno(fp)))
+        if (!isatty(fileno(fp)))
                 fputs("\n", fp);
 }
 

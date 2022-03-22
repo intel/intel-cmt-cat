@@ -60,7 +60,6 @@
 #include <time.h>      /**< localtime() */
 #include <unistd.h>
 
-#define PQOS_MAX_PID_MON_GROUPS 256
 #define PQOS_MON_EVENT_ALL                                                     \
         ((enum pqos_mon_event) ~(PQOS_MON_EVENT_TMEM_BW |                      \
                                  PQOS_PERF_EVENT_LLC_REF))
@@ -89,12 +88,6 @@ static const char *proc_pids_dir = "/proc";
  */
 static const char *proc_stat_whitelist = "RSD";
 
-/**
- * Number of cores that are selected in config string
- * for monitoring LLC occupancy
- */
-static int sel_monitor_num = 0;
-
 /** Trigger for disabling ipc monitoring */
 static int sel_disable_ipc = 0;
 /** Trigger for disabling llc_miss monitoring */
@@ -106,33 +99,43 @@ static int sel_disable_llc_miss = 0;
 static enum pqos_mon_event sel_events_max = (enum pqos_mon_event)0;
 
 /**
- * Maintains a table of core, event, number of events that are selected in
- * config string for monitoring LLC occupancy
+ * Monitoring group type
  */
-static struct core_group {
-        char *desc;
-        int num_cores;
-        unsigned *cores;
-        struct pqos_mon_data *pgrp;
-        enum pqos_mon_event events;
-} sel_monitor_core_tab[PQOS_MAX_CORES];
+enum mon_group_type {
+        MON_GROUP_TYPE_CORE = 0x1,
+        MON_GROUP_TYPE_PID = 0x2,
+};
 
 /**
- * Maintains a table of process id, event, number of events that are selected
- * in config string for monitoring
+ * Maintains a table of core, pid, event, number of events that are selected in
+ * config string for monitoring
  */
-static struct pid_group {
+static struct mon_group {
+        enum mon_group_type type;
         char *desc;
-        int num_pids;
-        pid_t *pids;
-        struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
-} sel_monitor_pid_tab[PQOS_MAX_PID_MON_GROUPS];
+        struct pqos_mon_data *data;
+        unsigned started;
+
+        union {
+                unsigned *cores;
+                pid_t *pids;
+
+                void *generic_res;
+        };
+
+        unsigned num_res;
+} *sel_monitor_group = NULL;
 
 /**
- * Maintains the number of process id's you want to track
+ * Maintains the number of monitoring groups
  */
-static int sel_process_num = 0;
+static unsigned sel_monitor_num = 0;
+
+/**
+ * Selected monitoring type
+ */
+static int sel_monitor_type = 0;
 
 /**
  * Maintains monitoring interval that is selected in config string for
@@ -199,7 +202,7 @@ static enum monitor_llc_format sel_llc_format = LLC_FORMAT_KILOBYTES;
 int
 monitor_process_mode(void)
 {
-        return (sel_process_num <= 0) ? 0 : 1;
+        return (sel_monitor_type == MON_GROUP_TYPE_PID);
 }
 
 /**
@@ -234,7 +237,7 @@ uinttostr(const unsigned val)
  * @retval -1 on error
  */
 static int
-set_cgrp(struct core_group *cg,
+set_cgrp(struct mon_group *cg,
          char *desc,
          const uint64_t *cores,
          const int num_cores)
@@ -246,13 +249,16 @@ set_cgrp(struct core_group *cg,
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
 
+        memset(cg, 0, sizeof(*cg));
+
+        cg->type = MON_GROUP_TYPE_CORE;
         cg->desc = desc;
         cg->cores = malloc(sizeof(unsigned) * num_cores);
         if (cg->cores == NULL) {
                 printf("Error allocating core group table\n");
                 return -1;
         }
-        cg->num_cores = num_cores;
+        cg->num_res = num_cores;
 
         /**
          * Transfer cores from buffer to table
@@ -276,7 +282,7 @@ set_cgrp(struct core_group *cg,
  * @retval -1 on error
  */
 static int
-set_pgrp(struct pid_group *pg,
+set_pgrp(struct mon_group *pg,
          char *desc,
          const uint64_t *pids,
          const int num_pids)
@@ -288,13 +294,16 @@ set_pgrp(struct pid_group *pg,
         ASSERT(pids != NULL);
         ASSERT(num_pids > 0);
 
+        memset(pg, 0, sizeof(*pg));
+
+        pg->type = MON_GROUP_TYPE_PID;
         pg->desc = desc;
         pg->pids = malloc(sizeof(pid_t) * num_pids);
         if (pg->pids == NULL) {
                 printf("Error allocating pid group table\n");
                 return -1;
         }
-        pg->num_pids = num_pids;
+        pg->num_res = num_pids;
 
         /**
          * Transfer pids from buffer to table
@@ -303,109 +312,6 @@ set_pgrp(struct pid_group *pg,
                 pg->pids[i] = (pid_t)pids[i];
 
         return 0;
-}
-
-/**
- * @brief Function to set the descriptions and cores/pids for each monitoring
- * group
- *
- * Takes a string containing individual cores/pids and groups of cores/pids and
- * breaks it into substrings which are used to set group values
- *
- * @param s string containing cores/pids to be divided into substrings
- * @param ctab table of core groups to set values in
- * @param ptab table of pids groups to set values in
- * @param max maximum number of groups allowed
- *
- * @return Number of core groups set up
- * @retval -1 on error
- */
-static int
-strtogrps(char *s,
-          struct core_group *ctab,
-          struct pid_group *ptab,
-          const unsigned max)
-{
-        unsigned i, group_count = 0;
-        uint64_t cbuf[PQOS_MAX_CORES];
-        char *non_grp = NULL;
-
-        ASSERT((ctab != NULL) ^ (ptab != NULL));
-        ASSERT(max > 0);
-
-        if (s == NULL)
-                return group_count;
-
-        while ((non_grp = strsep(&s, "[")) != NULL) {
-                /**
-                 * Ungrouped cores/pids
-                 */
-                if (*non_grp != '\0') {
-                        /* for separate cores/pids - each will get his own
-                         * group so strlisttotab result is treated as the
-                         * number of new groups
-                         */
-                        unsigned new_groups_count =
-                            strlisttotab(non_grp, cbuf, DIM(cbuf));
-
-                        if (group_count + new_groups_count > max)
-                                return -1;
-
-                        /* set group info */
-                        for (i = 0; i < new_groups_count; i++) {
-                                char *desc = uinttostr((unsigned)cbuf[i]);
-                                int ret;
-
-                                if (ctab != NULL)
-                                        ret = set_cgrp(&ctab[group_count], desc,
-                                                       &cbuf[i], 1);
-                                else
-                                        ret = set_pgrp(&ptab[group_count], desc,
-                                                       &cbuf[i], 1);
-                                if (ret < 0) {
-                                        free(desc);
-                                        return -1;
-                                }
-                                group_count++;
-                        }
-                }
-                /**
-                 * If group contains multiple cores/pids
-                 */
-                char *grp = strsep(&s, "]");
-
-                if (grp != NULL) {
-                        char *desc = NULL;
-                        unsigned element_count;
-                        int ret;
-
-                        if (group_count >= max)
-                                return -1;
-
-                        selfn_strdup(&desc, grp);
-
-                        /* for grouped pids/cores, all elements are in
-                         * one group so strlisttotab result is the number
-                         * of elements in that one group
-                         */
-                        element_count = strlisttotab(grp, cbuf, DIM(cbuf));
-
-                        /* set group info */
-                        if (ctab != NULL)
-                                ret = set_cgrp(&ctab[group_count], desc, cbuf,
-                                               element_count);
-                        else
-                                ret = set_pgrp(&ptab[group_count], desc, cbuf,
-                                               element_count);
-                        if (ret < 0) {
-                                free(desc);
-                                return -1;
-                        }
-                        group_count++;
-                }
-        }
-
-        return group_count;
 }
 
 /**
@@ -422,15 +328,15 @@ strtogrps(char *s,
  * @retval -1 if some but not all cores match
  */
 static int
-cmp_cgrps(const struct core_group *cg_a, const struct core_group *cg_b)
+cmp_cgrps(const struct mon_group *cg_a, const struct mon_group *cg_b)
 {
         int i, found = 0;
 
         ASSERT(cg_a != NULL);
         ASSERT(cg_b != NULL);
 
-        const int sz_a = cg_a->num_cores;
-        const int sz_b = cg_b->num_cores;
+        const int sz_a = cg_a->num_res;
+        const int sz_b = cg_b->num_res;
         const unsigned *tab_a = cg_a->cores;
         const unsigned *tab_b = cg_b->cores;
 
@@ -465,15 +371,15 @@ cmp_cgrps(const struct core_group *cg_a, const struct core_group *cg_b)
  * @retval -1 if some but not all pids match
  */
 static int
-cmp_pgrps(const struct pid_group *pg_a, const struct pid_group *pg_b)
+cmp_pgrps(const struct mon_group *pg_a, const struct mon_group *pg_b)
 {
         int i, found = 0;
 
         ASSERT(pg_a != NULL);
         ASSERT(pg_b != NULL);
 
-        const int sz_a = pg_a->num_pids;
-        const int sz_b = pg_b->num_pids;
+        const int sz_a = pg_a->num_res;
+        const int sz_b = pg_b->num_res;
         const pid_t *tab_a = pg_a->pids;
         const pid_t *tab_b = pg_b->pids;
 
@@ -495,6 +401,167 @@ cmp_pgrps(const struct pid_group *pg_a, const struct pid_group *pg_b)
 }
 
 /**
+ * @brief Function to compare resources in 2 groups
+ *
+ * @param grp_a pointer to group a
+ * @param grp_b pointer to group b
+ *
+ * @return Whether both groups contain some/none/all of the same resources
+ * @retval 1 if both groups contain the same pids
+ * @retval 0 if none of their pids match
+ * @retval -1 if some but not all pids match
+ * @retval -2 error
+ */
+static int
+cmp_grps(const struct mon_group *grp_a, const struct mon_group *grp_b)
+{
+        if (grp_a->type != grp_b->type)
+                return -2;
+
+        switch (grp_a->type) {
+        case MON_GROUP_TYPE_CORE:
+                return cmp_cgrps(grp_a, grp_b);
+                break;
+        case MON_GROUP_TYPE_PID:
+                return cmp_pgrps(grp_a, grp_b);
+                break;
+        }
+
+        return -2;
+}
+
+/**
+ * @brief Deallocates group memory
+ *
+ * @param grp monitoring group;
+ */
+static void
+grp_free(struct mon_group *grp)
+{
+        free(grp->desc);
+#ifndef __clang_analyzer__
+        free(grp->generic_res);
+#else
+        if (grp->type == MON_GROUP_TYPE_PID)
+                free(grp->pids);
+        else if (grp->type == MON_GROUP_TYPE_CORE)
+                free(grp->cores);
+#endif
+
+        if (grp->type == MON_GROUP_TYPE_CORE || grp->type == MON_GROUP_TYPE_PID)
+                free(grp->data);
+}
+
+/**
+ * @brief Adds monitoring group
+ *
+ * @param type monitoring group type
+ * @param event monitoring event
+ * @param desc string containing group description
+ * @param res pointer to table of resource values
+ * @param num_res number of resources contained in the table
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+static int
+grp_add(enum mon_group_type type,
+        enum pqos_mon_event event,
+        char *desc,
+        const uint64_t *res,
+        const int num_res)
+{
+        int ret = 0;
+        int dup = 0;
+        unsigned i;
+        struct mon_group new_grp;
+
+        switch (type) {
+        case MON_GROUP_TYPE_CORE:
+                sel_monitor_type |= MON_GROUP_TYPE_CORE;
+                ret = set_cgrp(&new_grp, desc, res, num_res);
+                break;
+        case MON_GROUP_TYPE_PID:
+                sel_monitor_type |= MON_GROUP_TYPE_PID;
+                ret = set_pgrp(&new_grp, desc, res, num_res);
+                break;
+        }
+        if (ret < 0) {
+                grp_free(&new_grp);
+                return ret;
+        }
+        new_grp.events = event;
+
+        /**
+         *  For each core group we are processing:
+         *  - if it's already in the sel_monitor_group
+         *    =>  update the entry
+         *  - else
+         *    => add it to the sel_monitor_group
+         */
+        for (i = 0; i < sel_monitor_num; i++) {
+                struct mon_group *grp = &sel_monitor_group[i];
+
+                if (grp->type != type)
+                        continue;
+
+                dup = cmp_grps(&new_grp, grp);
+                if (dup == 1) {
+                        grp->events |= event;
+                        break;
+                } else if (dup < 0)
+                        break;
+        }
+
+        if (dup == 1) {
+                grp_free(&new_grp);
+                return 0;
+        }
+
+        if (dup < 0) {
+                switch (type) {
+                case MON_GROUP_TYPE_CORE:
+                        fprintf(stderr, "Error: cannot monitor same "
+                                        "cores in different groups\n");
+                        break;
+                case MON_GROUP_TYPE_PID:
+                        fprintf(stderr, "Error: cannot monitor same "
+                                        "pids in different groups\n");
+                        break;
+                }
+                grp_free(&new_grp);
+                return -1;
+        } else {
+                struct mon_group *grps =
+                    realloc(sel_monitor_group,
+                            sizeof(*sel_monitor_group) * (sel_monitor_num + 1));
+
+                if (grps == NULL) {
+                        fprintf(stderr, "Error with memory allocation\n");
+                        grp_free(&new_grp);
+                        return -1;
+                } else
+                        sel_monitor_group = grps;
+
+                if (new_grp.type == MON_GROUP_TYPE_CORE ||
+                    new_grp.type == MON_GROUP_TYPE_PID) {
+                        new_grp.data = calloc(1, sizeof(*new_grp.data));
+                        if (new_grp.data == NULL) {
+                                fprintf(stderr,
+                                        "Error with memory allocation\n");
+                                grp_free(&new_grp);
+                                return -1;
+                        }
+                }
+
+                sel_monitor_group[sel_monitor_num++] = new_grp;
+        }
+
+        return 0;
+}
+
+/**
  * @brief Common function to parse selected events
  *
  * @param str string of the event
@@ -502,7 +569,7 @@ cmp_pgrps(const struct pid_group *pg_a, const struct pid_group *pg_b)
  */
 
 static void
-parse_event(char *str, enum pqos_mon_event *evt)
+parse_event(const char *str, enum pqos_mon_event *evt)
 {
         ASSERT(str != NULL);
         ASSERT(evt != NULL);
@@ -528,6 +595,82 @@ parse_event(char *str, enum pqos_mon_event *evt)
 }
 
 /**
+ * @brief Function to set the descriptions and cores/pids for each monitoring
+ * group
+ *
+ * @param str string passed to -m command line option
+ * @param type monitoring group type
+ *
+ * @retval -1 on error
+ */
+static int
+parse_monitor_group(char *str, enum mon_group_type type)
+{
+        enum pqos_mon_event evt = (enum pqos_mon_event)0;
+        unsigned group_count = 0;
+        unsigned i;
+        uint64_t cbuf[PQOS_MAX_CORES];
+        char *non_grp = NULL;
+
+        parse_event(str, &evt);
+
+        str = strchr(str, ':') + 1;
+        if (str == NULL)
+                return 0;
+
+        while ((non_grp = strsep(&str, "[")) != NULL) {
+                /**
+                 * Ungrouped cores/pids
+                 */
+                if (*non_grp != '\0') {
+                        /* for separate cores/pids - each will get his own
+                         * group so strlisttotab result is treated as the
+                         * number of new groups
+                         */
+                        unsigned new_groups_count =
+                            strlisttotab(non_grp, cbuf, DIM(cbuf));
+
+                        /* set group info */
+                        for (i = 0; i < new_groups_count; i++) {
+                                char *desc = uinttostr((unsigned)cbuf[i]);
+                                int ret;
+
+                                ret = grp_add(type, evt, desc, &cbuf[i], 1);
+                                if (ret < 0)
+                                        return -1;
+                                group_count++;
+                        }
+                }
+                /**
+                 * If group contains multiple cores/pids
+                 */
+                char *grp = strsep(&str, "]");
+
+                if (grp != NULL) {
+                        char *desc = NULL;
+                        unsigned element_count;
+                        int ret;
+
+                        selfn_strdup(&desc, grp);
+
+                        /* for grouped pids/cores, all elements are in
+                         * one group so strlisttotab result is the number
+                         * of elements in that one group
+                         */
+                        element_count = strlisttotab(grp, cbuf, DIM(cbuf));
+
+                        /* set group info */
+                        ret = grp_add(type, evt, desc, cbuf, element_count);
+                        if (ret < 0)
+                                return -1;
+                        group_count++;
+                }
+        }
+
+        return group_count;
+}
+
+/**
  * @brief Verifies and translates monitoring config string into
  *        internal monitoring configuration.
  *
@@ -536,71 +679,10 @@ parse_event(char *str, enum pqos_mon_event *evt)
 static void
 parse_monitor_cores(char *str)
 {
-        int i = 0, n = 0;
-        enum pqos_mon_event evt = (enum pqos_mon_event)0;
-        struct core_group *cgrp_tab = calloc(PQOS_MAX_CORES, sizeof(*cgrp_tab));
+        int ret = parse_monitor_group(str, MON_GROUP_TYPE_CORE);
 
-        if (cgrp_tab == NULL) {
-                printf("Error with memory allocation!\n");
+        if (ret < 0)
                 exit(EXIT_FAILURE);
-        }
-
-        parse_event(str, &evt);
-
-        n = strtogrps(strchr(str, ':') + 1, cgrp_tab, NULL, PQOS_MAX_CORES);
-        if (n < 0) {
-                printf("Error: Too many cores/groups selected\n");
-                goto error_exit;
-        }
-        /**
-         *  For each core group we are processing:
-         *  - if it's already in the sel_monitor_core_tab
-         *    =>  update the entry
-         *  - else
-         *    => add it to the sel_monitor_core_tab
-         */
-        for (i = 0; i < n; i++) {
-                int j, found = 0;
-
-                for (j = 0;
-                     j < sel_monitor_num && j < (int)DIM(sel_monitor_core_tab);
-                     j++) {
-                        found =
-                            cmp_cgrps(&sel_monitor_core_tab[j], &cgrp_tab[i]);
-                        if (found < 0) {
-                                printf("Error: cannot monitor same "
-                                       "cores in different groups\n");
-                                goto error_exit;
-                        }
-                        if (found) {
-                                sel_monitor_core_tab[j].events |= evt;
-                                break;
-                        }
-                }
-                if (!found &&
-                    sel_monitor_num < (int)DIM(sel_monitor_core_tab)) {
-                        struct core_group *cg =
-                            &sel_monitor_core_tab[sel_monitor_num];
-                        *cg = cgrp_tab[i];
-                        cg->events = evt;
-                        cg->pgrp = malloc(sizeof(struct pqos_mon_data));
-                        if (cg->pgrp == NULL) {
-                                printf("Error with memory allocation");
-                                goto error_exit;
-                        }
-                        ++sel_monitor_num;
-                } else {
-                        free(cgrp_tab[i].cores);
-                        free(cgrp_tab[i].desc);
-                }
-        }
-
-        free(cgrp_tab);
-        return;
-
-error_exit:
-        free(cgrp_tab);
-        exit(EXIT_FAILURE);
 }
 
 void
@@ -711,10 +793,7 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
               const struct pqos_capability *const cap_mon)
 {
         unsigned i;
-        int ret;
-
-        ASSERT(sel_monitor_num >= 0);
-        ASSERT(sel_process_num >= 0);
+        int ret = PQOS_RETVAL_OK;
 
         /**
          * Check output file type
@@ -758,105 +837,86 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
          * If no cores and events selected through command line
          * by default let's monitor all cores
          */
-        if (sel_monitor_num == 0 && sel_process_num == 0) {
+        if (sel_monitor_num == 0) {
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
-                        struct core_group *pg =
-                            &sel_monitor_core_tab[sel_monitor_num];
 
-                        if ((unsigned)sel_monitor_num >=
-                            DIM(sel_monitor_core_tab))
-                                break;
-                        ret = set_cgrp(pg, uinttostr(lcore), &core, 1);
+                        ret = grp_add(MON_GROUP_TYPE_CORE,
+                                      (enum pqos_mon_event)PQOS_MON_EVENT_ALL,
+                                      uinttostr(lcore), &core, 1);
                         if (ret != 0) {
                                 printf("Core group setup error!\n");
                                 exit(EXIT_FAILURE);
                         }
-                        pg->events = (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
-                        pg->pgrp = malloc(sizeof(*pg->pgrp));
-                        if (pg->pgrp == NULL) {
-                                printf("Error with memory allocation!\n");
-                                exit(EXIT_FAILURE);
-                        }
-                        sel_monitor_num++;
                 }
         }
-        if (sel_process_num > 0 && sel_monitor_num > 0) {
+        if (sel_monitor_type != MON_GROUP_TYPE_CORE &&
+            sel_monitor_type != MON_GROUP_TYPE_PID) {
                 printf("Monitoring start error, process and core"
                        " tracking can not be done simultaneously\n");
                 return -1;
         }
-        if (!monitor_process_mode()) {
-                /**
-                 * Make calls to pqos_mon_start - track cores
-                 */
-                for (i = 0; i < (unsigned)sel_monitor_num; i++) {
-                        struct core_group *cg = &sel_monitor_core_tab[i];
 
-                        monitor_setup_events(&cg->events, cap_mon);
+        for (i = 0; i < sel_monitor_num; i++) {
+                struct mon_group *grp = &sel_monitor_group[i];
 
-                        ret =
-                            pqos_mon_start(cg->num_cores, cg->cores, cg->events,
-                                           (void *)cg->desc, cg->pgrp);
-                        ASSERT(ret == PQOS_RETVAL_OK);
+                monitor_setup_events(&grp->events, cap_mon);
+
+                if (grp->type == MON_GROUP_TYPE_CORE) {
+                        /**
+                         * Make calls to pqos_mon_start - track cores
+                         */
+                        ret = pqos_mon_start(grp->num_res, grp->cores,
+                                             grp->events, (void *)grp->desc,
+                                             grp->data);
+
+                        if (ret == PQOS_RETVAL_PERF_CTR)
+                                printf("Use -r option to start monitoring "
+                                       "anyway.\n");
                         /**
                          * The error raised also if two instances of PQoS
                          * attempt to use the same core id.
                          */
                         if (ret != PQOS_RETVAL_OK) {
-                                unsigned j;
-
-                                if (ret == PQOS_RETVAL_PERF_CTR)
-                                        printf("Use -r option to start "
-                                               "monitoring anyway.\n");
                                 printf("Monitoring start error on core(s) "
                                        "%s, status %d\n",
-                                       cg->desc, ret);
+                                       grp->desc, ret);
+                                break;
+                        } else
+                                grp->started = 1;
 
-                                /**
-                                 * Stop mon groups that are already started
-                                 */
-                                for (j = 0; j < i; j++) {
-                                        cg = &sel_monitor_core_tab[j];
-                                        pqos_mon_stop(cg->pgrp);
-                                }
-                                return -1;
-                        }
-                }
-        } else {
-                /**
-                 * Make calls to pqos_mon_start_pid - track PIDs
-                 */
-                for (i = 0; i < (unsigned)sel_process_num; i++) {
-                        struct pid_group *pg = &sel_monitor_pid_tab[i];
-
-                        monitor_setup_events(&pg->events, cap_mon);
-
-                        ret = pqos_mon_start_pids(pg->num_pids, pg->pids,
-                                                  pg->events, (void *)pg->desc,
-                                                  pg->pgrp);
-                        ASSERT(ret == PQOS_RETVAL_OK);
+                } else if (grp->type == MON_GROUP_TYPE_PID) {
+                        /**
+                         * Make calls to pqos_mon_start_pid - track PIDs
+                         */
+                        ret = pqos_mon_start_pids(grp->num_res, grp->pids,
+                                                  grp->events,
+                                                  (void *)grp->desc, grp->data);
                         /**
                          * Any problem with monitoring the process?
                          */
                         if (ret != PQOS_RETVAL_OK) {
-                                unsigned j;
-
                                 printf("PID %s monitoring start error,"
                                        "status %d\n",
-                                       sel_monitor_pid_tab[i].desc, ret);
-
-                                /**
-                                 * Stop mon groups that are already started
-                                 */
-                                for (j = 0; j < i; j++) {
-                                        pg = &sel_monitor_pid_tab[j];
-                                        pqos_mon_stop(pg->pgrp);
-                                }
-                                return -1;
-                        }
+                                       grp->desc, ret);
+                                break;
+                        } else
+                                grp->started = 1;
                 }
+        }
+        if (ret != PQOS_RETVAL_OK) {
+                /**
+                 * Stop mon groups that are already started
+                 */
+                for (i = 0; i < sel_monitor_num; i++) {
+                        struct mon_group *grp = &sel_monitor_group[i];
+
+                        if (!grp->started)
+                                continue;
+                        pqos_mon_stop(grp->data);
+                }
+                return -1;
         }
         return 0;
 }
@@ -864,28 +924,20 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
 void
 monitor_stop(void)
 {
-        int i;
+        unsigned i;
 
-        if (!monitor_process_mode())
-                for (i = 0; i < sel_monitor_num; i++) {
-                        int ret = pqos_mon_stop(sel_monitor_core_tab[i].pgrp);
+        for (i = 0; i < sel_monitor_num; i++) {
+                struct mon_group *grp = &sel_monitor_group[i];
 
-                        if (ret != PQOS_RETVAL_OK)
-                                printf("Monitoring stop error!\n");
-                        free(sel_monitor_core_tab[i].desc);
-                        free(sel_monitor_core_tab[i].cores);
-                        free(sel_monitor_core_tab[i].pgrp);
-                }
-        else
-                for (i = 0; i < sel_process_num; i++) {
-                        int ret = pqos_mon_stop(sel_monitor_pid_tab[i].pgrp);
+                int ret = pqos_mon_stop(grp->data);
 
-                        if (ret != PQOS_RETVAL_OK)
-                                printf("Monitoring stop error!\n");
-                        free(sel_monitor_pid_tab[i].desc);
-                        free(sel_monitor_pid_tab[i].pids);
-                        free(sel_monitor_pid_tab[i].pgrp);
-                }
+                if (ret != PQOS_RETVAL_OK)
+                        printf("Monitoring stop error!\n");
+
+                grp_free(grp);
+        }
+
+        free(sel_monitor_group);
 }
 
 void
@@ -916,57 +968,6 @@ selfn_monitor_top_like(const char *arg)
 }
 
 /**
- * @brief Adds pids for monitoring in pids monitoring mode
- *
- * @param[in] pgrp pid group
- * @param[in] evt events to be monitored
- *
- * @retval 1 when group is added
- * @retval 0 when group was not added
- */
-static int
-add_pids_for_monitoring(const struct pid_group *pgrp,
-                        const enum pqos_mon_event evt)
-{
-        int j, found = 0;
-
-        /**
-         *  For each process:
-         *  - if it's already there in the sel_monitor_pid_tab
-         *  - update the entry
-         *  - else - add it to the sel_monitor_pid_tab
-         */
-        for (j = 0; j < sel_process_num && j < (int)DIM(sel_monitor_pid_tab);
-             j++) {
-                found = cmp_pgrps(&sel_monitor_pid_tab[j], pgrp);
-                if (found < 0) {
-                        printf("Error: cannot monitor same "
-                               "pids in different groups\n");
-                        exit(EXIT_FAILURE);
-                }
-                if (found) {
-                        sel_monitor_pid_tab[j].events |= evt;
-                        break;
-                }
-        }
-        if (!found && sel_process_num < (int)DIM(sel_monitor_pid_tab)) {
-                struct pid_group *pg = &sel_monitor_pid_tab[sel_process_num];
-                *pg = *pgrp;
-                pg->events = evt;
-                pg->pgrp = malloc(sizeof(struct pqos_mon_data));
-                if (pg->pgrp == NULL) {
-                        printf("Error with memory allocation");
-                        exit(EXIT_FAILURE);
-                }
-                ++sel_process_num;
-
-                return 1;
-        }
-
-        return 0;
-}
-
-/**
  * @brief Verifies and translates monitoring config string into
  *        internal monitoring configuration.
  *
@@ -975,37 +976,13 @@ add_pids_for_monitoring(const struct pid_group *pgrp,
 static void
 parse_monitor_pids(char *str)
 {
-        int i = 0, n = 0;
-        enum pqos_mon_event evt = (enum pqos_mon_event)0;
-        struct pid_group *pgrp_tab =
-            calloc(PQOS_MAX_PID_MON_GROUPS, sizeof(*pgrp_tab));
+        int ret = parse_monitor_group(str, MON_GROUP_TYPE_PID);
 
-        if (pgrp_tab == NULL) {
-                printf("Error with memory allocation!\n");
-                exit(EXIT_FAILURE);
-        }
-
-        parse_event(str, &evt);
-
-        n = strtogrps(strchr(str, ':') + 1, NULL, pgrp_tab,
-                      PQOS_MAX_PID_MON_GROUPS);
-        if (n < 0) {
-                printf("Error: Too many pids/groups selected\n");
-                goto error_exit;
-        } else if (n == 0)
+        if (ret > 0)
+                return;
+        if (ret == 0)
                 parse_error(str, "No process id selected for monitoring");
 
-        for (i = 0; i < n; i++)
-                if (!add_pids_for_monitoring(&pgrp_tab[i], evt)) {
-                        free(pgrp_tab[i].pids);
-                        free(pgrp_tab[i].desc);
-                }
-
-        free(pgrp_tab);
-        return;
-
-error_exit:
-        free(pgrp_tab);
         exit(EXIT_FAILURE);
 }
 
@@ -1482,27 +1459,19 @@ proc_stats_cmp(const void *a, const void *b)
  *        of resulting proc stats with highest CPU usage
  *
  * @param pslist list with all processes statistics (holds proc_stats)
- * @param top_procs[out] array to be filled with top-processes data
- * @param max_size max number of elements that top_procs can hold
  *
  * @return number of valid top processes in top_procs filled array (usually
  *         this will equal to max_size)
  */
 static int
-fill_top_procs(const struct slist *pslist,
-               struct pid_group *top_procs,
-               const int max_size)
+fill_top_procs(const struct slist *pslist)
 {
         const struct slist *it = NULL;
         int current_size = 0;
         int i;
         struct proc_stats stats[TOP_PROC_MAX];
 
-        ASSERT(max_size <= TOP_PROC_MAX);
-        ASSERT(top_procs != NULL);
-
-        memset(top_procs, 0, sizeof(top_procs[0]) * max_size);
-        memset(stats, 0, sizeof(stats[0]) * max_size);
+        memset(stats, 0, sizeof(stats[0]) * TOP_PROC_MAX);
 
         /* Iterating on CPU usage stats for all of the stored processes in
          * pslist in order to get max_size of 'survivors' - processes
@@ -1523,7 +1492,7 @@ fill_top_procs(const struct slist *pslist,
                  * simple. We have only to add proc_stats into free slot and
                  * sort entire array afterwards (sorting is done below)
                  */
-                if (current_size < max_size) {
+                if (current_size < TOP_PROC_MAX) {
                         stats[current_size] = *ps;
                         current_size++;
                 } else {
@@ -1561,7 +1530,13 @@ fill_top_procs(const struct slist *pslist,
                 char *desc = uinttostr((unsigned)stats[i].pid);
                 uint64_t pid = (uint64_t)stats[i].pid;
 
-                set_pgrp(&top_procs[i], desc, &pid, 1);
+                /* finally we can add list of top-pids for LLC/MBM monitoring
+                 * NOTE: list was sorted in ascending order, so in order to have
+                 * initially top-cpu processes on top, we are adding in reverse
+                 * order
+                 */
+                grp_add(MON_GROUP_TYPE_PID,
+                        (enum pqos_mon_event)PQOS_MON_EVENT_ALL, desc, &pid, 1);
         }
 
         return current_size;
@@ -1575,9 +1550,8 @@ fill_top_procs(const struct slist *pslist,
 void
 selfn_monitor_top_pids(void)
 {
-        int res = 0, top_size = 0, i;
+        int res = 0;
         struct slist *pslist = NULL, *it = NULL;
-        struct pid_group top_procs[TOP_PROC_MAX];
 
         printf("Monitoring top-pids enabled\n");
         sel_mon_top_like = 1;
@@ -1611,16 +1585,7 @@ selfn_monitor_top_pids(void)
                 goto cleanup_pslist;
         }
 
-        top_size = fill_top_procs(pslist, top_procs, TOP_PROC_MAX);
-
-        /* finally we can add list of top-pids for LLC/MBM monitoring
-         * NOTE: list was sorted in ascending order, so in order to have
-         * initially top-cpu processes on top, we are adding in reverse
-         * order
-         */
-        for (i = (top_size - 1); i >= 0; --i)
-                add_pids_for_monitoring(
-                    &top_procs[i], (enum pqos_mon_event)PQOS_MON_EVENT_ALL);
+        fill_top_procs(pslist);
 
 cleanup_pslist:
         /* cleaning list of all processes stats */
@@ -1718,16 +1683,12 @@ monitoring_ctrlc(int signo)
 static unsigned
 get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
 {
-        unsigned mon_number, i;
+        unsigned i;
         struct pqos_mon_data **p1, **p2;
 
         ASSERT(parray1 != NULL && parray2 != NULL);
-        if (!monitor_process_mode())
-                mon_number = (unsigned)sel_monitor_num;
-        else
-                mon_number = (unsigned)sel_process_num;
-        p1 = malloc(sizeof(p1[0]) * mon_number);
-        p2 = malloc(sizeof(p2[0]) * mon_number);
+        p1 = malloc(sizeof(p1[0]) * sel_monitor_num);
+        p2 = malloc(sizeof(p2[0]) * sel_monitor_num);
         if (p1 == NULL || p2 == NULL) {
                 if (p1)
                         free(p1);
@@ -1737,17 +1698,14 @@ get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
                 exit(EXIT_FAILURE);
         }
 
-        for (i = 0; i < mon_number; i++) {
-                if (!monitor_process_mode())
-                        p1[i] = sel_monitor_core_tab[i].pgrp;
-                else
-                        p1[i] = sel_monitor_pid_tab[i].pgrp;
+        for (i = 0; i < sel_monitor_num; i++) {
+                p1[i] = sel_monitor_group[i].data;
                 p2[i] = p1[i];
         }
 
         *parray1 = p1;
         *parray2 = p2;
-        return mon_number;
+        return sel_monitor_num;
 }
 
 void
