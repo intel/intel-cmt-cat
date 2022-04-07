@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2020-2022 Intel Corporation. All rights reserved.
+ * Copyright(c) 2022 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,25 +30,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "mock_monitoring.h"
-
-#include "mock_test.h"
-
-int
-__wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
-{
-        check_expected_ptr(group);
-
-        return mock_type(int);
-}
-
-int
-__wrap_resctrl_mon_active(unsigned *monitoring_status)
-{
-        int ret = mock_type(int);
-
-        if (ret == PQOS_RETVAL_OK)
-                *monitoring_status = mock_type(int);
-
-        return ret;
-}
+#ifndef __MOCK_TEST_H__
+#define __MOCK_TEST_H__
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
+/* clang-format off */
+#include <cmocka.h>
+/* clang-format on */
+#endif /* __MOCK_TEST_H__ */

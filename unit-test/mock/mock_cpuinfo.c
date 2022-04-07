@@ -30,11 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
 #include "mock_cpuinfo.h"
+
+#include "mock_test.h"
 
 void
 __wrap_cpuinfo_get_config(const struct cpuinfo_config **config)

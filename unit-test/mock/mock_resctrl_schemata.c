@@ -30,13 +30,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include <string.h>
-
 #include "mock_resctrl_schemata.h"
+
+#include "mock_test.h"
+
+#include <string.h>
 
 int
 __wrap_resctrl_schemata_read(FILE *fd, struct resctrl_schemata *schemata)

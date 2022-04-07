@@ -30,13 +30,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include <string.h>
-
 #include "mock_resctrl_utils.h"
+
+#include "mock_test.h"
+
+#include <string.h>
 
 int
 __wrap_resctrl_utils_file_exists(const char *path)

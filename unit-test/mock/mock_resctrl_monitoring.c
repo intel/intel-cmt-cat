@@ -30,12 +30,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
 #include "mock_resctrl_monitoring.h"
+
+#include "mock_test.h"
 
 int
 __wrap_resctrl_mon_assoc_get(const unsigned lcore,

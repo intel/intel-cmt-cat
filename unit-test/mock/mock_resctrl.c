@@ -29,14 +29,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-#include <string.h>
-
 #include "mock_resctrl.h"
+
+#include "mock_test.h"
+
+#include <string.h>
 
 int
 __wrap_resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask)

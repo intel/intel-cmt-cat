@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2020-2022 Intel Corporation. All rights reserved.
+ * Copyright(c) 2022 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,26 +29,34 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef __OUTPUT_H__
+#define __OUTPUT_H__
+#include <setjmp.h>
 
-#include "mock_monitoring.h"
+#define run_void_function(function_name, ...)                                  \
+        do {                                                                   \
+                output_start();                                                \
+                if (!setjmp(jump_buff))                                        \
+                        function_name(__VA_ARGS__);                            \
+                output_stop();                                                 \
+        } while (0)
 
-#include "mock_test.h"
+#define run_function(function_name, ret_var, ...)                              \
+        do {                                                                   \
+                output_start();                                                \
+                if (!setjmp(jump_buff))                                        \
+                        retvar = function_name(__VA_ARGS__);                   \
+                output_stop();                                                 \
+        } while (0)
 
-int
-__wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
-{
-        check_expected_ptr(group);
+jmp_buf jump_buff;
 
-        return mock_type(int);
-}
-
-int
-__wrap_resctrl_mon_active(unsigned *monitoring_status)
-{
-        int ret = mock_type(int);
-
-        if (ret == PQOS_RETVAL_OK)
-                *monitoring_status = mock_type(int);
-
-        return ret;
-}
+void output_start(void);
+void output_stop(void);
+const char *output_get(void);
+int output_exit_was_called(void);
+int output_get_exit_status(void);
+void __wrap_exit(int __status);
+int __wrap_printf(const char *format_string, ...);
+int __wrap_puts(const char *__s);
+#endif /* __OUTPUT_H__ */

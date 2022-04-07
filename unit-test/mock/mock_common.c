@@ -30,14 +30,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdarg.h>
-#include <stddef.h>
-#include <setjmp.h>
-#include <cmocka.h>
-
-#include "pqos.h"
-
 #include "mock_common.h"
+
+#include "mock_test.h"
+#include "pqos.h"
 
 int
 __wrap_pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
