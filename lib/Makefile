@@ -228,6 +228,7 @@ checkpatch:
 	-f resctrl_alloc.h -f resctrl_alloc.c \
 	-f resctrl_schemata.h -f resctrl_schemata.c \
 	-f resctrl_utils.h -f resctrl_utils.c \
+	-f uncore_monitoring.h -f uncore_monitoring.c \
 	-f types.h \
 	-f utils.h -f utils.c
 
@@ -274,7 +275,8 @@ cppcheck:
 	resctrl.h resctrl.c \
 	resctrl_monitoring.h resctrl_monitoring.c \
 	resctrl_schemata.h resctrl_schemata.c \
-	resctrl_utils.h resctrl_utils.c
+	resctrl_utils.h resctrl_utils.c \
+	uncore_monitoring.h -f uncore_monitoring.c
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

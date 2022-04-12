@@ -258,6 +258,7 @@ $(BIN_DIR)/test_hw_mon_assoc_write: test_hw_mon_assoc_write.c $(LIB_OBJS)
 		-Wl,--wrap=msr_read \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -268,6 +269,7 @@ $(BIN_DIR)/test_hw_mon_assoc_read: test_hw_mon_assoc_read.c $(LIB_OBJS)
 		-Wl,--wrap=msr_read \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -277,6 +279,7 @@ $(BIN_DIR)/test_hw_mon_assoc_unused: test_hw_mon_assoc_unused.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -294,6 +297,7 @@ $(BIN_DIR)/test_hw_mon_read_counter: test_hw_mon_read_counter.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -305,6 +309,7 @@ $(BIN_DIR)/test_hw_mon_start_perf: test_hw_mon_start_perf.c $(LIB_OBJS)
 		-Wl,--wrap=perf_mon_is_event_supported \
 		-Wl,--wrap=perf_mon_start \
 		-Wl,--wrap=perf_mon_stop \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -314,6 +319,7 @@ $(BIN_DIR)/test_hw_mon_start_counter: test_hw_mon_start_counter.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_cap_get \
 		-Wl,--wrap=perf_mon_init \
 		-Wl,--wrap=perf_mon_fini \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -326,6 +332,7 @@ $(BIN_DIR)/test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
 		-Wl,--wrap=perf_mon_is_event_supported \
 		-Wl,--wrap=perf_mon_start \
 		-Wl,--wrap=perf_mon_stop \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -335,6 +342,7 @@ $(BIN_DIR)/test_hw_cap: test_hw_cap.c $(LIB_OBJS)
 		-Wl,--wrap=lcpuid \
 		-Wl,--wrap=msr_read \
 		-Wl,--wrap=msr_write \
+		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

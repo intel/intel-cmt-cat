@@ -279,6 +279,15 @@ enum pqos_mon_event {
         PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC misses */
         PQOS_PERF_EVENT_IPC = 0x8000,      /**< instructions per clock */
         PQOS_PERF_EVENT_LLC_REF = 0x10000, /**< LLC references */
+
+        PQOS_PERF_EVENT_LLC_MISS_PCIE_READ =
+            0x100000, /**< DDIO LLC read misses */
+        PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE =
+            0x200000, /**< DDIO LLC write misses */
+        PQOS_PERF_EVENT_LLC_REF_PCIE_READ =
+            0x400000, /**< DDIO LLC read references */
+        PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE =
+            0x800000, /**< DDIO LLC write references */
 };
 
 /**

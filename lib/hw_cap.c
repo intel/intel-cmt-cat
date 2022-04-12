@@ -39,6 +39,7 @@
 #include "cpu_registers.h"
 #include "log.h"
 #include "machine.h"
+#include "uncore_monitoring.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -137,6 +138,7 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
         int ret = PQOS_RETVAL_OK;
         unsigned sz = 0, max_rmid = 0, l3_size = 0, num_events = 0;
         struct pqos_cap_mon *mon = NULL;
+        enum pqos_mon_event uncore_events = (enum pqos_mon_event)0;
 
         ASSERT(r_mon != NULL && cpu != NULL);
 
@@ -184,6 +186,21 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                 num_events++; /**< local memory bandwidth event */
         if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
                 num_events++; /**< remote memory bandwidth virtual event */
+
+        ret = uncore_mon_discover(&uncore_events);
+        if (ret == PQOS_RETVAL_RESOURCE)
+                LOG_DEBUG("Uncore monitoring not detected\n");
+        else if (ret == PQOS_RETVAL_OK) {
+                if (uncore_events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
+                        num_events++;
+                if (uncore_events & PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE)
+                        num_events++;
+                if (uncore_events & PQOS_PERF_EVENT_LLC_REF_PCIE_READ)
+                        num_events++;
+                if (uncore_events & PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)
+                        num_events++;
+        } else
+                return ret;
 
         if (!num_events)
                 return PQOS_RETVAL_ERROR;
@@ -249,6 +266,20 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_REF, 0, 0, 0,
                                      num_events);
         }
+
+        if (uncore_events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
+                                     0, 0, 0, num_events);
+        if (uncore_events & PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE)
+                add_monitoring_event(mon, 0,
+                                     PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE, 0, 0,
+                                     0, num_events);
+        if (uncore_events & PQOS_PERF_EVENT_LLC_REF_PCIE_READ)
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_REF_PCIE_READ,
+                                     0, 0, 0, num_events);
+        if (uncore_events & PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)
+                add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
+                                     0, 0, 0, num_events);
 
         (*r_mon) = mon;
         return PQOS_RETVAL_OK;

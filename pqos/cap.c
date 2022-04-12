@@ -114,6 +114,14 @@ get_mon_event_name(int event)
                 return "LLC references";
         case PQOS_PERF_EVENT_IPC:
                 return "Instructions/Clock (IPC)";
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_READ:
+                return "LLC misses - pcie read";
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE:
+                return "LLC misses - pcie write";
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_READ:
+                return "LLC references - pcie read";
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
+                return "LLC references - pcie write";
         default:
                 return "unknown";
         }
@@ -160,6 +168,10 @@ cap_print_features_mon(const unsigned indent,
                 case PQOS_PERF_EVENT_LLC_MISS:
                 case PQOS_PERF_EVENT_LLC_REF:
                 case PQOS_PERF_EVENT_IPC:
+                case PQOS_PERF_EVENT_LLC_REF_PCIE_READ:
+                case PQOS_PERF_EVENT_LLC_MISS_PCIE_READ:
+                case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
+                case PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE:
                         buffer = buffer_other;
                         break;
 
