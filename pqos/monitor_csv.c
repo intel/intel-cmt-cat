@@ -46,7 +46,7 @@ monitor_csv_begin(FILE *fp)
 
         ASSERT(fp != NULL);
 
-        if (!monitor_process_mode()) {
+        if (monitor_core_mode()) {
                 fprintf(fp, "Time,Core");
 #ifdef PQOS_RMID_CUSTOM
                 enum pqos_interface iface;
@@ -55,7 +55,7 @@ monitor_csv_begin(FILE *fp)
                 if (iface == PQOS_INTER_MSR)
                         fprintf(hdr, ",RMID");
 #endif
-        } else
+        } else if (monitor_process_mode())
                 fprintf(fp, "Time,PID,Core");
 
         if (events & PQOS_PERF_EVENT_IPC)
@@ -136,6 +136,7 @@ monitor_csv_row(FILE *fp,
         size_t offset = 0;
         char core_list[16];
         enum pqos_mon_event events = monitor_get_events();
+        unsigned i;
 
         ASSERT(fp != NULL);
         ASSERT(timestamp != NULL);
@@ -157,53 +158,33 @@ monitor_csv_row(FILE *fp,
         }
 #endif
 
-        offset += fillin_csv_column(
-            ",%.2f", monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_IPC),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_IPC,
-            events & PQOS_PERF_EVENT_IPC);
+        struct {
+                enum pqos_mon_event event;
+                const char *format;
+        } output[] = {
+            {.event = PQOS_PERF_EVENT_IPC, .format = ",%.2f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS, .format = ",%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_REF, .format = ",%.0f"},
+            {.event = PQOS_MON_EVENT_L3_OCCUP, .format = ",%.1f"},
+            {.event = PQOS_MON_EVENT_LMEM_BW, .format = ",%.1f"},
+            {.event = PQOS_MON_EVENT_RMEM_BW, .format = ",%.1f"},
+            {.event = PQOS_MON_EVENT_TMEM_BW, .format = ",%.1f"},
+        };
 
-        offset += fillin_csv_column(
-            ",%.0f",
-            monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_LLC_MISS),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
-            events & PQOS_PERF_EVENT_LLC_MISS);
+        for (i = 0; i < DIM(output); i++) {
+                double value =
+                    monitor_utils_get_value(mon_data, output[i].event);
 
-        offset += fillin_csv_column(
-            ",%.0f", monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_LLC_REF),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_LLC_REF,
-            events & PQOS_PERF_EVENT_LLC_REF);
+                offset += fillin_csv_column(output[i].format, value,
+                                            data + offset, sz_data - offset,
+                                            mon_data->event & output[i].event,
+                                            events & output[i].event);
+        }
 
-        offset += fillin_csv_column(
-            ",%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_L3_OCCUP),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
-            events & PQOS_MON_EVENT_L3_OCCUP);
-
-        offset += fillin_csv_column(
-            ",%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_LMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_LMEM_BW,
-            events & PQOS_MON_EVENT_LMEM_BW);
-
-        offset += fillin_csv_column(
-            ",%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_RMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-            events & PQOS_MON_EVENT_RMEM_BW);
-
-        fillin_csv_column(
-            ",%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_TMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_TMEM_BW,
-            events & PQOS_MON_EVENT_TMEM_BW);
-
-        if (!monitor_process_mode())
+        if (monitor_core_mode())
                 fprintf(fp, "%s,\"%s\"%s\n", timestamp,
                         (char *)mon_data->context, data);
-        else {
+        else if (monitor_process_mode()) {
                 memset(core_list, 0, sizeof(core_list));
 
                 if (monitor_utils_get_pid_cores(mon_data, core_list,

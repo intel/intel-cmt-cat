@@ -205,6 +205,12 @@ monitor_process_mode(void)
         return (sel_monitor_type == MON_GROUP_TYPE_PID);
 }
 
+int
+monitor_core_mode(void)
+{
+        return (sel_monitor_type == MON_GROUP_TYPE_CORE);
+}
+
 /**
  * @brief Function to safely translate an unsigned int
  *        value to a string

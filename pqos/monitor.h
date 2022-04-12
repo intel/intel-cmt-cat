@@ -122,13 +122,22 @@ void selfn_monitor_disable_ipc(const char *arg);
 void selfn_monitor_disable_llc_miss(const char *arg);
 
 /**
- * @brief Check to determine if processes or cores are monitored
+ * @brief Check to determine if processes are monitored
  *
  * @return Process monitoring mode status
  * @retval 0 monitoring cores
  * @retval 1 monitoring processes
  */
 int monitor_process_mode(void);
+
+/**
+ * @brief Check to determine if cores are monitored
+ *
+ * @return Process monitoring mode status
+ * @retval 0 monitoring cores
+ * @retval 1 monitoring processes
+ */
+int monitor_core_mode(void);
 
 /**
  * @brief Stops monitoring on selected core(s)/pid(s)

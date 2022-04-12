@@ -55,6 +55,13 @@ extern "C" {
 #define ASSERT(x)
 #endif
 
+/**
+ * Macros
+ */
+#ifndef DIM
+#define DIM(x) (sizeof(x) / sizeof(x[0]))
+#endif
+
 #define UNUSED_ARG(_x) ((void)(_x))
 
 /**

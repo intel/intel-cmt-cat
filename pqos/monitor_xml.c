@@ -118,6 +118,7 @@ monitor_xml_row(FILE *fp,
         char core_list[1024];
         size_t offset = 0;
         const char *l3_text = NULL;
+        unsigned i;
 
         ASSERT(fp != NULL);
         ASSERT(timestamp != NULL);
@@ -147,56 +148,52 @@ monitor_xml_row(FILE *fp,
         }
 #endif
 
-        offset += fillin_xml_column(
-            "%.2f", monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_IPC),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_IPC, events & PQOS_PERF_EVENT_IPC,
-            "ipc");
+        struct {
+                enum pqos_mon_event event;
+                const char *node_name;
+                const char *format;
+        } output[] = {
+            {.event = PQOS_PERF_EVENT_IPC,
+             .node_name = "ipc",
+             .format = "%.2f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS,
+             .node_name = "llc_misses",
+             .format = "%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_REF,
+             .node_name = "llc_references",
+             .format = "%.0f"},
+            {.event = PQOS_MON_EVENT_L3_OCCUP,
+             .node_name = l3_text,
+             .format = "%.1f"},
+            {.event = PQOS_MON_EVENT_LMEM_BW,
+             .node_name = "mbm_local_MB",
+             .format = "%.1f"},
+            {.event = PQOS_MON_EVENT_RMEM_BW,
+             .node_name = "mbm_remote_MB",
+             .format = "%.1f"},
+            {.event = PQOS_MON_EVENT_TMEM_BW,
+             .node_name = "mbm_total_MB",
+             .format = "%.1f"},
+        };
 
-        offset += fillin_xml_column(
-            "%.0f", monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_LLC_MISS),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
-            events & PQOS_PERF_EVENT_LLC_MISS, "llc_misses");
+        for (i = 0; i < DIM(output); i++) {
+                double value =
+                    monitor_utils_get_value(mon_data, output[i].event);
 
-        offset += fillin_xml_column(
-            "%.0f", monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_LLC_REF),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_LLC_REF,
-            events & PQOS_PERF_EVENT_LLC_REF, "llc_references");
-
-        offset += fillin_xml_column(
-            "%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_L3_OCCUP),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
-            events & PQOS_MON_EVENT_L3_OCCUP, l3_text);
-
-        offset += fillin_xml_column(
-            "%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_LMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_LMEM_BW,
-            events & PQOS_MON_EVENT_LMEM_BW, "mbm_local_MB");
-
-        offset += fillin_xml_column(
-            "%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_RMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-            events & PQOS_MON_EVENT_RMEM_BW, "mbm_remote_MB");
-
-        fillin_xml_column(
-            "%.1f", monitor_utils_get_value(mon_data, PQOS_MON_EVENT_TMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_TMEM_BW,
-            events & PQOS_MON_EVENT_TMEM_BW, "mbm_total_MB");
+                offset += fillin_xml_column(
+                    output[i].format, value, data + offset, sz_data - offset,
+                    mon_data->event & output[i].event, events & output[i].event,
+                    output[i].node_name);
+        }
 
         fprintf(fp, "%s\n", xml_child_open);
-        if (!monitor_process_mode())
+        fprintf(fp, "\t<time>%s</time>\n", timestamp);
+        if (monitor_core_mode())
                 fprintf(fp,
-                        "\t<time>%s</time>\n"
                         "\t<core>%s</core>\n"
                         "%s",
-                        timestamp, (char *)mon_data->context, data);
-        else {
+                        (char *)mon_data->context, data);
+        else if (monitor_process_mode()) {
                 memset(core_list, 0, sizeof(core_list));
 
                 if (monitor_utils_get_pid_cores(mon_data, core_list,
@@ -205,11 +202,10 @@ monitor_xml_row(FILE *fp,
                 }
 
                 fprintf(fp,
-                        "\t<time>%s</time>\n"
                         "\t<pid>%s</pid>\n"
                         "\t<core>%s</core>\n"
                         "%s",
-                        timestamp, (char *)mon_data->context, core_list, data);
+                        (char *)mon_data->context, core_list, data);
         }
         fprintf(fp, "%s\n", xml_child_close);
 }

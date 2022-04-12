@@ -61,7 +61,7 @@ monitor_text_header(FILE *fp, const char *timestamp)
 
         fprintf(fp, "TIME %s\n", timestamp);
 
-        if (!monitor_process_mode()) {
+        if (monitor_core_mode()) {
                 fprintf(fp, "    CORE");
 #ifdef PQOS_RMID_CUSTOM
                 enum pqos_interface iface;
@@ -70,7 +70,7 @@ monitor_text_header(FILE *fp, const char *timestamp)
                 if (iface == PQOS_INTER_MSR)
                         fprintf(fp, " RMID");
 #endif
-        } else
+        } else if (monitor_process_mode())
                 fprintf(fp, "     PID     CORE");
 
         if (events & PQOS_PERF_EVENT_IPC)
@@ -145,6 +145,7 @@ monitor_text_row(FILE *fp,
         size_t offset = 0;
         char core_list[16];
         enum pqos_mon_event events = monitor_get_events();
+        unsigned i;
 
         ASSERT(fp != NULL);
         ASSERT(data != NULL);
@@ -165,58 +166,38 @@ monitor_text_row(FILE *fp,
                     ret == PQOS_RETVAL_OK, sel_interface == PQOS_INTER_MSR);
         }
 #endif
+        struct {
+                enum pqos_mon_event event;
+                unsigned unit;
+                const char *format;
+        } output[] = {
+            {.event = PQOS_PERF_EVENT_IPC, .unit = 1, .format = " %11.2f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS,
+             .unit = 1000,
+             .format = " %10.0fk"},
+            {.event = PQOS_PERF_EVENT_LLC_REF,
+             .unit = 1000,
+             .format = " %10.0fk"},
+            {.event = PQOS_MON_EVENT_L3_OCCUP, .unit = 1, .format = " %11.1f"},
+            {.event = PQOS_MON_EVENT_LMEM_BW, .unit = 1, .format = " %11.1f"},
+            {.event = PQOS_MON_EVENT_RMEM_BW, .unit = 1, .format = " %11.1f"},
+            {.event = PQOS_MON_EVENT_TMEM_BW, .unit = 1, .format = " %11.1f"},
+        };
 
-        offset += fillin_text_column(
-            " %11.2f", monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_IPC),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_IPC,
-            events & PQOS_PERF_EVENT_IPC);
+        for (i = 0; i < DIM(output); i++) {
+                double value =
+                    monitor_utils_get_value(mon_data, output[i].event) /
+                    output[i].unit;
 
-        offset += fillin_text_column(
-            " %10.0fk",
-            monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_LLC_MISS) / 1000,
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_LLC_MISS,
-            events & PQOS_PERF_EVENT_LLC_MISS);
+                offset += fillin_text_column(output[i].format, value,
+                                             data + offset, sz_data - offset,
+                                             mon_data->event & output[i].event,
+                                             events & output[i].event);
+        }
 
-        offset += fillin_text_column(
-            " %10.0fk",
-            monitor_utils_get_value(mon_data, PQOS_PERF_EVENT_LLC_REF) / 1000,
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_PERF_EVENT_LLC_REF,
-            events & PQOS_PERF_EVENT_LLC_REF);
-
-        offset += fillin_text_column(
-            " %11.1f",
-            monitor_utils_get_value(mon_data, PQOS_MON_EVENT_L3_OCCUP),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_L3_OCCUP,
-            events & PQOS_MON_EVENT_L3_OCCUP);
-
-        offset += fillin_text_column(
-            " %11.1f",
-            monitor_utils_get_value(mon_data, PQOS_MON_EVENT_LMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_LMEM_BW,
-            events & PQOS_MON_EVENT_LMEM_BW);
-
-        offset += fillin_text_column(
-            " %11.1f",
-            monitor_utils_get_value(mon_data, PQOS_MON_EVENT_RMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_RMEM_BW,
-            events & PQOS_MON_EVENT_RMEM_BW);
-
-        fillin_text_column(
-            " %11.1f",
-            monitor_utils_get_value(mon_data, PQOS_MON_EVENT_TMEM_BW),
-            data + offset, sz_data - offset,
-            mon_data->event & PQOS_MON_EVENT_TMEM_BW,
-            events & PQOS_MON_EVENT_TMEM_BW);
-
-        if (!monitor_process_mode())
+        if (monitor_core_mode())
                 fprintf(fp, "\n%8.8s%s", (char *)mon_data->context, data);
-        else {
+        else if (monitor_process_mode()) {
                 memset(core_list, 0, sizeof(core_list));
 
                 if (monitor_utils_get_pid_cores(mon_data, core_list,

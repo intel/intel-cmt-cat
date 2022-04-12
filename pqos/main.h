@@ -46,9 +46,6 @@ extern "C" {
 /**
  * Macros
  */
-#ifndef DIM
-#define DIM(x) (sizeof(x) / sizeof(x[0]))
-#endif
 #ifndef MAX
 /**
  * Macro to return the maximum of two numbers
