@@ -177,8 +177,10 @@ resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
                 options = buf;
         }
 
-        if (mount("resctrl", RESCTRL_PATH, "resctrl", 0, options) != 0)
+        if (mount("resctrl", RESCTRL_PATH, "resctrl", 0, options) != 0) {
+                LOG_DEBUG("resctrl mount failed with error %d - %m\n", errno);
                 return PQOS_RETVAL_ERROR;
+        }
 
         return PQOS_RETVAL_OK;
 }
