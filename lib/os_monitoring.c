@@ -397,7 +397,6 @@ os_mon_stop(struct pqos_mon_data *group)
                 free(group->tid_map);
                 group->tid_map = NULL;
         }
-        memset(group, 0, sizeof(*group));
 
         return ret;
 }

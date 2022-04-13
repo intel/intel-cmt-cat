@@ -1792,9 +1792,12 @@ test_pqos_mon_stop_hw(void **state __attribute__((unused)))
 {
         int ret;
         struct pqos_mon_data group;
+        struct pqos_mon_data_internal *intl = malloc(sizeof(*intl));
 
         memset(&group, 0, sizeof(group));
+        memset(intl, 0, sizeof(*intl));
         group.valid = 0x00DEAD00;
+        group.intl = intl;
 
         wrap_check_init(1, PQOS_RETVAL_OK);
 
@@ -1810,9 +1813,12 @@ test_pqos_mon_stop_os(void **state __attribute__((unused)))
 {
         int ret;
         struct pqos_mon_data group;
+        struct pqos_mon_data_internal *intl = malloc(sizeof(*intl));
 
         memset(&group, 0, sizeof(group));
+        memset(intl, 0, sizeof(*intl));
         group.valid = 0x00DEAD00;
+        group.intl = intl;
 
         wrap_check_init(1, PQOS_RETVAL_OK);
 

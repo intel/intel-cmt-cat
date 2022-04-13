@@ -136,6 +136,17 @@ extern "C" {
 #define IA32_EVENT_LLC_REF_MASK   0x2EULL
 #define IA32_EVENT_LLC_REF_UMASK  0x4FULL
 
+/**
+ * MSR's to read DDIO monitoring metrics *
+ */
+#define IAT_MSR_C_UNIT_CTRL 0x00000E00
+
+#define IAT_MSR_C_PMON_BOX_CTRL0 0x00000E01
+#define IAT_MSR_C_PMON_BOX_CTRL1 0x00000E02
+#define IAT_MSR_C_PMON_BOX_CTRL2 0x00000E03
+#define IAT_MSR_C_PMON_BOX_CTRL3 0x00000E04
+#define IAT_MSR_C_PMON_BOX_CTR0  0x00000E08
+
 #ifdef __cplusplus
 }
 #endif

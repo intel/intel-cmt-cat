@@ -105,6 +105,14 @@ void selfn_monitor_file(const char *arg);
 void selfn_monitor_cores(const char *arg);
 
 /**
+ * @brief Translates multiple ddio monitoring request strings into
+ *        internal monitoring request structures
+ *
+ * @param str string passed to --mon-ddio command line option
+ */
+void selfn_monitor_uncore(const char *arg);
+
+/**
  * @brief Allows to use LLC-percent representation (by default LLC
  *        values are represented in kilobytes)
  *
@@ -138,6 +146,15 @@ int monitor_process_mode(void);
  * @retval 1 monitoring processes
  */
 int monitor_core_mode(void);
+
+/**
+ * @brief Check to determine if uncore monitoring is started
+ *
+ * @return Process monitoring mode status
+ * @retval 0 monitoring cores
+ * @retval 1 monitoring processes
+ */
+int monitor_uncore_mode(void);
 
 /**
  * @brief Stops monitoring on selected core(s)/pid(s)

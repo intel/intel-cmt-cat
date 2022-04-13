@@ -131,6 +131,10 @@ monitor_utils_get_value(const struct pqos_mon_data *const group,
                 break;
         case PQOS_PERF_EVENT_LLC_MISS:
         case PQOS_PERF_EVENT_LLC_REF:
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_READ:
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE:
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_READ:
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
                 ret = pqos_mon_get_value(group, event, NULL, &delta);
                 value = (double)delta;
                 break;

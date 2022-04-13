@@ -174,6 +174,18 @@ monitor_xml_row(FILE *fp,
             {.event = PQOS_MON_EVENT_TMEM_BW,
              .node_name = "mbm_total_MB",
              .format = "%.1f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
+             .node_name = "llc_misses_read",
+             .format = "%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE,
+             .node_name = "llc_misses_write",
+             .format = "%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_READ,
+             .node_name = "llc_references_read",
+             .format = "%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
+             .node_name = "llc_references_write",
+             .format = "%.0f"},
         };
 
         for (i = 0; i < DIM(output); i++) {
@@ -206,7 +218,11 @@ monitor_xml_row(FILE *fp,
                         "\t<core>%s</core>\n"
                         "%s",
                         (char *)mon_data->context, core_list, data);
-        }
+        } else if (monitor_uncore_mode())
+                fprintf(fp,
+                        "\t<socket>%s</socket>\n"
+                        "%s",
+                        (char *)mon_data->context, data);
         fprintf(fp, "%s\n", xml_child_close);
 }
 

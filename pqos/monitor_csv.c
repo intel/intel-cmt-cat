@@ -57,6 +57,8 @@ monitor_csv_begin(FILE *fp)
 #endif
         } else if (monitor_process_mode())
                 fprintf(fp, "Time,PID,Core");
+        else if (monitor_uncore_mode())
+                fprintf(fp, "Time,Socket");
 
         if (events & PQOS_PERF_EVENT_IPC)
                 fprintf(fp, ",IPC");
@@ -76,6 +78,15 @@ monitor_csv_begin(FILE *fp)
                 fprintf(fp, ",MBR[MB/s]");
         if (events & PQOS_MON_EVENT_TMEM_BW)
                 fprintf(fp, ",MBT[MB/s]");
+
+        if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
+                fprintf(fp, ",%11s", "LLC Misses Read");
+        if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE)
+                fprintf(fp, ",%11s", "LLC Misses Write");
+        if (events & PQOS_PERF_EVENT_LLC_REF_PCIE_READ)
+                fprintf(fp, ",%11s", "LLC References Read");
+        if (events & PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)
+                fprintf(fp, ",%11s", "LLC References Write");
 
         fputs("\n", fp);
 }
@@ -169,6 +180,10 @@ monitor_csv_row(FILE *fp,
             {.event = PQOS_MON_EVENT_LMEM_BW, .format = ",%.1f"},
             {.event = PQOS_MON_EVENT_RMEM_BW, .format = ",%.1f"},
             {.event = PQOS_MON_EVENT_TMEM_BW, .format = ",%.1f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ, .format = ",%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE, .format = ",%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_READ, .format = ",%.0f"},
+            {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE, .format = ",%.0f"},
         };
 
         for (i = 0; i < DIM(output); i++) {
@@ -181,7 +196,7 @@ monitor_csv_row(FILE *fp,
                                             events & output[i].event);
         }
 
-        if (monitor_core_mode())
+        if (monitor_core_mode() || monitor_uncore_mode())
                 fprintf(fp, "%s,\"%s\"%s\n", timestamp,
                         (char *)mon_data->context, data);
         else if (monitor_process_mode()) {

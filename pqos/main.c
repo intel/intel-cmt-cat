@@ -871,6 +871,7 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_DISABLE_MON_LLC_MISS 1002
 #define OPTION_VERSION              1003
 #define OPTION_INTERFACE            1004
+#define OPTION_MON_UNCORE           1005
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -885,6 +886,7 @@ static struct option long_cmd_opts[] = {
     {"mon-interval",         required_argument, 0, 'i'},
     {"mon-pid",              required_argument, 0, 'p'},
     {"mon-core",             required_argument, 0, 'm'},
+    {"mon-uncore",           optional_argument, 0, OPTION_MON_UNCORE},
     {"mon-time",             required_argument, 0, 't'},
     {"mon-top",              no_argument,       0, 'T'},
     {"mon-file",             required_argument, 0, 'o'},
@@ -978,6 +980,9 @@ main(int argc, char **argv)
                         break;
                 case 'm':
                         selfn_monitor_cores(optarg);
+                        break;
+                case OPTION_MON_UNCORE:
+                        selfn_monitor_uncore(optarg);
                         break;
                 case 't':
                         selfn_monitor_time(optarg);

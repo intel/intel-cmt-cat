@@ -1443,6 +1443,9 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 group->intl->resctrl.mon_group = NULL;
         }
 
+        if (group->intl->resctrl.l3id != NULL)
+                free(group->intl->resctrl.l3id);
+
 resctrl_mon_stop_exit:
         return ret;
 }

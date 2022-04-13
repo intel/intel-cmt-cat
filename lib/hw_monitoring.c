@@ -46,6 +46,7 @@
 #include "machine.h"
 #include "monitoring.h"
 #include "perf_monitoring.h"
+#include "uncore_monitoring.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -134,12 +135,16 @@ hw_mon_init(const struct pqos_cpuinfo *cpu,
 
 #ifdef __linux__
         ret = perf_mon_init(cpu, cap);
-        /* perf MBM is not supported */
+        if (ret != PQOS_RETVAL_RESOURCE && ret != PQOS_RETVAL_OK)
+                goto hw_mon_init_exit;
+#endif
+
+        ret = uncore_mon_init(cpu, cap);
+        /* uncore is not supported */
         if (ret == PQOS_RETVAL_RESOURCE)
                 ret = PQOS_RETVAL_OK;
         else if (ret != PQOS_RETVAL_OK)
                 goto hw_mon_init_exit;
-#endif
 
 #ifdef PQOS_RMID_CUSTOM
         rmid_cfg.type = cfg->rmid_cfg.type;
@@ -178,6 +183,8 @@ int
 hw_mon_fini(void)
 {
         m_rmid_max = 0;
+
+        uncore_mon_fini();
 
 #ifdef __linux__
         perf_mon_fini();
@@ -936,6 +943,37 @@ hw_mon_start_counter_exit:
         return ret;
 }
 
+/**
+ * @brief Validate if event is listed in capabilities
+ *
+ * @param [in[ cap capabilities structure
+ * @param [in] event monitoring event id
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+validate_event(const struct pqos_cap *cap, const enum pqos_mon_event event)
+{
+        unsigned i;
+
+        for (i = 0; i < (sizeof(event) * 8); i++) {
+                const enum pqos_mon_event evt_mask =
+                    (enum pqos_mon_event)(1U << i);
+                const struct pqos_monitor *ptr = NULL;
+                int retval;
+
+                if (!(evt_mask & event))
+                        continue;
+
+                retval = pqos_cap_get_event(cap, evt_mask, &ptr);
+                if (retval != PQOS_RETVAL_OK || ptr == NULL)
+                        return PQOS_RETVAL_PARAM;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 hw_mon_start(const unsigned num_cores,
              const unsigned *cores,
@@ -967,21 +1005,9 @@ hw_mon_start(const unsigned num_cores,
                 req_events |= (enum pqos_mon_event)(
                     PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_INSTRUCTIONS);
 
-        /**
-         * Validate if event is listed in capabilities
-         */
-        for (i = 0; i < (sizeof(event) * 8); i++) {
-                const enum pqos_mon_event evt_mask =
-                    (enum pqos_mon_event)(1U << i);
-                const struct pqos_monitor *ptr = NULL;
-
-                if (!(evt_mask & event))
-                        continue;
-
-                retval = pqos_cap_get_event(cap, evt_mask, &ptr);
-                if (retval != PQOS_RETVAL_OK || ptr == NULL)
-                        return PQOS_RETVAL_PARAM;
-        }
+        ret = validate_event(cap, event);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         /**
          * Check if all requested cores are valid
@@ -1073,6 +1099,76 @@ pqos_mon_start_error:
 }
 
 int
+hw_mon_start_uncore(const unsigned num_sockets,
+                    const unsigned *sockets,
+                    const enum pqos_mon_event event,
+                    void *context,
+                    struct pqos_mon_data *group)
+{
+        int ret;
+        unsigned i;
+        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu;
+        enum pqos_mon_event started_evts = (enum pqos_mon_event)0;
+
+        ASSERT(group != NULL);
+        ASSERT(sockets != NULL);
+        ASSERT(num_sockets > 0);
+        ASSERT(event > 0);
+
+        _pqos_cap_get(&cap, &cpu);
+
+        ret = validate_event(cap, event);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /* Check if all requested sockets are valid */
+        for (i = 0; i < num_sockets; i++) {
+                unsigned lcore;
+
+                ret = pqos_cpu_get_one_core(cpu, sockets[i], &lcore);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_PARAM;
+        }
+
+        /**
+         * Fill in the monitoring group structure
+         */
+        group->event = event;
+        group->context = context;
+        group->intl->uncore.num_sockets = num_sockets;
+        group->intl->uncore.sockets = (unsigned *)malloc(
+            sizeof(group->intl->uncore.sockets[0]) * num_sockets);
+        if (group->intl->uncore.sockets == NULL)
+                return PQOS_RETVAL_RESOURCE;
+        for (i = 0; i < num_sockets; i++)
+                group->intl->uncore.sockets[i] = sockets[i];
+
+        ret = uncore_mon_start(group, event);
+        if (ret != PQOS_RETVAL_OK)
+                goto hw_mon_start_uncore__exit;
+
+        started_evts |= group->intl->hw.event;
+
+        /*  Check if all selected events were started */
+        if ((group->event & started_evts) != group->event) {
+                LOG_ERROR("Failed to start all selected "
+                          "HW monitoring events\n");
+                ret = PQOS_RETVAL_ERROR;
+        }
+
+hw_mon_start_uncore__exit:
+        if (ret != PQOS_RETVAL_OK) {
+                uncore_mon_stop(group);
+
+                if (group->intl->uncore.sockets != NULL)
+                        free(group->intl->uncore.sockets);
+        }
+
+        return ret;
+}
+
+int
 hw_mon_stop(struct pqos_mon_data *group)
 {
         int ret = PQOS_RETVAL_OK;
@@ -1082,10 +1178,12 @@ hw_mon_stop(struct pqos_mon_data *group)
 
         ASSERT(group != NULL);
 
-        if (group->num_cores == 0 || group->cores == NULL ||
-            group->intl->hw.num_ctx == 0 || group->intl->hw.ctx == NULL) {
+        if (group->num_cores == 0 && group->intl->uncore.num_sockets == 0) {
                 return PQOS_RETVAL_PARAM;
-        }
+        } else if (group->num_cores > 0 &&
+                   (group->cores == NULL || group->intl->hw.num_ctx == 0 ||
+                    group->intl->hw.ctx == NULL))
+                return PQOS_RETVAL_PARAM;
 
         _pqos_cap_get(NULL, &cpu);
 
@@ -1122,12 +1220,16 @@ hw_mon_stop(struct pqos_mon_data *group)
         if (ret != PQOS_RETVAL_OK)
                 retval = ret;
 
+        /* stop uncore counters */
+        ret = uncore_mon_stop(group);
+        if (ret != PQOS_RETVAL_OK)
+                retval = ret;
+
         /**
          * Free poll contexts, core list and clear the group structure
          */
         free(group->cores);
         free(group->intl->hw.ctx);
-        memset(group, 0, sizeof(*group));
 
         return retval;
 }
@@ -1295,7 +1397,7 @@ hw_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         case PQOS_MON_EVENT_TMEM_BW:
                 ret = hw_mon_read_counter(group, event);
                 if (ret != PQOS_RETVAL_OK)
-                        goto pqos_core_poll__exit;
+                        goto hw_mon_poll__exit;
                 break;
         case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
         case (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS:
@@ -1303,13 +1405,21 @@ hw_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         case PQOS_PERF_EVENT_LLC_REF:
                 ret = hw_mon_read_perf(group, event);
                 if (ret != PQOS_RETVAL_OK)
-                        goto pqos_core_poll__exit;
+                        goto hw_mon_poll__exit;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_READ:
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE:
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_READ:
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
+                ret = uncore_mon_poll(group, event);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_poll__exit;
                 break;
         default:
                 ret = PQOS_RETVAL_PARAM;
         }
 
-pqos_core_poll__exit:
+hw_mon_poll__exit:
         return ret;
 }
 /*

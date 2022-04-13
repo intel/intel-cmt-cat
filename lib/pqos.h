@@ -588,6 +588,25 @@ int pqos_mon_remove_pids(const unsigned num_pids,
                          struct pqos_mon_data *group);
 
 /**
+ * @brief Starts uncore monitoring of selected \a sockets
+ *
+ * @param [in] num_sockets number of sockets in \a sockets array
+ * @param [in] sockets array of socket IDs
+ * @param [in] event monitoring event id
+ * @param [in] context a pointer for application's convenience
+ *             (unused by the library)
+ * @param [out] group a pointer to monitoring structure
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_start_uncore(const unsigned num_sockets,
+                          const unsigned *sockets,
+                          const enum pqos_mon_event event,
+                          void *context,
+                          struct pqos_mon_data **group);
+
+/**
  * @brief Stops resource monitoring data for selected monitoring group
  *
  * @param [in] group monitoring context for selected number of cores

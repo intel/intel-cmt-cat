@@ -76,11 +76,17 @@ static struct pqos_api {
         int (*mon_add_pids)(const unsigned num_pids,
                             const pid_t *pids,
                             struct pqos_mon_data *group);
-        /**  Remove pids from the resource monitoring group */
+        /** Remove pids from the resource monitoring group */
         int (*mon_remove_pids)(const unsigned num_pids,
                                const pid_t *pids,
                                struct pqos_mon_data *group);
-        /*Stops resource monitoring data for selected monitoring group */
+        /** Starts uncore monitoring */
+        int (*mon_start_uncore)(const unsigned num_sockets,
+                                const unsigned *sockets,
+                                const enum pqos_mon_event event,
+                                void *context,
+                                struct pqos_mon_data *group);
+        /** Stops resource monitoring data for selected monitoring group */
         int (*mon_stop)(struct pqos_mon_data *group);
 
         /** Associates lcore with given class of service */
@@ -187,6 +193,7 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = hw_mba_get_amd;
                         api.mba_set = hw_mba_set_amd;
                 } else {
+                        api.mon_start_uncore = hw_mon_start_uncore;
                         api.mba_get = hw_mba_get;
                         api.mba_set = hw_mba_set;
                 }
@@ -705,6 +712,7 @@ int
 pqos_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
+        int manage_memory;
 
         if (group == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -727,9 +735,12 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
+        manage_memory = group->intl->manage_memory;
         free(group->intl);
-        group->intl = NULL;
-        group->valid = 0;
+        if (manage_memory)
+                free(group);
+        else
+                memset(group, 0, sizeof(*group));
 
         _pqos_api_unlock();
 
@@ -882,6 +893,71 @@ pqos_mon_remove_pids(const unsigned num_pids,
 }
 
 int
+pqos_mon_start_uncore(const unsigned num_sockets,
+                      const unsigned *sockets,
+                      const enum pqos_mon_event event,
+                      void *context,
+                      struct pqos_mon_data **group)
+{
+        int ret;
+        struct pqos_mon_data *data = NULL;
+
+        if (num_sockets == 0 || sockets == NULL || group == NULL || event == 0)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Validate event parameter
+         */
+        if ((event & (PQOS_PERF_EVENT_LLC_MISS_PCIE_READ |
+                      PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE |
+                      PQOS_PERF_EVENT_LLC_REF_PCIE_READ |
+                      PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)) == 0)
+                return PQOS_RETVAL_PARAM;
+
+        _pqos_api_lock();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                _pqos_api_unlock();
+                return ret;
+        }
+
+        data = calloc(1, sizeof(*data));
+        if (data == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_mon_start_uncore_exit;
+        }
+
+        data->intl = calloc(1, sizeof(*data->intl));
+        if (data->intl == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_mon_start_uncore_exit;
+        }
+        data->intl->manage_memory = 1;
+
+        if (api.mon_start_uncore != NULL)
+                ret = api.mon_start_uncore(num_sockets, sockets, event, context,
+                                           data);
+        else {
+                LOG_INFO(UNSUPPORTED_INTERFACE);
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+pqos_mon_start_uncore_exit:
+        if (ret == PQOS_RETVAL_OK) {
+                data->valid = GROUP_VALID_MARKER;
+                *group = data;
+        } else if (data != NULL) {
+                free(data->intl);
+                free(data);
+        }
+
+        _pqos_api_unlock();
+
+        return ret;
+}
+
+int
 pqos_mon_get_value(const struct pqos_mon_data *const group,
                    const enum pqos_mon_event event_id,
                    uint64_t *value,
@@ -946,6 +1022,22 @@ pqos_mon_get_value(const struct pqos_mon_data *const group,
                 _value = group->intl->values.llc_references;
                 _delta = group->intl->values.llc_references_delta;
 #endif
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_READ:
+                _value = group->intl->values.pcie.llc_misses.read;
+                _delta = group->intl->values.pcie.llc_misses.read_delta;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE:
+                _value = group->intl->values.pcie.llc_misses.write;
+                _delta = group->intl->values.pcie.llc_misses.write_delta;
+                break;
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_READ:
+                _value = group->intl->values.pcie.llc_references.read;
+                _delta = group->intl->values.pcie.llc_references.read_delta;
+                break;
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
+                _value = group->intl->values.pcie.llc_references.write;
+                _delta = group->intl->values.pcie.llc_references.write_delta;
                 break;
         default:
                 LOG_ERROR("Unknown event %x\n", event_id);

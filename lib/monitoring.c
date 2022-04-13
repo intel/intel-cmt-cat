@@ -147,7 +147,11 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
             PQOS_PERF_EVENT_LLC_MISS,
             PQOS_PERF_EVENT_LLC_REF,
             (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
-            (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
+            (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS,
+            PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
+            PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE,
+            PQOS_PERF_EVENT_LLC_REF_PCIE_READ,
+            PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE};
 
 #ifdef __linux__
         if (group->intl->resctrl.event != 0) {

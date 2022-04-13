@@ -34,9 +34,63 @@
 
 #include "mock_test.h"
 
+#include <string.h>
+
 int
 __wrap_uncore_mon_discover(enum pqos_mon_event *event)
 {
         *event = 0;
         return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_uncore_mon_init(const struct pqos_cpuinfo *cpu,
+                       const struct pqos_cap *cap)
+{
+        assert_non_null(cpu);
+        assert_non_null(cap);
+
+        return PQOS_RETVAL_RESOURCE;
+}
+
+int
+__wrap_uncore_mon_fini(void)
+{
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_uncore_mon_start(struct pqos_mon_data *group,
+                        const enum pqos_mon_event event)
+{
+        assert_non_null(group);
+        assert_int_not_equal(event, 0);
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_uncore_mon_stop(struct pqos_mon_data *group)
+{
+        assert_non_null(group);
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_uncore_mon_poll(struct pqos_mon_data *group,
+                       const enum pqos_mon_event event)
+{
+        assert_non_null(group);
+        assert_int_not_equal(event, 0);
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_uncore_mon_is_event_supported(const enum pqos_mon_event event)
+{
+        assert_int_not_equal(event, 0);
+
+        return 0;
 }

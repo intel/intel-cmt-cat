@@ -72,6 +72,8 @@ monitor_text_header(FILE *fp, const char *timestamp)
 #endif
         } else if (monitor_process_mode())
                 fprintf(fp, "     PID     CORE");
+        else if (monitor_uncore_mode())
+                fprintf(fp, "  SOCKET");
 
         if (events & PQOS_PERF_EVENT_IPC)
                 fprintf(fp, "         IPC");
@@ -91,6 +93,15 @@ monitor_text_header(FILE *fp, const char *timestamp)
                 fprintf(fp, "   MBR[MB/s]");
         if (events & PQOS_MON_EVENT_TMEM_BW)
                 fprintf(fp, "   MBT[MB/s]");
+
+        if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
+                fprintf(fp, " %11s", "MISS_READ");
+        if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE)
+                fprintf(fp, " %11s", "MISS_WRITE");
+        if (events & PQOS_PERF_EVENT_LLC_REF_PCIE_READ)
+                fprintf(fp, " %11s", "REF_READ");
+        if (events & PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)
+                fprintf(fp, " %11s", "REF_WRITE");
 }
 
 /**
@@ -182,6 +193,18 @@ monitor_text_row(FILE *fp,
             {.event = PQOS_MON_EVENT_LMEM_BW, .unit = 1, .format = " %11.1f"},
             {.event = PQOS_MON_EVENT_RMEM_BW, .unit = 1, .format = " %11.1f"},
             {.event = PQOS_MON_EVENT_TMEM_BW, .unit = 1, .format = " %11.1f"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
+             .unit = 1000,
+             .format = " %10.0fk"},
+            {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE,
+             .unit = 1000,
+             .format = " %10.0fk"},
+            {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_READ,
+             .unit = 1000,
+             .format = " %10.0fk"},
+            {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
+             .unit = 1000,
+             .format = " %10.0fk"},
         };
 
         for (i = 0; i < DIM(output); i++) {
@@ -195,7 +218,7 @@ monitor_text_row(FILE *fp,
                                              events & output[i].event);
         }
 
-        if (monitor_core_mode())
+        if (monitor_core_mode() || monitor_uncore_mode())
                 fprintf(fp, "\n%8.8s%s", (char *)mon_data->context, data);
         else if (monitor_process_mode()) {
                 memset(core_list, 0, sizeof(core_list));

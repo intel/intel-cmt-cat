@@ -70,15 +70,29 @@ struct pqos_mon_perf_ctx {
  * Internal monitoring group data structure
  */
 struct pqos_mon_data_internal {
-#if PQOS_VERSION < 50000
         /**
          * The structure to store monitoring data
          */
         struct {
+#if PQOS_VERSION < 50000
                 uint64_t llc_references;       /**< LLC references - reading */
                 uint64_t llc_references_delta; /**< LLC references - delta */
-        } values;
 #endif
+                struct {
+                        struct {
+                                uint64_t read;
+                                uint64_t read_delta;
+                                uint64_t write;
+                                uint64_t write_delta;
+                        } llc_misses;
+                        struct {
+                                uint64_t read;
+                                uint64_t read_delta;
+                                uint64_t write;
+                                uint64_t write_delta;
+                        } llc_references;
+                } pcie;
+        } values;
 
         /**
          * Perf specific section
@@ -113,7 +127,14 @@ struct pqos_mon_data_internal {
                 unsigned num_ctx;              /**< number of poll contexts */
         } hw;
 
+        /* Uncore specific section */
+        struct {
+                unsigned num_sockets;
+                unsigned *sockets;
+        } uncore;
+
         int valid_mbm_read; /**< flag to discard 1st invalid read */
+        int manage_memory;  /**< mon data memory is managed by lib */
 };
 
 /**
