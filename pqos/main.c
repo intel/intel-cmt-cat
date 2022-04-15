@@ -131,10 +131,15 @@ static int sel_interface_selected = 0;
 static int sel_print_version = 0;
 
 #ifdef PQOS_RMID_CUSTOM
+/** rmid table max elements */
+unsigned rmid_map_rmid_max_elems = 128;
+/** core table max elements */
+unsigned rmid_map_core_max_elems = 128;
+
 /** rmid table */
-static pqos_rmid_t sel_rmid_map_rmid[PQOS_MAX_CORES];
+static pqos_rmid_t *sel_rmid_map_rmid = NULL;
 /** core table */
-static unsigned sel_rmid_map_core[PQOS_MAX_CORES];
+static unsigned *sel_rmid_map_core = NULL;
 /** Custom RMID configuration */
 static struct pqos_rmid_config sel_rmid_cfg = {
     PQOS_RMID_TYPE_DEFAULT,
@@ -231,13 +236,18 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                                 start = end;
                                 end = n;
                         }
+                        if (end > UINT_FAST64_MAX) {
+                                printf("Too large group items.\n");
+                                exit(EXIT_FAILURE);
+                        }
                         for (n = start; n <= end; n++) {
                                 if (!(isdup(tab, index, n))) {
                                         tab[index] = n;
                                         index++;
                                 }
                                 if (index >= max)
-                                        return index;
+                                        parse_error(
+                                            s, "Too many groups selected.\n");
                         }
                 } else {
                         /**
@@ -251,11 +261,110 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                                 index++;
                         }
                         if (index >= max)
-                                return index;
+                                parse_error(s, "Too many groups selected.\n");
                 }
         }
 
         return index;
+}
+
+unsigned
+strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
+{
+        unsigned index = 0;
+        char *saveptr = NULL;
+
+        if (s == NULL || (*tab) == NULL || *max == 0)
+                return index;
+
+        for (;;) {
+                char *p = NULL;
+                char *token = NULL;
+
+                token = strtok_r(s, ",", &saveptr);
+                if (token == NULL)
+                        break;
+
+                s = NULL;
+
+                /* get rid of leading spaces & skip empty tokens */
+                while (isspace(*token))
+                        token++;
+                if (*token == '\0')
+                        continue;
+
+                p = strchr(token, '-');
+                if (p != NULL) {
+                        /**
+                         * range of numbers provided
+                         * example: 1-5 or 12-9
+                         */
+                        uint64_t n, start, end;
+                        *p = '\0';
+                        start = strtouint64(token);
+                        end = strtouint64(p + 1);
+                        if (start > end) {
+                                /**
+                                 * no big deal just swap start with end
+                                 */
+                                n = start;
+                                start = end;
+                                end = n;
+                        }
+                        if (end > UINT_FAST64_MAX) {
+                                printf("Too large group items.\n");
+                                exit(EXIT_FAILURE);
+                        }
+                        for (n = start; n <= end; n++) {
+                                if (!(isdup(*tab, index, n))) {
+                                        (*tab)[index] = n;
+                                        index++;
+                                }
+                                if (index >= *max) {
+                                        (*tab) = realloc_and_init(
+                                            *tab, max, sizeof(**tab));
+                                        if ((*tab) == NULL) {
+                                                printf("Reallocation error!\n");
+                                                exit(EXIT_FAILURE);
+                                        }
+                                }
+                        }
+                } else {
+                        /**
+                         * single number provided here
+                         * remove duplicates if necessary
+                         */
+                        uint64_t val = strtouint64(token);
+
+                        if (!(isdup((*tab), index, val))) {
+                                (*tab)[index] = val;
+                                index++;
+                        }
+                        if (index >= *max) {
+                                (*tab) =
+                                    realloc_and_init(*tab, max, sizeof(**tab));
+                                if ((*tab) == NULL) {
+                                        printf("Reallocation error!\n");
+                                        exit(EXIT_FAILURE);
+                                }
+                        }
+                }
+        }
+
+        return index;
+}
+
+void *
+realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size)
+{
+        size_t prev_size = elem_size * *elem_count;
+        *elem_count = *elem_count * 2;
+        size_t next_size = elem_size * *elem_count;
+        uint8_t *tmp_ptr = realloc(ptr, next_size);
+
+        if (tmp_ptr != NULL)
+                memset(tmp_ptr + prev_size, 0, next_size - prev_size);
+        return tmp_ptr;
 }
 
 __attribute__((noreturn)) void
@@ -466,6 +575,7 @@ selfn_monitor_rmids(const char *arg)
 {
         char *cp = NULL, *str = NULL;
         char *saveptr = NULL;
+        uint64_t *cores = NULL;
 
         if (arg == NULL)
                 parse_error(arg, "NULL pointer!");
@@ -482,13 +592,19 @@ selfn_monitor_rmids(const char *arg)
                 char *p = NULL;
                 pqos_rmid_t rmid;
                 unsigned count;
-                uint64_t cores[PQOS_MAX_CORES];
+                unsigned core_list_size = 128;
                 unsigned i;
 
                 token = strtok_r(str, ";", &saveptr);
                 if (token == NULL)
                         break;
-
+                if (cores == NULL) {
+                        cores = calloc(core_list_size, sizeof(*cores));
+                        if (cores == NULL) {
+                                printf("Error with memory allocation!\n");
+                                goto error_exit;
+                        }
+                }
                 p = strchr(token, '=');
                 if (p == NULL)
                         parse_error(str, "Invalid RMID association format");
@@ -496,23 +612,48 @@ selfn_monitor_rmids(const char *arg)
 
                 rmid = (pqos_rmid_t)strtouint64(token);
 
-                count = strlisttotab(p + 1, cores, DIM(cores));
-                if (count == 0)
-                        return;
-
-                if (sel_rmid_cfg.map.num + count > PQOS_MAX_CORES)
-                        parse_error(
-                            p, "too many cores selected for RMID association");
+                count = strlisttotabrealloc(p + 1, &cores, &core_list_size);
 
                 for (i = 0; i < count; i++) {
                         sel_rmid_cfg.map.core[sel_rmid_cfg.map.num] =
                             (unsigned)cores[i];
                         sel_rmid_cfg.map.rmid[sel_rmid_cfg.map.num] = rmid;
                         sel_rmid_cfg.map.num++;
+                        if (sel_rmid_cfg.map.num >= rmid_map_rmid_max_elems) {
+                                sel_rmid_cfg.map.rmid = realloc_and_init(
+                                    sel_rmid_cfg.map.rmid,
+                                    &rmid_map_rmid_max_elems,
+                                    sizeof(*sel_rmid_cfg.map.rmid));
+                                if (sel_rmid_cfg.map.rmid == NULL) {
+                                        printf("Error with memory "
+                                               "reallocation!\n");
+                                        goto error_exit;
+                                }
+                        }
+                        if (sel_rmid_cfg.map.num >= rmid_map_core_max_elems) {
+                                sel_rmid_cfg.map.core = realloc_and_init(
+                                    sel_rmid_cfg.map.core,
+                                    &rmid_map_core_max_elems,
+                                    sizeof(*sel_rmid_cfg.map.core));
+                                if (sel_rmid_cfg.map.core == NULL) {
+                                        printf("Error with memory "
+                                               "reallocation!\n");
+                                        goto error_exit;
+                                }
+                        }
                 }
+                free(cores);
+                cores = NULL;
         }
-
+        if (cores != NULL)
+                free(cores);
         free(cp);
+        return;
+error_exit:
+        if (cores != NULL)
+                free(cores);
+        free(cp);
+        exit(EXIT_FAILURE);
 }
 #endif
 
@@ -927,6 +1068,26 @@ main(int argc, char **argv)
         m_cmd_name = argv[0];
         print_warning();
 
+#ifdef PQOS_RMID_CUSTOM
+        sel_rmid_map_rmid =
+            calloc(rmid_map_rmid_max_elems, sizeof(*sel_rmid_map_rmid));
+        if (sel_rmid_map_rmid == NULL) {
+                printf("Error with memory allocation!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_1;
+        }
+        sel_rmid_map_core =
+            calloc(rmid_map_core_max_elems, sizeof(*sel_rmid_map_core));
+        if (sel_rmid_map_core == NULL) {
+                printf("Error with memory allocation!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_1;
+        }
+        sel_rmid_cfg.type = PQOS_RMID_TYPE_DEFAULT;
+        sel_rmid_cfg.map.num = 0;
+        sel_rmid_cfg.map.rmid = sel_rmid_map_rmid;
+        sel_rmid_cfg.map.core = sel_rmid_map_core;
+#endif
         memset(&cfg, 0, sizeof(cfg));
 
         while ((cmd = getopt_long(argc, argv,
@@ -1140,7 +1301,6 @@ main(int argc, char **argv)
 #ifdef PQOS_RMID_CUSTOM
         cfg.rmid_cfg = sel_rmid_cfg;
 #endif
-
         ret = pqos_init(&cfg);
         if (ret != PQOS_RETVAL_OK) {
                 printf("Error initializing PQoS library!\n");
@@ -1318,6 +1478,11 @@ error_exit_1:
                 free(sel_config_file);
         if (l3cat_ids != NULL)
                 free(l3cat_ids);
-
+#ifdef PQOS_RMID_CUSTOM
+        if (sel_rmid_map_rmid != NULL)
+                free(sel_rmid_map_rmid);
+        if (sel_rmid_map_core != NULL)
+                free(sel_rmid_map_core);
+#endif
         return exit_val;
 }

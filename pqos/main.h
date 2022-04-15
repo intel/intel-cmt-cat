@@ -41,10 +41,11 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 
 /**
- * Macros
+ * Macros to return the maximum number of array elements
  */
 #ifndef MAX
 /**
@@ -57,11 +58,6 @@ extern "C" {
                 _a > _b ? _a : _b;                                             \
         })
 #endif /* !MAX */
-
-#define PQOS_MAX_SOCKETS      8
-#define PQOS_MAX_SOCKET_CORES 128
-#define PQOS_MAX_CORES        (PQOS_MAX_SOCKET_CORES * PQOS_MAX_SOCKETS)
-#define PQOS_MAX_L2IDS        PQOS_MAX_CORES
 
 /**
  * Maintains alloc option - allocate cores or task id's
@@ -106,6 +102,10 @@ uint64_t strtouint64(const char *s);
  * @return Number of elements placed into \a tab
  */
 unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
+
+unsigned strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max);
+
+void *realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size);
 
 /**
  * @brief Common function to handle string parsing errors

@@ -86,12 +86,17 @@ static unsigned sel_alloc_mod = 0;
 static int sel_assoc_core_num = 0;
 
 /**
+ * Max number of elements in sel_assoc_tab array
+ */
+static unsigned sel_assoc_tab_size = 128;
+
+/**
  * Core to COS associations details
  */
 static struct {
         unsigned core;
         unsigned class_id;
-} sel_assoc_tab[PQOS_MAX_CORES];
+} *sel_assoc_tab = NULL;
 
 /**
  * Number of Task ID to COS associations to be done
@@ -524,7 +529,8 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
         char *q = NULL, *p = NULL;
         char *s = NULL, *saveptr = NULL;
         enum sel_alloc_type type;
-        const unsigned max_res_sz = MAX(PQOS_MAX_SOCKETS, PQOS_MAX_L2IDS);
+
+        const unsigned max_res_sz = 256;
         unsigned res_ids[max_res_sz], *sp = NULL, i, n = 1;
 
         selfn_strdup(&s, str);
@@ -554,7 +560,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                 }
                 /* check for invalid resource ID */
                 for (i = 0; i < n; i++) {
-                        if (ids[i] >= max_res_sz) {
+                        if (ids[i] >= UINT_MAX) {
                                 printf("Resource ID out of range: %s\n", s);
                                 free(s);
                                 return ret;
@@ -704,7 +710,10 @@ set_allocation_assoc(void)
                         return -1;
                 }
         }
-
+        if (sel_assoc_tab != NULL) {
+                free(sel_assoc_tab);
+                sel_assoc_tab = NULL;
+        }
         return sel_assoc_core_num | sel_assoc_pid_num;
 }
 
@@ -717,9 +726,23 @@ set_allocation_assoc(void)
 static void
 fill_core_tab(char *str)
 {
-        uint64_t cores[PQOS_MAX_CORES];
+        unsigned max_cores_count = 128;
+        uint64_t *cores = calloc(max_cores_count, sizeof(uint64_t));
         unsigned i = 0, n = 0, cos = 0;
         char *p = NULL;
+
+        if (cores == NULL) {
+                printf("Error with memory allocation!\n");
+                goto error_exit;
+        }
+        if (sel_assoc_tab == NULL) {
+                sel_assoc_tab =
+                    calloc(sel_assoc_tab_size, sizeof(*sel_assoc_tab));
+                if (sel_assoc_tab == NULL) {
+                        printf("Error with memory allocation!\n");
+                        goto error_exit;
+                }
+        }
 
         if (strncasecmp(str, "cos:", 4) == 0)
                 str += strlen("cos:");
@@ -735,23 +758,28 @@ fill_core_tab(char *str)
         *p = '\0';
 
         cos = (unsigned)strtouint64(str);
+        n = strlisttotabrealloc(p + 1, &cores, &max_cores_count);
 
-        n = strlisttotab(p + 1, cores, DIM(cores));
         if (n == 0)
-                return;
+                goto normal_exit;
 
         if (sel_assoc_core_num <= 0) {
                 for (i = 0; i < n; i++) {
-                        if (i >= DIM(sel_assoc_tab))
-                                parse_error(str, "too many cores selected for "
-                                                 "allocation association");
+                        if (i >= sel_assoc_tab_size) {
+                                sel_assoc_tab = realloc_and_init(
+                                    sel_assoc_tab, &sel_assoc_tab_size,
+                                    sizeof(*sel_assoc_tab));
+                                if (sel_assoc_tab == NULL) {
+                                        printf("Reallocation error!\n");
+                                        goto error_exit;
+                                }
+                        }
                         sel_assoc_tab[i].core = (unsigned)cores[i];
                         sel_assoc_tab[i].class_id = cos;
                 }
                 sel_assoc_core_num = (int)n;
-                return;
+                goto normal_exit;
         }
-
         for (i = 0; i < n; i++) {
                 int j;
 
@@ -774,15 +802,29 @@ fill_core_tab(char *str)
                          */
                         unsigned k = (unsigned)sel_assoc_core_num;
 
-                        if (k >= DIM(sel_assoc_tab))
-                                parse_error(str, "too many cores selected for "
-                                                 "allocation association");
+                        if (k >= sel_assoc_tab_size) {
+                                sel_assoc_tab = realloc_and_init(
+                                    sel_assoc_tab, &sel_assoc_tab_size,
+                                    sizeof(*sel_assoc_tab));
+                                if (sel_assoc_tab == NULL) {
+                                        printf("Reallocation error!\n");
+                                        goto error_exit;
+                                }
+                        }
 
                         sel_assoc_tab[k].core = (unsigned)cores[i];
                         sel_assoc_tab[k].class_id = cos;
                         sel_assoc_core_num++;
                 }
         }
+normal_exit:
+        if (cores != NULL)
+                free(cores);
+        return;
+error_exit:
+        if (cores != NULL)
+                free(cores);
+        exit(EXIT_FAILURE);
 }
 
 /**

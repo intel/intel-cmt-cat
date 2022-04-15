@@ -78,6 +78,11 @@
 #define PID_COL_STIME  (15) /**< col for cpu-kernel time in /proc/pid/stat */
 
 #define TIMEOUT_INFINITE ((unsigned)-1)
+
+#define REALLOC_ALLOWED    1
+#define REALLOC_DISALLOWED 0
+#define CORE_LIST_SIZE     128
+
 /**
  * Local data structures
  *
@@ -283,7 +288,6 @@ grp_set_core(struct mon_group *cg,
          */
         for (i = 0; i < num_cores; i++)
                 cg->cores[i] = (unsigned)cores[i];
-
         return 0;
 }
 
@@ -393,11 +397,10 @@ grp_set_uncore(struct mon_group *group,
 static int
 grp_cmp_core(const struct mon_group *cg_a, const struct mon_group *cg_b)
 {
-        int i, found = 0;
-
         ASSERT(cg_a != NULL);
         ASSERT(cg_b != NULL);
 
+        int i, found = 0;
         const int sz_a = cg_a->num_res;
         const int sz_b = cg_b->num_res;
         const unsigned *tab_a = cg_a->cores;
@@ -716,6 +719,8 @@ parse_event(const char *str, enum pqos_mon_event *evt)
                 parse_error(str, "Unrecognized monitoring event type");
 }
 
+#define PARSE_MON_GRP_BUFF_SIZE 1500
+
 /**
  * @brief Function to set the descriptions and cores/pids for each monitoring
  * group
@@ -731,7 +736,7 @@ parse_monitor_group(char *str, enum mon_group_type type)
         enum pqos_mon_event evt = (enum pqos_mon_event)0;
         unsigned group_count = 0;
         unsigned i;
-        uint64_t cbuf[PQOS_MAX_CORES];
+        uint64_t cbuf[PARSE_MON_GRP_BUFF_SIZE];
         char *non_grp = NULL;
 
         parse_event(str, &evt);
