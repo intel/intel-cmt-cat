@@ -239,11 +239,20 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
         const enum pqos_mon_event perf_events = (enum pqos_mon_event)(
             PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS);
 
+        const enum pqos_mon_event uncore_events =
+            (enum pqos_mon_event)(PQOS_PERF_EVENT_LLC_MISS_PCIE_READ |
+                                  PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE |
+                                  PQOS_PERF_EVENT_LLC_REF_PCIE_READ |
+                                  PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE);
+
         for (i = 0; (unsigned)i < cap_mon->u.mon->num_events; i++)
                 sel_events_max |= (cap_mon->u.mon->events[i].type);
 
         /* Remove perf events IPC and LLC MISSES */
         sel_events_max &= ~perf_events;
+        /* Remove uncore events */
+        sel_events_max &= ~uncore_events;
+
         if (sel_monitor_num == 0 && sel_process_num == 0) {
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore = cpu_info->cores[i].lcore;
