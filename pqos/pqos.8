@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH PQOS 8 "May 08, 2020"
+.TH PQOS 8 "Apr 19, 2022"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -220,6 +220,23 @@ The \-I option must be used for PID monitoring.
 It is not possible to track both processes and cores at the same time.
 .RE
 .RE
+
+.TP
+.B \-\-mon-uncore[=EVTUNCORE]
+select sockets and uncore events for monitoring, EVTUNCORE format is 'EVENT:SOCKET_LIST.
+Socket's IDs can be grouped by enclosing them in square brackets.
+.br
+Examples:
+.RS
+.RS
+"--mon-uncore"
+.br
+"--mon-uncore=all:0"
+.RE
+.PP
+Note:
+It is not possible to track both sockets and cores at the same time.
+.RE
 .TP
 .B \-T, \-\-mon-top
 enable top like monitoring output sorted by highest LLC occupancy
@@ -258,7 +275,7 @@ set the library interface to use the kernel implementation. If not set the defau
 set the library interface to automatically detected one ('auto'), MSR ('msr') or kernel interface ('os').
 INTERFACE can be set to either 'auto' (default), 'msr' or 'os'. If automatic detection is selected ('auto'), it:
 .br
-1) Takes RDT_IFACE environment variable into account if this variable is set\n
+1) Takes RDT_IFACE environment variable into account if this variable is set
 .br
 2) Selects OS interface if the kernel interface is supported
 .br
