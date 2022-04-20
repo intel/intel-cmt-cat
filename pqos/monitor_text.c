@@ -66,7 +66,7 @@ monitor_text_header(FILE *fp, const char *timestamp)
 #ifdef PQOS_RMID_CUSTOM
                 enum pqos_interface iface;
 
-                pqos_get_inter(&iface);
+                pqos_inter_get(&iface);
                 if (iface == PQOS_INTER_MSR)
                         fprintf(fp, " RMID");
 #endif
@@ -167,14 +167,14 @@ monitor_text_row(FILE *fp,
 #ifdef PQOS_RMID_CUSTOM
         enum pqos_interface iface;
 
-        pqos_get_inter(&iface);
+        pqos_inter_get(&iface);
         if (iface == PQOS_INTER_MSR) {
                 pqos_rmid_t rmid;
                 int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
 
                 offset += fillin_text_column(
                     " %4.0f", (double)rmid, data + offset, sz_data - offset,
-                    ret == PQOS_RETVAL_OK, sel_interface == PQOS_INTER_MSR);
+                    ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR);
         }
 #endif
         struct {

@@ -133,26 +133,20 @@ void selfn_monitor_disable_llc_miss(const char *arg);
  * @brief Check to determine if processes are monitored
  *
  * @return Process monitoring mode status
- * @retval 0 monitoring cores
- * @retval 1 monitoring processes
  */
 int monitor_process_mode(void);
 
 /**
  * @brief Check to determine if cores are monitored
  *
- * @return Process monitoring mode status
- * @retval 0 monitoring cores
- * @retval 1 monitoring processes
+ * @return Core monitoring mode status
  */
 int monitor_core_mode(void);
 
 /**
  * @brief Check to determine if uncore monitoring is started
  *
- * @return Process monitoring mode status
- * @retval 0 monitoring cores
- * @retval 1 monitoring processes
+ * @return Uncore monitoring mode status
  */
 int monitor_uncore_mode(void);
 
