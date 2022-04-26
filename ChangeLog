@@ -1,4 +1,28 @@
 =======================================================================
+Release  v4.4.0  2022-04-25
+=======================================================================
+
+Contributors (alphabetical order):
+        Andrzej Dziarnik <andrzejx.dziarnik@intel.com>
+        Chen Guanqiao <chen.chenchacha@foxmail.com>
+        Colin Ian King <colin.i.king@gmail.com>
+        Georg Sauthoff <mail@gms.tf>
+        Michał Aleksiński <michalx.aleksinski@intel.com>
+
+1. Library:
+        - Added LLC references monitoring event
+        - Added uncore monitoring support
+2. PQoS
+        - Added LLC references monitoring event
+        - Added uncore monitoring support
+        - Removed cpu topology limits
+3. App QoS
+        - Added L2 CAT support
+4. General:
+        - Added scan-build static analysis
+        - Bug fixes
+
+=======================================================================
 Release  v4.3.0  2021-11-12
 =======================================================================
 

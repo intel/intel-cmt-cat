@@ -56,7 +56,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION      40300 /**< version 4.3.0 */
+#define PQOS_VERSION      40400 /**< version 4.4.0 */
 #define PQOS_MAX_COS      16    /**< 16 x COS */
 #define PQOS_MAX_L3CA_COS PQOS_MAX_COS
 #define PQOS_MAX_L2CA_COS PQOS_MAX_COS
@@ -1297,7 +1297,7 @@ enum pqos_vendor pqos_get_vendor(const struct pqos_cpuinfo *cpu);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-#ifndef SWIG
+#if !defined(SWIG) && !defined(SWIGPERL)
 __attribute__((deprecated))
 #endif
 static inline int

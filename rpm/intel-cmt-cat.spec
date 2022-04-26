@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    4.3.0
+%global githubver    4.4.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -38,7 +38,7 @@
 
 Summary:            Provides command line interface to CMT, MBM, CAT, CDP and MBA technologies
 Name:               %{githubname}
-Release:            2%{?dist}
+Release:            1%{?dist}
 Version:            %{githubver}
 License:            BSD
 Group:              Development/Tools
@@ -181,6 +181,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Tue Apr 12 2022  Michal Aleksinski <michalx.aleksinski@intel.com> 4.4.0-1
+- New release 4.4.0
+
 * Mon Dec 20 2021  Chen Guanqiao <chen.chenchacha@foxmail.com> 4.3.0-2
 - Spec file bug fixes
 

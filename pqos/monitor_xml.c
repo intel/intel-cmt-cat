@@ -137,7 +137,7 @@ monitor_xml_row(FILE *fp,
         enum pqos_interface iface;
 
         pqos_inter_get(&iface);
-        if (iface == PQOS_INTER_MSR) {
+        if (iface == PQOS_INTER_MSR && monitor_core_mode()) {
                 pqos_rmid_t rmid;
                 int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
 
