@@ -72,8 +72,21 @@ $(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=puts \
-		-Wl,--wrap=printf\
-		-Wl,--wrap=exit\
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=pqos_l3ca_get \
+		-Wl,--wrap=pqos_l2ca_get \
+		-Wl,--wrap=pqos_mba_get \
+		-Wl,--wrap=pqos_pid_get_pid_assoc \
+		-Wl,--wrap=pqos_alloc_assoc_get \
+		-Wl,--wrap=pqos_mon_assoc_get \
+		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=pqos_mba_set \
+		-Wl,--wrap=pqos_l3ca_set \
+		-Wl,--wrap=pqos_l2ca_set \
+		-Wl,--wrap=pqos_alloc_assoc_set \
+		-Wl,--wrap=pqos_alloc_assoc_set_pid \
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/alloc.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 

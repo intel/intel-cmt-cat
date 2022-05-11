@@ -41,11 +41,11 @@
                 output_stop();                                                 \
         } while (0)
 
-#define run_function(function_name, ret_var, ...)                              \
+#define run_function(function_name, retvar, ...)                              \
         do {                                                                   \
                 output_start();                                                \
                 if (!setjmp(jump_buff))                                        \
-                        retvar = function_name(__VA_ARGS__);                   \
+                        retvar = function_name(__VA_ARGS__);                  \
                 output_stop();                                                 \
         } while (0)
 
@@ -56,7 +56,9 @@ void output_stop(void);
 const char *output_get(void);
 int output_exit_was_called(void);
 int output_get_exit_status(void);
+int output_has_text(const char *format_string, ...);
 void __wrap_exit(int __status);
 int __wrap_printf(const char *format_string, ...);
 int __wrap_puts(const char *__s);
+int __wrap_putchar(int __c);
 #endif /* __OUTPUT_H__ */

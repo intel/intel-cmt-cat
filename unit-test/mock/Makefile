@@ -131,7 +131,9 @@ checkpatch:
 	-f mock_os_allocation.c \
 	-f mock_os_allocation.h \
 	-f mock_os_monitoring.c \
-	-f mock_os_monitoring.h
+	-f mock_os_monitoring.h \
+	-f mock_api.h \
+	-f mock_api.c
 
 CLANGFORMAT?=clang-format
 .PHONY: clang-format

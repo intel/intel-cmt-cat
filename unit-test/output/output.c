@@ -78,6 +78,28 @@ output_get_exit_status(void)
         return exit_code;
 }
 
+int
+output_has_text(const char *format_string, ...)
+{
+        int ret = 0;
+
+        if (format_string != NULL) {
+                int str_len = 0;
+                char *tmp_buff = NULL;
+                va_list args;
+
+                va_start(args, format_string);
+                str_len = vasprintf(&tmp_buff, format_string, args);
+                va_end(args);
+                if (tmp_buff != NULL) {
+                        if (str_len > 0 && strstr(buffer, tmp_buff) != NULL)
+                                ret = 1;
+                        free(tmp_buff);
+                }
+        }
+        return ret;
+}
+
 __attribute__((noreturn)) void
 __wrap_exit(int __status)
 {
@@ -119,4 +141,12 @@ __wrap_puts(const char *__s)
         }
 
         return strlen(__s);
+}
+
+int
+__wrap_putchar(int __c)
+{
+        if (grab_in_progress)
+                buffer[chars_in_buffer++] = __c;
+        return __c;
 }
