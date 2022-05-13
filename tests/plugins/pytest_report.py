@@ -132,7 +132,7 @@ class TestReport:
             return
 
         # We are interested only on executed tests
-        if report.outcome in ("passed", "failed"):
+        if report.outcome == "skipped":
             return
 
         nodeid = report.nodeid

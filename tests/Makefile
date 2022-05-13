@@ -3,7 +3,7 @@
 
 .PHONY: setup build run run-os run-msr style setup setup-dev
 
-TEST_ENV?=$(shell_hostname).json
+TEST_ENV?=$(shell hostname).json
 VENV_DIR?=../venv/test_$(shell hostname)
 
 setup:
