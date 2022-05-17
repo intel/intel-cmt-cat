@@ -38,16 +38,20 @@ LIB_DIR = ../../lib
 OBJ_DIR = ./obj
 BIN_DIR = ./bin
 MOCK_DIR = ../mock
+APP_MOCK_DIR = ./mock
+OBJ_APP_MOCK_DIR = $(APP_MOCK_DIR)/obj
 GRAB_OUTPUT_DIR = ../output
 PQOS_SRCS = $(sort $(wildcard $(PQOS_DIR)/*.c))
 PQOS_OBJS = $(PQOS_SRCS:$(PQOS_DIR)/%.c=$(OBJ_DIR)/%.o)
+APP_MOCK_SRCS = $(sort $(wildcard $(APP_MOCK_DIR)/*.c))
+APP_MOCK_OBJS = $(APP_MOCK_SRCS:$(APP_MOCK_DIR)/%.c=$(OBJ_APP_MOCK_DIR)/%.o)
 
 TESTS_SRCS = $(sort $(wildcard test_*.c))
 TESTS = $(TESTS_SRCS:%.c=$(BIN_DIR)/%)
 
 LDFLAGS = -L$(LIB_DIR) -L$(MOCK_DIR) -L$(GRAB_OUTPUT_DIR) -lpqos -lcmocka -lpqosmock -lgraboutput\
 	-z noexecstack -z relro -z now
-CFLAGS = -I$(LIB_DIR) -I$(PQOS_DIR) -I$(MOCK_DIR) -I$(GRAB_OUTPUT_DIR)\
+CFLAGS = -I$(LIB_DIR) -I$(PQOS_DIR) -I$(MOCK_DIR) -I$(GRAB_OUTPUT_DIR) -I$(APP_MOCK_DIR)\
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
@@ -67,8 +71,11 @@ $(OBJ_DIR)/%.o: $(PQOS_DIR)/%.c
 	mkdir -p $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-$(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
+$(OBJ_APP_MOCK_DIR)/%.o: $(APP_MOCK_DIR)/%.c
+	mkdir -p $(OBJ_APP_MOCK_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
+$(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=puts \
@@ -90,6 +97,18 @@ $(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/alloc.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_profiles: ./test_profiles.c $(PQOS_OBJS) $(APP_MOCK_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=selfn_allocation_class \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/profiles.o,$(PQOS_OBJS)) $(APP_MOCK_OBJS) $< -Wl,--end-group -o $@
+
+
 .PHONY: run
 run: $(TESTS)
 	@echo "Running pqos Unit Tests"
@@ -100,7 +119,7 @@ run: $(TESTS)
 CLANGFORMAT?=clang-format
 .PHONY: clang-format
 clang-format:
-	@for file in $(wildcard *.[ch]); do \
+	@for file in $(wildcard *.[ch]) $(wildcard $(APP_MOCK_DIR)/*.[ch]); do \
 		echo "Checking style $$file"; \
 		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
@@ -119,7 +138,10 @@ checkpatch:
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE,\
 	SPDX_LICENSE_TAG,ARRAY_SIZE,EMBEDDED_FUNCTION_NAME,\
 	SYMBOLIC_PERMS,CONST_STRUCT \
-	-f test_alloc.c
+	-f test_alloc.c \
+	-f test_profiles.c \
+	-f mock/mock_alloc.c \
+	-f mock/mock_alloc.h \
 
 .PHONY: style
 style:
@@ -130,3 +152,4 @@ style:
 clean:
 	rm -rf $(BIN_DIR)
 	rm -rf $(OBJ_DIR)
+	rm -rf $(OBJ_APP_MOCK_DIR)
