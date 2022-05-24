@@ -719,7 +719,7 @@ parse_event(const char *str, enum pqos_mon_event *evt)
                 parse_error(str, "Unrecognized monitoring event type");
 }
 
-#define PARSE_MON_GRP_BUFF_SIZE 1500
+#define PARSE_MON_GRP_BUFF_SIZE 1250
 
 /**
  * @brief Function to set the descriptions and cores/pids for each monitoring
