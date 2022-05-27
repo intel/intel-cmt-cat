@@ -34,6 +34,7 @@
 #
 ###############################################################################
 
+OBJDIR = obj
 LIBDIR ?= ../lib
 LDFLAGS = -L$(LIBDIR) -pie -z noexecstack -z relro -z now
 LDLIBS = -lpqos -lpthread
@@ -92,20 +93,27 @@ BIN_DIR = $(PREFIX)/bin
 MAN_DIR = $(PREFIX)/man/man8
 
 SRCS = $(sort $(wildcard *.c))
-OBJS = $(SRCS:.c=.o)
-DEPFILES = $(SRCS:.c=.d)
+OBJS = $(addprefix $(OBJDIR)/,$(SRCS:.c=.o))
+DEPFILES = $(addprefix $(OBJDIR)/,$(SRCS:.c=.d))
 
 all: $(APP)
+
+dump:
+	echo $(SRCS)
+	echo $(OBJS)
 
 $(APP): $(OBJS)
 	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-%.o: %.c %.d
+$(OBJDIR)/%.o: %.c $(OBJDIR)/%.d
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c -o $@ $<
 
-%.d: %.c
+$(OBJDIR)/%.d: %.c
+	@mkdir -p $(@D)
 	set -e; rm -f $@; \
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $< > $@.$$$$; \
-	sed 's/$(@:.d=.o)/$@/' < $@.$$$$ > $@; \
+	sed 's/$(@F:.d=.o)/$(@F)/' < $@.$$$$ > $@; \
 	rm -f $@.$$$$
 
 .PHONY: clean install uninstall
@@ -138,7 +146,8 @@ ifneq ($(shell uname), FreeBSD)
 endif
 
 clean:
-	-rm -f $(APP) $(OBJS) $(DEPFILES) ./*~
+	-rm -rf $(OBJDIR)
+	-rm -f $(APP) ./*.d ./*.o ./*~
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: checkpatch
@@ -156,7 +165,7 @@ checkpatch:
 CLANGFORMAT?=clang-format
 .PHONY: clang-format
 clang-format:
-	@for file in $(wildcard *.[ch]); do \
+	@for file in $(SRCS); do \
 		echo "Checking style $$file"; \
 		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \
@@ -180,12 +189,7 @@ cppcheck:
 	$(CPPCHECK) --enable=warning,portability,performance,unusedFunction,missingInclude \
 	--std=c99 -I$(LIBDIR) --template=gcc \
 	--suppress=missingIncludeSystem \
-	main.c main.h alloc.c alloc.h monitor.c monitor.h profiles.c profiles.h \
-	cap.h cap.c common.h common.c \
-	monitor_csv.c monitor_csv.h \
-	monitor_text.c monitor_text.h \
-	monitor_utils.c monitor_utils.h \
-	monitor_xml.c monitor_xml.h
+	$(SRCS)
 
 # if target not clean then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

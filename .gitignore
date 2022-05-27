@@ -6,7 +6,10 @@
 *.log
 *.d
 *.pyc
+
 pqos/pqos
+pqos/obj
+
 rdtset/rdtset
 
 examples/c/CAT_MBA/allocation_app_l2cat
