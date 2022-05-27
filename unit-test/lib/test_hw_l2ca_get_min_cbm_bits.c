@@ -48,6 +48,7 @@ hw_alloc_assoc_unused(const unsigned technology,
                       unsigned *class_id)
 {
         int ret;
+
         check_expected(technology);
         check_expected(l3cat_id);
         check_expected(l2cat_id);
@@ -95,8 +96,8 @@ test_hw_l2ca_get_min_cbm_bits(void **state)
         unsigned min_cbm_bits;
         unsigned expected_min_cbm_bits = 3;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_alloc_assoc_unused, technology, technology);
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
@@ -130,8 +131,8 @@ test_hw_l2ca_get_min_cbm_bits_no_free_cos(void **state)
         unsigned min_cbm_bits;
         unsigned i;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < 4; ++i) {
                 expect_value(hw_alloc_assoc_unused, technology, technology);

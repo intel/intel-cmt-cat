@@ -367,9 +367,7 @@ struct pqos_cacheinfo {
 };
 
 /**
- * =======================================
  * Vendor values
- * =======================================
  */
 enum pqos_vendor {
         PQOS_VENDOR_UNKNOWN = 0, /**< UNKNOWN */
@@ -619,7 +617,7 @@ int pqos_mon_stop(struct pqos_mon_data *group);
 /**
  * @brief Polls monitoring data from requested cores
  *
- * @param [in] groups table of monitoring group pointers to be be updated
+ * @param [in] groups table of monitoring group pointers to be updated
  * @param [in] num_groups number of monitoring groups in the table
  *
  * @return Operations status

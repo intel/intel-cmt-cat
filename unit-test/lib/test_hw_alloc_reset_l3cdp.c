@@ -49,7 +49,8 @@ test_hw_alloc_reset_l3cdp_enable(void **state)
 
         data->cap_l3ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
         for (i = 0; i < l3cat_id_num; i++) {
@@ -87,7 +88,8 @@ test_hw_alloc_reset_l3cdp_disable(void **state)
 
         data->cap_l3ca.cdp_on = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
         for (i = 0; i < l3cat_id_num; i++) {
@@ -124,7 +126,8 @@ test_hw_alloc_reset_l3cdp_error_read(void **state)
 
         data->cap_l3ca.cdp_on = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
 
@@ -150,7 +153,8 @@ test_hw_alloc_reset_l3cdp_error_write(void **state)
 
         data->cap_l3ca.cdp_on = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
 

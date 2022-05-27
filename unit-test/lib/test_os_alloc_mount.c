@@ -37,9 +37,13 @@
 /* ======== os_alloc_mount ======== */
 
 static void
-test_os_alloc_mount_param(void **state __attribute__((unused)))
+test_os_alloc_mount_param(void **state)
 {
+        struct test_data *data = (struct test_data *)*state;
         int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = os_alloc_mount(-1, PQOS_REQUIRE_CDP_OFF, PQOS_MBA_DEFAULT);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -66,8 +70,8 @@ test_os_alloc_mount_default(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(__wrap_resctrl_mount, l3_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
         expect_value(__wrap_resctrl_mount, l2_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
@@ -87,8 +91,8 @@ test_os_alloc_mount_l2cdp(void **state)
 
         data->cap_l2ca.cdp = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(__wrap_resctrl_mount, l3_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
         expect_value(__wrap_resctrl_mount, l2_cdp_cfg, PQOS_REQUIRE_CDP_ON);
@@ -108,8 +112,8 @@ test_os_alloc_mount_l2cdp_unsupported(void **state)
 
         data->cap_l2ca.cdp = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = os_alloc_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_ON,
                              PQOS_MBA_DEFAULT);
@@ -124,8 +128,8 @@ test_os_alloc_mount_l3cdp(void **state)
 
         data->cap_l3ca.cdp = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(__wrap_resctrl_mount, l3_cdp_cfg, PQOS_REQUIRE_CDP_ON);
         expect_value(__wrap_resctrl_mount, l2_cdp_cfg, PQOS_REQUIRE_CDP_OFF);
@@ -145,8 +149,8 @@ test_os_alloc_mount_l3cdp_unsupported(void **state)
 
         data->cap_l3ca.cdp = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = os_alloc_mount(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF,
                              PQOS_MBA_DEFAULT);
@@ -161,8 +165,8 @@ test_os_alloc_mount_mba_ctrl_unsupported(void **state)
 
         data->cap_mba.ctrl = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = os_alloc_mount(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_OFF,
                              PQOS_MBA_CTRL);

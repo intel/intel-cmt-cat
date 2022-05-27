@@ -168,7 +168,8 @@ test_hw_mon_assoc_get(void **state)
         pqos_rmid_t rmid = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_assoc_read, lcore, lcore);
         will_return(hw_mon_assoc_read, 2);
@@ -187,7 +188,8 @@ test_hw_mon_assoc_get_param(void **state)
         pqos_rmid_t rmid = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = hw_mon_assoc_get(200, &rmid);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -207,7 +209,8 @@ test_hw_mon_reset(void **state)
         int ret;
         unsigned i;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < cpu->num_cores; ++i)
                 expect_value(hw_mon_assoc_write, lcore, cpu->cores[i].lcore);
@@ -226,7 +229,8 @@ test_hw_mon_reset_error(void **state)
         int ret;
         unsigned i;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < cpu->num_cores; ++i)
                 expect_value(hw_mon_assoc_write, lcore, cpu->cores[i].lcore);
@@ -257,8 +261,8 @@ test_hw_mon_start_mbm(void **state)
         group.intl = &intl;
         memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_any(hw_mon_start_perf, event);
         will_return(hw_mon_start_perf, PQOS_RETVAL_OK);
@@ -275,7 +279,6 @@ test_hw_mon_start_mbm(void **state)
         assert_int_equal(group.num_cores, num_cores);
 
         /* free memory */
-        will_return(__wrap__pqos_cap_get, data->cpu);
         expect_value(hw_mon_assoc_read, lcore, cores[0]);
         will_return(hw_mon_assoc_read, 1);
         will_return(hw_mon_assoc_read, PQOS_RETVAL_OK);
@@ -304,8 +307,8 @@ test_hw_mon_start_perf(void **state)
         group.intl = &intl;
         memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_assoc_read, lcore, cores[0]);
         will_return(hw_mon_assoc_read, 0);
@@ -326,7 +329,6 @@ test_hw_mon_start_perf(void **state)
         assert_int_equal(group.num_cores, num_cores);
 
         /* free memory */
-        will_return(__wrap__pqos_cap_get, data->cpu);
         expect_value(hw_mon_assoc_read, lcore, cores[0]);
         will_return(hw_mon_assoc_read, 1);
         will_return(hw_mon_assoc_read, PQOS_RETVAL_OK);
@@ -363,7 +365,7 @@ test_hw_mon_poll(void **state __attribute__((unused)))
         ret = hw_mon_poll(&group, PQOS_MON_EVENT_TMEM_BW);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
-        ret = hw_mon_poll(&group, (enum pqos_mon_event) - 1);
+        ret = hw_mon_poll(&group, (enum pqos_mon_event)0xFFFFFFFF);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 

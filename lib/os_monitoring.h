@@ -114,7 +114,7 @@ PQOS_LOCAL int os_mon_start(const unsigned num_cores,
 /**
  * @brief OS interface to poll monitoring data from requested groups
  *
- * @param [in] groups table of monitoring group pointers to be be updated
+ * @param [in] groups table of monitoring group pointers to be updated
  * @param [in] num_groups number of monitoring groups in the table
  *
  * @return Operations status

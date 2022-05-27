@@ -73,17 +73,14 @@ test_hw_alloc_assoc_unused_l2ca(void **state)
         unsigned technology = 1 << PQOS_CAP_TYPE_L2CA;
         unsigned class_id;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
         ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(class_id, 2);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         ret = hw_alloc_assoc_unused(technology, 0, 2, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -98,16 +95,13 @@ test_hw_alloc_assoc_unused_l3ca(void **state)
         unsigned technology = 1 << PQOS_CAP_TYPE_L3CA;
         unsigned class_id;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
         ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         ret = hw_alloc_assoc_unused(technology, 1, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -122,16 +116,13 @@ test_hw_alloc_assoc_unused_mba(void **state)
         unsigned technology = 1 << PQOS_CAP_TYPE_MBA;
         unsigned class_id;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
         ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         ret = hw_alloc_assoc_unused(technology, 0, 0, 1, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -146,16 +137,13 @@ test_hw_alloc_assoc_unused_l2ca_when_l3_present(void **state)
         unsigned technology = 1 << PQOS_CAP_TYPE_L2CA;
         unsigned class_id;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
         ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         ret = hw_alloc_assoc_unused(technology, 0, 3, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);

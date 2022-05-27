@@ -106,8 +106,8 @@ test_hw_alloc_assoc_unused(void **state)
         int ret;
         struct pqos_mon_poll_ctx ctx;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return_count(hw_mon_assoc_read, PQOS_RETVAL_OK,
                           data->cpu->num_cores);
@@ -118,9 +118,6 @@ test_hw_alloc_assoc_unused(void **state)
         ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(ctx.rmid, 4);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         ctx.lcore = 5;
         ctx.cluster = 1;
@@ -137,8 +134,8 @@ test_hw_alloc_assoc_unused_invalid_cluster(void **state)
         int ret;
         struct pqos_mon_poll_ctx ctx;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ctx.lcore = 1;
         ctx.cluster = 5;

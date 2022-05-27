@@ -405,9 +405,7 @@ uncore_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
         int ret;
         unsigned s;
-        const struct pqos_cpuinfo *cpu;
-
-        _pqos_cap_get(NULL, &cpu);
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         for (s = 0; s < group->intl->uncore.num_sockets; ++s) {
                 unsigned lcore;
@@ -438,9 +436,7 @@ uncore_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
         unsigned s;
-        const struct pqos_cpuinfo *cpu;
-
-        _pqos_cap_get(NULL, &cpu);
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         for (s = 0; s < group->intl->uncore.num_sockets; ++s) {
                 unsigned lcore;
@@ -524,9 +520,7 @@ uncore_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         uint64_t old_value;
         uint64_t value = 0;
         unsigned i;
-        const struct pqos_cpuinfo *cpu;
-
-        _pqos_cap_get(NULL, &cpu);
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         for (i = 0; i < group->intl->uncore.num_sockets; ++i) {
                 unsigned lcore;

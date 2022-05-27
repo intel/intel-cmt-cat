@@ -283,8 +283,8 @@ int
 hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
                     const enum pqos_mon_event event)
 {
-        const struct pqos_cpuinfo *cpu;
-        const struct pqos_cap *cap;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        const struct pqos_cap *cap = _pqos_get_cap();
         int ret = PQOS_RETVAL_OK;
         unsigned max_rmid = 0;
         unsigned *core_list = NULL;
@@ -292,8 +292,6 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
         pqos_rmid_t *rmid_list = NULL;
 
         ASSERT(ctx != NULL);
-
-        _pqos_cap_get(&cap, &cpu);
 
         /* Getting max RMID for given event */
         ret = rmid_get_event_max(cap, &max_rmid, event);
@@ -408,11 +406,9 @@ hw_mon_assoc_unused_custom(struct pqos_mon_poll_ctx *ctx,
 static uint64_t
 scale_event(const enum pqos_mon_event event, const uint64_t val)
 {
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_monitor *pmon;
         int ret;
-
-        _pqos_cap_get(&cap, NULL);
 
         ASSERT(cap != NULL);
 
@@ -469,12 +465,10 @@ int
 hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 {
         int ret = PQOS_RETVAL_OK;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         if (rmid == NULL)
                 return PQOS_RETVAL_PARAM;
-
-        _pqos_cap_get(NULL, &cpu);
 
         ret = pqos_cpu_check_core(cpu, lcore);
         if (ret != PQOS_RETVAL_OK)
@@ -490,9 +484,15 @@ hw_mon_reset(void)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_capability *cap_mon;
 
-        _pqos_cap_get(NULL, &cpu);
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &cap_mon);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Monitoring not present!\n");
+                return ret;
+        }
 
         for (i = 0; i < cpu->num_cores; i++) {
                 int retval = hw_mon_assoc_write(cpu->cores[i].lcore, RMID0);
@@ -580,12 +580,10 @@ get_delta(const enum pqos_mon_event event,
           const uint64_t old_value,
           const uint64_t new_value)
 {
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_monitor *pmon;
         int ret;
         uint64_t max_value = 1LLU << 24;
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = pqos_cap_get_event(cap, event, &pmon);
         if (ret == PQOS_RETVAL_OK)
@@ -841,7 +839,7 @@ int
 hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
         const unsigned num_cores = group->num_cores;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         unsigned core2cluster[num_cores];
         struct pqos_mon_poll_ctx ctxs[num_cores];
         unsigned num_ctxs = 0;
@@ -850,8 +848,6 @@ hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
         enum pqos_mon_event ctx_event = (enum pqos_mon_event)(
             event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW));
-
-        _pqos_cap_get(NULL, &cpu);
 
         memset(ctxs, 0, sizeof(ctxs));
 
@@ -984,8 +980,8 @@ hw_mon_start(const unsigned num_cores,
         unsigned i;
         int ret = PQOS_RETVAL_OK;
         int retval = PQOS_RETVAL_OK;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         enum pqos_mon_event req_events;
         enum pqos_mon_event started_evts = (enum pqos_mon_event)0;
 
@@ -993,8 +989,6 @@ hw_mon_start(const unsigned num_cores,
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         req_events = event;
 
@@ -1107,16 +1101,14 @@ hw_mon_start_uncore(const unsigned num_sockets,
 {
         int ret;
         unsigned i;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         enum pqos_mon_event started_evts = (enum pqos_mon_event)0;
 
         ASSERT(group != NULL);
         ASSERT(sockets != NULL);
         ASSERT(num_sockets > 0);
         ASSERT(event > 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = validate_event(cap, event);
         if (ret != PQOS_RETVAL_OK)
@@ -1174,7 +1166,7 @@ hw_mon_stop(struct pqos_mon_data *group)
         int ret = PQOS_RETVAL_OK;
         int retval = PQOS_RETVAL_OK;
         unsigned i = 0;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(group != NULL);
 
@@ -1184,8 +1176,6 @@ hw_mon_stop(struct pqos_mon_data *group)
                    (group->cores == NULL || group->intl->hw.num_ctx == 0 ||
                     group->intl->hw.ctx == NULL))
                 return PQOS_RETVAL_PARAM;
-
-        _pqos_cap_get(NULL, &cpu);
 
         for (i = 0; i < group->intl->hw.num_ctx; i++) {
                 /**
@@ -1241,7 +1231,7 @@ hw_mon_read_counter(struct pqos_mon_data *group,
         struct pqos_event_values *pv = &group->values;
         uint64_t value = 0;
         uint64_t max_value = 1LLU << 24;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_monitor *pmon;
         unsigned i;
         int ret;
@@ -1249,8 +1239,6 @@ hw_mon_read_counter(struct pqos_mon_data *group,
         ASSERT(event == PQOS_MON_EVENT_L3_OCCUP ||
                event == PQOS_MON_EVENT_LMEM_BW ||
                event == PQOS_MON_EVENT_TMEM_BW);
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = pqos_cap_get_event(cap, event, &pmon);
         if (ret == PQOS_RETVAL_OK)

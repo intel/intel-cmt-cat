@@ -61,7 +61,7 @@ resctrl_lock_signalhandler(int signal)
 /**
  * @brief Obtain lock on resctrl filesystem
  *
- * @param[in] type type of lock
+ * @param[in] type lock type
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success

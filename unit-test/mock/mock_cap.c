@@ -54,14 +54,16 @@ __wrap__pqos_api_unlock(void)
         function_called();
 }
 
-void
-__wrap__pqos_cap_get(const struct pqos_cap **cap,
-                     const struct pqos_cpuinfo **cpu)
+const struct pqos_cap *
+__wrap__pqos_get_cap(void)
 {
-        if (cap != NULL)
-                *cap = mock_ptr_type(struct pqos_cap *);
-        if (cpu != NULL)
-                *cpu = mock_ptr_type(struct pqos_cpuinfo *);
+        return mock_ptr_type(const struct pqos_cap *);
+}
+
+const struct pqos_cpuinfo *
+__wrap__pqos_get_cpu(void)
+{
+        return mock_ptr_type(const struct pqos_cpuinfo *);
 }
 
 void

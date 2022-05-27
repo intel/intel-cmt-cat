@@ -53,6 +53,7 @@ __wrap_fread(void *ptr,
              FILE *stream __attribute__((unused)))
 {
         const char *data = mock_ptr_type(char *);
+
         if (data == NULL)
                 return 0;
 
@@ -65,6 +66,7 @@ char *
 __wrap_fgets(char *s, int n, FILE *stream __attribute__((unused)))
 {
         const char *data = mock_ptr_type(char *);
+
         if (data == NULL)
                 return NULL;
 

@@ -205,32 +205,9 @@ checkpatch:
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE,\
 	SPDX_LICENSE_TAG,ARRAY_SIZE,EMBEDDED_FUNCTION_NAME,\
-	SYMBOLIC_PERMS,CONST_STRUCT \
-	-f pqos.h \
-	-f allocation.h -f allocation.c \
-	-f api.h -f api.c \
-	-f cap.h -f cap.c \
-	-f common.h -f common.c \
-	-f cpuinfo.h -f cpuinfo.c \
-	-f hw_cap.h -f hw_cap.c \
-	-f hw_monitoring.h hw_monitoring.c \
-	-f log.h -f log.c \
-	-f machine.h -f machine.c \
-	-f monitoring.h -f monitoring.c \
-	-f os_allocation.h -f os_allocation.c \
-	-f os_cap.h -f os_cap.c \
-	-f os_common.h \
-	-f os_monitoring.h os_monitoring.c \
-	-f perf.h -f perf.c \
-	-f perf_monitoring.h -f perf_monitoring.c \
-	-f resctrl.h -f resctrl.c \
-	-f resctrl_monitoring.h -f resctrl_monitoring.c \
-	-f resctrl_alloc.h -f resctrl_alloc.c \
-	-f resctrl_schemata.h -f resctrl_schemata.c \
-	-f resctrl_utils.h -f resctrl_utils.c \
-	-f uncore_monitoring.h -f uncore_monitoring.c \
-	-f types.h \
-	-f utils.h -f utils.c
+	SYMBOLIC_PERMS,CONST_STRUCT,PREFER_DEFINED_ATTRIBUTE_MACRO \
+	--typedefsfile ../.checkpatch.types \
+	--file *.[ch]
 
 CLANGFORMAT?=clang-format
 .PHONY: clang-format
@@ -281,6 +258,14 @@ cppcheck:
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)
 ifneq ($(MAKECMDGOALS),clobber)
+ifneq ($(MAKECMDGOALS),style)
+ifneq ($(MAKECMDGOALS),clang-format)
+ifneq ($(MAKECMDGOALS),checkpatch)
+ifneq ($(MAKECMDGOALS),codespell)
 -include $(DEPFILES)
+endif
+endif
+endif
+endif
 endif
 endif

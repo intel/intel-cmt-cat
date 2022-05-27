@@ -113,8 +113,8 @@ test_hw_l3ca_set(void **state)
 
         data->cap_l3ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -148,8 +148,8 @@ test_hw_l3ca_set_cdp_on(void **state)
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -195,8 +195,8 @@ test_hw_l3ca_set_cdp_off(void **state)
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 1;
@@ -216,8 +216,8 @@ test_hw_l3ca_set_unsupported(void **state)
 
         data->cap_l3ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -242,8 +242,8 @@ test_hw_l3ca_get(void **state)
 
         data->cap_l3ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (class_id = 0; class_id < data->cap_l3ca.num_classes; ++class_id) {
                 expect_value(__wrap_msr_read, lcore, 0);
@@ -279,8 +279,8 @@ test_hw_l3ca_get_cdp(void **state)
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < data->cap_l3ca.num_classes * 2; ++i) {
                 expect_value(__wrap_msr_read, lcore, 0);
@@ -314,8 +314,8 @@ test_hw_l3ca_get_unsupported(void **state)
 
         data->cap_l3ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -337,8 +337,8 @@ test_hw_l3ca_get_param(void **state)
 
         data->cap_l3ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = hw_l3ca_get(l3cat_id, max_num_ca, &num_ca, ca);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
@@ -355,8 +355,8 @@ test_hw_l2ca_set(void **state)
 
         data->cap_l2ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -390,8 +390,8 @@ test_hw_l2ca_set_cdp_on(void **state)
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -437,8 +437,8 @@ test_hw_l2ca_set_cdp_off(void **state)
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 1;
@@ -458,8 +458,8 @@ test_hw_l2ca_set_unsupported(void **state)
 
         data->cap_l2ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -484,8 +484,8 @@ test_hw_l2ca_get(void **state)
 
         data->cap_l2ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (class_id = 0; class_id < data->cap_l2ca.num_classes; ++class_id) {
                 expect_value(__wrap_msr_read, lcore, 0);
@@ -521,8 +521,8 @@ test_hw_l2ca_get_cdp(void **state)
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < data->cap_l2ca.num_classes * 2; ++i) {
                 expect_value(__wrap_msr_read, lcore, 0);
@@ -556,8 +556,8 @@ test_hw_l2ca_get_unsupported(void **state)
 
         data->cap_l2ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ca[0].class_id = 0;
         ca[0].cdp = 0;
@@ -579,8 +579,8 @@ test_hw_l2ca_get_param(void **state)
 
         data->cap_l2ca.cdp_on = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = hw_l2ca_get(l2cat_id, max_num_ca, &num_ca, ca);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -595,8 +595,8 @@ test_hw_mba_set(void **state)
         int ret;
         struct pqos_mba requested[3];
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         requested[0].class_id = 0;
         requested[0].mb_max = 50;
@@ -633,8 +633,8 @@ test_hw_mba_set_actual(void **state)
         struct pqos_mba requested[1];
         struct pqos_mba actual[1];
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         requested[0].class_id = 1;
         requested[0].mb_max = 44;
@@ -663,8 +663,8 @@ test_hw_mba_set_unsupported(void **state)
         int ret;
         struct pqos_mba requested[1];
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         requested[0].class_id = 1;
         requested[0].mb_max = 44;
@@ -683,8 +683,8 @@ test_hw_mba_set_non_linear(void **state)
 
         data->cap_mba.is_linear = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         requested[0].class_id = 0;
         requested[0].mb_max = 50;
@@ -703,8 +703,8 @@ test_hw_mba_set_param(void **state)
 
         data->cap_mba.is_linear = 1;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         requested[0].class_id = 100;
         requested[0].mb_max = 50;
@@ -712,9 +712,6 @@ test_hw_mba_set_param(void **state)
 
         ret = hw_mba_set(0, 1, requested, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         requested[0].class_id = 100;
         requested[0].mb_max = 50000;
@@ -737,8 +734,8 @@ test_hw_mba_get(void **state)
         struct pqos_mba mba_tab[4];
         unsigned class_id;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (class_id = 0; class_id < data->cap_mba.num_classes; ++class_id) {
                 expect_value(__wrap_msr_read, lcore, 0);
@@ -769,8 +766,8 @@ test_hw_alloc_assoc_set(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_alloc_assoc_write, lcore, lcore);
         expect_value(hw_alloc_assoc_write, class_id, class_id);
@@ -788,14 +785,11 @@ test_hw_alloc_assoc_set_param(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = hw_alloc_assoc_set(1000, class_id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         ret = hw_alloc_assoc_set(lcore, 100);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -809,8 +803,8 @@ test_hw_alloc_assoc_set_unsupported(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = hw_alloc_assoc_set(lcore, class_id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -826,8 +820,8 @@ test_hw_alloc_assoc_get(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_alloc_assoc_read, lcore, lcore);
         will_return(hw_alloc_assoc_read, 2);
@@ -846,8 +840,8 @@ test_hw_alloc_assoc_get_param(void **state)
         unsigned class_id = 1;
         unsigned lcore = 200;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = hw_alloc_assoc_get(lcore, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -861,8 +855,8 @@ test_hw_alloc_assoc_get_unsupported(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = hw_alloc_assoc_get(lcore, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
@@ -895,8 +889,8 @@ test_hw_alloc_reset_unsupported_all(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
@@ -910,17 +904,13 @@ test_hw_alloc_reset_unsupported_l3ca(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ANY,
                              PQOS_MBA_ANY);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_ANY,
                              PQOS_MBA_ANY);
@@ -935,9 +925,9 @@ test_hw_alloc_reset_unsupported_l3cdp(void **state)
 
         data->cap_l3ca.cdp = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ANY,
                              PQOS_MBA_ANY);
@@ -950,17 +940,13 @@ test_hw_alloc_reset_unsupported_l2ca(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON,
                              PQOS_MBA_ANY);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_OFF,
                              PQOS_MBA_ANY);
@@ -975,9 +961,9 @@ test_hw_alloc_reset_unsupported_l2cdp(void **state)
 
         data->cap_l2ca.cdp = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON,
                              PQOS_MBA_ANY);
@@ -990,17 +976,13 @@ test_hw_alloc_reset_unsupported_mba(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
                              PQOS_MBA_DEFAULT);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
                              PQOS_MBA_CTRL);
@@ -1015,9 +997,9 @@ test_hw_alloc_reset_unsupported_mba_ctrl(void **state)
 
         data->cap_mba.ctrl = 0;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         ret = hw_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
                              PQOS_MBA_CTRL);
@@ -1036,9 +1018,9 @@ test_hw_alloc_reset_l3ca(void **state)
         data->cap_l3ca.cdp = 0;
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         for (i = 0; i < l3cat_id_num; ++i) {
                 unsigned coreid;
@@ -1082,9 +1064,9 @@ test_hw_alloc_reset_l3cdp_enable(void **state)
         data->cap_l3ca.cdp_on = 0;
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         for (i = 0; i < l3cat_id_num; ++i) {
                 unsigned coreid;
@@ -1132,9 +1114,9 @@ test_hw_alloc_reset_l3cdp_disable(void **state)
         data->cap_l3ca.cdp_on = 1;
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         for (i = 0; i < l3cat_id_num; ++i) {
                 unsigned coreid;
@@ -1181,9 +1163,9 @@ test_hw_alloc_reset_l2ca(void **state)
         data->cap_l2ca.cdp = 0;
         l2ids = pqos_cpu_get_l2ids(data->cpu, &l2id_num);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         for (i = 0; i < l2id_num; ++i) {
                 unsigned coreid;
@@ -1226,9 +1208,9 @@ test_hw_alloc_reset_l2cdp_enable(void **state)
         data->cap_l2ca.cdp_on = 0;
         l2ids = pqos_cpu_get_l2ids(data->cpu, &l2id_num);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         for (i = 0; i < l2id_num; ++i) {
                 unsigned coreid;
@@ -1275,9 +1257,9 @@ test_hw_alloc_reset_l2cdp_disable(void **state)
         data->cap_l2ca.cdp_on = 1;
         l2ids = pqos_cpu_get_l2ids(data->cpu, &l2id_num);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         for (i = 0; i < l2id_num; ++i) {
                 unsigned coreid;
@@ -1323,9 +1305,9 @@ test_hw_alloc_reset_mba(void **state)
         data->cap_mba.ctrl = 0;
         mba_ids = pqos_cpu_get_mba_ids(data->cpu, &mba_id_num);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
-        will_return(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
         for (i = 0; i < mba_id_num; ++i) {
                 unsigned coreid;

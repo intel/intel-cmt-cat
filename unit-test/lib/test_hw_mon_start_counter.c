@@ -110,7 +110,8 @@ test_hw_mon_start_counter(void **state)
         group.cores = cores;
         memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_assoc_unused, event, event);
         will_return(hw_mon_assoc_unused, 1);
@@ -148,7 +149,8 @@ test_hw_mon_start_counter_core_group(void **state)
         group.cores = cores;
         memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_assoc_unused, event, event);
         will_return(hw_mon_assoc_unused, 1);

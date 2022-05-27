@@ -111,29 +111,13 @@ DEPFILES = $(SRCS:.c=.d)
 CHECKPATCH?=checkpatch.pl
 .PHONY: checkpatch
 checkpatch:
-	$(CHECKPATCH) --no-tree --no-signoff --emacs \
+	$(CHECKPATCH) --no-tree --no-signoff --terse \
 	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
 	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE,\
 	SPDX_LICENSE_TAG,ARRAY_SIZE,EMBEDDED_FUNCTION_NAME,\
-	SYMBOLIC_PERMS,CONST_STRUCT \
-	-f mock_cap.c \
-	-f mock_cap.h \
-	-f mock_cpuinfo.c \
-	-f mock_cpuinfo.h \
-	-f mock_hw_allocation.c \
-	-f mock_hw_allocation.h \
-	-f mock_hw_monitoring.c \
-	-f mock_hw_monitoring.h \
-	-f mock_machine.c \
-	-f mock_machine.h \
-	-f mock_monitoring.c \
-	-f mock_monitoring.h \
-	-f mock_os_allocation.c \
-	-f mock_os_allocation.h \
-	-f mock_os_monitoring.c \
-	-f mock_os_monitoring.h \
-	-f mock_api.h \
-	-f mock_api.c
+	SYMBOLIC_PERMS,CONST_STRUCT,PREFER_DEFINED_ATTRIBUTE_MACRO \
+	--typedefsfile ../../.checkpatch.types \
+	--file *.[ch] \
 
 CLANGFORMAT?=clang-format
 .PHONY: clang-format

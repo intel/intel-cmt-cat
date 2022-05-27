@@ -53,7 +53,8 @@ test_hw_alloc_reset_assoc(void **state)
         int ret;
         unsigned i;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < data->cpu->num_cores; i++) {
                 unsigned lcore = data->cpu->cores[i].lcore;
@@ -74,7 +75,8 @@ test_hw_alloc_reset_assoc_error(void **state)
         int ret;
         unsigned i;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < data->cpu->num_cores; i++) {
                 unsigned lcore = data->cpu->cores[i].lcore;

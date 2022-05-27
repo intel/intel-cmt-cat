@@ -114,7 +114,8 @@ test_hw_mon_read_counter_tmem(void **state)
         ctx.cluster = 0;
         ctx.rmid = 2;
 
-        will_return_always(__wrap__pqos_cap_get, data->cap);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_read, lcore, cores[0]);
         expect_value(hw_mon_read, rmid, ctx.rmid);
@@ -168,7 +169,8 @@ test_hw_mon_read_counter_lmem(void **state)
         ctx.cluster = 0;
         ctx.rmid = 2;
 
-        will_return_always(__wrap__pqos_cap_get, data->cap);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_read, lcore, cores[0]);
         expect_value(hw_mon_read, rmid, ctx.rmid);
@@ -222,7 +224,8 @@ test_hw_mon_read_counter_llc(void **state)
         ctx.cluster = 0;
         ctx.rmid = 2;
 
-        will_return_always(__wrap__pqos_cap_get, data->cap);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_read, lcore, cores[0]);
         expect_value(hw_mon_read, rmid, ctx.rmid);

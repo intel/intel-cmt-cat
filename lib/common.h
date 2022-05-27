@@ -59,9 +59,7 @@ extern "C" {
  * @retval A valid pointer to a file or NULL on error (e.g. when the path
  * contains any symbolic links).
  */
-/* clang-format off */
-PQOS_LOCAL FILE * pqos_fopen(const char *name, const char *mode);
-/* clang-format on */
+PQOS_LOCAL FILE *pqos_fopen(const char *name, const char *mode);
 
 /**
  * @brief Wrapper around strcat

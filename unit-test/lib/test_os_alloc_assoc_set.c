@@ -47,8 +47,8 @@ test_os_alloc_assoc_set(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
@@ -72,8 +72,8 @@ test_os_alloc_assoc_set_active_mon(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
@@ -100,14 +100,11 @@ test_os_alloc_assoc_set_param(void **state)
         unsigned class_id = 1;
         unsigned lcore = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = os_alloc_assoc_set(1000, class_id);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
 
         ret = os_alloc_assoc_set(lcore, 100);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -123,7 +120,8 @@ test_os_alloc_assoc_set_pid(void **state)
         unsigned class_id = 1;
         pid_t task = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
@@ -147,7 +145,8 @@ test_os_alloc_assoc_set_pid_active_mon(void **state)
         unsigned class_id = 1;
         pid_t task = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
@@ -173,7 +172,8 @@ test_os_alloc_assoc_set_pid_param(void **state)
         int ret;
         pid_t task = 2;
 
-        will_return(__wrap__pqos_cap_get, data->cap);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         ret = os_alloc_assoc_set_pid(task, 100);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);

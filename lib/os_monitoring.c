@@ -410,15 +410,13 @@ os_mon_start(const unsigned num_cores,
 {
         unsigned i = 0;
         int ret;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(group != NULL);
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         /**
          * Validate if event is listed in capabilities

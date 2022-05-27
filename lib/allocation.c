@@ -133,14 +133,12 @@ hw_alloc_assoc_unused(const unsigned technology,
         int l2cat_id_set = l2_req;
         int l3cat_id_set = l3_req;
         int mba_id_set = mba_req;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         unsigned used_classes[PQOS_MAX_COS];
 
         if (class_id == NULL)
                 return PQOS_RETVAL_PARAM;
-
-        _pqos_cap_get(&cap, &cpu);
 
         memset(used_classes, 0, sizeof(used_classes));
 
@@ -287,13 +285,11 @@ hw_l3ca_set(const unsigned l3cat_id,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
         int cdp_enabled = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = pqos_l3ca_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
@@ -366,14 +362,12 @@ hw_l3ca_get(const unsigned l3cat_id,
         uint64_t val = 0;
         int retval = MACHINE_RETVAL_OK;
         int cdp_enabled = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(num_ca != NULL);
         ASSERT(ca != NULL);
         ASSERT(max_num_ca != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = pqos_l3ca_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
@@ -434,12 +428,10 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         int technology = 1 << PQOS_CAP_TYPE_L3CA;
         const struct pqos_capability *l3_cap = NULL;
         struct pqos_l3ca l3ca_config[PQOS_MAX_L3CA_COS];
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(min_cbm_bits != NULL);
-
-        _pqos_cap_get(&cap, &cpu);
 
         /**
          * Get L3 CAT capabilities
@@ -560,13 +552,11 @@ hw_l2ca_set(const unsigned l2id,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
         int cdp_enabled = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         /*
          * Check if L2 CAT is supported
@@ -651,14 +641,12 @@ hw_l2ca_get(const unsigned l2id,
         unsigned i = 0, count = 0;
         unsigned core = 0;
         int cdp_enabled = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(num_ca != NULL);
         ASSERT(ca != NULL);
         ASSERT(max_num_ca != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = pqos_l2ca_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
@@ -720,14 +708,12 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
         unsigned *l2ids = NULL, l2id_num = 0, l2id;
         unsigned class_id, l2ca_num, ways, i;
         int technology = 1 << PQOS_CAP_TYPE_L2CA;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const struct pqos_capability *l2_cap = NULL;
         struct pqos_l2ca l2ca_config[PQOS_MAX_L2CA_COS];
 
         ASSERT(min_cbm_bits != NULL);
-
-        _pqos_cap_get(&cap, &cpu);
 
         /**
          * Get L2 CAT capabilities
@@ -846,13 +832,11 @@ hw_mba_set(const unsigned mba_id,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0, step = 0;
         const struct pqos_capability *mba_cap = NULL;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(requested != NULL);
         ASSERT(num_cos != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         /**
          * Check if MBA is supported
@@ -933,14 +917,12 @@ hw_mba_set_amd(const unsigned mba_id,
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const struct pqos_capability *mba_cap = NULL;
 
         ASSERT(requested != NULL);
         ASSERT(num_cos != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         /**
          * Check if MBA is supported
@@ -1008,14 +990,12 @@ hw_mba_get(const unsigned mba_id,
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(num_cos != NULL);
         ASSERT(mba_tab != NULL);
         ASSERT(max_num_cos != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = pqos_mba_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
@@ -1053,14 +1033,12 @@ hw_mba_get_amd(const unsigned mba_id,
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, count = 0, core = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(num_cos != NULL);
         ASSERT(mba_tab != NULL);
         ASSERT(max_num_cos != 0);
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = pqos_mba_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
@@ -1116,10 +1094,8 @@ hw_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
-
-        _pqos_cap_get(&cap, &cpu);
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ret = pqos_cpu_check_core(cpu, lcore);
         if (ret != PQOS_RETVAL_OK)
@@ -1154,10 +1130,8 @@ hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
         const struct pqos_capability *l2_cap = NULL;
         const struct pqos_capability *mba_cap = NULL;
         int ret = PQOS_RETVAL_OK;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
-
-        _pqos_cap_get(&cap, &cpu);
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(class_id != NULL);
 
@@ -1198,14 +1172,12 @@ hw_alloc_assign(const unsigned technology,
         unsigned l3cat_id = 0, l2cat_id = 0, mba_id = 0;
         unsigned i;
         int ret;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(core_num > 0);
         ASSERT(core_array != NULL);
         ASSERT(class_id != NULL);
         ASSERT(technology != 0);
-
-        _pqos_cap_get(NULL, &cpu);
 
         /* Check if core belongs to one resource entity */
         for (i = 0; i < core_num; i++) {
@@ -1281,11 +1253,9 @@ hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
                      const int enable)
 {
         unsigned j = 0;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(l3cat_id_num > 0 && l3cat_ids != NULL);
-
-        _pqos_cap_get(NULL, &cpu);
 
         LOG_INFO("%s L3 CDP across sockets...\n",
                  (enable) ? "Enabling" : "Disabling");
@@ -1323,11 +1293,9 @@ hw_alloc_reset_l2cdp(const unsigned l2id_num,
 {
         unsigned i = 0;
         int ret;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(l2id_num > 0 && l2ids != NULL);
-
-        _pqos_cap_get(NULL, &cpu);
 
         LOG_INFO("%s L2 CDP across clusters...\n",
                  (enable) ? "Enabling" : "Disabling");
@@ -1381,9 +1349,7 @@ hw_alloc_reset_assoc(void)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i;
-        const struct pqos_cpuinfo *cpu;
-
-        _pqos_cap_get(NULL, &cpu);
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         for (i = 0; i < cpu->num_cores; i++)
                 if (hw_alloc_assoc_write(cpu->cores[i].lcore, 0) !=
@@ -1404,8 +1370,8 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         unsigned mba_id_num = 0;
         unsigned *l2ids = NULL;
         unsigned l2id_num = 0;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
@@ -1428,7 +1394,6 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         ASSERT(mba_cfg == PQOS_MBA_DEFAULT || mba_cfg == PQOS_MBA_CTRL ||
                mba_cfg == PQOS_MBA_ANY);
 
-        _pqos_cap_get(&cap, &cpu);
         cpuinfo_get_config(&vconfig);
 
         /* Get L3 CAT capabilities */

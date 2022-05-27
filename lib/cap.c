@@ -930,7 +930,14 @@ pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu)
                 return ret;
         }
 
-        _pqos_cap_get(cap, cpu);
+        if (cap != NULL) {
+                *cap = _pqos_get_cap();
+                ASSERT(*cap != NULL);
+        }
+        if (cpu != NULL) {
+                *cpu = _pqos_get_cpu();
+                ASSERT(*cpu != NULL);
+        }
 
         _pqos_api_unlock();
         return PQOS_RETVAL_OK;
@@ -1095,18 +1102,18 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
         }
 }
 
-void
-_pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu)
+const struct pqos_cap *
+_pqos_get_cap(void)
 {
-        if (cap != NULL) {
-                ASSERT(m_cap != NULL);
-                *cap = m_cap;
-        }
+        ASSERT(m_cap != NULL);
+        return m_cap;
+}
 
-        if (cpu != NULL) {
-                ASSERT(m_cpu != NULL);
-                *cpu = m_cpu;
-        }
+const struct pqos_cpuinfo *
+_pqos_get_cpu(void)
+{
+        ASSERT(m_cpu != NULL);
+        return m_cpu;
 }
 
 int

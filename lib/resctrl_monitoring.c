@@ -180,11 +180,9 @@ alloc_assoc_get(const unsigned lcore, unsigned *class_id)
 {
         int ret;
         unsigned max_cos;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         ASSERT(class_id != NULL);
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -216,11 +214,9 @@ alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
 {
         int ret;
         unsigned max_cos;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         ASSERT(class_id != NULL);
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -903,14 +899,12 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
         int ret = PQOS_RETVAL_OK;
         unsigned cos = 0;
         unsigned ctrl_grps;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const struct pqos_capability *cap_mon;
         struct resctrl_core_group *grps = NULL;
         unsigned grps_num = 0;
         unsigned grps_size;
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &cap_mon);
         if (ret != PQOS_RETVAL_OK)
@@ -1046,12 +1040,10 @@ resctrl_mon_assign(struct pqos_mon_data *group)
                 unsigned i;
                 unsigned l3ids = 0;
                 unsigned cgrp_num;
-                const struct pqos_cpuinfo *cpu;
-                const struct pqos_cap *cap;
+                const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+                const struct pqos_cap *cap = _pqos_get_cap();
                 unsigned max_threshold_occupancy;
                 unsigned max_cos;
-
-                _pqos_cap_get(&cap, &cpu);
 
                 /* list L3IDs for requested cores */
                 for (i = 0; i < group->num_cores; i++) {
@@ -1158,13 +1150,11 @@ resctrl_mon_start(struct pqos_mon_data *group)
         char *resctrl_group = NULL;
         int ret = PQOS_RETVAL_OK;
         unsigned i;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
         ASSERT(group != NULL);
         ASSERT(group->tid_nr == 0 || group->tid_map != NULL);
         ASSERT(group->num_cores == 0 || group->cores != NULL);
-
-        _pqos_cap_get(NULL, &cpu);
 
         /* List l3ids */
         for (i = 0; i < group->num_cores; i++) {
@@ -1249,9 +1239,7 @@ resctrl_mon_delete(const char *resctrl_group)
         int ret;
         unsigned max_cos;
         unsigned cos = 0;
-        const struct pqos_cap *cap;
-
-        _pqos_cap_get(&cap, NULL);
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -1290,16 +1278,14 @@ resctrl_mon_shared(struct pqos_mon_data *group, unsigned *shared)
         unsigned max_cos;
         unsigned cos;
         int ret;
-        const struct pqos_cap *cap;
-        const struct pqos_cpuinfo *cpu;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const char *mon_group = group->intl->resctrl.mon_group;
 
         *shared = 0;
 
         if (group->num_pids > 0)
                 return PQOS_RETVAL_OK;
-
-        _pqos_cap_get(&cap, &cpu);
 
         ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -1361,11 +1347,9 @@ resctrl_mon_stop(struct pqos_mon_data *group)
         int ret;
         unsigned max_cos;
         unsigned i;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         ASSERT(group != NULL);
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -1484,11 +1468,9 @@ resctrl_mon_purge(struct pqos_mon_data *group)
         unsigned cos;
         int ret;
         unsigned shared;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         ASSERT(group != NULL);
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = resctrl_mon_shared(group, &shared);
         if (ret != PQOS_RETVAL_OK)
@@ -1578,11 +1560,9 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         unsigned cos;
         unsigned i;
         uint64_t old_value;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         ASSERT(group != NULL);
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = resctrl_alloc_get_grps_num(cap, &max_cos);
         if (ret != PQOS_RETVAL_OK)
@@ -1666,12 +1646,10 @@ resctrl_mon_reset(void)
         unsigned grps;
         int num_groups;
         unsigned cos = 0;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         if (supported_events == 0)
                 return PQOS_RETVAL_RESOURCE;
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = resctrl_alloc_get_grps_num(cap, &grps);
         if (ret != PQOS_RETVAL_OK)
@@ -1722,14 +1700,12 @@ resctrl_mon_active(unsigned *monitoring_status)
         unsigned group_idx = 0;
         unsigned resctrl_group_count = 0;
         int ret;
-        const struct pqos_cap *cap;
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         if (supported_events == 0) {
                 *monitoring_status = 0;
                 return PQOS_RETVAL_OK;
         }
-
-        _pqos_cap_get(&cap, NULL);
 
         ret = resctrl_alloc_get_grps_num(cap, &resctrl_group_count);
         if (ret != PQOS_RETVAL_OK) {

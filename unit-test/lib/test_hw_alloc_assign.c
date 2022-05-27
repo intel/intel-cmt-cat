@@ -52,6 +52,7 @@ hw_alloc_assoc_unused(const unsigned technology,
                       unsigned *class_id)
 {
         int ret;
+
         check_expected(technology);
         check_expected(l3cat_id);
         check_expected(l2cat_id);
@@ -75,7 +76,9 @@ hw_alloc_assign_l2ca(void **state)
         unsigned core_array[] = {3};
         unsigned core_num = 1;
         unsigned class_id;
-        will_return(__wrap__pqos_cap_get, data->cpu);
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_alloc_assoc_unused, technology, technology);
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
@@ -102,7 +105,9 @@ hw_alloc_assign_l3ca(void **state)
         unsigned core_array[] = {3};
         unsigned core_num = 1;
         unsigned class_id;
-        will_return(__wrap__pqos_cap_get, data->cpu);
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_alloc_assoc_unused, technology, technology);
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
@@ -129,7 +134,9 @@ hw_alloc_assign_mba(void **state)
         unsigned core_array[] = {5};
         unsigned core_num = 1;
         unsigned class_id;
-        will_return(__wrap__pqos_cap_get, data->cpu);
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_alloc_assoc_unused, technology, technology);
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);

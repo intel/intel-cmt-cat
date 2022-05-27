@@ -109,11 +109,16 @@ PQOS_LOCAL enum pqos_interface _pqos_get_inter(void);
 /**
  * @brief Internal API to retrieve PQoS capabilities data
  *
- * @param [out] cap location to store PQoS capabilities information at
- * @param [out] cpu location to store CPU information at
+ * @return PQoS capabilities data
  */
-PQOS_LOCAL void _pqos_cap_get(const struct pqos_cap **cap,
-                              const struct pqos_cpuinfo **cpu);
+PQOS_LOCAL const struct pqos_cap *_pqos_get_cap(void);
+
+/**
+ * @brief Internal API to retrieve CPU information
+ *
+ * @return CPU information
+ */
+PQOS_LOCAL const struct pqos_cpuinfo *_pqos_get_cpu(void);
 
 /**
  * @brief Internal API to retrieve \a type of capability

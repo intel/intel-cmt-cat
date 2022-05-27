@@ -161,7 +161,7 @@ int pqos_mon_fini(void);
 /**
  * @brief Poll monitoring data from requested groups
  *
- * @param group monitoring group pointer to be be updated
+ * @param group monitoring group pointer to be updated
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success

@@ -591,9 +591,7 @@ resctrl_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
         unsigned grps;
         unsigned i;
         struct resctrl_cpumask mask;
-        const struct pqos_cap *cap;
-
-        _pqos_cap_get(&cap, NULL);
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         ret = resctrl_alloc_get_grps_num(cap, &grps);
         if (ret != PQOS_RETVAL_OK)
@@ -623,9 +621,7 @@ resctrl_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
 int
 resctrl_alloc_assoc_get_pid(const pid_t task, unsigned *class_id)
 {
-        const struct pqos_cap *cap;
-
-        _pqos_cap_get(&cap, NULL);
+        const struct pqos_cap *cap = _pqos_get_cap();
 
         /* Search tasks files */
         return resctrl_alloc_task_search(class_id, cap, task);

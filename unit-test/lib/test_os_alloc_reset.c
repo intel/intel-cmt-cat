@@ -47,7 +47,8 @@ test_os_alloc_reset_cores(void **state)
         int ret;
         unsigned i;
 
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(__wrap_resctrl_alloc_cpumask_read, class_id, 0);
         will_return(__wrap_resctrl_alloc_cpumask_read, PQOS_RETVAL_OK);
@@ -77,8 +78,8 @@ test_os_alloc_reset_schematas(void **state)
 
         resctrl_alloc_get_grps_num(data->cap, &grps);
 
-        will_return(__wrap__pqos_cap_get, data->cap);
-        will_return(__wrap__pqos_cap_get, data->cpu);
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         will_return(__wrap_resctrl_lock_exclusive, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_lock_release, PQOS_RETVAL_OK);
