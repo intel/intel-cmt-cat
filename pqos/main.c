@@ -362,14 +362,6 @@ realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size)
         return tmp_ptr;
 }
 
-__attribute__((noreturn)) void
-parse_error(const char *arg, const char *note)
-{
-        printf("Error parsing \"%s\" command line argument. %s\n",
-               arg ? arg : "<null>", note ? note : "");
-        exit(EXIT_FAILURE);
-}
-
 void
 selfn_strdup(char **sel, const char *arg)
 {

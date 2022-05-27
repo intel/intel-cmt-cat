@@ -36,8 +36,17 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+__attribute__((noreturn)) void
+parse_error(const char *arg, const char *note)
+{
+        printf("Error parsing \"%s\" command line argument. %s\n",
+               arg ? arg : "<null>", note ? note : "");
+        exit(EXIT_FAILURE);
+}
 
 FILE *
 safe_fopen(const char *name, const char *mode)

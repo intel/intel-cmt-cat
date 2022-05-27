@@ -93,6 +93,16 @@ FILE *safe_fopen(const char *name, const char *mode);
  */
 int safe_open(const char *pathname, int flags, mode_t mode);
 
+/**
+ * @brief Common function to handle string parsing errors
+ *
+ * On error, this function causes process to exit with FAILURE code.
+ *
+ * @param arg string that caused error when parsing
+ * @param note context and information about encountered error
+ */
+void parse_error(const char *arg, const char *note) __attribute__((noreturn));
+
 #ifdef __cplusplus
 }
 #endif
