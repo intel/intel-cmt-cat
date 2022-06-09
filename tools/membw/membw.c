@@ -60,12 +60,11 @@
  */
 
 #ifdef __linux__
-#define PAGE_SIZE (4 * 1024)
+#define PAGE_SIZE (4LLU * 1024)
 #endif
 
-#define MEMCHUNK_SIZE (PAGE_SIZE * 32 * 1024) /* 128MB chunk */
-#define CL_SIZE       (64)
-#define CHUNKS        (128)
+#define CL_SIZE (64LLU)
+#define CHUNKS  (256LLU)
 
 #ifdef DEBUG
 #include <assert.h>
@@ -137,6 +136,7 @@ static struct cpuid_out cpuid_7_0; /* leaf 7, sub-leaf 0 */
 static int stop_loop = 0;
 static void *memchunk = NULL;
 static unsigned memchunk_offset = 0;
+static size_t memchunk_size = PAGE_SIZE * 128 * 1024;
 
 /**
  * UTILS
@@ -183,6 +183,68 @@ lcpuid(const unsigned leaf, const unsigned subleaf, struct cpuid_out *out)
                      : "g"(leaf), "g"(subleaf)
                      : "%eax", "%ecx", "%edx");
 #endif
+}
+
+/**
+ * @brief Obtain cache size
+ *
+ * @param [in] level cache level
+ * @param [out] size cache size
+ *
+ * @return operational status
+ * @retval -1 on error
+ */
+static int
+cpu_cache_size(const unsigned level, size_t *size)
+{
+        unsigned leaf;
+        unsigned subleaf = 0;
+
+        /* Check CPU vendor */
+        {
+                struct cpuid_out vendor;
+
+                lcpuid(0x0, 0x0, &vendor);
+
+                if (vendor.ebx == 0x756e6547 && vendor.edx == 0x49656e69 &&
+                    vendor.ecx == 0x6c65746e) {
+                        /* CPU vendor - Intel */
+                        leaf = 4;
+
+                } else if (vendor.ebx == 0x68747541 &&
+                           vendor.edx == 0x69746E65 &&
+                           vendor.ecx == 0x444D4163) {
+                        /* CPU vendor - AMD */
+                        leaf = 0x8000001D;
+                } else
+                        return -1;
+        }
+
+        for (subleaf = 0;; subleaf++) {
+                struct cpuid_out cache_info;
+                unsigned cache_level;
+                unsigned cache_type;
+
+                lcpuid(leaf, subleaf, &cache_info);
+                cache_type = cache_info.eax & 0x1f;        /* EAX bits 04:00 */
+                cache_level = (cache_info.eax >> 5) & 0x7; /* EAX bits 07:05 */
+
+                if (cache_type == 0 || cache_type >= 4)
+                        break; /* no more caches or reserved */
+                if (cache_level != level)
+                        continue;
+
+                unsigned num_ways = (cache_info.ebx >> 22) + 1;
+                unsigned num_sets = cache_info.ecx + 1;
+                unsigned line_size = (cache_info.ebx & 0xfff) + 1;
+                unsigned num_partitions = ((cache_info.ebx >> 12) & 0x3ff) + 1;
+                unsigned way_size = num_partitions * num_sets * line_size;
+
+                *size = way_size * num_ways;
+                return 0;
+        }
+
+        return -1;
 }
 
 static uint32_t
@@ -360,7 +422,7 @@ malloc_and_init_memory(size_t s)
                 s64 -= (CL_SIZE / sizeof(uint64_t));
         }
 
-        mem_flush(p, MEMCHUNK_SIZE);
+        mem_flush(p, s);
         return p;
 }
 
@@ -763,7 +825,7 @@ mem_execute(const unsigned bw, const enum cl_type type)
         const uint64_t val = (uint64_t)rand();
         char *cp = (char *)memchunk;
         unsigned i = 0;
-        const size_t s = MEMCHUNK_SIZE / CL_SIZE; /* mem size in cache lines */
+        const size_t s = memchunk_size / CL_SIZE; /* mem size in cache lines */
 
         assert(memchunk != NULL);
 
@@ -983,6 +1045,7 @@ main(int argc, char **argv)
         int option_index;
         int ret;
         uint64_t features;
+        size_t cache_size;
 
         /* clang-format off */
         struct option options[] = {
@@ -1079,6 +1142,11 @@ main(int argc, char **argv)
                 return EXIT_FAILURE;
         }
 
+        if (cpu_cache_size(3, &cache_size) == 0) {
+                memchunk_size = (cache_size / PAGE_SIZE + 1) * PAGE_SIZE * 2;
+                if (memchunk_offset < PAGE_SIZE * CHUNKS)
+                        memchunk_offset = PAGE_SIZE * CHUNKS;
+        }
         features = cpu_feature_detect();
 
         switch (type) {
@@ -1131,7 +1199,7 @@ main(int argc, char **argv)
         set_thread_affinity(cpu);
 
         /* Allocate memory */
-        memchunk = malloc_and_init_memory(MEMCHUNK_SIZE);
+        memchunk = malloc_and_init_memory(memchunk_size);
         if (memchunk == NULL) {
                 printf("Failed to allocate memory!\n");
                 return EXIT_FAILURE;
