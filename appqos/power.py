@@ -71,8 +71,7 @@ def _set_freqs_epp(cores, min_freq=None, max_freq=None, epp=None):
         log.error("POWER: No power profile parameters specified!")
         return -1
 
-    log.debug(("POWER: Setting min/max/epp on cores {} to {}/{}/{}")\
-                .format(cores, min_freq, max_freq, epp))
+    log.debug(f"POWER: Setting min/max/epp on cores {cores} to {min_freq}/{max_freq}/{epp}")
 
     pwr_cores = power_common.get_pwr_cores()
     if not pwr_cores:
@@ -100,7 +99,7 @@ def reset(cores):
     Parameters:
         cores: list of core ids
     """
-    log.debug(("POWER: Reset on cores {}. Setting to \"default\".").format(cores))
+    log.debug(f"POWER: Reset on cores {cores}. Setting to \"default\".")
 
     if not cores:
         return -1
@@ -194,27 +193,25 @@ def validate_power_profiles(data, admission_control):
     for profile in data['power_profiles']:
         # id
         if profile['id'] in profile_ids:
-            raise ValueError("Power Profile {}, multiple profiles with same id."\
-                .format(profile['id']))
+            raise ValueError(f"Power Profile {profile['id']}, multiple profiles with same id.")
 
         profile_ids.append(profile['id'])
 
         # profile's freqs validation
         if not _is_max_freq_valid(profile['max_freq']):
-            raise ValueError("Power Profile {}, Invalid max. freq {}."\
-                .format(profile['id'], profile['max_freq']))
+            raise ValueError(f"Power Profile {profile['id']}, " \
+                             f"Invalid max. freq {profile['max_freq']}.")
 
         if not _is_min_freq_valid(profile['min_freq']):
-            raise ValueError("Power Profile {}, Invalid min. freq {}."\
-                .format(profile['id'], profile['min_freq']))
+            raise ValueError(f"Power Profile {profile['id']}, " \
+                             f"Invalid min. freq {profile['min_freq']}.")
 
         if profile['min_freq'] > profile['max_freq']:
-            raise ValueError("Power Profile {}, Invalid freqs!"\
-                " min. freq is higher than max. freq.".format(profile['id']))
+            raise ValueError(f"Power Profile {profile['id']}, Invalid freqs!"\
+                             " min. freq is higher than max. freq.")
 
         if not _is_epp_valid(profile['epp']):
-            raise ValueError("Power Profile {}, Invalid EPP value {}."\
-                .format(profile['id'], profile['epp']))
+            raise ValueError(f"Power Profile {profile['id']}, Invalid EPP value {profile['epp']}.")
 
     if admission_control and _do_admission_control_check():
         _admission_control_check(data)
@@ -302,7 +299,7 @@ def configure_power():
 
         # apply configuration only for changed profiles
         if prev_profile != profile:
-            log.debug("POWER: Power profile {} configuration...".format(profile['id']))
+            log.debug(f"POWER: Power profile {profile['id']} configuration...")
             min_freq = profile.get('min_freq', None)
             max_freq = profile.get('max_freq', None)
             epp = profile.get('epp', None)
@@ -349,7 +346,7 @@ def _get_curr_profiles():
             curr_profiles[power_id] = deepcopy(profile)
             curr_profiles[power_id]['cores'] = []
         else:
-            log.error("POWER: Profile {} does not exist!".format(power_id))
+            log.error(f"POWER: Profile {power_id} does not exist!")
             return None
 
     # get through all pools to extend curr power profiles config with theirs cores

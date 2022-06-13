@@ -82,8 +82,8 @@ class PqosApi:
         """
         for iface in ["msr","os"]:
             if not self.init(iface, True):
-                log.info("Interface {}, MBA BW: {}supported."\
-                        .format(iface.upper(), "un" if not self.is_mba_bw_supported() else ""))
+                log.info(f"Interface {iface.upper()}, " \
+                         f"MBA BW: {'un' if not self.is_mba_bw_supported() else ''}supported.")
                 self.fini()
                 self._supported_iface.append(iface)
 
@@ -114,8 +114,7 @@ class PqosApi:
             result = os.system("/bin/umount -a -t resctrl") # nosec - string literal
 
         if result:
-            log.error("Failed to umount resctrl fs! status code: {}"\
-                      .format(os.WEXITSTATUS(result)))
+            log.error(f"Failed to umount resctrl fs! status code: {os.WEXITSTATUS(result)}")
             return -1
 
         # attempt to initialize libpqos
@@ -429,7 +428,7 @@ class PqosApi:
         """
         try:
             sockets = self.cpuinfo.get_sockets()
-            return sum([len(self.cpuinfo.get_cores(socket)) for socket in sockets])
+            return sum((len(self.cpuinfo.get_cores(socket)) for socket in sockets))
         except Exception as ex:
             log.error(str(ex))
             return None

@@ -24,10 +24,10 @@ clean:
 	@rm -rf plugins/*.pyc
 
 pylint:
-	WORKON_HOME=$(VENV_DIR) pipenv run python -m pylint *.py plugins/*.py testcases/*.py testlib/*.py
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pylint *.py plugins/*.py testcases/*.py testlib/*.py
 
 bandit:
-	WORKON_HOME=$(VENV_DIR) pipenv run python -m bandit -s B101,B404,B603 *.py plugins/*.py testcases/*.py testlib/*.py;
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m bandit -s B101,B404,B603 *.py plugins/*.py testcases/*.py testlib/*.py;
 
 .PHONY: codespell
 codespell:

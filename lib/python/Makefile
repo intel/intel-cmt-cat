@@ -47,17 +47,18 @@ setup-dev: Pipfile
 	WORKON_HOME=$(VENV_DIR) pipenv install --skip-lock --dev
 
 test: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run python -m unittest discover pqos/test -v
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m unittest discover pqos/test -v
 
 coverage: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run python -m coverage run --source pqos -m unittest discover pqos/test
-	WORKON_HOME=$(VENV_DIR) pipenv run python -m coverage report -m --omit pqos/test/*.py,setup.py
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m coverage run --source pqos -m unittest discover pqos/test
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m coverage report -m --omit pqos/test/*.py,setup.py
 
 pylint: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run python -m pylint pqos/*.py pqos/test/*.py
+	# WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pylint --generate-rcfile > rc.default
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pylint pqos/*.py pqos/test/*.py
 
 bandit: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run python -m bandit *.py pqos/*.py
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m bandit *.py pqos/*.py
 
 CODESPELL?=codespell
 .PHONY: codespell

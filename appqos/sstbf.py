@@ -101,7 +101,7 @@ def configure_sstbf(configure):
 
     sys.commit(new_core_cfg)
 
-    log.sys('Intel SST-BF {}configured.'.format('' if configure else 'un'))
+    log.sys(f"Intel SST-BF {'' if configure else 'un'}configured.")
 
     return 0
 

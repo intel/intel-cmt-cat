@@ -245,8 +245,7 @@ class Pool:
                     [pid for pid in Pool.pools[pool_id]['pids'] if pid in pids]
 
                 if pids_moved_from_other_pool:
-                    log.debug("PIDs moved from other pools {}".\
-                        format(pids_moved_from_other_pool))
+                    log.debug(f"PIDs moved from other pools {pids_moved_from_other_pool}")
 
                 # update other pool PIDs
                 Pool.pools[pool_id]['pids'] = \
@@ -256,8 +255,7 @@ class Pool:
 
         # set affinity of removed pids to default
         if removed_pids:
-            log.debug("PIDs to be set to core affinity to 'Default' CPUs {}".\
-                format(removed_pids))
+            log.debug(f"PIDs to be set to core affinity to 'Default' CPUs {removed_pids}")
 
             # get cores for Default Pool #0
             cores = common.CONFIG_STORE.get_pool_attr('cores', 0)
@@ -309,7 +307,7 @@ class Pool:
 
         # Finally assign removed cores back to COS0/"Default" Pool
         if removed_cores:
-            log.debug("Cores assigned to COS#0 {}".format(removed_cores))
+            log.debug(f"Cores assigned to COS#0 {removed_cores}")
             common.PQOS_API.release(removed_cores)
 
         # Reset power profile settings
@@ -413,8 +411,7 @@ def configure_rdt():
             return -1
 
         recreate_default = True
-        log.info("RDT initialized with %s interface."\
-            % (common.CONFIG_STORE.get_rdt_iface().upper()))
+        log.info(f"RDT initialized with {common.CONFIG_STORE.get_rdt_iface().upper()} interface.")
 
     # Change MBA BW/CTRL state if needed
     if caps.mba_supported():
@@ -425,8 +422,7 @@ def configure_rdt():
                 return -1
 
             recreate_default = True
-            log.info("RDT MBA BW %sabled."\
-                % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
+            log.info(f"RDT MBA BW {'en' if common.PQOS_API.is_mba_bw_enabled() else 'dis'}abled.")
 
     if recreate_default:
         # On interface or MBA BW state change it is needed to recreate Default Pool #0
@@ -440,7 +436,7 @@ def configure_rdt():
     if old_pools:
         for pool_id in old_pools:
             if not pool_ids or pool_id not in pool_ids:
-                log.debug("Pool {} removed...".format(pool_id))
+                log.debug(f"Pool {pool_id} removed...")
                 Pool(pool_id).cores_set([])
 
                 # remove pool

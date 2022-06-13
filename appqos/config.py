@@ -191,7 +191,7 @@ class ConfigStore:
             if pool['id'] == pool_id:
                 return pool
 
-        raise KeyError("Pool {} does not exists.".format(pool_id))
+        raise KeyError(f"Pool {pool_id} does not exists.")
 
 
     @staticmethod
@@ -207,13 +207,13 @@ class ConfigStore:
             Pool details
         """
         if 'apps' not in data:
-            raise KeyError("App {} does not exist. No apps in config.".format(app_id))
+            raise KeyError(f"App {app_id} does not exist. No apps in config.")
 
         for app in data['apps']:
             if app['id'] == app_id:
                 return app
 
-        raise KeyError("App {} does not exist.".format(app_id))
+        raise KeyError(f"App {app_id} does not exist.")
 
 
     @staticmethod
@@ -235,7 +235,7 @@ class ConfigStore:
             if profile["id"] == power_id:
                 return profile
 
-        raise KeyError(("Power profile {} does not exists").format(power_id))
+        raise KeyError(f"Power profile {power_id} does not exists")
 
 
     @staticmethod
@@ -275,17 +275,17 @@ class ConfigStore:
         for pool in data['pools']:
             # id
             if pool['id'] in pool_ids:
-                raise ValueError("Pool {}, multiple pools with same id.".format(pool['id']))
+                raise ValueError(f"Pool {pool['id']}, multiple pools with same id.")
             pool_ids.append(pool['id'])
 
             # pool cores
             for core in pool['cores']:
                 if not common.PQOS_API.check_core(core):
-                    raise ValueError("Pool {}, Invalid core {}.".format(pool['id'], core))
+                    raise ValueError(f"Pool {pool['id']}, Invalid core {core}.")
 
             if cores.intersection(pool['cores']):
-                raise ValueError("Pool {}, Cores {} already assigned to another pool."\
-                    .format(pool['id'], cores.intersection(pool['cores'])))
+                raise ValueError(f"Pool {pool['id']}, " \
+                    f"Cores {cores.intersection(pool['cores'])} already assigned to another pool.")
 
             cores |= set(pool['cores'])
 
@@ -317,41 +317,40 @@ class ConfigStore:
         for app in data['apps']:
             # id
             if app['id'] in app_ids:
-                raise ValueError("App {}, multiple apps with same id.".format(app['id']))
+                raise ValueError(f"App {app['id']}, multiple apps with same id.")
             app_ids.append(app['id'])
 
             # app's cores validation
             if 'cores' in app:
                 for core in app['cores']:
                     if not common.PQOS_API.check_core(core):
-                        raise ValueError("App {}, Invalid core {}.".format(app['id'], core))
+                        raise ValueError(f"App {app['id']}, Invalid core {core}.")
 
             # app's pool validation
             app_pool = None
             for pool in data['pools']:
                 if 'apps' in pool and app['id'] in pool['apps']:
                     if app_pool:
-                        raise ValueError("App {}, Assigned to more than one pool."\
-                            .format(app['id']))
+                        raise ValueError(f"App {app['id']}, Assigned to more than one pool.")
                     app_pool = pool
 
             if app_pool is None:
-                raise ValueError("App {} not assigned to any pool.".format(app['id']))
+                raise ValueError(f"App {app['id']} not assigned to any pool.")
 
             if 'cores' in app:
                 diff_cores = set(app['cores']).difference(app_pool['cores'])
                 if diff_cores:
-                    raise ValueError("App {}, cores {} does not match Pool {}."\
-                        .format(app['id'], diff_cores, app_pool['id']))
+                    raise ValueError(f"App {app['id']}, " \
+                        f"cores {diff_cores} does not match Pool {app_pool['id']}.")
 
             # app's pids validation
             for pid in app['pids']:
                 if not pid_ops.is_pid_valid(pid):
-                    raise ValueError("App {}, PID {} is not valid.".format(app['id'], pid))
+                    raise ValueError(f"App {app['id']}, PID {pid} is not valid.")
 
             if pids.intersection(app['pids']):
-                raise ValueError("App {}, PIDs {} already assigned to another App."\
-                    .format(app['id'], pids.intersection(app['pids'])))
+                raise ValueError(f"App {app['id']}, " \
+                    f"PIDs {pids.intersection(app['pids'])} already assigned to another App.")
 
             pids |= set(app['pids'])
 
@@ -388,20 +387,21 @@ class ConfigStore:
             if 'l2cbm' in pool:
                 result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['l2cbm']))
                 if result or pool['l2cbm'] == 0:
-                    raise ValueError("Pool {}, L2 CBM {}/{} is not contiguous."\
-                    .format(pool['id'], hex(pool['l2cbm']), bin(pool['l2cbm'])))
+                    raise ValueError(f"Pool {pool['id']}, " \
+                        f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool['l2cbm'])} is not contiguous.")
                 if not caps.cat_l2_supported():
-                    raise ValueError("Pool {}, L2 CBM {}/{}, L2 CAT is not supported."\
-                    .format(pool['id'], hex(pool['l2cbm']), bin(pool['l2cbm'])))
+                    raise ValueError(f"Pool {pool['id']}, " \
+                                     f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool['l2cbm'])}, " \
+                                     "L2 CAT is not supported.")
 
             if 'cbm' in pool:
                 result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['cbm']))
                 if result or pool['cbm'] == 0:
-                    raise ValueError("Pool {}, CBM {}/{} is not contiguous."\
-                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
+                    raise ValueError(f"Pool {pool['id']}, " \
+                        f"CBM {hex(pool['cbm'])}/{bin(pool['cbm'])} is not contiguous.")
                 if not caps.cat_l3_supported():
-                    raise ValueError("Pool {}, CBM {}/{}, CAT is not supported."\
-                    .format(pool['id'], hex(pool['cbm']), bin(pool['cbm'])))
+                    raise ValueError(f"Pool {pool['id']}, " \
+                        f"CBM {hex(pool['cbm'])}/{bin(pool['cbm'])}, CAT is not supported.")
 
             if 'mba' in pool:
                 mba_pool_ids.append(pool['id'])
@@ -410,16 +410,14 @@ class ConfigStore:
                 mba_bw_pool_ids.append(pool['id'])
 
         if (mba_pool_ids or mba_bw_pool_ids) and not caps.mba_supported():
-            raise ValueError("Pools {}, MBA is not supported."\
-                .format(mba_pool_ids + mba_bw_pool_ids))
+            raise ValueError(f"Pools {mba_pool_ids + mba_bw_pool_ids}, MBA is not supported.")
 
         if mba_bw_pool_ids and not mba_ctrl_enabled:
-            raise ValueError("Pools {}, MBA BW is not enabled/supported."\
-                .format(mba_bw_pool_ids))
+            raise ValueError(f"Pools {mba_bw_pool_ids}, MBA BW is not enabled/supported.")
 
         if mba_pool_ids and mba_ctrl_enabled:
-            raise ValueError("Pools {}, MBA % is not enabled. Disable MBA BW and try again."\
-                .format(mba_pool_ids))
+            raise ValueError(f"Pools {mba_pool_ids}, MBA % is not enabled. " \
+                             "Disable MBA BW and try again.")
 
         return
 

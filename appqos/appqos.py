@@ -77,13 +77,12 @@ class AppQoS:
             log.error(ex)
             return
 
-        log.debug("Cores controlled: {}".\
-            format(common.CONFIG_STORE.get_pool_attr('cores', None)))
+        log.debug(f"Cores controlled: {common.CONFIG_STORE.get_pool_attr('cores', None)}")
 
         data = common.CONFIG_STORE.get_config()
         for pool in data['pools']:
-            log.debug("Pool: {}/{} Cores: {}, Apps: {}".format(pool.get('name'),\
-                pool.get('id'), pool.get('cores'), pool.get('apps')))
+            log.debug(f"Pool: {pool.get('name')}/{pool.get('id')} " \
+                      f"Cores: {pool.get('cores')}, Apps: {pool.get('apps')}")
 
         # set initial SST-BF configuration
         if caps.sstbf_enabled():
@@ -92,10 +91,10 @@ class AppQoS:
                 log.error("Failed to apply initial SST-BF configuration, terminating...")
                 return
 
-            log.info("SST-BF enabled, {}configured.".\
-                format("not " if not sstbf.is_sstbf_configured() else ""))
-            log.info("SST-BF HP cores: {}".format(sstbf.get_hp_cores()))
-            log.info("SST-BF STD cores: {}".format(sstbf.get_std_cores()))
+            log.info("SST-BF enabled, " \
+                     f"{'not ' if not sstbf.is_sstbf_configured() else ''}configured.")
+            log.info(f"SST-BF HP cores: {sstbf.get_hp_cores()}")
+            log.info(f"SST-BF STD cores: {sstbf.get_std_cores()}")
         else:
             log.info("SST-BF not enabled")
 
@@ -123,8 +122,7 @@ class AppQoS:
             if result != 0:
                 log.error("libpqos MBA CTRL initialization failed, Terminating...")
                 return
-            log.info("RDT MBA CTRL %sabled"\
-                % ("en" if common.PQOS_API.is_mba_bw_enabled() else "dis"))
+            log.info(f"RDT MBA CTRL {'en' if common.PQOS_API.is_mba_bw_enabled() else 'dis'}abled")
 
         result = cache_ops.configure_rdt()
         if result != 0:
@@ -153,8 +151,8 @@ class AppQoS:
 
                 time_diff = time.time() - last_cfg_change_ts
                 if time_diff < min_time_diff:
-                    log.info("Rate Limiter, sleeping " \
-                        + str(round((min_time_diff - time_diff) * 1000)) + "ms...")
+                    log.info("Rate Limiter, " \
+                             f"sleeping {round((min_time_diff - time_diff) * 1000)} ms...")
                     time.sleep(min_time_diff - time_diff)
 
                 log.info("Configuration changed, processing new config...")
@@ -193,7 +191,7 @@ def load_config(config_file):
     try:
         common.CONFIG_STORE.from_file(config_file)
     except IOError as ex:
-        log.error("Error reading from config file {}... ".format(config_file))
+        log.error(f"Error reading from config file {config_file}... ")
         log.error(ex)
         return -1
     except Exception as ex:
@@ -238,7 +236,7 @@ def main():
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
         return
-    log.info("RDT initialized with '%s' interface" % (common.PQOS_API.current_iface()))
+    log.info(f"RDT initialized with '{common.PQOS_API.current_iface()}' interface")
 
     # initialize capabilities
     result = caps.caps_init()

@@ -68,7 +68,7 @@ def get_pid_status(pid):
         # handle silently, most likely PID has terminated
         pass
     except psutil.Error as ex:
-        log.error("psutil, {}".format(str(ex)))
+        log.error(f"psutil, {str(ex)}")
 
     return 'Error', False, ''
 
@@ -100,4 +100,4 @@ def set_affinity(pids, cores):
         try:
             psutil.Process(pid).cpu_affinity(cores)
         except psutil.Error:
-            log.error("Failed to set {} PID affinity".format(pid))
+            log.error(f"Failed to set {pid} PID affinity")
