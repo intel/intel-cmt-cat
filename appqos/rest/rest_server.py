@@ -40,6 +40,7 @@ import multiprocessing
 import os
 import signal
 import ssl
+import sys
 
 from time import sleep
 from flask import Flask
@@ -86,10 +87,13 @@ class Server:
         self.context.set_ciphers(':'.join(TLS_CIPHERS))
 
         # allow TLS 1.2 and later
-        self.context.options |= ssl.OP_NO_SSLv2
-        self.context.options |= ssl.OP_NO_SSLv3
-        self.context.options |= ssl.OP_NO_TLSv1
-        self.context.options |= ssl.OP_NO_TLSv1_1
+        if sys.version_info < (3, 7, 0):
+            self.context.options |= ssl.OP_NO_SSLv2
+            self.context.options |= ssl.OP_NO_SSLv3
+            self.context.options |= ssl.OP_NO_TLSv1
+            self.context.options |= ssl.OP_NO_TLSv1_1
+        else:
+            self.context.minimum_version = ssl.TLSVersion.TLSv1_2
 
         # Apps and Pools API
         self.api.add_resource(Apps, '/apps')
