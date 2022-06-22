@@ -34,6 +34,7 @@ import os
 import logging
 import subprocess
 import psutil
+from testlib.env import Env
 
 ## @cond
 logging.basicConfig(level=logging.DEBUG)
@@ -50,28 +51,31 @@ class Test:
         self.rdtset = request.config.rdtset
         self.pqos = request.config.pqos
         if os.path.isdir("/sys/fs/resctrl/info"):
-            self.run(self.pqos + " --iface=os -R l3cdp-off", True)
-            self.run(self.pqos + " --iface=os -R l2cdp-off", True)
-            self.run("umount /sys/fs/resctrl", True)
-        self.run(self.pqos + " --iface=msr -R l3cdp-off", True)
-        self.run(self.pqos + " --iface=msr -R l2cdp-off", True)
-        self.run(self.pqos + " --iface=msr -r -t 0", True)
+            subprocess.call("umount /sys/fs/resctrl".split(),
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        reset_opt = ""
+        if Env().exists('cat', 'l3'):
+            reset_opt += 'l3cdp-off,'
+        if Env().exists('cat', 'l2'):
+            reset_opt += 'l2cdp-off,'
+
+        subprocess.call(f"{self.pqos} --iface=msr -R {reset_opt}".split(),
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call(f"{self.pqos} --iface=msr -r -t 0".split(),
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
     def fini(self):
-        self.run("killall -9 memtester", True)
+        subprocess.call("killall -9 memtester".split(),
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
     ## Runs command and adds output to log
     def run(self, command, quiet=False):
         with subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE) as child:
+                              stderr=subprocess.PIPE, encoding="utf-8") as child:
             stdout, stderr = child.communicate()
-
-        if stdout is not None:
-            stdout = stdout.decode("utf-8")
-        if stderr is not None:
-            stderr = stderr.decode("utf-8")
 
         if not quiet:
             self.log.debug(command)

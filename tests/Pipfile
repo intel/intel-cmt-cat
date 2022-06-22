@@ -9,6 +9,7 @@ pytest-timeout = "*"
 pexpect = "*"
 jsonschema = "*"
 psutil = "*"
+pytest-rerunfailures = "*"
 
 [dev-packages]
 codespell = "*"
