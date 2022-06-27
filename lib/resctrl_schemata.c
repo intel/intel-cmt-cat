@@ -686,6 +686,7 @@ int
 resctrl_schemata_mba_write(FILE *fd, const struct resctrl_schemata *schemata)
 {
         unsigned i;
+        int separator = 0;
 
         if (schemata->mba == NULL)
                 return PQOS_RETVAL_OK;
@@ -693,10 +694,17 @@ resctrl_schemata_mba_write(FILE *fd, const struct resctrl_schemata *schemata)
         fprintf(fd, "MB:");
         for (i = 0; i < schemata->mbaids_num; i++) {
                 unsigned id = schemata->mbaids[i];
+                unsigned value = schemata->mba[i].mb_max;
 
-                if (i > 0)
+                /* Do not rewrite default value it will be rounded up to
+                 * MBA granularity */
+                if (value == UINT32_MAX)
+                        continue;
+
+                if (separator)
                         fprintf(fd, ";");
-                fprintf(fd, "%u=%u", id, schemata->mba[i].mb_max);
+                separator = 1;
+                fprintf(fd, "%u=%u", id, value);
         }
         fprintf(fd, "\n");
 
