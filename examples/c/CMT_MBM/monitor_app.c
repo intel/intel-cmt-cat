@@ -237,7 +237,8 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
 {
         unsigned i;
         const enum pqos_mon_event perf_events = (enum pqos_mon_event)(
-            PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS);
+            PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+            PQOS_PERF_EVENT_LLC_REF);
 
         const enum pqos_mon_event uncore_events =
             (enum pqos_mon_event)(PQOS_PERF_EVENT_LLC_MISS_PCIE_READ |
