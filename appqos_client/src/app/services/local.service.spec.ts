@@ -1,5 +1,4 @@
-/*
-BSD LICENSE
+/*BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -26,23 +25,38 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
-import { DashboardPageComponent } from './components/dashboard-page/dashboard-page.component';
+import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 
-import { LoginComponent } from './components/login/login.component';
+import { LocalService } from './local.service';
 
-const routes: Routes = [
-  { path: 'login', component: LoginComponent },
-  { path: 'dashboard', component: DashboardPageComponent },
-  { path: '', redirectTo: '/login', pathMatch: 'full' }
-];
+describe('Given LocalService', () => {
+  beforeEach(() => 
+    MockBuilder(LocalService)
+  );
 
-@NgModule({
-  imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
-})
-export class AppRoutingModule { }
+  MockInstance.scope('case');
+
+  describe('when saveData method is executed', () => {
+    it('it should store data to the LocalStorage', () => {
+      const { point: { componentInstance: service } } = MockRender(LocalService);
+
+      service.saveData('hostName', 'localhost');
+
+      expect(localStorage.getItem('hostName')).toBe('localhost');
+    });
+  })
+
+  describe('when getData method is executed', () => {
+    it('it should return data from LocalStorage', () => {
+      const { point: { componentInstance: service } } = MockRender(LocalService);
+
+      localStorage.setItem('portNumber', '5000')
+
+      const expectedValue = service.getData('portNumber');
+
+      expect(expectedValue).toBe('5000');
+    });
+  })
+});

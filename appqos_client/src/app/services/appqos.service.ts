@@ -1,5 +1,4 @@
-/*
-BSD LICENSE
+/*BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -26,23 +25,20 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
-import { DashboardPageComponent } from './components/dashboard-page/dashboard-page.component';
+import { HttpClient } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { catchError, of } from 'rxjs';
 
-import { LoginComponent } from './components/login/login.component';
-
-const routes: Routes = [
-  { path: 'login', component: LoginComponent },
-  { path: 'dashboard', component: DashboardPageComponent },
-  { path: '', redirectTo: '/login', pathMatch: 'full' }
-];
-
-@NgModule({
-  imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
+@Injectable({
+  providedIn: 'root'
 })
-export class AppRoutingModule { }
+export class AppqosService {
+
+  constructor(private http: HttpClient) { }
+
+  getCaps(host: string, port: string) {
+    return this.http.get(`https://${host}:${port}/caps`).pipe(catchError(_=> of(false)));
+  }
+}

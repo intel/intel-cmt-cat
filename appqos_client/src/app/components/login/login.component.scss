@@ -29,20 +29,51 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
-import { DashboardPageComponent } from './components/dashboard-page/dashboard-page.component';
+$base-color: #0068b5;
 
-import { LoginComponent } from './components/login/login.component';
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 6.5rem 0;
 
-const routes: Routes = [
-  { path: 'login', component: LoginComponent },
-  { path: 'dashboard', component: DashboardPageComponent },
-  { path: '', redirectTo: '/login', pathMatch: 'full' }
-];
+  .logo {
+    width: 14rem;
+    height: 6rem;
+  }
 
-@NgModule({
-  imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
-})
-export class AppRoutingModule { }
+  .title {
+    padding-top: 2.5rem;
+    font-size: 2.2rem;
+    color: $base-color;
+  }
+
+  span {
+    display: block;
+    width: 23rem;
+    border-top: 1px solid $base-color;
+  }
+
+  .form {
+    display: flex;
+    flex-direction: column;
+    padding-top: 1.8rem;
+    align-items: center;
+  }
+
+  .field-address, .field-port {
+    padding-top: 0.5rem;
+    width: 16rem;
+  }
+
+  .submit-button {
+    width: 16rem;
+    height: 3rem;
+  }
+
+  .contact-text {
+    color: $base-color;
+    padding-top: 0.5rem;
+  }
+}

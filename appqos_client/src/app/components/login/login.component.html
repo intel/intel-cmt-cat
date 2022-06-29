@@ -1,4 +1,4 @@
-/*
+<!--
 BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
@@ -27,22 +27,38 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+-->
 
-import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router';
-import { DashboardPageComponent } from './components/dashboard-page/dashboard-page.component';
+<div class="container">
+  <img class="logo" src="../../../assets/intel_logo.jpg" alt="Intel">
+  <h1 class="title">Application Quality of Service</h1>
+  <span></span>
+  <form [formGroup]="form" class="form" (submit)="loginToSystem(form)">
+    <mat-form-field class="field-address" appearance="fill" >
+      <mat-label>Enter AppQoS host URL or IP address</mat-label>
+      <input matInput formControlName="hostName" placeholder="localhost">
+    </mat-form-field>
 
-import { LoginComponent } from './components/login/login.component';
+    <mat-form-field class="field-port" appearance="fill" >
+      <mat-label>Enter port number</mat-label>
+      <input matInput formControlName="portNumber" placeholder="5000">
+    </mat-form-field>
+    <mat-error *ngIf="hasError">
+      Please enter a valid credentials or server isn't responding...
+    </mat-error>
 
-const routes: Routes = [
-  { path: 'login', component: LoginComponent },
-  { path: 'dashboard', component: DashboardPageComponent },
-  { path: '', redirectTo: '/login', pathMatch: 'full' }
-];
+    <div class="">
+      <button mat-flat-button color="primary" class="submit-button" type="submit" [disabled]="form.invalid">LOGIN</button>
+    </div>
 
-@NgModule({
-  imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
-})
-export class AppRoutingModule { }
+    <a href="https://github.com/intel/intel-cmt-cat/tree
+    /master/appqos" class="contact-text" target="_blank">More about AppQoS.</a>
+  </form>
+  <mat-progress-spinner
+    class="loading"
+    *ngIf="loading"
+    color="primary"
+    mode="indeterminate"
+    diameter="35">
+  </mat-progress-spinner>
+</div>
