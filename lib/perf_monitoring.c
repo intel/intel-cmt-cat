@@ -253,8 +253,8 @@ set_arch_event_attrs(enum pqos_mon_event *events)
         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_LLC_MISS;
 
         /* Set LLC references event attributes */
-        events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs = attr;
-        events_tab[OS_MON_EVT_IDX_LLC_MISS].attrs.config =
+        events_tab[OS_MON_EVT_IDX_LLC_REF].attrs = attr;
+        events_tab[OS_MON_EVT_IDX_LLC_REF].attrs.config =
             PERF_COUNT_HW_CACHE_REFERENCES;
         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_LLC_REF;
 
