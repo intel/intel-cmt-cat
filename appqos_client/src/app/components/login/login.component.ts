@@ -47,9 +47,10 @@ export class LoginComponent implements OnInit {
   constructor(
     private service: AppqosService,
     private localStore: LocalService,
-    private router: Router) {}
+    private router: Router) { }
 
   ngOnInit(): void {
+    this.localStore.clearData();
     this.form = new FormGroup({
       hostName: new FormControl('', [Validators.required]),
       portNumber: new FormControl('', [Validators.required]),
@@ -78,21 +79,21 @@ export class LoginComponent implements OnInit {
     })
   }
 
-  private goToSystem(hostName: string, portNumber: string) {
+  private goToSystem(hostName: string, portNumber: string): void {
     this.router.navigate(['/dashboard']);
 
     this.localStore.saveData('hostName', hostName);
     this.localStore.saveData('portName', portNumber);
   }
 
-  hostNameChecker(hostName: string) {
+  hostNameChecker(hostName: string): string {
     const http = 'http://';
     const https = 'https://';
 
     if (hostName.includes(http)) {
-      return hostName.replace(http,'');
+      return hostName.replace(http, '');
     } else if (hostName.includes(https)) {
-      return hostName.replace(https,'');
+      return hostName.replace(https, '');
     } else {
       return hostName;
     }

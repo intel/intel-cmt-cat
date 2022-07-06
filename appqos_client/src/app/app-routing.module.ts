@@ -31,14 +31,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { DashboardPageComponent } from './components/dashboard-page/dashboard-page.component';
 
+import { DashboardPageComponent } from './components/dashboard-page/dashboard-page.component';
 import { LoginComponent } from './components/login/login.component';
+import { PermissionsGuard } from './services/permissions.guard';
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
-  { path: 'dashboard', component: DashboardPageComponent },
-  { path: '', redirectTo: '/login', pathMatch: 'full' }
+  { path: 'dashboard', component: DashboardPageComponent, canActivate: [PermissionsGuard] },
+  { path: '**', redirectTo: 'login', pathMatch: 'full' }
 ];
 
 @NgModule({

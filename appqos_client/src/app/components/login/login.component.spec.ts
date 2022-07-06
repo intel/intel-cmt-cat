@@ -52,6 +52,16 @@ describe('Given LoginComponent', () => {
 
   MockInstance.scope('case')
 
+  describe('when initialized', () => {
+    it('it clear localStorage', () => {
+      const localStorageSpy = spyOn(localStorage, 'clear');
+
+      MockRender(LoginComponent);
+
+      expect(localStorageSpy).toHaveBeenCalled();
+    });
+  });
+
   describe('when loginToSystem method is called with invalid form credentials', () => {
     it('it should give error', () => {
       const hostName = 'ErrorName';

@@ -32,7 +32,7 @@ import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { LocalService } from './local.service';
 
 describe('Given LocalService', () => {
-  beforeEach(() => 
+  beforeEach(() =>
     MockBuilder(LocalService)
   );
 
@@ -46,17 +46,29 @@ describe('Given LocalService', () => {
 
       expect(localStorage.getItem('hostName')).toBe('localhost');
     });
-  })
+  });
 
   describe('when getData method is executed', () => {
     it('it should return data from LocalStorage', () => {
       const { point: { componentInstance: service } } = MockRender(LocalService);
 
-      localStorage.setItem('portNumber', '5000')
+      localStorage.setItem('portNumber', '5000');
 
       const expectedValue = service.getData('portNumber');
 
       expect(expectedValue).toBe('5000');
     });
-  })
+  });
+
+  describe('when clearData method is executed', () => {
+    it('it should clear data from LocalStorage', () => {
+      const { point: { componentInstance: service } } = MockRender(LocalService);
+
+      localStorage.setItem('portNumber', '5000');
+
+      service.clearData();
+
+      expect(service.getData('portNumber')).toBeNull();
+    });
+  });
 });

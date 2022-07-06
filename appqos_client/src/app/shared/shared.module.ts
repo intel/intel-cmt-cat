@@ -39,6 +39,7 @@ import { LoginComponent } from "../components/login/login.component";
 import { AppqosService } from "../services/appqos.service";
 import { LocalService } from "../services/local.service";
 import { DashboardPageComponent } from "../components/dashboard-page/dashboard-page.component";
+import { PermissionsGuard } from "../services/permissions.guard";
 
 
 @NgModule({
@@ -59,6 +60,6 @@ import { DashboardPageComponent } from "../components/dashboard-page/dashboard-p
     HttpClientModule,
     DashboardPageComponent
   ],
-  providers: [AppqosService, LocalService]
+  providers: [AppqosService, LocalService, PermissionsGuard]
 })
 export class SharedModule { }
