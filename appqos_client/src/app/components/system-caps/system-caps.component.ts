@@ -27,8 +27,25 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.container {
-  display: flex;
-  justify-content: center;
-  column-gap: 1.2rem;
+import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+
+import { AppqosService } from 'src/app/services/appqos.service';
+import { Caps } from './system-caps.model';
+
+@Component({
+  selector: 'app-system-caps',
+  templateUrl: './system-caps.component.html',
+  styleUrls: ['./system-caps.component.scss'],
+  encapsulation: ViewEncapsulation.None,
+})
+export class SystemCapsComponent implements OnInit {
+  caps: string[] = [];
+
+  constructor(private service: AppqosService) {}
+
+  ngOnInit(): void {
+    this.service
+      .getCaps()
+      .subscribe((caps: Caps) => (this.caps = caps.capabilities));
+  }
 }

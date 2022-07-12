@@ -27,67 +27,54 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit } from '@angular/core';
-import { FormControl, FormGroup, Validators } from '@angular/forms';
-import { Router } from '@angular/router';
+import { HttpClientModule } from '@angular/common/http';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
+import { of } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
-import { LocalService } from 'src/app/services/local.service';
+import { SharedModule } from 'src/app/shared/shared.module';
+import { SystemCapsComponent } from './system-caps.component';
+import { Caps } from './system-caps.model';
 
-@Component({
-  selector: 'app-login',
-  templateUrl: './login.component.html',
-  styleUrls: ['./login.component.scss'],
-})
-export class LoginComponent implements OnInit {
-  form!: FormGroup;
-  hasError: boolean = false;
-  loading: boolean = false;
+describe('Given SystemCapsComponent', () => {
+  beforeEach(() =>
+    MockBuilder(SystemCapsComponent)
+      .replace(HttpClientModule, HttpClientTestingModule)
+      .mock(SharedModule)
+      .mock(AppqosService)
+  );
 
-  constructor(
-    private service: AppqosService,
-    private localStore: LocalService,
-    private router: Router
-  ) {}
+  MockInstance.scope('case');
 
-  ngOnInit(): void {
-    this.localStore.clearData();
-    this.form = new FormGroup({
-      hostName: new FormControl('', [
-        Validators.required,
-        Validators.pattern('^https://.*$'),
-      ]),
-      portNumber: new FormControl('', [
-        Validators.required,
-        Validators.pattern('^[0-9]*$'),
-      ]),
+  describe('when initialized', () => {
+    it('should display title property in card ', () => {
+      const title = 'System Capabilities';
+
+      const mockedCaps: Caps = {
+        capabilities: ['cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockRender(SystemCapsComponent);
+
+      const expectedTitle = ngMocks.formatText(ngMocks.find('mat-card-title'));
+
+      expect(expectedTitle).toBe(title);
     });
-  }
 
-  loginToSystem(form: FormGroup) {
-    const hostName = form.value.hostName.trim();
-    const portNumber = form.value.portNumber.trim();
-    this.loading = true;
-    this.hasError = false;
+    it('should get capabilities', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['cat', 'mba', 'sstbf', 'power'],
+      };
 
-    if (!form.valid) {
-      return;
-    }
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
 
-    this.service.login(hostName, portNumber).subscribe((result) => {
-      if (!result) {
-        this.hasError = true;
-      } else {
-        this.hasError = false;
-        this.goToSystem(hostName, portNumber);
-      }
+      const {
+        point: { componentInstance: component },
+      } = MockRender(SystemCapsComponent);
 
-      this.loading = false;
+      expect(component.caps).toBe(mockedCaps.capabilities);
     });
-  }
-
-  private goToSystem(hostName: string, portNumber: string): void {
-    this.localStore.saveData('api_url', `${hostName}:${portNumber}`);
-    this.router.navigate(['/dashboard']);
-  }
-}
+  });
+});

@@ -27,28 +27,26 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
+import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 
+import { SharedModule } from 'src/app/shared/shared.module';
 import { DashboardPageComponent } from './dashboard-page.component';
 
-describe('DashboardPageComponent', () => {
-  let component: DashboardPageComponent;
-  let fixture: ComponentFixture<DashboardPageComponent>;
+describe('Given DashboardPageComponent', () => {
+  beforeEach(() =>
+    MockBuilder(DashboardPageComponent).mock(SharedModule).mock(Router)
+  );
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      declarations: [DashboardPageComponent]
-    })
-      .compileComponents();
-  });
+  MockInstance.scope('case');
 
-  beforeEach(() => {
-    fixture = TestBed.createComponent(DashboardPageComponent);
-    component = fixture.componentInstance;
-    fixture.detectChanges();
-  });
-  // Temporary, will be removed
-  xit('should create', () => {
-    expect(component).toBeTruthy();
+  describe('when initialized', () => {
+    it('should render SystemCapsComponent', () => {
+      MockRender(DashboardPageComponent);
+
+      const expectValue = ngMocks.find('app-system-caps');
+
+      expect(expectValue).toBeTruthy();
+    });
   });
 });

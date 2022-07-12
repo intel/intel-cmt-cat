@@ -1,4 +1,4 @@
-/*BSD LICENSE
+<!--BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -25,10 +25,20 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
-.container {
-  display: flex;
-  justify-content: center;
-  column-gap: 1.2rem;
-}
+<mat-card>
+  <mat-card-title>System Capabilities</mat-card-title>
+  <mat-card-content>
+    <mat-list *ngFor="let cap of caps">
+      <div mat-subheader>{{cap}}</div>
+      <mat-divider [inset]="true"></mat-divider>
+      <mat-list-item>
+        <div matLine>
+           <span style="float:left">Left Text</span>
+           <span style="float:right">Right Text</span>
+        </div>
+      </mat-list-item>
+    </mat-list>
+  </mat-card-content>
+</mat-card>

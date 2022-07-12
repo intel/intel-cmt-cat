@@ -38,12 +38,16 @@ import { PermissionsGuard } from './services/permissions.guard';
 
 const routes: Routes = [
   { path: 'login', component: LoginComponent },
-  { path: 'dashboard', component: DashboardPageComponent, canActivate: [PermissionsGuard] },
-  { path: '**', redirectTo: 'login', pathMatch: 'full' }
+  {
+    path: 'dashboard',
+    component: DashboardPageComponent,
+    canActivate: [PermissionsGuard],
+  },
+  { path: '**', redirectTo: 'login', pathMatch: 'full' },
 ];
 
 @NgModule({
   imports: [RouterModule.forRoot(routes)],
-  exports: [RouterModule]
+  exports: [RouterModule],
 })
-export class AppRoutingModule { }
+export class AppRoutingModule {}

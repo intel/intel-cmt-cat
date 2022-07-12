@@ -5,19 +5,27 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { PermissionsGuard } from './permissions.guard';
 import { SharedModule } from '../shared/shared.module';
 import { LoginComponent } from '../components/login/login.component';
+import { LocalService } from './local.service';
 
 describe('TestRoutingGuard', () => {
   beforeEach(() =>
     MockBuilder(PermissionsGuard)
       .mock(RouterModule)
       .mock(SharedModule)
-      .keep(RouterTestingModule.withRoutes([{ path: 'login', component: LoginComponent }]))
+      .keep(LocalService)
+      .keep(
+        RouterTestingModule.withRoutes([
+          { path: 'login', component: LoginComponent },
+        ])
+      )
       .exclude(NG_MOCKS_GUARDS)
   );
 
   describe('when canActivate method is executed for a OTHER THAN Login and the user IS NOT logged in', () => {
     it('should return false to disallow activation', () => {
-      const { point: { componentInstance: guard } } = MockRender(PermissionsGuard);
+      const {
+        point: { componentInstance: guard },
+      } = MockRender(PermissionsGuard);
 
       localStorage.clear();
 
@@ -27,9 +35,11 @@ describe('TestRoutingGuard', () => {
 
   describe('when canActivate method is executed for a OTHER THAN Login and the user is logged in', () => {
     it('should return true to allow activation', () => {
-      const { point: { componentInstance: guard } } = MockRender(PermissionsGuard);
+      const {
+        point: { componentInstance: guard },
+      } = MockRender(PermissionsGuard);
 
-      localStorage.setItem('hostName', 'localhost');
+      localStorage.setItem('api_url', 'localhost:5000');
 
       expect(guard.canActivate()).toBeTrue();
     });

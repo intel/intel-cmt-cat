@@ -30,19 +30,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { Injectable } from '@angular/core';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class LocalService {
   public saveData(key: string, value: string): void {
-    localStorage.setItem(key, value);
+    window.localStorage.setItem(key, value);
   }
 
   public getData(key: string): string | null {
-    return localStorage.getItem(key);
+    return window.localStorage.getItem(key);
   }
 
-  public clearData() {
-    localStorage.clear();
+  public clearData(): void {
+    window.localStorage.clear();
+  }
+
+  /**
+   * Check if app is in "logged in" state
+   */
+  public isLoggedIn(): boolean {
+    if (window.localStorage.getItem('api_url') === null) {
+      return false;
+    }
+    return true;
   }
 }
-

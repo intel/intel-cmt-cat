@@ -76,3 +76,7 @@ $intel-theme: mat-light-theme($intel-primary, $intel-accent, $intel-warn);
 
 html, body { height: 100%; }
 body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+.mat-card-title {
+  font-size: 18px;
+}

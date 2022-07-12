@@ -28,52 +28,91 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpClientModule } from '@angular/common/http';
-import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
-import { MockBuilder, MockRender } from 'ng-mocks';
+import { MockBuilder, MockRender, ngMocks } from 'ng-mocks';
 
+import {
+  HttpClientTestingModule,
+  HttpTestingController,
+} from '@angular/common/http/testing';
+
+import { Caps } from '../components/system-caps/system-caps.model';
 import { AppqosService } from './appqos.service';
+import { LocalService } from './local.service';
 
 describe('Given AppqosService', () => {
   beforeEach(() =>
-    MockBuilder(AppqosService).replace(
-      HttpClientModule,
-      HttpClientTestingModule
-    )
+    MockBuilder(AppqosService)
+      .replace(HttpClientModule, HttpClientTestingModule)
+      .keep(LocalService)
   );
 
-  describe('when getCaps method is called with correct credentials', () => {
+  describe('when login method is called with correct credentials', () => {
     it('it should return response from HTTP request', () => {
-      const hostName = 'localhost';
+      const hostName = 'https://localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ["cat", "mba", "sstbf", "power"] };
-      const { point: { componentInstance: service } } = MockRender(AppqosService);
+      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
       const httpMock = TestBed.inject(HttpTestingController);
 
-      service.getCaps(hostName, portNumber).subscribe(result => {
+      service.login(hostName, portNumber).subscribe((result) => {
         expect(result).toBe(mockedCaps);
       });
 
-      const req = httpMock.expectOne(`https://${hostName}:${portNumber}/caps`);
+      const req = httpMock.expectOne(`${hostName}:${portNumber}/caps`);
       req.flush(mockedCaps);
       httpMock.verify();
     });
-  })
+  });
 
-  describe('when getCaps method is called with incorrect credentials', () => {
+  describe('when login method is called with incorrect credentials', () => {
     it('it should return error from HTTP request', () => {
-      const hostName = 'ErrorName';
+      const hostName = 'https://errorName';
       const portNumber = '404';
-      const { point: { componentInstance: service } } = MockRender(AppqosService);
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
       const httpMock = TestBed.inject(HttpTestingController);
 
-      service.getCaps(hostName, portNumber).subscribe(result => {
+      service.login(hostName, portNumber).subscribe((result) => {
         expect(result).toBeFalse();
       });
 
-      const req = httpMock.expectOne(`https://${hostName}:${portNumber}/caps`);
+      const req = httpMock.expectOne(`${hostName}:${portNumber}/caps`);
       req.flush(false);
       httpMock.verify();
     });
-  })
+  });
+
+  describe('when getCaps method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedCaps: Caps = {
+        capabilities: ['cat', 'mba', 'sstbf', 'power'],
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getCaps().subscribe((caps: Caps) => {
+        expect(caps).toBe(mockedCaps);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/caps`);
+      req.flush(mockedCaps);
+      httpMock.verify();
+    });
+  });
 });

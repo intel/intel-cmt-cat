@@ -1,18 +1,17 @@
 import { Injectable } from '@angular/core';
 import { CanActivate, Router } from '@angular/router';
 
+import { LocalService } from './local.service';
+
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class PermissionsGuard implements CanActivate {
-  constructor(private router: Router) { }
+  constructor(private router: Router, private local: LocalService) {}
 
   canActivate(): boolean {
-    if (localStorage.getItem('hostName') == null) {
-      this.router.navigate(['/login']);
-      return false;
-    } else {
-      return true;
-    }
+    if (this.local.isLoggedIn()) return true;
+    this.router.navigate(['/login']);
+    return false;
   }
 }

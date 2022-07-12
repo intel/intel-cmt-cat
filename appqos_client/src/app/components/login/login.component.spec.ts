@@ -27,33 +27,35 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { HttpClientModule } from "@angular/common/http";
-import { HttpClientTestingModule } from "@angular/common/http/testing";
-import { DebugElement } from "@angular/core";
-import { TestBed } from "@angular/core/testing";
-import { MatProgressSpinnerModule } from "@angular/material/progress-spinner";
-import { By } from "@angular/platform-browser";
-import { Router } from "@angular/router";
-import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
-import { of } from "rxjs";
+import { HttpClientModule } from '@angular/common/http';
+import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { DebugElement } from '@angular/core';
+import { TestBed } from '@angular/core/testing';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { By } from '@angular/platform-browser';
+import { Router } from '@angular/router';
+import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
+import { of } from 'rxjs';
 
-import { AppqosService } from "src/app/services/appqos.service";
-import { SharedModule } from "src/app/shared/shared.module";
-import { LoginComponent } from "./login.component";
-import { LocalService } from "src/app/services/local.service";
+import { AppqosService } from 'src/app/services/appqos.service';
+import { SharedModule } from 'src/app/shared/shared.module';
+import { LoginComponent } from './login.component';
+import { LocalService } from 'src/app/services/local.service';
 
 describe('Given LoginComponent', () => {
   beforeEach(() =>
-    MockBuilder(LoginComponent).replace(
-      HttpClientModule,
-      HttpClientTestingModule
-    ).mock(Router).mock(SharedModule).mock(MatProgressSpinnerModule).keep(LocalService)
+    MockBuilder(LoginComponent)
+      .replace(HttpClientModule, HttpClientTestingModule)
+      .mock(Router)
+      .mock(SharedModule)
+      .mock(MatProgressSpinnerModule)
+      .keep(LocalService)
   );
 
-  MockInstance.scope('case')
+  MockInstance.scope('case');
 
   describe('when initialized', () => {
-    it('it clear localStorage', () => {
+    it('should clear localStorage', () => {
       const localStorageSpy = spyOn(localStorage, 'clear');
 
       MockRender(LoginComponent);
@@ -63,11 +65,11 @@ describe('Given LoginComponent', () => {
   });
 
   describe('when loginToSystem method is called with invalid form credentials', () => {
-    it('it should give error', () => {
-      const hostName = 'ErrorName';
+    it('should give error', () => {
+      const hostName = 'https://errorName';
       const portNumber = '404';
 
-      MockInstance(AppqosService, 'getCaps', () => of(false));
+      MockInstance(AppqosService, 'login', () => of(false));
 
       const fixture = MockRender(LoginComponent);
       const component = fixture.point.componentInstance;
@@ -83,13 +85,43 @@ describe('Given LoginComponent', () => {
     });
   });
 
+  describe('when host name starts without https://', () => {
+    it('should give error that form invalid', () => {
+      const hostName = 'localhost';
+      const portNumber = '404';
+
+      const fixture = MockRender(LoginComponent);
+      const component = fixture.point.componentInstance;
+
+      component.form.patchValue({ hostName, portNumber });
+      fixture.detectChanges();
+
+      expect(component.form.invalid).toBeTrue();
+    });
+  });
+
+  describe('when host name starts with https://', () => {
+    it('should NOT give error that form invalid', () => {
+      const hostName = 'https://localhost';
+      const portNumber = '404';
+
+      const fixture = MockRender(LoginComponent);
+      const component = fixture.point.componentInstance;
+
+      component.form.patchValue({ hostName, portNumber });
+      fixture.detectChanges();
+
+      expect(component.form.valid).toBeTrue();
+    });
+  });
+
   describe('when loginToSystem method is called with valid form credentials', () => {
     it('it should NOT give error', () => {
       const hostName = 'localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ["cat", "mba", "sstbf", "power"] }
+      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(AppqosService, 'login', () => of(mockedCaps));
 
       const fixture = MockRender(LoginComponent);
       const component = fixture.point.componentInstance;
@@ -105,11 +137,11 @@ describe('Given LoginComponent', () => {
     });
 
     it('it should redirect to Dashboard page', () => {
-      const hostName = 'localhost';
+      const hostName = 'https://localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ["cat", "mba", "sstbf", "power"] }
+      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(AppqosService, 'login', () => of(mockedCaps));
 
       const fixture = MockRender(LoginComponent);
       const component = fixture.point.componentInstance;
@@ -127,11 +159,11 @@ describe('Given LoginComponent', () => {
     });
 
     it('it should store credentials to localStorage', () => {
-      const hostName = 'localhost';
+      const hostName = 'https://localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ["cat", "mba", "sstbf", "power"] }
+      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(AppqosService, 'login', () => of(mockedCaps));
 
       const fixture = MockRender(LoginComponent);
       const component = fixture.point.componentInstance;
@@ -141,16 +173,18 @@ describe('Given LoginComponent', () => {
 
       form.triggerEventHandler('submit', null);
 
-      expect(localStorage.getItem('hostName')).toBe(hostName);
+      const localStore = ngMocks.findInstance(LocalService);
+
+      expect(localStore.getData('api_url')).toBe('https://localhost:5000');
     });
   });
 
   describe('when loginToSystem method is called with invalid form credentials', () => {
     it('it should give error', () => {
-      const hostName = 'ErrorName';
+      const hostName = 'https://errorName';
       const portNumber = '404';
 
-      MockInstance(AppqosService, 'getCaps', () => of(false));
+      MockInstance(AppqosService, 'login', () => of(false));
 
       const fixture = MockRender(LoginComponent);
       const component = fixture.point.componentInstance;
@@ -163,54 +197,6 @@ describe('Given LoginComponent', () => {
       form.triggerEventHandler('submit', null);
 
       expect(component.hasError).toBeTrue();
-    });
-  });
-
-  describe('when hostNameChecker method is called and hostname starts with https://', () => {
-    it('it should return host name without https://', () => {
-      const hostName = 'https://localhost';
-
-      const { point: { componentInstance: component } } = MockRender(LoginComponent);
-
-      const expectedValue = component.hostNameChecker(hostName);
-
-      expect(expectedValue).toEqual('localhost');
-    });
-  });
-
-  describe('when hostNameChecker method is called and hostname starts without https://', () => {
-    it('it should return url', () => {
-      const hostName = 'localhost';
-
-      const { point: { componentInstance: component } } = MockRender(LoginComponent);
-
-      const expectedValue = component.hostNameChecker(hostName);
-
-      expect(expectedValue).toEqual(hostName);
-    });
-  });
-
-  describe('when hostNameChecker method is called and hostname starts with http://', () => {
-    it('it should return host name without http://', () => {
-      const hostName = 'http://localhost';
-
-      const { point: { componentInstance: component } } = MockRender(LoginComponent);
-
-      const expectedValue = component.hostNameChecker(hostName);
-
-      expect(expectedValue).toEqual('localhost');
-    });
-  });
-
-  describe('when hostNameChecker method is called and hostname starts without http://', () => {
-    it('it should return url', () => {
-      const hostName = 'localhost';
-
-      const { point: { componentInstance: component } } = MockRender(LoginComponent);
-
-      const expectedValue = component.hostNameChecker(hostName);
-
-      expect(expectedValue).toEqual(hostName);
     });
   });
 

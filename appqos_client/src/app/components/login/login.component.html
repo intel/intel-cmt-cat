@@ -34,9 +34,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <h1 class="title">Application Quality of Service</h1>
   <span></span>
   <form [formGroup]="form" class="form" (submit)="loginToSystem(form)">
-    <mat-form-field class="field-address" appearance="fill" >
+    <mat-form-field class="field-address" appearance="fill">
       <mat-label>Enter AppQoS host URL or IP address</mat-label>
-      <input matInput formControlName="hostName" placeholder="localhost">
+      <input matInput formControlName="hostName" placeholder="https://localhost">
+      <mat-error *ngIf="form.controls['hostName'].errors?.['pattern']">'https://' prefix required</mat-error>
     </mat-form-field>
 
     <mat-form-field class="field-port" appearance="fill" >

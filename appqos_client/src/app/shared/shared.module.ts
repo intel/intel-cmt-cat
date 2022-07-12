@@ -27,39 +27,40 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { NgModule } from "@angular/core";
+import { NgModule } from '@angular/core';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
-import { ReactiveFormsModule } from "@angular/forms";
-import { CommonModule } from "@angular/common";
+import { ReactiveFormsModule } from '@angular/forms';
+import { CommonModule } from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { HttpClientModule } from "@angular/common/http";
+import { HttpClientModule } from '@angular/common/http';
+import { MatCardModule } from '@angular/material/card';
+import { MatGridListModule } from '@angular/material/grid-list';
+import { MatListModule } from '@angular/material/list';
+import { MatDividerModule } from '@angular/material/divider';
 
-import { LoginComponent } from "../components/login/login.component";
-import { AppqosService } from "../services/appqos.service";
-import { LocalService } from "../services/local.service";
-import { DashboardPageComponent } from "../components/dashboard-page/dashboard-page.component";
-import { PermissionsGuard } from "../services/permissions.guard";
-
+import { LoginComponent } from '../components/login/login.component';
+import { AppqosService } from '../services/appqos.service';
+import { LocalService } from '../services/local.service';
+import { DashboardPageComponent } from '../components/dashboard-page/dashboard-page.component';
+import { PermissionsGuard } from '../services/permissions.guard';
+import { SystemCapsComponent } from '../components/system-caps/system-caps.component';
 
 @NgModule({
-  declarations: [
-    LoginComponent,
-    DashboardPageComponent
-  ],
+  declarations: [LoginComponent, DashboardPageComponent, SystemCapsComponent],
   imports: [
     MatInputModule,
     MatButtonModule,
     ReactiveFormsModule,
     CommonModule,
     HttpClientModule,
-    MatProgressSpinnerModule
+    MatProgressSpinnerModule,
+    MatCardModule,
+    MatGridListModule,
+    MatListModule,
+    MatDividerModule,
   ],
-  exports: [
-    LoginComponent,
-    HttpClientModule,
-    DashboardPageComponent
-  ],
-  providers: [AppqosService, LocalService, PermissionsGuard]
+  exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
+  providers: [AppqosService, LocalService, PermissionsGuard],
 })
-export class SharedModule { }
+export class SharedModule {}

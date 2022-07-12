@@ -29,16 +29,29 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, of } from 'rxjs';
+import { Router } from '@angular/router';
+import { catchError, Observable, of } from 'rxjs';
+
+import { Caps } from '../components/system-caps/system-caps.model';
+import { LocalService } from './local.service';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AppqosService {
+  constructor(private http: HttpClient, private local: LocalService) {}
 
-  constructor(private http: HttpClient) { }
+  login(host: string, port: string) {
+    return this.http
+      .get(`${host}:${port}/caps`)
+      .pipe(catchError((_) => of(false)));
+  }
 
-  getCaps(host: string, port: string) {
-    return this.http.get(`https://${host}:${port}/caps`).pipe(catchError(_=> of(false)));
+  /**
+   * Retrieve system capabilities
+   */
+  getCaps(): Observable<Caps> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<Caps>(`${api_url}/caps`);
   }
 }

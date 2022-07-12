@@ -35,11 +35,10 @@ import { LocalService } from 'src/app/services/local.service';
 @Component({
   selector: 'app-dashboard-page',
   templateUrl: './dashboard-page.component.html',
-  styleUrls: ['./dashboard-page.component.scss']
+  styleUrls: ['./dashboard-page.component.scss'],
 })
 export class DashboardPageComponent {
-
-  constructor(private localStore: LocalService, private router: Router) { }
+  constructor(private localStore: LocalService, private router: Router) {}
 
   logout() {
     this.localStore.clearData();

@@ -32,43 +32,75 @@ import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { LocalService } from './local.service';
 
 describe('Given LocalService', () => {
-  beforeEach(() =>
-    MockBuilder(LocalService)
-  );
+  beforeEach(() => MockBuilder(LocalService));
 
   MockInstance.scope('case');
 
   describe('when saveData method is executed', () => {
-    it('it should store data to the LocalStorage', () => {
-      const { point: { componentInstance: service } } = MockRender(LocalService);
+    it('should store data to the LocalStorage', () => {
+      const {
+        point: { componentInstance: service },
+      } = MockRender(LocalService);
 
-      service.saveData('hostName', 'localhost');
+      service.saveData('api_url', 'localhost:5000');
 
-      expect(localStorage.getItem('hostName')).toBe('localhost');
+      expect(localStorage.getItem('api_url')).toBe('localhost:5000');
     });
   });
 
   describe('when getData method is executed', () => {
-    it('it should return data from LocalStorage', () => {
-      const { point: { componentInstance: service } } = MockRender(LocalService);
+    it('should return data from LocalStorage', () => {
+      const {
+        point: { componentInstance: service },
+      } = MockRender(LocalService);
 
-      localStorage.setItem('portNumber', '5000');
+      localStorage.setItem('api_url', 'localhost:5000');
 
-      const expectedValue = service.getData('portNumber');
+      const expectedValue = service.getData('api_url');
 
-      expect(expectedValue).toBe('5000');
+      expect(expectedValue).toBe('localhost:5000');
     });
   });
 
   describe('when clearData method is executed', () => {
-    it('it should clear data from LocalStorage', () => {
-      const { point: { componentInstance: service } } = MockRender(LocalService);
+    it('should clear data from LocalStorage', () => {
+      const {
+        point: { componentInstance: service },
+      } = MockRender(LocalService);
 
-      localStorage.setItem('portNumber', '5000');
+      localStorage.setItem('api_url', 'localhost:5000');
 
       service.clearData();
 
-      expect(service.getData('portNumber')).toBeNull();
+      expect(service.getData('api_url')).toBeNull();
+    });
+  });
+
+  describe('when isLoggedIn method is executed and LocalStorage is null', () => {
+    it('should return false', () => {
+      const {
+        point: { componentInstance: service },
+      } = MockRender(LocalService);
+
+      service.clearData();
+
+      const expectedValue = service.isLoggedIn();
+
+      expect(expectedValue).toBeFalse();
+    });
+  });
+
+  describe('when isLoggedIn method is executed and LocalStorage is NOT null', () => {
+    it('should return true', () => {
+      const {
+        point: { componentInstance: service },
+      } = MockRender(LocalService);
+
+      service.saveData('api_url', 'localhost:5000');
+
+      const expectedValue = service.isLoggedIn();
+
+      expect(expectedValue).toBeTrue();
     });
   });
 });
