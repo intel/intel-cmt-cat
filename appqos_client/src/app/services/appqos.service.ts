@@ -29,7 +29,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { Router } from '@angular/router';
 import { catchError, Observable, of } from 'rxjs';
 
 import { Caps } from '../components/system-caps/system-caps.model';
@@ -38,6 +37,8 @@ import { LocalService } from './local.service';
 @Injectable({
   providedIn: 'root',
 })
+
+/* Service used to get data from backend */
 export class AppqosService {
   constructor(private http: HttpClient, private local: LocalService) {}
 

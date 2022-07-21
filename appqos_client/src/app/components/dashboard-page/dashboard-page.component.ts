@@ -37,6 +37,8 @@ import { LocalService } from 'src/app/services/local.service';
   templateUrl: './dashboard-page.component.html',
   styleUrls: ['./dashboard-page.component.scss'],
 })
+
+/* Component used to display Dashboard page*/
 export class DashboardPageComponent {
   constructor(private localStore: LocalService, private router: Router) {}
 

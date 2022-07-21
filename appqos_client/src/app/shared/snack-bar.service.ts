@@ -27,27 +27,25 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import { Injectable } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
-import { AppqosService } from 'src/app/services/appqos.service';
-import { Caps } from './system-caps.model';
-
-@Component({
-  selector: 'app-system-caps',
-  templateUrl: './system-caps.component.html',
-  styleUrls: ['./system-caps.component.scss'],
-  encapsulation: ViewEncapsulation.None,
+@Injectable({
+  providedIn: 'root',
 })
 
-/* Component used to show System Capabilities and capability details*/
-export class SystemCapsComponent implements OnInit {
-  caps: string[] = [];
+/* Service used to display error messages using angular snackbar */
+export class SnackBarService {
+  constructor(private snackBar: MatSnackBar) {}
 
-  constructor(private service: AppqosService) {}
-
-  ngOnInit(): void {
-    this.service
-      .getCaps()
-      .subscribe((caps: Caps) => (this.caps = caps.capabilities));
+  /**
+   * Displays error message in Snackbar
+   */
+  public handleError(error: string): void {
+    this.snackBar.open(error, '', {
+      duration: 3000,
+      horizontalPosition: 'end',
+      verticalPosition: 'top',
+    });
   }
 }

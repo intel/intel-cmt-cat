@@ -39,6 +39,8 @@ import { LocalService } from 'src/app/services/local.service';
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
 })
+
+/* Component used to display Login page with form fields*/
 export class LoginComponent implements OnInit {
   form!: FormGroup;
   hasError: boolean = false;

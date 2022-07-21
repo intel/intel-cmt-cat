@@ -27,27 +27,36 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 
-import { AppqosService } from 'src/app/services/appqos.service';
-import { Caps } from './system-caps.model';
+import { SharedModule } from './shared.module';
+import { SnackBarService } from './snack-bar.service';
 
-@Component({
-  selector: 'app-system-caps',
-  templateUrl: './system-caps.component.html',
-  styleUrls: ['./system-caps.component.scss'],
-  encapsulation: ViewEncapsulation.None,
-})
+describe('Given SnackBarService', () => {
+  beforeEach(() =>
+    MockBuilder(SnackBarService).mock(SharedModule).mock(MatSnackBar)
+  );
 
-/* Component used to show System Capabilities and capability details*/
-export class SystemCapsComponent implements OnInit {
-  caps: string[] = [];
+  MockInstance.scope('case');
 
-  constructor(private service: AppqosService) {}
+  describe('when handleError method is executed', () => {
+    it('should display error message snackbar', () => {
+      const openSnackbarSpy = jasmine.createSpy('snackbar.open');
+      const errorMessage = 'Failed connection!';
 
-  ngOnInit(): void {
-    this.service
-      .getCaps()
-      .subscribe((caps: Caps) => (this.caps = caps.capabilities));
-  }
-}
+      MockInstance(MatSnackBar, 'open', openSnackbarSpy);
+      const {
+        point: { componentInstance: service },
+      } = MockRender(SnackBarService);
+
+      service.handleError(errorMessage);
+
+      expect(openSnackbarSpy).toHaveBeenCalledWith(errorMessage, '', {
+        duration: 3000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top',
+      });
+    });
+  });
+});

@@ -32,6 +32,8 @@ import { Injectable } from '@angular/core';
 @Injectable({
   providedIn: 'root',
 })
+
+/* Service used to store data to localStorage */
 export class LocalService {
   public saveData(key: string, value: string): void {
     window.localStorage.setItem(key, value);
