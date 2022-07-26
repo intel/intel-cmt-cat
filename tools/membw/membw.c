@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/random.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -413,13 +414,11 @@ malloc_and_init_memory(size_t s)
                 return NULL;
         }
 
-        uint64_t *p64 = (uint64_t *)p;
-        size_t s64 = s / sizeof(uint64_t);
-
-        while (s64 > 0) {
-                *p64 = (uint64_t)rand();
-                p64 += (CL_SIZE / sizeof(uint64_t));
-                s64 -= (CL_SIZE / sizeof(uint64_t));
+        if (getrandom(p, s, 0) < 0) {
+                printf("ERROR: Failed to initialize memory\n");
+                stop_loop = 1;
+                free(p);
+                return NULL;
         }
 
         mem_flush(p, s);
@@ -822,12 +821,13 @@ cl_read_dqa(void *p)
 ALWAYS_INLINE void
 mem_execute(const unsigned bw, const enum cl_type type)
 {
-        const uint64_t val = (uint64_t)rand();
+        uint64_t val;
         char *cp = (char *)memchunk;
         unsigned i = 0;
         const size_t s = memchunk_size / CL_SIZE; /* mem size in cache lines */
 
-        assert(memchunk != NULL);
+        if (getrandom(&val, 8, 0) != 8)
+                return;
 
         for (i = 0; i < bw; i++) {
                 char *ptr = cp + (memchunk_offset * CL_SIZE);
@@ -1142,11 +1142,8 @@ main(int argc, char **argv)
                 return EXIT_FAILURE;
         }
 
-        if (cpu_cache_size(3, &cache_size) == 0) {
+        if (cpu_cache_size(3, &cache_size) == 0)
                 memchunk_size = (cache_size / PAGE_SIZE + 1) * PAGE_SIZE * 2;
-                if (memchunk_offset < PAGE_SIZE * CHUNKS)
-                        memchunk_offset = PAGE_SIZE * CHUNKS;
-        }
         features = cpu_feature_detect();
 
         switch (type) {
