@@ -36,7 +36,14 @@ import {
   HttpTestingController,
 } from '@angular/common/http/testing';
 
-import { Caps } from '../components/system-caps/system-caps.model';
+import {
+  CacheAllocation,
+  Caps,
+  MBA,
+  MBACTRL,
+  RDTIface,
+  SSTBF,
+} from '../components/system-caps/system-caps.model';
 import { AppqosService } from './appqos.service';
 import { LocalService } from './local.service';
 
@@ -51,7 +58,7 @@ describe('Given AppqosService', () => {
     it('it should return response from HTTP request', () => {
       const hostName = 'https://localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
+      const mockedCaps = { capabilities: ['l3cat', 'mba', 'sstbf', 'power'] };
 
       const {
         point: { componentInstance: service },
@@ -95,7 +102,7 @@ describe('Given AppqosService', () => {
       const api_url = 'https://localhost:5000';
 
       const mockedCaps: Caps = {
-        capabilities: ['cat', 'mba', 'sstbf', 'power'],
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
       };
 
       const {
@@ -112,6 +119,178 @@ describe('Given AppqosService', () => {
 
       const req = httpMock.expectOne(`${api_url}/caps`);
       req.flush(mockedCaps);
+      httpMock.verify();
+    });
+  });
+
+  describe('when getL3cat method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedL3cat: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016,
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getL3cat().subscribe((cat: CacheAllocation) => {
+        expect(cat).toBe(mockedL3cat);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/caps/l3cat`);
+      req.flush(mockedL3cat);
+      httpMock.verify();
+    });
+  });
+
+  describe('when getMbaCtrl method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedMbaCtrl: MBACTRL = {
+        enabled: false,
+        supported: true,
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getMbaCtrl().subscribe((mba: MBACTRL) => {
+        expect(mba).toBe(mockedMbaCtrl);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/caps/mba_ctrl`);
+      req.flush(mockedMbaCtrl);
+      httpMock.verify();
+    });
+  });
+
+  describe('when getRdtIface method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedRDT: RDTIface = {
+        interface: 'os',
+        interface_supported: ['msr', 'os'],
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getRdtIface().subscribe((rdt: RDTIface) => {
+        expect(rdt).toBe(mockedRDT);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/caps/rdt_iface`);
+      req.flush(mockedRDT);
+      httpMock.verify();
+    });
+  });
+
+  describe('when getSstbf method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedSSTBF: SSTBF = {
+        configured: false,
+        hp_cores: [1, 2],
+        std_cores: [1, 2],
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getSstbf().subscribe((sstbf: SSTBF) => {
+        expect(sstbf).toBe(mockedSSTBF);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/caps/sstbf`);
+      req.flush(mockedSSTBF);
+      httpMock.verify();
+    });
+  });
+
+  describe('when getMba method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedMba: MBA = {
+        clos_num: 12,
+        mba_enabled: true,
+        mba_bw_enabled: false,
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getMba().subscribe((mba: MBA) => {
+        expect(mba).toBe(mockedMba);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/caps/mba`);
+      req.flush(mockedMba);
+      httpMock.verify();
+    });
+  });
+
+  describe('when getL2cat method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedL2cat: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016,
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getL2cat().subscribe((l2cat: CacheAllocation) => {
+        expect(l2cat).toBe(mockedL2cat);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/caps/l2cat`);
+      req.flush(mockedL2cat);
       httpMock.verify();
     });
   });

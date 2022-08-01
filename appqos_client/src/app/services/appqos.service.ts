@@ -31,7 +31,15 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { catchError, Observable, of } from 'rxjs';
 
-import { Caps } from '../components/system-caps/system-caps.model';
+import {
+  CacheAllocation,
+  Caps,
+  MBA,
+  MBACTRL,
+  RDTIface,
+  SSTBF,
+} from '../components/system-caps/system-caps.model';
+
 import { LocalService } from './local.service';
 
 @Injectable({
@@ -54,5 +62,53 @@ export class AppqosService {
   getCaps(): Observable<Caps> {
     const api_url = this.local.getData('api_url');
     return this.http.get<Caps>(`${api_url}/caps`);
+  }
+
+  /**
+   * Retrieve L3 Cache Allocation
+   */
+  getL3cat(): Observable<CacheAllocation> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<CacheAllocation>(`${api_url}/caps/l3cat`);
+  }
+
+  /**
+   * Retrieve L2 Cache Allocation
+   */
+  getL2cat(): Observable<CacheAllocation> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<CacheAllocation>(`${api_url}/caps/l2cat`);
+  }
+
+  /**
+   * Retrieve Memory Bandwidth Allocation
+   */
+  getMba(): Observable<MBA> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<MBA>(`${api_url}/caps/mba`);
+  }
+
+  /**
+   * Retrieve Memory Bandwidth Allocation controller
+   */
+  getMbaCtrl(): Observable<MBACTRL> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<MBACTRL>(`${api_url}/caps/mba_ctrl`);
+  }
+
+  /**
+   * Retrieve RDT Interface
+   */
+  getRdtIface(): Observable<RDTIface> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<RDTIface>(`${api_url}/caps/rdt_iface`);
+  }
+
+  /**
+   * Retrieve SST - Base Frequency
+   */
+  getSstbf(): Observable<SSTBF> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<SSTBF>(`${api_url}/caps/sstbf`);
   }
 }

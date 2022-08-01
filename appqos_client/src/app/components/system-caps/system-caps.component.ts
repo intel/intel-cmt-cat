@@ -27,10 +27,31 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
+import { HttpErrorResponse } from '@angular/common/http';
+import {
+  AfterContentChecked,
+  AfterContentInit,
+  AfterViewInit,
+  Component,
+  DoCheck,
+  OnDestroy,
+  OnInit,
+  ViewChild,
+  ViewEncapsulation,
+} from '@angular/core';
+import { combineLatest, map, Observable, Subscription, tap } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
-import { Caps } from './system-caps.model';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { L3catComponent } from './l3cat/l3cat.component';
+
+import {
+  CacheAllocation,
+  Caps,
+  MBACTRL,
+  RDTIface,
+  SSTBF,
+} from './system-caps.model';
 
 @Component({
   selector: 'app-system-caps',
@@ -41,13 +62,24 @@ import { Caps } from './system-caps.model';
 
 /* Component used to show System Capabilities and capability details*/
 export class SystemCapsComponent implements OnInit {
-  caps: string[] = [];
+  caps!: string[];
+  loading: boolean = false;
 
-  constructor(private service: AppqosService) {}
+  constructor(
+    private service: AppqosService,
+    private snackBar: SnackBarService
+  ) {}
 
   ngOnInit(): void {
-    this.service
-      .getCaps()
-      .subscribe((caps: Caps) => (this.caps = caps.capabilities));
+    this.loading = true;
+    this.service.getCaps().subscribe({
+      next: (caps: Caps) => {
+        this.caps = caps.capabilities;
+        this.loading = false;
+      },
+      error: (error: HttpErrorResponse) => {
+        this.snackBar.handleError(error.message);
+      },
+    });
   }
 }

@@ -1,5 +1,4 @@
-/*
-BSD LICENSE
+/*BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -26,25 +25,41 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { Component, Input, OnInit } from '@angular/core';
+import { catchError, EMPTY, map, Observable } from 'rxjs';
+import { AppqosService } from 'src/app/services/appqos.service';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
 
-import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
-import { SharedModule } from './shared/shared.module';
+import { CacheAllocation } from '../system-caps.model';
 
-@NgModule({
-  declarations: [AppComponent],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    BrowserAnimationsModule,
-    SharedModule,
-  ],
-  bootstrap: [AppComponent],
+@Component({
+  selector: 'app-l2cat',
+  templateUrl: './l2cat.component.html',
+  styleUrls: ['./l2cat.component.scss'],
 })
-export class AppModule {}
+/* Component used to show L2CAT details*/
+export class L2catComponent implements OnInit {
+  @Input() isSupported!: boolean;
+  l2cat$!: Observable<CacheAllocation>;
+
+  constructor(
+    private service: AppqosService,
+    private snackBar: SnackBarService
+  ) {}
+
+  ngOnInit(): void {
+    this.l2cat$ = this.service.getL2cat().pipe(
+      map((cat: CacheAllocation) => ({
+        ...cat,
+        cache_size: Math.round((cat.cache_size / 1024 ** 2) * 100) / 100,
+        cw_size: Math.round((cat.cw_size / 1024 ** 2) * 100) / 100,
+      })),
+      catchError((err) => {
+        this.snackBar.handleError(err.message);
+        return EMPTY;
+      })
+    );
+  }
+}

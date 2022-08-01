@@ -119,7 +119,7 @@ describe('Given LoginComponent', () => {
     it('it should NOT give error', () => {
       const hostName = 'localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
+      const mockedCaps = { capabilities: ['l3cat', 'mba', 'sstbf', 'power'] };
 
       MockInstance(AppqosService, 'login', () => of(mockedCaps));
 
@@ -139,7 +139,7 @@ describe('Given LoginComponent', () => {
     it('it should redirect to Dashboard page', () => {
       const hostName = 'https://localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
+      const mockedCaps = { capabilities: ['l3cat', 'mba', 'sstbf', 'power'] };
 
       MockInstance(AppqosService, 'login', () => of(mockedCaps));
 
@@ -161,7 +161,7 @@ describe('Given LoginComponent', () => {
     it('it should store credentials to localStorage', () => {
       const hostName = 'https://localhost';
       const portNumber = '5000';
-      const mockedCaps = { capabilities: ['cat', 'mba', 'sstbf', 'power'] };
+      const mockedCaps = { capabilities: ['l3cat', 'mba', 'sstbf', 'power'] };
 
       MockInstance(AppqosService, 'login', () => of(mockedCaps));
 

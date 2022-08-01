@@ -1,5 +1,4 @@
-/*
-BSD LICENSE
+/*BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -26,25 +25,35 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { Component, Input, OnInit } from '@angular/core';
+import { catchError, EMPTY, Observable } from 'rxjs';
 
-import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
-import { SharedModule } from './shared/shared.module';
+import { AppqosService } from 'src/app/services/appqos.service';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { SSTBF } from '../system-caps.model';
 
-@NgModule({
-  declarations: [AppComponent],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    BrowserAnimationsModule,
-    SharedModule,
-  ],
-  bootstrap: [AppComponent],
+@Component({
+  selector: 'app-sstcp',
+  templateUrl: './sstcp.component.html',
+  styleUrls: ['./sstcp.component.scss'],
 })
-export class AppModule {}
+export class SstcpComponent implements OnInit {
+  @Input() isSupported!: boolean;
+  sstbf$!: Observable<SSTBF>;
+
+  constructor(
+    private service: AppqosService,
+    private snackBar: SnackBarService
+  ) {}
+
+  ngOnInit(): void {
+    this.sstbf$ = this.service.getSstbf().pipe(
+      catchError((err) => {
+        this.snackBar.handleError(err.message);
+        return EMPTY;
+      })
+    );
+  }
+}

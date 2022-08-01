@@ -30,3 +30,34 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 export interface Caps {
   capabilities: string[];
 }
+
+export interface CacheAllocation {
+  cache_size: number;
+  cdp_enabled: boolean;
+  cdp_supported: boolean;
+  clos_num: number;
+  cw_num: number;
+  cw_size: number;
+}
+
+export interface MBA {
+  clos_num: number;
+  mba_enabled: boolean;
+  mba_bw_enabled: boolean;
+}
+
+export interface MBACTRL {
+  enabled: boolean;
+  supported: boolean;
+}
+
+export interface RDTIface {
+  interface: string;
+  interface_supported: string[];
+}
+
+export interface SSTBF {
+  configured: boolean;
+  hp_cores: number[];
+  std_cores: number[];
+}

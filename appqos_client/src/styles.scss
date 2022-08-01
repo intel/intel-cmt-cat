@@ -84,5 +84,14 @@ body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
 .mat-snack-bar-container {
   min-width: 15rem;
   background: #F44336;
-  color: white;
+  color: #ffffff;
 }
+
+.mat-button-toggle-checked {
+  background-color: mat-color($intel-primary);
+  
+ .mat-button-toggle-label-content {
+  color: #ffffff;
+  }
+}
+

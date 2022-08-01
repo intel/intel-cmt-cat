@@ -1,5 +1,4 @@
-/*
-BSD LICENSE
+<!--BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -26,25 +25,48 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-
-import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
-import { SharedModule } from './shared/shared.module';
-
-@NgModule({
-  declarations: [AppComponent],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    BrowserAnimationsModule,
-    SharedModule,
-  ],
-  bootstrap: [AppComponent],
-})
-export class AppModule {}
+<mat-list>
+  <div mat-subheader>L2CAT</div>
+  <mat-divider [inset]="true"></mat-divider>
+  <div class="list">
+    <span>Supported</span>
+    <span [ngClass]="isSupported ? 'positive' : 'negative'">{{
+      isSupported ? "Yes" : "No"
+    }}</span>
+  </div>
+  <div *ngIf="isSupported">
+    <mat-list-item *ngIf="l2cat$ | async as l2cat">
+      <div matLine>
+        <span>Cache size</span>
+        <span>{{ l2cat.cache_size }}MB</span>
+      </div>
+      <div matLine>
+        <span>Cache way size</span>
+        <span>{{ l2cat.cw_size }}MB</span>
+      </div>
+      <div matLine>
+        <span>Cache way number</span>
+        <span>{{ l2cat.cw_num }}</span>
+      </div>
+      <div matLine>
+        <span>Clos number</span>
+        <span>{{ l2cat.clos_num }}</span>
+      </div>
+      <div matLine>
+        <span>CDP supported </span>
+        <span [ngClass]="l2cat.cdp_supported ? 'positive' : 'negative'">{{
+          l2cat.cdp_supported ? "Yes" : "No"
+        }}</span>
+      </div>
+      <div matLine *ngIf="l2cat.cdp_supported">
+        <span>CDP enabled</span>
+        <span>
+          <mat-slide-toggle color="primary" [checked]="l2cat.cdp_enabled">
+          </mat-slide-toggle>
+        </span>
+      </div>
+    </mat-list-item>
+  </div>
+</mat-list>

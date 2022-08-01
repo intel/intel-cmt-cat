@@ -29,6 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Injectable } from '@angular/core';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
 
 @Injectable({
   providedIn: 'root',
@@ -36,16 +37,20 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 
 /* Service used to display error messages using angular snackbar */
 export class SnackBarService {
-  constructor(private snackBar: MatSnackBar) {}
+  constructor(private snackBar: MatSnackBar, private router: Router) {}
 
   /**
    * Displays error message in Snackbar
    */
-  public handleError(error: string): void {
+  public handleError(error: string, failSilent?: boolean): void {
     this.snackBar.open(error, '', {
       duration: 3000,
       horizontalPosition: 'end',
       verticalPosition: 'top',
     });
+
+    if (failSilent) {
+      this.router.navigate(['/login']);
+    }
   }
 }

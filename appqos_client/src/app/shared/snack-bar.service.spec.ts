@@ -27,7 +27,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { TestBed } from '@angular/core/testing';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 
 import { SharedModule } from './shared.module';
@@ -35,7 +37,10 @@ import { SnackBarService } from './snack-bar.service';
 
 describe('Given SnackBarService', () => {
   beforeEach(() =>
-    MockBuilder(SnackBarService).mock(SharedModule).mock(MatSnackBar)
+    MockBuilder(SnackBarService)
+      .mock(SharedModule)
+      .mock(MatSnackBar)
+      .mock(Router)
   );
 
   MockInstance.scope('case');
@@ -57,6 +62,26 @@ describe('Given SnackBarService', () => {
         horizontalPosition: 'end',
         verticalPosition: 'top',
       });
+    });
+  });
+
+  describe('when handleError method is executed with failSilent', () => {
+    it('should display error message snackbar', () => {
+      const openSnackbarSpy = jasmine.createSpy('snackbar.open');
+      const errorMessage = 'Failed connection!';
+
+      MockInstance(MatSnackBar, 'open', openSnackbarSpy);
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(SnackBarService);
+
+      const router = TestBed.inject(Router);
+      const routerSpy = spyOn(router, 'navigate');
+
+      service.handleError(errorMessage, true);
+
+      expect(routerSpy).toHaveBeenCalledWith(['/login']);
     });
   });
 });

@@ -29,13 +29,22 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpClientModule } from '@angular/common/http';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
+import { fakeAsync } from '@angular/core/testing';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 import { of } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
+import { L3catComponent } from './l3cat/l3cat.component';
 import { SystemCapsComponent } from './system-caps.component';
-import { Caps } from './system-caps.model';
+
+import {
+  CacheAllocation,
+  Caps,
+  MBACTRL,
+  RDTIface,
+  SSTBF,
+} from './system-caps.model';
 
 describe('Given SystemCapsComponent', () => {
   beforeEach(() =>
@@ -50,12 +59,16 @@ describe('Given SystemCapsComponent', () => {
   describe('when initialized', () => {
     it('should display title property in card ', () => {
       const title = 'System Capabilities';
-
       const mockedCaps: Caps = {
-        capabilities: ['cat', 'mba', 'sstbf', 'power'],
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
       };
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      const capsSpy = jasmine.createSpy('getCaps');
+
+      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
+        of(mockedCaps)
+      );
+
       MockRender(SystemCapsComponent);
 
       const expectedTitle = ngMocks.formatText(ngMocks.find('mat-card-title'));
@@ -65,16 +78,68 @@ describe('Given SystemCapsComponent', () => {
 
     it('should get capabilities', () => {
       const mockedCaps: Caps = {
-        capabilities: ['cat', 'mba', 'sstbf', 'power'],
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
       };
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      const capsSpy = jasmine.createSpy('getCaps');
+
+      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
+        of(mockedCaps)
+      );
 
       const {
         point: { componentInstance: component },
       } = MockRender(SystemCapsComponent);
 
-      expect(component.caps).toBe(mockedCaps.capabilities);
+      expect(component.caps).toEqual(mockedCaps.capabilities);
+    });
+  });
+
+  describe('when request is sent to back', () => {
+    it('it should show display loading', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+      };
+
+      const capsSpy = jasmine.createSpy('getCaps');
+
+      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
+        of(mockedCaps)
+      );
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.loading = true;
+      fixture.detectChanges();
+
+      const content = ngMocks.find('.loading', null);
+
+      expect(content).toBeTruthy();
+    });
+  });
+
+  describe('when request is finished', () => {
+    it('it should should NOT display loading', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+      };
+
+      const capsSpy = jasmine.createSpy('getCaps');
+
+      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
+        of(mockedCaps)
+      );
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.loading = false;
+      fixture.detectChanges();
+
+      const content = ngMocks.find('.loading', null);
+
+      expect(content).toBeNull();
     });
   });
 });

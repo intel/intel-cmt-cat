@@ -1,5 +1,4 @@
-/*
-BSD LICENSE
+<!--BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -26,25 +25,26 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
-import { NgModule } from '@angular/core';
-import { BrowserModule } from '@angular/platform-browser';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-
-import { AppRoutingModule } from './app-routing.module';
-import { AppComponent } from './app.component';
-import { SharedModule } from './shared/shared.module';
-
-@NgModule({
-  declarations: [AppComponent],
-  imports: [
-    BrowserModule,
-    AppRoutingModule,
-    BrowserAnimationsModule,
-    SharedModule,
-  ],
-  bootstrap: [AppComponent],
-})
-export class AppModule {}
+<mat-list>
+  <div mat-subheader>SST-CP</div>
+  <mat-divider [inset]="true"></mat-divider>
+  <mat-list-item *ngIf="isSupported">
+    <div matLine *ngIf="sstbf$ | async as sstbf">
+      <span>Available</span>
+      <span
+        [ngClass]="!sstbf.configured && isSupported ? 'positive' : 'negative'"
+        >{{ !sstbf.configured && isSupported ? "Yes" : "No" }}</span
+      >
+    </div>
+  </mat-list-item>
+  <mat-list-item *ngIf="!isSupported">
+    <div matLine>
+      <span>Available</span>
+      <span [ngClass]="isSupported ? 'positive' : 'negative'">{{
+        isSupported ? "Yes" : "No"
+      }}</span>
+    </div>
+  </mat-list-item>
+</mat-list>

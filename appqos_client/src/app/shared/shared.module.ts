@@ -39,16 +39,34 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatListModule } from '@angular/material/list';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSlideToggleModule } from '@angular/material/slide-toggle';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
 import { LocalService } from '../services/local.service';
-import { DashboardPageComponent } from '../components/dashboard-page/dashboard-page.component';
 import { PermissionsGuard } from '../services/permissions.guard';
+import { DashboardPageComponent } from '../components/dashboard-page/dashboard-page.component';
 import { SystemCapsComponent } from '../components/system-caps/system-caps.component';
+import { L3catComponent } from '../components/system-caps/l3cat/l3cat.component';
+import { RdtIfaceComponent } from '../components/system-caps/rdt-iface/rdt-iface.component';
+import { MbaComponent } from '../components/system-caps/mba/mba.component';
+import { SstbfComponent } from '../components/system-caps/sstbf/sstbf.component';
+import { L2catComponent } from '../components/system-caps/l2cat/l2cat.component';
+import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component';
 
 @NgModule({
-  declarations: [LoginComponent, DashboardPageComponent, SystemCapsComponent],
+  declarations: [
+    LoginComponent,
+    DashboardPageComponent,
+    SystemCapsComponent,
+    L3catComponent,
+    RdtIfaceComponent,
+    MbaComponent,
+    SstbfComponent,
+    SstcpComponent,
+    L2catComponent,
+  ],
   imports: [
     MatInputModule,
     MatButtonModule,
@@ -61,6 +79,8 @@ import { SystemCapsComponent } from '../components/system-caps/system-caps.compo
     MatListModule,
     MatDividerModule,
     MatSnackBarModule,
+    MatSlideToggleModule,
+    MatButtonToggleModule,
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],
