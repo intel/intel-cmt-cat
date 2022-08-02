@@ -403,6 +403,8 @@ static void *
 malloc_and_init_memory(size_t s)
 {
         void *p = NULL;
+        uint8_t *pp = NULL;
+        ssize_t r = 0;
         int ret;
 
         ret = posix_memalign(&p, PAGE_SIZE, s - s % PAGE_SIZE);
@@ -414,11 +416,15 @@ malloc_and_init_memory(size_t s)
                 return NULL;
         }
 
-        if (getrandom(p, s, 0) < 0) {
-                printf("ERROR: Failed to initialize memory\n");
-                stop_loop = 1;
-                free(p);
-                return NULL;
+        pp = p;
+        for (ssize_t t = s; t > 0; t -= r, pp += r) {
+                r = getrandom(pp, t, 0);
+                if (r < 0) {
+                        printf("ERROR: Failed to initialize memory\n");
+                        stop_loop = 1;
+                        free(p);
+                        return NULL;
+                }
         }
 
         mem_flush(p, s);
