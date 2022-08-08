@@ -43,6 +43,7 @@ import multiprocessing
 import signal
 import syslog
 import time
+from jsonschema import ValidationError
 
 import cache_ops
 import caps
@@ -193,6 +194,9 @@ def load_config(config_file):
     except IOError as ex:
         log.error(f"Error reading from config file {config_file}... ")
         log.error(ex)
+        return -1
+    except ValidationError as ex:
+        log.error(f"Config file validation failed - {ex}")
         return -1
     except Exception as ex:
         log.error("Invalid config file... ")
