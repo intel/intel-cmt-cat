@@ -42,7 +42,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/random.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -392,6 +391,16 @@ mem_flush(void *p, size_t s)
         sb();
 }
 
+ALWAYS_INLINE uint64_t
+get_value(void)
+{
+        static uint64_t val = 0;
+
+        val -= 57;
+
+        return val;
+}
+
 /**
  * @brief Function to initialize and allocate memory to thread
  *
@@ -403,8 +412,6 @@ static void *
 malloc_and_init_memory(size_t s)
 {
         void *p = NULL;
-        uint8_t *pp = NULL;
-        ssize_t r = 0;
         int ret;
 
         ret = posix_memalign(&p, PAGE_SIZE, s - s % PAGE_SIZE);
@@ -416,15 +423,13 @@ malloc_and_init_memory(size_t s)
                 return NULL;
         }
 
-        pp = p;
-        for (ssize_t t = s; t > 0; t -= r, pp += r) {
-                r = getrandom(pp, t, 0);
-                if (r < 0) {
-                        printf("ERROR: Failed to initialize memory\n");
-                        stop_loop = 1;
-                        free(p);
-                        return NULL;
-                }
+        uint64_t *p64 = (uint64_t *)p;
+        size_t s64 = s / sizeof(uint64_t);
+
+        while (s64 > 0) {
+                *p64 = get_value();
+                ++p64;
+                --s64;
         }
 
         mem_flush(p, s);
@@ -827,16 +832,12 @@ cl_read_dqa(void *p)
 ALWAYS_INLINE void
 mem_execute(const unsigned bw, const enum cl_type type)
 {
-        uint64_t val;
+        uint64_t val = get_value();
         char *cp = (char *)memchunk;
-        unsigned i = 0;
-        const size_t s = memchunk_size / CL_SIZE; /* mem size in cache lines */
-
-        if (getrandom(&val, 8, 0) != 8)
-                return;
+        unsigned i;
 
         for (i = 0; i < bw; i++) {
-                char *ptr = cp + (memchunk_offset * CL_SIZE);
+                char *ptr = cp + memchunk_offset;
 
                 switch (type) {
                 case CL_TYPE_PREFETCH_T0:
@@ -912,7 +913,8 @@ mem_execute(const unsigned bw, const enum cl_type type)
                         assert(0);
                         break;
                 }
-                if (++memchunk_offset >= s)
+                memchunk_offset += CL_SIZE;
+                if (memchunk_offset >= memchunk_size)
                         memchunk_offset = 0;
         }
         sb();
