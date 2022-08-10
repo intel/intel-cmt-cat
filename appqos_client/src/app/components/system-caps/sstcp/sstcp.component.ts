@@ -27,33 +27,17 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Input, OnInit } from '@angular/core';
-import { catchError, EMPTY, Observable } from 'rxjs';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 
-import { AppqosService } from 'src/app/services/appqos.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { SSTBF } from '../system-caps.model';
 
 @Component({
   selector: 'app-sstcp',
   templateUrl: './sstcp.component.html',
   styleUrls: ['./sstcp.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SstcpComponent implements OnInit {
+export class SstcpComponent {
   @Input() isSupported!: boolean;
-  sstbf$!: Observable<SSTBF>;
-
-  constructor(
-    private service: AppqosService,
-    private snackBar: SnackBarService
-  ) {}
-
-  ngOnInit(): void {
-    this.sstbf$ = this.service.getSstbf().pipe(
-      catchError((err) => {
-        this.snackBar.handleError(err.message);
-        return EMPTY;
-      })
-    );
-  }
+  @Input() sstbf!: SSTBF;
 }

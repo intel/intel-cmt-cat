@@ -27,10 +27,15 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit, ViewEncapsulation } from '@angular/core';
-import { catchError, EMPTY, Observable, tap } from 'rxjs';
-import { AppqosService } from 'src/app/services/appqos.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { MatButtonToggleChange } from '@angular/material/button-toggle';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+  ViewEncapsulation,
+} from '@angular/core';
 
 import { RDTIface } from '../system-caps.model';
 
@@ -39,22 +44,19 @@ import { RDTIface } from '../system-caps.model';
   templateUrl: './rdt-iface.component.html',
   styleUrls: ['./rdt-iface.component.scss'],
   encapsulation: ViewEncapsulation.None,
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 /* Component used to show RDT interface details*/
-export class RdtIfaceComponent implements OnInit {
-  rdtIface$!: Observable<RDTIface>;
+export class RdtIfaceComponent {
+  @Input() rdtIface!: RDTIface;
+  @Output() changeEvent = new EventEmitter<MatButtonToggleChange>();
 
-  constructor(
-    private service: AppqosService,
-    private snackBar: SnackBarService
-  ) {}
+  onChangeIface(event: MatButtonToggleChange): void {
+    this.changeEvent.emit(event);
 
-  ngOnInit(): void {
-    this.rdtIface$ = this.service.getRdtIface().pipe(
-      catchError((err) => {
-        this.snackBar.handleError(err.message);
-        return EMPTY;
-      })
-    );
+    //Every time when we will click it will change state of Toggle butto value.
+    //If response will failure then it will equal current state because rdtIface is not changed.
+    //If response success then our rdtIface will updated and will eqaul new value.
+    event.source.buttonToggleGroup.value = this.rdtIface.interface;
   }
 }

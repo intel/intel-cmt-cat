@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
 <mat-list>
-  <div mat-subheader>L2CAT</div>
+  <div mat-subheader>L2 CAT</div>
   <mat-divider [inset]="true"></mat-divider>
   <div class="list">
     <span>Supported</span>
@@ -36,8 +36,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       isSupported ? "Yes" : "No"
     }}</span>
   </div>
-  <div *ngIf="isSupported">
-    <mat-list-item *ngIf="l2cat$ | async as l2cat">
+  <div *ngIf="isSupported && l2cat">
+    <mat-list-item>
       <div matLine>
         <span>Cache size</span>
         <span>{{ l2cat.cache_size }}MB</span>
@@ -51,7 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         <span>{{ l2cat.cw_num }}</span>
       </div>
       <div matLine>
-        <span>Clos number</span>
+        <span>COS number</span>
         <span>{{ l2cat.clos_num }}</span>
       </div>
       <div matLine>

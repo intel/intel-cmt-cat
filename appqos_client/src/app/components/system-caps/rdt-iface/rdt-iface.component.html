@@ -27,7 +27,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
-<mat-list *ngIf="rdtIface$ | async as rdtIface">
+<mat-list *ngIf="rdtIface">
   <div mat-subheader>RDT Interface selected</div>
   <mat-divider [inset]="true"></mat-divider>
   <mat-list-item>
@@ -40,6 +40,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           [value]="rdtIface.interface"
           aria-label="Interfaces"
           [disabled]="rdtIface.interface_supported.length === 1"
+          (change)="onChangeIface($event)"
         >
           <mat-button-toggle value="msr" color="primary">msr</mat-button-toggle>
           <mat-button-toggle value="os">os</mat-button-toggle>

@@ -31,67 +31,78 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 /* You can add global styles to this file, and also import other style files */
 
-@import '~@angular/material/theming';
+@import "~@angular/material/theming";
 @include mat-core();
 
 $int-primary-color: (
-  50 : #e0edf6,
-  100 : #b3d2e9,
-  200 : #80b4da,
-  300 : #4d95cb,
-  400 : #267fc0,
-  500 : #0068b5,
-  600 : #0060ae,
-  700 : #0055a5,
-  800 : #004b9d,
-  900 : #003a8d,
-  A100 : #b9d0ff,
-  A200 : #86aeff,
-  A400 : #538cff,
-  A700 : #3a7aff,
+  50: #e0edf6,
+  100: #b3d2e9,
+  200: #80b4da,
+  300: #4d95cb,
+  400: #267fc0,
+  500: #0068b5,
+  600: #0060ae,
+  700: #0055a5,
+  800: #004b9d,
+  900: #003a8d,
+  A100: #b9d0ff,
+  A200: #86aeff,
+  A400: #538cff,
+  A700: #3a7aff,
   contrast: (
-      50 : #000000,
-      100 : #000000,
-      200 : #000000,
-      300 : #000000,
-      400 : #ffffff,
-      500 : #ffffff,
-      600 : #ffffff,
-      700 : #ffffff,
-      800 : #ffffff,
-      900 : #ffffff,
-      A100 : #000000,
-      A200 : #000000,
-      A400 : #000000,
-      A700 : #ffffff,
-)
+    50: #000000,
+    100: #000000,
+    200: #000000,
+    300: #000000,
+    400: #ffffff,
+    500: #ffffff,
+    600: #ffffff,
+    700: #ffffff,
+    800: #ffffff,
+    900: #ffffff,
+    A100: #000000,
+    A200: #000000,
+    A400: #000000,
+    A700: #ffffff,
+  ),
 );
 
 $intel-primary: mat-palette($int-primary-color);
-$intel-accent:  mat-palette($mat-pink, 500, 900, A100);
-$intel-warn:    mat-palette($mat-deep-orange);
+$intel-accent: mat-palette($mat-pink, 500, 900, A100);
+$intel-warn: mat-palette($mat-deep-orange);
 $intel-theme: mat-light-theme($intel-primary, $intel-accent, $intel-warn);
 
 @include angular-material-theme($intel-theme);
 
-html, body { height: 100%; }
-body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+}
 
 .mat-card-title {
   font-size: 18px;
 }
 
-.mat-snack-bar-container {
+.snackError {
   min-width: 15rem;
-  background: #F44336;
+  background: #f44336;
+  color: #ffffff;
+}
+
+.snackSuccess {
+  min-width: 15rem;
+  background: mat-color($intel-primary);
   color: #ffffff;
 }
 
 .mat-button-toggle-checked {
   background-color: mat-color($intel-primary);
-  
- .mat-button-toggle-label-content {
-  color: #ffffff;
+
+  .mat-button-toggle-label-content {
+    color: #ffffff;
   }
 }
-

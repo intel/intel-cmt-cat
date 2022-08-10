@@ -37,14 +37,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
     }}</span>
   </div>
   <div *ngIf="isSupported">
-    <mat-list-item *ngIf="sstbf$ | async as sstbf">
+    <mat-list-item *ngIf="sstbf">
       <div matLine>
         <span>Configured</span>
         <span>
           <mat-slide-toggle
             color="primary"
-            aria-label="sstbf.configured"
+            name="configured"
             [checked]="sstbf.configured"
+            (change)="sstbfOnChange($event)"
           >
           </mat-slide-toggle>
         </span>

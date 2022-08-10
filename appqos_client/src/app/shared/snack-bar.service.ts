@@ -44,6 +44,7 @@ export class SnackBarService {
    */
   public handleError(error: string, failSilent?: boolean): void {
     this.snackBar.open(error, '', {
+      panelClass: 'snackError',
       duration: 3000,
       horizontalPosition: 'end',
       verticalPosition: 'top',
@@ -52,5 +53,14 @@ export class SnackBarService {
     if (failSilent) {
       this.router.navigate(['/login']);
     }
+  }
+
+  public displayInfo(message: string) {
+    this.snackBar.open(message, '', {
+      panelClass: 'snackSuccess',
+      duration: 3000,
+      horizontalPosition: 'end',
+      verticalPosition: 'top',
+    });
   }
 }

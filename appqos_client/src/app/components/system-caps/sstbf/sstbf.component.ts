@@ -27,33 +27,30 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Input, OnInit } from '@angular/core';
-import { catchError, EMPTY, Observable, tap } from 'rxjs';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+} from '@angular/core';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
-import { AppqosService } from 'src/app/services/appqos.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { SSTBF } from '../system-caps.model';
 
 @Component({
   selector: 'app-sstbf',
   templateUrl: './sstbf.component.html',
   styleUrls: ['./sstbf.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class SstbfComponent implements OnInit {
+export class SstbfComponent {
   @Input() isSupported!: boolean;
-  sstbf$!: Observable<SSTBF>;
+  @Output() changeEvent = new EventEmitter<MatSlideToggleChange>();
+  @Input() sstbf!: SSTBF;
 
-  constructor(
-    private service: AppqosService,
-    private snackBar: SnackBarService
-  ) {}
-
-  ngOnInit(): void {
-    this.sstbf$ = this.service.getSstbf().pipe(
-      catchError((err) => {
-        this.snackBar.handleError(err.message);
-        return EMPTY;
-      })
-    );
+  sstbfOnChange(event: MatSlideToggleChange) {
+    event.source.checked = this.sstbf.configured;
+    this.changeEvent.emit(event);
   }
 }

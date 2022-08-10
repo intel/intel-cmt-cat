@@ -27,10 +27,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Input, OnInit } from '@angular/core';
-import { catchError, EMPTY, map, Observable } from 'rxjs';
-import { AppqosService } from 'src/app/services/appqos.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 
 import { CacheAllocation } from '../system-caps.model';
 
@@ -38,28 +35,10 @@ import { CacheAllocation } from '../system-caps.model';
   selector: 'app-l2cat',
   templateUrl: './l2cat.component.html',
   styleUrls: ['./l2cat.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 /* Component used to show L2CAT details*/
-export class L2catComponent implements OnInit {
+export class L2catComponent {
   @Input() isSupported!: boolean;
-  l2cat$!: Observable<CacheAllocation>;
-
-  constructor(
-    private service: AppqosService,
-    private snackBar: SnackBarService
-  ) {}
-
-  ngOnInit(): void {
-    this.l2cat$ = this.service.getL2cat().pipe(
-      map((cat: CacheAllocation) => ({
-        ...cat,
-        cache_size: Math.round((cat.cache_size / 1024 ** 2) * 100) / 100,
-        cw_size: Math.round((cat.cw_size / 1024 ** 2) * 100) / 100,
-      })),
-      catchError((err) => {
-        this.snackBar.handleError(err.message);
-        return EMPTY;
-      })
-    );
-  }
+  @Input() l2cat!: CacheAllocation;
 }

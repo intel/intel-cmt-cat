@@ -31,7 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
   <div mat-subheader>SST-CP</div>
   <mat-divider [inset]="true"></mat-divider>
   <mat-list-item *ngIf="isSupported">
-    <div matLine *ngIf="sstbf$ | async as sstbf">
+    <div matLine *ngIf="sstbf">
       <span>Available</span>
       <span
         [ngClass]="!sstbf.configured && isSupported ? 'positive' : 'negative'"

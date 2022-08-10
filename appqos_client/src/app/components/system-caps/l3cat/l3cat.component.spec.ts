@@ -28,9 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
 
-import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { CacheAllocation } from '../system-caps.model';
 import { L3catComponent } from './l3cat.component';
@@ -41,39 +39,8 @@ describe('Given L3catComponent', () => {
   MockInstance.scope('case');
 
   describe('when initialized', () => {
-    it('should display "L3CAT" title', () => {
+    it('should display "L3 CAT" title', () => {
       const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3670016,
-      };
-
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
-
-      MockRender(L3catComponent, {
-        isSupported: true,
-      });
-
-      const expectValue = ngMocks.formatText(ngMocks.find('div'));
-
-      expect(expectValue).toEqual('L3CAT');
-    });
-  });
-  describe('when initialized and L3CAT is supported', () => {
-    it('should display L3CAT details', () => {
-      const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3670016,
-      };
-
-      const expectedL3cat = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
@@ -82,33 +49,65 @@ describe('Given L3catComponent', () => {
         cw_size: 3.5,
       };
 
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
-
-      const {
-        point: { componentInstance: component },
-      } = MockRender(L3catComponent, {
+      MockRender(L3catComponent, {
         isSupported: true,
+        l3cat: mockedL3cat,
       });
 
-      component.l3cat$.subscribe((l3cat: CacheAllocation) =>
-        expect(expectedL3cat).toEqual(l3cat)
-      );
-    });
+      const expectValue = ngMocks.formatText(ngMocks.find('div'));
 
-    it('should display "Supported Yes" text', () => {
+      expect(expectValue).toEqual('L3 CAT');
+    });
+  });
+
+  describe('when initialized and L3CAT is supported', () => {
+    it('should display L3 CAT details', () => {
       const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
 
       MockRender(L3catComponent, {
         isSupported: true,
+        l3cat: mockedL3cat,
+      });
+
+      const template = ngMocks.findAll('span');
+      const expextedData = ngMocks.formatText(template);
+
+      expect(expextedData).toEqual([
+        'Supported',
+        'Yes',
+        'Cache size',
+        '42MB',
+        'Cache way size',
+        '3.5MB',
+        'Cache way number',
+        '12',
+        'COS number',
+        '15',
+        'CDP supported',
+        'No',
+      ]);
+    });
+
+    it('should display "Supported Yes" text', () => {
+      const mockedL3cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      };
+
+      MockRender(L3catComponent, {
+        isSupported: true,
+        l3cat: mockedL3cat,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.positive'));
@@ -118,20 +117,19 @@ describe('Given L3catComponent', () => {
   });
 
   describe('when initialized and L3CAT is NOT supported', () => {
-    it('should NOT display L3CAT details', () => {
+    it('should NOT display L3 CAT details', () => {
       const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
 
       MockRender(L3catComponent, {
         isSupported: false,
+        l3cat: mockedL3cat,
       });
 
       const template = ngMocks.find('mat-list-item', null);
@@ -141,18 +139,17 @@ describe('Given L3catComponent', () => {
 
     it('should display "Supported No" text', () => {
       const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
 
       MockRender(L3catComponent, {
         isSupported: false,
+        l3cat: mockedL3cat,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.negative'));
@@ -164,18 +161,17 @@ describe('Given L3catComponent', () => {
   describe('when L3CAT CDP is supported', () => {
     it('should display "CDP enabled" toggle', () => {
       const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: true,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
 
       MockRender(L3catComponent, {
         isSupported: true,
+        l3cat: mockedL3cat,
       });
 
       const template = ngMocks.find('mat-slide-toggle');
@@ -187,18 +183,17 @@ describe('Given L3catComponent', () => {
   describe('when L3CAT CDP is NOT supported', () => {
     it('should NOT display "CDP enabled" toggle', () => {
       const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
 
       MockRender(L3catComponent, {
         isSupported: true,
+        l3cat: mockedL3cat,
       });
 
       const template = ngMocks.find('mat-slide-toggle', null);

@@ -46,6 +46,7 @@ import {
 } from '../components/system-caps/system-caps.model';
 import { AppqosService } from './appqos.service';
 import { LocalService } from './local.service';
+import { first } from 'rxjs';
 
 describe('Given AppqosService', () => {
   beforeEach(() =>
@@ -291,6 +292,87 @@ describe('Given AppqosService', () => {
 
       const req = httpMock.expectOne(`${api_url}/caps/l2cat`);
       req.flush(mockedL2cat);
+      httpMock.verify();
+    });
+  });
+
+  describe('when rdtIfacePut method is called', () => {
+    it('it should call correct REST API endpoint with PUT method', () => {
+      const api_url = 'https://localhost:5000';
+      const mockResponse = 'RDT Interface modified';
+      const body = 'os';
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service
+        .rdtIfacePut(body)
+        .pipe(first())
+        .subscribe((response: unknown) => {
+          expect(response).toBe(mockResponse);
+        });
+
+      const req = httpMock.expectOne(`${api_url}/caps/rdt_iface`);
+      req.flush(mockResponse);
+      httpMock.verify();
+    });
+  });
+
+  describe('when sstbfPut method is called', () => {
+    it('it should call correct REST API endpoint with PUT method', () => {
+      const api_url = 'https://localhost:5000';
+      const mockResponse = 'SST-BF caps modified';
+      const body = true;
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service
+        .sstbfPut(body)
+        .pipe(first())
+        .subscribe((response: unknown) => {
+          expect(response).toBe(mockResponse);
+        });
+
+      const req = httpMock.expectOne(`${api_url}/caps/sstbf`);
+      req.flush(mockResponse);
+      httpMock.verify();
+    });
+  });
+
+  describe('when mbaCtrlPut method is called', () => {
+    it('it should call correct REST API endpoint with PUT method', () => {
+      const api_url = 'https://localhost:5000';
+      const mockResponse = 'MBA CTRL status changed.';
+      const body = true;
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service
+        .mbaCtrlPut(body)
+        .pipe(first())
+        .subscribe((response: unknown) => {
+          expect(response).toBe(mockResponse);
+        });
+
+      const req = httpMock.expectOne(`${api_url}/caps/mba_ctrl`);
+      req.flush(mockResponse);
       httpMock.verify();
     });
   });

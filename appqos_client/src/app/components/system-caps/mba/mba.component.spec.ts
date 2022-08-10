@@ -28,11 +28,14 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
 
-import { AppqosService } from 'src/app/services/appqos.service';
+import {
+  MatSlideToggle,
+  MatSlideToggleChange,
+} from '@angular/material/slide-toggle';
+
 import { SharedModule } from 'src/app/shared/shared.module';
-import { MBACTRL } from '../system-caps.model';
+import { MBA, MBACTRL } from '../system-caps.model';
 import { MbaComponent } from './mba.component';
 
 describe('Given MbaComponent', () => {
@@ -42,10 +45,6 @@ describe('Given MbaComponent', () => {
 
   describe('when initialized', () => {
     it('should display "MBA" title', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: false };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
-
       MockRender(MbaComponent, {
         isSupported: true,
       });
@@ -57,27 +56,28 @@ describe('Given MbaComponent', () => {
   });
 
   describe('when initialized and MBA is supported', () => {
-    it('should display MBA controller details', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: false };
+    it('should display MBA COS number', () => {
+      const mockedMbaData: MBA & MBACTRL = {
+        clos_num: 24,
+        mba_enabled: true,
+        mba_bw_enabled: false,
+        enabled: true,
+        supported: true,
+      };
 
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
-
-      const {
-        point: { componentInstance: component },
-      } = MockRender(MbaComponent, {
+      MockRender(MbaComponent, {
         isSupported: true,
+        mba: mockedMbaData,
       });
 
-      component.mbaCtrl$.subscribe((mba: MBACTRL) =>
-        expect(mockedMbaCtrl).toEqual(mba)
+      const template = ngMocks.findAll('span')[3];
+
+      expect(ngMocks.formatText(template)).toEqual(
+        mockedMbaData.clos_num.toString()
       );
     });
 
     it('should display "Supported Yes" text', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: false };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
-
       MockRender(MbaComponent, {
         isSupported: true,
       });
@@ -90,10 +90,6 @@ describe('Given MbaComponent', () => {
 
   describe('when initialized and MBA is NOT supported', () => {
     it('should NOT display MBA controller details', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: false };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
-
       MockRender(MbaComponent, {
         isSupported: false,
       });
@@ -104,10 +100,6 @@ describe('Given MbaComponent', () => {
     });
 
     it('should display "Supported No" text', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: false };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
-
       MockRender(MbaComponent, {
         isSupported: false,
       });
@@ -120,12 +112,17 @@ describe('Given MbaComponent', () => {
 
   describe('when MBA controller is supported', () => {
     it('should display "MBA controller Yes" text', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: true };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
+      const mockedMbaData: MBA & MBACTRL = {
+        clos_num: 24,
+        mba_enabled: true,
+        mba_bw_enabled: false,
+        enabled: true,
+        supported: true,
+      };
 
       MockRender(MbaComponent, {
         isSupported: true,
+        mba: mockedMbaData,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.positive'));
@@ -134,12 +131,17 @@ describe('Given MbaComponent', () => {
     });
 
     it('should display "MBA controller enabled" toggle', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: true };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
+      const mockedMbaData: MBA & MBACTRL = {
+        clos_num: 24,
+        mba_enabled: true,
+        mba_bw_enabled: true,
+        enabled: true,
+        supported: true,
+      };
 
       MockRender(MbaComponent, {
         isSupported: true,
+        mba: mockedMbaData,
       });
 
       const template = ngMocks.find('mat-slide-toggle');
@@ -150,12 +152,17 @@ describe('Given MbaComponent', () => {
 
   describe('when MBA controller is NOT supported', () => {
     it('should display "MBA controller No" text', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: false };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
+      const mockedMbaData: MBA & MBACTRL = {
+        clos_num: 24,
+        mba_enabled: true,
+        mba_bw_enabled: true,
+        enabled: false,
+        supported: false,
+      };
 
       MockRender(MbaComponent, {
         isSupported: true,
+        mba: mockedMbaData,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.negative'));
@@ -164,17 +171,55 @@ describe('Given MbaComponent', () => {
     });
 
     it('should NOT display "MBA controller enabled" toggle', () => {
-      const mockedMbaCtrl: MBACTRL = { enabled: false, supported: false };
-
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
+      const mockedMbaData: MBA & MBACTRL = {
+        clos_num: 24,
+        mba_enabled: true,
+        mba_bw_enabled: true,
+        enabled: false,
+        supported: false,
+      };
 
       MockRender(MbaComponent, {
         isSupported: true,
+        mba: mockedMbaData,
       });
 
       const template = ngMocks.find('mat-slide-toggle', null);
 
       expect(template).toBeNull();
+    });
+  });
+
+  describe('when slide toggle is clicked', () => {
+    it('should emit "onChange" event with correct value', (done) => {
+      const event: MatSlideToggleChange = {
+        checked: false,
+        source: {} as MatSlideToggle,
+      };
+
+      const mockedMbaData: MBA & MBACTRL = {
+        clos_num: 24,
+        mba_enabled: true,
+        mba_bw_enabled: true,
+        enabled: true,
+        supported: true,
+      };
+
+      const fixture = MockRender(MbaComponent, {
+        isSupported: true,
+        mba: mockedMbaData,
+      });
+
+      const component = fixture.point.componentInstance;
+      const toggle = ngMocks.find('mat-slide-toggle');
+
+      component.changeEvent.subscribe((value) => {
+        expect(value.checked).toBeFalse();
+
+        done();
+      });
+
+      toggle.triggerEventHandler('change', event);
     });
   });
 });

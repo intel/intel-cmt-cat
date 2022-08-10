@@ -28,19 +28,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { fakeAsync } from '@angular/core/testing';
 
 import {
   MatButtonToggleGroupHarness,
   MatButtonToggleHarness,
 } from '@angular/material/button-toggle/testing';
 
-import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { RDTIface } from '../system-caps.model';
 import { RdtIfaceComponent } from './rdt-iface.component';
-import { MatButtonToggleModule } from '@angular/material/button-toggle';
 
 describe('Given RdtIfaceComponent', () => {
   beforeEach(() =>
@@ -58,8 +57,6 @@ describe('Given RdtIfaceComponent', () => {
         interface_supported: ['msr', 'os'],
       };
 
-      MockInstance(AppqosService, 'getRdtIface', () => of(mockedRDT));
-
       MockRender(RdtIfaceComponent, {
         rdtIface: mockedRDT,
       });
@@ -67,25 +64,6 @@ describe('Given RdtIfaceComponent', () => {
       const expectValue = ngMocks.formatText(ngMocks.find('div'));
 
       expect(expectValue).toEqual('RDT Interface selected');
-    });
-
-    it('should display RDT Interface details', () => {
-      const mockedRDT: RDTIface = {
-        interface: 'msr',
-        interface_supported: ['msr', 'os'],
-      };
-
-      MockInstance(AppqosService, 'getRdtIface', () => of(mockedRDT));
-
-      const {
-        point: { componentInstance: component },
-      } = MockRender(RdtIfaceComponent, {
-        rdtIface: mockedRDT,
-      });
-
-      component.rdtIface$.subscribe((rdt: RDTIface) =>
-        expect(rdt).toEqual(mockedRDT)
-      );
     });
   });
 
@@ -96,11 +74,10 @@ describe('Given RdtIfaceComponent', () => {
         interface_supported: ['msr'],
       };
 
-      MockInstance(AppqosService, 'getRdtIface', () => of(mockedRDT));
-
       const fixture = MockRender(RdtIfaceComponent, {
         rdtIface: mockedRDT,
       });
+
       const loader = TestbedHarnessEnvironment.loader(fixture);
       const group = await loader.getHarness(MatButtonToggleGroupHarness);
 
@@ -114,8 +91,6 @@ describe('Given RdtIfaceComponent', () => {
         interface: 'msr',
         interface_supported: ['msr', 'os'],
       };
-
-      MockInstance(AppqosService, 'getRdtIface', () => of(mockedRDT));
 
       const fixture = MockRender(RdtIfaceComponent, {
         rdtIface: mockedRDT,
@@ -133,5 +108,28 @@ describe('Given RdtIfaceComponent', () => {
 
       expect(lables).toEqual(['msr', 'os']);
     });
+  });
+
+  describe('when button toggle is clicked', () => {
+    it('should emit "onChange" event with correct value', fakeAsync(async () => {
+      const mockedRDT: RDTIface = {
+        interface: 'msr',
+        interface_supported: ['msr', 'os'],
+      };
+
+      const fixture = MockRender(RdtIfaceComponent, { rdtIface: mockedRDT });
+      const component = fixture.point.componentInstance;
+
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      const group = await loader.getHarness(MatButtonToggleGroupHarness);
+      const toggles = await group.getToggles();
+      const osButton = toggles[1];
+
+      component.changeEvent.subscribe((event) => {
+        expect(event.value).toEqual('os');
+      });
+
+      await osButton.check();
+    }));
   });
 });

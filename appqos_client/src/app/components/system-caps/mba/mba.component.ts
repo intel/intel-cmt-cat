@@ -27,34 +27,31 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { AfterViewInit, Component, Input, OnInit } from '@angular/core';
-import { catchError, EMPTY, Observable } from 'rxjs';
-import { AppqosService } from 'src/app/services/appqos.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
-
-import { MBACTRL } from '../system-caps.model';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+} from '@angular/core';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { MBA, MBACTRL } from '../system-caps.model';
 
 @Component({
   selector: 'app-mba',
   templateUrl: './mba.component.html',
   styleUrls: ['./mba.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 /* Component used to show MBA details*/
-export class MbaComponent implements OnInit {
+export class MbaComponent {
   @Input() isSupported: boolean = false;
-  mbaCtrl$!: Observable<MBACTRL>;
+  @Input() mba!: MBA & MBACTRL;
+  @Output() changeEvent = new EventEmitter<MatSlideToggleChange>();
 
-  constructor(
-    private service: AppqosService,
-    private snackBar: SnackBarService
-  ) {}
+  mbaOnChange(event: MatSlideToggleChange) {
+    event.source.checked = this.mba.enabled;
 
-  ngOnInit(): void {
-    this.mbaCtrl$ = this.service.getMbaCtrl().pipe(
-      catchError((err) => {
-        this.snackBar.handleError(err.message);
-        return EMPTY;
-      })
-    );
+    this.changeEvent.emit(event);
   }
 }

@@ -67,3 +67,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
     color: #6b6b6b;
   }
 }
+
+.card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mat-typography h2 {
+  margin: auto;
+}

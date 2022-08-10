@@ -28,9 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
 
-import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { CacheAllocation } from '../system-caps.model';
 import { L2catComponent } from './l2cat.component';
@@ -41,40 +39,8 @@ describe('Given L2catComponent', () => {
   MockInstance.scope('case');
 
   describe('when initialized', () => {
-    it('should display "L2CAT" title', () => {
+    it('should display "L2 CAT" title', () => {
       const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3670016,
-      };
-
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
-
-      MockRender(L2catComponent, {
-        isSupported: true,
-      });
-
-      const expectValue = ngMocks.formatText(ngMocks.find('div'));
-
-      expect(expectValue).toEqual('L2CAT');
-    });
-  });
-
-  describe('when initialized and L2CAT is supported', () => {
-    it('should display L2CAT details', () => {
-      const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3670016,
-      };
-
-      const expectedL2cat: CacheAllocation = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
@@ -83,33 +49,65 @@ describe('Given L2catComponent', () => {
         cw_size: 3.5,
       };
 
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
-
-      const {
-        point: { componentInstance: component },
-      } = MockRender(L2catComponent, {
+      MockRender(L2catComponent, {
         isSupported: true,
+        l2cat: mockedL2cat,
       });
 
-      component.l2cat$.subscribe((l2cat: CacheAllocation) =>
-        expect(expectedL2cat).toEqual(l2cat)
-      );
-    });
+      const expectValue = ngMocks.formatText(ngMocks.find('div'));
 
-    it('should display "Supported Yes" text', () => {
+      expect(expectValue).toEqual('L2 CAT');
+    });
+  });
+
+  describe('when initialized and L2 CAT is supported', () => {
+    it('should display L2 CAT details', () => {
       const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
 
       MockRender(L2catComponent, {
         isSupported: true,
+        l2cat: mockedL2cat,
+      });
+
+      const template = ngMocks.findAll('span');
+      const expextedData = ngMocks.formatText(template);
+
+      expect(expextedData).toEqual([
+        'Supported',
+        'Yes',
+        'Cache size',
+        '42MB',
+        'Cache way size',
+        '3.5MB',
+        'Cache way number',
+        '12',
+        'COS number',
+        '15',
+        'CDP supported',
+        'No',
+      ]);
+    });
+
+    it('should display "Supported Yes" text', () => {
+      const mockedL2cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      };
+
+      MockRender(L2catComponent, {
+        isSupported: true,
+        l2cat: mockedL2cat,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.positive'));
@@ -118,21 +116,20 @@ describe('Given L2catComponent', () => {
     });
   });
 
-  describe('when initialized and L2CAT is NOT supported', () => {
-    it('should NOT display L2CAT details', () => {
+  describe('when initialized and L2 CAT is NOT supported', () => {
+    it('should NOT display L2 CAT details', () => {
       const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
 
       MockRender(L2catComponent, {
         isSupported: false,
+        l2cat: mockedL2cat,
       });
 
       const template = ngMocks.find('mat-list-item', null);
@@ -142,18 +139,17 @@ describe('Given L2catComponent', () => {
 
     it('should display "Supported No" text', () => {
       const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
 
       MockRender(L2catComponent, {
         isSupported: false,
+        l2cat: mockedL2cat,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.negative'));
@@ -165,18 +161,17 @@ describe('Given L2catComponent', () => {
   describe('when L2CAT CDP is supported', () => {
     it('should display "CDP enabled" toggle', () => {
       const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: true,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
 
       MockRender(L2catComponent, {
         isSupported: true,
+        l2cat: mockedL2cat,
       });
 
       const template = ngMocks.find('mat-slide-toggle');
@@ -188,18 +183,17 @@ describe('Given L2catComponent', () => {
   describe('when L2CAT CDP is NOT supported', () => {
     it('should NOT display "CDP enabled" toggle', () => {
       const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
+        cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
         clos_num: 15,
         cw_num: 12,
-        cw_size: 3670016,
+        cw_size: 3.5,
       };
-
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
 
       MockRender(L2catComponent, {
         isSupported: true,
+        l2cat: mockedL2cat,
       });
 
       const template = ngMocks.find('mat-slide-toggle', null);

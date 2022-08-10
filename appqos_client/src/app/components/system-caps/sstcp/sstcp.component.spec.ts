@@ -28,9 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
 
-import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SSTBF } from '../system-caps.model';
 import { SstcpComponent } from './sstcp.component';
@@ -48,10 +46,9 @@ describe('Given SstpcComponent', () => {
         std_cores: [1, 2],
       };
 
-      MockInstance(AppqosService, 'getSstbf', () => of(mockedSSTBF));
-
       MockRender(SstcpComponent, {
         isSupported: true,
+        sstbf: mockedSSTBF,
       });
 
       const expectValue = ngMocks.formatText(ngMocks.find('div'));
@@ -68,14 +65,9 @@ describe('Given SstpcComponent', () => {
         std_cores: [1, 2],
       };
 
-      const RDTSpy = jasmine.createSpy('getSstbf');
-
-      MockInstance(AppqosService, 'getSstbf', RDTSpy).and.returnValue(
-        of(mockedSSTBF)
-      );
-
       MockRender(SstcpComponent, {
         isSupported: false,
+        sstbf: mockedSSTBF,
       });
 
       const template = ngMocks
@@ -94,14 +86,9 @@ describe('Given SstpcComponent', () => {
         std_cores: [1, 2],
       };
 
-      const RDTSpy = jasmine.createSpy('getSstbf');
-
-      MockInstance(AppqosService, 'getSstbf', RDTSpy).and.returnValue(
-        of(mockedSSTBF)
-      );
-
       MockRender(SstcpComponent, {
         isSupported: true,
+        sstbf: mockedSSTBF,
       });
 
       const template = ngMocks
@@ -120,14 +107,9 @@ describe('Given SstpcComponent', () => {
         std_cores: [1, 2],
       };
 
-      const RDTSpy = jasmine.createSpy('getSstbf');
-
-      MockInstance(AppqosService, 'getSstbf', RDTSpy).and.returnValue(
-        of(mockedSSTBF)
-      );
-
       MockRender(SstcpComponent, {
         isSupported: true,
+        sstbf: mockedSSTBF,
       });
 
       const template = ngMocks

@@ -29,8 +29,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 import { of } from 'rxjs';
-import { AppqosService } from 'src/app/services/appqos.service';
 
+import {
+  MatSlideToggle,
+  MatSlideToggleChange,
+} from '@angular/material/slide-toggle';
+
+import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SSTBF } from '../system-caps.model';
 import { SstbfComponent } from './sstbf.component';
@@ -48,9 +53,9 @@ describe('Given SstbfComponent', () => {
         std_cores: [1, 2],
       };
 
-      MockInstance(AppqosService, 'getSstbf', () => of(mockedSSTBF));
       MockRender(SstbfComponent, {
         isSupported: true,
+        sstbf: mockedSSTBF,
       });
 
       const expectValue = ngMocks.formatText(ngMocks.find('div'));
@@ -60,30 +65,6 @@ describe('Given SstbfComponent', () => {
   });
 
   describe('when initialized and SST-BF is supported', () => {
-    it('should display SST-BF details', () => {
-      const mockedSSTBF: SSTBF = {
-        configured: true,
-        hp_cores: [1, 2],
-        std_cores: [1, 2],
-      };
-
-      const RDTSpy = jasmine.createSpy('getSstbf');
-
-      MockInstance(AppqosService, 'getSstbf', RDTSpy).and.returnValue(
-        of(mockedSSTBF)
-      );
-
-      const {
-        point: { componentInstance: component },
-      } = MockRender(SstbfComponent, {
-        isSupported: true,
-      });
-
-      component.sstbf$.subscribe((sstbf: SSTBF) =>
-        expect(sstbf).toEqual(mockedSSTBF)
-      );
-    });
-
     it('should display "Available Yes" text', () => {
       const mockedSSTBF: SSTBF = {
         configured: true,
@@ -91,10 +72,9 @@ describe('Given SstbfComponent', () => {
         std_cores: [1, 2],
       };
 
-      MockInstance(AppqosService, 'getSstbf', () => of(mockedSSTBF));
-
       MockRender(SstbfComponent, {
         isSupported: true,
+        sstbf: mockedSSTBF,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.positive'));
@@ -111,10 +91,9 @@ describe('Given SstbfComponent', () => {
         std_cores: [1, 2],
       };
 
-      MockInstance(AppqosService, 'getSstbf', () => of(mockedSSTBF));
-
       MockRender(SstbfComponent, {
         isSupported: false,
+        sstbf: mockedSSTBF,
       });
 
       const template = ngMocks.find('mat-list-item', null);
@@ -129,15 +108,51 @@ describe('Given SstbfComponent', () => {
         std_cores: [1, 2],
       };
 
-      MockInstance(AppqosService, 'getSstbf', () => of(mockedSSTBF));
-
       MockRender(SstbfComponent, {
         isSupported: false,
+        sstbf: mockedSSTBF,
       });
 
       const template = ngMocks.formatText(ngMocks.find('.negative'));
 
       expect(template).toEqual('No');
+    });
+  });
+
+  describe('when slide toggle is clicked', () => {
+    it('should emit "onChange" event with correct value', (done) => {
+      const mockedSSTBF: SSTBF = {
+        configured: true,
+        hp_cores: [1, 2],
+        std_cores: [1, 2],
+      };
+
+      const event: MatSlideToggleChange = {
+        checked: false,
+        source: {} as MatSlideToggle,
+      };
+
+      const RDTSpy = jasmine.createSpy('getSstbf');
+
+      MockInstance(AppqosService, 'getSstbf', RDTSpy).and.returnValue(
+        of(mockedSSTBF)
+      );
+
+      const fixture = MockRender(SstbfComponent, {
+        isSupported: true,
+        sstbf: mockedSSTBF,
+      });
+
+      const component = fixture.point.componentInstance;
+      const toggle = ngMocks.find('mat-slide-toggle');
+
+      component.changeEvent.subscribe((value) => {
+        expect(value.checked).toBeFalse();
+
+        done();
+      });
+
+      toggle.triggerEventHandler('change', event);
     });
   });
 });

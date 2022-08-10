@@ -29,18 +29,26 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpClientModule } from '@angular/common/http';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
-import { fakeAsync } from '@angular/core/testing';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
+
+import {
+  MatButtonToggle,
+  MatButtonToggleChange,
+} from '@angular/material/button-toggle';
+import {
+  MatSlideToggle,
+  MatSlideToggleChange,
+} from '@angular/material/slide-toggle';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
-import { L3catComponent } from './l3cat/l3cat.component';
+import { SstcpComponent } from './sstcp/sstcp.component';
 import { SystemCapsComponent } from './system-caps.component';
-
 import {
   CacheAllocation,
   Caps,
+  MBA,
   MBACTRL,
   RDTIface,
   SSTBF,
@@ -51,7 +59,17 @@ describe('Given SystemCapsComponent', () => {
     MockBuilder(SystemCapsComponent)
       .replace(HttpClientModule, HttpClientTestingModule)
       .mock(SharedModule)
-      .mock(AppqosService)
+      .mock(AppqosService, {
+        getRdtIface: () => EMPTY,
+        getCaps: () =>
+          of({
+            capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+          }),
+        getSstbf: () => EMPTY,
+        getL3cat: () => EMPTY,
+        getL2cat: () => EMPTY,
+      })
+      .mock(SstcpComponent)
   );
 
   MockInstance.scope('case');
@@ -71,9 +89,110 @@ describe('Given SystemCapsComponent', () => {
 
       MockRender(SystemCapsComponent);
 
-      const expectedTitle = ngMocks.formatText(ngMocks.find('mat-card-title'));
+      const expectedTitle = ngMocks.formatText(ngMocks.find('.card-title'));
 
       expect(expectedTitle).toBe(title);
+    });
+
+    it('should get MBA data', () => {
+      const mockedMba: MBA = {
+        clos_num: 12,
+        mba_enabled: true,
+        mba_bw_enabled: false,
+      };
+
+      const mockedMbaCtrl: MBACTRL = { enabled: true, supported: true };
+
+      MockInstance(AppqosService, 'getMba', () => of(mockedMba));
+      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(SystemCapsComponent);
+
+      expect(component.mba).toEqual({ ...mockedMba, ...mockedMbaCtrl });
+    });
+
+    it('should get RDT interface', () => {
+      const mockedRDT: RDTIface = {
+        interface: 'os',
+        interface_supported: ['msr', 'os'],
+      };
+
+      MockInstance(AppqosService, 'getRdtIface', () => of(mockedRDT));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(SystemCapsComponent);
+
+      expect(component.rdtIface).toEqual(mockedRDT);
+    });
+
+    it('should get L3 CAT', () => {
+      const mockedL3cat: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016,
+      };
+
+      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(SystemCapsComponent);
+
+      expect(component.l3cat).toEqual({
+        ...mockedL3cat,
+        cache_size: 42,
+        cw_size: 3.5,
+      });
+    });
+
+    it('should get L2 CAT', () => {
+      const mockedL2cat: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016,
+      };
+
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'l2cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(SystemCapsComponent);
+
+      expect(component.l2cat).toEqual({
+        ...mockedL2cat,
+        cache_size: 42,
+        cw_size: 3.5,
+      });
+    });
+
+    it('should get SST-BF', () => {
+      const mockedSSTBF: SSTBF = {
+        configured: false,
+        hp_cores: [1, 2],
+        std_cores: [1, 2],
+      };
+
+      MockInstance(AppqosService, 'getSstbf', () => of(mockedSSTBF));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(SystemCapsComponent);
+
+      expect(component.sstbf).toEqual(mockedSSTBF);
     });
 
     it('should get capabilities', () => {
@@ -81,11 +200,7 @@ describe('Given SystemCapsComponent', () => {
         capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
       };
 
-      const capsSpy = jasmine.createSpy('getCaps');
-
-      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
-        of(mockedCaps)
-      );
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
 
       const {
         point: { componentInstance: component },
@@ -97,16 +212,6 @@ describe('Given SystemCapsComponent', () => {
 
   describe('when request is sent to back', () => {
     it('it should show display loading', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
-      };
-
-      const capsSpy = jasmine.createSpy('getCaps');
-
-      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
-        of(mockedCaps)
-      );
-
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
@@ -120,17 +225,7 @@ describe('Given SystemCapsComponent', () => {
   });
 
   describe('when request is finished', () => {
-    it('it should should NOT display loading', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
-      };
-
-      const capsSpy = jasmine.createSpy('getCaps');
-
-      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
-        of(mockedCaps)
-      );
-
+    it('it should NOT display loading', () => {
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
@@ -140,6 +235,72 @@ describe('Given SystemCapsComponent', () => {
       const content = ngMocks.find('.loading', null);
 
       expect(content).toBeNull();
+    });
+  });
+
+  describe('when onChangeIface method is called', () => {
+    it('it should call rdtIfacePut with correct value', () => {
+      const mockResponse = 'RDT Interface modified';
+      const rdtIfaceSpy = jasmine.createSpy('rdtIfacePut');
+      const event: MatButtonToggleChange = {
+        source: {} as MatButtonToggle,
+        value: 'os',
+      };
+
+      MockInstance(AppqosService, 'rdtIfacePut', rdtIfaceSpy)
+        .withArgs(event.value)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.onChangeIface(event);
+
+      expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
+    });
+  });
+
+  describe('when mbaOnChange method is called', () => {
+    it('it should call mbaCtrlPut with correct value', () => {
+      const mockResponse = 'MBA controller modified';
+      const mbaCtrlSpy = jasmine.createSpy('mbaCtrlPut');
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'mbaCtrlPut', mbaCtrlSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.mbaOnChange(event);
+
+      expect(mbaCtrlSpy).toHaveBeenCalledWith(event.checked);
+    });
+  });
+
+  describe('when sstbfOnChange method is called', () => {
+    it('it should call sstbfPut with correct value', () => {
+      const mockResponse = 'SST-BF caps modified';
+      const sstbfPutSpy = jasmine.createSpy('sstbfPut');
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
     });
   });
 });

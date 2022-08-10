@@ -61,3 +61,7 @@ export interface SSTBF {
   hp_cores: number[];
   std_cores: number[];
 }
+
+export interface resMessage {
+  message: string;
+}

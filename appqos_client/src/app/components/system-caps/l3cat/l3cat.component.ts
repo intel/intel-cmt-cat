@@ -27,39 +27,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Input, OnInit } from '@angular/core';
-import { catchError, EMPTY, map, Observable, throwError } from 'rxjs';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 
-import { AppqosService } from 'src/app/services/appqos.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { CacheAllocation } from '../system-caps.model';
 
 @Component({
   selector: 'app-l3cat',
   templateUrl: './l3cat.component.html',
   styleUrls: ['./l3cat.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 /* Component used to show L3CAT details*/
-export class L3catComponent implements OnInit {
+export class L3catComponent {
   @Input() isSupported!: boolean;
-  l3cat$!: Observable<CacheAllocation>;
-
-  constructor(
-    private service: AppqosService,
-    private snackBar: SnackBarService
-  ) {}
-
-  ngOnInit(): void {
-    this.l3cat$ = this.service.getL3cat().pipe(
-      map((cat: CacheAllocation) => ({
-        ...cat,
-        cache_size: Math.round((cat.cache_size / 1024 ** 2) * 100) / 100,
-        cw_size: Math.round((cat.cw_size / 1024 ** 2) * 100) / 100,
-      })),
-      catchError((err, caught) => {
-        this.snackBar.handleError(err.message);
-        return EMPTY;
-      })
-    );
-  }
+  @Input() l3cat!: CacheAllocation;
 }

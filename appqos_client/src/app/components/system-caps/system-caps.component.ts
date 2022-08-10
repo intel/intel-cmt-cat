@@ -32,6 +32,7 @@ import {
   AfterContentChecked,
   AfterContentInit,
   AfterViewInit,
+  ChangeDetectionStrategy,
   Component,
   DoCheck,
   OnDestroy,
@@ -39,17 +40,32 @@ import {
   ViewChild,
   ViewEncapsulation,
 } from '@angular/core';
-import { combineLatest, map, Observable, Subscription, tap } from 'rxjs';
+import { MatButtonToggleChange } from '@angular/material/button-toggle';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { Router } from '@angular/router';
+import {
+  catchError,
+  combineLatest,
+  EMPTY,
+  map,
+  Observable,
+  Subscription,
+  tap,
+} from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { L3catComponent } from './l3cat/l3cat.component';
+import { MbaComponent } from './mba/mba.component';
+import { SstcpComponent } from './sstcp/sstcp.component';
 
 import {
   CacheAllocation,
   Caps,
+  MBA,
   MBACTRL,
   RDTIface,
+  resMessage,
   SSTBF,
 } from './system-caps.model';
 
@@ -64,6 +80,12 @@ import {
 export class SystemCapsComponent implements OnInit {
   caps!: string[];
   loading: boolean = false;
+  interface!: string;
+  mba!: MBACTRL & MBA;
+  rdtIface!: RDTIface;
+  sstbf!: SSTBF;
+  l3cat!: CacheAllocation;
+  l2cat!: CacheAllocation;
 
   constructor(
     private service: AppqosService,
@@ -72,14 +94,149 @@ export class SystemCapsComponent implements OnInit {
 
   ngOnInit(): void {
     this.loading = true;
+
+    this._getRdtIface();
+    this._getCaps();
+  }
+
+  private _getCaps(): void {
     this.service.getCaps().subscribe({
-      next: (caps: Caps) => {
+      next: (caps) => {
         this.caps = caps.capabilities;
+        this._getMbaData();
+        this._getSstbf();
+        this._getL3cat();
+        this._getL2cat();
         this.loading = false;
       },
       error: (error: HttpErrorResponse) => {
         this.snackBar.handleError(error.message);
+        this.loading = false;
       },
     });
+  }
+
+  onChangeIface(event: MatButtonToggleChange) {
+    this.loading = true;
+    this.service.rdtIfacePut(event.value).subscribe({
+      next: (res: resMessage) => {
+        this.snackBar.displayInfo(res.message);
+        this._getCaps();
+        this._getRdtIface();
+        this.loading = false;
+      },
+      error: (error: HttpErrorResponse) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      },
+    });
+  }
+
+  sstbfOnChange(event: MatSlideToggleChange) {
+    this.loading = true;
+    this.service.sstbfPut(event.checked).subscribe({
+      next: (res: resMessage) => {
+        this.snackBar.displayInfo(res.message);
+        this._getSstbf();
+        this.loading = false;
+      },
+      error: (error: HttpErrorResponse) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      },
+    });
+  }
+
+  mbaOnChange(event: MatSlideToggleChange) {
+    this.loading = true;
+    this.service.mbaCtrlPut(event.checked).subscribe({
+      next: (res: resMessage) => {
+        this.snackBar.displayInfo(res.message);
+        this._getMbaData();
+        this.loading = false;
+      },
+      error: (error: HttpErrorResponse) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      },
+    });
+  }
+
+  private _getMbaData() {
+    if (!this.caps.includes('mba')) return;
+
+    combineLatest([this.service.getMba(), this.service.getMbaCtrl()]).subscribe(
+      {
+        next: ([mba, mbaCtrl]) => (this.mba = { ...mba, ...mbaCtrl }),
+        error: (error: HttpErrorResponse) => {
+          this.snackBar.handleError(error.message);
+          this.loading = false;
+        },
+      }
+    );
+  }
+
+  private _getRdtIface(): void {
+    this.service.getRdtIface().subscribe({
+      next: (rdtIface) => (this.rdtIface = rdtIface),
+      error: (error: HttpErrorResponse) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      },
+    });
+  }
+
+  private _getSstbf(): void {
+    if (!this.caps.includes('sstbf')) return;
+
+    this.service.getSstbf().subscribe({
+      next: (sstbf) => (this.sstbf = sstbf),
+      error: (error: HttpErrorResponse) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      },
+    });
+  }
+
+  private _getL3cat(): void {
+    if (!this.caps.includes('l3cat')) return;
+
+    this.service
+      .getL3cat()
+      .pipe(
+        map((cat: CacheAllocation) => ({
+          ...cat,
+          cache_size: Math.round((cat.cache_size / 1024 ** 2) * 100) / 100,
+          cw_size: Math.round((cat.cw_size / 1024 ** 2) * 100) / 100,
+        }))
+      )
+      .subscribe({
+        next: (l3cat) => (this.l3cat = l3cat),
+        error: (error: HttpErrorResponse) => {
+          this.snackBar.handleError(error.message);
+          this.loading = false;
+        },
+      });
+  }
+
+  private _getL2cat(): void {
+    if (!this.caps.includes('l2cat')) return;
+
+    this.service
+      .getL2cat()
+      .pipe(
+        map((cat: CacheAllocation) => ({
+          ...cat,
+          cache_size: Math.round((cat.cache_size / 1024 ** 2) * 100) / 100,
+          cw_size: Math.round((cat.cw_size / 1024 ** 2) * 100) / 100,
+        }))
+      )
+      .subscribe({
+        next: (l2cat) => (this.l2cat = l2cat),
+        error: (error: HttpErrorResponse) => {
+          this.snackBar.handleError(error.message);
+          this.loading = false;
+        },
+      });
   }
 }

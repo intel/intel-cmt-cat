@@ -37,17 +37,25 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
     }}</span>
   </div>
   <div *ngIf="isSupported">
-    <mat-list-item *ngIf="mbaCtrl$ | async as mbaCtrl">
+    <mat-list-item *ngIf="mba">
+      <div matLine>
+        <span>COS number</span>
+        <span>{{ mba.clos_num }}</span>
+      </div>
       <div matLine>
         <span>MBA controller supported</span>
-        <span [ngClass]="mbaCtrl.supported ? 'positive' : 'negative'">{{
-          mbaCtrl.supported ? "Yes" : "No"
+        <span [ngClass]="mba.supported ? 'positive' : 'negative'">{{
+          mba.supported ? "Yes" : "No"
         }}</span>
       </div>
-      <div matLine *ngIf="mbaCtrl.supported">
+      <div matLine *ngIf="mba.supported">
         <span>MBA controller enabled</span>
         <span>
-          <mat-slide-toggle color="primary" [checked]="mbaCtrl.enabled">
+          <mat-slide-toggle
+            color="primary"
+            [checked]="mba.enabled"
+            (change)="mbaOnChange($event)"
+          >
           </mat-slide-toggle>
         </span>
       </div>

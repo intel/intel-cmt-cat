@@ -58,6 +58,7 @@ describe('Given SnackBarService', () => {
       service.handleError(errorMessage);
 
       expect(openSnackbarSpy).toHaveBeenCalledWith(errorMessage, '', {
+        panelClass: 'snackError',
         duration: 3000,
         horizontalPosition: 'end',
         verticalPosition: 'top',
