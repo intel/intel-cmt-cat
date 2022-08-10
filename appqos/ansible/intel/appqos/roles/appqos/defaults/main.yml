@@ -45,7 +45,7 @@ appqos_path: /opt/intel/appqos_workspace
 appqos_port: 5000
 
 # Appqos run command
-appqos_cmd: "WORKON_HOME=../venv/appqos_$HOSTNAME nohup pipenv run ./appqos.py \
+appqos_cmd: "WORKON_HOME=../venv/appqos_$HOSTNAME nohup pipenv run python3 ./appqos \
 -c /tmp/appqos.conf --port {{ appqos_port }} > appqos.log 2>&1 &"
 
 # Appqos directory

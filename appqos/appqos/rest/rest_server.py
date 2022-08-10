@@ -81,6 +81,8 @@ class Server:
         self.app.url_map.strict_slashes = False
         self.api = Api(self.app)
 
+        self.http_server = None
+
         # initialize SSL context
         self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         self.context.verify_mode = ssl.CERT_REQUIRED
@@ -119,8 +121,8 @@ class Server:
 
         # MBA API
         if caps.mba_supported():
-           self.api.add_resource(CapsMba, '/caps/mba')
-           self.api.add_resource(CapsMbaCtrl, '/caps/mba_ctrl')
+            self.api.add_resource(CapsMba, '/caps/mba')
+            self.api.add_resource(CapsMbaCtrl, '/caps/mba_ctrl')
 
         # L3 CAT API
         if caps.cat_l3_supported():
@@ -136,7 +138,7 @@ class Server:
         self.app.register_error_handler(HTTPException, Server.error_handler)
 
 
-    def start(self, host, port, debug=False):
+    def start(self, host, port, _debug=False):
         """
         Start REST server
 
@@ -151,27 +153,27 @@ class Server:
 
         try:
             # check for file existence and type
-            with open(TLS_CERT_FILE, opener=common.check_link):
+            with open(TLS_CERT_FILE, opener=common.check_link, encoding='utf-8'):
                 pass
-            with open(TLS_KEY_FILE, opener=common.check_link):
+            with open(TLS_KEY_FILE, opener=common.check_link, encoding='utf-8'):
                 pass
             self.context.load_cert_chain(TLS_CERT_FILE, TLS_KEY_FILE)
         except (FileNotFoundError, PermissionError) as ex:
-            log.error("SSL cert or key file, {}".format(str(ex)))
+            log.error(f"SSL cert or key file, {str(ex)}")
             return -1
 
         # loading CA crt file - it is needed for mTLS verification of client certificates
         try:
-            with open(TLS_CA_CERT_FILE, opener=common.check_link):
+            with open(TLS_CA_CERT_FILE, opener=common.check_link, encoding='utf-8'):
                 pass
             self.context.load_verify_locations(cafile=TLS_CA_CERT_FILE)
 
         except (FileNotFoundError, PermissionError) as ex:
-            log.error("CA certificate file, {}".format(str(ex)))
+            log.error(f"CA certificate file, {str(ex)}")
             return -1
 
         self.http_server = WSGIServer((host, port), self.app, ssl_context=self.context, spawn=1)
-        def handle_gevent_stop(signum, frame):
+        def handle_gevent_stop(_signum, _frame):
             log.info("Stopping gevent server loop")
             self.http_server.stop()
             self.http_server.close()

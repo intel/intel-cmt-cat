@@ -40,8 +40,6 @@ from copy import deepcopy
 from flask_restful import Resource, request
 import jsonschema
 
-from power import AdmissionControlError
-
 from rest.rest_exceptions import NotFound, BadRequest, MethodNotAllowed
 
 import sstbf
@@ -53,8 +51,11 @@ def _get_power_profiles_expert_mode():
     return common.CONFIG_STORE.get_global_attr('power_profiles_expert_mode', False)
 
 
-def check_allowed(f):
-    @wraps(f)
+def check_allowed(func):
+    """
+    Check power permissions
+    """
+    @wraps(func)
     def func_wrapper(*args, **kwargs):
         if not _get_power_profiles_expert_mode():
             raise MethodNotAllowed("Please enable Expert Mode first.")
@@ -62,7 +63,7 @@ def check_allowed(f):
         if sstbf.is_sstbf_configured():
             raise MethodNotAllowed("SST-BF configured, please un-configure SST-BF first")
 
-        return f(*args, **kwargs)
+        return func(*args, **kwargs)
     return func_wrapper
 
 
@@ -128,7 +129,7 @@ class Power(Resource):
                     continue
 
                 if pool['power_profile'] == int(profile_id):
-                    raise BadRequest("POWER PROFILE {} is in use.".format(str(profile_id)))
+                    raise BadRequest(f"POWER PROFILE {profile_id} is in use.")
 
             # remove profile
             data['power_profiles'].remove(profile)
@@ -162,7 +163,7 @@ class Power(Resource):
             schema, resolver = common.CONFIG_STORE.load_json_schema('modify_power.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest("Request validation failed") from error
 
         admission_control_check = json_data.pop('verify', True)
 
@@ -180,14 +181,14 @@ class Power(Resource):
             try:
                 common.CONFIG_STORE.validate(data, admission_control_check)
             except Exception as ex:
-                raise BadRequest("POWER PROFILE " + str(profile_id) + " not updated, " + str(ex))
+                raise BadRequest(f"POWER PROFILE {profile_id} not updated") from ex
 
             common.CONFIG_STORE.set_config(data)
 
             res = {'message': "POWER PROFILE " + str(profile_id) + " updated"}
             return res, 200
 
-        raise NotFound("POWER PROFILE" + str(profile_id) + " not found in config")
+        raise NotFound(f"POWER PROFILE {profile_id} not found in config")
 
 
 class Powers(Resource):
@@ -232,7 +233,7 @@ class Powers(Resource):
             schema, resolver = common.CONFIG_STORE.load_json_schema('add_power.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest("Request validation failed") from error
 
         json_data['id'] = common.CONFIG_STORE.get_new_power_profile_id()
 
@@ -244,13 +245,13 @@ class Powers(Resource):
         try:
             common.CONFIG_STORE.validate(data, False)
         except Exception as ex:
-            raise BadRequest("New POWER PROFILE not added, " + str(ex))
+            raise BadRequest("New POWER PROFILE not added") from ex
 
         common.CONFIG_STORE.set_config(data)
 
         res = {
             'id': json_data['id'],
-            'message': "New POWER PROFILE {} added".format(json_data['id'])
+            'message': f"New POWER PROFILE {json_data['id']} added"
         }
 
         return res, 201

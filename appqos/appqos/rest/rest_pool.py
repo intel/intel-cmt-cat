@@ -76,7 +76,8 @@ class Pool(Resource):
         try:
             pool = common.CONFIG_STORE.get_pool(data, int(pool_id))
         except:
-            raise NotFound("POOL " + str(pool_id) + " not found in config")
+            # pylint: disable=raise-missing-from
+            raise NotFound(f"POOL {pool_id} not found in config")
         return pool, 200
 
 
@@ -99,23 +100,23 @@ class Pool(Resource):
             raise NotFound("No pools in config file")
 
         if int(pool_id) == 0:
-            raise BadRequest("POOL " + str(pool_id) + " is Default, cannot delete")
+            raise BadRequest(f"POOL {pool_id} is Default, cannot delete")
 
         for pool in data['pools']:
             if pool['id'] != int(pool_id):
                 continue
 
             if 'apps' in pool and pool['apps']:
-                raise BadRequest("POOL " + str(pool_id) + " is not empty")
+                raise BadRequest(f"POOL {pool_id} is not empty")
 
             # remove app
             data['pools'].remove(pool)
             common.CONFIG_STORE.set_config(data)
 
-            res = {'message': "POOL " + str(pool_id) + " deleted"}
+            res = {'message': f"POOL {pool_id} deleted"}
             return res, 200
 
-        raise NotFound("POOL " + str(pool_id) + " not found in config")
+        raise NotFound(f"POOL {pool_id} not found in config")
 
 
     @staticmethod
@@ -137,20 +138,20 @@ class Pool(Resource):
                 if not caps.cat_l3_supported():
                     raise BadRequest("System does not support CAT!")
                 if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
-                    raise BadRequest("Pool {} does not support CAT".format(pool_id))
+                    raise BadRequest(f"Pool {pool_id} does not support CAT")
 
             if 'mba' in json_data or 'mba_bw' in json_data:
                 if not caps.mba_supported():
                     raise BadRequest("System does not support MBA!")
                 if pool_id > common.PQOS_API.get_max_cos_id([common.MBA_CAP]):
-                    raise BadRequest("Pool {} does not support MBA".format(pool_id))
+                    raise BadRequest(f"Pool {pool_id} does not support MBA")
 
             if 'mba_bw' in json_data and not caps.mba_bw_enabled():
-                    raise BadRequest("MBA CTRL is not {}!"\
-                        .format("enabled" if caps.mba_bw_supported() else "supported"))
+                raise BadRequest("MBA CTRL is not "\
+                                 f"{'enabled' if caps.mba_bw_supported() else 'supported'}!")
 
             if 'mba' in json_data and caps.mba_bw_enabled():
-                    raise BadRequest("MBA RATE is disabled! Disable MBA CTRL and try again.")
+                raise BadRequest("MBA RATE is disabled! Disable MBA CTRL and try again.")
 
         json_data = request.get_json()
 
@@ -159,7 +160,7 @@ class Pool(Resource):
             schema, resolver = ConfigStore.load_json_schema('modify_pool.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest("Request validation failed") from error
 
         admission_control_check = json_data.pop('verify', True) and\
             ('cores' in json_data or 'power_profile' in json_data)
@@ -214,14 +215,14 @@ class Pool(Resource):
             try:
                 common.CONFIG_STORE.validate(data, admission_control_check)
             except Exception as ex:
-                raise BadRequest("POOL " + str(pool_id) + " not updated, " + str(ex))
+                raise BadRequest(f"POOL {pool_id} not updated, {ex}") from ex
 
             common.CONFIG_STORE.set_config(data)
 
-            res = {'message': "POOL " + str(pool_id) + " updated"}
+            res = {'message': f"POOL {pool_id} updated"}
             return res, 200
 
-        raise NotFound("POOL " + str(pool_id) + " not found in config")
+        raise NotFound(f"POOL {pool_id} not found in config")
 
 
 class Pools(Resource):
@@ -264,7 +265,7 @@ class Pools(Resource):
             schema, resolver = ConfigStore.load_json_schema('add_pool.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest("Request validation failed") from error
 
         admission_control_check = json_data.pop('verify', True) and\
             ('cores' in json_data or 'power_profile' in json_data)
@@ -301,12 +302,12 @@ class Pools(Resource):
         try:
             common.CONFIG_STORE.validate(data, admission_control_check)
         except Exception as ex:
-            raise BadRequest("New POOL not added, " + str(ex))
+            raise BadRequest("New POOL not added") from ex
 
         common.CONFIG_STORE.set_config(data)
 
         res = {
             'id': post_data['id'],
-            'message': "New POOL {} added".format(post_data['id'])
+            'message': f"New POOL {post_data['id']} added"
         }
         return res, 201

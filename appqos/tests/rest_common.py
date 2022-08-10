@@ -175,10 +175,10 @@ def get_max_cos_id(alloc_tech):
 def load_json_schema(filename):
     """ Loads the given schema file """
     # find path to schema
-    relative_path = join('schema', filename)
+    relative_path = join('appqos', 'schema', filename)
     absolute_path = join(dirname(dirname(__file__)), relative_path)
     # path to all schema files
-    schema_path = 'file:' + str(join(dirname(dirname(__file__)), 'schema')) + '/'
+    schema_path = 'file:' + str(join(dirname(dirname(__file__)), 'appqos', 'schema')) + '/'
     with open(absolute_path) as schema_file:
         # add resolver for python to find all schema files
         schema = json.loads(schema_file.read())

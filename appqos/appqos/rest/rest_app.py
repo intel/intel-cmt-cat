@@ -78,7 +78,8 @@ class App(Resource):
             app = common.CONFIG_STORE.get_app(data, int(app_id))
             app['pool_id'] = common.CONFIG_STORE.app_to_pool(int(app_id))
         except:
-            raise NotFound("APP " + str(app_id) + " not found in config")
+            # pylint: disable=raise-missing-from
+            raise NotFound(f"APP {app_id} not found in config")
 
         return app, 200
 
@@ -118,10 +119,10 @@ class App(Resource):
             data['apps'].remove(app)
             common.CONFIG_STORE.set_config(data)
 
-            res = {'message': "APP " + str(app_id) + " deleted"}
+            res = {'message': f"APP {app_id} deleted" }
             return res, 200
 
-        raise NotFound("APP " + str(app_id) + " not found in config")
+        raise NotFound(f"APP {app_id} not found in config")
 
 
     @staticmethod
@@ -147,7 +148,7 @@ class App(Resource):
             schema, resolver = ConfigStore.load_json_schema('modify_app.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest(f"Request validation failed - {error}") from error
 
         data = deepcopy(common.CONFIG_STORE.get_config())
         if 'apps' not in data or 'pools' not in data:
@@ -193,16 +194,16 @@ class App(Resource):
             except AdmissionControlError:
                 pass
             except Exception as ex:
-                raise BadRequest("APP " + str(app_id) + " not updated, " + str(ex))
+                raise BadRequest(f"APP {app_id} not updated, {ex}") from ex
 
             common.CONFIG_STORE.set_config(data)
             if 'pool_id' in json_data:
                 common.STATS_STORE.general_stats_inc_apps_moves()
 
-            res = {'message': "APP " + str(app_id) + " updated"}
+            res = {'message': f"APP {app_id} updated"}
             return res, 200
 
-        raise NotFound("APP " + str(app_id) + " not found in config")
+        raise NotFound(f"APP {app_id} not found in config")
 
 
 class Apps(Resource):
@@ -251,7 +252,7 @@ class Apps(Resource):
             schema, resolver = ConfigStore.load_json_schema('add_app.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest(f"Request validation failed - {error}") from error
 
         data = deepcopy(common.CONFIG_STORE.get_config())
 
@@ -264,7 +265,7 @@ class Apps(Resource):
             # validate pids
             for pid in json_data['pids']:
                 if not pid_ops.is_pid_valid(pid):
-                    raise BadRequest("New APP not added, invalid PID: " + str(pid))
+                    raise BadRequest(f"New APP not added, invalid PID: {pid}")
 
         # if pool_id not provided on app creation
         if 'pool_id' not in json_data or not json_data['pool_id']:
@@ -275,7 +276,7 @@ class Apps(Resource):
             if 'cores' in json_data and json_data['cores']:
                 for core in json_data['cores']:
                     if not common.PQOS_API.check_core(core):
-                        raise BadRequest("New APP not added, invalid core: " + str(core))
+                        raise BadRequest(f"New APP not added, invalid core: {core}")
                 for pool in data['pools']:
                     if set(json_data['cores']).issubset(pool['cores']):
                         json_data['pool_id'] = pool['id']
@@ -290,7 +291,7 @@ class Apps(Resource):
         try:
             pool = common.CONFIG_STORE.get_pool(data, json_data['pool_id'])
         except Exception as ex:
-            raise BadRequest("New APP not added, " + str(ex))
+            raise BadRequest(f"New APP not added, {ex}") from ex
 
         # update pool configuration to include new app
         if not 'apps' in pool:
@@ -305,12 +306,12 @@ class Apps(Resource):
         except AdmissionControlError:
             pass
         except Exception as ex:
-            raise BadRequest("New APP not added, " + str(ex))
+            raise BadRequest(f"New APP not added, {ex}") from ex
 
         common.CONFIG_STORE.set_config(data)
 
         res = {
             'id': json_data['id'],
-            'message': "New APP added to pool {}".format(str(pool['id']))
+            'message': f"New APP added to pool {pool['id']}"
         }
         return res, 201

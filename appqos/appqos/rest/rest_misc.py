@@ -131,7 +131,7 @@ class Sstbf(Resource):
             schema, resolver = ConfigStore.load_json_schema('modify_sstbf.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest(f"Request validation failed - {error}") from error
 
         if not sstbf.configure_sstbf(json_data['configured']) == 0:
             raise InternalError("Failed to change SST-BF configured state.")

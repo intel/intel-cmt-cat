@@ -96,7 +96,7 @@ _NOTE: App QoS requires root privileges._
 ```
 $ sudo make run
 
-WORKON_HOME=../venv/appqos_localhost pipenv run ./appqos.py
+WORKON_HOME=../venv/appqos_localhost pipenv run python3 ./appqos
 2021-05-07 16:58:37,472 INFO  Interface MSR, MBA BW: unsupported.
 2021-05-07 16:58:37,499 INFO  Interface OS, MBA BW: supported.
 2021-05-07 16:58:37,499 INFO  Supported RDT interfaces: ['msr', 'os']

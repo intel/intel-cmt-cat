@@ -94,4 +94,4 @@ RUN apt-get -y purge --auto-remove \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /appqos_workspace/appqos
-CMD ./appqos.py -c ${APPQOS_CONF_PATH} --port ${APPQOS_PORT}
+CMD python3 ./appqos -c ${APPQOS_CONF_PATH} --port ${APPQOS_PORT}

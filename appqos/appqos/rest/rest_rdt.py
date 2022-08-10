@@ -42,7 +42,7 @@ import jsonschema
 import caps
 import common
 
-from rest.rest_exceptions import BadRequest, InternalError
+from rest.rest_exceptions import BadRequest
 
 from config import ConfigStore
 
@@ -110,7 +110,7 @@ class CapsMbaCtrl(Resource):
             schema, resolver = ConfigStore.load_json_schema('modify_mba_ctrl.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest("Request validation failed") from error
 
         if not caps.mba_bw_supported():
             return {'message': "MBA CTRL not supported!"}, 409
@@ -128,6 +128,13 @@ class CapsMbaCtrl(Resource):
 
     @staticmethod
     def set_mba_ctrl_enabled(data, enabled):
+        """
+        Sets mba_ctrl enabled in config
+
+        Parameters:
+            data: configuration dict
+            enabled: mba_ctrl status
+        """
         if 'mba_ctrl' not in data:
             data['mba_ctrl'] = {}
 
@@ -171,10 +178,10 @@ class CapsRdtIface(Resource):
             schema, resolver = ConfigStore.load_json_schema('modify_rdt_iface.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
-            raise BadRequest("Request validation failed - %s" % (str(error)))
+            raise BadRequest("Request validation failed") from error
 
         if not json_data['interface'] in common.PQOS_API.supported_iface():
-            raise BadRequest("RDT interface '%s' not supported!" % (json_data['interface']))
+            raise BadRequest(f"RDT interface '{json_data['interface']}' not supported!")
 
         if common.CONFIG_STORE.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409

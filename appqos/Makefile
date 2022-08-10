@@ -47,20 +47,20 @@ setup-dev: Pipfile
 	WORKON_HOME=$(VENV_DIR) pipenv install --dev --skip-lock
 
 test: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pytest tests
+	WORKON_HOME=$(VENV_DIR) PYTHONPATH=./appqos pipenv run python3 -m pytest tests
 
 cov: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/
+	WORKON_HOME=$(VENV_DIR) PYTHONPATH=./appqos pipenv run python3 -m pytest --cov-report term-missing --cov-config .coveragerc --cov . tests/
 
 pylint:
-	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pylint --rcfile=$(CURDIR)/.pylintrc *.py
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pylint --rcfile=$(CURDIR)/.pylintrc ./appqos ./tests
 
 bandit:
-	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m bandit *.py
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m bandit -r ./appqos
 
 .PHONY: codespell
 codespell:
-	WORKON_HOME=$(VENV_DIR) pipenv run codespell -L unit --skip ca -q 2
+	WORKON_HOME=$(VENV_DIR) pipenv run codespell -L unit --skip ca -q 3
 
 style:
 	${MAKE} pylint
@@ -68,7 +68,7 @@ style:
 	${MAKE} codespell
 
 run: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run ./appqos.py
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 ./appqos
 
 clean:
 	@rm -rf __pycache__

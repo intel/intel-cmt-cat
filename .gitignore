@@ -24,6 +24,10 @@ tools/membw/membw
 
 appqos/appqos.crt
 appqos/appqos.key
+appqos/ca/*.key
+appqos/ca/*.crt
+appqos/ca/*.csr
+appqos/ca/*.srl
 appqos/env_*
 appqos/venv_*
 

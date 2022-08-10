@@ -173,7 +173,7 @@ By default it will attempt to read from "appqos.conf" file from current folder.
 Example command line to run App QoS in verbose mode and config file in
 non-default location:
 
-sudo ./appqos.py -c /tmp/appqos.conf -V
+sudo python3 ./appqos -c /tmp/appqos.conf -V
 
 NOTE:
 To run App QoS in virtualenv please use "make run" command.
@@ -359,8 +359,8 @@ Empty config file with essential configuration only:
 
 App QoS command line parameters (for more info please see USAGE paragraph)
 
-./appqos.py --help
-usage: appqos.py [-h] [-c PATH] [--port PORT] [-V]
+python3 ./appqos --help
+usage: appqos [-h] [-c PATH] [--port PORT] [-V]
 
 optional arguments:
   -h, --help            show this help message and exit
@@ -1038,7 +1038,7 @@ curl https://localhost:5000/caps/mba_ctrl -X GET --cert client_appqos.crt --key 
 
 NOTE: MBA CTRL is supported but NOT enabled.
 
-Enable RDT MBA CTRL 
+Enable RDT MBA CTRL
 
 curl https://localhost:5000/caps/mba_ctrl -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"enabled": true}'
 
