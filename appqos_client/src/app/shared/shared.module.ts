@@ -39,8 +39,10 @@ import { MatGridListModule } from '@angular/material/grid-list';
 import { MatListModule } from '@angular/material/list';
 import { MatDividerModule } from '@angular/material/divider';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
+import { MatIconModule } from '@angular/material/icon';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -48,6 +50,9 @@ import { LocalService } from '../services/local.service';
 import { PermissionsGuard } from '../services/permissions.guard';
 import { DashboardPageComponent } from '../components/dashboard-page/dashboard-page.component';
 import { SystemCapsComponent } from '../components/system-caps/system-caps.component';
+import { ToolbarComponent } from '../components/toolbar/toolbar.component';
+import { OverviewComponent } from '../components/overview/overview.component';
+import { RapConfigComponent } from '../components/rap-config/rap-config.component';
 import { L3catComponent } from '../components/system-caps/l3cat/l3cat.component';
 import { RdtIfaceComponent } from '../components/system-caps/rdt-iface/rdt-iface.component';
 import { MbaComponent } from '../components/system-caps/mba/mba.component';
@@ -60,6 +65,9 @@ import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component'
     LoginComponent,
     DashboardPageComponent,
     SystemCapsComponent,
+    ToolbarComponent,
+    OverviewComponent,
+    RapConfigComponent,
     L3catComponent,
     RdtIfaceComponent,
     MbaComponent,
@@ -79,6 +87,8 @@ import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component'
     MatListModule,
     MatDividerModule,
     MatSnackBarModule,
+    MatToolbarModule,
+    MatIconModule,
     MatSlideToggleModule,
     MatButtonToggleModule,
   ],

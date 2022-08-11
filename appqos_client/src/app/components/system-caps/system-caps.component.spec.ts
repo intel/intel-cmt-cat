@@ -53,6 +53,7 @@ import {
   RDTIface,
   SSTBF,
 } from './system-caps.model';
+import { LocalService } from 'src/app/services/local.service';
 
 describe('Given SystemCapsComponent', () => {
   beforeEach(() =>
@@ -70,11 +71,22 @@ describe('Given SystemCapsComponent', () => {
         getL2cat: () => EMPTY,
       })
       .mock(SstcpComponent)
+      .keep(LocalService)
   );
 
   MockInstance.scope('case');
 
   describe('when initialized', () => {
+    it('should display system name', () => {
+      localStorage.setItem('api_url', 'https://localhost:5000');
+
+      MockRender(SystemCapsComponent);
+
+      const systemName = ngMocks.formatText(ngMocks.find('.system-name'));
+
+      expect(systemName).toEqual('localhost');
+    });
+
     it('should display title property in card ', () => {
       const title = 'System Capabilities';
       const mockedCaps: Caps = {

@@ -1,4 +1,4 @@
-<!--BSD LICENSE
+/*BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -25,53 +25,42 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-<mat-card>
-  <h2 class="card-title">
-    System Capabilities
-    <mat-progress-spinner
-      class="loading"
-      *ngIf="loading"
-      color="primary"
-      mode="indeterminate"
-      diameter="20"
-    >
-    </mat-progress-spinner>
-  </h2>
-  <span class="system-name">{{ systemName }}</span>
-  <mat-card-content *ngIf="caps">
-    <!--RDT Interface-->
-    <app-rdt-iface
-      [rdtIface]="rdtIface"
-      (changeEvent)="onChangeIface($event)"
-    ></app-rdt-iface>
-    <!--L3CAT-->
-    <app-l3cat
-      [isSupported]="caps.includes('l3cat')"
-      [l3cat]="l3cat"
-    ></app-l3cat>
-    <!--L2CAT-->
-    <app-l2cat
-      [isSupported]="caps.includes('l2cat')"
-      [l2cat]="l2cat"
-    ></app-l2cat>
-    <!--MBA-->
-    <app-mba
-      [isSupported]="caps.includes('mba')"
-      [mba]="mba"
-      (changeEvent)="mbaOnChange($event)"
-    ></app-mba>
-    <!--SSTBF-->
-    <app-sstbf
-      [isSupported]="caps.includes('sstbf')"
-      [sstbf]="sstbf"
-      (changeEvent)="sstbfOnChange($event)"
-    ></app-sstbf>
-    <!--SSTPC-->
-    <app-sstcp
-      [sstbf]="sstbf"
-      [isSupported]="caps.includes('power')"
-    ></app-sstcp>
-  </mat-card-content>
-</mat-card>
+import {
+  Component,
+  EventEmitter,
+  OnInit,
+  Output,
+  ViewEncapsulation,
+} from '@angular/core';
+
+import { Router } from '@angular/router';
+
+import { LocalService } from 'src/app/services/local.service';
+
+@Component({
+  selector: 'app-toolbar',
+  templateUrl: './toolbar.component.html',
+  styleUrls: ['./toolbar.component.scss'],
+  encapsulation: ViewEncapsulation.None,
+})
+export class ToolbarComponent {
+  @Output() switcher = new EventEmitter<boolean>();
+  enableOverview: boolean = true;
+
+  constructor(private router: Router) {}
+
+  logout(): void {
+    this.router.navigate(['/login']);
+  }
+
+  switchContent(value: boolean): void {
+    if (!value) {
+      this.enableOverview = false;
+    } else {
+      this.enableOverview = true;
+    }
+    this.switcher.emit(value);
+  }
+}

@@ -1,4 +1,4 @@
-<!--BSD LICENSE
+/*BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -25,53 +25,29 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-<mat-card>
-  <h2 class="card-title">
-    System Capabilities
-    <mat-progress-spinner
-      class="loading"
-      *ngIf="loading"
-      color="primary"
-      mode="indeterminate"
-      diameter="20"
-    >
-    </mat-progress-spinner>
-  </h2>
-  <span class="system-name">{{ systemName }}</span>
-  <mat-card-content *ngIf="caps">
-    <!--RDT Interface-->
-    <app-rdt-iface
-      [rdtIface]="rdtIface"
-      (changeEvent)="onChangeIface($event)"
-    ></app-rdt-iface>
-    <!--L3CAT-->
-    <app-l3cat
-      [isSupported]="caps.includes('l3cat')"
-      [l3cat]="l3cat"
-    ></app-l3cat>
-    <!--L2CAT-->
-    <app-l2cat
-      [isSupported]="caps.includes('l2cat')"
-      [l2cat]="l2cat"
-    ></app-l2cat>
-    <!--MBA-->
-    <app-mba
-      [isSupported]="caps.includes('mba')"
-      [mba]="mba"
-      (changeEvent)="mbaOnChange($event)"
-    ></app-mba>
-    <!--SSTBF-->
-    <app-sstbf
-      [isSupported]="caps.includes('sstbf')"
-      [sstbf]="sstbf"
-      (changeEvent)="sstbfOnChange($event)"
-    ></app-sstbf>
-    <!--SSTPC-->
-    <app-sstcp
-      [sstbf]="sstbf"
-      [isSupported]="caps.includes('power')"
-    ></app-sstcp>
-  </mat-card-content>
-</mat-card>
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+
+import { RapConfigComponent } from './rap-config.component';
+
+describe('RapConfigComponent', () => {
+  let component: RapConfigComponent;
+  let fixture: ComponentFixture<RapConfigComponent>;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      declarations: [RapConfigComponent],
+    }).compileComponents();
+  });
+
+  beforeEach(() => {
+    fixture = TestBed.createComponent(RapConfigComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+});

@@ -29,9 +29,10 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-<!--Temporary, will be removed-->
-<button mat-flat-button color="warn" (click)="logout()">Logout</button>
+<app-toolbar (switcher)="switchContent($event)"></app-toolbar>
 
 <div class="container">
   <app-system-caps></app-system-caps>
+  <app-overview *ngIf="showContent"></app-overview>
+  <app-rap-config *ngIf="!showContent"></app-rap-config>
 </div>

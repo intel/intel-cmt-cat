@@ -27,51 +27,41 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
-<mat-card>
-  <h2 class="card-title">
-    System Capabilities
-    <mat-progress-spinner
-      class="loading"
-      *ngIf="loading"
-      color="primary"
-      mode="indeterminate"
-      diameter="20"
+<mat-toolbar color="primary">
+  <button mat-icon-button (click)="logout()">
+    <mat-icon class="logout">keyboard_backspace</mat-icon>
+  </button>
+  <img
+    class="logo-intel"
+    src="../../../assets/toolbar_intel_logo.png"
+    alt="Intel"
+  />
+
+  <div class="navigation-buttons">
+    <button
+      mat-flat-button
+      [ngClass]="{ active: enableOverview, inactive: !enableOverview }"
+      (click)="switchContent(true)"
     >
-    </mat-progress-spinner>
-  </h2>
-  <span class="system-name">{{ systemName }}</span>
-  <mat-card-content *ngIf="caps">
-    <!--RDT Interface-->
-    <app-rdt-iface
-      [rdtIface]="rdtIface"
-      (changeEvent)="onChangeIface($event)"
-    ></app-rdt-iface>
-    <!--L3CAT-->
-    <app-l3cat
-      [isSupported]="caps.includes('l3cat')"
-      [l3cat]="l3cat"
-    ></app-l3cat>
-    <!--L2CAT-->
-    <app-l2cat
-      [isSupported]="caps.includes('l2cat')"
-      [l2cat]="l2cat"
-    ></app-l2cat>
-    <!--MBA-->
-    <app-mba
-      [isSupported]="caps.includes('mba')"
-      [mba]="mba"
-      (changeEvent)="mbaOnChange($event)"
-    ></app-mba>
-    <!--SSTBF-->
-    <app-sstbf
-      [isSupported]="caps.includes('sstbf')"
-      [sstbf]="sstbf"
-      (changeEvent)="sstbfOnChange($event)"
-    ></app-sstbf>
-    <!--SSTPC-->
-    <app-sstcp
-      [sstbf]="sstbf"
-      [isSupported]="caps.includes('power')"
-    ></app-sstcp>
-  </mat-card-content>
-</mat-card>
+      OVERVIEW
+    </button>
+    <mat-divider vertical></mat-divider>
+    <button
+      mat-flat-button
+      [ngClass]="{ active: !enableOverview, inactive: enableOverview }"
+      (click)="switchContent(false)"
+    >
+      POOL CONFIG
+    </button>
+  </div>
+  <div class="import-export-btns">
+    <button mat-button class="import-button">
+      <mat-icon class="icon">archive</mat-icon>
+      Import
+    </button>
+    <button mat-button class="export-button">
+      <mat-icon class="icon">unarchive</mat-icon>
+      <span>Export</span>
+    </button>
+  </div>
+</mat-toolbar>

@@ -49,4 +49,64 @@ describe('Given DashboardPageComponent', () => {
       expect(expectValue).toBeTruthy();
     });
   });
+
+  describe('when OVERVIEW button clicked', () => {
+    it('should display Overview content', () => {
+      const fixture = MockRender(DashboardPageComponent);
+
+      const toolbar = ngMocks.find('app-toolbar');
+
+      toolbar.triggerEventHandler('switcher', true);
+
+      fixture.detectChanges();
+
+      const overview = ngMocks.find('app-overview');
+
+      expect(overview).toBeTruthy();
+    });
+
+    it('should display NOT RAP Config content', () => {
+      const fixture = MockRender(DashboardPageComponent);
+
+      const toolbar = ngMocks.find('app-toolbar');
+
+      toolbar.triggerEventHandler('switcher', true);
+
+      fixture.detectChanges();
+
+      const rapConfig = ngMocks.find('app-rap-config', null);
+
+      expect(rapConfig).toBeNull();
+    });
+  });
+
+  describe('when RAP CONFIG button clicked', () => {
+    it('should display RAP Config content', () => {
+      const fixture = MockRender(DashboardPageComponent);
+
+      const toolbar = ngMocks.find('app-toolbar');
+
+      toolbar.triggerEventHandler('switcher', false);
+
+      fixture.detectChanges();
+
+      const rapConfig = ngMocks.find('app-rap-config');
+
+      expect(rapConfig).toBeTruthy();
+    });
+
+    it('should NOT display Overview content', () => {
+      const fixture = MockRender(DashboardPageComponent);
+
+      const toolbar = ngMocks.find('app-toolbar');
+
+      toolbar.triggerEventHandler('switcher', false);
+
+      fixture.detectChanges();
+
+      const overview = ngMocks.find('app-overview', null);
+
+      expect(overview).toBeNull();
+    });
+  });
 });

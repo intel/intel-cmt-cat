@@ -95,8 +95,12 @@ body {
 
 .snackSuccess {
   min-width: 15rem;
-  background: mat-color($intel-primary);
+  background: green;
   color: #ffffff;
+}
+
+.mat-snack-bar-container {
+  margin: 70px 24px 24px !important;
 }
 
 .mat-button-toggle-checked {

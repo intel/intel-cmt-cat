@@ -29,6 +29,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 .container {
   display: flex;
-  justify-content: center;
-  column-gap: 1.2rem;
+  justify-content: flex-start;
+  column-gap: 1rem;
+  padding-top: 1.5rem;
+
+  app-system-caps {
+    margin-left: auto;
+  }
+
+  app-overview {
+    margin-right: auto;
+  }
 }

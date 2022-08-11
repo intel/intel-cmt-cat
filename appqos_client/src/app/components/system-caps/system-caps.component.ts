@@ -28,40 +28,17 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpErrorResponse } from '@angular/common/http';
-import {
-  AfterContentChecked,
-  AfterContentInit,
-  AfterViewInit,
-  ChangeDetectionStrategy,
-  Component,
-  DoCheck,
-  OnDestroy,
-  OnInit,
-  ViewChild,
-  ViewEncapsulation,
-} from '@angular/core';
+import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatButtonToggleChange } from '@angular/material/button-toggle';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
-import { Router } from '@angular/router';
-import {
-  catchError,
-  combineLatest,
-  EMPTY,
-  map,
-  Observable,
-  Subscription,
-  tap,
-} from 'rxjs';
+import { combineLatest, map } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { L3catComponent } from './l3cat/l3cat.component';
-import { MbaComponent } from './mba/mba.component';
-import { SstcpComponent } from './sstcp/sstcp.component';
 
 import {
   CacheAllocation,
-  Caps,
   MBA,
   MBACTRL,
   RDTIface,
@@ -86,14 +63,23 @@ export class SystemCapsComponent implements OnInit {
   sstbf!: SSTBF;
   l3cat!: CacheAllocation;
   l2cat!: CacheAllocation;
+  systemName: string | undefined;
 
   constructor(
     private service: AppqosService,
-    private snackBar: SnackBarService
+    private snackBar: SnackBarService,
+    private localStroe: LocalService
   ) {}
 
   ngOnInit(): void {
     this.loading = true;
+
+    this.systemName = this.localStroe
+      .getData('api_url')
+      ?.split('/')
+      .pop()
+      ?.split(':')
+      .shift();
 
     this._getRdtIface();
     this._getCaps();

@@ -29,6 +29,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 .mat-card {
   width: 15.5rem;
+  overflow-wrap: break-word;
+
+  .system-name {
+    font-size: initial;
+    color: #6b6b6b;
+  }
 
   .list {
     font-size: 16px;

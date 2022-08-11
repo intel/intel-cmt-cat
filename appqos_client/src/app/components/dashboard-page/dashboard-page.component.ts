@@ -28,9 +28,6 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component } from '@angular/core';
-import { Router } from '@angular/router';
-
-import { LocalService } from 'src/app/services/local.service';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -40,10 +37,9 @@ import { LocalService } from 'src/app/services/local.service';
 
 /* Component used to display Dashboard page*/
 export class DashboardPageComponent {
-  constructor(private localStore: LocalService, private router: Router) {}
+  showContent: boolean = true;
 
-  logout() {
-    this.localStore.clearData();
-    this.router.navigate(['/login']);
+  switchContent(event: boolean): void {
+    this.showContent = event;
   }
 }
