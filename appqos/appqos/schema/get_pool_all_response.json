@@ -5,5 +5,5 @@
   "description": "GET all POOLs results, URI /pools",
   "type": "array",
 
-  "items": { "$ref": "definitions.json#/pool_api_get"}
+  "items": { "$ref": "pool.json#/pool_api_get"}
 }

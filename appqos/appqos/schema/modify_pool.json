@@ -4,55 +4,5 @@
   "title": "REST API modify pool",
   "description": "PUT command, URI /pools",
 
-  "type": "object",
-
-  "properties": {
-    "name": {
-      "description": "Pool's name",
-      "$ref": "definitions.json#/string_nonempty"
-    },
-    "l2cbm": {
-      "description": "L2 CAT cache bit mask",
-      "$ref": "definitions.json#/string_hex"
-    },
-    "cbm": {
-      "description": "L3 CAT cache bit mask",
-      "$ref": "definitions.json#/string_hex"
-    },
-    "mba": {
-      "description": "MBA rate %",
-      "$ref": "definitions.json#/percentage_nonzero"
-    },
-    "mba_bw": {
-      "description": "MBA rate MBps",
-      "$ref": "definitions.json#/mbps_nonzero"
-    },
-    "cores": {
-      "description": "POOL cores",
-      "$ref": "definitions.json#/uint_uniq_nonempty_array"
-    },
-    "apps": {
-      "description": "APPs assigned to that pool",
-      "$ref": "definitions.json#/uint_uniq_array"
-    },
-    "power_profile" : {
-      "description": "Power profile ID",
-      "$ref": "definitions.json#/uint"
-    },
-    "verify": {
-      "description": "Power Profiles Admission Control",
-      "type": "boolean"
-    }
-  },
-  "anyOf": [
-    { "required": ["name"] },
-    { "required": ["l2cbm"] },
-    { "required": ["cbm"] },
-    { "required": ["mba"] },
-    { "required": ["mba_bw"] },
-    { "required": ["cores"] },
-    { "required": ["apps"] },
-    { "required": ["power_profile"] }
-  ],
-  "additionalProperties": false
+  "$ref": "pool.json#/pool_api_put"
 }

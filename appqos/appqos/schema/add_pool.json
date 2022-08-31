@@ -4,5 +4,5 @@
   "title": "REST API add pool",
   "description": "POST command, URI /pools",
 
-  "$ref": "definitions.json#/pool_api_post"
+  "$ref": "pool.json#/pool_api_post"
 }

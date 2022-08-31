@@ -20,14 +20,14 @@
 
   "percentage_nonzero": {
     "allOf": [
-      { "$ref": "#uint_nonzero" },
+      { "$ref": "#/uint_nonzero" },
       { "maximum": 100 }
     ]
   },
 
   "mbps_nonzero": {
     "allOf": [
-      { "$ref": "#uint_nonzero" },
+      { "$ref": "#/uint_nonzero" },
       { "maximum": 4294967296,
         "exclusiveMaximum": true
       }
@@ -37,7 +37,7 @@
   "uint_uniq_nonempty_array": {
     "description": "Non-empty array of unique Unsigned Integers",
     "type": "array",
-    "items": { "$ref": "#uint" },
+    "items": { "$ref": "#/uint" },
     "uniqueItems": true,
     "minItems": 1,
     "maxItems": 512
@@ -46,7 +46,7 @@
   "uint_uniq_array": {
     "description": "Array of unique Unsigned Integers",
     "type": "array",
-    "items": { "$ref": "#uint" },
+    "items": { "$ref": "#/uint" },
     "uniqueItems": true,
     "maxItems": 512
   },
@@ -210,111 +210,6 @@
           "name": {}
         },
         "required": ["min_freq", "max_freq", "epp"],
-        "additionalProperties": false
-      }
-    ]
-  },
-
-  "pool": {
-    "description": "Definition of Pool of APPs",
-    "type": "object",
-    "properties": {
-      "id": {
-        "description": "Pool ID",
-        "$ref": "#uint"
-      },
-      "name": {
-        "description": "Pool's name",
-        "$ref": "#string_nonempty"
-      },
-      "l2cbm": {
-        "description": "L2 CAT cache bit mask",
-        "$ref": "#string_hex"
-      },
-      "cbm": {
-        "description": "L3 CAT cache bit mask",
-        "$ref": "#string_hex"
-      },
-      "mba": {
-        "description": "MBA rate %",
-        "$ref": "#percentage_nonzero"
-      },
-      "mba_bw": {
-        "description": "MBA rate MBps",
-        "$ref": "#mbps_nonzero"
-      },
-      "power_profile" : {
-        "description": "Power profile ID",
-        "$ref": "#uint"
-      },
-      "cores": {
-        "description": "POOL cores",
-        "$ref": "#uint_uniq_nonempty_array"
-      },
-      "apps": {
-        "description": "APPs assigned to that pool",
-        "$ref": "#uint_uniq_array"
-      }
-    },
-    "required": ["cores"],
-    "anyOf": [
-      { "required": ["cbm"] },
-      { "required": ["l2cbm"] },
-      { "required": ["mba"] },
-      { "required": ["mba_bw"] },
-      { "required": ["power_profile"] }
-    ],
-    "dependencies": {
-      "mba": {
-          "type": "object",
-          "not": { "required": [ "mba_bw" ] }
-      }
-    }
-  },
-
-  "pool_cfg": {
-    "allOf": [
-      { "$ref": "#pool" },
-      { "properties": {
-          "name": {},
-          "cores": {},
-          "l2cbm":{},
-          "cbm": {},
-          "mba": {},
-          "mba_bw": {},
-          "id": {},
-          "apps": {},
-          "power_profile": {}
-        },
-        "required": ["cores", "id"],
-        "additionalProperties": false
-      }
-    ]
-  },
-
-  "pool_api_get": {
-    "allOf": [
-      { "$ref": "#pool" }
-    ]
-  },
-
-  "pool_api_post": {
-    "allOf": [
-      { "$ref": "#pool" },
-      { "properties": {
-          "name": {},
-          "cores": {},
-          "l2cbm": {},
-          "cbm": {},
-          "mba": {},
-          "mba_bw": {},
-          "power_profile" : {},
-          "verify": {
-              "description": "Power Profiles Admission Control",
-              "type": "boolean"
-          }
-        },
-        "required": ["cores"],
         "additionalProperties": false
       }
     ]

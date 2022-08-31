@@ -4,5 +4,5 @@
   "title": "REST API get pool",
   "description": "GET single POOL results, URI /pools/<pool_id>",
 
-  "$ref": "definitions.json#/pool_api_get"
+  "$ref": "pool.json#/pool_api_get"
 }

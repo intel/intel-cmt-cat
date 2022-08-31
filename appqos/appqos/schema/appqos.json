@@ -30,7 +30,7 @@
     "pools": {
       "description": "Pools of APPs definitions",
       "type": "array",
-      "items": { "$ref": "definitions.json#/pool_cfg" },
+      "items": { "$ref": "pool.json#/pool_cfg" },
       "uniqueItems": true
     },
 
