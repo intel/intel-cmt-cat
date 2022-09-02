@@ -667,12 +667,12 @@ class TestConfigValidate:
 
     @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
     @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
-    def test_pool_invalid_cbm(self):
+    def test_pool_invalid_l3cbm(self):
         data = {
             "pools": [
                 {
                     "apps": [],
-                    "cbm": 0x5,
+                    "l3cbm": 0x5,
                     "cores": [1, 3],
                     "id": 1,
                     "name": "pool 1"
@@ -718,7 +718,7 @@ class TestConfigValidate:
             "pools": [
                 {
                     "apps": [],
-                    "cbm": 0x4,
+                    "l3cbm": 0x4,
                     "cores": [1, 3],
                     "id": 1,
                     "name": "pool 1"
@@ -757,7 +757,7 @@ class TestConfigValidate:
             "pools": [
                 {
                     "apps": [],
-                    "cbm": 0x4,
+                    "l3cbm": 0x4,
                     "mba": 100,
                     "cores": [1, 3],
                     "id": 1,

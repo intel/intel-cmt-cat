@@ -41,6 +41,7 @@ import jsonschema
 
 import caps
 import common
+import log
 import pid_ops
 import power
 
@@ -394,14 +395,14 @@ class ConfigStore:
                                      f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool['l2cbm'])}, " \
                                      "L2 CAT is not supported.")
 
-            if 'cbm' in pool:
-                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['cbm']))
-                if result or pool['cbm'] == 0:
+            if 'l3cbm' in pool:
+                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['l3cbm']))
+                if result or pool['l3cbm'] == 0:
                     raise ValueError(f"Pool {pool['id']}, " \
-                        f"CBM {hex(pool['cbm'])}/{bin(pool['cbm'])} is not contiguous.")
+                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool['l3cbm'])} is not contiguous.")
                 if not caps.cat_l3_supported():
                     raise ValueError(f"Pool {pool['id']}, " \
-                        f"CBM {hex(pool['cbm'])}/{bin(pool['cbm'])}, CAT is not supported.")
+                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool['l3cbm'])}, CAT is not supported.")
 
             if 'mba' in pool:
                 mba_pool_ids.append(pool['id'])
@@ -491,8 +492,13 @@ class ConfigStore:
 
             # convert cbm to int
             for pool in data['pools']:
-                if 'cbm' in pool and not isinstance(pool['cbm'], int):
-                    pool['cbm'] = int(pool['cbm'], 16)
+                if 'cbm' in pool:
+                    log.warn("cbm property is deprecated, please use l3cbm instead")
+                    if 'l3cbm' not in pool:
+                        pool['l3cbm'] = pool['cbm']
+                    pool.pop('cbm')
+                if 'l3cbm' in pool and not isinstance(pool['cbm'], int):
+                    pool['l3cbm'] = int(pool['l3cbm'], 16)
                 if 'l2cbm' in pool and not isinstance(pool['l2cbm'], int):
                     pool['l2cbm'] = int(pool['l2cbm'], 16)
 

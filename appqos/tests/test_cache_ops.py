@@ -86,7 +86,7 @@ class TestPools(object):
         def get_attr(attr, pool_id):
             config = {
                 'cores': [1, 2],
-                'cbm': 15,
+                'l3cbm': 15,
                 'l2cbm': 7,
                 'mba': 88,
                 'apps': [1],
@@ -100,7 +100,7 @@ class TestPools(object):
 
         with mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_attr),\
              mock.patch('common.CONFIG_STORE.get_app_attr', new=get_attr),\
-             mock.patch('cache_ops.Pool.cbm_set') as mock_cbm_set,\
+             mock.patch('cache_ops.Pool.l3cbm_set') as mock_l3cbm_set,\
              mock.patch('cache_ops.Pool.l2cbm_set') as mock_l2cbm_set,\
              mock.patch('cache_ops.Pool.mba_set') as mock_mba_set,\
              mock.patch('cache_ops.Pool.cores_set') as mock_cores_set,\
@@ -109,7 +109,7 @@ class TestPools(object):
 
              Pool(1).configure()
 
-             mock_cbm_set.assert_called_once_with(15)
+             mock_l3cbm_set.assert_called_once_with(15)
              mock_l2cbm_set.assert_called_once_with(7)
              mock_mba_set.assert_called_once_with(88)
              mock_cores_set.assert_called_once_with([1,2])
@@ -117,24 +117,24 @@ class TestPools(object):
              mock_apply.assert_called_once_with(1)
 
 
-    def test_cbm_get(self):
+    def test_l3cbm_get(self):
         Pool.pools[3] = {}
-        Pool.pools[3]['cbm'] = 0xf
+        Pool.pools[3]['l3cbm'] = 0xf
         Pool.pools[1] = {}
 
-        assert Pool(3).cbm_get() == 0xf
-        assert not Pool(1).cbm_get()
-        assert not Pool(2).cbm_get()
+        assert Pool(3).l3cbm_get() == 0xf
+        assert not Pool(1).l3cbm_get()
+        assert not Pool(2).l3cbm_get()
 
 
-    def test_cbm_set(self):
+    def test_l3cbm_set(self):
         Pool.pools[3] = {}
-        Pool.pools[3]['cbm'] = 0xf
+        Pool.pools[3]['l3cbm'] = 0xf
         Pool.pools[1] = {}
 
-        Pool(3).cbm_set(0x1)
+        Pool(3).l3cbm_set(0x1)
 
-        assert 0x1 == Pool.pools[3]['cbm']
+        assert 0x1 == Pool.pools[3]['l3cbm']
 
 
     def test_l2cbm_set(self):
@@ -251,13 +251,13 @@ class TestPools(object):
         mock_alloc_assoc_set, mock_l3ca_set, mock_l2ca_set, mock_mba_set):
         Pool.pools[2] = {}
         Pool.pools[2]['cores'] = [1]
-        Pool.pools[2]['cbm'] = 0xc00
+        Pool.pools[2]['l3cbm'] = 0xc00
         Pool.pools[2]['l2cbm'] = 0xf
         Pool.pools[2]['mba'] = 99
 
         Pool.pools[1] = {}
         Pool.pools[1]['cores'] = [2, 3]
-        Pool.pools[1]['cbm'] = 0x300
+        Pool.pools[1]['l3cbm'] = 0x300
         Pool.pools[1]['l2cbm'] = 0xff
         Pool.pools[1]['mba'] = 11
 

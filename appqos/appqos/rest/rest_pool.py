@@ -42,6 +42,7 @@ import jsonschema
 
 import caps
 import common
+import log
 import sstbf
 
 from rest.rest_exceptions import NotFound, BadRequest, InternalError
@@ -134,7 +135,7 @@ class Pool(Resource):
             response, status code
         """
         def check_alloc_tech(pool_id, json_data):
-            if 'cbm' in json_data:
+            if 'l3cbm' in json_data:
                 if not caps.cat_l3_supported():
                     raise BadRequest("System does not support CAT!")
                 if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
@@ -173,23 +174,24 @@ class Pool(Resource):
             if pool['id'] != int(pool_id):
                 continue
 
+            if 'cbm' in json_data:
+                log.warn("cbm property is deprecated, please use l3cbm instead")
+                if 'l3cbm' not in json_data:
+                    json_data['l3cbm'] = json_data['cbm']
+                json_data.pop('cbm')
+
             check_alloc_tech(int(pool_id), json_data)
 
-            # set new l2cbm
-            if 'l2cbm' in json_data:
-                l2cbm = json_data['l2cbm']
-                if not isinstance(l2cbm, int):
-                    l2cbm = int(l2cbm, 16)
-
-                pool['l2cbm'] = l2cbm
-
             # set new cbm
-            if 'cbm' in json_data:
-                cbm = json_data['cbm']
+            for key in ['l2cbm', 'l3cbm']:
+                if key not in json_data:
+                    continue
+
+                cbm = json_data[key]
                 if not isinstance(cbm, int):
                     cbm = int(cbm, 16)
 
-                pool['cbm'] = cbm
+                pool[key] = cbm
 
             for feature in ['mba', 'mba_bw', 'cores']:
                 if feature in json_data:
@@ -276,21 +278,21 @@ class Pools(Resource):
             raise InternalError("New POOL not added, maximum number of POOLS"\
                 " reached for requested allocation combination")
 
-        # convert l2cbm from string to int
-        if 'l2cbm' in post_data:
-            l2cbm = post_data['l2cbm']
-            if not isinstance(l2cbm, int):
-                l2cbm = int(l2cbm, 16)
-
-            post_data['l2cbm'] = l2cbm
+        if 'cbm' in json_data and 'l3cbm' not in json_data:
+            log.warn("cbm property is deprecated, please use l3cbm instead")
+            post_data['l3cbm'] = post_data['cbm']
+            post_data.pop('cbm')
 
         # convert cbm from string to int
-        if 'cbm' in post_data:
-            cbm = post_data['cbm']
+        for key in ['l2cbm', 'l3cbm']:
+            if key not in post_data:
+                continue
+
+            cbm = post_data[key]
             if not isinstance(cbm, int):
                 cbm = int(cbm, 16)
 
-            post_data['cbm'] = cbm
+            post_data[key] = cbm
 
         # ignore 'power_profile' if SST-BF is enabled
         if sstbf.is_sstbf_configured():

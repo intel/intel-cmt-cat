@@ -21,6 +21,11 @@
       },
       "cbm": {
         "description": "L3 CAT cache bit mask (replaced by l3cbm)",
+        "deprecated": true,
+        "$ref": "definitions.json#/string_hex"
+      },
+      "l3cbm": {
+        "description": "L3 CAT cache bit mask",
         "$ref": "definitions.json#/string_hex"
       },
       "mba": {
@@ -60,6 +65,7 @@
           "cores": {},
           "l2cbm":{},
           "cbm": {},
+          "l3cbm":{},
           "mba": {},
           "mba_bw": {},
           "id": {},
@@ -68,6 +74,7 @@
         },
         "anyOf": [
           { "required": ["cbm"] },
+          { "required": ["l3cbm"] },
           { "required": ["l2cbm"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
@@ -93,6 +100,7 @@
           "cores": {},
           "l2cbm": {},
           "cbm": {},
+          "l3cbm": {},
           "mba": {},
           "mba_bw": {},
           "power_profile" : {},
@@ -103,6 +111,7 @@
         },
         "anyOf": [
           { "required": ["cbm"] },
+          { "required": ["l3cbm"] },
           { "required": ["l2cbm"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
@@ -122,6 +131,7 @@
           "cores": {},
           "l2cbm": {},
           "cbm": {},
+          "l3cbm": {},
           "mba": {},
           "mba_bw": {},
           "power_profile" : {},
@@ -135,6 +145,7 @@
           { "required": ["name"] },
           { "required": ["l2cbm"] },
           { "required": ["cbm"] },
+          { "required": ["l3cbm"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
           { "required": ["cores"] },

@@ -84,7 +84,7 @@ CONFIG = {
         },
         {
             "apps": [1],
-            "cbm": 0xf0,
+            "l3cbm": 0xf0,
             "cores": [1],
             "id": 1,
             "mba": 20,
@@ -92,7 +92,7 @@ CONFIG = {
         },
         {
             "apps": [2, 3],
-            "cbm": 0xf,
+            "l3cbm": 0xf,
             "cores": [2, 3],
             "id": 2,
             "name": "cat"

@@ -111,24 +111,24 @@ class Pool:
         """
         Pool.pools[self.pool]['l2cbm'] = l2cbm
 
-    def cbm_set(self, cbm):
+    def l3cbm_set(self, cbm):
         """
         Set cbm mask for the pool
 
         Parameters:
             cbm: new cbm mask
         """
-        Pool.pools[self.pool]['cbm'] = cbm
+        Pool.pools[self.pool]['l3cbm'] = cbm
 
 
-    def cbm_get(self):
+    def l3cbm_get(self):
         """
         Get cbm mask for the pool
 
         Returns:
             cbm mask, 0 on error
         """
-        return Pool.pools[self.pool].get('cbm')
+        return Pool.pools[self.pool].get('l3cbm')
 
     def l2cbm_get(self):
         """
@@ -192,8 +192,8 @@ class Pool:
             self.l2cbm_set(l2cbm)
 
         if caps.cat_l3_supported():
-            cbm = config.get_pool_attr('cbm', self.pool)
-            self.cbm_set(cbm)
+            l3cbm = config.get_pool_attr('l3cbm', self.pool)
+            self.l3cbm_set(l3cbm)
 
         if caps.mba_supported():
             if caps.mba_bw_enabled():
@@ -343,7 +343,7 @@ class Pool:
             return -1
 
         pool = Pool(pool_id)
-        cbm = pool.cbm_get()
+        l3cbm = pool.l3cbm_get()
         l2cbm = pool.l2cbm_get()
 
         mba = None
@@ -367,8 +367,8 @@ class Pool:
                 log.error("Failed to apply L2 CAT configuration!")
                 return -1
 
-        if cbm:
-            if common.PQOS_API.l3ca_set(sockets, pool_id, cbm) != 0:
+        if l3cbm:
+            if common.PQOS_API.l3ca_set(sockets, pool_id, l3cbm) != 0:
                 log.error("Failed to apply CAT configuration!")
                 return -1
 

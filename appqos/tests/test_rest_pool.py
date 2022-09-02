@@ -207,11 +207,11 @@ class TestPool_2:
         def set_config(data):
             for pool in data['pools']:
                 if pool['id'] == 1:
-                    assert pool['cbm'] == 0xc
+                    assert pool['l3cbm'] == 0xc
 
         with mock.patch('common.CONFIG_STORE.set_config', side_effect=set_config) as func_mock,\
              mock.patch('pid_ops.is_pid_valid', return_value=True):
-            response = REST.put("/pools/1", {"cbm": "0xc"})
+            response = REST.put("/pools/1", {"l3cbm": "0xc"})
             func_mock.assert_called_once()
 
         assert response.status_code == 200
