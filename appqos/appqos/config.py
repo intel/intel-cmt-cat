@@ -497,7 +497,7 @@ class ConfigStore:
                     if 'l3cbm' not in pool:
                         pool['l3cbm'] = pool['cbm']
                     pool.pop('cbm')
-                if 'l3cbm' in pool and not isinstance(pool['cbm'], int):
+                if 'l3cbm' in pool and not isinstance(pool['l3cbm'], int):
                     pool['l3cbm'] = int(pool['l3cbm'], 16)
                 if 'l2cbm' in pool and not isinstance(pool['l2cbm'], int):
                     pool['l2cbm'] = int(pool['l2cbm'], 16)
