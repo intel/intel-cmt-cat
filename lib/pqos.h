@@ -1367,6 +1367,23 @@ int pqos_mon_get_value(const struct pqos_mon_data *const group,
  */
 int pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value);
 
+/**
+ * @brief Frees memory previously allocated and returned by the library
+ * functions.
+ *
+ * Some pqos functions return memory buffers to their callers.
+ * It's the responsibility of the caller to free this memory when no longer
+ * needed.
+ *
+ * Call this function from Foreign Function Interfaces to avoid memory leaks.
+ *
+ * @param [in] pointer to memory area allocated and returned by pqos functions.
+ *             When NULL, the function does nothing.
+ *
+ * @return Void.
+ */
+void pqos_free(void *ptr);
+
 #ifdef __cplusplus
 }
 #endif

@@ -657,3 +657,9 @@ pqos_get_vendor(const struct pqos_cpuinfo *m_cpu)
 {
         return m_cpu->vendor;
 }
+
+void
+pqos_free(void *ptr)
+{
+        free(ptr);
+}
