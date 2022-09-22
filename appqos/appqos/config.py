@@ -683,7 +683,7 @@ class ConfigStore:
                 default_pool['mba'] = 100
 
         if caps.cat_l3_supported():
-            default_pool['cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
+            default_pool['l3cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
 
         if caps.cat_l2_supported():
             default_pool['l2cbm'] = common.PQOS_API.get_max_l2_cat_cbm()
@@ -722,7 +722,7 @@ class ConfigStore:
             alloc_type.append(common.MBA_CAP)
         if 'l2cbm' in new_pool_data:
             alloc_type.append(common.CAT_L2_CAP)
-        if 'cbm' in new_pool_data:
+        if 'l3cbm' in new_pool_data or 'cbm' in new_pool_data:
             alloc_type.append(common.CAT_L3_CAP)
         max_cos_id = common.PQOS_API.get_max_cos_id(alloc_type)
 

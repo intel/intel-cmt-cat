@@ -273,15 +273,16 @@ class Pools(Resource):
             ('cores' in json_data or 'power_profile' in json_data)
 
         post_data = json_data.copy()
+
+        if 'cbm' in post_data and 'l3cbm' not in post_data:
+            log.warn("cbm property is deprecated, please use l3cbm instead")
+            post_data['l3cbm'] = post_data['cbm']
+            post_data.pop('cbm')
+
         post_data['id'] = common.CONFIG_STORE.get_new_pool_id(post_data)
         if post_data['id'] is None:
             raise InternalError("New POOL not added, maximum number of POOLS"\
                 " reached for requested allocation combination")
-
-        if 'cbm' in json_data and 'l3cbm' not in json_data:
-            log.warn("cbm property is deprecated, please use l3cbm instead")
-            post_data['l3cbm'] = post_data['cbm']
-            post_data.pop('cbm')
 
         # convert cbm from string to int
         for key in ['l2cbm', 'l3cbm']:

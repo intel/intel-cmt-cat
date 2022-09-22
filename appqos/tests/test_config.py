@@ -239,10 +239,10 @@ def test_config_default_pool_cat():
 
     for pool in config['pools']:
         if pool['id'] == 0:
-            assert 'cbm' in pool
+            assert 'l3cbm' in pool
             assert not 'mba' in pool
             assert not 'mba_bw' in pool
-            pool_cbm = pool['cbm']
+            pool_cbm = pool['l3cbm']
             break
 
     assert pool_cbm == 0xDEADBEEF
@@ -276,6 +276,7 @@ def test_config_default_pool_l2cat():
         if pool['id'] == 0:
             assert 'l2cbm' in pool
             assert not 'cbm' in pool
+            assert not 'l3cbm' in pool
             assert not 'mba' in pool
             assert not 'mba_bw' in pool
             pool_l2cbm = pool['l2cbm']
@@ -344,6 +345,7 @@ def test_config_default_pool_mba_bw():
         if pool['id'] == 0:
             assert not 'mba' in pool
             assert not 'cbm' in pool
+            assert not 'l3cbm' in pool
             pool_mba_bw = pool['mba_bw']
             break
 
@@ -494,7 +496,7 @@ def test_config_reset():
         config_store.process_config()
 
         assert len(config_store.get_pool_attr('cores', None)) == 8
-        assert config_store.get_pool_attr('cbm', 0) == 0xFFF
+        assert config_store.get_pool_attr('l3cbm', 0) == 0xFFF
         assert config_store.get_pool_attr('l2cbm', 0) == 0xFF
         assert config_store.get_pool_attr('mba', 0) == 100
 
@@ -520,7 +522,7 @@ def test_config_reset():
         mock_get_cores.assert_called_once()
 
         assert len(config_store.get_pool_attr('cores', None)) == 16
-        assert config_store.get_pool_attr('cbm', 0) == 0xFFF
+        assert config_store.get_pool_attr('l3cbm', 0) == 0xFFF
         assert config_store.get_pool_attr('mba', 0) is None
 
 
@@ -683,7 +685,7 @@ class TestConfigValidate:
         with pytest.raises(ValueError, match="not contiguous"):
             ConfigStore.validate(data)
 
-        data['pools'][0]['cbm'] = 0
+        data['pools'][0]['l3cbm'] = 0
         with pytest.raises(ValueError, match="not contiguous"):
             ConfigStore.validate(data)
 
