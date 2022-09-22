@@ -37,6 +37,7 @@
 #include "mock_hw_monitoring.h"
 #include "mock_os_allocation.h"
 #include "mock_os_monitoring.h"
+#include "monitoring.h"
 #include "pqos.h"
 #include "test.h"
 
@@ -97,6 +98,17 @@ setup_os_resctrl_mon(void **state)
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         return ret;
+}
+
+/* ======== api_init ======== */
+
+static void
+test_api_init_param(void **state __attribute__((unused)))
+{
+        int ret;
+
+        ret = api_init(-1, PQOS_VENDOR_INTEL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
 /* ======== pqos_alloc_assoc_set ======== */
@@ -1979,7 +1991,6 @@ test_pqos_mon_start_pids_hw(void **state __attribute__((unused)))
         memset(&group, 0, sizeof(group));
 
         wrap_check_init(1, PQOS_RETVAL_OK);
-
         ret = pqos_mon_start_pids(num_pids, pids, event, context, &group);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
@@ -2021,6 +2032,10 @@ test_pqos_mon_start_pids_param(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
         ret = pqos_mon_start_pids(num_pids, pids, PQOS_PERF_EVENT_LLC_MISS,
+                                  context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_pids(num_pids, pids, PQOS_PERF_EVENT_LLC_REF,
                                   context, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
@@ -2236,6 +2251,95 @@ test_pqos_mon_remove_pids_param(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+/* ======== pqos_mon_start_uncore ======== */
+
+static void
+test_pqos_mon_start_uncore_init(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_sockets = 1;
+        unsigned sockets[] = {0};
+        enum pqos_mon_event event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret =
+            pqos_mon_start_uncore(num_sockets, sockets, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_mon_start_uncore_param(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_sockets = 1;
+        unsigned sockets[] = {0};
+        enum pqos_mon_event event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        ret = pqos_mon_start_uncore(0, sockets, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_uncore(num_sockets, NULL, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_uncore(num_sockets, sockets, 0, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_uncore(num_sockets, sockets, event, context, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_pqos_mon_start_uncore_os(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_sockets = 1;
+        unsigned sockets[] = {0};
+        enum pqos_mon_event event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret =
+            pqos_mon_start_uncore(num_sockets, sockets, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_mon_start_uncore_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_sockets = 1;
+        unsigned sockets[] = {0};
+        enum pqos_mon_event event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        memset(&group, 0, sizeof(group));
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_hw_mon_start_uncore, num_sockets, num_sockets);
+        expect_value(__wrap_hw_mon_start_uncore, sockets, sockets);
+        expect_value(__wrap_hw_mon_start_uncore, event, event);
+        expect_value(__wrap_hw_mon_start_uncore, context, context);
+        will_return(__wrap_hw_mon_start_uncore, PQOS_RETVAL_OK);
+
+        ret =
+            pqos_mon_start_uncore(num_sockets, sockets, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        if (group != NULL) {
+                free(group->intl);
+                free(group);
+        }
+}
+
 /* ======== pqos_mon_get_value ======== */
 
 static void
@@ -2282,6 +2386,13 @@ test_pqos_mon_get_value_param(void **state __attribute__((unused)))
 
         ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_IPC, &value, &delta);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        group.valid = 0x00DEAD00;
+        group.event = (enum pqos_mon_event)(-1);
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, (enum pqos_mon_event) - 1, &value,
+                                 &delta);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
 static void
@@ -2291,9 +2402,12 @@ test_pqos_mon_get_value(void **state __attribute__((unused)))
         uint64_t value;
         uint64_t delta;
         struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
 
         memset(&group, 0, sizeof(group));
+        memset(&intl, 0, sizeof(intl));
         group.valid = 0x00DEAD00;
+        group.intl = &intl;
         group.values.llc = 1;
         group.values.mbm_local = 2;
         group.values.mbm_local_delta = 3;
@@ -2306,7 +2420,18 @@ test_pqos_mon_get_value(void **state __attribute__((unused)))
 #if PQOS_VERSION >= 50000
         group.values.llc_references = 10;
         group.values.llc_references_delta = 11;
+#else
+        group.intl->values.llc_references = 10;
+        group.intl->values.llc_references_delta = 11;
 #endif
+        group.intl->values.pcie.llc_misses.read = 12;
+        group.intl->values.pcie.llc_misses.read_delta = 13;
+        group.intl->values.pcie.llc_misses.write = 14;
+        group.intl->values.pcie.llc_misses.write_delta = 15;
+        group.intl->values.pcie.llc_references.read = 16;
+        group.intl->values.pcie.llc_references.read_delta = 17;
+        group.intl->values.pcie.llc_references.write = 18;
+        group.intl->values.pcie.llc_references.write_delta = 19;
 
         group.event = PQOS_MON_EVENT_L3_OCCUP;
         wrap_check_init(1, PQOS_RETVAL_OK);
@@ -2360,15 +2485,51 @@ test_pqos_mon_get_value(void **state __attribute__((unused)))
         assert_int_equal(value, group.values.llc_misses);
         assert_int_equal(delta, group.values.llc_misses_delta);
 
-#if PQOS_VERSION >= 50000
         group.event = PQOS_PERF_EVENT_LLC_REF;
         wrap_check_init(1, PQOS_RETVAL_OK);
         ret =
             pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_REF, &value, &delta);
         assert_int_equal(ret, PQOS_RETVAL_OK);
+#if PQOS_VERSION >= 50000
         assert_int_equal(value, group.values.llc_references);
-        assert_int_equal(value, group.values.llc_references_delta);
+        assert_int_equal(delta, group.values.llc_references_delta);
+#else
+        assert_int_equal(value, group.intl->values.llc_references);
+        assert_int_equal(delta, group.intl->values.llc_references_delta);
 #endif
+        group.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
+                                 &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.intl->values.pcie.llc_misses.read);
+        assert_int_equal(delta, group.intl->values.pcie.llc_misses.read_delta);
+
+        group.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE,
+                                 &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.intl->values.pcie.llc_misses.write);
+        assert_int_equal(delta, group.intl->values.pcie.llc_misses.write_delta);
+
+        group.event = PQOS_PERF_EVENT_LLC_REF_PCIE_READ;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_REF_PCIE_READ,
+                                 &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.intl->values.pcie.llc_references.read);
+        assert_int_equal(delta,
+                         group.intl->values.pcie.llc_references.read_delta);
+
+        group.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE;
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
+                                 &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, group.intl->values.pcie.llc_references.write);
+        assert_int_equal(delta,
+                         group.intl->values.pcie.llc_references.write_delta);
 }
 
 /* ======== pqos_mon_get_ipc ======== */
@@ -2464,10 +2625,13 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_pids_init),
             cmocka_unit_test(test_pqos_mon_add_pids_init),
             cmocka_unit_test(test_pqos_mon_remove_pids_init),
+            cmocka_unit_test(test_pqos_mon_start_uncore_init),
             cmocka_unit_test(test_pqos_mon_get_value_init),
-            cmocka_unit_test(test_pqos_mon_get_ipc_init)};
+            cmocka_unit_test(test_pqos_mon_get_ipc_init),
+        };
 
         const struct CMUnitTest tests_param[] = {
+            cmocka_unit_test(test_api_init_param),
             cmocka_unit_test(test_pqos_alloc_assoc_get_param_id_null),
             cmocka_unit_test(test_pqos_alloc_assoc_get_pid_param_id_null),
             cmocka_unit_test(test_pqos_alloc_assign_param_technology),
@@ -2494,8 +2658,10 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_pids_param),
             cmocka_unit_test(test_pqos_mon_add_pids_param),
             cmocka_unit_test(test_pqos_mon_remove_pids_param),
+            cmocka_unit_test(test_pqos_mon_start_uncore_param),
             cmocka_unit_test(test_pqos_mon_get_value_param),
-            cmocka_unit_test(test_pqos_mon_get_ipc_param)};
+            cmocka_unit_test(test_pqos_mon_get_ipc_param),
+        };
 
         const struct CMUnitTest tests_hw[] = {
             cmocka_unit_test(test_pqos_alloc_assoc_set_hw),
@@ -2527,6 +2693,7 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_pid_hw),
             cmocka_unit_test(test_pqos_mon_add_pids_hw),
             cmocka_unit_test(test_pqos_mon_remove_pids_hw),
+            cmocka_unit_test(test_pqos_mon_start_uncore_hw),
             cmocka_unit_test(test_pqos_mon_get_value),
             cmocka_unit_test(test_pqos_mon_get_ipc)};
 
@@ -2559,7 +2726,9 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_pids_os),
             cmocka_unit_test(test_pqos_mon_start_pid_os),
             cmocka_unit_test(test_pqos_mon_add_pids_os),
-            cmocka_unit_test(test_pqos_mon_remove_pids_os)};
+            cmocka_unit_test(test_pqos_mon_remove_pids_os),
+            cmocka_unit_test(test_pqos_mon_start_uncore_os),
+        };
 #endif
 
         result += cmocka_run_group_tests(tests_init, NULL, NULL);

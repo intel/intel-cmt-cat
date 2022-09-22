@@ -66,6 +66,22 @@ __wrap_hw_mon_start(const unsigned num_cores,
 }
 
 int
+__wrap_hw_mon_start_uncore(const unsigned num_sockets,
+                           const unsigned *sockets,
+                           const enum pqos_mon_event event,
+                           void *context,
+                           struct pqos_mon_data **group)
+{
+        check_expected(num_sockets);
+        check_expected_ptr(sockets);
+        check_expected(event);
+        check_expected_ptr(context);
+        assert_non_null(group);
+
+        return mock_type(int);
+}
+
+int
 __wrap_hw_mon_stop(struct pqos_mon_data *group)
 {
         check_expected_ptr(group);

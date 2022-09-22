@@ -156,6 +156,7 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 		-Wl,--wrap=os_mon_start_pids \
 		-Wl,--wrap=os_mon_add_pids \
 		-Wl,--wrap=os_mon_remove_pids \
+		-Wl,--wrap=hw_mon_start_uncore \
 		-Wl,--wrap=_pqos_inter_get \
 		-Wl,--wrap=_pqos_get_cap \
 		-Wl,--wrap=_pqos_get_cpu \

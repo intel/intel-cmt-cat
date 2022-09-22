@@ -45,5 +45,10 @@ int __wrap_hw_mon_start(const unsigned num_cores,
 int __wrap_hw_mon_stop(struct pqos_mon_data *group);
 int __wrap_hw_mon_poll(struct pqos_mon_data *group,
                        const enum pqos_mon_event event);
+int __wrap_hw_mon_start_uncore(const unsigned num_sockets,
+                               const unsigned *sockets,
+                               const enum pqos_mon_event event,
+                               void *context,
+                               struct pqos_mon_data **group);
 
 #endif /* MOCK_HW_MONITORING_H_ */
