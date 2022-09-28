@@ -17,6 +17,7 @@ are met:
     
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
 OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
@@ -27,44 +28,41 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.logo-intel {
-  height: 9rem;
+.l3cat {
+  width: auto;
+  height: auto;
 }
 
-.mat-button-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-
-  .icon {
-    height: 1rem;
+.mat-card {
+  .info-text {
+    font-size: small;
+    margin-right: -41rem;
   }
-}
 
-.navigation-buttons {
-  margin: auto;
-  display: flex;
-  flex-direction: row;
-}
+  .pool {
+    padding: 1rem 1rem 0 1rem;
+  }
 
-.import-export-btns {
-  flex-basis: 20%;
-}
+  .pool-name {
+    font-size: initial;
+    font-weight: 500;
+  }
 
-.mat-divider-vertical {
-  border-color: #fff;
-}
+  .pool-button {
+    border-radius: 0%;
+    border: 1px solid #6b6b6b;
+    min-width: 25px;
+    line-height: 30px;
+    margin-right: 2px;
+    margin-top: 2px;
+    cursor: default;
+    pointer-events: none;
+    padding: 0 0.2rem;
+  }
 
-.active {
-  background-color: #0068b5;
-  color: #50e1ff;
-}
-
-.inactive {
-  background-color: #0068b5;
-  color: #fff;
-}
-
-.logout {
-  transform: scale(1.4);
+  .pool-cbm {
+    padding-top: 0.5rem;
+    flex-shrink: 0;
+    display: flex;
+  }
 }

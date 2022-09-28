@@ -29,24 +29,41 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
+import { EMPTY, of } from 'rxjs';
 
+import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { OverviewComponent } from './overview.component';
 
 describe('Given OverviewComponent', () => {
   beforeEach(() =>
-    MockBuilder(OverviewComponent).mock(SharedModule).mock(Router)
+    MockBuilder(OverviewComponent)
+      .mock(SharedModule)
+      .mock(Router)
+      .mock(LocalService, { getL3CacheWay: () => of(17) })
+      .mock(AppqosService, {
+        getPools: () => EMPTY,
+      })
   );
 
   MockInstance.scope('case');
 
   describe('when initialized', () => {
-    it('should render Overview', () => {
+    it('should render L3CacheAllocationComponent', () => {
       MockRender(OverviewComponent);
 
-      const expectValue = ngMocks.find('.overview-container');
+      const expectValue = ngMocks.find('app-l3-cache-allocation');
 
       expect(expectValue).toBeTruthy();
+    });
+
+    it('should get Cache way number', () => {
+      const {
+        point: { componentInstance: component },
+      } = MockRender(OverviewComponent);
+
+      expect(component.cacheWay).toEqual(17);
     });
   });
 });

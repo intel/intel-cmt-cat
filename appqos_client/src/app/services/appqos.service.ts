@@ -42,6 +42,7 @@ import {
 } from '../components/system-caps/system-caps.model';
 
 import { LocalService } from './local.service';
+import { Pools } from '../components/overview/overview.model';
 
 @Injectable({
   providedIn: 'root',
@@ -132,5 +133,13 @@ export class AppqosService {
     return this.http.put<any>(`${api_url}/caps/mba_ctrl`, {
       enabled: value,
     });
+  }
+
+  /**
+   * Retrieve Pools
+   */
+  getPools(): Observable<Pools[]> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<Pools[]>(`${api_url}/pools`);
   }
 }

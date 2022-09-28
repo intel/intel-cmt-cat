@@ -59,6 +59,7 @@ import { MbaComponent } from '../components/system-caps/mba/mba.component';
 import { SstbfComponent } from '../components/system-caps/sstbf/sstbf.component';
 import { L2catComponent } from '../components/system-caps/l2cat/l2cat.component';
 import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component';
+import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allocation/l3-cache-allocation.component';
 
 @NgModule({
   declarations: [
@@ -74,6 +75,7 @@ import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component'
     SstbfComponent,
     SstcpComponent,
     L2catComponent,
+    L3CacheAllocationComponent,
   ],
   imports: [
     MatInputModule,

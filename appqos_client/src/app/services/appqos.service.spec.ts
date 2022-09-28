@@ -47,6 +47,7 @@ import {
 import { AppqosService } from './appqos.service';
 import { LocalService } from './local.service';
 import { first } from 'rxjs';
+import { Pools } from '../components/overview/overview.model';
 
 describe('Given AppqosService', () => {
   beforeEach(() =>
@@ -373,6 +374,38 @@ describe('Given AppqosService', () => {
 
       const req = httpMock.expectOne(`${api_url}/caps/mba_ctrl`);
       req.flush(mockResponse);
+      httpMock.verify();
+    });
+  });
+
+  describe('when getPools method is called', () => {
+    it('it should return response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getPools().subscribe((pools: Pools[]) => {
+        expect(pools).toBe(mockedPool);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/pools`);
+      req.flush(mockedPool);
       httpMock.verify();
     });
   });

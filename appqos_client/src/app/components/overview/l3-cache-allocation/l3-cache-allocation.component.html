@@ -1,4 +1,5 @@
-/*BSD LICENSE
+<!--
+BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -25,46 +26,39 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
 
-.logo-intel {
-  height: 9rem;
-}
-
-.mat-button-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-
-  .icon {
-    height: 1rem;
-  }
-}
-
-.navigation-buttons {
-  margin: auto;
-  display: flex;
-  flex-direction: row;
-}
-
-.import-export-btns {
-  flex-basis: 20%;
-}
-
-.mat-divider-vertical {
-  border-color: #fff;
-}
-
-.active {
-  background-color: #0068b5;
-  color: #50e1ff;
-}
-
-.inactive {
-  background-color: #0068b5;
-  color: #fff;
-}
-
-.logout {
-  transform: scale(1.4);
-}
+<mat-card class="l3cat">
+  <mat-card-title>L3 Cache Allocation (CAT)</mat-card-title>
+  <mat-card-content>
+    <span class="info-text"
+      >Helps address shared resource concerns by providing software control of
+      where data is allocated into the last-level cache (LLC), enabling
+      isolation and prioritization of key applications...<a
+        href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-cache-allocation-technology.html?wapkw=introduction%20to%20cache%20allocation"
+        class="contact-text"
+        target="_blank"
+        >See more</a
+      ></span
+    >
+    <div class="pool" *ngFor="let pool of pools">
+      <span class="pool-name">
+        {{ pool.name }}
+      </span>
+      <div class="pool-cbm">
+        <button
+          mat-flat-button
+          class="pool-button"
+          *ngFor="let n of pool.l3Bitmask"
+          [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+        >
+          {{ n }}
+        </button>
+      </div>
+    </div>
+  </mat-card-content>
+  <mat-card-actions>
+    <button mat-button class="action-button" color="primary">EDIT</button>
+  </mat-card-actions>
+</mat-card>

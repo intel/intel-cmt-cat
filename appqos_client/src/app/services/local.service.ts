@@ -28,6 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Injectable } from '@angular/core';
+import { Observable, Subject } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -35,6 +36,16 @@ import { Injectable } from '@angular/core';
 
 /* Service used to store data to localStorage */
 export class LocalService {
+  l3CacheWay = new Subject<number>();
+
+  public setL3CacheWay(value: number) {
+    this.l3CacheWay.next(value);
+  }
+
+  public getL3CacheWay(): Observable<number> {
+    return this.l3CacheWay.asObservable();
+  }
+
   public saveData(key: string, value: string): void {
     window.localStorage.setItem(key, value);
   }

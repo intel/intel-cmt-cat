@@ -27,11 +27,48 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { map } from 'rxjs';
+
+import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
+import { Pools } from './overview.model';
 
 @Component({
   selector: 'app-overview',
   templateUrl: './overview.component.html',
   styleUrls: ['./overview.component.scss'],
 })
-export class OverviewComponent {}
+export class OverviewComponent implements OnInit {
+  pools!: Pools[];
+  cacheWay!: number;
+
+  constructor(
+    private service: AppqosService,
+    private localStore: LocalService
+  ) {}
+
+  ngOnInit(): void {
+    this.localStore.getL3CacheWay().subscribe((cacheWay: number) => {
+      (this.cacheWay = cacheWay), this.getPools();
+    });
+  }
+
+  getPools(): void {
+    this.service
+      .getPools()
+      .pipe(
+        map((pools) =>
+          pools.map((pool: Pools) => ({
+            ...pool,
+            l3Bitmask: pool.l3cbm
+              ?.toString(2)
+              .padStart(this.cacheWay, '0')
+              .split('')
+              .map(Number),
+          }))
+        )
+      )
+      .subscribe((pools) => (this.pools = pools.slice(0, 4)));
+  }
+}

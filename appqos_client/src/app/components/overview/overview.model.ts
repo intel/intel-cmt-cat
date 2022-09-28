@@ -27,44 +27,14 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.logo-intel {
-  height: 9rem;
-}
-
-.mat-button-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-
-  .icon {
-    height: 1rem;
-  }
-}
-
-.navigation-buttons {
-  margin: auto;
-  display: flex;
-  flex-direction: row;
-}
-
-.import-export-btns {
-  flex-basis: 20%;
-}
-
-.mat-divider-vertical {
-  border-color: #fff;
-}
-
-.active {
-  background-color: #0068b5;
-  color: #50e1ff;
-}
-
-.inactive {
-  background-color: #0068b5;
-  color: #fff;
-}
-
-.logout {
-  transform: scale(1.4);
+export interface Pools {
+  id: number;
+  mba_bw: number;
+  mba?: number | null;
+  l3cbm?: number;
+  l3Bitmask?: number[];
+  l2Bitmask?: number[];
+  l2cbm?: number;
+  name: string;
+  cores: number[];
 }

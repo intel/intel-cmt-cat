@@ -17,6 +17,7 @@ are met:
     
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
 OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
@@ -27,44 +28,15 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.logo-intel {
-  height: 9rem;
-}
+import { Component, Input } from '@angular/core';
 
-.mat-button-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+import { Pools } from '../overview.model';
 
-  .icon {
-    height: 1rem;
-  }
-}
-
-.navigation-buttons {
-  margin: auto;
-  display: flex;
-  flex-direction: row;
-}
-
-.import-export-btns {
-  flex-basis: 20%;
-}
-
-.mat-divider-vertical {
-  border-color: #fff;
-}
-
-.active {
-  background-color: #0068b5;
-  color: #50e1ff;
-}
-
-.inactive {
-  background-color: #0068b5;
-  color: #fff;
-}
-
-.logout {
-  transform: scale(1.4);
+@Component({
+  selector: 'app-l3-cache-allocation',
+  templateUrl: './l3-cache-allocation.component.html',
+  styleUrls: ['./l3-cache-allocation.component.scss'],
+})
+export class L3CacheAllocationComponent {
+  @Input() pools!: Pools[];
 }

@@ -33,13 +33,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   flex-direction: row;
   column-gap: 1rem;
 
-  .l3cat {
-    max-width: 33rem;
-    min-width: 50%;
+  .mba {
+    min-width: 33rem;
   }
 
-  .mba {
-    max-width: 33rem;
-    min-width: 50%;
+  app-l3-cache-allocation {
+    min-width: 33rem;
   }
 }

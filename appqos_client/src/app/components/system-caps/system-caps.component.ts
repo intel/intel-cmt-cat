@@ -197,7 +197,9 @@ export class SystemCapsComponent implements OnInit {
         }))
       )
       .subscribe({
-        next: (l3cat) => (this.l3cat = l3cat),
+        next: (l3cat) => {
+          (this.l3cat = l3cat), this.localStroe.setL3CacheWay(l3cat.cw_num);
+        },
         error: (error: HttpErrorResponse) => {
           this.snackBar.handleError(error.message);
           this.loading = false;
