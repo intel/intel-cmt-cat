@@ -206,12 +206,12 @@ class TestPqosApi(object):
 
     def test_l3ca_set(self):
         self.Pqos_api.l3ca.COS.return_value = 0xDEADBEEF
-        assert 0 == self.Pqos_api.l3ca_set([0], 1, 0xff)
-        self.Pqos_api.l3ca.COS.assert_called_once_with(1, 0xff)
+        assert 0 == self.Pqos_api.l3ca_set([0], 1, mask=0xff)
+        self.Pqos_api.l3ca.COS.assert_called_once_with(1, mask=0xff, code_mask=None, data_mask=None)
         self.Pqos_api.l3ca.set.assert_called_once_with(0, [0xDEADBEEF])
 
         self.Pqos_api.l3ca.set.mock_reset()
-        assert 0 == self.Pqos_api.l3ca_set([0,1], 1, 0xff)
+        assert 0 == self.Pqos_api.l3ca_set([0,1], 1, mask=0xff)
         self.Pqos_api.l3ca.set.assert_any_call(0, [0xDEADBEEF])
         self.Pqos_api.l3ca.set.assert_any_call(1, [0xDEADBEEF])
 
@@ -219,11 +219,11 @@ class TestPqosApi(object):
         assert -1 == self.Pqos_api.l3ca_set(0, 1, 0xff)
 
         self.Pqos_api.l3ca.COS.side_effect = Exception('Test')
-        assert -1 == self.Pqos_api.l3ca_set([0], 1, 0xff)
+        assert -1 == self.Pqos_api.l3ca_set([0], 1, mask=0xff)
         self.Pqos_api.l3ca.COS.mock_reset(side_effect = True)
 
         self.Pqos_api.l3ca.set.side_effect = Exception('Test')
-        assert -1 == self.Pqos_api.l3ca_set([0], 1, 0xff)
+        assert -1 == self.Pqos_api.l3ca_set([0], 1, mask=0xff)
 
 
     @mock.patch("os.system", mock.MagicMock(return_value=0))
@@ -407,7 +407,7 @@ class TestPqosApi(object):
 
         self.Pqos_api.cap.get_type.assert_called_once_with('l3ca')
         assert cache_size == 10 * 1024 * 1024
-    
+
     def test_get_l3_cache_way_size(self):
         l3ca_caps = PqosCapabilityL3Ca()
         l3ca_caps.way_size = 8 * 1024 * 1024

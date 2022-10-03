@@ -214,16 +214,29 @@ class PqosApi:
             0 on success
             -1 otherwise
         """
+        return self.reset(mba_cfg = "ctrl" if enable else "default")
+
+
+    def reset(self, l3_cdp_cfg = "any", l2_cdp_cfg = "any", mba_cfg = "any"):
+        """
+        Reset configuration and set RDT features enabled status
+
+        Returns:
+            0 on success
+            -1 otherwise
+        """
+
         try:
             # call libpqos alloc reset
-            self.alloc.reset("any", "any", "ctrl" if enable else "default")
+            self.alloc.reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg)
         except Exception as ex:
             log.error("libpqos reset(..) call failed!")
             log.error(str(ex))
             return -1
 
         # Reread MBA BW status from libpqos
-        self.refresh_mba_bw_status()
+        if mba_cfg != "any":
+            self.refresh_mba_bw_status()
 
         return 0
 
@@ -286,21 +299,23 @@ class PqosApi:
         return 0
 
 
-    def l3ca_set(self, sockets, cos_id, ways_mask):
+    def l3ca_set(self, sockets, cos_id, mask=None, code_mask=None, data_mask=None):
         """
         Configures L3 CAT for CoS
 
         Parameters:
             sockets: sockets list on which to configure L3 CAT
             cos_id: Class of Service
-            ways_mask: L3 CAT CBM to set
+            mask: L3 CAT CBM to set
+            code_mask: L3 CAT code CBM to set
+            data_mask: L3 CAT data CBM to set
 
         Returns:
             0 on success
             -1 otherwise
         """
         try:
-            cos = self.l3ca.COS(cos_id, ways_mask)
+            cos = self.l3ca.COS(cos_id, mask=mask, code_mask=code_mask, data_mask=data_mask)
             for socket in sockets:
                 self.l3ca.set(socket, [cos])
         except Exception as ex:

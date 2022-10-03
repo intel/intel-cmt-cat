@@ -322,6 +322,7 @@ def test_config_default_pool_mba():
 @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
 @mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
 @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("config.ConfigStore.get_mba_ctrl_enabled", mock.MagicMock(return_value=True))
 def test_config_default_pool_mba_bw():
     config_store = ConfigStore()
     config = deepcopy(CONFIG)

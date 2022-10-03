@@ -113,36 +113,57 @@ class ConfigStore:
 
         return None
 
-    def get_rdt_iface(self):
+    @staticmethod
+    def get_rdt_iface(data = None):
         """
         Get RDT interface from config
 
         Returns:
             configured RDT interface or "msr" by default
         """
-
-        data = self.get_config()
+        if data is None:
+            data = common.CONFIG_STORE.get_config()
 
         if 'rdt_iface' in data:
             return data['rdt_iface']['interface']
 
         return "msr"
 
-    def get_mba_ctrl_enabled(self):
+    @staticmethod
+    def get_mba_ctrl_enabled(data = None):
         """
         Get RDT MBA CTRL Enabled from config
+
+        data configuration data
 
         Returns:
             configured RDT MBA CTRL Enabled value or "false" by default
         """
-
-        data = self.get_config()
+        if data is None:
+            data = common.CONFIG_STORE.get_config()
 
         if 'mba_ctrl' in data:
             return data['mba_ctrl']['enabled']
 
         return False
 
+    @staticmethod
+    def get_l3cdp_enabled(data = None):
+        """
+        Get RDT L3 CDP Enabled from config
+
+        data configuration data
+
+        Returns:
+            configured RDT L3 CDP Enabled value or "false" by default
+        """
+        if data is None:
+            data = common.CONFIG_STORE.get_config()
+
+        if 'rdt' in data:
+            return data['rdt'].get('l3cdp', False)
+
+        return False
 
     def set_path(self, path):
         """
@@ -355,6 +376,45 @@ class ConfigStore:
 
             pids |= set(app['pids'])
 
+
+    @staticmethod
+    def _validate_rdt_cat_l3(data):
+        """
+        Validate L3 CAT RDT configuration
+
+        Parameters
+            data: configuration (dict)
+        """
+        l3cdp_enabled = data['rdt'].get('l3cdp', False) if 'rdt' in data \
+            else False
+
+        if l3cdp_enabled and not caps.cdp_l3_supported():
+            raise ValueError("RDT Configuration. L3 CDP requested but not supported!")
+
+        cdp_pool_ids = []
+
+        for pool in data['pools']:
+            for cbm in ['l3cbm', 'l3cbm_data', 'l3cbm_code']:
+                if not cbm in pool:
+                    continue
+
+                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool[cbm]))
+                if result or pool[cbm] == 0:
+                    raise ValueError(f"Pool {pool['id']}, " \
+                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])} is not contiguous.")
+                if not caps.cat_l3_supported():
+                    raise ValueError(f"Pool {pool['id']}, " \
+                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])}, CAT is not supported.")
+
+            if 'l3cbm_data' in pool or 'l3cbm_code' in pool:
+                cdp_pool_ids.append(pool['id'])
+
+        if cdp_pool_ids:
+            if not caps.cdp_l3_supported():
+                raise ValueError(f"Pools {cdp_pool_ids}, L3 CDP is not supported.")
+            if not l3cdp_enabled:
+                raise ValueError(f"Pools {cdp_pool_ids}, L3 CDP is not enabled.")
+
     @staticmethod
     def _validate_rdt(data):
         """
@@ -363,6 +423,7 @@ class ConfigStore:
         Parameters
             data: configuration (dict)
         """
+        ConfigStore._validate_rdt_cat_l3(data)
 
         # if data to be validated does not contain RDT iface and/or MBA CTRL info
         # get missing info from current configuration
@@ -394,15 +455,6 @@ class ConfigStore:
                     raise ValueError(f"Pool {pool['id']}, " \
                                      f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool['l2cbm'])}, " \
                                      "L2 CAT is not supported.")
-
-            if 'l3cbm' in pool:
-                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['l3cbm']))
-                if result or pool['l3cbm'] == 0:
-                    raise ValueError(f"Pool {pool['id']}, " \
-                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool['l3cbm'])} is not contiguous.")
-                if not caps.cat_l3_supported():
-                    raise ValueError(f"Pool {pool['id']}, " \
-                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool['l3cbm'])}, CAT is not supported.")
 
             if 'mba' in pool:
                 mba_pool_ids.append(pool['id'])
@@ -497,10 +549,10 @@ class ConfigStore:
                     if 'l3cbm' not in pool:
                         pool['l3cbm'] = pool['cbm']
                     pool.pop('cbm')
-                if 'l3cbm' in pool and not isinstance(pool['l3cbm'], int):
-                    pool['l3cbm'] = int(pool['l3cbm'], 16)
-                if 'l2cbm' in pool and not isinstance(pool['l2cbm'], int):
-                    pool['l2cbm'] = int(pool['l2cbm'], 16)
+
+                for cbm in ['l2cbm', 'l3cbm', 'l3cbm_code', 'l3cbm_data']:
+                    if cbm in pool and not isinstance(pool[cbm], int):
+                        pool[cbm] = int(pool[cbm], 16)
 
             return data
 
@@ -672,18 +724,25 @@ class ConfigStore:
         Update config with "Default" pool
         """
 
+        if 'pools' not in data:
+            data['pools'] = []
+
         # no Default pool configured
         default_pool = {}
         default_pool['id'] = 0
 
         if caps.mba_supported():
-            if caps.mba_bw_enabled():
+            if ConfigStore.get_mba_ctrl_enabled(data):
                 default_pool['mba_bw'] = 2**32 - 1
             else:
                 default_pool['mba'] = 100
 
         if caps.cat_l3_supported():
             default_pool['l3cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
+            if ConfigStore.get_l3cdp_enabled():
+                default_pool['l3cbm_code'] = default_pool['l3cbm']
+                default_pool['l3cbm_data'] = default_pool['l3cbm']
+
 
         if caps.cat_l2_supported():
             default_pool['l2cbm'] = common.PQOS_API.get_max_l2_cat_cbm()
@@ -703,6 +762,9 @@ class ConfigStore:
         """
         Remove Default pool
         """
+        if 'pools' not in data:
+            return
+
         for pool in data['pools'][:]:
             if pool['id'] == 0:
                 data['pools'].remove(pool)

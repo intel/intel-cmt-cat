@@ -216,7 +216,11 @@ class TestCaps:
             assert 'enabled' in data['mba_ctrl']
             assert data['mba_ctrl']['enabled'] == valid_request['enabled']
 
-        with mock.patch("common.CONFIG_STORE.set_config", new=set_config) as mock_set_config:
+        def get_mba_ctrl_enabled():
+            return not valid_request['enabled']
+
+        with mock.patch("common.CONFIG_STORE.set_config", new=set_config) as mock_set_config, \
+             mock.patch("common.CONFIG_STORE.get_mba_ctrl_enabled", new=get_mba_ctrl_enabled):
             response = Rest().put("/caps/mba_ctrl", valid_request)
             # All OK, MBA BW/CTRL supported and no pool configured
             assert response.status_code == 200
@@ -281,7 +285,13 @@ class TestCaps:
             assert 'interface' in data['rdt_iface']
             assert data['rdt_iface']['interface'] == iface
 
-        with mock.patch("common.CONFIG_STORE.set_config", new=set_config) as mock_set_config:
+        def get_rdt_iface():
+            if iface == "msr":
+                return "os"
+            return "msr"
+
+        with mock.patch("common.CONFIG_STORE.set_config", new=set_config) as mock_set_config, \
+             mock.patch("common.CONFIG_STORE.get_rdt_iface", new=get_rdt_iface):
             response = Rest().put("/caps/rdt_iface", {"interface": iface})
 
             # All OK, Requested RDT interface supported and no pool configured

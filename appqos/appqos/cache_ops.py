@@ -120,6 +120,23 @@ class Pool:
         """
         Pool.pools[self.pool]['l3cbm'] = cbm
 
+    def l3cbm_set_data(self, cbm):
+        """
+        Set l3 data mask for the pool
+
+        Parameters:
+            cbm: new cbm mask
+        """
+        Pool.pools[self.pool]['l3cbm_data'] = cbm
+
+    def l3cbm_set_code(self, cbm):
+        """
+        Set l3 code mask for the pool
+
+        Parameters:
+            cbm: new cbm mask
+        """
+        Pool.pools[self.pool]['l3cbm_code'] = cbm
 
     def l3cbm_get(self):
         """
@@ -129,6 +146,30 @@ class Pool:
             cbm mask, 0 on error
         """
         return Pool.pools[self.pool].get('l3cbm')
+
+    def l3cbm_get_data(self):
+        """
+        Get l3 data mask for the pool
+
+        Returns:
+            cbm mask, 0 on error
+        """
+        l3cbm_data = Pool.pools[self.pool].get('l3cbm_data', None)
+        if l3cbm_data is not None:
+            return l3cbm_data
+        return self.l3cbm_get()
+
+    def l3cbm_get_code(self):
+        """
+        Get l3 data mask for the pool
+
+        Returns:
+            cbm mask, 0 on error
+        """
+        l3cbm_code = Pool.pools[self.pool].get('l3cbm_code', None)
+        if l3cbm_code is not None:
+            return l3cbm_code
+        return self.l3cbm_get()
 
     def l2cbm_get(self):
         """
@@ -194,6 +235,9 @@ class Pool:
         if caps.cat_l3_supported():
             l3cbm = config.get_pool_attr('l3cbm', self.pool)
             self.l3cbm_set(l3cbm)
+            if config.get_l3cdp_enabled():
+                self.l3cbm_set_data(config.get_pool_attr('l3cbm_data', self.pool))
+                self.l3cbm_set_code(config.get_pool_attr('l3cbm_code', self.pool))
 
         if caps.mba_supported():
             if caps.mba_bw_enabled():
@@ -328,6 +372,7 @@ class Pool:
     @staticmethod
     def apply(pool_id):
         # pylint: disable=too-many-return-statements
+        # pylint: disable=too-many-branches
         """
         Apply RDT configuration for Pool
 
@@ -343,7 +388,16 @@ class Pool:
             return -1
 
         pool = Pool(pool_id)
-        l3cbm = pool.l3cbm_get()
+
+        l3cdp = common.CONFIG_STORE.get_l3cdp_enabled()
+        l3cbm = None
+        l3cbm_data = None
+        l3cbm_code = None
+        if l3cdp:
+            l3cbm_data = pool.l3cbm_get_data()
+            l3cbm_code = pool.l3cbm_get_code()
+        else:
+            l3cbm = pool.l3cbm_get()
         l2cbm = pool.l2cbm_get()
 
         mba = None
@@ -367,9 +421,15 @@ class Pool:
                 log.error("Failed to apply L2 CAT configuration!")
                 return -1
 
+        log.error(f"===> pool_id={pool_id} cbm={l3cbm} code={l3cbm_code} data={l3cbm_data}")
         if l3cbm:
-            if common.PQOS_API.l3ca_set(sockets, pool_id, l3cbm) != 0:
+            if common.PQOS_API.l3ca_set(sockets, pool_id, mask=l3cbm) != 0:
                 log.error("Failed to apply CAT configuration!")
+                return -1
+        elif l3cbm_code and l3cbm_data:
+            if common.PQOS_API.l3ca_set(sockets, pool_id, code_mask=l3cbm_code, \
+                                        data_mask=l3cbm_data) != 0:
+                log.error("Failed to apply L3 CDP configuration!")
                 return -1
 
         if mba:
@@ -403,26 +463,73 @@ def configure_rdt():
     result = 0
     recreate_default = False
 
-    # Change RDT interface if needed
-    cfg_rdt_iface = common.CONFIG_STORE.get_rdt_iface()
-    if cfg_rdt_iface != common.PQOS_API.current_iface():
-        if common.PQOS_API.init(cfg_rdt_iface):
-            log.error("Failed to initialize RDT interface!")
-            return -1
+    def rdt_interface():
+        """
+        Change RDT interface if needed
 
-        recreate_default = True
-        log.info(f"RDT initialized with {common.CONFIG_STORE.get_rdt_iface().upper()} interface.")
+        Returns:
+            False interface not changed
+        """
+        cfg_rdt_iface = common.CONFIG_STORE.get_rdt_iface()
+        if cfg_rdt_iface != common.PQOS_API.current_iface():
+            if common.PQOS_API.init(cfg_rdt_iface):
+                raise Exception("Failed to initialize RDT interface!")
 
-    # Change MBA BW/CTRL state if needed
-    if caps.mba_supported():
-        cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
-        if cfg_mba_ctrl_enabled != common.PQOS_API.is_mba_bw_enabled():
-            if common.PQOS_API.enable_mba_bw(cfg_mba_ctrl_enabled):
-                log.error("Failed to change MBA BW state!")
-                return -1
+            log.info(f"RDT initialized with {cfg_rdt_iface.upper()} interface.")
+            return True
 
-            recreate_default = True
+        return False
+
+    def rdt_reset():
+        """
+        Change RDT features enabled status
+
+        Returns:
+            False nothing changed
+        """
+
+        l3cdp_cfg = "any"
+        mba_cfg = "any"
+
+        # Change MBA BW/CTRL state if needed
+        if caps.mba_supported():
+            cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
+            if cfg_mba_ctrl_enabled == common.PQOS_API.is_mba_bw_enabled():
+                mba_cfg = "any"
+            elif cfg_mba_ctrl_enabled:
+                mba_cfg = "ctrl"
+            else:
+                mba_cfg = "default"
+
+        # Change L#CDP state if needed
+        if caps.cat_l3_supported() and caps.cdp_l3_supported():
+            cfg_l3cdp_enabled = common.CONFIG_STORE.get_l3cdp_enabled()
+            if cfg_l3cdp_enabled == common.PQOS_API.is_l3_cdp_enabled():
+                l3cdp_cfg = "any"
+            elif cfg_l3cdp_enabled:
+                l3cdp_cfg = "on"
+            else:
+                l3cdp_cfg = "off"
+
+        if l3cdp_cfg != "any" or mba_cfg != "any":
+            if common.PQOS_API.reset(l3_cdp_cfg = l3cdp_cfg, mba_cfg = mba_cfg):
+                if l3cdp_cfg != "any":
+                    raise Exception("Failed to change L3 CDP state!")
+                if mba_cfg != "any":
+                    raise Exception("Failed to change MBA BW state!")
+
             log.info(f"RDT MBA BW {'en' if common.PQOS_API.is_mba_bw_enabled() else 'dis'}abled.")
+            log.info(f"RDT L3 CDP {'en' if common.PQOS_API.is_l3_cdp_enabled() else 'dis'}abled.")
+
+    try:
+        if rdt_interface():
+            recreate_default = True
+        if rdt_reset():
+            recreate_default = True
+
+    except Exception as ex:
+        log.error(str(ex))
+        return -1
 
     if recreate_default:
         # On interface or MBA BW state change it is needed to recreate Default Pool #0

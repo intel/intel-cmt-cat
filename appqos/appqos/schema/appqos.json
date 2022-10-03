@@ -47,6 +47,19 @@
       "additionalProperties": false
     },
 
+    "rdt": {
+      "description": "RDT configuration",
+      "type": "object",
+      "properties": {
+        "l3cdp": {
+          "description": "L3 CDP",
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+
     "rdt_iface": {
       "description": "RDT configuration - libpqos interface",
       "type": "object",

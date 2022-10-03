@@ -78,6 +78,13 @@ def cat_l3_supported():
     return common.CAT_L3_CAP in SYSTEM_CAPS
 
 
+def cdp_l3_supported():
+    """
+    Returns L3 CDP support status
+    """
+    return common.PQOS_API.is_l3_cdp_supported()
+
+
 def cat_l2_supported():
     """
     Returns L2 CAT support status

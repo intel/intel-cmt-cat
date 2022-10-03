@@ -28,6 +28,14 @@
         "description": "L3 CAT cache bit mask",
         "$ref": "definitions.json#/string_hex"
       },
+      "l3cbm_code": {
+        "description": "L3 CAT cache code bit mask",
+        "$ref": "definitions.json#/string_hex"
+      },
+      "l3cbm_data": {
+        "description": "L3 CAT cache data bit mask",
+        "$ref": "definitions.json#/string_hex"
+      },
       "mba": {
         "description": "MBA rate %",
         "$ref": "definitions.json#/percentage_nonzero"
@@ -51,8 +59,22 @@
     },
     "dependencies": {
       "mba": {
-          "type": "object",
-          "not": { "required": [ "mba_bw" ] }
+        "type": "object",
+        "not": { "required": [ "mba_bw" ] }
+      },
+      "l3cbm_data": {
+        "type": "object",
+        "anyOf": [
+          { "required": ["l3cbm"] },
+          { "required": ["l3cbm_code"] }
+        ]
+      },
+      "l3cbm_code": {
+        "type": "object",
+        "anyOf": [
+          { "required": ["l3cbm"] },
+          { "required": ["l3cbm_data"] }
+        ]
       }
     }
   },
@@ -65,7 +87,9 @@
           "cores": {},
           "l2cbm":{},
           "cbm": {},
-          "l3cbm":{},
+          "l3cbm": {},
+          "l3cbm_data": {},
+          "l3cbm_code": {},
           "mba": {},
           "mba_bw": {},
           "id": {},
@@ -75,6 +99,8 @@
         "anyOf": [
           { "required": ["cbm"] },
           { "required": ["l3cbm"] },
+          { "required": ["l3cbm_code"] },
+          { "required": ["l3cbm_data"] },
           { "required": ["l2cbm"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
@@ -101,6 +127,8 @@
           "l2cbm": {},
           "cbm": {},
           "l3cbm": {},
+          "l3cbm_data": {},
+          "l3cbm_code": {},
           "mba": {},
           "mba_bw": {},
           "power_profile" : {},
@@ -112,6 +140,8 @@
         "anyOf": [
           { "required": ["cbm"] },
           { "required": ["l3cbm"] },
+          { "required": ["l3cbm_code"] },
+          { "required": ["l3cbm_data"] },
           { "required": ["l2cbm"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
@@ -132,6 +162,8 @@
           "l2cbm": {},
           "cbm": {},
           "l3cbm": {},
+          "l3cbm_code": {},
+          "l3cbm_data": {},
           "mba": {},
           "mba_bw": {},
           "power_profile" : {},
@@ -146,6 +178,8 @@
           { "required": ["l2cbm"] },
           { "required": ["cbm"] },
           { "required": ["l3cbm"] },
+          { "required": ["l3cbm_code"] },
+          { "required": ["l3cbm_data"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
           { "required": ["cores"] },
