@@ -356,12 +356,12 @@ _setup_counter(unsigned lcore, enum pqos_mon_event event)
                 return PQOS_RETVAL_PARAM;
         }
 
-        /* unfreeze conters */
+        /* unfreeze counters */
         ret = msr_write(lcore, reg_unit_ctrl, UNIT_CTRL_UNFREEZE_COUNTER);
         if (ret != MACHINE_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
-        /* freeze conters */
+        /* freeze conuters */
         ret = msr_write(lcore, reg_unit_ctrl, UNIT_CTRL_FREEZE_COUNTER);
         if (ret != MACHINE_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
@@ -392,7 +392,7 @@ _setup_counter(unsigned lcore, enum pqos_mon_event event)
         if (ret != MACHINE_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
-        /* unfreeze conters */
+        /* unfreeze counters */
         ret = msr_write(lcore, reg_unit_ctrl, UNIT_CTRL_UNFREEZE_COUNTER);
         if (ret != MACHINE_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
