@@ -48,38 +48,6 @@ describe('Given LocalService', () => {
     });
   });
 
-  describe('when setL3CacheWay method is executed', () => {
-    it('should emit l3cacheWay with cache way number', (done: DoneFn) => {
-      const {
-        point: { componentInstance: service },
-      } = MockRender(LocalService);
-
-      service.l3CacheWay.subscribe((value: number) => {
-        expect(value).toEqual(17);
-
-        done();
-      });
-
-      service.setL3CacheWay(17);
-    });
-  });
-
-  describe('when getL3CacheWay method is executed', () => {
-    it('should receive the cache way number', (done: DoneFn) => {
-      const {
-        point: { componentInstance: service },
-      } = MockRender(LocalService);
-
-      service.getL3CacheWay().subscribe((value: number) => {
-        expect(value).toEqual(17);
-
-        done();
-      });
-
-      service.l3CacheWay.next(17);
-    });
-  });
-
   describe('when getData method is executed', () => {
     it('should return data from LocalStorage', () => {
       const {

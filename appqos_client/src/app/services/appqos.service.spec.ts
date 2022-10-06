@@ -409,4 +409,63 @@ describe('Given AppqosService', () => {
       httpMock.verify();
     });
   });
+
+  describe('when poolPut method is called', () => {
+    it('it should call correct REST API endpoint with PUT method', () => {
+      const api_url = 'https://localhost:5000';
+      const mockResponse = 'Pool 0 updated.';
+      const body = { l3cbm: 7 };
+      const id = 0;
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service
+        .poolPut(body, id)
+        .pipe(first())
+        .subscribe((response: unknown) => {
+          expect(response).toBe(mockResponse);
+        });
+
+      const req = httpMock.expectOne(`${api_url}/pools/${id}`);
+      req.flush(mockResponse);
+      httpMock.verify();
+    });
+  });
+
+  describe('when poolPut method is called with incorrect L3 CBM', () => {
+    it('it should return error', () => {
+      const api_url = 'https://localhost:5000';
+      const mockErrorResponse = {
+        message:
+          'POOL 0 not updated, Pool 0, L3 CBM 0xcc/0b11001100 is not contiguous.',
+      };
+      const body = { l3cbm: 204 };
+      const id = 0;
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service
+        .poolPut(body, id)
+        .pipe(first())
+        .subscribe((response: unknown) => {
+          expect(response).toBe(mockErrorResponse);
+        });
+
+      const req = httpMock.expectOne(`${api_url}/pools/${id}`);
+      req.flush(mockErrorResponse);
+      httpMock.verify();
+    });
+  });
 });

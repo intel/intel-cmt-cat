@@ -28,8 +28,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Input } from '@angular/core';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 
+import { AppqosService } from 'src/app/services/appqos.service';
+import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 
 @Component({
@@ -37,6 +47,43 @@ import { Pools } from '../overview.model';
   templateUrl: './l3-cache-allocation.component.html',
   styleUrls: ['./l3-cache-allocation.component.scss'],
 })
-export class L3CacheAllocationComponent {
+export class L3CacheAllocationComponent implements OnChanges {
   @Input() pools!: Pools[];
+  @Output() poolEvent = new EventEmitter<unknown>();
+  poolsList!: Pools[];
+  numCacheWays!: number;
+
+  constructor(public dialog: MatDialog, private service: AppqosService) {}
+
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!this.pools) return;
+
+    this.service.getL3cat().subscribe((l3cat) => {
+      this.numCacheWays = l3cat.cw_num;
+      this._convertToBitmask();
+    });
+  }
+
+  private _convertToBitmask() {
+    this.poolsList = this.pools.map((pool: Pools) => ({
+      ...pool,
+      l3Bitmask: pool.l3cbm
+        ?.toString(2)
+        .padStart(this.numCacheWays, '0')
+        .split('')
+        .map(Number),
+    }));
+  }
+
+  openDialog() {
+    const dialogRef = this.dialog.open(EditDialogComponent, {
+      height: 'auto',
+      width: '50rem',
+      data: { l3cbm: true, numCacheWays: this.numCacheWays },
+    });
+
+    dialogRef.afterClosed().subscribe((_) => {
+      this.poolEvent.emit();
+    });
+  }
 }

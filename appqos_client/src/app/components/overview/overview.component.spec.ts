@@ -29,10 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
-import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { OverviewComponent } from './overview.component';
 
@@ -41,7 +40,6 @@ describe('Given OverviewComponent', () => {
     MockBuilder(OverviewComponent)
       .mock(SharedModule)
       .mock(Router)
-      .mock(LocalService, { getL3CacheWay: () => of(17) })
       .mock(AppqosService, {
         getPools: () => EMPTY,
       })
@@ -56,14 +54,6 @@ describe('Given OverviewComponent', () => {
       const expectValue = ngMocks.find('app-l3-cache-allocation');
 
       expect(expectValue).toBeTruthy();
-    });
-
-    it('should get Cache way number', () => {
-      const {
-        point: { componentInstance: component },
-      } = MockRender(OverviewComponent);
-
-      expect(component.cacheWay).toEqual(17);
     });
   });
 });

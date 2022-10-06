@@ -29,45 +29,58 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-<mat-card class="l3cat">
-  <mat-card-title>L3 Cache Allocation (CAT)</mat-card-title>
-  <mat-card-content>
-    <span class="info-text"
-      >Helps address shared resource concerns by providing software control of
-      where data is allocated into the last-level cache (LLC), enabling
-      isolation and prioritization of key applications...<a
-        href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-cache-allocation-technology.html?wapkw=introduction%20to%20cache%20allocation"
-        class="contact-text"
-        target="_blank"
-        >See more</a
-      ></span
+<div class="mba-dialog">
+  <div class="header-dialog">
+    <h2 mat-dialog-title *ngIf="data.l3cbm">L3 Cache Allocation (CAT)</h2>
+    <mat-progress-spinner
+      class="loading"
+      *ngIf="loading"
+      color="primary"
+      mode="indeterminate"
+      diameter="20"
     >
-    <div class="pool" *ngFor="let pool of poolsList">
+    </mat-progress-spinner>
+  </div>
+  <span class="info-text" *ngIf="data.l3cbm"
+    >Intel's Cache Allocation Technology (CAT) helps address shared resource
+    concerns by providing software control of where data is allocated into the
+    last-level cache (LLC), enabling isolation and prioritization of key
+    applications.</span
+  >
+  <mat-divider class="divider"></mat-divider>
+  <mat-dialog-content class="mat-typography">
+    <div class="pool" *ngFor="let pool of pools; index as i">
       <span class="pool-name">
         {{ pool.name }}
       </span>
-      <div class="pool-cbm">
+      <div class="l3cbm" *ngIf="data.l3cbm">
+        <div class="pool-l3cbm">
+          <button
+            mat-flat-button
+            [ngClass]="
+              data.numCacheWays > 12
+                ? 'l3cbm-button small'
+                : 'l3cbm-button large'
+            "
+            *ngFor="let n of pool.l3Bitmask; index as j"
+            [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            (click)="onChangeL3CBM(n, i, j)"
+          >
+            {{ n }}
+          </button>
+        </div>
         <button
           mat-flat-button
-          [ngClass]="
-            numCacheWays > 12 ? 'l3cbm-button small' : 'l3cbm-button large'
-          "
-          *ngFor="let n of pool.l3Bitmask"
-          [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+          color="primary"
+          class="apply-button"
+          (click)="saveL3CBM(i, pool.id)"
         >
-          {{ n }}
+          Apply
         </button>
       </div>
     </div>
-  </mat-card-content>
-  <mat-card-actions>
-    <button
-      mat-button
-      class="action-button"
-      color="primary"
-      (click)="openDialog()"
-    >
-      EDIT
-    </button>
-  </mat-card-actions>
-</mat-card>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button mat-dialog-close color="primary">CLOSE</button>
+  </mat-dialog-actions>
+</div>

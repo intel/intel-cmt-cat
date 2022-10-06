@@ -43,6 +43,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
+import { MatDialogModule } from '@angular/material/dialog';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -60,6 +61,7 @@ import { SstbfComponent } from '../components/system-caps/sstbf/sstbf.component'
 import { L2catComponent } from '../components/system-caps/l2cat/l2cat.component';
 import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component';
 import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allocation/l3-cache-allocation.component';
+import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dialog.component';
 
 @NgModule({
   declarations: [
@@ -76,6 +78,7 @@ import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allo
     SstcpComponent,
     L2catComponent,
     L3CacheAllocationComponent,
+    EditDialogComponent,
   ],
   imports: [
     MatInputModule,
@@ -93,6 +96,7 @@ import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allo
     MatIconModule,
     MatSlideToggleModule,
     MatButtonToggleModule,
+    MatDialogModule,
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],

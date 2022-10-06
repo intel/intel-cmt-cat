@@ -44,6 +44,8 @@ import {
 import { LocalService } from './local.service';
 import { Pools } from '../components/overview/overview.model';
 
+type poolPutType = { l3cbm: number };
+
 @Injectable({
   providedIn: 'root',
 })
@@ -141,5 +143,11 @@ export class AppqosService {
   getPools(): Observable<Pools[]> {
     const api_url = this.local.getData('api_url');
     return this.http.get<Pools[]>(`${api_url}/pools`);
+  }
+
+  poolPut(data: poolPutType, id: number): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+
+    return this.http.put<resMessage>(`${api_url}/pools/${id}`, data);
   }
 }

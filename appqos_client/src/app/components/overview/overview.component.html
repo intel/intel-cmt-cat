@@ -30,7 +30,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
 <div class="overview-container">
-  <app-l3-cache-allocation [pools]="pools"></app-l3-cache-allocation>
+  <app-l3-cache-allocation
+    [pools]="pools"
+    (poolEvent)="getPools()"
+  ></app-l3-cache-allocation>
   <mat-card class="mba">
     <mat-card-title>Memory Bandwidth Allocation(MBA)</mat-card-title>
     <mat-card-content>

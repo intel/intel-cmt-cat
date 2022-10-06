@@ -28,15 +28,32 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
+import { of } from 'rxjs';
 
 import { SharedModule } from 'src/app/shared/shared.module';
+import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { L3CacheAllocationComponent } from './l3-cache-allocation.component';
+import { AppqosService } from 'src/app/services/appqos.service';
 
 describe('Given OverviewComponent', () => {
   beforeEach(() =>
-    MockBuilder(L3CacheAllocationComponent).mock(SharedModule).mock(Router)
+    MockBuilder(L3CacheAllocationComponent)
+      .mock(SharedModule)
+      .mock(Router)
+      .mock(AppqosService, {
+        getL3cat: () =>
+          of({
+            cache_size: 44040192,
+            cdp_enabled: false,
+            cdp_supported: false,
+            clos_num: 15,
+            cw_num: 12,
+            cw_size: 3670016,
+          }),
+      })
   );
 
   MockInstance.scope('case');
@@ -51,26 +68,44 @@ describe('Given OverviewComponent', () => {
       expect(expectedTitle).toEqual(title);
     });
 
+    it('should get Cache way number', () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(L3CacheAllocationComponent, { pools: mockedPool });
+
+      expect(component.numCacheWays).toEqual(12);
+    });
+
     it('should display pool name', () => {
       const mockedPool: Pools[] = [
         {
           id: 0,
           mba_bw: 4294967295,
-          l3Bitmask: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          l3cbm: 2047,
           name: 'Default',
           cores: [0, 1, 45, 46, 47],
         },
         {
           id: 1,
           mba_bw: 4294967295,
-          l3Bitmask: [1, 1, 1, 1],
+          l3cbm: 15,
           name: 'HP',
           cores: [10, 12, 15],
         },
         {
           id: 2,
           mba_bw: 4294967295,
-          l3Bitmask: [1, 1, 1, 1, 0, 0, 0],
+          l3cbm: 2047,
           name: 'LP',
           cores: [16, 17, 14],
         },
@@ -90,21 +125,21 @@ describe('Given OverviewComponent', () => {
         {
           id: 0,
           mba_bw: 4294967295,
-          l3Bitmask: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+          l3cbm: 2047,
           name: 'Default',
           cores: [0, 1, 45, 46, 47],
         },
         {
           id: 1,
           mba_bw: 4294967295,
-          l3Bitmask: [1, 1, 1, 1],
+          l3cbm: 15,
           name: 'HP',
           cores: [10, 12, 15],
         },
         {
           id: 2,
           mba_bw: 4294967295,
-          l3Bitmask: [1, 1, 1, 1, 0, 0, 0],
+          l3cbm: 2047,
           name: 'LP',
           cores: [16, 17, 14],
         },
@@ -119,10 +154,42 @@ describe('Given OverviewComponent', () => {
         .map((pool) => ngMocks.formatText(pool));
 
       expect(expectedCbm).toEqual([
-        '1 1 1 1 1 1 1 1 1 1 1',
-        '1 1 1 1',
-        '1 1 1 1 0 0 0',
+        '0 1 1 1 1 1 1 1 1 1 1 1',
+        '0 0 0 0 0 0 0 0 1 1 1 1',
+        '0 1 1 1 1 1 1 1 1 1 1 1',
       ]);
+    });
+  });
+
+  describe('when click Edit button', () => {
+    it('should open modal dialog', () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      const dialogSpy = jasmine.createSpy('dialog.open');
+
+      MockInstance(MatDialog, 'open', dialogSpy).and.returnValue({
+        afterClosed: () => of(null),
+      });
+
+      MockRender(L3CacheAllocationComponent, { pools: mockedPool });
+
+      const expandButton = ngMocks.find('.action-button');
+
+      expandButton.triggerEventHandler('click', {});
+
+      expect(dialogSpy).toHaveBeenCalledWith(EditDialogComponent, {
+        height: 'auto',
+        width: '50rem',
+        data: { l3cbm: true, numCacheWays: 12 },
+      });
     });
   });
 
