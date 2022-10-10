@@ -278,8 +278,8 @@ class TestPools(object):
         mock_mba_set.assert_any_call([0, 2], 1, 11, False)
         mock_l3ca_set.assert_any_call([0, 2], 2, mask=0xc00)
         mock_l3ca_set.assert_any_call([0, 2], 1, mask=0x300)
-        mock_l2ca_set.assert_any_call([0, 1], 1, 0xff)
-        mock_l2ca_set.assert_any_call([0, 1], 2, 0xf)
+        mock_l2ca_set.assert_any_call([0, 1], 1, mask=0xff)
+        mock_l2ca_set.assert_any_call([0, 1], 2, mask=0xf)
         mock_alloc_assoc_set.assert_any_call([1], 2)
         mock_alloc_assoc_set.assert_any_call([2, 3], 1)
 

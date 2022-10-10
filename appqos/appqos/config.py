@@ -165,6 +165,22 @@ class ConfigStore:
 
         return False
 
+    @staticmethod
+    def get_l2cdp_enabled(data = None):
+        """
+        Get RDT L2 CDP Enabled from config
+        Returns:
+            configured RDT L2 CDP Enabled value or "false" by default
+        """
+        if data is None:
+            data = common.CONFIG_STORE.get_config()
+
+        if 'rdt' in data:
+            return data['rdt'].get('l2cdp', False)
+
+        return False
+
+
     def set_path(self, path):
         """
         Set path to configuration file
@@ -404,7 +420,7 @@ class ConfigStore:
                         f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])} is not contiguous.")
                 if not caps.cat_l3_supported():
                     raise ValueError(f"Pool {pool['id']}, " \
-                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])}, CAT is not supported.")
+                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])}, L3 CAT is not supported.")
 
             if 'l3cbm_data' in pool or 'l3cbm_code' in pool:
                 cdp_pool_ids.append(pool['id'])
@@ -416,6 +432,44 @@ class ConfigStore:
                 raise ValueError(f"Pools {cdp_pool_ids}, L3 CDP is not enabled.")
 
     @staticmethod
+    def _validate_rdt_cat_l2(data):
+        """
+        Validate L2 CAT RDT configuration
+        Parameters
+            data: configuration (dict)
+        """
+        l2cdp_enabled = data['rdt'].get('l2cdp', False) if 'rdt' in data \
+            else False
+
+        if l2cdp_enabled and not caps.cdp_l2_supported():
+            raise ValueError("RDT Configuration. L2 CDP requested but not supported!")
+
+        cdp_pool_ids = []
+
+        for pool in data['pools']:
+            for cbm in ['l2cbm', 'l2cbm_data', 'l2cbm_code']:
+                if not cbm in pool:
+                    continue
+
+                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool[cbm]))
+                if result or pool[cbm] == 0:
+                    raise ValueError(f"Pool {pool['id']}, " \
+                        f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool[cbm])} is not contiguous.")
+                if not caps.cat_l2_supported():
+                    raise ValueError(f"Pool {pool['id']}, " \
+                        f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool[cbm])}, L2 CAT is not supported.")
+
+            if 'l2cbm_data' in pool or 'l2cbm_code' in pool:
+                cdp_pool_ids.append(pool['id'])
+
+        if cdp_pool_ids:
+            if not caps.cdp_l2_supported():
+                raise ValueError(f"Pools {cdp_pool_ids}, L2 CDP is not supported.")
+            if not l2cdp_enabled:
+                raise ValueError(f"Pools {cdp_pool_ids}, L2 CDP is not enabled.")
+
+
+    @staticmethod
     def _validate_rdt(data):
         """
         Validate RDT configuration (including MBA CTRL) configuration
@@ -423,6 +477,7 @@ class ConfigStore:
         Parameters
             data: configuration (dict)
         """
+        ConfigStore._validate_rdt_cat_l2(data)
         ConfigStore._validate_rdt_cat_l3(data)
 
         # if data to be validated does not contain RDT iface and/or MBA CTRL info
@@ -445,17 +500,6 @@ class ConfigStore:
         mba_bw_pool_ids = []
 
         for pool in data['pools']:
-
-            if 'l2cbm' in pool:
-                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool['l2cbm']))
-                if result or pool['l2cbm'] == 0:
-                    raise ValueError(f"Pool {pool['id']}, " \
-                        f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool['l2cbm'])} is not contiguous.")
-                if not caps.cat_l2_supported():
-                    raise ValueError(f"Pool {pool['id']}, " \
-                                     f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool['l2cbm'])}, " \
-                                     "L2 CAT is not supported.")
-
             if 'mba' in pool:
                 mba_pool_ids.append(pool['id'])
 
@@ -550,7 +594,8 @@ class ConfigStore:
                         pool['l3cbm'] = pool['cbm']
                     pool.pop('cbm')
 
-                for cbm in ['l2cbm', 'l3cbm', 'l3cbm_code', 'l3cbm_data']:
+                for cbm in ['l2cbm', 'l2cbm_code', 'l2cbm_data', \
+                            'l3cbm', 'l3cbm_code', 'l3cbm_data']:
                     if cbm in pool and not isinstance(pool[cbm], int):
                         pool[cbm] = int(pool[cbm], 16)
 
@@ -739,13 +784,16 @@ class ConfigStore:
 
         if caps.cat_l3_supported():
             default_pool['l3cbm'] = common.PQOS_API.get_max_l3_cat_cbm()
-            if ConfigStore.get_l3cdp_enabled():
+            if ConfigStore.get_l3cdp_enabled(data):
                 default_pool['l3cbm_code'] = default_pool['l3cbm']
                 default_pool['l3cbm_data'] = default_pool['l3cbm']
 
-
         if caps.cat_l2_supported():
             default_pool['l2cbm'] = common.PQOS_API.get_max_l2_cat_cbm()
+            if ConfigStore.get_l2cdp_enabled(data):
+                default_pool['l2cbm_code'] = default_pool['l2cbm']
+                default_pool['l2cbm_data'] = default_pool['l2cbm']
+
         default_pool['name'] = "Default"
 
         # Use all unallocated cores

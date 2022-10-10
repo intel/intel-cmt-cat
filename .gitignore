@@ -30,6 +30,7 @@ appqos/ca/*.csr
 appqos/ca/*.srl
 appqos/env_*
 appqos/venv_*
+appqos/.coverage
 
 lib/python/.coverage
 lib/python/test_env

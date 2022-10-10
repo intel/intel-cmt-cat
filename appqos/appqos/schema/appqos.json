@@ -51,8 +51,13 @@
       "description": "RDT configuration",
       "type": "object",
       "properties": {
+        "l2cdp": {
+          "description": "Enable L2 CDP",
+          "type": "boolean",
+          "default": false
+        },
         "l3cdp": {
-          "description": "L3 CDP",
+          "description": "Enable L3 CDP",
           "type": "boolean",
           "default": false
         }

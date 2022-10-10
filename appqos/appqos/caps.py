@@ -92,6 +92,13 @@ def cat_l2_supported():
     return common.CAT_L2_CAP in SYSTEM_CAPS
 
 
+def cdp_l2_supported():
+    """
+    Returns L2 CDP support status
+    """
+    return common.PQOS_API.is_l2_cdp_supported()
+
+
 def mba_supported():
     """
     Returns MBA support status

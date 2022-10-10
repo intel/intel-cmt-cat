@@ -111,6 +111,24 @@ class Pool:
         """
         Pool.pools[self.pool]['l2cbm'] = l2cbm
 
+    def l2cbm_set_data(self, cbm):
+        """
+        Set l2 data mask for the pool
+
+        Parameters:
+            cbm: new cbm mask
+        """
+        Pool.pools[self.pool]['l2cbm_data'] = cbm
+
+    def l2cbm_set_code(self, cbm):
+        """
+        Set l2 code mask for the pool
+
+        Parameters:
+            cbm: new cbm mask
+        """
+        Pool.pools[self.pool]['l2cbm_code'] = cbm
+
     def l3cbm_set(self, cbm):
         """
         Set cbm mask for the pool
@@ -174,11 +192,34 @@ class Pool:
     def l2cbm_get(self):
         """
         Get cbm mask for the pool
-
         Returns:
             cbm mask, 0 on error
         """
         return Pool.pools[self.pool].get('l2cbm')
+
+    def l2cbm_get_data(self):
+        """
+        Get l2 data mask for the pool
+
+        Returns:
+            cbm mask, 0 on error
+        """
+        l2cbm_data = Pool.pools[self.pool].get('l2cbm_data', None)
+        if l2cbm_data is not None:
+            return l2cbm_data
+        return self.l2cbm_get()
+
+    def l2cbm_get_code(self):
+        """
+        Get l2 data mask for the pool
+
+        Returns:
+            cbm mask, 0 on error
+        """
+        l2cbm_code = Pool.pools[self.pool].get('l2cbm_code', None)
+        if l2cbm_code is not None:
+            return l2cbm_code
+        return self.l2cbm_get()
 
     def mba_set(self, mba):
         """
@@ -231,6 +272,9 @@ class Pool:
         if caps.cat_l2_supported():
             l2cbm = config.get_pool_attr('l2cbm', self.pool)
             self.l2cbm_set(l2cbm)
+            if config.get_l2cdp_enabled():
+                self.l2cbm_set_data(config.get_pool_attr('l2cbm_data', self.pool))
+                self.l2cbm_set_code(config.get_pool_attr('l2cbm_code', self.pool))
 
         if caps.cat_l3_supported():
             l3cbm = config.get_pool_attr('l3cbm', self.pool)
@@ -398,7 +442,16 @@ class Pool:
             l3cbm_code = pool.l3cbm_get_code()
         else:
             l3cbm = pool.l3cbm_get()
-        l2cbm = pool.l2cbm_get()
+
+        l2cdp = common.CONFIG_STORE.get_l2cdp_enabled()
+        l2cbm = None
+        l2cbm_data = None
+        l2cbm_code = None
+        if l2cdp:
+            l2cbm_data = pool.l2cbm_get_data()
+            l2cbm_code = pool.l2cbm_get_code()
+        else:
+            l2cbm = pool.l2cbm_get()
 
         mba = None
         ctrl = common.CONFIG_STORE.get_mba_ctrl_enabled()
@@ -417,11 +470,15 @@ class Pool:
 
         # pool id to COS, 1:1 mapping
         if l2cbm:
-            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, l2cbm) != 0:
+            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, mask=l2cbm) != 0:
                 log.error("Failed to apply L2 CAT configuration!")
                 return -1
+        elif l2cbm_code and l2cbm_data:
+            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, \
+                                        code_mask=l2cbm_code, data_mask=l2cbm_data) != 0:
+                log.error("Failed to apply L2 CDP configuration!")
+                return -1
 
-        log.error(f"===> pool_id={pool_id} cbm={l3cbm} code={l3cbm_code} data={l3cbm_data}")
         if l3cbm:
             if common.PQOS_API.l3ca_set(sockets, pool_id, mask=l3cbm) != 0:
                 log.error("Failed to apply CAT configuration!")
@@ -488,38 +545,71 @@ def configure_rdt():
             False nothing changed
         """
 
-        l3cdp_cfg = "any"
-        mba_cfg = "any"
+        def get_mba_cfg():
+            """
+            Obtain MBA configuration
+            """
+            if caps.mba_supported():
+                cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
+                # Change MBA BW/CTRL state if needed
+                if cfg_mba_ctrl_enabled == common.PQOS_API.is_mba_bw_enabled():
+                    return "any"
 
-        # Change MBA BW/CTRL state if needed
-        if caps.mba_supported():
-            cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
-            if cfg_mba_ctrl_enabled == common.PQOS_API.is_mba_bw_enabled():
-                mba_cfg = "any"
-            elif cfg_mba_ctrl_enabled:
-                mba_cfg = "ctrl"
-            else:
-                mba_cfg = "default"
+                if cfg_mba_ctrl_enabled:
+                    return "ctrl"
+                return "default"
 
-        # Change L#CDP state if needed
-        if caps.cat_l3_supported() and caps.cdp_l3_supported():
-            cfg_l3cdp_enabled = common.CONFIG_STORE.get_l3cdp_enabled()
-            if cfg_l3cdp_enabled == common.PQOS_API.is_l3_cdp_enabled():
-                l3cdp_cfg = "any"
-            elif cfg_l3cdp_enabled:
-                l3cdp_cfg = "on"
-            else:
-                l3cdp_cfg = "off"
+            return "any"
 
-        if l3cdp_cfg != "any" or mba_cfg != "any":
-            if common.PQOS_API.reset(l3_cdp_cfg = l3cdp_cfg, mba_cfg = mba_cfg):
+        def get_l2cdp_cfg():
+            """
+            Obtain L2 CDP configuration
+            """
+            if caps.cat_l2_supported() and caps.cdp_l2_supported():
+                cfg_l2cdp_enabled = common.CONFIG_STORE.get_l2cdp_enabled()
+                # Change L2CDP state if needed
+                if cfg_l2cdp_enabled == common.PQOS_API.is_l2_cdp_enabled():
+                    return "any"
+
+                if cfg_l2cdp_enabled:
+                    return "on"
+                return "off"
+
+            return "any"
+
+        def get_l3cdp_cfg():
+            """
+            Obtain L3 CDP configuration
+            """
+            if caps.cat_l3_supported() and caps.cdp_l3_supported():
+                cfg_l3cdp_enabled = common.CONFIG_STORE.get_l3cdp_enabled()
+                # Change L3CDP state if needed
+                if cfg_l3cdp_enabled == common.PQOS_API.is_l3_cdp_enabled():
+                    return "any"
+
+                if cfg_l3cdp_enabled:
+                    return "on"
+                return "off"
+
+            return "any"
+
+        l3cdp_cfg = get_l3cdp_cfg()
+        l2cdp_cfg = get_l2cdp_cfg()
+        mba_cfg = get_mba_cfg()
+
+        if l3cdp_cfg != "any" or l2cdp_cfg != "any" or mba_cfg != "any":
+            if common.PQOS_API.reset(l3_cdp_cfg = l3cdp_cfg, l2_cdp_cfg = l2cdp_cfg, \
+                                     mba_cfg = mba_cfg):
                 if l3cdp_cfg != "any":
                     raise Exception("Failed to change L3 CDP state!")
+                if l2cdp_cfg != "any":
+                    raise Exception("Failed to change L2 CDP state!")
                 if mba_cfg != "any":
                     raise Exception("Failed to change MBA BW state!")
 
             log.info(f"RDT MBA BW {'en' if common.PQOS_API.is_mba_bw_enabled() else 'dis'}abled.")
             log.info(f"RDT L3 CDP {'en' if common.PQOS_API.is_l3_cdp_enabled() else 'dis'}abled.")
+            log.info(f"RDT L2 CDP {'en' if common.PQOS_API.is_l2_cdp_enabled() else 'dis'}abled.")
 
     try:
         if rdt_interface():

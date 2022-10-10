@@ -368,7 +368,7 @@ class TestCaps:
             'cache_ways_num': 20,
             'clos_num': 14,
             'cdp_supported': True,
-            'cdp_enabled': True
+            'cdp_enabled': False
         }
 
         with mock.patch("caps.l2ca_info", return_value=info):
@@ -398,4 +398,4 @@ class TestCaps:
             assert data['cw_num'] == 20
             assert data['clos_num'] == 14
             assert data['cdp_supported']
-            assert data['cdp_enabled']
+            assert not data['cdp_enabled']

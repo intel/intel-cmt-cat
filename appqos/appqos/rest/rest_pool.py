@@ -183,7 +183,7 @@ class Pool(Resource):
             check_alloc_tech(int(pool_id), json_data)
 
             # set new cbm
-            for key in ['l2cbm', 'l3cbm', 'l3cbm_code', 'l3cbm_data']:
+            for key in ['l2cbm', 'l2cbm_code', 'l2cbm_data', 'l3cbm', 'l3cbm_code', 'l3cbm_data']:
                 if key not in json_data:
                     continue
 
@@ -285,7 +285,7 @@ class Pools(Resource):
                 " reached for requested allocation combination")
 
         # convert cbm from string to int
-        for key in ['l2cbm', 'l3cbm', 'l3cbm_code', 'l3cbm_data']:
+        for key in ['l2cbm', 'l2cbm_code', 'l2cbm_data', 'l3cbm', 'l3cbm_code', 'l3cbm_data']:
             if key not in post_data:
                 continue
 

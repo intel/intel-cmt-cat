@@ -324,7 +324,7 @@ class PqosApi:
 
         return 0
 
-    def l2ca_set(self, l2ids, cos_id, ways_mask):
+    def l2ca_set(self, l2ids, cos_id, mask=None, code_mask=None, data_mask=None):
         """
         Configures L2 CAT for CoS
 
@@ -332,13 +332,15 @@ class PqosApi:
             l2ids: L2 cache identifiers list on which to configure L2 CAT
             cos_id: Class of Service
             ways_mask: L2 CAT CBM to set
+            code_mask: L2 CAT code CBM to set
+            data_mask: L2 CAT data CBM to set
 
         Returns:
             0 on success
             -1 otherwise
         """
         try:
-            cos = self.l2ca.COS(cos_id, ways_mask)
+            cos = self.l2ca.COS(cos_id, mask=mask, code_mask=code_mask, data_mask=data_mask)
             for l2id in l2ids:
                 self.l2ca.set(l2id, [cos])
         except Exception as ex:

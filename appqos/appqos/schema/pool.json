@@ -19,6 +19,14 @@
         "description": "L2 CAT cache bit mask",
         "$ref": "definitions.json#/string_hex"
       },
+      "l2cbm_code": {
+        "description": "L2 CAT cache code bit mask",
+        "$ref": "definitions.json#/string_hex"
+      },
+      "l2cbm_data": {
+        "description": "L2 CAT cache data bit mask",
+        "$ref": "definitions.json#/string_hex"
+      },
       "cbm": {
         "description": "L3 CAT cache bit mask (replaced by l3cbm)",
         "deprecated": true,
@@ -75,6 +83,20 @@
           { "required": ["l3cbm"] },
           { "required": ["l3cbm_data"] }
         ]
+      },
+      "l2cbm_data": {
+        "type": "object",
+        "anyOf": [
+          { "required": ["l2cbm"] },
+          { "required": ["l2cbm_code"] }
+        ]
+      },
+      "l2cbm_code": {
+        "type": "object",
+        "anyOf": [
+          { "required": ["l2cbm"] },
+          { "required": ["l2cbm_data"] }
+        ]
       }
     }
   },
@@ -86,6 +108,8 @@
           "name": {},
           "cores": {},
           "l2cbm":{},
+          "l2cbm_data": {},
+          "l2cbm_code": {},
           "cbm": {},
           "l3cbm": {},
           "l3cbm_data": {},
@@ -102,6 +126,8 @@
           { "required": ["l3cbm_code"] },
           { "required": ["l3cbm_data"] },
           { "required": ["l2cbm"] },
+          { "required": ["l2cbm_code"] },
+          { "required": ["l2cbm_data"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
           { "required": ["power_profile"] }
@@ -125,6 +151,8 @@
           "name": {},
           "cores": {},
           "l2cbm": {},
+          "l2cbm_data": {},
+          "l2cbm_code": {},
           "cbm": {},
           "l3cbm": {},
           "l3cbm_data": {},
@@ -143,6 +171,8 @@
           { "required": ["l3cbm_code"] },
           { "required": ["l3cbm_data"] },
           { "required": ["l2cbm"] },
+          { "required": ["l2cbm_code"] },
+          { "required": ["l2cbm_data"] },
           { "required": ["mba"] },
           { "required": ["mba_bw"] },
           { "required": ["power_profile"] }
@@ -160,6 +190,8 @@
           "name": {},
           "cores": {},
           "l2cbm": {},
+          "l2cbm_data": {},
+          "l2cbm_code": {},
           "cbm": {},
           "l3cbm": {},
           "l3cbm_code": {},
@@ -176,6 +208,8 @@
         "anyOf": [
           { "required": ["name"] },
           { "required": ["l2cbm"] },
+          { "required": ["l2cbm_code"] },
+          { "required": ["l2cbm_data"] },
           { "required": ["cbm"] },
           { "required": ["l3cbm"] },
           { "required": ["l3cbm_code"] },

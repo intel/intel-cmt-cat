@@ -202,6 +202,7 @@ class CapsRdtIface(Resource):
             data['rdt_iface']['interface'] = json_data['interface']
             CapsMbaCtrl.set_mba_ctrl_enabled(data, False)
             CapsL3ca.set_cdp_enabled(data, False)
+            CapsL2ca.set_cdp_enabled(data, False)
 
             common.CONFIG_STORE.set_config(data)
 
@@ -313,6 +314,59 @@ class CapsL2ca(Resource):
             'cw_num': l2ca_info['cache_ways_num'],
             'clos_num': l2ca_info['clos_num'],
             'cdp_supported': l2ca_info['cdp_supported'],
-            'cdp_enabled': l2ca_info['cdp_enabled']
+            'cdp_enabled': common.CONFIG_STORE.get_l2cdp_enabled()
         }
         return res, 200
+
+
+    @staticmethod
+    def put():
+        """
+        Handles PUT /caps/l2ca request.
+        Raises BadRequest, InternalError
+        Returns:
+            response, status code
+        """
+        json_data = request.get_json()
+
+        # validate request
+        try:
+            schema, resolver = ConfigStore.load_json_schema('modify_cdp.json')
+            jsonschema.validate(json_data, schema, resolver=resolver)
+        except (jsonschema.ValidationError, OverflowError) as error:
+            raise BadRequest("Request validation failed") from error
+
+        if not caps.cdp_l2_supported():
+            return {'message': "L2 CDP not supported!"}, 409
+
+        if common.CONFIG_STORE.is_any_pool_defined():
+            return {'message': "Please remove all Pools first!"}, 409
+
+        if common.CONFIG_STORE.get_l2cdp_enabled() != json_data['cdp_enabled']:
+            data = deepcopy(common.CONFIG_STORE.get_config())
+
+            CapsL2ca.set_cdp_enabled(data, json_data['cdp_enabled'])
+
+            common.CONFIG_STORE.set_config(data)
+
+        return {'message': "L2 CDP status changed."}, 200
+
+
+    @staticmethod
+    def set_cdp_enabled(data, enabled):
+        """
+        Sets l2cdp enabled in config
+        Parameters:
+            data: configuration dict
+            enabled: l2cdp status
+        """
+        # remove default pool
+        common.CONFIG_STORE.remove_default_pool(data)
+
+        if 'rdt' not in data:
+            data['rdt'] = {}
+
+        data['rdt']['l2cdp'] = enabled
+
+        # recreate default pool
+        common.CONFIG_STORE.add_default_pool(data)
