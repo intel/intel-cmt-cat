@@ -43,4 +43,24 @@ int __wrap_resctrl_mon_assoc_get_pid(const pid_t task,
                                      char *name,
                                      const unsigned name_size);
 int __wrap_resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
+int __wrap_resctrl_mon_mkdir(const unsigned class_id, const char *name);
+int __wrap_resctrl_mon_rmdir(const unsigned class_id, const char *name);
+int __wrap_resctrl_mon_cpumask_read(const unsigned class_id,
+                                    const char *resctrl_group,
+                                    struct resctrl_cpumask *mask);
+int __wrap_resctrl_mon_cpumask_write(const unsigned class_id,
+                                     const char *resctrl_group,
+                                     const struct resctrl_cpumask *mask);
+
+/* headers for static functions */
+char *resctrl_mon_new_group(void);
+int resctrl_mon_mkdir(const unsigned class_id, const char *name);
+int resctrl_mon_rmdir(const unsigned class_id, const char *name);
+int resctrl_mon_cpumask_read(const unsigned class_id,
+                             const char *resctrl_group,
+                             struct resctrl_cpumask *mask);
+int resctrl_mon_cpumask_write(const unsigned class_id,
+                              const char *resctrl_group,
+                              const struct resctrl_cpumask *mask);
+
 #endif /* MOCK_RESCTRL_MONITORING_H_ */

@@ -23,7 +23,7 @@ CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-D'PQOS_LOCAL=' -D'PQOS_API='
+	-D'PQOS_LOCAL=' -D'PQOS_API=' -D'PQOS_STATIC='
 
 CFLAGS += -g -ggdb -O0
 
@@ -94,6 +94,20 @@ $(OBJ_DIR)/os_cap.o: $(LIB_DIR)/os_cap.c $(OBJ_DIR)/os_cap.d
 	objcopy $@ \
 		--globalize-symbol=os_cap_mon_resctrl_support --weaken-symbol=os_cap_mon_resctrl_support \
 		--globalize-symbol=os_cap_mon_perf_support --weaken-symbol=os_cap_mon_perf_support \
+		$@
+
+$(OBJ_DIR)/resctrl_monitoring.o: $(LIB_DIR)/resctrl_monitoring.c $(OBJ_DIR)/resctrl_monitoring.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=resctrl_mon_is_supported --weaken-symbol=resctrl_mon_is_supported \
+		--globalize-symbol=resctrl_mon_is_event_supported --weaken-symbol=resctrl_mon_is_event_supported \
+		--globalize-symbol=resctrl_mon_cpumask_read --weaken-symbol=resctrl_mon_cpumask_read \
+		--globalize-symbol=resctrl_mon_cpumask_write --weaken-symbol=resctrl_mon_cpumask_write \
+		--globalize-symbol=resctrl_mon_assoc_set --weaken-symbol=resctrl_mon_assoc_set \
+		--globalize-symbol=resctrl_mon_assoc_set_pid --weaken-symbol=resctrl_mon_assoc_set_pid \
+		--globalize-symbol=resctrl_mon_new_group --weaken-symbol=resctrl_mon_new_group \
+		--globalize-symbol=resctrl_mon_mkdir --weaken-symbol=resctrl_mon_mkdir \
+		--globalize-symbol=resctrl_mon_rmdir --weaken-symbol=resctrl_mon_rmdir \
 		$@
 
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
@@ -418,6 +432,66 @@ $(BIN_DIR)/test_resctrl_alloc: test_resctrl_alloc.c $(LIB_OBJS)
 		-Wl,--wrap=resctrl_schemata_l3ca_write \
 		-Wl,--wrap=resctrl_schemata_l2ca_write \
 		-Wl,--wrap=resctrl_schemata_mba_write \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_resctrl_mon_init: test_resctrl_mon_init.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--wrap=pqos_fclose \
+		-Wl,--wrap=pqos_dir_exists \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_resctrl_mon_cpumask: test_resctrl_mon_cpumask.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--wrap=pqos_fclose \
+		-Wl,--wrap=resctrl_cpumask_write \
+		-Wl,--wrap=resctrl_cpumask_read \
+		-Wl,--wrap=resctrl_cpumask_set \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_resctrl_mon_assoc: test_resctrl_mon_assoc.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=resctrl_alloc_get_grps_num \
+		-Wl,--wrap=resctrl_alloc_assoc_get \
+		-Wl,--wrap=resctrl_alloc_assoc_get_pid \
+		-Wl,--wrap=_pqos_get_cap \
+		-Wl,--wrap=resctrl_cpumask_get \
+		-Wl,--wrap=resctrl_cpumask_set \
+		-Wl,--wrap=scandir \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_resctrl_mon_start: test_resctrl_mon_start.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_get_cap \
+		-Wl,--wrap=_pqos_get_cpu \
+		-Wl,--wrap=scandir \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--wrap=pqos_fclose \
+		-Wl,--wrap=pqos_dir_exists \
+		-Wl,--wrap=resctrl_mon_cpumask_write \
+		-Wl,--wrap=resctrl_mon_cpumask_read \
+		-Wl,--wrap=resctrl_cpumask_unset \
+		-Wl,--wrap=resctrl_cpumask_set \
+		-Wl,--wrap=resctrl_cpumask_get \
+		-Wl,--wrap=resctrl_alloc_task_validate \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_resctrl_mon: test_resctrl_mon.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=mkdir \
+		-Wl,--wrap=rmdir \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

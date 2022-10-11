@@ -41,6 +41,10 @@ int __wrap_resctrl_cpumask_write(FILE *fd, const struct resctrl_cpumask *mask);
 int __wrap_resctrl_cpumask_read(FILE *fd, struct resctrl_cpumask *mask);
 void __wrap_resctrl_cpumask_set(const unsigned lcore,
                                 struct resctrl_cpumask *mask);
+void __wrap_resctrl_cpumask_unset(const unsigned lcore,
+                                  struct resctrl_cpumask *mask);
+int __wrap_resctrl_cpumask_get(const unsigned lcore,
+                               const struct resctrl_cpumask *mask);
 int __wrap_resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
                          const enum pqos_cdp_config l2_cdp_cfg,
                          const enum pqos_mba_config mba_cfg);

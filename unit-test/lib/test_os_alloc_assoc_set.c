@@ -86,6 +86,7 @@ test_os_alloc_assoc_set_active_mon(void **state)
         will_return(__wrap_resctrl_alloc_assoc_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_resctrl_mon_assoc_set, lcore, lcore);
+        expect_string(__wrap_resctrl_mon_assoc_set, name, "test");
         will_return(__wrap_resctrl_mon_assoc_set, PQOS_RETVAL_OK);
 
         ret = os_alloc_assoc_set(lcore, class_id);
@@ -159,6 +160,7 @@ test_os_alloc_assoc_set_pid_active_mon(void **state)
         will_return(__wrap_resctrl_alloc_assoc_set_pid, PQOS_RETVAL_OK);
 
         expect_value(__wrap_resctrl_mon_assoc_set_pid, task, task);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
         will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_OK);
 
         ret = os_alloc_assoc_set_pid(task, class_id);

@@ -62,6 +62,16 @@ extern "C" {
 PQOS_LOCAL FILE *pqos_fopen(const char *name, const char *mode);
 
 /**
+ * @brief Wrapper around fclose()
+ *
+ * @param [in] stream file descriptor
+ *
+ * @return Operational status
+ * @retval 0 on success
+ */
+PQOS_LOCAL int pqos_fclose(FILE *stream);
+
+/**
  * @brief Wrapper around strcat
  *
  * @param [out] dst Output buffer

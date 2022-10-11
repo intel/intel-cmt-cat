@@ -83,6 +83,12 @@ pqos_fopen_error:
         return NULL;
 }
 
+int
+pqos_fclose(FILE *stream)
+{
+        return fclose(stream);
+}
+
 char *
 pqos_strcat(char *dst, const char *src, size_t size)
 {

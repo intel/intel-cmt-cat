@@ -35,6 +35,8 @@
 
 #include "common.h"
 
+FILE *__wrap_pqos_fopen(const char *name, const char *mode);
+int __wrap_pqos_fclose(FILE *fd);
 int __wrap_pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value);
 int __wrap_pqos_file_exists(const char *path);
 int __wrap_pqos_dir_exists(const char *path);

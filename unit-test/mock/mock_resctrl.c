@@ -62,6 +62,23 @@ __wrap_resctrl_cpumask_set(const unsigned lcore, struct resctrl_cpumask *mask)
         check_expected(lcore);
 }
 
+void
+__wrap_resctrl_cpumask_unset(const unsigned lcore, struct resctrl_cpumask *mask)
+{
+        assert_non_null(mask);
+        check_expected(lcore);
+}
+
+int
+__wrap_resctrl_cpumask_get(const unsigned lcore,
+                           const struct resctrl_cpumask *mask)
+{
+        assert_non_null(mask);
+        check_expected(lcore);
+
+        return mock_type(int);
+}
+
 int
 __wrap_resctrl_mount(const enum pqos_cdp_config l3_cdp_cfg,
                      const enum pqos_cdp_config l2_cdp_cfg,

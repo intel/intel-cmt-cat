@@ -50,7 +50,6 @@
  * Local data structures
  * ---------------------------------------
  */
-static const struct pqos_cpuinfo *m_cpu = NULL;
 
 /** List of non virtual events */
 static const enum pqos_mon_event os_mon_event[] = {
@@ -354,16 +353,12 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        m_cpu = cpu;
-
         return ret;
 }
 
 int
 os_mon_fini(void)
 {
-        m_cpu = NULL;
-
         perf_mon_fini();
         resctrl_mon_fini();
 

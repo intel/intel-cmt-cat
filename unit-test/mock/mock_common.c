@@ -35,6 +35,24 @@
 #include "mock_test.h"
 #include "pqos.h"
 
+FILE *
+__wrap_pqos_fopen(const char *name, const char *mode)
+{
+        check_expected(name);
+        check_expected(mode);
+
+        return mock_ptr_type(FILE *);
+}
+
+int
+__wrap_pqos_fclose(FILE *fd)
+{
+        function_called();
+        assert_non_null(fd);
+
+        return mock_type(int);
+}
+
 int
 __wrap_pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
 {

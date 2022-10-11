@@ -43,6 +43,7 @@ extern "C" {
 #endif
 
 #include "pqos.h"
+#include "resctrl.h"
 #include "types.h"
 
 /**
@@ -107,6 +108,13 @@ PQOS_LOCAL int resctrl_mon_poll(struct pqos_mon_data *group,
  * @retval PQOS_RETVAL_OK on success
  */
 PQOS_LOCAL int resctrl_mon_reset(void);
+
+/**
+ * @brief Check if resctrl monitoring is supported
+ *
+ * @retval 0 if not supported
+ */
+PQOS_LOCAL int resctrl_mon_is_supported(void);
 
 /**
  * @brief Check if event is supported by resctrl

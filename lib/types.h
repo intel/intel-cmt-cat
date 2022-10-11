@@ -74,4 +74,10 @@ extern "C" {
 #define PQOS_LOCAL
 #endif
 
+#ifndef PQOS_STATIC
+#define PQOS_STATIC static
+#else
+#define PQOS_STATIC
+#endif
+
 #endif /* __PQOS_TYPES_H__ */

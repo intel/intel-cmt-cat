@@ -653,9 +653,9 @@ pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
 }
 
 enum pqos_vendor
-pqos_get_vendor(const struct pqos_cpuinfo *m_cpu)
+pqos_get_vendor(const struct pqos_cpuinfo *cpu)
 {
-        return m_cpu->vendor;
+        return cpu->vendor;
 }
 
 void

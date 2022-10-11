@@ -176,3 +176,27 @@ __wrap_resctrl_alloc_get_num_closids(unsigned *num_closids)
 
         return ret;
 }
+
+int
+__wrap_resctrl_alloc_get_grps_num(const struct pqos_cap *cap,
+                                  unsigned *grps_num)
+{
+        int ret;
+
+        assert_non_null(cap);
+        assert_non_null(grps_num);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *grps_num = mock_type(int);
+
+        return ret;
+}
+
+int
+__wrap_resctrl_alloc_task_validate(const pid_t task)
+{
+        check_expected(task);
+
+        return mock_type(int);
+}

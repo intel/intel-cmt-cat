@@ -58,13 +58,6 @@
 #define OS_MON_EVT_IDX_LLC_REF  8
 
 /**
- * ---------------------------------------
- * Local data structures
- * ---------------------------------------
- */
-static const struct pqos_cpuinfo *m_cpu = NULL;
-
-/**
  * Paths to RDT perf event info
  */
 #ifndef PERF_MON_SUPPORT
@@ -431,6 +424,7 @@ perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 
         ASSERT(cpu != NULL);
 
+        UNUSED_PARAM(cpu);
         UNUSED_PARAM(cap);
 
         /**
@@ -472,16 +466,12 @@ perf_mon_init_exit:
                          events_tab[i].desc);
         }
 
-        m_cpu = cpu;
-
         return ret;
 }
 
 int
 perf_mon_fini(void)
 {
-        m_cpu = NULL;
-
         return PQOS_RETVAL_OK;
 }
 

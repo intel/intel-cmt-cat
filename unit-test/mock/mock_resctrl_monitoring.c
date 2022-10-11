@@ -34,6 +34,8 @@
 
 #include "mock_test.h"
 
+#include <string.h>
+
 int
 __wrap_resctrl_mon_assoc_get(const unsigned lcore,
                              char *name,
@@ -43,6 +45,8 @@ __wrap_resctrl_mon_assoc_get(const unsigned lcore,
         assert_non_null(name);
         assert_int_not_equal(name_size, 0);
 
+        strncpy(name, "test", name_size);
+
         return mock_type(int);
 }
 
@@ -50,7 +54,7 @@ int
 __wrap_resctrl_mon_assoc_set(const unsigned lcore, const char *name)
 {
         check_expected(lcore);
-        assert_non_null(name);
+        check_expected(name);
 
         return mock_type(int);
 }
@@ -64,6 +68,8 @@ __wrap_resctrl_mon_assoc_get_pid(const pid_t task,
         assert_non_null(name);
         assert_int_not_equal(name_size, 0);
 
+        strncpy(name, "test", name_size);
+
         return mock_type(int);
 }
 
@@ -71,7 +77,49 @@ int
 __wrap_resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
 {
         check_expected(task);
-        assert_non_null(name);
+        check_expected(name);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_mkdir(const unsigned class_id, const char *name)
+{
+        check_expected(class_id);
+        check_expected(name);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_rmdir(const unsigned class_id, const char *name)
+{
+        check_expected(class_id);
+        check_expected(name);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_cpumask_read(const unsigned class_id,
+                                const char *resctrl_group,
+                                struct resctrl_cpumask *mask)
+{
+        check_expected(class_id);
+        check_expected(resctrl_group);
+        assert_non_null(mask);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_cpumask_write(const unsigned class_id,
+                                 const char *resctrl_group,
+                                 const struct resctrl_cpumask *mask)
+{
+        check_expected(class_id);
+        check_expected(resctrl_group);
+        assert_non_null(mask);
 
         return mock_type(int);
 }
