@@ -133,21 +133,6 @@ export class SystemCapsComponent implements OnInit {
     });
   }
 
-  mbaOnChange(event: MatSlideToggleChange) {
-    this.loading = true;
-    this.service.mbaCtrlPut(event.checked).subscribe({
-      next: (res: resMessage) => {
-        this.snackBar.displayInfo(res.message);
-        this._getMbaData();
-        this.loading = false;
-      },
-      error: (error: HttpErrorResponse) => {
-        this.snackBar.handleError(error.message);
-        this.loading = false;
-      },
-    });
-  }
-
   private _getMbaData() {
     if (!this.caps.includes('mba')) return;
 
@@ -164,7 +149,10 @@ export class SystemCapsComponent implements OnInit {
 
   private _getRdtIface(): void {
     this.service.getRdtIface().subscribe({
-      next: (rdtIface) => (this.rdtIface = rdtIface),
+      next: (rdtIface) => {
+        this.localStroe.setIfaceEvent();
+        this.rdtIface = rdtIface;
+      },
       error: (error: HttpErrorResponse) => {
         this.snackBar.handleError(error.message);
         this.loading = false;

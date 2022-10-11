@@ -44,6 +44,8 @@ import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { MatDialogModule } from '@angular/material/dialog';
+import { MatSliderModule } from '@angular/material/slider';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -62,6 +64,7 @@ import { L2catComponent } from '../components/system-caps/l2cat/l2cat.component'
 import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component';
 import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allocation/l3-cache-allocation.component';
 import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dialog.component';
+import { MbaAllocationComponent } from '../components/overview/mba-allocation/mba-allocation.component';
 
 @NgModule({
   declarations: [
@@ -79,6 +82,7 @@ import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dia
     L2catComponent,
     L3CacheAllocationComponent,
     EditDialogComponent,
+    MbaAllocationComponent,
   ],
   imports: [
     MatInputModule,
@@ -97,6 +101,8 @@ import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dia
     MatSlideToggleModule,
     MatButtonToggleModule,
     MatDialogModule,
+    MatSliderModule,
+    MatTooltipModule,
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],

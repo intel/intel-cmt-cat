@@ -29,11 +29,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 
-import {
-  MatSlideToggle,
-  MatSlideToggleChange,
-} from '@angular/material/slide-toggle';
-
 import { SharedModule } from 'src/app/shared/shared.module';
 import { MBA, MBACTRL } from '../system-caps.model';
 import { MbaComponent } from './mba.component';
@@ -129,25 +124,6 @@ describe('Given MbaComponent', () => {
 
       expect(template).toEqual('Yes');
     });
-
-    it('should display "MBA controller enabled" toggle', () => {
-      const mockedMbaData: MBA & MBACTRL = {
-        clos_num: 24,
-        mba_enabled: true,
-        mba_bw_enabled: true,
-        enabled: true,
-        supported: true,
-      };
-
-      MockRender(MbaComponent, {
-        isSupported: true,
-        mba: mockedMbaData,
-      });
-
-      const template = ngMocks.find('mat-slide-toggle');
-
-      expect(template).toBeTruthy();
-    });
   });
 
   describe('when MBA controller is NOT supported', () => {
@@ -168,58 +144,6 @@ describe('Given MbaComponent', () => {
       const template = ngMocks.formatText(ngMocks.find('.negative'));
 
       expect(template).toEqual('No');
-    });
-
-    it('should NOT display "MBA controller enabled" toggle', () => {
-      const mockedMbaData: MBA & MBACTRL = {
-        clos_num: 24,
-        mba_enabled: true,
-        mba_bw_enabled: true,
-        enabled: false,
-        supported: false,
-      };
-
-      MockRender(MbaComponent, {
-        isSupported: true,
-        mba: mockedMbaData,
-      });
-
-      const template = ngMocks.find('mat-slide-toggle', null);
-
-      expect(template).toBeNull();
-    });
-  });
-
-  describe('when slide toggle is clicked', () => {
-    it('should emit "onChange" event with correct value', (done) => {
-      const event: MatSlideToggleChange = {
-        checked: false,
-        source: {} as MatSlideToggle,
-      };
-
-      const mockedMbaData: MBA & MBACTRL = {
-        clos_num: 24,
-        mba_enabled: true,
-        mba_bw_enabled: true,
-        enabled: true,
-        supported: true,
-      };
-
-      const fixture = MockRender(MbaComponent, {
-        isSupported: true,
-        mba: mockedMbaData,
-      });
-
-      const component = fixture.point.componentInstance;
-      const toggle = ngMocks.find('mat-slide-toggle');
-
-      component.changeEvent.subscribe((value) => {
-        expect(value.checked).toBeFalse();
-
-        done();
-      });
-
-      toggle.triggerEventHandler('change', event);
     });
   });
 });

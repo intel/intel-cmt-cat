@@ -27,13 +27,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import {
+  MatSlideToggle,
+  MatSlideToggleChange,
+} from '@angular/material/slide-toggle';
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { EMPTY } from 'rxjs';
+import { EMPTY, of } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
+import { MBACTRL } from '../system-caps/system-caps.model';
 import { OverviewComponent } from './overview.component';
+import { Pools } from './overview.model';
 
 describe('Given OverviewComponent', () => {
   beforeEach(() =>
@@ -42,6 +49,10 @@ describe('Given OverviewComponent', () => {
       .mock(Router)
       .mock(AppqosService, {
         getPools: () => EMPTY,
+        getMbaCtrl: () => EMPTY,
+      })
+      .mock(LocalService, {
+        getIfaceEvent: () => EMPTY,
       })
   );
 
@@ -54,6 +65,64 @@ describe('Given OverviewComponent', () => {
       const expectValue = ngMocks.find('app-l3-cache-allocation');
 
       expect(expectValue).toBeTruthy();
+    });
+
+    it('should get Memory Bandwidth Allocation controller', () => {
+      const mockedMbaCtrlData: MBACTRL = {
+        enabled: true,
+        supported: true,
+      };
+
+      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrlData));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(OverviewComponent);
+
+      expect(component.mbaCtrl).toEqual(mockedMbaCtrlData);
+    });
+
+    it('should get Pools', () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(OverviewComponent);
+
+      expect(component.pools).toEqual(mockedPool);
+    });
+  });
+
+  describe('when mbaOnChange method is called', () => {
+    it('it should call mbaCtrlPut with correct value', () => {
+      const mockResponse = 'MBA controller modified';
+      const mbaCtrlSpy = jasmine.createSpy('mbaCtrlPut');
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'mbaCtrlPut', mbaCtrlSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(OverviewComponent);
+
+      component.mbaOnChange(event);
+
+      expect(mbaCtrlSpy).toHaveBeenCalledWith(event.checked);
     });
   });
 });

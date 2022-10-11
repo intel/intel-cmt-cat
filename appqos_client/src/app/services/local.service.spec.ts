@@ -103,4 +103,36 @@ describe('Given LocalService', () => {
       expect(expectedValue).toBeTrue();
     });
   });
+
+  describe('when setIfaceEvent method is executed', () => {
+    it('should emit ifaceEvent', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service },
+      } = MockRender(LocalService);
+
+      service.ifaceEvent.subscribe((event) => {
+        expect(event).toBeUndefined();
+
+        done();
+      });
+
+      service.setIfaceEvent();
+    });
+  });
+
+  describe('when getIfaceEvent method is executed', () => {
+    it('should detect changes', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service },
+      } = MockRender(LocalService);
+
+      service.getIfaceEvent().subscribe((event) => {
+        expect(event).toBeUndefined();
+
+        done();
+      });
+
+      service.ifaceEvent.next();
+    });
+  });
 });

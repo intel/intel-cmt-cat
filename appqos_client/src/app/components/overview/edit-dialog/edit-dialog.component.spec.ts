@@ -31,7 +31,12 @@ import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 import { EMPTY, of } from 'rxjs';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { MatSliderHarness } from '@angular/material/slider/testing';
 import { MatSliderModule } from '@angular/material/slider';
+import { MatInputHarness } from '@angular/material/input/testing';
+import { MatInputModule } from '@angular/material/input';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
@@ -49,6 +54,8 @@ describe('Given EditDialogComponent', () => {
         getPools: () => EMPTY,
       })
       .keep(MatSliderModule)
+      .keep(MatInputModule)
+      .keep(BrowserAnimationsModule)
   );
 
   MockInstance.scope('case');
@@ -231,6 +238,216 @@ describe('Given EditDialogComponent', () => {
       expect(component.pools[0].l3Bitmask).toEqual([
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
       ]);
+    });
+  });
+
+  describe('when initialized with MBA', () => {
+    it('should display "Memory Bandwidth Allocation (MBA)" title', async () => {
+      const title = 'Memory Bandwidth Allocation (MBA)';
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const expectedTitle = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(expectedTitle).toEqual(title);
+    });
+
+    it('should display mba value', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          name: 'Default',
+          mba: 70,
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const slider = await loader.getHarness(MatSliderHarness);
+
+      expect(await slider.getValue()).toEqual(70);
+    });
+  });
+
+  describe('when initialized with MBA BW and default value', () => {
+    it('should display empty with placeholder', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          mba_bw: 4294967295,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const inputs = await loader.getAllHarnesses(MatInputHarness);
+      const input = inputs[0];
+
+      expect((await input.getValue()).toString()).toEqual('');
+      expect((await input.getPlaceholder()).toString()).toEqual('5000');
+    });
+  });
+
+  describe('when initialized with MBA BW and NOT default value', () => {
+    it('should display poll mba_bw', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          mba_bw: 4294967,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const inputs = await loader.getAllHarnesses(MatInputHarness);
+      const input = inputs[0];
+
+      expect((await input.getValue()).toString()).toEqual('4294967');
+    });
+  });
+
+  describe('when saveMBA method is executed', () => {
+    it('should save pool mba by id', async () => {
+      const mockResponse = 'POOL 0 updated';
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          mba: 70,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
+        of(mockResponse)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const cbmButton = ngMocks.find('.apply-button');
+      cbmButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy).toHaveBeenCalledWith({ mba: 70 }, 0);
+    });
+  });
+
+  describe('when onChangeMBA method is executed', () => {
+    it('should update state of pool mba', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          name: 'Default',
+          mba: 70,
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      const component = fixture.point.componentInstance;
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const slider = await loader.getHarness(MatSliderHarness);
+
+      expect(await slider.getValue()).toBe(70);
+
+      await slider.setValue(50);
+
+      expect(component.pools[0].mba).toBe(50);
     });
   });
 });

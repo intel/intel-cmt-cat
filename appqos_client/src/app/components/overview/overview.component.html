@@ -34,10 +34,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     [pools]="pools"
     (poolEvent)="getPools()"
   ></app-l3-cache-allocation>
-  <mat-card class="mba">
-    <mat-card-title>Memory Bandwidth Allocation(MBA)</mat-card-title>
-    <mat-card-content>
-      <h1>MBA</h1>
-    </mat-card-content>
-  </mat-card>
+  <app-mba-allocation
+    [pools]="pools"
+    [mbaCtrl]="mbaCtrl"
+    (poolEvent)="getPools()"
+    (mbaCtrlEvent)="mbaOnChange($event)"
+  ></app-mba-allocation>
 </div>

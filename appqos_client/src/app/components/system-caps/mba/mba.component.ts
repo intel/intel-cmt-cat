@@ -27,14 +27,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import {
-  ChangeDetectionStrategy,
-  Component,
-  EventEmitter,
-  Input,
-  Output,
-} from '@angular/core';
-import { MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+
 import { MBA, MBACTRL } from '../system-caps.model';
 
 @Component({
@@ -47,11 +41,4 @@ import { MBA, MBACTRL } from '../system-caps.model';
 export class MbaComponent {
   @Input() isSupported: boolean = false;
   @Input() mba!: MBA & MBACTRL;
-  @Output() changeEvent = new EventEmitter<MatSlideToggleChange>();
-
-  mbaOnChange(event: MatSlideToggleChange) {
-    event.source.checked = this.mba.enabled;
-
-    this.changeEvent.emit(event);
-  }
 }

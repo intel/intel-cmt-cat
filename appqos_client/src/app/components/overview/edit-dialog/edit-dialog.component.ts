@@ -30,13 +30,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { AfterContentInit, Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatSliderChange } from '@angular/material/slider';
 import { map } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Pools } from '../overview.model';
 
-type dialogDataType = { l3cbm: boolean; numCacheWays: number };
+type dialogDataType = { mba?: boolean; l3cbm?: boolean; numCacheWays: number };
 
 @Component({
   selector: 'app-edit-dialog',
@@ -46,6 +47,7 @@ type dialogDataType = { l3cbm: boolean; numCacheWays: number };
 export class EditDialogComponent implements AfterContentInit {
   pools!: Pools[];
   loading = false;
+  mbaBwDefNum = 1 * Math.pow(2, 32) - 1;
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: dialogDataType,
@@ -65,7 +67,17 @@ export class EditDialogComponent implements AfterContentInit {
     }
   }
 
-  private _getPools() {
+  onChangeMbaBw(event: any, i: number) {
+    if (event.target.value === '') return;
+
+    this.pools[i]['mba_bw'] = event.target.value;
+  }
+
+  onChangeMBA(event: MatSliderChange, i: number) {
+    this.pools[i].mba = event.value!;
+  }
+
+  private _getPools(): void {
     this.loading = true;
     this.service
       .getPools()
@@ -91,6 +103,46 @@ export class EditDialogComponent implements AfterContentInit {
       .poolPut(
         {
           l3cbm: parseInt(this.pools[i].l3Bitmask!.join(''), 2),
+        },
+        id
+      )
+      .subscribe({
+        next: (response) => {
+          this.snackBar.displayInfo(response.message);
+          this._getPools();
+        },
+        error: (error) => {
+          this.snackBar.handleError(error.error.message);
+          this._getPools();
+        },
+      });
+  }
+
+  saveMBA(i: number, id: number) {
+    this.service
+      .poolPut(
+        {
+          mba: this.pools[i].mba,
+        },
+        id
+      )
+      .subscribe({
+        next: (response) => {
+          this.snackBar.displayInfo(response.message);
+          this._getPools();
+        },
+        error: (error) => {
+          this.snackBar.handleError(error.error.message);
+          this._getPools();
+        },
+      });
+  }
+
+  saveMBABW(i: number, id: number) {
+    this.service
+      .poolPut(
+        {
+          mba_bw: Number(this.pools[i].mba_bw),
         },
         id
       )

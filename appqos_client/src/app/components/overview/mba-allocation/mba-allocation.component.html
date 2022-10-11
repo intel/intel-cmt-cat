@@ -1,0 +1,88 @@
+<!--
+BSD LICENSE
+
+Copyright(c) 2022 Intel Corporation. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+  * Neither the name of Intel Corporation nor the names of its
+    contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+    
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+-->
+
+<mat-card class="mba">
+  <div class="mba-header">
+    <mat-card-title>Memory Bandwidth Allocation (MBA)</mat-card-title>
+
+    <mat-slide-toggle
+      color="primary"
+      *ngIf="mbaCtrl"
+      [checked]="mbaCtrl.enabled"
+      (change)="mbaOnChange($event)"
+      [matTooltip]="
+        mbaCtrl.supported ? 'MBA controller enabled' : 'MBA controller disabled'
+      "
+      matTooltipPosition="right"
+      [disabled]="!mbaCtrl.supported"
+    >
+    </mat-slide-toggle>
+  </div>
+  <mat-card-content>
+    <span class="info-text"
+      >Provides new levels of control over how memory bandwidth is distributed
+      across running applications. MBA enables improved prioritization,
+      bandwidth management and is a valuable tool to help control data center…
+      <a
+        href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-memory-bandwidth-allocation.html"
+        class="contact-text"
+        target="_blank"
+        >See more</a
+      ></span
+    >
+    <div class="pool" *ngFor="let pool of pools; index as i">
+      <span class="pool-name">
+        {{ pool.name }}
+      </span>
+      <div class="pool-mba" *ngIf="pool.mba">
+        <mat-slider
+          thumbLabel
+          [value]="pool.mba"
+          min="0"
+          max="100"
+          aria-label="units"
+        ></mat-slider>
+      </div>
+      <div class="pool-mba-mbps" *ngIf="pool.mba_bw">
+        <mat-form-field appearance="fill">
+          <mat-label>MBps</mat-label>
+          <input
+            matInput
+            [value]="pool.mba_bw === mbaBwDefNum ? 'Unrestricted' : pool.mba_bw"
+          />
+        </mat-form-field>
+      </div>
+    </div>
+  </mat-card-content>
+  <mat-card-actions class="action-button">
+    <button mat-button color="primary" (click)="openDialog()">EDIT</button>
+  </mat-card-actions>
+</mat-card>

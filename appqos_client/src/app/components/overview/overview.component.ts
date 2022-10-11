@@ -27,9 +27,14 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
 import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { MBACTRL, resMessage } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
 
 @Component({
@@ -39,16 +44,46 @@ import { Pools } from './overview.model';
 })
 export class OverviewComponent implements OnInit {
   pools!: Pools[];
+  mbaCtrl!: MBACTRL;
 
-  constructor(private service: AppqosService) {}
+  constructor(
+    private service: AppqosService,
+    private snackBar: SnackBarService,
+    private localService: LocalService
+  ) {}
 
   ngOnInit(): void {
+    this.getMbaCtrl();
     this.getPools();
+
+    this.localService.getIfaceEvent().subscribe((_) => {
+      this.getMbaCtrl();
+      this.getPools();
+    });
   }
 
   getPools(): void {
     this.service
       .getPools()
       .subscribe((pools) => (this.pools = pools.slice(0, 4)));
+  }
+
+  getMbaCtrl(): void {
+    this.service.getMbaCtrl().subscribe((mbaCtrl: MBACTRL) => {
+      this.mbaCtrl = mbaCtrl;
+    });
+  }
+
+  mbaOnChange(event: MatSlideToggleChange) {
+    this.service.mbaCtrlPut(event.checked).subscribe({
+      next: (res: resMessage) => {
+        this.snackBar.displayInfo(res.message);
+        this.getMbaCtrl();
+        this.getPools();
+      },
+      error: (error: HttpErrorResponse) => {
+        this.snackBar.handleError(error.message);
+      },
+    });
   }
 }

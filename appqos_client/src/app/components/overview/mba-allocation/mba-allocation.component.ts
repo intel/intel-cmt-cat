@@ -28,48 +28,56 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.l3cat {
-  width: auto;
-  height: auto;
-}
+import { HttpClient } from '@angular/common/http';
+import {
+  AfterContentInit,
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnInit,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
-.mat-card {
-  .info-text {
-    font-size: small;
-    margin-right: -41rem;
+import { AppqosService } from 'src/app/services/appqos.service';
+import { MBACTRL } from '../../system-caps/system-caps.model';
+import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
+import { Pools } from '../overview.model';
+
+@Component({
+  selector: 'app-mba-allocation',
+  templateUrl: './mba-allocation.component.html',
+  styleUrls: ['./mba-allocation.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class MbaAllocationComponent {
+  @Input() pools!: Pools[];
+  @Input() mbaCtrl!: MBACTRL;
+  @Output() poolEvent = new EventEmitter<unknown>();
+  @Output() mbaCtrlEvent = new EventEmitter<MatSlideToggleChange>();
+  mbaBwDefNum = 1 * Math.pow(2, 32) - 1;
+
+  constructor(public dialog: MatDialog) {}
+
+  mbaOnChange(event: MatSlideToggleChange) {
+    event.source.checked = this.mbaCtrl.enabled;
+
+    this.mbaCtrlEvent.emit(event);
   }
 
-  .pool {
-    padding: 2rem 1rem 0 1rem;
-  }
+  openDialog(): void {
+    const dialogRef = this.dialog.open(EditDialogComponent, {
+      height: 'auto',
+      width: '40rem',
+      data: { mba: true },
+    });
 
-  .pool-name {
-    font-size: initial;
-    font-weight: 500;
-  }
-
-  .l3cbm-button {
-    border-radius: 0%;
-    border: 1px solid #6b6b6b;
-    min-width: 25px;
-    line-height: 30px;
-    margin-right: 2px;
-    margin-top: 2px;
-    cursor: default;
-    pointer-events: none;
-  }
-
-  .l3cbm-button.large {
-    padding: 0 1rem;
-  }
-
-  .l3cbm-button.small {
-    padding: 0 0.2rem;
-  }
-
-  .pool-cbm {
-    padding-top: 0.5rem;
-    flex-shrink: 0;
-    display: flex;
+    dialogRef.afterClosed().subscribe((_) => {
+      this.poolEvent.emit();
+    });
   }
 }

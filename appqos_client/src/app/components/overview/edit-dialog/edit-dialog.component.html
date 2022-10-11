@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 <div class="mba-dialog">
   <div class="header-dialog">
     <h2 mat-dialog-title *ngIf="data.l3cbm">L3 Cache Allocation (CAT)</h2>
+    <h2 mat-dialog-title *ngIf="data.mba">Memory Bandwidth Allocation (MBA)</h2>
     <mat-progress-spinner
       class="loading"
       *ngIf="loading"
@@ -46,6 +47,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     concerns by providing software control of where data is allocated into the
     last-level cache (LLC), enabling isolation and prioritization of key
     applications.</span
+  >
+  <span class="info-text" *ngIf="data.mba"
+    >Memory Bandwidth Allocation (MBA), which provides new levels of control
+    over how memory bandwidth is distributed across running applications. MBA
+    enables improved prioritization, bandwidth management and is a valuable tool
+    to help control data center noisy neighbors.</span
   >
   <mat-divider class="divider"></mat-divider>
   <mat-dialog-content class="mat-typography">
@@ -74,6 +81,46 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           color="primary"
           class="apply-button"
           (click)="saveL3CBM(i, pool.id)"
+        >
+          Apply
+        </button>
+      </div>
+      <div class="mba" *ngIf="data.mba && pool.mba">
+        <div class="pool-mba">
+          <mat-slider
+            thumbLabel
+            [value]="pool.mba"
+            min="10"
+            max="100"
+            step="10"
+            aria-label="units"
+            (change)="onChangeMBA($event, i)"
+          ></mat-slider>
+        </div>
+        <button
+          mat-flat-button
+          color="primary"
+          class="apply-button"
+          (click)="saveMBA(i, pool.id)"
+        >
+          Apply
+        </button>
+      </div>
+      <div class="pool-mba-mbps" *ngIf="data.mba && pool.mba_bw">
+        <mat-form-field appearance="fill" floatLabel="always">
+          <mat-label>MBps</mat-label>
+          <input
+            matInput
+            [value]="pool.mba_bw === mbaBwDefNum ? '' : pool.mba_bw"
+            [placeholder]="pool.mba_bw === mbaBwDefNum ? '5000' : ''"
+            (input)="onChangeMbaBw($event, i)"
+          />
+        </mat-form-field>
+        <button
+          mat-flat-button
+          color="primary"
+          class="apply-button"
+          (click)="saveMBABW(i, pool.id)"
         >
           Apply
         </button>

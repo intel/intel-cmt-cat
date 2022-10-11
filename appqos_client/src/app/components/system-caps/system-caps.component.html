@@ -57,11 +57,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       [l2cat]="l2cat"
     ></app-l2cat>
     <!--MBA-->
-    <app-mba
-      [isSupported]="caps.includes('mba')"
-      [mba]="mba"
-      (changeEvent)="mbaOnChange($event)"
-    ></app-mba>
+    <app-mba [isSupported]="caps.includes('mba')" [mba]="mba"></app-mba>
     <!--SSTBF-->
     <app-sstbf
       [isSupported]="caps.includes('sstbf')"

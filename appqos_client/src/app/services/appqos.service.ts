@@ -44,7 +44,7 @@ import {
 import { LocalService } from './local.service';
 import { Pools } from '../components/overview/overview.model';
 
-type poolPutType = { l3cbm: number };
+type poolPutType = { l3cbm?: number; mba?: number; mba_bw?: number };
 
 @Injectable({
   providedIn: 'root',

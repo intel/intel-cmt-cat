@@ -29,8 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 export interface Pools {
   id: number;
-  mba_bw: number;
-  mba?: number | null;
+  mba_bw?: number;
+  mba?: number;
   l3cbm?: number;
   l3Bitmask?: number[];
   l2Bitmask?: number[];

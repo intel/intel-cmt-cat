@@ -38,7 +38,7 @@ import { Pools } from '../overview.model';
 import { L3CacheAllocationComponent } from './l3-cache-allocation.component';
 import { AppqosService } from 'src/app/services/appqos.service';
 
-describe('Given OverviewComponent', () => {
+describe('Given L3CacheAllocationComponent', () => {
   beforeEach(() =>
     MockBuilder(L3CacheAllocationComponent)
       .mock(SharedModule)
@@ -181,9 +181,9 @@ describe('Given OverviewComponent', () => {
 
       MockRender(L3CacheAllocationComponent, { pools: mockedPool });
 
-      const expandButton = ngMocks.find('.action-button');
+      const editButton = ngMocks.find('.action-button');
 
-      expandButton.triggerEventHandler('click', {});
+      editButton.triggerEventHandler('click', {});
 
       expect(dialogSpy).toHaveBeenCalledWith(EditDialogComponent, {
         height: 'auto',
@@ -193,7 +193,7 @@ describe('Given OverviewComponent', () => {
     });
   });
 
-  describe('when click "Go to wikipedia"', () => {
+  describe('when click "See more"', () => {
     it('should redirect to wiki page', () => {
       MockRender(L3CacheAllocationComponent);
 

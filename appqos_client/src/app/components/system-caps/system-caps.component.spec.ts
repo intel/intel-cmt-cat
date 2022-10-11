@@ -272,28 +272,6 @@ describe('Given SystemCapsComponent', () => {
     });
   });
 
-  describe('when mbaOnChange method is called', () => {
-    it('it should call mbaCtrlPut with correct value', () => {
-      const mockResponse = 'MBA controller modified';
-      const mbaCtrlSpy = jasmine.createSpy('mbaCtrlPut');
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
-      };
-
-      MockInstance(AppqosService, 'mbaCtrlPut', mbaCtrlSpy)
-        .withArgs(event.checked)
-        .and.returnValue(of(mockResponse));
-
-      const fixture = MockRender(SystemCapsComponent);
-      const component = fixture.point.componentInstance;
-
-      component.mbaOnChange(event);
-
-      expect(mbaCtrlSpy).toHaveBeenCalledWith(event.checked);
-    });
-  });
-
   describe('when sstbfOnChange method is called', () => {
     it('it should call sstbfPut with correct value', () => {
       const mockResponse = 'SST-BF caps modified';

@@ -74,7 +74,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 }
 
 .mat-dialog-content {
-  .l3cbm {
+  margin: auto;
+
+  .l3cbm,
+  .mba,
+  .pool-mba-mbps {
     display: flex;
     align-items: baseline;
 
@@ -88,7 +92,28 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
     padding: 0.5rem 0;
   }
 
+  .pool-mba {
+    padding-top: 1rem;
+  }
+
   .mat-slider-horizontal {
-    width: 24rem;
+    width: 30rem;
+  }
+}
+
+.pool-mba-mbps {
+  padding: 0.5rem 2rem 0 0;
+
+  .mat-form-field {
+    width: 20rem;
+
+    .mat-form-field-flex {
+      padding: 0 0.75rem;
+    }
+  }
+
+  mat-label {
+    font-size: initial;
+    color: #000000;
   }
 }
