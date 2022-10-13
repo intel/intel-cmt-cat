@@ -608,6 +608,26 @@ $(BIN_DIR)/test_os_cap_mon: test_os_cap_mon.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=open \
+		-Wl,--wrap=close \
+		-Wl,--wrap=lockf \
+		-Wl,--wrap=cpuinfo_init \
+		-Wl,--wrap=cpuinfo_fini \
+		-Wl,--wrap=hw_cap_mon_discover \
+		-Wl,--wrap=os_cap_mon_discover \
+		-Wl,--wrap=hw_cap_l3ca_discover \
+		-Wl,--wrap=os_cap_l3ca_discover \
+		-Wl,--wrap=hw_cap_l2ca_discover \
+		-Wl,--wrap=os_cap_l2ca_discover \
+		-Wl,--wrap=hw_cap_mba_discover \
+		-Wl,--wrap=os_cap_mba_discover \
+		-Wl,--wrap=pqos_mon_init \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 .PHONY: run
 run: $(TESTS)
 	@echo "Running Library Unit Tests"
