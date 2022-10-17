@@ -44,7 +44,7 @@ import common
 
 from rest.rest_exceptions import BadRequest
 
-from config import ConfigStore
+from config_store import ConfigStore
 
 class CapsMba(Resource):
     """
@@ -115,15 +115,17 @@ class CapsMbaCtrl(Resource):
         if not caps.mba_bw_supported():
             return {'message': "MBA CTRL not supported!"}, 409
 
-        if common.CONFIG_STORE.is_any_pool_defined():
+        cfg = ConfigStore.get_config()
+
+        if cfg.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409
 
-        if common.CONFIG_STORE.get_mba_ctrl_enabled() != json_data['enabled']:
-            data = deepcopy(common.CONFIG_STORE.get_config())
+        if cfg.get_mba_ctrl_enabled() != json_data['enabled']:
+            data = deepcopy(cfg)
 
             CapsMbaCtrl.set_mba_ctrl_enabled(data, json_data['enabled'])
 
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore.set_config(data)
 
         return {'message': "MBA CTRL status changed."}, 200
 
@@ -137,7 +139,7 @@ class CapsMbaCtrl(Resource):
             enabled: mba_ctrl status
         """
         # remove default pool
-        common.CONFIG_STORE.remove_default_pool(data)
+        data.remove_default_pool()
 
         if 'mba_ctrl' not in data:
             data['mba_ctrl'] = {}
@@ -145,7 +147,7 @@ class CapsMbaCtrl(Resource):
         data['mba_ctrl']['enabled'] = enabled
 
         # recreate default pool
-        common.CONFIG_STORE.add_default_pool(data)
+        data.add_default_pool()
 
 
 class CapsRdtIface(Resource):
@@ -162,8 +164,10 @@ class CapsRdtIface(Resource):
         Returns:
             response, status code
         """
+        cfg = ConfigStore.get_config()
+
         res = {
-            'interface': common.PQOS_API.current_iface(),
+            'interface': cfg.get_rdt_iface(),
             'interface_supported': common.PQOS_API.supported_iface()
         }
         return res, 200
@@ -182,7 +186,7 @@ class CapsRdtIface(Resource):
 
         # validate request
         try:
-            schema, resolver = ConfigStore.load_json_schema('modify_rdt_iface.json')
+            schema, resolver = ConfigStore().load_json_schema('modify_rdt_iface.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed") from error
@@ -190,21 +194,23 @@ class CapsRdtIface(Resource):
         if not json_data['interface'] in common.PQOS_API.supported_iface():
             raise BadRequest(f"RDT interface '{json_data['interface']}' not supported!")
 
-        if common.CONFIG_STORE.is_any_pool_defined():
+        cfg = ConfigStore.get_config()
+
+        if cfg.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409
 
-        if common.CONFIG_STORE.get_rdt_iface() != json_data['interface']:
-            data = deepcopy(common.CONFIG_STORE.get_config())
+        if cfg.get_rdt_iface() != json_data['interface']:
+            data = deepcopy(cfg)
 
             if 'rdt_iface' not in data:
                 data['rdt_iface'] = {}
-
             data['rdt_iface']['interface'] = json_data['interface']
+
             CapsMbaCtrl.set_mba_ctrl_enabled(data, False)
             CapsL3ca.set_cdp_enabled(data, False)
             CapsL2ca.set_cdp_enabled(data, False)
 
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore.set_config(data)
 
         res = {'message': "RDT Interface modified"}
         return res, 200
@@ -232,7 +238,7 @@ class CapsL3ca(Resource):
             'cw_num': l3ca_info['cache_ways_num'],
             'clos_num': l3ca_info['clos_num'],
             'cdp_supported': l3ca_info['cdp_supported'],
-            'cdp_enabled': common.CONFIG_STORE.get_l3cdp_enabled()
+            'cdp_enabled': ConfigStore.get_config().get_l3cdp_enabled()
         }
         return res, 200
 
@@ -258,15 +264,17 @@ class CapsL3ca(Resource):
         if not caps.cdp_l3_supported():
             return {'message': "L3 CDP not supported!"}, 409
 
-        if common.CONFIG_STORE.is_any_pool_defined():
+        cfg = ConfigStore.get_config()
+
+        if cfg.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409
 
-        if common.CONFIG_STORE.get_l3cdp_enabled() != json_data['cdp_enabled']:
-            data = deepcopy(common.CONFIG_STORE.get_config())
+        if cfg.get_l3cdp_enabled() != json_data['cdp_enabled']:
+            data = deepcopy(cfg)
 
             CapsL3ca.set_cdp_enabled(data, json_data['cdp_enabled'])
 
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore().set_config(data)
 
         return {'message': "L3 CDP status changed."}, 200
 
@@ -281,7 +289,7 @@ class CapsL3ca(Resource):
             enabled: l3cdp status
         """
         # remove default pool
-        common.CONFIG_STORE.remove_default_pool(data)
+        data.remove_default_pool()
 
         if 'rdt' not in data:
             data['rdt'] = {}
@@ -289,7 +297,7 @@ class CapsL3ca(Resource):
         data['rdt']['l3cdp'] = enabled
 
         # recreate default pool
-        common.CONFIG_STORE.add_default_pool(data)
+        data.add_default_pool()
 
 
 class CapsL2ca(Resource):
@@ -314,7 +322,7 @@ class CapsL2ca(Resource):
             'cw_num': l2ca_info['cache_ways_num'],
             'clos_num': l2ca_info['clos_num'],
             'cdp_supported': l2ca_info['cdp_supported'],
-            'cdp_enabled': common.CONFIG_STORE.get_l2cdp_enabled()
+            'cdp_enabled': ConfigStore.get_config().get_l2cdp_enabled()
         }
         return res, 200
 
@@ -339,15 +347,17 @@ class CapsL2ca(Resource):
         if not caps.cdp_l2_supported():
             return {'message': "L2 CDP not supported!"}, 409
 
-        if common.CONFIG_STORE.is_any_pool_defined():
+        cfg = ConfigStore.get_config()
+
+        if cfg.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409
 
-        if common.CONFIG_STORE.get_l2cdp_enabled() != json_data['cdp_enabled']:
-            data = deepcopy(common.CONFIG_STORE.get_config())
+        if cfg.get_l2cdp_enabled() != json_data['cdp_enabled']:
+            data = deepcopy(cfg)
 
             CapsL2ca.set_cdp_enabled(data, json_data['cdp_enabled'])
 
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore().set_config(data)
 
         return {'message': "L2 CDP status changed."}, 200
 
@@ -361,7 +371,7 @@ class CapsL2ca(Resource):
             enabled: l2cdp status
         """
         # remove default pool
-        common.CONFIG_STORE.remove_default_pool(data)
+        data.remove_default_pool()
 
         if 'rdt' not in data:
             data['rdt'] = {}
@@ -369,4 +379,4 @@ class CapsL2ca(Resource):
         data['rdt']['l2cdp'] = enabled
 
         # recreate default pool
-        common.CONFIG_STORE.add_default_pool(data)
+        data.add_default_pool()

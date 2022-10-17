@@ -48,6 +48,7 @@ import common
 import caps
 import pid_ops
 from stats import StatsStore
+from config import Config
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -148,15 +149,15 @@ CONFIG_EMPTY = {
 
 
 def get_config():
-    return deepcopy(CONFIG)
+    return Config(deepcopy(CONFIG))
 
 
 def get_config_empty():
-    return deepcopy(CONFIG_EMPTY)
+    return Config(deepcopy(CONFIG_EMPTY))
 
 
 def get_config_mba_bw():
-    mba_bw_config = deepcopy(CONFIG)
+    mba_bw_config = Config(deepcopy(CONFIG))
 
     for pool in mba_bw_config['pools']:
         if 'mba' in pool:

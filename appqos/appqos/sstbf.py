@@ -34,7 +34,6 @@
 SST-BF module
 """
 
-import common
 import power_common
 import log
 
@@ -44,15 +43,17 @@ PWR_CFG_BASE = "base"
 HP_CORES = None
 STD_CORES = None
 
-def init_sstbf():
+def init_sstbf(cfg):
     """
     Configure/Initialize SST-BF on start-up
+
+    Parameters
+        cfg: configuration
     """
     result = 0
-    data = common.CONFIG_STORE.get_config()
 
-    if 'sstbf' in data:
-        sstbf_cfg = data['sstbf']
+    if 'sstbf' in cfg:
+        sstbf_cfg = cfg['sstbf']
         if 'configured' in sstbf_cfg:
             log.info("Configuring SST-BF")
             result = configure_sstbf(sstbf_cfg['configured'])

@@ -47,7 +47,7 @@ from rest_common import get_config, load_json_schema, Rest
 
 class TestSstbf:
 
-    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
     @mock.patch("sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
     @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
@@ -76,7 +76,7 @@ class TestSstbf:
                assert data['std_cores'] == [4,5,6,7]
 
 
-    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=False))
     def test_get_sstbf_unsupported(self):
         response = Rest().get("/caps/sstbf")
@@ -86,7 +86,7 @@ class TestSstbf:
         assert response.status_code == 404
 
 
-    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
     @mock.patch("sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
     @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
@@ -101,7 +101,7 @@ class TestSstbf:
             func_mock.called_once_with(configured_value)
 
 
-    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("invalid_fields_json", [
         {"configured": 10},
@@ -121,7 +121,7 @@ class TestSstbf:
             func_mock.assert_not_called()
 
 
-    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
     def test_put_sstbf_enable_failed(self):
         with mock.patch("sstbf.configure_sstbf", return_value=-1) as func_mock:

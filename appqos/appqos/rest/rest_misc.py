@@ -46,7 +46,7 @@ import sstbf
 
 from rest.rest_exceptions import BadRequest, InternalError
 
-from config import ConfigStore
+from config_store import ConfigStore
 from stats import StatsStore
 
 
@@ -137,7 +137,7 @@ class Sstbf(Resource):
             raise InternalError("Failed to change SST-BF configured state.")
 
         # update power profile configuration
-        power.configure_power()
+        power.configure_power(ConfigStore.get_config())
 
         res = {'message': "SST-BF caps modified"}
         return res, 200
@@ -159,7 +159,7 @@ class Reset(Resource):
             response, status code
         """
 
-        common.CONFIG_STORE.reset()
+        ConfigStore().reset()
 
         res = {'message': "Reset performed. Configuration reloaded."}
         return res, 200

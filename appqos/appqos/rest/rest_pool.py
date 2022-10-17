@@ -47,7 +47,7 @@ import sstbf
 
 from rest.rest_exceptions import NotFound, BadRequest, InternalError
 
-from config import ConfigStore
+from config_store import ConfigStore
 
 
 class Pool(Resource):
@@ -70,12 +70,12 @@ class Pool(Resource):
             response, status code
         """
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
         try:
-            pool = common.CONFIG_STORE.get_pool(data, int(pool_id))
+            pool = data.get_pool(int(pool_id))
         except:
             # pylint: disable=raise-missing-from
             raise NotFound(f"POOL {pool_id} not found in config")
@@ -96,7 +96,7 @@ class Pool(Resource):
             response, status code
         """
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
@@ -112,7 +112,7 @@ class Pool(Resource):
 
             # remove app
             data['pools'].remove(pool)
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore.set_config(data)
 
             res = {'message': f"POOL {pool_id} deleted"}
             return res, 200
@@ -135,11 +135,17 @@ class Pool(Resource):
             response, status code
         """
         def check_alloc_tech(pool_id, json_data):
-            if 'l3cbm' in json_data:
+            if any(k in json_data for k in ('l3cbm', 'l3cbm_data', 'l3cbm_code')):
                 if not caps.cat_l3_supported():
                     raise BadRequest("System does not support CAT!")
                 if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
                     raise BadRequest(f"Pool {pool_id} does not support CAT")
+
+            if any(k in json_data for k in ('l2cbm', 'l2cbm_data', 'l2cbm_code')):
+                if not caps.cat_l2_supported():
+                    raise BadRequest("System does not support CAT!")
+                if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
+                    raise BadRequest(f"Pool {pool_id} does not support L2 CAT")
 
             if 'mba' in json_data or 'mba_bw' in json_data:
                 if not caps.mba_supported():
@@ -166,7 +172,7 @@ class Pool(Resource):
         admission_control_check = json_data.pop('verify', True) and\
             ('cores' in json_data or 'power_profile' in json_data)
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
@@ -215,11 +221,11 @@ class Pool(Resource):
                 pool['power_profile'] = json_data['power_profile']
 
             try:
-                common.CONFIG_STORE.validate(data, admission_control_check)
+                ConfigStore().validate(data, admission_control_check)
             except Exception as ex:
                 raise BadRequest(f"POOL {pool_id} not updated, {ex}") from ex
 
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore().set_config(data)
 
             res = {'message': f"POOL {pool_id} updated"}
             return res, 200
@@ -243,7 +249,7 @@ class Pools(Resource):
         Returns:
             response, status code
         """
-        data = common.CONFIG_STORE.get_config().copy()
+        data = ConfigStore.get_config()
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
@@ -279,7 +285,7 @@ class Pools(Resource):
             post_data['l3cbm'] = post_data['cbm']
             post_data.pop('cbm')
 
-        post_data['id'] = common.CONFIG_STORE.get_new_pool_id(post_data)
+        post_data['id'] = ConfigStore().get_new_pool_id(post_data)
         if post_data['id'] is None:
             raise InternalError("New POOL not added, maximum number of POOLS"\
                 " reached for requested allocation combination")
@@ -299,15 +305,16 @@ class Pools(Resource):
         if sstbf.is_sstbf_configured():
             post_data.pop('power_profile', None)
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        cfg = ConfigStore.get_config()
+        data = deepcopy(cfg)
         data['pools'].append(post_data)
 
         try:
-            common.CONFIG_STORE.validate(data, admission_control_check)
+            ConfigStore().validate(data, admission_control_check)
         except Exception as ex:
             raise BadRequest("New POOL not added") from ex
 
-        common.CONFIG_STORE.set_config(data)
+        ConfigStore.set_config(data)
 
         res = {
             'id': post_data['id'],

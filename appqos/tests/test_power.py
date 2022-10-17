@@ -36,6 +36,7 @@ import pytest
 import power
 import power_common
 import sstbf
+from config import Config
 
 class TestRestPowerProfiles:
 
@@ -461,7 +462,7 @@ class TestRestPowerProfiles:
         profiles = {5: {"min_freq": 1500, "max_freq": 2500, "epp": "performance", "id": 5},
             6 : {"min_freq": 1000, "max_freq": 1200, "epp": "power", "id": 6}}
 
-        def get_pool_attr(attr, pool_id):
+        def get_pool_attr(cls, attr, pool_id):
             if attr == 'id':
                 if pool_id is None:
                     return pool_ids
@@ -477,17 +478,17 @@ class TestRestPowerProfiles:
 
             return None
 
-        def get_power_profile(id):
+        def get_power_profile(cls, id):
             return profiles[id]
 
         # ERROR POWER: No Pools configured...
         power.PREV_PROFILES.clear()
-        with mock.patch('common.CONFIG_STORE.get_pool_attr', return_value=None) as mock_get_pool_attr,\
-            mock.patch('common.CONFIG_STORE.get_power_profile') as mock_get_power_profile,\
+        with mock.patch('config.Config.get_pool_attr', return_value=None) as mock_get_pool_attr,\
+            mock.patch('config.Config.get_power_profile') as mock_get_power_profile,\
             mock.patch('power.reset') as mock_reset,\
             mock.patch('power._set_freqs_epp') as mock_set_freqs_epp:
 
-            assert -1 == power.configure_power()
+            assert -1 == power.configure_power(Config({}))
             mock_get_pool_attr.assert_called_once_with('id', None)
             mock_get_power_profile.assert_not_called()
             mock_reset.assert_not_called()
@@ -495,24 +496,24 @@ class TestRestPowerProfiles:
 
         # ERROR POWER: Profile 5 does not exist!
         power.PREV_PROFILES.clear()
-        with mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_pool_attr),\
-            mock.patch('common.CONFIG_STORE.get_power_profile', return_value=None) as mock_get_power_profile,\
+        with mock.patch('config.Config.get_pool_attr', new=get_pool_attr),\
+            mock.patch('config.Config.get_power_profile', return_value=None) as mock_get_power_profile,\
             mock.patch('power.reset') as mock_reset,\
             mock.patch('power._set_freqs_epp') as mock_set_freqs_epp:
 
-            assert -1 == power.configure_power()
+            assert -1 == power.configure_power(Config({}))
             mock_get_power_profile.assert_called_once_with(5)
             mock_reset.assert_not_called()
             mock_set_freqs_epp.assert_not_called()
 
         # All OK!
         power.PREV_PROFILES.clear()
-        with mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_pool_attr),\
-            mock.patch('common.CONFIG_STORE.get_power_profile', new=get_power_profile),\
-            mock.patch('power.reset') as mock_reset,\
-            mock.patch('power._set_freqs_epp') as mock_set_freqs_epp:
+        with mock.patch('config.Config.get_pool_attr', new=get_pool_attr),\
+             mock.patch('config.Config.get_power_profile', new=get_power_profile),\
+             mock.patch('power.reset') as mock_reset,\
+             mock.patch('power._set_freqs_epp') as mock_set_freqs_epp:
 
-            assert 0 == power.configure_power()
+            assert 0 == power.configure_power(Config({}))
             mock_reset.assert_not_called()
             mock_set_freqs_epp.assert_any_call(pool_to_cores[0], profiles[5]["min_freq"], profiles[5]["max_freq"], profiles[5]["epp"])
             mock_set_freqs_epp.assert_any_call(pool_to_cores[1], profiles[6]["min_freq"], profiles[6]["max_freq"], profiles[6]["epp"])
@@ -520,23 +521,23 @@ class TestRestPowerProfiles:
         # POWER: Skipping Pool 0, no cores assigned
         power.PREV_PROFILES.clear()
         pool_to_cores[0] = []
-        with mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_pool_attr),\
-            mock.patch('common.CONFIG_STORE.get_power_profile', new=get_power_profile),\
+        with mock.patch('config.Config.get_pool_attr', new=get_pool_attr),\
+            mock.patch('config.Config.get_power_profile', new=get_power_profile),\
             mock.patch('power.reset') as mock_reset,\
             mock.patch('power._set_freqs_epp') as mock_set_freqs_epp:
 
-            assert 0 == power.configure_power()
+            assert 0 == power.configure_power(Config({}))
             mock_reset.assert_not_called()
             mock_set_freqs_epp.assert_called_once_with(pool_to_cores[1], profiles[6]["min_freq"], profiles[6]["max_freq"], profiles[6]["epp"])
 
         # POWER: Pool 1, no power profile assigned. Resetting to defaults.
         power.PREV_PROFILES.clear()
         pool_to_profiles[1] = None
-        with mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_pool_attr),\
-            mock.patch('common.CONFIG_STORE.get_power_profile', new=get_power_profile),\
+        with mock.patch('config.Config.get_pool_attr', new=get_pool_attr),\
+            mock.patch('config.Config.get_power_profile', new=get_power_profile),\
             mock.patch('power.reset') as mock_reset,\
             mock.patch('power._set_freqs_epp') as mock_set_freqs_epp:
 
-            assert 0 == power.configure_power()
+            assert 0 == power.configure_power(Config({}))
             mock_reset.assert_called_once_with(pool_to_cores[1])
             mock_set_freqs_epp.assert_not_called()

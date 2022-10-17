@@ -42,9 +42,9 @@ from rest_common import get_config, REST
 
 
 class TestReset:
-    @mock.patch("common.CONFIG_STORE.get_config", new=get_config)
+    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
     def test_reset(self):
-        with mock.patch('common.CONFIG_STORE.reset') as func_mock:
+        with mock.patch('config_store.ConfigStore.reset') as func_mock:
             response = REST.post("/reset")
             func_mock.assert_called_once()
 

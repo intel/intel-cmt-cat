@@ -38,7 +38,6 @@ from copy import deepcopy
 
 import log
 
-import common
 import power_common
 import sstbf
 
@@ -225,10 +224,6 @@ def _do_admission_control_check():
     return not sstbf.is_sstbf_configured()
 
 
-def _get_power_profiles_verify():
-    return common.CONFIG_STORE.get_global_attr('power_profiles_verify', True)
-
-
 def _admission_control_check(data):
     """
     Validate Power Profiles configuration,
@@ -267,9 +262,12 @@ def _admission_control_check(data):
             ("Power Profiles configuration would cause CPU to be oversubscribed.")
 
 
-def configure_power():
+def configure_power(cfg):
     """
     Configures Power Profiles
+
+    Parameters
+        cfg: configuration (dict)
     """
 
     global PREV_PROFILES
@@ -279,7 +277,7 @@ def configure_power():
         PREV_PROFILES = {}
         return 0
 
-    curr_profiles = _get_curr_profiles()
+    curr_profiles = _get_curr_profiles(cfg)
     if curr_profiles is None:
         return -1
 
@@ -306,7 +304,7 @@ def configure_power():
             _set_freqs_epp(profile['cores'], min_freq, max_freq, epp)
 
     # reset power config for cores with no power profile assigned
-    cores_to_reset = _get_cores_to_reset()
+    cores_to_reset = _get_cores_to_reset(cfg)
     if cores_to_reset:
         reset(cores_to_reset)
 
@@ -316,19 +314,22 @@ def configure_power():
     return 0
 
 
-def _get_curr_profiles():
+def _get_curr_profiles(cfg):
     """
     Creates a list of Power Profiles with cores assigned
+
+    Parameters
+        cfg: configuration (dict)
     """
 
     # get list of pool ids
-    pool_ids = common.CONFIG_STORE.get_pool_attr('id', None)
+    pool_ids = cfg.get_pool_attr('id', None)
     if not pool_ids:
         log.error("POWER: No Pools configured...")
         return None
 
     # get list of power profiles assigned to pools
-    power_ids = common.CONFIG_STORE.get_pool_attr('power_profile', None)
+    power_ids = cfg.get_pool_attr('power_profile', None)
 
     # if there are no power profiles assigned to pools,
     # there is nothing to configure...
@@ -341,7 +342,7 @@ def _get_curr_profiles():
     # Get current power profiles configuration
     curr_profiles = {}
     for power_id in power_ids:
-        profile = common.CONFIG_STORE.get_power_profile(power_id)
+        profile = cfg.get_power_profile(power_id)
         if profile:
             curr_profiles[power_id] = deepcopy(profile)
             curr_profiles[power_id]['cores'] = []
@@ -351,11 +352,11 @@ def _get_curr_profiles():
 
     # get through all pools to extend curr power profiles config with theirs cores
     for pool_id in pool_ids:
-        cores = common.CONFIG_STORE.get_pool_attr('cores', pool_id)
+        cores = cfg.get_pool_attr('cores', pool_id)
         if not cores:
             continue
 
-        power_id = common.CONFIG_STORE.get_pool_attr('power_profile', pool_id)
+        power_id = cfg.get_pool_attr('power_profile', pool_id)
         if power_id is None:
             continue
 
@@ -364,22 +365,25 @@ def _get_curr_profiles():
     return curr_profiles
 
 
-def _get_cores_to_reset():
+def _get_cores_to_reset(cfg):
     """
     Creates a list of cores to reset,
     ones with no power profiles assigned
+
+    Parameters
+        cfg: configuration (dict)
     """
 
     cores_to_reset = []
 
     # get list of pool ids
-    pool_ids = common.CONFIG_STORE.get_pool_attr('id', None)
+    pool_ids = cfg.get_pool_attr('id', None)
     if not pool_ids:
         return None
 
     for pool_id in pool_ids:
-        if common.CONFIG_STORE.get_pool_attr('power_profile', pool_id) is None:
-            cores = common.CONFIG_STORE.get_pool_attr('cores', pool_id)
+        if cfg.get_pool_attr('power_profile', pool_id) is None:
+            cores = cfg.get_pool_attr('cores', pool_id)
             if cores:
                 cores_to_reset.extend(cores)
 

@@ -1,7 +1,9 @@
+#!/usr/bin/env python3
+
 ################################################################################
 # BSD LICENSE
 #
-# Copyright(c) 2019-2022 Intel Corporation. All rights reserved.
+# Copyright(c) 2022 Intel Corporation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,39 +33,7 @@
 ################################################################################
 
 """
-Unit tests for rest module STATS
+App QoS software version
 """
 
-import json
-from jsonschema import validate
-import mock
-import pytest
-
-import common
-
-from stats import StatsStore
-
-from rest_common import get_config, load_json_schema, REST, CONFIG_EMPTY
-
-
-class TestStats:
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    def test_get(self):
-        def general_stats_get(get_stats_id):
-            if get_stats_id == StatsStore.General.NUM_APPS_MOVES:
-                return 1
-            if get_stats_id == StatsStore.General.NUM_ERR:
-                return 2
-
-        with mock.patch("common.STATS_STORE.general_stats_get", side_effect=general_stats_get) as mock_func:
-            response = REST.get("/stats")
-            mock_func.assert_called()
-        data = json.loads(response.data.decode('utf-8'))
-
-        # validate response schema
-        schema, resolver = load_json_schema('get_stats_response.json')
-        validate(data, schema, resolver=resolver)
-
-        assert response.status_code == 200
-        assert data["num_apps_moves"] == 1
-        assert data["num_err"] == 2
+__version__ = "4.4.1"

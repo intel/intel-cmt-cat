@@ -52,6 +52,7 @@ import log
 import power
 from rest import rest_server
 import sstbf
+from config_store import ConfigStore
 
 class AppQoS:
     """
@@ -72,22 +73,23 @@ class AppQoS:
 
         # process/validate already loaded config file
         try:
-            common.CONFIG_STORE.process_config()
+            ConfigStore().process_config()
         except Exception as ex:
             log.error("Invalid config file... ")
             log.error(ex)
             return
 
-        log.debug(f"Cores controlled: {common.CONFIG_STORE.get_pool_attr('cores', None)}")
+        data = ConfigStore.get_config()
 
-        data = common.CONFIG_STORE.get_config()
+        log.debug(f"Cores controlled: {data.get_pool_attr('cores', None)}")
+
         for pool in data['pools']:
             log.debug(f"Pool: {pool.get('name')}/{pool.get('id')} " \
                       f"Cores: {pool.get('cores')}, Apps: {pool.get('apps')}")
 
         # set initial SST-BF configuration
         if caps.sstbf_enabled():
-            result = sstbf.init_sstbf()
+            result = sstbf.init_sstbf(data)
             if result != 0:
                 log.error("Failed to apply initial SST-BF configuration, terminating...")
                 return
@@ -106,7 +108,7 @@ class AppQoS:
             else:
                 log.info("Power Profiles/SST-CP enabled.")
                 # set initial POWER configuration
-                result = power.configure_power()
+                result = power.configure_power(data)
                 if result != 0:
                     log.error("Failed to apply initial Power Profiles configuration,"\
                         " terminating...")
@@ -119,13 +121,13 @@ class AppQoS:
 
         # Configure MBA CTRL
         if caps.mba_supported():
-            result = common.PQOS_API.enable_mba_bw(common.CONFIG_STORE.get_mba_ctrl_enabled())
+            result = common.PQOS_API.enable_mba_bw(data.get_mba_ctrl_enabled())
             if result != 0:
                 log.error("libpqos MBA CTRL initialization failed, Terminating...")
                 return
             log.info(f"RDT MBA CTRL {'en' if common.PQOS_API.is_mba_bw_enabled() else 'dis'}abled")
 
-        result = cache_ops.configure_rdt()
+        result = cache_ops.configure_rdt(data)
         if result != 0:
             log.error("Failed to apply initial RDT configuration, terminating...")
             return
@@ -148,7 +150,8 @@ class AppQoS:
         min_time_diff = 1 / common.RATE_LIMIT
 
         while not self.stop_event.is_set():
-            if common.CONFIG_STORE.is_config_changed():
+            if ConfigStore().is_config_changed():
+                cfg = ConfigStore.get_config()
 
                 time_diff = time.time() - last_cfg_change_ts
                 if time_diff < min_time_diff:
@@ -157,13 +160,13 @@ class AppQoS:
                     time.sleep(min_time_diff - time_diff)
 
                 log.info("Configuration changed, processing new config...")
-                result = cache_ops.configure_rdt()
+                result = cache_ops.configure_rdt(cfg)
                 if result != 0:
                     log.error("Failed to apply RDT configuration!")
                     break
 
                 if caps.sstcp_enabled() and not sstbf.is_sstbf_configured():
-                    result = power.configure_power()
+                    result = power.configure_power(cfg)
                     if result != 0:
                         log.error("Failed to apply Power Profiles configuration!")
                         break
@@ -190,7 +193,7 @@ def load_config(config_file):
 
     # load config file
     try:
-        common.CONFIG_STORE.from_file(config_file)
+        ConfigStore().from_file(config_file)
     except IOError as ex:
         log.error(f"Error reading from config file {config_file}... ")
         log.error(ex)
@@ -236,7 +239,7 @@ def main():
         return
 
     # initialize libpqos/Intel RDT interface
-    result = common.PQOS_API.init(common.CONFIG_STORE.get_rdt_iface())
+    result = common.PQOS_API.init(ConfigStore.get_config().get_rdt_iface())
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
         return

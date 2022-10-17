@@ -36,6 +36,7 @@ import mock
 import common
 
 from cache_ops import *
+from config import Config
 
 def test_configure_rdt():
     Pool.pools[1] = {}
@@ -48,26 +49,28 @@ def test_configure_rdt():
     Pool.pools[2]['cbm'] = 0x200
     Pool.pools[2]['mba'] = 22
 
-    with mock.patch('common.CONFIG_STORE.get_pool_attr', return_value=[1]) as mock_get_pool_attr,\
+    with mock.patch('config.Config.get_pool_attr', return_value=[1]) as mock_get_pool_attr,\
          mock.patch('cache_ops.Pool.cores_set') as mock_cores_set,\
          mock.patch('cache_ops.Pool.configure', return_value=0) as mock_pool_configure,\
          mock.patch('cache_ops.Apps.configure', return_value=0) as mock_apps_configure,\
          mock.patch('common.PQOS_API.init', return_value=0),\
          mock.patch('common.PQOS_API.enable_mba_bw', return_value=0),\
-         mock.patch('common.CONFIG_STORE.recreate_default_pool', return_value=0):
+         mock.patch('config_store.ConfigStore.recreate_default_pool', return_value=0):
 
-        assert not configure_rdt()
+        cfg = Config({})
+
+        assert not configure_rdt(cfg)
 
         mock_cores_set.assert_called_once_with([])
         mock_pool_configure.assert_called_once()
         mock_apps_configure.assert_called_once()
 
         mock_pool_configure.return_value = -1
-        assert configure_rdt() == -1
+        assert configure_rdt(cfg) == -1
 
         mock_pool_configure.return_value = 0
         mock_get_pool_attr.return_value = []
-        assert configure_rdt() == -1
+        assert configure_rdt(cfg) == -1
 
 
 class TestPools(object):
@@ -83,7 +86,7 @@ class TestPools(object):
     @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
     @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
     def test_configure(self):
-        def get_attr(attr, pool_id):
+        def get_attr(cls, attr, pool_id):
             config = {
                 'cores': [1, 2],
                 'l3cbm': 15,
@@ -98,8 +101,8 @@ class TestPools(object):
             else:
                 return None
 
-        with mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_attr),\
-             mock.patch('common.CONFIG_STORE.get_app_attr', new=get_attr),\
+        with mock.patch('config.Config.get_pool_attr', new=get_attr),\
+             mock.patch('config.Config.get_app_attr', new=get_attr),\
              mock.patch('cache_ops.Pool.l3cbm_set') as mock_l3cbm_set,\
              mock.patch('cache_ops.Pool.l2cbm_set') as mock_l2cbm_set,\
              mock.patch('cache_ops.Pool.mba_set') as mock_mba_set,\
@@ -107,13 +110,13 @@ class TestPools(object):
              mock.patch('cache_ops.Pool.pids_set') as mock_pids_set,\
              mock.patch('cache_ops.Pool.apply') as mock_apply:
 
-             Pool(1).configure()
+             Pool(1).configure(Config({}))
 
              mock_l3cbm_set.assert_called_once_with(15)
              mock_l2cbm_set.assert_called_once_with(7)
              mock_mba_set.assert_called_once_with(88)
              mock_cores_set.assert_called_once_with([1,2])
-             mock_pids_set.assert_called_once_with([11,22])
+             mock_pids_set.assert_called_once_with([11,22], get_attr(None, 'cores', 0))
              mock_apply.assert_called_once_with(1)
 
 
@@ -188,14 +191,16 @@ class TestPools(object):
         Pool.pools[30] = {}
         Pool.pools[30]['pids'] = [3, 30, 3030]
 
-        with mock.patch('common.CONFIG_STORE.get_pool_attr', return_value=[1, 44, 66]),\
-             mock.patch('cache_ops.set_affinity') as set_aff_mock:
-            Pool(1).pids_set([1, 10])
+        with mock.patch('cache_ops.set_affinity') as set_aff_mock:
+
+            default_cores = [1, 44, 66]
+
+            Pool(1).pids_set([1, 10], default_cores)
 
             set_aff_mock.assert_called_once_with([1010], [1, 44, 66])
             set_aff_mock.reset_mock()
 
-            Pool(30).pids_set([30, 3030])
+            Pool(30).pids_set([30, 3030], default_cores)
 
             set_aff_mock.assert_called_once_with([3], [1, 44, 66])
 
@@ -246,7 +251,7 @@ class TestPools(object):
     @mock.patch('common.PQOS_API.alloc_assoc_set')
     @mock.patch('common.PQOS_API.get_sockets')
     @mock.patch('common.PQOS_API.get_l2ids')
-    @mock.patch('common.CONFIG_STORE.get_mba_ctrl_enabled')
+    @mock.patch('config.Config.get_mba_ctrl_enabled')
     def test_apply(self, mock_get_mba_ctrl_enabled, mock_get_l2ids, mock_get_socket, \
         mock_alloc_assoc_set, mock_l3ca_set, mock_l2ca_set, mock_mba_set):
         Pool.pools[2] = {}
@@ -363,30 +368,30 @@ class TestApps(object):
             }
         ]}
 
-        def get_pool_attr(attr, pool_id):
+        def get_pool_attr(cls, attr, pool_id):
             if attr == 'cores':
                 return [1, 2, 3, 4]
             else:
                 return None
 
-        with mock.patch('common.CONFIG_STORE.get_config', return_value={}),\
-             mock.patch('common.CONFIG_STORE.app_to_pool') as atp_mock,\
-             mock.patch('common.CONFIG_STORE.get_pool_attr') as gpa_mock,\
+        with mock.patch('config.Config.app_to_pool') as atp_mock,\
+             mock.patch('config.Config.get_pool_attr') as gpa_mock,\
              mock.patch('cache_ops.set_affinity') as sa_mock:
 
-                Apps.configure()
+                cfg = Config({})
+                Apps.configure(cfg)
 
                 atp_mock.assert_not_called()
                 gpa_mock.assert_not_called()
                 sa_mock.assert_not_called()
 
 
-        with mock.patch('common.CONFIG_STORE.get_config', return_value=CONFIG),\
-             mock.patch('common.CONFIG_STORE.app_to_pool', return_value=1),\
-             mock.patch('common.CONFIG_STORE.get_pool_attr', new=get_pool_attr),\
+        with mock.patch('config.Config.app_to_pool', return_value=1),\
+             mock.patch('config.Config.get_pool_attr', new=get_pool_attr),\
              mock.patch('cache_ops.set_affinity') as set_aff_mock:
 
-                Apps.configure()
+                cfg = Config(CONFIG)
+                Apps.configure(cfg)
 
                 set_aff_mock.assert_any_call([1], [1])
                 set_aff_mock.assert_any_call([2, 22], [2])

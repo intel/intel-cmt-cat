@@ -34,7 +34,7 @@ import mock
 import pytest
 
 import sstbf
-
+from config import Config
 
 def test_is_sstbf_enabled():
     class SYS:
@@ -159,11 +159,11 @@ def test_get_std_cores():
 
 def test_init_sstbf():
     for cfgd_value in [True, False]:
-        with mock.patch("common.CONFIG_STORE.get_config", return_value={'sstbf' : {'configured' : cfgd_value}}) as mock_get_cfg,\
-             mock.patch("sstbf.configure_sstbf", return_value=0) as mock_cfg,\
+        with mock.patch("sstbf.configure_sstbf", return_value=0) as mock_cfg,\
              mock.patch("sstbf._populate_cores") as mock_populate:
 
-             assert 0 == sstbf.init_sstbf()
-             mock_get_cfg.assert_called_once()
+             cfg = Config({'sstbf' : {'configured' : cfgd_value}})
+
+             assert 0 == sstbf.init_sstbf(cfg)
              mock_cfg.assert_called_once_with(cfgd_value)
              mock_populate.assert_called_once()

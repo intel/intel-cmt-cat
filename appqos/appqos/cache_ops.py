@@ -40,19 +40,20 @@ import common
 import log
 import power
 from pid_ops import set_affinity
+from config_store import ConfigStore
 
 class Apps:
     """
     Apps options
     """
     @staticmethod
-    def configure():
+    def configure(config):
         """
         Configure Apps, based on config content.
+
+        Parameters
+            config: configuration
         """
-
-        config = common.CONFIG_STORE.get_config()
-
         if 'apps' not in config:
             return 0
 
@@ -62,8 +63,8 @@ class Apps:
                 continue
 
             app_cores = app['cores'] if 'cores' in app else []
-            pool_id = common.CONFIG_STORE.app_to_pool(app['id'])
-            pool_cores = common.CONFIG_STORE.get_pool_attr('cores', pool_id)
+            pool_id = config.app_to_pool(app['id'])
+            pool_cores = config.get_pool_attr('cores', pool_id)
 
             # if there are no cores configured for App, or cores configured are
             # not a subset of Pool cores, revert to all Pool cores
@@ -84,7 +85,6 @@ class Pool:
     Static table of pools
     """
     pools = {}
-
 
     def __init__(self, pool):
         """
@@ -261,11 +261,13 @@ class Pool:
         return Pool.pools[self.pool].get('mba_bw')
 
 
-    def configure(self):
+    def configure(self, config):
         """
         Configure Pool, based on config content.
+
+        Parameters
+            config: configuration
         """
-        config = common.CONFIG_STORE
         cores = config.get_pool_attr('cores', self.pool)
         self.cores_set(cores)
 
@@ -275,6 +277,9 @@ class Pool:
             if config.get_l2cdp_enabled():
                 self.l2cbm_set_data(config.get_pool_attr('l2cbm_data', self.pool))
                 self.l2cbm_set_code(config.get_pool_attr('l2cbm_code', self.pool))
+            else:
+                self.l2cbm_set_data(None)
+                self.l2cbm_set_code(None)
 
         if caps.cat_l3_supported():
             l3cbm = config.get_pool_attr('l3cbm', self.pool)
@@ -282,11 +287,16 @@ class Pool:
             if config.get_l3cdp_enabled():
                 self.l3cbm_set_data(config.get_pool_attr('l3cbm_data', self.pool))
                 self.l3cbm_set_code(config.get_pool_attr('l3cbm_code', self.pool))
+            else:
+                self.l3cbm_set_data(None)
+                self.l3cbm_set_code(None)
 
         if caps.mba_supported():
             if caps.mba_bw_enabled():
                 self.mba_bw_set(config.get_pool_attr('mba_bw', self.pool))
+                self.mba_set(None)
             else:
+                self.mba_bw_set(None)
                 self.mba_set(config.get_pool_attr('mba', self.pool))
 
         apps = config.get_pool_attr('apps', self.pool)
@@ -297,17 +307,18 @@ class Pool:
                 if app_pids:
                     pids.extend(app_pids)
 
-            self.pids_set(pids)
+            self.pids_set(pids, config.get_pool_attr('cores', 0))
 
         return Pool.apply(self.pool)
 
 
-    def pids_set(self, pids):
+    def pids_set(self, pids, default_cores):
         """
         Set Pool's PIDs
 
         Parameters:
             pids: Pool's PIDs
+            default_cores: cores assigned to pool 0
         """
         old_pids = self.pids_get()
 
@@ -346,8 +357,7 @@ class Pool:
             log.debug(f"PIDs to be set to core affinity to 'Default' CPUs {removed_pids}")
 
             # get cores for Default Pool #0
-            cores = common.CONFIG_STORE.get_pool_attr('cores', 0)
-            set_affinity(removed_pids, cores)
+            set_affinity(removed_pids, default_cores)
 
 
     def pids_get(self):
@@ -433,31 +443,19 @@ class Pool:
 
         pool = Pool(pool_id)
 
-        l3cdp = common.CONFIG_STORE.get_l3cdp_enabled()
-        l3cbm = None
-        l3cbm_data = None
-        l3cbm_code = None
-        if l3cdp:
-            l3cbm_data = pool.l3cbm_get_data()
-            l3cbm_code = pool.l3cbm_get_code()
-        else:
-            l3cbm = pool.l3cbm_get()
+        l3cbm = pool.l3cbm_get()
+        l3cbm_data = pool.l3cbm_get_data()
+        l3cbm_code = pool.l3cbm_get_code()
 
-        l2cdp = common.CONFIG_STORE.get_l2cdp_enabled()
-        l2cbm = None
-        l2cbm_data = None
-        l2cbm_code = None
-        if l2cdp:
-            l2cbm_data = pool.l2cbm_get_data()
-            l2cbm_code = pool.l2cbm_get_code()
-        else:
-            l2cbm = pool.l2cbm_get()
+        l2cbm = pool.l2cbm_get()
+        l2cbm_data = pool.l2cbm_get_data()
+        l2cbm_code = pool.l2cbm_get_code()
 
-        mba = None
-        ctrl = common.CONFIG_STORE.get_mba_ctrl_enabled()
-        if ctrl:
-            mba = pool.mba_bw_get()
+        mba = pool.mba_bw_get()
+        if mba:
+            ctrl = True
         else:
+            ctrl = False
             mba = pool.mba_get()
 
         cores = pool.cores_get()
@@ -469,24 +467,24 @@ class Pool:
             return -1
 
         # pool id to COS, 1:1 mapping
-        if l2cbm:
-            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, mask=l2cbm) != 0:
-                log.error("Failed to apply L2 CAT configuration!")
-                return -1
-        elif l2cbm_code and l2cbm_data:
+        if common.PQOS_API.is_l2_cdp_enabled():
             if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, \
                                         code_mask=l2cbm_code, data_mask=l2cbm_data) != 0:
                 log.error("Failed to apply L2 CDP configuration!")
                 return -1
-
-        if l3cbm:
-            if common.PQOS_API.l3ca_set(sockets, pool_id, mask=l3cbm) != 0:
-                log.error("Failed to apply CAT configuration!")
+        elif l2cbm:
+            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, mask=l2cbm) != 0:
+                log.error("Failed to apply L2 CAT configuration!")
                 return -1
-        elif l3cbm_code and l3cbm_data:
+
+        if common.PQOS_API.is_l3_cdp_enabled():
             if common.PQOS_API.l3ca_set(sockets, pool_id, code_mask=l3cbm_code, \
                                         data_mask=l3cbm_data) != 0:
                 log.error("Failed to apply L3 CDP configuration!")
+                return -1
+        elif l3cbm:
+            if common.PQOS_API.l3ca_set(sockets, pool_id, mask=l3cbm) != 0:
+                log.error("Failed to apply CAT configuration!")
                 return -1
 
         if mba:
@@ -510,9 +508,12 @@ class Pool:
         Pool.pools = {}
 
 
-def configure_rdt():
+def configure_rdt(cfg):
     """
     Configure RDT
+
+    Parameters
+        cfg: configuration
 
     Returns:
         0 on success
@@ -527,7 +528,7 @@ def configure_rdt():
         Returns:
             False interface not changed
         """
-        cfg_rdt_iface = common.CONFIG_STORE.get_rdt_iface()
+        cfg_rdt_iface = cfg.get_rdt_iface()
         if cfg_rdt_iface != common.PQOS_API.current_iface():
             if common.PQOS_API.init(cfg_rdt_iface):
                 raise Exception("Failed to initialize RDT interface!")
@@ -550,7 +551,7 @@ def configure_rdt():
             Obtain MBA configuration
             """
             if caps.mba_supported():
-                cfg_mba_ctrl_enabled = common.CONFIG_STORE.get_mba_ctrl_enabled()
+                cfg_mba_ctrl_enabled = cfg.get_mba_ctrl_enabled()
                 # Change MBA BW/CTRL state if needed
                 if cfg_mba_ctrl_enabled == common.PQOS_API.is_mba_bw_enabled():
                     return "any"
@@ -566,7 +567,7 @@ def configure_rdt():
             Obtain L2 CDP configuration
             """
             if caps.cat_l2_supported() and caps.cdp_l2_supported():
-                cfg_l2cdp_enabled = common.CONFIG_STORE.get_l2cdp_enabled()
+                cfg_l2cdp_enabled = cfg.get_l2cdp_enabled()
                 # Change L2CDP state if needed
                 if cfg_l2cdp_enabled == common.PQOS_API.is_l2_cdp_enabled():
                     return "any"
@@ -582,7 +583,7 @@ def configure_rdt():
             Obtain L3 CDP configuration
             """
             if caps.cat_l3_supported() and caps.cdp_l3_supported():
-                cfg_l3cdp_enabled = common.CONFIG_STORE.get_l3cdp_enabled()
+                cfg_l3cdp_enabled = cfg.get_l3cdp_enabled()
                 # Change L3CDP state if needed
                 if cfg_l3cdp_enabled == common.PQOS_API.is_l3_cdp_enabled():
                     return "any"
@@ -623,12 +624,12 @@ def configure_rdt():
 
     if recreate_default:
         # On interface or MBA BW state change it is needed to recreate Default Pool #0
-        common.CONFIG_STORE.recreate_default_pool()
+        ConfigStore().recreate_default_pool()
 
     # detect removed pools
     old_pools = Pool.pools.copy()
 
-    pool_ids = common.CONFIG_STORE.get_pool_attr('id', None)
+    pool_ids = cfg.get_pool_attr('id', None)
 
     if old_pools:
         for pool_id in old_pools:
@@ -648,11 +649,11 @@ def configure_rdt():
 
     # Configure Pools, Intel RDT (CAT, MBA)
     for pool_id in Pool.pools:
-        result = Pool(pool_id).configure()
+        result = Pool(pool_id).configure(cfg)
         if result != 0:
             return result
 
     # Configure Apps, core affinity
-    result = Apps().configure()
+    result = Apps().configure(cfg)
 
     return result

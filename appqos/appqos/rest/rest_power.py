@@ -44,11 +44,11 @@ from rest.rest_exceptions import NotFound, BadRequest, MethodNotAllowed
 
 import sstbf
 
-import common
+from config_store import ConfigStore
 
 
 def _get_power_profiles_expert_mode():
-    return common.CONFIG_STORE.get_global_attr('power_profiles_expert_mode', False)
+    return ConfigStore.get_config().get_global_attr('power_profiles_expert_mode', False)
 
 
 def check_allowed(func):
@@ -88,7 +88,7 @@ class Power(Resource):
             response, status code
         """
 
-        data = common.CONFIG_STORE.get_config()
+        data = ConfigStore.get_config()
         if 'power_profiles' not in data:
             raise NotFound("No power profiles in config file")
 
@@ -115,7 +115,7 @@ class Power(Resource):
             response, status code
         """
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
 
         if 'power_profiles' not in data:
             raise NotFound("No Power Profiles in config file")
@@ -133,7 +133,7 @@ class Power(Resource):
 
             # remove profile
             data['power_profiles'].remove(profile)
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore.set_config(data)
 
             res = {'message': "POWER PROFILE " + str(profile_id) + " deleted"}
             return res, 200
@@ -160,14 +160,14 @@ class Power(Resource):
 
         # validate app schema
         try:
-            schema, resolver = common.CONFIG_STORE.load_json_schema('modify_power.json')
+            schema, resolver = ConfigStore().load_json_schema('modify_power.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed") from error
 
         admission_control_check = json_data.pop('verify', True)
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
         if 'power_profiles' not in data:
             raise NotFound("No Power Profiles in config file")
 
@@ -179,11 +179,11 @@ class Power(Resource):
             profile.update(json_data)
 
             try:
-                common.CONFIG_STORE.validate(data, admission_control_check)
+                ConfigStore().validate(data, admission_control_check)
             except Exception as ex:
                 raise BadRequest(f"POWER PROFILE {profile_id} not updated") from ex
 
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore.set_config(data)
 
             res = {'message': "POWER PROFILE " + str(profile_id) + " updated"}
             return res, 200
@@ -208,7 +208,7 @@ class Powers(Resource):
         Returns:
             response, status code
         """
-        data = common.CONFIG_STORE.get_config()
+        data = ConfigStore.get_config()
         if 'power_profiles' not in data:
             raise NotFound("No power profiles in config file")
 
@@ -230,24 +230,24 @@ class Powers(Resource):
         json_data = request.get_json()
 
         try:
-            schema, resolver = common.CONFIG_STORE.load_json_schema('add_power.json')
+            schema, resolver = ConfigStore().load_json_schema('add_power.json')
             jsonschema.validate(json_data, schema, resolver=resolver)
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed") from error
 
-        json_data['id'] = common.CONFIG_STORE.get_new_power_profile_id()
+        json_data['id'] = ConfigStore().get_new_power_profile_id()
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
         if 'power_profiles' not in data:
             data['power_profiles'] = []
         data['power_profiles'].append(json_data)
 
         try:
-            common.CONFIG_STORE.validate(data, False)
+            ConfigStore().validate(data, False)
         except Exception as ex:
             raise BadRequest("New POWER PROFILE not added") from ex
 
-        common.CONFIG_STORE.set_config(data)
+        ConfigStore().set_config(data)
 
         res = {
             'id': json_data['id'],

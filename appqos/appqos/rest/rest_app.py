@@ -47,7 +47,7 @@ from power import AdmissionControlError
 
 from rest.rest_exceptions import NotFound, BadRequest
 
-from config import ConfigStore
+from config_store import ConfigStore
 
 
 class App(Resource):
@@ -70,13 +70,13 @@ class App(Resource):
             response, status code
         """
 
-        data = common.CONFIG_STORE.get_config()
+        data = ConfigStore.get_config()
         if 'apps' not in data:
             raise NotFound("No apps in config file")
 
         try:
-            app = common.CONFIG_STORE.get_app(data, int(app_id))
-            app['pool_id'] = common.CONFIG_STORE.app_to_pool(int(app_id))
+            app = data.get_app(int(app_id))
+            app['pool_id'] = data.app_to_pool(int(app_id))
         except:
             # pylint: disable=raise-missing-from
             raise NotFound(f"APP {app_id} not found in config")
@@ -98,7 +98,7 @@ class App(Resource):
             response, status code
         """
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
 
@@ -117,7 +117,7 @@ class App(Resource):
 
             # remove app
             data['apps'].remove(app)
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore.set_config(data)
 
             res = {'message': f"APP {app_id} deleted" }
             return res, 200
@@ -150,7 +150,7 @@ class App(Resource):
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest(f"Request validation failed - {error}") from error
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
         if 'apps' not in data or 'pools' not in data:
             raise NotFound("No apps or pools in config file")
 
@@ -190,13 +190,13 @@ class App(Resource):
                 app['pids'] = json_data['pids']
 
             try:
-                common.CONFIG_STORE.validate(data)
+                ConfigStore().validate(data)
             except AdmissionControlError:
                 pass
             except Exception as ex:
                 raise BadRequest(f"APP {app_id} not updated, {ex}") from ex
 
-            common.CONFIG_STORE.set_config(data)
+            ConfigStore.set_config(data)
             if 'pool_id' in json_data:
                 common.STATS_STORE.general_stats_inc_apps_moves()
 
@@ -222,14 +222,14 @@ class Apps(Resource):
         Returns:
             response, status code
         """
-        data = common.CONFIG_STORE.get_config()
+        data = ConfigStore.get_config()
         if 'apps' not in data or not data['apps']:
             raise NotFound("No apps in config file")
 
         apps = data['apps']
 
         for app in apps:
-            app['pool_id'] = common.CONFIG_STORE.app_to_pool(app['id'])
+            app['pool_id'] = data.app_to_pool(app['id'])
 
         return (data['apps']), 200
 
@@ -254,12 +254,12 @@ class Apps(Resource):
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest(f"Request validation failed - {error}") from error
 
-        data = deepcopy(common.CONFIG_STORE.get_config())
+        data = deepcopy(ConfigStore.get_config())
 
         if 'pools' not in data:
             raise NotFound("No pools in config file")
 
-        json_data['id'] = common.CONFIG_STORE.get_new_app_id()
+        json_data['id'] = ConfigStore().get_new_app_id()
 
         if 'pids' in json_data:
             # validate pids
@@ -289,7 +289,7 @@ class Apps(Resource):
                     json_data.pop('cores')
 
         try:
-            pool = common.CONFIG_STORE.get_pool(data, json_data['pool_id'])
+            pool = data.get_pool(json_data['pool_id'])
         except Exception as ex:
             raise BadRequest(f"New APP not added, {ex}") from ex
 
@@ -302,13 +302,13 @@ class Apps(Resource):
         data['apps'].append(json_data)
 
         try:
-            common.CONFIG_STORE.validate(data)
+            ConfigStore().validate(data)
         except AdmissionControlError:
             pass
         except Exception as ex:
             raise BadRequest(f"New APP not added, {ex}") from ex
 
-        common.CONFIG_STORE.set_config(data)
+        ConfigStore().set_config(data)
 
         res = {
             'id': json_data['id'],

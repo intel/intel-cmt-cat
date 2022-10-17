@@ -39,7 +39,6 @@ import multiprocessing
 import os
 
 import pqos_api # pylint: disable=cyclic-import
-import config # pylint: disable=cyclic-import
 import stats # pylint: disable=cyclic-import
 
 
@@ -54,7 +53,6 @@ POWER_CAP = "power"
 RATE_LIMIT = 10 # rate limit of configuration changes in HZ
 
 MANAGER = multiprocessing.Manager()
-CONFIG_STORE = config.ConfigStore()
 STATS_STORE = stats.StatsStore()
 PQOS_API = pqos_api.PqosApi()
 
