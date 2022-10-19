@@ -351,6 +351,9 @@ struct pqos_coreinfo {
         unsigned l2_id;    /**< L2 cluster id */
         unsigned l3cat_id; /**< L3 CAT classes id */
         unsigned mba_id;   /**< MBA id */
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+        unsigned numa; /**< numa node in the system */
+#endif
 };
 
 /**

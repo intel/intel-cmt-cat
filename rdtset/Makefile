@@ -79,6 +79,10 @@ ifeq ($(RMID_CUSTOM),y)
 CFLAGS += -DPQOS_RMID_CUSTOM
 endif
 
+# SNC
+ifeq ($(PQOS_SNC),y)
+CFLAGS += -DPQOS_SNC
+endif
 
 # Needed by initgroups()
 ifeq ($(shell uname), FreeBSD)

@@ -63,7 +63,9 @@
         }
 
 FILTER(cpu)
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 FILTER(node)
+#endif
 FILTER(index)
 
 /**
@@ -166,6 +168,7 @@ cpu_online(unsigned lcore)
         return online;
 }
 
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 /**
  * @brief Detects node of \a lcore
  *
@@ -195,6 +198,7 @@ cpu_node(unsigned lcore, unsigned *node)
 
         return ret;
 }
+#endif
 
 /**
  * @brief Detects socket of \a lcore
@@ -309,7 +313,6 @@ os_cpuinfo_topology(void)
         for (i = 0; i < num_cpus; i++) {
                 unsigned lcore = atoi(namelist[i]->d_name + 3);
                 struct pqos_coreinfo *info = &cpu->cores[cpu->num_cores];
-                unsigned node;
 
                 if (!cpu_online(lcore))
                         continue;
@@ -318,9 +321,11 @@ os_cpuinfo_topology(void)
                 if (retval != PQOS_RETVAL_OK)
                         break;
 
-                retval = cpu_node(lcore, &node);
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+                retval = cpu_node(lcore, &info->numa);
                 if (retval != PQOS_RETVAL_OK)
                         break;
+#endif
 
                 retval = cpu_cache(lcore, &info->l3_id, &info->l2_id);
                 if (retval != PQOS_RETVAL_OK)
@@ -328,10 +333,16 @@ os_cpuinfo_topology(void)
 
                 info->lcore = lcore;
 
-                LOG_DEBUG("Detected core %u, socket %u, NUMAnode %u, L2 ID %u, "
-                          "L3 ID %u\n",
-                          info->lcore, info->socket, node, info->l2_id,
-                          info->l3_id);
+                LOG_DEBUG("Detected core %u, socket %u, "
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+                          "NUMAnode %u, "
+#endif
+                          "L2 ID %u, L3 ID %u\n",
+                          info->lcore, info->socket,
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+                          info->numa,
+#endif
+                          info->l2_id, info->l3_id);
 
                 cpu->num_cores++;
         }

@@ -35,6 +35,8 @@ appqos/.coverage
 lib/python/.coverage
 lib/python/test_env
 lib/python/venv_*
+lib/python/build
+lib/python/dist
 
 lib/perl/Makefile
 lib/perl/Makefile.old
@@ -51,4 +53,4 @@ venv
 
 unit-test/lib/obj
 unit-test/lib/bin
-
+unit-test/pqos/bin

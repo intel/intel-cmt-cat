@@ -398,9 +398,21 @@ detect_cpu(const int cpu,
         info->l3_id = apicid >> apic->l3_shift;
         info->l2_id = apicid >> apic->l2_shift;
 
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+        if (getcpu(NULL, &info->numa) != 0)
+                return -1;
+#endif
+
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+        LOG_DEBUG("Detected core %u, socket %u, NUMAnode %u, "
+                  "L2 ID %u, L3 ID %u, APICID %u\n",
+                  info->lcore, info->socket, info->numa, info->l2_id,
+                  info->l3_id, apicid);
+#else
         LOG_DEBUG("Detected core %u, socket %u, "
                   "L2 ID %u, L3 ID %u, APICID %u\n",
                   info->lcore, info->socket, info->l2_id, info->l3_id, apicid);
+#endif
 
         return 0;
 }
