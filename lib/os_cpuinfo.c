@@ -281,13 +281,16 @@ os_cpuinfo_topology(void)
 {
         struct pqos_cpuinfo *cpu = NULL;
         struct dirent **namelist = NULL;
-        unsigned max_core_count;
+        int max_core_count;
         int num_cpus;
         int i;
         int retval = PQOS_RETVAL_OK;
 
         max_core_count = sysconf(_SC_NPROCESSORS_CONF);
-        if (max_core_count == 0) {
+        if (max_core_count < 0) {
+                LOG_ERROR("Failed to get number of processors!\n");
+                return NULL;
+        } else if (max_core_count == 0) {
                 LOG_ERROR("Zero processors in the system!\n");
                 return NULL;
         }
@@ -304,7 +307,7 @@ os_cpuinfo_topology(void)
         memset(cpu, 0, mem_sz);
 
         num_cpus = scandir(SYSTEM_CPU, &namelist, filter_cpu, cpu_sort);
-        if (num_cpus <= 0 || (int)max_core_count < num_cpus) {
+        if (num_cpus <= 0 || max_core_count < num_cpus) {
                 LOG_ERROR("Failed to read proc cpus!\n");
                 free(cpu);
                 return NULL;
