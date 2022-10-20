@@ -47,8 +47,9 @@ from pqos.mba import PqosMba
 from pqos.allocation import PqosAlloc
 from pqos.cpuinfo import PqosCpuInfo
 
-import common
-import log
+from appqos import common
+from appqos import log
+from appqos.manager import MANAGER
 
 
 class PqosApi:
@@ -70,7 +71,7 @@ class PqosApi:
 
         # dict to share interface type and MBA BW status
         # between REST API process and "backend"
-        self.shared_dict = common.MANAGER.dict()
+        self.shared_dict = MANAGER.dict()
         self.shared_dict['current_iface'] = None
         self.shared_dict['mba_bw_supported'] = None
         self.shared_dict['mba_bw_enabled'] = None
@@ -842,3 +843,5 @@ class PqosApi:
         except Exception as ex:
             log.error(str(ex))
             return None
+
+PQOS_API = PqosApi()

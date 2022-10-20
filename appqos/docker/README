@@ -28,12 +28,12 @@ At first, prepare directory with App QoS config and certificate - this directory
 the running container. Name of this directory and location doesn't really matter but make sure that
 it will be accessible only to the 'root' user:
 
-$ mkdir -p /opt/intel/appqos_ca/
-$ chmod 700 /opt/intel/appqos_ca/
+$ mkdir -p /opt/intel/appqos/
+$ chmod 700 /opt/intel/appqos/
 
 Then, create there 'appqos.conf' configuration file with an empty configuration
 
-$ cd /opt/intel/appqos_ca/
+$ cd /opt/intel/appqos/
 $ cat > appqos.conf <<EOF
 {"apps": [], "sstbf": {"configured": false}, "pools": [], "power_profiles_expert_mode": true}
 EOF
@@ -54,7 +54,7 @@ total 16
 -rw-r--r-- 1 root root 1545 Apr  7 17:44 ca.crt
 
 $ sudo docker run --privileged --env APPQOS_PORT=5000 --expose 5000 \
--v /opt/intel/appqos_ca/:/appqos_workspace/appqos/ca \
+-v /opt/intel/appqos:/opt/intel/appqos \
 --mount type=bind,bind-propagation=shared,source=/sys/fs,target=/sys/fs \
 --pid=host --network=host --rm -it appqos
 ...
@@ -76,7 +76,7 @@ Note: For security reasons the container should not be exposed to any external n
 Explanation of options used:
 --privileged - run container in privileged mode to get access to device drivers
 --env APPQOS_PORT=5000 --expose 5000 - run App QoS on port 5000 and expose that port outside of the container
--v /opt/intel/appqos_ca/:/appqos_workspace/appqos/ca - shared volume with App QoS configuration and mTLS certificates
+-v /opt/intel/appqos:/opt/intel/appqos - shared volume with App QoS configuration and mTLS certificates
 --mount type=bind,bind-propagation=shared,source=/sys/fs,target=/sys/fs - share fs directory with container for resctrl interface
 --pid=host - needed for access to host processes from container
 --network=host - (optional) map container exposed ports to localhost port

@@ -34,8 +34,8 @@
 SST-BF module
 """
 
-import power_common
-import log
+from appqos import power_common
+from appqos import log
 
 PWR_CFG_SST_BF = "sst_bf"
 PWR_CFG_BASE = "base"

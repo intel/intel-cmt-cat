@@ -43,17 +43,18 @@ import pytest
 from requests.auth import _basic_auth_str
 from jsonschema import validate, RefResolver
 
-from rest import rest_server
-import common
-import caps
-import pid_ops
-from stats import StatsStore
-from config import Config
+from appqos.rest import rest_server
+import appqos.common
+import appqos.caps
+import appqos.pid_ops
+from appqos.stats import StatsStore
+from appqos.config import Config
 
 logging.basicConfig(level=logging.DEBUG)
 
 LOG = logging.getLogger('rest')
 
+#pylint: disable=duplicate-code
 CONFIG = {
     "apps": [
         {

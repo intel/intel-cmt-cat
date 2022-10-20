@@ -40,15 +40,13 @@ from flask_restful import Resource, request
 
 import jsonschema
 
-import caps
-import common
-import log
-import sstbf
-
-from rest.rest_exceptions import NotFound, BadRequest, InternalError
-
-from config_store import ConfigStore
-
+from appqos import caps
+from appqos import common
+from appqos import log
+from appqos import sstbf
+from appqos.config_store import ConfigStore
+from appqos.rest.rest_exceptions import NotFound, BadRequest, InternalError
+from appqos.pqos_api import PQOS_API
 
 class Pool(Resource):
     """
@@ -138,19 +136,19 @@ class Pool(Resource):
             if any(k in json_data for k in ('l3cbm', 'l3cbm_data', 'l3cbm_code')):
                 if not caps.cat_l3_supported():
                     raise BadRequest("System does not support CAT!")
-                if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
+                if pool_id > PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
                     raise BadRequest(f"Pool {pool_id} does not support CAT")
 
             if any(k in json_data for k in ('l2cbm', 'l2cbm_data', 'l2cbm_code')):
                 if not caps.cat_l2_supported():
                     raise BadRequest("System does not support CAT!")
-                if pool_id > common.PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
+                if pool_id > PQOS_API.get_max_cos_id([common.CAT_L2_CAP]):
                     raise BadRequest(f"Pool {pool_id} does not support L2 CAT")
 
             if 'mba' in json_data or 'mba_bw' in json_data:
                 if not caps.mba_supported():
                     raise BadRequest("System does not support MBA!")
-                if pool_id > common.PQOS_API.get_max_cos_id([common.MBA_CAP]):
+                if pool_id > PQOS_API.get_max_cos_id([common.MBA_CAP]):
                     raise BadRequest(f"Pool {pool_id} does not support MBA")
 
             if 'mba_bw' in json_data and not caps.mba_bw_enabled():
@@ -225,7 +223,7 @@ class Pool(Resource):
             except Exception as ex:
                 raise BadRequest(f"POOL {pool_id} not updated, {ex}") from ex
 
-            ConfigStore().set_config(data)
+            ConfigStore.set_config(data)
 
             res = {'message': f"POOL {pool_id} updated"}
             return res, 200

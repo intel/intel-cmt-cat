@@ -22,4 +22,4 @@ mock = "*"
 caniusepython3 = "*"
 requests = "*"
 codespell = "*"
-
+build = "*"

@@ -37,6 +37,6 @@ App QoS is a software created to demonstrate the use of Intel(R) RDT
 technologies (CAT, MBA) to improve QoS for applications via partitioning system
 resources.
 """
-from appqos import main
+from appqos.appqos import main
 
 main()

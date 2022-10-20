@@ -37,14 +37,14 @@ Unit tests for rest module RESET
 import mock
 import pytest
 
-import common
+import appqos.common
 from rest_common import get_config, REST
 
 
 class TestReset:
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     def test_reset(self):
-        with mock.patch('config_store.ConfigStore.reset') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.reset') as func_mock:
             response = REST.post("/reset")
             func_mock.assert_called_once()
 

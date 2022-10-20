@@ -41,18 +41,21 @@ starts REST API server and runs main loop (AppQoS)
 import argparse
 import multiprocessing
 import signal
+import sys
 import syslog
 import time
 from jsonschema import ValidationError
 
-import cache_ops
-import caps
-import common
-import log
-import power
-from rest import rest_server
-import sstbf
-from config_store import ConfigStore
+from appqos import cache_ops
+from appqos import caps
+from appqos import common
+from appqos import log
+from appqos import power
+from appqos.rest import rest_server
+from appqos import sstbf
+from appqos.config_store import ConfigStore
+from appqos.pqos_api import PQOS_API
+from appqos.__version__ import __version__
 
 class AppQoS:
     """
@@ -121,11 +124,11 @@ class AppQoS:
 
         # Configure MBA CTRL
         if caps.mba_supported():
-            result = common.PQOS_API.enable_mba_bw(data.get_mba_ctrl_enabled())
+            result = PQOS_API.enable_mba_bw(data.get_mba_ctrl_enabled())
             if result != 0:
                 log.error("libpqos MBA CTRL initialization failed, Terminating...")
                 return
-            log.info(f"RDT MBA CTRL {'en' if common.PQOS_API.is_mba_bw_enabled() else 'dis'}abled")
+            log.info(f"RDT MBA CTRL {'en' if PQOS_API.is_mba_bw_enabled() else 'dis'}abled")
 
         result = cache_ops.configure_rdt(data)
         if result != 0:
@@ -194,6 +197,10 @@ def load_config(config_file):
     # load config file
     try:
         ConfigStore().from_file(config_file)
+    except FileNotFoundError as ex:
+        log.error("Configuration file not found... ")
+        log.error(ex)
+        return -1
     except IOError as ex:
         log.error(f"Error reading from config file {config_file}... ")
         log.error(ex)
@@ -215,23 +222,28 @@ def main():
 
     # parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-c', '--config', metavar="PATH", default=common.CONFIG_FILENAME,
-                        help="Configuration file path")
+    parser.add_argument('-c', '--config', metavar="PATH", help="Configuration file path")
     parser.add_argument('--port', metavar=("PORT"), default=[5000], type=int, nargs=1,
                         help="REST API port")
     parser.add_argument('-V', '--verbose', action='store_true', help="Verbose mode")
     parser.add_argument('-a', '--address', metavar="INET_ADDRESS", default=common.DEFAULT_ADDRESS,
                         help="AppQoS inet address")
+    parser.add_argument('--version', action='store_true',
+                        help="Output version information and exit")
     cmd_args = parser.parse_args()
 
     # configure syslog output
     syslog.openlog("AppQoS")
 
+    if cmd_args.version:
+        print(f"appqos, version {__version__}")
+        sys.exit(0)
+
     if cmd_args.verbose:
         log.enable_verbose()
 
     # detect supported RDT interfaces
-    common.PQOS_API.detect_supported_ifaces()
+    PQOS_API.detect_supported_ifaces()
 
     # Load config file
     if load_config(cmd_args.config):
@@ -239,11 +251,11 @@ def main():
         return
 
     # initialize libpqos/Intel RDT interface
-    result = common.PQOS_API.init(ConfigStore.get_config().get_rdt_iface())
+    result = PQOS_API.init(ConfigStore.get_config().get_rdt_iface())
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
         return
-    log.info(f"RDT initialized with '{common.PQOS_API.current_iface()}' interface")
+    log.info(f"RDT initialized with '{PQOS_API.current_iface()}' interface")
 
     # initialize capabilities
     result = caps.caps_init()
@@ -266,7 +278,7 @@ def main():
         log.error("Required capabilities not supported, Terminating...")
 
     # de-initialize libpqos
-    common.PQOS_API.fini()
+    PQOS_API.fini()
 
 
 if __name__ == '__main__':

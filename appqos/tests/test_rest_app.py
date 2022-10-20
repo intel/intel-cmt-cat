@@ -39,15 +39,15 @@ from jsonschema import validate
 import mock
 import pytest
 
-import common
-import caps
-import pid_ops
+import appqos.common
+import appqos.caps
+import appqos.pid_ops
 
 from rest_common import get_config, load_json_schema, REST, CONFIG_EMPTY
 
 
-class TestApps:
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
+class TestAppsGet:
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     def test_get(self):
         response = REST.get("/apps")
         data = json.loads(response.data.decode('utf-8'))
@@ -63,7 +63,7 @@ class TestApps:
         assert len(data) == 3
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
     def test_get_empty(self):
         response = REST.get("/apps")
         data = json.loads(response.data.decode('utf-8'))
@@ -73,20 +73,21 @@ class TestApps:
         assert "No apps in config" in data["message"]
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
-    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+class TestAppPost:
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.power.validate_power_profiles", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
             {"pool_id": 2, "name":"hello","cores":[2, 3],"pids":[11]},
             {"pool_id": 2, "name":"hello", "pids": [12]}                                    # no cores
         ])
     def test_post(self, app_config):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock,\
-             mock.patch('pid_ops.is_pid_valid', return_value=True):
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock,\
+             mock.patch('appqos.pid_ops.is_pid_valid', return_value=True):
             response = REST.post("/apps", app_config)
             func_mock.assert_called_once()
         data = json.loads(response.data.decode('utf-8'))
@@ -99,64 +100,64 @@ class TestApps:
         assert 'id' in data
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
-    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.power.validate_power_profiles", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
         {"cores":[7,9]},                                                                # cores only
         {"pool_id": 2, "name": "hello", "cores": [2], "pids": [1], "unknown": [7,9]}    # unknown
     ])
     def test_post_badrequest(self, app_config):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.post("/apps", app_config)
             func_mock.assert_not_called()
 
         assert response.status_code == 400
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=False))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
-    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=False))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.power.validate_power_profiles", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
         {"pool_id": 2, "name":"hello", "cores":2, "pids":[1]},                          # invalid core
         {"pool_id": 2, "name":"hello", "cores":[-9], "pids":[1]},                       # invalid core
         {"pool_id": 2, "name": "hello", "cores": [22], "pids": [1]}                     # core does not match pool id
     ])
     def test_post_invalid_core(self, app_config):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.post("/apps", app_config)
             func_mock.assert_not_called()
 
         assert response.status_code == 400
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=False))
-    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=False))
+    @mock.patch("appqos.power.validate_power_profiles", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("app_config", [
         {"pool_id": 2, "name":"hello", "cores":[2], "pids":[199099]},                  # invalid PID
         {"pool_id": 2, "pids": 1},                                                     # invalid "pids" format
         {"pool_id": 2, "pids": [-1]},                                                  # invalid PID
     ])
     def test_post_invalid_pid(self, app_config):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.post("/apps", app_config)
             func_mock.assert_not_called()
 
         assert response.status_code == 400
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
     def test_post_empty_config(self):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.post("/apps", {"pool_id": 2, "name":"hello", "cores":[50], "pids":[1]})
             func_mock.assert_not_called()
 
         assert response.status_code == 404
 
 
-class TestApp_2:
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
+class TestAppGet:
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     def test_get(self):
         response = REST.get("/apps/2")
         data = json.loads(response.data.decode('utf-8'))
@@ -171,7 +172,7 @@ class TestApp_2:
         # structure, types and required fields are validated using schema
         assert data['id'] == 2
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
     def test_get_empty(self):
         response = REST.get("/apps/2")
         data = json.loads(response.data.decode('utf-8'))
@@ -181,9 +182,10 @@ class TestApp_2:
         assert "No apps in config" in data["message"]
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
+class TestAppDelete:
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     def test_delete_invalid_id(self):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.delete("/apps/10")
             func_mock.assert_not_called()
         data = json.loads(response.data.decode('utf-8'))
@@ -193,7 +195,7 @@ class TestApp_2:
         assert "APP 10 not found in config" in data["message"]
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     def test_delete(self):
         def set_config(data):
             for app in data['apps']:
@@ -201,29 +203,30 @@ class TestApp_2:
             for pool in data['pools']:
                 assert ('apps' not in pool) or (2 not in pool['apps'])
 
-        with mock.patch('config_store.ConfigStore.set_config', side_effect=set_config) as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config', side_effect=set_config) as func_mock:
             response = REST.delete("/apps/2")
             func_mock.assert_called_once()
 
         assert response.status_code == 200
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
     def test_delete_empty_config(self):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.delete("/apps/2")
             func_mock.assert_not_called()
 
         assert response.status_code == 404
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
-    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+class TestAppPut:
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_pool(self):
         def set_config(data):
             for pool in data['pools']:
@@ -232,68 +235,68 @@ class TestApp_2:
                 else:
                     assert ('apps' not in pool) or (2 not in pool['apps'])
 
-        with mock.patch('config_store.ConfigStore.set_config', side_effect=set_config) as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config', side_effect=set_config) as func_mock:
             response = REST.put("/apps/2", {"pool_id": 2})
             func_mock.assert_called_once()
 
         assert response.status_code == 200
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
-    @mock.patch("power.validate_power_profiles", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.power.validate_power_profiles", mock.MagicMock(return_value=True))
     def test_put_cores(self):
         def set_config(data):
             for app in data['apps']:
                 if app['id'] == 2:
                     assert app['cores'] == [3]
 
-        with mock.patch('config_store.ConfigStore.set_config', side_effect=set_config) as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config', side_effect=set_config) as func_mock:
             response = REST.put("/apps/2", {"pool_id": 2, "cores": [3]})
             func_mock.assert_called_once()
 
         assert response.status_code == 200
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     def test_put_invalid_pool(self):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.put("/apps/2", {"pool_id": 20})
             func_mock.assert_not_called()
 
         assert response.status_code == 400
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     def test_put_invalid_app(self):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.put("/apps/20", {"pool_id": 2})
             func_mock.assert_not_called()
 
         assert response.status_code == 404
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("common.PQOS_API.check_core", mock.MagicMock(return_value=True))
-    @mock.patch("pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.check_core", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.pid_ops.is_pid_valid", mock.MagicMock(return_value=True))
     def test_put_invalid(self):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.put("/apps/2", {"invalid": 20})
             func_mock.assert_not_called()
 
         assert response.status_code == 400
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
     def test_put_empty_config(self):
-        with mock.patch('config_store.ConfigStore.set_config') as func_mock:
+        with mock.patch('appqos.config_store.ConfigStore.set_config') as func_mock:
             response = REST.put("/apps/20", {"pool_id": 2})
             func_mock.assert_not_called()
 

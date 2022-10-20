@@ -39,45 +39,45 @@ from jsonschema import validate
 import mock
 import pytest
 
-import common
-import caps
+import appqos.common
+import appqos.caps
 
 from rest_common import get_config, load_json_schema, Rest
 
 
 class TestSstbf:
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
-    @mock.patch("sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
-    @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
+    @mock.patch("appqos.sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
+    @mock.patch("appqos.caps.sstbf_enabled", mock.MagicMock(return_value=True))
     def test_get_sstbf(self):
         for ret_val in [True, False]:
-           with mock.patch("sstbf.is_sstbf_configured", return_value=ret_val):
-               response = Rest().get("/caps/sstbf")
+            with mock.patch("appqos.sstbf.is_sstbf_configured", return_value=ret_val):
+                response = Rest().get("/caps/sstbf")
 
-               assert response.status_code == 200
+                assert response.status_code == 200
 
-               data = json.loads(response.data.decode('utf-8'))
+                data = json.loads(response.data.decode('utf-8'))
 
-               # validate response schema
-               schema, resolver = load_json_schema('get_sstbf_response.json')
-               validate(data, schema, resolver=resolver)
+                # validate response schema
+                schema, resolver = load_json_schema('get_sstbf_response.json')
+                validate(data, schema, resolver=resolver)
 
-               params = ['configured', 'hp_cores', 'std_cores']
+                params = ['configured', 'hp_cores', 'std_cores']
 
-               assert len(data) == len(params)
+                assert len(data) == len(params)
 
-               for param in params:
-                   assert param in data
+                for param in params:
+                    assert param in data
 
-               assert data['configured'] == ret_val
-               assert data['hp_cores'] == [0,1,2,3]
-               assert data['std_cores'] == [4,5,6,7]
+                assert data['configured'] == ret_val
+                assert data['hp_cores'] == [0,1,2,3]
+                assert data['std_cores'] == [4,5,6,7]
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=False))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.sstbf_enabled", mock.MagicMock(return_value=False))
     def test_get_sstbf_unsupported(self):
         response = Rest().get("/caps/sstbf")
         assert response.status_code == 404
@@ -86,23 +86,23 @@ class TestSstbf:
         assert response.status_code == 404
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
-    @mock.patch("sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
-    @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.sstbf.get_hp_cores", mock.MagicMock(return_value=[0,1,2,3]))
+    @mock.patch("appqos.sstbf.get_std_cores", mock.MagicMock(return_value=[4,5,6,7]))
+    @mock.patch("appqos.caps.sstbf_enabled", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("configured_value", [
         True,
         False
     ])
     def test_put_sstbf(self, configured_value):
-        with mock.patch("sstbf.configure_sstbf", return_value=0) as func_mock:
+        with mock.patch("appqos.sstbf.configure_sstbf", return_value=0) as func_mock:
             response = Rest().put("/caps/sstbf", {"configured": configured_value})
             assert response.status_code == 200
             func_mock.called_once_with(configured_value)
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.sstbf_enabled", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("invalid_fields_json", [
         {"configured": 10},
         {"configured": -1},
@@ -114,17 +114,17 @@ class TestSstbf:
         {"configured": False, "std_cores": [1,2,3]}
     ])
     def test_put_sstbf_invalid(self, invalid_fields_json):
-        with mock.patch("sstbf.configure_sstbf", return_value=0) as func_mock:
+        with mock.patch("appqos.sstbf.configure_sstbf", return_value=0) as func_mock:
             response = Rest().put("/caps/sstbf", invalid_fields_json)
             # expect 400 BAD REQUEST
             assert response.status_code == 400
             func_mock.assert_not_called()
 
 
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("caps.sstbf_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.sstbf_enabled", mock.MagicMock(return_value=True))
     def test_put_sstbf_enable_failed(self):
-        with mock.patch("sstbf.configure_sstbf", return_value=-1) as func_mock:
+        with mock.patch("appqos.sstbf.configure_sstbf", return_value=-1) as func_mock:
             response = Rest().put("/caps/sstbf", {"configured": True})
             assert response.status_code == 500
             func_mock.assert_called()

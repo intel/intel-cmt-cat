@@ -64,7 +64,11 @@ App QoS reads its initial configuration from configuration file. During the runt
 _NOTE: None of configuration changes made via REST API are saved to configuration file._
 
 ### Configuration file
-By default App QoS will attempt to read from "appqos.conf" file from current folder.
+You can specify a configuration file using `--config` option. Otherwise App QoS searches for a configuration file is the following order
+
+1. `appqos.conf` file from current working directory.
+2. `appqos/appqos.conf` file in your home directory which isn't root
+3. `/opt/intel/appqos/appqos.conf`
 
 Create ./appqos.conf file.
 ```

@@ -12,14 +12,14 @@ RUN apt-get update -q && \
         libpython3-stdlib && \
     apt-get clean
 
-# copy all intel-cmt-cat sources
-COPY . /appqos_workspace
-
 ################################################################################
 #       Build libpqos                                                          #
 ################################################################################
 FROM base AS build-libpqos
 ENV DEBIAN_FRONTEND noninteractive
+
+# copy all intel-cmt-cat sources
+COPY . /appqos_workspace
 
 # install libpqos dependencies
 RUN apt-get install -y --no-install-recommends \
@@ -43,17 +43,22 @@ ARG LC_ALL=C.UTF-8
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV WORKON_HOME=/venv/
+ENV PYTHONUSERBASE=/python
+ENV PIP_ROOT_USER_ACTION=ignore
+ENV PIP_USER=1
+
+# copy all intel-cmt-cat sources
+COPY . /appqos_workspace
 
 # install dependencies
 RUN apt-get install -y --no-install-recommends \
         python3-pip \
-        git \
-        make && \
-    apt-get clean && \
-    pip3 install pipenv
+        git && \
+    apt-get clean
 
 RUN mkdir -p /python && \
-    PYTHONUSERBASE=/python PIP_USER=1 PIPENV_SYSTEM=1 VENV_DIR=/venv/ make -C /appqos_workspace/appqos setup
+    python3 -m pip install --no-warn-script-location /appqos_workspace/lib/python && \
+    python3 -m pip install --no-warn-script-location /appqos_workspace/appqos
 
 ################################################################################
 #       Final image                                                            #
@@ -68,7 +73,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV PYTHONUSERBASE=/python
 ENV APPQOS_PORT=5000
-ENV APPQOS_CONF_PATH=ca/appqos.conf
+ENV APPQOS_CONF_PATH=/opt/intel/appqos/appqos.conf
 ENV APPQOS_ADDRESS=0.0.0.0
 
 # copy libpqos
@@ -76,6 +81,9 @@ COPY --from=build-libpqos /usr/local/lib/libpqos.so* /lib/
 
 # copy App QoS dependencies
 COPY --from=build-python /python /python
+
+# create config dir
+RUN mkdir -p /opt/intel/appqos
 
 # cleanup base packages
 RUN apt-get -y purge --auto-remove \
@@ -93,5 +101,4 @@ RUN apt-get -y purge --auto-remove \
     rm -rf /usr/sbin/chroot && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /appqos_workspace/appqos
-CMD python3 ./appqos -c ${APPQOS_CONF_PATH} --port ${APPQOS_PORT}
+CMD python3 -m appqos -c ${APPQOS_CONF_PATH} --port ${APPQOS_PORT} --address ${APPQOS_ADDRESS}

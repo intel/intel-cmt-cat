@@ -42,16 +42,16 @@ import mock
 import pytest
 import time
 
-import common
-import caps
-import rest.rest_power
+from appqos import common
+from appqos import caps
+from appqos.rest import rest_power
 
 from rest_common import get_config, load_json_schema, REST, Rest, CONFIG, CONFIG_EMPTY
 
 
 class TestRestPowerProfiles:
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("caps.SYSTEM_CAPS", ['cat', 'mba', 'power'])
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.caps.SYSTEM_CAPS", ['power'])
     def test_get(self):
         response = REST.get("/caps")
         data = json.loads(response.data.decode('utf-8'))
@@ -61,14 +61,12 @@ class TestRestPowerProfiles:
         validate(data, schema, resolver=resolver)
 
         assert response.status_code == 200
-        assert 'cat' in data["capabilities"]
-        assert 'mba' in data["capabilities"]
         assert 'power' in data["capabilities"]
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=False))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=False))
     def test_epp_unsupported_get_post(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 404
@@ -77,9 +75,9 @@ class TestRestPowerProfiles:
         assert response.status_code == 404
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_existing_profiles_operations_get_del(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 200
@@ -111,14 +109,14 @@ class TestRestPowerProfiles:
             for profile in config['power_profiles']:
                 assert profile['id'] != unused_profiles_id
 
-        with mock.patch("config_store.ConfigStore.set_config", new=mock_set_config):
+        with mock.patch("appqos.config_store.ConfigStore.set_config", new=mock_set_config):
             response = Rest().delete("/power_profiles/{}".format(unused_profiles_id))
             assert response.status_code == 200
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_existing_profiles_operations_put(self):
 
         put_profile = CONFIG['power_profiles'][-1]
@@ -129,8 +127,8 @@ class TestRestPowerProfiles:
                     assert profile != put_profile
                     break
 
-        with mock.patch("config_store.ConfigStore.set_config", side_effect=set_config) as mock_set_config,\
-            mock.patch("config_store.ConfigStore.validate"):
+        with mock.patch("appqos.config_store.ConfigStore.set_config", side_effect=set_config) as mock_set_config,\
+            mock.patch("appqos.config_store.ConfigStore.validate"):
             for key, value in put_profile.items():
 
                 if key in ["min_freq", "max_freq"]:
@@ -146,8 +144,8 @@ class TestRestPowerProfiles:
                     mock_set_config.assert_called()
 
 
-        with mock.patch("config_store.ConfigStore.validate", side_effect = Exception('Test Exception!')),\
-            mock.patch("config_store.ConfigStore.set_config") as mock_set_config:
+        with mock.patch("appqos.config_store.ConfigStore.validate", side_effect = Exception('Test Exception!')),\
+            mock.patch("appqos.config_store.ConfigStore.set_config") as mock_set_config:
             for key, value in put_profile.items():
 
                 if key in ["min_freq", "max_freq"]:
@@ -160,9 +158,9 @@ class TestRestPowerProfiles:
                 mock_set_config.assert_not_called()
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_nonexisting_profile_operations_get_del_put(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 200
@@ -186,9 +184,9 @@ class TestRestPowerProfiles:
         assert response.status_code == 404
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG_EMPTY))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_get_epp_no_profiles_configured(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 404
@@ -204,8 +202,8 @@ class TestRestPowerProfiles:
             assert response.status_code == 404
 
 
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("invalid_id", ["a", "test", "-1"])
     def test_invalid_index(self, invalid_id):
 
@@ -219,9 +217,9 @@ class TestRestPowerProfiles:
         assert response.status_code == 404
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("invalid_request", [
             {"id": 0, "min_freq": 1000, "max_freq": 2200, "epp": "performance", "name": "default"},
             {"id": 0},
@@ -251,9 +249,9 @@ class TestRestPowerProfiles:
         assert response.status_code == 400
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_operations_post(self):
 
         post_profile = {"min_freq": 1000, "max_freq": 2200, "epp": "performance", "name": "test_profile"}
@@ -267,35 +265,35 @@ class TestRestPowerProfiles:
                     assert profile == temp_profile
                     break
 
-        with mock.patch("config_store.ConfigStore.set_config", side_effect=set_config) as mock_set_config,\
-            mock.patch("config_store.ConfigStore.get_new_power_profile_id", return_value=post_profile_id) as mock_get_id,\
-            mock.patch("config_store.ConfigStore.validate") as mock_validate:
+        with mock.patch("appqos.config_store.ConfigStore.set_config", side_effect=set_config) as mock_set_config,\
+            mock.patch("appqos.config_store.ConfigStore.get_new_power_profile_id", return_value=post_profile_id) as mock_get_id,\
+            mock.patch("appqos.config_store.ConfigStore.validate") as mock_validate:
                 response = Rest().post("/power_profiles", post_profile)
                 assert response.status_code == 201
                 mock_set_config.assert_called()
                 mock_validate.assert_called()
                 mock_get_id.assert_called()
 
-        with mock.patch("config_store.ConfigStore.set_config") as mock_set_config,\
-            mock.patch("config_store.ConfigStore.get_new_power_profile_id", return_value=post_profile_id) as mock_get_id,\
-            mock.patch("config_store.ConfigStore.validate", side_effect = Exception('Test Exception!')) as mock_validate:
+        with mock.patch("appqos.config_store.ConfigStore.set_config") as mock_set_config,\
+            mock.patch("appqos.config_store.ConfigStore.get_new_power_profile_id", return_value=post_profile_id) as mock_get_id,\
+            mock.patch("appqos.config_store.ConfigStore.validate", side_effect = Exception('Test Exception!')) as mock_validate:
                 response = Rest().post("/power_profiles", post_profile)
                 assert response.status_code == 400
                 mock_validate.assert_called()
                 mock_set_config.assert_not_called()
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=False))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=False))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_operations_post_expert_mode_disable_post(self):
 
         post_profile = {"min_freq": 1000, "max_freq": 2200, "epp": "performance", "name": "test_profile"}
         post_profile_id = 10
 
-        with mock.patch("config_store.ConfigStore.set_config") as mock_set_config,\
-            mock.patch("config_store.ConfigStore.get_new_power_profile_id", return_value=post_profile_id) as mock_get_id,\
-            mock.patch("config_store.ConfigStore.validate") as mock_validate:
+        with mock.patch("appqos.config_store.ConfigStore.set_config") as mock_set_config,\
+            mock.patch("appqos.config_store.ConfigStore.get_new_power_profile_id", return_value=post_profile_id) as mock_get_id,\
+            mock.patch("appqos.config_store.ConfigStore.validate") as mock_validate:
                 response = Rest().post("/power_profiles", post_profile)
                 assert response.status_code == 405
                 mock_set_config.assert_not_called()
@@ -303,9 +301,9 @@ class TestRestPowerProfiles:
                 mock_get_id.assert_not_called()
 
 
-    @mock.patch("config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
-    @mock.patch("rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=False))
-    @mock.patch("caps.sstcp_enabled", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.config_store.ConfigStore.get_config", mock.MagicMock(return_value=CONFIG))
+    @mock.patch("appqos.rest.rest_power._get_power_profiles_expert_mode", mock.MagicMock(return_value=False))
+    @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_operations_post_expert_mode_disable_put_del(self):
         response = Rest().get("/power_profiles")
         assert response.status_code == 200
@@ -324,16 +322,16 @@ class TestRestPowerProfiles:
 
             profile_ids.append(profile['id'])
 
-            with mock.patch("config_store.ConfigStore.set_config") as mock_set_config,\
-                mock.patch("config_store.ConfigStore.validate") as mock_validate:
+            with mock.patch("appqos.config_store.ConfigStore.set_config") as mock_set_config,\
+                mock.patch("appqos.config_store.ConfigStore.validate") as mock_validate:
                     response = Rest().put("/power_profiles/{}".format(profile['id']), {"name": "Test_name"})
                     assert response.status_code == 405
                     mock_set_config.assert_not_called()
                     mock_validate.assert_not_called()
 
         for id in profile_ids:
-            with mock.patch("config_store.ConfigStore.set_config") as mock_set_config,\
-                mock.patch("config_store.ConfigStore.validate") as mock_validate:
+            with mock.patch("appqos.config_store.ConfigStore.set_config") as mock_set_config,\
+                mock.patch("appqos.config_store.ConfigStore.validate") as mock_validate:
                     response = Rest().delete("/power_profiles/{}".format(id))
                     assert response.status_code == 405
                     mock_set_config.assert_not_called()

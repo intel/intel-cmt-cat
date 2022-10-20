@@ -40,11 +40,9 @@ from copy import deepcopy
 from flask_restful import Resource, request
 import jsonschema
 
-from rest.rest_exceptions import NotFound, BadRequest, MethodNotAllowed
-
-import sstbf
-
-from config_store import ConfigStore
+from appqos import sstbf
+from appqos.config_store import ConfigStore
+from appqos.rest.rest_exceptions import NotFound, BadRequest, MethodNotAllowed
 
 
 def _get_power_profiles_expert_mode():

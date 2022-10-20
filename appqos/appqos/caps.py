@@ -34,11 +34,11 @@
 System capabilities module
 """
 
-import common
-import log
-import sstbf
-import power
-
+from appqos import common
+from appqos import log
+from appqos import sstbf
+from appqos import power
+from appqos.pqos_api import PQOS_API
 
 # System capabilities are detected during the runtime
 SYSTEM_CAPS = {}
@@ -65,7 +65,7 @@ def caps_init():
         sstcp_enabled()
     ]
 
-    if any(features) and common.PQOS_API.is_multicore():
+    if any(features) and PQOS_API.is_multicore():
         return 0
 
     return -1
@@ -82,7 +82,7 @@ def cdp_l3_supported():
     """
     Returns L3 CDP support status
     """
-    return common.PQOS_API.is_l3_cdp_supported()
+    return PQOS_API.is_l3_cdp_supported()
 
 
 def cat_l2_supported():
@@ -96,7 +96,7 @@ def cdp_l2_supported():
     """
     Returns L2 CDP support status
     """
-    return common.PQOS_API.is_l2_cdp_supported()
+    return PQOS_API.is_l2_cdp_supported()
 
 
 def mba_supported():
@@ -110,14 +110,14 @@ def mba_bw_supported():
     """
     Returns MBA BW support status
     """
-    return common.PQOS_API.is_mba_bw_supported()
+    return PQOS_API.is_mba_bw_supported()
 
 
 def mba_bw_enabled():
     """
     Returns MBA BW enabled status
     """
-    return common.PQOS_API.is_mba_bw_enabled()
+    return PQOS_API.is_mba_bw_enabled()
 
 
 def sstbf_enabled():
@@ -145,15 +145,15 @@ def detect_supported_caps():
     # generate list of supported capabilities
 
     # Intel RDT L3 CAT
-    if common.PQOS_API.is_l3_cat_supported():
+    if PQOS_API.is_l3_cat_supported():
         result.append(common.CAT_L3_CAP)
 
     # Intel RDT L2 CAT
-    if common.PQOS_API.is_l2_cat_supported():
+    if PQOS_API.is_l2_cat_supported():
         result.append(common.CAT_L2_CAP)
 
     # Intel RDT MBA
-    if common.PQOS_API.is_mba_supported():
+    if PQOS_API.is_mba_supported():
         result.append(common.MBA_CAP)
 
     if sstbf.is_sstbf_enabled():
@@ -177,7 +177,7 @@ def mba_info():
     """
 
     info = {
-        'clos_num': common.PQOS_API.get_mba_num_cos(),
+        'clos_num': PQOS_API.get_mba_num_cos(),
         'enabled': not mba_bw_enabled(),
         'ctrl_enabled': mba_bw_enabled()
     }
@@ -215,7 +215,7 @@ def l3ca_info():
         L3 cache allocation information
     """
 
-    rdt_api = common.PQOS_API
+    rdt_api = PQOS_API
     info = {
         'cache_size': rdt_api.get_l3_cache_size(),
         'cache_way_size': rdt_api.get_l3_cache_way_size(),
@@ -241,7 +241,7 @@ def l2ca_info():
         L2 cache allocation information
     """
 
-    rdt_api = common.PQOS_API
+    rdt_api = PQOS_API
     info = {
         'cache_size': rdt_api.get_l2_cache_size(),
         'cache_way_size': rdt_api.get_l2_cache_way_size(),

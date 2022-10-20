@@ -41,6 +41,7 @@ import os
 import signal
 import ssl
 import sys
+from pathlib import Path
 
 from time import sleep
 from flask import Flask
@@ -48,19 +49,20 @@ from flask_restful import Api
 from gevent.pywsgi import WSGIServer
 from werkzeug.exceptions import HTTPException
 
-import caps
-import common
-import log
+from appqos import caps
+from appqos import common
+from appqos import log
 
-from rest.rest_power import Power, Powers
-from rest.rest_app import App, Apps
-from rest.rest_pool import Pool, Pools
-from rest.rest_misc import Stats, Caps, Sstbf, Reset
-from rest.rest_rdt import CapsRdtIface, CapsMba, CapsMbaCtrl, CapsL3ca, CapsL2ca
+from appqos.rest.rest_power import Power, Powers
+from appqos.rest.rest_app import App, Apps
+from appqos.rest.rest_pool import Pool, Pools
+from appqos.rest.rest_misc import Stats, Caps, Sstbf, Reset
+from appqos.rest.rest_rdt import CapsRdtIface, CapsMba, CapsMbaCtrl, CapsL3ca, CapsL2ca
+from appqos.stats import STATS_STORE
 
-TLS_CERT_FILE = 'ca/appqos.crt'
-TLS_KEY_FILE = 'ca/appqos.key'
-TLS_CA_CERT_FILE = 'ca/ca.crt'
+TLS_CERT_FILE = 'appqos.crt'
+TLS_KEY_FILE = 'appqos.key'
+TLS_CA_CERT_FILE = 'ca.crt'
 
 TLS_CIPHERS = [
     'AES128-GCM-SHA256',
@@ -138,6 +140,47 @@ class Server:
         self.app.register_error_handler(HTTPException, Server.error_handler)
 
 
+    @staticmethod
+    def find_ca_dir():
+        """
+        Find App QoS certificates folder
+        """
+
+        def check_certs(path):
+            cert = path / TLS_CERT_FILE
+            if not cert.is_file():
+                return False
+
+            key = path / TLS_KEY_FILE
+            if not key.is_file():
+                return False
+
+            ca = path / TLS_CA_CERT_FILE
+            if not ca.is_file():
+                return False
+
+            return True
+
+        # current working directory
+        path = Path("ca")
+        if path.is_dir() and check_certs(path):
+            return path
+
+        # home directory
+        try:
+            user_home = Path.home()
+            if user_home is not None and str(user_home) not in ("~", "root"):
+                path = user_home / "appqos"
+                if path.is_dir():
+                    return path
+        except RuntimeError:
+            pass
+
+        # /opt/intel/appqos/ca
+        path = Path(common.CONFIG_DIR)
+        return path
+
+
     def start(self, host, port, _debug=False):
         """
         Start REST server
@@ -151,22 +194,27 @@ class Server:
             0 on success
         """
 
+        ca_dir = self.find_ca_dir()
+        log.info(f"Ussing SSL cert form {ca_dir}")
         try:
+            cert_file = ca_dir / TLS_CERT_FILE
+            key_file = ca_dir / TLS_KEY_FILE
             # check for file existence and type
-            with open(TLS_CERT_FILE, opener=common.check_link, encoding='utf-8'):
+            with open(cert_file, opener=common.check_link, encoding='utf-8'):
                 pass
-            with open(TLS_KEY_FILE, opener=common.check_link, encoding='utf-8'):
+            with open(key_file, opener=common.check_link, encoding='utf-8'):
                 pass
-            self.context.load_cert_chain(TLS_CERT_FILE, TLS_KEY_FILE)
+            self.context.load_cert_chain(cert_file, key_file)
         except (FileNotFoundError, PermissionError) as ex:
             log.error(f"SSL cert or key file, {str(ex)}")
             return -1
 
         # loading CA crt file - it is needed for mTLS verification of client certificates
         try:
-            with open(TLS_CA_CERT_FILE, opener=common.check_link, encoding='utf-8'):
+            ca_file = ca_dir / TLS_CA_CERT_FILE
+            with open(ca_file, opener=common.check_link, encoding='utf-8'):
                 pass
-            self.context.load_verify_locations(cafile=TLS_CA_CERT_FILE)
+            self.context.load_verify_locations(cafile=ca_file)
 
         except (FileNotFoundError, PermissionError) as ex:
             log.error(f"CA certificate file, {str(ex)}")
@@ -206,6 +254,6 @@ class Server:
         Parameters:
             error: error
         """
-        common.STATS_STORE.general_stats_inc_num_err()
+        STATS_STORE.general_stats_inc_num_err()
         response = {'message': error.description}
         return json.dumps(response), error.code

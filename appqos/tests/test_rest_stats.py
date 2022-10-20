@@ -39,15 +39,12 @@ from jsonschema import validate
 import mock
 import pytest
 
-import common
-
-from stats import StatsStore
-
+from appqos.stats import StatsStore
 from rest_common import get_config, load_json_schema, REST, CONFIG_EMPTY
 
 
 class TestStats:
-    @mock.patch("config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     def test_get(self):
         def general_stats_get(get_stats_id):
             if get_stats_id == StatsStore.General.NUM_APPS_MOVES:
@@ -55,7 +52,7 @@ class TestStats:
             if get_stats_id == StatsStore.General.NUM_ERR:
                 return 2
 
-        with mock.patch("common.STATS_STORE.general_stats_get", side_effect=general_stats_get) as mock_func:
+        with mock.patch("appqos.stats.STATS_STORE.general_stats_get", side_effect=general_stats_get) as mock_func:
             response = REST.get("/stats")
             mock_func.assert_called()
         data = json.loads(response.data.decode('utf-8'))

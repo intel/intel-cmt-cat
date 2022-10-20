@@ -39,12 +39,11 @@ from flask_restful import Resource, request
 
 import jsonschema
 
-import caps
-import common
-
-from rest.rest_exceptions import BadRequest
-
-from config_store import ConfigStore
+from appqos import caps
+from appqos import common
+from appqos.config_store import ConfigStore
+from appqos.rest.rest_exceptions import BadRequest
+from appqos.pqos_api import PQOS_API
 
 class CapsMba(Resource):
     """
@@ -168,7 +167,7 @@ class CapsRdtIface(Resource):
 
         res = {
             'interface': cfg.get_rdt_iface(),
-            'interface_supported': common.PQOS_API.supported_iface()
+            'interface_supported': PQOS_API.supported_iface()
         }
         return res, 200
 
@@ -191,7 +190,7 @@ class CapsRdtIface(Resource):
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed") from error
 
-        if not json_data['interface'] in common.PQOS_API.supported_iface():
+        if not json_data['interface'] in PQOS_API.supported_iface():
             raise BadRequest(f"RDT interface '{json_data['interface']}' not supported!")
 
         cfg = ConfigStore.get_config()

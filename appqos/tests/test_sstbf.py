@@ -30,13 +30,20 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
+"""
+Unit tests for appqos.sstbf module
+"""
+
 import mock
 import pytest
 
-import sstbf
-from config import Config
+from appqos import sstbf
+from appqos.config import Config
 
 def test_is_sstbf_enabled():
+    """
+    Tests sstbf.is_sstbf_enabled()
+    """
     class SYS:
         def __init__(self, enabled):
             self.sst_bf_enabled = enabled
@@ -59,6 +66,9 @@ def test_is_sstbf_enabled():
 
 
 def test_is_sstbf_configured():
+    """
+    Tests sstbf.is_sstbf_configured()
+    """
     class SYS:
         def __init__(self, configured):
             self.sst_bf_configured = configured
@@ -88,7 +98,9 @@ def test_is_sstbf_configured():
 
 
 def test_configure_sstbf():
-
+    """
+    Tests sstbf.configure_sstbf()
+    """
     sys = mock.MagicMock()
     sys.commit = mock.MagicMock()
 
@@ -110,6 +122,9 @@ def test_configure_sstbf():
 
 
 def test_get_hp_cores():
+    """
+    Tests sstbf.get_hp_cores()
+    """
     cores = []
     for i in range(0, 11):
         core = mock.MagicMock()
@@ -125,15 +140,18 @@ def test_get_hp_cores():
     for ret_val in [None, []]:
         sstbf.HP_CORES = None
         with mock.patch("pwr.get_cores", return_value=ret_val) as mock_get_cores:
-            assert sstbf.get_hp_cores() == None
+            assert sstbf.get_hp_cores() is None
 
     sstbf.HP_CORES = None
     with mock.patch("pwr.get_cores", side_effect = IOError('Test')) as mock_get_cores:
-        assert sstbf.get_hp_cores() == None
+        assert sstbf.get_hp_cores() is None
         mock_get_cores.assert_called_once()
 
 
 def test_get_std_cores():
+    """
+    Tests sstbf.get_std_cores()
+    """
     cores = []
     for i in range(0, 11):
         core = mock.MagicMock()
@@ -149,21 +167,24 @@ def test_get_std_cores():
     for ret_val in [None, []]:
         sstbf.STD_CORES = None
         with mock.patch("pwr.get_cores", return_value=ret_val) as mock_get_cores:
-            assert sstbf.get_std_cores() == None
+            assert sstbf.get_std_cores() is None
 
     sstbf.STD_CORES = None
     with mock.patch("pwr.get_cores", side_effect = IOError('Test')) as mock_get_cores:
-        assert sstbf.get_std_cores() == None
+        assert sstbf.get_std_cores() is None
         mock_get_cores.assert_called_once()
 
 
 def test_init_sstbf():
+    """
+    Tests sstbf.init_sstbf()
+    """
     for cfgd_value in [True, False]:
-        with mock.patch("sstbf.configure_sstbf", return_value=0) as mock_cfg,\
-             mock.patch("sstbf._populate_cores") as mock_populate:
+        with mock.patch("appqos.sstbf.configure_sstbf", return_value=0) as mock_cfg,\
+             mock.patch("appqos.sstbf._populate_cores") as mock_populate:
 
-             cfg = Config({'sstbf' : {'configured' : cfgd_value}})
+            cfg = Config({'sstbf' : {'configured' : cfgd_value}})
 
-             assert 0 == sstbf.init_sstbf(cfg)
-             mock_cfg.assert_called_once_with(cfgd_value)
-             mock_populate.assert_called_once()
+            assert 0 == sstbf.init_sstbf(cfg)
+            mock_cfg.assert_called_once_with(cfgd_value)
+            mock_populate.assert_called_once()

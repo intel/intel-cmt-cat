@@ -39,16 +39,13 @@ from flask_restful import Resource, request
 
 import jsonschema
 
-import caps
-import common
-import power
-import sstbf
-
-from rest.rest_exceptions import BadRequest, InternalError
-
-from config_store import ConfigStore
-from stats import StatsStore
-
+from appqos import caps
+from appqos import common
+from appqos import power
+from appqos import sstbf
+from appqos.config_store import ConfigStore
+from appqos.stats import StatsStore, STATS_STORE
+from appqos.rest.rest_exceptions import BadRequest, InternalError
 
 class Stats(Resource):
     """
@@ -67,8 +64,8 @@ class Stats(Resource):
         """
         res = {
             'num_apps_moves': \
-                common.STATS_STORE.general_stats_get(StatsStore.General.NUM_APPS_MOVES),
-            'num_err': common.STATS_STORE.general_stats_get(StatsStore.General.NUM_ERR)
+                STATS_STORE.general_stats_get(StatsStore.General.NUM_APPS_MOVES),
+            'num_err': STATS_STORE.general_stats_get(StatsStore.General.NUM_ERR)
         }
         return res, 200
 

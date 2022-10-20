@@ -1,0 +1,2 @@
+include appqos/schema/*.json
+include appqos/appqos.conf

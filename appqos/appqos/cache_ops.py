@@ -35,12 +35,12 @@ Cache Ops module.
 Provides RDT related helper functions used to configure RDT.
 """
 
-import caps
-import common
-import log
-import power
-from pid_ops import set_affinity
-from config_store import ConfigStore
+from appqos import caps
+from appqos import log
+from appqos import power
+from appqos.config_store import ConfigStore
+from appqos.pqos_api import PQOS_API
+from appqos.pid_ops import set_affinity
 
 class Apps:
     """
@@ -386,7 +386,7 @@ class Pool:
         Pool.pools[self.pool]['cores'] = cores
 
         # updated RDT configuration
-        common.PQOS_API.alloc_assoc_set(cores, self.pool)
+        PQOS_API.alloc_assoc_set(cores, self.pool)
 
         # process list of removed cores
         # pylint: disable=consider-using-dict-items
@@ -406,7 +406,7 @@ class Pool:
         # Finally assign removed cores back to COS0/"Default" Pool
         if removed_cores:
             log.debug(f"Cores assigned to COS#0 {removed_cores}")
-            common.PQOS_API.release(removed_cores)
+            PQOS_API.release(removed_cores)
 
         # Reset power profile settings
         if caps.sstcp_enabled() and removed_cores:
@@ -461,39 +461,39 @@ class Pool:
         cores = pool.cores_get()
 
         # Apply same RDT configuration on all sockets in the system
-        sockets = common.PQOS_API.get_sockets()
+        sockets = PQOS_API.get_sockets()
         if sockets is None:
             log.error("Failed to get sockets info!")
             return -1
 
         # pool id to COS, 1:1 mapping
-        if common.PQOS_API.is_l2_cdp_enabled():
-            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, \
+        if PQOS_API.is_l2_cdp_enabled():
+            if PQOS_API.l2ca_set(PQOS_API.get_l2ids(), pool_id, \
                                         code_mask=l2cbm_code, data_mask=l2cbm_data) != 0:
                 log.error("Failed to apply L2 CDP configuration!")
                 return -1
         elif l2cbm:
-            if common.PQOS_API.l2ca_set(common.PQOS_API.get_l2ids(), pool_id, mask=l2cbm) != 0:
+            if PQOS_API.l2ca_set(PQOS_API.get_l2ids(), pool_id, mask=l2cbm) != 0:
                 log.error("Failed to apply L2 CAT configuration!")
                 return -1
 
-        if common.PQOS_API.is_l3_cdp_enabled():
-            if common.PQOS_API.l3ca_set(sockets, pool_id, code_mask=l3cbm_code, \
+        if PQOS_API.is_l3_cdp_enabled():
+            if PQOS_API.l3ca_set(sockets, pool_id, code_mask=l3cbm_code, \
                                         data_mask=l3cbm_data) != 0:
                 log.error("Failed to apply L3 CDP configuration!")
                 return -1
         elif l3cbm:
-            if common.PQOS_API.l3ca_set(sockets, pool_id, mask=l3cbm) != 0:
+            if PQOS_API.l3ca_set(sockets, pool_id, mask=l3cbm) != 0:
                 log.error("Failed to apply CAT configuration!")
                 return -1
 
         if mba:
-            if common.PQOS_API.mba_set(sockets, pool_id, mba, ctrl) != 0:
+            if PQOS_API.mba_set(sockets, pool_id, mba, ctrl) != 0:
                 log.error("Failed to apply MBA configuration!")
                 return -1
 
         if cores:
-            if common.PQOS_API.alloc_assoc_set(cores, pool_id) != 0:
+            if PQOS_API.alloc_assoc_set(cores, pool_id) != 0:
                 log.error("Failed to associate RDT COS!")
                 return -1
 
@@ -529,8 +529,8 @@ def configure_rdt(cfg):
             False interface not changed
         """
         cfg_rdt_iface = cfg.get_rdt_iface()
-        if cfg_rdt_iface != common.PQOS_API.current_iface():
-            if common.PQOS_API.init(cfg_rdt_iface):
+        if cfg_rdt_iface != PQOS_API.current_iface():
+            if PQOS_API.init(cfg_rdt_iface):
                 raise Exception("Failed to initialize RDT interface!")
 
             log.info(f"RDT initialized with {cfg_rdt_iface.upper()} interface.")
@@ -553,7 +553,7 @@ def configure_rdt(cfg):
             if caps.mba_supported():
                 cfg_mba_ctrl_enabled = cfg.get_mba_ctrl_enabled()
                 # Change MBA BW/CTRL state if needed
-                if cfg_mba_ctrl_enabled == common.PQOS_API.is_mba_bw_enabled():
+                if cfg_mba_ctrl_enabled == PQOS_API.is_mba_bw_enabled():
                     return "any"
 
                 if cfg_mba_ctrl_enabled:
@@ -569,7 +569,7 @@ def configure_rdt(cfg):
             if caps.cat_l2_supported() and caps.cdp_l2_supported():
                 cfg_l2cdp_enabled = cfg.get_l2cdp_enabled()
                 # Change L2CDP state if needed
-                if cfg_l2cdp_enabled == common.PQOS_API.is_l2_cdp_enabled():
+                if cfg_l2cdp_enabled == PQOS_API.is_l2_cdp_enabled():
                     return "any"
 
                 if cfg_l2cdp_enabled:
@@ -585,7 +585,7 @@ def configure_rdt(cfg):
             if caps.cat_l3_supported() and caps.cdp_l3_supported():
                 cfg_l3cdp_enabled = cfg.get_l3cdp_enabled()
                 # Change L3CDP state if needed
-                if cfg_l3cdp_enabled == common.PQOS_API.is_l3_cdp_enabled():
+                if cfg_l3cdp_enabled == PQOS_API.is_l3_cdp_enabled():
                     return "any"
 
                 if cfg_l3cdp_enabled:
@@ -599,7 +599,7 @@ def configure_rdt(cfg):
         mba_cfg = get_mba_cfg()
 
         if l3cdp_cfg != "any" or l2cdp_cfg != "any" or mba_cfg != "any":
-            if common.PQOS_API.reset(l3_cdp_cfg = l3cdp_cfg, l2_cdp_cfg = l2cdp_cfg, \
+            if PQOS_API.reset(l3_cdp_cfg = l3cdp_cfg, l2_cdp_cfg = l2cdp_cfg, \
                                      mba_cfg = mba_cfg):
                 if l3cdp_cfg != "any":
                     raise Exception("Failed to change L3 CDP state!")
@@ -608,9 +608,9 @@ def configure_rdt(cfg):
                 if mba_cfg != "any":
                     raise Exception("Failed to change MBA BW state!")
 
-            log.info(f"RDT MBA BW {'en' if common.PQOS_API.is_mba_bw_enabled() else 'dis'}abled.")
-            log.info(f"RDT L3 CDP {'en' if common.PQOS_API.is_l3_cdp_enabled() else 'dis'}abled.")
-            log.info(f"RDT L2 CDP {'en' if common.PQOS_API.is_l2_cdp_enabled() else 'dis'}abled.")
+            log.info(f"RDT MBA BW {'en' if PQOS_API.is_mba_bw_enabled() else 'dis'}abled.")
+            log.info(f"RDT L3 CDP {'en' if PQOS_API.is_l3_cdp_enabled() else 'dis'}abled.")
+            log.info(f"RDT L2 CDP {'en' if PQOS_API.is_l2_cdp_enabled() else 'dis'}abled.")
 
     try:
         if rdt_interface():

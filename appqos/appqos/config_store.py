@@ -37,24 +37,27 @@ Module handling config file
 import json
 from os.path import join, dirname
 import re
+from pathlib import Path
 import jsonschema
 
-import caps
-import common
-import log
-import pid_ops
-import power
-from config import Config
+from appqos import caps
+from appqos import common
+from appqos import log
+from appqos import pid_ops
+from appqos import power
+from appqos.config import Config
+from appqos.manager import MANAGER
+from appqos.pqos_api import PQOS_API
 
 class ConfigStore:
     """
     Class to handle config file operations
     """
 
-    namespace = common.MANAGER.Namespace()
+    namespace = MANAGER.Namespace()
     namespace.config = {}
     namespace.path = None
-    changed_event = common.MANAGER.Event()
+    changed_event = MANAGER.Event()
 
     @staticmethod
     def set_path(path):
@@ -128,7 +131,7 @@ class ConfigStore:
 
             # pool cores
             for core in pool['cores']:
-                if not common.PQOS_API.check_core(core):
+                if not PQOS_API.check_core(core):
                     raise ValueError(f"Pool {pool['id']}, Invalid core {core}.")
 
             if cores.intersection(pool['cores']):
@@ -171,7 +174,7 @@ class ConfigStore:
             # app's cores validation
             if 'cores' in app:
                 for core in app['cores']:
-                    if not common.PQOS_API.check_core(core):
+                    if not PQOS_API.check_core(core):
                         raise ValueError(f"App {app['id']}, Invalid core {core}.")
 
             # app's pool validation
@@ -376,6 +379,39 @@ class ConfigStore:
             schema = json.loads(schema_file.read())
             return schema, jsonschema.RefResolver(schema_path, schema)
 
+    @staticmethod
+    def find_config_path():
+        """
+        Find configuration file location
+        1. appqos.conf in the current working directory
+        2. appqos/appqos.conf file in home directory
+        3. /opt/intel/appqos/appqos.conf
+        """
+        # current working directory
+        path = Path(common.CONFIG_FILENAME)
+        if path.is_file():
+            log.info(f"Found configuration - {path.resolve()}")
+            return path.resolve()
+
+        # home directory
+        try:
+            user_home = Path.home()
+            if user_home is not None and str(user_home) not in ("~", "root"):
+                path = user_home / "appqos" / common.CONFIG_FILENAME
+                if path.is_file():
+                    log.info(f"Found configuration - {path.resolve()}")
+                    return path.resolve()
+        except RuntimeError:
+            pass
+
+        # /opt/intel/appqos
+        path = Path(common.CONFIG_DIR) / common.CONFIG_FILENAME
+        if path.is_file():
+            log.info(f"Found configuration - {path.resolve()}")
+            return path.resolve()
+
+        raise FileNotFoundError("Failed to locate configuration file")
+
 
     @staticmethod
     def load(path):
@@ -388,6 +424,9 @@ class ConfigStore:
         Returns:
             schema validated configuration
         """
+        if path is None:
+            path = ConfigStore.find_config_path()
+
         with open(path, 'r', opener=common.check_link, encoding='UTF-8') as fd:
             raw_data = fd.read()
             data = json.loads(raw_data.replace('\r\n', '\\r\\n'))
@@ -488,7 +527,7 @@ class ConfigStore:
             alloc_type.append(common.CAT_L2_CAP)
         if any(k in new_pool_data for k in ('l3cbm', 'l3cbm_data', 'l3cbm_code')):
             alloc_type.append(common.CAT_L3_CAP)
-        max_cos_id = common.PQOS_API.get_max_cos_id(alloc_type)
+        max_cos_id = PQOS_API.get_max_cos_id(alloc_type)
 
         data = ConfigStore.get_config()
 

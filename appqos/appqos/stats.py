@@ -35,7 +35,7 @@ Stats module
 Stats processing helper functions and storage for stats
 """
 
-import common
+from appqos.manager import MANAGER
 
 
 class StatsStore:
@@ -55,7 +55,7 @@ class StatsStore:
 
 
     def __init__(self):
-        self.general_stats = common.MANAGER.dict()
+        self.general_stats = MANAGER.dict()
         for cntr in [self.General.NUM_APPS_MOVES,\
                 self.General.NUM_ERR,\
                 self.General.NUM_INV_ACCESS]:
@@ -110,3 +110,5 @@ class StatsStore:
         Increases num invalid access attempts stat value by 1
         """
         self.general_stats_inc(StatsStore.General.NUM_INV_ACCESS)
+
+STATS_STORE = StatsStore()

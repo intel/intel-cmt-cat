@@ -36,8 +36,8 @@ Module config
 
 from collections import UserDict
 
-import caps
-from common import PQOS_API
+from appqos import caps
+from appqos.pqos_api import PQOS_API
 
 class Config(UserDict):
 #pylint: disable=too-many-public-methods

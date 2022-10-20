@@ -30,13 +30,16 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
+"""
+Unit tests for appqos.cache_ops module
+"""
+
 import pytest
 import mock
 
-import common
-
-from cache_ops import *
-from config import Config
+from appqos import common
+from appqos.cache_ops import *
+from appqos.config import Config
 
 def test_configure_rdt():
     Pool.pools[1] = {}
@@ -49,13 +52,13 @@ def test_configure_rdt():
     Pool.pools[2]['cbm'] = 0x200
     Pool.pools[2]['mba'] = 22
 
-    with mock.patch('config.Config.get_pool_attr', return_value=[1]) as mock_get_pool_attr,\
-         mock.patch('cache_ops.Pool.cores_set') as mock_cores_set,\
-         mock.patch('cache_ops.Pool.configure', return_value=0) as mock_pool_configure,\
-         mock.patch('cache_ops.Apps.configure', return_value=0) as mock_apps_configure,\
-         mock.patch('common.PQOS_API.init', return_value=0),\
-         mock.patch('common.PQOS_API.enable_mba_bw', return_value=0),\
-         mock.patch('config_store.ConfigStore.recreate_default_pool', return_value=0):
+    with mock.patch('appqos.config.Config.get_pool_attr', return_value=[1]) as mock_get_pool_attr,\
+         mock.patch('appqos.cache_ops.Pool.cores_set') as mock_cores_set,\
+         mock.patch('appqos.cache_ops.Pool.configure', return_value=0) as mock_pool_configure,\
+         mock.patch('appqos.cache_ops.Apps.configure', return_value=0) as mock_apps_configure,\
+         mock.patch('appqos.pqos_api.PQOS_API.init', return_value=0),\
+         mock.patch('appqos.pqos_api.PQOS_API.enable_mba_bw', return_value=0),\
+         mock.patch('appqos.config_store.ConfigStore.recreate_default_pool', return_value=0):
 
         cfg = Config({})
 
@@ -82,9 +85,9 @@ class TestPools(object):
     ## @endcond
 
 
-    @mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
-    @mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
     def test_configure(self):
         def get_attr(cls, attr, pool_id):
             config = {
@@ -101,14 +104,14 @@ class TestPools(object):
             else:
                 return None
 
-        with mock.patch('config.Config.get_pool_attr', new=get_attr),\
-             mock.patch('config.Config.get_app_attr', new=get_attr),\
-             mock.patch('cache_ops.Pool.l3cbm_set') as mock_l3cbm_set,\
-             mock.patch('cache_ops.Pool.l2cbm_set') as mock_l2cbm_set,\
-             mock.patch('cache_ops.Pool.mba_set') as mock_mba_set,\
-             mock.patch('cache_ops.Pool.cores_set') as mock_cores_set,\
-             mock.patch('cache_ops.Pool.pids_set') as mock_pids_set,\
-             mock.patch('cache_ops.Pool.apply') as mock_apply:
+        with mock.patch('appqos.config.Config.get_pool_attr', new=get_attr),\
+             mock.patch('appqos.config.Config.get_app_attr', new=get_attr),\
+             mock.patch('appqos.cache_ops.Pool.l3cbm_set') as mock_l3cbm_set,\
+             mock.patch('appqos.cache_ops.Pool.l2cbm_set') as mock_l2cbm_set,\
+             mock.patch('appqos.cache_ops.Pool.mba_set') as mock_mba_set,\
+             mock.patch('appqos.cache_ops.Pool.cores_set') as mock_cores_set,\
+             mock.patch('appqos.cache_ops.Pool.pids_set') as mock_pids_set,\
+             mock.patch('appqos.cache_ops.Pool.apply') as mock_apply:
 
              Pool(1).configure(Config({}))
 
@@ -191,7 +194,7 @@ class TestPools(object):
         Pool.pools[30] = {}
         Pool.pools[30]['pids'] = [3, 30, 3030]
 
-        with mock.patch('cache_ops.set_affinity') as set_aff_mock:
+        with mock.patch('appqos.cache_ops.set_affinity') as set_aff_mock:
 
             default_cores = [1, 44, 66]
 
@@ -216,8 +219,8 @@ class TestPools(object):
         assert Pool(35).cores_get() == [3, 30, 33]
 
 
-    @mock.patch('common.PQOS_API.alloc_assoc_set')
-    @mock.patch('common.PQOS_API.release')
+    @mock.patch('appqos.pqos_api.PQOS_API.alloc_assoc_set')
+    @mock.patch('appqos.pqos_api.PQOS_API.release')
     def test_cores_set(self, mock_release, mock_alloc_assoc_set):
         Pool.pools[1] = {}
         Pool.pools[1]['cores'] = []
@@ -234,8 +237,8 @@ class TestPools(object):
         mock_release.assert_called_once_with([2])
 
 
-    @mock.patch('common.PQOS_API.l3ca_set')
-    @mock.patch('common.PQOS_API.alloc_assoc_set')
+    @mock.patch('appqos.pqos_api.PQOS_API.l3ca_set')
+    @mock.patch('appqos.pqos_api.PQOS_API.alloc_assoc_set')
     def test_apply_not_configured(self, mock_l3ca_set, mock_alloc_assoc_set):
         result = Pool.apply(1)
 
@@ -245,13 +248,13 @@ class TestPools(object):
         mock_alloc_assoc_set.assert_not_called()
 
 
-    @mock.patch('common.PQOS_API.mba_set')
-    @mock.patch('common.PQOS_API.l2ca_set')
-    @mock.patch('common.PQOS_API.l3ca_set')
-    @mock.patch('common.PQOS_API.alloc_assoc_set')
-    @mock.patch('common.PQOS_API.get_sockets')
-    @mock.patch('common.PQOS_API.get_l2ids')
-    @mock.patch('config.Config.get_mba_ctrl_enabled')
+    @mock.patch('appqos.pqos_api.PQOS_API.mba_set')
+    @mock.patch('appqos.pqos_api.PQOS_API.l2ca_set')
+    @mock.patch('appqos.pqos_api.PQOS_API.l3ca_set')
+    @mock.patch('appqos.pqos_api.PQOS_API.alloc_assoc_set')
+    @mock.patch('appqos.pqos_api.PQOS_API.get_sockets')
+    @mock.patch('appqos.pqos_api.PQOS_API.get_l2ids')
+    @mock.patch('appqos.config.Config.get_mba_ctrl_enabled')
     def test_apply(self, mock_get_mba_ctrl_enabled, mock_get_l2ids, mock_get_socket, \
         mock_alloc_assoc_set, mock_l3ca_set, mock_l2ca_set, mock_mba_set):
         Pool.pools[2] = {}
@@ -374,9 +377,9 @@ class TestApps(object):
             else:
                 return None
 
-        with mock.patch('config.Config.app_to_pool') as atp_mock,\
-             mock.patch('config.Config.get_pool_attr') as gpa_mock,\
-             mock.patch('cache_ops.set_affinity') as sa_mock:
+        with mock.patch('appqos.config.Config.app_to_pool') as atp_mock,\
+             mock.patch('appqos.config.Config.get_pool_attr') as gpa_mock,\
+             mock.patch('appqos.cache_ops.set_affinity') as sa_mock:
 
                 cfg = Config({})
                 Apps.configure(cfg)
@@ -386,9 +389,9 @@ class TestApps(object):
                 sa_mock.assert_not_called()
 
 
-        with mock.patch('config.Config.app_to_pool', return_value=1),\
-             mock.patch('config.Config.get_pool_attr', new=get_pool_attr),\
-             mock.patch('cache_ops.set_affinity') as set_aff_mock:
+        with mock.patch('appqos.config.Config.app_to_pool', return_value=1),\
+             mock.patch('appqos.config.Config.get_pool_attr', new=get_pool_attr),\
+             mock.patch('appqos.cache_ops.set_affinity') as set_aff_mock:
 
                 cfg = Config(CONFIG)
                 Apps.configure(cfg)

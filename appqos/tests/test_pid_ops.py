@@ -30,18 +30,22 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
+"""
+Unit tests for appqos.pid_ops module
+"""
+
 import pytest
 import mock
 import psutil
 
-from pid_ops import *
+from appqos.pid_ops import *
 
 def test_is_pid_valid():
-    with mock.patch('pid_ops.get_pid_status', return_value=('Running', True, 'TestApp')) as get_pid_status_mock:
+    with mock.patch('appqos.pid_ops.get_pid_status', return_value=('Running', True, 'TestApp')) as get_pid_status_mock:
         assert True == is_pid_valid(4321)
         get_pid_status_mock.assert_called_with(4321)
 
-    with mock.patch('pid_ops.get_pid_status', return_value=('Zombie', False, 'TestAppZombi')) as get_pid_status_mock:
+    with mock.patch('appqos.pid_ops.get_pid_status', return_value=('Zombie', False, 'TestAppZombi')) as get_pid_status_mock:
         assert False == is_pid_valid(1234)
         get_pid_status_mock.assert_called_with(1234)
 

@@ -30,21 +30,24 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
+"""
+Unit tests for appqos.pqos_api module
+"""
+
 import pytest
 import mock
 from pqos.capability import PqosCapabilityL2Ca, PqosCapabilityL3Ca
 from pqos.error import PqosErrorResource
 
-import common
-
-import pqos_api
+from appqos import common
+from appqos.pqos_api import PqosApi
 
 class TestPqosApi(object):
 
     ## @cond
     @pytest.fixture(autouse=True)
     def init(self):
-        self.Pqos_api = pqos_api.PqosApi()
+        self.Pqos_api = PqosApi()
 
         self.Pqos_api.cap = mock.MagicMock()
         self.Pqos_api.cap.get_l3ca_cos_num = mock.MagicMock()
@@ -73,10 +76,10 @@ class TestPqosApi(object):
 
 
     def test_get_max_l3_cat_cbm(self):
-        with mock.patch('pqos_api.PqosApi.is_l3_cat_supported', return_value = False):
+        with mock.patch('appqos.pqos_api.PqosApi.is_l3_cat_supported', return_value = False):
             assert None == self.Pqos_api.get_max_l3_cat_cbm()
 
-        with mock.patch('pqos_api.PqosApi.is_l3_cat_supported', return_value = True):
+        with mock.patch('appqos.pqos_api.PqosApi.is_l3_cat_supported', return_value = True):
 
             class A:
                 def __init__(self):
@@ -150,32 +153,32 @@ class TestPqosApi(object):
 
 
     def test_is_multicore(self):
-        with mock.patch('pqos_api.PqosApi.get_num_cores', return_value = 1):
+        with mock.patch('appqos.pqos_api.PqosApi.get_num_cores', return_value = 1):
             assert False == self.Pqos_api.is_multicore()
 
-        with mock.patch('pqos_api.PqosApi.get_num_cores', return_value = 2):
+        with mock.patch('appqos.pqos_api.PqosApi.get_num_cores', return_value = 2):
             assert True == self.Pqos_api.is_multicore()
 
 
     def test_is_l3_cat_supported(self):
-        with mock.patch('pqos_api.PqosApi.get_l3ca_num_cos', return_value = 0):
+        with mock.patch('appqos.pqos_api.PqosApi.get_l3ca_num_cos', return_value = 0):
             assert False == self.Pqos_api.is_l3_cat_supported()
 
-        with mock.patch('pqos_api.PqosApi.get_l3ca_num_cos', return_value = 8):
+        with mock.patch('appqos.pqos_api.PqosApi.get_l3ca_num_cos', return_value = 8):
             assert True == self.Pqos_api.is_l3_cat_supported()
 
-        with mock.patch('pqos_api.PqosApi.get_l3ca_num_cos', side_effect = Exception('Test')):
+        with mock.patch('appqos.pqos_api.PqosApi.get_l3ca_num_cos', side_effect = Exception('Test')):
             assert 0 == self.Pqos_api.is_l3_cat_supported()
 
 
     def test_is_mba_supported(self):
-        with mock.patch('pqos_api.PqosApi.get_mba_num_cos', return_value = 0):
+        with mock.patch('appqos.pqos_api.PqosApi.get_mba_num_cos', return_value = 0):
             assert False == self.Pqos_api.is_mba_supported()
 
-        with mock.patch('pqos_api.PqosApi.get_mba_num_cos', return_value = 8):
+        with mock.patch('appqos.pqos_api.PqosApi.get_mba_num_cos', return_value = 8):
             assert True == self.Pqos_api.is_mba_supported()
 
-        with mock.patch('pqos_api.PqosApi.get_mba_num_cos', side_effect = Exception('Test')):
+        with mock.patch('appqos.pqos_api.PqosApi.get_mba_num_cos', side_effect = Exception('Test')):
             assert 0 == self.Pqos_api.is_mba_supported()
 
 
@@ -241,7 +244,7 @@ class TestPqosApi(object):
              mock.patch('pqos.mba.PqosMba.__init__', return_value = None) as pqos_mba_init_mock,\
              mock.patch('pqos.allocation.PqosAlloc.__init__', return_value = None) as pqos_alloc_init_mock,\
              mock.patch('pqos.cpuinfo.PqosCpuInfo.__init__', return_value = None) as pqos_cpu_info_init_mock,\
-             mock.patch('pqos_api.PqosApi.supported_iface', return_value = supp_iface):
+             mock.patch('appqos.pqos_api.PqosApi.supported_iface', return_value = supp_iface):
 
             assert 0 == self.Pqos_api.init(iface)
 
@@ -258,13 +261,13 @@ class TestPqosApi(object):
 
     @pytest.mark.parametrize("iface", ["invalid_iface", "resctrl"])
     def test_init_invalid_iface(self, iface):
-        with mock.patch('pqos_api.PqosApi.supported_iface', return_value = ["msr", "os"]):
+        with mock.patch('appqos.pqos_api.PqosApi.supported_iface', return_value = ["msr", "os"]):
             assert -1 == self.Pqos_api.init(iface)
 
 
     @pytest.mark.parametrize("iface, supp_ifaces", [("os", ["msr"]), ("msr", ["os"])])
     def test_init_unsupported_iface(self, iface, supp_ifaces):
-        with mock.patch('pqos_api.PqosApi.supported_iface', return_value = supp_ifaces):
+        with mock.patch('appqos.pqos_api.PqosApi.supported_iface', return_value = supp_ifaces):
             assert -1 == self.Pqos_api.init(iface)
 
 
@@ -328,8 +331,8 @@ class TestPqosApi(object):
        assert None == self.Pqos_api.get_max_cos_id([])
 
 
-    @mock.patch("pqos_api.PqosApi.is_mba_bw_supported", mock.MagicMock(return_value=False))
-    @mock.patch("pqos_api.PqosApi.fini", mock.MagicMock(return_value=0))
+    @mock.patch("appqos.pqos_api.PqosApi.is_mba_bw_supported", mock.MagicMock(return_value=False))
+    @mock.patch("appqos.pqos_api.PqosApi.fini", mock.MagicMock(return_value=0))
     @pytest.mark.parametrize("supp_iface", [
         (["msr"]),
         (["os"]),
@@ -340,7 +343,7 @@ class TestPqosApi(object):
             assert force
             return 0 if iface in supp_iface else -1
 
-        with mock.patch('pqos_api.PqosApi.init', new=mock_init):
+        with mock.patch('appqos.pqos_api.PqosApi.init', new=mock_init):
             self.Pqos_api.detect_supported_ifaces()
             assert self.Pqos_api.supported_iface() == supp_iface
 
@@ -359,7 +362,7 @@ class TestPqosApi(object):
         assert self.Pqos_api.is_mba_bw_enabled() == mba_ctrl_en
 
 
-    @mock.patch("pqos_api.PqosApi.refresh_mba_bw_status", mock.MagicMock(return_value=0))
+    @mock.patch("appqos.pqos_api.PqosApi.refresh_mba_bw_status", mock.MagicMock(return_value=0))
     @pytest.mark.parametrize("enabled_mba_bw", [True, False])
     def test_enable_mba_bw(self, enabled_mba_bw):
 

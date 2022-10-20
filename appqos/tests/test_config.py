@@ -30,14 +30,18 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ################################################################################
 
+"""
+Unit tests for appqos.config module
+"""
+
 import pytest
 import logging
-import common
 import jsonschema
 import mock
 
-from config import Config
-import caps
+from appqos import common
+from appqos.config import Config
+import appqos.caps
 
 from copy import deepcopy
 
@@ -135,7 +139,7 @@ def test_config_pid_to_pool(pid, pool_id):
     assert config.pid_to_pool(pid) == pool_id
 
 
-@mock.patch('common.PQOS_API.get_cores')
+@mock.patch('appqos.pqos_api.PQOS_API.get_cores')
 def test_config_default_pool(mock_get_cores):
     mock_get_cores.return_value = range(16)
     config = Config(deepcopy(CONFIG))
@@ -169,10 +173,11 @@ def test_config_default_pool(mock_get_cores):
     assert not config.is_default_pool_defined()
 
 
-@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
-@mock.patch('common.PQOS_API.get_max_l3_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
-@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=True))
-@mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
+@mock.patch('appqos.pqos_api.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
+@mock.patch('appqos.pqos_api.PQOS_API.get_max_l3_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
+@mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=False))
 def test_config_default_pool_cat():
     config = Config(deepcopy(CONFIG))
 
@@ -202,11 +207,11 @@ def test_config_default_pool_cat():
     assert pool_cbm == 0xDEADBEEF
 
 
-@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
-@mock.patch('common.PQOS_API.get_max_l2_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
-@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
-@mock.patch("caps.cat_l2_supported", mock.MagicMock(return_value=True))
-@mock.patch("caps.mba_supported", mock.MagicMock(return_value=False))
+@mock.patch('appqos.pqos_api.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
+@mock.patch('appqos.pqos_api.PQOS_API.get_max_l2_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
+@mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=False))
 def test_config_default_pool_l2cat():
     config = Config(deepcopy(CONFIG))
 
@@ -238,10 +243,11 @@ def test_config_default_pool_l2cat():
     assert pool_l2cbm == 0xDEADBEEF
 
 
-@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
-@mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
-@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
-@mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=False))
+@mock.patch('appqos.pqos_api.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
+@mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.mba_bw_enabled", mock.MagicMock(return_value=False))
 def test_config_default_pool_mba():
     config = Config(deepcopy(CONFIG))
 
@@ -270,11 +276,11 @@ def test_config_default_pool_mba():
     assert pool_mba == 100
 
 
-@mock.patch('common.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
-@mock.patch("caps.mba_supported", mock.MagicMock(return_value=True))
-@mock.patch("caps.mba_bw_enabled", mock.MagicMock(return_value=True))
-@mock.patch("caps.cat_l3_supported", mock.MagicMock(return_value=False))
-@mock.patch("config.Config.get_mba_ctrl_enabled", mock.MagicMock(return_value=True))
+@mock.patch('appqos.pqos_api.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
+@mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.caps.mba_bw_enabled", mock.MagicMock(return_value=True))
+@mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.config.Config.get_mba_ctrl_enabled", mock.MagicMock(return_value=True))
 def test_config_default_pool_mba_bw():
     config = Config(deepcopy(CONFIG))
 

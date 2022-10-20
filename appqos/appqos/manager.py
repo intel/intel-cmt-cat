@@ -1,7 +1,7 @@
 ################################################################################
 # BSD LICENSE
 #
-# Copyright(c) 2019-2022 Intel Corporation. All rights reserved.
+# Copyright(c) 2022 Intel Corporation. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -31,34 +31,9 @@
 ################################################################################
 
 """
-Common global constants and instances
+Context manager
 """
 
-import errno
-import os
+import multiprocessing
 
-CONFIG_FILENAME = "appqos.conf"
-CONFIG_DIR = "/opt/intel/appqos"
-CAT_L3_CAP = "l3cat"
-CAT_L2_CAP = "l2cat"
-DEFAULT_ADDRESS = "127.0.0.1"
-MBA_CAP = "mba"
-SSTBF_CAP = "sstbf"
-POWER_CAP = "power"
-
-RATE_LIMIT = 10 # rate limit of configuration changes in HZ
-
-def check_link(path, flags):
-    """
-    A custom opener for "open" function.
-    Rises PermissionError if path points to a link
-
-    Parameters:
-        path: path to file
-        flags: flags for "os.open" function
-    Returns:
-        an open file descriptor
-    """
-    if os.path.islink(path):
-        raise PermissionError(errno.EPERM, os.strerror(errno.EPERM) + ". Is a link.", path)
-    return os.open(path, flags)
+MANAGER = multiprocessing.Manager()
