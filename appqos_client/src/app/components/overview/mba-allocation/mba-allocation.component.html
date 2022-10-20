@@ -47,8 +47,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     </mat-slide-toggle>
   </div>
   <mat-card-content>
-    <span class="info-text"
-      >Provides new levels of control over how memory bandwidth is distributed
+    <div class="info-text">
+      Provides new levels of control over how memory bandwidth is distributed
       across running applications. MBA enables improved prioritization,
       bandwidth management and is a valuable tool to help control data center…
       <a
@@ -56,8 +56,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         class="contact-text"
         target="_blank"
         >See more</a
-      ></span
-    >
+      >
+    </div>
     <div class="pool" *ngFor="let pool of pools; index as i">
       <span class="pool-name">
         {{ pool.name }}

@@ -32,16 +32,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 <mat-card class="l3cat">
   <mat-card-title>L3 Cache Allocation (CAT)</mat-card-title>
   <mat-card-content>
-    <span class="info-text"
-      >Helps address shared resource concerns by providing software control of
+    <div class="info-text">
+      Helps address shared resource concerns by providing software control of
       where data is allocated into the last-level cache (LLC), enabling
       isolation and prioritization of key applications...<a
         href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-cache-allocation-technology.html?wapkw=introduction%20to%20cache%20allocation"
         class="contact-text"
         target="_blank"
         >See more</a
-      ></span
-    >
+      >
+    </div>
     <div class="pool" *ngFor="let pool of poolsList">
       <span class="pool-name">
         {{ pool.name }}
@@ -49,9 +49,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <div class="pool-cbm">
         <button
           mat-flat-button
-          [ngClass]="
-            numCacheWays > 12 ? 'l3cbm-button small' : 'l3cbm-button large'
-          "
+          class="l3cbm-button"
           *ngFor="let n of pool.l3Bitmask"
           [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
         >

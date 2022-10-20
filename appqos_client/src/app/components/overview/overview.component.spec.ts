@@ -38,7 +38,7 @@ import { EMPTY, of } from 'rxjs';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
-import { MBACTRL } from '../system-caps/system-caps.model';
+import { Caps, MBACTRL } from '../system-caps/system-caps.model';
 import { OverviewComponent } from './overview.component';
 import { Pools } from './overview.model';
 
@@ -50,6 +50,7 @@ describe('Given OverviewComponent', () => {
       .mock(AppqosService, {
         getPools: () => EMPTY,
         getMbaCtrl: () => EMPTY,
+        getCaps: () => EMPTY,
       })
       .mock(LocalService, {
         getIfaceEvent: () => EMPTY,
@@ -59,14 +60,6 @@ describe('Given OverviewComponent', () => {
   MockInstance.scope('case');
 
   describe('when initialized', () => {
-    it('should render L3CacheAllocationComponent', () => {
-      MockRender(OverviewComponent);
-
-      const expectValue = ngMocks.find('app-l3-cache-allocation');
-
-      expect(expectValue).toBeTruthy();
-    });
-
     it('should get Memory Bandwidth Allocation controller', () => {
       const mockedMbaCtrlData: MBACTRL = {
         enabled: true,
@@ -80,6 +73,20 @@ describe('Given OverviewComponent', () => {
       } = MockRender(OverviewComponent);
 
       expect(component.mbaCtrl).toEqual(mockedMbaCtrlData);
+    });
+
+    it('should get Capabilities', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(OverviewComponent);
+
+      expect(component.caps).toEqual(mockedCaps.capabilities);
     });
 
     it('should get Pools', () => {
@@ -100,6 +107,96 @@ describe('Given OverviewComponent', () => {
       } = MockRender(OverviewComponent);
 
       expect(component.pools).toEqual(mockedPool);
+    });
+  });
+
+  describe('when initialized and L3 CAT is supported', () => {
+    it('should render L3CacheAllocationComponent', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockRender(OverviewComponent);
+
+      const expectValue = ngMocks.find('app-l3-cache-allocation');
+
+      expect(expectValue).toBeTruthy();
+    });
+  });
+
+  describe('when initialized and L3 CAT is NOT supported', () => {
+    it('should NOT render L3CacheAllocationComponent', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l2cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockRender(OverviewComponent);
+
+      const expectValue = ngMocks.find('app-l3-cache-allocation', null);
+
+      expect(expectValue).toBeNull();
+    });
+  });
+
+  describe('when initialized and L2 CAT is supported', () => {
+    it('should render L2CacheAllocationComponent', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l2cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockRender(OverviewComponent);
+
+      const expectValue = ngMocks.find('app-l2-cache-allocation');
+
+      expect(expectValue).toBeTruthy();
+    });
+  });
+
+  describe('when initialized and L2 CAT is NOT supported', () => {
+    it('should NOT render L2CacheAllocationComponent', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockRender(OverviewComponent);
+
+      const expectValue = ngMocks.find('app-l2-cache-allocation', null);
+
+      expect(expectValue).toBeNull();
+    });
+  });
+
+  describe('when initialized and MBA is supported', () => {
+    it('should render MbaAllocationComponent', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockRender(OverviewComponent);
+
+      const expectValue = ngMocks.find('app-mba-allocation');
+
+      expect(expectValue).toBeTruthy();
+    });
+  });
+
+  describe('when initialized and MBA is NOT supported', () => {
+    it('should NOT render MbaAllocationComponent', () => {
+      const mockedCaps: Caps = {
+        capabilities: ['l3cat', 'l2cat', 'sstbf', 'power'],
+      };
+
+      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockRender(OverviewComponent);
+
+      const expectValue = ngMocks.find('app-mba-allocation', null);
+
+      expect(expectValue).toBeNull();
     });
   });
 

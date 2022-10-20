@@ -45,6 +45,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 .mat-card {
   .info-text {
     font-size: small;
+    width: min-content;
+    min-width: fit-content;
   }
 
   .pool {

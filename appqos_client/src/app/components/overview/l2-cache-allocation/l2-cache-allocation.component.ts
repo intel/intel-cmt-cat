@@ -28,49 +28,63 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.l3cat {
-  width: auto;
-  height: auto;
-}
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  OnInit,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
 
-.mat-card {
-  .info-text {
-    font-size: small;
-    width: min-content;
-    min-width: fit-content;
+import { AppqosService } from 'src/app/services/appqos.service';
+import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
+import { Pools } from '../overview.model';
+
+@Component({
+  selector: 'app-l2-cache-allocation',
+  templateUrl: './l2-cache-allocation.component.html',
+  styleUrls: ['./l2-cache-allocation.component.scss'],
+})
+export class L2CacheAllocationComponent implements OnInit {
+  @Input() pools!: Pools[];
+  @Output() poolEvent = new EventEmitter<unknown>();
+  poolsList!: Pools[];
+  numCacheWays!: number;
+
+  constructor(public dialog: MatDialog, private service: AppqosService) {}
+
+  ngOnInit(): void {
+    if (!this.pools) return;
+
+    this.service.getL2cat().subscribe((l2cat) => {
+      this.numCacheWays = l2cat.cw_num;
+      this._convertToBitmask();
+    });
   }
 
-  .pool {
-    padding: 2rem 1rem 0 1rem;
+  private _convertToBitmask() {
+    this.poolsList = this.pools.map((pool: Pools) => ({
+      ...pool,
+      l2Bitmask: pool.l2cbm
+        ?.toString(2)
+        .padStart(this.numCacheWays, '0')
+        .split('')
+        .map(Number),
+    }));
   }
 
-  .pool-name {
-    font-size: initial;
-    font-weight: 500;
-  }
+  openDialog() {
+    const dialogRef = this.dialog.open(EditDialogComponent, {
+      height: 'auto',
+      width: '50rem',
+      data: { l2cbm: true, numCacheWays: this.numCacheWays },
+    });
 
-  .l3cbm-button {
-    border-radius: 0%;
-    border: 1px solid #6b6b6b;
-    min-width: 25px;
-    line-height: 30px;
-    margin-right: 2px;
-    margin-top: 2px;
-    cursor: default;
-    pointer-events: none;
-  }
-
-  .l3cbm-button.large {
-    padding: 0 1rem;
-  }
-
-  .l3cbm-button.small {
-    padding: 0 0.2rem;
-  }
-
-  .pool-cbm {
-    padding-top: 0.5rem;
-    flex-shrink: 0;
-    display: flex;
+    dialogRef.afterClosed().subscribe((_) => {
+      this.poolEvent.emit();
+    });
   }
 }

@@ -60,7 +60,7 @@ describe('Given EditDialogComponent', () => {
 
   MockInstance.scope('case');
 
-  describe('when initialized with CAT', () => {
+  describe('when initialized with L3 CAT', () => {
     it('should display "L3 Cache Allocation (CAT)" title', async () => {
       const title = 'L3 Cache Allocation (CAT)';
       const fixture = MockRender(
@@ -155,7 +155,109 @@ describe('Given EditDialogComponent', () => {
       await fixture.whenStable();
 
       const expectedCbm = ngMocks
-        .findAll('.pool-l3cbm')
+        .findAll('.pool-cbm')
+        .map((a) => ngMocks.formatText(a));
+
+      expect(expectedCbm).toEqual(['0 1 1 1 1 1 1 1 1 1 1 1']);
+    });
+  });
+
+  describe('when initialized with L2 CAT', () => {
+    it('should display "L2 Cache Allocation (CAT)" title', async () => {
+      const title = 'L2 Cache Allocation (CAT)';
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l2cbm: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const expectedTitle = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(expectedTitle).toEqual(title);
+    });
+
+    it('should display pool name', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      const poolsSpy = jasmine.createSpy('getPools');
+
+      MockInstance(AppqosService, 'getPools', poolsSpy).and.returnValue(
+        of(mockedPool)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l2cbm: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const expectedPoolName = ngMocks
+        .findAll('.pool-name')
+        .map((a) => ngMocks.formatText(a));
+
+      expect(expectedPoolName.toString()).toEqual(mockedPool[0].name);
+    });
+
+    it('should display l2cbm converted to binary', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      const poolsSpy = jasmine.createSpy('getPools');
+
+      MockInstance(AppqosService, 'getPools', poolsSpy).and.returnValue(
+        of(mockedPool)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l2cbm: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const expectedCbm = ngMocks
+        .findAll('.pool-cbm')
         .map((a) => ngMocks.formatText(a));
 
       expect(expectedCbm).toEqual(['0 1 1 1 1 1 1 1 1 1 1 1']);
@@ -203,6 +305,85 @@ describe('Given EditDialogComponent', () => {
     });
   });
 
+  describe('when saveL2CBM method is executed', () => {
+    it('should save pool l2cbm by id', async () => {
+      const mockResponse = 'POOL 0 updated';
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
+        of(mockResponse)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l2cbm: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const cbmButton = ngMocks.find('.apply-button');
+      cbmButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy).toHaveBeenCalledWith({ l2cbm: 2047 }, 0);
+    });
+  });
+
+  describe('when onChangeL2CBM method is executed', () => {
+    it('should update state of pool cbm by index', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l2cbm: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+      const component = fixture.point.componentInstance;
+      await fixture.whenStable();
+
+      const l2cbmButton = ngMocks.find('.cbm-button');
+      l2cbmButton.triggerEventHandler('click', null);
+
+      expect(component.pools[0].l2Bitmask).toEqual([
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      ]);
+    });
+  });
+
   describe('when onChangeL3CBM method is executed', () => {
     it('should update state of pool cbm by index', async () => {
       const mockedPool: Pools[] = [
@@ -232,7 +413,7 @@ describe('Given EditDialogComponent', () => {
       const component = fixture.point.componentInstance;
       await fixture.whenStable();
 
-      const l3cbmButton = ngMocks.find('.l3cbm-button');
+      const l3cbmButton = ngMocks.find('.cbm-button');
       l3cbmButton.triggerEventHandler('click', null);
 
       expect(component.pools[0].l3Bitmask).toEqual([

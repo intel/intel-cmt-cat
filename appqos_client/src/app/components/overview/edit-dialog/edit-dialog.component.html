@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 <div class="mba-dialog">
   <div class="header-dialog">
     <h2 mat-dialog-title *ngIf="data.l3cbm">L3 Cache Allocation (CAT)</h2>
+    <h2 mat-dialog-title *ngIf="data.l2cbm">L2 Cache Allocation (CAT)</h2>
     <h2 mat-dialog-title *ngIf="data.mba">Memory Bandwidth Allocation (MBA)</h2>
     <mat-progress-spinner
       class="loading"
@@ -54,20 +55,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     enables improved prioritization, bandwidth management and is a valuable tool
     to help control data center noisy neighbors.</span
   >
+  <span class="info-text" *ngIf="data.l2cbm"
+    >Intel's Cache Allocation Technology (CAT) helps address shared resource
+    concerns by providing software control of where data is allocated into the
+    Level 2 cache (L2), enabling isolation and prioritization of key
+    applications.</span
+  >
   <mat-divider class="divider"></mat-divider>
   <mat-dialog-content class="mat-typography">
     <div class="pool" *ngFor="let pool of pools; index as i">
       <span class="pool-name">
         {{ pool.name }}
       </span>
-      <div class="l3cbm" *ngIf="data.l3cbm">
-        <div class="pool-l3cbm">
+      <div class="cbm" *ngIf="data.l3cbm">
+        <div class="pool-cbm">
           <button
             mat-flat-button
             [ngClass]="
-              data.numCacheWays > 12
-                ? 'l3cbm-button small'
-                : 'l3cbm-button large'
+              data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
             "
             *ngFor="let n of pool.l3Bitmask; index as j"
             [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
@@ -81,6 +86,29 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           color="primary"
           class="apply-button"
           (click)="saveL3CBM(i, pool.id)"
+        >
+          Apply
+        </button>
+      </div>
+      <div class="cbm" *ngIf="data.l2cbm">
+        <div class="pool-cbm">
+          <button
+            mat-flat-button
+            [ngClass]="
+              data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
+            "
+            *ngFor="let n of pool.l2Bitmask; index as j"
+            [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            (click)="onChangeL2CBM(n, i, j)"
+          >
+            {{ n }}
+          </button>
+        </div>
+        <button
+          mat-flat-button
+          color="primary"
+          class="apply-button"
+          (click)="saveL2CBM(i, pool.id)"
         >
           Apply
         </button>

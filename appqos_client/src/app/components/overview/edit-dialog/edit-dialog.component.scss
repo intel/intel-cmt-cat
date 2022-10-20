@@ -41,7 +41,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   font-weight: 500;
 }
 
-.l3cbm-button {
+.cbm-button {
   border-radius: 0%;
   border: 1px solid #6b6b6b;
   min-width: 25px;
@@ -51,11 +51,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   margin-top: 2px;
 }
 
-.l3cbm-button.large {
+.cbm-button.large {
   padding: 0 1rem;
 }
 
-.l3cbm-button.small {
+.cbm-button.small {
   padding: 0 0.2rem;
 }
 
@@ -76,7 +76,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 .mat-dialog-content {
   margin: auto;
 
-  .l3cbm,
+  .cbm,
   .mba,
   .pool-mba-mbps {
     display: flex;
@@ -88,7 +88,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
     }
   }
 
-  .pool-l3cbm {
+  .pool-cbm {
     padding: 0.5rem 0;
   }
 

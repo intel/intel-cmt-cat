@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.l3cat {
+.l2cat {
   width: auto;
   height: auto;
 }
@@ -49,7 +49,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
     font-weight: 500;
   }
 
-  .l3cbm-button {
+  .l2cbm-button {
     border-radius: 0%;
     border: 1px solid #6b6b6b;
     min-width: 25px;
@@ -60,11 +60,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
     pointer-events: none;
   }
 
-  .l3cbm-button.large {
+  .l2cbm-button.large {
     padding: 0 1rem;
   }
 
-  .l3cbm-button.small {
+  .l2cbm-button.small {
     padding: 0 0.2rem;
   }
 

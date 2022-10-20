@@ -33,6 +33,7 @@ import {
   EventEmitter,
   Input,
   OnChanges,
+  OnInit,
   Output,
   SimpleChanges,
 } from '@angular/core';
@@ -47,7 +48,7 @@ import { Pools } from '../overview.model';
   templateUrl: './l3-cache-allocation.component.html',
   styleUrls: ['./l3-cache-allocation.component.scss'],
 })
-export class L3CacheAllocationComponent implements OnChanges {
+export class L3CacheAllocationComponent implements OnInit {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
@@ -55,7 +56,7 @@ export class L3CacheAllocationComponent implements OnChanges {
 
   constructor(public dialog: MatDialog, private service: AppqosService) {}
 
-  ngOnChanges(changes: SimpleChanges): void {
+  ngOnInit(): void {
     if (!this.pools) return;
 
     this.service.getL3cat().subscribe((l3cat) => {

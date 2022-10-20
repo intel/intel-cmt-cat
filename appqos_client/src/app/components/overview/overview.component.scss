@@ -30,14 +30,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 .overview-container {
   display: flex;
-  flex-direction: row;
-  column-gap: 1rem;
+  flex-direction: column;
+  row-gap: 1rem;
 
-  app-mba-allocation {
-    width: 33rem;
-  }
-
-  app-l3-cache-allocation {
-    min-width: 33rem;
+  app-mba-allocation,
+  app-l3-cache-allocation,
+  app-l2-cache-allocation {
+    width: auto;
   }
 }

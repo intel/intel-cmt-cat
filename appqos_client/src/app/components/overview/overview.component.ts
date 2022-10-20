@@ -34,7 +34,7 @@ import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { MBACTRL, resMessage } from '../system-caps/system-caps.model';
+import { Caps, MBACTRL, resMessage } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
 
 @Component({
@@ -45,6 +45,7 @@ import { Pools } from './overview.model';
 export class OverviewComponent implements OnInit {
   pools!: Pools[];
   mbaCtrl!: MBACTRL;
+  caps!: string[];
 
   constructor(
     private service: AppqosService,
@@ -55,6 +56,7 @@ export class OverviewComponent implements OnInit {
   ngOnInit(): void {
     this.getMbaCtrl();
     this.getPools();
+    this.getCaps();
 
     this.localService.getIfaceEvent().subscribe((_) => {
       this.getMbaCtrl();
@@ -65,7 +67,13 @@ export class OverviewComponent implements OnInit {
   getPools(): void {
     this.service
       .getPools()
-      .subscribe((pools) => (this.pools = pools.slice(0, 4)));
+      .subscribe((pools: Pools[]) => (this.pools = pools.slice(0, 4)));
+  }
+
+  getCaps(): void {
+    this.service
+      .getCaps()
+      .subscribe((caps: Caps) => (this.caps = caps.capabilities));
   }
 
   getMbaCtrl(): void {

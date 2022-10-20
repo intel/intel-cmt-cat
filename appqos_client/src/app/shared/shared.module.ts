@@ -65,6 +65,7 @@ import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component'
 import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allocation/l3-cache-allocation.component';
 import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dialog.component';
 import { MbaAllocationComponent } from '../components/overview/mba-allocation/mba-allocation.component';
+import { L2CacheAllocationComponent } from '../components/overview/l2-cache-allocation/l2-cache-allocation.component';
 
 @NgModule({
   declarations: [
@@ -81,6 +82,7 @@ import { MbaAllocationComponent } from '../components/overview/mba-allocation/mb
     SstcpComponent,
     L2catComponent,
     L3CacheAllocationComponent,
+    L2CacheAllocationComponent,
     EditDialogComponent,
     MbaAllocationComponent,
   ],
