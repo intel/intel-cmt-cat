@@ -48,7 +48,7 @@ import { Pools } from '../overview.model';
   templateUrl: './l2-cache-allocation.component.html',
   styleUrls: ['./l2-cache-allocation.component.scss'],
 })
-export class L2CacheAllocationComponent implements OnInit {
+export class L2CacheAllocationComponent implements OnChanges {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
@@ -56,9 +56,7 @@ export class L2CacheAllocationComponent implements OnInit {
 
   constructor(public dialog: MatDialog, private service: AppqosService) {}
 
-  ngOnInit(): void {
-    if (!this.pools) return;
-
+  ngOnChanges(changes: SimpleChanges): void {
     this.service.getL2cat().subscribe((l2cat) => {
       this.numCacheWays = l2cat.cw_num;
       this._convertToBitmask();

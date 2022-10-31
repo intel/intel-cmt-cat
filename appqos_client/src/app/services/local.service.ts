@@ -28,7 +28,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Injectable } from '@angular/core';
-import { Observable, Subject } from 'rxjs';
+import { BehaviorSubject, Observable, Subject } from 'rxjs';
+
+import { CacheAllocation } from '../components/system-caps/system-caps.model';
 
 @Injectable({
   providedIn: 'root',
@@ -37,6 +39,8 @@ import { Observable, Subject } from 'rxjs';
 /* Service used to store data to localStorage */
 export class LocalService {
   ifaceEvent = new Subject<void>();
+  l3cat = new BehaviorSubject<CacheAllocation | null>(null);
+  l2cat = new BehaviorSubject<CacheAllocation | null>(null);
 
   setIfaceEvent(): void {
     this.ifaceEvent.next();
@@ -44,6 +48,22 @@ export class LocalService {
 
   getIfaceEvent(): Observable<void> {
     return this.ifaceEvent.asObservable();
+  }
+
+  setL3CatEvent(l3cat: CacheAllocation) {
+    this.l3cat.next(l3cat);
+  }
+
+  getL3CatEvent(): Observable<CacheAllocation | null> {
+    return this.l3cat.asObservable();
+  }
+
+  setL2CatEvent(l2cat: CacheAllocation) {
+    this.l2cat.next(l2cat);
+  }
+
+  getL2CatEvent(): Observable<CacheAllocation | null> {
+    return this.l2cat.asObservable();
   }
 
   public saveData(key: string, value: string): void {

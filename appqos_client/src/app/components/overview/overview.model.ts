@@ -37,4 +37,13 @@ export interface Pools {
   l2cbm?: number;
   name: string;
   cores: number[];
+  apps?: number[];
+}
+
+export interface Apps {
+  id: number;
+  cores: number[];
+  name: string;
+  pids: number[];
+  pool_id: number;
 }

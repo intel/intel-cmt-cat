@@ -187,6 +187,7 @@ export class SystemCapsComponent implements OnInit {
       .subscribe({
         next: (l3cat) => {
           this.l3cat = l3cat;
+          this.localStroe.setL3CatEvent(l3cat);
         },
         error: (error: HttpErrorResponse) => {
           this.snackBar.handleError(error.message);
@@ -208,7 +209,10 @@ export class SystemCapsComponent implements OnInit {
         }))
       )
       .subscribe({
-        next: (l2cat) => (this.l2cat = l2cat),
+        next: (l2cat) => {
+          this.l2cat = l2cat;
+          this.localStroe.setL2CatEvent(l2cat);
+        },
         error: (error: HttpErrorResponse) => {
           this.snackBar.handleError(error.message);
           this.loading = false;

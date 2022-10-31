@@ -1,0 +1,171 @@
+/*BSD LICENSE
+
+Copyright(c) 2022 Intel Corporation. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+  * Neither the name of Intel Corporation nor the names of its
+    contributors may be used to endorse or promote products derived
+    from this software without specific prior written permission.
+    
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+
+@mixin pool-flex {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 1rem 0;
+}
+
+.pool-config {
+  width: auto;
+  height: auto;
+
+  .info-text {
+    font-size: small;
+    width: min-content;
+    min-width: fit-content;
+  }
+
+  .config {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: baseline;
+    padding-top: 0.5rem;
+
+    .mat-mini-fab {
+      margin-left: 1rem;
+
+      &::ng-deep .mat-button-wrapper {
+        display: flex;
+      }
+    }
+  }
+
+  .pool-details {
+    .pool-name {
+      @include pool-flex;
+      padding: 0;
+
+      .name-field {
+        width: 15rem;
+      }
+    }
+    .mat-raised-button {
+      min-width: 77px;
+      line-height: 33px;
+      padding: 0 9px;
+    }
+
+    .pool-l3cbm {
+      @include pool-flex;
+
+      .pool-cbm {
+        display: flex;
+        flex-direction: row;
+        padding-right: 0.5rem;
+
+        .l3cbm-button {
+          border-radius: 0%;
+          border: 1px solid #6b6b6b;
+          min-width: 25px;
+          line-height: 30px;
+          margin-right: 2px;
+          margin-top: 2px;
+        }
+      }
+    }
+
+    .pool-l2cbm {
+      @include pool-flex;
+
+      .pool-cbm {
+        display: flex;
+        flex-direction: row;
+        padding-right: 0.5rem;
+
+        .l2cbm-button {
+          border-radius: 0%;
+          border: 1px solid #6b6b6b;
+          min-width: 25px;
+          line-height: 30px;
+          margin-right: 2px;
+          margin-top: 2px;
+        }
+      }
+    }
+
+    .pool-mba {
+      @include pool-flex;
+      align-items: center;
+      flex: auto;
+      padding: 0.5rem 0 0 0;
+
+      .mat-slider-horizontal {
+        width: -webkit-fill-available;
+      }
+    }
+
+    .pool-mba-mbps {
+      @include pool-flex;
+      padding: 0.5rem 0 0 0;
+
+      .mat-form-field {
+        width: 20rem;
+      }
+    }
+
+    .pool-apps {
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+      min-width: fit-content;
+      width: min-content;
+
+      .mat-stroked-button {
+        margin-right: 0.3rem;
+        margin-bottom: 0.3rem;
+      }
+    }
+
+    .cores {
+      @include pool-flex;
+      align-items: center;
+      padding: 0.5rem 0 0 0;
+
+      .pool-cores {
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        flex: 1;
+        width: min-content;
+
+        .core-button {
+          min-width: 0;
+          padding: 0 0.5rem;
+          line-height: 1.5rem;
+          border-radius: 0%;
+          margin-right: 0.2rem;
+          margin-top: 0.3rem;
+        }
+      }
+    }
+  }
+}

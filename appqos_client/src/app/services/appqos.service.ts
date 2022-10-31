@@ -42,7 +42,7 @@ import {
 } from '../components/system-caps/system-caps.model';
 
 import { LocalService } from './local.service';
-import { Pools } from '../components/overview/overview.model';
+import { Apps, Pools } from '../components/overview/overview.model';
 
 type poolPutType = {
   l2cbm?: number;
@@ -154,5 +154,10 @@ export class AppqosService {
     const api_url = this.local.getData('api_url');
 
     return this.http.put<resMessage>(`${api_url}/pools/${id}`, data);
+  }
+
+  getApps(): Observable<Apps[]> {
+    const api_url = this.local.getData('api_url');
+    return this.http.get<Apps[]>(`${api_url}/apps `);
   }
 }

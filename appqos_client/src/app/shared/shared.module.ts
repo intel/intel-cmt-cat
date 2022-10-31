@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { NgModule } from '@angular/core';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
-import { ReactiveFormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { CommonModule } from '@angular/common';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { HttpClientModule } from '@angular/common/http';
@@ -46,6 +46,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatSelectModule } from '@angular/material/select';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -66,6 +67,7 @@ import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allo
 import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dialog.component';
 import { MbaAllocationComponent } from '../components/overview/mba-allocation/mba-allocation.component';
 import { L2CacheAllocationComponent } from '../components/overview/l2-cache-allocation/l2-cache-allocation.component';
+import { PoolConfigComponent } from '../components/rap-config/pool-config/pool-config.component';
 
 @NgModule({
   declarations: [
@@ -85,6 +87,7 @@ import { L2CacheAllocationComponent } from '../components/overview/l2-cache-allo
     L2CacheAllocationComponent,
     EditDialogComponent,
     MbaAllocationComponent,
+    PoolConfigComponent,
   ],
   imports: [
     MatInputModule,
@@ -105,6 +108,8 @@ import { L2CacheAllocationComponent } from '../components/overview/l2-cache-allo
     MatDialogModule,
     MatSliderModule,
     MatTooltipModule,
+    MatSelectModule,
+    FormsModule,
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],
