@@ -511,7 +511,7 @@ describe('Given EditDialogComponent', () => {
       const input = inputs[0];
 
       expect((await input.getValue()).toString()).toEqual('');
-      expect((await input.getPlaceholder()).toString()).toEqual('5000');
+      expect((await input.getPlaceholder()).toString()).toEqual('Unrestricted');
     });
   });
 

@@ -153,7 +153,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <input
             matInput
             [value]="pool.mba_bw === mbaBwDefNum ? '' : pool.mba_bw"
-            [placeholder]="pool.mba_bw === mbaBwDefNum ? '5000' : ''"
+            [placeholder]="pool.mba_bw === mbaBwDefNum ? 'Unrestricted' : ''"
             (input)="onChangeMbaBw($event, i)"
           />
         </mat-form-field>
@@ -161,9 +161,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           mat-flat-button
           color="primary"
           class="apply-button"
-          (click)="saveMBABW(i, pool.id)"
+          (click)="updateMBABW(i, pool.id)"
         >
           Apply
+        </button>
+        <button
+          mat-flat-button
+          class="reset-button"
+          (click)="resetMBABW(pool.id)"
+        >
+          Reset
         </button>
       </div>
     </div>

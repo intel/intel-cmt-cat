@@ -14,7 +14,7 @@ are met:
   * Neither the name of Intel Corporation nor the names of its
     contributors may be used to endorse or promote products derived
     from this software without specific prior written permission.
-    
+
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 
@@ -179,11 +179,19 @@ export class EditDialogComponent implements AfterContentInit {
       });
   }
 
-  saveMBABW(i: number, id: number) {
+  updateMBABW(i: number, id: number) {
+      this.setMBABW(Number(this.pools[i].mba_bw), id);
+  }
+
+  resetMBABW(id: number) {
+      this.setMBABW(this.mbaBwDefNum, id);
+  }
+
+  setMBABW(bwMbps: number, id: number) {
     this.service
       .poolPut(
         {
-          mba_bw: Number(this.pools[i].mba_bw),
+          mba_bw: bwMbps,
         },
         id
       )
