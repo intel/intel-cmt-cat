@@ -76,7 +76,7 @@ static struct {
 static void
 enforcement_get_input(int argc, char *argv[])
 {
-        int i = 0;
+        int i;
 
         if (argc < 2)
                 sel_l3ca_assoc_num = 0;
