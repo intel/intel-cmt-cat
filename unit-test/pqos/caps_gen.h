@@ -114,8 +114,10 @@ init_cap_mon(struct test_data *data)
                 return -1;
         cap_mon->u.mon = malloc(sizeof(struct pqos_cap_mon) +
                                 num_events * sizeof(struct pqos_monitor));
-        if (cap_mon->u.mon == NULL)
+        if (cap_mon->u.mon == NULL) {
+                free(cap_mon);
                 return -1;
+        }
 
         cap_mon->type = PQOS_CAP_TYPE_MON;
         cap_mon->u.mon->mem_size = 128;
@@ -153,8 +155,10 @@ init_cap_l3ca(struct test_data *data)
         if (cap_l3ca == NULL)
                 return -1;
         cap_l3ca->u.l3ca = calloc(1, sizeof(struct pqos_cap_l3ca));
-        if (cap_l3ca->u.l3ca == NULL)
+        if (cap_l3ca->u.l3ca == NULL) {
+                free(cap_l3ca);
                 return -1;
+        }
 
         cap_l3ca->type = PQOS_CAP_TYPE_L3CA;
         cap_l3ca->u.l3ca->mem_size = 32;
@@ -179,8 +183,10 @@ init_cap_l2ca(struct test_data *data)
         if (cap_l2ca == NULL)
                 return -1;
         cap_l2ca->u.l2ca = calloc(1, sizeof(struct pqos_cap_l2ca));
-        if (cap_l2ca->u.l2ca == NULL)
+        if (cap_l2ca->u.l2ca == NULL) {
+                free(cap_l2ca);
                 return -1;
+        }
 
         cap_l2ca->type = PQOS_CAP_TYPE_L2CA;
         cap_l2ca->u.l2ca->mem_size = 32;
@@ -205,8 +211,10 @@ init_cap_mba(struct test_data *data)
         if (cap_mba == NULL)
                 return -1;
         cap_mba->u.mba = calloc(1, sizeof(struct pqos_cap_mba));
-        if (cap_mba->u.mba == NULL)
+        if (cap_mba->u.mba == NULL) {
+                free(cap_mba);
                 return -1;
+        }
 
         cap_mba->type = PQOS_CAP_TYPE_MBA;
         cap_mba->u.mba->mem_size = 28;
