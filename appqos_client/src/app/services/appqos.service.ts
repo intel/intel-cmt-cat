@@ -49,6 +49,7 @@ type poolPutType = {
   l3cbm?: number;
   mba?: number;
   mba_bw?: number;
+  name?: string;
 };
 
 @Injectable({

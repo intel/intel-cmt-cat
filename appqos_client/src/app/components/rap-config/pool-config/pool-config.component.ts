@@ -27,14 +27,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { MatOptionSelectionChange } from '@angular/material/core';
+import { MatSliderChange } from '@angular/material/slider';
 import { catchError, combineLatest, of, take } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Apps, Pools } from '../../overview/overview.model';
-import { CacheAllocation } from '../../system-caps/system-caps.model';
+import {
+  CacheAllocation,
+  resMessage,
+} from '../../system-caps/system-caps.model';
 
 @Component({
   selector: 'app-pool-config',
@@ -46,13 +52,17 @@ export class PoolConfigComponent implements OnInit {
   pools!: Pools[];
   pool!: Pools;
   apps!: Apps[];
-  poolApps!: any;
+  poolApps!: Apps[];
+  poolName!: string;
+  mbaBW!: string;
+  poolId!: number;
   l3numCacheWays!: number;
   mbaBwDefNum = 1 * Math.pow(2, 32) - 1;
 
   constructor(
     private service: AppqosService,
-    private localService: LocalService
+    private localService: LocalService,
+    private snackBar: SnackBarService
   ) {}
 
   ngOnInit(): void {
@@ -61,7 +71,7 @@ export class PoolConfigComponent implements OnInit {
     this.localService.getIfaceEvent().subscribe((_) => this.getData());
   }
 
-  getData() {
+  getData(id?: number) {
     const pools$ = this.service.getPools().pipe(
       take(1),
       catchError((_) => of([]))
@@ -76,8 +86,12 @@ export class PoolConfigComponent implements OnInit {
       pools.map((pool) => pool.cores.sort((a, b) => a - b));
       this.pools = pools;
       this.apps = apps;
-      this.getPool(pools[0].id);
-      this.selected = pools[0].name;
+      if (id === undefined) {
+        this.getPool(pools[0].id);
+        this.selected = pools[0].name;
+      } else {
+        this.getPool(this.pool.id);
+      }
     });
   }
 
@@ -88,8 +102,10 @@ export class PoolConfigComponent implements OnInit {
   }
 
   getPool(id: number) {
+    this.poolId = id;
     this.pool = this.pools.find((pool: Pools) => pool.id === id) as Pools;
     this.poolApps = this.apps.filter((app) => app.pool_id === id);
+    this.selected = this.pool.name;
 
     if (this.pool.l3cbm) {
       this.localService
@@ -114,5 +130,142 @@ export class PoolConfigComponent implements OnInit {
             .map(Number);
         });
     }
+  }
+
+  onChangePoolName(event: any) {
+    if (event.target.value === '') {
+      this.snackBar.handleError('Invalid Pool name!');
+    }
+
+    this.poolName = event.target.value;
+  }
+
+  savePoolName() {
+    if (this.poolName === '') return;
+
+    this.service
+      .poolPut(
+        {
+          name: this.poolName,
+        },
+        this.pool.id
+      )
+      .subscribe({
+        next: (response) => {
+          this.nextHandler(response);
+          this.poolName = '';
+        },
+        error: (error) => {
+          this.errorHandler(error);
+        },
+      });
+  }
+
+  onChangeL3CBM(value: Number, i: number) {
+    if (value) {
+      this.pool.l3Bitmask![i] = 0;
+    } else {
+      this.pool.l3Bitmask![i] = 1;
+    }
+  }
+
+  onChangeL2CBM(value: Number, i: number) {
+    if (value) {
+      this.pool.l2Bitmask![i] = 0;
+    } else {
+      this.pool.l2Bitmask![i] = 1;
+    }
+  }
+
+  onChangeMBA(event: MatSliderChange) {
+    this.pool.mba = event.value!;
+  }
+
+  onChangeMbaBw(event: any) {
+    if (event.target.value === '') return;
+
+    this.pool.mba_bw = event.target.value;
+  }
+
+  saveL2CBM() {
+    this.service
+      .poolPut(
+        {
+          l2cbm: parseInt(this.pool.l2Bitmask!.join(''), 2),
+        },
+        this.pool.id
+      )
+      .subscribe({
+        next: (response) => {
+          this.nextHandler(response);
+        },
+        error: (error) => {
+          this.errorHandler(error);
+        },
+      });
+  }
+
+  saveL3CBM() {
+    this.service
+      .poolPut(
+        {
+          l3cbm: parseInt(this.pool.l3Bitmask!.join(''), 2),
+        },
+        this.pool.id
+      )
+      .subscribe({
+        next: (response) => {
+          this.nextHandler(response);
+        },
+        error: (error) => {
+          this.errorHandler(error);
+        },
+      });
+  }
+
+  saveMBA() {
+    this.service
+      .poolPut(
+        {
+          mba: this.pool.mba,
+        },
+        this.pool.id
+      )
+      .subscribe({
+        next: (response) => {
+          this.nextHandler(response);
+        },
+        error: (error) => {
+          this.errorHandler(error);
+        },
+      });
+  }
+
+  saveMBABW() {
+    this.service
+      .poolPut(
+        {
+          mba_bw: Number(this.pool.mba_bw),
+        },
+        this.pool.id
+      )
+      .subscribe({
+        next: (response) => {
+          this.nextHandler(response);
+        },
+        error: (error) => {
+          this.errorHandler(error);
+        },
+      });
+  }
+
+  nextHandler(response: resMessage) {
+    this.snackBar.displayInfo(response.message);
+    this.getData(this.pool.id);
+  }
+
+  errorHandler(error: HttpErrorResponse) {
+    this.snackBar.handleError(error.error.message);
+    this.getData(this.pool.id);
   }
 }

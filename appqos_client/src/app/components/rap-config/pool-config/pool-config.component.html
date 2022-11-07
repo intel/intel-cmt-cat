@@ -68,9 +68,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           floatLabel="always"
         >
           <mat-label>Name of Pool</mat-label>
-          <input matInput [value]="pool.name" required="true" />
+          <input
+            matInput
+            [value]="pool?.name"
+            (change)="onChangePoolName($event)"
+          />
         </mat-form-field>
-        <button mat-raised-button color="primary">RENAME</button>
+        <button mat-raised-button color="primary" (click)="savePoolName()">
+          RENAME
+        </button>
       </div>
       <span *ngIf="pool?.l3cbm">L3 Cache Allocation Technology (L3 CAT)</span>
       <div class="pool-l3cbm" *ngIf="pool.l3cbm">
@@ -78,13 +84,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           <button
             mat-flat-button
             class="l3cbm-button"
-            *ngFor="let n of pool?.l3Bitmask"
+            *ngFor="let n of pool?.l3Bitmask; index as i"
             [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            (click)="onChangeL3CBM(n, i)"
           >
             {{ n }}
           </button>
         </div>
-        <button mat-raised-button color="primary">APPLY</button>
+        <button mat-raised-button color="primary" (click)="saveL3CBM()">
+          APPLY
+        </button>
       </div>
       <span *ngIf="pool.l2cbm">L2 Cache Allocation Technology (L2 CAT)</span>
       <div class="pool-l2cbm" *ngIf="pool.l2cbm">
@@ -92,13 +101,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           <button
             mat-flat-button
             class="l2cbm-button"
-            *ngFor="let n of pool.l2Bitmask"
+            *ngFor="let n of pool.l2Bitmask; index as i"
             [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            (click)="onChangeL2CBM(n, i)"
           >
             {{ n }}
           </button>
         </div>
-        <button mat-raised-button color="primary">APPLY</button>
+        <button mat-raised-button color="primary" (click)="saveL2CBM()">
+          APPLY
+        </button>
       </div>
       <span *ngIf="pool.mba || pool.mba_bw"
         >Memory Bandwidth Allocation (MBA)</span
@@ -112,9 +124,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
             max="100"
             step="10"
             aria-label="units"
+            (change)="onChangeMBA($event)"
           ></mat-slider>
         </div>
-        <button mat-raised-button color="primary">APPLY</button>
+        <button mat-raised-button color="primary" (click)="saveMBA()">
+          APPLY
+        </button>
       </div>
       <div class="pool-mba-mbps" *ngIf="pool.mba_bw">
         <mat-form-field appearance="fill" floatLabel="always">
@@ -122,10 +137,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           <input
             matInput
             [value]="pool.mba_bw === mbaBwDefNum ? '' : pool.mba_bw"
-            [placeholder]="pool.mba_bw === mbaBwDefNum ? '5000' : ''"
+            [placeholder]="
+              pool.mba_bw === mbaBwDefNum || pool.mba_bw ? '5000' : ''
+            "
+            (change)="onChangeMbaBw($event)"
           />
         </mat-form-field>
-        <button mat-raised-button color="primary">APPLY</button>
+        <button mat-raised-button color="primary" (click)="saveMBABW()">
+          APPLY
+        </button>
       </div>
       <span>Apps</span>
       <br />
