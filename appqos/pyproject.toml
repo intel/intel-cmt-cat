@@ -1,6 +1,70 @@
+[project]
+name = "appqos"
+description = "App QoS is a software created to demonstrate the use of Intel(R) RDT technologies (CAT, MBA) to improve QoS for applications via partitioning system resources."
+authors = [
+    { name = "Michal Aleksinski", email = "michalx.aleksinski@intel.com"},
+    { name = "Wojciech Andralojc", email = "wojciechx.andralojc@intel.com"},
+    { name = "Adrian Boczkowski", email = "adrianx.boczkowski@intel.com"},
+    { name = "Khawar Abbasi", email = "khawar.abbasi@intel.com"}
+]
+maintainers = [
+    { name = "Michal Aleksinski", email = "michalx.aleksinski@intel.com"}
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">= 3.6"
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.6",
+    "License :: OSI Approved :: BSD License"
+]
+
+dependencies = [
+    "pqos == 4.4.1",
+    "jsonschema",
+    "pexpect",
+    "flask",
+    "flask-restful",
+    "gevent",
+    "psutil",
+    "pwr @ git+https://github.com/intel/CommsPowerManagement.git@pwr-v0.2.1#egg=pwr&subdirectory=pwr"
+]
+
+dynamic = ["version"]
+
+[project.urls]
+"Homepage" = "https://github.com/intel/intel-cmt-cat"
+"Source Code" = "https://github.com/intel/intel-cmt-cat"
+"Bug Tracker" = "https://github.com/intel/intel-cmt-cat/issues"
+
+
+[project.optional-dependencies]
+dev = [
+    "bandit",
+    "pylint",
+    "pytest",
+    "pytest-cov",
+    "mock",
+    "caniusepython3",
+    "requests",
+    "codespell"
+]
+
+
+[tool.setuptools]
+packages = ["appqos", "appqos.rest"]
+license-files = ["LICENSE"]
+
+
+[tool.setuptools.dynamic]
+version = {attr = "appqos.__version__.__version__"}
+
+
 [build-system]
 requires = [
-    "setuptools>=46.4.0",
+    "setuptools>=61.0.0",
     "wheel"
 ]
 build-backend = "setuptools.build_meta"

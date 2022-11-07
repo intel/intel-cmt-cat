@@ -1,6 +1,52 @@
+[project]
+name = "pqos"
+version = "4.4.1"
+description = "Python interface for Intel(R) RDT PQoS library"
+authors = [
+    { name = "Michal Aleksinski", email = "michalx.aleksinski@intel.com"},
+    { name = "Wojciech Andralojc", email = "wojciechx.andralojc@intel.com"},
+    { name = "Adrian Boczkowski", email = "adrianx.boczkowski@intel.com"},
+    { name = "Khawar Abbasi", email = "khawar.abbasi@intel.com"}
+]
+maintainers = [
+    { name = "Michal Aleksinski", email = "michalx.aleksinski@intel.com"}
+]
+license = { file = "LICENSE" }
+readme = "README.md"
+requires-python = ">= 3.6"
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.6",
+    "License :: OSI Approved :: BSD License"
+]
+
+dependencies = []
+
+
+[project.urls]
+"Homepage" = "https://github.com/intel/intel-cmt-cat"
+"Source Code" = "https://github.com/intel/intel-cmt-cat"
+"Bug Tracker" = "https://github.com/intel/intel-cmt-cat/issues"
+
+[project.optional-dependencies]
+dev = [
+    "bandit",
+    "pylint >=2.5.0",
+    "coverage",
+    "caniusepython3"
+]
+
+[tool.setuptools]
+packages = ["pqos"]
+license-files = ["LICENSE"]
+include-package-data = false
+
+
 [build-system]
 requires = [
-    "setuptools>=42",
+    "setuptools>=61.0.0",
     "wheel"
 ]
 build-backend = "setuptools.build_meta"
