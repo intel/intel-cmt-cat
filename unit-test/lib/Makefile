@@ -614,6 +614,7 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=open \
 		-Wl,--wrap=close \
 		-Wl,--wrap=lockf \
+		-Wl,--wrap=os_cap_init \
 		-Wl,--wrap=cpuinfo_init \
 		-Wl,--wrap=cpuinfo_fini \
 		-Wl,--wrap=hw_cap_mon_discover \
@@ -627,6 +628,28 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=pqos_mon_init \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_cap_static: ./test_cap_static.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=getenv \
+		-Wl,--wrap=malloc \
+		-Wl,--wrap=open \
+		-Wl,--wrap=close \
+		-Wl,--wrap=pthread_mutex_init \
+		-Wl,--wrap=pthread_mutex_destroy \
+		-Wl,--wrap=hw_cap_l3ca_discover \
+		-Wl,--wrap=os_cap_l3ca_discover \
+		-Wl,--wrap=hw_cap_l2ca_discover \
+		-Wl,--wrap=os_cap_l2ca_discover \
+		-Wl,--wrap=hw_cap_mba_discover \
+		-Wl,--wrap=amd_cap_mba_discover \
+		-Wl,--wrap=os_cap_mba_discover \
+		-Wl,--wrap=hw_cap_mon_discover \
+		-Wl,--wrap=os_cap_mon_discover \
+		-Wl,--wrap=os_cap_get_mba_ctrl \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/cap.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 
 .PHONY: run
 run: $(TESTS)

@@ -260,6 +260,9 @@ cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
         struct pqos_cap_l3ca *cap = NULL;
         int ret;
 
+        if (r_cap == NULL || cpu == NULL)
+                return PQOS_RETVAL_PARAM;
+
         cap = (struct pqos_cap_l3ca *)malloc(sizeof(*cap));
         if (cap == NULL)
                 return PQOS_RETVAL_RESOURCE;
@@ -305,6 +308,9 @@ cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
         struct pqos_cap_l2ca *cap = NULL;
         int ret;
 
+        if (r_cap == NULL || cpu == NULL)
+                return PQOS_RETVAL_PARAM;
+
         cap = (struct pqos_cap_l2ca *)malloc(sizeof(*cap));
         if (cap == NULL)
                 return PQOS_RETVAL_RESOURCE;
@@ -349,6 +355,9 @@ cap_mba_discover(struct pqos_cap_mba **r_cap,
 {
         struct pqos_cap_mba *cap = NULL;
         int ret;
+
+        if (r_cap == NULL || cpu == NULL)
+                return PQOS_RETVAL_PARAM;
 
         cap = (struct pqos_cap_mba *)malloc(sizeof(*cap));
         if (cap == NULL)
@@ -403,6 +412,8 @@ discover_capabilities(struct pqos_cap **p_cap,
         unsigned sz = 0;
         int ret = PQOS_RETVAL_RESOURCE;
 
+        if (p_cap == NULL || cpu == NULL)
+                return PQOS_RETVAL_PARAM;
         /**
          * Monitoring init
          */
@@ -621,6 +632,8 @@ discover_interface(enum pqos_interface requested_interface,
         LOG_INFO("Requested interface: %s\n",
                  interface_to_string(requested_interface));
 
+        if (interface == NULL)
+                return PQOS_RETVAL_PARAM;
 #ifdef __linux__
         if (requested_interface != PQOS_INTER_MSR &&
             requested_interface != PQOS_INTER_OS &&

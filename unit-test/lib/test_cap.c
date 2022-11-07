@@ -212,9 +212,20 @@ __wrap_pqos_mon_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
         return PQOS_RETVAL_OK;
 }
 
+int
+__wrap_os_cap_init(const enum pqos_interface inter)
+{
+        const LargestIntegralType valid_inters[] = {PQOS_INTER_OS,
+                                                    PQOS_INTER_OS_RESCTRL_MON};
+
+        function_called();
+        assert_in_set(inter, valid_inters, DIM(valid_inters));
+        return PQOS_RETVAL_OK;
+}
+
 /* ======== setup ========*/
 static int
-setup_cap_init(void **state __attribute__((unused)))
+setup_cap_init_msr(void **state __attribute__((unused)))
 {
         struct test_data *data;
 
@@ -222,6 +233,32 @@ setup_cap_init(void **state __attribute__((unused)))
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_MSR;
+
+        return 0;
+}
+
+static int
+setup_cap_init_os(void **state __attribute__((unused)))
+{
+        struct test_data *data;
+
+        test_init_all(state);
+
+        data = (struct test_data *)*state;
+        data->interface = PQOS_INTER_OS;
+
+        return 0;
+}
+
+static int
+setup_cap_init_os_resctrl_mon(void **state __attribute__((unused)))
+{
+        struct test_data *data;
+
+        test_init_all(state);
+
+        data = (struct test_data *)*state;
+        data->interface = PQOS_INTER_OS_RESCTRL_MON;
 
         return 0;
 }
@@ -256,9 +293,12 @@ static void
 test__pqos_get_inter(void **state __attribute__((unused)))
 {
         enum pqos_interface ret;
+        struct test_data *data;
+
+        data = (struct test_data *)*state;
 
         ret = _pqos_get_inter();
-        assert_int_equal(ret, PQOS_INTER_MSR);
+        assert_int_equal(ret, data->interface);
 }
 
 /* ======== _pqos_get_cap  ======== */
@@ -348,6 +388,7 @@ test_pqos_init(void **state __attribute__((unused)))
         memset(&cfg, 0, sizeof(cfg));
         cfg.verbose = LOG_VER_SILENT;
         cfg.fd_log = -1;
+        cfg.interface = data->interface;
 
         will_return(__wrap_cpuinfo_init, data->cpu);
         if (data->interface == PQOS_INTER_MSR) {
@@ -370,6 +411,10 @@ test_pqos_init(void **state __attribute__((unused)))
         expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
         expect_function_call(__wrap_open);
         wrap_lockf(F_LOCK);
+#ifdef __linux__
+        if (data->interface != PQOS_INTER_MSR)
+                expect_function_call(__wrap_os_cap_init);
+#endif
         if (data->interface == PQOS_INTER_MSR)
                 expect_function_call(__wrap_hw_cap_mon_discover);
 #ifdef __linux__
@@ -407,10 +452,48 @@ test_pqos_inter_get_param(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+static void
+test_pqos_inter_get_before_init(void **state __attribute__((unused)))
+{
+        int ret;
+        enum pqos_interface interface;
+
+        ret = pqos_inter_get(&interface);
+        assert_int_not_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_pqos_inter_get_after_init(void **state __attribute__((unused)))
+{
+        int ret;
+        enum pqos_interface interface;
+
+        wrap_lock_and_unlock();
+        ret = pqos_inter_get(&interface);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 /* ======== pqos_cap_get ======== */
 
 static void
-test_pqos_cap_get(void **state __attribute__((unused)))
+test_pqos_cap_get_before_init(void **state __attribute__((unused)))
+{
+        int ret;
+        const struct pqos_cap *p_cap;
+        const struct pqos_cpuinfo *p_cpu;
+
+        ret = pqos_cap_get(NULL, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        ret = pqos_cap_get(&p_cap, &p_cpu);
+        assert_int_not_equal(ret, PQOS_RETVAL_OK);
+        ret = pqos_cap_get(&p_cap, NULL);
+        assert_int_not_equal(ret, PQOS_RETVAL_OK);
+        ret = pqos_cap_get(NULL, &p_cpu);
+        assert_int_not_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_pqos_cap_get_after_init(void **state __attribute__((unused)))
 {
         int ret;
         const struct pqos_cap *p_cap;
@@ -432,38 +515,124 @@ test_pqos_cap_get(void **state __attribute__((unused)))
 /* ======== _pqos_cap_l3cdp_change ======== */
 
 static void
-test__pqos_cap_l3cdp_change(void **state __attribute__((unused)))
+test__pqos_cap_l3cdp_change_msr(void **state __attribute__((unused)))
 {
         struct test_data *data;
 
         data = (struct test_data *)*state;
-        will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
-        _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_OFF);
-        will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
-        _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ON);
-        will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
-        _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
-        will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
-        _pqos_cap_l3cdp_change(-1);
+
+        if (data->interface == PQOS_INTER_MSR) {
+                will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_OFF);
+                will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ON);
+                will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+                will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(-1);
+        }
 }
 
+#ifdef __linux__
+static void
+test__pqos_cap_l3cdp_change_os(void **state __attribute__((unused)))
+{
+        struct test_data *data;
+
+        data = (struct test_data *)*state;
+
+        if (data->interface == PQOS_INTER_OS) {
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_OFF);
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ON);
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(-1);
+        }
+}
+
+static void
+test__pqos_cap_l3cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
+{
+        struct test_data *data;
+
+        data = (struct test_data *)*state;
+
+        if (data->interface == PQOS_INTER_OS_RESCTRL_MON) {
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_OFF);
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ON);
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+                will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
+                _pqos_cap_l3cdp_change(-1);
+        }
+}
+
+#endif
 /* ======== _pqos_cap_l2cdp_change ======== */
 
 static void
-test__pqos_cap_l2cdp_change(void **state __attribute__((unused)))
+test__pqos_cap_l2cdp_change_msr(void **state __attribute__((unused)))
 {
         struct test_data *data;
 
         data = (struct test_data *)*state;
-        will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
-        _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_OFF);
-        will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
-        _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ON);
-        will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
-        _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ANY);
-        will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
-        _pqos_cap_l2cdp_change(-1);
+
+        if (data->interface == PQOS_INTER_MSR) {
+                will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_OFF);
+                will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ON);
+                will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ANY);
+                will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(-1);
+        }
 }
+
+#ifdef __linux__
+static void
+test__pqos_cap_l2cdp_change_os(void **state __attribute__((unused)))
+{
+        struct test_data *data;
+
+        data = (struct test_data *)*state;
+
+        if (data->interface == PQOS_INTER_OS) {
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_OFF);
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ON);
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ANY);
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(-1);
+        }
+}
+
+static void
+test__pqos_cap_l2cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
+{
+        struct test_data *data;
+
+        data = (struct test_data *)*state;
+
+        if (data->interface == PQOS_INTER_OS_RESCTRL_MON) {
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_OFF);
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ON);
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ANY);
+                will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
+                _pqos_cap_l2cdp_change(-1);
+        }
+}
+#endif
 
 /* ======== _pqos_cap_mba_change ======== */
 
@@ -491,20 +660,35 @@ main(void)
             cmocka_unit_test(test__pqos_check_init_before_init),
             cmocka_unit_test(test__pqos_get_cap_before_init),
             cmocka_unit_test(test__pqos_get_cpu_before_init),
+            cmocka_unit_test(test_pqos_inter_get_before_init),
+            cmocka_unit_test(test_pqos_cap_get_before_init),
             cmocka_unit_test(test_pqos_init),
-            cmocka_unit_test(test_pqos_cap_get),
+            cmocka_unit_test(test_pqos_inter_get_after_init),
+            cmocka_unit_test(test_pqos_cap_get_after_init),
             cmocka_unit_test(test__pqos_get_inter),
             cmocka_unit_test(test__pqos_get_cap_after_init),
             cmocka_unit_test(test__pqos_get_cpu_after_init),
             cmocka_unit_test(test__pqos_check_init_after_init),
-            cmocka_unit_test(test__pqos_cap_l3cdp_change),
-            cmocka_unit_test(test__pqos_cap_l2cdp_change),
+            cmocka_unit_test(test__pqos_cap_l3cdp_change_msr),
+            cmocka_unit_test(test__pqos_cap_l2cdp_change_msr),
+#ifdef __linux__
+            cmocka_unit_test(test__pqos_cap_l3cdp_change_os),
+            cmocka_unit_test(test__pqos_cap_l2cdp_change_os),
+            cmocka_unit_test(test__pqos_cap_l3cdp_change_os_resctrl_mon),
+            cmocka_unit_test(test__pqos_cap_l2cdp_change_os_resctrl_mon),
+#endif
             cmocka_unit_test(test__pqos_cap_mba_change),
             cmocka_unit_test(test_pqos_fini),
         };
 
         result += cmocka_run_group_tests(tests_cap_param, NULL, NULL);
-        result +=
-            cmocka_run_group_tests(tests_cap_init, setup_cap_init, test_fini);
+        result += cmocka_run_group_tests(tests_cap_init, setup_cap_init_msr,
+                                         test_fini);
+#ifdef __linux__
+        result += cmocka_run_group_tests(tests_cap_init, setup_cap_init_os,
+                                         test_fini);
+        result += cmocka_run_group_tests(
+            tests_cap_init, setup_cap_init_os_resctrl_mon, test_fini);
+#endif
         return result;
 }

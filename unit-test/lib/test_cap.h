@@ -1,4 +1,3 @@
-
 #ifndef __TEST_CAP_H
 #define __TEST_CAP_H
 
