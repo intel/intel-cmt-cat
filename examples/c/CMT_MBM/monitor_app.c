@@ -333,7 +333,7 @@ monitoring_loop(void)
 {
         unsigned mon_number = 0;
         int ret = PQOS_RETVAL_OK;
-        int i = 0;
+        int i;
 
         if (signal(SIGINT, monitoring_ctrlc) == SIG_ERR)
                 printf("Failed to catch SIGINT!\n");
