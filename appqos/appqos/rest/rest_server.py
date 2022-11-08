@@ -55,6 +55,7 @@ from appqos import log
 
 from appqos.rest.rest_power import Power, Powers
 from appqos.rest.rest_app import App, Apps
+from appqos.rest.rest_caps_cpu import CapsCpus
 from appqos.rest.rest_pool import Pool, Pools
 from appqos.rest.rest_misc import Stats, Caps, Sstbf, Reset
 from appqos.rest.rest_rdt import CapsRdtIface, CapsMba, CapsMbaCtrl, CapsL3ca, CapsL2ca
@@ -113,6 +114,7 @@ class Server:
         # Stats and Capabilities API
         self.api.add_resource(Stats, '/stats')
         self.api.add_resource(Caps, '/caps')
+        self.api.add_resource(CapsCpus, '/caps/cpu')
 
         # SST-BF API
         if caps.sstbf_enabled():

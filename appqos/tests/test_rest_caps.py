@@ -399,3 +399,61 @@ class TestCaps:
             assert data['clos_num'] == 14
             assert data['cdp_supported']
             assert not data['cdp_enabled']
+
+
+    # @mock.patch("pqos.cpuinfo.PqosCpuInfo.get_sockets", mock.MagicMock(return_value=[0]))
+    # @mock.patch("pqos.cpuinfo.PqosCpuInfo.get_cores", mock.MagicMock(return_value=[0,1,2,3]))
+    # @mock.patch("pqos.cpuinfo.PqosCpuInfo.get_vendor", mock.MagicMock(return_value="TEST_VENDOR"))
+    @mock.patch("appqos.pqos_api.PQOS_API.cpuinfo")
+    def test_caps_cpu_get(self, mock_cpuinfo):
+        """
+        Tests /caps/cpu GET API
+        """
+
+        from pqos.cpuinfo import PqosCacheInfo
+        from pqos.cpuinfo import PqosCoreInfo
+        from pqos.error import PqosErrorParam
+
+        def get_core_info(lcore):
+            return PqosCoreInfo(core=lcore,
+                                socket=0,
+                                l3_id=0,
+                                l2_id=(lcore / 2),
+                                l3cat_id=0,
+                                mba_id=0)
+
+        def get_cache_info(level):
+
+            if level == 2:
+                return PqosCacheInfo(num_ways=20,
+                                     num_sets=1024,
+                                     num_partitions=1,
+                                     line_size=64,
+                                     way_size=65536,
+                                     total_size=1310720)
+            elif level == 3:
+                return PqosCacheInfo(num_ways=12,
+                                     num_sets=81820,
+                                     num_partitions=1,
+                                     line_size=64,
+                                     way_size=5242880,
+                                     total_size=62914560)
+
+            raise PqosErrorParam("Invalid cache level")
+
+        mock_cpuinfo.get_cores.return_value = [0,1,2,3]
+        mock_cpuinfo.get_sockets.return_value = [0]
+        mock_cpuinfo.get_vendor.return_value = "TEST_VENDOR"
+        mock_cpuinfo.get_cache_info = get_cache_info
+        mock_cpuinfo.get_core_info = get_core_info
+
+
+        response = Rest().get("/caps/cpu")
+
+        assert response.status_code == 200
+
+        data = json.loads(response.data.decode('utf-8'))
+
+        # Validate response schema
+        schema, resolver = load_json_schema('get_caps_cpu_response.json')
+        validate(data, schema, resolver=resolver)

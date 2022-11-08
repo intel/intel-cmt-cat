@@ -39,7 +39,7 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 
 from pqos.common import pqos_handle_error, free_memory
-from pqos.error import PqosError
+from pqos.error import PqosError, PqosErrorParam, PqosErrorResource
 from pqos.pqos import Pqos
 
 
@@ -101,6 +101,19 @@ class PqosCoreInfo(object):
         self.l2_id = l2_id
         self.l3cat_id = l3cat_id
         self.mba_id = mba_id
+
+
+class PqosCacheInfo(object):
+    "Cache information"
+    # pylint: disable=too-few-public-methods, too-many-arguments
+
+    def __init__(self, num_ways, num_sets, num_partitions, line_size, way_size, total_size):
+        self.num_ways = num_ways
+        self.num_sets = num_sets
+        self.num_partitions = num_partitions
+        self.line_size = line_size
+        self.total_size = total_size
+        self.way_size = way_size
 
 
 def _get_array_items(count, p_items):
@@ -275,6 +288,38 @@ class PqosCpuInfo(object):
                                 l3cat_id=coreinfo_struct.l3cat_id,
                                 mba_id=coreinfo_struct.mba_id)
         return coreinfo
+
+
+    def get_cache_info(self, level):
+        """
+        Retrieves cache information from CPU info structure
+
+        Parameters:
+            level: cache level
+
+        Returns:
+            cache information
+        """
+        info = None
+
+        if level == 2:
+            info = self.p_cpu.contents.l2
+            if not info.detected:
+                raise PqosErrorResource("L2 cache not available in the system")
+        elif level == 3:
+            info = self.p_cpu.contents.l3
+            if not info.detected:
+                raise PqosErrorResource("L3 cache not available in the system")
+        else:
+            raise PqosErrorParam("Invalid cache level")
+
+        return PqosCacheInfo(num_ways=info.num_ways,
+                             num_sets=info.num_sets,
+                             num_partitions=info.num_partitions,
+                             line_size=info.line_size,
+                             way_size=info.way_size,
+                             total_size=info.total_size)
+
 
     def get_one_core(self, socket):
         """

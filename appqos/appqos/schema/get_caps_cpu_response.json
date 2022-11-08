@@ -1,0 +1,84 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+
+    "title": "REST API get caps/cpu",
+    "description": "GET CPU information",
+
+    "type": "object",
+
+    "definitions": {
+        "cache" : {
+            "type": "object",
+            "level": {
+               "description": "Cache level",
+               "$ref": "definitions.json#/uint"
+            },
+            "num_ways": {
+                "description": "Number of ways",
+               "$ref": "definitions.json#/uint"
+            },
+            "num_sets": {
+                "description": "Number of sets",
+               "$ref": "definitions.json#/uint"
+            },
+            "num_partitions": {
+                "description": "Number of partitions",
+               "$ref": "definitions.json#/uint"
+            },
+            "line_size": {
+                "description": "Cache line size",
+               "$ref": "definitions.json#/uint"
+            },
+            "total_size": {
+                "description": "Cache total size",
+               "$ref": "definitions.json#/uint"
+            },
+            "way_size": {
+                "description": "Cache way size",
+               "$ref": "definitions.json#/uint"
+            },
+            "required": ["level", "num_ways", "num_sets", "num_partitions", "line_size", "total_size", "way_size"]
+        },
+        "core" : {
+            "type": "object",
+            "socket": {
+                "description": "Socket",
+                "$ref": "definitions.json#/uint"
+            },
+            "lcore": {
+                "description": "Logical core",
+                "$ref": "definitions.json#/uint"
+            },
+            "L2ID": {
+                "description": "L2 cache ID",
+                "$ref": "definitions.json#/uint"
+            },
+            "L3ID": {
+                "description": "L3 cache ID",
+                "$ref": "definitions.json#/uint"
+            },
+            "required": ["socket", "lcore"]
+        }
+    },
+
+    "properties": {
+      "vendor": {
+        "description": "CPU vendor",
+        "type": "string"
+      },
+      "cache": {
+        "description": "Cache information",
+        "type": "array",
+        "items": { "$ref": "#/definitions/cache" },
+        "uniqueItems": true
+      },
+      "core": {
+        "description": "Core information",
+        "type": "array",
+        "items": { "$ref": "#/definitions/core" },
+        "uniqueItems": true
+      }
+    },
+    "required": ["vendor", "cache", "core"],
+    "additionalProperties": false
+  }
