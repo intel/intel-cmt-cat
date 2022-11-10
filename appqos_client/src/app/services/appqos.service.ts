@@ -50,6 +50,7 @@ type poolPutType = {
   mba?: number;
   mba_bw?: number;
   name?: string;
+  cores?: number[];
 };
 
 @Injectable({
@@ -157,8 +158,13 @@ export class AppqosService {
     return this.http.put<resMessage>(`${api_url}/pools/${id}`, data);
   }
 
+  deletePool(id: number): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.delete<resMessage>(`${api_url}/pools/${id}`);
+  }
+
   getApps(): Observable<Apps[]> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<Apps[]>(`${api_url}/apps `);
+    return this.http.get<Apps[]>(`${api_url}/apps`);
   }
 }

@@ -54,7 +54,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         <button mat-mini-fab color="primary">
           <mat-icon>add</mat-icon>
         </button>
-        <button mat-mini-fab color="accent">
+        <button mat-mini-fab color="accent" (click)="deletePool()">
           <mat-icon>delete</mat-icon>
         </button>
       </div>
@@ -170,7 +170,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
             {{ core }}
           </button>
         </div>
-        <button mat-raised-button color="primary">EDIT</button>
+        <button mat-raised-button color="primary" (click)="coresEditDialog()">
+          EDIT
+        </button>
       </div>
     </div>
   </mat-card-content>

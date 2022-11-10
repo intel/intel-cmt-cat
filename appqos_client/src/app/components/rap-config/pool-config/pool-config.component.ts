@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { MatOptionSelectionChange } from '@angular/material/core';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSliderChange } from '@angular/material/slider';
 import { catchError, combineLatest, of, take } from 'rxjs';
 
@@ -41,6 +42,7 @@ import {
   CacheAllocation,
   resMessage,
 } from '../../system-caps/system-caps.model';
+import { CoresEditDialogComponent } from '../cores-edit-dialog/cores-edit-dialog.component';
 
 @Component({
   selector: 'app-pool-config',
@@ -62,7 +64,8 @@ export class PoolConfigComponent implements OnInit {
   constructor(
     private service: AppqosService,
     private localService: LocalService,
-    private snackBar: SnackBarService
+    private snackBar: SnackBarService,
+    public dialog: MatDialog
   ) {}
 
   ngOnInit(): void {
@@ -267,5 +270,31 @@ export class PoolConfigComponent implements OnInit {
   errorHandler(error: HttpErrorResponse) {
     this.snackBar.handleError(error.error.message);
     this.getData(this.pool.id);
+  }
+
+  coresEditDialog() {
+    const dialogRef = this.dialog.open(CoresEditDialogComponent, {
+      height: 'auto',
+      width: '40rem',
+      data: this.pool,
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      this.getData(this.pool.id);
+    });
+  }
+
+  deletePool() {
+    if (!this.pool) return;
+
+    this.service.deletePool(this.pool.id).subscribe({
+      next: (response) => {
+        this.snackBar.displayInfo(response.message);
+        this.getData();
+      },
+      error: (error) => {
+        this.snackBar.handleError(error.error.message);
+      },
+    });
   }
 }
