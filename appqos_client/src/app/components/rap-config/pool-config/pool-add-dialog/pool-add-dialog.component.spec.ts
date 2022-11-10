@@ -17,7 +17,6 @@ are met:
     
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
 OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
@@ -27,57 +26,3 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
-
-import { HttpClient } from '@angular/common/http';
-import {
-  AfterContentInit,
-  ChangeDetectionStrategy,
-  Component,
-  EventEmitter,
-  Input,
-  OnChanges,
-  OnInit,
-  Output,
-  SimpleChanges,
-} from '@angular/core';
-import { MatDialog } from '@angular/material/dialog';
-import { MatSlideToggleChange } from '@angular/material/slide-toggle';
-
-import { AppqosService } from 'src/app/services/appqos.service';
-import { MBACTRL } from '../../system-caps/system-caps.model';
-import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
-import { Pools } from '../overview.model';
-
-@Component({
-  selector: 'app-mba-allocation',
-  templateUrl: './mba-allocation.component.html',
-  styleUrls: ['./mba-allocation.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-})
-export class MbaAllocationComponent {
-  @Input() pools!: Pools[];
-  @Input() mbaCtrl!: MBACTRL;
-  @Output() poolEvent = new EventEmitter<unknown>();
-  @Output() mbaCtrlEvent = new EventEmitter<MatSlideToggleChange>();
-  mbaBwDefNum = Math.pow(2, 32) - 1;
-
-  constructor(public dialog: MatDialog) {}
-
-  mbaOnChange(event: MatSlideToggleChange) {
-    event.source.checked = this.mbaCtrl.enabled;
-
-    this.mbaCtrlEvent.emit(event);
-  }
-
-  openDialog(): void {
-    const dialogRef = this.dialog.open(EditDialogComponent, {
-      height: 'auto',
-      width: '40rem',
-      data: { mba: true },
-    });
-
-    dialogRef.afterClosed().subscribe((_) => {
-      this.poolEvent.emit();
-    });
-  }
-}

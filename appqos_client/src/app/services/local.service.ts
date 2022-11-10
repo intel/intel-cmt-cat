@@ -41,6 +41,8 @@ export class LocalService {
   ifaceEvent = new Subject<void>();
   l3cat = new BehaviorSubject<CacheAllocation | null>(null);
   l2cat = new BehaviorSubject<CacheAllocation | null>(null);
+  caps = new BehaviorSubject<string[] | null>(null);
+  mbaCtrl = new BehaviorSubject<boolean | null>(null);
 
   setIfaceEvent(): void {
     this.ifaceEvent.next();
@@ -64,6 +66,22 @@ export class LocalService {
 
   getL2CatEvent(): Observable<CacheAllocation | null> {
     return this.l2cat.asObservable();
+  }
+
+  setCapsEvent(caps: string[]) {
+    this.caps.next(caps);
+  }
+
+  getCapsEvent(): Observable<string[] | null> {
+    return this.caps.asObservable();
+  }
+
+  setMbaCtrlEvent(mbaCtrl: boolean) {
+    this.mbaCtrl.next(mbaCtrl);
+  }
+
+  getMbaCtrlEvent(): Observable<boolean | null> {
+    return this.mbaCtrl.asObservable();
   }
 
   public saveData(key: string, value: string): void {

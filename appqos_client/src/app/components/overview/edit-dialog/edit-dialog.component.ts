@@ -52,7 +52,7 @@ type dialogDataType = {
 export class EditDialogComponent implements AfterContentInit {
   pools!: Pools[];
   loading = false;
-  mbaBwDefNum = 1 * Math.pow(2, 32) - 1;
+  mbaBwDefNum = Math.pow(2, 32) - 1;
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: dialogDataType,

@@ -163,6 +163,11 @@ export class AppqosService {
     return this.http.delete<resMessage>(`${api_url}/pools/${id}`);
   }
 
+  postPool(pool: any): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.post<resMessage>(`${api_url}/pools/`, pool);
+  }
+
   getApps(): Observable<Apps[]> {
     const api_url = this.local.getData('api_url');
     return this.http.get<Apps[]>(`${api_url}/apps`);

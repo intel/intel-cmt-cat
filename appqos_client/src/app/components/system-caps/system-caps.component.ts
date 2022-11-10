@@ -89,6 +89,7 @@ export class SystemCapsComponent implements OnInit {
     this.service.getCaps().subscribe({
       next: (caps) => {
         this.caps = caps.capabilities;
+        this.localStroe.setCapsEvent(caps.capabilities);
         this._getMbaData();
         this._getSstbf();
         this._getL3cat();

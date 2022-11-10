@@ -42,7 +42,8 @@ import {
   CacheAllocation,
   resMessage,
 } from '../../system-caps/system-caps.model';
-import { CoresEditDialogComponent } from '../cores-edit-dialog/cores-edit-dialog.component';
+import { CoresEditDialogComponent } from './cores-edit-dialog/cores-edit-dialog.component';
+import { PoolAddDialogComponent } from './pool-add-dialog/pool-add-dialog.component';
 
 @Component({
   selector: 'app-pool-config',
@@ -59,7 +60,8 @@ export class PoolConfigComponent implements OnInit {
   mbaBW!: string;
   poolId!: number;
   l3numCacheWays!: number;
-  mbaBwDefNum = 1 * Math.pow(2, 32) - 1;
+  l2numCacheWays!: number;
+  mbaBwDefNum = Math.pow(2, 32) - 1;
 
   constructor(
     private service: AppqosService,
@@ -87,11 +89,12 @@ export class PoolConfigComponent implements OnInit {
 
     combineLatest([pools$, apps$]).subscribe(([pools, apps]) => {
       pools.map((pool) => pool.cores.sort((a, b) => a - b));
+      const selectedPool = pools[pools.length - 1];
       this.pools = pools;
       this.apps = apps;
       if (id === undefined) {
-        this.getPool(pools[0].id);
-        this.selected = pools[0].name;
+        this.getPool(selectedPool.id);
+        this.selected = selectedPool.name;
       } else {
         this.getPool(this.pool.id);
       }
@@ -107,6 +110,7 @@ export class PoolConfigComponent implements OnInit {
   getPool(id: number) {
     this.poolId = id;
     this.pool = this.pools.find((pool: Pools) => pool.id === id) as Pools;
+
     this.poolApps = this.apps.filter((app) => app.pool_id === id);
     this.selected = this.pool.name;
 
@@ -114,6 +118,7 @@ export class PoolConfigComponent implements OnInit {
       this.localService
         .getL3CatEvent()
         .subscribe((l3cat: CacheAllocation | null) => {
+          this.l3numCacheWays = l3cat!.cw_num;
           this.pool.l3Bitmask = this.pool.l3cbm
             ?.toString(2)
             .padStart(l3cat!.cw_num, '0')
@@ -126,6 +131,7 @@ export class PoolConfigComponent implements OnInit {
       this.localService
         .getL2CatEvent()
         .subscribe((l2cat: CacheAllocation | null) => {
+          this.l2numCacheWays = l2cat!.cw_num;
           this.pool.l2Bitmask = this.pool.l2cbm
             ?.toString(2)
             .padStart(l2cat!.cw_num, '0')
@@ -279,7 +285,7 @@ export class PoolConfigComponent implements OnInit {
       data: this.pool,
     });
 
-    dialogRef.afterClosed().subscribe((result) => {
+    dialogRef.afterClosed().subscribe((_) => {
       this.getData(this.pool.id);
     });
   }
@@ -295,6 +301,18 @@ export class PoolConfigComponent implements OnInit {
       error: (error) => {
         this.snackBar.handleError(error.error.message);
       },
+    });
+  }
+
+  poolAddDialog() {
+    const dialogRef = this.dialog.open(PoolAddDialogComponent, {
+      height: 'auto',
+      width: '40rem',
+      data: { l2cwNum: this.l2numCacheWays, l3cwNum: this.l3numCacheWays },
+    });
+
+    dialogRef.afterClosed().subscribe((_) => {
+      this.getData();
     });
   }
 }

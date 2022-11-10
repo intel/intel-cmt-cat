@@ -68,7 +68,8 @@ import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dia
 import { MbaAllocationComponent } from '../components/overview/mba-allocation/mba-allocation.component';
 import { L2CacheAllocationComponent } from '../components/overview/l2-cache-allocation/l2-cache-allocation.component';
 import { PoolConfigComponent } from '../components/rap-config/pool-config/pool-config.component';
-import { CoresEditDialogComponent } from '../components/rap-config/cores-edit-dialog/cores-edit-dialog.component';
+import { CoresEditDialogComponent } from '../components/rap-config/pool-config/cores-edit-dialog/cores-edit-dialog.component';
+import { PoolAddDialogComponent } from '../components/rap-config/pool-config/pool-add-dialog/pool-add-dialog.component';
 
 @NgModule({
   declarations: [
@@ -90,6 +91,7 @@ import { CoresEditDialogComponent } from '../components/rap-config/cores-edit-di
     MbaAllocationComponent,
     PoolConfigComponent,
     CoresEditDialogComponent,
+    PoolAddDialogComponent,
   ],
   imports: [
     MatInputModule,

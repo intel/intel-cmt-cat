@@ -27,49 +27,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Inject, OnInit } from '@angular/core';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+.dialog-content {
+  display: flex;
+  flex-direction: column;
+}
 
-import { AppqosService } from 'src/app/services/appqos.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { Pools } from '../../overview/overview.model';
+.note {
+  padding-top: 1rem;
+}
 
-@Component({
-  selector: 'app-cores-edit-dialog',
-  templateUrl: './cores-edit-dialog.component.html',
-  styleUrls: ['./cores-edit-dialog.component.scss'],
-})
-export class CoresEditDialogComponent implements OnInit {
-  cores!: string;
-  isSaved = false;
+.name-field {
+  width: 15rem;
+  padding-top: 1rem;
+}
 
-  constructor(
-    @Inject(MAT_DIALOG_DATA) public data: Pools,
-    private service: AppqosService,
-    private snackBar: SnackBarService,
-    public dialogRef: MatDialogRef<CoresEditDialogComponent>
-  ) {}
-
-  ngOnInit(): void {
-    this.cores = String(this.data.cores);
-  }
-
-  saveCores() {
-    this.service
-      .poolPut(
-        {
-          cores: this.cores.split(/[,-]+/).map(Number),
-        },
-        this.data.id
-      )
-      .subscribe({
-        next: (response) => {
-          this.snackBar.displayInfo(response.message);
-          this.dialogRef.close();
-        },
-        error: (error) => {
-          this.snackBar.handleError(error.error.message);
-        },
-      });
-  }
+.core-field {
+  width: 30rem;
 }
