@@ -44,7 +44,7 @@ from requests.auth import _basic_auth_str
 from jsonschema import validate, RefResolver
 
 from appqos.rest import rest_server
-import appqos.common
+from appqos import common
 import appqos.caps
 import appqos.pid_ops
 from appqos.stats import StatsStore
@@ -189,8 +189,9 @@ def load_json_schema(filename):
 
 class Rest:
     def __init__(self):
-        self.server = rest_server.Server()
-        self.client = self.server.app.test_client()
+        with mock.patch("appqos.caps.caps_get", return_value=[common.CAT_L3_CAP, common.CAT_L2_CAP, common.MBA_CAP, common.SSTBF_CAP, common.POWER_CAP]):
+            self.server = rest_server.Server()
+            self.client = self.server.app.test_client()
 
     def get(self, url):
         response = self.client.get(url, headers={'Authorization': _basic_auth_str("user", "password")})

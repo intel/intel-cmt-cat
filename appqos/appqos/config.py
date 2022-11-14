@@ -218,6 +218,7 @@ class Config(UserDict):
         """
         Update config with "Default" pool
         """
+        iface = self.get_rdt_iface()
 
         if 'pools' not in self.data:
             self.data['pools'] = []
@@ -226,19 +227,19 @@ class Config(UserDict):
         default_pool = {}
         default_pool['id'] = 0
 
-        if caps.mba_supported():
+        if caps.mba_supported(iface):
             if self.get_mba_ctrl_enabled():
                 default_pool['mba_bw'] = 2**32 - 1
             else:
                 default_pool['mba'] = 100
 
-        if caps.cat_l3_supported():
+        if caps.cat_l3_supported(iface):
             default_pool['l3cbm'] = PQOS_API.get_max_l3_cat_cbm()
             if self.get_l3cdp_enabled():
                 default_pool['l3cbm_code'] = default_pool['l3cbm']
                 default_pool['l3cbm_data'] = default_pool['l3cbm']
 
-        if caps.cat_l2_supported():
+        if caps.cat_l2_supported(iface):
             default_pool['l2cbm'] = PQOS_API.get_max_l2_cat_cbm()
             if self.get_l2cdp_enabled():
                 default_pool['l2cbm_code'] = default_pool['l2cbm']

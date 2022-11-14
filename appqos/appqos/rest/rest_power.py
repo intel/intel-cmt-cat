@@ -179,7 +179,7 @@ class Power(Resource):
             try:
                 ConfigStore().validate(data, admission_control_check)
             except Exception as ex:
-                raise BadRequest(f"POWER PROFILE {profile_id} not updated") from ex
+                raise BadRequest(f"POWER PROFILE {profile_id} not updated - {str(ex)}") from ex
 
             ConfigStore.set_config(data)
 

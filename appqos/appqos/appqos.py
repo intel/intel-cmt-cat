@@ -123,7 +123,8 @@ class AppQoS:
         log.info("Configuring RDT")
 
         # Configure MBA CTRL
-        if caps.mba_supported():
+        iface = ConfigStore.get_config().get_rdt_iface()
+        if caps.mba_supported(iface):
             result = PQOS_API.enable_mba_bw(data.get_mba_ctrl_enabled())
             if result != 0:
                 log.error("libpqos MBA CTRL initialization failed, Terminating...")
@@ -242,8 +243,8 @@ def main():
     if cmd_args.verbose:
         log.enable_verbose()
 
-    # detect supported RDT interfaces
-    PQOS_API.detect_supported_ifaces()
+    # detect supported RDT interfaces and capabilities
+    caps.caps_detect()
 
     # Load config file
     if load_config(cmd_args.config):
@@ -251,14 +252,15 @@ def main():
         return
 
     # initialize libpqos/Intel RDT interface
-    result = PQOS_API.init(ConfigStore.get_config().get_rdt_iface())
+    iface = ConfigStore.get_config().get_rdt_iface()
+    result = PQOS_API.init(iface)
     if result != 0:
         log.error("libpqos initialization failed, Terminating...")
         return
     log.info(f"RDT initialized with '{PQOS_API.current_iface()}' interface")
 
     # initialize capabilities
-    result = caps.caps_init()
+    result = caps.caps_init(iface)
     if result == 0:
         # initialize main logic
         app_qos = AppQoS()

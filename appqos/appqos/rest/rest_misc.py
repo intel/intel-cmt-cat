@@ -40,7 +40,6 @@ from flask_restful import Resource, request
 import jsonschema
 
 from appqos import caps
-from appqos import common
 from appqos import power
 from appqos import sstbf
 from appqos.config_store import ConfigStore
@@ -85,7 +84,9 @@ class Caps(Resource):
         Returns:
             response, status code
         """
-        res = {'capabilities': caps.SYSTEM_CAPS}
+        iface = ConfigStore.get_config().get_rdt_iface()
+
+        res = {'capabilities': caps.caps_get(iface)}
         return res, 200
 
 

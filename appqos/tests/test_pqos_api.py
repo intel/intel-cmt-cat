@@ -230,21 +230,15 @@ class TestPqosApi(object):
 
 
     @mock.patch("os.system", mock.MagicMock(return_value=0))
-    @pytest.mark.parametrize("iface, supp_iface", [
-        ("msr", ["msr"]),
-        ("os", ["os"]),
-        ("msr", ["msr", "os"]),
-        ("os", ["msr", "os"]),
-    ])
-    def test_init(self, iface, supp_iface):
+    @pytest.mark.parametrize("iface", ["msr", "os"])
+    def test_init(self, iface):
         with mock.patch('pqos.Pqos.init') as pqos_init_mock,\
              mock.patch('pqos.Pqos.fini', return_value = 0) as pqos_finit_mock,\
              mock.patch('pqos.capability.PqosCap.__init__', return_value = None) as pqos_cap_init_mock,\
              mock.patch('pqos.l3ca.PqosCatL3.__init__', return_value = None) as pqos_cat_l3_init_mock,\
              mock.patch('pqos.mba.PqosMba.__init__', return_value = None) as pqos_mba_init_mock,\
              mock.patch('pqos.allocation.PqosAlloc.__init__', return_value = None) as pqos_alloc_init_mock,\
-             mock.patch('pqos.cpuinfo.PqosCpuInfo.__init__', return_value = None) as pqos_cpu_info_init_mock,\
-             mock.patch('appqos.pqos_api.PqosApi.supported_iface', return_value = supp_iface):
+             mock.patch('pqos.cpuinfo.PqosCpuInfo.__init__', return_value = None) as pqos_cpu_info_init_mock:
 
             assert 0 == self.Pqos_api.init(iface)
 
@@ -256,18 +250,6 @@ class TestPqosApi(object):
             pqos_cpu_info_init_mock.assert_called_once()
 
             pqos_cpu_info_init_mock.side_effect = Exception('Test')
-            assert -1 == self.Pqos_api.init(iface)
-
-
-    @pytest.mark.parametrize("iface", ["invalid_iface", "resctrl"])
-    def test_init_invalid_iface(self, iface):
-        with mock.patch('appqos.pqos_api.PqosApi.supported_iface', return_value = ["msr", "os"]):
-            assert -1 == self.Pqos_api.init(iface)
-
-
-    @pytest.mark.parametrize("iface, supp_ifaces", [("os", ["msr"]), ("msr", ["os"])])
-    def test_init_unsupported_iface(self, iface, supp_ifaces):
-        with mock.patch('appqos.pqos_api.PqosApi.supported_iface', return_value = supp_ifaces):
             assert -1 == self.Pqos_api.init(iface)
 
 
@@ -329,23 +311,6 @@ class TestPqosApi(object):
        assert None == self.Pqos_api.get_max_cos_id([common.MBA_CAP])
        assert None == self.Pqos_api.get_max_cos_id([common.CAT_L3_CAP])
        assert None == self.Pqos_api.get_max_cos_id([])
-
-
-    @mock.patch("appqos.pqos_api.PqosApi.is_mba_bw_supported", mock.MagicMock(return_value=False))
-    @mock.patch("appqos.pqos_api.PqosApi.fini", mock.MagicMock(return_value=0))
-    @pytest.mark.parametrize("supp_iface", [
-        (["msr"]),
-        (["os"]),
-        (["msr", "os"])
-    ])
-    def test_detect_supported_ifaces(self, supp_iface):
-        def mock_init(self, iface, force):
-            assert force
-            return 0 if iface in supp_iface else -1
-
-        with mock.patch('appqos.pqos_api.PqosApi.init', new=mock_init):
-            self.Pqos_api.detect_supported_ifaces()
-            assert self.Pqos_api.supported_iface() == supp_iface
 
 
     @pytest.mark.parametrize("mba_ctrl_supp", [True, False])

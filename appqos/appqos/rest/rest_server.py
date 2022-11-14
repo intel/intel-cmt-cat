@@ -124,17 +124,14 @@ class Server:
         self.api.add_resource(CapsRdtIface, '/caps/rdt_iface')
 
         # MBA API
-        if caps.mba_supported():
-            self.api.add_resource(CapsMba, '/caps/mba')
-            self.api.add_resource(CapsMbaCtrl, '/caps/mba_ctrl')
+        self.api.add_resource(CapsMba, '/caps/mba')
+        self.api.add_resource(CapsMbaCtrl, '/caps/mba_ctrl')
 
         # L3 CAT API
-        if caps.cat_l3_supported():
-            self.api.add_resource(CapsL3ca, '/caps/' + common.CAT_L3_CAP)
+        self.api.add_resource(CapsL3ca, '/caps/' + common.CAT_L3_CAP)
 
         # L2 CAT API
-        if caps.cat_l2_supported():
-            self.api.add_resource(CapsL2ca, '/caps/' + common.CAT_L2_CAP)
+        self.api.add_resource(CapsL2ca, '/caps/' + common.CAT_L2_CAP)
 
         # Reset API
         self.api.add_resource(Reset, '/reset')
@@ -157,8 +154,8 @@ class Server:
             if not key.is_file():
                 return False
 
-            ca = path / TLS_CA_CERT_FILE
-            if not ca.is_file():
+            ca_cert = path / TLS_CA_CERT_FILE
+            if not ca_cert.is_file():
                 return False
 
             return True

@@ -33,17 +33,10 @@
 REST API module
 RDT /caps/cpu requests.
 """
-from copy import deepcopy
-from flask_restful import Resource, request
-
-import jsonschema
-
-from appqos import caps
-from appqos import common
-from appqos.config_store import ConfigStore
-from appqos.rest.rest_exceptions import BadRequest
-from appqos.pqos_api import PQOS_API
+from flask_restful import Resource
 from pqos.error import PqosErrorResource
+
+from appqos.pqos_api import PQOS_API
 
 class CapsCpus(Resource):
     """

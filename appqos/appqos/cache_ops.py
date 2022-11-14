@@ -268,10 +268,11 @@ class Pool:
         Parameters
             config: configuration
         """
+        iface = config.get_rdt_iface()
         cores = config.get_pool_attr('cores', self.pool)
         self.cores_set(cores)
 
-        if caps.cat_l2_supported():
+        if caps.cat_l2_supported(iface):
             l2cbm = config.get_pool_attr('l2cbm', self.pool)
             self.l2cbm_set(l2cbm)
             if config.get_l2cdp_enabled():
@@ -280,8 +281,12 @@ class Pool:
             else:
                 self.l2cbm_set_data(None)
                 self.l2cbm_set_code(None)
+        else:
+            self.l2cbm_set(None)
+            self.l2cbm_set_data(None)
+            self.l2cbm_set_code(None)
 
-        if caps.cat_l3_supported():
+        if caps.cat_l3_supported(iface):
             l3cbm = config.get_pool_attr('l3cbm', self.pool)
             self.l3cbm_set(l3cbm)
             if config.get_l3cdp_enabled():
@@ -290,14 +295,21 @@ class Pool:
             else:
                 self.l3cbm_set_data(None)
                 self.l3cbm_set_code(None)
+        else:
+            self.l3cbm_set(None)
+            self.l3cbm_set_data(None)
+            self.l3cbm_set_code(None)
 
-        if caps.mba_supported():
+        if caps.mba_supported(iface):
             if caps.mba_bw_enabled():
                 self.mba_bw_set(config.get_pool_attr('mba_bw', self.pool))
                 self.mba_set(None)
             else:
                 self.mba_bw_set(None)
                 self.mba_set(config.get_pool_attr('mba', self.pool))
+        else:
+            self.mba_set(None)
+            self.mba_bw_set(None)
 
         apps = config.get_pool_attr('apps', self.pool)
         if apps is not None:
@@ -521,6 +533,8 @@ def configure_rdt(cfg):
     result = 0
     recreate_default = False
 
+    cfg_rdt_iface = cfg.get_rdt_iface()
+
     def rdt_interface():
         """
         Change RDT interface if needed
@@ -528,7 +542,6 @@ def configure_rdt(cfg):
         Returns:
             False interface not changed
         """
-        cfg_rdt_iface = cfg.get_rdt_iface()
         if cfg_rdt_iface != PQOS_API.current_iface():
             if PQOS_API.init(cfg_rdt_iface):
                 raise Exception("Failed to initialize RDT interface!")
@@ -550,7 +563,7 @@ def configure_rdt(cfg):
             """
             Obtain MBA configuration
             """
-            if caps.mba_supported():
+            if caps.mba_supported(cfg_rdt_iface):
                 cfg_mba_ctrl_enabled = cfg.get_mba_ctrl_enabled()
                 # Change MBA BW/CTRL state if needed
                 if cfg_mba_ctrl_enabled == PQOS_API.is_mba_bw_enabled():
@@ -566,7 +579,7 @@ def configure_rdt(cfg):
             """
             Obtain L2 CDP configuration
             """
-            if caps.cat_l2_supported() and caps.cdp_l2_supported():
+            if caps.cat_l2_supported(cfg_rdt_iface) and caps.cdp_l2_supported(cfg_rdt_iface):
                 cfg_l2cdp_enabled = cfg.get_l2cdp_enabled()
                 # Change L2CDP state if needed
                 if cfg_l2cdp_enabled == PQOS_API.is_l2_cdp_enabled():
@@ -582,7 +595,7 @@ def configure_rdt(cfg):
             """
             Obtain L3 CDP configuration
             """
-            if caps.cat_l3_supported() and caps.cdp_l3_supported():
+            if caps.cat_l3_supported(cfg_rdt_iface) and caps.cdp_l3_supported(cfg_rdt_iface):
                 cfg_l3cdp_enabled = cfg.get_l3cdp_enabled()
                 # Change L3CDP state if needed
                 if cfg_l3cdp_enabled == PQOS_API.is_l3_cdp_enabled():

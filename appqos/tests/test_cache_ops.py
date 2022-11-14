@@ -41,6 +41,7 @@ from appqos import common
 from appqos.cache_ops import *
 from appqos.config import Config
 
+@mock.patch("appqos.caps.caps_get", mock.MagicMock(return_value=[]))
 def test_configure_rdt():
     Pool.pools[1] = {}
     Pool.pools[1]['cores'] = [1, 101]
@@ -221,6 +222,7 @@ class TestPools(object):
 
     @mock.patch('appqos.pqos_api.PQOS_API.alloc_assoc_set')
     @mock.patch('appqos.pqos_api.PQOS_API.release')
+    @mock.patch('appqos.caps.caps_get', mock.MagicMock(return_value=[]))
     def test_cores_set(self, mock_release, mock_alloc_assoc_set):
         Pool.pools[1] = {}
         Pool.pools[1]['cores'] = []

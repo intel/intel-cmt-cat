@@ -40,27 +40,59 @@ from appqos import sstbf
 from appqos import power
 from appqos.pqos_api import PQOS_API
 
+
 # System capabilities are detected during the runtime
 SYSTEM_CAPS = {}
 
 
-def caps_init():
+def caps_detect():
+    """
+    Detects supported capabilities
+    """
+    # no need to keep it in shared dict as it does not changed during runtime.
+    global SYSTEM_CAPS
+
+    SYSTEM_CAPS = {}
+
+    for iface in ["msr", "os"]:
+        if PQOS_API.init(iface) == 0:
+            log.info(f"Interface {iface.upper()}, " \
+                     f"MBA BW: {'un' if not PQOS_API.is_mba_bw_supported() else ''}supported.")
+
+            SYSTEM_CAPS[iface] = detect_supported_caps()
+            PQOS_API.fini()
+
+    log.info(f"Supported RDT interfaces: {list(SYSTEM_CAPS.keys())}")
+
+
+def caps_iface():
+    """
+    Returns list of supported RDT interfaces
+
+    Returns:
+        list of supported interfaces
+    """
+    return list(SYSTEM_CAPS.keys())
+
+
+def caps_get(iface):
+    """
+    Get system capabilities
+    """
+    return SYSTEM_CAPS[iface]
+
+
+def caps_init(iface):
     """
     Runs supported capabilities detection and logs to console
     """
-    global SYSTEM_CAPS
 
-    if SYSTEM_CAPS:
-        SYSTEM_CAPS.clear()
-
-    SYSTEM_CAPS = detect_supported_caps()
-    log.info("Supported capabilities:")
-    log.info(SYSTEM_CAPS)
+    log.info(f"Supported capabilities: {caps_get(iface)}")
 
     features = [
-        cat_l2_supported(),
-        cat_l3_supported(),
-        mba_supported(),
+        cat_l2_supported(iface),
+        cat_l3_supported(iface),
+        mba_supported(iface),
         sstbf_enabled(),
         sstcp_enabled()
     ]
@@ -71,39 +103,39 @@ def caps_init():
     return -1
 
 
-def cat_l3_supported():
+def cat_l3_supported(iface):
     """
     Returns L3 CAT support status
     """
-    return common.CAT_L3_CAP in SYSTEM_CAPS
+    return common.CAT_L3_CAP in caps_get(iface)
 
 
-def cdp_l3_supported():
+def cdp_l3_supported(iface):
     """
     Returns L3 CDP support status
     """
-    return PQOS_API.is_l3_cdp_supported()
+    return common.CDP_L3_CAP in caps_get(iface)
 
 
-def cat_l2_supported():
+def cat_l2_supported(iface):
     """
     Returns L2 CAT support status
     """
-    return common.CAT_L2_CAP in SYSTEM_CAPS
+    return common.CAT_L2_CAP in caps_get(iface)
 
 
-def cdp_l2_supported():
+def cdp_l2_supported(iface):
     """
     Returns L2 CDP support status
     """
-    return PQOS_API.is_l2_cdp_supported()
+    return common.CDP_L2_CAP in caps_get(iface)
 
 
-def mba_supported():
+def mba_supported(iface):
     """
     Returns MBA support status
     """
-    return common.MBA_CAP in SYSTEM_CAPS
+    return common.MBA_CAP in caps_get(iface)
 
 
 def mba_bw_supported():
@@ -124,14 +156,14 @@ def sstbf_enabled():
     """
     Returns SST-BF support status
     """
-    return common.SSTBF_CAP in SYSTEM_CAPS
+    return common.SSTBF_CAP in caps_get("msr")
 
 
 def sstcp_enabled():
     """
     Returns SST-CP support status
     """
-    return common.POWER_CAP in SYSTEM_CAPS
+    return common.POWER_CAP in caps_get("msr")
 
 
 def detect_supported_caps():
@@ -147,10 +179,14 @@ def detect_supported_caps():
     # Intel RDT L3 CAT
     if PQOS_API.is_l3_cat_supported():
         result.append(common.CAT_L3_CAP)
+        if PQOS_API.is_l3_cdp_supported():
+            result.append(common.CDP_L3_CAP)
 
     # Intel RDT L2 CAT
     if PQOS_API.is_l2_cat_supported():
         result.append(common.CAT_L2_CAP)
+        if PQOS_API.is_l2_cdp_supported():
+            result.append(common.CDP_L2_CAP)
 
     # Intel RDT MBA
     if PQOS_API.is_mba_supported():

@@ -47,7 +47,7 @@ from rest_common import get_config, get_config_empty, load_json_schema, REST, Re
 
 class TestCaps:
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("appqos.caps.SYSTEM_CAPS", ['cat', 'mba', 'sstbf'])
+    @mock.patch("appqos.caps.caps_get", mock.MagicMock(return_value=['cat', 'mba', 'sstbf']))
     def test_get(self):
         response = REST.get("/caps")
         data = json.loads(response.data.decode('utf-8'))
@@ -62,16 +62,17 @@ class TestCaps:
         assert 'sstbf' in data["capabilities"]
 
 
+class TestCapsMba:
     @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=False))
     def test_caps_mba_mba_not_supported_get_put_post(self):
         response = Rest().get("/caps/mba")
         assert response.status_code == 404
 
         response = Rest().put("/caps/mba", {"mba_enabled": True})
-        assert response.status_code == 404
+        assert response.status_code == 405
 
         response = Rest().post("/caps/mba", {"mba_bw_enabled": True})
-        assert response.status_code == 404
+        assert response.status_code == 405
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
@@ -125,7 +126,7 @@ class TestCaps:
         assert response.status_code == 404
 
         response = Rest().post("/caps/mba_ctrl", {"enabled": True})
-        assert response.status_code == 404
+        assert response.status_code == 405
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
@@ -202,6 +203,7 @@ class TestCaps:
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config_empty)
     @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("appqos.caps.mba_bw_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.caps_get", mock.MagicMock(return_value=[]))
     @pytest.mark.parametrize("valid_request", [
             {"enabled": True},
             {"enabled": False}
@@ -227,13 +229,14 @@ class TestCaps:
             assert called
 
 
+class TestCapsIface:
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     @pytest.mark.parametrize("rdt_iface", ["msr", "os"])
     @pytest.mark.parametrize("rdt_iface_supported", [["msr"], ["msr", "os"]])
     def test_caps_rdt_iface_get(self, rdt_iface, rdt_iface_supported):
 
         with mock.patch("appqos.config.Config.get_rdt_iface", return_value=rdt_iface),\
-             mock.patch("appqos.pqos_api.PQOS_API.supported_iface", return_value=rdt_iface_supported):
+             mock.patch("appqos.caps.caps_iface", return_value=rdt_iface_supported):
             response = Rest().get("/caps/rdt_iface")
             assert response.status_code == 200
 
@@ -253,7 +256,7 @@ class TestCaps:
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("appqos.pqos_api.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr", "os"]))
+    @mock.patch("appqos.caps.caps_iface", mock.MagicMock(return_value=["msr", "os"]))
     @pytest.mark.parametrize("valid_request", [
             {"interface": "msr"},
             {"interface": "os"}
@@ -265,7 +268,7 @@ class TestCaps:
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config_empty)
-    @mock.patch("appqos.pqos_api.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr"]))
+    @mock.patch("appqos.caps.caps_iface", mock.MagicMock(return_value=["msr"]))
     def test_caps_rdt_iface_not_supported_put(self):
         response = Rest().put("/caps/rdt_iface", {"interface": "os"})
         # No pool configured, but requested RDT interface not supported
@@ -273,7 +276,8 @@ class TestCaps:
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config_empty)
-    @mock.patch("appqos.pqos_api.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr", "os"]))
+    @mock.patch("appqos.caps.caps_iface", mock.MagicMock(return_value=["msr", "os"]))
+    @mock.patch("appqos.caps.caps_get", mock.MagicMock(return_value=[]))
     @pytest.mark.parametrize("iface", ["msr", "os"])
     def test_caps_rdt_iface_put(self, iface):
         called = False
@@ -300,7 +304,7 @@ class TestCaps:
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
-    @mock.patch("appqos.pqos_api.PQOS_API.supported_iface", mock.MagicMock(return_value=["msr", "os"]))
+    @mock.patch("appqos.caps.caps_iface", mock.MagicMock(return_value=["msr", "os"]))
     @pytest.mark.parametrize("invalid_request", [
             {},
             {"interface": 1},
@@ -317,6 +321,7 @@ class TestCaps:
         assert response.status_code == 400
 
 
+class TestCapsL3Cat:
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_caps_l3ca_get(self):
@@ -358,7 +363,19 @@ class TestCaps:
             assert data['cdp_supported']
             assert not data['cdp_enabled']
 
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+    def test_caps_l3ca_get_unsupported(self):
+        response = Rest().get("/caps/l3cat")
+        assert response.status_code == 404
 
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+    def test_caps_l3ca_put_unsupported(self):
+        response = Rest().put("/caps/l3cat", {"cdp_enabled": True})
+        assert response.status_code == 404
+
+class TestCapsL2Cat:
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
     def test_caps_l2ca_get(self):
@@ -400,6 +417,17 @@ class TestCaps:
             assert data['cdp_supported']
             assert not data['cdp_enabled']
 
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
+    def test_caps_l2ca_get_unsupported(self):
+        response = Rest().get("/caps/l2cat")
+        assert response.status_code == 404
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
+    def test_caps_l2ca_put_unsupported(self):
+        response = Rest().put("/caps/l2cat", {"cdp_enabled": True})
+        assert response.status_code == 404
 
     # @mock.patch("pqos.cpuinfo.PqosCpuInfo.get_sockets", mock.MagicMock(return_value=[0]))
     # @mock.patch("pqos.cpuinfo.PqosCpuInfo.get_cores", mock.MagicMock(return_value=[0,1,2,3]))

@@ -40,10 +40,29 @@ from flask_restful import Resource, request
 import jsonschema
 
 from appqos import caps
-from appqos import common
 from appqos.config_store import ConfigStore
-from appqos.rest.rest_exceptions import BadRequest
-from appqos.pqos_api import PQOS_API
+from appqos.rest.rest_exceptions import BadRequest, NotFound
+
+class MbaNotFound(NotFound):
+    """
+    MBA not supported exception
+    """
+    def __init__(self):
+        NotFound.__init__(self, "MBA not supported!")
+
+class L3CatNotFound(NotFound):
+    """
+    L3 CAT not supported exception
+    """
+    def __init__(self):
+        NotFound.__init__(self, "L3 CAT not supported!")
+
+class L2CatNotFound(NotFound):
+    """
+    L2 CAT not supported exception
+    """
+    def __init__(self):
+        NotFound.__init__(self, "L2 CAT not supported!")
 
 class CapsMba(Resource):
     """
@@ -58,6 +77,8 @@ class CapsMba(Resource):
         Returns:
             response, status code
         """
+        if not caps.mba_supported(ConfigStore.get_config().get_rdt_iface()):
+            raise MbaNotFound()
 
         mba_info = caps.mba_info()
 
@@ -83,6 +104,8 @@ class CapsMbaCtrl(Resource):
         Returns:
             response, status code
         """
+        if not caps.mba_supported(ConfigStore.get_config().get_rdt_iface()):
+            raise MbaNotFound()
 
         mba_ctrl_info = caps.mba_ctrl_info()
 
@@ -102,6 +125,9 @@ class CapsMbaCtrl(Resource):
         Returns:
             response, status code
         """
+        if not caps.mba_supported(ConfigStore.get_config().get_rdt_iface()):
+            raise MbaNotFound()
+
         json_data = request.get_json()
 
         # validate request
@@ -167,7 +193,7 @@ class CapsRdtIface(Resource):
 
         res = {
             'interface': cfg.get_rdt_iface(),
-            'interface_supported': PQOS_API.supported_iface()
+            'interface_supported': caps.caps_iface()
         }
         return res, 200
 
@@ -190,7 +216,7 @@ class CapsRdtIface(Resource):
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed") from error
 
-        if not json_data['interface'] in PQOS_API.supported_iface():
+        if not json_data['interface'] in caps.caps_iface():
             raise BadRequest(f"RDT interface '{json_data['interface']}' not supported!")
 
         cfg = ConfigStore.get_config()
@@ -228,6 +254,10 @@ class CapsL3ca(Resource):
         Returns:
             response, status code
         """
+        config = ConfigStore.get_config()
+
+        if not caps.cat_l3_supported(config.get_rdt_iface()):
+            raise L3CatNotFound()
 
         l3ca_info = caps.l3ca_info()
 
@@ -237,7 +267,7 @@ class CapsL3ca(Resource):
             'cw_num': l3ca_info['cache_ways_num'],
             'clos_num': l3ca_info['clos_num'],
             'cdp_supported': l3ca_info['cdp_supported'],
-            'cdp_enabled': ConfigStore.get_config().get_l3cdp_enabled()
+            'cdp_enabled': config.get_l3cdp_enabled()
         }
         return res, 200
 
@@ -251,6 +281,11 @@ class CapsL3ca(Resource):
         Returns:
             response, status code
         """
+        iface = ConfigStore.get_config().get_rdt_iface()
+
+        if not caps.cat_l3_supported(iface):
+            raise L3CatNotFound()
+
         json_data = request.get_json()
 
         # validate request
@@ -260,7 +295,7 @@ class CapsL3ca(Resource):
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed") from error
 
-        if not caps.cdp_l3_supported():
+        if not caps.cdp_l3_supported(iface):
             return {'message': "L3 CDP not supported!"}, 409
 
         cfg = ConfigStore.get_config()
@@ -312,6 +347,10 @@ class CapsL2ca(Resource):
         Returns:
             response, status code
         """
+        config = ConfigStore.get_config()
+
+        if not caps.cat_l2_supported(config.get_rdt_iface()):
+            raise L2CatNotFound()
 
         l2ca_info = caps.l2ca_info()
 
@@ -321,7 +360,7 @@ class CapsL2ca(Resource):
             'cw_num': l2ca_info['cache_ways_num'],
             'clos_num': l2ca_info['clos_num'],
             'cdp_supported': l2ca_info['cdp_supported'],
-            'cdp_enabled': ConfigStore.get_config().get_l2cdp_enabled()
+            'cdp_enabled': config.get_l2cdp_enabled()
         }
         return res, 200
 
@@ -334,6 +373,9 @@ class CapsL2ca(Resource):
         Returns:
             response, status code
         """
+        if not caps.cat_l2_supported(ConfigStore.get_config().get_rdt_iface()):
+            raise L2CatNotFound()
+
         json_data = request.get_json()
 
         # validate request
@@ -343,10 +385,10 @@ class CapsL2ca(Resource):
         except (jsonschema.ValidationError, OverflowError) as error:
             raise BadRequest("Request validation failed") from error
 
-        if not caps.cdp_l2_supported():
-            return {'message': "L2 CDP not supported!"}, 409
-
         cfg = ConfigStore.get_config()
+
+        if not caps.cdp_l2_supported(cfg.get_rdt_iface()):
+            return {'message': "L2 CDP not supported!"}, 409
 
         if cfg.is_any_pool_defined():
             return {'message': "Please remove all Pools first!"}, 409

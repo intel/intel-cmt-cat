@@ -140,6 +140,9 @@ def test_config_pid_to_pool(pid, pool_id):
 
 
 @mock.patch('appqos.pqos_api.PQOS_API.get_cores')
+@mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=False))
 def test_config_default_pool(mock_get_cores):
     mock_get_cores.return_value = range(16)
     config = Config(deepcopy(CONFIG))
@@ -280,6 +283,7 @@ def test_config_default_pool_mba():
 @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
 @mock.patch("appqos.caps.mba_bw_enabled", mock.MagicMock(return_value=True))
 @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.config.Config.get_mba_ctrl_enabled", mock.MagicMock(return_value=True))
 def test_config_default_pool_mba_bw():
     config = Config(deepcopy(CONFIG))
@@ -304,6 +308,7 @@ def test_config_default_pool_mba_bw():
             assert not 'mba' in pool
             assert not 'cbm' in pool
             assert not 'l3cbm' in pool
+            assert not 'l2cbm' in pool
             pool_mba_bw = pool['mba_bw']
             break
 

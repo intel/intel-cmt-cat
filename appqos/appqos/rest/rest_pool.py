@@ -133,20 +133,22 @@ class Pool(Resource):
             response, status code
         """
         def check_alloc_tech(pool_id, json_data):
+            iface = ConfigStore.get_config().get_rdt_iface()
+
             if any(k in json_data for k in ('l3cbm', 'l3cbm_data', 'l3cbm_code')):
-                if not caps.cat_l3_supported():
+                if not caps.cat_l3_supported(iface):
                     raise BadRequest("System does not support CAT!")
                 if pool_id > PQOS_API.get_max_cos_id([common.CAT_L3_CAP]):
                     raise BadRequest(f"Pool {pool_id} does not support CAT")
 
             if any(k in json_data for k in ('l2cbm', 'l2cbm_data', 'l2cbm_code')):
-                if not caps.cat_l2_supported():
+                if not caps.cat_l2_supported(iface):
                     raise BadRequest("System does not support CAT!")
                 if pool_id > PQOS_API.get_max_cos_id([common.CAT_L2_CAP]):
                     raise BadRequest(f"Pool {pool_id} does not support L2 CAT")
 
             if 'mba' in json_data or 'mba_bw' in json_data:
-                if not caps.mba_supported():
+                if not caps.mba_supported(iface):
                     raise BadRequest("System does not support MBA!")
                 if pool_id > PQOS_API.get_max_cos_id([common.MBA_CAP]):
                     raise BadRequest(f"Pool {pool_id} does not support MBA")

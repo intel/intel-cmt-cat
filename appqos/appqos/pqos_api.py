@@ -67,7 +67,6 @@ class PqosApi:
         self.mba = None
         self.alloc = None
         self.cpuinfo = None
-        self._supported_iface = []
 
         # dict to share interface type and MBA BW status
         # between REST API process and "backend"
@@ -77,21 +76,7 @@ class PqosApi:
         self.shared_dict['mba_bw_enabled'] = None
 
 
-    def detect_supported_ifaces(self):
-        """
-        Detects supported RDT interfaces
-        """
-        for iface in ["msr","os"]:
-            if not self.init(iface, True):
-                log.info(f"Interface {iface.upper()}, " \
-                         f"MBA BW: {'un' if not self.is_mba_bw_supported() else ''}supported.")
-                self.fini()
-                self._supported_iface.append(iface)
-
-        log.info("Supported RDT interfaces: " + str(self.supported_iface()))
-
-
-    def init(self, iface, force_iface = False):
+    def init(self, iface):
         """
         Initializes libpqos
 
@@ -99,10 +84,6 @@ class PqosApi:
             0 on success
             -1 otherwise
         """
-
-        if not force_iface and not iface in self.supported_iface():
-            log.error(f"RDT does not support '{iface}' interface!")
-            return -1
 
         # deinitialize lib first
         if self.shared_dict['current_iface']:
@@ -173,18 +154,6 @@ class PqosApi:
             None when libpqos is not initialized
         """
         return self.shared_dict['current_iface']
-
-
-    def supported_iface(self):
-        """
-        Returns list of supported RDT interfaces
-
-        Returns:
-            list of supported interfaces
-        """
-        # no need to keep it in shared dict as it does not changed
-        # during runtime.
-        return self._supported_iface
 
 
     def is_mba_bw_supported(self):

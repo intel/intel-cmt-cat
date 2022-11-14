@@ -214,10 +214,10 @@ class ConfigStore:
         Parameters
             data: configuration (dict)
         """
-        l3cdp_enabled = data['rdt'].get('l3cdp', False) if 'rdt' in data \
-            else False
+        iface = data.get_rdt_iface()
+        l3cdp_enabled = data.get_l3cdp_enabled()
 
-        if l3cdp_enabled and not caps.cdp_l3_supported():
+        if l3cdp_enabled and not caps.cdp_l3_supported(iface):
             raise ValueError("RDT Configuration. L3 CDP requested but not supported!")
 
         cdp_pool_ids = []
@@ -231,7 +231,7 @@ class ConfigStore:
                 if result or pool[cbm] == 0:
                     raise ValueError(f"Pool {pool['id']}, " \
                         f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])} is not contiguous.")
-                if not caps.cat_l3_supported():
+                if not caps.cat_l3_supported(iface):
                     raise ValueError(f"Pool {pool['id']}, " \
                         f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])}, L3 CAT is not supported.")
 
@@ -239,7 +239,7 @@ class ConfigStore:
                 cdp_pool_ids.append(pool['id'])
 
         if cdp_pool_ids:
-            if not caps.cdp_l3_supported():
+            if not caps.cdp_l3_supported(iface):
                 raise ValueError(f"Pools {cdp_pool_ids}, L3 CDP is not supported.")
             if not l3cdp_enabled:
                 raise ValueError(f"Pools {cdp_pool_ids}, L3 CDP is not enabled.")
@@ -251,10 +251,10 @@ class ConfigStore:
         Parameters
             data: configuration (dict)
         """
-        l2cdp_enabled = data['rdt'].get('l2cdp', False) if 'rdt' in data \
-            else False
+        iface = data.get_rdt_iface()
+        l2cdp_enabled = data.get_l2cdp_enabled()
 
-        if l2cdp_enabled and not caps.cdp_l2_supported():
+        if l2cdp_enabled and not caps.cdp_l2_supported(iface):
             raise ValueError("RDT Configuration. L2 CDP requested but not supported!")
 
         cdp_pool_ids = []
@@ -268,7 +268,7 @@ class ConfigStore:
                 if result or pool[cbm] == 0:
                     raise ValueError(f"Pool {pool['id']}, " \
                         f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool[cbm])} is not contiguous.")
-                if not caps.cat_l2_supported():
+                if not caps.cat_l2_supported(iface):
                     raise ValueError(f"Pool {pool['id']}, " \
                         f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool[cbm])}, L2 CAT is not supported.")
 
@@ -276,7 +276,7 @@ class ConfigStore:
                 cdp_pool_ids.append(pool['id'])
 
         if cdp_pool_ids:
-            if not caps.cdp_l2_supported():
+            if not caps.cdp_l2_supported(iface):
                 raise ValueError(f"Pools {cdp_pool_ids}, L2 CDP is not supported.")
             if not l2cdp_enabled:
                 raise ValueError(f"Pools {cdp_pool_ids}, L2 CDP is not enabled.")
@@ -318,7 +318,7 @@ class ConfigStore:
             if 'mba_bw' in pool:
                 mba_bw_pool_ids.append(pool['id'])
 
-        if (mba_pool_ids or mba_bw_pool_ids) and not caps.mba_supported():
+        if (mba_pool_ids or mba_bw_pool_ids) and not caps.mba_supported(rdt_iface):
             raise ValueError(f"Pools {mba_pool_ids + mba_bw_pool_ids}, MBA is not supported.")
 
         if mba_bw_pool_ids and not mba_ctrl_enabled:

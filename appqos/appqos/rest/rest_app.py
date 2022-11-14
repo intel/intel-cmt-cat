@@ -40,7 +40,6 @@ from flask_restful import Resource, request
 
 import jsonschema
 
-from appqos import common
 from appqos import pid_ops
 from appqos.config_store import ConfigStore
 from appqos.power import AdmissionControlError

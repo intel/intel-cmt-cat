@@ -40,38 +40,68 @@ import pytest
 from appqos import common
 from appqos import caps
 
-def test_caps_init():
-    with mock.patch('appqos.caps.detect_supported_caps', return_value=[common.CAT_L3_CAP, common.MBA_CAP, common.SSTBF_CAP]) as mock_detect_caps,\
+@pytest.mark.parametrize("supp_iface", [["msr"], ["os"], ["msr", "os"]])
+@mock.patch("appqos.caps.detect_supported_caps", mock.MagicMock(return_value=[]))
+@mock.patch("appqos.pqos_api.PQOS_API.fini", mock.MagicMock(return_value=0))
+def test_caps_detect(supp_iface):
+    def pqos_init(iface,):
+        if iface in supp_iface:
+            return 0
+        return -1
+
+    with mock.patch("appqos.pqos_api.PQOS_API.init", new=pqos_init):
+        caps.caps_detect()
+        assert supp_iface == caps.caps_iface()
+
+
+@pytest.mark.parametrize("iface", ["msr", "os"])
+def test_caps_init(iface):
+    with mock.patch('appqos.caps.caps_get', mock.MagicMock(return_value=[common.CAT_L3_CAP, common.MBA_CAP, common.SSTBF_CAP])), \
          mock.patch('appqos.pqos_api.PQOS_API.is_multicore', return_value = True) as mock_is_multi:
 
-        assert not caps.caps_init()
+        assert not caps.caps_init(iface)
 
-        mock_detect_caps.assert_called_once()
         mock_is_multi.assert_called_once()
 
-        caps.SYSTEM_CAPS = ["TEST"]
-        assert not caps.caps_init()
+        assert not caps.caps_init(iface)
 
         mock_is_multi.return_value = False
-        assert caps.caps_init() == -1
+        assert caps.caps_init(iface) == -1
 
 
 @mock.patch("appqos.pqos_api.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l3_cdp_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l2_cat_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.pqos_api.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
 def test_detect_cat_l3():
     assert common.CAT_L3_CAP in caps.detect_supported_caps()
+    assert not common.CDP_L3_CAP in caps.detect_supported_caps()
     assert not common.MBA_CAP in caps.detect_supported_caps()
     assert not common.SSTBF_CAP in caps.detect_supported_caps()
 
 
 @mock.patch("appqos.pqos_api.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l3_cdp_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.pqos_api.PQOS_API.is_l2_cat_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.pqos_api.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
 def test_detect_cat_l3_negative():
     assert common.CAT_L3_CAP not in caps.detect_supported_caps()
 
+
+@mock.patch("appqos.pqos_api.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l3_cdp_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l2_cat_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.pqos_api.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
+def test_detect_cat_l3_cdp():
+    assert common.CAT_L3_CAP in caps.detect_supported_caps()
+    assert common.CDP_L3_CAP in caps.detect_supported_caps()
+    assert not common.CAT_L2_CAP in caps.detect_supported_caps()
+    assert not common.CDP_L2_CAP in caps.detect_supported_caps()
+    assert not common.MBA_CAP in caps.detect_supported_caps()
+    assert not common.SSTBF_CAP in caps.detect_supported_caps()
 
 @mock.patch("appqos.pqos_api.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.pqos_api.PQOS_API.is_l2_cat_supported", mock.MagicMock(return_value=False))
@@ -95,11 +125,27 @@ def test_detect_mba_negative():
 
 @mock.patch("appqos.pqos_api.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.pqos_api.PQOS_API.is_l2_cat_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l2_cdp_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.pqos_api.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
 def test_detect_cat_l2():
     assert not common.CAT_L3_CAP in caps.detect_supported_caps()
+    assert not common.CDP_L3_CAP in caps.detect_supported_caps()
     assert common.CAT_L2_CAP in caps.detect_supported_caps()
+    assert not common.CDP_L2_CAP in caps.detect_supported_caps()
+    assert not common.MBA_CAP in caps.detect_supported_caps()
+    assert not common.SSTBF_CAP in caps.detect_supported_caps()
+
+@mock.patch("appqos.pqos_api.PQOS_API.is_l3_cat_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l2_cat_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.pqos_api.PQOS_API.is_l2_cdp_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.pqos_api.PQOS_API.is_mba_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.sstbf.is_sstbf_enabled", mock.MagicMock(return_value=False))
+def test_detect_cat_l2_cdp():
+    assert not common.CAT_L3_CAP in caps.detect_supported_caps()
+    assert not common.CDP_L3_CAP in caps.detect_supported_caps()
+    assert common.CAT_L2_CAP in caps.detect_supported_caps()
+    assert common.CDP_L2_CAP in caps.detect_supported_caps()
     assert not common.MBA_CAP in caps.detect_supported_caps()
     assert not common.SSTBF_CAP in caps.detect_supported_caps()
 
