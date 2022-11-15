@@ -84,6 +84,7 @@ style:
 	$(MAKE) -C examples/c/PSEUDO_LOCK style
 	$(MAKE) -C appqos style
 	$(MAKE) -C tests style
+	$(MAKE) -C unit-test style
 
 cppcheck:
 	$(MAKE) -C lib cppcheck

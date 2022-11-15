@@ -2390,7 +2390,7 @@ test_pqos_mon_get_value_param(void **state __attribute__((unused)))
         group.valid = 0x00DEAD00;
         group.event = (enum pqos_mon_event)(-1);
         wrap_check_init(1, PQOS_RETVAL_OK);
-        ret = pqos_mon_get_value(&group, (enum pqos_mon_event) - 1, &value,
+        ret = pqos_mon_get_value(&group, (enum pqos_mon_event)(-1), &value,
                                  &delta);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }

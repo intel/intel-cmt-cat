@@ -41,11 +41,11 @@
                 output_stop();                                                 \
         } while (0)
 
-#define run_function(function_name, retvar, ...)                              \
+#define run_function(function_name, retvar, ...)                               \
         do {                                                                   \
                 output_start();                                                \
                 if (!setjmp(jump_buff))                                        \
-                        retvar = function_name(__VA_ARGS__);                  \
+                        retvar = function_name(__VA_ARGS__);                   \
                 output_stop();                                                 \
         } while (0)
 

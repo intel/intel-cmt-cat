@@ -309,6 +309,7 @@ int
 __wrap_pqos_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
 {
         int ret = mock_type(int);
+
         if (ret == PQOS_RETVAL_OK)
                 *min_cbm_bits = mock_type(unsigned);
         return ret;

@@ -134,13 +134,9 @@ __wrap_pthread_mutex_destroy(pthread_mutex_t *mutex)
         return mock();
 };
 
-int __real_open(const char *path, int oflags, int mode);
 int
 __wrap_open(const char *path, int oflags, int mode)
 {
-        if (strcmp(path, LOCKFILE))
-                return __real_open(path, oflags, mode);
-
         function_called();
         check_expected(path);
         check_expected(oflags);
@@ -149,13 +145,9 @@ __wrap_open(const char *path, int oflags, int mode)
         return mock();
 }
 
-int __real_close(int fildes);
 int
 __wrap_close(int fildes)
 {
-        if (fildes != LOCKFILENO)
-                return __real_close(fildes);
-
         function_called();
         check_expected(fildes);
 
@@ -192,8 +184,7 @@ log_printf(int type __attribute__((unused)),
 }
 
 #define MAKE_CAP_DIS_WRAPPER(name, str)                                        \
-        int name(struct str *cap,                                              \
-                 const struct pqos_cpuinfo *cpu __attribute__((unused)))       \
+        int __wrap_##name(struct str *cap, const struct pqos_cpuinfo *cpu)     \
         {                                                                      \
                 int ret = mock();                                              \
                 size_t sz = sizeof(*cap);                                      \
@@ -201,23 +192,24 @@ log_printf(int type __attribute__((unused)),
                 function_called();                                             \
                 if (ret == PQOS_RETVAL_OK) {                                   \
                         assert_non_null(cap);                                  \
+                        assert_non_null(cpu);                                  \
                         if (cap)                                               \
                                 memset(cap, 0, sz);                            \
                 }                                                              \
                 return ret;                                                    \
         }
 
-MAKE_CAP_DIS_WRAPPER(__wrap_hw_cap_l3ca_discover, pqos_cap_l3ca)
-MAKE_CAP_DIS_WRAPPER(__wrap_os_cap_l3ca_discover, pqos_cap_l3ca)
-MAKE_CAP_DIS_WRAPPER(__wrap_hw_cap_l2ca_discover, pqos_cap_l2ca)
-MAKE_CAP_DIS_WRAPPER(__wrap_os_cap_l2ca_discover, pqos_cap_l2ca)
-MAKE_CAP_DIS_WRAPPER(__wrap_hw_cap_mba_discover, pqos_cap_mba)
-MAKE_CAP_DIS_WRAPPER(__wrap_amd_cap_mba_discover, pqos_cap_mba)
-MAKE_CAP_DIS_WRAPPER(__wrap_os_cap_mba_discover, pqos_cap_mba)
+MAKE_CAP_DIS_WRAPPER(hw_cap_l3ca_discover, pqos_cap_l3ca)
+MAKE_CAP_DIS_WRAPPER(os_cap_l3ca_discover, pqos_cap_l3ca)
+MAKE_CAP_DIS_WRAPPER(hw_cap_l2ca_discover, pqos_cap_l2ca)
+MAKE_CAP_DIS_WRAPPER(os_cap_l2ca_discover, pqos_cap_l2ca)
+MAKE_CAP_DIS_WRAPPER(hw_cap_mba_discover, pqos_cap_mba)
+MAKE_CAP_DIS_WRAPPER(amd_cap_mba_discover, pqos_cap_mba)
+MAKE_CAP_DIS_WRAPPER(os_cap_mba_discover, pqos_cap_mba)
 
 #define MAKE_CAP_MON_WRAPPER(name)                                             \
-        int name(struct pqos_cap_mon **r_mon,                                  \
-                 const struct pqos_cpuinfo *cpu __attribute__((unused)))       \
+        int __wrap_##name(struct pqos_cap_mon **r_mon,                         \
+                          const struct pqos_cpuinfo *cpu)                      \
         {                                                                      \
                 int ret = mock();                                              \
                 size_t sz = sizeof(struct pqos_cap_mon);                       \
@@ -225,6 +217,7 @@ MAKE_CAP_DIS_WRAPPER(__wrap_os_cap_mba_discover, pqos_cap_mba)
                 function_called();                                             \
                 if (ret == PQOS_RETVAL_OK) {                                   \
                         assert_non_null(r_mon);                                \
+                        assert_non_null(cpu);                                  \
                         if (r_mon) {                                           \
                                 *r_mon = (struct pqos_cap_mon *)malloc(sz);    \
                                 assert_non_null(*r_mon);                       \
@@ -235,8 +228,8 @@ MAKE_CAP_DIS_WRAPPER(__wrap_os_cap_mba_discover, pqos_cap_mba)
                 return ret;                                                    \
         }
 
-MAKE_CAP_MON_WRAPPER(__wrap_hw_cap_mon_discover)
-MAKE_CAP_MON_WRAPPER(__wrap_os_cap_mon_discover)
+MAKE_CAP_MON_WRAPPER(hw_cap_mon_discover)
+MAKE_CAP_MON_WRAPPER(os_cap_mon_discover)
 
 int
 __wrap_os_cap_get_mba_ctrl(const struct pqos_cap *cap,

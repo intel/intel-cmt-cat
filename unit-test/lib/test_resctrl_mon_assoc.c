@@ -366,7 +366,7 @@ test_resctrl_mon_assoc_set(void **state __attribute__((unused)))
 {
         int ret;
         unsigned lcore = 1;
-        const char name[] = "test";
+        char name[] = "test";
         struct pqos_cap cap;
 
         will_return_maybe(__wrap__pqos_get_cap, &cap);
@@ -398,7 +398,7 @@ test_resctrl_mon_assoc_set_error(void **state __attribute__((unused)))
 {
         int ret;
         unsigned lcore = 1;
-        const char name[] = "test";
+        char name[] = "test";
         struct pqos_cap cap;
 
         will_return_maybe(__wrap__pqos_get_cap, &cap);
@@ -575,7 +575,7 @@ test_resctrl_mon_assoc_set_pid(void **state __attribute__((unused)))
 {
         int ret;
         pid_t pid = 1;
-        const char name[] = "test";
+        char name[] = "test";
         struct pqos_cap cap;
 
         will_return_maybe(__wrap__pqos_get_cap, &cap);
@@ -597,7 +597,7 @@ test_resctrl_mon_assoc_set_pid_error(void **state __attribute__((unused)))
 {
         int ret;
         pid_t pid = 1;
-        const char name[] = "test";
+        char name[] = "test";
         struct pqos_cap cap;
 
         will_return_maybe(__wrap__pqos_get_cap, &cap);
