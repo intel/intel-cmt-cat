@@ -58,7 +58,7 @@ pylint: $(VENV_DIR)
 	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m pylint pqos/*.py pqos/test/*.py
 
 bandit: $(VENV_DIR)
-	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m bandit *.py pqos/*.py
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m bandit -r pqos
 
 build: $(VENV_DIR)
 	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m build
