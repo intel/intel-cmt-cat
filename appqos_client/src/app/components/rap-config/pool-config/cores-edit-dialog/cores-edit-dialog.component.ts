@@ -54,7 +54,7 @@ export class CoresEditDialogComponent implements OnInit {
     this.cores = String(this.data.cores);
   }
 
-  saveCores() {
+  saveCores(): void {
     this.service
       .poolPut(
         {
@@ -68,7 +68,7 @@ export class CoresEditDialogComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.snackBar.displayInfo(response.message);
-          this.dialogRef.close();
+          this.dialogRef.close(true);
         },
         error: (error) => {
           this.snackBar.handleError(error.error.message);

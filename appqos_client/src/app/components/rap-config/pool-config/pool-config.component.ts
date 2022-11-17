@@ -28,11 +28,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
 import { MatOptionSelectionChange } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSliderChange } from '@angular/material/slider';
-import { catchError, combineLatest, of, take } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
@@ -49,16 +56,19 @@ import { PoolAddDialogComponent } from './pool-add-dialog/pool-add-dialog.compon
   selector: 'app-pool-config',
   templateUrl: './pool-config.component.html',
   styleUrls: ['./pool-config.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PoolConfigComponent implements OnInit {
+export class PoolConfigComponent implements OnChanges {
+  @Input() apps!: Apps[];
+  @Input() pools!: Pools[];
+  @Output() poolEvent = new EventEmitter<unknown>();
+
   selected!: string;
-  pools!: Pools[];
   pool!: Pools;
-  apps!: Apps[];
   poolApps!: Apps[];
   poolName!: string;
   mbaBW!: string;
-  poolId!: number;
+  poolId!: number | undefined;
   l3numCacheWays!: number;
   l2numCacheWays!: number;
   mbaBwDefNum = Math.pow(2, 32) - 1;
@@ -70,35 +80,20 @@ export class PoolConfigComponent implements OnInit {
     public dialog: MatDialog
   ) {}
 
-  ngOnInit(): void {
-    this.getData();
-
-    this.localService.getIfaceEvent().subscribe((_) => this.getData());
+  ngOnChanges(changes: SimpleChanges): void {
+    this.getData(this.poolId);
   }
 
   getData(id?: number) {
-    const pools$ = this.service.getPools().pipe(
-      take(1),
-      catchError((_) => of([]))
-    );
+    this.pools.map((pool) => pool.cores.sort((a, b) => a - b));
+    const selectedPool = this.pools[this.pools.length - 1];
 
-    const apps$ = this.service.getApps().pipe(
-      take(1),
-      catchError((_) => of([]))
-    );
-
-    combineLatest([pools$, apps$]).subscribe(([pools, apps]) => {
-      pools.map((pool) => pool.cores.sort((a, b) => a - b));
-      const selectedPool = pools[pools.length - 1];
-      this.pools = pools;
-      this.apps = apps;
-      if (id === undefined) {
-        this.getPool(selectedPool.id);
-        this.selected = selectedPool.name;
-      } else {
-        this.getPool(this.pool.id);
-      }
-    });
+    if (id === undefined) {
+      this.getPool(selectedPool.id);
+      this.selected = selectedPool.name;
+    } else {
+      this.getPool(id);
+    }
   }
 
   selectedPool(event: MatOptionSelectionChange, id: number) {
@@ -270,12 +265,12 @@ export class PoolConfigComponent implements OnInit {
 
   nextHandler(response: resMessage) {
     this.snackBar.displayInfo(response.message);
-    this.getData(this.pool.id);
+    this.poolEvent.emit();
   }
 
   errorHandler(error: HttpErrorResponse) {
     this.snackBar.handleError(error.error.message);
-    this.getData(this.pool.id);
+    this.poolEvent.emit();
   }
 
   coresEditDialog() {
@@ -285,8 +280,8 @@ export class PoolConfigComponent implements OnInit {
       data: this.pool,
     });
 
-    dialogRef.afterClosed().subscribe((_) => {
-      this.getData(this.pool.id);
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result) this.poolEvent.emit();
     });
   }
 
@@ -296,7 +291,8 @@ export class PoolConfigComponent implements OnInit {
     this.service.deletePool(this.pool.id).subscribe({
       next: (response) => {
         this.snackBar.displayInfo(response.message);
-        this.getData();
+        this.poolId = undefined;
+        this.poolEvent.emit();
       },
       error: (error) => {
         this.snackBar.handleError(error.error.message);
@@ -311,8 +307,11 @@ export class PoolConfigComponent implements OnInit {
       data: { l2cwNum: this.l2numCacheWays, l3cwNum: this.l3numCacheWays },
     });
 
-    dialogRef.afterClosed().subscribe((_) => {
-      this.getData();
+    dialogRef.afterClosed().subscribe((response) => {
+      if (response.id) {
+        this.poolId = response.id;
+        this.poolEvent.emit();
+      }
     });
   }
 }

@@ -27,49 +27,31 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit } from '@angular/core';
-import { catchError, combineLatest, of, take } from 'rxjs';
+import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
 
-import { AppqosService } from 'src/app/services/appqos.service';
-import { LocalService } from 'src/app/services/local.service';
-import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { Apps, Pools } from '../overview/overview.model';
+import { Apps, Pools } from '../../overview/overview.model';
 
 @Component({
-  selector: 'app-rap-config',
-  templateUrl: './rap-config.component.html',
-  styleUrls: ['./rap-config.component.scss'],
+  selector: 'app-apps-config',
+  templateUrl: './apps-config.component.html',
+  styleUrls: ['./apps-config.component.scss'],
 })
-export class RapConfigComponent implements OnInit {
-  apps!: Apps[];
-  pools!: Pools[];
+export class AppsConfigComponent implements OnChanges {
+  @Input() apps!: Apps[];
+  @Input() pools!: Pools[];
 
-  constructor(
-    private service: AppqosService,
-    private localService: LocalService,
-    private snackBar: SnackBarService
-  ) {}
+  tableData!: Apps[] & { coresList: string; poolName: string };
+  displayedColumns: string[] = ['name', 'pool', 'pids', 'cores', 'actions'];
 
-  ngOnInit(): void {
-    this.getConfigData();
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['apps'].currentValue) return;
 
-    this.localService.getIfaceEvent().subscribe((_) => this.getConfigData());
-  }
-
-  getConfigData(): void {
-    const pools$ = this.service.getPools().pipe(
-      take(1),
-      catchError((_) => of([]))
-    );
-
-    const apps$ = this.service.getApps().pipe(
-      take(1),
-      catchError((_) => of([]))
-    );
-
-    combineLatest([pools$, apps$]).subscribe(([pools, apps]) => {
-      this.pools = pools;
-      this.apps = apps;
-    });
+    this.tableData = changes['apps'].currentValue.map((app: Apps) => ({
+      ...app,
+      coresList: app.cores ? String(app.cores) : 'No Cores',
+      poolName: changes['pools'].currentValue.find(
+        (pool: Pools) => pool.id === app.pool_id
+      ).name,
+    }));
   }
 }

@@ -28,4 +28,12 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
-<app-pool-config></app-pool-config>
+<div class="container">
+  <app-pool-config
+    *ngIf="pools"
+    [apps]="apps"
+    [pools]="pools"
+    (poolEvent)="getConfigData()"
+  ></app-pool-config>
+  <app-apps-config [apps]="apps" [pools]="pools"></app-apps-config>
+</div>

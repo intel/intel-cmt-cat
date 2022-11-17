@@ -47,6 +47,7 @@ import { MatDialogModule } from '@angular/material/dialog';
 import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTableModule } from '@angular/material/table';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -68,8 +69,9 @@ import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dia
 import { MbaAllocationComponent } from '../components/overview/mba-allocation/mba-allocation.component';
 import { L2CacheAllocationComponent } from '../components/overview/l2-cache-allocation/l2-cache-allocation.component';
 import { PoolConfigComponent } from '../components/rap-config/pool-config/pool-config.component';
-import { CoresEditDialogComponent } from '../components/rap-config/pool-config/cores-edit-dialog/cores-edit-dialog.component';
 import { PoolAddDialogComponent } from '../components/rap-config/pool-config/pool-add-dialog/pool-add-dialog.component';
+import { AppsConfigComponent } from '../components/rap-config/apps-config/apps-config.component';
+import { CoresEditDialogComponent } from '../components/rap-config/pool-config/cores-edit-dialog/cores-edit-dialog.component';
 
 @NgModule({
   declarations: [
@@ -92,6 +94,7 @@ import { PoolAddDialogComponent } from '../components/rap-config/pool-config/poo
     PoolConfigComponent,
     CoresEditDialogComponent,
     PoolAddDialogComponent,
+    AppsConfigComponent,
   ],
   imports: [
     MatInputModule,
@@ -114,6 +117,7 @@ import { PoolAddDialogComponent } from '../components/rap-config/pool-config/poo
     MatTooltipModule,
     MatSelectModule,
     FormsModule,
+    MatTableModule,
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],

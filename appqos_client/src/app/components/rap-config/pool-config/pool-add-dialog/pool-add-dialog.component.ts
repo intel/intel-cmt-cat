@@ -105,7 +105,7 @@ export class PoolAddDialogComponent implements OnInit {
     this.service.postPool(pool).subscribe({
       next: (response) => {
         this.snackBar.displayInfo(response.message);
-        this.dialogRef.close();
+        this.dialogRef.close(response);
       },
       error: (error) => {
         this.snackBar.handleError(error.error.message);
