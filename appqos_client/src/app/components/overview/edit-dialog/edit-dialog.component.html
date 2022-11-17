@@ -43,24 +43,37 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     >
     </mat-progress-spinner>
   </div>
-  <span class="info-text" *ngIf="data.l3cbm"
-    >Intel's Cache Allocation Technology (CAT) helps address shared resource
-    concerns by providing software control of where data is allocated into the
-    last-level cache (LLC), enabling isolation and prioritization of key
-    applications.</span
-  >
+
+  <span class="info-text" *ngIf="data.l3cbm">
+    <p>
+      L3 Cache Allocation can be configured for each pool using capacity
+      bitmasks (CBMs). CBMs are used to specify the cache ways into which a
+      pools application(s) can fill. The following rows represent pool CBMs and
+      can be modified to enable some number of cache ways for each pool.
+    </p>
+    <em>CBM enabled bits must be contiguous and at least one bit per CBM must
+      be set.
+    </em>
+  </span>
+
   <span class="info-text" *ngIf="data.mba"
-    >Memory Bandwidth Allocation (MBA), which provides new levels of control
-    over how memory bandwidth is distributed across running applications. MBA
-    enables improved prioritization, bandwidth management and is a valuable tool
-    to help control data center noisy neighbors.</span
+    >Memory Bandwidth Allocation (MBA) provides approximate and indirect control
+     over memory bandwidth available to each pool. User can provide a required
+     bandwidth in either percentage format or MBps format.</span
   >
-  <span class="info-text" *ngIf="data.l2cbm"
-    >Intel's Cache Allocation Technology (CAT) helps address shared resource
-    concerns by providing software control of where data is allocated into the
-    Level 2 cache (L2), enabling isolation and prioritization of key
-    applications.</span
-  >
+
+  <span class="info-text" *ngIf="data.l2cbm">
+    <p>
+      L2 Cache Allocation can be configured for each pool using capacity
+      bitmasks (CBMs). CBMs are used to specify the cache ways into which a
+      pools application(s) can fill. The following rows represent pool CBMs and
+      can be modified to enable some number of cache ways for each pool.
+    </p>
+    <em>CBM enabled bits must be contiguous and at least one bit per CBM must
+      be set.
+    </em>
+  </span>
+
   <mat-divider class="divider"></mat-divider>
   <mat-dialog-content class="mat-typography">
     <div class="pool" *ngFor="let pool of pools; index as i">
