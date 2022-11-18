@@ -77,3 +77,11 @@ $base-color: #0068b5;
     padding-top: 0.5rem;
   }
 }
+
+.warning-msg {
+  background-color: #fdb913;
+  color: black;
+  height: fit-content;
+  font-size: 15px;
+  text-align: center;
+}

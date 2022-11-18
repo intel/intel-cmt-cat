@@ -68,3 +68,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 .logout {
   transform: scale(1.4);
 }
+
+.warning-msg {
+  background-color: #fdb913;
+  color: black;
+  height: fit-content;
+  justify-content: center;
+  font-size: 15px;
+}
