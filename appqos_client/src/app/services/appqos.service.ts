@@ -172,4 +172,9 @@ export class AppqosService {
     const api_url = this.local.getData('api_url');
     return this.http.get<Apps[]>(`${api_url}/apps`);
   }
+
+  postApp(app: any): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.post<resMessage>(`${api_url}/apps/`, app);
+  }
 }

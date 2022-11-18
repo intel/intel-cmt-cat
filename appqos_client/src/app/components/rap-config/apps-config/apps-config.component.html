@@ -31,7 +31,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 <mat-card class="pool-config">
   <mat-card-title
     >Application Configuration
-    <button mat-mini-fab color="primary">
+    <button mat-mini-fab color="primary" (click)="appAddDialog()">
       <mat-icon>add</mat-icon>
     </button></mat-card-title
   >
@@ -42,12 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       maintain application QoS.
     </div>
     <span *ngIf="!apps?.length">No applications currently configured</span>
-    <table
-      mat-table
-      [dataSource]="tableData"
-      *ngIf="tableData && apps?.length"
-      class="mat-elevation-z2"
-    >
+    <table mat-table [dataSource]="tableData" *ngIf="tableData && apps?.length">
       <ng-container matColumnDef="name">
         <th mat-header-cell *matHeaderCellDef>NAME</th>
         <td mat-cell *matCellDef="let app">{{ app.name }}</td>

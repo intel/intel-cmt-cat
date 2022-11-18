@@ -72,6 +72,7 @@ import { PoolConfigComponent } from '../components/rap-config/pool-config/pool-c
 import { PoolAddDialogComponent } from '../components/rap-config/pool-config/pool-add-dialog/pool-add-dialog.component';
 import { AppsConfigComponent } from '../components/rap-config/apps-config/apps-config.component';
 import { CoresEditDialogComponent } from '../components/rap-config/pool-config/cores-edit-dialog/cores-edit-dialog.component';
+import { AppsAddDialogComponent } from '../components/rap-config/apps-config/apps-add-dialog/apps-add-dialog.component';
 
 @NgModule({
   declarations: [
@@ -95,6 +96,7 @@ import { CoresEditDialogComponent } from '../components/rap-config/pool-config/c
     CoresEditDialogComponent,
     PoolAddDialogComponent,
     AppsConfigComponent,
+    AppsAddDialogComponent,
   ],
   imports: [
     MatInputModule,

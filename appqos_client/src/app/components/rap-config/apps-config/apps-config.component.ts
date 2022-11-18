@@ -27,9 +27,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
-
 import { Apps, Pools } from '../../overview/overview.model';
+import {
+  Component,
+  EventEmitter,
+  Input,
+  OnChanges,
+  Output,
+  SimpleChanges,
+} from '@angular/core';
+import { MatDialog } from '@angular/material/dialog';
+
+import { AppsAddDialogComponent } from './apps-add-dialog/apps-add-dialog.component';
 
 @Component({
   selector: 'app-apps-config',
@@ -39,19 +48,34 @@ import { Apps, Pools } from '../../overview/overview.model';
 export class AppsConfigComponent implements OnChanges {
   @Input() apps!: Apps[];
   @Input() pools!: Pools[];
+  @Output() appEvent = new EventEmitter<unknown>();
 
   tableData!: Apps[] & { coresList: string; poolName: string };
   displayedColumns: string[] = ['name', 'pool', 'pids', 'cores', 'actions'];
+
+  constructor(public dialog: MatDialog) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes['apps'].currentValue) return;
 
     this.tableData = changes['apps'].currentValue.map((app: Apps) => ({
       ...app,
-      coresList: app.cores ? String(app.cores) : 'No Cores',
+      coresList: String(app.cores),
       poolName: changes['pools'].currentValue.find(
         (pool: Pools) => pool.id === app.pool_id
       ).name,
     }));
+  }
+
+  appAddDialog() {
+    const dialogRef = this.dialog.open(AppsAddDialogComponent, {
+      height: 'auto',
+      width: '35rem',
+      data: this.pools,
+    });
+
+    dialogRef.afterClosed().subscribe((_) => {
+      this.appEvent.emit();
+    });
   }
 }

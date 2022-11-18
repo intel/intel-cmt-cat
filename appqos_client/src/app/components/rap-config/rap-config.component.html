@@ -35,5 +35,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
     [pools]="pools"
     (poolEvent)="getConfigData()"
   ></app-pool-config>
-  <app-apps-config [apps]="apps" [pools]="pools"></app-apps-config>
+  <app-apps-config
+    [apps]="apps"
+    [pools]="pools"
+    (appEvent)="getConfigData()"
+  ></app-apps-config>
 </div>
