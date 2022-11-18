@@ -243,13 +243,13 @@ class CapsRdtIface(Resource):
 
 class CapsL3ca(Resource):
     """
-    Handles /caps/l3ca requests
+    Handles /caps/l3cat requests
     """
 
     @staticmethod
     def get():
         """
-        Handles GET /caps/l3ca request.
+        Handles GET /caps/l3cat request.
 
         Returns:
             response, status code
@@ -275,7 +275,7 @@ class CapsL3ca(Resource):
     @staticmethod
     def put():
         """
-        Handles PUT /caps/l3ca request.
+        Handles PUT /caps/l3cat request.
         Raises BadRequest, InternalError
 
         Returns:
@@ -336,13 +336,13 @@ class CapsL3ca(Resource):
 
 class CapsL2ca(Resource):
     """
-    Handles /caps/l2ca requests
+    Handles /caps/l2cat requests
     """
 
     @staticmethod
     def get():
         """
-        Handles GET /caps/l2ca request.
+        Handles GET /caps/l2cat request.
 
         Returns:
             response, status code
@@ -368,7 +368,7 @@ class CapsL2ca(Resource):
     @staticmethod
     def put():
         """
-        Handles PUT /caps/l2ca request.
+        Handles PUT /caps/l2cat request.
         Raises BadRequest, InternalError
         Returns:
             response, status code

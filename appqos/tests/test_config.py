@@ -247,6 +247,92 @@ def test_config_default_pool_l2cat():
 
 
 @mock.patch('appqos.pqos_api.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
+@mock.patch('appqos.pqos_api.PQOS_API.get_max_l2_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
+@mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.config.Config.get_l3cdp_enabled", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.config.Config.get_l2cdp_enabled", mock.MagicMock(return_value=True))
+@mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=False))
+def test_config_default_pool_l2cdp():
+    config = Config(deepcopy(CONFIG))
+
+    # just in case, remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config.is_default_pool_defined()
+
+    # add default pool to config
+    config.add_default_pool()
+    assert config.is_default_pool_defined()
+
+    pool_l2cbm_code = None
+    pool_l2cbm_data = None
+
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            assert 'l2cbm_code' in pool
+            assert 'l2cbm_data' in pool
+            assert not 'cbm' in pool
+            assert 'l2cbm' in pool
+            assert not 'l3cbm' in pool
+            assert not 'mba' in pool
+            assert not 'mba_bw' in pool
+            pool_l2cbm_code = pool['l2cbm_code']
+            pool_l2cbm_data = pool['l2cbm_data']
+            break
+
+    assert pool_l2cbm_code == 0xDEADBEEF
+    assert pool_l2cbm_data == 0xDEADBEEF
+
+
+@mock.patch('appqos.pqos_api.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
+@mock.patch('appqos.pqos_api.PQOS_API.get_max_l3_cat_cbm', mock.MagicMock(return_value=0xDEADBEEF))
+@mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+@mock.patch("appqos.config.Config.get_l3cdp_enabled", mock.MagicMock(return_value=True))
+@mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
+@mock.patch("appqos.config.Config.get_l2cdp_enabled", mock.MagicMock(return_value=False))
+@mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=False))
+def test_config_default_pool_l3cdp():
+    config = Config(deepcopy(CONFIG))
+
+    # just in case, remove default pool from config
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            config['pools'].remove(pool)
+            break
+
+    # no default pool in config
+    assert not config.is_default_pool_defined()
+
+    # add default pool to config
+    config.add_default_pool()
+    assert config.is_default_pool_defined()
+
+    pool_l3cbm_code = None
+    pool_l3cbm_data = None
+
+    for pool in config['pools']:
+        if pool['id'] == 0:
+            assert 'l3cbm_code' in pool
+            assert 'l3cbm_data' in pool
+            assert not 'cbm' in pool
+            assert not 'l2cbm' in pool
+            assert 'l3cbm' in pool
+            assert not 'mba' in pool
+            assert not 'mba_bw' in pool
+            pool_l3cbm_code = pool['l3cbm_code']
+            pool_l3cbm_data = pool['l3cbm_data']
+            break
+
+    assert pool_l3cbm_code == 0xDEADBEEF
+    assert pool_l3cbm_data == 0xDEADBEEF
+
+
+@mock.patch('appqos.pqos_api.PQOS_API.get_cores', mock.MagicMock(return_value=range(8)))
 @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
 @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
 @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=False))
@@ -440,3 +526,25 @@ def test_get_mba_ctrl_enabled(cfg, result):
     config = Config(cfg)
 
     assert config.get_mba_ctrl_enabled() == result
+
+
+@pytest.mark.parametrize("cfg, result", [
+    ({}, False),
+    ({"rdt": {"l2cdp": True}}, True),
+    ({"rdt": {"l2cdp": False}}, False)
+])
+def test_get_l2cdp_enabled(cfg, result):
+    config = Config(cfg)
+
+    assert config.get_l2cdp_enabled() == result
+
+
+@pytest.mark.parametrize("cfg, result", [
+    ({}, False),
+    ({"rdt": {"l3cdp": True}}, True),
+    ({"rdt": {"l3cdp": False}}, False)
+])
+def test_get_l3cdp_enabled(cfg, result):
+    config = Config(cfg)
+
+    assert config.get_l3cdp_enabled() == result

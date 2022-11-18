@@ -197,3 +197,37 @@ def test_l2ca_info():
     assert info['clos_num'] == 12
     assert info['cdp_supported']
     assert info['cdp_enabled']
+
+
+@pytest.mark.parametrize("iface", ["msr", "os"])
+@mock.patch('appqos.pqos_api.PQOS_API.is_l3_cdp_supported', mock.MagicMock(return_value=True))
+def test_cdp_l3_supported_positive(iface):
+    assert caps.cdp_l3_supported(iface) == True;
+
+
+@pytest.mark.parametrize("iface", ["msr", "os"])
+@mock.patch('appqos.pqos_api.PQOS_API.is_l3_cdp_supported', mock.MagicMock(return_value=False))
+def test_cdp_l3_supported_positive(iface):
+    assert caps.cdp_l3_supported(iface) == False;
+
+
+@pytest.mark.parametrize("iface", ["msr", "os"])
+@mock.patch('appqos.pqos_api.PQOS_API.is_l2_cdp_supported', mock.MagicMock(return_value=True))
+def test_cdp_l2_supported_positive(iface):
+    assert caps.cdp_l2_supported(iface) == True;
+
+
+@pytest.mark.parametrize("iface", ["msr", "os"])
+@mock.patch('appqos.pqos_api.PQOS_API.is_l2_cdp_supported', mock.MagicMock(return_value=False))
+def test_cdp_l2_supported_positive(iface):
+    assert caps.cdp_l2_supported(iface) == False;
+
+
+@mock.patch('appqos.pqos_api.PQOS_API.is_mba_bw_supported', mock.MagicMock(return_value=True))
+def test_mba_bw_supported_positive():
+    assert caps.mba_bw_supported() == True;
+
+
+@mock.patch('appqos.pqos_api.PQOS_API.is_mba_bw_supported', mock.MagicMock(return_value=False))
+def test_mba_bw_supported_negative():
+    assert caps.mba_bw_supported() == False;

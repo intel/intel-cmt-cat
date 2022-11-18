@@ -1,8 +1,8 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
 
-  "title": "REST API get caps/l3ca",
-  "description": "GET Pool L3 CAT caps result, URI /caps/l3ca",
+  "title": "REST API get caps/l3cat",
+  "description": "GET Pool L3 CAT caps result, URI /caps/l3cat",
 
   "type": "object",
 

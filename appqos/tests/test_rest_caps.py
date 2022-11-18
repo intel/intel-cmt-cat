@@ -175,6 +175,42 @@ class TestCapsMba:
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l3_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("invalid_request", [
+            {},
+            {"enabled": 1},
+            {"enabled": "True"},
+            {"enabled": {}},
+            {"enabled": {"enabled": True}},
+            {"enabled": True, "supported": False},
+            {"enabled": False, "supported": True},
+            {"supported": True}
+    ])
+    def test_caps_l3_cdp_invalid_request_put(self, invalid_request):
+        response = Rest().put("/caps/l3cat", invalid_request)
+        assert response.status_code == 400
+
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l2_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("invalid_request", [
+            {},
+            {"enabled": 1},
+            {"enabled": "True"},
+            {"enabled": {}},
+            {"enabled": {"enabled": True}},
+            {"enabled": True, "supported": False},
+            {"enabled": False, "supported": True},
+            {"supported": True}
+    ])
+    def test_caps_l2_cdp_invalid_request_put(self, invalid_request):
+        response = Rest().put("/caps/l2cat", invalid_request)
+        assert response.status_code == 400
+
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("appqos.caps.mba_bw_supported", mock.MagicMock(return_value=False))
     @pytest.mark.parametrize("valid_request", [
@@ -188,6 +224,32 @@ class TestCapsMba:
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l3_supported", mock.MagicMock(return_value=False))
+    @pytest.mark.parametrize("valid_request", [
+            {"cdp_enabled": True},
+            {"cdp_enabled": False}
+    ])
+    def test_caps_l3_cdp_not_supported_put(self, valid_request):
+        response = Rest().put("/caps/l3cat", valid_request)
+        # l3 cdp not supported
+        assert response.status_code == 409
+
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l2_supported", mock.MagicMock(return_value=False))
+    @pytest.mark.parametrize("valid_request", [
+            {"cdp_enabled": True},
+            {"cdp_enabled": False}
+    ])
+    def test_caps_l2_cdp_not_supported_put(self, valid_request):
+        response = Rest().put("/caps/l2cat", valid_request)
+        # l2 cdp not supported
+        assert response.status_code == 409
+
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("appqos.caps.mba_bw_supported", mock.MagicMock(return_value=True))
     @pytest.mark.parametrize("valid_request", [
@@ -197,6 +259,32 @@ class TestCapsMba:
     def test_caps_mba_ctrl_pools_configured_put(self, valid_request):
         response = Rest().put("/caps/mba_ctrl", valid_request)
         # MBA BW/CTRL supported but Pools configured
+        assert response.status_code == 409
+
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l3_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("valid_request", [
+            {"cdp_enabled": True},
+            {"cdp_enabled": False}
+    ])
+    def test_caps_l3_cdp_pools_configured_put(self, valid_request):
+        response = Rest().put("/caps/l3cat", valid_request)
+        # l3 cdp supported but Pools configured
+        assert response.status_code == 409
+
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l2_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("valid_request", [
+            {"cdp_enabled": True},
+            {"cdp_enabled": False}
+    ])
+    def test_caps_l2_cdp_pools_configured_put(self, valid_request):
+        response = Rest().put("/caps/l2cat", valid_request)
+        # l2 cdp supported but Pools configured
         assert response.status_code == 409
 
 
@@ -369,6 +457,25 @@ class TestCapsL3Cat:
         response = Rest().get("/caps/l3cat")
         assert response.status_code == 404
 
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config_empty)
+    @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l3_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("valid_request", [
+            {"cdp_enabled": True},
+            {"cdp_enabled": False}
+    ])
+    def test_caps_l3ca_put(self, valid_request):
+        def set_config(data):
+            assert data['rdt'].get('l3cdp') == valid_request['cdp_enabled']
+        def get_l3cdp_enabled():
+            return not valid_request['cdp_enabled']
+        with mock.patch("appqos.config_store.ConfigStore.set_config", side_effect=set_config) as mock_set_config, \
+            mock.patch("appqos.config.Config.get_l3cdp_enabled", return_value=get_l3cdp_enabled):
+            response = Rest().put("/caps/l3cat", valid_request)
+            # All OK, l3 cdp supported and no pool configured
+            assert response.status_code == 200
+            mock_set_config.assert_called_once()
+
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
     @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=False))
     def test_caps_l3ca_put_unsupported(self):
@@ -428,6 +535,25 @@ class TestCapsL2Cat:
     def test_caps_l2ca_put_unsupported(self):
         response = Rest().put("/caps/l2cat", {"cdp_enabled": True})
         assert response.status_code == 404
+
+    @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config_empty)
+    @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
+    @mock.patch("appqos.caps.cdp_l2_supported", mock.MagicMock(return_value=True))
+    @pytest.mark.parametrize("valid_request", [
+            {"cdp_enabled": True},
+            {"cdp_enabled": False}
+    ])
+    def test_caps_l2ca_put(self, valid_request):
+        def set_config(data):
+            assert data['rdt'].get('l2cdp') == valid_request['cdp_enabled']
+        def get_l2cdp_enabled():
+            return not valid_request['cdp_enabled']
+        with mock.patch("appqos.config_store.ConfigStore.set_config", side_effect=set_config) as mock_set_config, \
+            mock.patch("appqos.config.Config.get_l2cdp_enabled", return_value=get_l2cdp_enabled):
+            response = Rest().put("/caps/l2cat", valid_request)
+            # All OK, l2 cdp  supported and no pool configured
+            assert response.status_code == 200
+            mock_set_config.assert_called_once()
 
     # @mock.patch("pqos.cpuinfo.PqosCpuInfo.get_sockets", mock.MagicMock(return_value=[0]))
     # @mock.patch("pqos.cpuinfo.PqosCpuInfo.get_cores", mock.MagicMock(return_value=[0,1,2,3]))

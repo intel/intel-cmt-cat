@@ -124,6 +124,50 @@ class TestPools(object):
              mock_apply.assert_called_once_with(1)
 
 
+        def get_attr(cls, attr, pool_id):
+            config = {
+                'cores': [1, 2],
+                'l3cbm_code': 3,
+                'l3cbm_data': 12,
+                'l2cbm_code': 3,
+                'l2cbm_data': 4,
+                'mba_bw': 100,
+                'apps': [1],
+                'pids': [11, 22]
+            }
+
+            if attr in config:
+                return config[attr]
+            else:
+                return None
+
+        with mock.patch('appqos.config.Config.get_pool_attr', new=get_attr),\
+             mock.patch('appqos.config.Config.get_app_attr', new=get_attr),\
+             mock.patch('appqos.config.Config.get_l2cdp_enabled', mock.MagicMock(return_value=True)),\
+             mock.patch('appqos.config.Config.get_l3cdp_enabled', mock.MagicMock(return_value=True)),\
+             mock.patch("appqos.caps.mba_bw_enabled", mock.MagicMock(return_value=True)),\
+             mock.patch('appqos.cache_ops.Pool.l3cbm_set_code') as mock_l3cbm_set_code,\
+             mock.patch('appqos.cache_ops.Pool.l3cbm_set_data') as mock_l3cbm_set_data,\
+             mock.patch('appqos.cache_ops.Pool.l2cbm_set_code') as mock_l2cbm_set_code,\
+             mock.patch('appqos.cache_ops.Pool.l2cbm_set_data') as mock_l2cbm_set_data,\
+             mock.patch('appqos.cache_ops.Pool.mba_bw_set') as mock_mba_bw_set,\
+             mock.patch('appqos.cache_ops.Pool.cores_set') as mock_cores_set,\
+             mock.patch('appqos.cache_ops.Pool.pids_set') as mock_pids_set,\
+             mock.patch('appqos.cache_ops.Pool.apply') as mock_apply:
+
+             Pool(1).configure(Config({}))
+
+             mock_l3cbm_set_code.assert_called_once_with(3)
+             mock_l3cbm_set_data.assert_called_once_with(12)
+             mock_l2cbm_set_code.assert_called_once_with(3)
+             mock_l2cbm_set_data.assert_called_once_with(4)
+             mock_l2cbm_set.assert_called_once_with(7)
+             mock_mba_bw_set.assert_called_once_with(100)
+             mock_cores_set.assert_called_once_with([1,2])
+             mock_pids_set.assert_called_once_with([11,22], get_attr(None, 'cores', 0))
+             mock_apply.assert_called_once_with(1)
+
+
     def test_l3cbm_get(self):
         Pool.pools[3] = {}
         Pool.pools[3]['l3cbm'] = 0xf
@@ -132,6 +176,26 @@ class TestPools(object):
         assert Pool(3).l3cbm_get() == 0xf
         assert not Pool(1).l3cbm_get()
         assert not Pool(2).l3cbm_get()
+
+
+    def test_l3cbm_get_code(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l3cbm_code'] = 0xf
+        Pool.pools[1] = {}
+
+        assert Pool(3).l3cbm_get_code() == 0xf
+        assert not Pool(1).l3cbm_get_code()
+        assert not Pool(2).l3cbm_get_code()
+
+
+    def test_l3cbm_get_data(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l3cbm_data'] = 0xf
+        Pool.pools[1] = {}
+
+        assert Pool(3).l3cbm_get_data() == 0xf
+        assert not Pool(1).l3cbm_get_data()
+        assert not Pool(2).l3cbm_get_data()
 
 
     def test_l3cbm_set(self):
@@ -144,6 +208,56 @@ class TestPools(object):
         assert 0x1 == Pool.pools[3]['l3cbm']
 
 
+    def test_l3cbm_set_code(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l3cbm_code'] = 0xf
+        Pool.pools[1] = {}
+
+        Pool(3).l3cbm_set_code(0x1)
+
+        assert 0x1 == Pool.pools[3]['l3cbm_code']
+
+
+    def test_l3cbm_set_data(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l3cbm_data'] = 0xf
+        Pool.pools[1] = {}
+
+        Pool(3).l3cbm_set_data(0x1)
+
+        assert 0x1 == Pool.pools[3]['l3cbm_data']
+
+
+    def test_l2cbm_get(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l2cbm'] = 0xf
+        Pool.pools[1] = {}
+
+        assert Pool(3).l2cbm_get() == 0xf
+        assert not Pool(1).l2cbm_get()
+        assert not Pool(2).l2cbm_get()
+
+
+    def test_l2cbm_get_code(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l2cbm_code'] = 0xf
+        Pool.pools[1] = {}
+
+        assert Pool(3).l2cbm_get_code() == 0xf
+        assert not Pool(1).l2cbm_get_code()
+        assert not Pool(2).l2cbm_get_code()
+
+
+    def test_l2cbm_get_data(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l2cbm_data'] = 0xf
+        Pool.pools[1] = {}
+
+        assert Pool(3).l2cbm_get_data() == 0xf
+        assert not Pool(1).l2cbm_get_data()
+        assert not Pool(2).l2cbm_get_data()
+
+
     def test_l2cbm_set(self):
         Pool.pools[3] = {}
         Pool.pools[3]['l2cbm'] = 0xf
@@ -152,6 +266,26 @@ class TestPools(object):
         Pool(3).l2cbm_set(0x1)
 
         assert 0x1 == Pool.pools[3]['l2cbm']
+
+
+    def test_l2cbm_set_code(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l2cbm_code'] = 0xf
+        Pool.pools[1] = {}
+
+        Pool(3).l2cbm_set_code(0x1)
+
+        assert 0x1 == Pool.pools[3]['l2cbm_code']
+
+
+    def test_l2cbm_set_data(self):
+        Pool.pools[3] = {}
+        Pool.pools[3]['l2cbm_data'] = 0xf
+        Pool.pools[1] = {}
+
+        Pool(3).l2cbm_set_data(0x1)
+
+        assert 0x1 == Pool.pools[3]['l2cbm_data']
 
 
     def test_mba_get(self):
@@ -250,6 +384,8 @@ class TestPools(object):
         mock_alloc_assoc_set.assert_not_called()
 
 
+    @mock.patch('appqos.pqos_api.PQOS_API.is_l2_cdp_enabled')
+    @mock.patch('appqos.pqos_api.PQOS_API.is_l3_cdp_enabled')
     @mock.patch('appqos.pqos_api.PQOS_API.mba_set')
     @mock.patch('appqos.pqos_api.PQOS_API.l2ca_set')
     @mock.patch('appqos.pqos_api.PQOS_API.l3ca_set')
@@ -258,7 +394,16 @@ class TestPools(object):
     @mock.patch('appqos.pqos_api.PQOS_API.get_l2ids')
     @mock.patch('appqos.config.Config.get_mba_ctrl_enabled')
     def test_apply(self, mock_get_mba_ctrl_enabled, mock_get_l2ids, mock_get_socket, \
-        mock_alloc_assoc_set, mock_l3ca_set, mock_l2ca_set, mock_mba_set):
+        mock_alloc_assoc_set, mock_l3ca_set, mock_l2ca_set, mock_mba_set, \
+        mock_is_l3_cdp_enabled, mock_is_l2_cdp_enabled):
+
+        Pool.pools[3] = {}
+        Pool.pools[3]['cores'] = [5, 6]
+        Pool.pools[3]['l3cbm_code'] = 0x800
+        Pool.pools[3]['l3cbm_data'] = 0x400
+        Pool.pools[3]['l2cbm_code'] = 0xc
+        Pool.pools[3]['l2cbm_data'] = 0x3
+
         Pool.pools[2] = {}
         Pool.pools[2]['cores'] = [1]
         Pool.pools[2]['l3cbm'] = 0xc00
@@ -275,6 +420,8 @@ class TestPools(object):
         mock_mba_set.return_value = 0
         mock_l3ca_set.return_value = 0
         mock_l2ca_set.return_value = 0
+        mock_is_l2_cdp_enabled.return_value = False
+        mock_is_l3_cdp_enabled.return_value = False
         mock_get_socket.return_value = [0, 2]
         mock_get_l2ids.return_value = [0, 1]
         mock_get_mba_ctrl_enabled.return_value = False
@@ -337,6 +484,27 @@ class TestPools(object):
         result = Pool.apply(1)
         assert result != 0
 
+        #cdp
+        mock_alloc_assoc_set.return_value = 0
+        mock_mba_set.return_value = 0
+        mock_l3ca_set.return_value = 0
+        mock_l2ca_set.return_value = 0
+        mock_is_l2_cdp_enabled.return_value = True
+        mock_is_l3_cdp_enabled.return_value = True
+        mock_get_socket.return_value = [0, 2]
+        mock_get_l2ids.return_value = [0, 1]
+        mock_get_mba_ctrl_enabled.return_value = False
+
+        result = Pool.apply(3)
+        assert result == 0
+
+        mock_l3ca_set.return_value = -1
+        result = Pool.apply(3)
+        assert result != 0
+
+        mock_l2ca_set.return_value = -1
+        result = Pool.apply(3)
+        assert result != 0
 
     def test_reset(self):
         Pool.pools[2] = {}
