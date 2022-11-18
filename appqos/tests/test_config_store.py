@@ -314,7 +314,7 @@ class TestConfigValidate:
             ConfigStore().validate(data)
 
         data['pools'][0]['l3cbm'] = 0
-        with pytest.raises(ValueError, match="not contiguous"):
+        with pytest.raises(jsonschema.ValidationError, match="0 is less than the minimum of 1"):
             ConfigStore().validate(data)
 
 
@@ -337,7 +337,7 @@ class TestConfigValidate:
             ConfigStore().validate(data)
 
         data['pools'][0]['l2cbm'] = 0
-        with pytest.raises(ValueError, match="not contiguous"):
+        with pytest.raises(jsonschema.ValidationError, match="0 is less than the minimum of 1"):
             ConfigStore().validate(data)
 
 

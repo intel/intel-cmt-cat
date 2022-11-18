@@ -69,34 +69,6 @@
       "mba": {
         "type": "object",
         "not": { "required": [ "mba_bw" ] }
-      },
-      "l3cbm_data": {
-        "type": "object",
-        "anyOf": [
-          { "required": ["l3cbm"] },
-          { "required": ["l3cbm_code"] }
-        ]
-      },
-      "l3cbm_code": {
-        "type": "object",
-        "anyOf": [
-          { "required": ["l3cbm"] },
-          { "required": ["l3cbm_data"] }
-        ]
-      },
-      "l2cbm_data": {
-        "type": "object",
-        "anyOf": [
-          { "required": ["l2cbm"] },
-          { "required": ["l2cbm_code"] }
-        ]
-      },
-      "l2cbm_code": {
-        "type": "object",
-        "anyOf": [
-          { "required": ["l2cbm"] },
-          { "required": ["l2cbm_data"] }
-        ]
       }
     }
   },
@@ -132,6 +104,36 @@
           { "required": ["mba_bw"] },
           { "required": ["power_profile"] }
         ],
+        "dependencies": {
+          "l3cbm_data": {
+            "type": "object",
+            "anyOf": [
+              { "required": ["l3cbm"] },
+              { "required": ["l3cbm_code"] }
+            ]
+          },
+          "l3cbm_code": {
+            "type": "object",
+            "anyOf": [
+              { "required": ["l3cbm"] },
+              { "required": ["l3cbm_data"] }
+            ]
+          },
+          "l2cbm_data": {
+            "type": "object",
+            "anyOf": [
+              { "required": ["l2cbm"] },
+              { "required": ["l2cbm_code"] }
+            ]
+          },
+          "l2cbm_code": {
+            "type": "object",
+            "anyOf": [
+              { "required": ["l2cbm"] },
+              { "required": ["l2cbm_data"] }
+            ]
+          }
+        },
         "required": ["cores", "id"],
         "additionalProperties": false
       }

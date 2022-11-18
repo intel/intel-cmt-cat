@@ -61,7 +61,8 @@
   "string_hex" : {
     "type": [ "integer", "string" ],
     "pattern": "^0x[0-9a-fA-F]{1,32}$",
-    "maxLength": 34
+    "maxLength": 34,
+    "minimum": 1
   },
 
   "app": {
