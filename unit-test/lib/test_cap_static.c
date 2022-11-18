@@ -97,7 +97,6 @@ check_malloc_force_fail(void)
 
 /* ======== mock ======== */
 
-void *__real_malloc(size_t size);
 void *
 __wrap_malloc(size_t size)
 {
@@ -106,7 +105,6 @@ __wrap_malloc(size_t size)
 
 const char *RDT_IFACE = "RDT_IFACE";
 
-char *__real_getenv(const char *name);
 char *
 __wrap_getenv(const char *name)
 {
@@ -126,6 +124,7 @@ __wrap_pthread_mutex_init(pthread_mutex_t *restrict mutex,
         function_called();
         return mock();
 }
+
 int
 __wrap_pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
@@ -135,8 +134,27 @@ __wrap_pthread_mutex_destroy(pthread_mutex_t *mutex)
 };
 
 int
+__wrap_pthread_mutex_lock(pthread_mutex_t *mutex)
+{
+        assert_non_null(mutex);
+        function_called();
+        return mock();
+};
+
+int
+__wrap_pthread_mutex_unlock(pthread_mutex_t *mutex)
+{
+        assert_non_null(mutex);
+        function_called();
+        return mock();
+};
+
+int
 __wrap_open(const char *path, int oflags, int mode)
 {
+        if (strcmp(path, LOCKFILE))
+                return __real_open(path, oflags, mode);
+
         function_called();
         check_expected(path);
         check_expected(oflags);
@@ -148,12 +166,29 @@ __wrap_open(const char *path, int oflags, int mode)
 int
 __wrap_close(int fildes)
 {
+        if (fildes != LOCKFILENO)
+                return __real_close(fildes);
+
         function_called();
         check_expected(fildes);
 
         return mock();
 }
 
+int
+__wrap_lockf(int fd, int cmd, off_t len)
+{
+        if (fd != LOCKFILENO)
+                return __real_lockf(fd, cmd, len);
+
+        function_called();
+        check_expected(fd);
+        check_expected(cmd);
+        check_expected(len);
+        return 0;
+}
+
+static int log_init_result = LOG_RETVAL_OK;
 int
 log_init(int fd_log __attribute__((unused)),
          void (*callback_log)(void *, const size_t, const char *)
@@ -163,15 +198,16 @@ log_init(int fd_log __attribute__((unused)),
 {
         function_called();
 
-        return 0;
+        return log_init_result;
 }
 
+static int log_fini_result = LOG_RETVAL_OK;
 int
 log_fini(void)
 {
         function_called();
 
-        return 0;
+        return log_fini_result;
 }
 
 void
@@ -231,6 +267,61 @@ MAKE_CAP_DIS_WRAPPER(os_cap_mba_discover, pqos_cap_mba)
 MAKE_CAP_MON_WRAPPER(hw_cap_mon_discover)
 MAKE_CAP_MON_WRAPPER(os_cap_mon_discover)
 
+#define wrap_lockf(cmdpar)                                                     \
+        do {                                                                   \
+                expect_value(__wrap_lockf, fd, LOCKFILENO);                    \
+                expect_value(__wrap_lockf, cmd, cmdpar);                       \
+                expect_value(__wrap_lockf, len, 0);                            \
+                expect_function_call(__wrap_lockf);                            \
+        } while (0)
+
+#define wrap_lock_and_unlock()                                                 \
+        do {                                                                   \
+                wrap_lockf(F_LOCK);                                            \
+                wrap_lockf(F_ULOCK);                                           \
+        } while (0)
+
+#define wrap_open(result)                                                      \
+        do {                                                                   \
+                expect_function_call(__wrap_open);                             \
+                expect_string(__wrap_open, path, LOCKFILE);                    \
+                expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);         \
+                expect_value(__wrap_open, mode,                                \
+                             S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);           \
+                will_return(__wrap_open, result);                              \
+        } while (0)
+
+#define wrap_close(result)                                                     \
+        do {                                                                   \
+                expect_function_call(__wrap_close);                            \
+                expect_value(__wrap_close, fildes, LOCKFILENO);                \
+                will_return(__wrap_close, result);                             \
+        } while (0)
+
+#define wrap_pthread_mutex_init(result)                                        \
+        do {                                                                   \
+                expect_function_call(__wrap_pthread_mutex_init);               \
+                will_return(__wrap_pthread_mutex_init, result);                \
+        } while (0)
+
+#define wrap_pthread_mutex_destroy(result)                                     \
+        do {                                                                   \
+                expect_function_call(__wrap_pthread_mutex_destroy);            \
+                will_return(__wrap_pthread_mutex_destroy, result);             \
+        } while (0)
+
+#define wrap_pthread_mutex_lock(result)                                        \
+        do {                                                                   \
+                expect_function_call(__wrap_pthread_mutex_lock);               \
+                will_return(__wrap_pthread_mutex_lock, result);                \
+        } while (0)
+
+#define wrap_pthread_mutex_unlock(result)                                      \
+        do {                                                                   \
+                expect_function_call(__wrap_pthread_mutex_unlock);             \
+                will_return(__wrap_pthread_mutex_unlock, result);              \
+        } while (0)
+
 int
 __wrap_os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                            const struct pqos_cpuinfo *cpu,
@@ -273,37 +364,41 @@ resctrl_is_supported(void)
         return mock();
 }
 
+static int cpuinfo_init_result = LOG_RETVAL_OK;
 int
 cpuinfo_init(enum pqos_interface interface __attribute__((unused)),
              const struct pqos_cpuinfo **topology __attribute__((unused)))
 {
         function_called();
 
-        return 0;
+        return cpuinfo_init_result;
 }
 
+static int cpuinfo_fini_result = LOG_RETVAL_OK;
 int
 cpuinfo_fini(void)
 {
         function_called();
 
-        return 0;
+        return cpuinfo_fini_result;
 }
 
+static int machine_init_result = LOG_RETVAL_OK;
 int
 machine_init(const unsigned max_core_id __attribute__((unused)))
 {
         function_called();
 
-        return 0;
+        return machine_init_result;
 }
 
+static int machine_fini_result = LOG_RETVAL_OK;
 int
 machine_fini(void)
 {
         function_called();
 
-        return 0;
+        return machine_fini_result;
 }
 
 int
@@ -1089,6 +1184,134 @@ test__pqos_api_init_exit(void **state __attribute__((unused)))
         assert_int_equal(_pqos_api_exit(), -1);
 }
 
+static void
+test_pqos_init_negative(void **state __attribute__((unused)))
+{
+        int save;
+        struct pqos_config cfg;
+
+        // fail at _pqos_api_init
+        save = m_apilock;
+        m_apilock = LOCKFILENO;
+        assert_int_equal(pqos_init(&cfg), PQOS_RETVAL_ERROR);
+        m_apilock = save;
+
+        // fail at _pqos_check_init
+        save = m_init_done;
+        m_init_done = 1;
+        wrap_open(LOCKFILENO);
+        wrap_pthread_mutex_init(0);
+        wrap_lockf(F_LOCK);
+        wrap_pthread_mutex_lock(0);
+        // cleanup
+        wrap_lockf(F_ULOCK);
+        wrap_pthread_mutex_unlock(0);
+        assert_int_equal(pqos_init(&cfg), PQOS_RETVAL_INIT);
+        m_init_done = save;
+        wrap_close(0);
+        wrap_pthread_mutex_destroy(0);
+        _pqos_api_exit();
+
+        // fail at log_init;
+        save = log_init_result;
+        log_init_result = LOG_RETVAL_ERROR;
+        wrap_open(LOCKFILENO);
+        wrap_pthread_mutex_init(0);
+        wrap_lockf(F_LOCK);
+        wrap_pthread_mutex_lock(0);
+        expect_function_call(log_init);
+        // cleanup
+        wrap_lockf(F_ULOCK);
+        wrap_pthread_mutex_unlock(0);
+        wrap_close(0);
+        wrap_pthread_mutex_destroy(0);
+        assert_int_not_equal(pqos_init(&cfg), LOG_RETVAL_OK);
+        log_init_result = save;
+
+        // fail at discover_interface
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.verbose = LOG_VER_SILENT;
+        cfg.fd_log = -1;
+        cfg.interface = -1;
+        wrap_open(LOCKFILENO);
+        wrap_pthread_mutex_init(0);
+        wrap_lockf(F_LOCK);
+        wrap_pthread_mutex_lock(0);
+        expect_function_call(log_init);
+        // cleanup
+        expect_function_call(log_fini);
+        wrap_lockf(F_ULOCK);
+        wrap_pthread_mutex_unlock(0);
+        wrap_close(0);
+        wrap_pthread_mutex_destroy(0);
+        assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
+
+        // fail at cpuinfo_init
+        save = cpuinfo_init_result;
+        cpuinfo_init_result = PQOS_RETVAL_ERROR;
+        cfg.interface = PQOS_INTER_MSR;
+        wrap_open(LOCKFILENO);
+        wrap_pthread_mutex_init(0);
+        wrap_lockf(F_LOCK);
+        wrap_pthread_mutex_lock(0);
+        expect_function_call(log_init);
+        expect_function_call(__wrap_getenv);
+        will_return(__wrap_getenv, NULL);
+        expect_function_call(cpuinfo_init);
+        // cleanup
+        expect_function_call(log_fini);
+        wrap_lockf(F_ULOCK);
+        wrap_pthread_mutex_unlock(0);
+        wrap_close(0);
+        wrap_pthread_mutex_destroy(0);
+        assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
+        cpuinfo_init_result = save;
+
+        // fail at cpuinfo_init
+        save = cpuinfo_init_result;
+        cpuinfo_init_result = PQOS_RETVAL_OK;
+        cfg.interface = PQOS_INTER_MSR;
+        wrap_open(LOCKFILENO);
+        wrap_pthread_mutex_init(0);
+        wrap_lockf(F_LOCK);
+        wrap_pthread_mutex_lock(0);
+        expect_function_call(log_init);
+        expect_function_call(__wrap_getenv);
+        will_return(__wrap_getenv, NULL);
+        expect_function_call(cpuinfo_init);
+        // cleanup
+        expect_function_call(log_fini);
+        wrap_lockf(F_ULOCK);
+        wrap_pthread_mutex_unlock(0);
+        wrap_close(0);
+        wrap_pthread_mutex_destroy(0);
+        assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
+        cpuinfo_init_result = save;
+}
+
+static void
+test_pqos_fini_negative(void **state __attribute__((unused)))
+{
+        wrap_pthread_mutex_lock(0);
+        wrap_pthread_mutex_unlock(0);
+        wrap_pthread_mutex_destroy(0);
+        assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);
+
+        m_init_done = 1;
+        wrap_pthread_mutex_lock(0);
+        cpuinfo_fini_result = PQOS_RETVAL_ERROR;
+        machine_fini_result = PQOS_RETVAL_ERROR;
+        log_fini_result = PQOS_RETVAL_ERROR;
+        expect_function_call(pqos_mon_fini);
+        expect_function_call(pqos_alloc_fini);
+        expect_function_call(cpuinfo_fini);
+        expect_function_call(machine_fini);
+        expect_function_call(log_fini);
+        wrap_pthread_mutex_unlock(0);
+        wrap_pthread_mutex_destroy(0);
+        assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);
+}
+
 /* ======== main ======== */
 int
 main(void)
@@ -1119,6 +1342,8 @@ main(void)
             cmocka_unit_test(test_discover_capabilities),
             cmocka_unit_test(test_discover_capabilities_malloc_fail),
             cmocka_unit_test(test__pqos_api_init_exit),
+            cmocka_unit_test(test_pqos_init_negative),
+            cmocka_unit_test(test_pqos_fini_negative),
         };
 
         result += cmocka_run_group_tests(tests, NULL, NULL);

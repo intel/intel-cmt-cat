@@ -636,8 +636,11 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(PQOS_OBJS)
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=open \
 		-Wl,--wrap=close \
+		-Wl,--wrap=lockf \
 		-Wl,--wrap=pthread_mutex_init \
 		-Wl,--wrap=pthread_mutex_destroy \
+		-Wl,--wrap=pthread_mutex_lock \
+		-Wl,--wrap=pthread_mutex_unlock \
 		-Wl,--wrap=hw_cap_l3ca_discover \
 		-Wl,--wrap=os_cap_l3ca_discover \
 		-Wl,--wrap=hw_cap_l2ca_discover \

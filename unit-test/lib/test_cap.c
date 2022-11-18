@@ -56,7 +56,6 @@
 
 /* ======== mock ========*/
 
-int __real_open(const char *path, int oflags, int mode);
 int
 __wrap_open(const char *path, int oflags, int mode)
 {
@@ -71,7 +70,6 @@ __wrap_open(const char *path, int oflags, int mode)
         return LOCKFILENO;
 }
 
-int __real_close(int fildes);
 int
 __wrap_close(int fildes)
 {
@@ -84,7 +82,6 @@ __wrap_close(int fildes)
         return 0;
 }
 
-int __real_lockf(int fd, int cmd, off_t len);
 int
 __wrap_lockf(int fd, int cmd, off_t len)
 {

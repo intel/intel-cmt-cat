@@ -902,10 +902,12 @@ pqos_fini(void)
 
         m_cpu = NULL;
 
-        for (i = 0; i < m_cap->num_cap; i++)
-                free(m_cap->capabilities[i].u.generic_ptr);
-        free((void *)m_cap);
-        m_cap = NULL;
+        if (m_cap != NULL) {
+                for (i = 0; i < m_cap->num_cap; i++)
+                        free(m_cap->capabilities[i].u.generic_ptr);
+                free((void *)m_cap);
+                m_cap = NULL;
+        };
 
         m_init_done = 0;
 
