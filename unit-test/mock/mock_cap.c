@@ -42,18 +42,6 @@ __wrap__pqos_check_init(const int expect)
         return mock_type(int);
 }
 
-void
-__wrap__pqos_api_lock(void)
-{
-        function_called();
-}
-
-void
-__wrap__pqos_api_unlock(void)
-{
-        function_called();
-}
-
 const struct pqos_cap *
 __wrap__pqos_get_cap(void)
 {

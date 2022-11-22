@@ -49,6 +49,13 @@ $(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
 		--globalize-symbol=hw_l2ca_get --weaken-symbol=hw_l2ca_get \
 		$@
 
+
+$(OBJ_DIR)/cap.o: $(LIB_DIR)/cap.c $(OBJ_DIR)/cap.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=_pqos_check_init --weaken-symbol=_pqos_check_init \
+		$@
+
 $(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.d
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
@@ -123,8 +130,8 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=_pqos_check_init \
-		-Wl,--wrap=_pqos_api_lock \
-		-Wl,--wrap=_pqos_api_unlock \
+		-Wl,--wrap=lock_get \
+		-Wl,--wrap=lock_release \
 		-Wl,--wrap=hw_alloc_assoc_set \
 		-Wl,--wrap=os_alloc_assoc_set \
 		-Wl,--wrap=hw_alloc_assoc_get \
@@ -505,7 +512,6 @@ $(BIN_DIR)/test_os_alloc_mount: test_os_alloc_mount.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-
 $(BIN_DIR)/test_os_allocation: test_os_allocation.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
@@ -611,9 +617,6 @@ $(BIN_DIR)/test_os_cap_mon: test_os_cap_mon.c $(LIB_OBJS)
 $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
-		-Wl,--wrap=open \
-		-Wl,--wrap=close \
-		-Wl,--wrap=lockf \
 		-Wl,--wrap=os_cap_init \
 		-Wl,--wrap=cpuinfo_init \
 		-Wl,--wrap=cpuinfo_fini \
@@ -626,6 +629,10 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=hw_cap_mba_discover \
 		-Wl,--wrap=os_cap_mba_discover \
 		-Wl,--wrap=pqos_mon_init \
+		-Wl,--wrap=lock_init \
+		-Wl,--wrap=lock_fini \
+		-Wl,--wrap=lock_get \
+		-Wl,--wrap=lock_release \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -634,13 +641,6 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(PQOS_OBJS)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=getenv \
 		-Wl,--wrap=malloc \
-		-Wl,--wrap=open \
-		-Wl,--wrap=close \
-		-Wl,--wrap=lockf \
-		-Wl,--wrap=pthread_mutex_init \
-		-Wl,--wrap=pthread_mutex_destroy \
-		-Wl,--wrap=pthread_mutex_lock \
-		-Wl,--wrap=pthread_mutex_unlock \
 		-Wl,--wrap=hw_cap_l3ca_discover \
 		-Wl,--wrap=os_cap_l3ca_discover \
 		-Wl,--wrap=hw_cap_l2ca_discover \
@@ -651,8 +651,35 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(PQOS_OBJS)
 		-Wl,--wrap=hw_cap_mon_discover \
 		-Wl,--wrap=os_cap_mon_discover \
 		-Wl,--wrap=os_cap_get_mba_ctrl \
+		-Wl,--wrap=lock_init \
+		-Wl,--wrap=lock_fini \
+		-Wl,--wrap=lock_get \
+		-Wl,--wrap=lock_release \
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/cap.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_lock: test_lock.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=open \
+		-Wl,--wrap=close \
+		-Wl,--wrap=lockf \
+		-Wl,--wrap=pthread_mutex_init \
+		-Wl,--wrap=pthread_mutex_destroy \
+		-Wl,--wrap=pthread_mutex_lock \
+		-Wl,--wrap=pthread_mutex_unlock \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_pqos_inter_get: test_pqos_inter_get.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=lock_init \
+		-Wl,--wrap=lock_fini \
+		-Wl,--wrap=lock_get \
+		-Wl,--wrap=lock_release \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
 .PHONY: run
 run: $(TESTS)

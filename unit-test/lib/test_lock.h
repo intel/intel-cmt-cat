@@ -30,13 +30,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_CAP_H
-#define __TEST_CAP_H
+#ifndef __TEST_LOCK_H
+#define __TEST_LOCK_H
 
 #include <aio.h>
 #include <stddef.h>
 
-void *__real_malloc(size_t size);
-char *__real_getenv(const char *name);
+#define LOCKFILENO 9999
 
-#endif /* __TEST_CAP_H */
+int __real_open(const char *path, int oflags, int mode);
+int __real_close(int fildes);
+int __real_lockf(int fd, int cmd, off_t len);
+
+#endif /* __TEST_LOCK_H */

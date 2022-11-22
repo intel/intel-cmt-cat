@@ -30,13 +30,62 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_CAP_H
-#define __TEST_CAP_H
+/**
+ * @brief Internal header file to share PQoS API lock mechanism
+ * and library initialization status.
+ */
 
-#include <aio.h>
-#include <stddef.h>
+#ifndef __PQOS_LOCK_H__
+#define __PQOS_LOCK_H__
 
-void *__real_malloc(size_t size);
-char *__real_getenv(const char *name);
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#endif /* __TEST_CAP_H */
+#include "types.h"
+
+#ifndef LOCKFILE
+#ifdef __linux__
+#define LOCKFILE "/var/lock/libpqos"
+#endif
+#ifdef __FreeBSD__
+#define LOCKFILE "/var/tmp/libpqos.lockfile"
+#endif
+#endif /*!LOCKFILE*/
+
+/**
+ * @brief Initializes API locks
+ *
+ * @return Operation status
+ * @retval 0 success
+ * @retval -1 error
+ */
+PQOS_LOCAL int lock_init(void);
+
+/**
+ * @brief Uninitializes API locks
+ *
+ * @return Operation status
+ * @retval 0 success
+ * @retval -1 error
+ */
+PQOS_LOCAL int lock_fini(void);
+
+/**
+ * @brief Acquires lock for PQoS API use
+ *
+ * Only one thread at a time is allowed to use the API.
+ * Each PQoS API need to use api_lock and api_unlock functions.
+ */
+PQOS_LOCAL void lock_get(void);
+
+/**
+ * @brief Symmetric operation to \a lock_get to release the lock
+ */
+PQOS_LOCAL void lock_release(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __PQOS_LOCK_H__ */

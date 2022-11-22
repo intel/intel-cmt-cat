@@ -39,8 +39,6 @@
  * Management functions include:
  * - management includes initializing and shutting down all other sub-modules
  *   including: monitoring, allocation, log, cpuinfo and machine
- * - provide functions for safe access to PQoS API - this is required for
- *   allocation and monitoring modules which also implement PQoS API
  *
  * Capability functions:
  * - monitoring detection, this is to discover all monitoring event types.
@@ -56,6 +54,7 @@
 #include "api.h"
 #include "cpuinfo.h"
 #include "hw_cap.h"
+#include "lock.h"
 #include "log.h"
 #include "machine.h"
 #include "monitoring.h"
@@ -64,27 +63,14 @@
 #include "resctrl_alloc.h"
 #include "utils.h"
 
-#include <fcntl.h> /* O_CREAT */
-#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/stat.h> /* S_Ixxx */
-#include <unistd.h>   /* usleep(), lockf() */
 
 /**
  * ---------------------------------------
  * Local macros
  * ---------------------------------------
  */
-
-#ifndef LOCKFILE
-#ifdef __linux__
-#define LOCKFILE "/var/lock/libpqos"
-#endif
-#ifdef __FreeBSD__
-#define LOCKFILE "/var/tmp/libpqos.lockfile"
-#endif
-#endif /*!LOCKFILE*/
 
 #define PROC_CPUINFO "/proc/cpuinfo"
 
@@ -119,105 +105,34 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 static int m_init_done = 0;
 
 /**
- * API thread/process safe access is secured through these locks.
- */
-static int m_apilock = -1;
-static pthread_mutex_t m_apilock_mutex;
-
-/**
  * Interface status
  *   0  PQOS_INTER_MSR
  *   1  PQOS_INTER_OS
  *   2  PQOS_INTER_OS_RESCTRL_MON
  */
 static enum pqos_interface m_interface = PQOS_INTER_MSR;
+
 /**
  * ---------------------------------------
- * Functions for safe multi-threading
+ * Local functions
  * ---------------------------------------
  */
-
-/**
- * @brief Initializes API locks
- *
- * @return Operation status
- * @retval 0 success
- * @retval -1 error
- */
-static int
-_pqos_api_init(void)
+enum pqos_interface
+_pqos_get_inter(void)
 {
-
-        const char *lock_filename = LOCKFILE;
-
-        if (m_apilock != -1)
-                return -1;
-
-        m_apilock = open(lock_filename, O_WRONLY | O_CREAT,
-                         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        if (m_apilock == -1)
-                return -1;
-
-        if (pthread_mutex_init(&m_apilock_mutex, NULL) != 0) {
-                close(m_apilock);
-                m_apilock = -1;
-                return -1;
-        }
-
-        return 0;
+        return m_interface;
 }
 
 /**
- * @brief Uninitializes API locks
+ * @brief Internal API to set PQoS interface
  *
- * @return Operation status
- * @retval 0 success
- * @retval -1 error
+ * @return PQoS interface
  */
-static int
-_pqos_api_exit(void)
+
+PQOS_STATIC void
+_pqos_set_inter(const enum pqos_interface iface)
 {
-        int ret = 0;
-
-        if (close(m_apilock) != 0)
-                ret = -1;
-
-        if (pthread_mutex_destroy(&m_apilock_mutex) != 0)
-                ret = -1;
-
-        m_apilock = -1;
-
-        return ret;
-}
-
-void
-_pqos_api_lock(void)
-{
-        int err = 0;
-
-        if (lockf(m_apilock, F_LOCK, 0) != 0)
-                err = 1;
-
-        if (pthread_mutex_lock(&m_apilock_mutex) != 0)
-                err = 1;
-
-        if (err)
-                LOG_ERROR("API lock error!\n");
-}
-
-void
-_pqos_api_unlock(void)
-{
-        int err = 0;
-
-        if (lockf(m_apilock, F_ULOCK, 0) != 0)
-                err = 1;
-
-        if (pthread_mutex_unlock(&m_apilock_mutex) != 0)
-                err = 1;
-
-        if (err)
-                LOG_ERROR("API unlock error!\n");
+        m_interface = iface;
 }
 
 /**
@@ -709,16 +624,17 @@ pqos_init(const struct pqos_config *config)
         if (config == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        if (_pqos_api_init() != 0) {
+        if (lock_init() != 0) {
                 fprintf(stderr, "API lock initialization error!\n");
                 return PQOS_RETVAL_ERROR;
         }
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(0);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
+                lock_fini();
                 return ret;
         }
 
@@ -787,11 +703,11 @@ pqos_init(const struct pqos_config *config)
 
         ret = api_init(interface, m_cpu->vendor);
         if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("_pqos_api_init() error %d\n", ret);
+                LOG_ERROR("lock_init() error %d\n", ret);
                 goto machine_init_error;
         }
 
-        m_interface = interface;
+        _pqos_set_inter(interface);
 
         ret = pqos_alloc_init(m_cpu, m_cap, config);
         switch (ret) {
@@ -857,10 +773,10 @@ init_error:
         if (ret == PQOS_RETVAL_OK)
                 m_init_done = 1;
 
-        _pqos_api_unlock();
+        lock_release();
 
         if (ret != PQOS_RETVAL_OK)
-                _pqos_api_exit();
+                lock_fini();
 
         return ret;
 }
@@ -872,12 +788,12 @@ pqos_fini(void)
         int retval = PQOS_RETVAL_OK;
         unsigned i = 0;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
-                _pqos_api_exit();
+                lock_release();
+                lock_fini();
                 return ret;
         }
 
@@ -911,9 +827,9 @@ pqos_fini(void)
 
         m_init_done = 0;
 
-        _pqos_api_unlock();
+        lock_release();
 
-        if (_pqos_api_exit() != 0)
+        if (lock_fini() != 0)
                 retval = PQOS_RETVAL_ERROR;
 
         return retval;
@@ -937,11 +853,11 @@ pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu)
         if (cap == NULL && cpu == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -954,7 +870,7 @@ pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu)
                 ASSERT(*cpu != NULL);
         }
 
-        _pqos_api_unlock();
+        lock_release();
         return PQOS_RETVAL_OK;
 }
 
@@ -1156,22 +1072,16 @@ pqos_inter_get(enum pqos_interface *interface)
         if (interface == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
         *interface = _pqos_get_inter();
 
-        _pqos_api_unlock();
+        lock_release();
         return PQOS_RETVAL_OK;
-}
-
-enum pqos_interface
-_pqos_get_inter(void)
-{
-        return m_interface;
 }

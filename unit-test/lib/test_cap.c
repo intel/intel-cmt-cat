@@ -30,8 +30,6 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "test_cap.h"
-
 #include "cap.h"
 #include "log.h"
 #include "mock_cap.h"
@@ -40,60 +38,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 
-#define wrap_lockf(cmdpar)                                                     \
-        do {                                                                   \
-                expect_value(__wrap_lockf, fd, LOCKFILENO);                    \
-                expect_value(__wrap_lockf, cmd, cmdpar);                       \
-                expect_value(__wrap_lockf, len, 0);                            \
-                expect_function_call(__wrap_lockf);                            \
-        } while (0)
-
-#define wrap_lock_and_unlock()                                                 \
-        do {                                                                   \
-                wrap_lockf(F_LOCK);                                            \
-                wrap_lockf(F_ULOCK);                                           \
-        } while (0)
-
 /* ======== mock ========*/
-
-int
-__wrap_open(const char *path, int oflags, int mode)
-{
-        if (strcmp(path, LOCKFILE))
-                return __real_open(path, oflags, mode);
-
-        function_called();
-        check_expected(path);
-        check_expected(oflags);
-        check_expected(mode);
-
-        return LOCKFILENO;
-}
-
-int
-__wrap_close(int fildes)
-{
-        if (fildes != LOCKFILENO)
-                return __real_close(fildes);
-
-        function_called();
-        check_expected(fildes);
-
-        return 0;
-}
-
-int
-__wrap_lockf(int fd, int cmd, off_t len)
-{
-        if (fd != LOCKFILENO)
-                return __real_lockf(fd, cmd, len);
-
-        function_called();
-        check_expected(fd);
-        check_expected(cmd);
-        check_expected(len);
-        return 0;
-}
 
 int
 __wrap_cpuinfo_init(enum pqos_interface interface __attribute__((unused)),
@@ -284,20 +229,6 @@ test__pqos_check_init_after_init(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
-/* ======== _pqos_get_inter  ======== */
-
-static void
-test__pqos_get_inter(void **state __attribute__((unused)))
-{
-        enum pqos_interface ret;
-        struct test_data *data;
-
-        data = (struct test_data *)*state;
-
-        ret = _pqos_get_inter();
-        assert_int_equal(ret, data->interface);
-}
-
 /* ======== _pqos_get_cap  ======== */
 
 static void
@@ -403,11 +334,9 @@ test_pqos_init(void **state __attribute__((unused)))
                 will_return(__wrap_os_cap_mba_discover, &(data->cap_mba));
         };
 #endif
-        expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);
-        expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        expect_function_call(__wrap_open);
-        wrap_lockf(F_LOCK);
+        expect_function_call(__wrap_lock_init);
+        will_return(__wrap_lock_init, 0);
+        expect_function_call(__wrap_lock_get);
 #ifdef __linux__
         if (data->interface != PQOS_INTER_MSR)
                 expect_function_call(__wrap_os_cap_init);
@@ -419,7 +348,8 @@ test_pqos_init(void **state __attribute__((unused)))
                  data->interface == PQOS_INTER_OS_RESCTRL_MON)
                 expect_function_call(__wrap_os_cap_mon_discover);
 #endif
-        wrap_lockf(F_ULOCK);
+        expect_function_call(__wrap_lock_release);
+
         ret = pqos_init(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
@@ -431,42 +361,11 @@ test_pqos_fini(void **state __attribute__((unused)))
 {
         int ret;
 
-        wrap_lock_and_unlock();
-        expect_function_call(__wrap_close);
-        expect_value(__wrap_close, fildes, LOCKFILENO);
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
+        expect_function_call(__wrap_lock_fini);
+        will_return(__wrap_lock_fini, 0);
         ret = pqos_fini();
-        assert_int_equal(ret, PQOS_RETVAL_OK);
-}
-
-/* ======== pqos_inter_get ======== */
-
-static void
-test_pqos_inter_get_param(void **state __attribute__((unused)))
-{
-        int ret;
-
-        ret = pqos_inter_get(NULL);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-}
-
-static void
-test_pqos_inter_get_before_init(void **state __attribute__((unused)))
-{
-        int ret;
-        enum pqos_interface interface;
-
-        ret = pqos_inter_get(&interface);
-        assert_int_not_equal(ret, PQOS_RETVAL_OK);
-}
-
-static void
-test_pqos_inter_get_after_init(void **state __attribute__((unused)))
-{
-        int ret;
-        enum pqos_interface interface;
-
-        wrap_lock_and_unlock();
-        ret = pqos_inter_get(&interface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -481,10 +380,19 @@ test_pqos_cap_get_before_init(void **state __attribute__((unused)))
 
         ret = pqos_cap_get(NULL, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(&p_cap, &p_cpu);
         assert_int_not_equal(ret, PQOS_RETVAL_OK);
+
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(&p_cap, NULL);
         assert_int_not_equal(ret, PQOS_RETVAL_OK);
+
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(NULL, &p_cpu);
         assert_int_not_equal(ret, PQOS_RETVAL_OK);
 }
@@ -498,13 +406,16 @@ test_pqos_cap_get_after_init(void **state __attribute__((unused)))
 
         ret = pqos_cap_get(NULL, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
-        wrap_lock_and_unlock();
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(&p_cap, &p_cpu);
         assert_int_equal(ret, PQOS_RETVAL_OK);
-        wrap_lock_and_unlock();
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(&p_cap, NULL);
         assert_int_equal(ret, PQOS_RETVAL_OK);
-        wrap_lock_and_unlock();
+        expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(NULL, &p_cpu);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
@@ -648,7 +559,6 @@ main(void)
         int result = 0;
 
         const struct CMUnitTest tests_cap_param[] = {
-            cmocka_unit_test(test_pqos_inter_get_param),
             cmocka_unit_test(test__pqos_cap_get_type_param),
             cmocka_unit_test(test_pqos_init_param),
         };
@@ -657,12 +567,9 @@ main(void)
             cmocka_unit_test(test__pqos_check_init_before_init),
             cmocka_unit_test(test__pqos_get_cap_before_init),
             cmocka_unit_test(test__pqos_get_cpu_before_init),
-            cmocka_unit_test(test_pqos_inter_get_before_init),
             cmocka_unit_test(test_pqos_cap_get_before_init),
             cmocka_unit_test(test_pqos_init),
-            cmocka_unit_test(test_pqos_inter_get_after_init),
             cmocka_unit_test(test_pqos_cap_get_after_init),
-            cmocka_unit_test(test__pqos_get_inter),
             cmocka_unit_test(test__pqos_get_cap_after_init),
             cmocka_unit_test(test__pqos_get_cpu_after_init),
             cmocka_unit_test(test__pqos_check_init_after_init),

@@ -249,6 +249,7 @@ cppcheck:
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
 	hw_cap.h hw_cap.c \
 	hw_monitoring.h hw_monitoring.c \
+	lock.h lock.c \
 	os_cap.h os_cap.c \
 	os_common.h \
 	os_monitoring.h os_monitoring.c \

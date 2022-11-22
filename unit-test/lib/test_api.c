@@ -50,10 +50,10 @@
                 /* _pqos_check_init */                                         \
                 expect_value(__wrap__pqos_check_init, expect, value);          \
                 will_return(__wrap__pqos_check_init, ret);                     \
-                /* _pqos_api_lock */                                           \
-                expect_function_call(__wrap__pqos_api_lock);                   \
-                /* _pqos_api_unlock */                                         \
-                expect_function_call(__wrap__pqos_api_unlock);                 \
+                /* lock_get */                                                 \
+                expect_function_call(__wrap_lock_get);                         \
+                /* lock_release */                                             \
+                expect_function_call(__wrap_lock_release);                     \
         } while (0)
 
 static int

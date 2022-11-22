@@ -30,13 +30,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_CAP_H
-#define __TEST_CAP_H
+#ifndef MOCK_LOCK_H_
+#define MOCK_LOCK_H_
 
-#include <aio.h>
-#include <stddef.h>
+#include "pqos.h"
 
-void *__real_malloc(size_t size);
-char *__real_getenv(const char *name);
+int __wrap_lock_init(void);
+int __wrap_lock_fini(void);
+void __wrap_lock_get(void);
+void __wrap_lock_release(void);
 
-#endif /* __TEST_CAP_H */
+#endif /* MOCK_LOCK_H_ */

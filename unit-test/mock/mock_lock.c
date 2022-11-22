@@ -30,13 +30,34 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __TEST_CAP_H
-#define __TEST_CAP_H
+#include "mock_lock.h"
 
-#include <aio.h>
-#include <stddef.h>
+#include "mock_test.h"
 
-void *__real_malloc(size_t size);
-char *__real_getenv(const char *name);
+int
+__wrap_lock_init(void)
+{
+        function_called();
 
-#endif /* __TEST_CAP_H */
+        return mock_type(int);
+}
+
+int
+__wrap_lock_fini(void)
+{
+        function_called();
+
+        return mock_type(int);
+}
+
+void
+__wrap_lock_get(void)
+{
+        function_called();
+}
+
+void
+__wrap_lock_release(void)
+{
+        function_called();
+}

@@ -76,19 +76,6 @@ PQOS_LOCAL void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 PQOS_LOCAL void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
 
 /**
- * @brief Acquires lock for PQoS API use
- *
- * Only one thread at a time is allowed to use the API.
- * Each PQoS API need to use api_lock and api_unlock functions.
- */
-PQOS_LOCAL void _pqos_api_lock(void);
-
-/**
- * @brief Symmetric operation to \a _pqos_api_lock to release the lock
- */
-PQOS_LOCAL void _pqos_api_unlock(void);
-
-/**
  * @brief Checks library initialization state
  *
  * @param expect expected stated of library initialization state

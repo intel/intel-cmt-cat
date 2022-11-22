@@ -37,6 +37,7 @@
 #include "cap.h"
 #include "cpuinfo.h"
 #include "hw_monitoring.h"
+#include "lock.h"
 #include "log.h"
 #include "monitoring.h"
 #include "os_allocation.h"
@@ -242,7 +243,7 @@ api_init(int interface, enum pqos_vendor vendor)
         ({                                                                     \
                 int ret;                                                       \
                                                                                \
-                _pqos_api_lock();                                              \
+                lock_get();                                                    \
                 do {                                                           \
                         ret = _pqos_check_init(1);                             \
                         if (ret != PQOS_RETVAL_OK)                             \
@@ -255,7 +256,7 @@ api_init(int interface, enum pqos_vendor vendor)
                                 ret = PQOS_RETVAL_RESOURCE;                    \
                         }                                                      \
                 } while (0);                                                   \
-                _pqos_api_unlock();                                            \
+                lock_release();                                                \
                                                                                \
                 ret;                                                           \
         })
@@ -384,11 +385,11 @@ pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         if (count == NULL)
                 return NULL;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return NULL;
         }
 
@@ -399,7 +400,7 @@ pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
         } else
                 LOG_INFO(UNSUPPORTED_INTERFACE);
 
-        _pqos_api_unlock();
+        lock_release();
 
         return tasks;
 }
@@ -569,11 +570,11 @@ pqos_mba_set(const unsigned mba_id,
         if (requested == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -589,7 +590,7 @@ pqos_mba_set(const unsigned mba_id,
                      requested[i].mb_max > vconfig->mba_max)) {
                         LOG_ERROR("MBA COS%u rate out of range (from 1-%d)!\n",
                                   requested[i].class_id, vconfig->mba_max);
-                        _pqos_api_unlock();
+                        lock_release();
                         return PQOS_RETVAL_PARAM;
                 }
         }
@@ -601,7 +602,7 @@ pqos_mba_set(const unsigned mba_id,
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
@@ -673,11 +674,11 @@ pqos_mon_start(const unsigned num_cores,
                 return PQOS_RETVAL_PARAM;
         }
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -703,7 +704,7 @@ pqos_mon_start_exit:
         else if (group->intl != NULL)
                 free(group->intl);
 
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
@@ -720,11 +721,11 @@ pqos_mon_stop(struct pqos_mon_data *group)
         if (group->valid != GROUP_VALID_MARKER)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -742,7 +743,7 @@ pqos_mon_stop(struct pqos_mon_data *group)
         else
                 memset(group, 0, sizeof(*group));
 
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
@@ -765,11 +766,11 @@ pqos_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
                         return PQOS_RETVAL_PARAM;
         }
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -782,7 +783,7 @@ pqos_mon_poll(struct pqos_mon_data **groups, const unsigned num_groups)
                         ret = retval;
                 }
         }
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
@@ -830,11 +831,11 @@ pqos_mon_start_pids(const unsigned num_pids,
                 return PQOS_RETVAL_PARAM;
         }
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -859,7 +860,7 @@ pqos_mon_start_pids_exit:
         else if (group->intl != NULL)
                 free(group->intl);
 
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
@@ -914,11 +915,11 @@ pqos_mon_start_uncore(const unsigned num_sockets,
                       PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)) == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -952,7 +953,7 @@ pqos_mon_start_uncore_exit:
                 free(data);
         }
 
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
@@ -982,11 +983,11 @@ pqos_mon_get_value(const struct pqos_mon_data *const group,
         if ((group->event & event_id) == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
@@ -1051,7 +1052,7 @@ pqos_mon_get_value(const struct pqos_mon_data *const group,
                         *delta = _delta;
         }
 
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
@@ -1070,17 +1071,17 @@ pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value)
         if ((group->event & PQOS_PERF_EVENT_IPC) == 0)
                 return PQOS_RETVAL_PARAM;
 
-        _pqos_api_lock();
+        lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
-                _pqos_api_unlock();
+                lock_release();
                 return ret;
         }
 
         *value = group->values.ipc;
 
-        _pqos_api_unlock();
+        lock_release();
 
         return ret;
 }
