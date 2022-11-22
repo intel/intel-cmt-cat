@@ -28,9 +28,11 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, Inject, OnInit } from '@angular/core';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Pools } from '../../../overview/overview.model';
 
@@ -42,26 +44,45 @@ import { Pools } from '../../../overview/overview.model';
 export class CoresEditDialogComponent implements OnInit {
   cores!: string;
   isSaved = false;
+  form!: FormGroup;
+  coresList!: number[];
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: Pools,
     private service: AppqosService,
+    private localService: LocalService,
     private snackBar: SnackBarService,
     public dialogRef: MatDialogRef<CoresEditDialogComponent>
   ) {}
 
   ngOnInit(): void {
-    this.cores = String(this.data.cores);
+    this.form = new FormGroup({
+      cores: new FormControl(String(this.data.cores), [
+        Validators.required,
+        Validators.pattern(
+          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$'
+        ),
+      ]),
+    });
   }
 
   saveCores(): void {
+    if (!this.form.valid) return;
+
+    if (this.form.value.cores.includes('-')) {
+      const splitedCores = this.form.value.cores.split(/[,-]/).map(Number);
+      const rangeCores = this.localService.getCoresDash(splitedCores);
+
+      splitedCores.splice(splitedCores.length - 2, 2);
+      this.coresList = [...splitedCores, ...rangeCores];
+    } else {
+      this.coresList = this.form.value.cores.split(',').map(Number);
+    }
+
     this.service
       .poolPut(
         {
-          cores: this.cores
-            .split(/[,-]/)
-            .filter((core: string) => core)
-            .map(Number),
+          cores: this.coresList,
         },
         this.data.id
       )

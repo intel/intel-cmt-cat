@@ -50,6 +50,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         placeholder="List of PID’s e.g. 2651, 2665 or 6490-6510"
         formControlName="pids"
       />
+      <mat-error *ngIf="form.controls['pids'].errors?.['pattern']"
+        >List of PID’s e.g. 2651, 2665 or 6490-6510
+      </mat-error>
     </mat-form-field>
     <mat-form-field class="core-field" appearance="fill" floatLabel="always">
       <mat-label>Cores</mat-label>
@@ -58,6 +61,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         placeholder="List of cores (optional)"
         formControlName="cores"
       />
+      <mat-error *ngIf="form.controls['cores'].errors?.['pattern']"
+        >List of CORE’s e.g. 1,2 or 1,2-5 or 1-5
+      </mat-error>
     </mat-form-field>
     <mat-form-field class="pool-field" appearance="fill">
       <mat-label>Select a Pool</mat-label>

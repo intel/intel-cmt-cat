@@ -28,11 +28,12 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, Inject, OnInit } from '@angular/core';
-import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { Form, FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 import { Apps, Pools } from 'src/app/components/overview/overview.model';
 import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { PoolAddDialogComponent } from '../../pool-config/pool-add-dialog/pool-add-dialog.component';
 
@@ -46,34 +47,45 @@ type PostApp = Omit<Apps, 'id'>;
 export class AppsAddDialogComponent implements OnInit {
   form!: FormGroup;
   poolsList!: Pools[];
+  coresList!: number[];
+  pidsList!: number[];
 
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: Pools[],
     private snackBar: SnackBarService,
     public dialogRef: MatDialogRef<PoolAddDialogComponent>,
-    private service: AppqosService
+    private service: AppqosService,
+    private localService: LocalService
   ) {}
 
   ngOnInit(): void {
-    console.log(this.data);
-
     this.form = new FormGroup({
       name: new FormControl('', [Validators.required]),
-      pids: new FormControl('', [Validators.required]),
-      cores: new FormControl(''),
+      pids: new FormControl('', [
+        Validators.required,
+        Validators.pattern(
+          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$'
+        ),
+      ]),
+      cores: new FormControl(
+        '',
+        Validators.pattern(
+          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$'
+        )
+      ),
       pool: new FormControl('', [Validators.required]),
     });
   }
 
   saveApp(): void {
     if (!this.form.valid) return;
+    if (this.form.value.cores) this.getCores(this.form.value.cores);
+
+    this.getPids(this.form.value.pids);
 
     let app: PostApp = {
       name: this.form.value.name,
-      pids: this.form.value.pids
-        .split(/[,-]/)
-        .filter((pid: string) => pid)
-        .map(Number),
+      pids: this.pidsList,
       pool_id: this.form.value.pool.id,
     };
 
@@ -82,10 +94,7 @@ export class AppsAddDialogComponent implements OnInit {
         (pool: Pools) => pool.id === this.form.value.pool.id
       )!.cores;
     } else {
-      app.cores = this.form.value.cores
-        .split(/[,-]/)
-        .filter((core: string) => core)
-        .map(Number);
+      app.cores = this.coresList;
     }
 
     this.postApp(app);
@@ -101,5 +110,29 @@ export class AppsAddDialogComponent implements OnInit {
         this.snackBar.handleError(error.error.message);
       },
     });
+  }
+
+  getPids(pids: string) {
+    if (pids.includes('-')) {
+      const splitedPids = pids.split(/[,-]/).map(Number);
+      const rangePids = this.localService.getPidsDash(splitedPids);
+
+      splitedPids.splice(splitedPids.length - 2, 2);
+      this.pidsList = [...splitedPids, ...rangePids];
+    } else {
+      this.pidsList = pids.split(',').map(Number);
+    }
+  }
+
+  getCores(cores: string) {
+    if (cores.includes('-')) {
+      const splitedCores = cores.split(/[,-]/).map(Number);
+      const rangeCores = this.localService.getCoresDash(splitedCores);
+
+      splitedCores.splice(splitedCores.length - 2, 2);
+      this.coresList = [...splitedCores, ...rangeCores];
+    } else {
+      this.coresList = cores.split(',').map(Number);
+    }
   }
 }

@@ -31,10 +31,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 <h2 mat-dialog-title>Edit Resource Pool Cores</h2>
 <div mat-dialog-content>
   <span class="note"><b>Notes</b>: Cores must not belong to another pool.</span>
-  <mat-form-field class="core-field" appearance="fill" floatLabel="always">
-    <mat-label>Cores</mat-label>
-    <input matInput [(ngModel)]="cores" />
-  </mat-form-field>
+  <form [formGroup]="form">
+    <mat-form-field class="core-field" appearance="fill" floatLabel="always">
+      <mat-label>Cores</mat-label>
+      <input matInput formControlName="cores" />
+      <mat-error *ngIf="form.controls['cores'].errors?.['pattern']"
+        >List of cores e.g. 1,2 or 1,2-5 or 1-5
+      </mat-error>
+    </mat-form-field>
+  </form>
 </div>
 <div mat-dialog-actions align="end">
   <button mat-button mat-dialog-close color="primary">Close</button>

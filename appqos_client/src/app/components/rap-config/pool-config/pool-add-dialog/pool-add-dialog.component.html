@@ -40,6 +40,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
     <mat-form-field class="core-field" appearance="fill">
       <mat-label>Cores</mat-label>
       <input matInput formControlName="cores" />
+      <mat-error *ngIf="form.controls['cores'].errors?.['pattern']"
+        >List of cores e.g. 1,2 or 1,2-5 or 1-5
+      </mat-error>
     </mat-form-field>
   </form>
 </div>

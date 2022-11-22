@@ -105,4 +105,32 @@ export class LocalService {
     }
     return true;
   }
+
+  public getCoresDash(cores: number[]): number[] {
+    let start = cores[cores.length - 2];
+    let end = cores[cores.length - 1];
+    const coresList = [];
+
+    if (start > end) [start, end] = [end, start];
+
+    for (let i = start; i <= end; i++) {
+      coresList.push(i);
+    }
+
+    return coresList;
+  }
+
+  public getPidsDash(pids: number[]): number[] {
+    let start = pids[pids.length - 2];
+    let end = pids[pids.length - 1];
+    const pidsList = [];
+
+    if (start > end) [start, end] = [end, start];
+
+    for (let i = start; i <= end; i++) {
+      pidsList.push(i);
+    }
+
+    return pidsList;
+  }
 }

@@ -53,6 +53,7 @@ export class PoolAddDialogComponent implements OnInit {
   caps!: string[] | null;
   mbaBwDefNum = Math.pow(2, 32) - 1;
   mbaCtrl!: boolean | null;
+  coresList!: number[];
 
   constructor(
     private localService: LocalService,
@@ -70,19 +71,31 @@ export class PoolAddDialogComponent implements OnInit {
 
     this.form = new FormGroup({
       name: new FormControl('', [Validators.required]),
-      cores: new FormControl('', [Validators.required]),
+      cores: new FormControl('', [
+        Validators.required,
+        Validators.pattern(
+          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$'
+        ),
+      ]),
     });
   }
 
   savePool(): void {
     if (!this.form.valid || !this.caps) return;
 
+    if (this.form.value.cores.includes('-')) {
+      const splitedCores = this.form.value.cores.split(/[,-]/).map(Number);
+      const rangeCores = this.localService.getCoresDash(splitedCores);
+
+      splitedCores.splice(splitedCores.length - 2, 2);
+      this.coresList = [...splitedCores, ...rangeCores];
+    } else {
+      this.coresList = this.form.value.cores.split(',').map(Number);
+    }
+
     let pool: PostPool = {
       name: this.form.value.name,
-      cores: this.form.value.cores
-        .split(/[,-]/)
-        .filter((core: string) => core)
-        .map(Number),
+      cores: this.coresList,
     };
 
     if (this.caps.includes('mba')) {
