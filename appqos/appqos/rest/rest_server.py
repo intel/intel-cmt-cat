@@ -76,13 +76,13 @@ class Server:
     REST API server
     """
 
-
     def __init__(self):
         self.process = None
         self.app = Flask(__name__)
         self.app.config['MAX_CONTENT_LENGTH'] = 2 * 1024
         self.app.url_map.strict_slashes = False
         self.api = Api(self.app)
+        self.cors = None
 
         self.http_server = None
 
@@ -180,7 +180,7 @@ class Server:
         return path
 
 
-    def start(self, host, port, _debug=False):
+    def start(self, host, port, _debug=False, cors=False):
         """
         Start REST server
 
@@ -192,6 +192,17 @@ class Server:
         Returns:
             0 on success
         """
+
+        try:
+            if cors:
+                # pylint: disable=import-outside-toplevel
+                from flask_cors import CORS
+
+                self.cors = CORS(self.app)
+            else:
+                self.cors = None
+        except ImportError:
+            pass
 
         ca_dir = self.find_ca_dir()
         log.info(f"Ussing SSL cert form {ca_dir}")

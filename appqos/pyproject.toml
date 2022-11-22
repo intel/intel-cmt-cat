@@ -41,6 +41,9 @@ dynamic = ["version"]
 
 
 [project.optional-dependencies]
+cors = [
+    "flask-cors"
+]
 dev = [
     "bandit",
     "pylint",

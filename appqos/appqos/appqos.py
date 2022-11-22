@@ -231,6 +231,18 @@ def main():
                         help="AppQoS inet address")
     parser.add_argument('--version', action='store_true',
                         help="Output version information and exit")
+
+    # Check if CORS package is installed
+    try:
+        # pylint: disable=import-outside-toplevel,unused-import
+        from flask_cors import CORS
+
+        parser.add_argument('--cors', action='store_true',
+                            help='Enable cross-origin resource sharing')
+        has_cors = True
+    except ImportError:
+        has_cors = False
+
     cmd_args = parser.parse_args()
 
     # configure syslog output
@@ -265,9 +277,12 @@ def main():
         # initialize main logic
         app_qos = AppQoS()
 
+        # Enable CORS
+        cors = has_cors and cmd_args.cors
+
         # start REST API server
         server = rest_server.Server()
-        result = server.start(cmd_args.address, cmd_args.port[0], cmd_args.verbose)
+        result = server.start(cmd_args.address, cmd_args.port[0], cmd_args.verbose, cors=cors)
         if result == 0:
             # run main logic
             app_qos.run()
