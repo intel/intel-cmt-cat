@@ -43,7 +43,8 @@ CFLAGS = -I$(LIBDIR) \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-D_GNU_SOURCE
+	-D_GNU_SOURCE \
+	-fcf-protection=full
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -60,11 +61,14 @@ CFLAGS += -Wcast-align \
 endif
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
+IS_CLANG = $(shell $(CC) -v 2>&1 | grep -c "^clang version ")
+
 # GCC-only options
 ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
-    -fwrapv
+    -fwrapv \
+	-fstack-protector-strong
 endif
 
 # DEBUG build

@@ -47,7 +47,8 @@ CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-Winline -msse4.2
+	-Winline -msse4.2 \
+	-fcf-protection=full
 
 ifeq ($(DEBUG),y)
 CFLAGS += -O0 -g -DDEBUG
@@ -66,12 +67,15 @@ CFLAGS += -mclwb
 endif
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
+IS_CLANG = $(shell $(CC) -v 2>&1 | grep -c "^clang version ")
+
 # GCC-only options
 ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
-    -fno-expensive-optimizations
+    -fno-expensive-optimizations \
+    -fstack-protector-strong
 endif
 
 SRCS = $(sort $(wildcard *.c))

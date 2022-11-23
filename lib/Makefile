@@ -43,7 +43,8 @@ CFLAGS = -pthread -I./ -D_GNU_SOURCE \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector \
-	-Wunreachable-code -Wsign-compare -Wno-endif-labels
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
+	-fcf-protection=full
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -63,11 +64,14 @@ CFLAGS += -Wcast-align \
 endif
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
+IS_CLANG = $(shell $(CC) -v 2>&1 | grep -c "^clang version ")
+
 # GCC-only options
 ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
-    -fwrapv
+    -fwrapv \
+    -fstack-protector-strong
 endif
 
 # so or static build
