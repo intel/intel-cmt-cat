@@ -36,11 +36,16 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdlib.h>
+#include <string.h>
 
 /* clang-format off */
 #include <cmocka.h>
-#include "cap.c"
 /* clang-format on */
+#include "test_cap.h"
+#include "mock_cap.h"
+
+#include "log.h"
+#include "pqos.h"
 
 /* ======== helpers ======= */
 
@@ -118,11 +123,11 @@ __wrap_getenv(const char *name)
 
 static int log_init_result = LOG_RETVAL_OK;
 int
-log_init(int fd_log __attribute__((unused)),
-         void (*callback_log)(void *, const size_t, const char *)
-             __attribute__((unused)),
-         void *context_log __attribute__((unused)),
-         int verbosity __attribute__((unused)))
+__wrap_log_init(int fd_log __attribute__((unused)),
+                void (*callback_log)(void *, const size_t, const char *)
+                    __attribute__((unused)),
+                void *context_log __attribute__((unused)),
+                int verbosity __attribute__((unused)))
 {
         function_called();
 
@@ -131,7 +136,7 @@ log_init(int fd_log __attribute__((unused)),
 
 static int log_fini_result = LOG_RETVAL_OK;
 int
-log_fini(void)
+__wrap_log_fini(void)
 {
         function_called();
 
@@ -139,9 +144,9 @@ log_fini(void)
 }
 
 void
-log_printf(int type __attribute__((unused)),
-           const char *str __attribute__((unused)),
-           ...)
+__wrap_log_printf(int type __attribute__((unused)),
+                  const char *str __attribute__((unused)),
+                  ...)
 {
         if (check_log_printf_enabled())
                 function_called();
@@ -195,61 +200,6 @@ MAKE_CAP_DIS_WRAPPER(os_cap_mba_discover, pqos_cap_mba)
 MAKE_CAP_MON_WRAPPER(hw_cap_mon_discover)
 MAKE_CAP_MON_WRAPPER(os_cap_mon_discover)
 
-#define wrap_lockf(cmdpar)                                                     \
-        do {                                                                   \
-                expect_value(__wrap_lockf, fd, LOCKFILENO);                    \
-                expect_value(__wrap_lockf, cmd, cmdpar);                       \
-                expect_value(__wrap_lockf, len, 0);                            \
-                expect_function_call(__wrap_lockf);                            \
-        } while (0)
-
-#define wrap_lock_and_unlock()                                                 \
-        do {                                                                   \
-                wrap_lockf(F_LOCK);                                            \
-                wrap_lockf(F_ULOCK);                                           \
-        } while (0)
-
-#define wrap_open(result)                                                      \
-        do {                                                                   \
-                expect_function_call(__wrap_open);                             \
-                expect_string(__wrap_open, path, LOCKFILE);                    \
-                expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);         \
-                expect_value(__wrap_open, mode,                                \
-                             S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);           \
-                will_return(__wrap_open, result);                              \
-        } while (0)
-
-#define wrap_close(result)                                                     \
-        do {                                                                   \
-                expect_function_call(__wrap_close);                            \
-                expect_value(__wrap_close, fildes, LOCKFILENO);                \
-                will_return(__wrap_close, result);                             \
-        } while (0)
-
-#define wrap_pthread_mutex_init(result)                                        \
-        do {                                                                   \
-                expect_function_call(__wrap_pthread_mutex_init);               \
-                will_return(__wrap_pthread_mutex_init, result);                \
-        } while (0)
-
-#define wrap_pthread_mutex_destroy(result)                                     \
-        do {                                                                   \
-                expect_function_call(__wrap_pthread_mutex_destroy);            \
-                will_return(__wrap_pthread_mutex_destroy, result);             \
-        } while (0)
-
-#define wrap_pthread_mutex_lock(result)                                        \
-        do {                                                                   \
-                expect_function_call(__wrap_pthread_mutex_lock);               \
-                will_return(__wrap_pthread_mutex_lock, result);                \
-        } while (0)
-
-#define wrap_pthread_mutex_unlock(result)                                      \
-        do {                                                                   \
-                expect_function_call(__wrap_pthread_mutex_unlock);             \
-                will_return(__wrap_pthread_mutex_unlock, result);              \
-        } while (0)
-
 int
 __wrap_os_cap_get_mba_ctrl(const struct pqos_cap *cap,
                            const struct pqos_cpuinfo *cpu,
@@ -266,10 +216,10 @@ __wrap_os_cap_get_mba_ctrl(const struct pqos_cap *cap,
 }
 
 int
-pqos_cap_get_type(const struct pqos_cap *cap __attribute__((unused)),
-                  const enum pqos_cap_type type __attribute__((unused)),
-                  const struct pqos_capability **cap_item
-                  __attribute__((unused)))
+__wrap_pqos_cap_get_type(const struct pqos_cap *cap __attribute__((unused)),
+                         const enum pqos_cap_type type __attribute__((unused)),
+                         const struct pqos_capability **cap_item
+                         __attribute__((unused)))
 {
         function_called();
 
@@ -277,7 +227,8 @@ pqos_cap_get_type(const struct pqos_cap *cap __attribute__((unused)),
 }
 
 int
-resctrl_alloc_get_num_closids(unsigned *num_closids __attribute__((unused)))
+__wrap_resctrl_alloc_get_num_closids(unsigned *num_closids
+                                     __attribute__((unused)))
 {
         function_called();
 
@@ -285,60 +236,25 @@ resctrl_alloc_get_num_closids(unsigned *num_closids __attribute__((unused)))
 }
 
 int
-resctrl_is_supported(void)
+__wrap_cpuinfo_init(enum pqos_interface interface __attribute__((unused)),
+                    const struct pqos_cpuinfo **topology
+                    __attribute__((unused)))
 {
         function_called();
 
-        return mock();
+        return mock_type(int);
 }
 
-static int cpuinfo_init_result = LOG_RETVAL_OK;
 int
-cpuinfo_init(enum pqos_interface interface __attribute__((unused)),
-             const struct pqos_cpuinfo **topology __attribute__((unused)))
+__wrap_cpuinfo_fini(void)
 {
         function_called();
 
-        return cpuinfo_init_result;
-}
-
-static int cpuinfo_fini_result = LOG_RETVAL_OK;
-int
-cpuinfo_fini(void)
-{
-        function_called();
-
-        return cpuinfo_fini_result;
-}
-
-static int machine_init_result = LOG_RETVAL_OK;
-int
-machine_init(const unsigned max_core_id __attribute__((unused)))
-{
-        function_called();
-
-        return machine_init_result;
-}
-
-static int machine_fini_result = LOG_RETVAL_OK;
-int
-machine_fini(void)
-{
-        function_called();
-
-        return machine_fini_result;
+        return mock_type(int);
 }
 
 int
-os_cap_init(const enum pqos_interface inter __attribute__((unused)))
-{
-        function_called();
-
-        return 0;
-}
-
-int
-_pqos_utils_init(int interface __attribute__((unused)))
+__wrap_os_cap_init(const enum pqos_interface inter __attribute__((unused)))
 {
         function_called();
 
@@ -346,8 +262,34 @@ _pqos_utils_init(int interface __attribute__((unused)))
 }
 
 int
-api_init(int interface __attribute__((unused)),
-         enum pqos_vendor vendor __attribute__((unused)))
+__wrap__pqos_utils_init(int interface __attribute__((unused)))
+{
+        function_called();
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_api_init(int interface __attribute__((unused)),
+                enum pqos_vendor vendor __attribute__((unused)))
+{
+        function_called();
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_pqos_alloc_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
+                       const struct pqos_cap *cap __attribute__((unused)),
+                       const struct pqos_config *cfg __attribute__((unused)))
+{
+        function_called();
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_pqos_alloc_fini(void)
 {
         function_called();
 
@@ -355,9 +297,9 @@ api_init(int interface __attribute__((unused)),
 }
 
 int
-pqos_alloc_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
-                const struct pqos_cap *cap __attribute__((unused)),
-                const struct pqos_config *cfg __attribute__((unused)))
+__wrap_pqos_mon_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
+                     const struct pqos_cap *cap __attribute__((unused)),
+                     const struct pqos_config *cfg __attribute__((unused)))
 {
         function_called();
 
@@ -365,7 +307,7 @@ pqos_alloc_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
 }
 
 int
-pqos_alloc_fini(void)
+__wrap_pqos_mon_fini(void)
 {
         function_called();
 
@@ -373,21 +315,9 @@ pqos_alloc_fini(void)
 }
 
 int
-pqos_mon_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
-              const struct pqos_cap *cap __attribute__((unused)),
-              const struct pqos_config *cfg __attribute__((unused)))
+_pqos_check_init(const int expect)
 {
-        function_called();
-
-        return 0;
-}
-
-int
-pqos_mon_fini(void)
-{
-        function_called();
-
-        return 0;
+        return __wrap__pqos_check_init(expect);
 }
 
 /* ======== tests ======== */
@@ -395,12 +325,12 @@ pqos_mon_fini(void)
 static void
 test_interface_to_string(void **state __attribute__((unused)))
 {
-        assert_string_equal(interface_to_string(PQOS_INTER_MSR), "MSR");
-        assert_string_equal(interface_to_string(PQOS_INTER_OS), "OS");
-        assert_string_equal(interface_to_string(PQOS_INTER_OS_RESCTRL_MON),
+        assert_string_equal(_cap_interface_to_string(PQOS_INTER_MSR), "MSR");
+        assert_string_equal(_cap_interface_to_string(PQOS_INTER_OS), "OS");
+        assert_string_equal(_cap_interface_to_string(PQOS_INTER_OS_RESCTRL_MON),
                             "OS_RESCTRL_MON");
-        assert_string_equal(interface_to_string(PQOS_INTER_AUTO), "AUTO");
-        assert_string_equal(interface_to_string(-1), "Unknown");
+        assert_string_equal(_cap_interface_to_string(PQOS_INTER_AUTO), "AUTO");
+        assert_string_equal(_cap_interface_to_string(-1), "Unknown");
 }
 
 static void
@@ -412,31 +342,31 @@ test_discover_interface_param(void **state __attribute__((unused)))
         enable_check_log_printf();
         for (i = -1; i <= PQOS_INTER_AUTO; i++) {
                 interface = i;
-                expect_function_call(log_printf);
+                expect_function_call(__wrap_log_printf);
                 assert_int_equal(discover_interface(interface, NULL),
                                  PQOS_RETVAL_PARAM);
         };
 
 #ifndef __linux
-        expect_function_call(log_printf);
+        expect_function_call(__wrap_log_printf);
         assert_int_equal(discover_interface(PQOS_INTER_OS, &interface),
                          PQOS_RETVAL_PARAM);
-        expect_function_call(log_printf);
+        expect_function_call(__wrap_log_printf);
         assert_int_equal(
             discover_interface(PQOS_INTER_OS_RESCTRL_MON, &interface),
             PQOS_RETVAL_PARAM);
 #endif
         interface = -1;
-        expect_function_call(log_printf);
+        expect_function_call(__wrap_log_printf);
         assert_int_equal(discover_interface(-1, &interface), PQOS_RETVAL_PARAM);
 
         interface = -1;
-        expect_function_call(log_printf);
+        expect_function_call(__wrap_log_printf);
         assert_int_equal(discover_interface(PQOS_INTER_MSR - 1, &interface),
                          PQOS_RETVAL_PARAM);
 
         interface = -1;
-        expect_function_call(log_printf);
+        expect_function_call(__wrap_log_printf);
         assert_int_equal(discover_interface(PQOS_INTER_AUTO + 1, &interface),
                          PQOS_RETVAL_PARAM);
 }
@@ -616,8 +546,8 @@ test_discover_interface_auto_linux(void **state __attribute__((unused)))
         interface = -1;
         expect_function_call(__wrap_getenv);
         will_return(__wrap_getenv, NULL);
-        expect_function_call(resctrl_is_supported);
-        will_return(resctrl_is_supported, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_resctrl_is_supported);
+        will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_OK);
         ret = discover_interface(PQOS_INTER_AUTO, &interface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(interface, PQOS_INTER_OS);
@@ -625,8 +555,8 @@ test_discover_interface_auto_linux(void **state __attribute__((unused)))
         interface = -1;
         expect_function_call(__wrap_getenv);
         will_return(__wrap_getenv, NULL);
-        expect_function_call(resctrl_is_supported);
-        will_return(resctrl_is_supported, PQOS_RETVAL_ERROR);
+        expect_function_call(__wrap_resctrl_is_supported);
+        will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_ERROR);
         ret = discover_interface(PQOS_INTER_AUTO, &interface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(interface, PQOS_INTER_MSR);
@@ -900,7 +830,7 @@ test_cap_xxx_discover_malloc_fail(void **state __attribute__((unused)))
 static void
 test_discover_capabilities(void **state __attribute__((unused)))
 {
-        struct pqos_cap *p_cap;
+        struct pqos_cap *p_cap = NULL;
         struct pqos_cpuinfo cpu;
 
         assert_int_equal(discover_capabilities(NULL, NULL, -1),
@@ -968,6 +898,9 @@ test_discover_capabilities(void **state __attribute__((unused)))
         will_return(__wrap_hw_cap_mba_discover, PQOS_RETVAL_RESOURCE);
         assert_int_equal(discover_capabilities(&p_cap, &cpu, PQOS_INTER_MSR),
                          PQOS_RETVAL_OK);
+        assert_non_null(p_cap);
+        free(p_cap);
+        p_cap = NULL;
 
         expect_function_call(__wrap_hw_cap_mon_discover);
         will_return(__wrap_hw_cap_mon_discover, PQOS_RETVAL_OK);
@@ -979,6 +912,9 @@ test_discover_capabilities(void **state __attribute__((unused)))
         will_return(__wrap_hw_cap_mba_discover, PQOS_RETVAL_OK);
         assert_int_equal(discover_capabilities(&p_cap, &cpu, PQOS_INTER_MSR),
                          PQOS_RETVAL_OK);
+        assert_non_null(p_cap);
+        free(p_cap);
+        p_cap = NULL;
 
         expect_function_call(__wrap_hw_cap_mon_discover);
         will_return(__wrap_hw_cap_mon_discover, PQOS_RETVAL_OK);
@@ -990,6 +926,10 @@ test_discover_capabilities(void **state __attribute__((unused)))
         will_return(__wrap_hw_cap_mba_discover, PQOS_RETVAL_OK);
         assert_int_equal(discover_capabilities(&p_cap, &cpu, PQOS_INTER_MSR),
                          PQOS_RETVAL_OK);
+        assert_non_null(p_cap);
+        free(p_cap);
+        p_cap = NULL;
+
 #ifdef __linux__
         expect_function_call(__wrap_os_cap_mon_discover);
         will_return(__wrap_os_cap_mon_discover, PQOS_RETVAL_OK);
@@ -1022,7 +962,7 @@ test_discover_capabilities(void **state __attribute__((unused)))
 static void
 test_discover_capabilities_malloc_fail(void **state __attribute__((unused)))
 {
-        struct pqos_cap *p_cap;
+        struct pqos_cap *p_cap = NULL;
         struct pqos_cpuinfo cpu;
 
         expect_function_call(__wrap_hw_cap_mon_discover);
@@ -1051,17 +991,16 @@ test_pqos_init_negative(void **state __attribute__((unused)))
         assert_int_equal(pqos_init(&cfg), PQOS_RETVAL_ERROR);
 
         // fail at _pqos_check_init
-        save = m_init_done;
-        m_init_done = 1;
         expect_function_call(__wrap_lock_init);
         will_return(__wrap_lock_init, 0);
         expect_function_call(__wrap_lock_get);
+        expect_value(__wrap__pqos_check_init, expect, 0);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_INIT);
         // cleanup
         expect_function_call(__wrap_lock_release);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_equal(pqos_init(&cfg), PQOS_RETVAL_INIT);
-        m_init_done = save;
 
         // fail at log_init;
         save = log_init_result;
@@ -1069,7 +1008,9 @@ test_pqos_init_negative(void **state __attribute__((unused)))
         expect_function_call(__wrap_lock_init);
         will_return(__wrap_lock_init, 0);
         expect_function_call(__wrap_lock_get);
-        expect_function_call(log_init);
+        expect_value(__wrap__pqos_check_init, expect, 0);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_log_init);
         // cleanup
         expect_function_call(__wrap_lock_release);
         expect_function_call(__wrap_lock_fini);
@@ -1085,51 +1026,34 @@ test_pqos_init_negative(void **state __attribute__((unused)))
         expect_function_call(__wrap_lock_init);
         will_return(__wrap_lock_init, 0);
         expect_function_call(__wrap_lock_get);
-        expect_function_call(log_init);
+        expect_value(__wrap__pqos_check_init, expect, 0);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_log_init);
         // cleanup
-        expect_function_call(log_fini);
+        expect_function_call(__wrap_log_fini);
         expect_function_call(__wrap_lock_release);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
 
         // fail at cpuinfo_init
-        save = cpuinfo_init_result;
-        cpuinfo_init_result = PQOS_RETVAL_ERROR;
         cfg.interface = PQOS_INTER_MSR;
         expect_function_call(__wrap_lock_init);
         will_return(__wrap_lock_init, 0);
         expect_function_call(__wrap_lock_get);
-        expect_function_call(log_init);
+        expect_value(__wrap__pqos_check_init, expect, 0);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_log_init);
         expect_function_call(__wrap_getenv);
         will_return(__wrap_getenv, NULL);
-        expect_function_call(cpuinfo_init);
+        expect_function_call(__wrap_cpuinfo_init);
+        will_return(__wrap_cpuinfo_init, PQOS_RETVAL_ERROR);
         // cleanup
-        expect_function_call(log_fini);
+        expect_function_call(__wrap_log_fini);
         expect_function_call(__wrap_lock_release);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
-        cpuinfo_init_result = save;
-
-        // fail at cpuinfo_init
-        save = cpuinfo_init_result;
-        cpuinfo_init_result = PQOS_RETVAL_OK;
-        cfg.interface = PQOS_INTER_MSR;
-        expect_function_call(__wrap_lock_init);
-        will_return(__wrap_lock_init, 0);
-        expect_function_call(__wrap_lock_get);
-        expect_function_call(log_init);
-        expect_function_call(__wrap_getenv);
-        will_return(__wrap_getenv, NULL);
-        expect_function_call(cpuinfo_init);
-        // cleanup
-        expect_function_call(log_fini);
-        expect_function_call(__wrap_lock_release);
-        expect_function_call(__wrap_lock_fini);
-        will_return(__wrap_lock_fini, 0);
-        assert_int_not_equal(pqos_init(&cfg), PQOS_RETVAL_OK);
-        cpuinfo_init_result = save;
 }
 
 static void
@@ -1137,20 +1061,23 @@ test_pqos_fini_negative(void **state __attribute__((unused)))
 {
         expect_function_call(__wrap_lock_get);
         expect_function_call(__wrap_lock_release);
+        expect_value(__wrap__pqos_check_init, expect, 1);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_INIT);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);
         assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);
 
-        m_init_done = 1;
         expect_function_call(__wrap_lock_get);
-        cpuinfo_fini_result = PQOS_RETVAL_ERROR;
-        machine_fini_result = PQOS_RETVAL_ERROR;
+        expect_value(__wrap__pqos_check_init, expect, 1);
+        will_return(__wrap__pqos_check_init, PQOS_RETVAL_OK);
         log_fini_result = PQOS_RETVAL_ERROR;
-        expect_function_call(pqos_mon_fini);
-        expect_function_call(pqos_alloc_fini);
-        expect_function_call(cpuinfo_fini);
-        expect_function_call(machine_fini);
-        expect_function_call(log_fini);
+        expect_function_call(__wrap_pqos_mon_fini);
+        expect_function_call(__wrap_pqos_alloc_fini);
+        expect_function_call(__wrap_cpuinfo_fini);
+        will_return(__wrap_cpuinfo_fini, PQOS_RETVAL_ERROR);
+        expect_function_call(__wrap_machine_fini);
+        will_return(__wrap_machine_fini, PQOS_RETVAL_ERROR);
+        expect_function_call(__wrap_log_fini);
         expect_function_call(__wrap_lock_release);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);

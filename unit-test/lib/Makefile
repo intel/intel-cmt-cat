@@ -636,7 +636,7 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-$(BIN_DIR)/test_cap_static: ./test_cap_static.c $(PQOS_OBJS)
+$(BIN_DIR)/test_cap_static: ./test_cap_static.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=getenv \
@@ -651,12 +651,28 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(PQOS_OBJS)
 		-Wl,--wrap=hw_cap_mon_discover \
 		-Wl,--wrap=os_cap_mon_discover \
 		-Wl,--wrap=os_cap_get_mba_ctrl \
+		-Wl,--wrap=pqos_cap_get_type \
+		-Wl,--wrap=api_init \
+		-Wl,--wrap=pqos_alloc_init \
+		-Wl,--wrap=pqos_alloc_fini \
+		-Wl,--wrap=pqos_utils_init \
+		-Wl,--wrap=pqos_mon_init \
+		-Wl,--wrap=pqos_mon_fini \
+		-Wl,--wrap=os_cap_init \
+		-Wl,--wrap=cpuinfo_init \
+		-Wl,--wrap=cpuinfo_fini \
+		-Wl,--wrap=log_init \
+		-Wl,--wrap=log_fini \
+		-Wl,--wrap=log_printf \
+		-Wl,--wrap=resctrl_is_supported \
+		-Wl,--wrap=machine_init \
+		-Wl,--wrap=machine_fini \
 		-Wl,--wrap=lock_init \
 		-Wl,--wrap=lock_fini \
 		-Wl,--wrap=lock_get \
 		-Wl,--wrap=lock_release \
 		-Wl,--start-group \
-		$(LDFLAGS) $(filter-out ./obj/cap.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
 $(BIN_DIR)/test_lock: test_lock.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)

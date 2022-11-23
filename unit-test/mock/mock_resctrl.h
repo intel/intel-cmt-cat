@@ -52,5 +52,6 @@ int __wrap_resctrl_umount(void);
 int __wrap_resctrl_lock_shared(void);
 int __wrap_resctrl_lock_exclusive(void);
 int __wrap_resctrl_lock_release(void);
+int __wrap_resctrl_is_supported(void);
 
 #endif /* MOCK_RESCTRL_H_ */

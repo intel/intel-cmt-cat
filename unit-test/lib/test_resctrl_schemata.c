@@ -365,7 +365,7 @@ test_resctrl_schemata_read_l2cdp(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l2ca ca;
-        FILE *fd = (FILE *)fd;
+        FILE *fd = (FILE *)1;
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);

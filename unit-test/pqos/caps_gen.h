@@ -280,8 +280,10 @@ init_caps(void **state, unsigned data_to_generate)
                 return -1;
 
         ret = init_cpuinfo(data, 4, 2);
-        if (ret != 0)
+        if (ret != 0) {
+                free(data);
                 return ret;
+        }
 
         if (data_to_generate & (1 << GENERATE_CAP_MON)) {
                 ret = init_cap_mon(data);

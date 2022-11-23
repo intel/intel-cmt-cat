@@ -114,3 +114,11 @@ __wrap_resctrl_lock_release(void)
 {
         return mock_type(int);
 }
+
+int
+__wrap_resctrl_is_supported(void)
+{
+        function_called();
+
+        return mock_type(int);
+}

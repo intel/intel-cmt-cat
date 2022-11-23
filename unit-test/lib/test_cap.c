@@ -169,9 +169,12 @@ __wrap_os_cap_init(const enum pqos_interface inter)
 static int
 setup_cap_init_msr(void **state __attribute__((unused)))
 {
+        int ret;
         struct test_data *data;
 
-        test_init_all(state);
+        ret = test_init_all(state);
+        if (ret != 0)
+                return ret;
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_MSR;
@@ -182,9 +185,12 @@ setup_cap_init_msr(void **state __attribute__((unused)))
 static int
 setup_cap_init_os(void **state __attribute__((unused)))
 {
+        int ret;
         struct test_data *data;
 
-        test_init_all(state);
+        ret = test_init_all(state);
+        if (ret != 0)
+                return ret;
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_OS;
@@ -195,9 +201,12 @@ setup_cap_init_os(void **state __attribute__((unused)))
 static int
 setup_cap_init_os_resctrl_mon(void **state __attribute__((unused)))
 {
+        int ret;
         struct test_data *data;
 
-        test_init_all(state);
+        ret = test_init_all(state);
+        if (ret != 0)
+                return ret;
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_OS_RESCTRL_MON;

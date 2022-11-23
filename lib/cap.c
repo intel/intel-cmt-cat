@@ -117,17 +117,12 @@ static enum pqos_interface m_interface = PQOS_INTER_MSR;
  * Local functions
  * ---------------------------------------
  */
+
 enum pqos_interface
 _pqos_get_inter(void)
 {
         return m_interface;
 }
-
-/**
- * @brief Internal API to set PQoS interface
- *
- * @return PQoS interface
- */
 
 PQOS_STATIC void
 _pqos_set_inter(const enum pqos_interface iface)
@@ -167,7 +162,7 @@ _pqos_check_init(const int expect)
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-static int
+PQOS_STATIC int
 cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
                   const struct pqos_cpuinfo *cpu,
                   const enum pqos_interface iface)
@@ -215,7 +210,7 @@ cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-static int
+PQOS_STATIC int
 cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
                   const struct pqos_cpuinfo *cpu,
                   const enum pqos_interface iface)
@@ -263,7 +258,7 @@ cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-static int
+PQOS_STATIC int
 cap_mba_discover(struct pqos_cap_mba **r_cap,
                  const struct pqos_cpuinfo *cpu,
                  const enum pqos_interface iface)
@@ -314,7 +309,7 @@ cap_mba_discover(struct pqos_cap_mba **r_cap,
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-static int
+PQOS_STATIC int
 discover_capabilities(struct pqos_cap **p_cap,
                       const struct pqos_cpuinfo *cpu,
                       enum pqos_interface inter)
@@ -512,8 +507,8 @@ error_exit:
  *
  * @return converted enumeration value into string
  */
-static const char *
-interface_to_string(enum pqos_interface interface)
+PQOS_STATIC const char *
+_cap_interface_to_string(enum pqos_interface interface)
 {
         switch (interface) {
         case PQOS_INTER_MSR:
@@ -538,14 +533,14 @@ interface_to_string(enum pqos_interface interface)
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
-static int
+PQOS_STATIC int
 discover_interface(enum pqos_interface requested_interface,
                    enum pqos_interface *interface)
 {
         char *environment = NULL;
 
         LOG_INFO("Requested interface: %s\n",
-                 interface_to_string(requested_interface));
+                 _cap_interface_to_string(requested_interface));
 
         if (interface == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -600,7 +595,8 @@ discover_interface(enum pqos_interface requested_interface,
                 *interface = requested_interface;
         }
 
-        LOG_INFO("Selected interface: %s\n", interface_to_string(*interface));
+        LOG_INFO("Selected interface: %s\n",
+                 _cap_interface_to_string(*interface));
         return PQOS_RETVAL_OK;
 }
 

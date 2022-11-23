@@ -43,6 +43,24 @@ void __wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg);
 void __wrap__pqos_inter_get(enum pqos_interface *interface);
 
+/* static functions declaration */
+int _pqos_api_init(void);
+int _pqos_api_exit(void);
+const char *_cap_interface_to_string(enum pqos_interface interface);
+int cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
+                      const struct pqos_cpuinfo *cpu,
+                      const enum pqos_interface iface);
+int cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
+                      const struct pqos_cpuinfo *cpu,
+                      const enum pqos_interface iface);
+int cap_mba_discover(struct pqos_cap_mba **r_cap,
+                     const struct pqos_cpuinfo *cpu,
+                     const enum pqos_interface iface);
+int discover_interface(enum pqos_interface requested_interface,
+                       enum pqos_interface *interface);
+int discover_capabilities(struct pqos_cap **p_cap,
+                          const struct pqos_cpuinfo *cpu,
+                          enum pqos_interface inter);
 void _pqos_set_inter(const enum pqos_interface iface);
 
 #endif /* MOCK_CAP_H_ */

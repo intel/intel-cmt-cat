@@ -34,7 +34,8 @@
 #define MOCK_MACHINE_H_
 
 #include <stdint.h>
-
+int __wrap_machine_init(const unsigned max_core_id);
+int __wrap_machine_fini(void);
 int __wrap_msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value);
 int __wrap_msr_write(const unsigned lcore,
                      const uint32_t reg,

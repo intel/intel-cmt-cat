@@ -294,15 +294,22 @@ __wrap_pqos_l3ca_get(const unsigned l3cat_id,
                      unsigned *num_ca,
                      struct pqos_l3ca *ca)
 {
+        int ret;
+
         check_expected(l3cat_id);
         check_expected(max_num_ca);
 
-        if (num_ca != NULL)
-                *num_ca = mock_type(unsigned);
-        if (ca != NULL)
-                memcpy(ca, mock_ptr_type(struct pqos_l3ca *),
-                       sizeof(struct pqos_l3ca) * *num_ca);
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        assert_non_null(num_ca);
+        assert_non_null(ca);
+
+        *num_ca = mock_type(unsigned);
+        memcpy(ca, mock_ptr_type(struct pqos_l3ca *),
+               sizeof(struct pqos_l3ca) * *num_ca);
+        return ret;
 }
 
 int
@@ -338,12 +345,14 @@ __wrap_pqos_l2ca_get(const unsigned l2id,
         check_expected(max_num_ca);
 
         ret = mock_type(int);
-        if (ret == PQOS_RETVAL_OK) {
-                *num_ca = mock_type(unsigned);
-                if (ca != NULL)
-                        memcpy(ca, mock_ptr_type(struct pqos_l2ca *),
-                               sizeof(struct pqos_l2ca) * *num_ca);
-        }
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        *num_ca = mock_type(unsigned);
+        if (ca != NULL)
+                memcpy(ca, mock_ptr_type(struct pqos_l2ca *),
+                       sizeof(struct pqos_l2ca) * *num_ca);
+
         return ret;
 }
 
@@ -385,15 +394,22 @@ __wrap_pqos_mba_get(const unsigned mba_id,
                     unsigned *num_cos,
                     struct pqos_mba *mba_tab)
 {
+        int ret;
+
         check_expected(mba_id);
         check_expected(max_num_cos);
 
-        if (num_cos != NULL)
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK) {
+                assert_non_null(num_cos);
+                assert_non_null(mba_tab);
+
                 *num_cos = mock_type(unsigned);
-        if (mba_tab != NULL)
+
                 memcpy(mba_tab, mock_ptr_type(struct pqos_mba *),
                        sizeof(struct pqos_mba) * *num_cos);
-        return mock_type(int);
+        }
+        return ret;
 }
 
 unsigned *

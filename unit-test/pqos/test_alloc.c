@@ -253,7 +253,7 @@ test_alloc_print_config_msr(void **state)
 
         /* generate data */
         l3ca = calloc(num_l3ca, sizeof(struct pqos_l3ca));
-        assert_false(l3ca == NULL);
+        assert_non_null(l3ca);
         for (i = 0; i < num_l3ca; i++) {
                 l3ca[i].class_id = i;
                 l3ca[i].cdp = 0;
@@ -261,7 +261,7 @@ test_alloc_print_config_msr(void **state)
                 ways_mask = ways_mask | ways_mask << 1;
         }
         l2ca = calloc(num_l2ca, sizeof(struct pqos_l2ca));
-        assert_false(l2ca == NULL);
+        assert_non_null(l2ca);
         ways_mask = 0x1;
         for (i = 0; i < num_l2ca; i++) {
                 l2ca[i].class_id = i;
@@ -270,7 +270,7 @@ test_alloc_print_config_msr(void **state)
                 ways_mask = ways_mask | ways_mask << 1;
         }
         mba = calloc(num_mba, sizeof(struct pqos_mba));
-        assert_false(mba == NULL);
+        assert_non_null(mba);
         for (i = 0; i < num_mba; i++) {
                 mba[i].class_id = i;
                 mba[i].mb_max = mb_max;
@@ -284,9 +284,9 @@ test_alloc_print_config_msr(void **state)
         for (i = 0; i < data->num_socket; i++) {
                 expect_value(__wrap_pqos_l3ca_get, l3cat_id, i);
                 expect_value(__wrap_pqos_l3ca_get, max_num_ca, num_l3ca);
+                will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
                 will_return(__wrap_pqos_l3ca_get, num_l3ca);
                 will_return(__wrap_pqos_l3ca_get, l3ca);
-                will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         }
 
         /* mock pqos_l2ca_get*/
@@ -303,9 +303,9 @@ test_alloc_print_config_msr(void **state)
         for (i = 0; i < data->num_socket; i++) {
                 expect_value(__wrap_pqos_mba_get, mba_id, i);
                 expect_value(__wrap_pqos_mba_get, max_num_cos, num_mba);
+                will_return(__wrap_pqos_mba_get, PQOS_RETVAL_OK);
                 will_return(__wrap_pqos_mba_get, num_mba);
                 will_return(__wrap_pqos_mba_get, mba);
-                will_return(__wrap_pqos_mba_get, PQOS_RETVAL_OK);
         }
 
         /* mock pqos_inter_get */
@@ -394,7 +394,7 @@ test_alloc_print_config_os(void **state)
 
         /* generate data */
         l3ca = calloc(num_l3ca, sizeof(struct pqos_l3ca));
-        assert_false(l3ca == NULL);
+        assert_non_null(l3ca);
         for (i = 0; i < num_l3ca; i++) {
                 l3ca[i].class_id = i;
                 l3ca[i].cdp = 0;
@@ -402,7 +402,7 @@ test_alloc_print_config_os(void **state)
                 ways_mask = ways_mask | ways_mask << 1;
         }
         l2ca = calloc(num_l2ca, sizeof(struct pqos_l2ca));
-        assert_false(l2ca == NULL);
+        assert_non_null(l2ca);
         ways_mask = 0x1;
         for (i = 0; i < num_l2ca; i++) {
                 l2ca[i].class_id = i;
@@ -411,7 +411,7 @@ test_alloc_print_config_os(void **state)
                 ways_mask = ways_mask | ways_mask << 1;
         }
         mba = calloc(num_mba, sizeof(struct pqos_mba));
-        assert_false(mba == NULL);
+        assert_non_null(mba);
         for (i = 0; i < num_mba; i++) {
                 mba[i].class_id = i;
                 mba[i].mb_max = mb_max;
@@ -425,12 +425,9 @@ test_alloc_print_config_os(void **state)
         for (i = 0; i < data->num_socket; i++) {
                 expect_value(__wrap_pqos_l3ca_get, l3cat_id, i);
                 expect_value(__wrap_pqos_l3ca_get, max_num_ca, num_l3ca);
+                will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
                 will_return(__wrap_pqos_l3ca_get, num_l3ca);
                 will_return(__wrap_pqos_l3ca_get, l3ca);
-                if (i == 0)
-                        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_PARAM);
-                else
-                        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         }
 
         /* mock pqos_l2ca_get*/
@@ -438,25 +435,18 @@ test_alloc_print_config_os(void **state)
                 expect_value(__wrap_pqos_l2ca_get, l2id, i);
                 expect_value(__wrap_pqos_l2ca_get, max_num_ca,
                              PQOS_MAX_L2CA_COS);
-                if (i == 0) {
-                        will_return(__wrap_pqos_l2ca_get, PQOS_RETVAL_PARAM);
-                } else {
-                        will_return(__wrap_pqos_l2ca_get, PQOS_RETVAL_OK);
-                        will_return(__wrap_pqos_l2ca_get, num_l2ca);
-                        will_return(__wrap_pqos_l2ca_get, l2ca);
-                }
+                will_return(__wrap_pqos_l2ca_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_l2ca_get, num_l2ca);
+                will_return(__wrap_pqos_l2ca_get, l2ca);
         }
 
         /* mock pqos_mba_get */
         for (i = 0; i < data->num_socket; i++) {
                 expect_value(__wrap_pqos_mba_get, mba_id, i);
                 expect_value(__wrap_pqos_mba_get, max_num_cos, num_mba);
+                will_return(__wrap_pqos_mba_get, PQOS_RETVAL_OK);
                 will_return(__wrap_pqos_mba_get, num_mba);
                 will_return(__wrap_pqos_mba_get, mba);
-                if (i == 0)
-                        will_return(__wrap_pqos_mba_get, PQOS_RETVAL_PARAM);
-                else
-                        will_return(__wrap_pqos_mba_get, PQOS_RETVAL_OK);
         }
 
         /* mock pqos_inter_get */
@@ -477,16 +467,16 @@ test_alloc_print_config_os(void **state)
 
         /* check output */
         assert_true(output_has_text("L3CA/MBA COS definitions for Socket 0:\n"
-                                    "    L3CA COS0 => ERROR\n"
-                                    "    L3CA COS1 => ERROR\n"
-                                    "    L3CA COS2 => ERROR\n"
-                                    "    L3CA COS3 => ERROR\n"
-                                    "    L3CA COS4 => ERROR\n"
-                                    "    L3CA COS5 => ERROR\n"
-                                    "    MBA COS0 => ERROR\n"
-                                    "    MBA COS1 => ERROR\n"
-                                    "    MBA COS2 => ERROR\n"
-                                    "    MBA COS3 => ERROR\n"
+                                    "    L3CA COS0 => MASK 0xf\n"
+                                    "    L3CA COS1 => MASK 0x1f\n"
+                                    "    L3CA COS2 => MASK 0x3f\n"
+                                    "    L3CA COS3 => MASK 0x7f\n"
+                                    "    L3CA COS4 => MASK 0xff\n"
+                                    "    L3CA COS5 => MASK 0x1ff\n"
+                                    "    MBA COS0 => 10%% available\n"
+                                    "    MBA COS1 => 20%% available\n"
+                                    "    MBA COS2 => 30%% available\n"
+                                    "    MBA COS3 => 40%% available\n"
                                     "L3CA/MBA COS definitions for Socket 1:\n"
                                     "    L3CA COS0 => MASK 0xf\n"
                                     "    L3CA COS1 => MASK 0x1f\n"
@@ -498,6 +488,11 @@ test_alloc_print_config_os(void **state)
                                     "    MBA COS1 => 20%% available\n"
                                     "    MBA COS2 => 30%% available\n"
                                     "    MBA COS3 => 40%% available\n"
+                                    "L2CA COS definitions for L2ID 0:\n"
+                                    "    L2CA COS0 => MASK 0x1\n"
+                                    "    L2CA COS1 => MASK 0x3\n"
+                                    "    L2CA COS2 => MASK 0x7\n"
+                                    "    L2CA COS3 => MASK 0xf\n"
                                     "L2CA COS definitions for L2ID 1:\n"
                                     "    L2CA COS0 => MASK 0x1\n"
                                     "    L2CA COS1 => MASK 0x3\n"
@@ -759,39 +754,39 @@ test_alloc_apply_l3ca(void **state)
         /* mock pqos_l3ca_get */
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 1);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 1);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 2);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 3);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         // /* mock pqos_l3ca_set */
         expect_value(__wrap_pqos_l3ca_set, l3cat_id, 0);
@@ -881,27 +876,27 @@ test_alloc_apply_l3ca_cdp(void **state)
         /* mock pqos_l3ca_get */
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 1);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l3ca_get, l3cat_id, 1);
         expect_value(__wrap_pqos_l3ca_get, max_num_ca, 16);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
-        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
 
         /* mock pqos_l3ca_set */
         expect_value(__wrap_pqos_l3ca_set, l3cat_id, 0);

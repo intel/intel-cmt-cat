@@ -69,14 +69,17 @@ setup_hw(void **state __attribute__((unused)))
 static int
 setup_os(void **state)
 {
+        int ret;
         struct test_data *data;
 
-        test_init_all(state);
+        ret = test_init_all(state);
+        if (ret != 0)
+                return ret;
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_OS;
 
-        int ret = api_init(PQOS_INTER_OS, PQOS_VENDOR_INTEL);
+        ret = api_init(PQOS_INTER_OS, PQOS_VENDOR_INTEL);
 
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
@@ -86,14 +89,17 @@ setup_os(void **state)
 static int
 setup_os_resctrl_mon(void **state)
 {
+        int ret;
         struct test_data *data;
 
-        test_init_all(state);
+        ret = test_init_all(state);
+        if (ret != 0)
+                return ret;
 
         data = (struct test_data *)*state;
         data->interface = PQOS_INTER_OS_RESCTRL_MON;
 
-        int ret = api_init(PQOS_INTER_OS_RESCTRL_MON, PQOS_VENDOR_INTEL);
+        ret = api_init(PQOS_INTER_OS_RESCTRL_MON, PQOS_VENDOR_INTEL);
 
         assert_int_equal(ret, PQOS_RETVAL_OK);
 

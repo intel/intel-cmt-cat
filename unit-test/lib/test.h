@@ -200,6 +200,24 @@ test_interface_init(struct test_data *data)
 }
 
 static inline int
+test_fini(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+
+        if (data != NULL) {
+                if (data->cpu != NULL)
+                        free(data->cpu);
+                if (data->cap != NULL)
+                        free(data->cap);
+                if (data->cap_mon != NULL)
+                        free(data->cap_mon);
+                free(data);
+        }
+
+        return 0;
+}
+
+static inline int
 test_init(void **state, unsigned technology)
 {
         int ret;
@@ -208,24 +226,28 @@ test_init(void **state, unsigned technology)
         data = calloc(1, sizeof(struct test_data));
         if (data == NULL)
                 return -1;
-
-        ret = test_cpuinfo_init(data);
-        if (ret != 0)
-                return ret;
-
-        ret = test_cap_init(data, technology);
-        if (ret != 0)
-                return ret;
-
-        ret = test_config_init(data);
-        if (ret != 0)
-                return ret;
-
-        ret = test_interface_init(data);
-        if (ret != 0)
-                return ret;
-
         *state = data;
+
+        do {
+                ret = test_cpuinfo_init(data);
+                if (ret != 0)
+                        break;
+
+                ret = test_cap_init(data, technology);
+                if (ret != 0)
+                        break;
+
+                ret = test_config_init(data);
+                if (ret != 0)
+                        break;
+
+                ret = test_interface_init(data);
+                if (ret != 0)
+                        break;
+        } while (0);
+
+        if (ret != 0)
+                test_fini(state);
 
         return ret;
 }
@@ -264,22 +286,4 @@ static inline int
 test_init_unsupported(void **state)
 {
         return test_init(state, 0);
-}
-
-static inline int
-test_fini(void **state)
-{
-        struct test_data *data = (struct test_data *)*state;
-
-        if (data != NULL) {
-                if (data->cpu != NULL)
-                        free(data->cpu);
-                if (data->cap != NULL)
-                        free(data->cap);
-                if (data->cap_mon != NULL)
-                        free(data->cap_mon);
-                free(data);
-        }
-
-        return 0;
 }

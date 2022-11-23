@@ -332,7 +332,7 @@ test_hw_mon_start_perf(void **state)
         expect_value(hw_mon_assoc_read, lcore, cores[0]);
         will_return(hw_mon_assoc_read, 1);
         will_return(hw_mon_assoc_read, PQOS_RETVAL_OK);
-        expect_value(hw_mon_assoc_write, lcore, cores[1]);
+        expect_value(hw_mon_assoc_write, lcore, cores[0]);
         expect_value(hw_mon_assoc_write, rmid, 0);
         will_return(hw_mon_assoc_write, PQOS_RETVAL_OK);
         will_return(hw_mon_stop_perf, PQOS_RETVAL_OK);

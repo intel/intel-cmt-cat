@@ -35,6 +35,22 @@
 #include "mock_test.h"
 
 int
+__wrap_machine_init(const unsigned max_core_id __attribute__((unused)))
+{
+        function_called();
+
+        return mock_type(int);
+}
+
+int
+__wrap_machine_fini(void)
+{
+        function_called();
+
+        return mock_type(int);
+}
+
+int
 __wrap_msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
 {
         check_expected(lcore);
