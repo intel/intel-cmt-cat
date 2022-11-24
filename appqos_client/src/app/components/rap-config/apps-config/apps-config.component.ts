@@ -39,6 +39,9 @@ import {
 import { MatDialog } from '@angular/material/dialog';
 
 import { AppsAddDialogComponent } from './apps-add-dialog/apps-add-dialog.component';
+import { AppsEditDialogComponent } from './apps-edit-dialog/apps-edit-dialog.component';
+import { AppqosService } from 'src/app/services/appqos.service';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
 
 @Component({
   selector: 'app-apps-config',
@@ -53,21 +56,32 @@ export class AppsConfigComponent implements OnChanges {
   tableData!: Apps[] & { coresList: string; poolName: string };
   displayedColumns: string[] = ['name', 'pool', 'pids', 'cores', 'actions'];
 
-  constructor(public dialog: MatDialog) {}
+  constructor(
+    public dialog: MatDialog,
+    private service: AppqosService,
+    private snackBar: SnackBarService
+  ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes['apps'].currentValue) return;
 
     this.tableData = changes['apps'].currentValue.map((app: Apps) => ({
       ...app,
-      coresList: String(app.cores),
+      coresList:
+        app.cores === undefined
+          ? String(
+              changes['pools'].currentValue.find(
+                (pool: Pools) => pool.id === app.pool_id
+              )?.cores
+            )
+          : String(app.cores),
       poolName: changes['pools'].currentValue.find(
         (pool: Pools) => pool.id === app.pool_id
-      ).name,
+      )?.name,
     }));
   }
 
-  appAddDialog() {
+  appAddDialog(): void {
     const dialogRef = this.dialog.open(AppsAddDialogComponent, {
       height: 'auto',
       width: '35rem',
@@ -76,6 +90,30 @@ export class AppsConfigComponent implements OnChanges {
 
     dialogRef.afterClosed().subscribe((_) => {
       this.appEvent.emit();
+    });
+  }
+
+  appEditDialog(app: Apps): void {
+    const dialogRef = this.dialog.open(AppsEditDialogComponent, {
+      height: 'auto',
+      width: '35rem',
+      data: { pools: this.pools, app: app },
+    });
+
+    dialogRef.afterClosed().subscribe((_) => {
+      this.appEvent.emit();
+    });
+  }
+
+  deleteApp(app: Apps): void {
+    this.service.deleteApp(app.id).subscribe({
+      next: (response) => {
+        this.snackBar.displayInfo(response.message);
+        this.appEvent.emit();
+      },
+      error: (error) => {
+        this.snackBar.handleError(error.error.message);
+      },
     });
   }
 }

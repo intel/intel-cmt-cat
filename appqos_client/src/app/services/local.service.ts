@@ -106,10 +106,21 @@ export class LocalService {
     return true;
   }
 
-  public getCoresDash(cores: number[]): number[] {
-    let start = cores[cores.length - 2];
-    let end = cores[cores.length - 1];
+  public getCoresDash(cores: string): number[] {
+    const splitedCores = cores.split(/[,-]/).map(Number);
+    let start = 0;
+    let end = 0;
     const coresList = [];
+
+    if (cores.indexOf('-') > cores.indexOf(',')) {
+      start = splitedCores[splitedCores.length - 2];
+      end = splitedCores[splitedCores.length - 1];
+      splitedCores.splice(splitedCores.length - 2, 2);
+    } else {
+      start = splitedCores[0];
+      end = splitedCores[1];
+      splitedCores.splice(0, 2);
+    }
 
     if (start > end) [start, end] = [end, start];
 
@@ -117,13 +128,24 @@ export class LocalService {
       coresList.push(i);
     }
 
-    return coresList;
+    return [...coresList, ...splitedCores];
   }
 
-  public getPidsDash(pids: number[]): number[] {
-    let start = pids[pids.length - 2];
-    let end = pids[pids.length - 1];
+  public getPidsDash(pids: string): number[] {
+    const splitedPids = pids.split(/[,-]/).map(Number);
+    let start = 0;
+    let end = 0;
     const pidsList = [];
+
+    if (pids.indexOf('-') > pids.indexOf(',')) {
+      start = splitedPids[splitedPids.length - 2];
+      end = splitedPids[splitedPids.length - 1];
+      splitedPids.splice(splitedPids.length - 2, 2);
+    } else {
+      start = splitedPids[0];
+      end = splitedPids[1];
+      splitedPids.splice(0, 2);
+    }
 
     if (start > end) [start, end] = [end, start];
 
@@ -131,6 +153,6 @@ export class LocalService {
       pidsList.push(i);
     }
 
-    return pidsList;
+    return [...pidsList, ...splitedPids];
   }
 }

@@ -60,7 +60,7 @@ export class CoresEditDialogComponent implements OnInit {
       cores: new FormControl(String(this.data.cores), [
         Validators.required,
         Validators.pattern(
-          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$'
+          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
         ),
       ]),
     });
@@ -70,11 +70,7 @@ export class CoresEditDialogComponent implements OnInit {
     if (!this.form.valid) return;
 
     if (this.form.value.cores.includes('-')) {
-      const splitedCores = this.form.value.cores.split(/[,-]/).map(Number);
-      const rangeCores = this.localService.getCoresDash(splitedCores);
-
-      splitedCores.splice(splitedCores.length - 2, 2);
-      this.coresList = [...splitedCores, ...rangeCores];
+      this.coresList = this.localService.getCoresDash(this.form.value.cores);
     } else {
       this.coresList = this.form.value.cores.split(',').map(Number);
     }

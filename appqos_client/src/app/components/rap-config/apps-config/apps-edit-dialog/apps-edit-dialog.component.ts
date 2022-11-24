@@ -28,8 +28,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, Inject, OnInit } from '@angular/core';
-import { Form, FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatSelectChange } from '@angular/material/select';
 
 import { Apps, Pools } from 'src/app/components/overview/overview.model';
 import { AppqosService } from 'src/app/services/appqos.service';
@@ -39,45 +40,55 @@ import { SnackBarService } from 'src/app/shared/snack-bar.service';
 type PostApp = Omit<Apps, 'id'>;
 
 @Component({
-  selector: 'app-apps-add-dialog',
-  templateUrl: './apps-add-dialog.component.html',
-  styleUrls: ['./apps-add-dialog.component.scss'],
+  selector: 'app-apps-edit-dialog',
+  templateUrl: './apps-edit-dialog.component.html',
+  styleUrls: ['./apps-edit-dialog.component.scss'],
 })
-export class AppsAddDialogComponent implements OnInit {
+export class AppsEditDialogComponent implements OnInit {
   form!: FormGroup;
   poolsList!: Pools[];
+  selected!: string;
   coresList!: number[];
   pidsList!: number[];
 
   constructor(
-    @Inject(MAT_DIALOG_DATA) public data: Pools[],
+    @Inject(MAT_DIALOG_DATA) public data: { pools: Pools[]; app: Apps },
     private snackBar: SnackBarService,
-    private localService: LocalService,
-    public dialogRef: MatDialogRef<AppsAddDialogComponent>,
-    private service: AppqosService
+    public dialogRef: MatDialogRef<AppsEditDialogComponent>,
+    private service: AppqosService,
+    private localService: LocalService
   ) {}
 
   ngOnInit(): void {
     this.form = new FormGroup({
-      name: new FormControl('', [Validators.required]),
-      pids: new FormControl('', [
+      name: new FormControl(this.data.app.name, [Validators.required]),
+      pids: new FormControl(String(this.data.app.pids), [
         Validators.required,
         Validators.pattern(
           '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
         ),
       ]),
       cores: new FormControl(
-        '',
-        Validators.pattern(
-          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
-        )
+        this.data.app.cores === undefined
+          ? String(
+              this.data.pools.find(
+                (pool: Pools) => pool.id === this.data.app.pool_id
+              )?.cores
+            )
+          : String(this.data.app.cores),
+        [
+          Validators.pattern(
+            '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
+          ),
+        ]
       ),
-      pool: new FormControl('', [Validators.required]),
+      pool: new FormControl(this.data.app.pool_id, [Validators.required]),
     });
   }
 
   saveApp(): void {
     if (!this.form.valid) return;
+
     if (this.form.value.cores) this.getCores(this.form.value.cores);
 
     this.getPids(this.form.value.pids);
@@ -85,22 +96,20 @@ export class AppsAddDialogComponent implements OnInit {
     let app: PostApp = {
       name: this.form.value.name,
       pids: this.pidsList,
-      pool_id: this.form.value.pool.id,
+      pool_id: this.form.value.pool,
     };
 
     if (!this.form.value.cores) {
-      app.cores = this.data.find(
-        (pool: Pools) => pool.id === this.form.value.pool.id
-      )!.cores;
+      app.cores = this.getPoolCores(this.form.value.pool);
     } else {
       app.cores = this.coresList;
     }
 
-    this.postApp(app);
+    this.updateApp(app);
   }
 
-  postApp(app: PostApp): void {
-    this.service.postApp(app).subscribe({
+  updateApp(app: PostApp): void {
+    this.service.appPut(app, this.data.app.id).subscribe({
       next: (response) => {
         this.snackBar.displayInfo(response.message);
         this.dialogRef.close();
@@ -111,7 +120,7 @@ export class AppsAddDialogComponent implements OnInit {
     });
   }
 
-  getPids(pids: string) {
+  getPids(pids: string): void {
     if (pids.includes('-')) {
       this.pidsList = this.localService.getPidsDash(pids);
     } else {
@@ -119,11 +128,25 @@ export class AppsAddDialogComponent implements OnInit {
     }
   }
 
-  getCores(cores: string) {
+  getCores(cores: string): void {
     if (cores.includes('-')) {
       this.coresList = this.localService.getCoresDash(cores);
     } else {
       this.coresList = cores.split(',').map(Number);
     }
+  }
+
+  poolChange(event: MatSelectChange): void {
+    if (this.data.app.pool_id === event.value) {
+      this.form.controls['cores'].setValue(String(this.data.app.cores));
+    } else {
+      this.form.controls['cores'].setValue(
+        String(this.getPoolCores(event.value))
+      );
+    }
+  }
+
+  getPoolCores(id: number): number[] {
+    return this.data.pools.find((pool: Pools) => pool.id === id)!.cores;
   }
 }

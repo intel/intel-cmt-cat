@@ -177,4 +177,15 @@ export class AppqosService {
     const api_url = this.local.getData('api_url');
     return this.http.post<resMessage>(`${api_url}/apps/`, app);
   }
+
+  appPut(app: any, id: number): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+
+    return this.http.put<resMessage>(`${api_url}/apps/${id}`, app);
+  }
+
+  deleteApp(id: number): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.delete<resMessage>(`${api_url}/apps/${id}`);
+  }
 }
