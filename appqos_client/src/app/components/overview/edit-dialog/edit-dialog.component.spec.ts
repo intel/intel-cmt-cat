@@ -631,4 +631,48 @@ describe('Given EditDialogComponent', () => {
       expect(component.pools[0].mba).toBe(50);
     });
   });
+
+  /* Test: Click Reset button */
+  describe('when resetMBABW method is executed', () => {
+    it('should reset with default mba_bw value((2^32) - 1)', async () => {
+      const mockResponse = 'POOL 0 updated';
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          mba_bw: 1000,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
+        of(mockResponse)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      /* Click Reset button. So that resetMBABW() will send default
+      mba_bw value((2^32) - 1) */
+      await fixture.whenStable();
+      const cbmButton = ngMocks.find('.reset-button');
+      cbmButton.triggerEventHandler('click', null);
+
+      /* Check 4294967295 is sent by resetMBABW */
+      expect(poolsSpy).toHaveBeenCalledWith({ mba_bw: 4294967295 }, 0);
+    });
+  });
 });
