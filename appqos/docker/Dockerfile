@@ -57,8 +57,10 @@ RUN apt-get install -y --no-install-recommends \
     apt-get clean
 
 RUN mkdir -p /python && \
+    python3 -m pip install --no-warn-script-location --upgrade pip && \
     python3 -m pip install --no-warn-script-location /appqos_workspace/lib/python && \
-    python3 -m pip install --no-warn-script-location /appqos_workspace/appqos
+    python3 -m pip install --no-warn-script-location /appqos_workspace/appqos && \
+    python3 -m pip uninstall -y pip
 
 ################################################################################
 #       Final image                                                            #
@@ -75,6 +77,8 @@ ENV PYTHONUSERBASE=/python
 ENV APPQOS_PORT=5000
 ENV APPQOS_CONF_PATH=/opt/intel/appqos/appqos.conf
 ENV APPQOS_ADDRESS=0.0.0.0
+
+COPY . /appqos_workspace
 
 # copy libpqos
 COPY --from=build-libpqos /usr/local/lib/libpqos.so* /lib/
