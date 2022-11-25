@@ -11,7 +11,7 @@ flask-restful = "*"
 gevent = "*"
 psutil = "*"
 pqos = {path = "../lib/python"}
-pwr = {git = "https://github.com/intel/CommsPowerManagement.git", ref = "pwr-v0.2.1", subdirectory = "pwr"}
+pwr = {git = "https://github.com/intel/CommsPowerManagement.git", ref = "pwr-v0.2.2", subdirectory = "pwr"}
 
 [dev-packages]
 flask-cors = "*"

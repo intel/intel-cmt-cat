@@ -29,7 +29,7 @@ dependencies = [
     "flask-restful",
     "gevent",
     "psutil",
-    "pwr @ git+https://github.com/intel/CommsPowerManagement.git@pwr-v0.2.1#egg=pwr&subdirectory=pwr"
+    "pwr @ git+https://github.com/intel/CommsPowerManagement.git@pwr-v0.2.2#egg=pwr&subdirectory=pwr"
 ]
 
 dynamic = ["version"]
