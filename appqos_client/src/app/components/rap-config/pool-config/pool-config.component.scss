@@ -51,6 +51,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
     align-items: baseline;
     padding-top: 0.5rem;
 
+    .mat-form-field {
+      width: 15rem;
+    }
+
     .mat-mini-fab {
       margin-left: 1rem;
 
@@ -130,7 +134,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
       padding: 0.5rem 0 0 0;
 
       .mat-form-field {
-        width: 20rem;
+        width: 15rem;
       }
     }
 
