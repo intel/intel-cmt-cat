@@ -59,8 +59,8 @@ describe('Given L3CacheAllocationComponent', () => {
   MockInstance.scope('case');
 
   describe('when initialized', () => {
-    it('should display "L3 Cache Allocation (CAT)" title', () => {
-      const title = 'L3 Cache Allocation (CAT)';
+    it('should display "L3 Cache Allocation Technology (CAT)" title', () => {
+      const title = 'L3 Cache Allocation Technology (CAT)';
       MockRender(L3CacheAllocationComponent);
 
       const expectedTitle = ngMocks.formatText(ngMocks.find('mat-card-title'));

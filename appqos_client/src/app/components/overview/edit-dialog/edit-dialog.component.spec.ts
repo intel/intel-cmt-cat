@@ -61,8 +61,8 @@ describe('Given EditDialogComponent', () => {
   MockInstance.scope('case');
 
   describe('when initialized with L3 CAT', () => {
-    it('should display "L3 Cache Allocation (CAT)" title', async () => {
-      const title = 'L3 Cache Allocation (CAT)';
+    it('should display "L3 Cache Allocation Technology (CAT)" title', async () => {
+      const title = 'L3 Cache Allocation Technology (CAT)';
       const fixture = MockRender(
         EditDialogComponent,
         {},
@@ -163,8 +163,8 @@ describe('Given EditDialogComponent', () => {
   });
 
   describe('when initialized with L2 CAT', () => {
-    it('should display "L2 Cache Allocation (CAT)" title', async () => {
-      const title = 'L2 Cache Allocation (CAT)';
+    it('should display "L2 Cache Allocation Technology (CAT)" title', async () => {
+      const title = 'L2 Cache Allocation Technology (CAT)';
       const fixture = MockRender(
         EditDialogComponent,
         {},
