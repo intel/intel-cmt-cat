@@ -32,6 +32,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   display: flex;
   flex-direction: column;
   row-gap: 1rem;
+  min-width: 35rem;
 
   app-mba-allocation,
   app-l3-cache-allocation,
