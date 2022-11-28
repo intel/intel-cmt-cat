@@ -33,9 +33,7 @@ import {
   EventEmitter,
   Input,
   OnChanges,
-  OnInit,
   Output,
-  SimpleChanges,
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -56,7 +54,7 @@ export class L2CacheAllocationComponent implements OnChanges {
 
   constructor(public dialog: MatDialog, private service: AppqosService) {}
 
-  ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(): void {
     this.service.getL2cat().subscribe((l2cat) => {
       this.numCacheWays = l2cat.cw_num;
       this._convertToBitmask();
@@ -81,7 +79,7 @@ export class L2CacheAllocationComponent implements OnChanges {
       data: { l2cbm: true, numCacheWays: this.numCacheWays },
     });
 
-    dialogRef.afterClosed().subscribe((_) => {
+    dialogRef.afterClosed().subscribe(() => {
       this.poolEvent.emit();
     });
   }

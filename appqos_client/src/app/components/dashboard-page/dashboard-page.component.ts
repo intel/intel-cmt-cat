@@ -37,7 +37,7 @@ import { Component } from '@angular/core';
 
 /* Component used to display Dashboard page*/
 export class DashboardPageComponent {
-  showContent: boolean = true;
+  showContent = true;
 
   switchContent(event: boolean): void {
     this.showContent = event;

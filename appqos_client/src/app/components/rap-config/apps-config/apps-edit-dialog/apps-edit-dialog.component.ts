@@ -93,14 +93,16 @@ export class AppsEditDialogComponent implements OnInit {
 
     this.getPids(this.form.value.pids);
 
-    let app: PostApp = {
+    const app: PostApp = {
       name: this.form.value.name,
       pids: this.pidsList,
       pool_id: this.form.value.pool,
     };
 
     if (!this.form.value.cores) {
-      app.cores = this.getPoolCores(this.form.value.pool);
+      app.cores = this.data.pools.find(
+        (pool: Pools) => pool.id === this.form.value.pool.id
+      )?.cores;
     } else {
       app.cores = this.coresList;
     }

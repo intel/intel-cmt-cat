@@ -35,7 +35,6 @@ import {
   Input,
   OnChanges,
   Output,
-  SimpleChanges,
 } from '@angular/core';
 import { MatOptionSelectionChange } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
@@ -80,7 +79,7 @@ export class PoolConfigComponent implements OnChanges {
     public dialog: MatDialog
   ) {}
 
-  ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(): void {
     this.getData(this.poolId);
   }
 
@@ -165,7 +164,7 @@ export class PoolConfigComponent implements OnChanges {
       });
   }
 
-  onChangeL3CBM(value: Number, i: number) {
+  onChangeL3CBM(value: number, i: number) {
     if (value) {
       this.pool.l3Bitmask![i] = 0;
     } else {
@@ -173,7 +172,7 @@ export class PoolConfigComponent implements OnChanges {
     }
   }
 
-  onChangeL2CBM(value: Number, i: number) {
+  onChangeL2CBM(value: number, i: number) {
     if (value) {
       this.pool.l2Bitmask![i] = 0;
     } else {

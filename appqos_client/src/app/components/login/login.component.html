@@ -34,36 +34,57 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   technologies and should not be deployed in production environments.
 </div>
 <div class="container">
-  <img class="logo" src="../../../assets/intel_logo.jpg" alt="Intel">
+  <img class="logo" src="../../../assets/intel_logo.jpg" alt="Intel" />
   <h1 class="title">Application Quality of Service</h1>
   <span></span>
   <form [formGroup]="form" class="form" (submit)="loginToSystem(form)">
     <mat-form-field class="field-address" appearance="fill">
       <mat-label>Enter AppQoS host URL or IP address</mat-label>
-      <input matInput formControlName="hostName" placeholder="https://localhost">
-      <mat-error *ngIf="form.controls['hostName'].errors?.['pattern']">'https://' prefix required</mat-error>
+      <input
+        matInput
+        formControlName="hostName"
+        placeholder="https://localhost"
+      />
+      <mat-error *ngIf="form.controls['hostName'].errors?.['pattern']"
+        >'https://' prefix required</mat-error
+      >
     </mat-form-field>
 
-    <mat-form-field class="field-port" appearance="fill" >
+    <mat-form-field class="field-port" appearance="fill">
       <mat-label>Enter port number</mat-label>
-      <input matInput formControlName="portNumber" placeholder="5000">
+      <input matInput formControlName="portNumber" placeholder="5000" />
     </mat-form-field>
     <mat-error *ngIf="hasError">
       Please enter a valid credentials or server isn't responding...
     </mat-error>
 
     <div class="">
-      <button mat-flat-button color="primary" class="submit-button" type="submit" [disabled]="form.invalid">LOGIN</button>
+      <button
+        mat-flat-button
+        color="primary"
+        class="submit-button"
+        type="submit"
+        [disabled]="form.invalid"
+      >
+        LOGIN
+      </button>
     </div>
 
-    <a href="https://github.com/intel/intel-cmt-cat/tree
-    /master/appqos" class="contact-text" target="_blank">More about AppQoS.</a>
+    <a
+      href="https://github.com/intel/intel-cmt-cat/tree
+    /master/appqos"
+      class="contact-text"
+      target="_blank"
+      rel="noopener noreferrer"
+      >More about AppQoS.</a
+    >
   </form>
   <mat-progress-spinner
     class="loading"
     *ngIf="loading"
     color="primary"
     mode="indeterminate"
-    diameter="35">
+    diameter="35"
+  >
   </mat-progress-spinner>
 </div>

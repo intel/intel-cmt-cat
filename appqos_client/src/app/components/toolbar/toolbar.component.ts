@@ -30,14 +30,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import {
   Component,
   EventEmitter,
-  OnInit,
   Output,
   ViewEncapsulation,
 } from '@angular/core';
-
 import { Router } from '@angular/router';
-
-import { LocalService } from 'src/app/services/local.service';
 
 @Component({
   selector: 'app-toolbar',
@@ -47,7 +43,7 @@ import { LocalService } from 'src/app/services/local.service';
 })
 export class ToolbarComponent {
   @Output() switcher = new EventEmitter<boolean>();
-  enableOverview: boolean = true;
+  enableOverview = true;
 
   constructor(private router: Router) {}
 

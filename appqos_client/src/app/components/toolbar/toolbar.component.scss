@@ -31,6 +31,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   height: 9rem;
 }
 
+.material-icons.logout:before {
+  content: none;
+}
+
 .mat-button-wrapper {
   display: flex;
   flex-direction: column;

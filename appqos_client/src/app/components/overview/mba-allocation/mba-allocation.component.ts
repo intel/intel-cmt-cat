@@ -28,22 +28,16 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { HttpClient } from '@angular/common/http';
 import {
-  AfterContentInit,
   ChangeDetectionStrategy,
   Component,
   EventEmitter,
   Input,
-  OnChanges,
-  OnInit,
   Output,
-  SimpleChanges,
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
-import { AppqosService } from 'src/app/services/appqos.service';
 import { MBACTRL } from '../../system-caps/system-caps.model';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
@@ -76,7 +70,7 @@ export class MbaAllocationComponent {
       data: { mba: true },
     });
 
-    dialogRef.afterClosed().subscribe((_) => {
+    dialogRef.afterClosed().subscribe(() => {
       this.poolEvent.emit();
     });
   }

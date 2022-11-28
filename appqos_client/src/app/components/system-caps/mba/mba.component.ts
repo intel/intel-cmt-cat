@@ -39,6 +39,6 @@ import { MBA, MBACTRL } from '../system-caps.model';
 })
 /* Component used to show MBA details*/
 export class MbaComponent {
-  @Input() isSupported: boolean = false;
+  @Input() isSupported = false;
   @Input() mba!: MBA & MBACTRL;
 }

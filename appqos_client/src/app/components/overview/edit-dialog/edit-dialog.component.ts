@@ -31,7 +31,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { AfterContentInit, Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSliderChange } from '@angular/material/slider';
-import { map } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
@@ -180,11 +179,11 @@ export class EditDialogComponent implements AfterContentInit {
   }
 
   updateMBABW(i: number, id: number) {
-      this.setMBABW(Number(this.pools[i].mba_bw), id);
+    this.setMBABW(Number(this.pools[i].mba_bw), id);
   }
 
   resetMBABW(id: number) {
-      this.setMBABW(this.mbaBwDefNum, id);
+    this.setMBABW(this.mbaBwDefNum, id);
   }
 
   setMBABW(bwMbps: number, id: number) {

@@ -32,6 +32,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /* You can add global styles to this file, and also import other style files */
 
 @import "~@angular/material/theming";
+$roboto-font-path: "~roboto-fontface/fonts" !default;
+
+@import "~roboto-fontface/css/roboto/sass/roboto-fontface";
+$material-design-icons-font-directory-path: "~material-design-icons-iconfont/dist/fonts/";
+@import "material-design-icons-iconfont/src/material-design-icons";
 @include mat-core();
 
 $int-primary-color: (

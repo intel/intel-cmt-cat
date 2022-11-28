@@ -43,8 +43,8 @@ import { LocalService } from 'src/app/services/local.service';
 /* Component used to display Login page with form fields*/
 export class LoginComponent implements OnInit {
   form!: FormGroup;
-  hasError: boolean = false;
-  loading: boolean = false;
+  hasError = false;
+  loading = false;
 
   constructor(
     private service: AppqosService,

@@ -89,7 +89,7 @@ export class PoolAddDialogComponent implements OnInit {
       this.coresList = this.form.value.cores.split(',').map(Number);
     }
 
-    let pool: PostPool = {
+    const pool: PostPool = {
       name: this.form.value.name,
       cores: this.coresList,
     };

@@ -51,18 +51,18 @@ export class RapConfigComponent implements OnInit {
   ngOnInit(): void {
     this.getConfigData();
 
-    this.localService.getIfaceEvent().subscribe((_) => this.getConfigData());
+    this.localService.getIfaceEvent().subscribe(() => this.getConfigData());
   }
 
   getConfigData(): void {
     const pools$ = this.service.getPools().pipe(
       take(1),
-      catchError((_) => of([]))
+      catchError(() => of([]))
     );
 
     const apps$ = this.service.getApps().pipe(
       take(1),
-      catchError((_) => of([]))
+      catchError(() => of([]))
     );
 
     combineLatest([pools$, apps$]).subscribe(([pools, apps]) => {

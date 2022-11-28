@@ -34,7 +34,6 @@ import {
   Input,
   OnChanges,
   Output,
-  SimpleChanges,
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -55,7 +54,7 @@ export class L3CacheAllocationComponent implements OnChanges {
 
   constructor(public dialog: MatDialog, private service: AppqosService) {}
 
-  ngOnChanges(changes: SimpleChanges): void {
+  ngOnChanges(): void {
     this.service.getL3cat().subscribe((l3cat) => {
       this.numCacheWays = l3cat.cw_num;
       this._convertToBitmask();
@@ -80,7 +79,7 @@ export class L3CacheAllocationComponent implements OnChanges {
       data: { l3cbm: true, numCacheWays: this.numCacheWays },
     });
 
-    dialogRef.afterClosed().subscribe((_) => {
+    dialogRef.afterClosed().subscribe(() => {
       this.poolEvent.emit();
     });
   }

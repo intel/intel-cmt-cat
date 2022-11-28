@@ -40,7 +40,6 @@ import {
   resMessage,
   SSTBF,
 } from '../components/system-caps/system-caps.model';
-
 import { LocalService } from './local.service';
 import { Apps, Pools } from '../components/overview/overview.model';
 
@@ -64,7 +63,7 @@ export class AppqosService {
   login(host: string, port: string) {
     return this.http
       .get(`${host}:${port}/caps`)
-      .pipe(catchError((_) => of(false)));
+      .pipe(catchError(() => of(false)));
   }
 
   /**
@@ -132,14 +131,14 @@ export class AppqosService {
 
   sstbfPut(value: boolean): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-    return this.http.put<any>(`${api_url}/caps/sstbf`, {
+    return this.http.put<resMessage>(`${api_url}/caps/sstbf`, {
       configured: value,
     });
   }
 
   mbaCtrlPut(value: boolean): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-    return this.http.put<any>(`${api_url}/caps/mba_ctrl`, {
+    return this.http.put<resMessage>(`${api_url}/caps/mba_ctrl`, {
       enabled: value,
     });
   }

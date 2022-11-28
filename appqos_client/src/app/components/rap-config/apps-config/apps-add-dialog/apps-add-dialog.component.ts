@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, Inject, OnInit } from '@angular/core';
-import { Form, FormControl, FormGroup, Validators } from '@angular/forms';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 import { Apps, Pools } from 'src/app/components/overview/overview.model';
@@ -82,7 +82,7 @@ export class AppsAddDialogComponent implements OnInit {
 
     this.getPids(this.form.value.pids);
 
-    let app: PostApp = {
+    const app: PostApp = {
       name: this.form.value.name,
       pids: this.pidsList,
       pool_id: this.form.value.pool.id,

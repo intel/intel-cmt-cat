@@ -58,7 +58,7 @@ export class OverviewComponent implements OnInit {
     this.getPools();
     this.getCaps();
 
-    this.localService.getIfaceEvent().subscribe((_) => {
+    this.localService.getIfaceEvent().subscribe(() => {
       this.getMbaCtrl();
       this.getPools();
     });

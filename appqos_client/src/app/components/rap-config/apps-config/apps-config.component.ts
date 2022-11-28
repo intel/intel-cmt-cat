@@ -88,7 +88,7 @@ export class AppsConfigComponent implements OnChanges {
       data: this.pools,
     });
 
-    dialogRef.afterClosed().subscribe((_) => {
+    dialogRef.afterClosed().subscribe(() => {
       this.appEvent.emit();
     });
   }
@@ -100,7 +100,7 @@ export class AppsConfigComponent implements OnChanges {
       data: { pools: this.pools, app: app },
     });
 
-    dialogRef.afterClosed().subscribe((_) => {
+    dialogRef.afterClosed().subscribe(() => {
       this.appEvent.emit();
     });
   }

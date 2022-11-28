@@ -56,7 +56,7 @@ import {
 /* Component used to show System Capabilities and capability details*/
 export class SystemCapsComponent implements OnInit {
   caps!: string[];
-  loading: boolean = false;
+  loading = false;
   interface!: string;
   mba!: MBACTRL & MBA;
   rdtIface!: RDTIface;
