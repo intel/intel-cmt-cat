@@ -49,13 +49,13 @@ class of service (CLOS) and associate cores / logical threads with a
 class of service.
 
 MBA controller allows to specify memory bandwidth in MBps instead of percentage.
-It is supported only on OS interface and requires Linux kernel since
-4.18 and above.
+It is supported only on OS interface and requires Linux kernel
+4.18 or above.
 
 Use of concurrent monitoring instances is possible as long as each
 instance monitors exclusive set of cores. Library APIs are also thread safe.
 
-For additional CMT, MBM, CAT and MBA details please see refer to the Intel(R)
+For additional CMT, MBM, CAT and MBA details please refer to the Intel(R)
 Architecture Software Development Manuals available at:
 http://www.intel.com/content/www/us/en/processors/architectures-software-developer-manuals.html
 Specific information with regard to CMT, MBM, CAT and MBA can be found in
