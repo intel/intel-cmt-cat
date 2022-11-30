@@ -62,7 +62,8 @@ $base-color: #0068b5;
     align-items: center;
   }
 
-  .field-address, .field-port {
+  .field-address,
+  .field-port {
     padding-top: 0.5rem;
     width: 16rem;
   }
@@ -70,6 +71,7 @@ $base-color: #0068b5;
   .submit-button {
     width: 16rem;
     height: 3rem;
+    margin-top: 0.5rem;
   }
 
   .contact-text {

@@ -61,7 +61,8 @@ export class LoginComponent implements OnInit {
       ]),
       portNumber: new FormControl('', [
         Validators.required,
-        Validators.pattern('^[0-9]*$'),
+        Validators.min(0),
+        Validators.max(65353),
       ]),
     });
   }

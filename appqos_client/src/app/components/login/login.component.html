@@ -53,12 +53,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <mat-form-field class="field-port" appearance="fill">
       <mat-label>Enter port number</mat-label>
       <input matInput formControlName="portNumber" placeholder="5000" />
+      <mat-error
+        *ngIf="form.controls['portNumber'].errors?.['min'] || form.controls['portNumber'].errors?.['max']"
+        >TCP standards (0-65353)</mat-error
+      >
     </mat-form-field>
     <mat-error *ngIf="hasError">
       Please enter a valid credentials or server isn't responding...
     </mat-error>
 
-    <div class="">
+    <div>
       <button
         mat-flat-button
         color="primary"
@@ -70,8 +74,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </button>
     </div>
 
-    <a href="https://github.com/intel/intel-cmt-cat/tree/master/appqos"
-    class="contact-text" target="_blank">More about AppQoS.</a>
+    <a
+      href="https://github.com/intel/intel-cmt-cat/tree/master/appqos"
+      class="contact-text"
+      target="_blank"
+      >More about AppQoS.</a
+    >
   </form>
   <mat-progress-spinner
     class="loading"
