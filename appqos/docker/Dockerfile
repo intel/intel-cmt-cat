@@ -78,8 +78,6 @@ ENV APPQOS_PORT=5000
 ENV APPQOS_CONF_PATH=/opt/intel/appqos/appqos.conf
 ENV APPQOS_ADDRESS=0.0.0.0
 
-COPY . /appqos_workspace
-
 # copy libpqos
 COPY --from=build-libpqos /usr/local/lib/libpqos.so* /lib/
 
