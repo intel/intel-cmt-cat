@@ -42,6 +42,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
     <mat-form-field class="name-field" appearance="fill">
       <mat-label>Name of Application</mat-label>
       <input matInput formControlName="name" />
+      <mat-error *ngIf="form.controls['name'].errors?.['pattern']"
+        >name has invalid characters</mat-error
+      >
+      <mat-error *ngIf="form.controls['name'].errors?.['required']"
+        >name is required
+      </mat-error>
+      <mat-error *ngIf="form.controls['name'].hasError('maxlength')"
+        >max length 80 characters</mat-error
+      >
     </mat-form-field>
     <mat-form-field class="pids-field" appearance="fill" floatLabel="always">
       <mat-label>PIDS</mat-label>
@@ -50,6 +59,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         placeholder="List of PID’s e.g. 2651, 2665 or 6490-6510"
         formControlName="pids"
       />
+      <mat-error *ngIf="form.controls['pids'].errors?.['required']"
+        >pids is required!
+      </mat-error>
+      <mat-error *ngIf="form.controls['pids'].hasError('maxlength')"
+        >max length 4096 characters</mat-error
+      >
       <mat-error *ngIf="form.controls['pids'].errors?.['pattern']"
         >List of PID’s e.g. 2651, 2665 or 6490-6510
       </mat-error>
@@ -61,6 +76,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         placeholder="List of cores (optional)"
         formControlName="cores"
       />
+      <mat-error *ngIf="form.controls['cores'].hasError('maxlength')"
+        >max length 4096 characters</mat-error
+      >
+      <mat-error *ngIf="form.controls['cores'].errors"
+        >limit cores to maximum number of 1024</mat-error
+      >
       <mat-error *ngIf="form.controls['cores'].errors?.['pattern']"
         >List of CORE’s e.g. 1,2 or 1,2-5 or 1-5
       </mat-error>
@@ -77,5 +98,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 </div>
 <div mat-dialog-actions align="end">
   <button mat-button mat-dialog-close color="primary">Close</button>
-  <button mat-flat-button color="primary" (click)="saveApp()">Save</button>
+  <button
+    mat-flat-button
+    color="primary"
+    (click)="saveApp()"
+    [disabled]="!form.valid"
+  >
+    Save
+  </button>
 </div>

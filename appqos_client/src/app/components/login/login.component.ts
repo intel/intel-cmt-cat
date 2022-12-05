@@ -33,6 +33,7 @@ import { Router } from '@angular/router';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
+import { Standards } from '../system-caps/system-caps.model';
 
 @Component({
   selector: 'app-login',
@@ -57,12 +58,14 @@ export class LoginComponent implements OnInit {
     this.form = new FormGroup({
       hostName: new FormControl('', [
         Validators.required,
-        Validators.pattern('^https://.*$'),
+        Validators.pattern('^https://+[!-~]+$'),
+        Validators.maxLength(Standards.MAX_CHARS),
       ]),
       portNumber: new FormControl('', [
         Validators.required,
         Validators.min(0),
         Validators.max(65353),
+        Validators.pattern('^[0-9]+$'),
       ]),
     });
   }

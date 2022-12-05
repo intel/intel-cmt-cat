@@ -38,10 +38,26 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       <mat-error *ngIf="form.controls['cores'].errors?.['pattern']"
         >List of cores e.g. 1,2 or 1,2-5 or 1-5
       </mat-error>
+      <mat-error *ngIf="form.controls['cores'].errors?.['required']"
+        >Cores is required!
+      </mat-error>
+      <mat-error *ngIf="form.controls['cores'].hasError('maxlength')"
+        >max length 4096 characters</mat-error
+      >
+      <mat-error *ngIf="form.controls['cores'].errors"
+        >limit cores to maximum number of 1024</mat-error
+      >
     </mat-form-field>
   </form>
 </div>
 <div mat-dialog-actions align="end">
   <button mat-button mat-dialog-close color="primary">Close</button>
-  <button mat-flat-button color="primary" (click)="saveCores()">Save</button>
+  <button
+    mat-flat-button
+    color="primary"
+    (click)="saveCores()"
+    [disabled]="!this.form.valid"
+  >
+    Save
+  </button>
 </div>

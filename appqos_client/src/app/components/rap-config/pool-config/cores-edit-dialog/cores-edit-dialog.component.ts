@@ -30,6 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { Component, Inject, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { Standards } from 'src/app/components/system-caps/system-caps.model';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
@@ -59,6 +60,7 @@ export class CoresEditDialogComponent implements OnInit {
     this.form = new FormGroup({
       cores: new FormControl(String(this.data.cores), [
         Validators.required,
+        Validators.maxLength(Standards.MAX_CHARS_CORES),
         Validators.pattern(
           '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
         ),
@@ -73,6 +75,11 @@ export class CoresEditDialogComponent implements OnInit {
       this.coresList = this.localService.getCoresDash(this.form.value.cores);
     } else {
       this.coresList = this.form.value.cores.split(',').map(Number);
+    }
+
+    if (Math.max(...this.coresList) > Standards.MAX_CORES) {
+      this.form.controls['cores'].setErrors({ incorrect: true });
+      return;
     }
 
     this.service

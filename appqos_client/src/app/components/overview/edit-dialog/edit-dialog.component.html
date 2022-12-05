@@ -31,8 +31,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 <div class="mba-dialog">
   <div class="header-dialog">
-    <h2 mat-dialog-title *ngIf="data.l3cbm">L3 Cache Allocation Technology (CAT)</h2>
-    <h2 mat-dialog-title *ngIf="data.l2cbm">L2 Cache Allocation Technology (CAT)</h2>
+    <h2 mat-dialog-title *ngIf="data.l3cbm">
+      L3 Cache Allocation Technology (CAT)
+    </h2>
+    <h2 mat-dialog-title *ngIf="data.l2cbm">
+      L2 Cache Allocation Technology (CAT)
+    </h2>
     <h2 mat-dialog-title *ngIf="data.mba">Memory Bandwidth Allocation (MBA)</h2>
     <mat-progress-spinner
       class="loading"
@@ -51,15 +55,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       pools application(s) can fill. The following rows represent pool CBMs and
       can be modified to enable some number of cache ways for each pool.
     </p>
-    <em>CBM enabled bits must be contiguous and at least one bit per CBM must
-      be set.
+    <em
+      >CBM enabled bits must be contiguous and at least one bit per CBM must be
+      set.
     </em>
   </span>
 
   <span class="info-text" *ngIf="data.mba"
     >Memory Bandwidth Allocation (MBA) provides approximate and indirect control
-     over memory bandwidth available to each pool. User can provide a required
-     bandwidth in either percentage format or MBps format.</span
+    over memory bandwidth available to each pool. User can provide a required
+    bandwidth in either percentage format or MBps format.</span
   >
 
   <span class="info-text" *ngIf="data.l2cbm">
@@ -69,14 +74,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       pools application(s) can fill. The following rows represent pool CBMs and
       can be modified to enable some number of cache ways for each pool.
     </p>
-    <em>CBM enabled bits must be contiguous and at least one bit per CBM must
-      be set.
+    <em
+      >CBM enabled bits must be contiguous and at least one bit per CBM must be
+      set.
     </em>
   </span>
 
   <mat-divider class="divider"></mat-divider>
   <mat-dialog-content class="mat-typography">
     <div class="pool" *ngFor="let pool of pools; index as i">
+      <ul *ngIf="pool.isValid" class="error">
+        <li>MBps is required!</li>
+        <li>MBps value too large</li>
+      </ul>
       <span class="pool-name">
         {{ pool.name }}
       </span>
@@ -153,8 +163,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <input
             matInput
             [value]="pool.mba_bw === mbaBwDefNum ? '' : pool.mba_bw"
-            [placeholder]="pool.mba_bw === mbaBwDefNum ? 'Unrestricted' : ''"
+            [placeholder]="
+              pool.mba_bw === mbaBwDefNum ? 'Unrestricted' : '5000'
+            "
             (input)="onChangeMbaBw($event, i)"
+            required
+            type="number"
           />
         </mat-form-field>
         <button
@@ -168,6 +182,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <button
           mat-flat-button
           class="reset-button"
+          color="accent"
           (click)="resetMBABW(pool.id)"
         >
           Reset

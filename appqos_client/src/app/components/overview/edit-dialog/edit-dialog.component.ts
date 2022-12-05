@@ -43,13 +43,17 @@ type dialogDataType = {
   numCacheWays: number;
 };
 
+type Pool = Pools & {
+  isValid?: boolean;
+};
+
 @Component({
   selector: 'app-edit-dialog',
   templateUrl: './edit-dialog.component.html',
   styleUrls: ['./edit-dialog.component.scss'],
 })
 export class EditDialogComponent implements AfterContentInit {
-  pools!: Pools[];
+  pools!: Pool[];
   loading = false;
   mbaBwDefNum = Math.pow(2, 32) - 1;
 
@@ -80,9 +84,18 @@ export class EditDialogComponent implements AfterContentInit {
   }
 
   onChangeMbaBw(event: any, i: number) {
-    if (event.target.value === '') return;
+    if (event.target.value === '') {
+      this.pools[i].isValid = true;
+      return;
+    }
 
-    this.pools[i]['mba_bw'] = event.target.value;
+    const mbaBw = Number(event.target.value);
+    if (mbaBw < 1 || mbaBw > this.mbaBwDefNum) {
+      this.pools[i].isValid = true;
+    } else {
+      this.pools[i]['mba_bw'] = event.target.value;
+      this.pools[i].isValid = false;
+    }
   }
 
   onChangeMBA(event: MatSliderChange, i: number) {

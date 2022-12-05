@@ -65,9 +65,7 @@ export class OverviewComponent implements OnInit {
   }
 
   getPools(): void {
-    this.service
-      .getPools()
-      .subscribe((pools: Pools[]) => (this.pools = pools.slice(0, 4)));
+    this.service.getPools().subscribe((pools: Pools[]) => (this.pools = pools));
   }
 
   getCaps(): void {

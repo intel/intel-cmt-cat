@@ -68,13 +68,23 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           floatLabel="always"
         >
           <mat-label>Name of Pool</mat-label>
-          <input
-            matInput
-            [value]="pool?.name"
-            (change)="onChangePoolName($event)"
-          />
+          <input matInput [formControl]="nameControl" required />
+          <mat-error *ngIf="nameControl.errors?.['pattern']"
+            >name has invalid characters</mat-error
+          >
+          <mat-error *ngIf="nameControl.errors?.['required']"
+            >name is required
+          </mat-error>
+          <mat-error *ngIf="nameControl.hasError('maxlength')"
+            >max length 80 characters</mat-error
+          >
         </mat-form-field>
-        <button mat-raised-button color="primary" (click)="savePoolName()">
+        <button
+          mat-raised-button
+          color="primary"
+          (click)="savePoolName()"
+          [disabled]="!nameControl.valid"
+        >
           RENAME
         </button>
       </div>
@@ -136,16 +146,34 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           <mat-label>MBps</mat-label>
           <input
             matInput
-            [value]="pool.mba_bw === mbaBwDefNum ? '' : pool.mba_bw"
+            [formControl]="mbaBwControl"
             [placeholder]="
-              pool.mba_bw === mbaBwDefNum || pool.mba_bw ? '5000' : ''
+              pool.mba_bw === mbaBwDefNum || pool.mba_bw ? 'Unrestricted' : ''
             "
-            (change)="onChangeMbaBw($event)"
+            required
+            type="number"
           />
+          <mat-error *ngIf="mbaBwControl.errors?.['required']"
+            >MBps is required
+          </mat-error>
+          <mat-error
+            *ngIf="mbaBwControl.errors?.['min'] || mbaBwControl.errors?.['max'] || mbaBwControl.errors?.['pattern']"
+            >MBps value too large
+          </mat-error>
         </mat-form-field>
-        <button mat-raised-button color="primary" (click)="saveMBABW()">
-          APPLY
-        </button>
+        <div class="action-btn">
+          <button mat-raised-button color="accent" (click)="saveMBABW(true)">
+            Reset
+          </button>
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="saveMBABW(false)"
+            [disabled]="!mbaBwControl.valid"
+          >
+            APPLY
+          </button>
+        </div>
       </div>
       <span>Apps</span>
       <br />

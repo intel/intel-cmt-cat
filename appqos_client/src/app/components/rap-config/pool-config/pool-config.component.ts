@@ -36,6 +36,7 @@ import {
   OnChanges,
   Output,
 } from '@angular/core';
+import { FormControl, Validators } from '@angular/forms';
 import { MatOptionSelectionChange } from '@angular/material/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSliderChange } from '@angular/material/slider';
@@ -47,6 +48,7 @@ import { Apps, Pools } from '../../overview/overview.model';
 import {
   CacheAllocation,
   resMessage,
+  Standards,
 } from '../../system-caps/system-caps.model';
 import { CoresEditDialogComponent } from './cores-edit-dialog/cores-edit-dialog.component';
 import { PoolAddDialogComponent } from './pool-add-dialog/pool-add-dialog.component';
@@ -66,11 +68,21 @@ export class PoolConfigComponent implements OnChanges {
   pool!: Pools;
   poolApps!: Apps[];
   poolName!: string;
-  mbaBW!: string;
   poolId!: number | undefined;
   l3numCacheWays!: number;
   l2numCacheWays!: number;
   mbaBwDefNum = Math.pow(2, 32) - 1;
+  mbaBwControl = new FormControl('', [
+    Validators.required,
+    Validators.min(1),
+    Validators.max(this.mbaBwDefNum),
+    Validators.pattern('^[0-9]+$'),
+  ]);
+  nameControl = new FormControl('', [
+    Validators.pattern('^[0-9a-zA-Z]+[ -~]+$'),
+    Validators.required,
+    Validators.maxLength(Standards.MAX_CHARS),
+  ]);
 
   constructor(
     private service: AppqosService,
@@ -107,6 +119,10 @@ export class PoolConfigComponent implements OnChanges {
 
     this.poolApps = this.apps.filter((app) => app.pool_id === id);
     this.selected = this.pool.name;
+    this.mbaBwControl.setValue(
+      this.pool.mba_bw === this.mbaBwDefNum ? '' : this.pool.mba_bw
+    );
+    this.nameControl.setValue(this.pool.name);
 
     if (this.pool.l3cbm) {
       this.localService
@@ -135,21 +151,11 @@ export class PoolConfigComponent implements OnChanges {
     }
   }
 
-  onChangePoolName(event: any) {
-    if (event.target.value === '') {
-      this.snackBar.handleError('Invalid Pool name!');
-    }
-
-    this.poolName = event.target.value;
-  }
-
   savePoolName() {
-    if (this.poolName === '') return;
-
     this.service
       .poolPut(
         {
-          name: this.poolName,
+          name: this.nameControl.value,
         },
         this.pool.id
       )
@@ -182,12 +188,6 @@ export class PoolConfigComponent implements OnChanges {
 
   onChangeMBA(event: MatSliderChange) {
     this.pool.mba = event.value!;
-  }
-
-  onChangeMbaBw(event: any) {
-    if (event.target.value === '') return;
-
-    this.pool.mba_bw = event.target.value;
   }
 
   saveL2CBM() {
@@ -244,11 +244,13 @@ export class PoolConfigComponent implements OnChanges {
       });
   }
 
-  saveMBABW() {
+  saveMBABW(reset: boolean) {
+    if (reset) this.mbaBwControl.markAsUntouched();
+
     this.service
       .poolPut(
         {
-          mba_bw: Number(this.pool.mba_bw),
+          mba_bw: reset ? this.mbaBwDefNum : Number(this.mbaBwControl.value),
         },
         this.pool.id
       )

@@ -65,3 +65,10 @@ export interface SSTBF {
 export interface resMessage {
   message: string;
 }
+
+export enum Standards {
+  MAX_CHARS = 80,
+  MAX_CHARS_CORES = 4096,
+  MAX_CHARS_PIDS = 4096,
+  MAX_CORES = 1024,
+}

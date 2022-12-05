@@ -46,7 +46,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         placeholder="https://localhost"
       />
       <mat-error *ngIf="form.controls['hostName'].errors?.['pattern']"
-        >'https://' prefix required</mat-error
+        >'https://' prefix required or host has invalid characters</mat-error
+      >
+      <mat-error *ngIf="form.controls['hostName'].hasError('maxlength')"
+        >max length 80 characters</mat-error
       >
     </mat-form-field>
 
@@ -56,6 +59,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <mat-error
         *ngIf="form.controls['portNumber'].errors?.['min'] || form.controls['portNumber'].errors?.['max']"
         >TCP standards (0-65353)</mat-error
+      >
+      <mat-error *ngIf="form.controls['portNumber'].errors?.['pattern']"
+        >port has invalid characters</mat-error
       >
     </mat-form-field>
     <mat-error *ngIf="hasError">

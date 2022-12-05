@@ -32,6 +32,7 @@ import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 import { Apps, Pools } from 'src/app/components/overview/overview.model';
+import { Standards } from 'src/app/components/system-caps/system-caps.model';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
@@ -59,19 +60,24 @@ export class AppsAddDialogComponent implements OnInit {
 
   ngOnInit(): void {
     this.form = new FormGroup({
-      name: new FormControl('', [Validators.required]),
+      name: new FormControl('', [
+        Validators.pattern('^[ -~]+$'),
+        Validators.required,
+        Validators.maxLength(Standards.MAX_CHARS),
+      ]),
       pids: new FormControl('', [
         Validators.required,
         Validators.pattern(
           '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
         ),
+        Validators.maxLength(Standards.MAX_CHARS_PIDS),
       ]),
-      cores: new FormControl(
-        '',
+      cores: new FormControl('', [
         Validators.pattern(
           '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
-        )
-      ),
+        ),
+        Validators.maxLength(Standards.MAX_CHARS_CORES),
+      ]),
       pool: new FormControl('', [Validators.required]),
     });
   }
@@ -124,6 +130,10 @@ export class AppsAddDialogComponent implements OnInit {
       this.coresList = this.localService.getCoresDash(cores);
     } else {
       this.coresList = cores.split(',').map(Number);
+    }
+
+    if (Math.max(...this.coresList) > Standards.MAX_CORES) {
+      this.form.controls['cores'].setErrors({ incorrect: true });
     }
   }
 }
