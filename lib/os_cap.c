@@ -442,7 +442,6 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
         cap->l3_size = cpu->l3.total_size;
 
         for (i = 0; i < DIM(events); i++) {
-                int supported;
                 uint32_t scale;
                 struct pqos_cap_mon *mon;
                 struct pqos_monitor *monitor;
