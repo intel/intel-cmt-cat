@@ -58,8 +58,43 @@ class PqosApi:
     Wrapper for libpqos wrapper.
     """
 
+    _instance = None
+    pqos = None
+
+    @classmethod
+    def set_instance(cls, instance):
+        "Sets an instance of this class."
+
+        cls._instance = instance
+
+    @classmethod
+    def get_instance(cls):
+        "Gets an instance of this class."
+
+        return cls._instance
+
+    def __new__(cls):
+        """
+        Returns an object of this class if already created
+        or constructs a new one.
+        """
+
+        instance = cls.get_instance()
+
+        # if instance is None:
+        #     instance = object.__new__(cls)
+        #     cls.set_instance(instance)
+
+        if instance is None:
+            instance = object.__new__(cls)
+            cls.set_instance(instance)
+
+        return cls.get_instance()
 
     def __init__(self):
+        if self.pqos is not None:
+            return
+
         self.pqos = Pqos()
         self.cap = None
         self.l3ca = None

@@ -76,6 +76,7 @@ class TestCapsMba:
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.current_iface", mock.MagicMock(return_value="msr"))
     @mock.patch("appqos.caps.mba_supported", mock.MagicMock(return_value=True))
     @mock.patch("appqos.caps.mba_bw_supported", mock.MagicMock(return_value=True))
     @mock.patch("appqos.pqos_api.PQOS_API.get_mba_num_cos", mock.MagicMock(return_value=8))
@@ -411,6 +412,7 @@ class TestCapsIface:
 
 class TestCapsL3Cat:
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.current_iface", mock.MagicMock(return_value="msr"))
     @mock.patch("appqos.caps.cat_l3_supported", mock.MagicMock(return_value=True))
     def test_caps_l3ca_get(self):
         info = {
@@ -484,6 +486,7 @@ class TestCapsL3Cat:
 
 class TestCapsL2Cat:
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
+    @mock.patch("appqos.pqos_api.PQOS_API.current_iface", mock.MagicMock(return_value="msr"))
     @mock.patch("appqos.caps.cat_l2_supported", mock.MagicMock(return_value=True))
     def test_caps_l2ca_get(self):
         info = {

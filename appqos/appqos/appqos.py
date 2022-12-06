@@ -43,6 +43,7 @@ import multiprocessing
 import signal
 import sys
 import syslog
+import threading
 import time
 from jsonschema import ValidationError
 
@@ -65,11 +66,11 @@ class AppQoS:
     Handles configuration changes.
     """
 
+    stop_event = multiprocessing.Event()
+    thread = None
 
-    def __init__(self):
-        self.stop_event = multiprocessing.Event()
-
-    def run(self):
+    @staticmethod
+    def run():
         """
         Runs main loop.
         """
@@ -80,7 +81,7 @@ class AppQoS:
         except Exception as ex:
             log.error("Invalid config file... ")
             log.error(ex)
-            return
+            return -1
 
         data = ConfigStore.get_config()
 
@@ -95,7 +96,7 @@ class AppQoS:
             result = sstbf.init_sstbf(data)
             if result != 0:
                 log.error("Failed to apply initial SST-BF configuration, terminating...")
-                return
+                return -1
 
             log.info("SST-BF enabled, " \
                      f"{'not ' if not sstbf.is_sstbf_configured() else ''}configured.")
@@ -115,7 +116,7 @@ class AppQoS:
                 if result != 0:
                     log.error("Failed to apply initial Power Profiles configuration,"\
                         " terminating...")
-                    return
+                    return -1
         else:
             log.info("Power Profiles/EPP not enabled")
 
@@ -128,23 +129,36 @@ class AppQoS:
             result = PQOS_API.enable_mba_bw(data.get_mba_ctrl_enabled())
             if result != 0:
                 log.error("libpqos MBA CTRL initialization failed, Terminating...")
-                return
+                return -1
             log.info(f"RDT MBA CTRL {'en' if PQOS_API.is_mba_bw_enabled() else 'dis'}abled")
 
         result = cache_ops.configure_rdt(data)
         if result != 0:
             log.error("Failed to apply initial RDT configuration, terminating...")
-            return
+            return -1
 
-        # set CTRL+C sig handler
-        signal.signal(signal.SIGINT, self.signal_handler)
+        AppQoS.thread = threading.Thread(target=AppQoS.event_handler)
+        AppQoS.thread.start()
 
-        self.event_handler()
+        return 0
+
+
+    @staticmethod
+    def stop():
+        """
+        Runs main loop.
+        """
+        AppQoS.stop_event.set()
 
         log.info("Terminating...")
 
+        if AppQoS.thread is not None:
+            AppQoS.thread.join()
+            AppQoS.thread = None
 
-    def event_handler(self):
+
+    @staticmethod
+    def event_handler():
         """
         Handles config_changed event
         """
@@ -153,7 +167,7 @@ class AppQoS:
         last_cfg_change_ts = 0
         min_time_diff = 1 / common.RATE_LIMIT
 
-        while not self.stop_event.is_set():
+        while not AppQoS.stop_event.is_set():
             if ConfigStore().is_config_changed():
                 cfg = ConfigStore.get_config()
 
@@ -178,14 +192,6 @@ class AppQoS:
                 last_cfg_change_ts = time.time()
                 log.info("New configuration processed")
 
-
-    def signal_handler(self, _signum, _frame):
-        """
-        Handles CTR+C
-        """
-
-        print("CTRL+C...")
-        self.stop_event.set()
 
 def load_config(config_file):
     """
@@ -220,6 +226,19 @@ def main():
     """
     Main entry point
     """
+
+    server = None
+
+    def signal_handler(_signum, _frame):
+        """
+        Handles CTR+C
+        """
+        print("CTRL+C...")
+
+        if server is not None:
+            server.terminate()
+
+        AppQoS.stop()
 
     # parse command line arguments
     parser = argparse.ArgumentParser()
@@ -274,23 +293,23 @@ def main():
     # initialize capabilities
     result = caps.caps_init(iface)
     if result == 0:
-        # initialize main logic
-        app_qos = AppQoS()
+        signal.signal(signal.SIGINT, signal_handler)
 
         # Enable CORS
         cors = has_cors and cmd_args.cors
 
         # start REST API server
         server = rest_server.Server()
-        result = server.start(cmd_args.address, cmd_args.port[0], cmd_args.verbose, cors=cors)
-        if result == 0:
-            # run main logic
-            app_qos.run()
 
-            # stop REST API server
-            server.terminate()
-        else:
-            log.error("Failed to start REST API server, Terminating...")
+        # initialize main logic
+        result = AppQoS.run()
+        if result == 0:
+            result = server.start(cmd_args.address, cmd_args.port[0], cmd_args.verbose, cors=cors)
+            if result != 0:
+                log.error("Failed to start REST API server, Terminating...")
+
+        AppQoS.stop()
+
     else:
         log.error("Required capabilities not supported, Terminating...")
 

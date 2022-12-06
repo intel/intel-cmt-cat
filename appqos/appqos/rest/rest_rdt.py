@@ -40,8 +40,9 @@ from flask_restful import Resource, request
 import jsonschema
 
 from appqos import caps
+from appqos.pqos_api import PQOS_API
 from appqos.config_store import ConfigStore
-from appqos.rest.rest_exceptions import BadRequest, NotFound
+from appqos.rest.rest_exceptions import BadRequest, NotFound, Reconfiguring
 
 class MbaNotFound(NotFound):
     """
@@ -77,11 +78,16 @@ class CapsMba(Resource):
         Returns:
             response, status code
         """
-        if not caps.mba_supported(ConfigStore.get_config().get_rdt_iface()):
+
+        config = ConfigStore.get_config()
+
+        if not caps.mba_supported(config.get_rdt_iface()):
             raise MbaNotFound()
 
-        mba_info = caps.mba_info()
+        if config.get_rdt_iface() != PQOS_API.current_iface():
+            raise Reconfiguring()
 
+        mba_info = caps.mba_info()
         res = {
             'clos_num': mba_info['clos_num'],
             'mba_enabled': mba_info['enabled'],
@@ -259,8 +265,10 @@ class CapsL3ca(Resource):
         if not caps.cat_l3_supported(config.get_rdt_iface()):
             raise L3CatNotFound()
 
-        l3ca_info = caps.l3ca_info()
+        if config.get_rdt_iface() != PQOS_API.current_iface():
+            raise Reconfiguring()
 
+        l3ca_info = caps.l3ca_info()
         res = {
             'cache_size': l3ca_info['cache_size'],
             'cw_size': l3ca_info['cache_way_size'],
@@ -352,8 +360,10 @@ class CapsL2ca(Resource):
         if not caps.cat_l2_supported(config.get_rdt_iface()):
             raise L2CatNotFound()
 
-        l2ca_info = caps.l2ca_info()
+        if config.get_rdt_iface() != PQOS_API.current_iface():
+            raise Reconfiguring()
 
+        l2ca_info = caps.l2ca_info()
         res = {
             'cache_size': l2ca_info['cache_size'],
             'cw_size': l2ca_info['cache_way_size'],

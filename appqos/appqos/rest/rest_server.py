@@ -36,14 +36,9 @@ REST server
 """
 
 import json
-import multiprocessing
-import os
-import signal
 import ssl
 import sys
 from pathlib import Path
-
-from time import sleep
 from flask import Flask
 from flask_restful import Api
 from gevent.pywsgi import WSGIServer
@@ -52,7 +47,6 @@ from werkzeug.exceptions import HTTPException
 from appqos import caps
 from appqos import common
 from appqos import log
-
 from appqos.rest.rest_power import Power, Powers
 from appqos.rest.rest_app import App, Apps
 from appqos.rest.rest_caps_cpu import CapsCpus
@@ -188,6 +182,7 @@ class Server:
             host: address to bind to
             port: port to bind to
             debug(bool): Debug flag
+            cors: Enable cors
 
         Returns:
             0 on success
@@ -230,18 +225,12 @@ class Server:
             log.error(f"CA certificate file, {str(ex)}")
             return -1
 
-        self.http_server = WSGIServer((host, port), self.app, ssl_context=self.context, spawn=1)
-        def handle_gevent_stop(_signum, _frame):
-            log.info("Stopping gevent server loop")
-            self.http_server.stop()
-            self.http_server.close()
 
-        # dedicated handler for gevent server is needed to stop it gracefully
-        # before process will be terminated
-        signal.signal(signal.SIGINT, handle_gevent_stop)
+        self.http_server = WSGIServer((host, port), self.app, spawn=2, ssl_context=self.context)
+        self.http_server.init_socket()
+        log.info(f"Starting REST API server on {host}:{port}")
+        self.http_server.serve_forever()
 
-        self.process = multiprocessing.Process(target=self.http_server.serve_forever)
-        self.process.start()
         return 0
 
 
@@ -249,12 +238,7 @@ class Server:
         """
         Terminates server
         """
-        os.kill(self.process.pid, signal.SIGINT)
-        sleep(1)
-        if self.process.is_alive():
-            self.process.terminate()
-        self.process.join()
-
+        self.http_server.stop()
 
     @staticmethod
     def error_handler(error):
@@ -265,5 +249,10 @@ class Server:
             error: error
         """
         STATS_STORE.general_stats_inc_num_err()
-        response = {'message': error.description}
-        return json.dumps(response), error.code
+
+        response = error.get_response()
+        response.data = json.dumps({
+            "message": error.description,
+        })
+        response.content_type = "application/json"
+        return response

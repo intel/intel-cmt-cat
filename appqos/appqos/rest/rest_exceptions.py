@@ -35,7 +35,8 @@ REST API module
 Exceptions
 """
 
-from werkzeug.exceptions import HTTPException
+
+from werkzeug.exceptions import HTTPException, ServiceUnavailable
 
 
 class RestError(HTTPException):
@@ -65,7 +66,6 @@ class BadRequest(RestError):
     BadRequest exception
     """
 
-
     def __init__(self, description="Bad Request"):
         RestError.__init__(self, 400, description)
 
@@ -74,7 +74,6 @@ class InternalError(RestError):
     """
     InternalError exception
     """
-
 
     def __init__(self, description="Internal Server Error"):
         RestError.__init__(self, 500, description)
@@ -85,6 +84,14 @@ class MethodNotAllowed(RestError):
     Method Not Allowed exception
     """
 
-
     def __init__(self, description="Method Not Allowed"):
         RestError.__init__(self, 405, description)
+
+
+class Reconfiguring(ServiceUnavailable):
+    """
+    App Qos is reconfiguring
+    """
+    def __init__(self):
+        desc = "App QoS is reconfiguring, please try again later"
+        ServiceUnavailable.__init__(self, description=desc, retry_after=1)
