@@ -22,7 +22,8 @@ ENV DEBIAN_FRONTEND noninteractive
 COPY . /appqos_workspace
 
 # install libpqos dependencies
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update -q && \
+    apt-get install -y --no-install-recommends \
         make \
         gcc \
         libc-dev && \
@@ -51,7 +52,8 @@ ENV PIP_USER=1
 COPY . /appqos_workspace
 
 # install dependencies
-RUN apt-get install -y --no-install-recommends \
+RUN apt-get update -q && \
+    apt-get install -y --no-install-recommends \
         python3-pip \
         git && \
     apt-get clean
