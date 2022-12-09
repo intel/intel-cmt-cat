@@ -15,7 +15,7 @@ frontend main
         default_backend static
 
 backend static
-        server static 127.0.0.1:5000 ssl verify required  ca-file /opt/intel/appqos/ca.crt  crt /opt/intel/appqos/client_appqos.pem
+        server static 127.0.0.1:5000 ssl verify required crt /etc/ssl/certs/appqos/client_appqos.pem ca-file /etc/ssl/certs/appqos/ca.crt
 ```
 
 The frontend here remains open to all connections. Please refer to HAProxy documentation to choose convenient method for controlling access to the service. 
