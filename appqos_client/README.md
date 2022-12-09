@@ -34,11 +34,7 @@ The appqos/ca/ directory contains scripts to generate temporary self-signed cert
 - `gen_test_certs_additional.sh` script will generate a PKCS 12 certificate named _client_appqos.p12_ that can be imported into the browser to allow client authentication
 
 #### Step 2 - Copy certificate to local machine
-  To copy `client_appqos.p12` certificate to the local machine use this command:
-
-  ```
-  scp -r username@server:<file path>/client_appqos.p12 <path where you want store it>
-  ```
+  To copy `client_appqos.p12` certificate to the local machine where the browser is running
 
 #### Step 3 - Import `client_appqos.p12` certificate to the browser
 
