@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    4.4.1
+%global githubver    4.5.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -181,6 +181,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Fri Dec 02 2022  Michal Aleksinski <michalx.aleksinski@intel.com> 4.5.0-1
+- New release 4.5.0
+
 * Thu Aug 11 2022  Michal Aleksinski <michalx.aleksinski@intel.com> 4.4.1-1
 - New release 4.4.1
 

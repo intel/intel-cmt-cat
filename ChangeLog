@@ -1,4 +1,23 @@
 =======================================================================
+Release  v4.5.0  2022-12-15
+=======================================================================
+
+Contributors (alphabetical order):
+        Adrian Stanciu <adrian.stanciu@intel.com>
+        Colin Ian King <colin.i.king@gmail.com>
+        Mariusz Szafranski <mariuszx.szafranski@intel.com>
+        Michał Aleksiński <michalx.aleksinski@intel.com>
+        Wolfgang Pross <wolfgang.pross@intel.com>
+
+1. App QoS
+        - Added L2 CDP support
+        - Added L3 CDP support
+        - Expose platform topology
+        - CORS support
+2. General:
+        - Bug fixes
+
+=======================================================================
 Release  v4.4.1  2022-08-12
 =======================================================================
 
