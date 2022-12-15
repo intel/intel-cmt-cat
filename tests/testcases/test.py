@@ -33,6 +33,7 @@
 import os
 import logging
 import subprocess
+import time
 import psutil
 from testlib.env import Env
 
@@ -73,9 +74,17 @@ class Test:
 
     ## Runs command and adds output to log
     def run(self, command, quiet=False):
-        with subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, encoding="utf-8") as child:
-            stdout, stderr = child.communicate()
+        with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              encoding="utf-8") as child:
+            (stdout, stderr) = child.communicate()
+
+        # repeat command on RMID exhaustion
+        if "Failed to create resctrl group /sys/fs/resctrl/COS" in stdout:
+            # wait for limbo list cleanup
+            time.sleep(1)
+            with subprocess.Popen(command.split(), stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              encoding="utf-8") as child:
+                (stdout, stderr) = child.communicate()
 
         if not quiet:
             self.log.debug(command)
