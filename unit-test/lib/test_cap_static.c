@@ -30,22 +30,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "test_cap.h"
-
-#include <setjmp.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
-
-/* clang-format off */
-#include <cmocka.h>
-/* clang-format on */
-#include "test_cap.h"
-#include "mock_cap.h"
-
 #include "log.h"
+#include "mock_cap.h"
 #include "pqos.h"
+#include "test.h"
+#include "test_cap.h"
 
 /* ======== helpers ======= */
 

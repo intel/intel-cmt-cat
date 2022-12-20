@@ -135,7 +135,7 @@ int
 pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
 {
         FILE *fd;
-        char buf[16] = "\0";
+        char buf[17] = "\0";
         char *s = buf;
         char *endptr = NULL;
         size_t bytes;
@@ -150,10 +150,10 @@ pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
 
         bytes = fread(buf, sizeof(buf) - 1, 1, fd);
         if (bytes == 0 && !feof(fd)) {
-                fclose(fd);
+                pqos_fclose(fd);
                 return PQOS_RETVAL_ERROR;
         }
-        fclose(fd);
+        pqos_fclose(fd);
 
         val = strtoull(s, &endptr, base);
 
@@ -217,6 +217,7 @@ pqos_file_contains(const char *fname, const char *str, int *found)
                 return PQOS_RETVAL_OK;
         }
 
+        *found = 0;
         while (fgets(temp, sizeof(temp), fd) != NULL) {
                 if (strstr(temp, str) != NULL) {
                         *found = 1;

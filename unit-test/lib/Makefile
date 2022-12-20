@@ -7,9 +7,6 @@ LIB_OBJS = $(LIB_SRCS:$(LIB_DIR)/%.c=$(OBJ_DIR)/%.o)
 LIB_DEPS = $(LIB_SRCS:$(LIB_DIR)/%.c=$(OBJ_DIR)/%.d)
 
 MOCK_DIR = ../mock
-MOCK_SRCS = $(sort $(wildcard $(MOCK_DIR)*.c))
-MOCK_OBJS += $(OBJ_DIR)/hw_alloc_assoc_write.o
-MOCK_OBJS += $(OBJ_DIR)/hw_alloc_assoc_read.o
 
 TESTS_SRCS = $(sort $(wildcard test_*.c))
 TESTS = $(TESTS_SRCS:%.c=$(BIN_DIR)/%)
@@ -49,6 +46,12 @@ $(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
 		--globalize-symbol=hw_l2ca_get --weaken-symbol=hw_l2ca_get \
 		$@
 
+$(OBJ_DIR)/common.o: $(LIB_DIR)/common.c $(OBJ_DIR)/common.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=pqos_fopen --weaken-symbol=pqos_fopen \
+		--globalize-symbol=pqos_fclose --weaken-symbol=pqos_fclose \
+		$@
 
 $(OBJ_DIR)/cap.o: $(LIB_DIR)/cap.c $(OBJ_DIR)/cap.d
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -694,6 +697,110 @@ $(BIN_DIR)/test_pqos_inter_get: test_pqos_inter_get.c $(LIB_OBJS)
 		-Wl,--wrap=lock_fini \
 		-Wl,--wrap=lock_get \
 		-Wl,--wrap=lock_release \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_common: ./test_common.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=getline \
+		-Wl,--wrap=fopen \
+		-Wl,--wrap=fgets \
+		-Wl,--wrap=fclose \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_common_fread_uint64: ./test_common_fread_uint64.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=fread \
+		-Wl,--wrap=feof \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--wrap=pqos_close \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_mba_ids: ./test_utils_pqos_cpu_get_mba_ids.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_sockets: ./test_utils_pqos_cpu_get_sockets.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_l3cat_ids: ./test_utils_pqos_cpu_get_l3cat_ids.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_l2ids: ./test_utils_pqos_cpu_get_l2ids.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_cores: ./test_utils_pqos_cpu_get_cores.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_one_core: ./test_utils_pqos_cpu_get_one_core.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_socketid: ./test_utils_pqos_cpu_get_socketid.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_one_by_l2id: ./test_utils_pqos_cpu_get_one_by_l2id.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_one_by_l3cat_id: ./test_utils_pqos_cpu_get_one_by_l3cat_id.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_one_by_mba_id: ./test_utils_pqos_cpu_get_one_by_mba_id.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_clusterid: ./test_utils_pqos_cpu_get_clusterid.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_utils_pqos_cpu_get_core_info: ./test_utils_pqos_cpu_get_core_info.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_utils_pqos_cpu_check_core: ./test_utils_pqos_cpu_check_core.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
