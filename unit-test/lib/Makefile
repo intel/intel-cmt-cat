@@ -750,7 +750,6 @@ $(BIN_DIR)/test_utils_pqos_cpu_get_cores: ./test_utils_pqos_cpu_get_cores.c $(LI
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-
 $(BIN_DIR)/test_utils_pqos_cpu_get_one_core: ./test_utils_pqos_cpu_get_one_core.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
@@ -764,13 +763,11 @@ $(BIN_DIR)/test_utils_pqos_cpu_get_socketid: ./test_utils_pqos_cpu_get_socketid.
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-
 $(BIN_DIR)/test_utils_pqos_cpu_get_one_by_l2id: ./test_utils_pqos_cpu_get_one_by_l2id.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
-
 
 $(BIN_DIR)/test_utils_pqos_cpu_get_one_by_l3cat_id: ./test_utils_pqos_cpu_get_one_by_l3cat_id.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
@@ -784,7 +781,6 @@ $(BIN_DIR)/test_utils_pqos_cpu_get_one_by_mba_id: ./test_utils_pqos_cpu_get_one_
 	$(CC) $(CFLAGS) \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
-
 
 $(BIN_DIR)/test_utils_pqos_cpu_get_clusterid: ./test_utils_pqos_cpu_get_clusterid.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
@@ -801,6 +797,15 @@ $(BIN_DIR)/test_utils_pqos_cpu_get_core_info: ./test_utils_pqos_cpu_get_core_inf
 $(BIN_DIR)/test_utils_pqos_cpu_check_core: ./test_utils_pqos_cpu_check_core.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_uncore_monitoring_stop: ./test_uncore_monitoring_stop.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=lcpuid \
+		-Wl,--wrap=_pqos_get_cpu \
+		-Wl,--wrap=msr_write \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
