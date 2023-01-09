@@ -32,6 +32,7 @@
 
 #include "mock_machine.h"
 
+#include "machine.h"
 #include "mock_test.h"
 
 int
@@ -53,11 +54,16 @@ __wrap_machine_fini(void)
 int
 __wrap_msr_read(const unsigned lcore, const uint32_t reg, uint64_t *value)
 {
+        int ret;
+
         check_expected(lcore);
         check_expected(reg);
-        *value = mock_type(uint64_t);
 
-        return mock_type(int);
+        ret = mock_type(int);
+        if (ret == MACHINE_RETVAL_OK)
+                *value = mock_type(uint64_t);
+
+        return ret;
 }
 
 int

@@ -45,9 +45,9 @@ test_hw_alloc_assoc_read(void **state __attribute__((unused)))
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_ASSOC);
+        will_return(__wrap_msr_read, PQOS_RETVAL_OK);
         will_return(__wrap_msr_read, ((uint64_t)2)
                                          << PQOS_MSR_ASSOC_QECOS_SHIFT);
-        will_return(__wrap_msr_read, PQOS_RETVAL_OK);
 
         ret = hw_alloc_assoc_read(lcore, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -73,8 +73,6 @@ test_hw_alloc_assoc_read_error(void **state __attribute__((unused)))
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_ASSOC);
-        will_return(__wrap_msr_read, ((uint64_t)2)
-                                         << PQOS_MSR_ASSOC_QECOS_SHIFT);
         will_return(__wrap_msr_read, PQOS_RETVAL_ERROR);
 
         ret = hw_alloc_assoc_read(lcore, &class_id);

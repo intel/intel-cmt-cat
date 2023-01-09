@@ -45,8 +45,8 @@ test_hw_mon_assoc_write(void **state __attribute__((unused)))
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_ASSOC);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 0);
 
         expect_value(__wrap_msr_write, lcore, lcore);
         expect_value(__wrap_msr_write, reg, PQOS_MSR_ASSOC);
@@ -66,7 +66,6 @@ test_hw_mon_assoc_write_error_read(void **state __attribute__((unused)))
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_ASSOC);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, PQOS_RETVAL_ERROR);
 
         ret = hw_mon_assoc_write(lcore, rmid);
@@ -82,8 +81,8 @@ test_hw_mon_assoc_write_error_write(void **state __attribute__((unused)))
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_ASSOC);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 0);
 
         expect_value(__wrap_msr_write, lcore, lcore);
         expect_value(__wrap_msr_write, reg, PQOS_MSR_ASSOC);

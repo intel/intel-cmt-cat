@@ -300,6 +300,11 @@ uncore_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 int
 uncore_mon_fini(void)
 {
+        m_uncore_cha = 0;
+        all_evt_mask = (enum pqos_mon_event)0;
+        uncore_events = NULL;
+        uncore_unit_ctrl = NULL;
+
         return PQOS_RETVAL_OK;
 }
 
@@ -403,7 +408,7 @@ _setup_counter(unsigned lcore, enum pqos_mon_event event)
 int
 uncore_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
 {
-        int ret;
+        int ret = PQOS_RETVAL_OK;
         unsigned s;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
 
@@ -421,14 +426,14 @@ uncore_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
                                 continue;
 
                         ret = _setup_counter(lcore, event);
-                        if (ret != PQOS_RETVAL_ERROR)
+                        if (ret == PQOS_RETVAL_ERROR)
                                 break;
                 }
         }
 
         group->intl->hw.event |= (enum pqos_mon_event)(event & all_evt_mask);
 
-        return PQOS_RETVAL_OK;
+        return ret;
 }
 
 int

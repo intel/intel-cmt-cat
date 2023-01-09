@@ -249,8 +249,8 @@ test_hw_l3ca_get(void **state)
                 expect_value(__wrap_msr_read, lcore, 0);
                 expect_value(__wrap_msr_read, reg,
                              PQOS_MSR_L3CA_MASK_START + class_id);
-                will_return(__wrap_msr_read, 0x1 << class_id);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, 0x1 << class_id);
         }
 
         ret = hw_l3ca_get(l3cat_id, max_num_ca, &num_ca, ca);
@@ -286,8 +286,8 @@ test_hw_l3ca_get_cdp(void **state)
                 expect_value(__wrap_msr_read, lcore, 0);
                 expect_value(__wrap_msr_read, reg,
                              PQOS_MSR_L3CA_MASK_START + i);
-                will_return(__wrap_msr_read, 0x1 << i);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, 0x1 << i);
         }
 
         ret = hw_l3ca_get(l3cat_id, max_num_ca, &num_ca, ca);
@@ -491,8 +491,8 @@ test_hw_l2ca_get(void **state)
                 expect_value(__wrap_msr_read, lcore, 0);
                 expect_value(__wrap_msr_read, reg,
                              PQOS_MSR_L2CA_MASK_START + class_id);
-                will_return(__wrap_msr_read, 0x1 << class_id);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, 0x1 << class_id);
         }
 
         ret = hw_l2ca_get(l2cat_id, max_num_ca, &num_ca, ca);
@@ -528,8 +528,8 @@ test_hw_l2ca_get_cdp(void **state)
                 expect_value(__wrap_msr_read, lcore, 0);
                 expect_value(__wrap_msr_read, reg,
                              PQOS_MSR_L2CA_MASK_START + i);
-                will_return(__wrap_msr_read, 0x1 << i);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, 0x1 << i);
         }
 
         ret = hw_l2ca_get(l2cat_id, max_num_ca, &num_ca, ca);
@@ -646,8 +646,8 @@ test_hw_mba_set_actual(void **state)
         will_return(__wrap_msr_write, PQOS_RETVAL_OK);
         expect_value(__wrap_msr_read, lcore, 0);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_MBA_MASK_START + 1);
-        will_return(__wrap_msr_read, 60);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 60);
 
         ret = hw_mba_set(0, 1, requested, actual);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -741,8 +741,8 @@ test_hw_mba_get(void **state)
                 expect_value(__wrap_msr_read, lcore, 0);
                 expect_value(__wrap_msr_read, reg,
                              PQOS_MSR_MBA_MASK_START + class_id);
-                will_return(__wrap_msr_read, class_id * 10);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, class_id * 10);
         }
 
         ret = hw_mba_get(mba_id, max_num_cos, &num_cos, mba_tab);

@@ -14,6 +14,9 @@ run:
 	$(MAKE) -C lib run
 	$(MAKE) -C pqos run
 
+run.lib:
+	$(MAKE) -C lib run
+
 style:
 	$(MAKE) -C lib style
 	$(MAKE) -C mock style

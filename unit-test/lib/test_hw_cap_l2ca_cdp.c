@@ -51,8 +51,8 @@ test_hw_cap_l2ca_cdp_enabled(void **state)
         for (i = 0; i < l2id_num; ++i) {
                 expect_any(__wrap_msr_read, lcore);
                 expect_value(__wrap_msr_read, reg, PQOS_MSR_L2_QOS_CFG);
-                will_return(__wrap_msr_read, PQOS_MSR_L2_QOS_CFG_CDP_EN);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, PQOS_MSR_L2_QOS_CFG_CDP_EN);
         }
 
         ret = hw_cap_l2ca_cdp(data->cpu, &enabled);
@@ -78,8 +78,8 @@ test_hw_cap_l2ca_cdp_disabled(void **state)
         for (i = 0; i < l2id_num; ++i) {
                 expect_any(__wrap_msr_read, lcore);
                 expect_value(__wrap_msr_read, reg, PQOS_MSR_L2_QOS_CFG);
-                will_return(__wrap_msr_read, 0);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, 0);
         }
 
         ret = hw_cap_l2ca_cdp(data->cpu, &enabled);
@@ -105,12 +105,12 @@ test_hw_cap_l2ca_cdp_conflict(void **state)
         for (i = 0; i < l2id_num; ++i) {
                 expect_any(__wrap_msr_read, lcore);
                 expect_value(__wrap_msr_read, reg, PQOS_MSR_L2_QOS_CFG);
+                will_return(__wrap_msr_read, PQOS_RETVAL_OK);
                 if (i == 1)
                         will_return(__wrap_msr_read, 0);
                 else
                         will_return(__wrap_msr_read,
                                     PQOS_MSR_L2_QOS_CFG_CDP_EN);
-                will_return(__wrap_msr_read, PQOS_RETVAL_OK);
         }
 
         ret = hw_cap_l2ca_cdp(data->cpu, &enabled);

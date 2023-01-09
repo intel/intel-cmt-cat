@@ -60,8 +60,8 @@ test_hw_mon_read(void **state __attribute__((unused)))
         /* read */
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
-        will_return(__wrap_msr_read, 5);
         will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+        will_return(__wrap_msr_read, 5);
 
         ret = hw_mon_read(lcore, rmid, event, &value);
         assert_int_equal(ret, MACHINE_RETVAL_OK);
@@ -91,14 +91,14 @@ test_hw_mon_read_unavailable(void **state __attribute__((unused)))
         /* QMC unavailable */
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
-        will_return(__wrap_msr_read, PQOS_MSR_MON_QMC_UNAVAILABLE);
         will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+        will_return(__wrap_msr_read, PQOS_MSR_MON_QMC_UNAVAILABLE);
 
         /* retry read */
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
-        will_return(__wrap_msr_read, 5);
         will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+        will_return(__wrap_msr_read, 5);
 
         ret = hw_mon_read(lcore, rmid, event, &value);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -128,13 +128,13 @@ test_hw_mon_read_error(void **state __attribute__((unused)))
         /* QMC error */
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
-        will_return(__wrap_msr_read, PQOS_MSR_MON_QMC_ERROR);
         will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+        will_return(__wrap_msr_read, PQOS_MSR_MON_QMC_ERROR);
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_EVTSEL);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+        will_return(__wrap_msr_read, 0);
 
         /* select event */
         expect_value(__wrap_msr_write, lcore, lcore);
@@ -145,8 +145,8 @@ test_hw_mon_read_error(void **state __attribute__((unused)))
         /* retry read */
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_MON_QMC);
-        will_return(__wrap_msr_read, 5);
         will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+        will_return(__wrap_msr_read, 5);
 
         ret = hw_mon_read(lcore, rmid, event, &value);
         assert_int_equal(ret, PQOS_RETVAL_OK);

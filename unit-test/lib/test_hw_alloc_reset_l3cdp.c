@@ -60,14 +60,14 @@ test_hw_alloc_reset_l3cdp_enable(void **state)
 
                 expect_value(__wrap_msr_read, lcore, lcore);
                 expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-                will_return(__wrap_msr_read, 0);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, 0);
 
                 expect_value(__wrap_msr_write, lcore, lcore);
                 expect_value(__wrap_msr_write, reg, PQOS_MSR_L3_QOS_CFG);
+                will_return(__wrap_msr_write, PQOS_RETVAL_OK);
                 expect_value(__wrap_msr_write, value,
                              PQOS_MSR_L3_QOS_CFG_CDP_EN);
-                will_return(__wrap_msr_write, PQOS_RETVAL_OK);
         }
 
         ret = hw_alloc_reset_l3cdp(l3cat_id_num, l3cat_ids, 1);
@@ -99,8 +99,8 @@ test_hw_alloc_reset_l3cdp_disable(void **state)
 
                 expect_value(__wrap_msr_read, lcore, lcore);
                 expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-                will_return(__wrap_msr_read, UINT64_MAX);
                 will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+                will_return(__wrap_msr_read, UINT64_MAX);
 
                 expect_value(__wrap_msr_write, lcore, lcore);
                 expect_value(__wrap_msr_write, reg, PQOS_MSR_L3_QOS_CFG);
@@ -133,7 +133,6 @@ test_hw_alloc_reset_l3cdp_error_read(void **state)
 
         expect_value(__wrap_msr_read, lcore, 0);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, UINT64_MAX);
         will_return(__wrap_msr_read, PQOS_RETVAL_ERROR);
 
         ret = hw_alloc_reset_l3cdp(l3cat_id_num, l3cat_ids, 0);
@@ -160,8 +159,8 @@ test_hw_alloc_reset_l3cdp_error_write(void **state)
 
         expect_value(__wrap_msr_read, lcore, 0);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 0);
 
         expect_value(__wrap_msr_write, lcore, 0);
         expect_value(__wrap_msr_write, reg, PQOS_MSR_L3_QOS_CFG);

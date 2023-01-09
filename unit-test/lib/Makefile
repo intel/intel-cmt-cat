@@ -800,12 +800,14 @@ $(BIN_DIR)/test_utils_pqos_cpu_check_core: ./test_utils_pqos_cpu_check_core.c $(
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-$(BIN_DIR)/test_uncore_monitoring_stop: ./test_uncore_monitoring_stop.c $(LIB_OBJS)
+$(BIN_DIR)/test_uncore_monitoring: ./test_uncore_monitoring.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=lcpuid \
+		-Wl,--wrap=scandir \
 		-Wl,--wrap=_pqos_get_cpu \
 		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

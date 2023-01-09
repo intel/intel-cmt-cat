@@ -44,13 +44,13 @@ test_hw_cap_l3ca_cdp_enabled(void **state)
 
         expect_any(__wrap_msr_read, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, PQOS_MSR_L3_QOS_CFG_CDP_EN);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, PQOS_MSR_L3_QOS_CFG_CDP_EN);
 
         expect_any(__wrap_msr_read, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, PQOS_MSR_L3_QOS_CFG_CDP_EN);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, PQOS_MSR_L3_QOS_CFG_CDP_EN);
 
         ret = hw_cap_l3ca_cdp(data->cpu, &enabled);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -66,13 +66,13 @@ test_hw_cap_l3ca_cdp_disabled(void **state)
 
         expect_any(__wrap_msr_read, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 0);
 
         expect_any(__wrap_msr_read, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 0);
 
         ret = hw_cap_l3ca_cdp(data->cpu, &enabled);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -88,13 +88,13 @@ test_hw_cap_l3ca_cdp_conflict(void **state)
 
         expect_any(__wrap_msr_read, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, 0);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 0);
 
         expect_any(__wrap_msr_read, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_QOS_CFG);
-        will_return(__wrap_msr_read, PQOS_MSR_L3_QOS_CFG_CDP_EN);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, PQOS_MSR_L3_QOS_CFG_CDP_EN);
 
         ret = hw_cap_l3ca_cdp(data->cpu, &enabled);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);

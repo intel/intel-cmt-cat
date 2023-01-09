@@ -45,8 +45,8 @@ test_hw_mon_assoc_read(void **state __attribute__((unused)))
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_ASSOC);
-        will_return(__wrap_msr_read, 2);
         will_return(__wrap_msr_read, PQOS_RETVAL_OK);
+        will_return(__wrap_msr_read, 2);
 
         ret = hw_mon_assoc_read(lcore, &rmid);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -62,7 +62,6 @@ test_hw_mon_assoc_read_error(void **state __attribute__((unused)))
 
         expect_value(__wrap_msr_read, lcore, lcore);
         expect_value(__wrap_msr_read, reg, PQOS_MSR_ASSOC);
-        will_return(__wrap_msr_read, 2);
         will_return(__wrap_msr_read, PQOS_RETVAL_ERROR);
 
         ret = hw_mon_assoc_read(lcore, &rmid);
