@@ -98,7 +98,7 @@ class TestSstbf:
         with mock.patch("appqos.sstbf.configure_sstbf", return_value=0) as func_mock:
             response = Rest().put("/caps/sstbf", {"configured": configured_value})
             assert response.status_code == 200
-            func_mock.called_once_with(configured_value)
+            func_mock.assert_called_once_with(configured_value)
 
 
     @mock.patch("appqos.config_store.ConfigStore.get_config", new=get_config)
