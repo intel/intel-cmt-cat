@@ -63,8 +63,6 @@
 #ifndef PERF_MON_SUPPORT
 #define PERF_MON_SUPPORT "/proc/sys/kernel/perf_event_paranoid"
 #endif
-static const char *perf_events = "events/";
-static const char *perf_type = "type";
 
 /**
  * Monitoring event type
@@ -197,16 +195,16 @@ set_mon_type(void)
         FILE *fd;
         char file[64], evt[8];
 
-        snprintf(file, sizeof(file) - 1, "%s/%s", PERF_MON_PATH, perf_type);
+        snprintf(file, sizeof(file) - 1, "%s", PERF_MON_TYPE);
         fd = pqos_fopen(file, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_RESOURCE;
         if (fgets(evt, sizeof(evt), fd) == NULL) {
                 LOG_ERROR("Failed to read perf monitoring type!\n");
-                fclose(fd);
+                pqos_fclose(fd);
                 return PQOS_RETVAL_ERROR;
         }
-        fclose(fd);
+        pqos_fclose(fd);
 
         os_mon_type = (int)strtol(evt, NULL, 0);
         if (os_mon_type == 0) {
@@ -290,8 +288,7 @@ set_rdt_event_attrs(const int idx, const char *fname)
         /**
          * Read event type from file system
          */
-        snprintf(file, sizeof(file) - 1, "%s/%s%s", PERF_MON_PATH, perf_events,
-                 fname);
+        snprintf(file, sizeof(file) - 1, "%s/%s", PERF_MON_EVENTS, fname);
         fd = pqos_fopen(file, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open %s!\n", file);
@@ -299,10 +296,10 @@ set_rdt_event_attrs(const int idx, const char *fname)
         }
         if (fgets(buf, sizeof(buf), fd) == NULL) {
                 LOG_ERROR("Failed to read OS monitoring event!\n");
-                fclose(fd);
+                pqos_fclose(fd);
                 return PQOS_RETVAL_ERROR;
         }
-        fclose(fd);
+        pqos_fclose(fd);
         p = buf;
         strsep(&p, "=");
         if (p == NULL) {
@@ -315,15 +312,14 @@ set_rdt_event_attrs(const int idx, const char *fname)
         /**
          * Read scale factor from file system
          */
-        snprintf(file, sizeof(file) - 1, "%s/%s%s.scale", PERF_MON_PATH,
-                 perf_events, fname);
+        snprintf(file, sizeof(file) - 1, "%s/%s.scale", PERF_MON_EVENTS, fname);
         fd = pqos_fopen(file, "r");
         if (fd == NULL) {
                 LOG_ERROR("Failed to open OS monitoring event scale file!\n");
                 return PQOS_RETVAL_ERROR;
         }
         ret = fscanf(fd, "%10lf", &sf);
-        fclose(fd);
+        pqos_fclose(fd);
         if (ret < 1) {
                 LOG_ERROR("Failed to read OS monitoring event scale factor!\n");
                 return PQOS_RETVAL_ERROR;
@@ -361,7 +357,7 @@ set_mon_events(void)
         /**
          * Read and store event data in table
          */
-        snprintf(dir, sizeof(dir) - 1, "%s/%s", PERF_MON_PATH, perf_events);
+        snprintf(dir, sizeof(dir) - 1, "%s", PERF_MON_EVENTS);
         files = scandir(dir, &namelist, filter, NULL);
         if (files <= 0) {
                 LOG_ERROR("Failed to read perf monitoring events directory!\n");
@@ -420,7 +416,6 @@ perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
         int ret;
         unsigned i;
-        struct stat st;
 
         ASSERT(cpu != NULL);
 
@@ -430,7 +425,7 @@ perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         /**
          * Perf monitoring not supported
          */
-        if (stat(PERF_MON_SUPPORT, &st) != 0) {
+        if (!pqos_file_exists(PERF_MON_SUPPORT)) {
                 LOG_INFO("Perf monitoring not supported.");
                 return PQOS_RETVAL_RESOURCE;
 
@@ -472,6 +467,12 @@ perf_mon_init_exit:
 int
 perf_mon_fini(void)
 {
+        unsigned i;
+
+        all_evt_mask = (enum pqos_mon_event)0;
+        for (i = 0; i < DIM(events_tab); ++i)
+                events_tab[i].supported = 0;
+
         return PQOS_RETVAL_OK;
 }
 

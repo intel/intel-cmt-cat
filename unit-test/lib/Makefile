@@ -756,7 +756,6 @@ $(BIN_DIR)/test_utils_pqos_cpu_get_one_core: ./test_utils_pqos_cpu_get_one_core.
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-
 $(BIN_DIR)/test_utils_pqos_cpu_get_socketid: ./test_utils_pqos_cpu_get_socketid.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
@@ -808,6 +807,20 @@ $(BIN_DIR)/test_uncore_monitoring: ./test_uncore_monitoring.c $(LIB_OBJS)
 		-Wl,--wrap=_pqos_get_cpu \
 		-Wl,--wrap=msr_write \
 		-Wl,--wrap=msr_read \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_perf_monitoring: ./test_perf_monitoring.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=perf_setup_counter \
+		-Wl,--wrap=perf_shutdown_counter \
+		-Wl,--wrap=perf_read_counter \
+		-Wl,--wrap=perf_mon_get_fd \
+		-Wl,--wrap=pqos_file_exists \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--wrap=pqos_fclose \
+		-Wl,--wrap=scandir \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

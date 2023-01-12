@@ -99,6 +99,8 @@ _uncore_mon_fini(void **state __attribute__((unused)))
 {
         int ret = uncore_mon_fini();
 
+        test_fini(state);
+
         return ret == PQOS_RETVAL_OK ? 0 : -1;
 }
 

@@ -45,7 +45,9 @@ extern "C" {
 #include "pqos.h"
 #include "types.h"
 
-#define PERF_MON_PATH "/sys/devices/intel_cqm"
+#define PERF_MON_PATH   "/sys/devices/intel_cqm"
+#define PERF_MON_TYPE   "/sys/devices/intel_cqm/type"
+#define PERF_MON_EVENTS "/sys/devices/intel_cqm/events"
 
 /**
  * Local monitor event types
