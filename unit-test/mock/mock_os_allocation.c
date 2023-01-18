@@ -141,13 +141,9 @@ __wrap_os_alloc_release_pid(const pid_t *task_array, const unsigned task_num)
 }
 
 int
-__wrap_os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                      const enum pqos_cdp_config l2_cdp_cfg,
-                      const enum pqos_mba_config mba_cfg)
+__wrap_os_alloc_reset(const struct pqos_alloc_config *cfg)
 {
-        check_expected(l3_cdp_cfg);
-        check_expected(l2_cdp_cfg);
-        check_expected(mba_cfg);
+        check_expected_ptr(cfg);
 
         return mock_type(int);
 }

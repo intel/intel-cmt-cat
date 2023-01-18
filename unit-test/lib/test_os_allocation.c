@@ -950,8 +950,7 @@ test_os_alloc_reset_unsupported_all(void **state)
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_ANY);
+        ret = os_alloc_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
@@ -960,16 +959,23 @@ test_os_alloc_reset_unsupported_l3ca(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_ANY);
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_OFF, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_ANY);
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_OFF;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
@@ -978,14 +984,21 @@ test_os_alloc_reset_unsupported_l3cdp(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
 
         data->cap_l3ca.cdp = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_ANY);
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
@@ -994,16 +1007,23 @@ test_os_alloc_reset_unsupported_l2ca(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON,
-                             PQOS_MBA_ANY);
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_OFF,
-                             PQOS_MBA_ANY);
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_OFF;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
@@ -1012,14 +1032,21 @@ test_os_alloc_reset_unsupported_l2cdp(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
 
         data->cap_l2ca.cdp = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON,
-                             PQOS_MBA_ANY);
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
@@ -1028,16 +1055,23 @@ test_os_alloc_reset_unsupported_mba(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_DEFAULT);
+        cfg.mba = PQOS_MBA_DEFAULT;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_CTRL);
+        cfg.mba = PQOS_MBA_CTRL;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
@@ -1046,14 +1080,22 @@ test_os_alloc_reset_unsupported_mba_ctrl(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
+        cfg.mba = PQOS_MBA_DEFAULT;
 
         data->cap_mba.ctrl = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_CTRL);
+        cfg.mba = PQOS_MBA_CTRL;
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
@@ -1073,8 +1115,7 @@ test_os_alloc_reset_light(void **state)
         will_return(os_alloc_reset_schematas, PQOS_RETVAL_OK);
         will_return(os_alloc_reset_tasks, PQOS_RETVAL_OK);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_ANY);
+        ret = os_alloc_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -1162,13 +1203,19 @@ test_os_alloc_reset_l3cdp_enable(void **state)
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ON;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = l3_cdp_cfg;
+        cfg.l2_cdp = l2_cdp_cfg;
+        cfg.mba = mba_cfg;
 
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 0;
 
         test_os_alloc_reset_full(data, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 
-        ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -1180,13 +1227,19 @@ test_os_alloc_reset_l3cdp_disable(void **state)
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_OFF;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = l3_cdp_cfg;
+        cfg.l2_cdp = l2_cdp_cfg;
+        cfg.mba = mba_cfg;
 
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 1;
 
         test_os_alloc_reset_full(data, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 
-        ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -1195,6 +1248,14 @@ test_os_alloc_reset_l3cdp_mon(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
 
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 0;
@@ -1209,8 +1270,7 @@ test_os_alloc_reset_l3cdp_mon(void **state)
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 1);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_ANY);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
@@ -1222,13 +1282,18 @@ test_os_alloc_reset_l2cdp_enable(void **state)
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ON;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        struct pqos_alloc_config cfg;
 
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = l3_cdp_cfg;
+        cfg.l2_cdp = l2_cdp_cfg;
+        cfg.mba = mba_cfg;
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 0;
 
         test_os_alloc_reset_full(data, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 
-        ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -1240,13 +1305,19 @@ test_os_alloc_reset_l2cdp_disable(void **state)
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_OFF;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = l3_cdp_cfg;
+        cfg.l2_cdp = l2_cdp_cfg;
+        cfg.mba = mba_cfg;
 
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 1;
 
         test_os_alloc_reset_full(data, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 
-        ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -1255,6 +1326,14 @@ test_os_alloc_reset_l2cdp_mon(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
 
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 0;
@@ -1269,8 +1348,7 @@ test_os_alloc_reset_l2cdp_mon(void **state)
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 1);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON,
-                             PQOS_MBA_ANY);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
@@ -1282,13 +1360,19 @@ test_os_alloc_reset_mba_ctrl_enable(void **state)
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_CTRL;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = l3_cdp_cfg;
+        cfg.l2_cdp = l2_cdp_cfg;
+        cfg.mba = mba_cfg;
 
         data->cap_mba.ctrl = 1;
         data->cap_mba.ctrl_on = 0;
 
         test_os_alloc_reset_full(data, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 
-        ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -1300,13 +1384,19 @@ test_os_alloc_reset_mba_ctrl_disable(void **state)
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_DEFAULT;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = l3_cdp_cfg;
+        cfg.l2_cdp = l2_cdp_cfg;
+        cfg.mba = mba_cfg;
 
         data->cap_mba.ctrl = 1;
         data->cap_mba.ctrl_on = 1;
 
         test_os_alloc_reset_full(data, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
 
-        ret = os_alloc_reset(l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -1315,6 +1405,14 @@ test_os_alloc_reset_mba_ctrl_mon(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+#if PQOS_VERSION < 50000
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+#endif
+        cfg.mba = PQOS_MBA_CTRL;
 
         data->cap_mba.ctrl = 1;
         data->cap_mba.ctrl_on = 0;
@@ -1329,8 +1427,7 @@ test_os_alloc_reset_mba_ctrl_mon(void **state)
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 1);
 
-        ret = os_alloc_reset(PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ANY,
-                             PQOS_MBA_CTRL);
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 

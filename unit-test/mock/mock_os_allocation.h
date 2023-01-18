@@ -51,9 +51,7 @@ int __wrap_os_alloc_assign_pid(const unsigned technology,
                                unsigned *class_id);
 int __wrap_os_alloc_release_pid(const pid_t *task_array,
                                 const unsigned task_num);
-int __wrap_os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                          const enum pqos_cdp_config l2_cdp_cfg,
-                          const enum pqos_mba_config mba_cfg);
+int __wrap_os_alloc_reset(const struct pqos_alloc_config *cfg);
 unsigned *__wrap_os_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
 int __wrap_os_l3ca_set(const unsigned l3cat_id,
                        const unsigned num_cos,

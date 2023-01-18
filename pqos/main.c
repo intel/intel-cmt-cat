@@ -59,19 +59,12 @@
 #define DEFAULT_TABLE_SIZE 128
 
 /**
- * Default L3 CDP configuration option - don't enforce on or off
+ * Default configuration of allocation
  */
-static enum pqos_cdp_config selfn_l3cdp_config = PQOS_REQUIRE_CDP_ANY;
-
-/**
- * Default L2 CDP configuration option - don't enforce on or off
- */
-static enum pqos_cdp_config selfn_l2cdp_config = PQOS_REQUIRE_CDP_ANY;
-
-/**
- * Default MBA configuration option - don't enforce on or off
- */
-static enum pqos_mba_config selfn_mba_config = PQOS_MBA_ANY;
+static struct pqos_alloc_config sel_alloc_config = {
+    .l3_cdp = PQOS_REQUIRE_CDP_ANY,
+    .l2_cdp = PQOS_REQUIRE_CDP_ANY,
+    .mba = PQOS_MBA_ANY};
 
 /**
  * Monitoring reset
@@ -444,6 +437,7 @@ selfn_reset_alloc(const char *arg)
                 char *tok = NULL;
                 char *saveptr = NULL;
                 char *s = NULL;
+                struct pqos_alloc_config *cfg = &sel_alloc_config;
 
                 selfn_strdup(&s, arg);
 
@@ -480,21 +474,21 @@ selfn_reset_alloc(const char *arg)
 
                         for (i = 0; i < DIM(patternsl3); i++)
                                 if (strcasecmp(tok, patternsl3[i].name) == 0) {
-                                        selfn_l3cdp_config = patternsl3[i].cdp;
+                                        cfg->l3_cdp = patternsl3[i].cdp;
                                         valid = 1;
                                         break;
                                 }
 
                         for (i = 0; i < DIM(patternsl2); i++)
                                 if (strcasecmp(tok, patternsl2[i].name) == 0) {
-                                        selfn_l2cdp_config = patternsl2[i].cdp;
+                                        cfg->l2_cdp = patternsl2[i].cdp;
                                         valid = 1;
                                         break;
                                 }
 
                         for (i = 0; i < DIM(patternsmb); i++)
                                 if (strcasecmp(tok, patternsmb[i].name) == 0) {
-                                        selfn_mba_config = patternsmb[i].mba;
+                                        cfg->mba = patternsmb[i].mba;
                                         valid = 1;
                                         break;
                                 }
@@ -1385,8 +1379,7 @@ main(int argc, char **argv)
                 /**
                  * Reset allocation configuration to after-reset state and exit
                  */
-                ret = pqos_alloc_reset(selfn_l3cdp_config, selfn_l2cdp_config,
-                                       selfn_mba_config);
+                ret = pqos_alloc_reset_config(&sel_alloc_config);
                 if (ret != PQOS_RETVAL_OK) {
                         exit_val = EXIT_FAILURE;
                         printf("Allocation reset failed!\n");

@@ -50,6 +50,12 @@
 extern "C" {
 #endif
 
+#ifndef SWIG
+#define PQOS_DEPRECATED __attribute__((deprecated))
+#else
+#define PQOS_DEPRECATED
+#endif
+
 /*
  * =======================================
  * Various defines
@@ -95,12 +101,21 @@ enum pqos_interface {
  * =======================================
  */
 
+#if PQOS_VERSION >= 50000
+enum pqos_cdp_config {
+        PQOS_REQUIRE_CDP_ANY = 0, /**< app will work with any CDP
+                                     setting */
+        PQOS_REQUIRE_CDP_OFF,     /**< app not compatible with CDP */
+        PQOS_REQUIRE_CDP_ON       /**< app requires CDP */
+};
+#else
 enum pqos_cdp_config {
         PQOS_REQUIRE_CDP_OFF = 0, /**< app not compatible with CDP */
         PQOS_REQUIRE_CDP_ON,      /**< app requires CDP */
         PQOS_REQUIRE_CDP_ANY      /**< app will work with any CDP
                                      setting */
 };
+#endif
 
 /**
  * Resource Monitoring ID (RMID) definition
@@ -245,7 +260,7 @@ struct pqos_cap_l2ca {
  * Memory Bandwidth Allocation configuration enumeration
  */
 enum pqos_mba_config {
-        PQOS_MBA_ANY,     /**< currently enabled configuration */
+        PQOS_MBA_ANY = 0, /**< currently enabled configuration */
         PQOS_MBA_DEFAULT, /**< direct MBA hardware configuration
                              (percentage) */
         PQOS_MBA_CTRL     /**< MBA controller configuration (MBps) */
@@ -764,12 +779,45 @@ int pqos_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
  * @param [in] l2_cdp_cfg requested L2 CAT CDP config
  * @param [in] mba_cfg requested MBA config
  *
+ * @deprecated since 5.0.0
+ * @see pqos_alloc_reset_config()
+ *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
+#if PQOS_VERSION >= 50000
+PQOS_DEPRECATED
+#endif
 int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                      const enum pqos_cdp_config l2_cdp_cfg,
                      const enum pqos_mba_config mba_cfg);
+
+/**
+ * Configuration of allocation
+ */
+struct pqos_alloc_config {
+        enum pqos_cdp_config l3_cdp; /**< requested L3 CAT CDP config */
+        enum pqos_cdp_config l2_cdp; /**< requested L2 CAT CDP config */
+        enum pqos_mba_config mba;    /**< requested MBA config */
+};
+
+/**
+ * @brief Resets configuration of allocation technologies
+ *
+ * Reverts CAT/MBA state to the one after reset:
+ * - all cores associated with COS0
+ * - all COS are set to give access to entire resource
+ * - all device channels associated with COS0
+ *
+ * As part of allocation reset CDP, MBA, I/O RDT reconfiguration
+ * can be performed. This can be requested via \a cfg.
+ *
+ * @param [in] cfg requested configuration
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_alloc_reset_config(const struct pqos_alloc_config *cfg);
 
 /*
  * =======================================

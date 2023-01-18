@@ -191,16 +191,12 @@ PQOS_LOCAL int os_alloc_reset_tasks(void);
  * As part of allocation reset MBA reconfiguration can be performed.
  * This can be requested via \a mba_cfg.
  *
- * @param [in] l3_cdp_cfg requested L3 CAT CDP config
- * @param [in] l2_cdp_cfg requested L2 CAT CDP config
- * @param [in] mba_cfg requested MBA config
+ * @param [in] cfg requested configuration
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-PQOS_LOCAL int os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                              const enum pqos_cdp_config l2_cdp_cfg,
-                              const enum pqos_mba_config mba_cfg);
+PQOS_LOCAL int os_alloc_reset(const struct pqos_alloc_config *cfg);
 
 /**
  * @brief OS interface to set classes of service

@@ -193,16 +193,12 @@ PQOS_LOCAL int hw_alloc_release(const unsigned *core_array,
  * As part of allocation reset CDP reconfiguration can be performed.
  * This can be requested via \a l3_cdp_cfg or \a l2_cdp_cfg.
  *
- * @param [in] l3_cdp_cfg requested L3 CAT CDP config
- * @param [in] l2_cdp_cfg requested L2 CAT CDP config
- * @param [in] mba_cfg requested MBA CTRL config
+ * @param [in] cfg requested configuration
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-PQOS_LOCAL int hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                              const enum pqos_cdp_config l2_cdp_cfg,
-                              const enum pqos_mba_config mba_cfg);
+PQOS_LOCAL int hw_alloc_reset(const struct pqos_alloc_config *cfg);
 
 /**
  * @brief Enables or disables L3 CDP across selected CPU sockets

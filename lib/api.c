@@ -115,9 +115,7 @@ static struct pqos_api {
         int (*alloc_release_pid)(const pid_t *task_array,
                                  const unsigned task_num);
         /** Resets configuration of allocation technologies */
-        int (*alloc_reset)(const enum pqos_cdp_config l3_cdp_cfg,
-                           const enum pqos_cdp_config l2_cdp_cfg,
-                           const enum pqos_mba_config mba_cfg);
+        int (*alloc_reset)(const struct pqos_alloc_config *cfg);
 
         /** Sets L3 classes of service */
         int (*l3ca_set)(const unsigned l3cat_id,
@@ -350,30 +348,50 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                  const enum pqos_cdp_config l2_cdp_cfg,
                  const enum pqos_mba_config mba_cfg)
 {
-        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
-            l3_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
-            l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
-                LOG_ERROR("Unrecognized L3 CDP configuration setting %d!\n",
-                          l3_cdp_cfg);
-                return PQOS_RETVAL_PARAM;
+        struct pqos_alloc_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
+
+        cfg.l3_cdp = l3_cdp_cfg;
+        cfg.l2_cdp = l2_cdp_cfg;
+        cfg.mba = mba_cfg;
+
+        return pqos_alloc_reset_config(&cfg);
+}
+
+int
+pqos_alloc_reset_config(const struct pqos_alloc_config *cfg)
+{
+        /* validate parameters */
+        if (cfg != NULL) {
+                if (cfg->l3_cdp != PQOS_REQUIRE_CDP_ON &&
+                    cfg->l3_cdp != PQOS_REQUIRE_CDP_OFF &&
+                    cfg->l3_cdp != PQOS_REQUIRE_CDP_ANY) {
+                        LOG_ERROR(
+                            "Unrecognized L3 CDP configuration setting %d!\n",
+                            cfg->l3_cdp);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (cfg->l2_cdp != PQOS_REQUIRE_CDP_ON &&
+                    cfg->l2_cdp != PQOS_REQUIRE_CDP_OFF &&
+                    cfg->l2_cdp != PQOS_REQUIRE_CDP_ANY) {
+                        LOG_ERROR(
+                            "Unrecognized L2 CDP configuration setting %d!\n",
+                            cfg->l2_cdp);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (cfg->mba != PQOS_MBA_ANY && cfg->mba != PQOS_MBA_DEFAULT &&
+                    cfg->mba != PQOS_MBA_CTRL) {
+                        LOG_ERROR(
+                            "Unrecognized MBA configuration setting %d!\n",
+                            cfg->mba);
+                        return PQOS_RETVAL_PARAM;
+                }
         }
 
-        if (l2_cdp_cfg != PQOS_REQUIRE_CDP_ON &&
-            l2_cdp_cfg != PQOS_REQUIRE_CDP_OFF &&
-            l2_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
-                LOG_ERROR("Unrecognized L2 CDP configuration setting %d!\n",
-                          l2_cdp_cfg);
-                return PQOS_RETVAL_PARAM;
-        }
-
-        if (mba_cfg != PQOS_MBA_ANY && mba_cfg != PQOS_MBA_DEFAULT &&
-            mba_cfg != PQOS_MBA_CTRL) {
-                LOG_ERROR("Unrecognized MBA configuration setting %d!\n",
-                          mba_cfg);
-                return PQOS_RETVAL_PARAM;
-        }
-
-        return API_CALL(alloc_reset, l3_cdp_cfg, l2_cdp_cfg, mba_cfg);
+        return API_CALL(alloc_reset, cfg);
 }
 
 unsigned *

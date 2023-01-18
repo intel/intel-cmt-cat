@@ -43,9 +43,7 @@ int __wrap_hw_alloc_assign(const unsigned technology,
                            unsigned *class_id);
 int __wrap_hw_alloc_release(const unsigned *core_array,
                             const unsigned core_num);
-int __wrap_hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                          const enum pqos_cdp_config l2_cdp_cfg,
-                          const enum pqos_mba_config mba_cfg);
+int __wrap_hw_alloc_reset(const struct pqos_alloc_config *cfg);
 int __wrap_hw_l3ca_set(const unsigned l3cat_id,
                        const unsigned num_cos,
                        const struct pqos_l3ca *ca);

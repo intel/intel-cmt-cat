@@ -854,9 +854,7 @@ os_alloc_reset_full_exit:
 }
 
 int
-os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-               const enum pqos_cdp_config l2_cdp_cfg,
-               const enum pqos_mba_config mba_cfg)
+os_alloc_reset(const struct pqos_alloc_config *cfg)
 {
         const struct pqos_capability *alloc_cap = NULL;
         const struct pqos_cap_l3ca *l3_cap = NULL;
@@ -870,6 +868,15 @@ os_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         int mba_changed = 0;
         int ret;
         const struct pqos_cap *cap = _pqos_get_cap();
+        enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
+        enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
+        enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+
+        if (cfg != NULL) {
+                l3_cdp_cfg = cfg->l3_cdp;
+                l2_cdp_cfg = cfg->l2_cdp;
+                mba_cfg = cfg->mba;
+        }
 
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
                l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||

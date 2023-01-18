@@ -1360,9 +1360,7 @@ hw_alloc_reset_assoc(void)
 }
 
 int
-hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-               const enum pqos_cdp_config l2_cdp_cfg,
-               const enum pqos_mba_config mba_cfg)
+hw_alloc_reset(const struct pqos_alloc_config *cfg)
 {
         unsigned *l3cat_ids = NULL;
         unsigned l3cat_id_num = 0;
@@ -1382,19 +1380,28 @@ hw_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         unsigned max_l2_cos = 0;
         unsigned j;
         int cdp_supported;
+        enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
+        enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
+        enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
 
-        ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
-               l3_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
-               l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+        ASSERT(cfg == NULL || cfg->l3_cdp == PQOS_REQUIRE_CDP_ON ||
+               cfg->l3_cdp == PQOS_REQUIRE_CDP_OFF ||
+               cfg->l3_cdp == PQOS_REQUIRE_CDP_ANY);
 
-        ASSERT(l2_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
-               l2_cdp_cfg == PQOS_REQUIRE_CDP_OFF ||
-               l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY);
+        ASSERT(cfg == NULL || cfg->l2_cdp == PQOS_REQUIRE_CDP_ON ||
+               cfg->l2_cdp == PQOS_REQUIRE_CDP_OFF ||
+               cfg->l2_cdp == PQOS_REQUIRE_CDP_ANY);
 
-        ASSERT(mba_cfg == PQOS_MBA_DEFAULT || mba_cfg == PQOS_MBA_CTRL ||
-               mba_cfg == PQOS_MBA_ANY);
+        ASSERT(cfg == NULL || cfg->mba == PQOS_MBA_DEFAULT ||
+               cfg->mba == PQOS_MBA_CTRL || cfg->mba == PQOS_MBA_ANY);
 
         cpuinfo_get_config(&vconfig);
+
+        if (cfg != NULL) {
+                l3_cdp_cfg = cfg->l3_cdp;
+                l2_cdp_cfg = cfg->l2_cdp;
+                mba_cfg = cfg->mba;
+        }
 
         /* Get L3 CAT capabilities */
         (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
