@@ -51,11 +51,13 @@
 #include <string.h>
 #include <unistd.h> /* sysconf() */
 #ifdef __FreeBSD__
-#include <sys/cpuset.h> /* sched affinity */
-#include <sys/param.h>  /* sched affinity */
+#include <linux/getcpu.h> /* getcpu */
+#include <sys/cpuset.h>   /* sched affinity */
+#include <sys/param.h>    /* sched affinity */
 #endif
 #ifdef __linux__
 #include <sched.h> /* sched affinity */
+#include <sys/syscall.h>
 #endif
 
 /**
@@ -399,8 +401,12 @@ detect_cpu(const int cpu,
         info->l2_id = apicid >> apic->l2_shift;
 
 #if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+#if defined __linux__ && defined __NR_getcpu
+        syscall(__NR_getcpu, NULL, &info->numa, NULL);
+#else
         if (getcpu(NULL, &info->numa) != 0)
                 return -1;
+#endif
 #endif
 
 #if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
