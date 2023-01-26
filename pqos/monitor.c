@@ -43,6 +43,9 @@
 #include "monitor_utils.h"
 #include "monitor_xml.h"
 #include "pqos.h"
+#ifdef PQOS_RMID_CUSTOM
+#include "pqos_internal.h"
+#endif
 
 #include <ctype.h>  /**< isspace() */
 #include <dirent.h> /**< for dir list*/
@@ -136,6 +139,10 @@ static struct mon_group {
         };
 
         unsigned num_res;
+
+#ifdef PQOS_RMID_CUSTOM
+        struct pqos_mon_options opt;
+#endif
 } *sel_monitor_group = NULL;
 
 /**
@@ -562,7 +569,7 @@ grp_free(struct mon_group *grp)
                 free(grp->sockets);
 #endif
 
-        if (grp->type == MON_GROUP_TYPE_CORE || grp->type == MON_GROUP_TYPE_PID)
+        if (grp->type == MON_GROUP_TYPE_PID)
                 /* coverity[double_free] */
                 free(grp->data);
 }
@@ -580,7 +587,7 @@ grp_free(struct mon_group *grp)
  * @retval 0 on success
  * @retval -1 on error
  */
-static int
+static struct mon_group *
 grp_add(enum mon_group_type type,
         enum pqos_mon_event event,
         char *desc,
@@ -592,6 +599,7 @@ grp_add(enum mon_group_type type,
         unsigned i;
         struct mon_group new_grp;
 
+        memset(&new_grp, 0, sizeof(new_grp));
         switch (type) {
         case MON_GROUP_TYPE_CORE:
                 sel_monitor_type |= MON_GROUP_TYPE_CORE;
@@ -606,11 +614,11 @@ grp_add(enum mon_group_type type,
                 ret = grp_set_uncore(&new_grp, desc, res, num_res);
                 break;
         default:
-                return -1;
+                return NULL;
         }
         if (ret < 0) {
                 grp_free(&new_grp);
-                return ret;
+                return NULL;
         }
         new_grp.events = event;
 
@@ -626,38 +634,34 @@ grp_add(enum mon_group_type type,
 
                 if (grp->type != type)
                         continue;
-
                 dup = grp_cmp(&new_grp, grp);
                 if (dup == 1) {
                         grp->events |= event;
-                        break;
-                } else if (dup < 0)
-                        break;
-        }
-
-        if (dup == 1) {
-                grp_free(&new_grp);
-                return 0;
-        }
-
-        if (dup < 0) {
-                switch (type) {
-                case MON_GROUP_TYPE_CORE:
-                        fprintf(stderr, "Error: cannot monitor same "
-                                        "cores in different groups\n");
-                        break;
-                case MON_GROUP_TYPE_PID:
-                        fprintf(stderr, "Error: cannot monitor same "
-                                        "pids in different groups\n");
-                        break;
-                case MON_GROUP_TYPE_UNCORE:
-                        fprintf(stderr, "Error: cannot monitor same "
+                        grp_free(&new_grp);
+                        return grp;
+                } else if (dup < 0) {
+                        switch (type) {
+                        case MON_GROUP_TYPE_CORE:
+                                fprintf(stderr, "Error: cannot monitor same "
+                                                "cores in different groups\n");
+                                break;
+                        case MON_GROUP_TYPE_PID:
+                                fprintf(stderr, "Error: cannot monitor same "
+                                                "pids in different groups\n");
+                                break;
+                        case MON_GROUP_TYPE_UNCORE:
+                                fprintf(stderr,
+                                        "Error: cannot monitor same "
                                         "sockets in different groups\n");
-                        break;
+                                break;
+                        }
+                        grp_free(&new_grp);
+                        return NULL;
                 }
-                grp_free(&new_grp);
-                return -1;
-        } else {
+        }
+
+        /* allocate memory for monitoring context */
+        {
                 struct mon_group *grps =
                     realloc(sel_monitor_group,
                             sizeof(*sel_monitor_group) * (sel_monitor_num + 1));
@@ -665,25 +669,23 @@ grp_add(enum mon_group_type type,
                 if (grps == NULL) {
                         fprintf(stderr, "Error with memory allocation\n");
                         grp_free(&new_grp);
-                        return -1;
+                        return NULL;
                 } else
                         sel_monitor_group = grps;
-
-                if (new_grp.type == MON_GROUP_TYPE_CORE ||
-                    new_grp.type == MON_GROUP_TYPE_PID) {
-                        new_grp.data = calloc(1, sizeof(*new_grp.data));
-                        if (new_grp.data == NULL) {
-                                fprintf(stderr,
-                                        "Error with memory allocation\n");
-                                grp_free(&new_grp);
-                                return -1;
-                        }
-                }
-
-                sel_monitor_group[sel_monitor_num++] = new_grp;
         }
 
-        return 0;
+        if (new_grp.type == MON_GROUP_TYPE_PID) {
+                new_grp.data = calloc(1, sizeof(*new_grp.data));
+                if (new_grp.data == NULL) {
+                        fprintf(stderr, "Error with memory allocation\n");
+                        grp_free(&new_grp);
+                        return NULL;
+                }
+        }
+
+        sel_monitor_group[sel_monitor_num++] = new_grp;
+
+        return &sel_monitor_group[sel_monitor_num - 1];
 }
 
 /**
@@ -757,12 +759,13 @@ parse_monitor_group(char *str, enum mon_group_type type)
 
                         /* set group info */
                         for (i = 0; i < new_groups_count; i++) {
+                                const struct mon_group *grp;
                                 char *desc = uinttostr((unsigned)cbuf[i]);
-                                int ret;
 
-                                ret = grp_add(type, evt, desc, &cbuf[i], 1);
-                                if (ret < 0)
+                                grp = grp_add(type, evt, desc, &cbuf[i], 1);
+                                if (grp == NULL)
                                         return -1;
+
                                 group_count++;
                         }
                 }
@@ -774,7 +777,7 @@ parse_monitor_group(char *str, enum mon_group_type type)
                 if (grp != NULL) {
                         char *desc = NULL;
                         unsigned element_count;
-                        int ret;
+                        const struct mon_group *group;
 
                         selfn_strdup(&desc, grp);
 
@@ -785,8 +788,8 @@ parse_monitor_group(char *str, enum mon_group_type type)
                         element_count = strlisttotab(grp, cbuf, DIM(cbuf));
 
                         /* set group info */
-                        ret = grp_add(type, evt, desc, cbuf, element_count);
-                        if (ret < 0)
+                        group = grp_add(type, evt, desc, cbuf, element_count);
+                        if (group == NULL)
                                 return -1;
                         group_count++;
                 }
@@ -867,6 +870,72 @@ selfn_monitor_cores(const char *arg)
 
         free(cp);
 }
+
+#ifdef PQOS_RMID_CUSTOM
+#define DEFAULT_TABLE_SIZE 128
+
+void
+selfn_monitor_rmid_cores(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+        char *saveptr = NULL;
+        uint64_t *cores = NULL;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&cp, arg);
+
+        for (str = cp;; str = NULL) {
+                char *token = NULL;
+                char *p = NULL;
+                pqos_rmid_t rmid;
+                unsigned count;
+                unsigned core_list_size = DEFAULT_TABLE_SIZE;
+                char *desc = NULL;
+                struct mon_group *grp;
+
+                token = strtok_r(str, ";", &saveptr);
+                if (token == NULL)
+                        break;
+                if (cores == NULL) {
+                        cores = calloc(core_list_size, sizeof(*cores));
+                        if (cores == NULL) {
+                                printf("Error with memory allocation!\n");
+                                goto error_exit;
+                        }
+                }
+                p = strchr(token, '=');
+                if (p == NULL)
+                        parse_error(str, "Invalid RMID association format");
+                *p = '\0';
+
+                rmid = (pqos_rmid_t)strtouint64(token);
+                selfn_strdup(&desc, p + 1);
+                count = strlisttotabrealloc(p + 1, &cores, &core_list_size);
+
+                grp = grp_add(MON_GROUP_TYPE_CORE, 0, desc, cores, count);
+                if (grp == NULL)
+                        goto error_exit;
+
+                grp->opt.rmid.type = PQOS_RMID_TYPE_MAP;
+                grp->opt.rmid.rmid = rmid;
+
+                free(cores);
+                cores = NULL;
+        }
+        free(cp);
+        return;
+error_exit:
+        if (cores != NULL)
+                free(cores);
+        free(cp);
+        exit(EXIT_FAILURE);
+}
+#endif /* PQOS_RMID_CUSTOM */
 
 void
 selfn_monitor_uncore(const char *arg)
@@ -1003,11 +1072,12 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         unsigned lcore = cpu_info->cores[i].lcore;
                         uint64_t core = (uint64_t)lcore;
+                        const struct mon_group *grp;
 
-                        ret = grp_add(MON_GROUP_TYPE_CORE,
+                        grp = grp_add(MON_GROUP_TYPE_CORE,
                                       (enum pqos_mon_event)PQOS_MON_EVENT_ALL,
                                       uinttostr(lcore), &core, 1);
-                        if (ret != 0) {
+                        if (grp == NULL) {
                                 printf("Core group setup error!\n");
                                 exit(EXIT_FAILURE);
                         }
@@ -1016,11 +1086,12 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                    sel_monitor_type == MON_GROUP_TYPE_UNCORE) {
                 for (i = 0; i < cpu_info->num_cores; i++) {
                         uint64_t socket = (uint64_t)cpu_info->cores[i].socket;
+                        const struct mon_group *grp;
 
-                        ret = grp_add(MON_GROUP_TYPE_UNCORE,
+                        grp = grp_add(MON_GROUP_TYPE_UNCORE,
                                       (enum pqos_mon_event)PQOS_MON_EVENT_ALL,
                                       uinttostr(socket), &socket, 1);
-                        if (ret != 0) {
+                        if (grp == NULL) {
                                 printf("Uncore group setup error!\n");
                                 exit(EXIT_FAILURE);
                         }
@@ -1043,9 +1114,15 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         /**
                          * Make calls to pqos_mon_start - track cores
                          */
-                        ret = pqos_mon_start(grp->num_res, grp->cores,
-                                             grp->events, (void *)grp->desc,
-                                             grp->data);
+#ifdef PQOS_RMID_CUSTOM
+                        ret = pqos_mon_start_cores_ext(
+                            grp->num_res, grp->cores, grp->events,
+                            (void *)grp->desc, &grp->data, &grp->opt);
+#else
+                        ret = pqos_mon_start_cores(
+                            grp->num_res, grp->cores, grp->events,
+                            (void *)grp->desc, &grp->data);
+#endif
 
                         if (ret == PQOS_RETVAL_PERF_CTR)
                                 printf("Use -r option to start monitoring "
@@ -1718,16 +1795,17 @@ fill_top_procs(const struct slist *pslist)
         for (i = 0; i < current_size; i++) {
                 char *desc = uinttostr((unsigned)stats[i].pid);
                 uint64_t pid = (uint64_t)stats[i].pid;
+                const struct mon_group *grp;
 
                 /* finally we can add list of top-pids for LLC/MBM monitoring
                  * NOTE: list was sorted in ascending order, so in order to have
                  * initially top-cpu processes on top, we are adding in reverse
                  * order
                  */
-                int retval = grp_add(MON_GROUP_TYPE_PID,
-                                     (enum pqos_mon_event)PQOS_MON_EVENT_ALL,
-                                     desc, &pid, 1);
-                if (retval < 0)
+                grp = grp_add(MON_GROUP_TYPE_PID,
+                              (enum pqos_mon_event)PQOS_MON_EVENT_ALL, desc,
+                              &pid, 1);
+                if (grp == NULL)
                         exit(EXIT_FAILURE);
         }
 

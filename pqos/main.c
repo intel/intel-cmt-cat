@@ -126,14 +126,6 @@ static int sel_interface_selected = 0;
  */
 static int sel_print_version = 0;
 
-#ifdef PQOS_RMID_CUSTOM
-static unsigned sel_rmid_size = 0;
-
-/** Custom RMID configuration */
-static struct pqos_rmid_config sel_rmid_cfg = {PQOS_RMID_TYPE_DEFAULT,
-                                               {0, NULL, NULL}};
-#endif
-
 /**
  * @brief Function to check if a value is already contained in a table
  *
@@ -545,127 +537,6 @@ selfn_display_verbose(const char *arg)
         sel_display_verbose = 1;
 }
 
-#ifdef PQOS_RMID_CUSTOM
-/**
- * @brief Sets custom RMID mapping for the core
- *
- * @param [in] lcore logical core
- * @param [in] rmid selected RMID
- *
- * @return Operation status
- * @retval 0 OK
- * @retval -1 error
- */
-static int
-monitor_rmid_set(unsigned lcore, pqos_rmid_t rmid)
-{
-        /* allocate more memory */
-        if (sel_rmid_cfg.map.num >= sel_rmid_size) {
-                unsigned size = sel_rmid_size;
-                unsigned *core = sel_rmid_cfg.map.core;
-                pqos_rmid_t *rmid = sel_rmid_cfg.map.rmid;
-
-                if (size == 0)
-                        size = DEFAULT_TABLE_SIZE;
-                else
-                        size *= 2;
-
-                core = realloc(sel_rmid_cfg.map.core, size * sizeof(*core));
-                if (core == NULL) {
-                        fprintf(stderr, "Error with memory allocation!\n");
-                        return -1;
-                }
-                sel_rmid_cfg.map.core = core;
-
-                rmid = realloc(sel_rmid_cfg.map.rmid, size * sizeof(*rmid));
-                if (rmid == NULL) {
-                        fprintf(stderr, "Error with memory allocation!\n");
-                        return -1;
-                }
-                sel_rmid_cfg.map.rmid = rmid;
-
-                sel_rmid_size = size;
-        }
-
-        sel_rmid_cfg.map.core[sel_rmid_cfg.map.num] = lcore;
-        sel_rmid_cfg.map.rmid[sel_rmid_cfg.map.num] = rmid;
-        sel_rmid_cfg.map.num++;
-
-        return 0;
-}
-
-/**
- * @brief Selects custom RMID mapping
- *
- * @param arg string passed to --rmid command line option
- */
-static void
-selfn_monitor_rmids(const char *arg)
-{
-        char *cp = NULL, *str = NULL;
-        char *saveptr = NULL;
-        uint64_t *cores = NULL;
-
-        if (arg == NULL)
-                parse_error(arg, "NULL pointer!");
-
-        if (*arg == '\0')
-                parse_error(arg, "Empty string!");
-
-        sel_rmid_cfg.type = PQOS_RMID_TYPE_MAP;
-
-        selfn_strdup(&cp, arg);
-
-        for (str = cp;; str = NULL) {
-                char *token = NULL;
-                char *p = NULL;
-                pqos_rmid_t rmid;
-                unsigned count;
-                unsigned core_list_size = DEFAULT_TABLE_SIZE;
-                unsigned i;
-
-                token = strtok_r(str, ";", &saveptr);
-                if (token == NULL)
-                        break;
-                if (cores == NULL) {
-                        cores = calloc(core_list_size, sizeof(*cores));
-                        if (cores == NULL) {
-                                printf("Error with memory allocation!\n");
-                                goto error_exit;
-                        }
-                }
-                p = strchr(token, '=');
-                if (p == NULL)
-                        parse_error(str, "Invalid RMID association format");
-                *p = '\0';
-
-                rmid = (pqos_rmid_t)strtouint64(token);
-
-                count = strlisttotabrealloc(p + 1, &cores, &core_list_size);
-
-                for (i = 0; i < count; i++) {
-                        if (cores[i] > UINT_MAX)
-                                goto error_exit;
-
-                        if (monitor_rmid_set((unsigned)cores[i], rmid) < 0)
-                                goto error_exit;
-                }
-
-                free(cores);
-                cores = NULL;
-        }
-        if (cores != NULL)
-                free(cores);
-        free(cp);
-        return;
-error_exit:
-        if (cores != NULL)
-                free(cores);
-        free(cp);
-        exit(EXIT_FAILURE);
-}
-#endif
-
 /**
  * @brief Selects allocation profile from internal DB
  *
@@ -760,7 +631,7 @@ parse_config_file(const char *fname)
             {"monitor-pids:",       selfn_monitor_pids },      /**< -p */
             {"monitor-cores:",      selfn_monitor_cores },     /**< -m */
 #ifdef PQOS_RMID_CUSTOM
-            {"monitor-rmid:",       selfn_monitor_rmids },
+            {"monitor-rmid:",       selfn_monitor_rmid_cores },
 #endif
             {"monitor-time:",       selfn_monitor_time },      /**< -t */
             {"monitor-interval:",   selfn_monitor_interval },  /**< -i */
@@ -1252,7 +1123,7 @@ main(int argc, char **argv)
                         break;
 #ifdef PQOS_RMID_CUSTOM
                 case OPTION_RMID:
-                        selfn_monitor_rmids(optarg);
+                        selfn_monitor_rmid_cores(optarg);
                         break;
 #endif
                 default:
@@ -1294,9 +1165,6 @@ main(int argc, char **argv)
         if (sel_print_version)
                 print_tool_version();
 
-#ifdef PQOS_RMID_CUSTOM
-        cfg.rmid_cfg = sel_rmid_cfg;
-#endif
         ret = pqos_init(&cfg);
         if (ret != PQOS_RETVAL_OK) {
                 printf("Error initializing PQoS library!\n");
@@ -1473,11 +1341,5 @@ error_exit_1:
                 free(sel_config_file);
         if (l3cat_ids != NULL)
                 free(l3cat_ids);
-#ifdef PQOS_RMID_CUSTOM
-        if (sel_rmid_cfg.map.core != NULL)
-                free(sel_rmid_cfg.map.core);
-        if (sel_rmid_cfg.map.rmid != NULL)
-                free(sel_rmid_cfg.map.rmid);
-#endif
         return exit_val;
 }

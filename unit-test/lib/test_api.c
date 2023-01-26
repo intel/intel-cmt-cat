@@ -1705,23 +1705,23 @@ test_pqos_mon_start_os(void **state __attribute__((unused)))
         unsigned cores[] = {1};
         enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
         void *context = NULL;
-        struct pqos_mon_data group;
-
-        memset(&group, 0, sizeof(group));
+        struct pqos_mon_data *group = NULL;
 
         wrap_check_init(1, PQOS_RETVAL_OK);
 
-        expect_value(__wrap_os_mon_start, num_cores, num_cores);
-        expect_value(__wrap_os_mon_start, cores, cores);
-        expect_value(__wrap_os_mon_start, event, event);
-        expect_value(__wrap_os_mon_start, context, context);
-        expect_value(__wrap_os_mon_start, group, &group);
-        will_return(__wrap_os_mon_start, PQOS_RETVAL_OK);
+        expect_value(__wrap_os_mon_start_cores, num_cores, num_cores);
+        expect_value(__wrap_os_mon_start_cores, cores, cores);
+        expect_value(__wrap_os_mon_start_cores, event, event);
+        expect_value(__wrap_os_mon_start_cores, context, context);
+        will_return(__wrap_os_mon_start_cores, PQOS_RETVAL_OK);
 
-        ret = pqos_mon_start(num_cores, cores, event, context, &group);
+        ret = pqos_mon_start_cores(num_cores, cores, event, context, &group);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
-        free(group.intl);
+        if (group != NULL) {
+                free(group->intl);
+                free(group);
+        }
 }
 
 static void
@@ -1732,23 +1732,23 @@ test_pqos_mon_start_hw(void **state __attribute__((unused)))
         unsigned cores[] = {1};
         enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
         void *context = NULL;
-        struct pqos_mon_data group;
-
-        memset(&group, 0, sizeof(group));
+        struct pqos_mon_data *group = NULL;
 
         wrap_check_init(1, PQOS_RETVAL_OK);
 
-        expect_value(__wrap_hw_mon_start, num_cores, num_cores);
-        expect_value(__wrap_hw_mon_start, cores, cores);
-        expect_value(__wrap_hw_mon_start, event, event);
-        expect_value(__wrap_hw_mon_start, context, context);
-        expect_value(__wrap_hw_mon_start, group, &group);
-        will_return(__wrap_hw_mon_start, PQOS_RETVAL_OK);
+        expect_value(__wrap_hw_mon_start_cores, num_cores, num_cores);
+        expect_value(__wrap_hw_mon_start_cores, cores, cores);
+        expect_value(__wrap_hw_mon_start_cores, event, event);
+        expect_value(__wrap_hw_mon_start_cores, context, context);
+        will_return(__wrap_hw_mon_start_cores, PQOS_RETVAL_OK);
 
-        ret = pqos_mon_start(num_cores, cores, event, context, &group);
+        ret = pqos_mon_start_cores(num_cores, cores, event, context, &group);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
-        free(group.intl);
+        if (group != NULL) {
+                free(group->intl);
+                free(group);
+        }
 }
 
 static void

@@ -43,6 +43,7 @@ extern "C" {
 
 #include "monitoring.h"
 #include "pqos.h"
+#include "pqos_internal.h"
 #include "types.h"
 
 /**
@@ -56,8 +57,7 @@ extern "C" {
  * @retval PQOS_RETVAL_OK success
  */
 PQOS_LOCAL int hw_mon_init(const struct pqos_cpuinfo *cpu,
-                           const struct pqos_cap *cap,
-                           const struct pqos_config *cfg);
+                           const struct pqos_cap *cap);
 
 /**
  * @brief Shuts down hardware monitoring sub-module of the library
@@ -105,11 +105,16 @@ PQOS_LOCAL int hw_mon_assoc_read(const unsigned lcore, pqos_rmid_t *rmid);
  *
  * @param [in,out] ctx poll context
  * @param [in] event Monitoring event type
+ * @param [in] min_rmid min RMID
+ * @param [in] max_rmid max RMID
  *
  * @return Operations status
  */
 PQOS_LOCAL int hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
-                                   const enum pqos_mon_event event);
+                                   const enum pqos_mon_event event,
+                                   pqos_rmid_t min_rmid,
+                                   pqos_rmid_t max_rmid,
+                                   const struct pqos_mon_options *opt);
 
 /**
  * @brief Hardware interface to read RMID association of the \a lcore
@@ -149,12 +154,14 @@ PQOS_LOCAL int hw_mon_stop_perf(struct pqos_mon_data *group);
  *
  * @param group monitoring structure
  * @param event PQoS event type
+ * @param [in] opt extended options
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
 PQOS_LOCAL int hw_mon_start_counter(struct pqos_mon_data *group,
-                                    enum pqos_mon_event event);
+                                    enum pqos_mon_event event,
+                                    const struct pqos_mon_options *opt);
 
 /**
  * @brief Hardware interface to start resource monitoring on selected
@@ -172,15 +179,17 @@ PQOS_LOCAL int hw_mon_start_counter(struct pqos_mon_data *group,
  * @param [in] context a pointer for application's convenience
  *            (unused by the library)
  * @param [in,out] group a pointer to monitoring structure
+ * @param [in] opt extended options
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-PQOS_LOCAL int hw_mon_start(const unsigned num_cores,
-                            const unsigned *cores,
-                            const enum pqos_mon_event event,
-                            void *context,
-                            struct pqos_mon_data *group);
+PQOS_LOCAL int hw_mon_start_cores(const unsigned num_cores,
+                                  const unsigned *cores,
+                                  const enum pqos_mon_event event,
+                                  void *context,
+                                  struct pqos_mon_data *group,
+                                  const struct pqos_mon_options *opt);
 
 /**
  * @brief Hardware interface to stop resource monitoring data for selected

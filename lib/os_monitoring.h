@@ -42,6 +42,7 @@ extern "C" {
 #endif
 
 #include "pqos.h"
+#include "pqos_internal.h"
 #include "types.h"
 
 /**
@@ -101,15 +102,17 @@ PQOS_LOCAL int os_mon_stop(struct pqos_mon_data *group);
  * @param [in] context a pointer for application's convenience
  *            (unused by the library)
  * @param [in,out] group a pointer to monitoring structure
+ * @param [in] opt extended options
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-PQOS_LOCAL int os_mon_start(const unsigned num_cores,
-                            const unsigned *cores,
-                            const enum pqos_mon_event event,
-                            void *context,
-                            struct pqos_mon_data *group);
+PQOS_LOCAL int os_mon_start_cores(const unsigned num_cores,
+                                  const unsigned *cores,
+                                  const enum pqos_mon_event event,
+                                  void *context,
+                                  struct pqos_mon_data *group,
+                                  const struct pqos_mon_options *opt);
 
 /**
  * @brief OS interface to poll monitoring data from requested groups

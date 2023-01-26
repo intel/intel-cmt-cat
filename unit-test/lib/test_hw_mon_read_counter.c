@@ -48,7 +48,7 @@ test_init_mon(void **state)
         if (ret == 0) {
                 struct test_data *data = (struct test_data *)*state;
 
-                ret = hw_mon_init(data->cpu, data->cap, NULL);
+                ret = hw_mon_init(data->cpu, data->cap);
                 assert_int_equal(ret, PQOS_RETVAL_OK);
         }
 

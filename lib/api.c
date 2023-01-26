@@ -42,6 +42,7 @@
 #include "monitoring.h"
 #include "os_allocation.h"
 #include "os_monitoring.h"
+#include "pqos_internal.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -62,11 +63,12 @@ static struct pqos_api {
         /** Reads RMID association lcore */
         int (*mon_assoc_get)(const unsigned lcore, pqos_rmid_t *rmid);
         /** Starts resource monitoring on selected group of cores */
-        int (*mon_start)(const unsigned num_cores,
-                         const unsigned *cores,
-                         const enum pqos_mon_event event,
-                         void *context,
-                         struct pqos_mon_data *group);
+        int (*mon_start_cores)(const unsigned num_cores,
+                               const unsigned *cores,
+                               const enum pqos_mon_event event,
+                               void *context,
+                               struct pqos_mon_data *group,
+                               const struct pqos_mon_options *opt);
         /** Starts resource monitoring of selected pids */
         int (*mon_start_pids)(const unsigned num_pids,
                               const pid_t *pids,
@@ -175,7 +177,7 @@ api_init(int interface, enum pqos_vendor vendor)
         if (interface == PQOS_INTER_MSR) {
                 api.mon_reset = hw_mon_reset;
                 api.mon_assoc_get = hw_mon_assoc_get;
-                api.mon_start = hw_mon_start;
+                api.mon_start_cores = hw_mon_start_cores;
                 api.mon_stop = hw_mon_stop;
                 api.alloc_assoc_set = hw_alloc_assoc_set;
                 api.alloc_assoc_get = hw_alloc_assoc_get;
@@ -201,7 +203,7 @@ api_init(int interface, enum pqos_vendor vendor)
         } else if (interface == PQOS_INTER_OS ||
                    interface == PQOS_INTER_OS_RESCTRL_MON) {
                 api.mon_reset = os_mon_reset;
-                api.mon_start = os_mon_start;
+                api.mon_start_cores = os_mon_start_cores;
                 api.mon_start_pids = os_mon_start_pids;
                 api.mon_add_pids = os_mon_add_pids;
                 api.mon_remove_pids = os_mon_remove_pids;
@@ -666,6 +668,7 @@ pqos_mon_start(const unsigned num_cores,
                struct pqos_mon_data *group)
 {
         int ret;
+        struct pqos_mon_options opt;
 
         if (group == NULL || cores == NULL || num_cores == 0 || event == 0)
                 return PQOS_RETVAL_PARAM;
@@ -709,8 +712,10 @@ pqos_mon_start(const unsigned num_cores,
         }
         memset(group->intl, 0, sizeof(*group->intl));
 
-        if (api.mon_start != NULL)
-                ret = api.mon_start(num_cores, cores, event, context, group);
+        memset(&opt, 0, sizeof(opt));
+        if (api.mon_start_cores != NULL)
+                ret = api.mon_start_cores(num_cores, cores, event, context,
+                                          group, &opt);
         else {
                 LOG_INFO(UNSUPPORTED_INTERFACE);
                 ret = PQOS_RETVAL_RESOURCE;
@@ -721,6 +726,98 @@ pqos_mon_start_exit:
                 group->valid = GROUP_VALID_MARKER;
         else if (group->intl != NULL)
                 free(group->intl);
+
+        lock_release();
+
+        return ret;
+}
+
+int
+pqos_mon_start_cores(const unsigned num_cores,
+                     const unsigned *cores,
+                     const enum pqos_mon_event event,
+                     void *context,
+                     struct pqos_mon_data **group)
+{
+        struct pqos_mon_options opt;
+
+        memset(&opt, 0, sizeof(opt));
+
+        return pqos_mon_start_cores_ext(num_cores, cores, event, context, group,
+                                        &opt);
+}
+
+int
+pqos_mon_start_cores_ext(const unsigned num_cores,
+                         const unsigned *cores,
+                         const enum pqos_mon_event event,
+                         void *context,
+                         struct pqos_mon_data **group,
+                         const struct pqos_mon_options *opt)
+{
+        int ret;
+        struct pqos_mon_data *data = NULL;
+
+        if (group == NULL || cores == NULL || num_cores == 0 || event == 0 ||
+            opt == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Validate event parameter
+         * - only combinations of events allowed
+         * - do not allow non-PQoS events to be monitored on its own
+         */
+        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
+                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                       PQOS_PERF_EVENT_LLC_REF)))
+                return PQOS_RETVAL_PARAM;
+
+        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
+            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+                LOG_ERROR("Only PMU events selected for monitoring\n");
+                return PQOS_RETVAL_PARAM;
+        }
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        data = calloc(1, sizeof(*data));
+        if (data == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_mon_start_cores_exit;
+        }
+
+        data->intl = calloc(1, sizeof(*data->intl));
+        if (data->intl == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_mon_start_cores_exit;
+        }
+        data->intl->manage_memory = 1;
+
+        if (api.mon_start_cores != NULL)
+                ret = api.mon_start_cores(num_cores, cores, event, context,
+                                          data, opt);
+        else {
+                LOG_INFO(UNSUPPORTED_INTERFACE);
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+pqos_mon_start_cores_exit:
+        if (ret == PQOS_RETVAL_OK) {
+                data->valid = GROUP_VALID_MARKER;
+                *group = data;
+        } else if (data != NULL) {
+                free(data->intl);
+                free(data);
+        }
 
         lock_release();
 

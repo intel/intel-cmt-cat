@@ -50,17 +50,19 @@ __wrap_hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 }
 
 int
-__wrap_hw_mon_start(const unsigned num_cores,
-                    const unsigned *cores,
-                    const enum pqos_mon_event event,
-                    void *context,
-                    struct pqos_mon_data *group)
+__wrap_hw_mon_start_cores(const unsigned num_cores,
+                          const unsigned *cores,
+                          const enum pqos_mon_event event,
+                          void *context,
+                          struct pqos_mon_data *group,
+                          const struct pqos_mon_options *opt)
 {
         check_expected(num_cores);
         check_expected_ptr(cores);
         check_expected(event);
         check_expected_ptr(context);
-        check_expected_ptr(group);
+        assert_non_null(group);
+        assert_non_null(opt);
 
         return mock_type(int);
 }

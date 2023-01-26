@@ -104,6 +104,15 @@ void selfn_monitor_file(const char *arg);
  */
 void selfn_monitor_cores(const char *arg);
 
+#ifdef PQOS_RMID_CUSTOM
+/**
+ * @brief Selects custom RMID mapping for cores
+ *
+ * @param arg string passed to --rmid command line option
+ */
+void selfn_monitor_rmid_cores(const char *arg);
+#endif
+
 /**
  * @brief Translates multiple ddio monitoring request strings into
  *        internal monitoring request structures

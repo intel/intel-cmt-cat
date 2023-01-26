@@ -48,7 +48,7 @@ test_init_mon(void **state)
         if (ret == 0) {
                 struct test_data *data = (struct test_data *)*state;
 
-                ret = hw_mon_init(data->cpu, data->cap, NULL);
+                ret = hw_mon_init(data->cpu, data->cap);
                 assert_int_equal(ret, PQOS_RETVAL_OK);
         }
 
@@ -105,6 +105,9 @@ test_hw_alloc_assoc_unused(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_mon_poll_ctx ctx;
+        struct pqos_mon_options opt;
+
+        memset(&opt, 0, sizeof(opt));
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
@@ -115,14 +118,16 @@ test_hw_alloc_assoc_unused(void **state)
         ctx.lcore = 1;
         ctx.cluster = 0;
 
-        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW);
+        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW, 1, UINT32_MAX,
+                                  &opt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(ctx.rmid, 4);
 
         ctx.lcore = 5;
         ctx.cluster = 1;
 
-        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW);
+        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW, 1, UINT32_MAX,
+                                  &opt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(ctx.rmid, 1);
 }
@@ -133,6 +138,9 @@ test_hw_alloc_assoc_unused_invalid_cluster(void **state)
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_mon_poll_ctx ctx;
+        struct pqos_mon_options opt;
+
+        memset(&opt, 0, sizeof(opt));
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
@@ -140,7 +148,61 @@ test_hw_alloc_assoc_unused_invalid_cluster(void **state)
         ctx.lcore = 1;
         ctx.cluster = 5;
 
-        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW);
+        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW, 1, UINT32_MAX,
+                                  &opt);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_hw_alloc_assoc_unused_range(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_mon_poll_ctx ctx;
+        struct pqos_mon_options opt;
+        unsigned rmid_min = 10;
+        unsigned rmid_max = 20;
+
+        memset(&opt, 0, sizeof(opt));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        will_return_count(hw_mon_assoc_read, PQOS_RETVAL_OK,
+                          data->cpu->num_cores / 2);
+
+        ctx.lcore = 5;
+        ctx.cluster = 0;
+
+        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW, rmid_min,
+                                  rmid_max, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_in_range(ctx.rmid, rmid_min, rmid_max);
+}
+
+static void
+test_hw_alloc_assoc_unused_not_found(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_mon_poll_ctx ctx;
+        struct pqos_mon_options opt;
+        unsigned rmid_min = 1;
+        unsigned rmid_max = 2;
+
+        memset(&opt, 0, sizeof(opt));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        will_return_count(hw_mon_assoc_read, PQOS_RETVAL_OK,
+                          data->cpu->num_cores / 2);
+
+        ctx.lcore = 5;
+        ctx.cluster = 0;
+
+        ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW, rmid_min,
+                                  rmid_max, &opt);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
@@ -151,7 +213,10 @@ main(void)
 
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_hw_alloc_assoc_unused),
-            cmocka_unit_test(test_hw_alloc_assoc_unused_invalid_cluster)};
+            cmocka_unit_test(test_hw_alloc_assoc_unused_invalid_cluster),
+            cmocka_unit_test(test_hw_alloc_assoc_unused_range),
+            cmocka_unit_test(test_hw_alloc_assoc_unused_not_found),
+        };
 
         result += cmocka_run_group_tests(tests, test_init_mon, test_fini_mon);
 

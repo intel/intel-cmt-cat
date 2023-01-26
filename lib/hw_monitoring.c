@@ -77,13 +77,6 @@
  * ---------------------------------------
  */
 static unsigned m_rmid_max = 0; /**< max RMID */
-#ifdef PQOS_RMID_CUSTOM
-/* clang-format off */
-/** Custom RMID configuration */
-static struct pqos_rmid_config rmid_cfg = {PQOS_RMID_TYPE_DEFAULT,
-                                           {0, NULL, NULL} };
-/* clang-format on */
-#endif
 
 /** List of non-virtual perf events */
 static const enum pqos_mon_event perf_event[] = {
@@ -113,9 +106,7 @@ static uint64_t scale_event(const enum pqos_mon_event event,
  */
 
 int
-hw_mon_init(const struct pqos_cpuinfo *cpu,
-            const struct pqos_cap *cap,
-            const struct pqos_config *cfg)
+hw_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
         int ret;
         const struct pqos_capability *item = NULL;
@@ -146,32 +137,6 @@ hw_mon_init(const struct pqos_cpuinfo *cpu,
         else if (ret != PQOS_RETVAL_OK)
                 goto hw_mon_init_exit;
 
-#ifdef PQOS_RMID_CUSTOM
-        rmid_cfg.type = cfg->rmid_cfg.type;
-        if (cfg->rmid_cfg.type == PQOS_RMID_TYPE_MAP) {
-                const unsigned num = cfg->rmid_cfg.map.num;
-                unsigned i;
-
-                if (cfg->rmid_cfg.map.core == NULL ||
-                    cfg->rmid_cfg.map.rmid == NULL) {
-                        ret = PQOS_RETVAL_PARAM;
-                        goto hw_mon_init_exit;
-                }
-
-                rmid_cfg.map.num = num;
-                rmid_cfg.map.core = (unsigned *)malloc(sizeof(unsigned) * num);
-                rmid_cfg.map.rmid =
-                    (pqos_rmid_t *)malloc(sizeof(pqos_rmid_t) * num);
-
-                for (i = 0; i < num; i++) {
-                        rmid_cfg.map.core[i] = cfg->rmid_cfg.map.core[i];
-                        rmid_cfg.map.rmid[i] = cfg->rmid_cfg.map.rmid[i];
-                }
-        }
-#else
-        UNUSED_PARAM(cfg);
-#endif
-
 hw_mon_init_exit:
         if (ret != PQOS_RETVAL_OK)
                 hw_mon_fini();
@@ -188,13 +153,6 @@ hw_mon_fini(void)
 
 #ifdef __linux__
         perf_mon_fini();
-#endif
-
-#ifdef PQOS_RMID_CUSTOM
-        if (rmid_cfg.map.core != NULL)
-                free(rmid_cfg.map.core);
-        if (rmid_cfg.map.rmid != NULL)
-                free(rmid_cfg.map.rmid);
 #endif
 
         return PQOS_RETVAL_OK;
@@ -271,65 +229,95 @@ rmid_get_event_max(const struct pqos_cap *cap,
         return PQOS_RETVAL_OK;
 }
 
-/**
- * @brief Get used RMIDs on ctx->cluster
- *
- * @param [in,out] ctx poll context
- * @param [in] event Monitoring event type
- *
- * @return Operations status
- */
 int
 hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
-                    const enum pqos_mon_event event)
+                    const enum pqos_mon_event event,
+                    pqos_rmid_t min_rmid,
+                    pqos_rmid_t max_rmid,
+                    const struct pqos_mon_options *opt)
 {
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const struct pqos_cap *cap = _pqos_get_cap();
         int ret = PQOS_RETVAL_OK;
-        unsigned max_rmid = 0;
+        pqos_rmid_t rmid;
         unsigned *core_list = NULL;
         unsigned i, core_count;
-        pqos_rmid_t *rmid_list = NULL;
+        uint8_t *rmid_list = NULL;
 
         ASSERT(ctx != NULL);
 
+#ifndef PQOS_RMID_CUSTOM
+        UNUSED_PARAM(opt);
+#endif
+
         /* Getting max RMID for given event */
-        ret = rmid_get_event_max(cap, &max_rmid, event);
+        ret = rmid_get_event_max(cap, &rmid, event);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
+        if (rmid - 1 < max_rmid)
+                max_rmid = rmid - 1;
+        if (min_rmid < 1)
+                min_rmid = 1;
+
+        /* list of used RMIDs */
+        rmid_list = (uint8_t *)calloc(max_rmid + 2, sizeof(*rmid_list));
+        if (rmid_list == NULL)
+                return PQOS_RETVAL_RESOURCE;
 
         /**
          * Check for free RMID in the cluster by reading current associations.
          */
         core_list = pqos_cpu_get_cores_l3id(cpu, ctx->cluster, &core_count);
-        if (core_list == NULL)
-                return PQOS_RETVAL_ERROR;
-        ASSERT(core_count > 0);
-        rmid_list = (pqos_rmid_t *)malloc(sizeof(rmid_list[0]) * core_count);
-        if (rmid_list == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
+        if (core_list == NULL) {
+                ret = PQOS_RETVAL_ERROR;
                 goto rmid_alloc_error;
         }
-
+        ASSERT(core_count > 0);
+        /* Mark RMIDs used for core monitoring */
         for (i = 0; i < core_count; i++) {
-                ret = hw_mon_assoc_read(core_list[i], &rmid_list[i]);
+                pqos_rmid_t rmid;
+
+                ret = hw_mon_assoc_read(core_list[i], &rmid);
                 if (ret != PQOS_RETVAL_OK)
                         goto rmid_alloc_error;
+                if (rmid <= max_rmid)
+                        rmid_list[rmid] = 1;
         }
 
-        ret = PQOS_RETVAL_ERROR;
-        for (i = 1; i < max_rmid; i++) {
-                unsigned j = 0;
-
-                for (j = 0; j < core_count; j++)
-                        if (i == rmid_list[j])
-                                break;
-                if (j >= core_count) {
-                        ret = PQOS_RETVAL_OK;
-                        ctx->rmid = i;
-                        break;
+#ifdef PQOS_RMID_CUSTOM
+        if (opt->rmid.type == PQOS_RMID_TYPE_MAP) {
+                if (opt->rmid.rmid < min_rmid || opt->rmid.rmid > max_rmid) {
+                        LOG_ERROR("Custom RMID %u not in range %u-%u\n",
+                                  opt->rmid.rmid, min_rmid, max_rmid);
+                        ret = PQOS_RETVAL_PARAM;
+                        goto rmid_alloc_error;
                 }
+
+                if (opt->rmid.rmid > max_rmid ||
+                    rmid_list[opt->rmid.rmid] != 0) {
+                        LOG_ERROR("Custom RMID %u in use\n", opt->rmid.rmid);
+                        ret = PQOS_RETVAL_ERROR;
+                        goto rmid_alloc_error;
+                }
+
+                ctx->rmid = opt->rmid.rmid;
+
+        } else if (opt->rmid.type == PQOS_RMID_TYPE_DEFAULT) {
+#endif
+                ret = PQOS_RETVAL_ERROR;
+                for (i = min_rmid; i <= max_rmid; i++)
+                        if (rmid_list[i] == 0) {
+                                ret = PQOS_RETVAL_OK;
+                                fprintf(stderr, "===> RMID %u\n", i);
+                                ctx->rmid = i;
+                                break;
+                        }
+#ifdef PQOS_RMID_CUSTOM
+        } else {
+                LOG_ERROR("RMID Custom: Unsupported rmid type: %u\n",
+                          opt->rmid.type);
         }
+#endif
 
 rmid_alloc_error:
         if (rmid_list != NULL)
@@ -338,49 +326,6 @@ rmid_alloc_error:
                 free(core_list);
         return ret;
 }
-
-#ifdef PQOS_RMID_CUSTOM
-/**
- * @brief Gets RMID value based on information stored in rmid_cfg
- *
- * @param [in,out] ctx poll context
- * @param [in] event Monitoring event type
- * @param [in] rmid_cfg rmid configuration parameters
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-hw_mon_assoc_unused_custom(struct pqos_mon_poll_ctx *ctx,
-                           const enum pqos_mon_event event,
-                           const struct pqos_rmid_config *rmid_cfg)
-{
-        if (ctx == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        if (rmid_cfg == NULL || rmid_cfg->type == PQOS_RMID_TYPE_DEFAULT) {
-                return hw_mon_assoc_unused(ctx, event);
-        } else if (rmid_cfg->type == PQOS_RMID_TYPE_MAP) {
-                unsigned i;
-
-                for (i = 0; i < rmid_cfg->map.num; i++) {
-                        if (ctx->lcore == rmid_cfg->map.core[i]) {
-                                ctx->rmid = rmid_cfg->map.rmid[i];
-                                return PQOS_RETVAL_OK;
-                        }
-                }
-
-                LOG_ERROR("RMID Custom: No mapping for core %u\n", ctx->lcore);
-        } else {
-                LOG_ERROR("RMID Custom: Unsupported rmid type: %u\n",
-                          rmid_cfg->type);
-
-                return PQOS_RETVAL_PARAM;
-        }
-
-        return PQOS_RETVAL_ERROR;
-}
-#endif
 
 /*
  * =======================================
@@ -836,7 +781,9 @@ hw_mon_stop_perf(struct pqos_mon_data *group)
 }
 
 int
-hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
+hw_mon_start_counter(struct pqos_mon_data *group,
+                     enum pqos_mon_event event,
+                     const struct pqos_mon_options *opt)
 {
         const unsigned num_cores = group->num_cores;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
@@ -879,12 +826,9 @@ hw_mon_start_counter(struct pqos_mon_data *group, enum pqos_mon_event event)
                          */
                         ctxs[num_ctxs].lcore = lcore;
                         ctxs[num_ctxs].cluster = cluster;
-#ifdef PQOS_RMID_CUSTOM
-                        ret = hw_mon_assoc_unused_custom(&ctxs[num_ctxs],
-                                                         ctx_event, &rmid_cfg);
-#else
-                        ret = hw_mon_assoc_unused(&ctxs[num_ctxs], ctx_event);
-#endif
+
+                        ret = hw_mon_assoc_unused(&ctxs[num_ctxs], ctx_event, 1,
+                                                  UINT32_MAX, opt);
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
 
@@ -971,11 +915,12 @@ validate_event(const struct pqos_cap *cap, const enum pqos_mon_event event)
 }
 
 int
-hw_mon_start(const unsigned num_cores,
-             const unsigned *cores,
-             const enum pqos_mon_event event,
-             void *context,
-             struct pqos_mon_data *group)
+hw_mon_start_cores(const unsigned num_cores,
+                   const unsigned *cores,
+                   const enum pqos_mon_event event,
+                   void *context,
+                   struct pqos_mon_data *group,
+                   const struct pqos_mon_options *opt)
 {
         unsigned i;
         int ret = PQOS_RETVAL_OK;
@@ -1049,7 +994,7 @@ hw_mon_start(const unsigned num_cores,
                 goto pqos_mon_start_error;
 
         /* start MBM/CMT events */
-        retval = hw_mon_start_counter(group, req_events);
+        retval = hw_mon_start_counter(group, req_events, opt);
         if (retval != PQOS_RETVAL_OK)
                 goto pqos_mon_start_error;
 

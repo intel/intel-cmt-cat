@@ -37,11 +37,12 @@
 
 int __wrap_hw_mon_reset(void);
 int __wrap_hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
-int __wrap_hw_mon_start(const unsigned num_cores,
-                        const unsigned *cores,
-                        const enum pqos_mon_event event,
-                        void *context,
-                        struct pqos_mon_data *group);
+int __wrap_hw_mon_start_cores(const unsigned num_cores,
+                              const unsigned *cores,
+                              const enum pqos_mon_event event,
+                              void *context,
+                              struct pqos_mon_data *group,
+                              const struct pqos_mon_options *opt);
 int __wrap_hw_mon_stop(struct pqos_mon_data *group);
 int __wrap_hw_mon_poll(struct pqos_mon_data *group,
                        const enum pqos_mon_event event);

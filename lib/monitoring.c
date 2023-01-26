@@ -86,6 +86,8 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
         int ret;
         enum pqos_interface interface = _pqos_get_inter();
 
+        UNUSED_PARAM(cfg);
+
         ASSERT(cfg != NULL);
         /**
          * If monitoring capability has been discovered
@@ -108,7 +110,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
                 return ret;
 #endif
         if (interface == PQOS_INTER_MSR)
-                ret = hw_mon_init(cpu, cap, cfg);
+                ret = hw_mon_init(cpu, cap);
 
 pqos_mon_init_exit:
         return ret;

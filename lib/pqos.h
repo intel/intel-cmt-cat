@@ -122,28 +122,6 @@ enum pqos_cdp_config {
  */
 typedef uint32_t pqos_rmid_t;
 
-#ifdef PQOS_RMID_CUSTOM
-/**
- * RMID initialization types
- */
-enum pqos_rmid_type {
-        PQOS_RMID_TYPE_DEFAULT = 0, /**< Default sequential init */
-        PQOS_RMID_TYPE_MAP          /**< Custom Core to RMID mapping */
-};
-
-/**
- * RMID configuration
- */
-struct pqos_rmid_config {
-        enum pqos_rmid_type type; /**< rmid initialization type */
-        struct {
-                unsigned num;      /**< number of rmid to core mappings */
-                pqos_rmid_t *rmid; /**< rmid table */
-                unsigned *core;    /**< core table */
-        } map;
-};
-#endif
-
 /**
  * PQoS library configuration structure
  *
@@ -177,9 +155,6 @@ struct pqos_config {
         void *context_log;
         int verbose;
         enum pqos_interface interface;
-#ifdef PQOS_RMID_CUSTOM
-        struct pqos_rmid_config rmid_cfg;
-#endif
 };
 
 /**
@@ -530,14 +505,48 @@ int pqos_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  *
+ * @deprecated since 5.0.0
+ * @see pqos_mon_start_cores()
+ *
  * @note As of Kernel 4.10, Intel(R) RDT perf results per core are found to
  *       be incorrect.
  */
+#if PQOS_VERSION >= 50000
+PQOS_DEPRECATED
+#endif
 int pqos_mon_start(const unsigned num_cores,
                    const unsigned *cores,
                    const enum pqos_mon_event event,
                    void *context,
                    struct pqos_mon_data *group);
+
+/**
+ * @brief Starts resource monitoring on selected group of cores
+ *
+ * The function sets up content of the \a group structure.
+ *
+ * Note that \a event cannot select PQOS_PERF_EVENT_IPC or
+ * PQOS_PERF_EVENT_L3_MISS events without any PQoS event
+ * selected at the same time.
+ *
+ * @param [in] num_cores number of cores in \a cores array
+ * @param [in] cores array of logical core id's
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [out] group a pointer to monitoring structure
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ *
+ * @note As of Kernel 4.10, Intel(R) RDT perf results per core are found to
+ *       be incorrect.
+ */
+int pqos_mon_start_cores(const unsigned num_cores,
+                         const unsigned *cores,
+                         const enum pqos_mon_event event,
+                         void *context,
+                         struct pqos_mon_data **group);
 
 /**
  * @brief Starts resource monitoring of selected \a pid (process)
@@ -807,10 +816,9 @@ struct pqos_alloc_config {
  * Reverts CAT/MBA state to the one after reset:
  * - all cores associated with COS0
  * - all COS are set to give access to entire resource
- * - all device channels associated with COS0
  *
- * As part of allocation reset CDP, MBA, I/O RDT reconfiguration
- * can be performed. This can be requested via \a cfg.
+ * As part of allocation reset CDP, MBA can be performed.
+ * This can be requested via \a cfg.
  *
  * @param [in] cfg requested configuration
  *

@@ -172,8 +172,8 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 		-Wl,--wrap=hw_mon_reset \
 		-Wl,--wrap=os_mon_reset \
 		-Wl,--wrap=hw_mon_assoc_get \
-		-Wl,--wrap=hw_mon_start \
-		-Wl,--wrap=os_mon_start \
+		-Wl,--wrap=hw_mon_start_cores \
+		-Wl,--wrap=os_mon_start_cores \
 		-Wl,--wrap=hw_mon_stop \
 		-Wl,--wrap=os_mon_stop \
 		-Wl,--wrap=pqos_mon_poll_events \

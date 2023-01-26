@@ -48,7 +48,7 @@ test_init_mon(void **state)
         if (ret == 0) {
                 struct test_data *data = (struct test_data *)*state;
 
-                ret = hw_mon_init(data->cpu, data->cap, NULL);
+                ret = hw_mon_init(data->cpu, data->cap);
                 assert_int_equal(ret, PQOS_RETVAL_OK);
         }
 
@@ -81,10 +81,16 @@ hw_mon_assoc_write(const unsigned lcore, const pqos_rmid_t rmid)
 
 int
 hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
-                    const enum pqos_mon_event event)
+                    const enum pqos_mon_event event,
+                    pqos_rmid_t min_rmid,
+                    pqos_rmid_t max_rmid,
+                    const struct pqos_mon_options *opt)
 {
         assert_non_null(ctx);
         check_expected(event);
+        assert_int_equal(min_rmid, 1);
+        assert_int_equal(max_rmid, UINT32_MAX);
+        assert_non_null(opt);
 
         ctx->rmid = mock_type(int);
 
@@ -103,6 +109,9 @@ test_hw_mon_start_counter(void **state)
         struct pqos_mon_data_internal intl;
         enum pqos_mon_event event = PQOS_MON_EVENT_TMEM_BW;
         int ret;
+        struct pqos_mon_options opt;
+
+        memset(&opt, 0, sizeof(opt));
 
         memset(&group, 0, sizeof(struct pqos_mon_data));
         group.intl = &intl;
@@ -121,7 +130,7 @@ test_hw_mon_start_counter(void **state)
         expect_value(hw_mon_assoc_write, rmid, 1);
         will_return(hw_mon_assoc_write, PQOS_RETVAL_OK);
 
-        ret = hw_mon_start_counter(&group, event);
+        ret = hw_mon_start_counter(&group, event, &opt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(group.intl->hw.event, event);
         assert_int_equal(group.intl->hw.num_ctx, 1);
@@ -142,6 +151,9 @@ test_hw_mon_start_counter_core_group(void **state)
         struct pqos_mon_data_internal intl;
         enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
         int ret;
+        struct pqos_mon_options opt;
+
+        memset(&opt, 0, sizeof(opt));
 
         memset(&group, 0, sizeof(struct pqos_mon_data));
         group.intl = &intl;
@@ -168,7 +180,7 @@ test_hw_mon_start_counter_core_group(void **state)
         expect_value(hw_mon_assoc_write, rmid, 2);
         will_return(hw_mon_assoc_write, PQOS_RETVAL_OK);
 
-        ret = hw_mon_start_counter(&group, event);
+        ret = hw_mon_start_counter(&group, event, &opt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(group.intl->hw.event, event);
         assert_int_equal(group.intl->hw.num_ctx, 2);

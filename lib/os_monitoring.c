@@ -398,11 +398,12 @@ os_mon_stop(struct pqos_mon_data *group)
 }
 
 int
-os_mon_start(const unsigned num_cores,
-             const unsigned *cores,
-             const enum pqos_mon_event event,
-             void *context,
-             struct pqos_mon_data *group)
+os_mon_start_cores(const unsigned num_cores,
+                   const unsigned *cores,
+                   const enum pqos_mon_event event,
+                   void *context,
+                   struct pqos_mon_data *group,
+                   const struct pqos_mon_options *opt)
 {
         unsigned i = 0;
         int ret;
@@ -413,6 +414,8 @@ os_mon_start(const unsigned num_cores,
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
+
+        UNUSED_PARAM(opt);
 
         /**
          * Validate if event is listed in capabilities
