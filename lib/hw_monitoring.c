@@ -308,7 +308,6 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
                 for (i = min_rmid; i <= max_rmid; i++)
                         if (rmid_list[i] == 0) {
                                 ret = PQOS_RETVAL_OK;
-                                fprintf(stderr, "===> RMID %u\n", i);
                                 ctx->rmid = i;
                                 break;
                         }
