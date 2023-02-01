@@ -47,7 +47,7 @@ import {
 import { AppqosService } from './appqos.service';
 import { LocalService } from './local.service';
 import { first } from 'rxjs';
-import { Pools } from '../components/overview/overview.model';
+import { Pools, Apps } from '../components/overview/overview.model';
 
 describe('Given AppqosService', () => {
   beforeEach(() =>
@@ -468,4 +468,30 @@ describe('Given AppqosService', () => {
       httpMock.verify();
     });
   });
+
+  describe('when getApps method is called ', () => {
+    it('it should response', () => {
+      const api_url = 'http://localhost:5000'
+
+      const mockedApps: Apps[] = [
+        { id: 1, name: 'test', pids: [1, 2, 3], pool_id: 0 }
+      ]
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getApps().subscribe((apps: Apps[]) => {
+        expect(apps).toBe(mockedApps);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/apps`);
+      req.flush(mockedApps);
+      httpMock.verify();
+    })
+  })
 });
