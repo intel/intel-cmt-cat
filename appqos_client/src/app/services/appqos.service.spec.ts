@@ -478,20 +478,56 @@ describe('Given AppqosService', () => {
       }
 
       const {
-        point : {componentInstance: service}
+        point: { componentInstance: service }
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
       const local = ngMocks.findInstance(LocalService);
       local.saveData('api_url', api_url);
 
-      service.deletePool(0).subscribe((response)=> {
+      service.deletePool(0).subscribe((response) => {
         expect(response).toBe(mockResponse);
       })
 
       const req = httpMock.expectOne(`${api_url}/pools/0`);
       req.flush(mockResponse);
       httpMock.verify();
+    })
+  });
+
+  describe('when postPool method is called', () => {
+    it('it should responed', () => {
+      const api_url = 'http://localhost:5000';
+
+      const mockResponse = {
+        status: 201,
+        body: {
+          id: 0,
+          message: "New POOL {post_data['id']} added"
+        }
+      }
+
+      const mockPool: Pools = {
+        id: 2,
+        name: 'test',
+        cores: [1, 2, 3]
+      }
+
+      const {
+        point: { componentInstance: service }
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.postPool(mockPool).subscribe((response: unknown) => {
+        expect(response).toBe(mockResponse);
+      })
+
+      const req = httpMock.expectOne(`${api_url}/pools/`);
+      req.flush(mockResponse);
+      httpMock.verify()
     })
   })
 
