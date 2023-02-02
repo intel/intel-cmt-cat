@@ -469,6 +469,32 @@ describe('Given AppqosService', () => {
     });
   });
 
+  describe('when deletePool method called with pool id', () => {
+    it('it should response', () => {
+      const api_url = 'http://localhost:5000';
+
+      const mockResponse = {
+        message: 'f"POOL 0 deleted'
+      }
+
+      const {
+        point : {componentInstance: service}
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.deletePool(0).subscribe((response)=> {
+        expect(response).toBe(mockResponse);
+      })
+
+      const req = httpMock.expectOne(`${api_url}/pools/0`);
+      req.flush(mockResponse);
+      httpMock.verify();
+    })
+  })
+
   describe('when getApps method is called ', () => {
     it('it should response', () => {
       const api_url = 'http://localhost:5000'
