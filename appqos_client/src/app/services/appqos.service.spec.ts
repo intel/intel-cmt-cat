@@ -564,7 +564,7 @@ describe('Given AppqosService', () => {
       const mockedApps: Apps = {
         id: 1,
         name: 'test',
-        pids: [1,2,3],
+        pids: [1, 2, 3],
         pool_id: 2
       }
 
@@ -572,12 +572,12 @@ describe('Given AppqosService', () => {
         status: 201,
         body: {
           id: 1,
-          message: "New APP added to pool {pool['id']}"
+          message: 'New APP added to pool 1'
         }
       }
 
       const {
-        point: { componentInstance: service}
+        point: { componentInstance: service }
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
@@ -591,6 +591,42 @@ describe('Given AppqosService', () => {
       const req = httpMock.expectOne(`${api_url}/apps/`);
       req.flush(mockedResponse);
       httpMock.verify();
-    })
-  })
+    });
+  });
+
+  describe('when appPut method is called', () => {
+    it('it should responed', () => {
+      const api_url = 'http://localhost:5000';
+
+      const mockedApps: Apps = {
+        id: 1,
+        name: 'test',
+        pids: [1, 2, 3],
+        pool_id: 2
+      }
+
+      const mockedResponse = {
+        status: 200,
+        body: {
+          message: 'APP 1 updated'
+        }
+      }
+
+      const {
+        point: {componentInstance: service}
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.appPut(mockedApps, 1).subscribe((response: unknown) => {
+          expect(response).toBe(mockedResponse);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/apps/1`);
+      req.flush(mockedResponse);
+      httpMock.verify()
+    });
+  });
 });
