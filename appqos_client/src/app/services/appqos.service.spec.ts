@@ -629,4 +629,33 @@ describe('Given AppqosService', () => {
       httpMock.verify()
     });
   });
+
+  describe('when deleteApp method is called with id', () => {
+    it('it should responed', () => {
+      const api_url = 'http://localhost:5000';
+
+      const mockedResponse = {
+        status: 200,
+        body: {
+          message: 'APP 0 deleted'
+        }
+      }
+
+      const {
+        point: {componentInstance: service}
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.deleteApp(0).subscribe((response: unknown) => {
+        expect(response).toBe(mockedResponse);
+      })
+
+      const req = httpMock.expectOne(`${api_url}/apps/0`);
+      req.flush(mockedResponse);
+      httpMock.verify();
+    })
+  })
 });
