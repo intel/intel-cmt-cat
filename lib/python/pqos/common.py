@@ -146,7 +146,7 @@ def free_memory(ptr):
     libc_path = ctypes.util.find_library('c')
 
     if not libc_path:
-        raise Exception('Cannot find libc')
+        raise OSError('Cannot find libc')
 
     libc = ctypes.cdll.LoadLibrary(libc_path)
     libc.free(ptr)

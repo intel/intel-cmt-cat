@@ -544,7 +544,7 @@ def configure_rdt(cfg):
         """
         if cfg_rdt_iface != PQOS_API.current_iface():
             if PQOS_API.init(cfg_rdt_iface):
-                raise Exception("Failed to initialize RDT interface!")
+                raise RuntimeError("Failed to initialize RDT interface!")
 
             log.info(f"RDT initialized with {cfg_rdt_iface.upper()} interface.")
             return True
@@ -615,11 +615,11 @@ def configure_rdt(cfg):
             if PQOS_API.reset(l3_cdp_cfg = l3cdp_cfg, l2_cdp_cfg = l2cdp_cfg, \
                                      mba_cfg = mba_cfg):
                 if l3cdp_cfg != "any":
-                    raise Exception("Failed to change L3 CDP state!")
+                    raise RuntimeError("Failed to change L3 CDP state!")
                 if l2cdp_cfg != "any":
-                    raise Exception("Failed to change L2 CDP state!")
+                    raise RuntimeError("Failed to change L2 CDP state!")
                 if mba_cfg != "any":
-                    raise Exception("Failed to change MBA BW state!")
+                    raise RuntimeError("Failed to change MBA BW state!")
 
             log.info(f"RDT MBA BW {'en' if PQOS_API.is_mba_bw_enabled() else 'dis'}abled.")
             log.info(f"RDT L3 CDP {'en' if PQOS_API.is_l3_cdp_enabled() else 'dis'}abled.")
