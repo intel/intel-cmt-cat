@@ -40,6 +40,7 @@
 
 #include "utils.h"
 
+#include "cap.h"
 #include "cpuinfo.h"
 #include "pqos.h"
 
@@ -168,6 +169,40 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu, unsigned *count)
         *count = scount;
         return sockets;
 }
+
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+unsigned *
+pqos_cpu_get_numa(const struct pqos_cpuinfo *cpu, unsigned *count)
+{
+        unsigned ncount = 0, i = 0;
+        unsigned *numa = NULL;
+
+        if (cpu == NULL || count == NULL)
+                return NULL;
+        numa = (unsigned *)malloc(sizeof(numa[0]) * cpu->num_cores);
+        if (numa == NULL)
+                return NULL;
+        for (i = 0; i < cpu->num_cores; i++) {
+                unsigned j = 0;
+
+                /**
+                 * Check if this numa id is already on the \a numa list
+                 */
+                for (j = 0; j < ncount; j++)
+                        if (cpu->cores[i].numa == numa[j])
+                                break;
+
+                if (j >= ncount || ncount == 0) {
+                        /**
+                         * This socket wasn't reported before
+                         */
+                        numa[ncount++] = cpu->cores[i].numa;
+                }
+        }
+        *count = ncount;
+        return numa;
+}
+#endif /* PQOS_SNC */
 
 unsigned *
 pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu, unsigned *count)
@@ -334,6 +369,30 @@ pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
         return PQOS_RETVAL_ERROR;
 }
 
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+int
+pqos_cpu_get_one_by_numaid(const struct pqos_cpuinfo *cpu,
+                           const unsigned numaid,
+                           unsigned *lcore)
+{
+        unsigned i = 0;
+
+        ASSERT(cpu != NULL);
+        ASSERT(lcore != NULL);
+
+        if (cpu == NULL || lcore == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].numa == numaid) {
+                        *lcore = cpu->cores[i].lcore;
+                        return PQOS_RETVAL_OK;
+                }
+
+        return PQOS_RETVAL_ERROR;
+}
+#endif
+
 int
 pqos_cpu_get_one_by_l3cat_id(const struct pqos_cpuinfo *cpu,
                              const unsigned l3cat_id,
@@ -435,6 +494,27 @@ pqos_cpu_get_socketid(const struct pqos_cpuinfo *cpu,
         return PQOS_RETVAL_ERROR;
 }
 
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+int
+pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
+                    const unsigned lcore,
+                    unsigned *numa)
+{
+        unsigned i = 0;
+
+        if (cpu == NULL || numa == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].lcore == lcore) {
+                        *numa = cpu->cores[i].numa;
+                        return PQOS_RETVAL_OK;
+                }
+
+        return PQOS_RETVAL_ERROR;
+}
+#endif /* PQOS_SNC */
+
 int
 pqos_cpu_get_clusterid(const struct pqos_cpuinfo *cpu,
                        const unsigned lcore,
@@ -481,6 +561,22 @@ pqos_cap_get_type(const struct pqos_cap *cap,
         }
 
         return ret;
+}
+
+const struct pqos_capability *
+_pqos_cap_get_type(const enum pqos_cap_type type)
+{
+        const struct pqos_capability *cap_item;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        int ret;
+
+        ASSERT(cap != NULL);
+
+        ret = pqos_cap_get_type(cap, type, &cap_item);
+        if (ret == PQOS_RETVAL_OK)
+                return cap_item;
+
+        return NULL;
 }
 
 int

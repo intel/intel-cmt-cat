@@ -171,8 +171,13 @@ setup_cap_init_msr(void **state __attribute__((unused)))
 {
         int ret;
         struct test_data *data;
+        unsigned technology = 0;
 
-        ret = test_init_all(state);
+        technology |= 1 << PQOS_CAP_TYPE_MBA;
+        technology |= 1 << PQOS_CAP_TYPE_L3CA;
+        technology |= 1 << PQOS_CAP_TYPE_L2CA;
+
+        ret = test_init(state, technology);
         if (ret != 0)
                 return ret;
 
@@ -187,8 +192,13 @@ setup_cap_init_os(void **state __attribute__((unused)))
 {
         int ret;
         struct test_data *data;
+        unsigned technology = 0;
 
-        ret = test_init_all(state);
+        technology |= 1 << PQOS_CAP_TYPE_MBA;
+        technology |= 1 << PQOS_CAP_TYPE_L3CA;
+        technology |= 1 << PQOS_CAP_TYPE_L2CA;
+
+        ret = test_init(state, technology);
         if (ret != 0)
                 return ret;
 
@@ -203,8 +213,13 @@ setup_cap_init_os_resctrl_mon(void **state __attribute__((unused)))
 {
         int ret;
         struct test_data *data;
+        unsigned technology = 0;
 
-        ret = test_init_all(state);
+        technology |= 1 << PQOS_CAP_TYPE_MBA;
+        technology |= 1 << PQOS_CAP_TYPE_L3CA;
+        technology |= 1 << PQOS_CAP_TYPE_L2CA;
+
+        ret = test_init(state, technology);
         if (ret != 0)
                 return ret;
 
@@ -276,28 +291,6 @@ test__pqos_get_cpu_after_init(void **state __attribute__((unused)))
 
         ret = _pqos_get_cpu();
         assert_non_null(ret);
-}
-
-/* ======== _pqos_cap_get_type ======== */
-
-static void
-test__pqos_cap_get_type_param(void **state __attribute__((unused)))
-{
-        int ret;
-        const struct pqos_capability *p_cap_item;
-
-        ret = _pqos_cap_get_type(-1, NULL);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-        ret = _pqos_cap_get_type(-1, &p_cap_item);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_MON, NULL);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA, NULL);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA, NULL);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-        ret = _pqos_cap_get_type(PQOS_CAP_TYPE_MBA, NULL);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
 /* ======== pqos_init ======== */
@@ -568,7 +561,6 @@ main(void)
         int result = 0;
 
         const struct CMUnitTest tests_cap_param[] = {
-            cmocka_unit_test(test__pqos_cap_get_type_param),
             cmocka_unit_test(test_pqos_init_param),
         };
 

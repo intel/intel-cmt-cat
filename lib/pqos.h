@@ -1046,6 +1046,19 @@ unsigned *pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu,
  */
 unsigned *pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu, unsigned *count);
 
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+/**
+ * @brief Retrieves numa id's from cpu info structure
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [out] count place to store actual number of sockets returned
+ *
+ * @return Allocated array of size \a count populated with numa id's
+ * @retval NULL on error
+ */
+unsigned *pqos_cpu_get_numa(const struct pqos_cpuinfo *cpu, unsigned *count);
+#endif
+
 /**
  * @brief Retrieves L2 id's from cpu info structure
  *
@@ -1138,6 +1151,22 @@ int pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
                           const unsigned socket,
                           unsigned *lcore);
 
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+/**
+ * @brief Retrieves one core id from cpu info structure for \a numaid
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [in] numaid id to enumerate
+ * @param [out] lcore place to store returned core id
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_cpu_get_one_by_numaid(const struct pqos_cpuinfo *cpu,
+                               const unsigned numaid,
+                               unsigned *lcore);
+#endif
+
 /**
  * @brief Retrieves one core id from cpu info structure for \a l3cat id
  *
@@ -1189,6 +1218,22 @@ int pqos_cpu_check_core(const struct pqos_cpuinfo *cpu, const unsigned lcore);
 int pqos_cpu_get_socketid(const struct pqos_cpuinfo *cpu,
                           const unsigned lcore,
                           unsigned *socket);
+
+#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
+/**
+ * @brief Retrieves NUMA cluster id for given logical core id
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [in] lcore logical core id
+ * @param [out] numa location to store numa id at
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
+                        const unsigned lcore,
+                        unsigned *numa);
+#endif
 
 /**
  * @brief Retrieves monitoring cluster id for given logical core id

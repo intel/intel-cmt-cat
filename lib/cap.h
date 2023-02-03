@@ -107,18 +107,6 @@ PQOS_LOCAL const struct pqos_cap *_pqos_get_cap(void);
  */
 PQOS_LOCAL const struct pqos_cpuinfo *_pqos_get_cpu(void);
 
-/**
- * @brief Internal API to retrieve \a type of capability
- *
- * @param [in] type capability type to look for
- * @param [out] cap_item place to store pointer to selected capability
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-PQOS_LOCAL int _pqos_cap_get_type(const enum pqos_cap_type type,
-                                  const struct pqos_capability **cap_item);
-
 #ifdef __cplusplus
 }
 #endif

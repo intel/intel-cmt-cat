@@ -1043,13 +1043,6 @@ _pqos_get_cpu(void)
         return m_cpu;
 }
 
-int
-_pqos_cap_get_type(const enum pqos_cap_type type,
-                   const struct pqos_capability **cap_item)
-{
-        return pqos_cap_get_type(m_cap, type, cap_item);
-}
-
 /**
  * =======================================
  * =======================================

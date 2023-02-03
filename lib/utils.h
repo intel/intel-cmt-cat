@@ -42,6 +42,7 @@
 extern "C" {
 #endif
 
+#include "pqos.h"
 #include "types.h"
 
 /**
@@ -53,6 +54,16 @@ extern "C" {
  * @retval PQOS_RETVAL_OK success
  */
 PQOS_LOCAL int _pqos_utils_init(int interface);
+
+/**
+ * @brief Internal API to retrieve \a type of capability
+ *
+ * @param [in] type capability type to look for
+ *
+ * @return Pointer to selected capability
+ */
+PQOS_LOCAL const struct pqos_capability *
+_pqos_cap_get_type(const enum pqos_cap_type type);
 
 #ifdef __cplusplus
 }

@@ -278,6 +278,7 @@ test_init_all(void **state)
         technology |= 1 << PQOS_CAP_TYPE_MBA;
         technology |= 1 << PQOS_CAP_TYPE_L3CA;
         technology |= 1 << PQOS_CAP_TYPE_L2CA;
+        technology |= 1 << PQOS_CAP_TYPE_MON;
 
         return test_init(state, technology);
 }
