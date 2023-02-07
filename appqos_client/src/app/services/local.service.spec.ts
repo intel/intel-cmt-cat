@@ -28,6 +28,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
+import { skip } from 'rxjs';
+import { CacheAllocation } from '../components/system-caps/system-caps.model';
 
 import { LocalService } from './local.service';
 
@@ -135,4 +137,54 @@ describe('Given LocalService', () => {
       service.ifaceEvent.next();
     });
   });
+
+  describe('when setL3CatEvent method is executed', () => {
+    it('should emit L3cat', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const mockedL3cat: CacheAllocation = {
+        cache_size: 20,
+        cdp_enabled: true,
+        cdp_supported: false,
+        clos_num: 23,
+        cw_num: 10,
+        cw_size: 30
+      }
+
+      service.l3cat.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedL3cat);
+        
+        done();
+      })
+
+      service.setL3CatEvent(mockedL3cat);
+    })
+  })
+
+  describe('when getL3CatEvent method is excuted', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: {componentInstance: service}
+      } = MockRender(LocalService);
+
+      const mockedL3cat: CacheAllocation = {
+        cache_size: 20,
+        cdp_enabled: true,
+        cdp_supported: false,
+        clos_num: 23,
+        cw_num: 10,
+        cw_size: 30
+      }
+
+      service.getL3CatEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedL3cat);
+
+        done();
+      });
+
+      service.l3cat.next(mockedL3cat);
+    })
+  })
 });
