@@ -29,7 +29,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { skip } from 'rxjs';
-import { CacheAllocation } from '../components/system-caps/system-caps.model';
+import { MbaAllocationComponent } from '../components/overview/mba-allocation/mba-allocation.component';
+import { CacheAllocation, MBACTRL } from '../components/system-caps/system-caps.model';
 
 import { LocalService } from './local.service';
 
@@ -263,7 +264,7 @@ describe('Given LocalService', () => {
   describe('when getCapsEvent method is excuted', () => {
     it('should detect change', (done: DoneFn) => {
       const {
-        point: {componentInstance: service}
+        point: { componentInstance: service }
       } = MockRender(LocalService);
 
       const mockedCaps: string[] = [
@@ -279,6 +280,38 @@ describe('Given LocalService', () => {
       })
 
       service.caps.next(mockedCaps);
+    })
+  })
+
+  describe('when setMbaCtrlEvent method is excuted', () => {
+    it('it should emit', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.mbaCtrl.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBeTrue;
+
+        done();
+      })
+
+      service.setMbaCtrlEvent(true);
+    })
+  })
+
+  describe('when getMbaCtrlEvent method is excuted', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+      
+      service.getMbaCtrlEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBeTrue;
+
+        done();
+      })
+
+      service.mbaCtrl.next(true);
     })
   })
 });
