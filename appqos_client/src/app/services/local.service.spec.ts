@@ -315,7 +315,7 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when getCoresDash method is given a string', () => {
+  describe('when getCoresDash method is called', () => {
     it('should return array of numbers 1 to 11 when given "1-10,11"', () => {
       const {
         point: { componentInstance: service }
@@ -355,4 +355,45 @@ describe('Given LocalService', () => {
       ).toEqual(numbers);
     })
   })
-});
+
+  describe('when getPidsDash method is called', () => {
+    it('should return array of numbers 1 to 11 when given "1-10,11"', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const testString = '1-10,11';
+      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+      expect(
+        service.getPidsDash(testString).sort((a, b) => { return a - b })
+      ).toEqual(numbers);
+    })
+
+    it('should return array of numbers 1 to 11 when given "1,2,3,4-11"', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const testString = '1,2,3,4-11';
+      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+      expect(
+        service.getPidsDash(testString).sort((a, b) => { return a - b })
+      ).toEqual(numbers);
+    })
+
+    it('should return an array of numbers 1-11 when given "11-1"', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const testString = '11-1';
+      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+
+      expect(
+        service.getPidsDash(testString).sort((a, b) => { return a - b })
+      ).toEqual(numbers);
+    })
+  })
+})
