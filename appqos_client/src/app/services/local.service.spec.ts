@@ -216,7 +216,7 @@ describe('Given LocalService', () => {
   describe('when getL2CatEvent method is excuted', () => {
     it('should detect change', (done: DoneFn) => {
       const {
-        point: {componentInstance: service}
+        point: { componentInstance: service }
       } = MockRender(LocalService);
 
       const mockedL2cat: CacheAllocation = {
@@ -235,6 +235,50 @@ describe('Given LocalService', () => {
       })
 
       service.l2cat.next(mockedL2cat);
+    })
+  })
+
+  describe('when setCapsEvent method is excuted', () => {
+    it('it should emit', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const mockedCaps: string[] = [
+        'L3Cat',
+        'L2Cat',
+        'mba',
+      ]
+
+      service.caps.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedCaps);
+
+        done();
+      })
+
+      service.setCapsEvent(mockedCaps);
+    })
+  })
+
+  describe('when getCapsEvent method is excuted', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: {componentInstance: service}
+      } = MockRender(LocalService);
+
+      const mockedCaps: string[] = [
+        'L3Cat',
+        'L2Cat',
+        'mba',
+      ]
+
+      service.getCapsEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedCaps);
+
+        done();
+      })
+
+      service.caps.next(mockedCaps);
     })
   })
 });
