@@ -155,7 +155,7 @@ describe('Given LocalService', () => {
 
       service.l3cat.pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedL3cat);
-        
+
         done();
       })
 
@@ -166,7 +166,7 @@ describe('Given LocalService', () => {
   describe('when getL3CatEvent method is excuted', () => {
     it('should detect change', (done: DoneFn) => {
       const {
-        point: {componentInstance: service}
+        point: { componentInstance: service }
       } = MockRender(LocalService);
 
       const mockedL3cat: CacheAllocation = {
@@ -185,6 +185,56 @@ describe('Given LocalService', () => {
       });
 
       service.l3cat.next(mockedL3cat);
+    })
+  });
+
+  describe('when setL2CatEvent method is excuted', () => {
+    it('it should emit', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const mockedL2cat: CacheAllocation = {
+        cache_size: 20,
+        cdp_enabled: true,
+        cdp_supported: false,
+        clos_num: 23,
+        cw_num: 10,
+        cw_size: 30
+      }
+
+      service.l2cat.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedL2cat);
+
+        done();
+      })
+
+      service.setL2CatEvent(mockedL2cat);
+    })
+  })
+
+  describe('when getL2CatEvent method is excuted', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: {componentInstance: service}
+      } = MockRender(LocalService);
+
+      const mockedL2cat: CacheAllocation = {
+        cache_size: 20,
+        cdp_enabled: true,
+        cdp_supported: false,
+        clos_num: 23,
+        cw_num: 10,
+        cw_size: 30
+      }
+
+      service.getL2CatEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedL2cat);
+
+        done();
+      })
+
+      service.l2cat.next(mockedL2cat);
     })
   })
 });
