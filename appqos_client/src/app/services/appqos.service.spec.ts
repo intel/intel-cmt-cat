@@ -470,8 +470,8 @@ describe('Given AppqosService', () => {
   });
 
   describe('when deletePool method called with pool id', () => {
-    it('it should response', () => {
-      const api_url = 'http://localhost:5000';
+    it('it should return "f"POOL 0 deleted" message', () => {
+      const api_url = 'https://localhost:5000';
 
       const mockResponse = {
         message: 'f"POOL 0 deleted'
@@ -496,14 +496,14 @@ describe('Given AppqosService', () => {
   });
 
   describe('when postPool method is called', () => {
-    it('it should responed', () => {
-      const api_url = 'http://localhost:5000';
+    it('it should return "New POOL 0 added" message', () => {
+      const api_url = 'https://localhost:5000';
 
       const mockResponse = {
         status: 201,
         body: {
           id: 0,
-          message: "New POOL {post_data['id']} added"
+          message: "New POOL 0 added"
         }
       }
 
@@ -532,8 +532,8 @@ describe('Given AppqosService', () => {
   })
 
   describe('when getApps method is called ', () => {
-    it('it should response', () => {
-      const api_url = 'http://localhost:5000'
+    it('it should return a response', () => {
+      const api_url = 'https://localhost:5000'
 
       const mockedApps: Apps[] = [
         { id: 1, name: 'test', pids: [1, 2, 3], pool_id: 0 }
@@ -558,8 +558,8 @@ describe('Given AppqosService', () => {
   })
 
   describe('when postApp method is called', () => {
-    it('it should responed', () => {
-      const api_url = 'http://localhost:5000';
+    it('it should return "New APP added to pool 1" message', () => {
+      const api_url = 'https://localhost:5000';
 
       const mockedApps: Apps = {
         id: 1,
@@ -595,8 +595,8 @@ describe('Given AppqosService', () => {
   });
 
   describe('when appPut method is called', () => {
-    it('it should responed', () => {
-      const api_url = 'http://localhost:5000';
+    it('it should return "APP 1 updated" message', () => {
+      const api_url = 'https://localhost:5000';
 
       const mockedApps: Apps = {
         id: 1,
@@ -631,8 +631,8 @@ describe('Given AppqosService', () => {
   });
 
   describe('when deleteApp method is called with id', () => {
-    it('it should responed', () => {
-      const api_url = 'http://localhost:5000';
+    it('it should return "APP 0 deleted" message', () => {
+      const api_url = 'https://localhost:5000';
 
       const mockedResponse = {
         status: 200,
