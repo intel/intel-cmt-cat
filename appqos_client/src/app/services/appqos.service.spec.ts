@@ -472,9 +472,10 @@ describe('Given AppqosService', () => {
   describe('when deletePool method called with pool id', () => {
     it('it should return "f"POOL 0 deleted" message', () => {
       const api_url = 'https://localhost:5000';
+      const poolID = 0;
 
       const mockResponse = {
-        message: 'f"POOL 0 deleted'
+        message: `f"POOL ${poolID} deleted`
       }
 
       const {
@@ -485,11 +486,11 @@ describe('Given AppqosService', () => {
       const local = ngMocks.findInstance(LocalService);
       local.saveData('api_url', api_url);
 
-      service.deletePool(0).subscribe((response) => {
+      service.deletePool(poolID).subscribe((response) => {
         expect(response).toBe(mockResponse);
       })
 
-      const req = httpMock.expectOne(`${api_url}/pools/0`);
+      const req = httpMock.expectOne(`${api_url}/pools/${poolID}`);
       req.flush(mockResponse);
       httpMock.verify();
     })
@@ -597,6 +598,7 @@ describe('Given AppqosService', () => {
   describe('when appPut method is called', () => {
     it('it should return "APP 1 updated" message', () => {
       const api_url = 'https://localhost:5000';
+      const appID = 1;
 
       const mockedApps: Apps = {
         id: 1,
@@ -608,7 +610,7 @@ describe('Given AppqosService', () => {
       const mockedResponse = {
         status: 200,
         body: {
-          message: 'APP 1 updated'
+          message: `APP ${appID} updated`
         }
       }
 
@@ -620,11 +622,11 @@ describe('Given AppqosService', () => {
       const local = ngMocks.findInstance(LocalService);
       local.saveData('api_url', api_url);
 
-      service.appPut(mockedApps, 1).subscribe((response: unknown) => {
+      service.appPut(mockedApps, appID).subscribe((response: unknown) => {
           expect(response).toBe(mockedResponse);
       });
 
-      const req = httpMock.expectOne(`${api_url}/apps/1`);
+      const req = httpMock.expectOne(`${api_url}/apps/${appID}`);
       req.flush(mockedResponse);
       httpMock.verify()
     });
@@ -633,11 +635,12 @@ describe('Given AppqosService', () => {
   describe('when deleteApp method is called with id', () => {
     it('it should return "APP 0 deleted" message', () => {
       const api_url = 'https://localhost:5000';
+      const appID = 0;
 
       const mockedResponse = {
         status: 200,
         body: {
-          message: 'APP 0 deleted'
+          message: `APP ${appID} deleted`
         }
       }
 
@@ -649,11 +652,11 @@ describe('Given AppqosService', () => {
       const local = ngMocks.findInstance(LocalService);
       local.saveData('api_url', api_url);
 
-      service.deleteApp(0).subscribe((response: unknown) => {
+      service.deleteApp(appID).subscribe((response: unknown) => {
         expect(response).toBe(mockedResponse);
       })
 
-      const req = httpMock.expectOne(`${api_url}/apps/0`);
+      const req = httpMock.expectOne(`${api_url}/apps/${appID}`);
       req.flush(mockedResponse);
       httpMock.verify();
     })
