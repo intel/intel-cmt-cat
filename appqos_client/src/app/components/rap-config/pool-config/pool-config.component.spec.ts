@@ -35,6 +35,7 @@ import { SharedModule } from 'src/app/shared/shared.module';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { BehaviorSubject, EMPTY, of } from 'rxjs';
 import { LocalService } from 'src/app/services/local.service';
+import { MatOptionSelectionChange, MatOption } from '@angular/material/core';
 
 describe('Given poolConfigComponent', () => {
   beforeEach(() => {
@@ -100,6 +101,58 @@ describe('Given poolConfigComponent', () => {
       expect(component.selected).toBe(mockedPools[poolID].name);
       expect(component.pool.l3Bitmask).toEqual(mockedL3Bitmask);
       expect(component.pool.l2Bitmask).toEqual(mockedL2BitMask);
+    })
+  })
+
+  describe('when getData method is called', () => {
+    it('it should call getPool method', () => {
+      const poolID = 0;
+
+      const fixture = MockRender(PoolConfigComponent, params);
+      const component = fixture.point.componentInstance;
+
+      const getPoolSpy = spyOn(component, 'getPool');
+
+      component.getData(poolID);
+      expect(getPoolSpy).toHaveBeenCalledTimes(1);
+    })
+  })
+
+  describe('when selectedPool method is called', () => {
+    it('it should call getPool method if there is user input', () => {
+      const poolID = 0;
+
+      const event: MatOptionSelectionChange = {
+        source: {} as MatOption,
+        isUserInput: true
+      }
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const getPoolSpy = spyOn(component, 'getPool');
+
+      component.selectedPool(event, poolID);
+      expect(getPoolSpy).toHaveBeenCalledTimes(1);
+    })
+
+    it('it should not call getPool method if there is not user input', () => {
+      const poolID = 0;
+
+      const event: MatOptionSelectionChange = {
+        source: {} as MatOption,
+        isUserInput: false
+      }
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params)
+
+      const getPoolSpy = spyOn(component, 'getPool');
+
+      component.selectedPool(event, poolID);
+      expect(getPoolSpy).not.toHaveBeenCalled();
     })
   })
 });
