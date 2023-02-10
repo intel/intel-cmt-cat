@@ -164,7 +164,7 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when getL3CatEvent method is excuted', () => {
+  describe('when getL3CatEvent method is executed', () => {
     it('should detect change', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
@@ -189,7 +189,7 @@ describe('Given LocalService', () => {
     })
   });
 
-  describe('when setL2CatEvent method is excuted', () => {
+  describe('when setL2CatEvent method is executed', () => {
     it('it should emit', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
@@ -214,7 +214,7 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when getL2CatEvent method is excuted', () => {
+  describe('when getL2CatEvent method is executed', () => {
     it('should detect change', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
@@ -239,15 +239,15 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when setCapsEvent method is excuted', () => {
+  describe('when setCapsEvent method is executed', () => {
     it('it should emit', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
       const mockedCaps: string[] = [
-        'L3Cat',
-        'L2Cat',
+        'l3cat',
+        'l2cat',
         'mba',
       ]
 
@@ -261,7 +261,7 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when getCapsEvent method is excuted', () => {
+  describe('when getCapsEvent method is executed', () => {
     it('should detect change', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
@@ -283,7 +283,7 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when setMbaCtrlEvent method is excuted', () => {
+  describe('when setMbaCtrlEvent method is executed', () => {
     it('it should emit', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
@@ -299,7 +299,7 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when getMbaCtrlEvent method is excuted', () => {
+  describe('when getMbaCtrlEvent method is executed', () => {
     it('should detect change', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
