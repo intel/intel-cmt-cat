@@ -37,6 +37,30 @@ import { LocalService } from './local.service';
 describe('Given LocalService', () => {
   beforeEach(() => MockBuilder(LocalService));
 
+  const mockedL3cat: CacheAllocation = {
+    cache_size: 20,
+    cdp_enabled: true,
+    cdp_supported: false,
+    clos_num: 23,
+    cw_num: 10,
+    cw_size: 30
+  }
+
+  const mockedL2cat: CacheAllocation = {
+    cache_size: 20,
+    cdp_enabled: true,
+    cdp_supported: false,
+    clos_num: 23,
+    cw_num: 10,
+    cw_size: 30
+  }
+
+  const mockedCaps: string[] = [
+    'l3cat',
+    'l2cat',
+    'mba',
+  ]
+
   MockInstance.scope('case');
 
   describe('when saveData method is executed', () => {
@@ -145,15 +169,6 @@ describe('Given LocalService', () => {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const mockedL3cat: CacheAllocation = {
-        cache_size: 20,
-        cdp_enabled: true,
-        cdp_supported: false,
-        clos_num: 23,
-        cw_num: 10,
-        cw_size: 30
-      }
-
       service.l3cat.pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedL3cat);
 
@@ -169,15 +184,6 @@ describe('Given LocalService', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
-
-      const mockedL3cat: CacheAllocation = {
-        cache_size: 20,
-        cdp_enabled: true,
-        cdp_supported: false,
-        clos_num: 23,
-        cw_num: 10,
-        cw_size: 30
-      }
 
       service.getL3CatEvent().pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedL3cat);
@@ -195,15 +201,6 @@ describe('Given LocalService', () => {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const mockedL2cat: CacheAllocation = {
-        cache_size: 20,
-        cdp_enabled: true,
-        cdp_supported: false,
-        clos_num: 23,
-        cw_num: 10,
-        cw_size: 30
-      }
-
       service.l2cat.pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedL2cat);
 
@@ -219,15 +216,6 @@ describe('Given LocalService', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
-
-      const mockedL2cat: CacheAllocation = {
-        cache_size: 20,
-        cdp_enabled: true,
-        cdp_supported: false,
-        clos_num: 23,
-        cw_num: 10,
-        cw_size: 30
-      }
 
       service.getL2CatEvent().pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedL2cat);
@@ -245,12 +233,6 @@ describe('Given LocalService', () => {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const mockedCaps: string[] = [
-        'l3cat',
-        'l2cat',
-        'mba',
-      ]
-
       service.caps.pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedCaps);
 
@@ -266,12 +248,6 @@ describe('Given LocalService', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
-
-      const mockedCaps: string[] = [
-        'L3Cat',
-        'L2Cat',
-        'mba',
-      ]
 
       service.getCapsEvent().pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedCaps);
