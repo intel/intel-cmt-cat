@@ -507,8 +507,9 @@ describe('Given AppqosService', () => {
           message: "New POOL 0 added"
         }
       }
-      const mockPool: Pools = {
-        id: 2,
+      type PostPool = Omit<Pools, 'id'>;
+
+      const mockPool: PostPool = {
         name: 'test',
         cores: [1, 2, 3]
       }
