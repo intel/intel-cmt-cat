@@ -169,6 +169,7 @@ describe('Given LocalService', () => {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
+      //skip() is used as the event will pass null when subscribing to it
       service.l3cat.pipe(skip(1)).subscribe((event) => {
         expect(event).toBe(mockedL3cat);
 
@@ -260,34 +261,62 @@ describe('Given LocalService', () => {
   })
 
   describe('when setMbaCtrlEvent method is executed', () => {
-    it('it should emit', (done: DoneFn) => {
+    it('it should emit (true)', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
       service.mbaCtrl.pipe(skip(1)).subscribe((event) => {
-        expect(event).toBeTrue;
+        expect(event).toBeTrue();
 
         done();
       })
 
       service.setMbaCtrlEvent(true);
     })
+
+    it('it should emit (false)', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.mbaCtrl.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBeFalse();
+
+        done();
+      })
+
+      service.setMbaCtrlEvent(false);
+    })
   })
 
   describe('when getMbaCtrlEvent method is executed', () => {
-    it('should detect change', (done: DoneFn) => {
+    it('should detect change (true)', (done: DoneFn) => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
       service.getMbaCtrlEvent().pipe(skip(1)).subscribe((event) => {
-        expect(event).toBeTrue;
+        expect(event).toBeTrue();
 
         done();
       })
 
       service.mbaCtrl.next(true);
+    })
+
+    it('should detect change (false)', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.getMbaCtrlEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBeFalse();
+
+        done();
+      })
+
+      service.mbaCtrl.next(false);
     })
   })
 
