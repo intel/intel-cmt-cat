@@ -470,12 +470,12 @@ describe('Given AppqosService', () => {
   });
 
   describe('when deletePool method called with pool id', () => {
-    it('it should return "f"POOL 0 deleted" message', () => {
+    it('it should return "POOL 0 deleted" message', () => {
       const api_url = 'https://localhost:5000';
       const poolID = 0;
 
       const mockResponse = {
-        message: `f"POOL ${poolID} deleted`
+        message: `POOL ${poolID} deleted`
       }
 
       const {
@@ -507,7 +507,6 @@ describe('Given AppqosService', () => {
           message: "New POOL 0 added"
         }
       }
-
       const mockPool: Pools = {
         id: 2,
         name: 'test',
@@ -615,7 +614,7 @@ describe('Given AppqosService', () => {
       }
 
       const {
-        point: {componentInstance: service}
+        point: { componentInstance: service }
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
@@ -623,7 +622,7 @@ describe('Given AppqosService', () => {
       local.saveData('api_url', api_url);
 
       service.appPut(mockedApps, appID).subscribe((response: unknown) => {
-          expect(response).toBe(mockedResponse);
+        expect(response).toBe(mockedResponse);
       });
 
       const req = httpMock.expectOne(`${api_url}/apps/${appID}`);
@@ -645,7 +644,7 @@ describe('Given AppqosService', () => {
       }
 
       const {
-        point: {componentInstance: service}
+        point: { componentInstance: service }
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
