@@ -37,6 +37,7 @@ import { BehaviorSubject, EMPTY, of, throwError } from 'rxjs';
 import { LocalService } from 'src/app/services/local.service';
 import { MatOptionSelectionChange, MatOption } from '@angular/material/core';
 import { HttpErrorResponse } from '@angular/common/http';
+import { MatSliderChange, MatSlider } from '@angular/material/slider';
 
 describe('Given poolConfigComponent', () => {
   beforeEach(() => {
@@ -239,6 +240,41 @@ describe('Given poolConfigComponent', () => {
 
       component.onChangeL3CBM(0, 0);
       expect(component.pool.l3Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 0]);
+    })
+  })
+
+  describe('when onChangeL2CBM method is called', () => {
+    it('it should update l2Bitmask', () => {
+      const mockedL3Bitmask = [0, 1, 1, 1, 1, 1, 1, 1];
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.pool.l2Bitmask = mockedL3Bitmask;
+      component.onChangeL2CBM(0, 0);
+      expect(component.pool.l2Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
+
+      component.onChangeL2CBM(1, 7);
+      expect(component.pool.l2Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 0])
+    })
+  })
+
+  describe('when onChangeMBA is called', () => {
+    it('it should update mba', () => {
+      const mockMbaValue = 20;
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const event: MatSliderChange = {
+        source: {} as MatSlider,
+        value: mockMbaValue
+      }
+
+      component.onChangeMBA(event);
+      expect(component.pool.mba).toBe(mockMbaValue);
     })
   })
 });
