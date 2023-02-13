@@ -33,16 +33,18 @@ import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { Pools, Apps } from '../../overview/overview.model';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { AppqosService } from 'src/app/services/appqos.service';
-import { BehaviorSubject, EMPTY, of } from 'rxjs';
+import { BehaviorSubject, EMPTY, of, throwError } from 'rxjs';
 import { LocalService } from 'src/app/services/local.service';
 import { MatOptionSelectionChange, MatOption } from '@angular/material/core';
+import { HttpErrorResponse } from '@angular/common/http';
 
 describe('Given poolConfigComponent', () => {
   beforeEach(() => {
     return MockBuilder(PoolConfigComponent)
       .mock(SharedModule)
       .mock(AppqosService, {
-        getPools: () => EMPTY
+        getPools: () => EMPTY,
+        poolPut: () => EMPTY
       })
       .mock(LocalService, {
         getL3CatEvent: () => EMPTY,
@@ -153,6 +155,90 @@ describe('Given poolConfigComponent', () => {
 
       component.selectedPool(event, poolID);
       expect(getPoolSpy).not.toHaveBeenCalled();
+    })
+  })
+
+  describe('when savePoolName method is called', () => {
+    const poolName = 'pool_0';
+
+    const mockedPools: Pools[] = [
+      { id: 0, name: poolName, cores: [1, 2, 3] }
+    ]
+
+    const params = {
+      pools: mockedPools,
+      apps: []
+    }
+
+    it('it should update the pool name', () => {
+      const poolID = 0;
+
+      const mockedResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+
+      MockInstance(AppqosService, 'poolPut', () => of(mockedResponse));
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+
+      component.nameControl.setValue(poolName);
+      component.poolId = poolID;
+
+      component.savePoolName();
+
+      expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
+      expect(component.poolName).toBe('');
+    })
+
+    it('it should handle errors', () => {
+      const invaildPoolID = -1;
+
+      const poolPutSpy = jasmine.createSpy().and.returnValue(
+        throwError(() => new HttpErrorResponse({
+          error: 'poolPut error'
+        }))
+      );
+
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const errorHandlerSpy = spyOn(component, 'errorHandler');
+
+      component.nameControl.setValue(poolName);
+      component.poolId = invaildPoolID;
+
+      component.savePoolName();
+
+      expect(poolPutSpy).toHaveBeenCalledTimes(1);
+      expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
+
+      expect(component.nameControl.value).toBe(poolName);
+    })
+  })
+
+  describe('when onChangeL3CBM is called', () => {
+    it('it should update l3Bitmask', () => {
+      const mockedL3Bitmask = [0, 1, 1, 1, 1, 1, 1, 1, 1];
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+
+      component.pool.l3Bitmask = mockedL3Bitmask;
+      component.onChangeL3CBM(1, 8);
+      expect(component.pool.l3Bitmask).toEqual([0, 1, 1, 1, 1, 1, 1, 1, 0]);
+
+      component.onChangeL3CBM(0, 0);
+      expect(component.pool.l3Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 0]);
     })
   })
 });
