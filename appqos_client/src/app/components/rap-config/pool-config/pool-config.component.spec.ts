@@ -190,7 +190,8 @@ describe('Given poolConfigComponent', () => {
       component.nameControl.setValue(poolName);
       component.poolId = poolID;
 
-      component.savePoolName();
+      const renamePoolButton = ngMocks.find('#test-rename-pool-button');
+      renamePoolButton.triggerEventHandler('click', null);
 
       expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
       expect(component.poolName).toBe('');
@@ -216,7 +217,8 @@ describe('Given poolConfigComponent', () => {
       component.nameControl.setValue(poolName);
       component.poolId = invaildPoolID;
 
-      component.savePoolName();
+      const renamePoolButton = ngMocks.find('#test-rename-pool-button');
+      renamePoolButton.triggerEventHandler('click', null);
 
       expect(poolPutSpy).toHaveBeenCalledTimes(1);
       expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
@@ -275,6 +277,128 @@ describe('Given poolConfigComponent', () => {
 
       component.onChangeMBA(event);
       expect(component.pool.mba).toBe(mockMbaValue);
+    })
+  })
+
+  describe('when saveL2CBM method is called', () => {
+    const poolID = 0;
+    const mockedL2Bitmask = [0, 1, 1, 1, 1, 1, 1, 1];
+
+    const mockedPools: Pools[] = [
+      { id: 0, name: 'pool_0', cores: [1, 2, 3], l2cbm: 7 },
+    ];
+
+    const params = {
+      pools: mockedPools,
+      apps: []
+    }
+
+    it('it should update l2cbm', () => {
+      const mockedResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+
+      MockInstance(AppqosService, 'poolPut', () => of(mockedResponse));
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+
+      component.pool.l2Bitmask = mockedL2Bitmask;
+      component.poolId = poolID;
+
+      const saveL2CBMButton = ngMocks.find('#save-l2cbm-button');
+      saveL2CBMButton.triggerEventHandler('click', null);
+
+      expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
+      expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
+    })
+
+    it('it should handle error', () => {
+      const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
+        throwError(() => new HttpErrorResponse({
+          error: 'poolPut error'
+        }))
+      );
+
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const errorHandlerSpy = spyOn(component, 'errorHandler');
+      component.pool.l2Bitmask = mockedL2Bitmask;
+      component.poolId = poolID;
+
+      const saveL2CBMButton = ngMocks.find('#save-l2cbm-button');
+      saveL2CBMButton.triggerEventHandler('click', null);
+
+      expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
+    })
+  })
+
+  describe('when saveL3CBM method is called', () => {
+    const poolID = 0;
+    const mockedL3Bitmask = [0, 1, 1, 1, 1, 1, 1, 1];
+
+    const mockedPools: Pools[] = [
+      { id: 0, name: 'pool_0', cores: [1, 2, 3], l3cbm: 127 },
+    ];
+
+    const params = {
+      pools: mockedPools,
+      apps: []
+    }
+
+    it('it should update l3cbm', () => {
+      const mockResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+
+      MockInstance(AppqosService, 'poolPut', () => of(mockResponse));
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+      component.poolId = poolID;
+      component.pool.l3Bitmask = mockedL3Bitmask;
+
+      const saveL3CBMButton = ngMocks.find('#save-l3cbm-button');
+      saveL3CBMButton.triggerEventHandler('click', null);
+
+      expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
+      expect(nextHandlerSpy).toHaveBeenCalledWith(mockResponse);
+    })
+
+    it('it should handle error', () => {
+      const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
+        throwError(() => new HttpErrorResponse({
+          error: 'poolPut Error'
+        }))
+      )
+
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const errorHandlerSpy = spyOn(component, 'errorHandler');
+
+      component.pool.l3Bitmask = mockedL3Bitmask;
+      component.poolId = poolID;
+
+      const saveL3CBMButton = ngMocks.find('#save-l3cbm-button');
+      saveL3CBMButton.triggerEventHandler('click', null);
+
+      expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
     })
   })
 });

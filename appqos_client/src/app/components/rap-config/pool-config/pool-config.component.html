@@ -82,6 +82,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         <button
           mat-raised-button
           color="primary"
+          id="test-rename-pool-button"
           (click)="savePoolName()"
           [disabled]="!nameControl.valid"
         >
@@ -101,7 +102,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
             {{ n }}
           </button>
         </div>
-        <button mat-raised-button color="primary" (click)="saveL3CBM()">
+        <button
+          mat-raised-button
+          color="primary"
+          id="save-l3cbm-button"
+          (click)="saveL3CBM()"
+        >
           APPLY
         </button>
       </div>
@@ -118,7 +124,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
             {{ n }}
           </button>
         </div>
-        <button mat-raised-button color="primary" (click)="saveL2CBM()">
+        <button
+          mat-raised-button
+          id="save-l2cbm-button"
+          color="primary"
+          (click)="saveL2CBM()"
+        >
           APPLY
         </button>
       </div>
