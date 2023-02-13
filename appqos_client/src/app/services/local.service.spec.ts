@@ -375,30 +375,34 @@ describe('Given LocalService', () => {
       ).toEqual(numbers);
     })
 
-    it('should return array of numbers 1 to 11 when given "1,2,3,4-11"', () => {
-      const {
-        point: { componentInstance: service }
-      } = MockRender(LocalService);
+    it('should return array of numbers 4156985 to 4156992' +
+      'when given "4156985,4156986,4156987,4156988-4156992"', () => {
+        const {
+          point: { componentInstance: service }
+        } = MockRender(LocalService);
 
-      const testString = '1,2,3,4-11';
-      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+        const testString = '4156985,4156986,4156987,4156988-4156992';
+        const numbers = [4156985, 4156986, 4156987,
+          4156988, 4156989, 4156990, 4156991, 4156992];
 
-      expect(
-        service.getPidsDash(testString).sort((a, b) => { return a - b })
-      ).toEqual(numbers);
-    })
+        expect(
+          service.getPidsDash(testString).sort((a, b) => { return a - b })
+        ).toEqual(numbers);
+      })
 
-    it('should return an array of numbers 1-11 when given "11-1"', () => {
-      const {
-        point: { componentInstance: service }
-      } = MockRender(LocalService);
+    it('should return an array of numbers 1126973 to 1126984 ' +
+      'when given "1126984-1126973"', () => {
+        const {
+          point: { componentInstance: service }
+        } = MockRender(LocalService);
 
-      const testString = '11-1';
-      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        const testString = '1126984-1126973';
+        const numbers = [1126973, 1126974, 1126975, 1126976,
+          1126977, 1126978, 1126979, 1126980, 1126981, 1126982, 1126983, 1126984]
 
-      expect(
-        service.getPidsDash(testString).sort((a, b) => { return a - b })
-      ).toEqual(numbers);
-    })
+        expect(
+          service.getPidsDash(testString).sort((a, b) => { return a - b })
+        ).toEqual(numbers);
+      })
   })
 })
