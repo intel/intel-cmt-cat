@@ -1083,12 +1083,13 @@ print_l2ca_config(const struct pqos_l2ca *ca, const int is_error)
 }
 
 /**
- * @brief Per socket L3 CAT and MBA class definition printing
+ * @brief Per socket L3 CAT, MBA and SMBA class definition printing
  *
  * If new per socket technologies appear they should be added here, too.
  *
  * @param [in] cap_l3ca pointer to L3 CAT capability structure
  * @param [in] cap_mba pointer to MBA capability structure
+ * @param [in] cap_smba pointer to SMBA capability structure
  * @param [in] sock_count number of socket id's in \a sockets
  * @param [in] sockets arrays of socket id's
  */
