@@ -74,6 +74,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_l2ca,
                         const struct pqos_capability *cap_mba,
+                        const struct pqos_capability *cap_smba,
                         const struct pqos_cpuinfo *cpu_info,
                         const int verbose);
 

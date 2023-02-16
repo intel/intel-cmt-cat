@@ -1267,8 +1267,8 @@ main(int argc, char **argv)
                 /**
                  * Show info about allocation config and exit
                  */
-                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba, p_cpu,
-                                   sel_verbose_mode);
+                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
+                                   cap_smba, p_cpu, sel_verbose_mode);
                 goto allocation_exit;
         }
 
