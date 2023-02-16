@@ -438,6 +438,28 @@ pqos_cpu_get_one_by_mba_id(const struct pqos_cpuinfo *cpu,
 }
 
 int
+pqos_cpu_get_one_by_smba_id(const struct pqos_cpuinfo *cpu,
+                            const unsigned smba_id,
+                            unsigned *lcore)
+{
+        unsigned i = 0;
+
+        ASSERT(cpu != NULL);
+        ASSERT(lcore != NULL);
+
+        if (cpu == NULL || lcore == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].smba_id == smba_id) {
+                        *lcore = cpu->cores[i].lcore;
+                        return PQOS_RETVAL_OK;
+                }
+
+        return PQOS_RETVAL_ERROR;
+}
+
+int
 pqos_cpu_get_one_by_l2id(const struct pqos_cpuinfo *cpu,
                          const unsigned l2id,
                          unsigned *lcore)

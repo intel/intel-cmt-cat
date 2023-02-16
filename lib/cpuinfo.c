@@ -612,6 +612,7 @@ cpuinfo_init(enum pqos_interface interface,
                 if (vendor == PQOS_VENDOR_AMD) {
                         info->l3cat_id = info->l3_id;
                         info->mba_id = info->l3_id;
+                        info->smba_id = info->l3_id;
                 } else {
                         info->l3cat_id = info->socket;
                         info->mba_id = info->socket;
