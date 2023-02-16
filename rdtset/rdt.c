@@ -282,6 +282,18 @@ get_max_res_id(unsigned technology, unsigned *max_res_id)
                 free(ids);
         }
 
+        /* get number of smba_ids */
+        if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                ids = pqos_cpu_get_smba_ids(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return -EFAULT;
+
+                for (i = 0; i < num_ids; i++)
+                        max = ids[i] > max ? ids[i] : max;
+
+                free(ids);
+        }
+
         *max_res_id = max;
         return 0;
 }
@@ -1297,6 +1309,48 @@ get_mba_id_cores(const cpu_set_t *cores,
 }
 
 /**
+ * @brief Gets cores from \a cores set which belong to \a smab_id
+ *
+ * @param [in] cores set of cores
+ * @param [in] smba_id to get cores from
+ * @param [out] core_num number of cores in \a core_array
+ * @param [out] core_array array of cores
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+get_smba_id_cores(const cpu_set_t *cores,
+                  const unsigned smba_id,
+                  unsigned *core_num,
+                  unsigned core_array[CPU_SETSIZE])
+{
+        unsigned i;
+
+        if (cores == NULL || core_num == NULL || core_array == NULL)
+                return -EINVAL;
+
+        if (m_cpu == NULL)
+                return -EFAULT;
+
+        if (CPU_COUNT(cores) == 0) {
+                *core_num = 0;
+                return 0;
+        }
+
+        for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
+                if (m_cpu->cores[i].smba_id != smba_id ||
+                    0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
+                        continue;
+
+                core_array[(*core_num)++] = m_cpu->cores[i].lcore;
+        }
+
+        return 0;
+}
+
+/**
  * @brief Gets cores from \a cores set which belong to \a l2_id
  *
  * @param [in] cores set of cores
@@ -1705,7 +1759,8 @@ cfg_set_cores_os(const unsigned technology,
                  const cpu_set_t *cores,
                  const struct pqos_l2ca *l2ca,
                  const struct pqos_l3ca *l3ca,
-                 const struct pqos_mba *mba)
+                 const struct pqos_mba *mba,
+                 const struct pqos_mba *smba)
 {
         int ret;
         unsigned i, max_id, core_num, cos_id;
@@ -1789,6 +1844,25 @@ cfg_set_cores_os(const unsigned technology,
 
                         /* Configure COS on res ID i */
                         ret = cfg_configure_cos(NULL, NULL, mba, NULL,
+                                                core_array[0], cos_id);
+                        if (ret != 0)
+                                return ret;
+                }
+
+                if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                        memset(core_array, 0, sizeof(core_array));
+
+                        /* Get cores on res id i */
+                        ret =
+                            get_smba_id_cores(cores, i, &core_num, core_array);
+                        if (ret != 0)
+                                return ret;
+
+                        if (core_num == 0)
+                                continue;
+
+                        /* Configure COS on res ID i */
+                        ret = cfg_configure_cos(NULL, NULL, NULL, smba,
                                                 core_array[0], cos_id);
                         if (ret != 0)
                                 return ret;
@@ -2080,7 +2154,7 @@ alloc_configure(void)
                                                 &l3ca[i], &mba[i]);
                 else
                         ret = cfg_set_cores_os(technology, &cpu[i], &l2ca[i],
-                                               &l3ca[i], &mba[i]);
+                                               &l3ca[i], &mba[i], &smba[i]);
 
                 /* If assign fails then free already assigned cpus */
                 if (ret != 0) {
