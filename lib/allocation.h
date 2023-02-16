@@ -423,6 +423,24 @@ PQOS_LOCAL int hw_mba_get_amd(const unsigned mba_id,
                               unsigned *num_cos,
                               struct pqos_mba *mba_tab);
 
+/**
+ * @brief Hardware interface to read SMBA from \a smba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  smba_id SMBA resource id
+ * @param [in]  max_num_cos maximum number of classes of service
+ *              that can be accommodated at \a smba_tab
+ * @param [out] num_cos number of classes of service read into \a smba_tab
+ * @param [out] smba_tab table with read classes of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_smba_get_amd(const unsigned smba_id,
+                               const unsigned max_num_cos,
+                               unsigned *num_cos,
+                               struct pqos_mba *smba_tab);
+
 #ifdef __cplusplus
 }
 #endif
