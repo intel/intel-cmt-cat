@@ -97,6 +97,43 @@ pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
 }
 
 unsigned *
+pqos_cpu_get_smba_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
+{
+        unsigned smba_id_count = 0, i = 0;
+        unsigned *smba_ids = NULL;
+
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+        if (cpu == NULL || count == NULL)
+                return NULL;
+
+        smba_ids = (unsigned *)malloc(sizeof(smba_ids[0]) * cpu->num_cores);
+        if (smba_ids == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++) {
+                unsigned j = 0;
+
+                /**
+                 * Check if this smba id is already on the \a mbas list
+                 */
+                for (j = 0; j < smba_id_count && smba_id_count > 0; j++)
+                        if (cpu->cores[i].smba_id == smba_ids[j])
+                                break;
+
+                if (j >= smba_id_count || smba_id_count == 0) {
+                        /**
+                         * This smba_id wasn't reported before
+                         */
+                        smba_ids[smba_id_count++] = cpu->cores[i].smba_id;
+                }
+        }
+
+        *count = smba_id_count;
+        return smba_ids;
+}
+
+unsigned *
 pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
 {
         unsigned l3cat_count = 0, i = 0;
