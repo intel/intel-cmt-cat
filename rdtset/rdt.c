@@ -160,6 +160,9 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
         case PQOS_CAP_TYPE_MBA:
                 return cfg.u.mba != NULL && cfg.u.mba->mb_max > 0;
 
+        case PQOS_CAP_TYPE_SMBA:
+                return cfg.u.smba != NULL && cfg.u.smba->mb_max > 0;
+
         default:
                 break;
         }
@@ -506,6 +509,36 @@ rdt_mba_str_to_rate(const char *param, struct rdt_cfg mba)
 }
 
 /**
+ * @brief Parses rate string \a param and stores in \a mba
+ *
+ * @param [in] param rate string
+ * @param [out] smba to store result
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+rdt_smba_str_to_rate(const char *param, struct rdt_cfg smba)
+{
+        uint64_t rate;
+        int ret;
+
+        if (PQOS_CAP_TYPE_SMBA != smba.type || NULL == smba.u.generic_ptr ||
+            NULL == param)
+                return -EINVAL;
+
+        ret = str_to_uint64(param, 10, &rate);
+        if (ret < 0 || rate == 0)
+                return -EINVAL;
+
+        smba.u.smba->ctrl = 0;
+        smba.u.smba->mb_max = rate;
+
+        return 0;
+}
+
+/**
  * @brief Parses mbps string \a param and stores in \a mba
  *
  * @param [in] param mbps string
@@ -557,6 +590,7 @@ simplify_feature_str(const char *feature)
             {"l3", '3'},
             {"mba", 'm'},
             {"mba_max", 'b'},
+            {"smba", 's'},
             {NULL, 0}
             /* clang-format on */
         };
@@ -588,6 +622,7 @@ parse_rdt(char *rdtstr)
         const struct rdt_cfg l2ca = wrap_l2ca(&g_cfg.config[idx].l2);
         const struct rdt_cfg l3ca = wrap_l3ca(&g_cfg.config[idx].l3);
         const struct rdt_cfg mba = wrap_mba(&g_cfg.config[idx].mba);
+        const struct rdt_cfg smba = wrap_smba(&g_cfg.config[idx].smba);
         const unsigned min_len_group = strlen("3=f");
         int ret;
 
@@ -663,6 +698,15 @@ parse_rdt(char *rdtstr)
                                 return ret;
                         break;
 
+                case 's':
+                        if (rdt_cfg_is_valid(smba))
+                                return -EINVAL;
+
+                        ret = rdt_smba_str_to_rate(param, smba);
+                        if (ret < 0)
+                                return ret;
+                        break;
+
                 default:
                         fprintf(stderr, "Invalid option: \"%s\"\n", feature);
                         return -EINVAL;
@@ -676,7 +720,7 @@ parse_rdt(char *rdtstr)
                 g_cfg.config[idx].pid_cfg = 1;
 
         if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
-              rdt_cfg_is_valid(mba)))
+              rdt_cfg_is_valid(mba) || rdt_cfg_is_valid(smba)))
                 return -EINVAL;
 
         g_cfg.config_count++;
