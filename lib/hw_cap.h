@@ -132,6 +132,18 @@ PQOS_LOCAL int hw_cap_mba_discover(struct pqos_cap_mba *cap,
  */
 PQOS_LOCAL int amd_cap_mba_discover(struct pqos_cap_mba *cap,
                                     const struct pqos_cpuinfo *cpu);
+/**
+ * @brief Discovers SMBA support for AMD
+ *
+ * @param cap place to store SMBA capabilities
+ * @param cpu detected cpu topology
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_RESOURCE if not supported
+ */
+PQOS_LOCAL int amd_cap_smba_discover(struct pqos_cap_mba *cap,
+                                     const struct pqos_cpuinfo *cpu);
 
 #ifdef __cplusplus
 }

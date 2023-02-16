@@ -892,3 +892,38 @@ amd_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 
         return ret;
 }
+
+int
+amd_cap_smba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
+{
+        struct cpuid_out res;
+
+        UNUSED_PARAM(cpu);
+        ASSERT(cap != NULL);
+
+        memset(cap, 0, sizeof(*cap));
+        cap->mem_size = sizeof(*cap);
+        cap->ctrl = -1;
+        cap->ctrl_on = 0;
+
+        /**
+         * Run CPUID.0x80000020.0 to check
+         * for SMBA allocation capability (bit 2 of ebx)
+         */
+        lcpuid(0x80000020, 0x0, &res);
+        if (!(res.ebx & (1 << 2))) {
+                LOG_INFO("CPUID.0x80000008.0: SMBA not supported\n");
+                free(cap);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        lcpuid(0x80000020, 1, &res);
+
+        cap->num_classes = (res.edx & 0xffff) + 1;
+
+        /* AMD does not support throttle_max and is_linear. Set it to 0 */
+        cap->throttle_max = 0;
+        cap->is_linear = 0;
+
+        return PQOS_RETVAL_OK;
+}
