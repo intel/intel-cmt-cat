@@ -1010,6 +1010,43 @@ int pqos_mba_get(const unsigned mba_id,
                  unsigned *num_cos,
                  struct pqos_mba *mba_tab);
 
+/**
+ * @brief Sets classes of service defined by \a smba on \a smba id
+ *
+ * @param [in]  smba_id SMBA resource id
+ * @param [in]  num_cos number of classes of service at \a ca
+ * @param [in]  requested table with class of service definitions
+ * @param [out] actual table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PPQOS_RETVAL_RESOURCE if the feature is not supported.
+ * @retval PPQOS_RETVAL_ERROR for other errors.
+ */
+int pqos_smba_set(const unsigned smba_id,
+                  const unsigned num_cos,
+                  const struct pqos_mba *requested,
+                  struct pqos_mba *actual);
+
+/**
+ * @brief Get SMBA from \a smba_id
+ *
+ * @param [in]  smba_id SMBA resource id
+ * @param [in]  max_num_cos maximum number of classes of service
+ *              that can be accommodated at \a smba_tab
+ * @param [out] num_cos number of classes of service read into \a smba_tab
+ * @param [out] smba_tab table with read classes of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PPQOS_RETVAL_RESOURCE if the feature is not supported.
+ * @retval PPQOS_RETVAL_ERROR for other errors.
+ */
+int pqos_smba_get(const unsigned smba_id,
+                  const unsigned max_num_cos,
+                  unsigned *num_cos,
+                  struct pqos_mba *mba_tab);
+
 /*
  * =======================================
  * Utility API

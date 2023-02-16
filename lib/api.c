@@ -153,6 +153,16 @@ static struct pqos_api {
                        const unsigned num_cos,
                        const struct pqos_mba *requested,
                        struct pqos_mba *actual);
+        /** Get SMBA */
+        int (*smba_get)(const unsigned smba_id,
+                        const unsigned max_num_cos,
+                        unsigned *num_cos,
+                        struct pqos_mba *smba_tab);
+        /** Set SMBA mask */
+        int (*smba_set)(const unsigned smba_id,
+                        const unsigned num_cos,
+                        const struct pqos_mba *requested,
+                        struct pqos_mba *actual);
 
         /** Retrieves tasks associated with COS */
         unsigned *(*pid_get_pid_assoc)(const unsigned class_id,
@@ -637,6 +647,72 @@ pqos_mba_get(const unsigned mba_id,
                 return PQOS_RETVAL_PARAM;
 
         return API_CALL(mba_get, mba_id, max_num_cos, num_cos, mba_tab);
+}
+
+/*
+ * =======================================
+ * Slow Memory Bandwidth Allocation
+ * =======================================
+ */
+int
+pqos_smba_set(const unsigned smba_id,
+              const unsigned num_cos,
+              const struct pqos_mba *requested,
+              struct pqos_mba *actual)
+{
+        int ret;
+        unsigned i;
+
+        if (requested == NULL || num_cos == 0)
+                return PQOS_RETVAL_PARAM;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        /**
+         * Check if SMBA rate is within allowed range
+         */
+        for (i = 0; i < num_cos; i++) {
+                const struct cpuinfo_config *vconfig;
+
+                cpuinfo_get_config(&vconfig);
+                if (requested[i].ctrl == 0 &&
+                    (requested[i].mb_max == 0 ||
+                     requested[i].mb_max > vconfig->mba_max)) {
+                        LOG_ERROR("SMBA COS%u rate out of range (from 1-%d)!\n",
+                                  requested[i].class_id, vconfig->mba_max);
+                        lock_release();
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
+        if (api.smba_set != NULL)
+                ret = api.smba_set(smba_id, num_cos, requested, actual);
+        else {
+                LOG_INFO(UNSUPPORTED_INTERFACE);
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+        lock_release();
+
+        return ret;
+}
+
+int
+pqos_smba_get(const unsigned smba_id,
+              const unsigned max_num_cos,
+              unsigned *num_cos,
+              struct pqos_mba *smba_tab)
+{
+        if (num_cos == NULL || smba_tab == NULL || max_num_cos == 0)
+                return PQOS_RETVAL_PARAM;
+
+        return API_CALL(smba_get, smba_id, max_num_cos, num_cos, smba_tab);
 }
 
 /*
