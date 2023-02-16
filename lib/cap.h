@@ -76,6 +76,16 @@ PQOS_LOCAL void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 PQOS_LOCAL void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
 
 /**
+ * @brief Modifies SMBA capability structure upon MBA CTRL config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for MBA & CTRL support.
+ *
+ * @param [in] cfg MBA CTRL configuration
+ */
+PQOS_LOCAL void _pqos_cap_smba_change(const enum pqos_mba_config cfg);
+
+/**
  * @brief Checks library initialization state
  *
  * @param expect expected stated of library initialization state
