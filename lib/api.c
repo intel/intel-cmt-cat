@@ -239,6 +239,7 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = os_mba_get_amd;
                         api.mba_set = os_mba_set_amd;
                         api.smba_get = os_smba_get_amd;
+                        api.smba_set = os_smba_set_amd;
                 } else {
                         api.mba_get = os_mba_get;
                         api.mba_set = os_mba_set;

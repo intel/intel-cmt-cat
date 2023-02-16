@@ -370,6 +370,23 @@ PQOS_LOCAL int os_smba_get_amd(const unsigned mba_id,
                                struct pqos_mba *smba_tab);
 
 /**
+ * @brief OS interface to set classes of service defined by \a smba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  smba_id MBA resource id
+ * @param [in]  num_cos number of classes of service at \a ca
+ * @param [in]  requested table with class of service definitions
+ * @param [out] actual table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int os_smba_set_amd(const unsigned smba_id,
+                               const unsigned num_cos,
+                               const struct pqos_mba *requested,
+                               struct pqos_mba *actual);
+
+/**
  * @brief OS interface to associate \a lcore
  *        with given class of service
  *
