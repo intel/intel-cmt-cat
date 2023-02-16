@@ -144,6 +144,18 @@ PQOS_LOCAL int os_cap_l2ca_discover(struct pqos_cap_l2ca *cap,
 PQOS_LOCAL int os_cap_mba_discover(struct pqos_cap_mba *cap,
                                    const struct pqos_cpuinfo *cpu);
 
+/**
+ * @brief Discovers OS support of SMBA
+ *
+ * @param cap place to store SMBA capabilities
+ * @param cpu detected cpu topology
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL int os_cap_smba_discover(struct pqos_cap_mba *cap,
+                                    const struct pqos_cpuinfo *cpu);
+
 #ifdef __cplusplus
 }
 #endif

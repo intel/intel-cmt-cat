@@ -328,6 +328,12 @@ cap_smba_discover(struct pqos_cap_mba **r_cap,
                 else
                         ret = PQOS_RETVAL_RESOURCE;
                 break;
+#ifdef __linux__
+        case PQOS_INTER_OS:
+        case PQOS_INTER_OS_RESCTRL_MON:
+                ret = os_cap_smba_discover(cap, cpu);
+                break;
+#endif
         default:
                 ret = PQOS_RETVAL_RESOURCE;
                 break;
