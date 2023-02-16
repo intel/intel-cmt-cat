@@ -108,6 +108,7 @@ PQOS_LOCAL int hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id);
  * @param [in] l3cat_id L3 CAT resource id
  * @param [in] l2cat_id L2 CAT resource id
  * @param [in] mba_id MBA resource id
+ * @param [in] smba_id SMBA resource id
  * @param [out] class_id unused COS
  *
  * NOTE: It is our assumption that mba id and cat ids are same for
@@ -120,6 +121,7 @@ PQOS_LOCAL int hw_alloc_assoc_unused(const unsigned technology,
                                      unsigned l3cat_id,
                                      unsigned l2cat_id,
                                      unsigned mba_id,
+                                     unsigned smba_id,
                                      unsigned *class_id);
 
 /**

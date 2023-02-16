@@ -78,11 +78,11 @@ test_hw_alloc_assoc_unused_l2ca(void **state)
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
-        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(class_id, 2);
 
-        ret = hw_alloc_assoc_unused(technology, 0, 2, 0, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 0, 2, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(class_id, 1);
 }
@@ -100,10 +100,10 @@ test_hw_alloc_assoc_unused_l3ca(void **state)
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
-        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
-        ret = hw_alloc_assoc_unused(technology, 1, 0, 0, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 1, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(class_id, 3);
 }
@@ -121,10 +121,10 @@ test_hw_alloc_assoc_unused_mba(void **state)
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
-        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
-        ret = hw_alloc_assoc_unused(technology, 0, 0, 1, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 0, 0, 1, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(class_id, 3);
 }
@@ -142,10 +142,10 @@ test_hw_alloc_assoc_unused_l2ca_when_l3_present(void **state)
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
-        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 0, 0, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
-        ret = hw_alloc_assoc_unused(technology, 0, 3, 0, &class_id);
+        ret = hw_alloc_assoc_unused(technology, 0, 3, 0, 0, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(class_id, 1);
 }
