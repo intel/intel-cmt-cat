@@ -94,6 +94,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
 int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_capability *cap_l2ca,
                 const struct pqos_capability *cap_mba,
+                const struct pqos_capability *cap_smba,
                 const struct pqos_cpuinfo *cpu);
 
 #ifdef __cplusplus

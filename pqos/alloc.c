@@ -667,6 +667,8 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                 type = L2CA;
         else if (strcasecmp(str, "mba") == 0)
                 type = MBA;
+        else if (strcasecmp(str, "smba") == 0)
+                type = SMBA;
         else if (strcasecmp(str, "mba_max") == 0)
                 type = MBA_CTRL;
         else {
@@ -1347,9 +1349,11 @@ int
 alloc_apply(const struct pqos_capability *cap_l3ca,
             const struct pqos_capability *cap_l2ca,
             const struct pqos_capability *cap_mba,
+            const struct pqos_capability *cap_smba,
             const struct pqos_cpuinfo *cpu)
 {
-        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL) {
+        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL ||
+            cap_smba != NULL) {
                 /**
                  * If allocation config changed then exit.
                  * For monitoring, start the program again unless

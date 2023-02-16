@@ -51,6 +51,7 @@ struct test_data {
         struct pqos_cap_l3ca cap_l3ca;
         struct pqos_cap_l2ca cap_l2ca;
         struct pqos_cap_mba cap_mba;
+        struct pqos_cap_mba cap_smba;
         struct pqos_cap_mon *cap_mon;
         enum pqos_interface interface;
 };
