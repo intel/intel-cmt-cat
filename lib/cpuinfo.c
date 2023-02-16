@@ -543,6 +543,7 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
                 config->mba_max = PQOS_MBA_MAX_AMD;
                 config->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
                 config->mba_default_val = PQOS_MBA_MAX_AMD;
+                config->smba_msr_reg = PQOS_MSR_SMBA_MASK_START_AMD;
         } else {
                 LOG_ERROR("init_config: init failed!");
                 return -EFAULT;

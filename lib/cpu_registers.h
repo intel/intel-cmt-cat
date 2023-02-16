@@ -69,6 +69,11 @@ extern "C" {
  */
 #define PQOS_MSR_MBA_MASK_START_AMD 0xC0000200
 
+/**
+ * SMBA Allocation class of service (COS) MSR register for AMD
+ */
+#define PQOS_MSR_SMBA_MASK_START_AMD 0xC0000280
+
 #define PQOS_MSR_L3_QOS_CFG        0xC81 /**< L3 CAT config register */
 #define PQOS_MSR_L3_QOS_CFG_CDP_EN 1ULL  /**< L3 CDP enable bit */
 

@@ -55,6 +55,7 @@ struct cpuinfo_config {
         unsigned mba_max;         /**< default memory bandwidth */
         unsigned mba_default_val; /**< Memory bandwidth reset value */
         uint32_t mba_msr_reg;     /**< MBA mask base register */
+        uint32_t smba_msr_reg;    /**< SMBA mask base register */
 };
 
 /**
