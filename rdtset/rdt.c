@@ -1893,7 +1893,8 @@ static int
 cfg_set_pids(const unsigned technology,
              const struct pqos_l3ca *l3ca,
              const struct pqos_l2ca *l2ca,
-             const struct pqos_mba *mba)
+             const struct pqos_mba *mba,
+             const struct pqos_mba *smba)
 {
         int ret = 0;
         unsigned i, cos_id, num_pids = 1;
@@ -1993,6 +1994,31 @@ cfg_set_pids(const unsigned technology,
                 }
                 free(ids);
         }
+
+        /* Set COS definitions across all res L3 IDs */
+        if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                unsigned num_ids, *ids;
+
+                ids = pqos_cpu_get_smba_ids(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return -EFAULT;
+
+                for (i = 0; i < num_ids; i++) {
+                        unsigned core;
+
+                        ret = pqos_cpu_get_one_by_smba_id(m_cpu, ids[i], &core);
+                        if (ret != 0)
+                                break;
+
+                        /* Configure COS on res L3 ID i */
+                        ret = cfg_configure_cos(NULL, NULL, NULL, smba, core,
+                                                cos_id);
+                        if (ret != 0)
+                                break;
+                }
+                free(ids);
+        }
+
 set_pids_exit:
         if (ret != 0)
                 (void)pqos_alloc_release_pid(p, num_pids);
@@ -2006,6 +2032,7 @@ alloc_configure(void)
         struct pqos_l3ca l3ca[g_cfg.config_count];
         struct pqos_l2ca l2ca[g_cfg.config_count];
         struct pqos_mba mba[g_cfg.config_count];
+        struct pqos_mba smba[g_cfg.config_count];
         cpu_set_t cpu[g_cfg.config_count];
         int pid_cfg[g_cfg.config_count];
         unsigned i = 0;
@@ -2024,6 +2051,7 @@ alloc_configure(void)
                 l3ca[i] = g_cfg.config[i].l3;
                 l2ca[i] = g_cfg.config[i].l2;
                 mba[i] = g_cfg.config[i].mba;
+                smba[i] = g_cfg.config[i].smba;
                 cpu[i] = g_cfg.config[i].cpumask;
                 pid_cfg[i] = g_cfg.config[i].pid_cfg;
         }
@@ -2040,10 +2068,13 @@ alloc_configure(void)
                 if (rdt_cfg_is_valid(wrap_mba(&mba[i])))
                         technology |= (1 << PQOS_CAP_TYPE_MBA);
 
+                if (rdt_cfg_is_valid(wrap_smba(&smba[i])))
+                        technology |= (1 << PQOS_CAP_TYPE_SMBA);
+
                 /* If pid config selected then assign tasks otherwise cores */
                 if (pid_cfg[i])
                         ret = cfg_set_pids(technology, &l3ca[i], &l2ca[i],
-                                           &mba[i]);
+                                           &mba[i], &smba[i]);
                 else if (g_cfg.interface == PQOS_INTER_MSR)
                         ret = cfg_set_cores_msr(technology, &cpu[i], &l2ca[i],
                                                 &l3ca[i], &mba[i]);
