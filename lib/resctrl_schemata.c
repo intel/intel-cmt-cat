@@ -189,7 +189,8 @@ int
 resctrl_schemata_reset(struct resctrl_schemata *schmt,
                        const struct pqos_cap_l3ca *l3ca_cap,
                        const struct pqos_cap_l2ca *l2ca_cap,
-                       const struct pqos_cap_mba *mba_cap)
+                       const struct pqos_cap_mba *mba_cap,
+                       const struct pqos_cap_mba *smba_cap)
 {
         unsigned j;
 
@@ -240,6 +241,23 @@ resctrl_schemata_reset(struct resctrl_schemata *schmt,
 
                 for (j = 0; j < schmt->mbaids_num; j++)
                         schmt->mba[j].mb_max = default_mba;
+        }
+
+        /* Reset SMBA */
+        if (smba_cap != NULL) {
+                const struct cpuinfo_config *vconfig;
+                uint32_t default_smba;
+
+                cpuinfo_get_config(&vconfig);
+                default_smba = vconfig->mba_max;
+
+                /* kernel always rounds up value to MBA granularity */
+                if (smba_cap->ctrl_on)
+                        default_smba =
+                            UINT32_MAX - UINT32_MAX % smba_cap->throttle_step;
+
+                for (j = 0; j < schmt->mbaids_num; j++)
+                        schmt->smba[j].mb_max = default_smba;
         }
 
         return PQOS_RETVAL_OK;

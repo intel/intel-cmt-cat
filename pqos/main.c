@@ -64,7 +64,8 @@
 static struct pqos_alloc_config sel_alloc_config = {
     .l3_cdp = PQOS_REQUIRE_CDP_ANY,
     .l2_cdp = PQOS_REQUIRE_CDP_ANY,
-    .mba = PQOS_MBA_ANY};
+    .mba = PQOS_MBA_ANY,
+    .smba = PQOS_MBA_ANY};
 
 /**
  * Monitoring reset

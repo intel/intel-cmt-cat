@@ -646,6 +646,7 @@ test_pqos_alloc_reset_init(void **state __attribute__((unused)))
         cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
         cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
         cfg.mba = PQOS_MBA_ANY;
+        cfg.smba = PQOS_MBA_ANY;
 
         wrap_check_init(1, PQOS_RETVAL_INIT);
 
@@ -660,6 +661,7 @@ test_pqos_alloc_reset_os(void **state __attribute__((unused)))
         unsigned l3;
         unsigned l2;
         unsigned mba;
+        unsigned smba;
 
         enum pqos_cdp_config l3_cdp_cfg[] = {
             PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF};
@@ -667,25 +669,31 @@ test_pqos_alloc_reset_os(void **state __attribute__((unused)))
             PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF};
         enum pqos_mba_config mba_cfg[] = {PQOS_MBA_ANY, PQOS_MBA_DEFAULT,
                                           PQOS_MBA_CTRL};
+        enum pqos_mba_config smba_cfg[] = {PQOS_MBA_ANY, PQOS_MBA_DEFAULT,
+                                           PQOS_MBA_CTRL};
 
         for (l3 = 0; l3 < DIM(l3_cdp_cfg); ++l3) {
                 for (l2 = 0; l2 < DIM(l2_cdp_cfg); ++l2) {
                         for (mba = 0; mba < DIM(mba_cfg); ++mba) {
-                                struct pqos_alloc_config cfg;
+                                for (smba = 0; smba < DIM(smba_cfg); ++smba) {
+                                        struct pqos_alloc_config cfg;
 
-                                memset(&cfg, 0, sizeof(cfg));
-                                cfg.l3_cdp = l3_cdp_cfg[l3];
-                                cfg.l2_cdp = l2_cdp_cfg[l2];
-                                cfg.mba = mba_cfg[mba];
+                                        memset(&cfg, 0, sizeof(cfg));
+                                        cfg.l3_cdp = l3_cdp_cfg[l3];
+                                        cfg.l2_cdp = l2_cdp_cfg[l2];
+                                        cfg.mba = mba_cfg[mba];
+                                        cfg.smba = smba_cfg[smba];
 
-                                wrap_check_init(1, PQOS_RETVAL_OK);
+                                        wrap_check_init(1, PQOS_RETVAL_OK);
 
-                                expect_value(__wrap_os_alloc_reset, cfg, &cfg);
-                                will_return(__wrap_os_alloc_reset,
-                                            PQOS_RETVAL_OK);
+                                        expect_value(__wrap_os_alloc_reset, cfg,
+                                                     &cfg);
+                                        will_return(__wrap_os_alloc_reset,
+                                                    PQOS_RETVAL_OK);
 
-                                ret = pqos_alloc_reset_config(&cfg);
-                                assert_int_equal(ret, PQOS_RETVAL_OK);
+                                        ret = pqos_alloc_reset_config(&cfg);
+                                        assert_int_equal(ret, PQOS_RETVAL_OK);
+                                }
                         }
                 }
         }
@@ -698,6 +706,7 @@ test_pqos_alloc_reset_hw(void **state __attribute__((unused)))
         unsigned l3;
         unsigned l2;
         unsigned mba;
+        unsigned smba;
 
         enum pqos_cdp_config l3_cdp_cfg[] = {
             PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF};
@@ -705,25 +714,31 @@ test_pqos_alloc_reset_hw(void **state __attribute__((unused)))
             PQOS_REQUIRE_CDP_ANY, PQOS_REQUIRE_CDP_ON, PQOS_REQUIRE_CDP_OFF};
         enum pqos_mba_config mba_cfg[] = {PQOS_MBA_ANY, PQOS_MBA_DEFAULT,
                                           PQOS_MBA_CTRL};
+        enum pqos_mba_config smba_cfg[] = {PQOS_MBA_ANY, PQOS_MBA_DEFAULT,
+                                           PQOS_MBA_CTRL};
 
         for (l3 = 0; l3 < DIM(l3_cdp_cfg); ++l3) {
                 for (l2 = 0; l2 < DIM(l2_cdp_cfg); ++l2) {
                         for (mba = 0; mba < DIM(mba_cfg); ++mba) {
-                                struct pqos_alloc_config cfg;
+                                for (smba = 0; smba < DIM(smba_cfg); ++smba) {
+                                        struct pqos_alloc_config cfg;
 
-                                memset(&cfg, 0, sizeof(cfg));
-                                cfg.l3_cdp = l3_cdp_cfg[l3];
-                                cfg.l2_cdp = l2_cdp_cfg[l2];
-                                cfg.mba = mba_cfg[mba];
+                                        memset(&cfg, 0, sizeof(cfg));
+                                        cfg.l3_cdp = l3_cdp_cfg[l3];
+                                        cfg.l2_cdp = l2_cdp_cfg[l2];
+                                        cfg.mba = mba_cfg[mba];
+                                        cfg.smba = smba_cfg[mba];
 
-                                wrap_check_init(1, PQOS_RETVAL_OK);
+                                        wrap_check_init(1, PQOS_RETVAL_OK);
 
-                                expect_value(__wrap_hw_alloc_reset, cfg, &cfg);
-                                will_return(__wrap_hw_alloc_reset,
-                                            PQOS_RETVAL_OK);
+                                        expect_value(__wrap_hw_alloc_reset, cfg,
+                                                     &cfg);
+                                        will_return(__wrap_hw_alloc_reset,
+                                                    PQOS_RETVAL_OK);
 
-                                ret = pqos_alloc_reset_config(&cfg);
-                                assert_int_equal(ret, PQOS_RETVAL_OK);
+                                        ret = pqos_alloc_reset_config(&cfg);
+                                        assert_int_equal(ret, PQOS_RETVAL_OK);
+                                }
                         }
                 }
         }
@@ -747,6 +762,11 @@ test_pqos_alloc_reset_param(void **state __attribute__((unused)))
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.mba = -1;
+        ret = pqos_alloc_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.smba = -1;
         ret = pqos_alloc_reset_config(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }

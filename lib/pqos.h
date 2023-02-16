@@ -791,6 +791,7 @@ int pqos_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
  * @param [in] l2_cdp_cfg requested L2 CAT CDP config
  * @param [in] mba_cfg requested MBA config
+ * @param [in] smba_cfg requested SMBA config
  *
  * @deprecated since 5.0.0
  * @see pqos_alloc_reset_config()
@@ -803,7 +804,8 @@ PQOS_DEPRECATED
 #endif
 int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
                      const enum pqos_cdp_config l2_cdp_cfg,
-                     const enum pqos_mba_config mba_cfg);
+                     const enum pqos_mba_config mba_cfg,
+                     const enum pqos_mba_config smba_cfg);
 
 /**
  * Configuration of allocation
@@ -812,6 +814,7 @@ struct pqos_alloc_config {
         enum pqos_cdp_config l3_cdp; /**< requested L3 CAT CDP config */
         enum pqos_cdp_config l2_cdp; /**< requested L2 CAT CDP config */
         enum pqos_mba_config mba;    /**< requested MBA config */
+        enum pqos_mba_config smba;   /**< requested SMBA config */
 };
 
 /**

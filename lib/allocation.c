@@ -1483,6 +1483,8 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         unsigned l3cat_id_num = 0;
         unsigned *mba_ids = NULL;
         unsigned mba_id_num = 0;
+        unsigned *smba_ids = NULL;
+        unsigned smba_id_num = 0;
         unsigned *l2ids = NULL;
         unsigned l2id_num = 0;
         const struct pqos_cap *cap = _pqos_get_cap();
@@ -1491,6 +1493,7 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
         const struct pqos_cap_mba *mba_cap = NULL;
+        const struct pqos_cap_mba *smba_cap = NULL;
         const struct cpuinfo_config *vconfig;
         int ret = PQOS_RETVAL_OK;
         unsigned max_l3_cos = 0;
@@ -1500,6 +1503,7 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        enum pqos_mba_config smba_cfg = PQOS_MBA_ANY;
 
         ASSERT(cfg == NULL || cfg->l3_cdp == PQOS_REQUIRE_CDP_ON ||
                cfg->l3_cdp == PQOS_REQUIRE_CDP_OFF ||
@@ -1512,12 +1516,16 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         ASSERT(cfg == NULL || cfg->mba == PQOS_MBA_DEFAULT ||
                cfg->mba == PQOS_MBA_CTRL || cfg->mba == PQOS_MBA_ANY);
 
+        ASSERT(cfg == NULL || cfg->smba == PQOS_MBA_DEFAULT ||
+               cfg->smba == PQOS_MBA_CTRL || cfg->smba == PQOS_MBA_ANY);
+
         cpuinfo_get_config(&vconfig);
 
         if (cfg != NULL) {
                 l3_cdp_cfg = cfg->l3_cdp;
                 l2_cdp_cfg = cfg->l2_cdp;
                 mba_cfg = cfg->mba;
+                smba_cfg = cfg->smba;
         }
 
         /* Get L3 CAT capabilities */
@@ -1536,6 +1544,12 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
+
+        /* Get SMBA capabilities */
+        alloc_cap = NULL;
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &alloc_cap);
+        if (alloc_cap != NULL)
+                smba_cap = alloc_cap->u.smba;
 
         /* Check if either L2 CAT, L3 CAT or MBA is supported */
         if (l2_cap == NULL && l3_cap == NULL && mba_cap == NULL) {
@@ -1561,6 +1575,13 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 ret = PQOS_RETVAL_RESOURCE;
                 goto pqos_alloc_reset_exit;
         }
+        /* Check SMBA requested while not present */
+        if (smba_cap == NULL && smba_cfg != PQOS_MBA_ANY) {
+                LOG_ERROR("SMBA setting requested but no SMBA present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_alloc_reset_exit;
+        }
+
         if (l3_cap != NULL) {
                 ret = pqos_l3ca_cdp_enabled(cap, &cdp_supported, NULL);
                 if (ret != PQOS_RETVAL_OK)
@@ -1686,6 +1707,34 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 }
         }
 
+        if (smba_cap != NULL) {
+                /**
+                 * Get number & list of mba_ids in the system
+                 */
+                smba_ids = pqos_cpu_get_smba_ids(cpu, &smba_id_num);
+                if (smba_ids == NULL || smba_id_num == 0)
+                        goto pqos_alloc_reset_exit;
+
+                /**
+                 * Go through all L3 CAT ids and reset MBA class definitions
+                 * 0 is the default MBA COS value in linear mode.
+                 */
+                for (j = 0; j < smba_id_num; j++) {
+                        unsigned core = 0;
+
+                        ret =
+                            pqos_cpu_get_one_by_mba_id(cpu, smba_ids[j], &core);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
+
+                        ret = hw_alloc_reset_cos(vconfig->smba_msr_reg,
+                                                 smba_cap->num_classes, core,
+                                                 vconfig->mba_default_val);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto pqos_alloc_reset_exit;
+                }
+        }
+
         /**
          * Associate all cores with COS0
          */
@@ -1758,6 +1807,8 @@ pqos_alloc_reset_exit:
                 free(l3cat_ids);
         if (mba_ids != NULL)
                 free(mba_ids);
+        if (smba_ids != NULL)
+                free(smba_ids);
         if (l2ids != NULL)
                 free(l2ids);
         return ret;
