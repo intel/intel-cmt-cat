@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 import { PoolConfigComponent } from './pool-config.component';
-import { CacheAllocation } from '../../system-caps/system-caps.model';
+import { CacheAllocation, resMessage } from '../../system-caps/system-caps.model';
 import { Pools, Apps } from '../../overview/overview.model';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { AppqosService } from 'src/app/services/appqos.service';
@@ -38,6 +38,8 @@ import { LocalService } from 'src/app/services/local.service';
 import { MatOptionSelectionChange, MatOption } from '@angular/material/core';
 import { HttpErrorResponse } from '@angular/common/http';
 import { MatSliderChange, MatSlider } from '@angular/material/slider';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { MatDialog } from '@angular/material/dialog';
 
 describe('Given poolConfigComponent', () => {
   beforeEach(() => {
@@ -190,7 +192,7 @@ describe('Given poolConfigComponent', () => {
       component.nameControl.setValue(poolName);
       component.poolId = poolID;
 
-      const renamePoolButton = ngMocks.find('#test-rename-pool-button');
+      const renamePoolButton = ngMocks.find('#rename-pool-button');
       renamePoolButton.triggerEventHandler('click', null);
 
       expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
@@ -217,7 +219,7 @@ describe('Given poolConfigComponent', () => {
       component.nameControl.setValue(poolName);
       component.poolId = invaildPoolID;
 
-      const renamePoolButton = ngMocks.find('#test-rename-pool-button');
+      const renamePoolButton = ngMocks.find('#rename-pool-button');
       renamePoolButton.triggerEventHandler('click', null);
 
       expect(poolPutSpy).toHaveBeenCalledTimes(1);
@@ -399,6 +401,336 @@ describe('Given poolConfigComponent', () => {
       saveL3CBMButton.triggerEventHandler('click', null);
 
       expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
+    })
+  })
+
+  describe('when saveMBA method is called', () => {
+    const poolID = 0;
+    const mockedMba = 30;
+
+    const mockedPools: Pools[] = [
+      { id: 0, name: 'pool_0', cores: [1, 2, 3], mba: mockedMba }
+    ]
+
+    const params = {
+      pools: mockedPools,
+      apps: []
+    }
+
+    it('it should save mba', () => {
+      const mockedResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+
+      MockInstance(AppqosService, 'poolPut', () => of(mockedResponse));
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+
+      component.poolId = poolID;
+
+      const saveMBAButton = ngMocks.find('#save-mba-button');
+      saveMBAButton.triggerEventHandler('click', null);
+
+      expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
+      expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
+    })
+
+    it('it should handle error', () => {
+      const mockedError: HttpErrorResponse = new HttpErrorResponse({
+        error: 'poolPut Error'
+      });
+
+      const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
+        throwError(() => mockedError)
+      );
+
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const errorHandlerSpy = spyOn(component, 'errorHandler');
+
+      component.poolId = poolID;
+
+      const saveMBAButton = ngMocks.find('#save-mba-button');
+      saveMBAButton.triggerEventHandler('click', null);
+
+      expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
+      expect(errorHandlerSpy).toHaveBeenCalledWith(mockedError);
+    })
+  })
+
+  describe('when saveMBABW method is called', () => {
+    const poolID = 0;
+    const mbaBw = 2147483648;
+    const mbaBwDefault = Math.pow(2, 32) - 1
+    const mockedPools: Pools[] = [
+      { id: 0, name: 'pool_0', cores: [1, 2, 3], mba_bw: 1 }
+    ]
+
+    const params = {
+      pools: mockedPools,
+      apps: []
+    }
+
+    it('it should save mba_bw when apply button is pressed', () => {
+      const mockedResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+
+      const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(of(mockedResponse));
+
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+
+      component.poolId = poolID;
+      component.mbaBwControl.setValue(mbaBw);
+
+      const saveMBABWButton = ngMocks.find('#mbabw-apply-button');
+      saveMBABWButton.triggerEventHandler('click', null);
+
+      expect(poolPutSpy).toHaveBeenCalledWith({ mba_bw: mbaBw }, poolID);
+      expect(nextHandlerSpy).toHaveBeenCalledOnceWith(mockedResponse);
+    })
+
+    it('it should use default value when reset button is pressed', () => {
+      const mockedResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+
+      const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(of(mockedResponse));
+
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+
+      component.poolId = poolID;
+      component.mbaBwControl.setValue(mbaBw);
+
+      const saveMBABWButton = ngMocks.find('#mbabw-reset-button');
+      saveMBABWButton.triggerEventHandler('click', null);
+
+      expect(poolPutSpy).toHaveBeenCalledOnceWith({ mba_bw: mbaBwDefault }, poolID);
+      expect(nextHandlerSpy).toHaveBeenCalledOnceWith(mockedResponse);
+    })
+
+    it('it should handle error', () => {
+      const mockedError: HttpErrorResponse = new HttpErrorResponse({
+        error: 'poolPut error'
+      });
+
+      const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(throwError(() => mockedError));
+
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const errorHandlerSpy = spyOn(component, 'errorHandler');
+
+      component.poolId = poolID;
+      component.mbaBwControl.setValue(mbaBw);
+
+      const saveMBABWButton = ngMocks.find('#mbabw-apply-button');
+      saveMBABWButton.triggerEventHandler('click', null);
+
+      expect(poolPutSpy).toHaveBeenCalledOnceWith({ mba_bw: mbaBw }, poolID);
+      expect(errorHandlerSpy).toHaveBeenCalledOnceWith(mockedError);
+    })
+  })
+
+  describe('when nextHandler method is called', () => {
+    it('it should display a response and emit a pool event', () => {
+      const mockedResponse: resMessage = {
+        message: 'POOL 0 updated'
+      }
+
+      const displayInfoSpy = jasmine.createSpy('displayInfo');
+
+      MockInstance(SnackBarService, 'displayInfo', displayInfoSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.poolEvent.subscribe((event) => {
+        expect(event).toBeUndefined();
+      });
+
+      component.nextHandler(mockedResponse);
+
+      expect(displayInfoSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
+    })
+  })
+
+  describe('when errorHandler method is called', () => {
+    it('it should display a error and emit a pool event', () => {
+      const mockedError: HttpErrorResponse = new HttpErrorResponse({
+        error: {
+          message: 'rest API error'
+        }
+      })
+
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.poolEvent.subscribe((event) => {
+        expect(event).toBeUndefined();
+      })
+
+      component.errorHandler(mockedError);
+
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.error.message);
+    })
+  })
+
+  describe('when coresEditDialog method is called', () => {
+    it('it should render CoresEditDialogComponent', () => {
+      const matDialogSpy = jasmine.createSpy('open').and.returnValue(
+        { afterClosed: () => of(true), close: null }
+      );
+
+      MockInstance(MatDialog, 'open', matDialogSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const editCoresButton = ngMocks.find('#edit-cores-button');
+      editCoresButton.triggerEventHandler('click', null);
+
+      component.poolEvent.subscribe((event) => {
+        expect(event).toBeUndefined();
+      })
+
+      expect(matDialogSpy).toHaveBeenCalledTimes(1);
+    })
+  })
+
+  describe('when deletePool method is called', () => {
+    const poolID = 0;
+
+    const mockedPools: Pools[] = [
+      { id: poolID, name: 'pool_0', cores: [1, 2, 3] }
+    ]
+
+    const params = {
+      pools: mockedPools,
+      apps: []
+    }
+
+    it('it should display a response', () => {
+      const mockedResponse = {
+        status: 200,
+        message: `POOL ${poolID} deleted`
+      }
+
+      const deletePoolSpy = jasmine.createSpy('deletePool').and.returnValue(of(mockedResponse));
+      const displayInfoSpy = jasmine.createSpy('displayInfo');
+
+      MockInstance(AppqosService, 'deletePool', deletePoolSpy);
+      MockInstance(SnackBarService, 'displayInfo', displayInfoSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.pool = mockedPools[0];
+      component.poolId = poolID;
+
+      component.poolEvent.subscribe((event) => {
+        expect(event).toBeUndefined();
+      })
+
+      const deletePoolButton = ngMocks.find('#delete-pool-button');
+      deletePoolButton.triggerEventHandler('click', null);
+
+      expect(deletePoolSpy).toHaveBeenCalledOnceWith(poolID);
+      expect(displayInfoSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
+      expect(component.poolId).toBeUndefined();
+    })
+
+    it('it should handle error', () => {
+      const mockedError: HttpErrorResponse = new HttpErrorResponse({
+        error: {
+          message: 'rest API error'
+        }
+      })
+
+      const deletePoolSpy = jasmine.createSpy('deletePool').and.returnValue(
+        throwError(() => mockedError)
+      );
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(AppqosService, 'deletePool', deletePoolSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.poolId = poolID;
+
+      const deletePoolButton = ngMocks.find('#delete-pool-button');
+      deletePoolButton.triggerEventHandler('click', null);
+
+      expect(deletePoolSpy).toHaveBeenCalledWith(poolID);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.error.message);
+    })
+  })
+
+  describe('when poolAddDialog method is called', () => {
+    it('it should render poolAddDialog component', () => {
+      const poolID = 1;
+
+      const mockedResponse = {
+        id: poolID
+      }
+
+      const dialogRef = {
+        afterClosed: () => of(mockedResponse)
+      }
+
+      const matDialogSpy = jasmine.createSpy('open').and.returnValue(dialogRef);
+      MockInstance(MatDialog, 'open', matDialogSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.poolEvent.subscribe((event) => {
+        expect(event).toBeUndefined();
+      })
+
+      const addPoolButton = ngMocks.find('#add-pool-button');
+      addPoolButton.triggerEventHandler('click', null);
+
+      expect(matDialogSpy).toHaveBeenCalledTimes(1);
+      expect(component.poolId).toBe(poolID);
     })
   })
 });

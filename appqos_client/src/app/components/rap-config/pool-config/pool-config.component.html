@@ -51,10 +51,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         </mat-select>
       </mat-form-field>
       <div class="action-buttons">
-        <button mat-mini-fab color="primary" (click)="poolAddDialog()">
+        <button
+          mat-mini-fab
+          color="primary"
+          id="add-pool-button"
+          (click)="poolAddDialog()"
+        >
           <mat-icon>add</mat-icon>
         </button>
-        <button mat-mini-fab color="accent" (click)="deletePool()">
+        <button
+          mat-mini-fab
+          color="accent"
+          id="delete-pool-button"
+          (click)="deletePool()"
+        >
           <mat-icon>delete</mat-icon>
         </button>
       </div>
@@ -82,7 +92,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         <button
           mat-raised-button
           color="primary"
-          id="test-rename-pool-button"
+          id="rename-pool-button"
           (click)="savePoolName()"
           [disabled]="!nameControl.valid"
         >
@@ -148,7 +158,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
             (change)="onChangeMBA($event)"
           ></mat-slider>
         </div>
-        <button mat-raised-button color="primary" (click)="saveMBA()">
+        <button
+          mat-raised-button
+          color="primary"
+          id="save-mba-button"
+          (click)="saveMBA()"
+        >
           APPLY
         </button>
       </div>
@@ -173,12 +188,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           </mat-error>
         </mat-form-field>
         <div class="action-btn">
-          <button mat-raised-button color="accent" (click)="saveMBABW(true)">
+          <button
+            mat-raised-button
+            color="accent"
+            id="mbabw-reset-button"
+            (click)="saveMBABW(true)"
+          >
             Reset
           </button>
           <button
             mat-raised-button
             color="primary"
+            id="mbabw-apply-button"
             (click)="saveMBABW(false)"
             [disabled]="!mbaBwControl.valid"
           >
@@ -209,7 +230,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
             {{ core }}
           </button>
         </div>
-        <button mat-raised-button color="primary" (click)="coresEditDialog()">
+        <button
+          mat-raised-button
+          color="primary"
+          id="edit-cores-button"
+          (click)="coresEditDialog()"
+        >
           EDIT
         </button>
       </div>
