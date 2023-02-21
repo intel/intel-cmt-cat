@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, of, throwError } from 'rxjs';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatSliderHarness } from '@angular/material/slider/testing';
 import { MatSliderModule } from '@angular/material/slider';
@@ -303,6 +303,61 @@ describe('Given EditDialogComponent', () => {
 
       expect(poolsSpy).toHaveBeenCalledWith({ l3cbm: 2047 }, 0);
     });
+
+    it('should handle errors', async () => {
+      const mockResponse = 'POOL 0 not updated'
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 4095,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      // throw error on poolPut()
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and
+        .returnValue(throwError(() => new Error(mockResponse)));
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l3cbm: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+      const component = fixture.point.componentInstance;
+
+      const l3cbmButtons = ngMocks.findAll('.cbm-button');
+      l3cbmButtons[0].triggerEventHandler('click', null);
+
+      // check CBM button click updates correct bit
+      expect(component.pools[0].l3Bitmask)
+      .withContext('pool 0 l3cbm to be modified')
+      .not.toBe([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+
+      // check apply button click sends correct CBM value
+      const cbmButton = ngMocks.find('.apply-button');
+      cbmButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy).withContext('putPools to be called with modified l3cbm')
+      .toHaveBeenCalledWith({ l3cbm: 2047 }, 0);
+
+      // check CBM value unchanged after error encountered
+      await fixture.whenStable();
+      expect(component.pools[0].l3cbm)
+      .withContext('initial l3cbm should be preserved')
+      .toBe(4095);
+    });
   });
 
   describe('when saveL2CBM method is executed', () => {
@@ -344,6 +399,61 @@ describe('Given EditDialogComponent', () => {
 
       expect(poolsSpy).toHaveBeenCalledWith({ l2cbm: 2047 }, 0);
     });
+
+    it('should handle errors', async () => {
+      const mockResponse = 'POOL 0 not updated'
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l2cbm: 4095,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      // throw error on poolPu()
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and
+        .returnValue(throwError(() => new Error(mockResponse)));
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l2cbm: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+      const component = fixture.point.componentInstance;
+
+      const l2cbmButtons = ngMocks.findAll('.cbm-button');
+      l2cbmButtons[0].triggerEventHandler('click', null);
+
+      // check CBM button click updates correct bit
+      expect(component.pools[0].l2Bitmask)
+      .withContext('pool 0 l2cbm to be modified')
+      .not.toBe([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+
+      // check apply button click sends correct CBM value
+      const cbmButton = ngMocks.find('.apply-button');
+      cbmButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy).withContext('putPools to be called with modified l2cbm')
+      .toHaveBeenCalledWith({ l2cbm: 2047 }, 0);
+
+      // check CBM value unchanged after error encountered
+      await fixture.whenStable();
+      expect(component.pools[0].l2cbm)
+      .withContext('initial l2cbm should be preserved')
+      .toBe(4095);
+    });
   });
 
   describe('when onChangeL2CBM method is executed', () => {
@@ -378,9 +488,24 @@ describe('Given EditDialogComponent', () => {
       const l2cbmButton = ngMocks.find('.cbm-button');
       l2cbmButton.triggerEventHandler('click', null);
 
-      expect(component.pools[0].l2Bitmask).toEqual([
+      // check CBM button click enables correct bit
+      expect(component.pools[0].l2Bitmask)
+      .withContext('should set index 0 bit to 1').toEqual([
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
       ]);
+
+      // check correct number of buttons displayed
+      const l2cbmButtons = ngMocks.findAll('.cbm-button');
+      expect(l2cbmButtons.length)
+      .withContext('should render 12 buttons').toBe(12);
+
+      // check CBM button click disables correct bit
+      l2cbmButtons[l2cbmButtons.length - 1].triggerEventHandler('click', null);
+      expect(component.pools[0].l2Bitmask)
+      .withContext('should set index 11 to 0').toEqual([
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+      ]);
+
     });
   });
 
@@ -416,8 +541,22 @@ describe('Given EditDialogComponent', () => {
       const l3cbmButton = ngMocks.find('.cbm-button');
       l3cbmButton.triggerEventHandler('click', null);
 
-      expect(component.pools[0].l3Bitmask).toEqual([
+      // check CBM button click enables correct bit
+      expect(component.pools[0].l3Bitmask)
+      .withContext('should set index 0 bit to 1').toEqual([
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+      ]);
+
+      // check correct number of buttons displayed
+      const l3cbmButtons = ngMocks.findAll('.cbm-button');
+      expect(l3cbmButtons.length)
+      .withContext('should render 12 buttons').toBe(12);
+
+      // check CBM button click disables correct bit
+      l3cbmButtons[4].triggerEventHandler('click', null);
+      expect(component.pools[0].l3Bitmask)
+      .withContext('should set index 4 to 0').toEqual([
+        1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1,
       ]);
     });
   });
@@ -590,6 +729,63 @@ describe('Given EditDialogComponent', () => {
 
       expect(poolsSpy).toHaveBeenCalledWith({ mba: 70 }, 0);
     });
+
+    it('should handle errors', async () => {
+      const mockResponse = 'POOL 0 not updated'
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          mba: 70,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      // throw error on poolPut()
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and
+        .returnValue(throwError(() => new Error(mockResponse)));
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      const component = fixture.point.componentInstance;
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const slider = await loader.getHarness(MatSliderHarness);
+
+      // check correct slider value
+      expect(await slider.getValue()).toBe(70);
+
+      // set new slider value
+      await slider.setValue(50);
+
+      // check apply button click sends correct MBA value
+      const applyButton = ngMocks.find('.apply-button');
+      applyButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy)
+      .withContext('putPools to be called with modified mba value')
+      .toHaveBeenCalledWith({ mba: 50 }, 0);
+
+      // check MBA value unchanged after error encountered
+      await fixture.whenStable();
+      expect(component.pools[0].mba)
+      .withContext('initial mba value should be preserved')
+      .toBe(70);
+    });
   });
 
   describe('when onChangeMBA method is executed', () => {
@@ -668,11 +864,107 @@ describe('Given EditDialogComponent', () => {
       /* Click Reset button. So that resetMBABW() will send default
       mba_bw value((2^32) - 1) */
       await fixture.whenStable();
-      const cbmButton = ngMocks.find('.reset-button');
-      cbmButton.triggerEventHandler('click', null);
+      const resetButton = ngMocks.find('.reset-button');
+      resetButton.triggerEventHandler('click', null);
 
       /* Check 4294967295 is sent by resetMBABW */
       expect(poolsSpy).toHaveBeenCalledWith({ mba_bw: 4294967295 }, 0);
+    });
+
+    it('should handle errors', async () => {
+      const mockResponse = 'POOL 0 not updated'
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          mba_bw: 1000,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      // throw error on poolPut()
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and
+        .returnValue(throwError(() => new Error(mockResponse)));
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      // check reset button click sends default mba_bw value
+      const resetButton = ngMocks.find('.reset-button');
+      resetButton.triggerEventHandler('click', null);
+
+      // check 4294967295 is sent by resetMBABW
+      expect(poolsSpy).toHaveBeenCalledWith({ mba_bw: 4294967295 }, 0);
+
+      // check mba_bw value unchanged after error encountered
+      expect(fixture.point.componentInstance.pools[0].mba_bw)
+      .withContext('initial mba_bw value should be preserved').toBe(1000);
+    });
+  });
+
+  describe('when onChangeMbaBW method is executed', () => {
+    it('should update state of pool mba_bw', async () => {
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const mockResponse = 'POOL 0 updated';
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          l3cbm: 2047,
+          name: 'Default',
+          mba_bw: 1000,
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
+        of(mockResponse)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { mba: true },
+            },
+          ],
+        }
+      );
+
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const inputs = await loader.getAllHarnesses(MatInputHarness);
+      const input = inputs[0];
+
+      expect((await input.getValue()).toString())
+      .withContext('input should contain correct initial value')
+      .toEqual('1000');
+
+      const applyButton = ngMocks.find('.apply-button');
+      await input.setValue('5000');
+      applyButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy)
+      .withContext('input valued to be applied')
+      .toHaveBeenCalledWith({ mba_bw: 5000 }, 0);
     });
   });
 });
