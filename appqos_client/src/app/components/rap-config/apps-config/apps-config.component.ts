@@ -112,7 +112,7 @@ export class AppsConfigComponent implements OnChanges {
         this.appEvent.emit();
       },
       error: (error) => {
-        this.snackBar.handleError(error.error.message);
+        this.snackBar.handleError(error.message);
       },
     });
   }

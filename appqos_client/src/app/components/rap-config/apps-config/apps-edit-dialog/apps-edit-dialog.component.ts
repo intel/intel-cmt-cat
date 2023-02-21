@@ -123,7 +123,7 @@ export class AppsEditDialogComponent implements OnInit {
         this.dialogRef.close();
       },
       error: (error) => {
-        this.snackBar.handleError(error.error.message);
+        this.snackBar.handleError(error.message);
       },
     });
   }

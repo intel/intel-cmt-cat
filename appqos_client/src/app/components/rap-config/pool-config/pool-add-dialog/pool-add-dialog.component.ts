@@ -128,7 +128,7 @@ export class PoolAddDialogComponent implements OnInit {
         this.dialogRef.close(response);
       },
       error: (error) => {
-        this.snackBar.handleError(error.error.message);
+        this.snackBar.handleError(error.message);
       },
     });
   }

@@ -270,7 +270,7 @@ export class PoolConfigComponent implements OnChanges {
   }
 
   errorHandler(error: HttpErrorResponse) {
-    this.snackBar.handleError(error.error.message);
+    this.snackBar.handleError(error.message);
     this.poolEvent.emit();
   }
 

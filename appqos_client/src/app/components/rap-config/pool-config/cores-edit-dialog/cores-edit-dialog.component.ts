@@ -95,7 +95,7 @@ export class CoresEditDialogComponent implements OnInit {
           this.dialogRef.close(true);
         },
         error: (error) => {
-          this.snackBar.handleError(error.error.message);
+          this.snackBar.handleError(error.message);
         },
       });
   }

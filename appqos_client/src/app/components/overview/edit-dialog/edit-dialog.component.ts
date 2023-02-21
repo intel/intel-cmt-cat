@@ -145,7 +145,7 @@ export class EditDialogComponent implements AfterContentInit {
           this._getPools();
         },
         error: (error) => {
-          this.snackBar.handleError(error.error.message);
+          this.snackBar.handleError(error.message);
           this._getPools();
         },
       });
@@ -165,7 +165,7 @@ export class EditDialogComponent implements AfterContentInit {
           this._getPools();
         },
         error: (error) => {
-          this.snackBar.handleError(error.error.message);
+          this.snackBar.handleError(error.message);
           this._getPools();
         },
       });
@@ -185,7 +185,7 @@ export class EditDialogComponent implements AfterContentInit {
           this._getPools();
         },
         error: (error) => {
-          this.snackBar.handleError(error.error.message);
+          this.snackBar.handleError(error.message);
           this._getPools();
         },
       });
@@ -213,7 +213,7 @@ export class EditDialogComponent implements AfterContentInit {
           this._getPools();
         },
         error: (error) => {
-          this.snackBar.handleError(error.error.message);
+          this.snackBar.handleError(error.message);
           this._getPools();
         },
       });
