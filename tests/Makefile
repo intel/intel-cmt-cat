@@ -39,7 +39,7 @@ style:
 	${MAKE} codespell
 
 run:
-	WORKON_HOME=$(VENV_DIR) pipenv run pytest --env=$(TEST_ENV)
+	WORKON_HOME=$(VENV_DIR) python3 -m pipenv run pytest --env=$(TEST_ENV) testcases
 
 run-os:
 	WORKON_HOME=$(VENV_DIR) pipenv run pytest --env=$(TEST_ENV) --iface-os

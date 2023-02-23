@@ -80,7 +80,7 @@ class TestPqosMBM(test.Test):
     #  Verify MBM values for core
     #
     #  \b Instruction:
-    #  1. Run "taskset -c 4 memtester 100M" in the background
+    #  1. Run "taskset -c 4 memtester 1000M" in the background
     #  2. Run "pqos [-I] -m mbl:0-15 -m mbr:0-15" to start MBL and MBR monitoring
     #  3. Terminate memtester
     #
@@ -93,7 +93,6 @@ class TestPqosMBM(test.Test):
             mbl = None
             mbr = None
             lines = output.split("\n")
-
             for line in lines:
                 # pylint: disable=line-too-long
                 match = re.search(r"^\s*([0-9]*)\s*[0-9]*\.[0-9]*\s*[0-9]*k\s*([0-9]*\.[0-9])\s*([0-9]*\.[0-9])\s*$", line)
@@ -104,7 +103,7 @@ class TestPqosMBM(test.Test):
                         mbr = float(match.group(3))
             return mbl, mbr
 
-        command = "taskset -c 4 memtester 100M"
+        command = "taskset -c 4 memtester 1000M"
         with subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE):
             time.sleep(2)
 
@@ -112,27 +111,17 @@ class TestPqosMBM(test.Test):
             assert exitcode == 0
             assert re.search(r"CORE\s*IPC\s*MISSES\s*MBL\[MB/s\]\s*MBR\[MB/s\]", stdout) \
                 is not None
-
             (mbl, _) = get_mbm(stdout, 4)
             assert mbl > 100
-
             for core in range(15):
                 if core == 4:
                     continue
-
                 (mbl_core, _) = get_mbm(stdout, core)
                 assert mbl_core < mbl / 10
 
 
-    ## PQOS - MBM Monitor MBL and MBR (tasks)
-    #
-    #  \b Priority: High
-    #
-    #  \b Objective:
-    #  Verify MBM values for task id
-    #
     #  \b Instruction:
-    #  1. Run "memtester 100M" in the background
+    #  1. Run "memtester 1000M" in the background
     #  2. Run "pqos -I -p mbl:<memtester pid> -p mbl:1 -p mbr:<memtester pid> -p mbr:1" to start
     #     MBL and MBR monitoring
     #  3. Terminate memtester
@@ -148,7 +137,6 @@ class TestPqosMBM(test.Test):
             mbl = None
             mbr = None
             lines = output.split("\n")
-
             for line in lines:
                 # pylint: disable=line-too-long
                 match = re.search(r"^\s*([0-9]*)\s*[0-9,]*\s*[0-9]*\.[0-9]*\s*[0-9]*k\s*([0-9]*\.[0-9])\s*([0-9]*\.[0-9])\s*$", line)
@@ -159,7 +147,7 @@ class TestPqosMBM(test.Test):
                         mbr = float(match.group(3))
             return mbl, mbr
 
-        command = "taskset -c 4 memtester 100M"
+        command = "taskset -c 4 memtester 1000M"
         with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
                               stdout=subprocess.PIPE) as memtester:
 

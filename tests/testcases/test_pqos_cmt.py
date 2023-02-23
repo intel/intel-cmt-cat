@@ -148,18 +148,22 @@ class TestPqosCMT(test.Test):
 
         command = "memtester 100M"
         with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
-                              stdout=subprocess.PIPE) as memtester:
+                              stdout=subprocess.PIPE) as memtester,\
+             subprocess.Popen("sleep 60".split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as sleep:
 
             time.sleep(2)
 
-            (stdout, _, exitcode) = self.run_pqos(iface, f"-p llc:1 -p llc:{memtester.pid} -t 1")
+            (stdout, _, exitcode) = \
+                self.run_pqos(iface, f"-p llc:{sleep.pid} -p llc:{memtester.pid} -t 1")
             assert exitcode == 0
             assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*LLC\[KB\]", stdout) is not None
 
             assert get_cmt(stdout, memtester.pid) > 1000
-            assert get_cmt(stdout, 1) < 500
+            assert get_cmt(stdout, sleep.pid) < 50
 
             memtester.kill()
+            sleep.kill()
 
     ## PQOS - CMT Monitor LLC occupancy - percentage LLC for tasks
     #
@@ -199,19 +203,22 @@ class TestPqosCMT(test.Test):
 
         command = "memtester 100M"
         with subprocess.Popen(command.split(), stdin=subprocess.PIPE,
-                              stdout=subprocess.PIPE) as memtester:
+                              stdout=subprocess.PIPE) as memtester,\
+             subprocess.Popen("sleep 60".split(), stdin=subprocess.PIPE,
+                              stdout=subprocess.PIPE) as sleep:
 
             time.sleep(2)
 
-            (stdout, _, exitcode) = self.run_pqos(iface,
-                                                  f"-p llc:1 -p llc:{memtester.pid} -t 2 -P")
+            (stdout, _, exitcode) = \
+                self.run_pqos(iface, f"-p llc:{sleep.pid} -p llc:{memtester.pid} -t 2 -P")
             assert exitcode == 0
             assert re.search(r"PID\s*CORE\s*IPC\s*MISSES\s*LLC\[%\]", stdout) is not None
 
             memtester_percent = get_cmt_percent(stdout, memtester.pid)
-            pid_one_percent = get_cmt_percent(stdout, 1)
+            pid_one_percent = get_cmt_percent(stdout, sleep.pid)
 
             # assuming that memtester will show higher LLC load than other pid
             assert memtester_percent > pid_one_percent
 
             memtester.kill()
+            sleep.terminate()

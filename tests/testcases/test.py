@@ -70,6 +70,8 @@ class Test:
     def fini(self):
         subprocess.call("killall -9 memtester".split(),
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.call("killall -9 membw".split(),
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
     ## Runs command and adds output to log
