@@ -86,7 +86,7 @@ __wrap_os_mon_start_pids(const unsigned num_pids,
         assert_non_null(pids);
         check_expected(event);
         check_expected_ptr(context);
-        check_expected_ptr(group);
+        assert_non_null(group);
 
         return mock_type(int);
 }

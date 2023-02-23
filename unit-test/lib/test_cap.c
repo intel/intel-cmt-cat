@@ -155,6 +155,14 @@ __wrap_pqos_mon_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
 }
 
 int
+__wrap_pqos_alloc_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
+                       const struct pqos_cap *cap __attribute__((unused)),
+                       const struct pqos_config *cfg __attribute__((unused)))
+{
+        return PQOS_RETVAL_OK;
+}
+
+int
 __wrap_os_cap_init(const enum pqos_interface inter)
 {
         const LargestIntegralType valid_inters[] = {PQOS_INTER_OS,

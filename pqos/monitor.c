@@ -568,10 +568,6 @@ grp_free(struct mon_group *grp)
         else if (grp->type == MON_GROUP_TYPE_UNCORE)
                 free(grp->sockets);
 #endif
-
-        if (grp->type == MON_GROUP_TYPE_PID)
-                /* coverity[double_free] */
-                free(grp->data);
 }
 
 /**
@@ -672,15 +668,6 @@ grp_add(enum mon_group_type type,
                         return NULL;
                 } else
                         sel_monitor_group = grps;
-        }
-
-        if (new_grp.type == MON_GROUP_TYPE_PID) {
-                new_grp.data = calloc(1, sizeof(*new_grp.data));
-                if (new_grp.data == NULL) {
-                        fprintf(stderr, "Error with memory allocation\n");
-                        grp_free(&new_grp);
-                        return NULL;
-                }
         }
 
         sel_monitor_group[sel_monitor_num++] = new_grp;
@@ -1143,9 +1130,9 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         /**
                          * Make calls to pqos_mon_start_pid - track PIDs
                          */
-                        ret = pqos_mon_start_pids(grp->num_res, grp->pids,
-                                                  grp->events,
-                                                  (void *)grp->desc, grp->data);
+                        ret = pqos_mon_start_pids2(
+                            grp->num_res, grp->pids, grp->events,
+                            (void *)grp->desc, &grp->data);
                         /**
                          * Any problem with monitoring the process?
                          */

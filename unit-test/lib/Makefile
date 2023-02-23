@@ -632,6 +632,7 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=hw_cap_mba_discover \
 		-Wl,--wrap=os_cap_mba_discover \
 		-Wl,--wrap=pqos_mon_init \
+		-Wl,--wrap=pqos_alloc_init \
 		-Wl,--wrap=lock_init \
 		-Wl,--wrap=lock_fini \
 		-Wl,--wrap=lock_get \

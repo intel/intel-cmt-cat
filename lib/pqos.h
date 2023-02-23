@@ -557,9 +557,15 @@ int pqos_mon_start_cores(const unsigned num_cores,
  *             (unused by the library)
  * @param [in,out] group a pointer to monitoring structure
  *
+ * @deprecated since 5.0.0
+ * @see pqos_mon_start_pids2()
+ *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
+#if PQOS_VERSION >= 50000
+PQOS_DEPRECATED
+#endif
 int pqos_mon_start_pid(const pid_t pid,
                        const enum pqos_mon_event event,
                        void *context,
@@ -575,14 +581,39 @@ int pqos_mon_start_pid(const pid_t pid,
  *             (unused by the library)
  * @param [in,out] group a pointer to monitoring structure
  *
+ * @deprecated since 5.0.0
+ * @see pqos_mon_start_pids2()
+ *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
+#if PQOS_VERSION >= 50000
+PQOS_DEPRECATED
+#endif
 int pqos_mon_start_pids(const unsigned num_pids,
                         const pid_t *pids,
                         const enum pqos_mon_event event,
                         void *context,
                         struct pqos_mon_data *group);
+
+/**
+ * @brief Starts resource monitoring of selected \a pids (processes)
+ *
+ * @param [in] num_pids number of pids in \a pids array
+ * @param [in] pids array of process ID
+ * @param [in] event monitoring event id
+ * @param [in] context a pointer for application's convenience
+ *             (unused by the library)
+ * @param [out] group a pointer to monitoring structure
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_start_pids2(const unsigned num_pids,
+                         const pid_t *pids,
+                         const enum pqos_mon_event event,
+                         void *context,
+                         struct pqos_mon_data **group);
 
 /**
  * @brief Adds pids to the resource monitoring grpup

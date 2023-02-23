@@ -781,45 +781,21 @@ pqos_mon_start_cores_ext(const unsigned num_cores,
                 return PQOS_RETVAL_PARAM;
         }
 
-        lock_get();
+        data = calloc(1, sizeof(*data) + sizeof(struct pqos_mon_data_internal));
+        if (data == NULL)
+                return PQOS_RETVAL_RESOURCE;
 
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                lock_release();
-                return ret;
-        }
-
-        data = calloc(1, sizeof(*data));
-        if (data == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_cores_exit;
-        }
-
-        data->intl = calloc(1, sizeof(*data->intl));
-        if (data->intl == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_cores_exit;
-        }
+        data->intl = (struct pqos_mon_data_internal *)(&data[1]);
         data->intl->manage_memory = 1;
 
-        if (api.mon_start_cores != NULL)
-                ret = api.mon_start_cores(num_cores, cores, event, context,
-                                          data, opt);
-        else {
-                LOG_INFO(UNSUPPORTED_INTERFACE);
-                ret = PQOS_RETVAL_RESOURCE;
-        }
+        ret = API_CALL(mon_start_cores, num_cores, cores, event, context, data,
+                       opt);
 
-pqos_mon_start_cores_exit:
         if (ret == PQOS_RETVAL_OK) {
                 data->valid = GROUP_VALID_MARKER;
                 *group = data;
-        } else if (data != NULL) {
-                free(data->intl);
+        } else if (data != NULL)
                 free(data);
-        }
-
-        lock_release();
 
         return ret;
 }
@@ -828,7 +804,6 @@ int
 pqos_mon_stop(struct pqos_mon_data *group)
 {
         int ret;
-        int manage_memory;
 
         if (group == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -851,12 +826,12 @@ pqos_mon_stop(struct pqos_mon_data *group)
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
-        manage_memory = group->intl->manage_memory;
-        free(group->intl);
-        if (manage_memory)
+        if (group->intl->manage_memory)
                 free(group);
-        else
+        else {
+                free(group->intl);
                 memset(group, 0, sizeof(*group));
+        }
 
         lock_release();
 
@@ -981,6 +956,56 @@ pqos_mon_start_pids_exit:
 }
 
 int
+pqos_mon_start_pids2(const unsigned num_pids,
+                     const pid_t *pids,
+                     const enum pqos_mon_event event,
+                     void *context,
+                     struct pqos_mon_data **group)
+{
+        int ret;
+        struct pqos_mon_data *data = NULL;
+
+        if (group == NULL || num_pids == 0 || pids == NULL || event == 0)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Validate event parameter
+         * - only combinations of events allowed
+         * - do not allow non-PQoS events to be monitored on its own
+         */
+        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
+                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                       PQOS_PERF_EVENT_LLC_REF)))
+                return PQOS_RETVAL_PARAM;
+
+        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
+            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+                LOG_ERROR("Only PMU events selected for monitoring\n");
+                return PQOS_RETVAL_PARAM;
+        }
+
+        data = calloc(1, sizeof(*data) + sizeof(struct pqos_mon_data_internal));
+        if (data == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        data->intl = (struct pqos_mon_data_internal *)(&data[1]);
+        data->intl->manage_memory = 1;
+
+        ret = API_CALL(mon_start_pids, num_pids, pids, event, context, data);
+
+        if (ret == PQOS_RETVAL_OK) {
+                data->valid = GROUP_VALID_MARKER;
+                *group = data;
+        } else if (data != NULL)
+                free(data);
+
+        return ret;
+}
+
+int
 pqos_mon_add_pids(const unsigned num_pids,
                   const pid_t *pids,
                   struct pqos_mon_data *group)
@@ -1030,45 +1055,20 @@ pqos_mon_start_uncore(const unsigned num_sockets,
                       PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)) == 0)
                 return PQOS_RETVAL_PARAM;
 
-        lock_get();
-
-        ret = _pqos_check_init(1);
-        if (ret != PQOS_RETVAL_OK) {
-                lock_release();
-                return ret;
-        }
-
-        data = calloc(1, sizeof(*data));
-        if (data == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_uncore_exit;
-        }
-
-        data->intl = calloc(1, sizeof(*data->intl));
-        if (data->intl == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_uncore_exit;
-        }
+        data = calloc(1, sizeof(*data) + sizeof(struct pqos_mon_data_internal));
+        if (data == NULL)
+                return PQOS_RETVAL_RESOURCE;
+        data->intl = (struct pqos_mon_data_internal *)(&data[1]);
         data->intl->manage_memory = 1;
 
-        if (api.mon_start_uncore != NULL)
-                ret = api.mon_start_uncore(num_sockets, sockets, event, context,
-                                           data);
-        else {
-                LOG_INFO(UNSUPPORTED_INTERFACE);
-                ret = PQOS_RETVAL_RESOURCE;
-        }
+        ret = API_CALL(mon_start_uncore, num_sockets, sockets, event, context,
+                       data);
 
-pqos_mon_start_uncore_exit:
         if (ret == PQOS_RETVAL_OK) {
                 data->valid = GROUP_VALID_MARKER;
                 *group = data;
-        } else if (data != NULL) {
-                free(data->intl);
+        } else if (data != NULL)
                 free(data);
-        }
-
-        lock_release();
 
         return ret;
 }

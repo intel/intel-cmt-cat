@@ -52,6 +52,8 @@ struct pqos_mon_options {
                 enum pqos_rmid_type type;
                 pqos_rmid_t rmid; /**< custom rmid value*/
         } rmid;
+#else
+        int reserved;
 #endif /* PQOS_RMID_CUSTOM */
 };
 

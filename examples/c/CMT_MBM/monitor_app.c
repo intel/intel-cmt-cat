@@ -70,10 +70,8 @@ static enum pqos_mon_event sel_events_max = (enum pqos_mon_event)0;
  */
 static struct {
         unsigned core;
-        struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
 } sel_monitor_core_tab[PQOS_MAX_CORES];
-static struct pqos_mon_data *m_mon_grps[PQOS_MAX_CORES];
 
 /**
  * Maintains a table of process id, event, number of events that are selected
@@ -81,9 +79,10 @@ static struct pqos_mon_data *m_mon_grps[PQOS_MAX_CORES];
  */
 static struct {
         pid_t pid;
-        struct pqos_mon_data *pgrp;
         enum pqos_mon_event events;
 } sel_monitor_pid_tab[PQOS_MAX_PIDS];
+
+static struct pqos_mon_data *m_mon_grps[PQOS_MAX_CORES];
 
 /**
  * Maintains the number of process id's you want to track
@@ -201,8 +200,6 @@ monitoring_get_input(int argc, char *argv[])
                         if (num_args > PQOS_MAX_PIDS)
                                 num_args = PQOS_MAX_PIDS;
                         for (i = 0; i < num_args; i++) {
-                                m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
-                                sel_monitor_pid_tab[i].pgrp = m_mon_grps[i];
                                 sel_monitor_pid_tab[i].pid =
                                     (unsigned)atoi(argv[num_opts + i]);
                         }
@@ -211,8 +208,6 @@ monitoring_get_input(int argc, char *argv[])
                         if (num_args > PQOS_MAX_CORES)
                                 num_args = PQOS_MAX_CORES;
                         for (i = 0; i < num_args; i++) {
-                                m_mon_grps[i] = malloc(sizeof(**m_mon_grps));
-                                sel_monitor_core_tab[i].pgrp = m_mon_grps[i];
                                 sel_monitor_core_tab[i].core =
                                     (unsigned)atoi(argv[num_opts + i]);
                         }
@@ -263,8 +258,6 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                             sel_events_max;
                         m_mon_grps[sel_monitor_num] =
                             malloc(sizeof(**m_mon_grps));
-                        sel_monitor_core_tab[sel_monitor_num].pgrp =
-                            m_mon_grps[sel_monitor_num];
                         sel_monitor_num++;
                 }
         }
@@ -273,8 +266,8 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         unsigned lcore = sel_monitor_core_tab[i].core;
                         int ret;
 
-                        ret = pqos_mon_start(1, &lcore, sel_events_max, NULL,
-                                             sel_monitor_core_tab[i].pgrp);
+                        ret = pqos_mon_start_cores(1, &lcore, sel_events_max,
+                                                   NULL, &m_mon_grps[i]);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Monitoring start error on core %u,"
                                        "status %d\n",
@@ -287,9 +280,9 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         pid_t pid = sel_monitor_pid_tab[i].pid;
                         int ret;
 
-                        ret = pqos_mon_start_pids(1, &pid,
-                                                  PQOS_MON_EVENT_L3_OCCUP, NULL,
-                                                  sel_monitor_pid_tab[i].pgrp);
+                        ret = pqos_mon_start_pids2(1, &pid,
+                                                   PQOS_MON_EVENT_L3_OCCUP,
+                                                   NULL, &m_mon_grps[i]);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Monitoring start error on pid %u,"
                                        "status %d\n",
