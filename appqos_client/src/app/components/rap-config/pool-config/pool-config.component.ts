@@ -89,7 +89,7 @@ export class PoolConfigComponent implements OnChanges {
     private localService: LocalService,
     private snackBar: SnackBarService,
     public dialog: MatDialog
-  ) {}
+  ) { }
 
   ngOnChanges(): void {
     this.getData(this.poolId);

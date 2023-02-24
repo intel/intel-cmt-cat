@@ -36,10 +36,11 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { BehaviorSubject, EMPTY, of, throwError } from 'rxjs';
 import { LocalService } from 'src/app/services/local.service';
 import { MatOptionSelectionChange, MatOption } from '@angular/material/core';
-import { HttpErrorResponse } from '@angular/common/http';
-import { MatSliderChange, MatSlider } from '@angular/material/slider';
+import { MatSliderChange, MatSlider, MatSliderModule } from '@angular/material/slider';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { MatDialog } from '@angular/material/dialog';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { MatSliderHarness } from '@angular/material/slider/testing';
 
 describe('Given poolConfigComponent', () => {
   beforeEach(() => {
@@ -53,6 +54,7 @@ describe('Given poolConfigComponent', () => {
         getL3CatEvent: () => EMPTY,
         getL2CatEvent: () => EMPTY
       })
+      .keep(MatSliderModule)
   })
 
   const mockedPools: Pools[] = [
@@ -201,11 +203,13 @@ describe('Given poolConfigComponent', () => {
 
     it('it should handle errors', () => {
       const invaildPoolID = -1;
+      const mockedError: Error = {
+        name: 'Error',
+        message: 'rest API error'
+      }
 
       const poolPutSpy = jasmine.createSpy().and.returnValue(
-        throwError(() => new HttpErrorResponse({
-          error: 'poolPut error'
-        }))
+        throwError(() => mockedError)
       );
 
       MockInstance(AppqosService, 'poolPut', poolPutSpy);
@@ -265,20 +269,33 @@ describe('Given poolConfigComponent', () => {
   })
 
   describe('when onChangeMBA is called', () => {
-    it('it should update mba', () => {
-      const mockMbaValue = 20;
+    it('it should update mba', async () => {
+      const oldMba = 20;
+      const newMba = 100;
 
-      const {
-        point: { componentInstance: component }
-      } = MockRender(PoolConfigComponent, params);
+      const mockedPools: Pools[] = [
+        { id: 0, name: 'pool_0', cores: [1, 2, 3], mba: oldMba },
+      ];
 
-      const event: MatSliderChange = {
-        source: {} as MatSlider,
-        value: mockMbaValue
+      const params = {
+        pools: mockedPools,
+        apps: []
       }
 
-      component.onChangeMBA(event);
-      expect(component.pool.mba).toBe(mockMbaValue);
+      const fixture = MockRender(PoolConfigComponent, params);
+      const component = fixture.point.componentInstance;
+
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const slider = await loader.getHarness(MatSliderHarness);
+
+      expect(await slider.getValue()).toBe(oldMba);
+      expect(component.pool.mba).toBe(oldMba);
+
+      await slider.setValue(newMba);
+
+      expect(await slider.getValue()).toBe(newMba);
+      expect(component.pool.mba).toBe(newMba);
     })
   })
 
@@ -320,10 +337,13 @@ describe('Given poolConfigComponent', () => {
     })
 
     it('it should handle error', () => {
+      const mockedError: Error = {
+        name: 'Error',
+        message: `POOL ${poolID} not updated`
+      }
+
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
-        throwError(() => new HttpErrorResponse({
-          error: 'poolPut error'
-        }))
+        throwError(() => mockedError)
       );
 
       MockInstance(AppqosService, 'poolPut', poolPutSpy);
@@ -380,10 +400,12 @@ describe('Given poolConfigComponent', () => {
     })
 
     it('it should handle error', () => {
+      const mockedError: Error = {
+        name: 'Error',
+        message: `POOL ${poolID} not updated`
+      }
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
-        throwError(() => new HttpErrorResponse({
-          error: 'poolPut Error'
-        }))
+        throwError(() => mockedError)
       )
 
       MockInstance(AppqosService, 'poolPut', poolPutSpy);
@@ -406,10 +428,11 @@ describe('Given poolConfigComponent', () => {
 
   describe('when saveMBA method is called', () => {
     const poolID = 0;
-    const mockedMba = 30;
+    const oldMba = 30;
+    const newMba = 90;
 
     const mockedPools: Pools[] = [
-      { id: 0, name: 'pool_0', cores: [1, 2, 3], mba: mockedMba }
+      { id: 0, name: 'pool_0', cores: [1, 2, 3], mba: oldMba }
     ]
 
     const params = {
@@ -417,33 +440,42 @@ describe('Given poolConfigComponent', () => {
       apps: []
     }
 
-    it('it should save mba', () => {
+    it('it should save mba', async () => {
       const mockedResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
       }
 
-      MockInstance(AppqosService, 'poolPut', () => of(mockedResponse));
+      const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockedResponse))
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
 
-      const {
-        point: { componentInstance: component }
-      } = MockRender(PoolConfigComponent, params);
+      const fixture = MockRender(PoolConfigComponent, params);
+      const component = fixture.point.componentInstance;
+
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      await fixture.whenStable();
+      const slider = await loader.getHarness(MatSliderHarness);
+
+      expect(await slider.getValue()).toBe(oldMba);
 
       const nextHandlerSpy = spyOn(component, 'nextHandler');
 
       component.poolId = poolID;
+      await slider.setValue(newMba);
 
       const saveMBAButton = ngMocks.find('#save-mba-button');
       saveMBAButton.triggerEventHandler('click', null);
 
-      expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
-      expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
+      expect(await slider.getValue()).toBe(newMba);
+      expect(nextHandlerSpy).toHaveBeenCalledOnceWith(mockedResponse);
+      expect(poolPutSpy).toHaveBeenCalledOnceWith({ mba: newMba }, poolID);
     })
 
     it('it should handle error', () => {
-      const mockedError: HttpErrorResponse = new HttpErrorResponse({
-        error: 'poolPut Error'
-      });
+      const mockedError: Error = {
+        name: 'Error',
+        message: `POOL ${poolID} not updated`
+      }
 
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
         throwError(() => mockedError)
@@ -533,9 +565,10 @@ describe('Given poolConfigComponent', () => {
     })
 
     it('it should handle error', () => {
-      const mockedError: HttpErrorResponse = new HttpErrorResponse({
-        error: 'poolPut error'
-      });
+      const mockedError: Error = {
+        name: 'Error',
+        message: `POOL ${poolID} not updated`
+      }
 
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(throwError(() => mockedError));
 
@@ -584,11 +617,10 @@ describe('Given poolConfigComponent', () => {
 
   describe('when errorHandler method is called', () => {
     it('it should display a error and emit a pool event', () => {
-      const mockedError: HttpErrorResponse = new HttpErrorResponse({
-        error: {
-          message: 'rest API error'
-        }
-      })
+      const mockedError: Error = {
+        name: 'Error',
+        message: 'rest API error'
+      }
 
       const handleErrorSpy = jasmine.createSpy('handleError');
 
@@ -604,7 +636,7 @@ describe('Given poolConfigComponent', () => {
 
       component.errorHandler(mockedError);
 
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.error.message);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     })
   })
 
@@ -675,11 +707,10 @@ describe('Given poolConfigComponent', () => {
     })
 
     it('it should handle error', () => {
-      const mockedError: HttpErrorResponse = new HttpErrorResponse({
-        error: {
-          message: 'rest API error'
-        }
-      })
+      const mockedError: Error = {
+        name: 'Error',
+        message: 'rest API error'
+      }
 
       const deletePoolSpy = jasmine.createSpy('deletePool').and.returnValue(
         throwError(() => mockedError)
@@ -699,7 +730,7 @@ describe('Given poolConfigComponent', () => {
       deletePoolButton.triggerEventHandler('click', null);
 
       expect(deletePoolSpy).toHaveBeenCalledWith(poolID);
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.error.message);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     })
   })
 
