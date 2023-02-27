@@ -269,7 +269,7 @@ export class PoolConfigComponent implements OnChanges {
     this.poolEvent.emit();
   }
 
-  errorHandler(error: HttpErrorResponse) {
+  errorHandler(error: Error) {
     this.snackBar.handleError(error.message);
     this.poolEvent.emit();
   }
@@ -296,7 +296,7 @@ export class PoolConfigComponent implements OnChanges {
         this.poolEvent.emit();
       },
       error: (error) => {
-        this.snackBar.handleError(error.error.message);
+        this.snackBar.handleError(error.message);
       },
     });
   }
