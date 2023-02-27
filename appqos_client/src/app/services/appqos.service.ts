@@ -27,9 +27,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, Observable, of } from 'rxjs';
+import { catchError, Observable, of, throwError } from 'rxjs';
 
 import {
   CacheAllocation,
@@ -58,7 +58,7 @@ type poolPutType = {
 
 /* Service used to get data from backend */
 export class AppqosService {
-  constructor(private http: HttpClient, private local: LocalService) {}
+  constructor(private http: HttpClient, private local: LocalService) { }
 
   login(host: string, port: string) {
     return this.http
@@ -71,7 +71,8 @@ export class AppqosService {
    */
   getCaps(): Observable<Caps> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<Caps>(`${api_url}/caps`);
+    return this.http.get<Caps>(`${api_url}/caps`)
+      .pipe(catchError(this.handleError));
   }
 
   /**
@@ -79,7 +80,8 @@ export class AppqosService {
    */
   getL3cat(): Observable<CacheAllocation> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<CacheAllocation>(`${api_url}/caps/l3cat`);
+    return this.http.get<CacheAllocation>(`${api_url}/caps/l3cat`)
+      .pipe(catchError(this.handleError));
   }
 
   /**
@@ -87,7 +89,8 @@ export class AppqosService {
    */
   getL2cat(): Observable<CacheAllocation> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<CacheAllocation>(`${api_url}/caps/l2cat`);
+    return this.http.get<CacheAllocation>(`${api_url}/caps/l2cat`)
+      .pipe(catchError(this.handleError));
   }
 
   /**
@@ -95,7 +98,8 @@ export class AppqosService {
    */
   getMba(): Observable<MBA> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<MBA>(`${api_url}/caps/mba`);
+    return this.http.get<MBA>(`${api_url}/caps/mba`)
+      .pipe(catchError(this.handleError));
   }
 
   /**
@@ -103,7 +107,8 @@ export class AppqosService {
    */
   getMbaCtrl(): Observable<MBACTRL> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<MBACTRL>(`${api_url}/caps/mba_ctrl`);
+    return this.http.get<MBACTRL>(`${api_url}/caps/mba_ctrl`)
+      .pipe(catchError(this.handleError));
   }
 
   /**
@@ -111,7 +116,8 @@ export class AppqosService {
    */
   getRdtIface(): Observable<RDTIface> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<RDTIface>(`${api_url}/caps/rdt_iface`);
+    return this.http.get<RDTIface>(`${api_url}/caps/rdt_iface`)
+      .pipe(catchError(this.handleError));
   }
 
   /**
@@ -119,28 +125,29 @@ export class AppqosService {
    */
   getSstbf(): Observable<SSTBF> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<SSTBF>(`${api_url}/caps/sstbf`);
+    return this.http.get<SSTBF>(`${api_url}/caps/sstbf`)
+      .pipe(catchError(this.handleError));
   }
 
   rdtIfacePut(value: string): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
     return this.http.put<resMessage>(`${api_url}/caps/rdt_iface`, {
       interface: value,
-    });
+    }).pipe(catchError(this.handleError));
   }
 
   sstbfPut(value: boolean): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
     return this.http.put<resMessage>(`${api_url}/caps/sstbf`, {
       configured: value,
-    });
+    }).pipe(catchError(this.handleError));
   }
 
   mbaCtrlPut(value: boolean): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
     return this.http.put<resMessage>(`${api_url}/caps/mba_ctrl`, {
       enabled: value,
-    });
+    }).pipe(catchError(this.handleError));
   }
 
   /**
@@ -148,42 +155,60 @@ export class AppqosService {
    */
   getPools(): Observable<Pools[]> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<Pools[]>(`${api_url}/pools`);
+    return this.http.get<Pools[]>(`${api_url}/pools`)
+      .pipe(catchError(this.handleError));
   }
 
   poolPut(data: poolPutType, id: number): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-
-    return this.http.put<resMessage>(`${api_url}/pools/${id}`, data);
+    return this.http.put<resMessage>(`${api_url}/pools/${id}`, data)
+      .pipe(catchError(this.handleError));
   }
 
   deletePool(id: number): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-    return this.http.delete<resMessage>(`${api_url}/pools/${id}`);
+    return this.http.delete<resMessage>(`${api_url}/pools/${id}`)
+      .pipe(catchError(this.handleError));
   }
 
   postPool(pool: any): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-    return this.http.post<resMessage>(`${api_url}/pools/`, pool);
+    return this.http.post<resMessage>(`${api_url}/pools/`, pool)
+      .pipe(catchError(this.handleError));
   }
 
   getApps(): Observable<Apps[]> {
     const api_url = this.local.getData('api_url');
-    return this.http.get<Apps[]>(`${api_url}/apps`);
+    return this.http.get<Apps[]>(`${api_url}/apps`)
+      .pipe(catchError(this.handleError));
   }
 
   postApp(app: any): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-    return this.http.post<resMessage>(`${api_url}/apps/`, app);
+    return this.http.post<resMessage>(`${api_url}/apps/`, app)
+      .pipe(catchError(this.handleError));
   }
 
   appPut(app: any, id: number): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-    return this.http.put<resMessage>(`${api_url}/apps/${id}`, app);
+    return this.http.put<resMessage>(`${api_url}/apps/${id}`, app)
+      .pipe(catchError(this.handleError));
   }
 
   deleteApp(id: number): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
-    return this.http.delete<resMessage>(`${api_url}/apps/${id}`);
+    return this.http.delete<resMessage>(`${api_url}/apps/${id}`)
+      .pipe(catchError(this.handleError));
+  }
+
+  handleError(error: HttpErrorResponse): Observable<any> {
+    if (!error.status) {
+      //client / network error
+      return throwError(() => Error(error.statusText))
+    }
+    else {
+      //server error
+      return throwError(() => Error(error.error.message))
+    }
   }
 }
