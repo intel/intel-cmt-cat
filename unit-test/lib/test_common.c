@@ -111,7 +111,7 @@ test_common_pqos_strcat(void **state __attribute__((unused)))
 static void
 test_common_pqos_file_exists(void **state __attribute__((unused)))
 {
-        const char *path1 = "/bin/users";
+        const char *path1 = "/proc/cpuinfo";
         const char *path2 = "./some_random_file_name_that_doesnt_exist";
         int return_value;
 
@@ -127,7 +127,7 @@ test_common_pqos_dir_exists(void **state __attribute__((unused)))
 {
         int return_value;
 
-        return_value = pqos_dir_exists("/bin/users");
+        return_value = pqos_dir_exists("/proc/cpuinfo");
         assert_int_equal(return_value, 0);
 
         return_value = pqos_dir_exists("/bin/");

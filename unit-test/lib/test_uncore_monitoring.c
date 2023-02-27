@@ -505,7 +505,7 @@ test_uncore_mon_start_llc_miss_pcie_write(void **state)
         /* calculated value */
         expect_value(__wrap_msr_write, value, 4203573);
         /* calculated value */
-        expect_value(__wrap_msr_write, value, 277555);
+        expect_value(__wrap_msr_write, value, 0x10049033);
         /* UNIT_CTRL_RESET_COUNTER */
         expect_value(__wrap_msr_write, value, 65794);
         /* UNIT_CTRL_UNFREEZE_COUNTER */
@@ -563,7 +563,7 @@ test_uncore_mon_start_llc_ref_pcie_read(void **state)
         /* UNIT_CTRL_FREEZE_COUNTER */
         expect_value(__wrap_msr_write, value, 65792);
         /* calculated value */
-        expect_value(__wrap_msr_write, value, 4203573);
+        expect_value(__wrap_msr_write, value, 0x401435);
         /* calculated value */
         expect_value(__wrap_msr_write, value, 277555);
         /* UNIT_CTRL_RESET_COUNTER */
@@ -619,13 +619,13 @@ test_uncore_mon_start_llc_ref_pcie_write(void **state)
         /* AT_MSR_C_UNIT_CTRL + 0x10 * UNCORE_EVENT_LLC_REF_PCIE_WRITE */
         expect_value(__wrap_msr_write, reg, 3632);
         /* UNIT_CTRL_UNFREEZE_COUNTER */
-        expect_value(__wrap_msr_write, value, 65536);
+        expect_value(__wrap_msr_write, value, 0x10000);
         /* UNIT_CTRL_FREEZE_COUNTER */
         expect_value(__wrap_msr_write, value, 65792);
         /* calculated value */
-        expect_value(__wrap_msr_write, value, 4203573);
+        expect_value(__wrap_msr_write, value, 0x401435);
         /* calculated value */
-        expect_value(__wrap_msr_write, value, 277555);
+        expect_value(__wrap_msr_write, value, 0x10049033);
         /* UNIT_CTRL_RESET_COUNTER */
         expect_value(__wrap_msr_write, value, 65794);
         /* UNIT_CTRL_UNFREEZE_COUNTER */

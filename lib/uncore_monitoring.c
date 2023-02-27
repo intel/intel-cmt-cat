@@ -321,8 +321,7 @@ static int
 _setup_counter(unsigned lcore, enum pqos_mon_event event)
 {
         int ret = PQOS_RETVAL_OK;
-        struct uncore_mon_event *evt =
-            get_event(PQOS_PERF_EVENT_LLC_MISS_PCIE_READ);
+        struct uncore_mon_event *evt = get_event(event);
         uint32_t reg_unit_ctrl;
         uint32_t reg_ctrl;
         uint32_t reg_filter1;
@@ -425,8 +424,8 @@ uncore_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
                         if ((event & uncore_event_map[i]) == 0)
                                 continue;
 
-                        ret = _setup_counter(lcore, event);
-                        if (ret == PQOS_RETVAL_ERROR)
+                        ret = _setup_counter(lcore, uncore_event_map[i]);
+                        if (ret != PQOS_RETVAL_OK)
                                 break;
                 }
         }
