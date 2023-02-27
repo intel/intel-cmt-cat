@@ -314,7 +314,6 @@ stop_monitoring(void)
                 ret = pqos_mon_stop(m_mon_grps[i]);
                 if (ret != PQOS_RETVAL_OK)
                         printf("Monitoring stop error!\n");
-                free(m_mon_grps[i]);
         }
 }
 
