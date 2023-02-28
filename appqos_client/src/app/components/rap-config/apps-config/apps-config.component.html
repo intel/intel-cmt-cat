@@ -31,11 +31,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 <mat-card class="pool-config">
   <mat-card-title
     >Application Configuration
-    <button mat-mini-fab color="primary" (click)="appAddDialog()">
+    <button mat-mini-fab
+      color="primary"
+      id="add-app-button"
+      (click)="appAddDialog()">
       <mat-icon>add</mat-icon>
     </button></mat-card-title
   >
-  <mat-card-content>
+  <mat-card-content id="apps-table">
     <div class="info-text">
       Applications are groups of processes that can be assigned to resource
       pools. Resource pools can then be used to configure processor resources to
@@ -70,10 +73,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       <ng-container matColumnDef="actions">
         <th mat-header-cell *matHeaderCellDef>ACTIONS</th>
         <td mat-cell *matCellDef="let app">
-          <button mat-icon-button color="warn" (click)="appEditDialog(app)">
+          <button mat-icon-button
+            color="warn"
+            id="edit-app-button"
+            (click)="appEditDialog(app)">
             <mat-icon>edit</mat-icon>
           </button>
-          <button mat-icon-button color="accent" (click)="deleteApp(app)">
+          <button mat-icon-button
+            color="accent"
+            id="delete-app-button"
+            (click)="deleteApp(app)">
             <mat-icon>delete</mat-icon>
           </button>
         </td>
