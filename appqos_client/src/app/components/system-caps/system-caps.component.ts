@@ -27,7 +27,6 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatButtonToggleChange } from '@angular/material/button-toggle';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
@@ -68,13 +67,13 @@ export class SystemCapsComponent implements OnInit {
   constructor(
     private service: AppqosService,
     private snackBar: SnackBarService,
-    private localStroe: LocalService
+    private localStore: LocalService
   ) {}
 
   ngOnInit(): void {
     this.loading = true;
 
-    this.systemName = this.localStroe
+    this.systemName = this.localStore
       .getData('api_url')
       ?.split('/')
       .pop()
@@ -89,14 +88,14 @@ export class SystemCapsComponent implements OnInit {
     this.service.getCaps().subscribe({
       next: (caps) => {
         this.caps = caps.capabilities;
-        this.localStroe.setCapsEvent(caps.capabilities);
+        this.localStore.setCapsEvent(caps.capabilities);
         this._getMbaData();
         this._getSstbf();
         this._getL3cat();
         this._getL2cat();
         this.loading = false;
       },
-      error: (error: HttpErrorResponse) => {
+      error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
       },
@@ -112,7 +111,7 @@ export class SystemCapsComponent implements OnInit {
         this._getRdtIface();
         this.loading = false;
       },
-      error: (error: HttpErrorResponse) => {
+      error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
       },
@@ -127,7 +126,7 @@ export class SystemCapsComponent implements OnInit {
         this._getSstbf();
         this.loading = false;
       },
-      error: (error: HttpErrorResponse) => {
+      error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
       },
@@ -140,7 +139,7 @@ export class SystemCapsComponent implements OnInit {
     combineLatest([this.service.getMba(), this.service.getMbaCtrl()]).subscribe(
       {
         next: ([mba, mbaCtrl]) => (this.mba = { ...mba, ...mbaCtrl }),
-        error: (error: HttpErrorResponse) => {
+        error: (error: Error) => {
           this.snackBar.handleError(error.message);
           this.loading = false;
         },
@@ -151,10 +150,10 @@ export class SystemCapsComponent implements OnInit {
   private _getRdtIface(): void {
     this.service.getRdtIface().subscribe({
       next: (rdtIface) => {
-        this.localStroe.setIfaceEvent();
+        this.localStore.setIfaceEvent();
         this.rdtIface = rdtIface;
       },
-      error: (error: HttpErrorResponse) => {
+      error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
       },
@@ -166,7 +165,7 @@ export class SystemCapsComponent implements OnInit {
 
     this.service.getSstbf().subscribe({
       next: (sstbf) => (this.sstbf = sstbf),
-      error: (error: HttpErrorResponse) => {
+      error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
       },
@@ -188,9 +187,9 @@ export class SystemCapsComponent implements OnInit {
       .subscribe({
         next: (l3cat) => {
           this.l3cat = l3cat;
-          this.localStroe.setL3CatEvent(l3cat);
+          this.localStore.setL3CatEvent(l3cat);
         },
-        error: (error: HttpErrorResponse) => {
+        error: (error: Error) => {
           this.snackBar.handleError(error.message);
           this.loading = false;
         },
@@ -212,9 +211,9 @@ export class SystemCapsComponent implements OnInit {
       .subscribe({
         next: (l2cat) => {
           this.l2cat = l2cat;
-          this.localStroe.setL2CatEvent(l2cat);
+          this.localStore.setL2CatEvent(l2cat);
         },
-        error: (error: HttpErrorResponse) => {
+        error: (error: Error) => {
           this.snackBar.handleError(error.message);
           this.loading = false;
         },
