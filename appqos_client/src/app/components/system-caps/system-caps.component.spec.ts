@@ -27,10 +27,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { HttpClientModule } from '@angular/common/http';
-import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, of, throwError } from 'rxjs';
 
 import {
   MatButtonToggle,
@@ -45,6 +43,7 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SstcpComponent } from './sstcp/sstcp.component';
 import { SystemCapsComponent } from './system-caps.component';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import {
   CacheAllocation,
   Caps,
@@ -58,21 +57,28 @@ import { LocalService } from 'src/app/services/local.service';
 describe('Given SystemCapsComponent', () => {
   beforeEach(() =>
     MockBuilder(SystemCapsComponent)
-      .replace(HttpClientModule, HttpClientTestingModule)
       .mock(SharedModule)
       .mock(AppqosService, {
         getRdtIface: () => EMPTY,
         getCaps: () =>
           of({
-            capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+            capabilities: ['l3cat', 'l2cat', 'mba', 'sstbf', 'power'],
           }),
         getSstbf: () => EMPTY,
         getL3cat: () => EMPTY,
         getL2cat: () => EMPTY,
+        getMba: () => EMPTY,
+        getMbaCtrl: () => EMPTY,
       })
+      .mock(SnackBarService)
       .mock(SstcpComponent)
       .keep(LocalService)
   );
+
+  const mockedError: Error = {
+    name: 'Error',
+    message: 'rest API error',
+  };
 
   MockInstance.scope('case');
 
@@ -90,7 +96,7 @@ describe('Given SystemCapsComponent', () => {
     it('should display title property in card ', () => {
       const title = 'System Capabilities';
       const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
+        capabilities: ['l2cat', 'power'],
       };
 
       const capsSpy = jasmine.createSpy('getCaps');
@@ -220,6 +226,90 @@ describe('Given SystemCapsComponent', () => {
 
       expect(component.caps).toEqual(mockedCaps.capabilities);
     });
+
+    it('should handle getCaps() error', () => {
+      const getCapsSpy = jasmine.createSpy()
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(AppqosService, 'getCaps', getCapsSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(SystemCapsComponent);
+
+      expect(getCapsSpy).toHaveBeenCalled();
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('should handle _getMbaData() error', () => {
+      const getMbaSpy = jasmine.createSpy()
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(AppqosService, 'getMba', getMbaSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(SystemCapsComponent);
+
+      expect(getMbaSpy).toHaveBeenCalled();
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('should handle _getRdtIface() error', () => {
+      const getRdtIfaceSpy = jasmine.createSpy()
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(AppqosService, 'getRdtIface', getRdtIfaceSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(SystemCapsComponent);
+
+      expect(getRdtIfaceSpy).toHaveBeenCalled();
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('should handle _getSstbf() error', () => {
+      const getSstbfSpy = jasmine.createSpy()
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(AppqosService, 'getSstbf', getSstbfSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(SystemCapsComponent);
+
+      expect(getSstbfSpy).toHaveBeenCalled();
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('should handle _getL3cat() error', () => {
+      const getL3catSpy = jasmine.createSpy()
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(AppqosService, 'getL3cat', getL3catSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(SystemCapsComponent);
+
+      expect(getL3catSpy).toHaveBeenCalled();
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('should handle _getL2cat() error', () => {
+      const getL2catSpy = jasmine.createSpy()
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(AppqosService, 'getL2cat', getL2catSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(SystemCapsComponent);
+
+      expect(getL2catSpy).toHaveBeenCalled();
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
   });
 
   describe('when request is sent to back', () => {
@@ -270,6 +360,28 @@ describe('Given SystemCapsComponent', () => {
 
       expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
     });
+
+    it('it should catch error', () => {
+      const handleErrorSpy = jasmine.createSpy();
+      const rdtIfaceSpy = jasmine.createSpy();
+      const event: MatButtonToggleChange = {
+        source: {} as MatButtonToggle,
+        value: 'os',
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'rdtIfacePut', rdtIfaceSpy)
+        .withArgs(event.value)
+        .and.returnValue(throwError(() => mockedError));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.onChangeIface(event);
+
+      expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
   });
 
   describe('when sstbfOnChange method is called', () => {
@@ -291,6 +403,28 @@ describe('Given SystemCapsComponent', () => {
       component.sstbfOnChange(event);
 
       expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+    });
+
+    it('it should catch error', () => {
+      const handleErrorSpy = jasmine.createSpy();
+      const sstbfPutSpy = jasmine.createSpy();
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(throwError(() => mockedError));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });
 });
