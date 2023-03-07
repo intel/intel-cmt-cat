@@ -65,6 +65,7 @@ export class AppsEditDialogComponent implements OnInit {
       name: new FormControl(this.data.app.name, [
         Validators.required,
         Validators.pattern('^[ -~]+$'),
+        Validators.maxLength(Standards.MAX_CHARS)
       ]),
       pids: new FormControl(String(this.data.app.pids), [
         Validators.required,
@@ -107,7 +108,7 @@ export class AppsEditDialogComponent implements OnInit {
 
     if (!this.form.value.cores) {
       app.cores = this.data.pools.find(
-        (pool: Pools) => pool.id === this.form.value.pool.id
+        (pool: Pools) => pool.id === this.form.value.pool
       )?.cores;
     } else {
       app.cores = this.coresList;
