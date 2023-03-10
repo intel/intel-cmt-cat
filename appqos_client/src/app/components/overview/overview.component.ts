@@ -88,7 +88,7 @@ export class OverviewComponent implements OnInit {
         this.getMbaCtrl();
         this.getPools();
       },
-      error: (error: HttpErrorResponse) => {
+      error: (error: Error) => {
         this.snackBar.handleError(error.message);
       },
     });
