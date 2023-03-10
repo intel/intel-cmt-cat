@@ -45,6 +45,27 @@ describe('Given SnackBarService', () => {
 
   MockInstance.scope('case');
 
+  describe('when displayInfo method is executed', () => {
+    it('should display message snackbar', () => {
+      const openSnackbarSpy = jasmine.createSpy('snackbar.open');
+      const message = 'Success!';
+
+      MockInstance(MatSnackBar, 'open', openSnackbarSpy);
+      const {
+        point: { componentInstance: service },
+      } = MockRender(SnackBarService);
+
+      service.displayInfo(message);
+
+      expect(openSnackbarSpy).toHaveBeenCalledWith(message, '', {
+        panelClass: 'snackSuccess',
+        duration: 3000,
+        horizontalPosition: 'end',
+        verticalPosition: 'top',
+      });
+    });
+  });
+
   describe('when handleError method is executed', () => {
     it('should display error message snackbar', () => {
       const openSnackbarSpy = jasmine.createSpy('snackbar.open');
