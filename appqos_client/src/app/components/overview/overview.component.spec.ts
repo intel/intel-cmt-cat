@@ -33,11 +33,12 @@ import {
 } from '@angular/material/slide-toggle';
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { EMPTY, of } from 'rxjs';
+import { EMPTY, of, throwError } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Caps, MBACTRL } from '../system-caps/system-caps.model';
 import { OverviewComponent } from './overview.component';
 import { Pools } from './overview.model';
@@ -52,9 +53,7 @@ describe('Given OverviewComponent', () => {
         getMbaCtrl: () => EMPTY,
         getCaps: () => EMPTY,
       })
-      .mock(LocalService, {
-        getIfaceEvent: () => EMPTY,
-      })
+      .keep(LocalService)
   );
 
   MockInstance.scope('case');
@@ -108,6 +107,31 @@ describe('Given OverviewComponent', () => {
 
       expect(component.pools).toEqual(mockedPool);
     });
+
+    it('should subscribe to getIfaceEvent()', () => {
+      const getMbaCtrlSpy = jasmine.createSpy('getMbaCtrl').and.returnValue(of());
+      const getPoolsSpy = jasmine.createSpy('getPools').and.returnValue(of());
+
+      MockInstance(AppqosService, 'getMbaCtrl', getMbaCtrlSpy);
+      MockInstance(AppqosService, 'getPools', getPoolsSpy);
+
+      let local = new LocalService()
+
+      MockRender(OverviewComponent, {}, {
+        providers: [
+        { provide: LocalService, useValue: local }
+      ]
+      });
+
+      expect(getMbaCtrlSpy).toHaveBeenCalledTimes(1);
+      expect(getPoolsSpy).toHaveBeenCalledTimes(1);
+
+      local.setIfaceEvent();
+
+      expect(getMbaCtrlSpy).toHaveBeenCalledTimes(2);
+      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
+    });
+
   });
 
   describe('when initialized and L3 CAT is supported', () => {
@@ -220,6 +244,36 @@ describe('Given OverviewComponent', () => {
       component.mbaOnChange(event);
 
       expect(mbaCtrlSpy).toHaveBeenCalledWith(event.checked);
+    });
+
+    it('it should handle error', () => {
+      const mockedError: Error = {
+        name: 'Error',
+        message: 'rest API error'
+      }
+
+      const handleErrorSpy = jasmine.createSpy('handleError');
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      const mbaCtrlSpy = jasmine.createSpy('mbaCtrlPut');
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'mbaCtrlPut', mbaCtrlSpy)
+        .withArgs(event.checked)
+        .and.returnValue(throwError(() => mockedError));
+
+      const {
+        point: { componentInstance: component },
+      } = MockRender(OverviewComponent);
+
+      component.mbaOnChange(event);
+
+      expect(mbaCtrlSpy).toHaveBeenCalledWith(event.checked);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });
 });
