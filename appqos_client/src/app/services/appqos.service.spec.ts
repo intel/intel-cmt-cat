@@ -27,7 +27,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HttpErrorResponse } from '@angular/common/http';
 import { TestBed } from '@angular/core/testing';
 import { MockBuilder, MockRender, ngMocks } from 'ng-mocks';
 
@@ -661,4 +661,42 @@ describe('Given AppqosService', () => {
       httpMock.verify();
     })
   })
+
+  describe('when handleError() is called with client side error', () => {
+    it('it should return error status text', () => {
+      const mockErrorResponse = {
+        status: 0,
+        statusText: "Client Error!"
+      }
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      service.handleError(mockErrorResponse as HttpErrorResponse).subscribe({
+        // error response should be called
+        error: (err) => expect(err.message)
+        .toBe(mockErrorResponse.statusText)
+      });
+    });
+  });
+
+  describe('when handleError() is called with server side error', () => {
+    it('it should return error message', () => {
+      const mockErrorResponse = {
+        status: 400,
+        error: {
+          message: "Server Error!"
+        }
+      }
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      service.handleError(mockErrorResponse as HttpErrorResponse).subscribe({
+        // error response should be called
+        error: (err) => expect(err.message)
+        .toBe(mockErrorResponse.error.message)
+      });
+    });
+  });
 });
