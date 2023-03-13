@@ -65,16 +65,17 @@ export class AppsConfigComponent implements OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     if (!changes['apps'].currentValue) return;
 
+    changes['apps'].currentValue.forEach((app: Apps) => {
+      if (!app.cores) {
+        app.cores = changes['pools'].currentValue.find(
+          (pool: Pools) => pool.id === app.pool_id
+        )?.cores;
+      }
+    });
+
     this.tableData = changes['apps'].currentValue.map((app: Apps) => ({
       ...app,
-      coresList:
-        app.cores === undefined
-          ? String(
-              changes['pools'].currentValue.find(
-                (pool: Pools) => pool.id === app.pool_id
-              )?.cores
-            )
-          : String(app.cores),
+      coresList: String(app.cores),
       poolName: changes['pools'].currentValue.find(
         (pool: Pools) => pool.id === app.pool_id
       )?.name,
