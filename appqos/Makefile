@@ -73,6 +73,8 @@ style:
 
 run:
 	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m appqos
+help:
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m appqos --help
 
 clean:
 	@rm -rf __pycache__

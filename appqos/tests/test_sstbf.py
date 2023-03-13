@@ -40,6 +40,14 @@ import pytest
 from appqos import sstbf
 from appqos.config import Config
 
+try:
+    import pwr
+
+    HAS_PWR = True
+except ImportError:
+    HAS_PWR = False
+
+@pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
 def test_is_sstbf_enabled():
     """
     Tests sstbf.is_sstbf_enabled()
@@ -65,6 +73,7 @@ def test_is_sstbf_enabled():
         mock_get_system.assert_called_once()
 
 
+@pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
 def test_is_sstbf_configured():
     """
     Tests sstbf.is_sstbf_configured()
@@ -97,6 +106,7 @@ def test_is_sstbf_configured():
         mock_get_system.assert_called_once()
 
 
+@pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
 def test_configure_sstbf():
     """
     Tests sstbf.configure_sstbf()
@@ -121,6 +131,7 @@ def test_configure_sstbf():
         mock_get_sys.assert_called_once()
 
 
+@pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
 def test_get_hp_cores():
     """
     Tests sstbf.get_hp_cores()
@@ -148,6 +159,7 @@ def test_get_hp_cores():
         mock_get_cores.assert_called_once()
 
 
+@pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
 def test_get_std_cores():
     """
     Tests sstbf.get_std_cores()

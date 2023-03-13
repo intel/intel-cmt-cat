@@ -42,9 +42,17 @@ from appqos import power_common
 from appqos import sstbf
 from appqos.config import Config
 
+try:
+    import pwr
+
+    HAS_PWR = True
+except ImportError:
+    HAS_PWR = False
+
 class TestRestPowerProfiles:
 
 
+    @pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
     def test_is_sstcp_enabled(self):
         class SYS:
             def __init__(self, enabled):
@@ -68,6 +76,7 @@ class TestRestPowerProfiles:
             mock_get_system.assert_called_once()
 
 
+    @pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
     def test__get_pwr_cpus(self):
         class CPU:
             def __init__(self, core_list):
@@ -95,6 +104,7 @@ class TestRestPowerProfiles:
             mock_get_cpus.assert_called_once()
 
 
+    @pytest.mark.skipif(not HAS_PWR, reason="pwr package not installed")
     def test__get_pwr_cores(self):
         class CORE:
             def __init__(self, id):

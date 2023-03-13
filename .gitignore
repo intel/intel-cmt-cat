@@ -36,6 +36,7 @@ appqos/.coverage
 appqos/dist
 appqos/appqos.egg-info
 appqos/Pipfile.lock
+appqos/build
 
 lib/python/.coverage
 lib/python/test_env

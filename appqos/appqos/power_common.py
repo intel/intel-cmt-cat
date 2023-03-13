@@ -34,12 +34,24 @@
 Power common functions module
 """
 
-import pwr
+from appqos import log
+
+try:
+    import pwr
+
+    HAS_PWR = True
+except ImportError:
+    HAS_PWR = False
 
 def get_pwr_sys():
     """
     Returns list of CPU objects or None on error
     """
+
+    if not HAS_PWR:
+        log.info("Power profiles and SST-BF disabled. pwr package not found")
+        return None
+
     try:
         pwr_sys = pwr.get_system()
     except (IOError, ValueError):
@@ -52,6 +64,10 @@ def get_pwr_cpus():
     """
     Returns list of CPU objects or None on error
     """
+
+    if not HAS_PWR:
+        return None
+
     try:
         cpus = pwr.get_cpus()
     except (IOError, ValueError):
@@ -64,6 +80,9 @@ def get_pwr_cores():
     """
     Returns list of CORE objects or None on error
     """
+
+    if not HAS_PWR:
+        return None
 
     try:
         cores = pwr.get_cores()
