@@ -1,4 +1,4 @@
-/*BSD LICENSE
+<!--BSD LICENSE
 
 Copyright(c) 2022 Intel Corporation. All rights reserved.
 
@@ -25,20 +25,53 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
-
-import { CacheAllocation } from '../system-caps.model';
-
-@Component({
-  selector: 'app-l3cat',
-  templateUrl: './l3cat.component.html',
-  styleUrls: ['./l3cat.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
-})
-/* Component used to show L3CAT details*/
-export class L3catComponent {
-  @Input() isSupported!: boolean;
-  @Input() l3cat!: CacheAllocation;
-}
+<mat-list>
+  <div mat-subheader>{{ title }}</div>
+  <mat-divider [inset]="true"></mat-divider>
+  <div class="list">
+    <span>Supported</span>
+    <span [ngClass]="isSupported ? 'positive' : 'negative'">{{
+      isSupported ? "Yes" : "No"
+    }}</span>
+  </div>
+  <div *ngIf="isSupported && cat">
+    <mat-list-item>
+      <div matLine>
+        <span>Cache size</span>
+        <span>{{ cat.cache_size }}MB</span>
+      </div>
+      <div matLine>
+        <span>Cache way size</span>
+        <span>{{ cat.cw_size }}MB</span>
+      </div>
+      <div matLine>
+        <span>Number of cache ways</span>
+        <span>{{ cat.cw_num }}</span>
+      </div>
+      <div matLine>
+        <span>Number of COS</span>
+        <span>{{ cat.clos_num }}</span>
+      </div>
+      <div matLine>
+        <span>CDP supported </span>
+        <span [ngClass]="cat.cdp_supported ? 'positive' : 'negative'">{{
+          cat.cdp_supported ? "Yes" : "No"
+        }}</span>
+      </div>
+      <div matLine *ngIf="cat.cdp_supported">
+        <span>CDP enabled</span>
+        <span>
+          <mat-slide-toggle
+            color="primary"
+            [matTooltip]="'Not currently supported'"
+            [disabled]="true"
+            [checked]="cat.cdp_enabled"
+          >
+          </mat-slide-toggle>
+        </span>
+      </div>
+    </mat-list-item>
+  </div>
+</mat-list>

@@ -32,13 +32,14 @@ import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { CacheAllocation } from '../system-caps.model';
 
 @Component({
-  selector: 'app-l2cat',
-  templateUrl: './l2cat.component.html',
-  styleUrls: ['./l2cat.component.scss'],
+  selector: 'app-cat',
+  templateUrl: './cat.component.html',
+  styleUrls: ['./cat.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-/* Component used to show L2CAT details*/
-export class L2catComponent {
+/* Component used to show CAT details*/
+export class CatComponent {
   @Input() isSupported!: boolean;
-  @Input() l2cat!: CacheAllocation;
+  @Input() title!: string; 
+  @Input() cat!: CacheAllocation;
 }

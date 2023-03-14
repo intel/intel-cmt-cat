@@ -58,11 +58,9 @@ import { SystemCapsComponent } from '../components/system-caps/system-caps.compo
 import { ToolbarComponent } from '../components/toolbar/toolbar.component';
 import { OverviewComponent } from '../components/overview/overview.component';
 import { RapConfigComponent } from '../components/rap-config/rap-config.component';
-import { L3catComponent } from '../components/system-caps/l3cat/l3cat.component';
 import { RdtIfaceComponent } from '../components/system-caps/rdt-iface/rdt-iface.component';
 import { MbaComponent } from '../components/system-caps/mba/mba.component';
 import { SstbfComponent } from '../components/system-caps/sstbf/sstbf.component';
-import { L2catComponent } from '../components/system-caps/l2cat/l2cat.component';
 import { SstcpComponent } from '../components/system-caps/sstcp/sstcp.component';
 import { L3CacheAllocationComponent } from '../components/overview/l3-cache-allocation/l3-cache-allocation.component';
 import { EditDialogComponent } from '../components/overview/edit-dialog/edit-dialog.component';
@@ -74,6 +72,7 @@ import { AppsConfigComponent } from '../components/rap-config/apps-config/apps-c
 import { CoresEditDialogComponent } from '../components/rap-config/pool-config/cores-edit-dialog/cores-edit-dialog.component';
 import { AppsAddDialogComponent } from '../components/rap-config/apps-config/apps-add-dialog/apps-add-dialog.component';
 import { AppsEditDialogComponent } from '../components/rap-config/apps-config/apps-edit-dialog/apps-edit-dialog.component';
+import { CatComponent } from '../components/system-caps/cat/cat.component';
 
 @NgModule({
   declarations: [
@@ -83,12 +82,10 @@ import { AppsEditDialogComponent } from '../components/rap-config/apps-config/ap
     ToolbarComponent,
     OverviewComponent,
     RapConfigComponent,
-    L3catComponent,
     RdtIfaceComponent,
     MbaComponent,
     SstbfComponent,
     SstcpComponent,
-    L2catComponent,
     L3CacheAllocationComponent,
     L2CacheAllocationComponent,
     EditDialogComponent,
@@ -99,6 +96,7 @@ import { AppsEditDialogComponent } from '../components/rap-config/apps-config/ap
     AppsConfigComponent,
     AppsAddDialogComponent,
     AppsEditDialogComponent,
+    CatComponent,
   ],
   imports: [
     MatInputModule,

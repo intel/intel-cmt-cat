@@ -47,15 +47,17 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       (changeEvent)="onChangeIface($event)"
     ></app-rdt-iface>
     <!--L3CAT-->
-    <app-l3cat
+    <app-cat
       [isSupported]="caps.includes('l3cat')"
-      [l3cat]="l3cat"
-    ></app-l3cat>
+      [cat]="l3cat"
+      title="L3 CAT"
+    ></app-cat>
     <!--L2CAT-->
-    <app-l2cat
+    <app-cat
       [isSupported]="caps.includes('l2cat')"
-      [l2cat]="l2cat"
-    ></app-l2cat>
+      [cat]="l2cat"
+      title="L2 CAT"
+    ></app-cat>
     <!--MBA-->
     <app-mba [isSupported]="caps.includes('mba')" [mba]="mba"></app-mba>
     <!--SSTBF-->

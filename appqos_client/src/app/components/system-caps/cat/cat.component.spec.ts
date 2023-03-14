@@ -31,14 +31,37 @@ import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 
 import { SharedModule } from 'src/app/shared/shared.module';
 import { CacheAllocation } from '../system-caps.model';
-import { L3catComponent } from './l3cat.component';
+import { CatComponent } from './cat.component';
 
-describe('Given L3catComponent', () => {
-  beforeEach(() => MockBuilder(L3catComponent).mock(SharedModule));
+
+describe('Given CatComponent', () => {
+  beforeEach(() => MockBuilder(CatComponent).mock(SharedModule));
 
   MockInstance.scope('case');
 
   describe('when initialized', () => {
+    it('should display "L2 CAT" title', () => {
+      const mockedL2cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      };
+      const title = 'L2 CAT';
+
+      MockRender(CatComponent, {
+        isSupported: true,
+        cat: mockedL2cat,
+        title: title
+      });
+
+      const expectValue = ngMocks.formatText(ngMocks.find('div'));
+
+      expect(expectValue).toEqual(title);
+    });
+
     it('should display "L3 CAT" title', () => {
       const mockedL3cat: CacheAllocation = {
         cache_size: 42,
@@ -48,21 +71,23 @@ describe('Given L3catComponent', () => {
         cw_num: 12,
         cw_size: 3.5,
       };
+      const title = 'L3 CAT';
 
-      MockRender(L3catComponent, {
+      MockRender(CatComponent, {
         isSupported: true,
-        l3cat: mockedL3cat,
+        cat: mockedL3cat,
+        title: title
       });
 
       const expectValue = ngMocks.formatText(ngMocks.find('div'));
 
-      expect(expectValue).toEqual('L3 CAT');
+      expect(expectValue).toEqual(title);
     });
   });
 
-  describe('when initialized and L3CAT is supported', () => {
-    it('should display L3 CAT details', () => {
-      const mockedL3cat: CacheAllocation = {
+  describe('when initialized and L2 CAT is supported', () => {
+    it('should display CAT details', () => {
+      const mockedL2cat: CacheAllocation = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
@@ -70,10 +95,12 @@ describe('Given L3catComponent', () => {
         cw_num: 12,
         cw_size: 3.5,
       };
+      const title = 'L2 CAT';
 
-      MockRender(L3catComponent, {
+      MockRender(CatComponent, {
         isSupported: true,
-        l3cat: mockedL3cat,
+        cat: mockedL2cat,
+        title: title
       });
 
       const template = ngMocks.findAll('span');
@@ -96,7 +123,7 @@ describe('Given L3catComponent', () => {
     });
 
     it('should display "Supported Yes" text', () => {
-      const mockedL3cat: CacheAllocation = {
+      const mockedL2cat: CacheAllocation = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
@@ -104,10 +131,12 @@ describe('Given L3catComponent', () => {
         cw_num: 12,
         cw_size: 3.5,
       };
+      const title = 'L2 CAT';
 
-      MockRender(L3catComponent, {
+      MockRender(CatComponent, {
         isSupported: true,
-        l3cat: mockedL3cat,
+        cat: mockedL2cat,
+        title: title
       });
 
       const template = ngMocks.formatText(ngMocks.find('.positive'));
@@ -116,9 +145,9 @@ describe('Given L3catComponent', () => {
     });
   });
 
-  describe('when initialized and L3CAT is NOT supported', () => {
-    it('should NOT display L3 CAT details', () => {
-      const mockedL3cat: CacheAllocation = {
+  describe('when initialized and L2 CAT is NOT supported', () => {
+    it('should NOT display L2 CAT details', () => {
+      const mockedL2cat: CacheAllocation = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
@@ -126,10 +155,12 @@ describe('Given L3catComponent', () => {
         cw_num: 12,
         cw_size: 3.5,
       };
+      const title = 'L2 CAT';
 
-      MockRender(L3catComponent, {
+      MockRender(CatComponent, {
         isSupported: false,
-        l3cat: mockedL3cat,
+        cat: mockedL2cat,
+        title: title
       });
 
       const template = ngMocks.find('mat-list-item', null);
@@ -138,7 +169,7 @@ describe('Given L3catComponent', () => {
     });
 
     it('should display "Supported No" text', () => {
-      const mockedL3cat: CacheAllocation = {
+      const mockedL2cat: CacheAllocation = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
@@ -146,10 +177,12 @@ describe('Given L3catComponent', () => {
         cw_num: 12,
         cw_size: 3.5,
       };
+      const title = 'L2 CAT';
 
-      MockRender(L3catComponent, {
+      MockRender(CatComponent, {
         isSupported: false,
-        l3cat: mockedL3cat,
+        cat: mockedL2cat,
+        title: title
       });
 
       const template = ngMocks.formatText(ngMocks.find('.negative'));
@@ -158,9 +191,9 @@ describe('Given L3catComponent', () => {
     });
   });
 
-  describe('when L3CAT CDP is supported', () => {
+  describe('when CAT CDP is supported', () => {
     it('should display "CDP enabled" toggle', () => {
-      const mockedL3cat: CacheAllocation = {
+      const mockedCat: CacheAllocation = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: true,
@@ -168,10 +201,12 @@ describe('Given L3catComponent', () => {
         cw_num: 12,
         cw_size: 3.5,
       };
+      const title = 'L2 CAT';
 
-      MockRender(L3catComponent, {
+      MockRender(CatComponent, {
         isSupported: true,
-        l3cat: mockedL3cat,
+        cat: mockedCat,
+        title: title
       });
 
       const template = ngMocks.find('mat-slide-toggle');
@@ -180,9 +215,9 @@ describe('Given L3catComponent', () => {
     });
   });
 
-  describe('when L3CAT CDP is NOT supported', () => {
+  describe('when CAT CDP is NOT supported', () => {
     it('should NOT display "CDP enabled" toggle', () => {
-      const mockedL3cat: CacheAllocation = {
+      const mockedCat: CacheAllocation = {
         cache_size: 42,
         cdp_enabled: false,
         cdp_supported: false,
@@ -190,10 +225,12 @@ describe('Given L3catComponent', () => {
         cw_num: 12,
         cw_size: 3.5,
       };
+      const title = 'L2 CAT';
 
-      MockRender(L3catComponent, {
+      MockRender(CatComponent, {
         isSupported: true,
-        l3cat: mockedL3cat,
+        cat: mockedCat,
+        title: title
       });
 
       const template = ngMocks.find('mat-slide-toggle', null);
@@ -202,3 +239,4 @@ describe('Given L3catComponent', () => {
     });
   });
 });
+
