@@ -92,6 +92,7 @@ PQOS_LOCAL int resctrl_mon_stop(struct pqos_mon_data *group);
  * Reads counters for all events and stores values
  *
  * @param group monitoring structure
+ * @param [in] event monitoring event
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success

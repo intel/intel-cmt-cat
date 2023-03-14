@@ -129,7 +129,7 @@ struct resctrl_cpumask {
  * @brief Set lcore bit in cpu mask
  *
  * @param [in] lcore Core number
- * @param [in] cpumask Modified cpu mask
+ * @param [in] mask Modified cpu mask
  */
 PQOS_LOCAL void resctrl_cpumask_set(const unsigned lcore,
                                     struct resctrl_cpumask *mask);
@@ -138,7 +138,7 @@ PQOS_LOCAL void resctrl_cpumask_set(const unsigned lcore,
  * @brief Unset lcore bit in cpu mask
  *
  * @param [in] lcore Core number
- * @param [in] cpumask Modified cpu mask
+ * @param [in] mask Modified cpu mask
  */
 PQOS_LOCAL void resctrl_cpumask_unset(const unsigned lcore,
                                       struct resctrl_cpumask *mask);
@@ -147,7 +147,7 @@ PQOS_LOCAL void resctrl_cpumask_unset(const unsigned lcore,
  * @brief Check if lcore is set in cpu mask
  *
  * @param [in] lcore Core number
- * @param [in] cpumask Cpu mask
+ * @param [in] mask Cpu mask
  *
  * @return Returns 1 when bit corresponding to lcore is set in mask
  * @retval 1 if cpu bit is set in mask

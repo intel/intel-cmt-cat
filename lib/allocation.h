@@ -203,8 +203,8 @@ PQOS_LOCAL int hw_alloc_reset(const struct pqos_alloc_config *cfg);
 /**
  * @brief Enables or disables L3 CDP across selected CPU sockets
  *
- * @param [in] sockets_num dimension of \a sockets array
- * @param [in] sockets array with socket ids to change CDP config on
+ * @param [in] l3cat_id_num dimension of \a sockets array
+ * @param [in] l3cat_ids array with socket ids to change CDP config on
  * @param [in] enable CDP enable/disable flag, 1 - enable, 0 - disable
  *
  * @return Operations status
@@ -372,7 +372,7 @@ PQOS_LOCAL int hw_mba_set(const unsigned mba_id,
 /**
  * @brief Hardware interface to set classes of service
  *        defined by \a requested on \a mba_id
- * @NOTE: This function is specific to AMD
+ * @note: This function is specific to AMD
  *
  * @param [in]  mba_id
  * @param [in]  num_cos number of classes of service at \a ca
@@ -406,7 +406,7 @@ PQOS_LOCAL int hw_mba_get(const unsigned mba_id,
 
 /**
  * @brief Hardware interface to read MBA from \a mba_id
- * @NOTE: This function is specific to AMD
+ * @note: This function is specific to AMD
  *
  * @param [in]  mba_id MBA resource id
  * @param [in]  max_num_cos maximum number of classes of service

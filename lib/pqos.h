@@ -1147,7 +1147,7 @@ unsigned *pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
  * @brief Retrieves one core id from cpu info structure for \a mba_id
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param [in] mba to enumerate
+ * @param [in] mba_id to enumerate
  * @param [out] lcore place to store returned core id
  *
  * @return Operation status
@@ -1202,7 +1202,7 @@ int pqos_cpu_get_one_by_numaid(const struct pqos_cpuinfo *cpu,
  * @brief Retrieves one core id from cpu info structure for \a l3cat id
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param [in] l3cat id to enumerate
+ * @param [in] l3cat_id id to enumerate
  * @param [out] lcore place to store returned core id
  *
  * @return Operation status
@@ -1498,7 +1498,7 @@ int pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value);
  *
  * Call this function from Foreign Function Interfaces to avoid memory leaks.
  *
- * @param [in] pointer to memory area allocated and returned by pqos functions.
+ * @param [in] ptr to memory area allocated and returned by pqos functions.
  *             When NULL, the function does nothing.
  *
  * @return Void.

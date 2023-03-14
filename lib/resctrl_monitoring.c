@@ -402,10 +402,9 @@ resctrl_mon_read_counter(const unsigned class_id,
  *
  * @param [in] class_id COS id
  * @param [in] resctrl_group mon group name
- * @param [in] event resctrl mon event
  * @param [in] l3ids l3ids to read from
  * @param [in] l3ids_num number of l3ids
- * @param [in] event monitoring event
+ * @param [in] event resctrl monitoring event
  * @param [out] value counter value
  *
  * @return Operational status
@@ -594,6 +593,7 @@ resctrl_mon_empty(const unsigned class_id,
 /**
  * @brief Create monitoring group directory if not exists
  *
+ * @param [in] class_id COS id
  * @param[in] name mon group name
  *
  * @return Operation status
@@ -617,6 +617,7 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
 /**
  * @brief Remove monitoring group directory if exists
  *
+ * @param [in] class_id COS id
  * @param[in] name mon group name
  *
  * @return Operation status
@@ -1553,6 +1554,7 @@ resctrl_mon_purge(struct pqos_mon_data *group)
  * Reads counters for all events and stores values
  *
  * @param group monitoring structure
+ * @param [in] event monitoring event
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success

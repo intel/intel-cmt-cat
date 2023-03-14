@@ -301,7 +301,7 @@ PQOS_LOCAL int os_mba_set(const unsigned mba_id,
 
 /**
  * @brief OS interface to set classes of service defined by \a mba_id
- * @NOTE: This function is specific to AMD
+ * @note: This function is specific to AMD
  *
  * @param [in]  mba_id MBA resource id
  * @param [in]  num_cos number of classes of service at \a ca
@@ -335,7 +335,7 @@ PQOS_LOCAL int os_mba_get(const unsigned mba_id,
 
 /**
  * @brief OS interface to read MBA from \a mba_id
- * @NOTE: This function is specific to AMD
+ * @note: This function is specific to AMD
  *
  * @param [in]  mba_id MBA resource id
  * @param [in]  max_num_cos maximum number of classes of service
