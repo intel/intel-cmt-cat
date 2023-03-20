@@ -1463,9 +1463,15 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 ca.class_id = cos_id;
 
                 ret = pqos_l3ca_set(l3cat_id, 1, &ca);
-                if (ret != PQOS_RETVAL_OK) {
+                if (ret == PQOS_RETVAL_PARAM) {
                         fprintf(stderr,
-                                "Error setting L3 CAT COS#%u on l3cat id %u!\n",
+                                "Invalid parameters for L3 CAT COS#%u "
+                                "on L3ID %u!\n",
+                                cos_id, l3cat_id);
+                        return -EINVAL;
+                } else if (ret != PQOS_RETVAL_OK) {
+                        fprintf(stderr,
+                                "Error setting L3 CAT COS#%u on L3ID %u!\n",
                                 cos_id, l3cat_id);
                         return -EFAULT;
                 }
@@ -1501,12 +1507,20 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 /* set proper COS id */
                 ca.class_id = cos_id;
 
-                if (pqos_l2ca_set(l2_id, 1, &ca) != PQOS_RETVAL_OK) {
+                ret = pqos_l2ca_set(l2_id, 1, &ca);
+                if (ret == PQOS_RETVAL_PARAM) {
+                        fprintf(stderr,
+                                "Invalid parameters for L2 CAT COS#%u "
+                                "on L2ID %u!\n",
+                                cos_id, l2_id);
+                        return -EINVAL;
+                } else if (ret != PQOS_RETVAL_OK) {
                         fprintf(stderr,
                                 "Error setting L2 CAT COS#%u on L2ID %u!\n",
                                 cos_id, l2_id);
                         return -EFAULT;
                 }
+
                 if (g_cfg.verbose) {
                         if (ca.cdp)
                                 printf("L2ID %u L2CA COS%u => DATA 0x%lx"
