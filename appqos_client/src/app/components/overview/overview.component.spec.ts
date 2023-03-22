@@ -39,7 +39,7 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { Caps, MBACTRL } from '../system-caps/system-caps.model';
+import { CacheAllocation, Caps, MBACTRL } from '../system-caps/system-caps.model';
 import { OverviewComponent } from './overview.component';
 import { Pools } from './overview.model';
 
@@ -124,14 +124,41 @@ describe('Given OverviewComponent', () => {
       });
 
       expect(getMbaCtrlSpy).toHaveBeenCalledTimes(1);
-      expect(getPoolsSpy).toHaveBeenCalledTimes(1);
+      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
 
       local.setIfaceEvent();
 
       expect(getMbaCtrlSpy).toHaveBeenCalledTimes(2);
-      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
+      expect(getPoolsSpy).toHaveBeenCalledTimes(3);
     });
 
+    it('should subscribe to getL3CatEvent()', () => {
+      const l3cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      }
+
+      const getPoolsSpy = jasmine.createSpy('getPools').and.returnValue(of());
+      MockInstance(AppqosService, 'getPools', getPoolsSpy);
+
+      let local = new LocalService()
+
+      MockRender(OverviewComponent, {}, {
+        providers: [
+        { provide: LocalService, useValue: local }
+      ]
+      });
+
+      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
+
+      local.setL3CatEvent(l3cat);
+
+      expect(getPoolsSpy).toHaveBeenCalledTimes(3);
+    });
   });
 
   describe('when initialized and L3 CAT is supported', () => {

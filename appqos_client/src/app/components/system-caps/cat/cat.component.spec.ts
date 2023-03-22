@@ -27,8 +27,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { MatSlideToggle, MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-
 import { SharedModule } from 'src/app/shared/shared.module';
 import { CacheAllocation } from '../system-caps.model';
 import { CatComponent } from './cat.component';
@@ -236,6 +236,78 @@ describe('Given CatComponent', () => {
       const template = ngMocks.find('mat-slide-toggle', null);
 
       expect(template).toBeNull();
+    });
+  });
+
+  describe('when slide toggle is clicked', () => {
+    it('should emit "onChange" event with false', (done) => {
+      const mockedCat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: false,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      };
+      const title = 'L2 CAT';
+
+      const event: MatSlideToggleChange = {
+        checked: !mockedCat.cdp_enabled,
+        source: {} as MatSlideToggle,
+      };
+
+      const {
+        point: {componentInstance: component}
+      } = MockRender(CatComponent, {
+        isSupported: true,
+        cat: mockedCat,
+        title: title
+      })
+
+      const toggle = ngMocks.find('mat-slide-toggle');
+
+      component.changeEvent.subscribe((value) => {
+        expect(value.checked).toBeTrue();
+
+        done();
+      });
+
+      toggle.triggerEventHandler('change', event);
+    });
+
+    it('should emit "onChange" event with true', (done) => {
+      const mockedCat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      };
+      const title = 'L2 CAT';
+
+      const event: MatSlideToggleChange = {
+        checked: !mockedCat.cdp_enabled,
+        source: {} as MatSlideToggle,
+      };
+
+      const {
+        point: {componentInstance: component}
+      } = MockRender(CatComponent, {
+        isSupported: true,
+        cat: mockedCat,
+        title: title
+      })
+
+      const toggle = ngMocks.find('mat-slide-toggle');
+
+      component.changeEvent.subscribe((value) => {
+        expect(value.checked).toBeFalse();
+
+        done();
+      });
+
+      toggle.triggerEventHandler('change', event);
     });
   });
 });

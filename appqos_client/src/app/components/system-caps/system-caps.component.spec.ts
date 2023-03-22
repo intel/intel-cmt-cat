@@ -427,4 +427,48 @@ describe('Given SystemCapsComponent', () => {
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });
+
+  describe('when l3CdpOnChange method is called', () => {
+    it('it should call l3CdpPut with correct value', () => {
+      const mockResponse = 'L3 CAT status changed';
+      const l3CdpPutSpy = jasmine.createSpy();
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.l3CdpOnChange(event);
+
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+    });
+
+    it('it should catch error', () => {
+      const handleErrorSpy = jasmine.createSpy();
+      const l3CdpPutSpy = jasmine.createSpy();
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(throwError(() => mockedError));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.l3CdpOnChange(event);
+
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+  });
 });
