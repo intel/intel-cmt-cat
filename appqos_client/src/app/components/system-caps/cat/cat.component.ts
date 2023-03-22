@@ -27,7 +27,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
 import { CacheAllocation } from '../system-caps.model';
 
@@ -42,4 +43,10 @@ export class CatComponent {
   @Input() isSupported!: boolean;
   @Input() title!: string; 
   @Input() cat!: CacheAllocation;
+  @Output() changeEvent = new EventEmitter<MatSlideToggleChange>();
+
+  cdpOnChange(event: MatSlideToggleChange) {
+    event.source.checked = this.cat.cdp_enabled;
+    this.changeEvent.emit(event);
+  }
 }

@@ -151,6 +151,16 @@ export class AppqosService {
   }
 
   /**
+   * Enable/disable L3 CAT CDP 
+   */
+  l3CdpPut(value: boolean): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.put<resMessage>(`${api_url}/caps/l3cat`, {
+      cdp_enabled: value
+    }).pipe(catchError(this.handleError));
+  }
+
+  /**
    * Retrieve Pools
    */
   getPools(): Observable<Pools[]> {

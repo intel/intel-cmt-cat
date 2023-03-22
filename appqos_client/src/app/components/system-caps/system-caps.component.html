@@ -51,6 +51,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       [isSupported]="caps.includes('l3cat')"
       [cat]="l3cat"
       title="L3 CAT"
+      (changeEvent)="l3CdpOnChange($event)"
     ></app-cat>
     <!--L2CAT-->
     <app-cat

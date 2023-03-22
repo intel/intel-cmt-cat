@@ -27,7 +27,6 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
@@ -62,6 +61,10 @@ export class OverviewComponent implements OnInit {
       this.getMbaCtrl();
       this.getPools();
     });
+
+    this.localService.getL3CatEvent().subscribe(() => {
+      this.getPools();
+    })
   }
 
   getPools(): void {

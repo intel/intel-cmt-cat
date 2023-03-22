@@ -65,9 +65,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         <span>
           <mat-slide-toggle
             color="primary"
-            [matTooltip]="'Not currently supported'"
-            [disabled]="true"
             [checked]="cat.cdp_enabled"
+            (change)="cdpOnChange($event)"
           >
           </mat-slide-toggle>
         </span>
