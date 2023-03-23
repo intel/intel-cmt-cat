@@ -37,7 +37,15 @@ import { SnackBarService } from "src/app/shared/snack-bar.service";
 import { PoolAddDialogComponent } from "./pool-add-dialog.component";
 
 describe('Given poolAddDialogComponent', () => {
+  let parseNumberListSpy: any;
+
   beforeEach(() => {
+    parseNumberListSpy = spyOn(
+      LocalService.prototype,
+      'parseNumberList'
+    ).and.callThrough();
+    MockInstance(LocalService, 'parseNumberList', parseNumberListSpy);
+
     return MockBuilder(PoolAddDialogComponent)
       .mock(SharedModule)
       .mock(LocalService, {
@@ -45,11 +53,11 @@ describe('Given poolAddDialogComponent', () => {
         getMbaCtrlEvent: () => EMPTY,
       })
       .mock(AppqosService, {
-        postPool: () => EMPTY
+        postPool: () => EMPTY,
       })
       .mock(SnackBarService)
-      .mock(MatDialogRef)
-  })
+      .mock(MatDialogRef);
+  });
 
   const mockedCaps = [
     'l3cat',
@@ -108,9 +116,6 @@ describe('Given poolAddDialogComponent', () => {
         mba: 100
       }
 
-      const getCoresDashSpy = spyOn(LocalService.prototype, 'getCoresDash').and.callThrough();
-      MockInstance(LocalService, 'getCoresDash', getCoresDashSpy);
-
       const {
         point: { componentInstance: component }
       } = MockRender(PoolAddDialogComponent, {}, {
@@ -130,7 +135,7 @@ describe('Given poolAddDialogComponent', () => {
       savePoolButton.triggerEventHandler('click', null);
 
       expect(component.form.valid).toBeTrue();
-      expect(getCoresDashSpy).toHaveBeenCalledWith(cores);
+      expect(parseNumberListSpy).toHaveBeenCalledWith(cores);
       expect(component.coresList).toEqual(mockedCoresList);
       expect(postPoolSpy).toHaveBeenCalledWith(mockedPool);
     })
@@ -140,9 +145,6 @@ describe('Given poolAddDialogComponent', () => {
       const cores = '';
       const coresErrorMessage = 'Cores is required!';
       const nameErrorMessage = 'Name is required!';
-
-      const getCoresDashSpy = jasmine.createSpy();
-      MockInstance(LocalService, 'getCoresDash', getCoresDashSpy);
 
       const fixture = MockRender(PoolAddDialogComponent, {}, {
         providers: [
@@ -175,7 +177,7 @@ describe('Given poolAddDialogComponent', () => {
       expect(nameReqError).toBe(nameErrorMessage);
       expect(component.form.controls['name'].errors?.['required']).toBeTrue();
 
-      expect(getCoresDashSpy).not.toHaveBeenCalled();
+      expect(parseNumberListSpy).not.toHaveBeenCalled();
       expect(postPoolSpy).not.toHaveBeenCalled();
     })
 
@@ -208,37 +210,41 @@ describe('Given poolAddDialogComponent', () => {
       expect(component.form.controls['name'].hasError('maxlength')).toBeTrue();
     })
 
-    it('it should throw error if cores exceeds MAX_CORES',  () => {
+    it('it should throw error if cores exceeds MAX_CORES', () => {
       const name = 'pool_0';
       const cores = '1024,1025';
-      const maxCoresErrorText = 'limit cores to maximum number of 1024'
+      const maxCoresErrorText = 'limit cores to maximum number of 1024';
 
-      const fixture = MockRender(PoolAddDialogComponent, {}, {
-        providers: [
-          {
-            provide: MAT_DIALOG_DATA,
-            useValue: mockedData
-          }
-        ]
-      });
+      const fixture = MockRender(
+        PoolAddDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: mockedData,
+            },
+          ],
+        }
+      );
       const component = fixture.point.componentInstance;
       const postPoolSpy = spyOn(component, 'postPool');
 
       component.form.patchValue({ name, cores });
-      
+
       const savePoolButton = ngMocks.find('#save-pool-button');
       savePoolButton.triggerEventHandler('click', null);
-      
+
       fixture.detectChanges();
-      
+
       const maxCoresError = ngMocks.formatText(
         ngMocks.find('#max-cores-error')
       );
-      
+
       expect(maxCoresError).toBe(maxCoresErrorText);
       expect(postPoolSpy).not.toHaveBeenCalled();
       expect(component.form.invalid).toBeTrue();
-    })
+    });
 
     it('it should throw error if cores input field exceeds 4096 characters', () => {
       const name = 'pool_0';
@@ -275,7 +281,7 @@ describe('Given poolAddDialogComponent', () => {
 
     it('it should throw error if cores are not formatted correctly', () => {
       const name = 'pool_0';
-      const cores = '1,11-14,45-75';
+      const cores = ',1,11-14,45-75';
       const coresErrorMessage = 'List of cores e.g. 1,2 or 1,2-5 or 1-5';
 
       const fixture = MockRender(PoolAddDialogComponent, {}, {

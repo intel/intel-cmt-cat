@@ -320,7 +320,7 @@ describe('Given LocalService', () => {
     })
   })
 
-  describe('when getCoresDash method is called', () => {
+  describe('when parseNumberList method is called', () => {
     it('should return array of numbers 1 to 11 when given "1-10,11"', () => {
       const {
         point: { componentInstance: service }
@@ -330,7 +330,7 @@ describe('Given LocalService', () => {
       const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
       expect(
-        service.getCoresDash(testString)
+        service.parseNumberList(testString)
       ).toEqual(numbers);
     })
 
@@ -342,9 +342,7 @@ describe('Given LocalService', () => {
       const testString = '1,2,3,4-11';
       const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
-      expect(
-        service.getCoresDash(testString).sort((a, b) => { return a - b })
-      ).toEqual(numbers);
+      expect(service.parseNumberList(testString)).toEqual(numbers);
     })
 
     it('should return array of numbers 1 to 11 when given "11-1"', () => {
@@ -355,9 +353,29 @@ describe('Given LocalService', () => {
       const testString = '11-1'
       const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
-      expect(
-        service.getCoresDash(testString).sort((a, b) => { return a - b })
-      ).toEqual(numbers);
+      expect(service.parseNumberList(testString)).toEqual(numbers);
+    })
+
+    it('should return array of numbers 1 to 15 when given "11-7,3,15,12-14,1,2,6-4"', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const testString = '11-7,3,15,12-14,1,2,6-4'
+      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+
+      expect(service.parseNumberList(testString)).toEqual(numbers);
+    })
+
+    it('should return array of numbers 1 to 5 when given "3,2,1,1,2,3,4,5-1,4"', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const testString = '3,2,1,1,2,3,4,5-1,4'
+      const numbers = [1, 2, 3, 4, 5];
+
+      expect(service.parseNumberList(testString)).toEqual(numbers);
     })
   })
 

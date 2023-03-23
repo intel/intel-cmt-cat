@@ -45,7 +45,7 @@ describe('Given coresEditDialog component', () => {
       .mock(AppqosService, {
         poolPut: () => EMPTY
       })
-      .mock(LocalService)
+      .keep(LocalService)
       .mock(SnackBarService)
       .mock(MatDialogRef)
   })
@@ -125,7 +125,7 @@ describe('Given coresEditDialog component', () => {
     })
 
     it('it should throw error if cores are not formatted correctly', () => {
-      const mockedCores = '25,35-42,50-67';
+      const mockedCores = '25,35-42,50-67,';
       const coresError = 'List of cores e.g. 1,2 or 1,2-5 or 1-5';
 
       const poolPutSpy = jasmine.createSpy();
@@ -188,12 +188,13 @@ describe('Given coresEditDialog component', () => {
         message: `POOL ${poolId} updated`
       }
 
-      const getCoresDashSpy = jasmine.createSpy().and.returnValue(mockedCoresList);
+      const parseNumberListSpy =
+        spyOn(LocalService.prototype, 'parseNumberList').and.callThrough();
       const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockedResponse));
       const snackBarSpy = jasmine.createSpy();
       const closeSpy = jasmine.createSpy();
 
-      MockInstance(LocalService, 'getCoresDash', getCoresDashSpy);
+      MockInstance(LocalService, 'parseNumberList', parseNumberListSpy);
       MockInstance(AppqosService, 'poolPut', poolPutSpy);
       MockInstance(SnackBarService, 'displayInfo', snackBarSpy);
       MockInstance(MatDialogRef, 'close', closeSpy);
@@ -213,7 +214,7 @@ describe('Given coresEditDialog component', () => {
       const saveCoresButton = ngMocks.find('#save-cores-button');
       saveCoresButton.triggerEventHandler('click', null);
 
-      expect(getCoresDashSpy).toHaveBeenCalledOnceWith(mockedCores);
+      expect(parseNumberListSpy).toHaveBeenCalledOnceWith(mockedCores);
       expect(poolPutSpy).toHaveBeenCalledOnceWith({ cores: mockedCoresList }, poolId);
       expect(snackBarSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
       expect(closeSpy).toHaveBeenCalledOnceWith(true);
@@ -227,13 +228,14 @@ describe('Given coresEditDialog component', () => {
         message: `POOL ${poolId} not updated`
       }
 
-      const getCoresDashSpy = jasmine.createSpy().and.returnValue(mockedCoresList);
+      const parseNumberListSpy =
+        spyOn(LocalService.prototype, 'parseNumberList').and.callThrough();
       const poolPutSpy = jasmine.createSpy().and.returnValue(
         throwError(() => mockedError)
       );
       const snackBarSpy = jasmine.createSpy();
 
-      MockInstance(LocalService, 'getCoresDash', getCoresDashSpy);
+      MockInstance(LocalService, 'parseNumberList', parseNumberListSpy);
       MockInstance(AppqosService, 'poolPut', poolPutSpy);
       MockInstance(SnackBarService, 'handleError', snackBarSpy);
 
@@ -252,7 +254,7 @@ describe('Given coresEditDialog component', () => {
       const saveCoresButton = ngMocks.find('#save-cores-button');
       saveCoresButton.triggerEventHandler('click', null);
 
-      expect(getCoresDashSpy).toHaveBeenCalledOnceWith(mockedCores);
+      expect(parseNumberListSpy).toHaveBeenCalledOnceWith(mockedCores);
       expect(poolPutSpy).toHaveBeenCalledOnceWith({ cores: mockedCoresList }, poolId);
       expect(snackBarSpy).toHaveBeenCalledOnceWith(mockedError.message);
     })

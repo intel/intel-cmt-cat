@@ -106,29 +106,44 @@ export class LocalService {
     return true;
   }
 
-  public getCoresDash(cores: string): number[] {
-    const splitedCores = cores.split(/[,-]/).map(Number);
-    let start = 0;
-    let end = 0;
-    const coresList = [];
+  /**
+   * Parse and sort string of numbers
+   *
+   * @param {string} numbers String of comma separated numbers where each
+   * value should be a single number or a range of numbers e.g. 0,1-5
+   *
+   * @returns {number[]} List of sorted unique numbers
+   */
+  public parseNumberList(numbers: string): number[] {
+    const numStrs = numbers.split(',');
+    let numberList: number[] = [];
 
-    if (cores.indexOf('-') > cores.indexOf(',')) {
-      start = splitedCores[splitedCores.length - 2];
-      end = splitedCores[splitedCores.length - 1];
-      splitedCores.splice(splitedCores.length - 2, 2);
-    } else {
-      start = splitedCores[0];
-      end = splitedCores[1];
-      splitedCores.splice(0, 2);
+    if (!numStrs.length) {
+      return numberList;
     }
 
-    if (start > end) [start, end] = [end, start];
+    // convert string to list of numbers
+    numStrs.forEach((numStr: string) => {
+      if (numStr.includes('-')) {
+        const range = numStr.split('-').map(Number);
+        let start = range[0];
+        let end = range[1];
 
-    for (let i = start; i <= end; i++) {
-      coresList.push(i);
-    }
+        // swap if needed to start from the smallest number
+        if (start > end) [start, end] = [end, start];
 
-    return [...coresList, ...splitedCores];
+        for (let i = start; i <= end; i++) {
+          numberList.push(i);
+        }
+      } else {
+        numberList.push(Number(numStr));
+      }
+    })
+
+    // sort list and return unique set of numbers
+    numberList.sort((a, b) => a - b);
+
+    return [ ...new Set(numberList)]
   }
 
   public getPidsDash(pids: string): number[] {

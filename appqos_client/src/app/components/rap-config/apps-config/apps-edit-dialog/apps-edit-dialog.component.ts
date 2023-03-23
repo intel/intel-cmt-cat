@@ -84,7 +84,7 @@ export class AppsEditDialogComponent implements OnInit {
           : String(this.data.app.cores),
         [
           Validators.pattern(
-            '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
+            '^([0-9]+|([0-9]+(-[0-9]+)))(,([0-9])+|,([0-9]+(-[0-9]+)))*$'
           ),
           Validators.maxLength(Standards.MAX_CHARS_CORES),
         ]
@@ -138,11 +138,7 @@ export class AppsEditDialogComponent implements OnInit {
   }
 
   getCores(cores: string): void {
-    if (cores.includes('-')) {
-      this.coresList = this.localService.getCoresDash(cores);
-    } else {
-      this.coresList = cores.split(',').map(Number);
-    }
+    this.coresList = this.localService.parseNumberList(cores);
 
     if (Math.max(...this.coresList) > Standards.MAX_CORES) {
       this.form.controls['cores'].setErrors({ incorrect: true });

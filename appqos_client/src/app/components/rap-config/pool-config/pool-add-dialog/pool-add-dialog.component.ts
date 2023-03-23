@@ -80,7 +80,7 @@ export class PoolAddDialogComponent implements OnInit {
         Validators.required,
         Validators.maxLength(Standards.MAX_CHARS_CORES),
         Validators.pattern(
-          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
+          '^([0-9]+|([0-9]+(-[0-9]+)))(,([0-9])+|,([0-9]+(-[0-9]+)))*$'
         ),
       ]),
     });
@@ -89,11 +89,7 @@ export class PoolAddDialogComponent implements OnInit {
   savePool(): void {
     if (!this.form.valid || !this.caps) return;
 
-    if (this.form.value.cores.includes('-')) {
-      this.coresList = this.localService.getCoresDash(this.form.value.cores);
-    } else {
-      this.coresList = this.form.value.cores.split(',').map(Number);
-    }
+    this.coresList = this.localService.parseNumberList(this.form.value.cores);
 
     if (Math.max(...this.coresList) > Standards.MAX_CORES) {
       this.form.controls['cores'].setErrors({ incorrect: true });

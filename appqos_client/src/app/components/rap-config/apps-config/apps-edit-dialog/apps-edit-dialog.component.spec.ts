@@ -44,10 +44,10 @@ describe('Given AppsEditDialog component', () => {
   MockInstance.scope('case');
   
   beforeEach(() => {
-    getCoresDashSpy = spyOn(LocalService.prototype, 'getCoresDash').and.callThrough();
+    parseNumberListSpy = spyOn(LocalService.prototype, 'parseNumberList').and.callThrough();
     getPidsDashSpy = spyOn(LocalService.prototype, 'getPidsDash').and.callThrough();
 
-    MockInstance(LocalService, 'getCoresDash', getCoresDashSpy);
+    MockInstance(LocalService, 'parseNumberList', parseNumberListSpy);
     MockInstance(LocalService, 'getPidsDash', getPidsDashSpy);
 
     return MockBuilder(AppsEditDialogComponent)
@@ -59,7 +59,7 @@ describe('Given AppsEditDialog component', () => {
   })
 
   let getPidsDashSpy: any,
-    getCoresDashSpy: any;
+    parseNumberListSpy: any;
 
   type PostApp = Omit<Apps, 'id'>;
 
@@ -209,7 +209,7 @@ describe('Given AppsEditDialog component', () => {
 
   it('it should display the pattern error', () => {
     const pids = '4156985-4156991, 4156992-4156998';
-    const cores = '1,3,4-7,8-11';
+    const cores = '1,3,4-7,,8-11';
 
     const pidsError = 'List of PID’s e.g. 2651, 2665 or 6490-6510';
     const coresError = 'List of CORE’s e.g. 1,2 or 1,2-5 or 1-5';
@@ -441,7 +441,7 @@ describe('Given AppsEditDialog component', () => {
   })
 
   describe('when getCores method is called', () => {
-    it('it should call getCoresDash', () => {
+    it('it should call parseNumberList', () => {
       const cores = '23-31';
       const coresList = [23, 24, 25, 26, 27, 28, 29, 30, 31];
 
@@ -456,7 +456,7 @@ describe('Given AppsEditDialog component', () => {
       const component = fixture.point.componentInstance;
 
       component.getCores(cores);
-      expect(getCoresDashSpy).toHaveBeenCalledOnceWith(cores);
+      expect(parseNumberListSpy).toHaveBeenCalledOnceWith(cores);
       expect(component.coresList).toEqual(coresList);
     })
 

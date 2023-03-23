@@ -62,7 +62,7 @@ export class CoresEditDialogComponent implements OnInit {
         Validators.required,
         Validators.maxLength(Standards.MAX_CHARS_CORES),
         Validators.pattern(
-          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
+          '^([0-9]+|([0-9]+(-[0-9]+)))(,([0-9])+|,([0-9]+(-[0-9]+)))*$'
         ),
       ]),
     });
@@ -70,14 +70,9 @@ export class CoresEditDialogComponent implements OnInit {
 
   saveCores(): void {
     if (!this.form.valid) return;
+    const cores = this.localService.parseNumberList(this.form.value.cores);
 
-    if (this.form.value.cores.includes('-')) {
-      this.coresList = this.localService.getCoresDash(this.form.value.cores);
-    } else {
-      this.coresList = this.form.value.cores.split(',').map(Number);
-    }
-
-    if (Math.max(...this.coresList) > Standards.MAX_CORES) {
+    if (Math.max(...cores) > Standards.MAX_CORES) {
       this.form.controls['cores'].setErrors({ incorrect: true });
       return;
     }
@@ -85,7 +80,7 @@ export class CoresEditDialogComponent implements OnInit {
     this.service
       .poolPut(
         {
-          cores: this.coresList,
+          cores: cores,
         },
         this.data.id
       )
