@@ -689,6 +689,33 @@ describe('Given AppqosService', () => {
     });
   });
 
+  describe('when l2CdpPut method is called', () => {
+    it('it should call correct REST API endpoint with PUT method', () => {
+      const api_url = 'https://localhost:5000';
+      const mockResponse = 'L2 CDP status changed.';
+      const body = true;
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service
+        .l2CdpPut(body)
+        .pipe(first())
+        .subscribe((response: unknown) => {
+          expect(response).toBe(mockResponse);
+        });
+
+      const req = httpMock.expectOne(`${api_url}/caps/l2cat`);
+      req.flush(mockResponse);
+      httpMock.verify();
+    });
+  });
+
   describe('when handleError() is called with client side error', () => {
     it('it should return error status text', () => {
       const mockErrorResponse = {
