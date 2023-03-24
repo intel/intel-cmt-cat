@@ -967,6 +967,8 @@ hw_mon_start_cores(const unsigned num_cores,
                         return PQOS_RETVAL_PARAM;
 
                 if (rmid != RMID0) {
+                        LOG_ERROR("Monitoring on core %u is already started\n",
+                                  lcore);
                         /* If not RMID0 then it is already monitored */
                         LOG_INFO("Core %u is already monitored with "
                                  "RMID%u.\n",
