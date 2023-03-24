@@ -43,10 +43,7 @@ describe('Given appsAddDialogComponent', () => {
   MockInstance.scope('case');
 
   beforeEach(() => {
-    getPidsDashSpy = spyOn(LocalService.prototype, 'getPidsDash').and.callThrough();
     parseNumberListSpy = spyOn(LocalService.prototype, 'parseNumberList').and.callThrough();
-
-    MockInstance(LocalService, 'getPidsDash', getPidsDashSpy);
     MockInstance(LocalService, 'parseNumberList', parseNumberListSpy);
 
     return MockBuilder(AppsAddDialogComponent)
@@ -57,8 +54,7 @@ describe('Given appsAddDialogComponent', () => {
       .mock(MatDialogRef)
   })
 
-  let getPidsDashSpy: any,
-    parseNumberListSpy: any;
+  let parseNumberListSpy: any;
 
   type PostApp = Omit<Apps, 'id'>
 
@@ -323,7 +319,7 @@ describe('Given appsAddDialogComponent', () => {
   })
 
   describe('when getPids method is called', () => {
-    it('it should call getPidsDash', () => {
+    it('it should call parseNumberList', () => {
       const pids = '36951-36959';
       const pidsList = [
         36951, 36952, 36953, 36954, 36955, 36956, 36957, 36958, 36959
@@ -340,7 +336,7 @@ describe('Given appsAddDialogComponent', () => {
       const component = fixture.point.componentInstance;
 
       component.getPids(pids);
-      expect(getPidsDashSpy).toHaveBeenCalledOnceWith(pids);
+      expect(parseNumberListSpy).toHaveBeenCalledOnceWith(pids);
       expect(component.pidsList).toEqual(pidsList);
     })
 

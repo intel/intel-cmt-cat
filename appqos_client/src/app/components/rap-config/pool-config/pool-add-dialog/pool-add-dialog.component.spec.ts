@@ -39,6 +39,8 @@ import { PoolAddDialogComponent } from "./pool-add-dialog.component";
 describe('Given poolAddDialogComponent', () => {
   let parseNumberListSpy: any;
 
+  MockInstance.scope('case');
+
   beforeEach(() => {
     parseNumberListSpy = spyOn(
       LocalService.prototype,
@@ -70,8 +72,6 @@ describe('Given poolAddDialogComponent', () => {
     l2cwNum: 10,
     l3cwNum: 12
   }
-
-  MockInstance.scope('case');
 
   describe('when initialized', () => {
     it('it should populate the caps array & set mbaCtrl', () => {

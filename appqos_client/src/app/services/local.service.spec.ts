@@ -29,9 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { skip } from 'rxjs';
-import { MbaAllocationComponent } from '../components/overview/mba-allocation/mba-allocation.component';
-import { CacheAllocation, MBACTRL } from '../components/system-caps/system-caps.model';
-
+import { CacheAllocation } from '../components/system-caps/system-caps.model';
 import { LocalService } from './local.service';
 
 describe('Given LocalService', () => {
@@ -377,50 +375,31 @@ describe('Given LocalService', () => {
 
       expect(service.parseNumberList(testString)).toEqual(numbers);
     })
-  })
 
-  describe('when getPidsDash method is called', () => {
-    it('should return array of numbers 1 to 11 when given "1-10,11"', () => {
+    it('should return array of numbers 4156985 to 4156992' +
+       'when given "4156985,4156986,4156987,4156988-4156992"', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const testString = '1-10,11';
-      const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      const testString = '4156985,4156986,4156987,4156988-4156992';
+      const numbers = [4156985, 4156986, 4156987,
+        4156988, 4156989, 4156990, 4156991, 4156992];
 
-      expect(
-        service.getPidsDash(testString).sort((a, b) => { return a - b })
-      ).toEqual(numbers);
+      expect(service.parseNumberList(testString)).toEqual(numbers);
     })
 
-    it('should return array of numbers 4156985 to 4156992' +
-      'when given "4156985,4156986,4156987,4156988-4156992"', () => {
-        const {
-          point: { componentInstance: service }
-        } = MockRender(LocalService);
-
-        const testString = '4156985,4156986,4156987,4156988-4156992';
-        const numbers = [4156985, 4156986, 4156987,
-          4156988, 4156989, 4156990, 4156991, 4156992];
-
-        expect(
-          service.getPidsDash(testString).sort((a, b) => { return a - b })
-        ).toEqual(numbers);
-      })
-
     it('should return an array of numbers 1126973 to 1126984 ' +
-      'when given "1126984-1126973"', () => {
-        const {
-          point: { componentInstance: service }
-        } = MockRender(LocalService);
+       'when given "1126984-1126973"', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
 
-        const testString = '1126984-1126973';
-        const numbers = [1126973, 1126974, 1126975, 1126976,
-          1126977, 1126978, 1126979, 1126980, 1126981, 1126982, 1126983, 1126984]
+      const testString = '1126984-1126973';
+      const numbers = [1126973, 1126974, 1126975, 1126976,
+        1126977, 1126978, 1126979, 1126980, 1126981, 1126982, 1126983, 1126984]
 
-        expect(
-          service.getPidsDash(testString).sort((a, b) => { return a - b })
-        ).toEqual(numbers);
-      })
+      expect(service.parseNumberList(testString)).toEqual(numbers);
+    })
   })
 })

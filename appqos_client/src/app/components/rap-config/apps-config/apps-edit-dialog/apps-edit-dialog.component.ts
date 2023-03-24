@@ -70,7 +70,7 @@ export class AppsEditDialogComponent implements OnInit {
       pids: new FormControl(String(this.data.app.pids), [
         Validators.required,
         Validators.pattern(
-          '^[0-9]+(?:,[0-9]+)+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)?$|^[0-9]+(?:-[0-9]+)+(?:,[0-9]+)+(?:,[0-9]+)?$'
+          '^([0-9]+|([0-9]+(-[0-9]+)))(,([0-9])+|,([0-9]+(-[0-9]+)))*$'
         ),
         Validators.maxLength(Standards.MAX_CHARS_PIDS),
       ]),
@@ -130,11 +130,7 @@ export class AppsEditDialogComponent implements OnInit {
   }
 
   getPids(pids: string): void {
-    if (pids.includes('-')) {
-      this.pidsList = this.localService.getPidsDash(pids);
-    } else {
-      this.pidsList = pids.split(',').map(Number);
-    }
+      this.pidsList = this.localService.parseNumberList(pids);
   }
 
   getCores(cores: string): void {

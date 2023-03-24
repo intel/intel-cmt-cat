@@ -145,29 +145,4 @@ export class LocalService {
 
     return [ ...new Set(numberList)]
   }
-
-  public getPidsDash(pids: string): number[] {
-    const splitedPids = pids.split(/[,-]/).map(Number);
-    let start = 0;
-    let end = 0;
-    const pidsList = [];
-
-    if (pids.indexOf('-') > pids.indexOf(',')) {
-      start = splitedPids[splitedPids.length - 2];
-      end = splitedPids[splitedPids.length - 1];
-      splitedPids.splice(splitedPids.length - 2, 2);
-    } else {
-      start = splitedPids[0];
-      end = splitedPids[1];
-      splitedPids.splice(0, 2);
-    }
-
-    if (start > end) [start, end] = [end, start];
-
-    for (let i = start; i <= end; i++) {
-      pidsList.push(i);
-    }
-
-    return [...pidsList, ...splitedPids];
-  }
 }
