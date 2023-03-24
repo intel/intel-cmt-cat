@@ -161,6 +161,16 @@ export class AppqosService {
   }
 
   /**
+   * Enable/disable L2 CAT CDP
+   */
+  l2CdpPut(value: Boolean): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.put<resMessage>(`${api_url}/caps/l2cat`, {
+      cdp_enabled: value
+    }).pipe(catchError(this.handleError));
+  }
+
+  /**
    * Retrieve Pools
    */
   getPools(): Observable<Pools[]> {

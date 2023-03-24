@@ -148,6 +148,21 @@ export class SystemCapsComponent implements OnInit {
     })
   }
 
+  l2CdpOnChange(event: MatSlideToggleChange) {
+    this.loading = true;
+    this.service.l2CdpPut(event.checked).subscribe({
+      next: (res: resMessage) => {
+        this.snackBar.displayInfo(res.message);
+        this._getL2cat();
+        this.loading = false;
+      },
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      }
+    })
+  }
+
   private _getMbaData() {
     if (!this.caps.includes('mba')) return;
 
