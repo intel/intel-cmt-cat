@@ -1196,10 +1196,6 @@ main(int argc, char **argv)
                 break;
         }
 
-        printf("- THREAD logical core id: %u, "
-               " memory bandwidth [MB]: %u, starting...\n",
-               cpu, mem_bw);
-
         /* Bind thread to cpu */
         set_thread_affinity(cpu);
 
@@ -1212,6 +1208,11 @@ main(int argc, char **argv)
 
         /* Calculate memory bandwidth to use */
         mem_bw *= (((1024 * 1024) / CL_SIZE)) / CHUNKS;
+
+        printf("- THREAD logical core id: %u, "
+               " memory bandwidth [MB]: %u, starting...\n",
+               cpu, mem_bw);
+        fflush(stdout);
 
         /* Stress memory bandwidth */
         while (stop_loop == 0) {
