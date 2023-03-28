@@ -43,19 +43,55 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         >See more</a
       >
     </div>
+    <div class="info-text" *ngIf="l3cat?.cdp_enabled">
+      <br />
+      Code and Data Prioritization (CDP) enables separate control over code and
+      data placement in the LLC...
+      <a
+        href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-code-and-data-prioritization-with-usage-models.html"
+        class="contact-text"
+        target="_blank"
+        rel="noopener noreferrer"
+      >See more</a>
+    </div>
     <div class="pool" *ngFor="let pool of poolsList">
-      <span class="pool-name">
+      <span
+        class="pool-name"
+        [ngStyle]="{ 'padding-left': l3cat.cdp_enabled ? '3rem' : '1rem' }"
+      >
         {{ pool.name }}
       </span>
-      <div class="pool-cbm">
-        <button
-          mat-flat-button
-          class="l3cbm-button"
-          *ngFor="let n of pool.l3Bitmask"
-          [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
-        >
-          {{ n }}
-        </button>
+      <div>
+        <div class="pool-cdp-label">
+          <div class="pool-cdp-code" *ngIf="l3cat.cdp_enabled">Code</div>
+          <div class="pool-cdp-data" *ngIf="l3cat.cdp_enabled">Data</div>
+        </div>
+        <div class="pool-cdp">
+          <div class="pool-cbm">
+            <button
+              mat-flat-button
+              class="l3cbm-button"
+              *ngFor="
+                let n of !l3cat.cdp_enabled
+                  ? pool.l3Bitmask
+                  : pool.l3BitmaskCode
+              "
+              [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            >
+              {{ n }}
+            </button>
+          </div>
+          <div class="pool-cbm" *ngIf="l3cat.cdp_enabled">
+            <button
+              mat-flat-button
+              class="l3cbm-button"
+              *ngFor="let n of pool.l3BitmaskData"
+              [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            >
+              {{ n }}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </mat-card-content>

@@ -41,6 +41,7 @@ type PostPool = Omit<Pools, 'id'>;
 type dialogDataType = {
   l2cwNum?: number | undefined;
   l3cwNum?: number | undefined;
+  l3cdp_enabled?: boolean;
 };
 
 @Component({
@@ -62,7 +63,7 @@ export class PoolAddDialogComponent implements OnInit {
     private snackBar: SnackBarService,
     public dialogRef: MatDialogRef<PoolAddDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: dialogDataType
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.localService.getCapsEvent().subscribe((caps) => (this.caps = caps));
@@ -108,8 +109,16 @@ export class PoolAddDialogComponent implements OnInit {
         pool.mba = 100;
       }
     }
-    if (this.caps.includes('l3cat') && this.data.l3cwNum)
-      pool.l3cbm = (1 << this.data.l3cwNum) - 1;
+    if (this.caps.includes('l3cat') && this.data.l3cwNum) {
+      const l3cdm = (1 << this.data.l3cwNum) - 1;
+
+      if (this.data.l3cdp_enabled) {
+        pool.l3cbm_data = l3cdm;
+        pool.l3cbm_code = l3cdm;
+      } else {
+        pool.l3cbm = l3cdm;
+      }
+    }
 
     if (this.caps.includes('l2cat') && this.data.l2cwNum)
       pool.l2cbm = (1 << this.data.l2cwNum) - 1;

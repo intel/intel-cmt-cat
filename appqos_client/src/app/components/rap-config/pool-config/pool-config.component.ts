@@ -33,6 +33,7 @@ import {
   EventEmitter,
   Input,
   OnChanges,
+  OnInit,
   Output,
 } from '@angular/core';
 import { FormControl, Validators } from '@angular/forms';
@@ -58,7 +59,7 @@ import { PoolAddDialogComponent } from './pool-add-dialog/pool-add-dialog.compon
   styleUrls: ['./pool-config.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PoolConfigComponent implements OnChanges {
+export class PoolConfigComponent implements OnChanges, OnInit {
   @Input() apps!: Apps[];
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
@@ -70,6 +71,7 @@ export class PoolConfigComponent implements OnChanges {
   poolId!: number | undefined;
   l3numCacheWays!: number;
   l2numCacheWays!: number;
+  l3cat!: CacheAllocation | null;
   mbaBwDefNum = Math.pow(2, 32) - 1;
   mbaBwControl = new FormControl('', [
     Validators.required,
@@ -89,6 +91,12 @@ export class PoolConfigComponent implements OnChanges {
     private snackBar: SnackBarService,
     public dialog: MatDialog
   ) { }
+
+  ngOnInit(): void {
+    this.localService.getL3CatEvent().subscribe((l3cat) => {
+      this.l3cat = l3cat;
+    })
+  }
 
   ngOnChanges(): void {
     this.getData(this.poolId);
@@ -304,7 +312,11 @@ export class PoolConfigComponent implements OnChanges {
     const dialogRef = this.dialog.open(PoolAddDialogComponent, {
       height: 'auto',
       width: '40rem',
-      data: { l2cwNum: this.l2numCacheWays, l3cwNum: this.l3numCacheWays },
+      data: {
+        l2cwNum: this.l2numCacheWays,
+        l3cwNum: this.l3numCacheWays,
+        l3cdp_enabled: this.l3cat?.cdp_enabled
+      },
     });
 
     dialogRef.afterClosed().subscribe((response) => {

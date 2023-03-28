@@ -38,6 +38,7 @@ import {
 import { MatDialog } from '@angular/material/dialog';
 
 import { AppqosService } from 'src/app/services/appqos.service';
+import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 
@@ -50,33 +51,49 @@ export class L3CacheAllocationComponent implements OnChanges {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
-  numCacheWays!: number;
+  l3cat!: CacheAllocation;
 
-  constructor(public dialog: MatDialog, private service: AppqosService) {}
+  constructor(public dialog: MatDialog, private service: AppqosService) { }
 
   ngOnChanges(): void {
     this.service.getL3cat().subscribe((l3cat) => {
-      this.numCacheWays = l3cat.cw_num;
+      this.l3cat = l3cat;
       this._convertToBitmask();
     });
   }
 
   private _convertToBitmask() {
-    this.poolsList = this.pools.map((pool: Pools) => ({
-      ...pool,
-      l3Bitmask: pool.l3cbm
-        ?.toString(2)
-        .padStart(this.numCacheWays, '0')
-        .split('')
-        .map(Number),
-    }));
+    if (this.l3cat.cdp_enabled) {
+      this.poolsList = this.pools.map((pool: Pools) => ({
+        ...pool,
+        l3BitmaskCode: pool.l3cbm_code
+          ?.toString(2)
+          .padStart(this.l3cat.cw_num, '0')
+          .split('')
+          .map(Number),
+        l3BitmaskData: pool.l3cbm_data
+          ?.toString(2)
+          .padStart(this.l3cat.cw_num, '0')
+          .split('')
+          .map(Number),
+      }));
+    } else {
+      this.poolsList = this.pools.map((pool: Pools) => ({
+        ...pool,
+        l3Bitmask: pool.l3cbm
+          ?.toString(2)
+          .padStart(this.l3cat.cw_num, '0')
+          .split('')
+          .map(Number),
+      }));
+    }
   }
 
   openDialog() {
     const dialogRef = this.dialog.open(EditDialogComponent, {
       height: 'auto',
       width: '50rem',
-      data: { l3cbm: true, numCacheWays: this.numCacheWays },
+      data: { l3cbm: true, numCacheWays: this.l3cat.cw_num },
     });
 
     dialogRef.afterClosed().subscribe(() => {
