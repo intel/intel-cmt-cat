@@ -1206,13 +1206,13 @@ main(int argc, char **argv)
                 return EXIT_FAILURE;
         }
 
-        /* Calculate memory bandwidth to use */
-        mem_bw *= (((1024 * 1024) / CL_SIZE)) / CHUNKS;
-
         printf("- THREAD logical core id: %u, "
                " memory bandwidth [MB]: %u, starting...\n",
                cpu, mem_bw);
         fflush(stdout);
+
+        /* Calculate memory bandwidth to use */
+        mem_bw *= (((1024 * 1024) / CL_SIZE)) / CHUNKS;
 
         /* Stress memory bandwidth */
         while (stop_loop == 0) {
