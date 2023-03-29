@@ -82,6 +82,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
     .pool-l3cbm {
       @include pool-flex;
+      align-items: center;
 
       .pool-cbm {
         display: flex;
@@ -89,6 +90,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
         padding-right: 0.5rem;
 
         .l3cbm-button {
+          display: flex;
           border-radius: 0%;
           border: 1px solid #6b6b6b;
           min-width: 25px;
@@ -96,6 +98,21 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
           margin-right: 2px;
           margin-top: 2px;
         }
+      }
+
+      .pool-l3cbm-label {
+        position: relative;
+        margin-right: 2.5rem;
+      }
+
+      .pool-l3cbm-code {
+        position: absolute;
+        margin-top: -2.2rem;
+      }
+
+      .pool-l3cbm-data {
+        position: absolute;
+        margin-top: 1.1rem;
       }
     }
 

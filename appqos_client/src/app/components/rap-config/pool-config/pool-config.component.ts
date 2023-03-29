@@ -35,6 +35,7 @@ import {
   OnChanges,
   OnInit,
   Output,
+  SimpleChanges
 } from '@angular/core';
 import { FormControl, Validators } from '@angular/forms';
 import { MatOptionSelectionChange } from '@angular/material/core';
@@ -98,7 +99,8 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     })
   }
 
-  ngOnChanges(): void {
+  ngOnChanges(changes: SimpleChanges): void {
+    if (!changes['pools'].currentValue) return
     this.getData(this.poolId);
   }
 
@@ -131,17 +133,32 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     );
     this.nameControl.setValue(this.pool.name);
 
-    if (this.pool.l3cbm) {
+    if (this.pool.l3cbm || this.l3cat?.cdp_enabled) {
       this.localService
         .getL3CatEvent()
         .subscribe((l3cat: CacheAllocation | null) => {
           this.l3numCacheWays = l3cat!.cw_num;
-          this.pool.l3Bitmask = this.pool.l3cbm
-            ?.toString(2)
-            .padStart(l3cat!.cw_num, '0')
-            .split('')
-            .map(Number);
-        });
+          if (l3cat!.cdp_enabled) {
+            this.pool.l3BitmaskCode = this.pool.l3cbm_code
+              ?.toString(2)
+              .padStart(l3cat!.cw_num, '0')
+              .split('')
+              .map(Number);
+
+            this.pool.l3BitmaskData = this.pool.l3cbm_data
+              ?.toString(2)
+              .padStart(l3cat!.cw_num, '0')
+              .split('')
+              .map(Number);
+          } else {
+            this.pool.l3Bitmask = this.pool.l3cbm
+              ?.toString(2)
+              .padStart(l3cat!.cw_num, '0')
+              .split('')
+              .map(Number);
+          }
+        }
+        );
     }
 
     if (this.pool.l2cbm) {
@@ -177,12 +194,16 @@ export class PoolConfigComponent implements OnChanges, OnInit {
       });
   }
 
-  onChangeL3CBM(value: number, i: number) {
-    if (value) {
-      this.pool.l3Bitmask![i] = 0;
-    } else {
-      this.pool.l3Bitmask![i] = 1;
-    }
+  onChangeL3CBM(value: number, index: number) {
+    this.pool.l3Bitmask![index] = Number(!value); 
+  }
+
+  onChangeL3CdpCode(value: number, index: number) {
+    this.pool.l3BitmaskCode![index] = Number(!value);
+  }
+
+  onChangeL3CdpData(value: number, index: number) {
+    this.pool.l3BitmaskData![index] = Number(!value);
   }
 
   onChangeL2CBM(value: number, i: number) {
@@ -218,9 +239,14 @@ export class PoolConfigComponent implements OnChanges, OnInit {
   saveL3CBM() {
     this.service
       .poolPut(
-        {
-          l3cbm: parseInt(this.pool.l3Bitmask!.join(''), 2),
-        },
+        (this.l3cat?.cdp_enabled) ?
+          {
+            l3cbm_code: parseInt(this.pool.l3BitmaskCode!.join(''), 2),
+            l3cbm_data: parseInt(this.pool.l3BitmaskData!.join(''), 2),
+          } :
+          {
+            l3cbm: parseInt(this.pool.l3Bitmask!.join(''), 2),
+          },
         this.pool.id
       )
       .subscribe({

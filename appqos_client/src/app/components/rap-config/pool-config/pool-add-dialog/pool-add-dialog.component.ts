@@ -110,13 +110,13 @@ export class PoolAddDialogComponent implements OnInit {
       }
     }
     if (this.caps.includes('l3cat') && this.data.l3cwNum) {
-      const l3cdm = (1 << this.data.l3cwNum) - 1;
+      const l3cbm = (1 << this.data.l3cwNum) - 1;
 
       if (this.data.l3cdp_enabled) {
-        pool.l3cbm_data = l3cdm;
-        pool.l3cbm_code = l3cdm;
+        pool.l3cbm_data = l3cbm;
+        pool.l3cbm_code = l3cbm;
       } else {
-        pool.l3cbm = l3cdm;
+        pool.l3cbm = l3cbm;
       }
     }
 
