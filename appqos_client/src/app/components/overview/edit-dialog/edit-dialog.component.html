@@ -55,6 +55,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       pools application(s) can fill. The following rows represent pool CBMs and
       can be modified to enable some number of cache ways for each pool.
     </p>
+    <p *ngIf="data.l3cdp">
+      CDP provides separate control over code and data by enabling separate
+      masks for code and data. With traditional CAT enabled, COS maps 1:1 with
+      CBMs. With CDP enabled, the mapping is now 1:2 (each CLOS maps to two
+      CBMs, one for code and one for data)
+    </p>
     <em
       >CBM enabled bits must be contiguous and at least one bit per CBM must be
       set.
@@ -82,37 +88,86 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   <mat-divider class="divider"></mat-divider>
   <mat-dialog-content class="mat-typography">
-    <div class="pool" *ngFor="let pool of pools; index as i">
+    <div class="pool" *ngFor="let pool of pools; index as poolIndex">
       <ul *ngIf="pool.isValid" class="error">
         <li>MBps is required!</li>
         <li>MBps value too large</li>
       </ul>
-      <span class="pool-name">
+      <span
+        class="pool-name"
+        [ngStyle]="{ 'margin-left': data.l3cdp ? '3rem' : '0rem' }"
+      >
         {{ pool.name }}
       </span>
-      <div class="cbm" *ngIf="data.l3cbm">
+      <!--L3 CAT-->
+      <div class="cbm" *ngIf="data.l3cbm && !data.l3cdp">
         <div class="pool-cbm">
           <button
             mat-flat-button
             [ngClass]="
               data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
             "
-            *ngFor="let n of pool.l3Bitmask; index as j"
-            [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
-            (click)="onChangeL3CBM(n, i, j)"
+            *ngFor="let bit of pool.l3Bitmask; index as bitIndex"
+            [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
+            (click)="onChangeL3CBM(bit, poolIndex, bitIndex)"
           >
-            {{ n }}
+            {{ bit }}
           </button>
         </div>
         <button
           mat-flat-button
           color="primary"
           class="apply-button"
-          (click)="saveL3CBM(i, pool.id)"
+          (click)="saveL3CBM(poolIndex, pool.id)"
         >
           Apply
         </button>
       </div>
+      <!--L3 CAT CDP-->
+      <div class="cdp" *ngIf="data.l3cdp">
+        <div class="cdp-label">
+          <div class="cdp-code">Code</div>
+          <div class="cdp-data">Data</div>
+        </div>
+        <div class="cdp-buttons">
+          <div class="pool-cdp">
+            <button
+              mat-flat-button
+              [ngClass]="
+                data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
+              "
+              *ngFor="let bit of pool.l3BitmaskCode; index as bitIndex"
+              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
+              (click)="onChangeL3CdpCode(bit, poolIndex, bitIndex)"
+            >
+              {{ bit }}
+            </button>
+          </div>
+          <div class="pool-cdp">
+            <button
+              mat-flat-button
+              [ngClass]="
+                data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
+              "
+              *ngFor="let bit of pool.l3BitmaskData; index as bitIndex"
+              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
+              (click)="onChangeL3CdpData(bit, poolIndex, bitIndex)"
+            >
+              {{ bit }}
+            </button>
+          </div>
+          <button
+            mat-flat-button
+            color="primary"
+            class="apply-button cdp-apply-button"
+            (click)="saveL3CBM(poolIndex, pool.id)"
+          >
+            Apply
+          </button>
+        </div>
+        <mat-divider class="divider"></mat-divider>
+      </div>
+      <!--L2 CAT-->
       <div class="cbm" *ngIf="data.l2cbm">
         <div class="pool-cbm">
           <button
@@ -122,7 +177,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             "
             *ngFor="let n of pool.l2Bitmask; index as j"
             [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
-            (click)="onChangeL2CBM(n, i, j)"
+            (click)="onChangeL2CBM(n, poolIndex, j)"
           >
             {{ n }}
           </button>
@@ -131,7 +186,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           mat-flat-button
           color="primary"
           class="apply-button"
-          (click)="saveL2CBM(i, pool.id)"
+          (click)="saveL2CBM(poolIndex, pool.id)"
         >
           Apply
         </button>
@@ -145,14 +200,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             max="100"
             step="10"
             aria-label="units"
-            (change)="onChangeMBA($event, i)"
+            (change)="onChangeMBA($event, poolIndex)"
           ></mat-slider>
         </div>
         <button
           mat-flat-button
           color="primary"
           class="apply-button"
-          (click)="saveMBA(i, pool.id)"
+          (click)="saveMBA(poolIndex, pool.id)"
         >
           Apply
         </button>
@@ -166,7 +221,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             [placeholder]="
               pool.mba_bw === mbaBwDefNum ? 'Unrestricted' : '5000'
             "
-            (input)="onChangeMbaBw($event, i)"
+            (input)="onChangeMbaBw($event, poolIndex)"
             required
             type="number"
           />
@@ -175,7 +230,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           mat-flat-button
           color="primary"
           class="apply-button"
-          (click)="updateMBABW(i, pool.id)"
+          (click)="updateMBABW(poolIndex, pool.id)"
         >
           Apply
         </button>

@@ -40,6 +40,7 @@ type dialogDataType = {
   mba?: boolean;
   l2cbm?: boolean;
   l3cbm?: boolean;
+  l3cdp?: boolean;
   numCacheWays: number;
 };
 
@@ -61,18 +62,22 @@ export class EditDialogComponent implements AfterContentInit {
     @Inject(MAT_DIALOG_DATA) public data: dialogDataType,
     private service: AppqosService,
     private snackBar: SnackBarService
-  ) {}
+  ) { }
 
   ngAfterContentInit(): void {
     this._getPools();
   }
 
-  onChangeL3CBM(value: number, i: number, j: number) {
-    if (value) {
-      this.pools[i].l3Bitmask![j] = 0;
-    } else {
-      this.pools[i].l3Bitmask![j] = 1;
-    }
+  onChangeL3CBM(value: number, poolIndex: number, bitIndex: number) {
+    this.pools[poolIndex].l3Bitmask![bitIndex] = Number(!value);
+  }
+
+  onChangeL3CdpCode(value: number, poolIndex: number, bitIndex: number) {
+    this.pools[poolIndex].l3BitmaskCode![bitIndex] = Number(!value);
+  }
+
+  onChangeL3CdpData(value: number, poolIndex: number, bitIndex: number) {
+    this.pools[poolIndex].l3BitmaskData![bitIndex] = Number(!value);
   }
 
   onChangeL2CBM(value: number, i: number, j: number) {
@@ -111,14 +116,30 @@ export class EditDialogComponent implements AfterContentInit {
 
   private _convertToBitmask(pools: Pools[]): Pools[] {
     if (this.data.l3cbm) {
-      return pools.map((pool: Pools) => ({
-        ...pool,
-        l3Bitmask: pool.l3cbm
-          ?.toString(2)
-          .padStart(this.data.numCacheWays, '0')
-          .split('')
-          .map(Number),
-      }));
+      if (this.data.l3cdp) {
+        return pools.map((pool: Pools) => ({
+          ...pool,
+          l3BitmaskCode: pool.l3cbm_code
+            ?.toString(2)
+            .padStart(this.data.numCacheWays, '0')
+            .split('')
+            .map(Number),
+          l3BitmaskData: pool.l3cbm_data
+            ?.toString(2)
+            .padStart(this.data.numCacheWays, '0')
+            .split('')
+            .map(Number),
+        }));
+      } else {
+        return pools.map((pool: Pools) => ({
+          ...pool,
+          l3Bitmask: pool.l3cbm
+            ?.toString(2)
+            .padStart(this.data.numCacheWays, '0')
+            .split('')
+            .map(Number),
+        }));
+      }
     } else {
       return pools.map((pool: Pools) => ({
         ...pool,
@@ -134,9 +155,14 @@ export class EditDialogComponent implements AfterContentInit {
   saveL3CBM(i: number, id: number) {
     this.service
       .poolPut(
-        {
-          l3cbm: parseInt(this.pools[i].l3Bitmask!.join(''), 2),
-        },
+        (this.data.l3cdp) ?
+          {
+            l3cbm_code: parseInt(this.pools[i].l3BitmaskCode!.join(''), 2),
+            l3cbm_data: parseInt(this.pools[i].l3BitmaskData!.join(''), 2),
+          } :
+          {
+            l3cbm: parseInt(this.pools[i].l3Bitmask!.join(''), 2),
+          },
         id
       )
       .subscribe({

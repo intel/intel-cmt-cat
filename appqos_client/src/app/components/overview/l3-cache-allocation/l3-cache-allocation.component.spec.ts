@@ -188,7 +188,7 @@ describe('Given L3CacheAllocationComponent', () => {
       expect(dialogSpy).toHaveBeenCalledWith(EditDialogComponent, {
         height: 'auto',
         width: '50rem',
-        data: { l3cbm: true, numCacheWays: 12 },
+        data: { l3cbm: true, numCacheWays: 12, l3cdp: false },
       });
     });
   });

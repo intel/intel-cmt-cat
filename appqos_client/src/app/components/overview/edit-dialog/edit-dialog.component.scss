@@ -85,9 +85,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
   .cbm,
   .mba,
+  .cdp,
   .pool-mba-mbps {
     display: flex;
-    align-items: baseline;
+    align-items: center;
 
     .apply-button {
       line-height: 2.1rem;
@@ -103,6 +104,35 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
   .pool-cbm {
     padding: 0.5rem 0;
+  }
+
+  .pool-cdp {
+    padding: 0.5rem 0;
+    display: inline-block;
+  }
+
+  .cdp-label {
+    float: left;
+    margin-right: 1rem;
+  }
+
+  .cdp-code {
+    margin-top: 0.3rem;
+  }
+
+  .cdp-data {
+    margin-top: 1.8rem;
+  }
+
+  .cdp-buttons {
+    position: relative;
+  }
+
+  .cdp-apply-button {
+    position: absolute;
+    top: 50%;
+    margin-top: -17px;
+    margin-left: 0.7rem;
   }
 
   .pool-mba {

@@ -93,7 +93,11 @@ export class L3CacheAllocationComponent implements OnChanges {
     const dialogRef = this.dialog.open(EditDialogComponent, {
       height: 'auto',
       width: '50rem',
-      data: { l3cbm: true, numCacheWays: this.l3cat.cw_num },
+      data: {
+        l3cbm: true,
+        l3cdp: this.l3cat.cdp_enabled,
+        numCacheWays: this.l3cat.cw_num
+      },
     });
 
     dialogRef.afterClosed().subscribe(() => {
