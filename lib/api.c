@@ -695,21 +695,22 @@ pqos_mon_start(const unsigned num_cores,
                 return PQOS_RETVAL_PARAM;
         }
 
+        struct pqos_mon_data_internal *mem = malloc(sizeof(*group->intl));
+
+        if (mem == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
         lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 lock_release();
+                free(mem);
                 return ret;
         }
 
         memset(group, 0, sizeof(*group));
-        group->intl =
-            (struct pqos_mon_data_internal *)malloc(sizeof(*group->intl));
-        if (group->intl == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_exit;
-        }
+        group->intl = mem;
         memset(group->intl, 0, sizeof(*group->intl));
 
         memset(&opt, 0, sizeof(opt));
@@ -721,11 +722,10 @@ pqos_mon_start(const unsigned num_cores,
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
-pqos_mon_start_exit:
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
-        else if (group->intl != NULL)
-                free(group->intl);
+        else if (mem != NULL)
+                free(mem);
 
         lock_release();
 
@@ -921,20 +921,22 @@ pqos_mon_start_pids(const unsigned num_pids,
                 return PQOS_RETVAL_PARAM;
         }
 
+        struct pqos_mon_data_internal *mem = malloc(sizeof(*group->intl));
+
+        if (mem == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
         lock_get();
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
                 lock_release();
+                free(mem);
                 return ret;
         }
 
         memset(group, 0, sizeof(*group));
-        group->intl = malloc(sizeof(*group->intl));
-        if (group->intl == NULL) {
-                ret = PQOS_RETVAL_RESOURCE;
-                goto pqos_mon_start_pids_exit;
-        }
+        group->intl = mem;
         memset(group->intl, 0, sizeof(*group->intl));
 
         if (api.mon_start_pids != NULL)
@@ -944,11 +946,10 @@ pqos_mon_start_pids(const unsigned num_pids,
                 ret = PQOS_RETVAL_RESOURCE;
         }
 
-pqos_mon_start_pids_exit:
         if (ret == PQOS_RETVAL_OK)
                 group->valid = GROUP_VALID_MARKER;
-        else if (group->intl != NULL)
-                free(group->intl);
+        else if (mem != NULL)
+                free(mem);
 
         lock_release();
 
