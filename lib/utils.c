@@ -304,30 +304,8 @@ pqos_cpu_get_cores(const struct pqos_cpuinfo *cpu,
                    const unsigned socket,
                    unsigned *count)
 {
-        unsigned i = 0, cnt = 0;
-        unsigned *cores = NULL;
-
-        ASSERT(cpu != NULL);
-        ASSERT(count != NULL);
-
-        if (cpu == NULL || count == NULL)
-                return NULL;
-
-        cores = (unsigned *)malloc(cpu->num_cores * sizeof(cores[0]));
-        if (cores == NULL)
-                return NULL;
-
-        for (i = 0; i < cpu->num_cores; i++)
-                if (cpu->cores[i].socket == socket)
-                        cores[cnt++] = cpu->cores[i].lcore;
-
-        if (!cnt) {
-                free(cores);
-                return NULL;
-        }
-
-        *count = cnt;
-        return cores;
+        return __get_cores_per_topology_obj(cpu, TOPO_OBJ_SOCKET, socket,
+                                            count);
 }
 
 const struct pqos_coreinfo *
