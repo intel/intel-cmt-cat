@@ -37,6 +37,7 @@ import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { L3CacheAllocationComponent } from './l3-cache-allocation.component';
 import { AppqosService } from 'src/app/services/appqos.service';
+import { CacheAllocation } from '../../system-caps/system-caps.model';
 
 describe('Given L3CacheAllocationComponent', () => {
   beforeEach(() =>
@@ -159,6 +160,100 @@ describe('Given L3CacheAllocationComponent', () => {
         '0 1 1 1 1 1 1 1 1 1 1 1',
       ]);
     });
+
+    it('it should display l3cbm code & data if cdp is enabled', async () => {
+      const mockedL3Cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      }
+      
+      MockInstance(AppqosService,'getL3cat' , () => of(mockedL3Cat));
+      
+      const mockedPools: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm_code: 2047,
+          l3cbm_data: 511,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+        {
+          id: 1,
+          mba_bw: 4294967295,
+          l3cbm_code: 15,
+          l3cbm_data: 4088,
+          name: 'HP',
+          cores: [10, 12, 15],
+        }
+      ];
+
+      const fixture = MockRender(L3CacheAllocationComponent, {
+        pools: mockedPools,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const expectedCbm = ngMocks
+        .findAll('.pool-cbm')
+        .map((pool) => ngMocks.formatText(pool))
+
+      expect(expectedCbm).toEqual([
+        '0 1 1 1 1 1 1 1 1 1 1 1',
+        '0 0 0 1 1 1 1 1 1 1 1 1',
+        '0 0 0 0 0 0 0 0 1 1 1 1',
+        '1 1 1 1 1 1 1 1 1 0 0 0',
+      ]);
+    })
+
+    it('it should display code and data label if cdp is enabled', async () => {
+      const mockedL3Cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      }
+
+      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3Cat));
+      
+      const mockedPools: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm_code: 2047,
+          l3cbm_data: 511,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+        {
+          id: 1,
+          mba_bw: 4294967295,
+          l3cbm_code: 15,
+          l3cbm_data: 4088,
+          name: 'HP',
+          cores: [10, 12, 15],
+        }
+      ];
+
+      const fixture = MockRender(L3CacheAllocationComponent, {
+        pools: mockedPools,
+      });
+      fixture.detectChanges();
+      await fixture.whenStable();
+
+      const label = ngMocks.formatText(
+        ngMocks.find('.pool-cdp-label')
+      );
+
+      expect(label).toContain('Data');
+      expect(label).toContain('Code');
+    })
   });
 
   describe('when click Edit button', () => {

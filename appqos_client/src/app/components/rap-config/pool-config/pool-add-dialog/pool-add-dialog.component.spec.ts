@@ -27,7 +27,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks"
+import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
 import { EMPTY, of, throwError } from "rxjs";
 import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
 import { AppqosService } from "src/app/services/appqos.service";
@@ -140,6 +140,45 @@ describe('Given poolAddDialogComponent', () => {
       expect(postPoolSpy).toHaveBeenCalledWith(mockedPool);
     })
 
+    it('it should save the correct properties when cdp is enabled', () => {
+      const name = 'pool_0';
+      const cores = '0-11';
+      const mockedCoresList = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+      const l3cbm = (1 << mockedData.l3cwNum) - 1;
+
+      const mockedPool = {
+        name: name,
+        cores: mockedCoresList,
+        l3cbm_code: l3cbm,
+        l3cbm_data: l3cbm,
+        l2cbm: (1 << mockedData.l2cwNum) - 1,
+        mba: 100
+      }
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolAddDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: { ...mockedData, l3cdp_enabled: true }
+          }
+        ]
+      });
+
+      const postPoolSpy = spyOn(component, 'postPool');
+
+      component.form.patchValue({ name, cores });
+
+      const savePoolButton = ngMocks.find('#save-pool-button');
+      savePoolButton.triggerEventHandler('click', null);
+
+      expect(component.form.valid).toBeTrue();
+      expect(parseNumberListSpy).toHaveBeenCalledWith(cores);
+      expect(component.coresList).toEqual(mockedCoresList);
+      expect(postPoolSpy).toHaveBeenCalledWith(mockedPool);
+    })
+
     it('it should return if the form is not valid', () => {
       const name = '';
       const cores = '';
@@ -186,10 +225,10 @@ describe('Given poolAddDialogComponent', () => {
       const coresErrorMessage = 'max length 80 characters';
 
       let name = 'p';
-      for (let i = 0; i < 80; i++){
+      for (let i = 0; i < 80; i++) {
         name += 'p';
       }
-      
+
       const fixture = MockRender(PoolAddDialogComponent, {}, {
         providers: [
           {
@@ -249,12 +288,12 @@ describe('Given poolAddDialogComponent', () => {
     it('it should throw error if cores input field exceeds 4096 characters', () => {
       const name = 'pool_0';
       const maxCoresErrorText = 'max length 4096 characters';
-      
+
       let cores: string = '0';
-      for (let i = 1; i < 5000; i++){
+      for (let i = 1; i < 5000; i++) {
         cores = `${cores}, ${i}`;
       }
-      
+
       const fixture = MockRender(PoolAddDialogComponent, {}, {
         providers: [
           {
@@ -272,7 +311,7 @@ describe('Given poolAddDialogComponent', () => {
       const maxCoresError = ngMocks.formatText(
         ngMocks.find('#max-char-cores-error')
       );
-      
+
       expect(maxCoresError).toBe(maxCoresErrorText);
       expect(postPoolSpy).not.toHaveBeenCalled();
       expect(component.form.invalid).toBeTrue();
@@ -304,7 +343,7 @@ describe('Given poolAddDialogComponent', () => {
       expect(coresError).toBe(coresErrorMessage);
       expect(component.form.controls['cores'].hasError('pattern')).toBeTrue();
     })
- 
+
     it('it should create a pool', () => {
       const name = 'pool_0';
       const cores = '11,12';

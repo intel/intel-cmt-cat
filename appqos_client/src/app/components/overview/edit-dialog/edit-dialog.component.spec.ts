@@ -304,6 +304,52 @@ describe('Given EditDialogComponent', () => {
       expect(poolsSpy).toHaveBeenCalledWith({ l3cbm: 2047 }, 0);
     });
 
+    it('it should have the correct properties if CDP is enabled', async () => {
+      const mockResponse = 'POOL 0 updated';
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const poolId = 0;
+
+      const expectedPrams = {
+        l3cbm_code: 2047,
+        l3cbm_data: 2047,
+      }
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm_code: 2047,
+          l3cbm_data: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
+        of(mockResponse)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l3cbm: true, l3cdp: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const cbmButton = ngMocks.find('.apply-button');
+      cbmButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy).toHaveBeenCalledWith(expectedPrams, poolId);
+    })
+
     it('should handle errors', async () => {
       const mockResponse = 'POOL 0 not updated'
       const poolsSpy = jasmine.createSpy('poolPut');
@@ -342,21 +388,21 @@ describe('Given EditDialogComponent', () => {
 
       // check CBM button click updates correct bit
       expect(component.pools[0].l3Bitmask)
-      .withContext('pool 0 l3cbm to be modified')
-      .not.toBe([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+        .withContext('pool 0 l3cbm to be modified')
+        .not.toBe([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
 
       // check apply button click sends correct CBM value
       const cbmButton = ngMocks.find('.apply-button');
       cbmButton.triggerEventHandler('click', null);
 
       expect(poolsSpy).withContext('putPools to be called with modified l3cbm')
-      .toHaveBeenCalledWith({ l3cbm: 2047 }, 0);
+        .toHaveBeenCalledWith({ l3cbm: 2047 }, 0);
 
       // check CBM value unchanged after error encountered
       await fixture.whenStable();
       expect(component.pools[0].l3cbm)
-      .withContext('initial l3cbm should be preserved')
-      .toBe(4095);
+        .withContext('initial l3cbm should be preserved')
+        .toBe(4095);
     });
   });
 
@@ -438,21 +484,21 @@ describe('Given EditDialogComponent', () => {
 
       // check CBM button click updates correct bit
       expect(component.pools[0].l2Bitmask)
-      .withContext('pool 0 l2cbm to be modified')
-      .not.toBe([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
+        .withContext('pool 0 l2cbm to be modified')
+        .not.toBe([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]);
 
       // check apply button click sends correct CBM value
       const cbmButton = ngMocks.find('.apply-button');
       cbmButton.triggerEventHandler('click', null);
 
       expect(poolsSpy).withContext('putPools to be called with modified l2cbm')
-      .toHaveBeenCalledWith({ l2cbm: 2047 }, 0);
+        .toHaveBeenCalledWith({ l2cbm: 2047 }, 0);
 
       // check CBM value unchanged after error encountered
       await fixture.whenStable();
       expect(component.pools[0].l2cbm)
-      .withContext('initial l2cbm should be preserved')
-      .toBe(4095);
+        .withContext('initial l2cbm should be preserved')
+        .toBe(4095);
     });
   });
 
@@ -490,21 +536,21 @@ describe('Given EditDialogComponent', () => {
 
       // check CBM button click enables correct bit
       expect(component.pools[0].l2Bitmask)
-      .withContext('should set index 0 bit to 1').toEqual([
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-      ]);
+        .withContext('should set index 0 bit to 1').toEqual([
+          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        ]);
 
       // check correct number of buttons displayed
       const l2cbmButtons = ngMocks.findAll('.cbm-button');
       expect(l2cbmButtons.length)
-      .withContext('should render 12 buttons').toBe(12);
+        .withContext('should render 12 buttons').toBe(12);
 
       // check CBM button click disables correct bit
       l2cbmButtons[l2cbmButtons.length - 1].triggerEventHandler('click', null);
       expect(component.pools[0].l2Bitmask)
-      .withContext('should set index 11 to 0').toEqual([
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
-      ]);
+        .withContext('should set index 11 to 0').toEqual([
+          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
+        ]);
 
     });
   });
@@ -543,22 +589,122 @@ describe('Given EditDialogComponent', () => {
 
       // check CBM button click enables correct bit
       expect(component.pools[0].l3Bitmask)
-      .withContext('should set index 0 bit to 1').toEqual([
-        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-      ]);
+        .withContext('should set index 0 bit to 1').toEqual([
+          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        ]);
 
       // check correct number of buttons displayed
       const l3cbmButtons = ngMocks.findAll('.cbm-button');
       expect(l3cbmButtons.length)
-      .withContext('should render 12 buttons').toBe(12);
+        .withContext('should render 12 buttons').toBe(12);
 
       // check CBM button click disables correct bit
       l3cbmButtons[4].triggerEventHandler('click', null);
       expect(component.pools[0].l3Bitmask)
-      .withContext('should set index 4 to 0').toEqual([
-        1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1,
-      ]);
+        .withContext('should set index 4 to 0').toEqual([
+          1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1,
+        ]);
     });
+  });
+
+  describe('when onChangeL3CdpCode method is called', () => {
+    it('it should update l3bitmaskCode of the pool', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm_code: 4095,
+          l3cbm_data: 4095,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l3cbm: true, l3cdp: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      const component = fixture.point.componentInstance;
+      await fixture.whenStable();
+
+      const l3cbmButtons = ngMocks.findAll('.cdp-code-button');
+      expect(l3cbmButtons.length).toBe(12);
+
+      expect(component.pools[0].l3BitmaskCode).toEqual(
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      );
+
+      l3cbmButtons[0].triggerEventHandler('click', null);
+      expect(component.pools[0].l3BitmaskCode).toEqual(
+        [0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      );
+
+      l3cbmButtons[8].triggerEventHandler('click', null);
+      expect(component.pools[0].l3BitmaskCode).toEqual(
+        [0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1]
+      );
+    })
+  });
+
+  describe('when onChangeL3CdpData method is called', () => {
+    it('it should update l3bitmaskData of the pool', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l3cbm_code: 4095,
+          l3cbm_data: 4095,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { l3cbm: true, l3cdp: true, numCacheWays: 12 },
+            },
+          ],
+        }
+      );
+
+      const component = fixture.point.componentInstance;
+      await fixture.whenStable();
+
+      const l3cbmButtons = ngMocks.findAll('.cdp-data-button');
+      expect(l3cbmButtons.length).toBe(12);
+
+      expect(component.pools[0].l3BitmaskData).toEqual(
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      );
+
+      l3cbmButtons[3].triggerEventHandler('click', null);
+      expect(component.pools[0].l3BitmaskData).toEqual(
+        [1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1]
+      );
+
+      l3cbmButtons[11].triggerEventHandler('click', null);
+      expect(component.pools[0].l3BitmaskData).toEqual(
+        [1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0]
+      );
+    })
   });
 
   describe('when initialized with MBA', () => {
@@ -777,14 +923,14 @@ describe('Given EditDialogComponent', () => {
       applyButton.triggerEventHandler('click', null);
 
       expect(poolsSpy)
-      .withContext('putPools to be called with modified mba value')
-      .toHaveBeenCalledWith({ mba: 50 }, 0);
+        .withContext('putPools to be called with modified mba value')
+        .toHaveBeenCalledWith({ mba: 50 }, 0);
 
       // check MBA value unchanged after error encountered
       await fixture.whenStable();
       expect(component.pools[0].mba)
-      .withContext('initial mba value should be preserved')
-      .toBe(70);
+        .withContext('initial mba value should be preserved')
+        .toBe(70);
     });
   });
 
@@ -913,7 +1059,7 @@ describe('Given EditDialogComponent', () => {
 
       // check mba_bw value unchanged after error encountered
       expect(fixture.point.componentInstance.pools[0].mba_bw)
-      .withContext('initial mba_bw value should be preserved').toBe(1000);
+        .withContext('initial mba_bw value should be preserved').toBe(1000);
     });
   });
 
@@ -955,16 +1101,16 @@ describe('Given EditDialogComponent', () => {
       const input = inputs[0];
 
       expect((await input.getValue()).toString())
-      .withContext('input should contain correct initial value')
-      .toEqual('1000');
+        .withContext('input should contain correct initial value')
+        .toEqual('1000');
 
       const applyButton = ngMocks.find('.apply-button');
       await input.setValue('5000');
       applyButton.triggerEventHandler('click', null);
 
       expect(poolsSpy)
-      .withContext('input valued to be applied')
-      .toHaveBeenCalledWith({ mba_bw: 5000 }, 0);
+        .withContext('input valued to be applied')
+        .toHaveBeenCalledWith({ mba_bw: 5000 }, 0);
     });
   });
 });

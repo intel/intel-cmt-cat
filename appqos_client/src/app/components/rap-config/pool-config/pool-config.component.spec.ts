@@ -30,13 +30,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 import { PoolConfigComponent } from './pool-config.component';
 import { CacheAllocation, resMessage } from '../../system-caps/system-caps.model';
-import { Pools, Apps } from '../../overview/overview.model';
+import { Pools } from '../../overview/overview.model';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { BehaviorSubject, EMPTY, of, throwError } from 'rxjs';
 import { LocalService } from 'src/app/services/local.service';
 import { MatOptionSelectionChange, MatOption } from '@angular/material/core';
-import { MatSliderChange, MatSlider, MatSliderModule } from '@angular/material/slider';
+import { MatSliderModule } from '@angular/material/slider';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { MatDialog } from '@angular/material/dialog';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
@@ -108,6 +108,51 @@ describe('Given poolConfigComponent', () => {
       expect(component.selected).toBe(mockedPools[poolID].name);
       expect(component.pool.l3Bitmask).toEqual(mockedL3Bitmask);
       expect(component.pool.l2Bitmask).toEqual(mockedL2BitMask);
+    })
+
+    it('it should update correct bitmasks when cdp is enabled', () => {
+      const poolId = 0;
+      const mockedL3BitmaskCode = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1];
+      const mockedL3BitmaskData = [0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0];
+
+      const mockedPools: Pools[] = [
+        {
+          id: 0,
+          name: 'pool_0',
+          cores: [1, 2, 3],
+          l3cbm_code: 15,
+          l3cbm_data: 504,
+          l2cbm: 7
+        },
+      ];
+
+      const params = {
+        pools: mockedPools,
+        apps: []
+      }
+
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
+      }
+
+      const catEvent = new BehaviorSubject<CacheAllocation>(mockedCache);
+
+      MockInstance(LocalService, 'getL3CatEvent', () => catEvent);
+      MockInstance(LocalService, 'getL2CatEvent', () => catEvent);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.getPool(poolId);
+      expect(component.selected).toBe(mockedPools[poolId].name);
+      expect(component.pool.l3BitmaskCode).toEqual(mockedL3BitmaskCode);
+      expect(component.pool.l3BitmaskData).toEqual(mockedL3BitmaskData);
     })
   })
 
@@ -248,6 +293,40 @@ describe('Given poolConfigComponent', () => {
 
       component.onChangeL3CBM(0, 0);
       expect(component.pool.l3Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 0]);
+    })
+  })
+
+  describe('when onChangeL3CdpCode is called', () => {
+    it('it should update l3bitmaskCode', () => {
+      const mockedL3BitmaskCode = [1, 1, 0, 1, 1, 1, 1, 1, 1];
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.pool.l3BitmaskCode = mockedL3BitmaskCode;
+      component.onChangeL3CdpCode(1, 6);
+      expect(component.pool.l3BitmaskCode).toEqual([1, 1, 0, 1, 1, 1, 0, 1, 1]);
+
+      component.onChangeL3CdpCode(0, 2);
+      expect(component.pool.l3BitmaskCode).toEqual([1, 1, 1, 1, 1, 1, 0, 1, 1])
+    })
+  })
+
+  describe('when onChangeL3CdpData is called', () => {
+    it('it should update l3bitmaskData', () => {
+      const mockedL3BitmaskData = [1, 1, 1, 1, 1, 1, 1, 0, 1];
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.pool.l3BitmaskData = mockedL3BitmaskData;
+      component.onChangeL3CdpData(0, 7);
+      expect(component.pool.l3BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1]);
+
+      component.onChangeL3CdpData(1, 4);
+      expect(component.pool.l3BitmaskData).toEqual([1, 1, 1, 1, 0, 1, 1, 1, 1])
     })
   })
 
@@ -398,6 +477,45 @@ describe('Given poolConfigComponent', () => {
       expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
       expect(nextHandlerSpy).toHaveBeenCalledWith(mockResponse);
     })
+
+    it('it should update the correct properties when cdp is enabled', () => {
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
+      }
+
+      const mockResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+      const mockedcbm = 127;
+
+      const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockResponse));
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+      component.poolId = poolID;
+      component.pool.l3BitmaskCode = mockedL3Bitmask;
+      component.pool.l3BitmaskData = mockedL3Bitmask;
+      component.l3cat = mockedCache;
+
+      const saveL3CBMButton = ngMocks.find('#save-l3cbm-button');
+      saveL3CBMButton.triggerEventHandler('click', null);
+
+      expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
+      expect(nextHandlerSpy).toHaveBeenCalledWith(mockResponse);
+      expect(poolPutSpy).toHaveBeenCalledOnceWith(
+        { l3cbm_code: mockedcbm, l3cbm_data: mockedcbm }, poolID
+      );
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {
@@ -762,6 +880,31 @@ describe('Given poolConfigComponent', () => {
 
       expect(matDialogSpy).toHaveBeenCalledTimes(1);
       expect(component.poolId).toBe(poolID);
+    })
+  })
+
+  describe('when cdp is enabled', () => {
+    it('it should display code and data label', async () => {
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
+      }
+
+      const catEvent = new BehaviorSubject<CacheAllocation>(mockedCache);
+
+      MockInstance(LocalService, 'getL3CatEvent', () => catEvent);
+      MockRender(PoolConfigComponent, params);
+      
+      const label = ngMocks.formatText(
+        ngMocks.find('.pool-l3cbm-label')
+      );
+
+      expect(label).toContain('Code');
+      expect(label).toContain('Data');
     })
   })
 });
