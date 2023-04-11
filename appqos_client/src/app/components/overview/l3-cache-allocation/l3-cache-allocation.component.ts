@@ -41,6 +41,7 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
+import { LocalService } from 'src/app/services/local.service';
 
 @Component({
   selector: 'app-l3-cache-allocation',
@@ -53,7 +54,9 @@ export class L3CacheAllocationComponent implements OnChanges {
   poolsList!: Pools[];
   l3cat!: CacheAllocation;
 
-  constructor(public dialog: MatDialog, private service: AppqosService) { }
+  constructor(public dialog: MatDialog,
+    private service: AppqosService,
+    private localService: LocalService) { }
 
   ngOnChanges(): void {
     this.service.getL3cat().subscribe((l3cat) => {
@@ -66,25 +69,13 @@ export class L3CacheAllocationComponent implements OnChanges {
     if (this.l3cat.cdp_enabled) {
       this.poolsList = this.pools.map((pool: Pools) => ({
         ...pool,
-        l3BitmaskCode: pool.l3cbm_code
-          ?.toString(2)
-          .padStart(this.l3cat.cw_num, '0')
-          .split('')
-          .map(Number),
-        l3BitmaskData: pool.l3cbm_data
-          ?.toString(2)
-          .padStart(this.l3cat.cw_num, '0')
-          .split('')
-          .map(Number),
+        l3BitmaskCode: this.localService.convertToBitmask(pool.l3cbm_code, this.l3cat.cw_num),
+        l3BitmaskData: this.localService.convertToBitmask(pool.l3cbm_data, this.l3cat.cw_num),
       }));
     } else {
       this.poolsList = this.pools.map((pool: Pools) => ({
         ...pool,
-        l3Bitmask: pool.l3cbm
-          ?.toString(2)
-          .padStart(this.l3cat.cw_num, '0')
-          .split('')
-          .map(Number),
+        l3Bitmask: this.localService.convertToBitmask(pool.l3cbm, this.l3cat.cw_num),
       }));
     }
   }

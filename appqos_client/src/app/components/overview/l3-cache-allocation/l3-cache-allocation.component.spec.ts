@@ -38,6 +38,7 @@ import { Pools } from '../overview.model';
 import { L3CacheAllocationComponent } from './l3-cache-allocation.component';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { CacheAllocation } from '../../system-caps/system-caps.model';
+import { LocalService } from 'src/app/services/local.service';
 
 describe('Given L3CacheAllocationComponent', () => {
   beforeEach(() =>
@@ -54,7 +55,7 @@ describe('Given L3CacheAllocationComponent', () => {
             cw_num: 12,
             cw_size: 3670016,
           }),
-      })
+      }).keep(LocalService)
   );
 
   MockInstance.scope('case');

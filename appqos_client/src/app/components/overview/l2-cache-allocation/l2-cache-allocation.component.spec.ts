@@ -37,6 +37,7 @@ import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { L2CacheAllocationComponent } from './l2-cache-allocation.component';
+import { LocalService } from 'src/app/services/local.service';
 
 describe('Given L2CacheAllocationComponent', () => {
   beforeEach(() =>
@@ -54,6 +55,7 @@ describe('Given L2CacheAllocationComponent', () => {
             cw_size: 3670016,
           }),
       })
+    .keep(LocalService)
   );
 
   MockInstance.scope('case');
@@ -83,7 +85,7 @@ describe('Given L2CacheAllocationComponent', () => {
         point: { componentInstance: component },
       } = MockRender(L2CacheAllocationComponent, { pools: mockedPool });
 
-      expect(component.numCacheWays).toEqual(12);
+      expect(component.l2cat.cw_num).toEqual(12);
     });
 
     it('should display pool name', () => {

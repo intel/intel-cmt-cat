@@ -73,4 +73,18 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
     flex-shrink: 0;
     display: flex;
   }
+
+  .pool-cdp-label {
+    float: left;
+    margin-right: 1rem;
+    margin-top: 1rem;
+  }
+
+  .pool-cdp-code {
+    margin-top: 0.1rem;
+  }
+
+  .pool-cdp-data {
+    margin-top: 1.3rem;
+  }
 }

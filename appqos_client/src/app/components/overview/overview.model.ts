@@ -38,7 +38,11 @@ export interface Pools {
   l3BitmaskCode?: number[];
   l3BitmaskData?: number[];
   l2cbm?: number;
+  l2cbm_code?: number;
+  l2cbm_data?: number;
   l2Bitmask?: number[];
+  l2BitmaskCode?: number[];
+  l2BitmaskData?: number[];
   name: string;
   cores: number[];
   apps?: number[];

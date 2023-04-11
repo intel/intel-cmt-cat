@@ -73,6 +73,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
   l3numCacheWays!: number;
   l2numCacheWays!: number;
   l3cat!: CacheAllocation | null;
+  l2cat!: CacheAllocation | null;
   mbaBwDefNum = Math.pow(2, 32) - 1;
   mbaBwControl = new FormControl('', [
     Validators.required,
@@ -96,6 +97,10 @@ export class PoolConfigComponent implements OnChanges, OnInit {
   ngOnInit(): void {
     this.localService.getL3CatEvent().subscribe((l3cat) => {
       this.l3cat = l3cat;
+    });
+
+    this.localService.getL2CatEvent().subscribe((l2cat) => {
+      this.l2cat = l2cat;
     })
   }
 
@@ -341,7 +346,8 @@ export class PoolConfigComponent implements OnChanges, OnInit {
       data: {
         l2cwNum: this.l2numCacheWays,
         l3cwNum: this.l3numCacheWays,
-        l3cdp_enabled: this.l3cat?.cdp_enabled
+        l3cdp_enabled: this.l3cat?.cdp_enabled,
+        l2cdp_enabled: this.l2cat?.cdp_enabled
       },
     });
 

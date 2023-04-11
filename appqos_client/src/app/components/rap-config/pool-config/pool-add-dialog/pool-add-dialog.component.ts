@@ -42,6 +42,7 @@ type dialogDataType = {
   l2cwNum?: number | undefined;
   l3cwNum?: number | undefined;
   l3cdp_enabled?: boolean;
+  l2cdp_enabled?: boolean;
 };
 
 @Component({
@@ -120,8 +121,16 @@ export class PoolAddDialogComponent implements OnInit {
       }
     }
 
-    if (this.caps.includes('l2cat') && this.data.l2cwNum)
-      pool.l2cbm = (1 << this.data.l2cwNum) - 1;
+    if (this.caps.includes('l2cat') && this.data.l2cwNum) {
+      const l2cbm = (1 << this.data.l2cwNum) - 1;
+
+      if (this.data.l2cdp_enabled) {
+        pool.l2cbm_code = l2cbm;
+        pool.l2cbm_data = l2cbm;
+      } else {
+        pool.l2cbm = l2cbm;
+      }
+    }
 
     this.postPool(pool);
   }

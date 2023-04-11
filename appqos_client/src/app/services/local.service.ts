@@ -143,6 +143,12 @@ export class LocalService {
     // sort list and return unique set of numbers
     numberList.sort((a, b) => a - b);
 
-    return [ ...new Set(numberList)]
+    return [...new Set(numberList)]
+  }
+
+  public convertToBitmask(cbm: number | undefined, cw_num: number): number[] {
+    return cbm!.toString(2)
+      .padStart(cw_num, '0')
+      .split('').map(Number);
   }
 }

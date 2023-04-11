@@ -40,6 +40,8 @@ import { MatDialog } from '@angular/material/dialog';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
+import { CacheAllocation } from '../../system-caps/system-caps.model';
+import { LocalService } from 'src/app/services/local.service';
 
 @Component({
   selector: 'app-l2-cache-allocation',
@@ -50,25 +52,29 @@ export class L2CacheAllocationComponent implements OnChanges {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
-  numCacheWays!: number;
+  l2cat!: CacheAllocation;
 
-  constructor(public dialog: MatDialog, private service: AppqosService) {}
+  constructor(public dialog: MatDialog,
+    private service: AppqosService,
+    private localService: LocalService) { }
 
   ngOnChanges(): void {
     this.service.getL2cat().subscribe((l2cat) => {
-      this.numCacheWays = l2cat.cw_num;
+      this.l2cat = l2cat;
       this._convertToBitmask();
     });
   }
 
   private _convertToBitmask() {
-    this.poolsList = this.pools.map((pool: Pools) => ({
+    this.poolsList = (this.l2cat.cdp_enabled) ?
+      this.pools.map((pool: Pools) => ({
       ...pool,
-      l2Bitmask: pool.l2cbm
-        ?.toString(2)
-        .padStart(this.numCacheWays, '0')
-        .split('')
-        .map(Number),
+      l2BitmaskCode: this.localService.convertToBitmask(pool.l2cbm_code, this.l2cat.cw_num),
+      l2BitmaskData: this.localService.convertToBitmask(pool.l2cbm_data, this.l2cat.cw_num)
+    })) :
+      this.pools.map((pool: Pools) => ({
+      ...pool,
+      l2Bitmask: this.localService.convertToBitmask(pool.l2cbm, this.l2cat.cw_num)
     }));
   }
 
@@ -76,7 +82,7 @@ export class L2CacheAllocationComponent implements OnChanges {
     const dialogRef = this.dialog.open(EditDialogComponent, {
       height: 'auto',
       width: '50rem',
-      data: { l2cbm: true, numCacheWays: this.numCacheWays },
+      data: { l2cbm: true, numCacheWays: this.l2cat.cw_num },
     });
 
     dialogRef.afterClosed().subscribe(() => {

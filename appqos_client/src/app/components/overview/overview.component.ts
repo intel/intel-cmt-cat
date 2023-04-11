@@ -35,6 +35,7 @@ import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Caps, MBACTRL, resMessage } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
+import { skip } from 'rxjs';
 
 @Component({
   selector: 'app-overview',
@@ -63,6 +64,10 @@ export class OverviewComponent implements OnInit {
     });
 
     this.localService.getL3CatEvent().subscribe(() => {
+      this.getPools();
+    });
+
+    this.localService.getL2CatEvent().pipe(skip(1)).subscribe(() => {
       this.getPools();
     })
   }
