@@ -82,7 +82,11 @@ export class L2CacheAllocationComponent implements OnChanges {
     const dialogRef = this.dialog.open(EditDialogComponent, {
       height: 'auto',
       width: '50rem',
-      data: { l2cbm: true, numCacheWays: this.l2cat.cw_num },
+      data: {
+        l2cbm: true,
+        l2cdp: this.l2cat.cdp_enabled,
+        numCacheWays: this.l2cat.cw_num
+      },
     });
 
     dialogRef.afterClosed().subscribe(() => {

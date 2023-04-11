@@ -45,9 +45,11 @@ import { Apps, Pools } from '../components/overview/overview.model';
 
 type poolPutType = {
   l2cbm?: number;
+  l2cbm_code?: number;
+  l2cbm_data?: number;
+  l3cbm?: number;
   l3cbm_code?: number;
   l3cbm_data?: number;
-  l3cbm?: number;
   mba?: number;
   mba_bw?: number;
   name?: string;

@@ -190,7 +190,11 @@ describe('Given L2CacheAllocationComponent', () => {
       expect(dialogSpy).toHaveBeenCalledWith(EditDialogComponent, {
         height: 'auto',
         width: '50rem',
-        data: { l2cbm: true, numCacheWays: 12 },
+        data: {
+          l2cbm: true,
+          l2cdp: false,
+          numCacheWays: 12
+        },
       });
     });
   });

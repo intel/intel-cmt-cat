@@ -35,10 +35,12 @@ import { MatSliderChange } from '@angular/material/slider';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Pools } from '../overview.model';
+import { LocalService } from 'src/app/services/local.service';
 
 type dialogDataType = {
   mba?: boolean;
   l2cbm?: boolean;
+  l2cdp?: boolean;
   l3cbm?: boolean;
   l3cdp?: boolean;
   numCacheWays: number;
@@ -61,7 +63,8 @@ export class EditDialogComponent implements AfterContentInit {
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: dialogDataType,
     private service: AppqosService,
-    private snackBar: SnackBarService
+    private snackBar: SnackBarService,
+    private localservice: LocalService
   ) { }
 
   ngAfterContentInit(): void {
@@ -80,12 +83,16 @@ export class EditDialogComponent implements AfterContentInit {
     this.pools[poolIndex].l3BitmaskData![bitIndex] = Number(!value);
   }
 
-  onChangeL2CBM(value: number, i: number, j: number) {
-    if (value) {
-      this.pools[i].l2Bitmask![j] = 0;
-    } else {
-      this.pools[i].l2Bitmask![j] = 1;
-    }
+  onChangeL2CBM(value: number, poolIndex: number, bitIndex: number) {
+    this.pools[poolIndex].l2Bitmask![bitIndex] = Number(!value);
+  }
+
+  onChangeL2CdpCode(value: number, poolIndex: number, bitIndex: number) {
+    this.pools[poolIndex].l2BitmaskCode![bitIndex] = Number(!value);
+  }
+
+  onChangeL2CdpData(value: number, poolIndex: number, bitIndex: number) {
+    this.pools[poolIndex].l2BitmaskData![bitIndex] = Number(!value);
   }
 
   onChangeMbaBw(event: any, i: number) {
@@ -116,39 +123,29 @@ export class EditDialogComponent implements AfterContentInit {
 
   private _convertToBitmask(pools: Pools[]): Pools[] {
     if (this.data.l3cbm) {
-      if (this.data.l3cdp) {
-        return pools.map((pool: Pools) => ({
+      return pools.map((pool: Pools) => (
+        (this.data.l3cdp) ? {
           ...pool,
-          l3BitmaskCode: pool.l3cbm_code
-            ?.toString(2)
-            .padStart(this.data.numCacheWays, '0')
-            .split('')
-            .map(Number),
-          l3BitmaskData: pool.l3cbm_data
-            ?.toString(2)
-            .padStart(this.data.numCacheWays, '0')
-            .split('')
-            .map(Number),
-        }));
-      } else {
-        return pools.map((pool: Pools) => ({
+          l3BitmaskCode: this.localservice.convertToBitmask(pool.l3cbm_code, this.data.numCacheWays),
+          l3BitmaskData: this.localservice.convertToBitmask(pool.l3cbm_data, this.data.numCacheWays),
+        } : {
           ...pool,
-          l3Bitmask: pool.l3cbm
-            ?.toString(2)
-            .padStart(this.data.numCacheWays, '0')
-            .split('')
-            .map(Number),
-        }));
-      }
+          l3Bitmask: this.localservice.convertToBitmask(pool.l3cbm, this.data.numCacheWays),
+        }
+      ));
+    } else if (this.data.l2cbm) {
+      return pools.map((pool: Pools) => (
+        (this.data.l2cdp) ? {
+          ...pool,
+          l2BitmaskCode: this.localservice.convertToBitmask(pool.l2cbm_code, this.data.numCacheWays),
+          l2BitmaskData: this.localservice.convertToBitmask(pool.l2cbm_data, this.data.numCacheWays),
+        } : {
+          ...pool,
+          l2Bitmask: this.localservice.convertToBitmask(pool.l2cbm, this.data.numCacheWays),
+        }
+      ));
     } else {
-      return pools.map((pool: Pools) => ({
-        ...pool,
-        l2Bitmask: pool.l2cbm
-          ?.toString(2)
-          .padStart(this.data.numCacheWays, '0')
-          .split('')
-          .map(Number),
-      }));
+      return pools;
     }
   }
 
@@ -180,9 +177,14 @@ export class EditDialogComponent implements AfterContentInit {
   saveL2CBM(i: number, id: number) {
     this.service
       .poolPut(
-        {
-          l2cbm: parseInt(this.pools[i].l2Bitmask!.join(''), 2),
-        },
+        (this.data.l2cdp) ?
+          {
+            l2cbm_code: parseInt(this.pools[i].l2BitmaskCode!.join(''), 2),
+            l2cbm_data: parseInt(this.pools[i].l2BitmaskData!.join(''), 2)
+          } :
+          {
+            l2cbm: parseInt(this.pools[i].l2Bitmask!.join(''), 2),
+          },
         id
       )
       .subscribe({

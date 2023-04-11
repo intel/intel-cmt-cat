@@ -42,6 +42,7 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { Pools } from '../overview.model';
 import { EditDialogComponent } from './edit-dialog.component';
+import { LocalService } from 'src/app/services/local.service';
 
 describe('Given EditDialogComponent', () => {
   beforeEach(() =>
@@ -56,6 +57,7 @@ describe('Given EditDialogComponent', () => {
       .keep(MatSliderModule)
       .keep(MatInputModule)
       .keep(BrowserAnimationsModule)
+      .keep(LocalService)
   );
 
   MockInstance.scope('case');
@@ -165,6 +167,21 @@ describe('Given EditDialogComponent', () => {
   describe('when initialized with L2 CAT', () => {
     it('should display "L2 Cache Allocation Technology (CAT)" title', async () => {
       const title = 'L2 Cache Allocation Technology (CAT)';
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm: 2047,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      const poolsSpy = jasmine.createSpy('getPools');
+
+      MockInstance(AppqosService, 'getPools', poolsSpy).and.returnValue(
+        of(mockedPool)
+      );
       const fixture = MockRender(
         EditDialogComponent,
         {},
@@ -892,7 +909,9 @@ describe('Given EditDialogComponent', () => {
       // throw error on poolPut()
       MockInstance(AppqosService, 'poolPut', poolsSpy).and
         .returnValue(throwError(() => new Error(mockResponse)));
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'getPools', () => of(
+        mockedPool.map((pool: Pools) => ({ ...pool }))
+      ));
 
       const fixture = MockRender(
         EditDialogComponent,
