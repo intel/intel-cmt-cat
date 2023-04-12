@@ -48,7 +48,8 @@ describe('Given RapConfigComponent', () => {
       })
       .mock(LocalService, {
         getIfaceEvent: () => EMPTY,
-        getL3CatEvent: () => EMPTY
+        getL3CatEvent: () => EMPTY,
+        getL2CatEvent: () => EMPTY
       });
   });
 

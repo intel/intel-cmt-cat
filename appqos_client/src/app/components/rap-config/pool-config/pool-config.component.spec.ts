@@ -900,7 +900,7 @@ describe('Given poolConfigComponent', () => {
       MockRender(PoolConfigComponent, params);
       
       const label = ngMocks.formatText(
-        ngMocks.find('.pool-l3cbm-label')
+        ngMocks.find('.cbm-label')
       );
 
       expect(label).toContain('Code');

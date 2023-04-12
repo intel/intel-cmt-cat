@@ -99,12 +99,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           RENAME
         </button>
       </div>
-      <span *ngIf="pool?.l3cbm || l3cat?.cdp_enabled">L3 Cache Allocation Technology (L3 CAT)</span>
-      <div class="pool-l3cbm" *ngIf="pool.l3cbm && !(l3cat?.cdp_enabled)">
-        <div class="pool-cbm">
+      <span *ngIf="pool?.l3cbm || l3cat?.cdp_enabled"
+        >L3 Cache Allocation Technology (L3 CAT)</span
+      >
+      <div class="pool-cbm" *ngIf="pool.l3cbm && !l3cat?.cdp_enabled">
+        <div class="cbm">
           <button
             mat-flat-button
-            class="l3cbm-button"
+            class="cbm-button"
             *ngFor="let bit of pool?.l3Bitmask; index as i"
             [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
             (click)="onChangeL3CBM(bit, i)"
@@ -121,53 +123,55 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           APPLY
         </button>
       </div>
-      <div class="pool-l3cbm" *ngIf="l3cat?.cdp_enabled">
-        <div class="pool-l3cbm-label">
-          <div class="pool-l3cbm-code">Code</div>
-          <div class="pool-l3cbm-data">Data</div>
+      <div class="pool-cbm" *ngIf="l3cat?.cdp_enabled">
+        <div class="cbm-label">
+          <div class="cbm-code">Code</div>
+          <div class="cbm-data">Data</div>
         </div>
         <div>
-        <div class="pool-cbm">
+          <div class="cbm">
+            <button
+              mat-flat-button
+              class="cbm-button"
+              *ngFor="let bit of pool?.l3BitmaskCode; index as i"
+              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
+              (click)="onChangeL3CdpCode(bit, i)"
+            >
+              {{ bit }}
+            </button>
+          </div>
+          <br />
+          <div class="cbm">
+            <button
+              mat-flat-button
+              class="cbm-button"
+              *ngFor="let bit of pool?.l3BitmaskData; index as i"
+              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
+              (click)="onChangeL3CdpData(bit, i)"
+            >
+              {{ bit }}
+            </button>
+          </div>
+        </div>
+        <div>
           <button
-            mat-flat-button
-            class="l3cbm-button"
-            *ngFor="let bit of pool?.l3BitmaskCode; index as i"
-            [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
-            (click)="onChangeL3CdpCode(bit, i)"
+            mat-raised-button
+            color="primary"
+            id="save-l3cdp-button"
+            (click)="saveL3CBM()"
           >
-            {{ bit }}
+            APPLY
           </button>
         </div>
-        <br>
-        <div class="pool-cbm">
+      </div>
+      <span *ngIf="pool.l2cbm || l2cat?.cdp_enabled"
+        >L2 Cache Allocation Technology (L2 CAT)</span
+      >
+      <div class="pool-cbm" *ngIf="pool.l2cbm && !l2cat?.cdp_enabled">
+        <div class="cbm">
           <button
             mat-flat-button
-            class="l3cbm-button"
-            *ngFor="let bit of pool?.l3BitmaskData; index as i"
-            [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
-            (click)="onChangeL3CdpData(bit, i)"
-          >
-            {{ bit }}
-          </button>
-        </div>
-      </div>
-      <div>
-        <button
-          mat-raised-button
-          color="primary"
-          id="save-l3cdp-button"
-          (click)="saveL3CBM()"
-        >
-          APPLY
-        </button>
-      </div>
-      </div>
-      <span *ngIf="pool.l2cbm">L2 Cache Allocation Technology (L2 CAT)</span>
-      <div class="pool-l2cbm" *ngIf="pool.l2cbm">
-        <div class="pool-cbm">
-          <button
-            mat-flat-button
-            class="l2cbm-button"
+            class="cbm-button"
             *ngFor="let n of pool.l2Bitmask; index as i"
             [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
             (click)="onChangeL2CBM(n, i)"
@@ -183,6 +187,48 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
         >
           APPLY
         </button>
+      </div>
+
+      <div class="pool-cbm" *ngIf="l2cat?.cdp_enabled">
+        <div class="cbm-label">
+          <div class="cbm-code">Code</div>
+          <div class="cbm-data">Data</div>
+        </div>
+        <div>
+          <div class="cbm">
+            <button
+              mat-flat-button
+              class="cbm-button"
+              *ngFor="let bit of pool?.l2BitmaskCode; index as i"
+              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
+              (click)="onChangeL2CdpCode(bit, i)"
+            >
+              {{ bit }}
+            </button>
+          </div>
+          <br />
+          <div class="cbm">
+            <button
+              mat-flat-button
+              class="cbm-button"
+              *ngFor="let bit of pool?.l2BitmaskData; index as i"
+              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
+              (click)="onChangeL2CdpData(bit, i)"
+            >
+              {{ bit }}
+            </button>
+          </div>
+        </div>
+        <div>
+          <button
+            mat-raised-button
+            color="primary"
+            id="save-l2cdp-button"
+            (click)="saveL2CBM()"
+          >
+            APPLY
+          </button>
+        </div>
       </div>
       <span *ngIf="pool.mba || pool.mba_bw"
         >Memory Bandwidth Allocation (MBA)</span

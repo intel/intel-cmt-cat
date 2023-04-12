@@ -166,16 +166,29 @@ export class PoolConfigComponent implements OnChanges, OnInit {
         );
     }
 
-    if (this.pool.l2cbm) {
+    if (this.pool.l2cbm || this.l2cat?.cdp_enabled) {
       this.localService
         .getL2CatEvent()
         .subscribe((l2cat: CacheAllocation | null) => {
           this.l2numCacheWays = l2cat!.cw_num;
-          this.pool.l2Bitmask = this.pool.l2cbm
-            ?.toString(2)
-            .padStart(l2cat!.cw_num, '0')
-            .split('')
-            .map(Number);
+          if (l2cat!.cdp_enabled) {
+            this.pool.l2BitmaskCode = this.pool.l2cbm_code
+              ?.toString(2)
+              .padStart(l2cat!.cw_num, '0')
+              .split('')
+              .map(Number);
+            this.pool.l2BitmaskData = this.pool.l2cbm_data
+              ?.toString(2)
+              .padStart(l2cat!.cw_num, '0')
+              .split('')
+              .map(Number);
+          } else {
+            this.pool.l2Bitmask = this.pool.l2cbm
+              ?.toString(2)
+              .padStart(l2cat!.cw_num, '0')
+              .split('')
+              .map(Number);
+          }
         });
     }
   }
@@ -200,7 +213,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
   }
 
   onChangeL3CBM(value: number, index: number) {
-    this.pool.l3Bitmask![index] = Number(!value); 
+    this.pool.l3Bitmask![index] = Number(!value);
   }
 
   onChangeL3CdpCode(value: number, index: number) {
@@ -211,12 +224,16 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     this.pool.l3BitmaskData![index] = Number(!value);
   }
 
-  onChangeL2CBM(value: number, i: number) {
-    if (value) {
-      this.pool.l2Bitmask![i] = 0;
-    } else {
-      this.pool.l2Bitmask![i] = 1;
-    }
+  onChangeL2CBM(value: number, index: number) {
+    this.pool.l2Bitmask![index] = Number(!value);
+  }
+
+  onChangeL2CdpCode(value: number, index: number) {
+    this.pool.l2BitmaskCode![index] = Number(!value);
+  }
+
+  onChangeL2CdpData(value: number, index: number) {
+    this.pool.l2BitmaskData![index] = Number(!value);
   }
 
   onChangeMBA(event: MatSliderChange) {
@@ -226,9 +243,14 @@ export class PoolConfigComponent implements OnChanges, OnInit {
   saveL2CBM() {
     this.service
       .poolPut(
-        {
-          l2cbm: parseInt(this.pool.l2Bitmask!.join(''), 2),
-        },
+        (this.l2cat?.cdp_enabled) ?
+          {
+            l2cbm_code: parseInt(this.pool.l2BitmaskCode!.join(''), 2),
+            l2cbm_data: parseInt(this.pool.l2BitmaskData!.join(''), 2)
+          } :
+          {
+            l2cbm: parseInt(this.pool.l2Bitmask!.join(''), 2),
+          },
         this.pool.id
       )
       .subscribe({

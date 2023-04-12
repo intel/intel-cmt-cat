@@ -53,6 +53,7 @@ export class RapConfigComponent implements OnInit {
 
     this.localService.getIfaceEvent().subscribe(() => this.getConfigData());
     this.localService.getL3CatEvent().subscribe(() => this.getConfigData());
+    this.localService.getL2CatEvent().subscribe(() => this.getConfigData());
   }
 
   getConfigData(): void {
