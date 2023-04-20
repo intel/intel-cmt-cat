@@ -90,6 +90,20 @@ PQOS_LOCAL int cpuinfo_fini(void);
  */
 PQOS_LOCAL void cpuinfo_get_config(const struct cpuinfo_config **config);
 
+/**
+ * @brief Detect cpu model
+ *
+ * @return detected cpu model
+ */
+uint32_t get_cpu_model(void);
+
+/**
+ * @brief Detect cpu family
+ *
+ * @return detected cpu family
+ */
+uint32_t get_cpu_family(void);
+
 #ifdef __cplusplus
 }
 #endif

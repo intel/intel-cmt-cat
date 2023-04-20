@@ -38,6 +38,7 @@
 #include "log.h"
 #include "machine.h"
 #include "monitoring.h"
+#include "cpuinfo.h"
 
 #include <dirent.h> /**< scandir() */
 #include <fnmatch.h>
@@ -176,26 +177,7 @@ filter_cha(const struct dirent *dir)
         return fnmatch(UNCORE_CHA "[0-9]*", dir->d_name, 0) == 0;
 }
 
-/**
- * @brief Detect cpu model
- *
- * @return detected cpu model
- */
-static uint32_t
-_get_cpu_model(void)
-{
-        uint32_t model;
-        struct cpuid_out out;
 
-        lcpuid(1, 0, &out);
-
-        /* Read CPU model */
-        model = (out.eax & 0xf0) >> 4;
-        /* Read CPU extended model */
-        model |= (out.eax & 0xf0000) >> 12;
-
-        return model;
-}
 
 /**
  * @brief Discover uncore monitoring events
@@ -208,7 +190,7 @@ _get_cpu_model(void)
 int
 uncore_mon_discover(enum pqos_mon_event *event)
 {
-        uint32_t model = _get_cpu_model();
+        uint32_t model = get_cpu_model();
 
         if (model == CPU_MODEL_SKX)
                 *event =
@@ -251,7 +233,7 @@ uncore_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         UNUSED_PARAM(cpu);
 
         {
-                uint32_t model = _get_cpu_model();
+                uint32_t model = get_cpu_model();
 
                 if (model == CPU_MODEL_SKX) {
                         uncore_events = uncore_events_skx;

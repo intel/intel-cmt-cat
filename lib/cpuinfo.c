@@ -515,6 +515,48 @@ detect_vendor(void)
 }
 
 /**
+ * @brief Detect cpu model
+ *
+ * @return detected cpu model
+ */
+uint32_t
+get_cpu_model(void)
+{
+        uint32_t model;
+        struct cpuid_out out;
+
+        lcpuid(1, 0, &out);
+
+        /* Read CPU model */
+        model = (out.eax & 0xf0) >> 4;
+        /* Read CPU extended model */
+        model |= (out.eax & 0xf0000) >> 12;
+
+        return model;
+}
+
+/**
+ * @brief Detect cpu family
+ *
+ * @return detected cpu family
+ */
+uint32_t
+get_cpu_family(void)
+{
+        uint32_t family;
+        struct cpuid_out out;
+
+        lcpuid(1, 0, &out);
+
+        /* Read CPU family */
+        family = (out.eax & 0xf00) >> 8;
+        /* Read CPU extended family */
+        family |= (out.eax & 0xff00000) >> 16;
+
+        return family;
+}
+
+/**
  * Initialize pointers for the vendors
  *
  * @param config configuration structures

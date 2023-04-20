@@ -37,6 +37,7 @@
 #include "hw_cap.h"
 
 #include "cpu_registers.h"
+#include "cpuinfo.h"
 #include "log.h"
 #include "machine.h"
 #include "uncore_monitoring.h"
@@ -484,6 +485,41 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
 }
 
 /**
+ * @brief Detects presence of L3 CAT based on model & family ID.
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_RESOURCE technology not supported
+ */
+static int
+hw_cap_l3ca_model(void)
+{
+        int supported_models[] = {63};
+        int supported_family[] = {6};
+        int cpu_model = get_cpu_model();
+        int cpu_family = get_cpu_family();
+        int model_ret = PQOS_RETVAL_RESOURCE;
+        int family_ret = PQOS_RETVAL_RESOURCE;
+
+        for (unsigned long i = 0;
+             i < sizeof(supported_models) / sizeof(supported_models[0]); i++) {
+                if (cpu_model == supported_models[i])
+                        model_ret = PQOS_RETVAL_OK;
+        }
+
+        for (unsigned long i = 0;
+             i < sizeof(supported_family) / sizeof(supported_family[0]); i++) {
+                if (cpu_family == supported_family[i])
+                        family_ret = PQOS_RETVAL_OK;
+        }
+
+        if (model_ret == PQOS_RETVAL_OK && family_ret == PQOS_RETVAL_OK)
+                return PQOS_RETVAL_OK;
+        else
+                return PQOS_RETVAL_RESOURCE;
+}
+
+/**
  * @brief Detects presence of L3 CAT based on CPUID
  *
  * @param cap CAT structure to be initialized
@@ -583,7 +619,6 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                 /**
                  * Use CPUID method
                  */
-                LOG_INFO("CPUID.0x7.0: L3 CAT supported\n");
                 ret = hw_cap_l3ca_cpuid(cap, cpu);
                 if (ret == PQOS_RETVAL_RESOURCE) {
                         LOG_INFO("CPUID.0x10.0: L3 CAT not detected. "
@@ -599,11 +634,17 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         if (check_brand_str) {
                 /**
                  * Use brand string matching method 1st.
-                 * If it fails then try register probing.
+                 * If it fails then check the model and family ID.
                  */
                 ret = hw_cap_l3ca_brandstr(cap);
-                if (ret != PQOS_RETVAL_OK && check_brand_str > 1)
+                if (ret != PQOS_RETVAL_OK && check_brand_str > 1) {
+                        LOG_INFO("Checking model and family ID...\n");
+                        ret = hw_cap_l3ca_model();
+                }
+                if (ret == PQOS_RETVAL_OK || getenv("RDT_PROBE_MSR") != NULL) {
+                        LOG_INFO("Probing msr....\n");
                         ret = hw_cap_l3ca_probe(cap, cpu);
+                }
                 if (ret == PQOS_RETVAL_OK)
                         ret =
                             get_cache_info(&cpu->l3, &cap->num_ways, &l3_size);
