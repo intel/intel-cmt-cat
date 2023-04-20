@@ -72,3 +72,31 @@ export enum Standards {
   MAX_CHARS_PIDS = 4096,
   MAX_CORES = 1024,
 }
+
+/* cache information */
+export interface CacheInfo {
+  level: number;
+  num_ways: number;
+  num_sets: number;
+  num_partitions: number;
+  line_size: number;
+  total_size: number;
+  way_size: number;
+}
+
+/* logical core information */
+export interface CoreInfo {
+  socket: number;
+  lcore: number;
+  L2ID: number;
+  L3ID?: number;
+  sstbfHP?: boolean;
+}
+
+/* system information  */
+export interface SystemTopology {
+  vendor: string;
+  cache: CacheInfo[];
+  core: CoreInfo[];
+}
+

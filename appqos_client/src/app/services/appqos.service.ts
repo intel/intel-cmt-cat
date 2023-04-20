@@ -29,11 +29,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, Observable, of, throwError } from 'rxjs';
+import { catchError, Observable, of, tap, throwError } from 'rxjs';
 
 import {
   CacheAllocation,
   Caps,
+  SystemTopology,
   MBA,
   MBACTRL,
   RDTIface,
@@ -77,6 +78,23 @@ export class AppqosService {
     const api_url = this.local.getData('api_url');
     return this.http.get<Caps>(`${api_url}/caps`)
       .pipe(catchError(this.handleError));
+  }
+
+  /**
+   * Retrieve system topology information
+   */
+  getSystemTopology(): Observable<SystemTopology> {
+    // first try to read from storage
+    const topo = this.local.getData('system_topology');
+    if (topo) return of(JSON.parse(topo));
+
+    // otherwise retrieve from server and store
+    const api_url = this.local.getData('api_url');
+    return this.http.get<SystemTopology>(`${api_url}/caps/cpu`)
+      .pipe(tap((topo) => this.local.saveData(
+        'system_topology', JSON.stringify(topo)
+      )),
+      catchError(this.handleError));
   }
 
   /**
