@@ -35,10 +35,10 @@
 
 #include "cap.h"
 #include "cpu_registers.h"
+#include "cpuinfo.h"
 #include "log.h"
 #include "machine.h"
 #include "monitoring.h"
-#include "cpuinfo.h"
 
 #include <dirent.h> /**< scandir() */
 #include <fnmatch.h>
@@ -176,8 +176,6 @@ filter_cha(const struct dirent *dir)
 {
         return fnmatch(UNCORE_CHA "[0-9]*", dir->d_name, 0) == 0;
 }
-
-
 
 /**
  * @brief Discover uncore monitoring events
