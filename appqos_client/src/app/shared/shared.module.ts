@@ -73,6 +73,9 @@ import { CoresEditDialogComponent } from '../components/rap-config/pool-config/c
 import { AppsAddDialogComponent } from '../components/rap-config/apps-config/apps-add-dialog/apps-add-dialog.component';
 import { AppsEditDialogComponent } from '../components/rap-config/apps-config/apps-edit-dialog/apps-edit-dialog.component';
 import { CatComponent } from '../components/system-caps/cat/cat.component';
+import { SystemTopologyComponent } from '../components/system-topology/system-topology.component';
+import { NodeComponent } from '../components/system-topology/node/node.component';
+import { CoreComponent } from '../components/system-topology/core/core.component';
 
 @NgModule({
   declarations: [
@@ -97,6 +100,9 @@ import { CatComponent } from '../components/system-caps/cat/cat.component';
     AppsAddDialogComponent,
     AppsEditDialogComponent,
     CatComponent,
+    SystemTopologyComponent,
+    NodeComponent,
+    CoreComponent,
   ],
   imports: [
     MatInputModule,
