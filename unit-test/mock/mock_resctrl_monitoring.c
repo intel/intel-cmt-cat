@@ -37,6 +37,52 @@
 #include <string.h>
 
 int
+__wrap_resctrl_mon_start(struct pqos_mon_data *group)
+{
+        check_expected_ptr(group);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_stop(struct pqos_mon_data *group)
+{
+        check_expected_ptr(group);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_is_event_supported(const enum pqos_mon_event event)
+{
+        check_expected_ptr(event);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_init(const struct pqos_cpuinfo *cpu,
+                        const struct pqos_cap *cap)
+{
+        check_expected_ptr(cpu);
+        check_expected_ptr(cap);
+
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_fini(void)
+{
+        return mock_type(int);
+}
+
+int
+__wrap_resctrl_mon_reset(void)
+{
+        return mock_type(int);
+}
+
+int
 __wrap_resctrl_mon_assoc_get(const unsigned lcore,
                              char *name,
                              const unsigned name_size)

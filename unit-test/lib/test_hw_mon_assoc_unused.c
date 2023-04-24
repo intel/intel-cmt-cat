@@ -36,7 +36,7 @@
 #include "test.h"
 
 static int
-test_init_mon(void **state)
+wrap_init_mon(void **state)
 {
         int ret;
 
@@ -56,7 +56,7 @@ test_init_mon(void **state)
 }
 
 static int
-test_fini_mon(void **state)
+wrap_fini_mon(void **state)
 {
         int ret;
 
@@ -218,7 +218,7 @@ main(void)
             cmocka_unit_test(test_hw_alloc_assoc_unused_not_found),
         };
 
-        result += cmocka_run_group_tests(tests, test_init_mon, test_fini_mon);
+        result += cmocka_run_group_tests(tests, wrap_init_mon, wrap_fini_mon);
 
         return result;
 }

@@ -268,7 +268,7 @@ test__pqos_get_cap_before_init(void **state __attribute__((unused)))
 {
         const struct pqos_cap *ret;
 
-        ret = _pqos_get_cap();
+        ret = __real__pqos_get_cap();
         assert_null(ret);
 }
 
@@ -277,7 +277,7 @@ test__pqos_get_cap_after_init(void **state __attribute__((unused)))
 {
         const struct pqos_cap *ret;
 
-        ret = _pqos_get_cap();
+        ret = __real__pqos_get_cap();
         assert_non_null(ret);
 }
 
@@ -288,7 +288,7 @@ test__pqos_get_cpu_before_init(void **state __attribute__((unused)))
 {
         const struct pqos_cpuinfo *ret;
 
-        ret = _pqos_get_cpu();
+        ret = __real__pqos_get_cpu();
         assert_null(ret);
 }
 
@@ -297,7 +297,7 @@ test__pqos_get_cpu_after_init(void **state __attribute__((unused)))
 {
         const struct pqos_cpuinfo *ret;
 
-        ret = _pqos_get_cpu();
+        ret = __real__pqos_get_cpu();
         assert_non_null(ret);
 }
 

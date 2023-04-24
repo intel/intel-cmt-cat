@@ -38,6 +38,8 @@
 int __wrap__pqos_check_init(const int expect);
 const struct pqos_cap *__wrap__pqos_get_cap(void);
 const struct pqos_cpuinfo *__wrap__pqos_get_cpu(void);
+const struct pqos_cap *__real__pqos_get_cap(void);
+const struct pqos_cpuinfo *__real__pqos_get_cpu(void);
 void __wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg);

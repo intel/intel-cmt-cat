@@ -39,12 +39,6 @@
 
 #include <dirent.h>
 
-static int
-test_init_mon(void **state)
-{
-        return test_init(state, 1 << PQOS_CAP_TYPE_MON);
-}
-
 /* ======== mock ======== */
 
 int

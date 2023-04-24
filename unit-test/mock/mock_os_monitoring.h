@@ -57,4 +57,9 @@ int __wrap_os_mon_remove_pids(const unsigned num_pids,
                               const pid_t *pids,
                               struct pqos_mon_data *group);
 
+/* ======== headers for static functions ======== */
+int os_mon_stop_events(struct pqos_mon_data *group);
+int os_mon_start_events(struct pqos_mon_data *group);
+int os_mon_tid_exists(const pid_t pid);
+
 #endif /* MOCK_OS_MONITORING_H_ */

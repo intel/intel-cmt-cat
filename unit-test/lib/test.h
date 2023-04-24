@@ -271,6 +271,12 @@ test_init_mba(void **state)
 }
 
 static inline int
+test_init_mon(void **state)
+{
+        return test_init(state, 1 << PQOS_CAP_TYPE_MON);
+}
+
+static inline int
 test_init_all(void **state)
 {
         unsigned technology = 0;

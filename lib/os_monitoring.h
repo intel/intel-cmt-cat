@@ -115,18 +115,6 @@ PQOS_LOCAL int os_mon_start_cores(const unsigned num_cores,
                                   const struct pqos_mon_options *opt);
 
 /**
- * @brief OS interface to poll monitoring data from requested groups
- *
- * @param [in] groups table of monitoring group pointers to be updated
- * @param [in] num_groups number of monitoring groups in the table
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-PQOS_LOCAL int os_mon_poll(struct pqos_mon_data **groups,
-                           const unsigned num_groups);
-
-/**
  * @brief OS interface to start monitoring of selected group of \a pids
  *
  * @param [in] num_pids number of pids in \a pids array
