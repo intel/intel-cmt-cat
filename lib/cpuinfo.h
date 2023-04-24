@@ -47,6 +47,8 @@
 extern "C" {
 #endif
 
+#define CPU_MODEL_SKX 0x55
+
 /**
  * CPU vendor configuration value
  */
@@ -56,6 +58,9 @@ struct cpuinfo_config {
         unsigned mba_default_val; /**< Memory bandwidth reset value */
         uint32_t mba_msr_reg;     /**< MBA mask base register */
 };
+
+static int cpuinfo_supported_cpu_models[] = {63};
+static int cpuinfo_supported_cpu_familes[] = {6};
 
 /**
  * @brief Initializes CPU information module
@@ -95,14 +100,14 @@ PQOS_LOCAL void cpuinfo_get_config(const struct cpuinfo_config **config);
  *
  * @return detected cpu model
  */
-uint32_t get_cpu_model(void);
+uint32_t cpuinfo_get_cpu_model(void);
 
 /**
  * @brief Detect cpu family
  *
  * @return detected cpu family
  */
-uint32_t get_cpu_family(void);
+uint32_t cpuinfo_get_cpu_family(void);
 
 #ifdef __cplusplus
 }

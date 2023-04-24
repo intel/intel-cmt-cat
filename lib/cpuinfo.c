@@ -520,7 +520,7 @@ detect_vendor(void)
  * @return detected cpu model
  */
 uint32_t
-get_cpu_model(void)
+cpuinfo_get_cpu_model(void)
 {
         uint32_t model;
         struct cpuid_out out;
@@ -541,7 +541,7 @@ get_cpu_model(void)
  * @return detected cpu family
  */
 uint32_t
-get_cpu_family(void)
+cpuinfo_get_cpu_family(void)
 {
         uint32_t family;
         struct cpuid_out out;

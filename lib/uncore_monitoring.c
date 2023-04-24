@@ -68,8 +68,6 @@
 
 #define UNCORE_CHA_MAX 40
 
-#define CPU_MODEL_SKX 0x55
-
 /** uncore channels */
 static uint64_t m_uncore_cha = 0;
 
@@ -188,7 +186,7 @@ filter_cha(const struct dirent *dir)
 int
 uncore_mon_discover(enum pqos_mon_event *event)
 {
-        uint32_t model = get_cpu_model();
+        uint32_t model = cpuinfo_get_cpu_model();
 
         if (model == CPU_MODEL_SKX)
                 *event =
@@ -231,7 +229,7 @@ uncore_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         UNUSED_PARAM(cpu);
 
         {
-                uint32_t model = get_cpu_model();
+                uint32_t model = cpuinfo_get_cpu_model();
 
                 if (model == CPU_MODEL_SKX) {
                         uncore_events = uncore_events_skx;

@@ -494,22 +494,18 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
 static int
 hw_cap_l3ca_model(void)
 {
-        int supported_models[] = {63};
-        int supported_family[] = {6};
-        int cpu_model = get_cpu_model();
-        int cpu_family = get_cpu_family();
+        int cpu_model = cpuinfo_get_cpu_model();
+        int cpu_family = cpuinfo_get_cpu_family();
         int model_ret = PQOS_RETVAL_RESOURCE;
         int family_ret = PQOS_RETVAL_RESOURCE;
 
-        for (unsigned long i = 0;
-             i < sizeof(supported_models) / sizeof(supported_models[0]); i++) {
-                if (cpu_model == supported_models[i])
+        for (unsigned i = 0; i < DIM(cpuinfo_supported_cpu_models); i++) {
+                if (cpu_model == cpuinfo_supported_cpu_models[i])
                         model_ret = PQOS_RETVAL_OK;
         }
 
-        for (unsigned long i = 0;
-             i < sizeof(supported_family) / sizeof(supported_family[0]); i++) {
-                if (cpu_family == supported_family[i])
+        for (unsigned i = 0; i < DIM(cpuinfo_supported_cpu_familes); i++) {
+                if (cpu_family == cpuinfo_supported_cpu_familes[i])
                         family_ret = PQOS_RETVAL_OK;
         }
 
