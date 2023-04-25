@@ -47,7 +47,9 @@
 extern "C" {
 #endif
 
-#define CPU_MODEL_SKX 0x55
+#define CPU_MODEL_SKX  0x55
+#define CPU_MODEL_HSX  0x3f
+#define CPU_FAMILY_HSX 0x06
 
 /**
  * CPU vendor configuration value
@@ -58,9 +60,6 @@ struct cpuinfo_config {
         unsigned mba_default_val; /**< Memory bandwidth reset value */
         uint32_t mba_msr_reg;     /**< MBA mask base register */
 };
-
-static int cpuinfo_supported_cpu_models[] = {63};
-static int cpuinfo_supported_cpu_familes[] = {6};
 
 /**
  * @brief Initializes CPU information module

@@ -494,8 +494,10 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
 static int
 hw_cap_l3ca_model(void)
 {
-        int cpu_model = cpuinfo_get_cpu_model();
-        int cpu_family = cpuinfo_get_cpu_family();
+        const int cpuinfo_supported_cpu_models[] = {CPU_MODEL_HSX};
+        const int cpuinfo_supported_cpu_familes[] = {CPU_FAMILY_HSX};
+        const int cpu_model = cpuinfo_get_cpu_model();
+        const int cpu_family = cpuinfo_get_cpu_family();
         int model_ret = PQOS_RETVAL_RESOURCE;
         int family_ret = PQOS_RETVAL_RESOURCE;
 
@@ -596,7 +598,7 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
 {
         struct cpuid_out res;
         unsigned l3_size = 0;
-        unsigned check_brand_str = 0;
+        unsigned cpuid_check_fail = 0;
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(cap != NULL);
@@ -619,21 +621,21 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                 if (ret == PQOS_RETVAL_RESOURCE) {
                         LOG_INFO("CPUID.0x10.0: L3 CAT not detected. "
                                  "Checking brand string...\n");
-                        check_brand_str = 1;
+                        cpuid_check_fail = 1;
                 } else if (ret == PQOS_RETVAL_OK)
                         ret = get_cache_info(&cpu->l3, NULL, &l3_size);
         } else {
                 LOG_INFO("CPUID.0x7.0: L3 CAT not detected. "
                          "Checking brand string...\n");
-                check_brand_str = 2;
+                cpuid_check_fail = 1;
         }
-        if (check_brand_str) {
+        if (cpuid_check_fail) {
                 /**
                  * Use brand string matching method 1st.
                  * If it fails then check the model and family ID.
                  */
                 ret = hw_cap_l3ca_brandstr(cap);
-                if (ret != PQOS_RETVAL_OK && check_brand_str > 1) {
+                if (ret != PQOS_RETVAL_OK) {
                         LOG_INFO("Checking model and family ID...\n");
                         ret = hw_cap_l3ca_model();
                 }
