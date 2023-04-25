@@ -145,13 +145,15 @@ describe('Given poolAddDialogComponent', () => {
       const cores = '0-11';
       const mockedCoresList = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
       const l3cbm = (1 << mockedData.l3cwNum) - 1;
+      const l2cbm = (1 << mockedData.l2cwNum) - 1;
 
       const mockedPool = {
         name: name,
         cores: mockedCoresList,
         l3cbm_code: l3cbm,
         l3cbm_data: l3cbm,
-        l2cbm: (1 << mockedData.l2cwNum) - 1,
+        l2cbm_code: l2cbm,
+        l2cbm_data: l2cbm,
         mba: 100
       }
 
@@ -161,7 +163,11 @@ describe('Given poolAddDialogComponent', () => {
         providers: [
           {
             provide: MAT_DIALOG_DATA,
-            useValue: { ...mockedData, l3cdp_enabled: true }
+            useValue: {
+              ...mockedData,
+              l3cdp_enabled: true,
+              l2cdp_enabled: true
+            }
           }
         ]
       });

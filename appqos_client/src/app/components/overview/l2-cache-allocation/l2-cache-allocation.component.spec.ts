@@ -38,6 +38,7 @@ import { Pools } from '../overview.model';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { L2CacheAllocationComponent } from './l2-cache-allocation.component';
 import { LocalService } from 'src/app/services/local.service';
+import { CacheAllocation } from '../../system-caps/system-caps.model';
 
 describe('Given L2CacheAllocationComponent', () => {
   beforeEach(() =>
@@ -55,7 +56,7 @@ describe('Given L2CacheAllocationComponent', () => {
             cw_size: 3670016,
           }),
       })
-    .keep(LocalService)
+      .keep(LocalService)
   );
 
   MockInstance.scope('case');
@@ -159,6 +160,63 @@ describe('Given L2CacheAllocationComponent', () => {
         '0 1 1 1 1 1 1 1 1 1 1 1',
         '0 0 0 0 0 0 0 0 1 1 1 1',
         '0 1 1 1 1 1 1 1 1 1 1 1',
+      ]);
+    });
+
+    it('should display l2cbm code and data if cdp is enabled', () => {
+      const mockedL2Cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      }
+
+      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2Cat));
+
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm_code: 4064,
+          l2cbm_data: 3840,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+        {
+          id: 1,
+          mba_bw: 4294967295,
+          l2cbm_code: 4088,
+          l2cbm_data: 511,
+          name: 'HP',
+          cores: [10, 12, 15],
+        },
+        {
+          id: 2,
+          mba_bw: 4294967295,
+          l2cbm_code: 240,
+          l2cbm_data: 15,
+          name: 'LP',
+          cores: [16, 17, 14],
+        },
+      ];
+
+      MockRender(L2CacheAllocationComponent, {
+        pools: mockedPool,
+      });
+
+      const expectedCbm = ngMocks
+        .findAll('.pool-cbm')
+        .map((pool) => ngMocks.formatText(pool));
+
+      expect(expectedCbm).toEqual([
+        '1 1 1 1 1 1 1 0 0 0 0 0',
+        '1 1 1 1 0 0 0 0 0 0 0 0',
+        '1 1 1 1 1 1 1 1 1 0 0 0',
+        '0 0 0 1 1 1 1 1 1 1 1 1',
+        '0 0 0 0 1 1 1 1 0 0 0 0',
+        '0 0 0 0 0 0 0 0 1 1 1 1',
       ]);
     });
   });

@@ -377,29 +377,91 @@ describe('Given LocalService', () => {
     })
 
     it('should return array of numbers 4156985 to 4156992' +
-       'when given "4156985,4156986,4156987,4156988-4156992"', () => {
-      const {
-        point: { componentInstance: service }
-      } = MockRender(LocalService);
+      'when given "4156985,4156986,4156987,4156988-4156992"', () => {
+        const {
+          point: { componentInstance: service }
+        } = MockRender(LocalService);
 
-      const testString = '4156985,4156986,4156987,4156988-4156992';
-      const numbers = [4156985, 4156986, 4156987,
-        4156988, 4156989, 4156990, 4156991, 4156992];
+        const testString = '4156985,4156986,4156987,4156988-4156992';
+        const numbers = [4156985, 4156986, 4156987,
+          4156988, 4156989, 4156990, 4156991, 4156992];
 
-      expect(service.parseNumberList(testString)).toEqual(numbers);
-    })
+        expect(service.parseNumberList(testString)).toEqual(numbers);
+      })
 
     it('should return an array of numbers 1126973 to 1126984 ' +
-       'when given "1126984-1126973"', () => {
+      'when given "1126984-1126973"', () => {
+        const {
+          point: { componentInstance: service }
+        } = MockRender(LocalService);
+
+        const testString = '1126984-1126973';
+        const numbers = [1126973, 1126974, 1126975, 1126976,
+          1126977, 1126978, 1126979, 1126980, 1126981, 1126982, 1126983, 1126984]
+
+        expect(service.parseNumberList(testString)).toEqual(numbers);
+      })
+  })
+
+  describe('when convertToBitmask is called', () => {
+    it('it should return correct bitmask when given 63 & 12', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const testString = '1126984-1126973';
-      const numbers = [1126973, 1126974, 1126975, 1126976,
-        1126977, 1126978, 1126979, 1126980, 1126981, 1126982, 1126983, 1126984]
+      const cbm = 63;
+      const cw_num = 12;
+      const expectedBitmask = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
 
-      expect(service.parseNumberList(testString)).toEqual(numbers);
-    })
+      expect(service.convertToBitmask(cbm, cw_num)).toEqual(expectedBitmask);
+    });
+
+    it('it should return correct bitmask when given 1008 & 12', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const cbm = 1008;
+      const cw_num = 12;
+      const expectedBitmask = [0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0];
+
+      expect(service.convertToBitmask(cbm, cw_num)).toEqual(expectedBitmask);
+    });
+
+    it('it should return correct bitmask when given 224 & 12', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const cbm = 224;
+      const cw_num = 16;
+      const expectedBitmask = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0];
+
+      expect(service.convertToBitmask(cbm, cw_num)).toEqual(expectedBitmask);
+    });
+
+    it('it should return correct bitmask when given 4095 & 10', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const cbm = 1023;
+      const cw_num = 10;
+      const expectedBitmask = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+
+      expect(service.convertToBitmask(cbm, cw_num)).toEqual(expectedBitmask);
+    });
+
+    it('it should return correct bitmask when given 2046 & 12', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      const cbm = 127;
+      const cw_num = 8;
+      const expectedBitmask = [0, 1, 1, 1, 1, 1, 1, 1];
+
+      expect(service.convertToBitmask(cbm, cw_num)).toEqual(expectedBitmask);
+    });
   })
 })

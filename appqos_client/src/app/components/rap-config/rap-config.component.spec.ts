@@ -134,7 +134,28 @@ describe('Given RapConfigComponent', () => {
       expect(component.getConfigData)
         .withContext('should call getConfigData when event emitted')
         .toHaveBeenCalledTimes(1);
-    })
+    });
+
+    it('should subscribe to getL2CatEvent', () => {
+      const mockGetl2CatEvent = new Subject<void>();
+      const getConfigDataSpy = jasmine.createSpy();
+      const getl2CatEventSpy =
+        jasmine.createSpy().and.returnValue(mockGetl2CatEvent);
+
+      MockInstance(LocalService, 'getL2CatEvent', getl2CatEventSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(RapConfigComponent);
+
+      component.getConfigData = getConfigDataSpy;
+
+      mockGetl2CatEvent.next();
+
+      expect(component.getConfigData)
+        .withContext('should call getConfigData when event emitted')
+        .toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('when initialized with errors', () => {

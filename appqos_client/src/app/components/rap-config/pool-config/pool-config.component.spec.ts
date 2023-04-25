@@ -114,6 +114,8 @@ describe('Given poolConfigComponent', () => {
       const poolId = 0;
       const mockedL3BitmaskCode = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1];
       const mockedL3BitmaskData = [0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0];
+      const mockedL2BitmaskCode = [0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1];
+      const mockedL2BitmaskData = [0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0];
 
       const mockedPools: Pools[] = [
         {
@@ -122,7 +124,8 @@ describe('Given poolConfigComponent', () => {
           cores: [1, 2, 3],
           l3cbm_code: 15,
           l3cbm_data: 504,
-          l2cbm: 7
+          l2cbm_code: 63,
+          l2cbm_data: 240,
         },
       ];
 
@@ -153,6 +156,8 @@ describe('Given poolConfigComponent', () => {
       expect(component.selected).toBe(mockedPools[poolId].name);
       expect(component.pool.l3BitmaskCode).toEqual(mockedL3BitmaskCode);
       expect(component.pool.l3BitmaskData).toEqual(mockedL3BitmaskData);
+      expect(component.pool.l2BitmaskCode).toEqual(mockedL2BitmaskCode);
+      expect(component.pool.l2BitmaskData).toEqual(mockedL2BitmaskData);
     })
   })
 
@@ -347,6 +352,40 @@ describe('Given poolConfigComponent', () => {
     })
   })
 
+  describe('when onChangeL2CdpCode method is called', () => {
+    it('it should update l2BitmaskCode', () => {
+      const mockedL2BitmaskCode = [1, 1, 1, 1, 1, 1, 1, 0];
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.pool.l2BitmaskCode = mockedL2BitmaskCode;
+      component.onChangeL2CdpCode(0, 7);
+      expect(component.pool.l2BitmaskCode).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
+
+      component.onChangeL2CdpCode(1, 5);
+      expect(component.pool.l2BitmaskCode).toEqual([1, 1, 1, 1, 1, 0, 1, 1])
+    });
+  });
+
+  describe('when onChangeL2CdpData method is called', () => {
+    it('it should update l2BitmaskData', () => {
+      const mockedL2BitmaskData = [1, 1, 1, 0, 1, 1, 1, 1];
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      component.pool.l2BitmaskData = mockedL2BitmaskData;
+      component.onChangeL2CdpData(0, 3);
+      expect(component.pool.l2BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
+
+      component.onChangeL2CdpData(1, 6);
+      expect(component.pool.l2BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 0, 1])
+    });
+  });
+
   describe('when onChangeMBA is called', () => {
     it('it should update mba', async () => {
       const oldMba = 20;
@@ -413,7 +452,46 @@ describe('Given poolConfigComponent', () => {
 
       expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
       expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
-    })
+    });
+
+    it('it should update the correct properties when cdp is enabled', () => {
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
+      }
+
+      const mockResponse = {
+        status: 200,
+        message: `POOL ${poolID} updated`
+      }
+      const mockedcbm = 127;
+
+      const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockResponse));
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PoolConfigComponent, params);
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+      component.poolId = poolID;
+      component.pool.l2BitmaskCode = mockedL2Bitmask;
+      component.pool.l2BitmaskData = mockedL2Bitmask;
+      component.l2cat = mockedCache;
+
+      const saveL2CBMButton = ngMocks.find('#save-l2cbm-button');
+      saveL2CBMButton.triggerEventHandler('click', null);
+
+      expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
+      expect(nextHandlerSpy).toHaveBeenCalledWith(mockResponse);
+      expect(poolPutSpy).toHaveBeenCalledOnceWith(
+        { l2cbm_code: mockedcbm, l2cbm_data: mockedcbm }, poolID
+      );
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {

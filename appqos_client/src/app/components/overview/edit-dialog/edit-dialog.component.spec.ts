@@ -463,6 +463,56 @@ describe('Given EditDialogComponent', () => {
       expect(poolsSpy).toHaveBeenCalledWith({ l2cbm: 2047 }, 0);
     });
 
+    it('should save pool l2cbm code & data by pool id', async () => {
+      const mockResponse = 'POOL 0 updated';
+      const poolID = 0;
+      const poolsSpy = jasmine.createSpy('poolPut');
+      const expectedParams = {
+        l2cbm_code: 2047,
+        l2cbm_data: 4064,
+      }
+
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm_code: 2047,
+          l2cbm_data: 4064,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
+        of(mockResponse)
+      );
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: {
+                l2cbm: true,
+                l2cdp: true,
+                numCacheWays: 12
+              },
+            },
+          ],
+        }
+      );
+
+      await fixture.whenStable();
+
+      const cbmButton = ngMocks.find('.apply-button');
+      cbmButton.triggerEventHandler('click', null);
+
+      expect(poolsSpy).toHaveBeenCalledWith(expectedParams, poolID);
+    });
+
     it('should handle errors', async () => {
       const mockResponse = 'POOL 0 not updated'
       const poolsSpy = jasmine.createSpy('poolPut');
@@ -475,7 +525,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      // throw error on poolPu()
+      // throw error on poolPut()
       MockInstance(AppqosService, 'poolPut', poolsSpy).and
         .returnValue(throwError(() => new Error(mockResponse)));
       MockInstance(AppqosService, 'getPools', () => of(mockedPool));
@@ -568,6 +618,114 @@ describe('Given EditDialogComponent', () => {
         .withContext('should set index 11 to 0').toEqual([
           1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0,
         ]);
+
+    });
+  });
+
+  describe('when onChangeL2CdpCode method is executed', () => {
+    it('should update l2bitmaskCode by index', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm_code: 4095,
+          l2cbm_data: 4095,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: {
+                l2cbm: true,
+                l2cdp: true,
+                numCacheWays: 12
+              },
+            },
+          ],
+        }
+      );
+      const component = fixture.point.componentInstance;
+      await fixture.whenStable();
+
+      const l2cbmButtons = ngMocks.findAll('.cdp-code-button');
+      expect(l2cbmButtons.length).toBe(12);
+
+      expect(component.pools[0].l2BitmaskCode).toEqual(
+        [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+      );
+
+      l2cbmButtons[4].triggerEventHandler('click', null);
+      expect(component.pools[0].l2BitmaskCode).toEqual(
+        [1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1]
+      );
+
+      l2cbmButtons[5].triggerEventHandler('click', null);
+      expect(component.pools[0].l2BitmaskCode).toEqual(
+        [1, 1, 1, 1, 0, 0, 1, 1, 1, 1, 1, 1]
+      );
+
+    });
+  });
+
+  describe('when onChangeL2CdpData method is executed', () => {
+    it('should update l2bitmaskData by index', async () => {
+      const mockedPool: Pools[] = [
+        {
+          id: 0,
+          mba_bw: 4294967295,
+          l2cbm_code: 4095,
+          l2cbm_data: 4064,
+          name: 'Default',
+          cores: [0, 1, 45, 46, 47],
+        },
+      ];
+
+      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+
+      const fixture = MockRender(
+        EditDialogComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: {
+                l2cbm: true,
+                l2cdp: true,
+                numCacheWays: 12
+              },
+            },
+          ],
+        }
+      );
+      const component = fixture.point.componentInstance;
+      await fixture.whenStable();
+
+      const l2cbmButtons = ngMocks.findAll('.cdp-data-button');
+      expect(l2cbmButtons.length).toBe(12);
+
+      expect(component.pools[0].l2BitmaskData).toEqual(
+        [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0]
+      );
+
+      l2cbmButtons[7].triggerEventHandler('click', null);
+      expect(component.pools[0].l2BitmaskData).toEqual(
+        [1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+      );
+
+      l2cbmButtons[2].triggerEventHandler('click', null);
+      expect(component.pools[0].l2BitmaskData).toEqual(
+        [1, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+      );
 
     });
   });

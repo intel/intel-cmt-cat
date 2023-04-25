@@ -150,13 +150,41 @@ describe('Given OverviewComponent', () => {
 
       MockRender(OverviewComponent, {}, {
         providers: [
+          { provide: LocalService, useValue: local }
+        ]
+      });
+
+      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
+
+      local.setL3CatEvent(l3cat);
+
+      expect(getPoolsSpy).toHaveBeenCalledTimes(3);
+    });
+
+    it('should subscribe to getL2CatEvent()', () => {
+      const l2cat: CacheAllocation = {
+        cache_size: 42,
+        cdp_enabled: false,
+        cdp_supported: false,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3.5,
+      }
+
+      const getPoolsSpy = jasmine.createSpy('getPools').and.returnValue(of());
+      MockInstance(AppqosService, 'getPools', getPoolsSpy);
+
+      let local = new LocalService()
+
+      MockRender(OverviewComponent, {}, {
+        providers: [
         { provide: LocalService, useValue: local }
       ]
       });
 
       expect(getPoolsSpy).toHaveBeenCalledTimes(2);
 
-      local.setL3CatEvent(l3cat);
+      local.setL2CatEvent(l2cat);
 
       expect(getPoolsSpy).toHaveBeenCalledTimes(3);
     });
