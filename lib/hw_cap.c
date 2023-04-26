@@ -627,7 +627,7 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         } else {
                 LOG_INFO("CPUID.0x7.0: L3 CAT not detected. "
                          "Checking brand string...\n");
-                cpuid_check_fail = 1;
+                cpuid_check_fail = 2;
         }
         if (cpuid_check_fail) {
                 /**
@@ -635,7 +635,7 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                  * If it fails then check the model and family ID.
                  */
                 ret = hw_cap_l3ca_brandstr(cap);
-                if (ret != PQOS_RETVAL_OK) {
+                if (ret != PQOS_RETVAL_OK && cpuid_check_fail > 1) {
                         LOG_INFO("Checking model and family ID...\n");
                         ret = hw_cap_l3ca_model();
                 }
