@@ -306,15 +306,9 @@ str_to_uint64(const char *str, int base, uint64_t *value)
         while (isblank(*str_start))
                 str_start++;
 
-        if (base == 10 && !isdigit(*str_start))
-                return -EINVAL;
-
-        if (base == 16 && !isxdigit(*str_start))
-                return -EINVAL;
-
         errno = 0;
         val = strtoull(str_start, &str_end, base);
-        if (errno != 0 || str_end == NULL || str_end == str_start)
+        if (errno != 0 || str_end == NULL || *str_end != '\0')
                 return -EINVAL;
         if (val > UINT64_MAX)
                 return -EINVAL;
@@ -329,51 +323,54 @@ str_to_uint64(const char *str, int base, uint64_t *value)
  *        and stores result in \a mask and \a cmask
  *
  * @param [in] cbm CBM string
- * @param [in] force_dual_mask expect two masks separated with ','
- * @param [out] mask common (L2 or L3 non CDP) or data mask (L3 CDP)
- * @param [out] cmask code mask (L3 CDP)
+ * @param [in] cdp two masks separated with ','
+ * @param [out] data_mask common (L2 or L3 non CDP) or data mask (L3 CDP)
+ * @param [out] code_mask code mask (L3 CDP)
  *
  * @return status
  * @retval 0 on success
  * @retval negative on error (-errno)
  */
 static int
-parse_mask_set(const char *cbm,
-               const int force_dual_mask,
-               uint64_t *mask,
-               uint64_t *cmask)
+parse_mask_set(char *cbm, int *cdp, uint64_t *data_mask, uint64_t *code_mask)
 {
-        int offset = 0;
-        const char *cbm_start = cbm;
+        char *p = cbm;
+        char *saveptr = NULL;
+        uint64_t mask[2] = {0};
+        unsigned mask_count = 0;
 
-        /* parse mask_set from start point */
-        if (*cbm_start == '(' || force_dual_mask) {
-                while (!isxdigit(*cbm_start))
-                        cbm_start++;
+        /* skip brackets */
+        if (*p == '(') {
+                char *q = strchr(p, ')');
 
-                offset = str_to_uint64(cbm_start, 16, cmask);
-                if (offset < 0)
-                        goto err;
-
-                cbm_start += offset;
-
-                while (isblank(*cbm_start))
-                        cbm_start++;
-
-                if (*cbm_start != ',')
-                        goto err;
-
-                cbm_start++;
+                if (q == NULL)
+                        return -EINVAL;
+                ++p;
+                *q = '\0';
         }
 
-        offset = str_to_uint64(cbm_start, 16, mask);
-        if (offset < 0)
-                goto err;
+        for (;; p = NULL) {
+                int ret;
+                char *token = NULL;
 
-        return cbm_start + offset - cbm;
+                token = strtok_r(p, ",", &saveptr);
+                if (token == NULL)
+                        break;
 
-err:
-        return -EINVAL;
+                /* more than 2 masks */
+                if (mask_count > 1)
+                        return -EINVAL;
+
+                ret = str_to_uint64(token, 16, &mask[mask_count++]);
+                if (ret < 0)
+                        return -EINVAL;
+        }
+
+        *data_mask = mask[0];
+        *code_mask = mask[1];
+        *cdp = mask_count > 1;
+
+        return 0;
 }
 
 /**
@@ -436,35 +433,36 @@ parse_reset(const char *cpustr)
  * @retval negative on error (-errno)
  */
 static int
-rdt_ca_str_to_cbm(const char *param, struct rdt_cfg ca)
+rdt_ca_str_to_cbm(char *param, struct rdt_cfg ca)
 {
         uint64_t mask = 0, mask2 = 0;
-        int ret, force_dual_mask;
+        int cdp;
+        int ret;
 
         if (!(PQOS_CAP_TYPE_L2CA == ca.type || PQOS_CAP_TYPE_L3CA == ca.type) ||
             NULL == ca.u.generic_ptr || NULL == param)
                 return -EINVAL;
 
-        force_dual_mask = (NULL != strchr(param, ','));
-        ret = parse_mask_set(param, force_dual_mask, &mask, &mask2);
+        ret = parse_mask_set(param, &cdp, &mask, &mask2);
         if (ret < 0)
                 return -EINVAL;
 
         if (mask == 0 || is_contiguous(rdt_cfg_get_type_str(ca), mask) == 0)
                 return -EINVAL;
 
-        if (mask2 != 0 && is_contiguous(rdt_cfg_get_type_str(ca), mask2) == 0)
+        if (cdp &&
+            (mask2 == 0 || is_contiguous(rdt_cfg_get_type_str(ca), mask2) == 0))
                 return -EINVAL;
 
         if (PQOS_CAP_TYPE_L2CA == ca.type) {
-                if (mask2 != 0) {
+                if (cdp) {
                         ca.u.l2->cdp = 1;
                         ca.u.l2->u.s.data_mask = mask;
                         ca.u.l2->u.s.code_mask = mask2;
                 } else
                         ca.u.l2->u.ways_mask = mask;
         } else {
-                if (mask2 != 0) {
+                if (cdp) {
                         ca.u.l3->cdp = 1;
                         ca.u.l3->u.s.data_mask = mask;
                         ca.u.l3->u.s.code_mask = mask2;
@@ -606,7 +604,7 @@ parse_rdt(char *rdtstr)
                 }
 
                 const char *feature = strtok_r(group, "=", &group_saveptr);
-                const char *param = strtok_r(NULL, "=", &group_saveptr);
+                char *param = strtok_r(NULL, "=", &group_saveptr);
 
                 if (feature == NULL || param == NULL) {
                         fprintf(stderr, "Invalid option: \"%s\"\n", group);
