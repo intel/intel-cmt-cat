@@ -10,7 +10,8 @@ RUN apt-get update -q && \
     apt-get install -y --no-install-recommends \
         python3-minimal \
         libpython3-stdlib && \
-    apt-get clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 ################################################################################
 #       Build libpqos                                                          #
@@ -27,7 +28,8 @@ RUN apt-get update -q && \
         make \
         gcc \
         libc-dev && \
-    apt-get clean
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /appqos_workspace
 RUN make && make install
@@ -59,9 +61,9 @@ RUN apt-get update -q && \
     apt-get clean
 
 RUN mkdir -p /python && \
-    python3 -m pip install --no-warn-script-location --upgrade pip && \
-    python3 -m pip install --no-warn-script-location /appqos_workspace/lib/python && \
-    python3 -m pip install --no-warn-script-location /appqos_workspace/appqos && \
+    python3 -m pip install --no-cache-dir --no-warn-script-location --upgrade pip && \
+    python3 -m pip install --no-cache-dir --no-warn-script-location /appqos_workspace/lib/python && \
+    python3 -m pip install --no-cache-dir --no-warn-script-location /appqos_workspace/appqos && \
     python3 -m pip uninstall -y pip
 
 ################################################################################
@@ -105,4 +107,7 @@ RUN apt-get -y purge --auto-remove \
     rm -rf /usr/sbin/chroot && \
     rm -rf /var/lib/apt/lists/*
 
-CMD python3 -m appqos -c ${APPQOS_CONF_PATH} --port ${APPQOS_PORT} --address ${APPQOS_ADDRESS}
+CMD ["python3", "-m",  "appqos", \
+    "-c", "${APPQOS_CONF_PATH}", \
+    "--port", "${APPQOS_PORT}", \
+    "--address", "${APPQOS_ADDRESS}"]
