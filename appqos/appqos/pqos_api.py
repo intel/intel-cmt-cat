@@ -746,6 +746,26 @@ class PqosApi:
             log.error(str(ex))
             return None
 
+    def get_l3_non_contiguous_cbm(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L3 cache non-contiguous cbm
+
+        Returns:
+            L3 cache non-contiguous cbm
+            or None on error
+        """
+
+        if not self.is_l3_cat_supported():
+            return None
+
+        try:
+            l3ca_caps = self.cap.get_type("l3ca")
+            return l3ca_caps.non_contiguous_cbm
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
     def get_l2_cache_size(self):
         # pylint: disable=no-self-use
         """
@@ -844,6 +864,26 @@ class PqosApi:
         try:
             l2ca_caps = self.cap.get_type("l2ca")
             return l2ca_caps.cdp_on
+        except Exception as ex:
+            log.error(str(ex))
+            return None
+
+    def get_l2_non_contiguous_cbm(self):
+        # pylint: disable=no-self-use
+        """
+        Gets L2 cache non-contiguous cbm
+
+        Returns:
+            L2 cache non-contiguous cbm
+            or None on error
+        """
+
+        if not self.is_l2_cat_supported():
+            return None
+
+        try:
+            l2ca_caps = self.cap.get_type("l2ca")
+            return l2ca_caps.non_contiguous_cbm
         except Exception as ex:
             log.error(str(ex))
             return None

@@ -520,6 +520,8 @@ hw_cap_l3ca_cpuid(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
         cap->cdp_on = 0;
         cap->way_contention = (uint64_t)res.ebx;
+        cap->non_contiguous_cbm =
+            (res.ecx >> PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT_BIT) & 1;
 
         if (cap->cdp) {
                 /**
@@ -713,6 +715,8 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
         cap->cdp_on = 0;
         cap->way_contention = (uint64_t)res.ebx;
+        cap->non_contiguous_cbm =
+            (res.ecx >> PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT_BIT) & 1;
 
         if (cap->cdp) {
                 int cdp_on = 0;

@@ -45,6 +45,19 @@ extern "C" {
 #include "pqos.h"
 #include "types.h"
 
+#define IS_CONTIGNOUS(ca)                                                      \
+        ({                                                                     \
+                int ret;                                                       \
+                                                                               \
+                if (ca.cdp)                                                    \
+                        ret = alloc_is_bitmask_contiguous(ca.u.s.data_mask) && \
+                              alloc_is_bitmask_contiguous(ca.u.s.code_mask);   \
+                else                                                           \
+                        ret = alloc_is_bitmask_contiguous(ca.u.ways_mask);     \
+                                                                               \
+                ret;                                                           \
+        })
+
 /**
  * Types of possible PQoS allocation technologies
  */
@@ -421,6 +434,22 @@ PQOS_LOCAL int hw_mba_get_amd(const unsigned mba_id,
                               const unsigned max_num_cos,
                               unsigned *num_cos,
                               struct pqos_mba *mba_tab);
+
+/**
+ * @brief Tests if \a bitmask is contiguous
+ *
+ * Zero bit mask is regarded as not contiguous.
+ *
+ * The function shifts out first group of contiguous 1's in the bit mask.
+ * Next it checks remaining bitmask content to make a decision.
+ *
+ * @param bitmask bit mask to be validated for contiguity
+ *
+ * @return Bit mask contiguity check result
+ * @retval 0 not contiguous
+ * @retval 1 contiguous
+ */
+PQOS_LOCAL int alloc_is_bitmask_contiguous(uint64_t bitmask);
 
 #ifdef __cplusplus
 }

@@ -116,6 +116,17 @@ def cdp_l3_supported(iface):
     """
     return common.CDP_L3_CAP in caps_get(iface)
 
+def is_l3_non_contiguous_cbm_supported(iface):
+    """
+    Returns L3 CDP Non-contiguous CBM support status
+    """
+    return common.NON_CONTIGUOUS_CBM_L3_CAP in caps_get(iface)
+
+def is_l2_non_contiguous_cbm_supported(iface):
+    """
+    Returns L2 Non-contiguous CBM support status
+    """
+    return common.NON_CONTIGUOUS_CBM_L2_CAP in caps_get(iface)
 
 def cat_l2_supported(iface):
     """
@@ -181,12 +192,16 @@ def detect_supported_caps():
         result.append(common.CAT_L3_CAP)
         if PQOS_API.is_l3_cdp_supported():
             result.append(common.CDP_L3_CAP)
+        if PQOS_API.get_l3_non_contiguous_cbm():
+            result.append(common.NON_CONTIGUOUS_CBM_L3_CAP)
 
     # Intel RDT L2 CAT
     if PQOS_API.is_l2_cat_supported():
         result.append(common.CAT_L2_CAP)
         if PQOS_API.is_l2_cdp_supported():
             result.append(common.CDP_L2_CAP)
+        if PQOS_API.get_l2_non_contiguous_cbm():
+            result.append(common.NON_CONTIGUOUS_CBM_L2_CAP)
 
     # Intel RDT MBA
     if PQOS_API.is_mba_supported():
@@ -258,7 +273,8 @@ def l3ca_info():
         'cache_ways_num': rdt_api.get_l3_num_cache_ways(),
         'clos_num': rdt_api.get_l3ca_num_cos(),
         'cdp_supported': rdt_api.is_l3_cdp_supported(),
-        'cdp_enabled': rdt_api.is_l3_cdp_enabled()
+        'cdp_enabled': rdt_api.is_l3_cdp_enabled(),
+        'non_contiguous_cbm': rdt_api.get_l3_non_contiguous_cbm()
     }
     return info
 
@@ -284,6 +300,7 @@ def l2ca_info():
         'cache_ways_num': rdt_api.get_l2_num_cache_ways(),
         'clos_num': rdt_api.get_l2ca_num_cos(),
         'cdp_supported': rdt_api.is_l2_cdp_supported(),
-        'cdp_enabled': rdt_api.is_l2_cdp_enabled()
+        'cdp_enabled': rdt_api.is_l2_cdp_enabled(),
+        'non_contiguous_cbm': rdt_api.get_l2_non_contiguous_cbm()
     }
     return info

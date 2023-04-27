@@ -924,13 +924,6 @@ test_pqos_l3ca_set_param(void **state __attribute__((unused)))
 
         ca[0].class_id = 1;
         ca[0].cdp = 0;
-        ca[0].u.ways_mask = 0x5;
-
-        ret = pqos_l3ca_set(l3cat_id, num_cos, ca);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        ca[0].class_id = 1;
-        ca[0].cdp = 0;
         ca[0].u.ways_mask = 0;
 
         ret = pqos_l3ca_set(l3cat_id, num_cos, ca);
@@ -938,7 +931,7 @@ test_pqos_l3ca_set_param(void **state __attribute__((unused)))
 
         ca[0].class_id = 1;
         ca[0].cdp = 1;
-        ca[0].u.s.data_mask = 0x5;
+        ca[0].u.s.data_mask = 0x0;
         ca[0].u.s.code_mask = 0xf0;
 
         ret = pqos_l3ca_set(l3cat_id, num_cos, ca);
@@ -947,7 +940,7 @@ test_pqos_l3ca_set_param(void **state __attribute__((unused)))
         ca[0].class_id = 1;
         ca[0].cdp = 1;
         ca[0].u.s.data_mask = 0xf0;
-        ca[0].u.s.code_mask = 0x5;
+        ca[0].u.s.code_mask = 0x0;
 
         ret = pqos_l3ca_set(l3cat_id, num_cos, ca);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -1194,13 +1187,6 @@ test_pqos_l2ca_set_param(void **state __attribute__((unused)))
 
         ca[0].class_id = 1;
         ca[0].cdp = 0;
-        ca[0].u.ways_mask = 0x5;
-
-        ret = pqos_l2ca_set(l2id, num_cos, ca);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        ca[0].class_id = 1;
-        ca[0].cdp = 0;
         ca[0].u.ways_mask = 0;
 
         ret = pqos_l2ca_set(l2id, num_cos, ca);
@@ -1208,7 +1194,7 @@ test_pqos_l2ca_set_param(void **state __attribute__((unused)))
 
         ca[0].class_id = 1;
         ca[0].cdp = 1;
-        ca[0].u.s.data_mask = 0x5;
+        ca[0].u.s.data_mask = 0x0;
         ca[0].u.s.code_mask = 0xf0;
 
         ret = pqos_l2ca_set(l2id, num_cos, ca);
@@ -1217,7 +1203,7 @@ test_pqos_l2ca_set_param(void **state __attribute__((unused)))
         ca[0].class_id = 1;
         ca[0].cdp = 1;
         ca[0].u.s.data_mask = 0xf0;
-        ca[0].u.s.code_mask = 0x5;
+        ca[0].u.s.code_mask = 0x0;
 
         ret = pqos_l2ca_set(l2id, num_cos, ca);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);

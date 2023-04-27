@@ -168,62 +168,6 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
 }
 
 /**
- * @brief Returns number of set bits in \a bitmask
- *
- * @param [in] bitmask
- *
- * @return bits count
- */
-static unsigned
-bits_count(uint64_t bitmask)
-{
-        unsigned count = 0;
-
-        for (; bitmask != 0; count++)
-                bitmask &= bitmask - 1;
-
-        return count;
-}
-
-/**
- * @brief Tests if \a bitmask is contiguous
- *
- * @param [in] cat_type string to identify CAT type (L2 or L3) on error
- * @param [in] bitmask bitmask to be tested
- *
- * @return Result
- * @retval 1 on success
- * @retval 0 on failure
- */
-static int
-is_contiguous(const char *cat_type, const uint64_t bitmask)
-{
-        /* check if bitmask is contiguous */
-        unsigned i = 0, j = 0;
-        const unsigned max_idx = (sizeof(bitmask) * CHAR_BIT);
-
-        if (bitmask == 0)
-                return 0;
-
-        for (i = 0; i < max_idx; i++) {
-                if (((1ULL << i) & bitmask) != 0)
-                        j++;
-                else if (j > 0)
-                        break;
-        }
-
-        if (bits_count(bitmask) != j) {
-                fprintf(stderr,
-                        "Allocation: %s CAT mask 0x%llx is not "
-                        "contiguous.\n",
-                        cat_type, (unsigned long long)bitmask);
-                return 0;
-        }
-
-        return 1;
-}
-
-/**
  * @brief Function to get the highest resource ID (socket/cluster)
  *
  * @param [in] technology used to determine if res ID should be l3cat_id or
@@ -447,11 +391,10 @@ rdt_ca_str_to_cbm(char *param, struct rdt_cfg ca)
         if (ret < 0)
                 return -EINVAL;
 
-        if (mask == 0 || is_contiguous(rdt_cfg_get_type_str(ca), mask) == 0)
+        if (mask == 0)
                 return -EINVAL;
 
-        if (cdp &&
-            (mask2 == 0 || is_contiguous(rdt_cfg_get_type_str(ca), mask2) == 0))
+        if (cdp && mask2 == 0)
                 return -EINVAL;
 
         if (PQOS_CAP_TYPE_L2CA == ca.type) {

@@ -38,6 +38,33 @@
 #include "mock_machine.h"
 #include "test.h"
 
+/* Size of an array of type struct pqos_l3ca */
+#define MAX_CA_1 1
+/* First index of an array of type struct pqos_l3ca */
+#define CA_IDX_ZERO 0
+/* Second index of an array of type struct pqos_l3ca */
+#define CA_IDX_ONE 1
+
+#define CDP_ON       1
+#define CDP_OFF      0
+#define CDP_ENABLED  1
+#define CDP_DISABLED 0
+
+#define MAX_COS 1
+#define COS_ONE 1
+
+#define L2_CAT_ID 0
+#define L3_CAT_ID 0
+
+/* Sample Contiguous bitmask for dat, code and ways masks */
+#define CONTIGUOUS_CBM 0xF0
+/* Sample Non-contiguous bitmask for dat, code and ways masks */
+#define NON_CONTIGUOUS_CBM 0x5
+/* Non-Contiguous 1s value support in CBM(Cache Bit Mask) */
+#define NON_CONTIGUOUS_CBM_SUPPORTED 1
+/* Contiguous 1s value support in CBM(Cache Bit Mask) */
+#define NON_CONTIGUOUS_CBM_UNSUPPORTED 0
+
 /* ======== mock ======== */
 
 int
@@ -225,6 +252,127 @@ test_hw_l3ca_set_unsupported(void **state)
 
         ret = hw_l3ca_set(0, 1, ca);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+/**
+ * @brief This function mocks contiguous CBM. And it tests hw_l3ca_set function
+ * with Non-Contiguous mask(Code, Data and Ways). Since Non-Contiguous CBM is
+ * not supported, hw_l3ca_set should return PQOS_RETVAL_PARAM.
+ *
+ * @param [in] pointer to struct test_data.
+ *
+ * @return Void.
+ */
+static void
+test_hw_l3ca_set_param(void **state __attribute__((unused)))
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_l3ca ca[MAX_CA_1] = {};
+        int ret;
+
+        data->cap_l3ca.non_contiguous_cbm = NON_CONTIGUOUS_CBM_UNSUPPORTED;
+        data->cap_l3ca.cdp = CDP_ENABLED;
+        data->cap_l3ca.cdp_on = CDP_ON;
+
+        /* Fill the struct pqos_cap_l3ca with simulated values */
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* Test Non-Contiguous ways mask */
+        ca[CA_IDX_ZERO].cdp = CDP_DISABLED;
+        ca[CA_IDX_ZERO].u.ways_mask = NON_CONTIGUOUS_CBM;
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* Test Non-Contiguous data mask */
+        ca[CA_IDX_ZERO].class_id = COS_ONE;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = NON_CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = CONTIGUOUS_CBM;
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* Test Non-Contiguous code mask */
+        ca[CA_IDX_ZERO].class_id = COS_ONE;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = NON_CONTIGUOUS_CBM;
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/**
+ * @brief This function mocks Non-Contiguous CBM. And it tests hw_l3ca_set
+ * function with Non-Contiguous mask(Code, Data and Ways). Since Non-Contiguous
+ * CBM is supported, hw_l3ca_set should return PQOS_RETVAL_OK.
+ *
+ * @param [in] pointer to struct test_data.
+ *
+ * @return Void.
+ */
+static void
+test_hw_l3ca_set_non_contiguous_cbm(void **state __attribute__((unused)))
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_l3ca ca[MAX_CA_1] = {};
+        int ret;
+
+        data->cap_l3ca.non_contiguous_cbm = NON_CONTIGUOUS_CBM_SUPPORTED;
+        data->cap_l3ca.cdp = CDP_ENABLED;
+        data->cap_l3ca.cdp_on = CDP_ON;
+
+        /* Fill the struct pqos_cap_l3ca with simulated values */
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* Test Non-Contiguous data mask */
+        ca[CA_IDX_ZERO].class_id = L3_CAT_ID;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = NON_CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = CONTIGUOUS_CBM;
+
+        /* Simulation of writing data mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L3CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.data_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+        /* Simulation of writing code mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L3CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2 +
+                         1);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.code_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        /* Test Non-Contiguous code mask */
+        ca[CA_IDX_ZERO].class_id = L3_CAT_ID;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = NON_CONTIGUOUS_CBM;
+
+        /* Simulation of writing data mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L3CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.data_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+        /* Simulation of writing code mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L3CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2 +
+                         1);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.code_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+
+        ret = hw_l3ca_set(L3_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
 /* ======== hw_l3ca_get ======== */
@@ -467,6 +615,127 @@ test_hw_l2ca_set_unsupported(void **state)
 
         ret = hw_l2ca_set(0, 1, ca);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+/**
+ * @brief This function mocks contiguous CBM. And it tests hw_l2ca_set function
+ * with Non-Contiguous mask(Code, Data and Ways). Since Non-Contiguous CBM is
+ * not supported, hw_l2ca_set should return PQOS_RETVAL_PARAM.
+ *
+ * @param [in] pointer to struct test_data.
+ *
+ * @return Void.
+ */
+static void
+test_hw_l2ca_set_param(void **state __attribute__((unused)))
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_l2ca ca[MAX_CA_1] = {};
+        int ret;
+
+        data->cap_l2ca.non_contiguous_cbm = NON_CONTIGUOUS_CBM_UNSUPPORTED;
+        data->cap_l2ca.cdp = CDP_ENABLED;
+        data->cap_l2ca.cdp_on = CDP_ON;
+
+        /* Fill the struct pqos_cap_l2ca with simulated values */
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* Test Non-Contiguous ways mask */
+        ca[CA_IDX_ZERO].cdp = CDP_DISABLED;
+        ca[CA_IDX_ZERO].u.ways_mask = NON_CONTIGUOUS_CBM;
+
+        ret = hw_l2ca_set(L2_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* Test Non-Contiguous data mask */
+        ca[CA_IDX_ZERO].class_id = COS_ONE;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = NON_CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = CONTIGUOUS_CBM;
+
+        ret = hw_l2ca_set(L2_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* Test Non-Contiguous code mask */
+        ca[CA_IDX_ZERO].class_id = COS_ONE;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = NON_CONTIGUOUS_CBM;
+
+        ret = hw_l2ca_set(L2_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/**
+ * @brief This function mocks Non-Contiguous CBM. And it tests hw_l2ca_set
+ * function with Non-Contiguous mask(Code, Data and Ways). Since Non-Contiguous
+ * CBM is supported, hw_l2ca_set should return PQOS_RETVAL_OK.
+ *
+ * @param [in] pointer to struct test_data.
+ *
+ * @return Void.
+ */
+static void
+test_hw_l2ca_set_non_contiguous_cbm(void **state __attribute__((unused)))
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_l2ca ca[MAX_CA_1] = {};
+        int ret;
+
+        data->cap_l2ca.non_contiguous_cbm = NON_CONTIGUOUS_CBM_SUPPORTED;
+        data->cap_l2ca.cdp = CDP_ENABLED;
+        data->cap_l2ca.cdp_on = CDP_ON;
+
+        /* Fill the struct pqos_cap_l2ca with simulated values */
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
+        /* Test Non-Contiguous data mask */
+        ca[CA_IDX_ZERO].class_id = L2_CAT_ID;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = NON_CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = CONTIGUOUS_CBM;
+
+        /* Simulation of writing data mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L2CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.data_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+        /* Simulation of writing code mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L2CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2 +
+                         1);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.code_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+
+        ret = hw_l2ca_set(L2_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        /* Test Non-Contiguous code mask */
+        ca[CA_IDX_ZERO].class_id = L2_CAT_ID;
+        ca[CA_IDX_ZERO].cdp = CDP_ENABLED;
+        ca[CA_IDX_ZERO].u.s.data_mask = CONTIGUOUS_CBM;
+        ca[CA_IDX_ZERO].u.s.code_mask = NON_CONTIGUOUS_CBM;
+
+        /* Simulation of writing data mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L2CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.data_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+        /* Simulation of writing code mask into msr register */
+        expect_value(__wrap_msr_write, lcore, 0);
+        expect_value(__wrap_msr_write, reg,
+                     PQOS_MSR_L2CA_MASK_START + ca[CA_IDX_ZERO].class_id * 2 +
+                         1);
+        expect_value(__wrap_msr_write, value, ca[CA_IDX_ZERO].u.s.code_mask);
+        will_return(__wrap_msr_write, PQOS_RETVAL_OK);
+
+        ret = hw_l2ca_set(L2_CAT_ID, MAX_COS, ca);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
 /* ======== hw_l2ca_get ======== */
@@ -1410,6 +1679,8 @@ main(void)
             cmocka_unit_test(test_hw_l3ca_set),
             cmocka_unit_test(test_hw_l3ca_set_cdp_on),
             cmocka_unit_test(test_hw_l3ca_set_cdp_off),
+            cmocka_unit_test(test_hw_l3ca_set_param),
+            cmocka_unit_test(test_hw_l3ca_set_non_contiguous_cbm),
             cmocka_unit_test(test_hw_l3ca_get),
             cmocka_unit_test(test_hw_l3ca_get_cdp),
             cmocka_unit_test(test_hw_l3ca_get_param),
@@ -1428,6 +1699,8 @@ main(void)
             cmocka_unit_test(test_hw_l2ca_set),
             cmocka_unit_test(test_hw_l2ca_set_cdp_on),
             cmocka_unit_test(test_hw_l2ca_set_cdp_off),
+            cmocka_unit_test(test_hw_l2ca_set_param),
+            cmocka_unit_test(test_hw_l2ca_set_non_contiguous_cbm),
             cmocka_unit_test(test_hw_l2ca_get),
             cmocka_unit_test(test_hw_l2ca_get_cdp),
             cmocka_unit_test(test_hw_l2ca_get_param),

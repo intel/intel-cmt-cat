@@ -95,6 +95,13 @@ extern "C" {
 #define PQOS_RES_ID_MB_ALLOCATION 3 /**< Memory BW allocation */
 
 #define PQOS_CPUID_CAT_CDP_BIT 2 /**< CDP supported bit */
+/* Non-Contiguous 1s value supported bit */
+#define PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT_BIT 3
+
+/**
+ * Non-Contiguous 1s value support in CBM(Cache Bit Mask)
+ */
+#define PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT 1
 
 /**
  * Monitoring data read MSR register

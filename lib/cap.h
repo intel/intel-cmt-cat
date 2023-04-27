@@ -107,6 +107,22 @@ PQOS_LOCAL const struct pqos_cap *_pqos_get_cap(void);
  */
 PQOS_LOCAL const struct pqos_cpuinfo *_pqos_get_cpu(void);
 
+/**
+ * @brief Returns value of L3 Non-Contiguous CBM(Cache Bit Mask) support
+ *
+ * @return Operation status
+ * @retval struct pqos_cap_l3ca member non_contiguous_cbm on success
+ */
+PQOS_LOCAL int cap_get_l3ca_non_contignous(void);
+
+/**
+ * @brief Returns value of L2 Non-Contiguous CBM(Cache Bit Mask) support
+ *
+ * @return Operation status
+ * @retval struct pqos_cap_l2ca member non_contiguous_cbm on success
+ */
+PQOS_LOCAL int cap_get_l2ca_non_contignous(void);
+
 #ifdef __cplusplus
 }
 #endif

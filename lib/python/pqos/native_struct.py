@@ -77,6 +77,7 @@ class CPqosCapabilityL3(ctypes.Structure):
         ('way_contention', ctypes.c_uint64),
         ('cdp', ctypes.c_int),
         ('cdp_on', ctypes.c_int),
+        ('non_contiguous_cbm', ctypes.c_uint),
     ]
 
 
@@ -92,6 +93,7 @@ class CPqosCapabilityL2(ctypes.Structure):
         ('way_contention', ctypes.c_uint64),
         ('cdp', ctypes.c_int),
         ('cdp_on', ctypes.c_int),
+        ('non_contiguous_cbm', ctypes.c_uint),
     ]
 
 

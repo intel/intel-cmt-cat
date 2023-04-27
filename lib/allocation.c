@@ -291,6 +291,20 @@ hw_l3ca_set(const unsigned l3cat_id,
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
 
+        /* Check L3 CBM is non-contiguous */
+        if (!cap_get_l3ca_non_contignous()) {
+                unsigned idx;
+                /* Check all COS CBM are contiguous */
+                for (idx = 0; idx < num_ca; idx++) {
+                        if (!IS_CONTIGNOUS(ca[idx])) {
+                                LOG_ERROR("L3 CAT COS%u bit mask is not "
+                                          "contiguous!\n",
+                                          ca[idx].class_id);
+                                return PQOS_RETVAL_PARAM;
+                        }
+                }
+        }
+
         ret = pqos_l3ca_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
                 return ret; /**< perhaps no L3CA capability */
@@ -557,6 +571,20 @@ hw_l2ca_set(const unsigned l2id,
 
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
+
+        /* Check L2 CBM is non-contiguous */
+        if (!cap_get_l2ca_non_contignous()) {
+                unsigned idx;
+                /* Check all COS CBM are contiguous */
+                for (idx = 0; idx < num_ca; idx++) {
+                        if (!IS_CONTIGNOUS(ca[idx])) {
+                                LOG_ERROR("L2 CAT COS%u bit mask is not "
+                                          "contiguous!\n",
+                                          ca[idx].class_id);
+                                return PQOS_RETVAL_PARAM;
+                        }
+                }
+        }
 
         /*
          * Check if L2 CAT is supported
@@ -1644,4 +1672,19 @@ pqos_alloc_reset_exit:
         if (l2ids != NULL)
                 free(l2ids);
         return ret;
+}
+
+int
+alloc_is_bitmask_contiguous(uint64_t bitmask)
+{
+        if (bitmask == 0)
+                return 0;
+
+        while ((bitmask & 1) == 0) /**< Shift until 1 found at position 0 */
+                bitmask >>= 1;
+
+        while ((bitmask & 1) != 0) /**< Shift until 0 found at position 0 */
+                bitmask >>= 1;
+
+        return (bitmask) ? 0 : 1; /**< non-zero bitmask is not contiguous */
 }

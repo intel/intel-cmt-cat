@@ -220,6 +220,7 @@ class ConfigStore:
         if l3cdp_enabled and not caps.cdp_l3_supported(iface):
             raise ValueError("RDT Configuration. L3 CDP requested but not supported!")
 
+        non_contiguous_cbm = caps.is_l3_non_contiguous_cbm_supported(iface)
         cdp_pool_ids = []
 
         for pool in data['pools']:
@@ -227,10 +228,15 @@ class ConfigStore:
                 if not cbm in pool:
                     continue
 
-                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool[cbm]))
-                if result or pool[cbm] == 0:
-                    raise ValueError(f"Pool {pool['id']}, " \
-                        f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])} is not contiguous.")
+                if pool[cbm] == 0:
+                    raise ValueError(f"Pool {pool['id']}, L3 CBM is zero.")
+
+                if not non_contiguous_cbm:
+                    result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool[cbm]))
+                    if result:
+                        raise ValueError(f"Pool {pool['id']}, " \
+                            f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])} is not contiguous.")
+
                 if not caps.cat_l3_supported(iface):
                     raise ValueError(f"Pool {pool['id']}, " \
                         f"L3 CBM {hex(pool['l3cbm'])}/{bin(pool[cbm])}, L3 CAT is not supported.")
@@ -257,6 +263,7 @@ class ConfigStore:
         if l2cdp_enabled and not caps.cdp_l2_supported(iface):
             raise ValueError("RDT Configuration. L2 CDP requested but not supported!")
 
+        non_contiguous_cbm = caps.is_l2_non_contiguous_cbm_supported(iface)
         cdp_pool_ids = []
 
         for pool in data['pools']:
@@ -264,10 +271,15 @@ class ConfigStore:
                 if not cbm in pool:
                     continue
 
-                result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool[cbm]))
-                if result or pool[cbm] == 0:
-                    raise ValueError(f"Pool {pool['id']}, " \
-                        f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool[cbm])} is not contiguous.")
+                if pool[cbm] == 0:
+                    raise ValueError(f"Pool {pool['id']}, L2 CBM is zero.")
+
+                if not non_contiguous_cbm:
+                    result = re.search('1{1,32}0{1,32}1{1,32}', bin(pool[cbm]))
+                    if result:
+                        raise ValueError(f"Pool {pool['id']}, " \
+                            f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool[cbm])} is not contiguous.")
+
                 if not caps.cat_l2_supported(iface):
                     raise ValueError(f"Pool {pool['id']}, " \
                         f"L2 CBM {hex(pool['l2cbm'])}/{bin(pool[cbm])}, L2 CAT is not supported.")

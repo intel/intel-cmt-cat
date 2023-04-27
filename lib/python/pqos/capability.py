@@ -54,30 +54,32 @@ class PqosCapabilityMonitoring(object):
 
 class PqosCapabilityL3Ca(object):
     "PQoS L3 cache allocation capability"
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-few-public-methods,too-many-instance-attributes
 
     def __init__(self):
-        self.mem_size = 0           # byte size of the structure
-        self.num_classes = 0        # number of classes of service
-        self.num_ways = 0           # number of cache ways
-        self.way_size = 0           # way size in bytes
-        self.way_contention = 0     # ways contention bit mask
-        self.cdp = False            # code data prioritization feature support
-        self.cdp_on = False         # code data prioritization on or off
+        self.mem_size = 0               # byte size of the structure
+        self.num_classes = 0            # number of classes of service
+        self.num_ways = 0               # number of cache ways
+        self.way_size = 0               # way size in bytes
+        self.way_contention = 0         # ways contention bit mask
+        self.cdp = False                # code data prioritization feature support
+        self.cdp_on = False             # code data prioritization on or off
+        self.non_contiguous_cbm = False # Non-Contiguous CBM support
 
 
 class PqosCapabilityL2Ca(object):
     "PQoS L2 cache allocation capability"
-    # pylint: disable=too-few-public-methods
+    # pylint: disable=too-few-public-methods,too-many-instance-attributes
 
     def __init__(self):
-        self.mem_size = 0           # byte size of the structure
-        self.num_classes = 0        # number of classes of service
-        self.num_ways = 0           # number of cache ways
-        self.way_size = 0           # way size in bytes
-        self.way_contention = 0     # ways contention bit mask
-        self.cdp = False            # code data prioritization feature support
-        self.cdp_on = False         # code data prioritization on or off
+        self.mem_size = 0               # byte size of the structure
+        self.num_classes = 0            # number of classes of service
+        self.num_ways = 0               # number of cache ways
+        self.way_size = 0               # way size in bytes
+        self.way_contention = 0         # ways contention bit mask
+        self.cdp = False                # code data prioritization feature support
+        self.cdp_on = False             # code data prioritization on or off
+        self.non_contiguous_cbm = False # Non-Contiguous CBM support
 
 
 class PqosCapabilityMba(object):
@@ -138,6 +140,7 @@ def _get_cap_l3ca(p_capability):
     capability.way_contention = c_capability.way_contention
     capability.cdp = _get_tristate_bool(c_capability.cdp)
     capability.cdp_on = _get_tristate_bool(c_capability.cdp_on)
+    capability.non_contiguous_cbm = c_capability.non_contiguous_cbm
     return capability
 
 
@@ -155,6 +158,7 @@ def _get_cap_l2ca(p_capability):
     capability.way_contention = c_capability.way_contention
     capability.cdp = _get_tristate_bool(c_capability.cdp)
     capability.cdp_on = _get_tristate_bool(c_capability.cdp_on)
+    capability.non_contiguous_cbm = c_capability.non_contiguous_cbm
     return capability
 
 

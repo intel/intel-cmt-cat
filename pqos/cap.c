@@ -246,6 +246,8 @@ cap_print_features_l3ca(const unsigned indent,
         printf_indent(indent + 4, "CDP: %s\n",
                       l3ca->cdp ? (l3ca->cdp_on ? "enabled" : "disabled")
                                 : "unsupported");
+        printf_indent(indent + 4, "Non-Contiguous CBM: %s\n",
+                      l3ca->non_contiguous_cbm ? "supported" : "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l3ca->num_classes);
 
         if (!verbose)
@@ -282,6 +284,8 @@ cap_print_features_l2ca(const unsigned indent,
         printf_indent(indent + 4, "CDP: %s\n",
                       l2ca->cdp ? (l2ca->cdp_on ? "enabled" : "disabled")
                                 : "unsupported");
+        printf_indent(indent + 4, "Non-Contiguous CBM: %s\n",
+                      l2ca->non_contiguous_cbm ? "supported" : "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l2ca->num_classes);
 
         if (!verbose)

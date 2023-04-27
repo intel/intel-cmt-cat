@@ -36,6 +36,10 @@
 
 #define MAX_CPUID_LEAFS 20
 
+#define NON_CONTIGUOUS_CBM_UNSUPPORTED 0
+#define NON_CONTIGUOUS_CBM_SUPPORTED   1
+#define NON_CONTIGUOUS_CBM_BIT         3
+
 struct test_lcpuid {
         unsigned leaf;
         unsigned subleaf;
@@ -416,6 +420,8 @@ test_hw_cap_l3ca_discover(void **state)
         assert_int_equal(cap_l3ca.cdp, 0);
         assert_int_equal(cap_l3ca.cdp_on, 0);
         assert_int_equal(cap_l3ca.way_contention, way_contention);
+        assert_int_equal(cap_l3ca.non_contiguous_cbm,
+                         NON_CONTIGUOUS_CBM_UNSUPPORTED);
 }
 
 static void
@@ -462,6 +468,29 @@ test_hw_cap_l3ca_discover_cdp(void **state)
 
         ret = hw_cap_l3ca_discover(&cap_l3ca, data->cpu);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_hw_cap_l3ca_discover_non_contiguous_cbm(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_l3ca cap_l3ca;
+        int ret;
+        uint32_t num_classes = 16;
+        uint32_t num_ways = 11;
+        uint32_t way_contention = 0x600;
+        uint32_t non_contiguous_cbm = NON_CONTIGUOUS_CBM_SUPPORTED
+                                      << NON_CONTIGUOUS_CBM_BIT;
+
+        _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x2, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x1, num_ways - 1, way_contention, non_contiguous_cbm,
+                    num_classes - 1);
+
+        ret = hw_cap_l3ca_discover(&cap_l3ca, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_l3ca.non_contiguous_cbm,
+                         NON_CONTIGUOUS_CBM_SUPPORTED);
 }
 
 /* ======== test_hw_cap_l2ca_discover ======== */
@@ -515,6 +544,8 @@ test_hw_cap_l2ca_discover(void **state)
         assert_int_equal(cap_l2ca.cdp, 0);
         assert_int_equal(cap_l2ca.cdp_on, 0);
         assert_int_equal(cap_l2ca.way_contention, way_contention);
+        assert_int_equal(cap_l2ca.non_contiguous_cbm,
+                         NON_CONTIGUOUS_CBM_UNSUPPORTED);
 }
 
 static void
@@ -561,6 +592,29 @@ test_hw_cap_l2ca_discover_cdp(void **state)
 
         ret = hw_cap_l2ca_discover(&cap_l2ca, data->cpu);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_hw_cap_l2ca_discover_non_contiguous_cbm(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_l2ca cap_l2ca;
+        int ret;
+        uint32_t num_classes = 16;
+        uint32_t num_ways = 11;
+        uint32_t way_contention = 0x600;
+        uint32_t non_contiguous_cbm = NON_CONTIGUOUS_CBM_SUPPORTED
+                                      << NON_CONTIGUOUS_CBM_BIT;
+
+        _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x4, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x2, num_ways - 1, way_contention, non_contiguous_cbm,
+                    num_classes - 1);
+
+        ret = hw_cap_l2ca_discover(&cap_l2ca, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_l2ca.non_contiguous_cbm,
+                         NON_CONTIGUOUS_CBM_SUPPORTED);
 }
 
 /* ======== hw_cap_mba_discover ======== */
@@ -651,12 +705,16 @@ main(void)
                                    _init),
             cmocka_unit_test_setup(test_hw_cap_l3ca_discover, _init),
             cmocka_unit_test_setup(test_hw_cap_l3ca_discover_cdp, _init),
+            cmocka_unit_test_setup(test_hw_cap_l3ca_discover_non_contiguous_cbm,
+                                   _init),
             cmocka_unit_test_setup(test_hw_cap_l2ca_discover_alloc_unsupported,
                                    _init),
             cmocka_unit_test_setup(test_hw_cap_l2ca_discover_unsupported,
                                    _init),
             cmocka_unit_test_setup(test_hw_cap_l2ca_discover, _init),
             cmocka_unit_test_setup(test_hw_cap_l2ca_discover_cdp, _init),
+            cmocka_unit_test_setup(test_hw_cap_l2ca_discover_non_contiguous_cbm,
+                                   _init),
             cmocka_unit_test_setup(test_hw_cap_mba_discover_alloc_unsupported,
                                    _init),
             cmocka_unit_test_setup(test_hw_cap_mba_discover_unsupported, _init),

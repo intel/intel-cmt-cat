@@ -431,35 +431,6 @@ pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count)
  * =======================================
  */
 
-/**
- * @brief Tests if \a bitmask is contiguous
- *
- * Zero bit mask is regarded as not contiguous.
- *
- * The function shifts out first group of contiguous 1's in the bit mask.
- * Next it checks remaining bitmask content to make a decision.
- *
- * @param bitmask bit mask to be validated for contiguity
- *
- * @return Bit mask contiguity check result
- * @retval 0 not contiguous
- * @retval 1 contiguous
- */
-static int
-is_contiguous(uint64_t bitmask)
-{
-        if (bitmask == 0)
-                return 0;
-
-        while ((bitmask & 1) == 0) /**< Shift until 1 found at position 0 */
-                bitmask >>= 1;
-
-        while ((bitmask & 1) != 0) /**< Shift until 0 found at position 0 */
-                bitmask >>= 1;
-
-        return (bitmask) ? 0 : 1; /**< non-zero bitmask is not contiguous */
-}
-
 int
 pqos_l3ca_set(const unsigned l3cat_id,
               const unsigned num_cos,
@@ -471,20 +442,19 @@ pqos_l3ca_set(const unsigned l3cat_id,
                 return PQOS_RETVAL_PARAM;
 
         /**
-         * Check if class bitmasks are contiguous.
+         * Check if class bitmasks are zero.
          */
         for (i = 0; i < num_cos; i++) {
-                int is_contig = 0;
+                int is_non_zero = 0;
 
-                if (ca[i].cdp) {
-                        is_contig = is_contiguous(ca[i].u.s.data_mask) &&
-                                    is_contiguous(ca[i].u.s.code_mask);
-                } else
-                        is_contig = is_contiguous(ca[i].u.ways_mask);
+                if (ca[i].cdp)
+                        is_non_zero =
+                            ca[i].u.s.data_mask && ca[i].u.s.code_mask;
+                else
+                        is_non_zero = ca[i].u.ways_mask;
 
-                if (!is_contig) {
-                        LOG_ERROR("L3 COS%u bit mask is not contiguous!\n",
-                                  ca[i].class_id);
+                if (!is_non_zero) {
+                        LOG_ERROR("L3 COS%u bit mask is 0!\n", ca[i].class_id);
                         return PQOS_RETVAL_PARAM;
                 }
         }
@@ -530,20 +500,19 @@ pqos_l2ca_set(const unsigned l2id,
                 return PQOS_RETVAL_PARAM;
 
         /**
-         * Check if class bitmasks are contiguous
+         * Check if class bitmasks are zero.
          */
         for (i = 0; i < num_cos; i++) {
-                int is_contig = 0;
+                int is_non_zero = 0;
 
-                if (ca[i].cdp) {
-                        is_contig = is_contiguous(ca[i].u.s.data_mask) &&
-                                    is_contiguous(ca[i].u.s.code_mask);
-                } else
-                        is_contig = is_contiguous(ca[i].u.ways_mask);
+                if (ca[i].cdp)
+                        is_non_zero =
+                            ca[i].u.s.data_mask && ca[i].u.s.code_mask;
+                else
+                        is_non_zero = ca[i].u.ways_mask;
 
-                if (!is_contig) {
-                        LOG_ERROR("L2 COS%u bit mask is not contiguous!\n",
-                                  ca[i].class_id);
+                if (!is_non_zero) {
+                        LOG_ERROR("L2 COS%u bit mask is 0!\n", ca[i].class_id);
                         return PQOS_RETVAL_PARAM;
                 }
         }

@@ -206,29 +206,30 @@ enum pqos_cap_type {
  * L3 Cache Allocation (CA) capability structure
  */
 struct pqos_cap_l3ca {
-        unsigned mem_size;       /**< byte size of the structure */
-        unsigned num_classes;    /**< number of classes of service */
-        unsigned num_ways;       /**< number of cache ways */
-        unsigned way_size;       /**< way size in bytes */
-        uint64_t way_contention; /**< ways contention bit mask */
-        int cdp;                 /**< code data prioritization feature
-                                    support */
-        int cdp_on;              /**< code data prioritization on or
-                                    off */
+        unsigned mem_size;           /**< byte size of the structure */
+        unsigned num_classes;        /**< number of classes of service */
+        unsigned num_ways;           /**< number of cache ways */
+        unsigned way_size;           /**< way size in bytes */
+        uint64_t way_contention;     /**< ways contention bit mask */
+        int cdp;                     /**< code data prioritization feature
+                                        support */
+        int cdp_on;                  /**< code data prioritization on or off */
+        unsigned non_contiguous_cbm; /**< Non-Contiguous CBM support */
 };
 
 /**
  * L2 Cache Allocation (CA) capability structure
  */
 struct pqos_cap_l2ca {
-        unsigned mem_size;       /**< byte size of the structure */
-        unsigned num_classes;    /**< number of classes of service */
-        unsigned num_ways;       /**< number of cache ways */
-        unsigned way_size;       /**< way size in bytes */
-        uint64_t way_contention; /**< ways contention bit mask */
-        int cdp;                 /**< code data prioritization feature
-                                    support */
-        int cdp_on;              /**< code data prioritization on or off */
+        unsigned mem_size;           /**< byte size of the structure */
+        unsigned num_classes;        /**< number of classes of service */
+        unsigned num_ways;           /**< number of cache ways */
+        unsigned way_size;           /**< way size in bytes */
+        uint64_t way_contention;     /**< ways contention bit mask */
+        int cdp;                     /**< code data prioritization feature
+                                        support */
+        int cdp_on;                  /**< code data prioritization on or off */
+        unsigned non_contiguous_cbm; /**< Non-Contiguous CBM support */
 };
 
 /**

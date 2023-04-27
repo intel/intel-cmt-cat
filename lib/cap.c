@@ -52,6 +52,7 @@
 
 #include "allocation.h"
 #include "api.h"
+#include "cpu_registers.h"
 #include "cpuinfo.h"
 #include "hw_cap.h"
 #include "lock.h"
@@ -1041,6 +1042,32 @@ _pqos_get_cpu(void)
 {
         ASSERT(m_cpu != NULL);
         return m_cpu;
+}
+
+int
+cap_get_l3ca_non_contignous(void)
+{
+        const struct pqos_capability *l3cap =
+            _pqos_cap_get_type(PQOS_CAP_TYPE_L3CA);
+
+        /* If L3 capability is not available, return contiguous CBM support */
+        if (l3cap == NULL)
+                return !PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT;
+
+        return l3cap->u.l3ca->non_contiguous_cbm;
+}
+
+int
+cap_get_l2ca_non_contignous(void)
+{
+        const struct pqos_capability *l2cap =
+            _pqos_cap_get_type(PQOS_CAP_TYPE_L2CA);
+
+        /* If L2 capability is not available, return contiguous CBM support */
+        if (l2cap == NULL)
+                return !PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT;
+
+        return l2cap->u.l2ca->non_contiguous_cbm;
 }
 
 /**
