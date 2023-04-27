@@ -43,4 +43,6 @@ int __wrap_pqos_file_exists(const char *path);
 int __wrap_pqos_dir_exists(const char *path);
 int __wrap_pqos_file_contains(const char *fname, const char *str, int *found);
 
+size_t __wrap_fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+
 #endif /* MOCK_COMMON_H_ */

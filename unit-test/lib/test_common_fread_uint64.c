@@ -53,27 +53,6 @@ pqos_fclose(FILE *fd)
         return __wrap_pqos_fclose(fd);
 }
 
-size_t
-__wrap_fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
-{
-        char *data;
-        size_t ret;
-
-        assert_int_equal(nmemb, 1);
-        assert_non_null(ptr);
-        assert_non_null(stream);
-
-        data = mock_ptr_type(char *);
-        ret = strlen(data);
-
-        if (ret > 0) {
-                assert_true(size >= strlen(data));
-                strncpy(ptr, data, size);
-        }
-
-        return ret;
-}
-
 int
 __wrap_feof(FILE *stream)
 {

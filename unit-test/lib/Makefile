@@ -127,14 +127,6 @@ $(OBJ_DIR)/resctrl_monitoring.o: $(LIB_DIR)/resctrl_monitoring.c $(OBJ_DIR)/resc
 		--globalize-symbol=resctrl_mon_rmdir --weaken-symbol=resctrl_mon_rmdir \
 		$@
 
-# $(OBJ_DIR)/os_monitoring.o: $(LIB_DIR)/os_monitoring.c $(OBJ_DIR)/os_monitoring.d
-# 	$(CC) $(CFLAGS) -c $< -o $@
-# 	objcopy $@ \
-# 		--globalize-symbol=os_mon_stop_events --weaken-symbol=os_mon_stop_events \
-# 		--globalize-symbol=os_mon_start_events --weaken-symbol=os_mon_start_events \
-# 		--globalize-symbol=os_mon_tid_exists --weaken-symbol=os_mon_tid_exists \
-# 		$@
-
 $(LIB_DEPS): $(OBJ_DIR)/%.d : $(LIB_DIR)/%.c
 	mkdir -p $(OBJ_DIR)
 	$(CC) -MM -MP -MF $@ $(CFLAGS) $<
@@ -683,6 +675,7 @@ $(BIN_DIR)/test_common: ./test_common.c $(LIB_OBJS)
 		-Wl,--wrap=getline \
 		-Wl,--wrap=fopen \
 		-Wl,--wrap=fgets \
+		-Wl,--wrap=fread \
 		-Wl,--wrap=fclose \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@

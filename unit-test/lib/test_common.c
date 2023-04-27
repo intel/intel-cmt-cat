@@ -39,13 +39,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#define FILE_DEAD ((FILE *)0xDEAD)
 
 ssize_t
 __wrap_getline(char **string, size_t *n, FILE *stream)
 {
         ssize_t ret;
 
-        assert_int_equal(*n, 0);
+        assert_non_null(n);
         assert_non_null(stream);
 
         ret = mock_type(ssize_t);
@@ -58,13 +61,34 @@ __wrap_getline(char **string, size_t *n, FILE *stream)
         return ret;
 }
 
+FILE *__real_fopen(const char *name, const char *mode);
+
 FILE *
 __wrap_fopen(const char *name, const char *mode)
 {
+        FILE *fd;
+
         check_expected(name);
         check_expected(mode);
 
-        return mock_type(FILE *);
+        fd = mock_type(FILE *);
+        if (fd == NULL || fd == FILE_DEAD)
+                return fd;
+
+        return __real_fopen(name, mode);
+}
+
+int __real_fclose(FILE *stream);
+
+int
+__wrap_fclose(FILE *stream)
+{
+        assert_non_null(stream);
+
+        if (stream != FILE_DEAD)
+                return __real_fclose(stream);
+
+        return mock_type(int);
 }
 
 char *
@@ -84,14 +108,6 @@ __wrap_fgets(char *str, int n, FILE *stream)
         strncpy(str, data, n);
 
         return str;
-}
-
-int
-__wrap_fclose(FILE *stream)
-{
-        assert_non_null(stream);
-
-        return mock_type(int);
 }
 
 static void
@@ -145,18 +161,18 @@ test_common_pqos_fgets(void **state __attribute__((unused)))
 
         will_return(__wrap_getline, 4);
         will_return(__wrap_getline, "AbC\n");
-        return_value = pqos_fgets(string, 4, (FILE *)0x12345678);
+        return_value = pqos_fgets(string, 4, FILE_DEAD);
         assert_non_null(return_value);
         assert_string_equal(string, "AbC");
         assert_string_equal(return_value, "AbC");
 
         will_return(__wrap_getline, 4);
         will_return(__wrap_getline, "ABC\n");
-        return_value = pqos_fgets(string, 3, (FILE *)0x12345678);
+        return_value = pqos_fgets(string, 3, FILE_DEAD);
         assert_null(return_value);
 
         will_return(__wrap_getline, -1);
-        return_value = pqos_fgets(string, 4, (FILE *)0x12345678);
+        return_value = pqos_fgets(string, 4, FILE_DEAD);
         assert_null(return_value);
 }
 
@@ -170,7 +186,7 @@ test_common_pqos_file_contains(void **state __attribute__((unused)))
 
         expect_string(__wrap_fopen, name, path);
         expect_string(__wrap_fopen, mode, "r");
-        will_return(__wrap_fopen, 0xDEAD);
+        will_return(__wrap_fopen, FILE_DEAD);
         will_return(__wrap_fgets, "Test string");
         will_return(__wrap_fclose, 0);
         ret_value = pqos_file_contains(path, search_str1, &found_param);
@@ -179,7 +195,7 @@ test_common_pqos_file_contains(void **state __attribute__((unused)))
 
         expect_string(__wrap_fopen, name, path);
         expect_string(__wrap_fopen, mode, "r");
-        will_return(__wrap_fopen, 0xDEAD);
+        will_return(__wrap_fopen, FILE_DEAD);
         will_return(__wrap_fgets, "test string");
         will_return(__wrap_fgets, "");
         will_return(__wrap_fclose, 0);
@@ -207,6 +223,63 @@ test_common_pqos_file_contains(void **state __attribute__((unused)))
         assert_int_equal(found_param, 0);
 }
 
+static void
+test_common_pqos_fopen(void **state __attribute__((unused)))
+{
+        FILE *fd;
+
+        /* file does not exists */
+        {
+                const char *path = "/proc/file_that_doesnt_exist";
+
+                fd = pqos_fopen(path, "r");
+                assert_null(fd);
+        }
+
+        /* directory */
+        {
+                const char *path = "/proc";
+
+                expect_string(__wrap_fopen, name, path);
+                expect_string(__wrap_fopen, mode, "r");
+                will_return(__wrap_fopen, NULL);
+
+                fd = pqos_fopen(path, "r");
+                assert_null(fd);
+        }
+
+        /* symlink */
+        {
+                const char *path = "/tmp/pqos_ut_symlink";
+
+                unlink(path);
+                assert_return_code(symlink("/proc/cpuinfo", path), 0);
+
+                expect_string(__wrap_fopen, name, path);
+                expect_string(__wrap_fopen, mode, "r");
+                will_return(__wrap_fopen, (FILE *)1);
+
+                fd = pqos_fopen(path, "r");
+                assert_null(fd);
+
+                unlink(path);
+        }
+
+        /* normal file */
+        {
+                const char *path = "/proc/cpuinfo";
+
+                expect_string(__wrap_fopen, name, path);
+                expect_string(__wrap_fopen, mode, "r");
+                will_return(__wrap_fopen, (FILE *)1);
+
+                fd = pqos_fopen(path, "r");
+                assert_non_null(fd);
+
+                pqos_fclose(fd);
+        }
+}
+
 int
 main(void)
 {
@@ -217,7 +290,9 @@ main(void)
             cmocka_unit_test(test_common_pqos_file_exists),
             cmocka_unit_test(test_common_pqos_dir_exists),
             cmocka_unit_test(test_common_pqos_fgets),
-            cmocka_unit_test(test_common_pqos_file_contains)};
+            cmocka_unit_test(test_common_pqos_file_contains),
+            cmocka_unit_test(test_common_pqos_fopen),
+        };
 
         result += cmocka_run_group_tests(tests_common, NULL, NULL);
 

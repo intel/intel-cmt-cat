@@ -35,6 +35,8 @@
 #include "mock_test.h"
 #include "pqos.h"
 
+#include <string.h>
+
 FILE *
 __wrap_pqos_fopen(const char *name, const char *mode)
 {
@@ -96,6 +98,27 @@ __wrap_pqos_file_contains(const char *fname, const char *str, int *found)
         ret = mock_type(int);
         if (ret == PQOS_RETVAL_OK)
                 *found = mock_type(int);
+
+        return ret;
+}
+
+size_t
+__wrap_fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+        char *data;
+        size_t ret;
+
+        assert_int_equal(nmemb, 1);
+        assert_non_null(ptr);
+        assert_non_null(stream);
+
+        data = mock_ptr_type(char *);
+        ret = strlen(data);
+
+        if (ret > 0) {
+                assert_true(size >= strlen(data));
+                strncpy(ptr, data, size);
+        }
 
         return ret;
 }

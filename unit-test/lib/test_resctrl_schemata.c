@@ -46,22 +46,6 @@ _init(void **state __attribute__((unused)))
 
 /* ======== mock ======== */
 
-size_t
-__wrap_fread(void *ptr,
-             size_t size,
-             size_t nitems,
-             FILE *stream __attribute__((unused)))
-{
-        const char *data = mock_ptr_type(char *);
-
-        if (data == NULL)
-                return 0;
-
-        strncpy((char *)ptr, data, size * nitems);
-
-        return strlen(data);
-}
-
 char *
 __wrap_fgets(char *s, int n, FILE *stream __attribute__((unused)))
 {
