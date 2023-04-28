@@ -72,12 +72,20 @@ export class LocalService {
     return this.l3cat.asObservable();
   }
 
+  getL3CatCurrentValue(): CacheAllocation | null {
+    return this.l3cat.getValue()
+  }
+
   setL2CatEvent(l2cat: CacheAllocation) {
     this.l2cat.next(l2cat);
   }
 
   getL2CatEvent(): Observable<CacheAllocation | null> {
     return this.l2cat.asObservable();
+  }
+
+  getL2CatCurrentValue(): CacheAllocation | null {
+    return this.l2cat.getValue()
   }
 
   setCapsEvent(caps: string[]) {
@@ -158,8 +166,8 @@ export class LocalService {
     return [...new Set(numberList)]
   }
 
-  public convertToBitmask(cbm: number | undefined, cw_num: number): number[] {
-    return cbm!.toString(2)
+  public convertToBitmask(cbm: number | undefined, cw_num: number): number[] | undefined {
+    return cbm?.toString(2)
       .padStart(cw_num, '0')
       .split('').map(Number);
   }

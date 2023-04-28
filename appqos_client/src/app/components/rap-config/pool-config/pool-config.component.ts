@@ -101,7 +101,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
 
     this.localService.getL2CatEvent().subscribe((l2cat) => {
       this.l2cat = l2cat;
-    })
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -138,58 +138,25 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     );
     this.nameControl.setValue(this.pool.name);
 
-    if (this.pool.l3cbm || this.l3cat?.cdp_enabled) {
-      this.localService
-        .getL3CatEvent()
-        .subscribe((l3cat: CacheAllocation | null) => {
-          this.l3numCacheWays = l3cat!.cw_num;
-          if (l3cat!.cdp_enabled) {
-            this.pool.l3BitmaskCode = this.pool.l3cbm_code
-              ?.toString(2)
-              .padStart(l3cat!.cw_num, '0')
-              .split('')
-              .map(Number);
-
-            this.pool.l3BitmaskData = this.pool.l3cbm_data
-              ?.toString(2)
-              .padStart(l3cat!.cw_num, '0')
-              .split('')
-              .map(Number);
-          } else {
-            this.pool.l3Bitmask = this.pool.l3cbm
-              ?.toString(2)
-              .padStart(l3cat!.cw_num, '0')
-              .split('')
-              .map(Number);
-          }
-        }
-        );
+    if (this.pool.l3cbm || this.pool.l3cbm_code) {
+      this.l3cat = this.localService.getL3CatCurrentValue();
+      if (this.l3cat?.cdp_enabled) {
+        this.pool.l3BitmaskCode = this.localService.convertToBitmask(this.pool.l3cbm_code, this.l3cat.cw_num);
+        this.pool.l3BitmaskData = this.localService.convertToBitmask(this.pool.l3cbm_data, this.l3cat.cw_num);
+      } else {
+        this.pool.l3Bitmask = this.localService.convertToBitmask(this.pool.l3cbm, this.l3cat!.cw_num);
+      }
     }
 
-    if (this.pool.l2cbm || this.l2cat?.cdp_enabled) {
-      this.localService
-        .getL2CatEvent()
-        .subscribe((l2cat: CacheAllocation | null) => {
-          this.l2numCacheWays = l2cat!.cw_num;
-          if (l2cat!.cdp_enabled) {
-            this.pool.l2BitmaskCode = this.pool.l2cbm_code
-              ?.toString(2)
-              .padStart(l2cat!.cw_num, '0')
-              .split('')
-              .map(Number);
-            this.pool.l2BitmaskData = this.pool.l2cbm_data
-              ?.toString(2)
-              .padStart(l2cat!.cw_num, '0')
-              .split('')
-              .map(Number);
-          } else {
-            this.pool.l2Bitmask = this.pool.l2cbm
-              ?.toString(2)
-              .padStart(l2cat!.cw_num, '0')
-              .split('')
-              .map(Number);
-          }
-        });
+    if (this.pool.l2cbm || this.pool.l2cbm_code) {
+      this.l2cat = this.localService.getL2CatCurrentValue();
+      if (this.l2cat?.cdp_enabled) {
+        this.pool.l2BitmaskCode = this.localService.convertToBitmask(this.pool.l2cbm_code, this.l2cat.cw_num);
+        this.pool.l2BitmaskData = this.localService.convertToBitmask(this.pool.l2cbm_data, this.l2cat.cw_num);
+      } else {
+        this.pool.l2Bitmask = this.localService.convertToBitmask(this.pool.l2cbm, this.l2cat!.cw_num);
+      }
+
     }
   }
 
@@ -366,15 +333,15 @@ export class PoolConfigComponent implements OnChanges, OnInit {
       height: 'auto',
       width: '40rem',
       data: {
-        l2cwNum: this.l2numCacheWays,
-        l3cwNum: this.l3numCacheWays,
+        l2cwNum: this.l2cat?.cw_num,
+        l3cwNum: this.l3cat?.cw_num,
         l3cdp_enabled: this.l3cat?.cdp_enabled,
         l2cdp_enabled: this.l2cat?.cdp_enabled
       },
     });
 
     dialogRef.afterClosed().subscribe((response) => {
-      if (response.id) {
+      if (response?.id) {
         this.poolId = response.id;
         this.poolEvent.emit();
       }

@@ -57,14 +57,14 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <div class="pool" *ngFor="let pool of poolsList">
       <span
         class="pool-name"
-        [ngStyle]="{ 'padding-left': l3cat.cdp_enabled ? '3rem' : '1rem' }"
+        [ngStyle]="{ 'padding-left': l3cat!.cdp_enabled ? '3rem' : '1rem' }"
       >
         {{ pool.name }}
       </span>
       <div>
         <div class="pool-cdp-label">
-          <div class="pool-cdp-code" *ngIf="l3cat.cdp_enabled">Code</div>
-          <div class="pool-cdp-data" *ngIf="l3cat.cdp_enabled">Data</div>
+          <div class="pool-cdp-code" *ngIf="l3cat!.cdp_enabled">Code</div>
+          <div class="pool-cdp-data" *ngIf="l3cat!.cdp_enabled">Data</div>
         </div>
         <div class="pool-cdp">
           <div class="pool-cbm">
@@ -72,7 +72,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
               mat-flat-button
               class="l3cbm-button"
               *ngFor="
-                let n of !l3cat.cdp_enabled
+                let n of !l3cat!.cdp_enabled
                   ? pool.l3Bitmask
                   : pool.l3BitmaskCode
               "
@@ -81,7 +81,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
               {{ n }}
             </button>
           </div>
-          <div class="pool-cbm" *ngIf="l3cat.cdp_enabled">
+          <div class="pool-cbm" *ngIf="l3cat!.cdp_enabled">
             <button
               mat-flat-button
               class="l3cbm-button"

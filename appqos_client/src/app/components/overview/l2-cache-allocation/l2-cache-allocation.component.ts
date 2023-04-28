@@ -33,11 +33,10 @@ import {
   EventEmitter,
   Input,
   OnChanges,
-  Output,
+  OnInit, Output
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
-import { AppqosService } from 'src/app/services/appqos.service';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { CacheAllocation } from '../../system-caps/system-caps.model';
@@ -48,34 +47,40 @@ import { LocalService } from 'src/app/services/local.service';
   templateUrl: './l2-cache-allocation.component.html',
   styleUrls: ['./l2-cache-allocation.component.scss'],
 })
-export class L2CacheAllocationComponent implements OnChanges {
+export class L2CacheAllocationComponent implements OnInit, OnChanges {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
-  l2cat!: CacheAllocation;
+  l2cat!: CacheAllocation | null;
 
-  constructor(public dialog: MatDialog,
-    private service: AppqosService,
-    private localService: LocalService) { }
+  constructor(
+    public dialog: MatDialog,
+    private localService: LocalService
+  ) { }
 
-  ngOnChanges(): void {
-    this.service.getL2cat().subscribe((l2cat) => {
+  ngOnInit(): void {
+    this.localService.getL2CatEvent().subscribe((l2cat) => {
       this.l2cat = l2cat;
       this._convertToBitmask();
     });
   }
 
+  ngOnChanges(): void {
+    this._convertToBitmask();
+  }
+
   private _convertToBitmask() {
-    this.poolsList = (this.l2cat.cdp_enabled) ?
-      this.pools.map((pool: Pools) => ({
-      ...pool,
-      l2BitmaskCode: this.localService.convertToBitmask(pool.l2cbm_code, this.l2cat.cw_num),
-      l2BitmaskData: this.localService.convertToBitmask(pool.l2cbm_data, this.l2cat.cw_num)
-    })) :
-      this.pools.map((pool: Pools) => ({
-      ...pool,
-      l2Bitmask: this.localService.convertToBitmask(pool.l2cbm, this.l2cat.cw_num)
-    }));
+    if (!this.l2cat) return;
+    this.poolsList = this.pools.map((pool: Pools) => (
+      (this.l2cat?.cdp_enabled) ? {
+        ...pool,
+        l2BitmaskCode: this.localService.convertToBitmask(pool.l2cbm_code, this.l2cat!.cw_num),
+        l2BitmaskData: this.localService.convertToBitmask(pool.l2cbm_data, this.l2cat!.cw_num),
+      } : {
+        ...pool,
+        l2Bitmask: this.localService.convertToBitmask(pool.l2cbm, this.l2cat!.cw_num),
+      }
+    ));
   }
 
   openDialog() {
@@ -84,8 +89,8 @@ export class L2CacheAllocationComponent implements OnChanges {
       width: '50rem',
       data: {
         l2cbm: true,
-        l2cdp: this.l2cat.cdp_enabled,
-        numCacheWays: this.l2cat.cw_num
+        l2cdp: this.l2cat!.cdp_enabled,
+        numCacheWays: this.l2cat!.cw_num
       },
     });
 

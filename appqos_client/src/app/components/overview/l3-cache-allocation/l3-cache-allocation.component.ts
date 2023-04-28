@@ -33,11 +33,11 @@ import {
   EventEmitter,
   Input,
   OnChanges,
-  Output,
+  OnInit,
+  Output
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
-import { AppqosService } from 'src/app/services/appqos.service';
 import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
@@ -48,36 +48,40 @@ import { LocalService } from 'src/app/services/local.service';
   templateUrl: './l3-cache-allocation.component.html',
   styleUrls: ['./l3-cache-allocation.component.scss'],
 })
-export class L3CacheAllocationComponent implements OnChanges {
+export class L3CacheAllocationComponent implements OnInit, OnChanges {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
-  l3cat!: CacheAllocation;
+  l3cat!: CacheAllocation | null;
 
-  constructor(public dialog: MatDialog,
-    private service: AppqosService,
-    private localService: LocalService) { }
+  constructor(
+    public dialog: MatDialog,
+    private localService: LocalService
+  ) { }
 
-  ngOnChanges(): void {
-    this.service.getL3cat().subscribe((l3cat) => {
+  ngOnInit(): void {
+    this.localService.getL3CatEvent().subscribe((l3cat) => {
       this.l3cat = l3cat;
       this._convertToBitmask();
     });
   }
 
+  ngOnChanges(): void {
+    this._convertToBitmask();
+  }
+
   private _convertToBitmask() {
-    if (this.l3cat.cdp_enabled) {
-      this.poolsList = this.pools.map((pool: Pools) => ({
+    if (!this.l3cat) return;
+    this.poolsList = this.pools.map((pool: Pools) => (
+      (this.l3cat?.cdp_enabled) ? {
         ...pool,
-        l3BitmaskCode: this.localService.convertToBitmask(pool.l3cbm_code, this.l3cat.cw_num),
-        l3BitmaskData: this.localService.convertToBitmask(pool.l3cbm_data, this.l3cat.cw_num),
-      }));
-    } else {
-      this.poolsList = this.pools.map((pool: Pools) => ({
+        l3BitmaskCode: this.localService.convertToBitmask(pool.l3cbm_code, this.l3cat!.cw_num),
+        l3BitmaskData: this.localService.convertToBitmask(pool.l3cbm_data, this.l3cat!.cw_num),
+      } : {
         ...pool,
-        l3Bitmask: this.localService.convertToBitmask(pool.l3cbm, this.l3cat.cw_num),
-      }));
-    }
+        l3Bitmask: this.localService.convertToBitmask(pool.l3cbm, this.l3cat!.cw_num),
+      }
+    ));
   }
 
   openDialog() {
@@ -86,8 +90,8 @@ export class L3CacheAllocationComponent implements OnChanges {
       width: '50rem',
       data: {
         l3cbm: true,
-        l3cdp: this.l3cat.cdp_enabled,
-        numCacheWays: this.l3cat.cw_num
+        l3cdp: this.l3cat!.cdp_enabled,
+        numCacheWays: this.l3cat!.cw_num
       },
     });
 

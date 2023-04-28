@@ -55,10 +55,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       >See more</a>
     </div>
     <div class="pool" *ngFor="let pool of poolsList">
-      <span class="pool-name" [ngStyle]="{ 'padding-left': l2cat.cdp_enabled ? '3rem' : '0rem' }">
+      <span class="pool-name" [ngStyle]="{ 'padding-left': l2cat!.cdp_enabled ? '3rem' : '0rem' }">
         {{ pool.name }}
       </span>
-      <div class="pool-cbm" *ngIf="!l2cat.cdp_enabled">
+      <div class="pool-cbm" *ngIf="!l2cat!.cdp_enabled">
         <button
           mat-flat-button
           class="l2cbm-button"
@@ -68,7 +68,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           {{ n }}
         </button>
       </div>
-      <div *ngIf="l2cat.cdp_enabled">
+      <div *ngIf="l2cat!.cdp_enabled">
         <div class="pool-cdp-label">
           <div class="pool-cdp-code">Code</div>
           <div class="pool-cdp-data">Data</div>

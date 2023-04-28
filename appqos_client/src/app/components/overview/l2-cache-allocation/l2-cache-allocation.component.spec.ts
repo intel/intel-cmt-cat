@@ -86,7 +86,7 @@ describe('Given L2CacheAllocationComponent', () => {
         point: { componentInstance: component },
       } = MockRender(L2CacheAllocationComponent, { pools: mockedPool });
 
-      expect(component.l2cat.cw_num).toEqual(12);
+      expect(component.l2cat!.cw_num).toEqual(12);
     });
 
     it('should display pool name', () => {
