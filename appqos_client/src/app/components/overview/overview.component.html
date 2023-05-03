@@ -29,6 +29,11 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 <div class="overview-container">
+  <app-system-topology
+    *ngIf="topology"
+    [systemTopology]="topology"
+    >
+  </app-system-topology>
   <app-l3-cache-allocation
     *ngIf="caps?.includes('l3cat')"
     [pools]="pools"

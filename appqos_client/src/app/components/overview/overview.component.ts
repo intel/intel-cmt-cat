@@ -33,7 +33,7 @@ import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { Caps, MBACTRL, resMessage } from '../system-caps/system-caps.model';
+import { Caps, SystemTopology, MBACTRL, resMessage } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
 import { skip } from 'rxjs';
 
@@ -46,6 +46,7 @@ export class OverviewComponent implements OnInit {
   pools!: Pools[];
   mbaCtrl!: MBACTRL;
   caps!: string[];
+  topology: SystemTopology | null = null;
 
   constructor(
     private service: AppqosService,
@@ -54,6 +55,7 @@ export class OverviewComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.getTopology();
     this.getMbaCtrl();
     this.getPools();
     this.getCaps();
@@ -86,6 +88,12 @@ export class OverviewComponent implements OnInit {
     this.service.getMbaCtrl().subscribe((mbaCtrl: MBACTRL) => {
       this.mbaCtrl = mbaCtrl;
       this.localService.setMbaCtrlEvent(mbaCtrl.enabled);
+    });
+  }
+
+  getTopology(): void {
+    this.service.getSystemTopology().subscribe((topo: SystemTopology) => {
+        this.topology = topo;
     });
   }
 

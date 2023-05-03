@@ -49,6 +49,7 @@ describe('Given OverviewComponent', () => {
       .mock(SharedModule)
       .mock(Router)
       .mock(AppqosService, {
+        getSystemTopology: () => EMPTY,
         getPools: () => EMPTY,
         getMbaCtrl: () => EMPTY,
         getCaps: () => EMPTY,
