@@ -100,3 +100,8 @@ export interface SystemTopology {
   core: CoreInfo[];
 }
 
+/* node specific information */
+export interface Node {
+  nodeID: number;
+  cores?: CoreInfo[];
+}

@@ -30,7 +30,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable, Subject } from 'rxjs';
 
-import { CacheAllocation } from '../components/system-caps/system-caps.model';
+import {
+  CacheAllocation,
+  SSTBF,
+} from '../components/system-caps/system-caps.model';
 
 @Injectable({
   providedIn: 'root',
@@ -43,6 +46,7 @@ export class LocalService {
   l2cat = new BehaviorSubject<CacheAllocation | null>(null);
   caps = new BehaviorSubject<string[] | null>(null);
   mbaCtrl = new BehaviorSubject<boolean | null>(null);
+  sstbf = new BehaviorSubject<SSTBF | null>(null);
 
   setIfaceEvent(): void {
     this.ifaceEvent.next();
@@ -50,6 +54,14 @@ export class LocalService {
 
   getIfaceEvent(): Observable<void> {
     return this.ifaceEvent.asObservable();
+  }
+
+  setSstbfEvent(sstbf: SSTBF) {
+    this.sstbf.next(sstbf);
+  }
+
+  getSstbfEvent(): Observable<SSTBF | null> {
+    return this.sstbf.asObservable();
   }
 
   setL3CatEvent(l3cat: CacheAllocation) {

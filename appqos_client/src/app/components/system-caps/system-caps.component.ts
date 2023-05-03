@@ -194,7 +194,10 @@ export class SystemCapsComponent implements OnInit {
     if (!this.caps.includes('sstbf')) return;
 
     this.service.getSstbf().subscribe({
-      next: (sstbf) => (this.sstbf = sstbf),
+      next: (sstbf) => {
+        this.localStore.setSstbfEvent(sstbf);
+        this.sstbf = sstbf
+      },
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
