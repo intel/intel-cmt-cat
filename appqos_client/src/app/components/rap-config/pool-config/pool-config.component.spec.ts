@@ -52,7 +52,10 @@ describe('Given poolConfigComponent', () => {
       })
       .mock(LocalService, {
         getL3CatEvent: () => EMPTY,
-        getL2CatEvent: () => EMPTY
+        getL2CatEvent: () => EMPTY,
+        getL3CatCurrentValue: () => mockedCache,
+        getL2CatCurrentValue: () => mockedCache,
+        convertToBitmask: LocalService.prototype.convertToBitmask
       })
       .keep(MatSliderModule)
   })
@@ -94,11 +97,6 @@ describe('Given poolConfigComponent', () => {
         pools: mockedPools,
         apps: []
       }
-
-      const catEvent = new BehaviorSubject<CacheAllocation>(mockedCache);
-
-      MockInstance(LocalService, 'getL3CatEvent', () => catEvent);
-      MockInstance(LocalService, 'getL2CatEvent', () => catEvent);
 
       const {
         point: { componentInstance: component }
@@ -143,10 +141,8 @@ describe('Given poolConfigComponent', () => {
         cw_size: 3670016
       }
 
-      const catEvent = new BehaviorSubject<CacheAllocation>(mockedCache);
-
-      MockInstance(LocalService, 'getL3CatEvent', () => catEvent);
-      MockInstance(LocalService, 'getL2CatEvent', () => catEvent);
+      MockInstance(LocalService, 'getL3CatCurrentValue', () => mockedCache);
+      MockInstance(LocalService, 'getL2CatCurrentValue', () => mockedCache);
 
       const {
         point: { componentInstance: component }

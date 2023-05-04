@@ -35,7 +35,6 @@ import { of } from 'rxjs';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
-import { AppqosService } from 'src/app/services/appqos.service';
 import { L2CacheAllocationComponent } from './l2-cache-allocation.component';
 import { LocalService } from 'src/app/services/local.service';
 import { CacheAllocation } from '../../system-caps/system-caps.model';
@@ -45,8 +44,8 @@ describe('Given L2CacheAllocationComponent', () => {
     MockBuilder(L2CacheAllocationComponent)
       .mock(SharedModule)
       .mock(Router)
-      .mock(AppqosService, {
-        getL2cat: () =>
+      .mock(LocalService, {
+        getL2CatEvent: () =>
           of({
             cache_size: 44040192,
             cdp_enabled: false,
@@ -55,8 +54,8 @@ describe('Given L2CacheAllocationComponent', () => {
             cw_num: 12,
             cw_size: 3670016,
           }),
+        convertToBitmask: LocalService.prototype.convertToBitmask
       })
-      .keep(LocalService)
   );
 
   MockInstance.scope('case');
@@ -173,7 +172,7 @@ describe('Given L2CacheAllocationComponent', () => {
         cw_size: 3.5,
       }
 
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2Cat));
+      MockInstance(LocalService, 'getL2CatEvent', () => of(mockedL2Cat));
 
       const mockedPool: Pools[] = [
         {

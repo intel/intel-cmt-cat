@@ -45,8 +45,8 @@ describe('Given L3CacheAllocationComponent', () => {
     MockBuilder(L3CacheAllocationComponent)
       .mock(SharedModule)
       .mock(Router)
-      .mock(AppqosService, {
-        getL3cat: () =>
+      .mock(LocalService, {
+        getL3CatEvent: () =>
           of({
             cache_size: 44040192,
             cdp_enabled: false,
@@ -55,7 +55,8 @@ describe('Given L3CacheAllocationComponent', () => {
             cw_num: 12,
             cw_size: 3670016,
           }),
-      }).keep(LocalService)
+        convertToBitmask: LocalService.prototype.convertToBitmask,
+      })
   );
 
   MockInstance.scope('case');
@@ -172,7 +173,7 @@ describe('Given L3CacheAllocationComponent', () => {
         cw_size: 3.5,
       }
       
-      MockInstance(AppqosService,'getL3cat' , () => of(mockedL3Cat));
+      MockInstance(LocalService,'getL3CatEvent' , () => of(mockedL3Cat));
       
       const mockedPools: Pools[] = [
         {
@@ -221,7 +222,7 @@ describe('Given L3CacheAllocationComponent', () => {
         cw_size: 3.5,
       }
 
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3Cat));
+      MockInstance(LocalService, 'getL3CatEvent', () => of(mockedL3Cat));
       
       const mockedPools: Pools[] = [
         {
