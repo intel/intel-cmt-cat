@@ -131,6 +131,32 @@ pqos_fgets_error:
         return NULL;
 }
 
+/**
+ * @brief Read integer from file
+ *
+ * @param [in] path file path
+ * @param [out] value parsed value
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int
+pqos_fread_uint(const char *path, unsigned *value)
+{
+        int ret = PQOS_RETVAL_OK;
+        FILE *fd;
+
+        fd = pqos_fopen(path, "r");
+        if (fd != NULL) {
+                if (fscanf(fd, "%u", value) != 1)
+                        ret = PQOS_RETVAL_ERROR;
+                pqos_fclose(fd);
+        } else
+                return PQOS_RETVAL_RESOURCE;
+
+        return ret;
+}
+
 int
 pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
 {

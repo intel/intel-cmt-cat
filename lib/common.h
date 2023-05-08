@@ -88,6 +88,17 @@ PQOS_LOCAL char *pqos_strcat(char *dst, const char *src, size_t size);
 PQOS_LOCAL char *pqos_fgets(char *s, int n, FILE *stream);
 
 /**
+ * @brief Read integer from file
+ *
+ * @param [in] path file path
+ * @param [out] value parsed value
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int pqos_fread_uint(const char *path, unsigned *value);
+
+/**
  * @brief Read uint64 from file
  *
  * @param [in] fname name of the file

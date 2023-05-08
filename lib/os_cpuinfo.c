@@ -120,47 +120,21 @@ cpu_sort(const struct dirent **dir1, const struct dirent **dir2)
 }
 
 /**
- * @brief Read integer from file
- *
- * @param [in] path file path
- * @param [out] value parsed value
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- */
-static int
-fread_uint(const char *path, unsigned *value)
-{
-        int ret = PQOS_RETVAL_OK;
-        FILE *fd;
-
-        fd = pqos_fopen(path, "r");
-        if (fd != NULL) {
-                if (fscanf(fd, "%u", value) != 1)
-                        ret = PQOS_RETVAL_ERROR;
-                fclose(fd);
-        } else
-                return PQOS_RETVAL_RESOURCE;
-
-        return ret;
-}
-
-/**
  * @brief Detects if \a lcore is online
  *
  * @param [in] lcore Logical core id
  *
  * @return if logical core is online
  */
-static int
-cpu_online(unsigned lcore)
+PQOS_STATIC int
+os_cpuinfo_cpu_online(unsigned lcore)
 {
         char buf[256];
         unsigned online = 0;
         int retval;
 
         snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%u/online", lcore);
-        retval = fread_uint(buf, &online);
+        retval = pqos_fread_uint(buf, &online);
         /* online file does not exists for cpu 0 */
         if (retval == PQOS_RETVAL_RESOURCE)
                 online = 1;
@@ -178,8 +152,8 @@ cpu_online(unsigned lcore)
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-static int
-cpu_node(unsigned lcore, unsigned *node)
+PQOS_STATIC int
+os_cpuinfo_cpu_node(unsigned lcore, unsigned *node)
 {
         char buf[256];
         struct dirent **namelist = NULL;
@@ -209,14 +183,14 @@ cpu_node(unsigned lcore, unsigned *node)
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-static int
-cpu_socket(unsigned lcore, unsigned *socket)
+PQOS_STATIC int
+os_cpuinfo_cpu_socket(unsigned lcore, unsigned *socket)
 {
         char buf[256];
 
         snprintf(buf, sizeof(buf) - 1,
                  SYSTEM_CPU "/cpu%u/topology/physical_package_id", lcore);
-        return fread_uint(buf, socket);
+        return pqos_fread_uint(buf, socket);
 }
 
 /**
@@ -229,8 +203,8 @@ cpu_socket(unsigned lcore, unsigned *socket)
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-static int
-cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2)
+PQOS_STATIC int
+os_cpuinfo_cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2)
 {
         char buf[512];
         struct dirent **namelist = NULL;
@@ -247,13 +221,13 @@ cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2)
                 snprintf(buf, sizeof(buf) - 1,
                          SYSTEM_CPU "/cpu%u/cache/%s/level", lcore,
                          namelist[i]->d_name);
-                ret = fread_uint(buf, &level);
+                ret = pqos_fread_uint(buf, &level);
                 if (ret != PQOS_RETVAL_OK)
                         break;
 
                 snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%u/cache/%s/id",
                          lcore, namelist[i]->d_name);
-                ret = fread_uint(buf, &id);
+                ret = pqos_fread_uint(buf, &id);
                 if (ret != PQOS_RETVAL_OK)
                         break;
 
@@ -317,20 +291,21 @@ os_cpuinfo_topology(void)
                 unsigned lcore = atoi(namelist[i]->d_name + 3);
                 struct pqos_coreinfo *info = &cpu->cores[cpu->num_cores];
 
-                if (!cpu_online(lcore))
+                if (!os_cpuinfo_cpu_online(lcore))
                         continue;
 
-                retval = cpu_socket(lcore, &info->socket);
+                retval = os_cpuinfo_cpu_socket(lcore, &info->socket);
                 if (retval != PQOS_RETVAL_OK)
                         break;
 
 #if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
-                retval = cpu_node(lcore, &info->numa);
+                retval = os_cpuinfo_cpu_node(lcore, &info->numa);
                 if (retval != PQOS_RETVAL_OK)
                         break;
 #endif
 
-                retval = cpu_cache(lcore, &info->l3_id, &info->l2_id);
+                retval =
+                    os_cpuinfo_cpu_cache(lcore, &info->l3_id, &info->l2_id);
                 if (retval != PQOS_RETVAL_OK)
                         break;
 

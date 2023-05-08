@@ -136,13 +136,84 @@ test_common_pqos_fread_uint64(void **state __attribute__((unused)))
         assert_int_equal(return_value, PQOS_RETVAL_ERROR);
 }
 
+/* ======== pqos_fread_uint ======== */
+
+static void
+test_common_pqos_fread_uint(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned value;
+        const char *path = "/tmp/path";
+        FILE *fd = tmpfile();
+
+        assert_non_null(fd);
+        fprintf(fd, "123\n");
+        fseek(fd, 0, SEEK_SET);
+
+        expect_string(__wrap_pqos_fopen, name, path);
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, fd);
+        expect_function_call(__wrap_pqos_fclose);
+        will_return(__wrap_pqos_fclose, 0);
+
+        ret = pqos_fread_uint(path, &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 123);
+
+        fclose(fd);
+}
+
+static void
+test_common_pqos_fread_uint_error(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned value;
+        const char *path = "/tmp/path";
+
+        /* could not open file */
+        expect_string(__wrap_pqos_fopen, name, path);
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, NULL);
+
+        ret = pqos_fread_uint(path, &value);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_common_pqos_fread_uint_invalid(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned value;
+        const char *path = "/tmp/path";
+        FILE *fd = tmpfile();
+
+        assert_non_null(fd);
+        fprintf(fd, "invalid");
+        fseek(fd, 0, SEEK_SET);
+
+        expect_string(__wrap_pqos_fopen, name, path);
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, fd);
+        expect_function_call(__wrap_pqos_fclose);
+        will_return(__wrap_pqos_fclose, 0);
+
+        ret = pqos_fread_uint(path, &value);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+
+        fclose(fd);
+}
+
 int
 main(void)
 {
         int result = 0;
 
         const struct CMUnitTest tests_common_fread_uint64[] = {
-            cmocka_unit_test(test_common_pqos_fread_uint64)};
+            cmocka_unit_test(test_common_pqos_fread_uint64),
+            cmocka_unit_test(test_common_pqos_fread_uint),
+            cmocka_unit_test(test_common_pqos_fread_uint_error),
+            cmocka_unit_test(test_common_pqos_fread_uint_invalid),
+        };
 
         result += cmocka_run_group_tests(tests_common_fread_uint64, NULL, NULL);
 

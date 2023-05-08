@@ -56,6 +56,21 @@ __wrap_pqos_fclose(FILE *fd)
 }
 
 int
+__wrap_pqos_fread_uint(const char *path, unsigned *value)
+{
+        int ret;
+
+        check_expected(path);
+        assert_non_null(value);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *value = mock_type(unsigned);
+
+        return ret;
+}
+
+int
 __wrap_pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value)
 {
         int ret;

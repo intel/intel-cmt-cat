@@ -1,7 +1,7 @@
 /*
  * BSD LICENSE
  *
- * Copyright(c) 2020-2023 Intel Corporation. All rights reserved.
+ * Copyright(c) 2023 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,20 +30,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MOCK_COMMON_H_
-#define MOCK_COMMON_H_
+#ifndef MOCK_OS_CPUINFO_H_
+#define MOCK_OS_CPUINFO_H_
 
-#include "common.h"
+#include "os_cpuinfo.h"
 
-FILE *__wrap_pqos_fopen(const char *name, const char *mode);
-int __wrap_pqos_fclose(FILE *fd);
-int __real_pqos_fclose(FILE *fd);
-int __wrap_pqos_fread_uint(const char *path, unsigned *value);
-int __wrap_pqos_fread_uint64(const char *fname, unsigned base, uint64_t *value);
-int __wrap_pqos_file_exists(const char *path);
-int __wrap_pqos_dir_exists(const char *path);
-int __wrap_pqos_file_contains(const char *fname, const char *str, int *found);
+/* ======== headers for static functions ======== */
+int os_cpuinfo_cpu_online(unsigned lcore);
+int os_cpuinfo_cpu_socket(unsigned lcore, unsigned *socket);
+int os_cpuinfo_cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2);
+#if PQOS_VERSION >= 50000
+int os_cpuinfo_cpu_node(unsigned lcore, unsigned *node);
+#endif
 
-size_t __wrap_fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
-
-#endif /* MOCK_COMMON_H_ */
+#endif /* MOCK_OS_MONITORING_H_ */
