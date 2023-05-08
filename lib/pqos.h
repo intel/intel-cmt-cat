@@ -840,6 +840,7 @@ struct pqos_alloc_config {
         enum pqos_cdp_config l3_cdp; /**< requested L3 CAT CDP config */
         enum pqos_cdp_config l2_cdp; /**< requested L2 CAT CDP config */
         enum pqos_mba_config mba;    /**< requested MBA config */
+        int reserved[5];             /**< reserved for future use */
 };
 
 /**
