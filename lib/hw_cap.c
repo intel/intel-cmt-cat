@@ -494,27 +494,22 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
 static int
 hw_cap_l3ca_model(void)
 {
-        const int cpuinfo_supported_cpu_models[] = {CPU_MODEL_HSX};
-        const int cpuinfo_supported_cpu_familes[] = {CPU_FAMILY_HSX};
         const int cpu_model = cpuinfo_get_cpu_model();
         const int cpu_family = cpuinfo_get_cpu_family();
-        int model_ret = PQOS_RETVAL_RESOURCE;
-        int family_ret = PQOS_RETVAL_RESOURCE;
 
-        for (unsigned i = 0; i < DIM(cpuinfo_supported_cpu_models); i++) {
-                if (cpu_model == cpuinfo_supported_cpu_models[i])
-                        model_ret = PQOS_RETVAL_OK;
-        }
+        const struct {
+                int model;
+                int family;
+        } supported_cpus[] = {
+            {.family = CPU_FAMILY_HSX, .model = CPU_MODEL_HSX}};
 
-        for (unsigned i = 0; i < DIM(cpuinfo_supported_cpu_familes); i++) {
-                if (cpu_family == cpuinfo_supported_cpu_familes[i])
-                        family_ret = PQOS_RETVAL_OK;
-        }
+        for (unsigned i = 0; i < DIM(supported_cpus); i++) {
+                if (supported_cpus[i].model == cpu_model &&
+                    supported_cpus[i].family == cpu_family)
+                        return PQOS_RETVAL_OK;
+        };
 
-        if (model_ret == PQOS_RETVAL_OK && family_ret == PQOS_RETVAL_OK)
-                return PQOS_RETVAL_OK;
-        else
-                return PQOS_RETVAL_RESOURCE;
+        return PQOS_RETVAL_RESOURCE;
 }
 
 /**
