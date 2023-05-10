@@ -43,20 +43,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
   <mat-card-content *ngIf="caps">
     <!--RDT Interface-->
     <app-rdt-iface
-      [rdtIface]="rdtIface"
+      [rdtIface]="rdtIface!"
       (changeEvent)="onChangeIface($event)"
     ></app-rdt-iface>
     <!--L3CAT-->
     <app-cat
       [isSupported]="caps.includes('l3cat')"
-      [cat]="l3cat"
+      [cat]="l3cat!"
       title="L3 CAT"
       (changeEvent)="l3CdpOnChange($event)"
     ></app-cat>
     <!--L2CAT-->
     <app-cat
       [isSupported]="caps.includes('l2cat')"
-      [cat]="l2cat"
+      [cat]="l2cat!"
       title="L2 CAT"
       (changeEvent)="l2CdpOnChange($event)"
     ></app-cat>
@@ -65,12 +65,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
     <!--SSTBF-->
     <app-sstbf
       [isSupported]="caps.includes('sstbf')"
-      [sstbf]="sstbf"
+      [sstbf]="sstbf!"
       (changeEvent)="sstbfOnChange($event)"
     ></app-sstbf>
     <!--SSTPC-->
     <app-sstcp
-      [sstbf]="sstbf"
+      [sstbf]="sstbf!"
       [isSupported]="caps.includes('power')"
     ></app-sstcp>
   </mat-card-content>

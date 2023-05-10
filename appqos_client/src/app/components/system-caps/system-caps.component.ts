@@ -54,52 +54,60 @@ import {
 
 /* Component used to show System Capabilities and capability details*/
 export class SystemCapsComponent implements OnInit {
-  caps!: string[];
+  caps!: string[] | null;
   loading = false;
-  interface!: string;
-  mba!: MBACTRL & MBA;
-  rdtIface!: RDTIface;
-  sstbf!: SSTBF;
-  l3cat!: CacheAllocation;
-  l2cat!: CacheAllocation;
+  mba!: MBA & MBACTRL;
+  mbaCtrl!: MBACTRL | null;
+  rdtIface!: RDTIface | null;
+  sstbf!: SSTBF | null;
+  l3cat!: CacheAllocation | null;
+  l2cat!: CacheAllocation | null;
   systemName: string | undefined;
 
   constructor(
     private service: AppqosService,
     private snackBar: SnackBarService,
-    private localStore: LocalService
-  ) {}
+    private localService: LocalService
+  ) { }
 
   ngOnInit(): void {
     this.loading = true;
 
-    this.systemName = this.localStore
+    this.systemName = this.localService
       .getData('api_url')
       ?.split('/')
       .pop()
       ?.split(':')
       .shift();
 
-    this._getRdtIface();
-    this._getCaps();
-  }
-
-  private _getCaps(): void {
-    this.service.getCaps().subscribe({
-      next: (caps) => {
-        this.caps = caps.capabilities;
-        this.localStore.setCapsEvent(caps.capabilities);
-        this._getMbaData();
-        this._getSstbf();
-        this._getL3cat();
-        this._getL2cat();
-        this.loading = false;
-      },
-      error: (error: Error) => {
-        this.snackBar.handleError(error.message);
-        this.loading = false;
-      },
+    this.localService.getCapsEvent().subscribe((caps) => {
+      this.caps = caps;
     });
+
+    this.localService.getL3CatEvent().subscribe((l3cat) => {
+      this.l3cat = l3cat;
+    });
+
+    this.localService.getL2CatEvent().subscribe((l2cat) => {
+      this.l2cat = l2cat;
+    });
+
+    this.localService.getSstbfEvent().subscribe((sstbf) => {
+      this.sstbf = sstbf;
+    });
+
+    this.localService.getRdtIfaceEvent().subscribe((rdtIFace) => {
+      this.rdtIface = rdtIFace
+    });
+
+    combineLatest([
+      this.localService.getMbaEvent(),
+      this.localService.getMbaCtrlEvent()
+    ]).subscribe(([mba, mbaCtrl]) => {
+      this.mba = { ...mba, ...mbaCtrl } as MBA & MBACTRL
+    });
+
+    this.loading = false;
   }
 
   onChangeIface(event: MatButtonToggleChange) {
@@ -107,7 +115,10 @@ export class SystemCapsComponent implements OnInit {
     this.service.rdtIfacePut(event.value).subscribe({
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
-        this._getCaps();
+        this._getMbaData();
+        this._getSstbf();
+        this._getL3cat();
+        this._getL2cat();
         this._getRdtIface();
         this.loading = false;
       },
@@ -164,7 +175,7 @@ export class SystemCapsComponent implements OnInit {
   }
 
   private _getMbaData() {
-    if (!this.caps.includes('mba')) return;
+    if (!this.caps!.includes('mba')) return;
 
     combineLatest([this.service.getMba(), this.service.getMbaCtrl()]).subscribe(
       {
@@ -180,8 +191,8 @@ export class SystemCapsComponent implements OnInit {
   private _getRdtIface(): void {
     this.service.getRdtIface().subscribe({
       next: (rdtIface) => {
-        this.localStore.setIfaceEvent();
         this.rdtIface = rdtIface;
+        this.loading = false;
       },
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
@@ -191,13 +202,10 @@ export class SystemCapsComponent implements OnInit {
   }
 
   private _getSstbf(): void {
-    if (!this.caps.includes('sstbf')) return;
+    if (!this.caps!.includes('sstbf')) return;
 
     this.service.getSstbf().subscribe({
-      next: (sstbf) => {
-        this.localStore.setSstbfEvent(sstbf);
-        this.sstbf = sstbf
-      },
+      next: (sstbf) => { this.sstbf = sstbf },
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
@@ -206,50 +214,26 @@ export class SystemCapsComponent implements OnInit {
   }
 
   private _getL3cat(): void {
-    if (!this.caps.includes('l3cat')) return;
+    if (!this.caps!.includes('l3cat')) return;
 
-    this.service
-      .getL3cat()
-      .pipe(
-        map((cat: CacheAllocation) => ({
-          ...cat,
-          cache_size: Math.round((cat.cache_size / 1024 ** 2) * 100) / 100,
-          cw_size: Math.round((cat.cw_size / 1024 ** 2) * 100) / 100,
-        }))
-      )
-      .subscribe({
-        next: (l3cat) => {
-          this.l3cat = l3cat;
-          this.localStore.setL3CatEvent(l3cat);
-        },
-        error: (error: Error) => {
-          this.snackBar.handleError(error.message);
-          this.loading = false;
-        },
-      });
+    this.service.getL3cat().subscribe({
+      next: (l3cat) => { this.l3cat = l3cat; },
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      },
+    });
   }
 
   private _getL2cat(): void {
-    if (!this.caps.includes('l2cat')) return;
+    if (!this.caps!.includes('l2cat')) return;
 
-    this.service
-      .getL2cat()
-      .pipe(
-        map((cat: CacheAllocation) => ({
-          ...cat,
-          cache_size: Math.round((cat.cache_size / 1024 ** 2) * 100) / 100,
-          cw_size: Math.round((cat.cw_size / 1024 ** 2) * 100) / 100,
-        }))
-      )
-      .subscribe({
-        next: (l2cat) => {
-          this.l2cat = l2cat;
-          this.localStore.setL2CatEvent(l2cat);
-        },
-        error: (error: Error) => {
-          this.snackBar.handleError(error.message);
-          this.loading = false;
-        },
-      });
+    this.service.getL2cat().subscribe({
+      next: (l2cat) => { this.l2cat = l2cat; },
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+        this.loading = false;
+      },
+    });
   }
 }

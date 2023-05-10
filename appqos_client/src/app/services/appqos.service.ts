@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
-import { catchError, Observable, of, tap, throwError } from 'rxjs';
+import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
 
 import {
   CacheAllocation,
@@ -94,7 +94,7 @@ export class AppqosService {
       .pipe(tap((topo) => this.local.saveData(
         'system_topology', JSON.stringify(topo)
       )),
-      catchError(this.handleError));
+        catchError(this.handleError));
   }
 
   /**
@@ -103,7 +103,17 @@ export class AppqosService {
   getL3cat(): Observable<CacheAllocation> {
     const api_url = this.local.getData('api_url');
     return this.http.get<CacheAllocation>(`${api_url}/caps/l3cat`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        map((l3cat: CacheAllocation) => {
+          l3cat.cache_size = Math.round((l3cat.cache_size / 1024 ** 2) * 100) / 100;
+          l3cat.cw_size = Math.round((l3cat.cw_size / 1024 ** 2) * 100) / 100;
+          return l3cat;
+        }),
+        tap((l3cat: CacheAllocation) => {
+          this.local.setL3CatEvent(l3cat);
+        }),
+      );
   }
 
   /**
@@ -112,7 +122,17 @@ export class AppqosService {
   getL2cat(): Observable<CacheAllocation> {
     const api_url = this.local.getData('api_url');
     return this.http.get<CacheAllocation>(`${api_url}/caps/l2cat`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        map((l2cat: CacheAllocation) => {
+          l2cat.cache_size = Math.round((l2cat.cache_size / 1024 ** 2) * 100) / 100;
+          l2cat.cw_size = Math.round((l2cat.cw_size / 1024 ** 2) * 100) / 100;
+          return l2cat;
+        }),
+        tap((l2cat) => {
+          this.local.setL2CatEvent(l2cat);
+        }),
+      );
   }
 
   /**
@@ -121,7 +141,10 @@ export class AppqosService {
   getMba(): Observable<MBA> {
     const api_url = this.local.getData('api_url');
     return this.http.get<MBA>(`${api_url}/caps/mba`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        tap((mba) => this.local.setMbaEvent(mba)),
+      );
   }
 
   /**
@@ -130,7 +153,10 @@ export class AppqosService {
   getMbaCtrl(): Observable<MBACTRL> {
     const api_url = this.local.getData('api_url');
     return this.http.get<MBACTRL>(`${api_url}/caps/mba_ctrl`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        tap((mbaCtrl) => this.local.setMbaCtrlEvent(mbaCtrl)),
+      );
   }
 
   /**
@@ -139,7 +165,10 @@ export class AppqosService {
   getRdtIface(): Observable<RDTIface> {
     const api_url = this.local.getData('api_url');
     return this.http.get<RDTIface>(`${api_url}/caps/rdt_iface`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        tap((rdtIface) => this.local.setRdtIfaceEvent(rdtIface))
+      );
   }
 
   /**
@@ -148,7 +177,10 @@ export class AppqosService {
   getSstbf(): Observable<SSTBF> {
     const api_url = this.local.getData('api_url');
     return this.http.get<SSTBF>(`${api_url}/caps/sstbf`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        tap((sstbf) => this.local.setSstbfEvent(sstbf)),
+      );
   }
 
   rdtIfacePut(value: string): Observable<resMessage> {

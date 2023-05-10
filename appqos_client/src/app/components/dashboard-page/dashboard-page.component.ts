@@ -27,7 +27,13 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { AppqosService } from 'src/app/services/appqos.service';
+import { LocalService } from 'src/app/services/local.service';
+import { CacheAllocation } from '../system-caps/system-caps.model';
+import { map } from 'rxjs';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -36,10 +42,98 @@ import { Component } from '@angular/core';
 })
 
 /* Component used to display Dashboard page*/
-export class DashboardPageComponent {
-  showContent = true;
+export class DashboardPageComponent implements OnInit {
+  showContent: boolean = true;
+
+  constructor(
+    private service: AppqosService,
+    private localService: LocalService,
+    private snackBar: SnackBarService,
+    private router: Router
+  ) { }
+
+  ngOnInit(): void {
+    this._getCaps();
+  }
 
   switchContent(event: boolean): void {
     this.showContent = event;
+  }
+
+  private _getCaps() {
+    this.service.getCaps().subscribe(
+      {
+        next: (caps) => {
+          this.localService.setCapsEvent(caps.capabilities);
+          this._getRdtIface();
+
+          if (caps.capabilities.includes('l3cat'))
+            this._getL3Cat();
+
+          if (caps.capabilities.includes('l2cat'))
+            this._getL2Cat();
+
+          if (caps.capabilities.includes('sstbf'))
+            this._getSstbf();
+
+          if (caps.capabilities.includes('mba')) {
+            this._getMba();
+            this._getMbaCtrl();
+          }
+            
+        },
+        error: (error: Error) => {
+          this.snackBar.handleError(error.message);
+          this.router.navigate(['/login']);
+        }
+      });
+  }
+
+  private _getL3Cat() {
+    this.service.getL3cat().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    });
+  }
+
+  private _getL2Cat() {
+    this.service.getL2cat().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    });
+  }
+
+  private _getMba() {
+    this.service.getMba().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    });
+  }
+
+  private _getMbaCtrl() {
+    this.service.getMbaCtrl().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    });
+  }
+
+  private _getSstbf() {
+    this.service.getSstbf().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    })
+  }
+
+  private _getRdtIface() {
+    this.service.getRdtIface().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    })
   }
 }

@@ -35,6 +35,7 @@ import { LocalService } from "src/app/services/local.service";
 import { SharedModule } from "src/app/shared/shared.module";
 import { SnackBarService } from "src/app/shared/snack-bar.service";
 import { PoolAddDialogComponent } from "./pool-add-dialog.component";
+import { MBACTRL } from "src/app/components/system-caps/system-caps.model";
 
 describe('Given poolAddDialogComponent', () => {
   let parseNumberListSpy: any;
@@ -67,7 +68,11 @@ describe('Given poolAddDialogComponent', () => {
     'mba'
   ]
 
-  const mockedMbaCtrl = false;
+  const mockedMbaCtrl: MBACTRL = {
+    enabled: false,
+    supported: false
+  };
+  
   const mockedData = {
     l2cwNum: 10,
     l3cwNum: 12
@@ -375,7 +380,10 @@ describe('Given poolAddDialogComponent', () => {
 
       const postPoolSpy = spyOn(component, 'postPool');
 
-      component.mbaCtrl = true;
+      component.mbaCtrl = {
+        enabled: true,
+        supported: true
+      };
       component.form.patchValue({ name, cores });
 
       const savePoolButton = ngMocks.find('#save-pool-button');

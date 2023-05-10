@@ -47,7 +47,7 @@ describe('Given RapConfigComponent', () => {
         getApps: () => EMPTY,
       })
       .mock(LocalService, {
-        getIfaceEvent: () => EMPTY,
+        getRdtIfaceEvent: () => EMPTY,
         getL3CatEvent: () => EMPTY,
         getL2CatEvent: () => EMPTY
       });
@@ -97,11 +97,11 @@ describe('Given RapConfigComponent', () => {
       // create mock observable and spies
       const mockGetIFaceEvent$ = new Subject<void>();
       const getConfigDataSpy = jasmine.createSpy();
-      const getIfaceEvent =
+      const getRdtIfaceEvent =
         jasmine.createSpy().and.returnValue(mockGetIFaceEvent$);
 
-      // replace localService.getIFaceEvent() with spy
-      MockInstance(LocalService, () => ({ getIfaceEvent }));
+      // replace localService.getRdtIFaceEvent() with spy
+      MockInstance(LocalService, () => ({ getRdtIfaceEvent }));
 
       const fixture = MockRender(RapConfigComponent);
 

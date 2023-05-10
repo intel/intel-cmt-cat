@@ -32,11 +32,61 @@ import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 
 import { SharedModule } from 'src/app/shared/shared.module';
 import { DashboardPageComponent } from './dashboard-page.component';
+import { AppqosService } from 'src/app/services/appqos.service';
+import { of } from 'rxjs';
+import { LocalService } from 'src/app/services/local.service';
+import { Caps, CacheAllocation, MBA, MBACTRL, SSTBF } from '../system-caps/system-caps.model';
 
 describe('Given DashboardPageComponent', () => {
   beforeEach(() =>
-    MockBuilder(DashboardPageComponent).mock(SharedModule).mock(Router)
+    MockBuilder(DashboardPageComponent)
+      .mock(SharedModule)
+      .mock(Router)
+      .mock(AppqosService, {
+        getCaps: () => of(mockedCaps),
+        getL2cat: () => of(mockedCache),
+        getL3cat: () => of(mockedCache),
+        getMba: () => of(mockedMba),
+        getMbaCtrl: () => of(mockedMbaCtrl),
+        getSstbf: () => of(mockedSSTBF),
+      })
+      .mock(LocalService)
   );
+
+  const mockedCaps: Caps = {
+    capabilities: ['l3cat', 'l2cat', 'mba', 'sstbf']
+  };
+
+  const mockedCache: CacheAllocation = {
+    cache_size: 44040192,
+    cdp_enabled: false,
+    cdp_supported: false,
+    clos_num: 15,
+    cw_num: 12,
+    cw_size: 3670016
+  };
+
+  const mockedMba: MBA = {
+    mba_enabled: false,
+    mba_bw_enabled: false,
+    clos_num: 7
+  };
+
+  const mockedMbaCtrl: MBACTRL = {
+    enabled: false,
+    supported: true
+  };
+
+  const mockedSSTBF: SSTBF = {
+    configured: true,
+    hp_cores: [1, 2],
+    std_cores: [1, 2],
+  };
+
+  const mockedError: Error = {
+    name: 'Error',
+    message: 'rest API error',
+  };
 
   MockInstance.scope('case');
 

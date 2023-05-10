@@ -72,8 +72,49 @@ describe('Given SystemCapsComponent', () => {
       })
       .mock(SnackBarService)
       .mock(SstcpComponent)
-      .keep(LocalService)
+      .mock(LocalService, {
+        getCapsEvent: () => of(mockedCaps),
+        getL3CatEvent: () => of(mockedCache),
+        getL2CatEvent: () => of(mockedCache),
+        getMbaEvent: () => of(mockedMba),
+        getMbaCtrlEvent: () => of(mockedMbaCtrl),
+        getSstbfEvent: () => of(mockedSSTBF),
+        getRdtIfaceEvent: () => of(mockedRDT),
+        getData: LocalService.prototype.getData
+      })
   );
+
+  const mockedCaps = ['l3cat', 'l2cat', 'mba', 'sstbf', 'power'];
+
+  const mockedCache: CacheAllocation = {
+    cache_size: 42,
+    cdp_enabled: false,
+    cdp_supported: false,
+    clos_num: 15,
+    cw_num: 12,
+    cw_size: 3.5,
+  };
+
+  const mockedSSTBF: SSTBF = {
+    configured: false,
+    hp_cores: [1, 2],
+    std_cores: [1, 2],
+  };
+
+  const mockedMba: MBA = {
+    clos_num: 12,
+    mba_enabled: true,
+    mba_bw_enabled: true,
+  };
+
+  const mockedMbaCtrl: MBACTRL = {
+    enabled: false, supported: true
+  };
+
+  const mockedRDT: RDTIface = {
+    interface: 'os',
+    interface_supported: ['msr', 'os'],
+  };
 
   const mockedError: Error = {
     name: 'Error',
@@ -95,15 +136,6 @@ describe('Given SystemCapsComponent', () => {
 
     it('should display title property in card ', () => {
       const title = 'System Capabilities';
-      const mockedCaps: Caps = {
-        capabilities: ['l2cat', 'power'],
-      };
-
-      const capsSpy = jasmine.createSpy('getCaps');
-
-      MockInstance(AppqosService, 'getCaps', capsSpy).and.returnValue(
-        of(mockedCaps)
-      );
 
       MockRender(SystemCapsComponent);
 
@@ -113,17 +145,8 @@ describe('Given SystemCapsComponent', () => {
     });
 
     it('should get MBA data', () => {
-      const mockedMba: MBA = {
-        clos_num: 12,
-        mba_enabled: true,
-        mba_bw_enabled: false,
-      };
-
-      const mockedMbaCtrl: MBACTRL = { enabled: true, supported: true };
-
-      MockInstance(AppqosService, 'getMba', () => of(mockedMba));
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrl));
-
+      MockInstance(LocalService, 'getMbaEvent', () => of(mockedMba));
+      MockInstance(LocalService, 'getMbaCtrlEvent', () => of(mockedMbaCtrl));
       const {
         point: { componentInstance: component },
       } = MockRender(SystemCapsComponent);
@@ -132,13 +155,6 @@ describe('Given SystemCapsComponent', () => {
     });
 
     it('should get RDT interface', () => {
-      const mockedRDT: RDTIface = {
-        interface: 'os',
-        interface_supported: ['msr', 'os'],
-      };
-
-      MockInstance(AppqosService, 'getRdtIface', () => of(mockedRDT));
-
       const {
         point: { componentInstance: component },
       } = MockRender(SystemCapsComponent);
@@ -147,65 +163,22 @@ describe('Given SystemCapsComponent', () => {
     });
 
     it('should get L3 CAT', () => {
-      const mockedL3cat: CacheAllocation = {
-        cache_size: 44040192,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3670016,
-      };
-
-      MockInstance(AppqosService, 'getL3cat', () => of(mockedL3cat));
-
       const {
         point: { componentInstance: component },
       } = MockRender(SystemCapsComponent);
 
-      expect(component.l3cat).toEqual({
-        ...mockedL3cat,
-        cache_size: 42,
-        cw_size: 3.5,
-      });
+      expect(component.l3cat).toEqual(mockedCache);
     });
 
     it('should get L2 CAT', () => {
-      const mockedL2cat: CacheAllocation = {
-        cache_size: 44040192,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3670016,
-      };
-
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'l2cat', 'mba', 'sstbf', 'power'],
-      };
-
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
-      MockInstance(AppqosService, 'getL2cat', () => of(mockedL2cat));
-
       const {
         point: { componentInstance: component },
       } = MockRender(SystemCapsComponent);
 
-      expect(component.l2cat).toEqual({
-        ...mockedL2cat,
-        cache_size: 42,
-        cw_size: 3.5,
-      });
+      expect(component.l2cat).toEqual(mockedCache);
     });
 
     it('should get SST-BF', () => {
-      const mockedSSTBF: SSTBF = {
-        configured: false,
-        hp_cores: [1, 2],
-        std_cores: [1, 2],
-      };
-
-      MockInstance(AppqosService, 'getSstbf', () => of(mockedSSTBF));
-
       const {
         point: { componentInstance: component },
       } = MockRender(SystemCapsComponent);
@@ -214,101 +187,13 @@ describe('Given SystemCapsComponent', () => {
     });
 
     it('should get capabilities', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
-      };
-
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
 
       const {
         point: { componentInstance: component },
       } = MockRender(SystemCapsComponent);
 
-      expect(component.caps).toEqual(mockedCaps.capabilities);
-    });
-
-    it('should handle getCaps() error', () => {
-      const getCapsSpy = jasmine.createSpy()
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleError');
-
-      MockInstance(AppqosService, 'getCaps', getCapsSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(SystemCapsComponent);
-
-      expect(getCapsSpy).toHaveBeenCalled();
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    });
-
-    it('should handle _getMbaData() error', () => {
-      const getMbaSpy = jasmine.createSpy()
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleError');
-
-      MockInstance(AppqosService, 'getMba', getMbaSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(SystemCapsComponent);
-
-      expect(getMbaSpy).toHaveBeenCalled();
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    });
-
-    it('should handle _getRdtIface() error', () => {
-      const getRdtIfaceSpy = jasmine.createSpy()
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleError');
-
-      MockInstance(AppqosService, 'getRdtIface', getRdtIfaceSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(SystemCapsComponent);
-
-      expect(getRdtIfaceSpy).toHaveBeenCalled();
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    });
-
-    it('should handle _getSstbf() error', () => {
-      const getSstbfSpy = jasmine.createSpy()
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleError');
-
-      MockInstance(AppqosService, 'getSstbf', getSstbfSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(SystemCapsComponent);
-
-      expect(getSstbfSpy).toHaveBeenCalled();
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    });
-
-    it('should handle _getL3cat() error', () => {
-      const getL3catSpy = jasmine.createSpy()
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleError');
-
-      MockInstance(AppqosService, 'getL3cat', getL3catSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(SystemCapsComponent);
-
-      expect(getL3catSpy).toHaveBeenCalled();
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    });
-
-    it('should handle _getL2cat() error', () => {
-      const getL2catSpy = jasmine.createSpy()
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleError');
-
-      MockInstance(AppqosService, 'getL2cat', getL2catSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(SystemCapsComponent);
-
-      expect(getL2catSpy).toHaveBeenCalled();
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+      expect(component.caps).toEqual(mockedCaps);
     });
   });
 

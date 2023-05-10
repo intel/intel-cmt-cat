@@ -39,7 +39,7 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { CacheAllocation, Caps, MBACTRL } from '../system-caps/system-caps.model';
+import { CacheAllocation, Caps, MBACTRL, RDTIface } from '../system-caps/system-caps.model';
 import { OverviewComponent } from './overview.component';
 import { Pools } from './overview.model';
 
@@ -110,6 +110,11 @@ describe('Given OverviewComponent', () => {
     });
 
     it('should subscribe to getIfaceEvent()', () => {
+      const mockedRDT: RDTIface = {
+        interface: 'os',
+        interface_supported: ['msr', 'os'],
+      };
+      
       const getMbaCtrlSpy = jasmine.createSpy('getMbaCtrl').and.returnValue(of());
       const getPoolsSpy = jasmine.createSpy('getPools').and.returnValue(of());
 
@@ -127,7 +132,7 @@ describe('Given OverviewComponent', () => {
       expect(getMbaCtrlSpy).toHaveBeenCalledTimes(1);
       expect(getPoolsSpy).toHaveBeenCalledTimes(2);
 
-      local.setIfaceEvent();
+      local.setRdtIfaceEvent(mockedRDT);
 
       expect(getMbaCtrlSpy).toHaveBeenCalledTimes(2);
       expect(getPoolsSpy).toHaveBeenCalledTimes(3);

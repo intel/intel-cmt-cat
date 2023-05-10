@@ -32,6 +32,9 @@ import { BehaviorSubject, Observable, Subject } from 'rxjs';
 
 import {
   CacheAllocation,
+  MBA,
+  MBACTRL,
+  RDTIface,
   SSTBF,
 } from '../components/system-caps/system-caps.model';
 
@@ -41,19 +44,20 @@ import {
 
 /* Service used to store data to localStorage */
 export class LocalService {
-  ifaceEvent = new Subject<void>();
+  rdtIFace = new BehaviorSubject<RDTIface | null>(null);
   l3cat = new BehaviorSubject<CacheAllocation | null>(null);
   l2cat = new BehaviorSubject<CacheAllocation | null>(null);
   caps = new BehaviorSubject<string[] | null>(null);
-  mbaCtrl = new BehaviorSubject<boolean | null>(null);
+  mba = new BehaviorSubject<MBA | null>(null);
+  mbaCtrl = new BehaviorSubject<MBACTRL | null>(null);
   sstbf = new BehaviorSubject<SSTBF | null>(null);
 
-  setIfaceEvent(): void {
-    this.ifaceEvent.next();
+  setRdtIfaceEvent(rdtIFace: RDTIface): void {
+    this.rdtIFace.next(rdtIFace);
   }
 
-  getIfaceEvent(): Observable<void> {
-    return this.ifaceEvent.asObservable();
+  getRdtIfaceEvent(): Observable<RDTIface | null> {
+    return this.rdtIFace.asObservable();
   }
 
   setSstbfEvent(sstbf: SSTBF) {
@@ -96,11 +100,19 @@ export class LocalService {
     return this.caps.asObservable();
   }
 
-  setMbaCtrlEvent(mbaCtrl: boolean) {
+  getMbaEvent(): Observable<MBA | null>{
+    return this.mba.asObservable();
+  }
+
+  setMbaEvent(mba: MBA) {
+    this.mba.next(mba);
+  }
+
+  setMbaCtrlEvent(mbaCtrl: MBACTRL) {
     this.mbaCtrl.next(mbaCtrl);
   }
 
-  getMbaCtrlEvent(): Observable<boolean | null> {
+  getMbaCtrlEvent(): Observable<MBACTRL | null> {
     return this.mbaCtrl.asObservable();
   }
 

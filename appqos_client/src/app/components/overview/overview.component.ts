@@ -60,7 +60,7 @@ export class OverviewComponent implements OnInit {
     this.getPools();
     this.getCaps();
 
-    this.localService.getIfaceEvent().subscribe(() => {
+    this.localService.getRdtIfaceEvent().pipe(skip(1)).subscribe(() => {
       this.getMbaCtrl();
       this.getPools();
     });
@@ -87,7 +87,6 @@ export class OverviewComponent implements OnInit {
   getMbaCtrl(): void {
     this.service.getMbaCtrl().subscribe((mbaCtrl: MBACTRL) => {
       this.mbaCtrl = mbaCtrl;
-      this.localService.setMbaCtrlEvent(mbaCtrl.enabled);
     });
   }
 

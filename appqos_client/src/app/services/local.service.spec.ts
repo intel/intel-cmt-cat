@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { skip } from 'rxjs';
-import { CacheAllocation } from '../components/system-caps/system-caps.model';
+import { CacheAllocation, MBACTRL, RDTIface } from '../components/system-caps/system-caps.model';
 import { LocalService } from './local.service';
 
 describe('Given LocalService', () => {
@@ -131,33 +131,43 @@ describe('Given LocalService', () => {
 
   describe('when setIfaceEvent method is executed', () => {
     it('should emit ifaceEvent', (done: DoneFn) => {
+      const mockedRDT: RDTIface = {
+        interface: 'os',
+        interface_supported: ['msr', 'os'],
+      };
+      
       const {
         point: { componentInstance: service },
       } = MockRender(LocalService);
 
-      service.ifaceEvent.subscribe((event) => {
-        expect(event).toBeUndefined();
+      service.rdtIFace.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedRDT);
 
         done();
       });
 
-      service.setIfaceEvent();
+      service.setRdtIfaceEvent(mockedRDT);
     });
   });
 
   describe('when getIfaceEvent method is executed', () => {
     it('should detect changes', (done: DoneFn) => {
+      const mockedRDT: RDTIface = {
+        interface: 'os',
+        interface_supported: ['msr', 'os'],
+      };
+
       const {
         point: { componentInstance: service },
       } = MockRender(LocalService);
 
-      service.getIfaceEvent().subscribe((event) => {
-        expect(event).toBeUndefined();
+      service.getRdtIfaceEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedRDT);
 
         done();
       });
 
-      service.ifaceEvent.next();
+      service.rdtIFace.next(mockedRDT);
     });
   });
 
@@ -259,62 +269,79 @@ describe('Given LocalService', () => {
   })
 
   describe('when setMbaCtrlEvent method is executed', () => {
-    it('it should emit (true)', (done: DoneFn) => {
+    it('it should emit mbaCtrl (Supported & Enabled)', (done: DoneFn) => {
+      const mockedMbaCtrl: MBACTRL = {
+        enabled: true,
+        supported: true
+      };
+
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
       service.mbaCtrl.pipe(skip(1)).subscribe((event) => {
-        expect(event).toBeTrue();
+        expect(event).toBe(mockedMbaCtrl);
 
         done();
       })
 
-      service.setMbaCtrlEvent(true);
+      service.setMbaCtrlEvent(mockedMbaCtrl);
     })
 
-    it('it should emit (false)', (done: DoneFn) => {
+    it('it should emit mbaCtrl (Not Supported & Disabled)', (done: DoneFn) => {
+      const mockedMbaCtrl: MBACTRL = {
+        enabled: false,
+        supported: false
+      };
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
       service.mbaCtrl.pipe(skip(1)).subscribe((event) => {
-        expect(event).toBeFalse();
+        expect(event).toBe(mockedMbaCtrl);
 
         done();
       })
 
-      service.setMbaCtrlEvent(false);
+      service.setMbaCtrlEvent(mockedMbaCtrl);
     })
   })
 
   describe('when getMbaCtrlEvent method is executed', () => {
-    it('should detect change (true)', (done: DoneFn) => {
+    it('should detect change (Supported & Enabled)', (done: DoneFn) => {
+      const mockedMbaCtrl: MBACTRL = {
+        enabled: true,
+        supported: true
+      };
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
       service.getMbaCtrlEvent().pipe(skip(1)).subscribe((event) => {
-        expect(event).toBeTrue();
+        expect(event).toBe(mockedMbaCtrl);
 
         done();
       })
 
-      service.mbaCtrl.next(true);
+      service.mbaCtrl.next(mockedMbaCtrl);
     })
 
-    it('should detect change (false)', (done: DoneFn) => {
+    it('should detect change (Not Supported & Disabled)', (done: DoneFn) => {
+      const mockedMbaCtrl: MBACTRL = {
+        enabled: false,
+        supported: false
+      };
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
       service.getMbaCtrlEvent().pipe(skip(1)).subscribe((event) => {
-        expect(event).toBeFalse();
+        expect(event).toBe(mockedMbaCtrl);
 
         done();
       })
 
-      service.mbaCtrl.next(false);
+      service.mbaCtrl.next(mockedMbaCtrl);
     })
   })
 

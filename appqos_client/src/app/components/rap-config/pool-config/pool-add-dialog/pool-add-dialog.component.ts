@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { Component, Inject, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
-import { Standards } from 'src/app/components/system-caps/system-caps.model';
+import { MBACTRL, Standards } from 'src/app/components/system-caps/system-caps.model';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
@@ -55,7 +55,7 @@ export class PoolAddDialogComponent implements OnInit {
   pool = {};
   caps!: string[] | null;
   mbaBwDefNum = Math.pow(2, 32) - 1;
-  mbaCtrl!: boolean | null;
+  mbaCtrl!: MBACTRL | null;
   coresList!: number[];
 
   constructor(
@@ -104,7 +104,7 @@ export class PoolAddDialogComponent implements OnInit {
     };
 
     if (this.caps.includes('mba')) {
-      if (this.mbaCtrl) {
+      if (this.mbaCtrl?.enabled) {
         pool.mba_bw = this.mbaBwDefNum;
       } else {
         pool.mba = 100;
