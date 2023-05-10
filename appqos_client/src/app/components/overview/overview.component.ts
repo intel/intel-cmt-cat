@@ -35,7 +35,6 @@ import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Caps, SystemTopology, MBACTRL, resMessage } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
-import { skip } from 'rxjs';
 
 @Component({
   selector: 'app-overview',
@@ -44,7 +43,7 @@ import { skip } from 'rxjs';
 })
 export class OverviewComponent implements OnInit {
   pools!: Pools[];
-  mbaCtrl!: MBACTRL;
+  mbaCtrl!: MBACTRL | null;
   caps!: string[];
   topology: SystemTopology | null = null;
 
@@ -56,32 +55,18 @@ export class OverviewComponent implements OnInit {
 
   ngOnInit(): void {
     this.getTopology();
-    this.getMbaCtrl();
-    this.getPools();
-    this.getCaps();
 
-    this.localService.getRdtIfaceEvent().pipe(skip(1)).subscribe(() => {
-      this.getMbaCtrl();
-      this.getPools();
+    this.localService.getCapsEvent().subscribe((caps) => {
+      this.caps = caps;
     });
 
-    this.localService.getL3CatEvent().subscribe(() => {
-      this.getPools();
+    this.localService.getMbaCtrlEvent().subscribe((mbaCtrl) => {
+      this.mbaCtrl = mbaCtrl;
     });
 
-    this.localService.getL2CatEvent().pipe(skip(1)).subscribe(() => {
-      this.getPools();
-    })
-  }
-
-  getPools(): void {
-    this.service.getPools().subscribe((pools: Pools[]) => (this.pools = pools));
-  }
-
-  getCaps(): void {
-    this.service
-      .getCaps()
-      .subscribe((caps: Caps) => (this.caps = caps.capabilities));
+    this.localService.getPoolsEvent().subscribe((pools) => {
+      this.pools = pools;
+    });
   }
 
   getMbaCtrl(): void {
@@ -101,11 +86,19 @@ export class OverviewComponent implements OnInit {
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
         this.getMbaCtrl();
-        this.getPools();
+        this._getPools();
       },
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
       },
+    });
+  }
+
+  private _getPools() {
+    this.service.getPools().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
     });
   }
 }

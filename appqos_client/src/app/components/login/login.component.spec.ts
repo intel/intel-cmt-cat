@@ -35,7 +35,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { By } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
+import { of, throwError } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
@@ -68,8 +68,13 @@ describe('Given LoginComponent', () => {
     it('should give error', () => {
       const hostName = 'https://errorName';
       const portNumber = '404';
+      const mockedError = {
+        message: 'REST API error',
+        name: 'error'
+      }
 
-      MockInstance(AppqosService, 'login', () => of(false));
+      const loginSpy = jasmine.createSpy('loginSpy').and.returnValue(throwError(() => mockedError))
+      MockInstance(AppqosService, 'login', loginSpy);
 
       const fixture = MockRender(LoginComponent);
       const component = fixture.point.componentInstance;
@@ -81,6 +86,7 @@ describe('Given LoginComponent', () => {
 
       form.triggerEventHandler('submit', null);
 
+      expect(loginSpy).toHaveBeenCalledTimes(1);
       expect(component.hasError).toBeTrue();
     });
   });
@@ -176,27 +182,6 @@ describe('Given LoginComponent', () => {
       const localStore = ngMocks.findInstance(LocalService);
 
       expect(localStore.getData('api_url')).toBe('https://localhost:5000');
-    });
-  });
-
-  describe('when loginToSystem method is called with invalid form credentials', () => {
-    it('it should give error', () => {
-      const hostName = 'https://errorName';
-      const portNumber = '404';
-
-      MockInstance(AppqosService, 'login', () => of(false));
-
-      const fixture = MockRender(LoginComponent);
-      const component = fixture.point.componentInstance;
-
-      component.form.patchValue({ hostName, portNumber });
-      fixture.detectChanges();
-
-      const form: DebugElement = fixture.debugElement.query(By.css('form'));
-
-      form.triggerEventHandler('submit', null);
-
-      expect(component.hasError).toBeTrue();
     });
   });
 

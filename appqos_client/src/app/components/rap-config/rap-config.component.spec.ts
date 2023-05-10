@@ -32,7 +32,7 @@ import { RapConfigComponent } from './rap-config.component';
 import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { Pools, Apps } from '../overview/overview.model';
 import { LocalService } from 'src/app/services/local.service';
-import { of, EMPTY, Subject, throwError } from 'rxjs';
+import { of, EMPTY, throwError } from 'rxjs';
 import { SharedModule } from 'src/app/shared/shared.module';
 
 describe('Given RapConfigComponent', () => {
@@ -49,7 +49,9 @@ describe('Given RapConfigComponent', () => {
       .mock(LocalService, {
         getRdtIfaceEvent: () => EMPTY,
         getL3CatEvent: () => EMPTY,
-        getL2CatEvent: () => EMPTY
+        getL2CatEvent: () => EMPTY,
+        getPoolsEvent: () => EMPTY,
+        getAppsEvent: () => EMPTY
       });
   });
 
@@ -78,8 +80,8 @@ describe('Given RapConfigComponent', () => {
     ];
 
     // set mock app and pool data to be returned from AppqosService
-    MockInstance(AppqosService, 'getPools', () => of(mockedPools));
-    MockInstance(AppqosService, 'getApps', () => of(mockedApps));
+    MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
+    MockInstance(LocalService, 'getAppsEvent', () => of(mockedApps));
 
     it('should populate list of apps and pools', () => {
       const component = MockRender(RapConfigComponent).point.componentInstance;
@@ -92,70 +94,6 @@ describe('Given RapConfigComponent', () => {
         .withContext('should get list of pools')
         .toEqual(mockedPools);
     });
-
-    it('should subscribe to localService.getIfaceEvent()', () => {
-      // create mock observable and spies
-      const mockGetIFaceEvent$ = new Subject<void>();
-      const getConfigDataSpy = jasmine.createSpy();
-      const getRdtIfaceEvent =
-        jasmine.createSpy().and.returnValue(mockGetIFaceEvent$);
-
-      // replace localService.getRdtIFaceEvent() with spy
-      MockInstance(LocalService, () => ({ getRdtIfaceEvent }));
-
-      const fixture = MockRender(RapConfigComponent);
-
-      // replace getConfigData() with spy
-      fixture.point.componentInstance.getConfigData = getConfigDataSpy;
-
-      mockGetIFaceEvent$.next();
-
-      expect(fixture.point.componentInstance.getConfigData)
-        .withContext('should call getConfigData when event emitted')
-        .toHaveBeenCalledTimes(1);
-    })
-
-    it('should subscribe to getL3CatEvent', () => {
-      const mockGetl3CatEvent = new Subject<void>();
-      const getConfigDataSpy = jasmine.createSpy();
-      const getl3CatEventSpy =
-        jasmine.createSpy().and.returnValue(mockGetl3CatEvent);
-
-      MockInstance(LocalService, 'getL3CatEvent', getl3CatEventSpy);
-
-      const {
-        point: { componentInstance: component }
-      } = MockRender(RapConfigComponent);
-
-      component.getConfigData = getConfigDataSpy;
-
-      mockGetl3CatEvent.next();
-
-      expect(component.getConfigData)
-        .withContext('should call getConfigData when event emitted')
-        .toHaveBeenCalledTimes(1);
-    });
-
-    it('should subscribe to getL2CatEvent', () => {
-      const mockGetl2CatEvent = new Subject<void>();
-      const getConfigDataSpy = jasmine.createSpy();
-      const getl2CatEventSpy =
-        jasmine.createSpy().and.returnValue(mockGetl2CatEvent);
-
-      MockInstance(LocalService, 'getL2CatEvent', getl2CatEventSpy);
-
-      const {
-        point: { componentInstance: component }
-      } = MockRender(RapConfigComponent);
-
-      component.getConfigData = getConfigDataSpy;
-
-      mockGetl2CatEvent.next();
-
-      expect(component.getConfigData)
-        .withContext('should call getConfigData when event emitted')
-        .toHaveBeenCalledTimes(1);
-    });
   });
 
   describe('when initialized with errors', () => {
@@ -165,27 +103,25 @@ describe('Given RapConfigComponent', () => {
         .returnValue(throwError(() => new Error('getPools error')));
       const getAppsSpy = jasmine.createSpy().and
         .returnValue(throwError(() => new Error('getApps error')));
+      const setAppsEventSpy = jasmine.createSpy('setAppsEventSpy');
+      const setPoolsEventSpy = jasmine.createSpy('setPoolsEventSpy');
 
       MockInstance(AppqosService, 'getPools', getPoolsSpy);
       MockInstance(AppqosService, 'getApps', getAppsSpy);
+      MockInstance(LocalService, 'setAppsEvent', setAppsEventSpy);
+      MockInstance(LocalService, 'setPoolsEvent', setPoolsEventSpy);
 
       const fixture = MockRender(RapConfigComponent);
       const component = fixture.point.componentInstance;
       const emptyApps: Apps[] = [];
       const emptyPools: Pools[] = [];
 
-      // very getPools() and getApps() called during gnOnInit()
-      expect(getPoolsSpy).toHaveBeenCalledTimes(1);
-      expect(getAppsSpy).toHaveBeenCalledTimes(1);
+      component.getConfigData();
 
       // verify errors were handled correctly
-      expect(component.apps)
-        .withContext('should return empty apps list on error')
-        .toEqual(emptyApps);
+      expect(setAppsEventSpy).toHaveBeenCalledOnceWith(emptyApps)
 
-      expect(component.pools)
-        .withContext('should return empty pools list on error')
-        .toEqual(emptyPools);
+      expect(setPoolsEventSpy).toHaveBeenCalledOnceWith(emptyPools);
     });
   });
 });

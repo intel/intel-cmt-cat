@@ -54,10 +54,15 @@ describe('Given EditDialogComponent', () => {
       .mock(AppqosService, {
         getPools: () => EMPTY,
       })
+      .mock(LocalService, {
+        getL3CatEvent: () => EMPTY,
+        getPoolsEvent: () => EMPTY,
+        convertToBitmask: LocalService.prototype.convertToBitmask,
+      })
       .keep(MatSliderModule)
       .keep(MatInputModule)
       .keep(BrowserAnimationsModule)
-      .keep(LocalService)
+
   );
 
   MockInstance.scope('case');
@@ -98,7 +103,7 @@ describe('Given EditDialogComponent', () => {
 
       const poolsSpy = jasmine.createSpy('getPools');
 
-      MockInstance(AppqosService, 'getPools', poolsSpy).and.returnValue(
+      MockInstance(LocalService, 'getPoolsEvent', poolsSpy).and.returnValue(
         of(mockedPool)
       );
 
@@ -137,7 +142,7 @@ describe('Given EditDialogComponent', () => {
 
       const poolsSpy = jasmine.createSpy('getPools');
 
-      MockInstance(AppqosService, 'getPools', poolsSpy).and.returnValue(
+      MockInstance(LocalService, 'getPoolsEvent', poolsSpy).and.returnValue(
         of(mockedPool)
       );
 
@@ -215,7 +220,7 @@ describe('Given EditDialogComponent', () => {
 
       const poolsSpy = jasmine.createSpy('getPools');
 
-      MockInstance(AppqosService, 'getPools', poolsSpy).and.returnValue(
+      MockInstance(LocalService, 'getPoolsEvent', poolsSpy).and.returnValue(
         of(mockedPool)
       );
 
@@ -254,7 +259,7 @@ describe('Given EditDialogComponent', () => {
 
       const poolsSpy = jasmine.createSpy('getPools');
 
-      MockInstance(AppqosService, 'getPools', poolsSpy).and.returnValue(
+      MockInstance(LocalService, 'getPoolsEvent', poolsSpy).and.returnValue(
         of(mockedPool)
       );
 
@@ -295,7 +300,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
       MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
         of(mockResponse)
       );
@@ -341,7 +346,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
       MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
         of(mockResponse)
       );
@@ -382,7 +387,8 @@ describe('Given EditDialogComponent', () => {
       // throw error on poolPut()
       MockInstance(AppqosService, 'poolPut', poolsSpy).and
         .returnValue(throwError(() => new Error(mockResponse)));
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'getPools', () => of([...mockedPool]));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -437,7 +443,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
       MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
         of(mockResponse)
       );
@@ -483,7 +489,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
       MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
         of(mockResponse)
       );
@@ -528,7 +534,8 @@ describe('Given EditDialogComponent', () => {
       // throw error on poolPut()
       MockInstance(AppqosService, 'poolPut', poolsSpy).and
         .returnValue(throwError(() => new Error(mockResponse)));
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'getPools', () => of([...mockedPool]));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -581,7 +588,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -635,7 +642,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -689,7 +696,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -742,7 +749,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -795,7 +802,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -845,7 +852,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -916,7 +923,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -950,7 +957,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -987,7 +994,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -1025,7 +1032,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of([...mockedPool]));
       MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
         of(mockResponse)
       );
@@ -1068,7 +1075,10 @@ describe('Given EditDialogComponent', () => {
       MockInstance(AppqosService, 'poolPut', poolsSpy).and
         .returnValue(throwError(() => new Error(mockResponse)));
       MockInstance(AppqosService, 'getPools', () => of(
-        mockedPool.map((pool: Pools) => ({ ...pool }))
+        mockedPool.map((pools) => ({...pools}))
+      ));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(
+        mockedPool.map((pools) => ({ ...pools }))
       ));
 
       const fixture = MockRender(
@@ -1123,7 +1133,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -1166,7 +1176,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
       MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
         of(mockResponse)
       );
@@ -1210,7 +1220,8 @@ describe('Given EditDialogComponent', () => {
       // throw error on poolPut()
       MockInstance(AppqosService, 'poolPut', poolsSpy).and
         .returnValue(throwError(() => new Error(mockResponse)));
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(AppqosService, 'getPools', () => of([...mockedPool]));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const fixture = MockRender(
         EditDialogComponent,
@@ -1254,7 +1265,7 @@ describe('Given EditDialogComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
       MockInstance(AppqosService, 'poolPut', poolsSpy).and.returnValue(
         of(mockResponse)
       );

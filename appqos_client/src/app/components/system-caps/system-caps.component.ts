@@ -150,6 +150,7 @@ export class SystemCapsComponent implements OnInit {
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
         this._getL3cat();
+        this._getPools();
         this.loading = false;
       },
       error: (error: Error) => {
@@ -165,6 +166,7 @@ export class SystemCapsComponent implements OnInit {
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
         this._getL2cat();
+        this._getPools();
         this.loading = false;
       },
       error: (error: Error) => {
@@ -192,6 +194,7 @@ export class SystemCapsComponent implements OnInit {
     this.service.getRdtIface().subscribe({
       next: (rdtIface) => {
         this.rdtIface = rdtIface;
+        this._getPools();
         this.loading = false;
       },
       error: (error: Error) => {
@@ -235,5 +238,13 @@ export class SystemCapsComponent implements OnInit {
         this.loading = false;
       },
     });
+  }
+
+  private _getPools() {
+    this.service.getPools().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    })
   }
 }

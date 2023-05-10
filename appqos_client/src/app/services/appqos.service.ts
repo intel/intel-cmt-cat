@@ -67,8 +67,13 @@ export class AppqosService {
 
   login(host: string, port: string) {
     return this.http
-      .get(`${host}:${port}/caps`)
-      .pipe(catchError(() => of(false)));
+      .get(`${host}:${port}/caps/cpu`)
+      .pipe(
+        catchError(this.handleError),
+        tap((topo) => this.local.saveData(
+          'system_topology', JSON.stringify(topo)
+        )
+      ));
   }
 
   /**
@@ -77,7 +82,10 @@ export class AppqosService {
   getCaps(): Observable<Caps> {
     const api_url = this.local.getData('api_url');
     return this.http.get<Caps>(`${api_url}/caps`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        tap((caps) => this.local.setCapsEvent(caps.capabilities))
+      );
   }
 
   /**
@@ -230,7 +238,10 @@ export class AppqosService {
   getPools(): Observable<Pools[]> {
     const api_url = this.local.getData('api_url');
     return this.http.get<Pools[]>(`${api_url}/pools`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(this.handleError),
+        tap((pools) => this.local.setPoolsEvent(pools))
+      );
   }
 
   poolPut(data: poolPutType, id: number): Observable<resMessage> {
@@ -254,7 +265,10 @@ export class AppqosService {
   getApps(): Observable<Apps[]> {
     const api_url = this.local.getData('api_url');
     return this.http.get<Apps[]>(`${api_url}/apps`)
-      .pipe(catchError(this.handleError));
+      .pipe(
+        catchError(() => of([])),
+        tap((apps)=> this.local.setAppsEvent(apps))
+      );
   }
 
   postApp(app: any): Observable<resMessage> {

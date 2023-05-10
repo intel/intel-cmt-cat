@@ -63,7 +63,7 @@ export class AppsConfigComponent implements OnChanges {
   ) {}
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (!changes['apps'].currentValue) return;
+    if (!changes['apps']?.currentValue) return;
 
     changes['apps'].currentValue.forEach((app: Apps) => {
       if (!app.cores) {
@@ -76,7 +76,7 @@ export class AppsConfigComponent implements OnChanges {
     this.tableData = changes['apps'].currentValue.map((app: Apps) => ({
       ...app,
       coresList: String(app.cores),
-      poolName: changes['pools'].currentValue.find(
+      poolName: this.pools.find(
         (pool: Pools) => pool.id === app.pool_id
       )?.name,
     }));
@@ -89,8 +89,8 @@ export class AppsConfigComponent implements OnChanges {
       data: this.pools,
     });
 
-    dialogRef.afterClosed().subscribe(() => {
-      this.appEvent.emit();
+    dialogRef.afterClosed().subscribe((result) => {
+      if(result) this.appEvent.emit();
     });
   }
 
@@ -101,8 +101,8 @@ export class AppsConfigComponent implements OnChanges {
       data: { pools: this.pools, app: app },
     });
 
-    dialogRef.afterClosed().subscribe(() => {
-      this.appEvent.emit();
+    dialogRef.afterClosed().subscribe((result) => {
+      if(result) this.appEvent.emit();
     });
   }
 

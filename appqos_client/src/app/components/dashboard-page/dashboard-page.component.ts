@@ -31,9 +31,10 @@ import { Component, OnInit } from '@angular/core';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { CacheAllocation } from '../system-caps/system-caps.model';
-import { map } from 'rxjs';
+import { catchError, map, of } from 'rxjs';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Router } from '@angular/router';
+import { Apps } from '../overview/overview.model';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -64,8 +65,9 @@ export class DashboardPageComponent implements OnInit {
     this.service.getCaps().subscribe(
       {
         next: (caps) => {
-          this.localService.setCapsEvent(caps.capabilities);
           this._getRdtIface();
+          this._getPools();
+          this._getApps();
 
           if (caps.capabilities.includes('l3cat'))
             this._getL3Cat();
@@ -80,7 +82,7 @@ export class DashboardPageComponent implements OnInit {
             this._getMba();
             this._getMbaCtrl();
           }
-            
+
         },
         error: (error: Error) => {
           this.snackBar.handleError(error.message);
@@ -135,5 +137,17 @@ export class DashboardPageComponent implements OnInit {
         this.snackBar.handleError(error.message);
       }
     })
+  }
+
+  private _getPools() {
+    this.service.getPools().subscribe({
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    })
+  }
+
+  private _getApps() {
+    this.service.getApps().subscribe();
   }
 }

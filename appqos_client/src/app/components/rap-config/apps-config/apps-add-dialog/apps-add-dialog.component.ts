@@ -109,7 +109,7 @@ export class AppsAddDialogComponent implements OnInit {
     this.service.postApp(app).subscribe({
       next: (response) => {
         this.snackBar.displayInfo(response.message);
-        this.dialogRef.close();
+        this.dialogRef.close(true);
       },
       error: (error) => {
         this.snackBar.handleError(error.message);

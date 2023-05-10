@@ -54,7 +54,11 @@ describe('Given OverviewComponent', () => {
         getMbaCtrl: () => EMPTY,
         getCaps: () => EMPTY,
       })
-      .keep(LocalService)
+      .mock(LocalService, {
+        getCapsEvent: () => EMPTY,
+        getMbaCtrlEvent: () => EMPTY,
+        getPoolsEvent: () => EMPTY
+      })
   );
 
   MockInstance.scope('case');
@@ -66,7 +70,7 @@ describe('Given OverviewComponent', () => {
         supported: true,
       };
 
-      MockInstance(AppqosService, 'getMbaCtrl', () => of(mockedMbaCtrlData));
+      MockInstance(LocalService, 'getMbaCtrlEvent', () => of(mockedMbaCtrlData));
 
       const {
         point: { componentInstance: component },
@@ -76,17 +80,15 @@ describe('Given OverviewComponent', () => {
     });
 
     it('should get Capabilities', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
-      };
+      const mockedCaps = ['l2cat', 'mba', 'sstbf', 'power'];
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
 
       const {
         point: { componentInstance: component },
       } = MockRender(OverviewComponent);
 
-      expect(component.caps).toEqual(mockedCaps.capabilities);
+      expect(component.caps).toEqual(mockedCaps);
     });
 
     it('should get Pools', () => {
@@ -100,7 +102,7 @@ describe('Given OverviewComponent', () => {
         },
       ];
 
-      MockInstance(AppqosService, 'getPools', () => of(mockedPool));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPool));
 
       const {
         point: { componentInstance: component },
@@ -108,100 +110,13 @@ describe('Given OverviewComponent', () => {
 
       expect(component.pools).toEqual(mockedPool);
     });
-
-    it('should subscribe to getIfaceEvent()', () => {
-      const mockedRDT: RDTIface = {
-        interface: 'os',
-        interface_supported: ['msr', 'os'],
-      };
-      
-      const getMbaCtrlSpy = jasmine.createSpy('getMbaCtrl').and.returnValue(of());
-      const getPoolsSpy = jasmine.createSpy('getPools').and.returnValue(of());
-
-      MockInstance(AppqosService, 'getMbaCtrl', getMbaCtrlSpy);
-      MockInstance(AppqosService, 'getPools', getPoolsSpy);
-
-      let local = new LocalService()
-
-      MockRender(OverviewComponent, {}, {
-        providers: [
-        { provide: LocalService, useValue: local }
-      ]
-      });
-
-      expect(getMbaCtrlSpy).toHaveBeenCalledTimes(1);
-      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
-
-      local.setRdtIfaceEvent(mockedRDT);
-
-      expect(getMbaCtrlSpy).toHaveBeenCalledTimes(2);
-      expect(getPoolsSpy).toHaveBeenCalledTimes(3);
-    });
-
-    it('should subscribe to getL3CatEvent()', () => {
-      const l3cat: CacheAllocation = {
-        cache_size: 42,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3.5,
-      }
-
-      const getPoolsSpy = jasmine.createSpy('getPools').and.returnValue(of());
-      MockInstance(AppqosService, 'getPools', getPoolsSpy);
-
-      let local = new LocalService()
-
-      MockRender(OverviewComponent, {}, {
-        providers: [
-          { provide: LocalService, useValue: local }
-        ]
-      });
-
-      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
-
-      local.setL3CatEvent(l3cat);
-
-      expect(getPoolsSpy).toHaveBeenCalledTimes(3);
-    });
-
-    it('should subscribe to getL2CatEvent()', () => {
-      const l2cat: CacheAllocation = {
-        cache_size: 42,
-        cdp_enabled: false,
-        cdp_supported: false,
-        clos_num: 15,
-        cw_num: 12,
-        cw_size: 3.5,
-      }
-
-      const getPoolsSpy = jasmine.createSpy('getPools').and.returnValue(of());
-      MockInstance(AppqosService, 'getPools', getPoolsSpy);
-
-      let local = new LocalService()
-
-      MockRender(OverviewComponent, {}, {
-        providers: [
-        { provide: LocalService, useValue: local }
-      ]
-      });
-
-      expect(getPoolsSpy).toHaveBeenCalledTimes(2);
-
-      local.setL2CatEvent(l2cat);
-
-      expect(getPoolsSpy).toHaveBeenCalledTimes(3);
-    });
   });
 
   describe('when initialized and L3 CAT is supported', () => {
     it('should render L3CacheAllocationComponent', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
-      };
+      const mockedCaps = ['l3cat', 'mba', 'sstbf', 'power'];
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
       const expectValue = ngMocks.find('app-l3-cache-allocation');
@@ -212,11 +127,9 @@ describe('Given OverviewComponent', () => {
 
   describe('when initialized and L3 CAT is NOT supported', () => {
     it('should NOT render L3CacheAllocationComponent', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l2cat', 'mba', 'sstbf', 'power'],
-      };
+      const mockedCaps = ['l2cat', 'mba', 'sstbf', 'power'];
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
       const expectValue = ngMocks.find('app-l3-cache-allocation', null);
@@ -227,11 +140,9 @@ describe('Given OverviewComponent', () => {
 
   describe('when initialized and L2 CAT is supported', () => {
     it('should render L2CacheAllocationComponent', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l2cat', 'mba', 'sstbf', 'power'],
-      };
+      const mockedCaps = ['l2cat', 'mba', 'sstbf', 'power'];
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
       const expectValue = ngMocks.find('app-l2-cache-allocation');
@@ -242,11 +153,9 @@ describe('Given OverviewComponent', () => {
 
   describe('when initialized and L2 CAT is NOT supported', () => {
     it('should NOT render L2CacheAllocationComponent', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
-      };
+      const mockedCaps = ['l3cat', 'mba', 'sstbf', 'power'];
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
       const expectValue = ngMocks.find('app-l2-cache-allocation', null);
@@ -257,11 +166,9 @@ describe('Given OverviewComponent', () => {
 
   describe('when initialized and MBA is supported', () => {
     it('should render MbaAllocationComponent', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'mba', 'sstbf', 'power'],
-      };
+      const mockedCaps = ['l3cat', 'mba', 'sstbf', 'power'];
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
       const expectValue = ngMocks.find('app-mba-allocation');
@@ -272,11 +179,9 @@ describe('Given OverviewComponent', () => {
 
   describe('when initialized and MBA is NOT supported', () => {
     it('should NOT render MbaAllocationComponent', () => {
-      const mockedCaps: Caps = {
-        capabilities: ['l3cat', 'l2cat', 'sstbf', 'power'],
-      };
+      const mockedCaps = ['l3cat', 'l2cat', 'sstbf', 'power'];
 
-      MockInstance(AppqosService, 'getCaps', () => of(mockedCaps));
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
       const expectValue = ngMocks.find('app-mba-allocation', null);

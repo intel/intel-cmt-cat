@@ -49,11 +49,13 @@ export class RapConfigComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.getConfigData();
+    this.localService.getPoolsEvent().subscribe((pools) => {
+      this.pools = pools;
+    });
 
-    this.localService.getRdtIfaceEvent().subscribe(() => this.getConfigData());
-    this.localService.getL3CatEvent().subscribe(() => this.getConfigData());
-    this.localService.getL2CatEvent().subscribe(() => this.getConfigData());
+    this.localService.getAppsEvent().subscribe((apps) => {
+      this.apps = apps;
+    });
   }
 
   getConfigData(): void {
@@ -68,8 +70,8 @@ export class RapConfigComponent implements OnInit {
     );
 
     combineLatest([pools$, apps$]).subscribe(([pools, apps]) => {
-      this.pools = pools;
-      this.apps = apps;
+      this.localService.setPoolsEvent(pools);
+      this.localService.setAppsEvent(apps);
     });
   }
 }

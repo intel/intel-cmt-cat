@@ -69,6 +69,7 @@ describe('Given SystemCapsComponent', () => {
         getL2cat: () => EMPTY,
         getMba: () => EMPTY,
         getMbaCtrl: () => EMPTY,
+        getPools: () => EMPTY
       })
       .mock(SnackBarService)
       .mock(SstcpComponent)

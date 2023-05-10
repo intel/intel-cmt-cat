@@ -72,7 +72,7 @@ describe('Given AppqosService', () => {
         expect(result).toBe(mockedCaps);
       });
 
-      const req = httpMock.expectOne(`${hostName}:${portNumber}/caps`);
+      const req = httpMock.expectOne(`${hostName}:${portNumber}/caps/cpu`);
       req.flush(mockedCaps);
       httpMock.verify();
     });
@@ -93,7 +93,7 @@ describe('Given AppqosService', () => {
         expect(result).toBeFalse();
       });
 
-      const req = httpMock.expectOne(`${hostName}:${portNumber}/caps`);
+      const req = httpMock.expectOne(`${hostName}:${portNumber}/caps/cpu`);
       req.flush(false);
       httpMock.verify();
     });

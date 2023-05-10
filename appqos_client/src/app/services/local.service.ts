@@ -37,6 +37,7 @@ import {
   RDTIface,
   SSTBF,
 } from '../components/system-caps/system-caps.model';
+import { Apps, Pools } from '../components/overview/overview.model';
 
 @Injectable({
   providedIn: 'root',
@@ -47,10 +48,12 @@ export class LocalService {
   rdtIFace = new BehaviorSubject<RDTIface | null>(null);
   l3cat = new BehaviorSubject<CacheAllocation | null>(null);
   l2cat = new BehaviorSubject<CacheAllocation | null>(null);
-  caps = new BehaviorSubject<string[] | null>(null);
+  caps = new BehaviorSubject<string[] | []>([]);
   mba = new BehaviorSubject<MBA | null>(null);
   mbaCtrl = new BehaviorSubject<MBACTRL | null>(null);
   sstbf = new BehaviorSubject<SSTBF | null>(null);
+  pools = new BehaviorSubject<Pools[] | []>([]);
+  apps = new BehaviorSubject<Apps[] | []>([]);
 
   setRdtIfaceEvent(rdtIFace: RDTIface): void {
     this.rdtIFace.next(rdtIFace);
@@ -96,7 +99,7 @@ export class LocalService {
     this.caps.next(caps);
   }
 
-  getCapsEvent(): Observable<string[] | null> {
+  getCapsEvent(): Observable<string[] | []> {
     return this.caps.asObservable();
   }
 
@@ -114,6 +117,22 @@ export class LocalService {
 
   getMbaCtrlEvent(): Observable<MBACTRL | null> {
     return this.mbaCtrl.asObservable();
+  }
+
+  setPoolsEvent(pools: Pools[]) {
+    this.pools.next(pools);
+  }
+
+  getPoolsEvent(): Observable<Pools[] | []> {
+    return this.pools.asObservable();
+  }
+
+  setAppsEvent(apps: Apps[]) {
+    this.apps.next(apps);
+  }
+
+  getAppsEvent(): Observable<Apps[] | []> {
+    return this.apps.asObservable();
   }
 
   public saveData(key: string, value: string): void {

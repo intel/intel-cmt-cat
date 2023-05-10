@@ -121,7 +121,7 @@ export class AppsEditDialogComponent implements OnInit {
     this.service.appPut(app, this.data.app.id).subscribe({
       next: (response) => {
         this.snackBar.displayInfo(response.message);
-        this.dialogRef.close();
+        this.dialogRef.close(true);
       },
       error: (error) => {
         this.snackBar.handleError(error.message);

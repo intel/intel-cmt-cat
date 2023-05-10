@@ -37,19 +37,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   <app-l3-cache-allocation
     *ngIf="caps?.includes('l3cat')"
     [pools]="pools"
-    (poolEvent)="getPools()"
   ></app-l3-cache-allocation>
   <app-l2-cache-allocation
     *ngIf="caps?.includes('l2cat')"
     [pools]="pools"
-    (poolEvent)="getPools()"
   >
   </app-l2-cache-allocation>
   <app-mba-allocation
     *ngIf="caps?.includes('mba')"
     [pools]="pools"
-    [mbaCtrl]="mbaCtrl"
-    (poolEvent)="getPools()"
+    [mbaCtrl]="mbaCtrl!"
     (mbaCtrlEvent)="mbaOnChange($event)"
   ></app-mba-allocation>
 </div>

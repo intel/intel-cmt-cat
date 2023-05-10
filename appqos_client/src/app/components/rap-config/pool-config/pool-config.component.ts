@@ -34,8 +34,7 @@ import {
   Input,
   OnChanges,
   OnInit,
-  Output,
-  SimpleChanges
+  Output
 } from '@angular/core';
 import { FormControl, Validators } from '@angular/forms';
 import { MatOptionSelectionChange } from '@angular/material/core';
@@ -104,8 +103,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     });
   }
 
-  ngOnChanges(changes: SimpleChanges): void {
-    if (!changes['pools'].currentValue) return
+  ngOnChanges(): void {
     this.getData(this.poolId);
   }
 
@@ -129,7 +127,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
 
   getPool(id: number) {
     this.poolId = id;
-    this.pool = this.pools.find((pool: Pools) => pool.id === id) as Pools;
+    this.pool = {...this.pools.find((pool: Pools) => pool.id === id)} as Pools;
 
     this.poolApps = this.apps.filter((app) => app.pool_id === id);
     this.selected = this.pool.name;

@@ -80,15 +80,16 @@ export class LoginComponent implements OnInit {
       return;
     }
 
-    this.service.login(hostName, portNumber).subscribe((result) => {
-      if (!result) {
-        this.hasError = true;
-      } else {
+    this.service.login(hostName, portNumber).subscribe({
+      next: () => {
         this.hasError = false;
+        this.loading = false;
         this.goToSystem(hostName, portNumber);
+      },
+      error: () => {
+        this.hasError = true;
+        this.loading = false;
       }
-
-      this.loading = false;
     });
   }
 

@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { AfterContentInit, Component, Inject } from '@angular/core';
+import { AfterContentInit, Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSliderChange } from '@angular/material/slider';
 
@@ -55,7 +55,7 @@ type Pool = Pools & {
   templateUrl: './edit-dialog.component.html',
   styleUrls: ['./edit-dialog.component.scss'],
 })
-export class EditDialogComponent implements AfterContentInit {
+export class EditDialogComponent implements OnInit {
   pools!: Pool[];
   loading = false;
   mbaBwDefNum = Math.pow(2, 32) - 1;
@@ -67,8 +67,10 @@ export class EditDialogComponent implements AfterContentInit {
     private localservice: LocalService
   ) { }
 
-  ngAfterContentInit(): void {
-    this._getPools();
+  ngOnInit(): void {
+    this.localservice.getPoolsEvent().subscribe((pools) => {
+      this.pools = this._convertToBitmask(pools);
+    });
   }
 
   onChangeL3CBM(value: number, poolIndex: number, bitIndex: number) {
@@ -117,7 +119,8 @@ export class EditDialogComponent implements AfterContentInit {
   private _getPools(): void {
     this.loading = true;
     this.service.getPools().subscribe((pools: Pools[]) => {
-      (this.pools = this._convertToBitmask(pools)), (this.loading = false);
+      this.pools = this._convertToBitmask(pools);
+      this.loading = false;
     });
   }
 
@@ -145,7 +148,7 @@ export class EditDialogComponent implements AfterContentInit {
         }
       ));
     } else {
-      return pools;
+      return pools.map((pools) => ({ ...pools }));
     }
   }
 
