@@ -41,17 +41,21 @@ import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { LocalService } from 'src/app/services/local.service';
+import { Subscription } from 'rxjs';
+import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 @Component({
   selector: 'app-l2-cache-allocation',
   templateUrl: './l2-cache-allocation.component.html',
   styleUrls: ['./l2-cache-allocation.component.scss'],
 })
+@AutoUnsubscribe
 export class L2CacheAllocationComponent implements OnInit, OnChanges {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
   l2cat!: CacheAllocation | null;
+  l2catSub!: Subscription;
 
   constructor(
     public dialog: MatDialog,
@@ -59,7 +63,7 @@ export class L2CacheAllocationComponent implements OnInit, OnChanges {
   ) { }
 
   ngOnInit(): void {
-    this.localService.getL2CatEvent().subscribe((l2cat) => {
+    this.l2catSub = this.localService.getL2CatEvent().subscribe((l2cat) => {
       this.l2cat = l2cat;
       this._convertToBitmask();
     });

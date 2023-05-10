@@ -33,40 +33,46 @@ import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { Caps, SystemTopology, MBACTRL, resMessage } from '../system-caps/system-caps.model';
+import { SystemTopology, MBACTRL, resMessage } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
+import { AutoUnsubscribe } from 'src/app/services/decorators';
+import { Subscription } from 'rxjs'
 
 @Component({
   selector: 'app-overview',
   templateUrl: './overview.component.html',
   styleUrls: ['./overview.component.scss'],
 })
+@AutoUnsubscribe
 export class OverviewComponent implements OnInit {
   pools!: Pools[];
   mbaCtrl!: MBACTRL | null;
   caps!: string[];
   topology: SystemTopology | null = null;
+  subs: Subscription[] = [];
 
   constructor(
     private service: AppqosService,
     private snackBar: SnackBarService,
     private localService: LocalService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.getTopology();
 
-    this.localService.getCapsEvent().subscribe((caps) => {
+    const capsSub = this.localService.getCapsEvent().subscribe((caps) => {
       this.caps = caps;
     });
 
-    this.localService.getMbaCtrlEvent().subscribe((mbaCtrl) => {
+    const mbaCtrlSub = this.localService.getMbaCtrlEvent().subscribe((mbaCtrl) => {
       this.mbaCtrl = mbaCtrl;
     });
 
-    this.localService.getPoolsEvent().subscribe((pools) => {
+    const poolsSub = this.localService.getPoolsEvent().subscribe((pools) => {
       this.pools = pools;
     });
+
+    this.subs.push(capsSub, mbaCtrlSub, poolsSub);
   }
 
   getMbaCtrl(): void {
@@ -77,7 +83,7 @@ export class OverviewComponent implements OnInit {
 
   getTopology(): void {
     this.service.getSystemTopology().subscribe((topo: SystemTopology) => {
-        this.topology = topo;
+      this.topology = topo;
     });
   }
 

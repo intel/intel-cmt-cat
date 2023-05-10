@@ -32,22 +32,26 @@ import { Component, Input, OnInit } from '@angular/core';
 import { LocalService } from 'src/app/services/local.service';
 import { Node, SystemTopology, SSTBF } from '../system-caps/system-caps.model';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { Subscription } from 'rxjs'
+import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 @Component({
   selector: 'app-system-topology',
   templateUrl: './system-topology.component.html',
   styleUrls: ['./system-topology.component.scss'],
 })
+@AutoUnsubscribe
 export class SystemTopologyComponent implements OnInit {
   @Input() systemTopology!: SystemTopology;
   nodes: Node[] = [];
   detailedView = false;
   sstbf!: SSTBF | null;
+  sstbfSub!: Subscription;
 
   constructor(private local: LocalService) { }
 
   ngOnInit(): void {
-    this.local.getSstbfEvent().subscribe({
+    this.sstbfSub = this.local.getSstbfEvent().subscribe({
       next: (sstbf) => {
         this.sstbf = sstbf;
         this.setNodeInfo();

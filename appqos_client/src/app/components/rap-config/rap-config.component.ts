@@ -28,34 +28,40 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, OnInit } from '@angular/core';
-import { catchError, combineLatest, of, take } from 'rxjs';
+import { Subscription, catchError, combineLatest, of, take } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { Apps, Pools } from '../overview/overview.model';
+import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 @Component({
   selector: 'app-rap-config',
   templateUrl: './rap-config.component.html',
   styleUrls: ['./rap-config.component.scss'],
 })
+@AutoUnsubscribe
 export class RapConfigComponent implements OnInit {
   apps!: Apps[];
   pools!: Pools[];
 
+  subs: Subscription[] = [];
+
   constructor(
     private service: AppqosService,
     private localService: LocalService
-  ) {}
+  ) { }
 
   ngOnInit(): void {
-    this.localService.getPoolsEvent().subscribe((pools) => {
+    const poolsSub = this.localService.getPoolsEvent().subscribe((pools) => {
       this.pools = pools;
     });
 
-    this.localService.getAppsEvent().subscribe((apps) => {
+    const appsSub = this.localService.getAppsEvent().subscribe((apps) => {
       this.apps = apps;
     });
+
+    this.subs.push(poolsSub, appsSub);
   }
 
   getConfigData(): void {

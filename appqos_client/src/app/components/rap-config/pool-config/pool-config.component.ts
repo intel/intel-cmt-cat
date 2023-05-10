@@ -52,6 +52,8 @@ import {
 } from '../../system-caps/system-caps.model';
 import { CoresEditDialogComponent } from './cores-edit-dialog/cores-edit-dialog.component';
 import { PoolAddDialogComponent } from './pool-add-dialog/pool-add-dialog.component';
+import { AutoUnsubscribe } from 'src/app/services/decorators';
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-pool-config',
@@ -59,6 +61,7 @@ import { PoolAddDialogComponent } from './pool-add-dialog/pool-add-dialog.compon
   styleUrls: ['./pool-config.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
+@AutoUnsubscribe
 export class PoolConfigComponent implements OnChanges, OnInit {
   @Input() apps!: Apps[];
   @Input() pools!: Pools[];
@@ -85,6 +88,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     Validators.required,
     Validators.maxLength(Standards.MAX_CHARS),
   ]);
+  subs: Subscription[] = [];
 
   constructor(
     private service: AppqosService,
@@ -94,13 +98,15 @@ export class PoolConfigComponent implements OnChanges, OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.localService.getL3CatEvent().subscribe((l3cat) => {
+    const l3catSub = this.localService.getL3CatEvent().subscribe((l3cat) => {
       this.l3cat = l3cat;
     });
 
-    this.localService.getL2CatEvent().subscribe((l2cat) => {
+    const l2catSub = this.localService.getL2CatEvent().subscribe((l2cat) => {
       this.l2cat = l2cat;
     });
+
+    this.subs.push(l3catSub, l2catSub)
   }
 
   ngOnChanges(): void {
@@ -127,7 +133,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
 
   getPool(id: number) {
     this.poolId = id;
-    this.pool = {...this.pools.find((pool: Pools) => pool.id === id)} as Pools;
+    this.pool = { ...this.pools.find((pool: Pools) => pool.id === id) } as Pools;
 
     this.poolApps = this.apps.filter((app) => app.pool_id === id);
     this.selected = this.pool.name;

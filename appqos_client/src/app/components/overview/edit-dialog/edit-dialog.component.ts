@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { AfterContentInit, Component, Inject, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSliderChange } from '@angular/material/slider';
 
@@ -36,6 +36,8 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Pools } from '../overview.model';
 import { LocalService } from 'src/app/services/local.service';
+import { Subscription } from 'rxjs';
+import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 type dialogDataType = {
   mba?: boolean;
@@ -55,8 +57,10 @@ type Pool = Pools & {
   templateUrl: './edit-dialog.component.html',
   styleUrls: ['./edit-dialog.component.scss'],
 })
+@AutoUnsubscribe
 export class EditDialogComponent implements OnInit {
   pools!: Pool[];
+  poolsSub!: Subscription;
   loading = false;
   mbaBwDefNum = Math.pow(2, 32) - 1;
 
@@ -68,7 +72,7 @@ export class EditDialogComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.localservice.getPoolsEvent().subscribe((pools) => {
+    this.poolsSub = this.localservice.getPoolsEvent().subscribe((pools) => {
       this.pools = this._convertToBitmask(pools);
     });
   }

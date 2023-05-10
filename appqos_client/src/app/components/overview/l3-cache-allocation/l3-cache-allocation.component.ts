@@ -42,17 +42,21 @@ import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { LocalService } from 'src/app/services/local.service';
+import { Subscription } from 'rxjs'
+import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 @Component({
   selector: 'app-l3-cache-allocation',
   templateUrl: './l3-cache-allocation.component.html',
   styleUrls: ['./l3-cache-allocation.component.scss'],
 })
+@AutoUnsubscribe
 export class L3CacheAllocationComponent implements OnInit, OnChanges {
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];
   l3cat!: CacheAllocation | null;
+  l3catSub!: Subscription;
 
   constructor(
     public dialog: MatDialog,
@@ -60,7 +64,7 @@ export class L3CacheAllocationComponent implements OnInit, OnChanges {
   ) { }
 
   ngOnInit(): void {
-    this.localService.getL3CatEvent().subscribe((l3cat) => {
+    this.l3catSub = this.localService.getL3CatEvent().subscribe((l3cat) => {
       this.l3cat = l3cat;
       this._convertToBitmask();
     });

@@ -30,7 +30,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatButtonToggleChange } from '@angular/material/button-toggle';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
-import { combineLatest, map } from 'rxjs';
+import { combineLatest, Subscription } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
@@ -44,6 +44,7 @@ import {
   resMessage,
   SSTBF,
 } from './system-caps.model';
+import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 @Component({
   selector: 'app-system-caps',
@@ -51,7 +52,7 @@ import {
   styleUrls: ['./system-caps.component.scss'],
   encapsulation: ViewEncapsulation.None,
 })
-
+@AutoUnsubscribe
 /* Component used to show System Capabilities and capability details*/
 export class SystemCapsComponent implements OnInit {
   caps!: string[] | null;
@@ -63,6 +64,8 @@ export class SystemCapsComponent implements OnInit {
   l3cat!: CacheAllocation | null;
   l2cat!: CacheAllocation | null;
   systemName: string | undefined;
+
+  subs: Subscription[] = [];
 
   constructor(
     private service: AppqosService,
@@ -80,27 +83,27 @@ export class SystemCapsComponent implements OnInit {
       ?.split(':')
       .shift();
 
-    this.localService.getCapsEvent().subscribe((caps) => {
+    const capsSub = this.localService.getCapsEvent().subscribe((caps) => {
       this.caps = caps;
     });
 
-    this.localService.getL3CatEvent().subscribe((l3cat) => {
+    const l3catSub = this.localService.getL3CatEvent().subscribe((l3cat) => {
       this.l3cat = l3cat;
     });
 
-    this.localService.getL2CatEvent().subscribe((l2cat) => {
+    const l2catSub = this.localService.getL2CatEvent().subscribe((l2cat) => {
       this.l2cat = l2cat;
     });
 
-    this.localService.getSstbfEvent().subscribe((sstbf) => {
+    const sstbfSub = this.localService.getSstbfEvent().subscribe((sstbf) => {
       this.sstbf = sstbf;
     });
 
-    this.localService.getRdtIfaceEvent().subscribe((rdtIFace) => {
+    const rdtIfaceSub = this.localService.getRdtIfaceEvent().subscribe((rdtIFace) => {
       this.rdtIface = rdtIFace
     });
 
-    combineLatest([
+    const mbaSub = combineLatest([
       this.localService.getMbaEvent(),
       this.localService.getMbaCtrlEvent()
     ]).subscribe(([mba, mbaCtrl]) => {
@@ -108,6 +111,8 @@ export class SystemCapsComponent implements OnInit {
     });
 
     this.loading = false;
+
+    this.subs.push(capsSub, l3catSub, l2catSub, sstbfSub, rdtIfaceSub, mbaSub);
   }
 
   onChangeIface(event: MatButtonToggleChange) {

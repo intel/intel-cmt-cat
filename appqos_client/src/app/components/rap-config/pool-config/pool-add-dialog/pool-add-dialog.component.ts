@@ -36,6 +36,8 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Pools } from '../../../overview/overview.model';
+import { Subscription } from 'rxjs';
+import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 type PostPool = Omit<Pools, 'id'>;
 type dialogDataType = {
@@ -50,6 +52,7 @@ type dialogDataType = {
   templateUrl: './pool-add-dialog.component.html',
   styleUrls: ['./pool-add-dialog.component.scss'],
 })
+@AutoUnsubscribe
 export class PoolAddDialogComponent implements OnInit {
   form!: FormGroup;
   pool = {};
@@ -57,6 +60,8 @@ export class PoolAddDialogComponent implements OnInit {
   mbaBwDefNum = Math.pow(2, 32) - 1;
   mbaCtrl!: MBACTRL | null;
   coresList!: number[];
+
+  subs: Subscription[] = [];
 
   constructor(
     private localService: LocalService,
@@ -67,10 +72,11 @@ export class PoolAddDialogComponent implements OnInit {
   ) { }
 
   ngOnInit(): void {
-    this.localService.getCapsEvent().subscribe((caps) => (this.caps = caps));
-    this.localService
-      .getMbaCtrlEvent()
+    const capsSub = this.localService.getCapsEvent().subscribe((caps) => (this.caps = caps));
+    const mbaCtrlSub = this.localService.getMbaCtrlEvent()
       .subscribe((mbaCtrl) => (this.mbaCtrl = mbaCtrl));
+
+    this.subs.push(capsSub, mbaCtrlSub);
 
     this.form = new FormGroup({
       name: new FormControl('', [
