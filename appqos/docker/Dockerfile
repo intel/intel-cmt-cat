@@ -6,6 +6,11 @@ ENV DEBIAN_FRONTEND noninteractive
 
 # update base image
 RUN apt-get update -q && \
+    apt-get -y purge --auto-remove \
+        dirmngr \
+        gpg-agent \
+        libc-dev \
+        libc-dev-bin && \
     apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends \
         python3-minimal \
@@ -92,12 +97,7 @@ COPY --from=build-python /python /python
 RUN mkdir -p /opt/intel/appqos
 
 # cleanup base packages
-RUN apt-get -y purge --auto-remove \
-        dirmngr \
-        gpg-agent \
-        libc-dev \
-        libc-dev-bin && \
-    apt-get -y purge --auto-remove --allow-remove-essential \
+RUN apt-get -y purge --auto-remove --allow-remove-essential \
         grep \
         libpcre3 && \
     dpkg --force-depends -r libsqlite3-0 && \
