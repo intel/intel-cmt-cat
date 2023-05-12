@@ -126,17 +126,17 @@ class TestPqosL3Cat(test.Test):
     #  \b Priority: High
     #
     #  \b Objective:
-    #  Unable to set up allocation COS with a bitmask more than 28 bits
+    #  Unable to set up allocation COS with a bitmask more than 32 bits
     #
     #  \b Instruction:
-    #  Run "pqos [-I] -e llc:2=0xffffffff" to set the COS bitmask which is more than 28 bits.
+    #  Run "pqos [-I] -e llc:2=0xfffffffff" to set the COS bitmask which is more than 32 bits.
     #
     #  \b Result:
     #  Observe "SOCKET 0 L3CA COS2 - FAILED!" and "Allocation configuration error!" in output
     @PRIORITY_HIGH
     @pytest.mark.rdt_supported("cat_l3")
     def test_pqos_l3cat_set_negative(self, iface):
-        (stdout, _, exitstatus) = self.run_pqos(iface, "-e llc:2=0xffffffff")
+        (stdout, _, exitstatus) = self.run_pqos(iface, "-e llc:2=0xfffffffff")
         assert exitstatus == 1
         assert "SOCKET 0 L3CA COS2 - FAILED" in stdout
         assert "Allocation configuration error!" in stdout
