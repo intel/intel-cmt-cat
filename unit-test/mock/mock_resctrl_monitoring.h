@@ -69,5 +69,10 @@ int resctrl_mon_cpumask_read(const unsigned class_id,
 int resctrl_mon_cpumask_write(const unsigned class_id,
                               const char *resctrl_group,
                               const struct resctrl_cpumask *mask);
+int resctrl_mon_read_counter(const unsigned class_id,
+                             const char *resctrl_group,
+                             const unsigned l3id,
+                             const enum pqos_mon_event event,
+                             uint64_t *value);
 
 #endif /* MOCK_RESCTRL_MONITORING_H_ */

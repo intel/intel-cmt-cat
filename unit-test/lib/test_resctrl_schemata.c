@@ -33,72 +33,7 @@
 #include "resctrl_schemata.h"
 #include "test.h"
 
-static const unsigned _buffer_size = 1024;
-static char _buffer[1024];
-
-static int
-_init(void **state __attribute__((unused)))
-{
-        _buffer[0] = '\0';
-
-        return 0;
-}
-
 /* ======== mock ======== */
-
-char *
-__wrap_fgets(char *s, int n, FILE *stream __attribute__((unused)))
-{
-        const char *data = mock_ptr_type(char *);
-
-        if (data == NULL)
-                return NULL;
-
-        strncpy(s, data, n);
-
-        return s;
-}
-
-int
-__wrap_fprintf(FILE *stream __attribute__((unused)), const char *format, ...)
-{
-        int ret;
-        va_list args;
-        unsigned used = strlen(_buffer);
-
-        va_start(args, format);
-        ret = vsnprintf(_buffer + used, _buffer_size - used, format, args);
-        va_end(args);
-
-        return ret;
-}
-
-size_t
-__wrap_fwrite(const void *ptr,
-              size_t size,
-              size_t nitems,
-              FILE *stream __attribute__((unused)))
-{
-        const char *data = (const char *)ptr;
-        unsigned len = strlen(_buffer);
-
-        strncpy(_buffer + strlen(_buffer), data, size * nitems);
-
-        _buffer[len + size * nitems] = '\0';
-
-        return size * nitems;
-}
-
-int
-__wrap_fputc(int c, FILE *stream __attribute__((unused)))
-{
-        unsigned len = strlen(_buffer);
-
-        _buffer[len] = (char)c;
-        _buffer[len + 1] = '\0';
-
-        return c;
-}
 
 /* ======== resctrl_schemata_l2ca_get ======== */
 
@@ -307,14 +242,15 @@ test_resctrl_schemata_read_l2(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l2ca ca;
-        const char *l2_data = "L2:0=f;1=ff;2=f0;3=1";
-        FILE *fd = (FILE *)1;
+        FILE *fd = tmpfile();
+
+        /* init schemata file */
+        assert_non_null(fd);
+        fprintf(fd, "L2:0=f;1=ff;2=f0;3=1\n");
+        fseek(fd, 0, SEEK_SET);
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
-
-        will_return(__wrap_fgets, l2_data);
-        will_return(__wrap_fgets, NULL);
 
         ret = resctrl_schemata_read(fd, schmt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -340,6 +276,7 @@ test_resctrl_schemata_read_l2(void **state)
         assert_int_equal(ca.u.ways_mask, 0x1);
 
         resctrl_schemata_free(schmt);
+        fclose(fd);
 }
 
 static void
@@ -349,14 +286,16 @@ test_resctrl_schemata_read_l2cdp(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l2ca ca;
-        FILE *fd = (FILE *)1;
+        FILE *fd = tmpfile();
+
+        /* init schemata file */
+        assert_non_null(fd);
+        fprintf(fd, "L2DATA:0=f;1=ff;2=f0;3=1\n");
+        fprintf(fd, "L2CODE:0=1;1=0xf;2=ff;3=2\n");
+        fseek(fd, 0, SEEK_SET);
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
-
-        will_return(__wrap_fgets, "L2DATA:0=f;1=ff;2=f0;3=1");
-        will_return(__wrap_fgets, "L2CODE:0=1;1=0xf;2=ff;3=2");
-        will_return(__wrap_fgets, NULL);
 
         ret = resctrl_schemata_read(fd, schmt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -368,6 +307,7 @@ test_resctrl_schemata_read_l2cdp(void **state)
         assert_int_equal(ca.u.s.code_mask, 0x1);
 
         resctrl_schemata_free(schmt);
+        fclose(fd);
 }
 
 static void
@@ -377,13 +317,15 @@ test_resctrl_schemata_read_l3(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l3ca ca;
-        FILE *fd = (FILE *)1;
+        FILE *fd = tmpfile();
+
+        /* init schemata file */
+        assert_non_null(fd);
+        fprintf(fd, "L3:0=f;1=ff\n");
+        fseek(fd, 0, SEEK_SET);
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
-
-        will_return(__wrap_fgets, "L3:0=f;1=ff");
-        will_return(__wrap_fgets, NULL);
 
         ret = resctrl_schemata_read(fd, schmt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -399,6 +341,7 @@ test_resctrl_schemata_read_l3(void **state)
         assert_int_equal(ca.u.ways_mask, 0xff);
 
         resctrl_schemata_free(schmt);
+        fclose(fd);
 }
 
 static void
@@ -408,14 +351,16 @@ test_resctrl_schemata_read_l3cdp(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l3ca ca;
-        FILE *fd = NULL;
+        FILE *fd = tmpfile();
+
+        /* init schemata file */
+        assert_non_null(fd);
+        fprintf(fd, "L3DATA:0=f;1=ff\n");
+        fprintf(fd, "L3CODE:0=1;1=0xf\n");
+        fseek(fd, 0, SEEK_SET);
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
-
-        will_return(__wrap_fgets, "L3DATA:0=f;1=ff");
-        will_return(__wrap_fgets, "L3CODE:0=1;1=0xf");
-        will_return(__wrap_fgets, NULL);
 
         ret = resctrl_schemata_read(fd, schmt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -427,6 +372,7 @@ test_resctrl_schemata_read_l3cdp(void **state)
         assert_int_equal(ca.u.s.code_mask, 0x1);
 
         resctrl_schemata_free(schmt);
+        fclose(fd);
 }
 
 static void
@@ -436,13 +382,15 @@ test_resctrl_schemata_read_mba(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_mba ca;
-        FILE *fd = NULL;
+        FILE *fd = tmpfile();
+
+        /* init schemata file */
+        assert_non_null(fd);
+        fprintf(fd, "MB:0=50;1=60\n");
+        fseek(fd, 0, SEEK_SET);
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
-
-        will_return(__wrap_fgets, "MB:0=50;1=60");
-        will_return(__wrap_fgets, NULL);
 
         ret = resctrl_schemata_read(fd, schmt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -456,6 +404,7 @@ test_resctrl_schemata_read_mba(void **state)
         assert_int_equal(ca.mb_max, 60);
 
         resctrl_schemata_free(schmt);
+        fclose(fd);
 }
 
 /* ======== resctrl_schemata_l3ca_write ======== */
@@ -467,7 +416,7 @@ test_resctrl_schemata_l3ca_write(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l3ca ca;
-        FILE *fd = NULL;
+        char buf[256];
 
         data->cap_l3ca.cdp = 0;
         data->cap_l3ca.cdp_on = 0;
@@ -486,9 +435,31 @@ test_resctrl_schemata_l3ca_write(void **state)
         ret = resctrl_schemata_l3ca_set(schmt, 1, &ca);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
-        ret = resctrl_schemata_l3ca_write(fd, schmt);
-        assert_int_equal(ret, PQOS_RETVAL_OK);
-        assert_string_equal(_buffer, "L3:0=f;1=ff\n");
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_l3ca_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd), "L3:0=f;1=ff\n");
+
+                fclose(fd);
+        }
+
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd), "L3:0=f;1=ff\n");
+
+                fclose(fd);
+        }
 
         resctrl_schemata_free(schmt);
 }
@@ -500,7 +471,10 @@ test_resctrl_schemata_l3ca_write_cdp(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l3ca ca;
-        FILE *fd = NULL;
+        char buf[256];
+        FILE *fd = tmpfile();
+
+        assert_non_null(fd);
 
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 1;
@@ -523,9 +497,12 @@ test_resctrl_schemata_l3ca_write_cdp(void **state)
 
         ret = resctrl_schemata_l3ca_write(fd, schmt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
-        assert_string_equal(_buffer, "L3CODE:0=f0;1=f0\nL3DATA:0=f;1=ff\n");
+        fseek(fd, 0, SEEK_SET);
+        assert_string_equal(fgets(buf, DIM(buf), fd), "L3CODE:0=f0;1=f0\n");
+        assert_string_equal(fgets(buf, DIM(buf), fd), "L3DATA:0=f;1=ff\n");
 
         resctrl_schemata_free(schmt);
+        fclose(fd);
 }
 
 /* ======== resctrl_schemata_l2ca_write ======== */
@@ -537,7 +514,7 @@ test_resctrl_schemata_l2ca_write(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l2ca ca;
-        FILE *fd = NULL;
+        char buf[256];
 
         data->cap_l2ca.cdp = 0;
         data->cap_l2ca.cdp_on = 0;
@@ -564,9 +541,33 @@ test_resctrl_schemata_l2ca_write(void **state)
         ret = resctrl_schemata_l2ca_set(schmt, 3, &ca);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
-        ret = resctrl_schemata_l2ca_write(fd, schmt);
-        assert_int_equal(ret, PQOS_RETVAL_OK);
-        assert_string_equal(_buffer, "L2:0=f;1=ff;2=f0;3=1\n");
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_l2ca_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd),
+                                    "L2:0=f;1=ff;2=f0;3=1\n");
+
+                fclose(fd);
+        }
+
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd),
+                                    "L2:0=f;1=ff;2=f0;3=1\n");
+
+                fclose(fd);
+        }
 
         resctrl_schemata_free(schmt);
 }
@@ -578,7 +579,7 @@ test_resctrl_schemata_l2ca_write_cdp(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_l2ca ca;
-        FILE *fd = NULL;
+        char buf[256];
 
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 1;
@@ -609,10 +610,35 @@ test_resctrl_schemata_l2ca_write_cdp(void **state)
         ret = resctrl_schemata_l2ca_set(schmt, 3, &ca);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
-        ret = resctrl_schemata_l2ca_write(fd, schmt);
-        assert_int_equal(ret, PQOS_RETVAL_OK);
-        assert_string_equal(_buffer, "L2CODE:0=f0;1=f0;2=1;3=4\n"
-                                     "L2DATA:0=f;1=ff;2=2;3=8\n");
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_l2ca_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd),
+                                    "L2CODE:0=f0;1=f0;2=1;3=4\n");
+                assert_string_equal(fgets(buf, DIM(buf), fd),
+                                    "L2DATA:0=f;1=ff;2=2;3=8\n");
+                fclose(fd);
+        }
+
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd),
+                                    "L2CODE:0=f0;1=f0;2=1;3=4\n");
+                assert_string_equal(fgets(buf, DIM(buf), fd),
+                                    "L2DATA:0=f;1=ff;2=2;3=8\n");
+                fclose(fd);
+        }
 
         resctrl_schemata_free(schmt);
 }
@@ -626,7 +652,7 @@ test_resctrl_schemata_mba_write(void **state)
         int ret;
         struct resctrl_schemata *schmt;
         struct pqos_mba ca;
-        FILE *fd = NULL;
+        char buf[256];
 
         schmt = resctrl_schemata_alloc(data->cap, data->cpu);
         assert_non_null(schmt);
@@ -642,9 +668,31 @@ test_resctrl_schemata_mba_write(void **state)
         ret = resctrl_schemata_mba_set(schmt, 1, &ca);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
-        ret = resctrl_schemata_mba_write(fd, schmt);
-        assert_int_equal(ret, PQOS_RETVAL_OK);
-        assert_string_equal(_buffer, "MB:0=50;1=60\n");
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_mba_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd), "MB:0=50;1=60\n");
+
+                fclose(fd);
+        }
+
+        {
+                FILE *fd = tmpfile();
+
+                assert_non_null(fd);
+
+                ret = resctrl_schemata_write(fd, schmt);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+                fseek(fd, 0, SEEK_SET);
+                assert_string_equal(fgets(buf, DIM(buf), fd), "MB:0=50;1=60\n");
+
+                fclose(fd);
+        }
 
         resctrl_schemata_free(schmt);
 }
@@ -660,9 +708,9 @@ main(void)
             cmocka_unit_test(test_resctrl_schemata_l3ca_set),
             cmocka_unit_test(test_resctrl_schemata_read_l3),
             cmocka_unit_test(test_resctrl_schemata_read_l3cdp),
-            cmocka_unit_test_setup(test_resctrl_schemata_l3ca_write, _init),
-            cmocka_unit_test_setup(test_resctrl_schemata_l3ca_write_cdp,
-                                   _init)};
+            cmocka_unit_test(test_resctrl_schemata_l3ca_write),
+            cmocka_unit_test(test_resctrl_schemata_l3ca_write_cdp),
+        };
 
         const struct CMUnitTest tests_l2ca[] = {
             cmocka_unit_test(test_resctrl_schemata_l2ca_get_invalid_id),
@@ -670,16 +718,17 @@ main(void)
             cmocka_unit_test(test_resctrl_schemata_l2ca_set),
             cmocka_unit_test(test_resctrl_schemata_read_l2),
             cmocka_unit_test(test_resctrl_schemata_read_l2cdp),
-            cmocka_unit_test_setup(test_resctrl_schemata_l2ca_write, _init),
-            cmocka_unit_test_setup(test_resctrl_schemata_l2ca_write_cdp,
-                                   _init)};
+            cmocka_unit_test(test_resctrl_schemata_l2ca_write),
+            cmocka_unit_test(test_resctrl_schemata_l2ca_write_cdp),
+        };
 
         const struct CMUnitTest tests_mba[] = {
             cmocka_unit_test(test_resctrl_schemata_mba_get_invalid_id),
             cmocka_unit_test(test_resctrl_schemata_mba_set_invalid_id),
             cmocka_unit_test(test_resctrl_schemata_mba_set),
             cmocka_unit_test(test_resctrl_schemata_read_mba),
-            cmocka_unit_test_setup(test_resctrl_schemata_mba_write, _init)};
+            cmocka_unit_test(test_resctrl_schemata_mba_write),
+        };
 
         result += cmocka_run_group_tests(tests_l3ca, test_init_l3ca, test_fini);
         result += cmocka_run_group_tests(tests_l2ca, test_init_l2ca, test_fini);

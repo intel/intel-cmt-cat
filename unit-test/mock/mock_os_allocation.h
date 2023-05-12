@@ -35,6 +35,8 @@
 
 #include "pqos.h"
 
+int __wrap_os_alloc_init(const struct pqos_cpuinfo *cpu,
+                         const struct pqos_cap *cap);
 int __wrap_os_alloc_assoc_set(const unsigned lcore, const unsigned class_id);
 int __wrap_os_alloc_assoc_get(const unsigned lcore, unsigned *class_id);
 int __wrap_os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id);

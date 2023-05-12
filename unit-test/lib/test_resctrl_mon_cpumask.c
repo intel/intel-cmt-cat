@@ -52,7 +52,7 @@ test_resctrl_mon_cpumask_read(void **state __attribute__((unused)))
         expect_string(__wrap_pqos_fopen, name,
                       "/sys/fs/resctrl/mon_groups/test/cpus");
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, (FILE *)1);
+        will_return(__wrap_pqos_fopen, "test");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
 
@@ -66,7 +66,7 @@ test_resctrl_mon_cpumask_read(void **state __attribute__((unused)))
         expect_string(__wrap_pqos_fopen, name,
                       "/sys/fs/resctrl/COS1/mon_groups/test/cpus");
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, (FILE *)1);
+        will_return(__wrap_pqos_fopen, "test");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
 
@@ -113,7 +113,7 @@ test_resctrl_mon_cpumask_write(void **state __attribute__((unused)))
         expect_string(__wrap_pqos_fopen, name,
                       "/sys/fs/resctrl/mon_groups/test/cpus");
         expect_string(__wrap_pqos_fopen, mode, "w");
-        will_return(__wrap_pqos_fopen, (FILE *)1);
+        will_return(__wrap_pqos_fopen, (FILE *)0XDEAD);
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
 
@@ -127,7 +127,7 @@ test_resctrl_mon_cpumask_write(void **state __attribute__((unused)))
         expect_string(__wrap_pqos_fopen, name,
                       "/sys/fs/resctrl/COS1/mon_groups/test/cpus");
         expect_string(__wrap_pqos_fopen, mode, "w");
-        will_return(__wrap_pqos_fopen, (FILE *)1);
+        will_return(__wrap_pqos_fopen, (FILE *)0xDEAD);
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
 
@@ -172,7 +172,7 @@ test_resctrl_mon_cpumask_write_invalid(void **state __attribute__((unused)))
         expect_string(__wrap_pqos_fopen, name,
                       "/sys/fs/resctrl/mon_groups/test/cpus");
         expect_string(__wrap_pqos_fopen, mode, "w");
-        will_return(__wrap_pqos_fopen, (FILE *)1);
+        will_return(__wrap_pqos_fopen, (FILE *)0xDEAD);
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, -1);
 

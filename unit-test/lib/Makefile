@@ -192,6 +192,14 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_allocation: test_allocation.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=_pqos_get_inter \
+		-Wl,--wrap=os_alloc_init \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_hw_allocation: test_hw_allocation.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
@@ -400,14 +408,17 @@ $(BIN_DIR)/test_hw_cap_l2ca_cdp: test_hw_cap_l2ca_cdp.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_resctrl: test_resctrl.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=mount \
+		-Wl,--wrap=umount2 \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_resctrl_schemata: test_resctrl_schemata.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
-		-Wl,--wrap=fread \
-		-Wl,--wrap=fgets \
-		-Wl,--wrap=fprintf \
-		-Wl,--wrap=fwrite \
-		-Wl,--wrap=fputc \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -480,6 +491,7 @@ $(BIN_DIR)/test_resctrl_mon: test_resctrl_mon.c $(LIB_OBJS)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=mkdir \
 		-Wl,--wrap=rmdir \
+		-Wl,--wrap=pqos_fopen \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -683,8 +695,6 @@ $(BIN_DIR)/test_common: ./test_common.c $(LIB_OBJS)
 $(BIN_DIR)/test_common_fread_uint64: ./test_common_fread_uint64.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
-		-Wl,--wrap=fread \
-		-Wl,--wrap=feof \
 		-Wl,--wrap=pqos_fopen \
 		-Wl,--wrap=pqos_close \
 		-Wl,--start-group \

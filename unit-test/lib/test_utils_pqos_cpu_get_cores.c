@@ -54,7 +54,7 @@ test_utils_pqos_cpu_get_cores_empty_list(void **state __attribute__((unused)))
         assert_int_equal(count_param, 0);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 }
 
 static void
@@ -90,7 +90,7 @@ test_utils_pqos_cpu_get_cores_multiple_cores_on_the_list(
         assert_int_equal(return_value[2], 9);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 
         socket = 2;
 
@@ -101,7 +101,7 @@ test_utils_pqos_cpu_get_cores_multiple_cores_on_the_list(
         assert_int_equal(return_value[0], 8);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 
         socket = 3;
 
@@ -127,7 +127,7 @@ test_utils_pqos_cpu_get_cores_cpu_null(void **state __attribute__((unused)))
         assert_int_equal(count_param, 1);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 }
 
 static void
@@ -146,7 +146,7 @@ test_utils_pqos_cpu_get_cores_count_null(void **state __attribute__((unused)))
         assert_int_equal(count_param, 1);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 }
 
 int

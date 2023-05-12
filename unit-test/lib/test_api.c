@@ -651,6 +651,12 @@ test_pqos_alloc_reset_init(void **state __attribute__((unused)))
 
         ret = pqos_alloc_reset_config(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_INIT);
+
+        /* test old reset method */
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_alloc_reset(cfg.l3_cdp, cfg.l2_cdp, cfg.mba);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
 }
 
 static void
@@ -679,12 +685,21 @@ test_pqos_alloc_reset_os(void **state __attribute__((unused)))
                                 cfg.mba = mba_cfg[mba];
 
                                 wrap_check_init(1, PQOS_RETVAL_OK);
-
                                 expect_value(__wrap_os_alloc_reset, cfg, &cfg);
                                 will_return(__wrap_os_alloc_reset,
                                             PQOS_RETVAL_OK);
 
                                 ret = pqos_alloc_reset_config(&cfg);
+                                assert_int_equal(ret, PQOS_RETVAL_OK);
+
+                                /* test old reset method */
+                                wrap_check_init(1, PQOS_RETVAL_OK);
+                                expect_any(__wrap_os_alloc_reset, cfg);
+                                will_return(__wrap_os_alloc_reset,
+                                            PQOS_RETVAL_OK);
+
+                                ret = pqos_alloc_reset(cfg.l3_cdp, cfg.l2_cdp,
+                                                       cfg.mba);
                                 assert_int_equal(ret, PQOS_RETVAL_OK);
                         }
                 }
@@ -717,12 +732,21 @@ test_pqos_alloc_reset_hw(void **state __attribute__((unused)))
                                 cfg.mba = mba_cfg[mba];
 
                                 wrap_check_init(1, PQOS_RETVAL_OK);
-
                                 expect_value(__wrap_hw_alloc_reset, cfg, &cfg);
                                 will_return(__wrap_hw_alloc_reset,
                                             PQOS_RETVAL_OK);
 
                                 ret = pqos_alloc_reset_config(&cfg);
+                                assert_int_equal(ret, PQOS_RETVAL_OK);
+
+                                /* test old reset method */
+                                wrap_check_init(1, PQOS_RETVAL_OK);
+                                expect_any(__wrap_hw_alloc_reset, cfg);
+                                will_return(__wrap_hw_alloc_reset,
+                                            PQOS_RETVAL_OK);
+
+                                ret = pqos_alloc_reset(cfg.l3_cdp, cfg.l2_cdp,
+                                                       cfg.mba);
                                 assert_int_equal(ret, PQOS_RETVAL_OK);
                         }
                 }

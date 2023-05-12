@@ -33,6 +33,15 @@
 #include "resctrl_monitoring.h"
 #include "test.h"
 
+FILE *
+__wrap_pqos_fopen(const char *name, const char *mode)
+{
+        check_expected(name);
+        check_expected(mode);
+
+        return mock_ptr_type(FILE *);
+}
+
 static FILE *
 create_mon_features(enum pqos_mon_event events)
 {

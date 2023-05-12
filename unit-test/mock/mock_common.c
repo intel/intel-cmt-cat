@@ -43,6 +43,23 @@ __wrap_pqos_fopen(const char *name, const char *mode)
         check_expected(name);
         check_expected(mode);
 
+        if (strcmp(mode, "r") == 0) {
+                const char *data = mock_ptr_type(const char *);
+
+                if (data == NULL)
+                        return NULL;
+                else {
+                        FILE *fd = tmpfile();
+
+                        assert_non_null(fd);
+
+                        fprintf(fd, "%s", data);
+                        fseek(fd, 0, SEEK_SET);
+
+                        return fd;
+                }
+        }
+
         return mock_ptr_type(FILE *);
 }
 
@@ -51,6 +68,9 @@ __wrap_pqos_fclose(FILE *fd)
 {
         function_called();
         assert_non_null(fd);
+
+        if (fd != NULL && fd != (FILE *)0xDEAD)
+                fclose(fd);
 
         return mock_type(int);
 }

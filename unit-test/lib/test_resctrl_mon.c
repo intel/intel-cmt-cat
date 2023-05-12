@@ -77,6 +77,7 @@ test_resctrl_mon_mkdir(void **state __attribute__((unused)))
 }
 
 /* ======== resctrl_mon_rmdir ======== */
+
 static void
 test_resctrl_mon_rmdir(void **state __attribute__((unused)))
 {
@@ -95,12 +96,89 @@ test_resctrl_mon_rmdir(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+/* ======== resctrl_mon_read_counter ======== */
+
+static void
+test_resctrl_mon_read_counter(void **state __attribute__((unused)))
+{
+        int ret;
+        uint64_t value;
+
+        /* llc */
+        expect_string(__wrap_pqos_fopen, name,
+                      "/sys/fs/resctrl/COS1/mon_groups/test/mon_data/mon_L3_00/"
+                      "llc_occupancy");
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, "1");
+
+        ret = resctrl_mon_read_counter(1, "test", 0, PQOS_MON_EVENT_L3_OCCUP,
+                                       &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 1);
+
+        /* lmem */
+        expect_string(__wrap_pqos_fopen, name,
+                      "/sys/fs/resctrl/COS1/mon_groups/test/mon_data/mon_L3_00/"
+                      "mbm_local_bytes");
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, "2");
+
+        ret = resctrl_mon_read_counter(1, "test", 0, PQOS_MON_EVENT_LMEM_BW,
+                                       &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 2);
+
+        /* tmem */
+        expect_string(__wrap_pqos_fopen, name,
+                      "/sys/fs/resctrl/COS1/mon_groups/test/mon_data/mon_L3_00/"
+                      "mbm_total_bytes");
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, "3");
+
+        ret = resctrl_mon_read_counter(1, "test", 0, PQOS_MON_EVENT_TMEM_BW,
+                                       &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 3);
+}
+
+static void
+test_resctrl_mon_read_counter_error(void **state __attribute__((unused)))
+{
+        int ret;
+        uint64_t value = 0;
+
+        /* file doesn't exists*/
+        expect_string(__wrap_pqos_fopen, name,
+                      "/sys/fs/resctrl/COS1/mon_groups/test/mon_data/mon_L3_00/"
+                      "llc_occupancy");
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, NULL);
+
+        ret = resctrl_mon_read_counter(1, "test", 0, PQOS_MON_EVENT_L3_OCCUP,
+                                       &value);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+
+        /* invalid value */
+        expect_string(__wrap_pqos_fopen, name,
+                      "/sys/fs/resctrl/COS1/mon_groups/test/mon_data/mon_L3_00/"
+                      "llc_occupancy");
+        expect_string(__wrap_pqos_fopen, mode, "r");
+        will_return(__wrap_pqos_fopen, ";invalid");
+
+        ret = resctrl_mon_read_counter(1, "test", 0, PQOS_MON_EVENT_L3_OCCUP,
+                                       &value);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(value, 0);
+}
+
 int
 main(void)
 {
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_resctrl_mon_mkdir),
             cmocka_unit_test(test_resctrl_mon_rmdir),
+            cmocka_unit_test(test_resctrl_mon_read_counter),
+            cmocka_unit_test(test_resctrl_mon_read_counter_error),
         };
 
         cmocka_run_group_tests(tests, NULL, NULL);

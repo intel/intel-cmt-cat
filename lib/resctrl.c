@@ -344,7 +344,7 @@ resctrl_is_supported(void)
                                    "Kernel version 4.10 or higher required");
 
         if (resctrl == 0)
-                return PQOS_RETVAL_ERROR;
+                return PQOS_RETVAL_RESOURCE;
 
         return PQOS_RETVAL_OK;
 }

@@ -350,7 +350,7 @@ resctrl_mon_cpumask_read(const unsigned class_id,
  * @return Operational status
  * @retval PQOS_RETVAL_OK on success
  */
-static int
+PQOS_STATIC int
 resctrl_mon_read_counter(const unsigned class_id,
                          const char *resctrl_group,
                          const unsigned l3id,

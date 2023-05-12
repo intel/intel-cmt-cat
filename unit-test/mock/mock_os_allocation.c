@@ -35,6 +35,15 @@
 #include "mock_test.h"
 
 int
+__wrap_os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
+{
+        check_expected_ptr(cpu);
+        check_expected_ptr(cap);
+
+        return mock_type(int);
+}
+
+int
 __wrap_os_alloc_assoc_set(const unsigned lcore, const unsigned class_id)
 {
         check_expected(lcore);

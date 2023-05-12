@@ -71,8 +71,7 @@ test_common_pqos_fread_uint64(void **state __attribute__((unused)))
 
         expect_string(__wrap_pqos_fopen, name, path);
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, 0xDEAD);
-        will_return(__wrap_fread, "9999999999999999");
+        will_return(__wrap_pqos_fopen, "9999999999999999");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
         expected_value = 9999999999999999;
@@ -82,9 +81,7 @@ test_common_pqos_fread_uint64(void **state __attribute__((unused)))
 
         expect_string(__wrap_pqos_fopen, name, path);
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, 0xDEAD);
-        will_return(__wrap_fread, "");
-        will_return(__wrap_feof, 1);
+        will_return(__wrap_pqos_fopen, "");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
         return_value = pqos_fread_uint64(path, 16, &value_param);
@@ -92,8 +89,7 @@ test_common_pqos_fread_uint64(void **state __attribute__((unused)))
 
         expect_string(__wrap_pqos_fopen, name, path);
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, 0xDEAD);
-        will_return(__wrap_fread, "fffffffffffffffe");
+        will_return(__wrap_pqos_fopen, "fffffffffffffffe");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
         expected_value = 0xFFFFFFFFFFFFFFFE;
@@ -103,8 +99,7 @@ test_common_pqos_fread_uint64(void **state __attribute__((unused)))
 
         expect_string(__wrap_pqos_fopen, name, path);
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, 0xDEAD);
-        will_return(__wrap_fread, "\n");
+        will_return(__wrap_pqos_fopen, "\n");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
         return_value = pqos_fread_uint64(path, 16, &value_param);
@@ -112,18 +107,7 @@ test_common_pqos_fread_uint64(void **state __attribute__((unused)))
 
         expect_string(__wrap_pqos_fopen, name, path);
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, 0xDEAD);
-        will_return(__wrap_fread, "");
-        will_return(__wrap_feof, 0);
-        expect_function_call(__wrap_pqos_fclose);
-        will_return(__wrap_pqos_fclose, 0);
-        return_value = pqos_fread_uint64(path, 16, &value_param);
-        assert_int_equal(return_value, PQOS_RETVAL_ERROR);
-
-        expect_string(__wrap_pqos_fopen, name, path);
-        expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, 0xDEAD);
-        will_return(__wrap_fread, "invalid");
+        will_return(__wrap_pqos_fopen, "invalid");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
         return_value = pqos_fread_uint64(path, 16, &value_param);
@@ -144,23 +128,16 @@ test_common_pqos_fread_uint(void **state __attribute__((unused)))
         int ret;
         unsigned value;
         const char *path = "/tmp/path";
-        FILE *fd = tmpfile();
-
-        assert_non_null(fd);
-        fprintf(fd, "123\n");
-        fseek(fd, 0, SEEK_SET);
 
         expect_string(__wrap_pqos_fopen, name, path);
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, fd);
+        will_return(__wrap_pqos_fopen, "123\n");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
 
         ret = pqos_fread_uint(path, &value);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(value, 123);
-
-        fclose(fd);
 }
 
 static void
@@ -185,22 +162,15 @@ test_common_pqos_fread_uint_invalid(void **state __attribute__((unused)))
         int ret;
         unsigned value;
         const char *path = "/tmp/path";
-        FILE *fd = tmpfile();
-
-        assert_non_null(fd);
-        fprintf(fd, "invalid");
-        fseek(fd, 0, SEEK_SET);
 
         expect_string(__wrap_pqos_fopen, name, path);
         expect_string(__wrap_pqos_fopen, mode, "r");
-        will_return(__wrap_pqos_fopen, fd);
+        will_return(__wrap_pqos_fopen, "invalid\n");
         expect_function_call(__wrap_pqos_fclose);
         will_return(__wrap_pqos_fclose, 0);
 
         ret = pqos_fread_uint(path, &value);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
-
-        fclose(fd);
 }
 
 int

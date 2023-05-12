@@ -54,7 +54,7 @@ test_utils_pqos_cpu_get_l3cat_ids_empty_list(void **state
         assert_int_equal(count_param, 0);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 }
 
 static void
@@ -84,7 +84,7 @@ test_utils_pqos_cpu_get_l3cat_ids_multiple_cores_on_the_list(
         assert_int_equal(return_value[2], 3);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 
         if (cpu_param != NULL)
                 free(cpu_param);
@@ -102,7 +102,7 @@ test_utils_pqos_cpu_get_l3cat_ids_cpu_null(void **state __attribute__((unused)))
         assert_int_equal(count_param, 1);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 }
 
 static void
@@ -121,7 +121,7 @@ test_utils_pqos_cpu_get_l3cat_ids_count_null(void **state
         assert_int_equal(count_param, 1);
 
         if (return_value != NULL)
-                free(return_value);
+                pqos_free(return_value);
 }
 
 int
