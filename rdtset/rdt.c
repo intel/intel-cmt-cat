@@ -250,6 +250,12 @@ str_to_uint64(const char *str, int base, uint64_t *value)
         while (isblank(*str_start))
                 str_start++;
 
+        if (base == 10 && !isdigit(*str_start))
+                return -EINVAL;
+
+        if (base == 16 && !isxdigit(*str_start))
+                return -EINVAL;
+
         errno = 0;
         val = strtoull(str_start, &str_end, base);
         if (errno != 0 || str_end == NULL || *str_end != '\0')
