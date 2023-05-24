@@ -107,7 +107,4 @@ RUN apt-get -y purge --auto-remove --allow-remove-essential \
     rm -rf /usr/sbin/chroot && \
     rm -rf /var/lib/apt/lists/*
 
-CMD ["python3", "-m",  "appqos", \
-    "-c", "${APPQOS_CONF_PATH}", \
-    "--port", "${APPQOS_PORT}", \
-    "--address", "${APPQOS_ADDRESS}"]
+CMD [ "sh", "-c", "python3 -m appqos -c ${APPQOS_CONF_PATH} --port ${APPQOS_PORT} --address ${APPQOS_ADDRESS}" ]
