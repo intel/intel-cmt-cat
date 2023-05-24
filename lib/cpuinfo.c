@@ -51,9 +51,8 @@
 #include <string.h>
 #include <unistd.h> /* sysconf() */
 #ifdef __FreeBSD__
-#include <linux/getcpu.h> /* getcpu */
-#include <sys/cpuset.h>   /* sched affinity */
-#include <sys/param.h>    /* sched affinity */
+#include <sys/cpuset.h> /* sched affinity */
+#include <sys/param.h>  /* sched affinity */
 #endif
 #ifdef __linux__
 #include <sched.h> /* sched affinity */
