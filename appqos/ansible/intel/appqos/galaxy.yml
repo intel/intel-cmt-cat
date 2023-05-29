@@ -1,7 +1,7 @@
 ---
 namespace: intel
 name: appqos
-version: 1.0.3
+version: 4.6.0
 
 readme: README.md
 

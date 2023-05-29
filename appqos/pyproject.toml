@@ -22,7 +22,7 @@ classifiers = [
 ]
 
 dependencies = [
-    "pqos == 4.5.0",
+    "pqos == 4.6.0",
     "jsonschema",
     "pexpect",
     "flask",

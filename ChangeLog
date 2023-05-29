@@ -1,4 +1,27 @@
 =======================================================================
+Release  v4.6.0 2023-05-29
+=======================================================================
+
+Contributors (alphabetical order):
+        Boczkowski, AdrianX <adrianx.boczkowski@intel.com>
+        Klosowski, Marcin <marcinx.klosowski@intel.com>
+        Michal Aleksiński <michalx.aleksinski@intel.com>
+        Raghavan Kanagaraj <raghavan.kanagaraj@intel.com>
+        Roman Storozhenko <roman.storozhenko@intel.com>
+        Shanahan, Corey <corey.shanahan@intel.com>
+
+1. Library:
+        - Added Non-Contiguous CBM support
+2. PQoS
+        - Added Non-Contiguous CBM support
+3. App QoS
+        - Added Non-Contiguous CBM support
+4. rdtset
+        - Added Non-Contiguous CBM support
+5. General:
+        - Bug fixes
+
+=======================================================================
 Release  v4.5.0  2022-12-15
 =======================================================================
 
