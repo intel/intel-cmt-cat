@@ -45,12 +45,10 @@ import { SstcpComponent } from './sstcp/sstcp.component';
 import { SystemCapsComponent } from './system-caps.component';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import {
-  CacheAllocation,
-  Caps,
-  MBA,
+  CacheAllocation, MBA,
   MBACTRL,
   RDTIface,
-  SSTBF,
+  SSTBF
 } from './system-caps.model';
 import { LocalService } from 'src/app/services/local.service';
 
@@ -268,6 +266,145 @@ describe('Given SystemCapsComponent', () => {
       expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
+
+    it('it should call _getMbaData', () => {
+      const mockResponse = 'RDT Interface modified';
+      const mockedMba: MBA = {
+        clos_num: 12,
+        mba_enabled: false,
+        mba_bw_enabled: true,
+      };
+
+      const mockedMbaCtrl: MBACTRL = {
+        enabled: false, supported: false
+      };
+      const rdtIfaceSpy = jasmine.createSpy('rdtIfacePut');
+      const getMbaSpy = jasmine.createSpy('getMbaSpy')
+        .and.returnValue(of(mockedMba));
+      const getMbaCtrlSpy = jasmine.createSpy('getMbaCtrlSpy')
+        .and.returnValue(of(mockedMbaCtrl));
+
+      const event: MatButtonToggleChange = {
+        source: {} as MatButtonToggle,
+        value: 'os',
+      };
+
+      MockInstance(AppqosService, 'getMba', getMbaSpy);
+      MockInstance(AppqosService, 'getMbaCtrl', getMbaCtrlSpy);
+
+      MockInstance(AppqosService, 'rdtIfacePut', rdtIfaceSpy)
+        .withArgs(event.value)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.onChangeIface(event);
+
+      expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
+      expect(getMbaSpy).toHaveBeenCalledTimes(1);
+      expect(getMbaCtrlSpy).toHaveBeenCalledTimes(1);
+      expect(component.mba).toEqual({ ...mockedMba, ...mockedMbaCtrl });
+    });
+
+    it('it should handle _getMbaData error', () => {
+      const mockResponse = 'RDT Interface modified';
+      const mockedMbaError: Error = {
+        name: 'Error',
+        message: 'Mba GET Error',
+      };
+      const mockedMbaCtrlError: Error = {
+        name: 'Error',
+        message: 'MbaCtrl GET Error',
+      };
+
+      const rdtIfaceSpy = jasmine.createSpy('rdtIfacePut');
+      const getMbaSpy = jasmine.createSpy('getMbaSpy')
+        .and.returnValue(throwError(() => mockedMbaError));
+      const getMbaCtrlSpy = jasmine.createSpy('getMbaCtrlSpy')
+        .and.returnValue(throwError(() => mockedMbaCtrlError));
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+
+      const event: MatButtonToggleChange = {
+        source: {} as MatButtonToggle,
+        value: 'os',
+      };
+
+      MockInstance(AppqosService, 'getMba', getMbaSpy);
+      MockInstance(AppqosService, 'getMbaCtrl', getMbaCtrlSpy);
+
+      MockInstance(AppqosService, 'rdtIfacePut', rdtIfaceSpy)
+        .withArgs(event.value)
+        .and.returnValue(of(mockResponse));
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.onChangeIface(event);
+
+      expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
+      expect(getMbaSpy).toHaveBeenCalledTimes(1);
+      expect(getMbaCtrlSpy).toHaveBeenCalledTimes(1);
+      expect(handleErrorSpy).toHaveBeenCalledWith(mockedMbaError.message);
+    });
+
+    it('it should call _getRdtIface', () => {
+      const mockResponse = 'RDT Interface modified';
+
+      const rdtIfaceSpy = jasmine.createSpy('rdtIfacePut');
+      const getRdtSpy = jasmine.createSpy('getRdtSpy')
+        .and.returnValue(of(mockedRDT));
+
+      const event: MatButtonToggleChange = {
+        source: {} as MatButtonToggle,
+        value: 'os',
+      };
+
+      MockInstance(AppqosService, 'getRdtIface', getRdtSpy);
+
+      MockInstance(AppqosService, 'rdtIfacePut', rdtIfaceSpy)
+        .withArgs(event.value)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.onChangeIface(event);
+
+      expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
+      expect(getRdtSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('it should handle _getRdtIface error', () => {
+      const mockResponse = 'RDT Interface modified';
+
+      const rdtIfaceSpy = jasmine.createSpy('rdtIfacePut');
+      const getRdtSpy = jasmine.createSpy('getRdtSpy')
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+
+      const event: MatButtonToggleChange = {
+        source: {} as MatButtonToggle,
+        value: 'os',
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'getRdtIface', getRdtSpy);
+
+      MockInstance(AppqosService, 'rdtIfacePut', rdtIfaceSpy)
+        .withArgs(event.value)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.onChangeIface(event);
+
+      expect(rdtIfaceSpy).toHaveBeenCalledWith(event.value);
+      expect(getRdtSpy).toHaveBeenCalledTimes(1);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
   });
 
   describe('when sstbfOnChange method is called', () => {
@@ -310,6 +447,60 @@ describe('Given SystemCapsComponent', () => {
       component.sstbfOnChange(event);
 
       expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('it should call _getSstbf', () => {
+      const mockResponse = 'SST-BF caps modified';
+      const sstbfPutSpy = jasmine.createSpy('sstbfPutSpy');
+      const getSstbfSpy = jasmine.createSpy('getSstbfSpy')
+        .and.returnValue(of(mockedSSTBF));
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
+      MockInstance(AppqosService, 'getSstbf', getSstbfSpy);
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getSstbfSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('it should handle _getSstbf error', () => {
+      const mockResponse = 'SST-BF caps modified';
+      const sstbfPutSpy = jasmine.createSpy('sstbfPutSpy');
+      const getSstbfSpy = jasmine.createSpy('getSstbfSpy')
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'getSstbf', getSstbfSpy);
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getSstbfSpy).toHaveBeenCalledTimes(1);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });
@@ -356,6 +547,59 @@ describe('Given SystemCapsComponent', () => {
       expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
+
+    it('it should call _getL3cat', () => {
+      const mockResponse = 'L3 CAT status changed';
+      const l3CdpPutSpy = jasmine.createSpy('l3CdpPutSpy');
+      const getL3catSpy = jasmine.createSpy('getL3catSpy')
+        .and.returnValue(of(mockedCache));
+      
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'getL3cat', getL3catSpy);
+      MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.l3CdpOnChange(event);
+
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getL3catSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('it should handle _getL3cat error', () => {
+      const mockResponse = 'L3 CAT status changed';
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+      const l3CdpPutSpy = jasmine.createSpy('l3CdpPutSpy');
+      const getL3catSpy = jasmine.createSpy('getL3catSpy')
+        .and.returnValue(throwError(() => mockedError));
+      
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'getL3cat', getL3catSpy);
+      MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.l3CdpOnChange(event);
+
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getL3catSpy).toHaveBeenCalledTimes(1);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
   });
 
   describe('when l2CdpOnChange method is called', () => {
@@ -398,6 +642,87 @@ describe('Given SystemCapsComponent', () => {
       component.l2CdpOnChange(event);
 
       expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('it should call _getL2cat', () => {
+      const mockResponse = 'L2 CAT status changed';
+      const l2CdpPutSpy = jasmine.createSpy('l2CdpPutSpy');
+      const getL2catSpy = jasmine.createSpy('getL2catSpy')
+        .and.returnValue(of(mockedCache));
+      
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'getL2cat', getL2catSpy);
+      MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.l2CdpOnChange(event);
+
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getL2catSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('it should handle _getL2cat error', () => {
+      const mockResponse = 'L2 CAT status changed';
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+      const l2CdpPutSpy = jasmine.createSpy('l2CdpPutSpy');
+      const getL2catSpy = jasmine.createSpy('getL2catSpy')
+        .and.returnValue(throwError(() => mockedError));
+      
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'getL2cat', getL2catSpy);
+      MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.l2CdpOnChange(event);
+
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getL2catSpy).toHaveBeenCalledTimes(1);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('it should handle _getPools error', () => {
+      const mockResponse = 'L2 CAT status changed';
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+      const l2CdpPutSpy = jasmine.createSpy('l2CdpPutSpy');
+      const getPoolsSpy = jasmine.createSpy('getPoolsSpy')
+        .and.returnValue(throwError(() => mockedError));
+      
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'getPools', getPoolsSpy);
+      MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(SystemCapsComponent);
+      const component = fixture.point.componentInstance;
+
+      component.l2CdpOnChange(event);
+
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getPoolsSpy).toHaveBeenCalledTimes(1);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });
