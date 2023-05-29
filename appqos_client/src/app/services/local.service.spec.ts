@@ -29,8 +29,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { skip } from 'rxjs';
-import { CacheAllocation, MBACTRL, RDTIface } from '../components/system-caps/system-caps.model';
+import { CacheAllocation, MBA, MBACTRL, RDTIface, SSTBF } from '../components/system-caps/system-caps.model';
 import { LocalService } from './local.service';
+import { Apps, Pools } from '../components/overview/overview.model';
 
 describe('Given LocalService', () => {
   beforeEach(() => MockBuilder(LocalService));
@@ -58,6 +59,46 @@ describe('Given LocalService', () => {
     'l2cat',
     'mba',
   ]
+
+  const mockedSSTBF: SSTBF = {
+    configured: true,
+    hp_cores: [1, 2],
+    std_cores: [1, 2],
+  };
+
+  const mockedMba: MBA = {
+    mba_enabled: false,
+    mba_bw_enabled: false,
+    clos_num: 7
+  };
+
+  const mockedPools: Pools[] = [
+    {
+      id: 0,
+      mba_bw: 4294967295,
+      l3cbm_code: 2047,
+      l3cbm_data: 511,
+      name: 'Default',
+      cores: [0, 1, 45, 46, 47],
+    },
+    {
+      id: 1,
+      mba_bw: 4294967295,
+      l3cbm_code: 15,
+      l3cbm_data: 4088,
+      name: 'HP',
+      cores: [10, 12, 15],
+    }
+  ];
+
+  const mockedApps: Apps[] = [
+    {
+      id: 1,
+      name: 'test',
+      pids: [1, 2, 3],
+      pool_id: 0,
+    },
+  ];
 
   MockInstance.scope('case');
 
@@ -204,6 +245,18 @@ describe('Given LocalService', () => {
     })
   });
 
+  describe('when getL3CatCurrentValue method is excuted', () => {
+    it('it should return current l3cat', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.setL3CatEvent(mockedL3cat);
+
+      expect(service.getL3CatCurrentValue()).toBe(mockedL3cat);
+    });
+  });
+
   describe('when setL2CatEvent method is executed', () => {
     it('it should emit', (done: DoneFn) => {
       const {
@@ -235,6 +288,18 @@ describe('Given LocalService', () => {
       service.l2cat.next(mockedL2cat);
     })
   })
+
+  describe('when getL2CatCurrentValue method is excuted', () => {
+    it('it should return current l2cat', () => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.setL2CatEvent(mockedL2cat);
+
+      expect(service.getL2CatCurrentValue()).toBe(mockedL2cat);
+    });
+  });
 
   describe('when setCapsEvent method is executed', () => {
     it('it should emit', (done: DoneFn) => {
@@ -491,4 +556,132 @@ describe('Given LocalService', () => {
       expect(service.convertToBitmask(cbm, cw_num)).toEqual(expectedBitmask);
     });
   })
+
+  describe('when setSstbfEvent method is executed', () => {
+    it('should emit SSTBF', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.sstbf.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedSSTBF);
+
+        done();
+      });
+
+      service.setSstbfEvent(mockedSSTBF);
+    });
+  });
+
+  describe('when getSstbfEvent method is executed', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.getSstbfEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedSSTBF);
+
+        done();
+      });
+
+      service.sstbf.next(mockedSSTBF);
+    });
+  });
+
+  describe('when setMbaEvent method is executed', () => {
+    it('should emit Mba', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.mba.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedMba);
+
+        done();
+      });
+
+      service.setMbaEvent(mockedMba);
+    });
+  });
+
+  describe('when getMbaEvent method is executed', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.getMbaEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedMba);
+
+        done();
+      });
+
+      service.mba.next(mockedMba);
+    });
+  });
+
+  describe('when setPoolsEvent method is executed', () => {
+    it('should emit pools', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.pools.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedPools);
+
+        done();
+      });
+
+      service.setPoolsEvent(mockedPools);
+    });
+  });
+
+  describe('when getPoolsEvent method is executed', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.getPoolsEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedPools);
+
+        done();
+      });
+
+      service.pools.next(mockedPools);
+    });
+  });
+
+  describe('when setAppsEvent method is executed', () => {
+    it('should emit Apps', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.apps.pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedApps);
+
+        done();
+      });
+
+      service.setAppsEvent(mockedApps);
+    });
+  });
+
+  describe('when getAppsEvent method is executed', () => {
+    it('should detect change', (done: DoneFn) => {
+      const {
+        point: { componentInstance: service }
+      } = MockRender(LocalService);
+
+      service.getAppsEvent().pipe(skip(1)).subscribe((event) => {
+        expect(event).toBe(mockedApps);
+
+        done();
+      });
+
+      service.apps.next(mockedApps);
+    });
+  });
 })
