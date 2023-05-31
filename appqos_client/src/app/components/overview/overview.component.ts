@@ -33,7 +33,7 @@ import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { SystemTopology, MBACTRL, resMessage } from '../system-caps/system-caps.model';
+import { SystemTopology, MBACTRL, resMessage, PowerProfiles, SSTBF, EnergyPerformPref } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
 import { AutoUnsubscribe } from 'src/app/services/decorators';
 import { Subscription } from 'rxjs'
@@ -48,7 +48,9 @@ export class OverviewComponent implements OnInit {
   pools!: Pools[];
   mbaCtrl!: MBACTRL | null;
   caps!: string[];
-  topology: SystemTopology | null = null;
+  topology!: SystemTopology | null;
+  pwrProfiles!: PowerProfiles[];
+  sstbf!: SSTBF | null;
   subs: Subscription[] = [];
 
   constructor(
@@ -72,7 +74,15 @@ export class OverviewComponent implements OnInit {
       this.pools = pools;
     });
 
-    this.subs.push(capsSub, mbaCtrlSub, poolsSub);
+    const pwrProfilesSub = this.localService.getPowerProfilesEvent().subscribe((pwrProfiles) => {
+      this.pwrProfiles = pwrProfiles;
+    });
+
+    const sstbfSub = this.localService.getSstbfEvent().subscribe((sstbf) => {
+      this.sstbf = sstbf;
+    });
+
+    this.subs.push(capsSub, mbaCtrlSub, poolsSub, pwrProfilesSub, sstbfSub);
   }
 
   getMbaCtrl(): void {

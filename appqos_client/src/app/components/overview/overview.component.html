@@ -49,4 +49,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     [mbaCtrl]="mbaCtrl!"
     (mbaCtrlEvent)="mbaOnChange($event)"
   ></app-mba-allocation>
+  <app-power-profiles
+    [pwrProfiles]="pwrProfiles"
+    *ngIf="caps?.includes('power') && !sstbf?.configured"
+  ></app-power-profiles>
 </div>

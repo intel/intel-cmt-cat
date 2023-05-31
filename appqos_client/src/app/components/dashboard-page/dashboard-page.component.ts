@@ -83,6 +83,9 @@ export class DashboardPageComponent implements OnInit {
             this._getMbaCtrl();
           }
 
+          if (caps.capabilities.includes('power'))
+            this._getPwrProfiles();
+
         },
         error: (error: Error) => {
           this.snackBar.handleError(error.message);
@@ -149,5 +152,9 @@ export class DashboardPageComponent implements OnInit {
 
   private _getApps() {
     this.service.getApps().subscribe();
+  }
+
+  private _getPwrProfiles() {
+    this.service.getPowerProfile().subscribe();
   }
 }

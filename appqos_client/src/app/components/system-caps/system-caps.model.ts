@@ -105,3 +105,18 @@ export interface Node {
   nodeID: number;
   cores?: CoreInfo[];
 }
+
+export interface PowerProfiles {
+  id: number,
+  name: string,
+  min_freq: number,
+  max_freq: number,
+  epp: EnergyPerformPref,
+}
+
+export enum EnergyPerformPref {
+  performance = "Performance",
+  balancePerformance = "Balance Performance",
+  balancePower = "Balance Power",
+  power = "Power",
+}

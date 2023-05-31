@@ -39,7 +39,7 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { CacheAllocation, Caps, MBACTRL, RDTIface } from '../system-caps/system-caps.model';
+import { MBACTRL } from '../system-caps/system-caps.model';
 import { OverviewComponent } from './overview.component';
 import { Pools } from './overview.model';
 
@@ -57,7 +57,9 @@ describe('Given OverviewComponent', () => {
       .mock(LocalService, {
         getCapsEvent: () => EMPTY,
         getMbaCtrlEvent: () => EMPTY,
-        getPoolsEvent: () => EMPTY
+        getPoolsEvent: () => EMPTY,
+        getPowerProfilesEvent: () => EMPTY,
+        getSstbfEvent: () => EMPTY
       })
   );
 

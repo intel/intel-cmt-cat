@@ -48,6 +48,7 @@ import { MatSliderModule } from '@angular/material/slider';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
+import { MatMenuModule } from '@angular/material/menu';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -76,6 +77,7 @@ import { CatComponent } from '../components/system-caps/cat/cat.component';
 import { SystemTopologyComponent } from '../components/system-topology/system-topology.component';
 import { NodeComponent } from '../components/system-topology/node/node.component';
 import { CoreComponent } from '../components/system-topology/core/core.component';
+import { PowerProfilesComponent } from '../components/power-profiles/power-profiles.component';
 
 @NgModule({
   declarations: [
@@ -103,6 +105,7 @@ import { CoreComponent } from '../components/system-topology/core/core.component
     SystemTopologyComponent,
     NodeComponent,
     CoreComponent,
+    PowerProfilesComponent,
   ],
   imports: [
     MatInputModule,
@@ -126,8 +129,9 @@ import { CoreComponent } from '../components/system-topology/core/core.component
     MatSelectModule,
     FormsModule,
     MatTableModule,
+    MatMenuModule,
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],
 })
-export class SharedModule {}
+export class SharedModule { }

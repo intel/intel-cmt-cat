@@ -34,6 +34,7 @@ import {
   CacheAllocation,
   MBA,
   MBACTRL,
+  PowerProfiles,
   RDTIface,
   SSTBF,
 } from '../components/system-caps/system-caps.model';
@@ -54,6 +55,7 @@ export class LocalService {
   sstbf = new BehaviorSubject<SSTBF | null>(null);
   pools = new BehaviorSubject<Pools[] | []>([]);
   apps = new BehaviorSubject<Apps[] | []>([]);
+  pwrProfiles = new BehaviorSubject<PowerProfiles[] | []>([]);
 
   setRdtIfaceEvent(rdtIFace: RDTIface): void {
     this.rdtIFace.next(rdtIFace);
@@ -133,6 +135,14 @@ export class LocalService {
 
   getAppsEvent(): Observable<Apps[] | []> {
     return this.apps.asObservable();
+  }
+
+  setPowerProfilesEvent(profiles: PowerProfiles[]) {
+    this.pwrProfiles.next(profiles);
+  }
+
+  getPowerProfilesEvent(): Observable<PowerProfiles[]>{
+    return this.pwrProfiles.asObservable();
   }
 
   public saveData(key: string, value: string): void {

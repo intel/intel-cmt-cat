@@ -40,6 +40,7 @@ import {
   RDTIface,
   resMessage,
   SSTBF,
+  PowerProfiles,
 } from '../components/system-caps/system-caps.model';
 import { LocalService } from './local.service';
 import { Apps, Pools } from '../components/overview/overview.model';
@@ -287,6 +288,15 @@ export class AppqosService {
     const api_url = this.local.getData('api_url');
     return this.http.delete<resMessage>(`${api_url}/apps/${id}`)
       .pipe(catchError(this.handleError));
+  }
+
+  getPowerProfile(): Observable<PowerProfiles[]>{
+    const api_url = this.local.getData('api_url');
+    return this.http.get<PowerProfiles[]>(`${api_url}/power_profiles`)
+      .pipe(
+        catchError(() => of([])),
+        tap((pwrProfiles) => this.local.setPowerProfilesEvent(pwrProfiles))
+      );
   }
 
   handleError(error: HttpErrorResponse): Observable<any> {
