@@ -27,15 +27,88 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
+import { FormControl, FormGroup, Validators } from '@angular/forms';
+import { EnergyPerformPref, PowerProfiles, Standards, eppDisplayStr, eppPostStr } from '../../system-caps/system-caps.model';
+import { AppqosService } from 'src/app/services/appqos.service';
+import { MatDialogRef } from '@angular/material/dialog';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+
+type PostProfile = Omit<PowerProfiles, 'id'>
 
 @Component({
   selector: 'app-power-profiles-dialog',
   templateUrl: './power-profiles-dialog.component.html',
   styleUrls: ['./power-profiles-dialog.component.scss']
 })
-export class PowerProfileDialogComponent  {
+export class PowerProfileDialogComponent implements OnInit {
+  form!: FormGroup;
+  epp: string[] = eppDisplayStr;
+  
+  MIN_FREQ: Standards = Standards.MIN_FREQ;
+  MAX_FREQ: Standards = Standards.MAX_FREQ;
 
-  constructor() { }
+  constructor(
+    private service: AppqosService,
+    private snackbar: SnackBarService,
+    public dialogRef: MatDialogRef<PowerProfileDialogComponent>,
+  ) { }
 
+  ngOnInit(): void {
+    this.form = new FormGroup({
+      name: new FormControl('', [
+        Validators.required,
+        Validators.pattern('^[ -~]+$'),
+        Validators.maxLength(Standards.MAX_CHARS)
+      ]),
+      minFreq: new FormControl('', [
+        Validators.required,
+        Validators.pattern('^[0-9]+$'),
+        Validators.min(Standards.MIN_FREQ),
+        Validators.max(Standards.MAX_FREQ),
+      ]),
+      maxFreq: new FormControl('', [
+        Validators.required,
+        Validators.pattern('^[0-9]+$'),
+        Validators.min(Standards.MIN_FREQ),
+        Validators.max(Standards.MAX_FREQ),
+      ]),
+      epp: new FormControl(this.epp[EnergyPerformPref.balancePerformance], [
+        Validators.required,
+      ])
+    });
+  }
+
+  savePwrProfile() {
+    if (this.form.invalid) return;
+
+    const profile: PostProfile = {
+      name: this.form.controls['name'].value,
+      min_freq: this.form.controls['minFreq'].value,
+      max_freq: this.form.controls['maxFreq'].value,
+      epp: eppPostStr[
+        eppDisplayStr.indexOf(this.form.controls['epp'].value)
+      ]
+    }
+
+    this.service.postPowerProfiles(profile).subscribe({
+      next: (res) => {
+        this.snackbar.displayInfo(res.message);
+        this.service.getPowerProfile().subscribe();
+        this.dialogRef.close();
+      },
+      error: (error: Error) => {
+        this.snackbar.handleError(error.message);
+      }
+    })
+  }
+
+  checkFreq() {
+    const maxFreq = this.form.controls['maxFreq'];
+    const minFreq = this.form.controls['minFreq'];
+
+    if ((maxFreq.value && minFreq.value) && (minFreq.value > maxFreq.value)) {
+      maxFreq.setErrors({ lessThanMin: true })
+    }
+  }
 }

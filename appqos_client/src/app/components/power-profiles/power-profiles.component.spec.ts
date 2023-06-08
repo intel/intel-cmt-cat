@@ -51,28 +51,28 @@ describe('Given PowerProfilesComponent', () => {
       name: 'profile_0',
       min_freq: 1000,
       max_freq: 1200,
-      epp: EnergyPerformPref.balancePerformance
+      epp: 'balance_performance'
     },
     {
       id: 1,
       name: 'profile_1',
       min_freq: 1000,
       max_freq: 1200,
-      epp: EnergyPerformPref.balancePower
+      epp: 'balance_power'
     },
     {
       id: 2,
       name: 'profile_2',
       min_freq: 1000,
       max_freq: 1200,
-      epp: EnergyPerformPref.power
+      epp: 'power'
     },
     {
       id: 3,
       name: 'profile_3',
       min_freq: 1000,
       max_freq: 1200,
-      epp: EnergyPerformPref.performance
+      epp: 'performance'
     }
   ];
 
@@ -84,14 +84,14 @@ describe('Given PowerProfilesComponent', () => {
     it('it should display correct title', () => {
       const title = "Speed Select Technology - Core Power (SST-CP)";
 
-      MockRender(PowerProfilesComponent);
+      MockRender(PowerProfilesComponent, params);
 
       const expectValue = ngMocks.formatText(ngMocks.find('mat-card-title'));
       expect(expectValue).toEqual(title);
     });
 
     it('it should display add button', () => {
-      MockRender(PowerProfilesComponent);
+      MockRender(PowerProfilesComponent, params);
 
       const expectValue = ngMocks.find('mat-mini-fab', null);
 
@@ -111,7 +111,9 @@ describe('Given PowerProfilesComponent', () => {
         expect(cells['name'].text[i]).toBe(profile.name);
         expect(cells['minFreq'].text[i]).toBe(String(profile.min_freq) + 'Mhz');
         expect(cells['maxFreq'].text[i]).toBe(String(profile.max_freq) + 'Mhz');
-        expect(cells['epp'].text[i]).toBe(profile.epp);
+        expect(
+          cells['epp'].text[i].replace(' ', '_').toLowerCase()
+        ).toBe(profile.epp);
       });
     });
 
@@ -133,7 +135,7 @@ describe('Given PowerProfilesComponent', () => {
 
   describe('when click "See more"', () => {
     it('should redirect to wiki page', () => {
-      MockRender(PowerProfilesComponent);
+      MockRender(PowerProfilesComponent, params);
 
       const infoUrl = ngMocks.find('a').nativeElement.getAttribute('href');
 

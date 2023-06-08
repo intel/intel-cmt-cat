@@ -27,17 +27,35 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Input } from '@angular/core';
-import { PowerProfiles } from '../system-caps/system-caps.model';
+import { Component, Input, OnChanges } from '@angular/core';
+import { EnergyPerformPref, PowerProfiles, eppDisplayStr, eppPostStr } from '../system-caps/system-caps.model';
+import { MatDialog } from '@angular/material/dialog';
+import { PowerProfileDialogComponent } from './power-profiles-dialog/power-profiles-dialog.component';
 
 @Component({
   selector: 'app-power-profiles',
   templateUrl: './power-profiles.component.html',
   styleUrls: ['./power-profiles.component.scss']
 })
-export class PowerProfilesComponent {
+export class PowerProfilesComponent implements OnChanges {
   @Input() pwrProfiles!: PowerProfiles[];
-  tableHeaders: string[] = ['id', 'name', 'minFreq', 'maxFreq', 'epp', 'action']
-  constructor() { }
+  tableData!: PowerProfiles[];
+  tableHeaders: string[] = ['id', 'name', 'minFreq', 'maxFreq', 'epp', 'action'];
+
+  constructor(public dialog: MatDialog) { }
+
+  ngOnChanges(): void {
+    this.tableData = this.pwrProfiles.map((profile) => ({
+      ...profile,
+      epp: eppDisplayStr[eppPostStr.indexOf(profile.epp)]
+    }));
+  }
+
+  pwrProfileAddDialog() {
+    this.dialog.open(PowerProfileDialogComponent, {
+      height: 'auto',
+      width: '35rem',
+    })
+  }
 
 }

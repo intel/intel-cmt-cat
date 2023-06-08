@@ -290,6 +290,7 @@ export class AppqosService {
       .pipe(catchError(this.handleError));
   }
 
+  /* Retrieve Power Profiles */
   getPowerProfile(): Observable<PowerProfiles[]>{
     const api_url = this.local.getData('api_url');
     return this.http.get<PowerProfiles[]>(`${api_url}/power_profiles`)
@@ -297,6 +298,13 @@ export class AppqosService {
         catchError(() => of([])),
         tap((pwrProfiles) => this.local.setPowerProfilesEvent(pwrProfiles))
       );
+  }
+
+  /* Post new Power Profile */
+  postPowerProfiles(profile: any): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.post<resMessage>(`${api_url}/power_profiles`, profile)
+      .pipe(catchError(this.handleError));
   }
 
   handleError(error: HttpErrorResponse): Observable<any> {

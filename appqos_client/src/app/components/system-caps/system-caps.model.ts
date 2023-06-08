@@ -71,6 +71,8 @@ export enum Standards {
   MAX_CHARS_CORES = 4096,
   MAX_CHARS_PIDS = 4096,
   MAX_CORES = 1024,
+  MIN_FREQ = 400,
+  MAX_FREQ = 5000
 }
 
 /* cache information */
@@ -106,17 +108,33 @@ export interface Node {
   cores?: CoreInfo[];
 }
 
+/* power profile information */
 export interface PowerProfiles {
   id: number,
   name: string,
   min_freq: number,
   max_freq: number,
-  epp: EnergyPerformPref,
+  epp: string,
 }
 
+/* energy performance preference (EPP) */
 export enum EnergyPerformPref {
-  performance = "Performance",
-  balancePerformance = "Balance Performance",
-  balancePower = "Balance Power",
-  power = "Power",
+  performance = 0,
+  balancePerformance = 1,
+  balancePower = 2,
+  power = 3,
 }
+
+export const eppDisplayStr: string[] = [
+  'Performance',
+  'Balance Performance',
+  'Balance Power',
+  'Power'
+];
+
+export const eppPostStr: string[] = [
+  'performance',
+  'balance_performance',
+  'balance_power',
+  'power'
+];

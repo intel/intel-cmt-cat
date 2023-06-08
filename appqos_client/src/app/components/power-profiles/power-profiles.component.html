@@ -33,7 +33,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     <mat-card-title>
       Speed Select Technology - Core Power (SST-CP)
     </mat-card-title>
-    <button mat-mini-fab color="primary">
+    <button mat-mini-fab color="primary" (click)="pwrProfileAddDialog()">
       <mat-icon>add</mat-icon>
     </button>
   </div>
@@ -52,7 +52,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     </div>
     <br />
     <span *ngIf="!pwrProfiles?.length">No profiles currently configured</span>
-    <table mat-table [dataSource]="pwrProfiles" *ngIf="pwrProfiles?.length">
+    <table mat-table [dataSource]="tableData" *ngIf="pwrProfiles?.length">
       <ng-container matColumnDef="id">
         <th mat-header-cell *matHeaderCellDef>ID</th>
         <td mat-cell *matCellDef="let profile">{{ profile.id }}</td>
