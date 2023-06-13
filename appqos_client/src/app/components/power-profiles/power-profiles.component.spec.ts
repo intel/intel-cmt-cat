@@ -27,15 +27,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { MockBuilder, MockRender, ngMocks } from "ng-mocks";
+import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
 import { PowerProfilesComponent } from "./power-profiles.component";
 import { SharedModule } from "src/app/shared/shared.module";
 import { Router } from "@angular/router";
-import { EnergyPerformPref, PowerProfiles } from "../system-caps/system-caps.model";
+import { PowerProfiles } from "../system-caps/system-caps.model";
 import { HarnessLoader } from "@angular/cdk/testing";
 import { TestbedHarnessEnvironment } from "@angular/cdk/testing/testbed";
 import { MatTableHarness } from "@angular/material/table/testing";
 import { MatTableModule } from "@angular/material/table";
+import { MatDialog } from "@angular/material/dialog";
+import { PowerProfileDialogComponent } from "./power-profiles-dialog/power-profiles-dialog.component";
+import { MatButtonModule } from "@angular/material/button";
 
 describe('Given PowerProfilesComponent', () => {
   beforeEach(() =>
@@ -43,7 +46,10 @@ describe('Given PowerProfilesComponent', () => {
       .mock(SharedModule)
       .mock(Router)
       .keep(MatTableModule)
+      .keep(MatButtonModule)
   );
+
+  MockInstance.scope('case');
 
   const mockedPwrProfiles: PowerProfiles[] = [
     {
@@ -93,7 +99,7 @@ describe('Given PowerProfilesComponent', () => {
     it('it should display add button', () => {
       MockRender(PowerProfilesComponent, params);
 
-      const expectValue = ngMocks.find('mat-mini-fab', null);
+      const expectValue = ngMocks.find('.mat-mini-fab');
 
       expect(expectValue).toBeDefined();
     });
@@ -125,7 +131,7 @@ describe('Given PowerProfilesComponent', () => {
 
       MockRender(PowerProfilesComponent, params);
 
-      const expectedMsg = ngMocks.formatText(ngMocks.find('span'));
+      const expectedMsg = ngMocks.formatText(ngMocks.find('mat-card-content > span'));
       const table = ngMocks.find('table', null);
 
       expect(expectedMsg).toEqual(msg);
@@ -142,6 +148,31 @@ describe('Given PowerProfilesComponent', () => {
       expect(infoUrl).toEqual(
         'https://www.intel.com/content/www/us/en/architecture-and-technology/speed-select-technology-article.html'
       );
+    });
+  });
+
+  describe('when add button is clicked', () => {
+    it('it should open power profiles dialog', () => {
+      const params = {
+        height: 'auto',
+        width: '35rem',
+      };
+
+      const openSpy = jasmine.createSpy('openSpy');
+      MockInstance(MatDialog, 'open', openSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PowerProfilesComponent, params);
+
+      const addDialogSpy = spyOn(component, 'pwrProfileAddDialog')
+        .and.callThrough();
+
+      const addButton = ngMocks.find('.mat-mini-fab');
+      addButton.triggerEventHandler('click', null);
+
+      expect(addDialogSpy).toHaveBeenCalledTimes(1);
+      expect(openSpy).toHaveBeenCalledOnceWith(PowerProfileDialogComponent, params);
     });
   });
 });
