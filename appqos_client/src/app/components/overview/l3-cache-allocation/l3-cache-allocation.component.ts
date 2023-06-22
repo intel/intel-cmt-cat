@@ -42,7 +42,7 @@ import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { LocalService } from 'src/app/services/local.service';
-import { Subscription } from 'rxjs'
+import { Subscription } from 'rxjs';
 import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 @Component({

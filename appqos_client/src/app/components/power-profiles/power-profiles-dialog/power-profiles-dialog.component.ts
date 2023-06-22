@@ -89,7 +89,7 @@ export class PowerProfileDialogComponent implements OnInit {
       epp: eppPostStr[
         eppDisplayStr.indexOf(this.form.controls['epp'].value)
       ]
-    }
+    };
 
     this.service.postPowerProfiles(profile).subscribe({
       next: (res) => {
@@ -100,7 +100,7 @@ export class PowerProfileDialogComponent implements OnInit {
       error: (error: Error) => {
         this.snackbar.handleError(error.message);
       }
-    })
+    });
   }
 
   checkFreq() {
@@ -108,7 +108,7 @@ export class PowerProfileDialogComponent implements OnInit {
     const minFreq = this.form.controls['minFreq'];
 
     if ((maxFreq.value && minFreq.value) && (minFreq.value > maxFreq.value)) {
-      maxFreq.setErrors({ lessThanMin: true })
+      maxFreq.setErrors({ lessThanMin: true });
     }
   }
 }

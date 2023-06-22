@@ -30,11 +30,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 import { Component, OnInit } from '@angular/core';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
-import { CacheAllocation } from '../system-caps/system-caps.model';
-import { catchError, map, of } from 'rxjs';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Router } from '@angular/router';
-import { Apps } from '../overview/overview.model';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -44,7 +41,7 @@ import { Apps } from '../overview/overview.model';
 
 /* Component used to display Dashboard page*/
 export class DashboardPageComponent implements OnInit {
-  showContent: boolean = true;
+  showContent = true;
 
   constructor(
     private service: AppqosService,
@@ -131,7 +128,7 @@ export class DashboardPageComponent implements OnInit {
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
       }
-    })
+    });
   }
 
   private _getRdtIface() {
@@ -139,7 +136,7 @@ export class DashboardPageComponent implements OnInit {
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
       }
-    })
+    });
   }
 
   private _getPools() {
@@ -147,7 +144,7 @@ export class DashboardPageComponent implements OnInit {
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
       }
-    })
+    });
   }
 
   private _getApps() {

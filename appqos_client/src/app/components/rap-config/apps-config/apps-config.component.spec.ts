@@ -137,8 +137,8 @@ describe('Given AppConfigComponent', () => {
       };
 
       // initialize component with mocked initail apps and pools
-      let fixture = MockRender(AppsConfigComponent, params);
-      let loader: HarnessLoader = TestbedHarnessEnvironment.loader(fixture);
+      const fixture = MockRender(AppsConfigComponent, params);
+      const loader: HarnessLoader = TestbedHarnessEnvironment.loader(fixture);
 
       // assert expected table values
       const cells = await loader

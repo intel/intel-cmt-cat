@@ -57,8 +57,8 @@ describe('Given poolConfigComponent', () => {
         getL2CatCurrentValue: () => mockedCache,
         convertToBitmask: LocalService.prototype.convertToBitmask
       })
-      .keep(MatSliderModule)
-  })
+      .keep(MatSliderModule);
+  });
 
   const mockedPools: Pools[] = [
     { id: 0, name: 'pool_0', cores: [1, 2, 3] },
@@ -74,12 +74,12 @@ describe('Given poolConfigComponent', () => {
     clos_num: 15,
     cw_num: 12,
     cw_size: 3670016
-  }
+  };
 
   const params = {
     pools: mockedPools,
     apps: []
-  }
+  };
 
   MockInstance.scope('case');
 
@@ -96,7 +96,7 @@ describe('Given poolConfigComponent', () => {
       const params = {
         pools: mockedPools,
         apps: []
-      }
+      };
 
       const {
         point: { componentInstance: component }
@@ -106,7 +106,7 @@ describe('Given poolConfigComponent', () => {
       expect(component.selected).toBe(mockedPools[poolID].name);
       expect(component.pool.l3Bitmask).toEqual(mockedL3Bitmask);
       expect(component.pool.l2Bitmask).toEqual(mockedL2BitMask);
-    })
+    });
 
     it('it should update correct bitmasks when cdp is enabled', () => {
       const poolId = 0;
@@ -130,7 +130,7 @@ describe('Given poolConfigComponent', () => {
       const params = {
         pools: mockedPools,
         apps: []
-      }
+      };
 
       const mockedCache: CacheAllocation = {
         cache_size: 44040192,
@@ -139,7 +139,7 @@ describe('Given poolConfigComponent', () => {
         clos_num: 15,
         cw_num: 12,
         cw_size: 3670016
-      }
+      };
 
       MockInstance(LocalService, 'getL3CatCurrentValue', () => mockedCache);
       MockInstance(LocalService, 'getL2CatCurrentValue', () => mockedCache);
@@ -154,8 +154,8 @@ describe('Given poolConfigComponent', () => {
       expect(component.pool.l3BitmaskData).toEqual(mockedL3BitmaskData);
       expect(component.pool.l2BitmaskCode).toEqual(mockedL2BitmaskCode);
       expect(component.pool.l2BitmaskData).toEqual(mockedL2BitmaskData);
-    })
-  })
+    });
+  });
 
   describe('when getData method is called', () => {
     it('it should call getPool method', () => {
@@ -168,8 +168,8 @@ describe('Given poolConfigComponent', () => {
 
       component.getData(poolID);
       expect(getPoolSpy).toHaveBeenCalledTimes(1);
-    })
-  })
+    });
+  });
 
   describe('when selectedPool method is called', () => {
     it('it should call getPool method if there is user input', () => {
@@ -178,7 +178,7 @@ describe('Given poolConfigComponent', () => {
       const event: MatOptionSelectionChange = {
         source: {} as MatOption,
         isUserInput: true
-      }
+      };
 
       const {
         point: { componentInstance: component }
@@ -188,7 +188,7 @@ describe('Given poolConfigComponent', () => {
 
       component.selectedPool(event, poolID);
       expect(getPoolSpy).toHaveBeenCalledTimes(1);
-    })
+    });
 
     it('it should not call getPool method if there is not user input', () => {
       const poolID = 0;
@@ -196,30 +196,30 @@ describe('Given poolConfigComponent', () => {
       const event: MatOptionSelectionChange = {
         source: {} as MatOption,
         isUserInput: false
-      }
+      };
 
       const {
         point: { componentInstance: component }
-      } = MockRender(PoolConfigComponent, params)
+      } = MockRender(PoolConfigComponent, params);
 
       const getPoolSpy = spyOn(component, 'getPool');
 
       component.selectedPool(event, poolID);
       expect(getPoolSpy).not.toHaveBeenCalled();
-    })
-  })
+    });
+  });
 
   describe('when savePoolName method is called', () => {
     const poolName = 'pool_0';
 
     const mockedPools: Pools[] = [
       { id: 0, name: poolName, cores: [1, 2, 3] }
-    ]
+    ];
 
     const params = {
       pools: mockedPools,
       apps: []
-    }
+    };
 
     it('it should update the pool name', () => {
       const poolID = 0;
@@ -227,7 +227,7 @@ describe('Given poolConfigComponent', () => {
       const mockedResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
 
       MockInstance(AppqosService, 'poolPut', () => of(mockedResponse));
 
@@ -245,14 +245,14 @@ describe('Given poolConfigComponent', () => {
 
       expect(nextHandlerSpy).toHaveBeenCalledWith(mockedResponse);
       expect(component.poolName).toBe('');
-    })
+    });
 
     it('it should handle errors', () => {
       const invaildPoolID = -1;
       const mockedError: Error = {
         name: 'Error',
         message: 'rest API error'
-      }
+      };
 
       const poolPutSpy = jasmine.createSpy().and.returnValue(
         throwError(() => mockedError)
@@ -276,8 +276,8 @@ describe('Given poolConfigComponent', () => {
       expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
 
       expect(component.nameControl.value).toBe(poolName);
-    })
-  })
+    });
+  });
 
   describe('when onChangeL3CBM is called', () => {
     it('it should update l3Bitmask', () => {
@@ -287,15 +287,14 @@ describe('Given poolConfigComponent', () => {
         point: { componentInstance: component }
       } = MockRender(PoolConfigComponent, params);
 
-
       component.pool.l3Bitmask = mockedL3Bitmask;
       component.onChangeL3CBM(1, 8);
       expect(component.pool.l3Bitmask).toEqual([0, 1, 1, 1, 1, 1, 1, 1, 0]);
 
       component.onChangeL3CBM(0, 0);
       expect(component.pool.l3Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 0]);
-    })
-  })
+    });
+  });
 
   describe('when onChangeL3CdpCode is called', () => {
     it('it should update l3bitmaskCode', () => {
@@ -310,9 +309,9 @@ describe('Given poolConfigComponent', () => {
       expect(component.pool.l3BitmaskCode).toEqual([1, 1, 0, 1, 1, 1, 0, 1, 1]);
 
       component.onChangeL3CdpCode(0, 2);
-      expect(component.pool.l3BitmaskCode).toEqual([1, 1, 1, 1, 1, 1, 0, 1, 1])
-    })
-  })
+      expect(component.pool.l3BitmaskCode).toEqual([1, 1, 1, 1, 1, 1, 0, 1, 1]);
+    });
+  });
 
   describe('when onChangeL3CdpData is called', () => {
     it('it should update l3bitmaskData', () => {
@@ -327,9 +326,9 @@ describe('Given poolConfigComponent', () => {
       expect(component.pool.l3BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 1, 1, 1]);
 
       component.onChangeL3CdpData(1, 4);
-      expect(component.pool.l3BitmaskData).toEqual([1, 1, 1, 1, 0, 1, 1, 1, 1])
-    })
-  })
+      expect(component.pool.l3BitmaskData).toEqual([1, 1, 1, 1, 0, 1, 1, 1, 1]);
+    });
+  });
 
   describe('when onChangeL2CBM method is called', () => {
     it('it should update l2Bitmask', () => {
@@ -341,12 +340,12 @@ describe('Given poolConfigComponent', () => {
 
       component.pool.l2Bitmask = mockedL3Bitmask;
       component.onChangeL2CBM(0, 0);
-      expect(component.pool.l2Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
+      expect(component.pool.l2Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
 
       component.onChangeL2CBM(1, 7);
-      expect(component.pool.l2Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 0])
-    })
-  })
+      expect(component.pool.l2Bitmask).toEqual([1, 1, 1, 1, 1, 1, 1, 0]);
+    });
+  });
 
   describe('when onChangeL2CdpCode method is called', () => {
     it('it should update l2BitmaskCode', () => {
@@ -358,10 +357,10 @@ describe('Given poolConfigComponent', () => {
 
       component.pool.l2BitmaskCode = mockedL2BitmaskCode;
       component.onChangeL2CdpCode(0, 7);
-      expect(component.pool.l2BitmaskCode).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
+      expect(component.pool.l2BitmaskCode).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
 
       component.onChangeL2CdpCode(1, 5);
-      expect(component.pool.l2BitmaskCode).toEqual([1, 1, 1, 1, 1, 0, 1, 1])
+      expect(component.pool.l2BitmaskCode).toEqual([1, 1, 1, 1, 1, 0, 1, 1]);
     });
   });
 
@@ -375,10 +374,10 @@ describe('Given poolConfigComponent', () => {
 
       component.pool.l2BitmaskData = mockedL2BitmaskData;
       component.onChangeL2CdpData(0, 3);
-      expect(component.pool.l2BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 1, 1])
+      expect(component.pool.l2BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 1, 1]);
 
       component.onChangeL2CdpData(1, 6);
-      expect(component.pool.l2BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 0, 1])
+      expect(component.pool.l2BitmaskData).toEqual([1, 1, 1, 1, 1, 1, 0, 1]);
     });
   });
 
@@ -394,7 +393,7 @@ describe('Given poolConfigComponent', () => {
       const params = {
         pools: mockedPools,
         apps: []
-      }
+      };
 
       const fixture = MockRender(PoolConfigComponent, params);
       const component = fixture.point.componentInstance;
@@ -410,8 +409,8 @@ describe('Given poolConfigComponent', () => {
 
       expect(await slider.getValue()).toBe(newMba);
       expect(component.pool.mba).toBe(newMba);
-    })
-  })
+    });
+  });
 
   describe('when saveL2CBM method is called', () => {
     const poolID = 0;
@@ -424,13 +423,13 @@ describe('Given poolConfigComponent', () => {
     const params = {
       pools: mockedPools,
       apps: []
-    }
+    };
 
     it('it should update l2cbm', () => {
       const mockedResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
 
       MockInstance(AppqosService, 'poolPut', () => of(mockedResponse));
 
@@ -458,12 +457,12 @@ describe('Given poolConfigComponent', () => {
         clos_num: 15,
         cw_num: 12,
         cw_size: 3670016
-      }
+      };
 
       const mockResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
       const mockedcbm = 127;
 
       const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockResponse));
@@ -493,7 +492,7 @@ describe('Given poolConfigComponent', () => {
       const mockedError: Error = {
         name: 'Error',
         message: `POOL ${poolID} not updated`
-      }
+      };
 
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
         throwError(() => mockedError)
@@ -513,8 +512,8 @@ describe('Given poolConfigComponent', () => {
       saveL2CBMButton.triggerEventHandler('click', null);
 
       expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
-    })
-  })
+    });
+  });
 
   describe('when saveL3CBM method is called', () => {
     const poolID = 0;
@@ -527,13 +526,13 @@ describe('Given poolConfigComponent', () => {
     const params = {
       pools: mockedPools,
       apps: []
-    }
+    };
 
     it('it should update l3cbm', () => {
       const mockResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
 
       MockInstance(AppqosService, 'poolPut', () => of(mockResponse));
 
@@ -550,7 +549,7 @@ describe('Given poolConfigComponent', () => {
 
       expect(nextHandlerSpy).toHaveBeenCalledTimes(1);
       expect(nextHandlerSpy).toHaveBeenCalledWith(mockResponse);
-    })
+    });
 
     it('it should update the correct properties when cdp is enabled', () => {
       const mockedCache: CacheAllocation = {
@@ -560,12 +559,12 @@ describe('Given poolConfigComponent', () => {
         clos_num: 15,
         cw_num: 12,
         cw_size: 3670016
-      }
+      };
 
       const mockResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
       const mockedcbm = 127;
 
       const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockResponse));
@@ -595,10 +594,10 @@ describe('Given poolConfigComponent', () => {
       const mockedError: Error = {
         name: 'Error',
         message: `POOL ${poolID} not updated`
-      }
+      };
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
         throwError(() => mockedError)
-      )
+      );
 
       MockInstance(AppqosService, 'poolPut', poolPutSpy);
 
@@ -615,8 +614,8 @@ describe('Given poolConfigComponent', () => {
       saveL3CBMButton.triggerEventHandler('click', null);
 
       expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
-    })
-  })
+    });
+  });
 
   describe('when saveMBA method is called', () => {
     const poolID = 0;
@@ -625,20 +624,20 @@ describe('Given poolConfigComponent', () => {
 
     const mockedPools: Pools[] = [
       { id: 0, name: 'pool_0', cores: [1, 2, 3], mba: oldMba }
-    ]
+    ];
 
     const params = {
       pools: mockedPools,
       apps: []
-    }
+    };
 
     it('it should save mba', async () => {
       const mockedResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
 
-      const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockedResponse))
+      const poolPutSpy = jasmine.createSpy().and.returnValue(of(mockedResponse));
       MockInstance(AppqosService, 'poolPut', poolPutSpy);
 
       const fixture = MockRender(PoolConfigComponent, params);
@@ -661,13 +660,13 @@ describe('Given poolConfigComponent', () => {
       expect(await slider.getValue()).toBe(newMba);
       expect(nextHandlerSpy).toHaveBeenCalledOnceWith(mockedResponse);
       expect(poolPutSpy).toHaveBeenCalledOnceWith({ mba: newMba }, poolID);
-    })
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {
         name: 'Error',
         message: `POOL ${poolID} not updated`
-      }
+      };
 
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(
         throwError(() => mockedError)
@@ -688,27 +687,27 @@ describe('Given poolConfigComponent', () => {
 
       expect(errorHandlerSpy).toHaveBeenCalledTimes(1);
       expect(errorHandlerSpy).toHaveBeenCalledWith(mockedError);
-    })
-  })
+    });
+  });
 
   describe('when saveMBABW method is called', () => {
     const poolID = 0;
     const mbaBw = 2147483648;
-    const mbaBwDefault = Math.pow(2, 32) - 1
+    const mbaBwDefault = Math.pow(2, 32) - 1;
     const mockedPools: Pools[] = [
       { id: 0, name: 'pool_0', cores: [1, 2, 3], mba_bw: 1 }
-    ]
+    ];
 
     const params = {
       pools: mockedPools,
       apps: []
-    }
+    };
 
     it('it should save mba_bw when apply button is pressed', () => {
       const mockedResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
 
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(of(mockedResponse));
 
@@ -728,13 +727,13 @@ describe('Given poolConfigComponent', () => {
 
       expect(poolPutSpy).toHaveBeenCalledWith({ mba_bw: mbaBw }, poolID);
       expect(nextHandlerSpy).toHaveBeenCalledOnceWith(mockedResponse);
-    })
+    });
 
     it('it should use default value when reset button is pressed', () => {
       const mockedResponse = {
         status: 200,
         message: `POOL ${poolID} updated`
-      }
+      };
 
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(of(mockedResponse));
 
@@ -754,13 +753,13 @@ describe('Given poolConfigComponent', () => {
 
       expect(poolPutSpy).toHaveBeenCalledOnceWith({ mba_bw: mbaBwDefault }, poolID);
       expect(nextHandlerSpy).toHaveBeenCalledOnceWith(mockedResponse);
-    })
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {
         name: 'Error',
         message: `POOL ${poolID} not updated`
-      }
+      };
 
       const poolPutSpy = jasmine.createSpy('poolPut').and.returnValue(throwError(() => mockedError));
 
@@ -780,14 +779,14 @@ describe('Given poolConfigComponent', () => {
 
       expect(poolPutSpy).toHaveBeenCalledOnceWith({ mba_bw: mbaBw }, poolID);
       expect(errorHandlerSpy).toHaveBeenCalledOnceWith(mockedError);
-    })
-  })
+    });
+  });
 
   describe('when nextHandler method is called', () => {
     it('it should display a response and emit a pool event', () => {
       const mockedResponse: resMessage = {
         message: 'POOL 0 updated'
-      }
+      };
 
       const displayInfoSpy = jasmine.createSpy('displayInfo');
 
@@ -804,15 +803,15 @@ describe('Given poolConfigComponent', () => {
       component.nextHandler(mockedResponse);
 
       expect(displayInfoSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
-    })
-  })
+    });
+  });
 
   describe('when errorHandler method is called', () => {
     it('it should display a error and emit a pool event', () => {
       const mockedError: Error = {
         name: 'Error',
         message: 'rest API error'
-      }
+      };
 
       const handleErrorSpy = jasmine.createSpy('handleError');
 
@@ -824,13 +823,13 @@ describe('Given poolConfigComponent', () => {
 
       component.poolEvent.subscribe((event) => {
         expect(event).toBeUndefined();
-      })
+      });
 
       component.errorHandler(mockedError);
 
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    })
-  })
+    });
+  });
 
   describe('when coresEditDialog method is called', () => {
     it('it should render CoresEditDialogComponent', () => {
@@ -849,29 +848,29 @@ describe('Given poolConfigComponent', () => {
 
       component.poolEvent.subscribe((event) => {
         expect(event).toBeUndefined();
-      })
+      });
 
       expect(matDialogSpy).toHaveBeenCalledTimes(1);
-    })
-  })
+    });
+  });
 
   describe('when deletePool method is called', () => {
     const poolID = 0;
 
     const mockedPools: Pools[] = [
       { id: poolID, name: 'pool_0', cores: [1, 2, 3] }
-    ]
+    ];
 
     const params = {
       pools: mockedPools,
       apps: []
-    }
+    };
 
     it('it should display a response', () => {
       const mockedResponse = {
         status: 200,
         message: `POOL ${poolID} deleted`
-      }
+      };
 
       const deletePoolSpy = jasmine.createSpy('deletePool').and.returnValue(of(mockedResponse));
       const displayInfoSpy = jasmine.createSpy('displayInfo');
@@ -888,7 +887,7 @@ describe('Given poolConfigComponent', () => {
 
       component.poolEvent.subscribe((event) => {
         expect(event).toBeUndefined();
-      })
+      });
 
       const deletePoolButton = ngMocks.find('#delete-pool-button');
       deletePoolButton.triggerEventHandler('click', null);
@@ -896,13 +895,13 @@ describe('Given poolConfigComponent', () => {
       expect(deletePoolSpy).toHaveBeenCalledOnceWith(poolID);
       expect(displayInfoSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
       expect(component.poolId).toBeUndefined();
-    })
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {
         name: 'Error',
         message: 'rest API error'
-      }
+      };
 
       const deletePoolSpy = jasmine.createSpy('deletePool').and.returnValue(
         throwError(() => mockedError)
@@ -923,8 +922,8 @@ describe('Given poolConfigComponent', () => {
 
       expect(deletePoolSpy).toHaveBeenCalledWith(poolID);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    })
-  })
+    });
+  });
 
   describe('when poolAddDialog method is called', () => {
     it('it should render poolAddDialog component', () => {
@@ -932,11 +931,11 @@ describe('Given poolConfigComponent', () => {
 
       const mockedResponse = {
         id: poolID
-      }
+      };
 
       const dialogRef = {
         afterClosed: () => of(mockedResponse)
-      }
+      };
 
       const matDialogSpy = jasmine.createSpy('open').and.returnValue(dialogRef);
       MockInstance(MatDialog, 'open', matDialogSpy);
@@ -947,15 +946,15 @@ describe('Given poolConfigComponent', () => {
 
       component.poolEvent.subscribe((event) => {
         expect(event).toBeUndefined();
-      })
+      });
 
       const addPoolButton = ngMocks.find('#add-pool-button');
       addPoolButton.triggerEventHandler('click', null);
 
       expect(matDialogSpy).toHaveBeenCalledTimes(1);
       expect(component.poolId).toBe(poolID);
-    })
-  })
+    });
+  });
 
   describe('when cdp is enabled', () => {
     it('it should display code and data label', async () => {
@@ -966,7 +965,7 @@ describe('Given poolConfigComponent', () => {
         clos_num: 15,
         cw_num: 12,
         cw_size: 3670016
-      }
+      };
 
       const catEvent = new BehaviorSubject<CacheAllocation>(mockedCache);
 
@@ -979,6 +978,6 @@ describe('Given poolConfigComponent', () => {
 
       expect(label).toContain('Code');
       expect(label).toContain('Data');
-    })
-  })
+    });
+  });
 });

@@ -226,7 +226,7 @@ export class AppqosService {
   /**
    * Enable/disable L2 CAT CDP
    */
-  l2CdpPut(value: Boolean): Observable<resMessage> {
+  l2CdpPut(value: boolean): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
     return this.http.put<resMessage>(`${api_url}/caps/l2cat`, {
       cdp_enabled: value
@@ -310,11 +310,11 @@ export class AppqosService {
   handleError(error: HttpErrorResponse): Observable<any> {
     if (!error.status) {
       //client / network error
-      return throwError(() => Error(error.statusText))
+      return throwError(() => Error(error.statusText));
     }
     else {
       //server error
-      return throwError(() => Error(error.error.message))
+      return throwError(() => Error(error.error.message));
     }
   }
 }

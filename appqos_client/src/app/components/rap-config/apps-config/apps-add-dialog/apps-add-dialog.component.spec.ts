@@ -27,17 +27,17 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog"
-import { MatError } from "@angular/material/form-field"
-import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks"
-import { of, throwError } from "rxjs"
-import { Apps, Pools } from "src/app/components/overview/overview.model"
-import { resMessage } from "src/app/components/system-caps/system-caps.model"
-import { AppqosService } from "src/app/services/appqos.service"
-import { LocalService } from "src/app/services/local.service"
-import { SharedModule } from "src/app/shared/shared.module"
-import { SnackBarService } from "src/app/shared/snack-bar.service"
-import { AppsAddDialogComponent } from "./apps-add-dialog.component"
+import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
+import { MatError } from "@angular/material/form-field";
+import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
+import { of, throwError } from "rxjs";
+import { Apps, Pools } from "src/app/components/overview/overview.model";
+import { resMessage } from "src/app/components/system-caps/system-caps.model";
+import { AppqosService } from "src/app/services/appqos.service";
+import { LocalService } from "src/app/services/local.service";
+import { SharedModule } from "src/app/shared/shared.module";
+import { SnackBarService } from "src/app/shared/snack-bar.service";
+import { AppsAddDialogComponent } from "./apps-add-dialog.component";
 
 describe('Given appsAddDialogComponent', () => {
   MockInstance.scope('case');
@@ -51,8 +51,8 @@ describe('Given appsAddDialogComponent', () => {
       .mock(LocalService)
       .mock(AppqosService)
       .mock(SnackBarService)
-      .mock(MatDialogRef)
-  })
+      .mock(MatDialogRef);
+  });
 
   let parseNumberListSpy: any;
 
@@ -62,7 +62,7 @@ describe('Given appsAddDialogComponent', () => {
     { id: 0, name: 'pool_0', cores: [1, 2, 3] },
     { id: 1, name: 'pool_1', cores: [4, 5, 6] },
     { id: 2, name: 'pool_2', cores: [7, 8, 9] }
-  ]
+  ];
 
   describe('when form is invalid ', () => {
     it('it should display required error', () => {
@@ -90,7 +90,7 @@ describe('Given appsAddDialogComponent', () => {
 
       expect(errorMessages.includes(nameError)).toBeTrue();
       expect(errorMessages.includes(pidsError)).toBeTrue();
-    })
+    });
 
     it('it should display max length error', () => {
       let name = 'P';
@@ -127,8 +127,8 @@ describe('Given appsAddDialogComponent', () => {
       expect(errorMessages.includes(nameError)).toBeTrue();
       expect(errorMessages.includes(pidsError)).toBeTrue();
       expect(errorMessages.includes(coresError)).toBeTrue();
-    })
-  })
+    });
+  });
 
   it('it should display the pattern error', () => {
     const pids = '4156985-4156991, 4156992-4156998';
@@ -156,7 +156,7 @@ describe('Given appsAddDialogComponent', () => {
 
     expect(errorMessages.includes(pidsError)).toBeTrue();
     expect(errorMessages.includes(coresError)).toBeTrue();
-  })
+  });
 
   describe('when saveApp method is called', () => {
     it('it should return if the form is invalid', () => {
@@ -181,7 +181,7 @@ describe('Given appsAddDialogComponent', () => {
       updateButton.triggerEventHandler('click', null);
 
       expect(postAppSpy).not.toHaveBeenCalled();
-    })
+    });
 
     it('it should save the app using app cores when specified', () => {
       const name = 'app';
@@ -196,7 +196,7 @@ describe('Given appsAddDialogComponent', () => {
         pids: pidsList,
         cores: coresList,
         pool_id: poolID
-      }
+      };
 
       const fixture = MockRender(AppsAddDialogComponent, {}, {
         providers: [
@@ -215,7 +215,7 @@ describe('Given appsAddDialogComponent', () => {
       updateButton.triggerEventHandler('click', null);
 
       expect(postAppSpy).toHaveBeenCalledWith(mockedPostApp);
-    })
+    });
 
     it('it should save the app using pool cores when not specified', () => {
       const name = 'app';
@@ -229,7 +229,7 @@ describe('Given appsAddDialogComponent', () => {
         pids: pidsList,
         cores: mockedPools[poolID].cores,
         pool_id: poolID
-      }
+      };
 
       const fixture = MockRender(AppsAddDialogComponent, {}, {
         providers: [
@@ -248,8 +248,8 @@ describe('Given appsAddDialogComponent', () => {
       updateButton.triggerEventHandler('click', null);
 
       expect(postAppSpy).toHaveBeenCalledWith(mockedPostApp);
-    })
-  })
+    });
+  });
 
   describe('when postApp method is called', () => {
     const mockedPostApp: PostApp = {
@@ -257,12 +257,12 @@ describe('Given appsAddDialogComponent', () => {
       pids: [36915,36916],
       cores: mockedPools[0].cores,
       pool_id: 0
-    }
+    };
 
     it('it should handle response and close the dialog', () => {
       const mockedResponse: resMessage = {
         message: 'NEW APP 0 added to POOL 0'
-      }
+      };
 
       const postAppSpy = jasmine.createSpy().and.returnValue(of(mockedResponse));
       const displayInfoSpy = jasmine.createSpy();
@@ -286,18 +286,18 @@ describe('Given appsAddDialogComponent', () => {
       expect(postAppSpy).toHaveBeenCalledOnceWith(mockedPostApp);
       expect(displayInfoSpy).toHaveBeenCalledTimes(1);
       expect(closeSpy).toHaveBeenCalledTimes(1);
-    })
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {
         name: 'error',
         message: 'rest API error'
-      }
+      };
 
       const postAppSpy = jasmine.createSpy().and.returnValue(
         throwError(() => mockedError)
       );
-      const handleErrorSpy = jasmine.createSpy()
+      const handleErrorSpy = jasmine.createSpy();
 
       MockInstance(AppqosService, 'postApp', postAppSpy);
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
@@ -315,8 +315,8 @@ describe('Given appsAddDialogComponent', () => {
 
       expect(postAppSpy).toHaveBeenCalledOnceWith(mockedPostApp);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    })
-  })
+    });
+  });
 
   describe('when getPids method is called', () => {
     it('it should call parseNumberList', () => {
@@ -338,7 +338,7 @@ describe('Given appsAddDialogComponent', () => {
       component.getPids(pids);
       expect(parseNumberListSpy).toHaveBeenCalledOnceWith(pids);
       expect(component.pidsList).toEqual(pidsList);
-    })
+    });
 
     it('it should split pids string', () => {
       const pids = '2105,2106';
@@ -358,8 +358,8 @@ describe('Given appsAddDialogComponent', () => {
 
       component.getPids(pids);
       expect(component.pidsList).toEqual(pidsList);
-    })
-  })
+    });
+  });
 
   describe('when getCores method is called', () => {
     it('it should call parseNumberList', () => {
@@ -379,7 +379,7 @@ describe('Given appsAddDialogComponent', () => {
       component.getCores(cores);
       expect(parseNumberListSpy).toHaveBeenCalledOnceWith(cores);
       expect(component.coresList).toEqual(coresList);
-    })
+    });
 
     it('it should split cores string', () => {
       const cores = '41,42';
@@ -397,7 +397,7 @@ describe('Given appsAddDialogComponent', () => {
 
       component.getCores(cores);
       expect(component.coresList).toEqual(coresList);
-    })
+    });
 
     it('it should throw error if cores exceeds MAX_CORES', () => {
       const name = 'app_0';
@@ -427,6 +427,6 @@ describe('Given appsAddDialogComponent', () => {
 
       expect(expectCoresError).toBe(coresError);
       expect(component.coresList).toEqual(coresList);
-    })
-  })
-})
+    });
+  });
+});

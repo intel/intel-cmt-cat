@@ -36,7 +36,6 @@ import { SharedModule } from 'src/app/shared/shared.module';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
 import { Pools } from '../overview.model';
 import { L3CacheAllocationComponent } from './l3-cache-allocation.component';
-import { AppqosService } from 'src/app/services/appqos.service';
 import { CacheAllocation } from '../../system-caps/system-caps.model';
 import { LocalService } from 'src/app/services/local.service';
 
@@ -171,7 +170,7 @@ describe('Given L3CacheAllocationComponent', () => {
         clos_num: 15,
         cw_num: 12,
         cw_size: 3.5,
-      }
+      };
       
       MockInstance(LocalService,'getL3CatEvent' , () => of(mockedL3Cat));
       
@@ -202,7 +201,7 @@ describe('Given L3CacheAllocationComponent', () => {
 
       const expectedCbm = ngMocks
         .findAll('.pool-cbm')
-        .map((pool) => ngMocks.formatText(pool))
+        .map((pool) => ngMocks.formatText(pool));
 
       expect(expectedCbm).toEqual([
         '0 1 1 1 1 1 1 1 1 1 1 1',
@@ -210,7 +209,7 @@ describe('Given L3CacheAllocationComponent', () => {
         '0 0 0 0 0 0 0 0 1 1 1 1',
         '1 1 1 1 1 1 1 1 1 0 0 0',
       ]);
-    })
+    });
 
     it('it should display code and data label if cdp is enabled', async () => {
       const mockedL3Cat: CacheAllocation = {
@@ -220,7 +219,7 @@ describe('Given L3CacheAllocationComponent', () => {
         clos_num: 15,
         cw_num: 12,
         cw_size: 3.5,
-      }
+      };
 
       MockInstance(LocalService, 'getL3CatEvent', () => of(mockedL3Cat));
       
@@ -255,7 +254,7 @@ describe('Given L3CacheAllocationComponent', () => {
 
       expect(label).toContain('Data');
       expect(label).toContain('Code');
-    })
+    });
   });
 
   describe('when click Edit button', () => {

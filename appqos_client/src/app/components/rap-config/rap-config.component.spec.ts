@@ -119,7 +119,7 @@ describe('Given RapConfigComponent', () => {
       component.getConfigData();
 
       // verify errors were handled correctly
-      expect(setAppsEventSpy).toHaveBeenCalledOnceWith(emptyApps)
+      expect(setAppsEventSpy).toHaveBeenCalledOnceWith(emptyApps);
 
       expect(setPoolsEventSpy).toHaveBeenCalledOnceWith(emptyPools);
     });

@@ -48,7 +48,7 @@ describe('Given PowerPorfilesComponent', () => {
       .mock(MatDialogRef)
       .mock(MatFormField)
       .mock(MatSelect)
-      .keep(MatButtonModule)
+      .keep(MatButtonModule);
   });
 
   MockInstance.scope('case');
@@ -78,7 +78,7 @@ describe('Given PowerPorfilesComponent', () => {
       const freqError = 'frequency is required';
 
       const fixture = MockRender(PowerProfileDialogComponent);
-      const component = fixture.point.componentInstance
+      const component = fixture.point.componentInstance;
 
       component.form.patchValue({ name, minFreq, maxFreq });
       fixture.detectChanges();
@@ -175,10 +175,10 @@ describe('Given PowerPorfilesComponent', () => {
         min_freq: '800',
         max_freq: '1200',
         epp: 'power'
-      }
+      };
       const mockedMessage: resMessage = {
         message: 'REST API'
-      }
+      };
 
       const postPowerProfilesSpy = jasmine.createSpy('postPowerProfileSpy')
         .and.returnValue(of(mockedMessage));
@@ -218,17 +218,17 @@ describe('Given PowerPorfilesComponent', () => {
         min_freq: '800',
         max_freq: '1200',
         epp: 'power'
-      }
+      };
       const mockedError: Error = {
         name: 'error',
         message: 'REST API'
-      }
+      };
 
       const postPowerProfileSpy = jasmine.createSpy('postPowerProfileSpy')
         .and.returnValue(throwError(() => mockedError));
       const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
 
-      MockInstance(AppqosService, 'postPowerProfiles', postPowerProfileSpy)
+      MockInstance(AppqosService, 'postPowerProfiles', postPowerProfileSpy);
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
 
       const fixture = MockRender(PowerProfileDialogComponent);
@@ -255,7 +255,7 @@ describe('Given PowerPorfilesComponent', () => {
         min_freq: '80',
         max_freq: '120',
         epp: 'power'
-      }
+      };
 
       const postPowerProfilesSpy = jasmine.createSpy('postPowerProfileSpy');
 

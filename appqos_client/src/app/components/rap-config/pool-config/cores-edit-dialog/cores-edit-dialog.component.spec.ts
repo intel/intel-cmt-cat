@@ -27,16 +27,16 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog"
-import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks"
-import { AppqosService } from "src/app/services/appqos.service"
-import { LocalService } from "src/app/services/local.service"
-import { SharedModule } from "src/app/shared/shared.module"
-import { SnackBarService } from "src/app/shared/snack-bar.service"
-import { CoresEditDialogComponent } from "./cores-edit-dialog.component"
+import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
+import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
+import { AppqosService } from "src/app/services/appqos.service";
+import { LocalService } from "src/app/services/local.service";
+import { SharedModule } from "src/app/shared/shared.module";
+import { SnackBarService } from "src/app/shared/snack-bar.service";
+import { CoresEditDialogComponent } from "./cores-edit-dialog.component";
 import { EMPTY, of, throwError } from 'rxjs';
-import { Pools } from "src/app/components/overview/overview.model"
-import { MatError } from "@angular/material/form-field"
+import { Pools } from "src/app/components/overview/overview.model";
+import { MatError } from "@angular/material/form-field";
 
 describe('Given coresEditDialog component', () => {
   beforeEach(() => {
@@ -47,14 +47,14 @@ describe('Given coresEditDialog component', () => {
       })
       .keep(LocalService)
       .mock(SnackBarService)
-      .mock(MatDialogRef)
-  })
+      .mock(MatDialogRef);
+  });
 
   const mockedPool: Pools = {
     id: 0,
     name: 'pool_0',
     cores: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-  }
+  };
 
   MockInstance.scope('case');
 
@@ -89,7 +89,7 @@ describe('Given coresEditDialog component', () => {
       expect(expectCoresError).toBe(coresError);
       expect(poolPutSpy).not.toHaveBeenCalled();
       expect(component.form.invalid).toBeTrue();
-    })
+    });
 
     it('it should return if one of the cores exceed MAX_CORES', () => {
       const mockedCores = '1024,1025';
@@ -122,7 +122,7 @@ describe('Given coresEditDialog component', () => {
       expect(expectCoresError).toBe(coresError);
       expect(component.form.controls['cores'].hasError('incorrect')).toBeTrue();
       expect(poolPutSpy).not.toHaveBeenCalled();
-    })
+    });
 
     it('it should throw error if cores are not formatted correctly', () => {
       const mockedCores = '25,35-42,50-67,';
@@ -146,15 +146,15 @@ describe('Given coresEditDialog component', () => {
 
       const expectCoresError = ngMocks.formatText(
         ngMocks.findAll(MatError)[0]
-      )
+      );
 
       expect(expectCoresError).toBe(coresError);
       expect(component.form.controls['cores'].hasError('pattern')).toBeTrue();
-    })
+    });
 
     it('it should throw error if the input field exceeds 4096 characters', () => {
       const coresError = 'max length 4096 characters';
-      let cores: string = '0';
+      let cores = '0';
       for (let i = 1; i < 5000; i++){
         cores = `${cores}, ${i}`;
       }
@@ -174,11 +174,11 @@ describe('Given coresEditDialog component', () => {
 
       const expectCoresError = ngMocks.formatText(
         ngMocks.findAll(MatError)[1]
-      )
+      );
 
       expect(expectCoresError).toBe(coresError);
       expect(component.form.controls['cores'].hasError('maxlength'));
-    })
+    });
 
     it('it should handle PUT request response and close the dialog', () => {
       const poolId = 0;
@@ -186,7 +186,7 @@ describe('Given coresEditDialog component', () => {
       const mockedCoresList = [22, 23, 24, 25, 26, 27, 28, 29, 30];
       const mockedResponse = {
         message: `POOL ${poolId} updated`
-      }
+      };
 
       const parseNumberListSpy =
         spyOn(LocalService.prototype, 'parseNumberList').and.callThrough();
@@ -206,7 +206,7 @@ describe('Given coresEditDialog component', () => {
             { provide: MAT_DIALOG_DATA, useValue: mockedPool }
           ]
         }
-      )
+      );
 
       const component = fixture.point.componentInstance;
       component.form.patchValue({ cores: mockedCores });
@@ -218,7 +218,7 @@ describe('Given coresEditDialog component', () => {
       expect(poolPutSpy).toHaveBeenCalledOnceWith({ cores: mockedCoresList }, poolId);
       expect(snackBarSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
       expect(closeSpy).toHaveBeenCalledOnceWith(true);
-    })
+    });
 
     it('it should handle PUT request error', () => {
       const poolId = 0;
@@ -226,7 +226,7 @@ describe('Given coresEditDialog component', () => {
       const mockedCoresList = [15, 16, 17, 18, 19, 20, 21];
       const mockedError = {
         message: `POOL ${poolId} not updated`
-      }
+      };
 
       const parseNumberListSpy =
         spyOn(LocalService.prototype, 'parseNumberList').and.callThrough();
@@ -246,7 +246,7 @@ describe('Given coresEditDialog component', () => {
             { provide: MAT_DIALOG_DATA, useValue: mockedPool }
           ]
         }
-      )
+      );
 
       const component = fixture.point.componentInstance;
       component.form.patchValue({ cores: mockedCores });
@@ -257,6 +257,6 @@ describe('Given coresEditDialog component', () => {
       expect(parseNumberListSpy).toHaveBeenCalledOnceWith(mockedCores);
       expect(poolPutSpy).toHaveBeenCalledOnceWith({ cores: mockedCoresList }, poolId);
       expect(snackBarSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    })
-  })
-})
+    });
+  });
+});

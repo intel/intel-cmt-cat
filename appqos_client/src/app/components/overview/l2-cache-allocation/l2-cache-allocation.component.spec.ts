@@ -170,7 +170,7 @@ describe('Given L2CacheAllocationComponent', () => {
         clos_num: 15,
         cw_num: 12,
         cw_size: 3.5,
-      }
+      };
 
       MockInstance(LocalService, 'getL2CatEvent', () => of(mockedL2Cat));
 

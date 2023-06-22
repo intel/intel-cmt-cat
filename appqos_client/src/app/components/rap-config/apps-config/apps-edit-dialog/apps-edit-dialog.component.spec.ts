@@ -27,18 +27,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog"
-import { MatError } from "@angular/material/form-field"
-import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks"
-import { Apps, Pools } from "src/app/components/overview/overview.model"
-import { resMessage } from "src/app/components/system-caps/system-caps.model"
-import { AppqosService } from "src/app/services/appqos.service"
-import { LocalService } from "src/app/services/local.service"
-import { SharedModule } from "src/app/shared/shared.module"
-import { SnackBarService } from "src/app/shared/snack-bar.service"
-import { AppsEditDialogComponent } from "./apps-edit-dialog.component"
-import { of, throwError } from "rxjs"
-import { MatSelect, MatSelectChange } from "@angular/material/select"
+import { MatDialogRef, MAT_DIALOG_DATA } from "@angular/material/dialog";
+import { MatError } from "@angular/material/form-field";
+import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
+import { Apps, Pools } from "src/app/components/overview/overview.model";
+import { resMessage } from "src/app/components/system-caps/system-caps.model";
+import { AppqosService } from "src/app/services/appqos.service";
+import { LocalService } from "src/app/services/local.service";
+import { SharedModule } from "src/app/shared/shared.module";
+import { SnackBarService } from "src/app/shared/snack-bar.service";
+import { AppsEditDialogComponent } from "./apps-edit-dialog.component";
+import { of, throwError } from "rxjs";
+import { MatSelect, MatSelectChange } from "@angular/material/select";
 
 describe('Given AppsEditDialog component', () => {
   MockInstance.scope('case');
@@ -52,8 +52,8 @@ describe('Given AppsEditDialog component', () => {
       .mock(LocalService)
       .mock(AppqosService)
       .mock(SnackBarService)
-      .mock(MatDialogRef)
-  })
+      .mock(MatDialogRef);
+  });
 
   let parseNumberListSpy: any;
 
@@ -63,7 +63,7 @@ describe('Given AppsEditDialog component', () => {
     { id: 0, name: 'pool_0', cores: [1, 2, 3] },
     { id: 1, name: 'pool_1', cores: [4, 5, 6] },
     { id: 2, name: 'pool_2', cores: [7, 8, 9] }
-  ]
+  ];
 
   const mockApp: Apps = {
     id: 0,
@@ -71,7 +71,7 @@ describe('Given AppsEditDialog component', () => {
     pids: [4156985, 4156986, 4156987],
     cores: mockedPools[0].cores,
     pool_id: 0
-  }
+  };
 
   describe('when initialise', () => {
     it('it should populate input fields', () => {
@@ -89,7 +89,7 @@ describe('Given AppsEditDialog component', () => {
       expect(component.form.controls['pids'].value).toBe(mockApp.pids.toString());
       expect(component.form.controls['cores'].value).toBe(mockedPools[0].cores.toString());
       expect(component.form.controls['pool'].value).toBe(mockApp.pool_id);
-    })
+    });
 
     it('it should populate the correct cores', () => {
       const mockedApp: Apps = {
@@ -98,7 +98,7 @@ describe('Given AppsEditDialog component', () => {
         pids: [4156985, 4156986, 4156987],
         cores: [2],
         pool_id: 0
-      }
+      };
 
       const fixture = MockRender(AppsEditDialogComponent, {}, {
         providers: [
@@ -112,7 +112,7 @@ describe('Given AppsEditDialog component', () => {
 
       expect(component.form.controls['cores'].value)
         .toBe(mockedApp.cores?.toString());
-    })
+    });
 
     it('it should popluate the correct cores if undefined', () => {
       const mockedApp: Apps = {
@@ -120,7 +120,7 @@ describe('Given AppsEditDialog component', () => {
         name: 'app_0',
         pids: [4156985, 4156986, 4156987],
         pool_id: 0
-      }
+      };
 
       const fixture = MockRender(AppsEditDialogComponent, {}, {
         providers: [
@@ -134,8 +134,8 @@ describe('Given AppsEditDialog component', () => {
 
       expect(component.form.controls['cores'].value)
         .toBe(mockedPools[0].cores.toString());
-    })
-  })
+    });
+  });
 
   describe('when form is invalid ', () => {
     it('it should display required error', () => {
@@ -163,7 +163,7 @@ describe('Given AppsEditDialog component', () => {
 
       expect(errorMessages.includes(nameError)).toBeTrue();
       expect(errorMessages.includes(pidsError)).toBeTrue();
-    })
+    });
 
     it('it should display max length error', () => {
       let name = 'P';
@@ -200,8 +200,8 @@ describe('Given AppsEditDialog component', () => {
       expect(errorMessages.includes(nameError)).toBeTrue();
       expect(errorMessages.includes(pidsError)).toBeTrue();
       expect(errorMessages.includes(coresError)).toBeTrue();
-    })
-  })
+    });
+  });
 
   it('it should display the pattern error', () => {
     const pids = '4156985-4156991, 4156992-4156998';
@@ -229,7 +229,7 @@ describe('Given AppsEditDialog component', () => {
 
     expect(errorMessages.includes(pidsError)).toBeTrue();
     expect(errorMessages.includes(coresError)).toBeTrue();
-  })
+  });
 
   describe('when saveApp method is called', () => {
     it('it should return if the form is invalid', () => {
@@ -254,7 +254,7 @@ describe('Given AppsEditDialog component', () => {
       updateButton.triggerEventHandler('click', null);
 
       expect(updateAppSpy).not.toHaveBeenCalled();
-    })
+    });
 
     it('it should save the app using app cores when specified', () => {
       const name = 'app';
@@ -269,7 +269,7 @@ describe('Given AppsEditDialog component', () => {
         pids: pidsList,
         cores: coresList,
         pool_id: poolID
-      }
+      };
 
       const fixture = MockRender(AppsEditDialogComponent, {}, {
         providers: [
@@ -288,7 +288,7 @@ describe('Given AppsEditDialog component', () => {
       updateButton.triggerEventHandler('click', null);
 
       expect(updateAppSpy).toHaveBeenCalledWith(mockedPostApp);
-    })
+    });
 
     it('it should save the app using pool cores when not specified', () => {
       const name = 'app';
@@ -302,7 +302,7 @@ describe('Given AppsEditDialog component', () => {
         pids: pidsList,
         cores: mockedPools[poolID].cores,
         pool_id: poolID
-      }
+      };
 
       const fixture = MockRender(AppsEditDialogComponent, {}, {
         providers: [
@@ -315,15 +315,14 @@ describe('Given AppsEditDialog component', () => {
       const component = fixture.point.componentInstance;
       component.form.patchValue({ name, pids, cores });
 
-
       const updateAppSpy = spyOn(component, 'updateApp');
 
       const updateButton = ngMocks.find('#update-button');
       updateButton.triggerEventHandler('click', null);
 
       expect(updateAppSpy).toHaveBeenCalledWith(mockedPostApp);
-    })
-  })
+    });
+  });
 
   describe('when updateApp method is called', () => {
     const appId = 0;
@@ -332,12 +331,12 @@ describe('Given AppsEditDialog component', () => {
       pids: [45836, 45837, 45838, 45839, 45840],
       pool_id: 0,
       cores: [1, 2, 3]
-    }
+    };
 
     it('it should handle response', () => {
       const mockedResponse: resMessage = {
         message: `APP ${appId} updated`
-      }
+      };
 
       const appPutSpy = jasmine.createSpy().and.returnValue(of(mockedResponse));
       const displayInfoSpy = jasmine.createSpy();
@@ -361,17 +360,17 @@ describe('Given AppsEditDialog component', () => {
       expect(appPutSpy).toHaveBeenCalledOnceWith(mockedPostApp, appId);
       expect(displayInfoSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
       expect(closeSpy).toHaveBeenCalledTimes(1);
-    })
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {
         name: 'error',
         message: `APP ${appId} not updated`
-      }
+      };
 
       const appPutSpy = jasmine.createSpy().and.returnValue(
         throwError(() => mockedError)
-      );;
+      );
       const handleErrorSpy = jasmine.createSpy();
 
       MockInstance(AppqosService, 'appPut', appPutSpy);
@@ -390,8 +389,8 @@ describe('Given AppsEditDialog component', () => {
 
       expect(appPutSpy).toHaveBeenCalledOnceWith(mockedPostApp, appId);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    })
-  })
+    });
+  });
 
   describe('when getPids method is called', () => {
     it('it should call parseNumberList', () => {
@@ -413,7 +412,7 @@ describe('Given AppsEditDialog component', () => {
       component.getPids(pids);
       expect(parseNumberListSpy).toHaveBeenCalledOnceWith(pids);
       expect(component.pidsList).toEqual(pidsList);
-    })
+    });
 
     it('it should split pids string', () => {
       const pids = '2105,2106';
@@ -433,8 +432,8 @@ describe('Given AppsEditDialog component', () => {
 
       component.getPids(pids);
       expect(component.pidsList).toEqual(pidsList);
-    })
-  })
+    });
+  });
 
   describe('when getCores method is called', () => {
     it('it should call parseNumberList', () => {
@@ -454,7 +453,7 @@ describe('Given AppsEditDialog component', () => {
       component.getCores(cores);
       expect(parseNumberListSpy).toHaveBeenCalledOnceWith(cores);
       expect(component.coresList).toEqual(coresList);
-    })
+    });
 
     it('it should split cores string', () => {
       const cores = '41,42';
@@ -472,7 +471,7 @@ describe('Given AppsEditDialog component', () => {
 
       component.getCores(cores);
       expect(component.coresList).toEqual(coresList);
-    })
+    });
 
     it('it should throw error if cores exceeds MAX_CORES', () => {
       const cores = '1025';
@@ -498,8 +497,8 @@ describe('Given AppsEditDialog component', () => {
 
       expect(expectCoresError).toBe(coresError);
       expect(component.coresList).toEqual(coresList);
-    })
-  })
+    });
+  });
 
   describe('when user changes pool', () => {
     const mockApp: Apps = {
@@ -508,7 +507,7 @@ describe('Given AppsEditDialog component', () => {
       pids: [4156985, 4156986],
       cores: [2],
       pool_id: 0
-    }
+    };
 
     it('it should display the correct cores for the current app', () => {
       const poolId = mockApp.pool_id;
@@ -525,13 +524,13 @@ describe('Given AppsEditDialog component', () => {
       const event: MatSelectChange = {
         source: {} as MatSelect,
         value: poolId
-      }
+      };
 
       component.poolChange(event);
 
       expect(component.form.controls['cores'].value)
         .toBe(mockApp.cores?.toString());
-    })
+    });
 
     it('it should display the correct cores for that pool', () => {
       const poolId = 1;
@@ -548,14 +547,14 @@ describe('Given AppsEditDialog component', () => {
       const event: MatSelectChange = {
         source: {} as MatSelect,
         value: poolId
-      }
+      };
 
       component.poolChange(event);
 
       expect(component.form.controls['cores'].value)
         .toBe(mockedPools[poolId].cores.toString());
-    })
-  })
+    });
+  });
 
   describe('when getPoolCores method is called', () => {
     it('it should return the correct cores', () => {
@@ -571,6 +570,6 @@ describe('Given AppsEditDialog component', () => {
 
       expect(component.getPoolCores(0)).toEqual(mockedPools[0].cores);
       expect(component.getPoolCores(2)).toEqual(mockedPools[2].cores);
-    })
-  })
-})
+    });
+  });
+});

@@ -33,7 +33,6 @@ import { SharedModule } from 'src/app/shared/shared.module';
 import { CacheAllocation } from '../system-caps.model';
 import { CatComponent } from './cat.component';
 
-
 describe('Given CatComponent', () => {
   beforeEach(() => MockBuilder(CatComponent).mock(SharedModule));
 
@@ -262,7 +261,7 @@ describe('Given CatComponent', () => {
         isSupported: true,
         cat: mockedCat,
         title: title
-      })
+      });
 
       const toggle = ngMocks.find('mat-slide-toggle');
 
@@ -297,7 +296,7 @@ describe('Given CatComponent', () => {
         isSupported: true,
         cat: mockedCat,
         title: title
-      })
+      });
 
       const toggle = ngMocks.find('mat-slide-toggle');
 

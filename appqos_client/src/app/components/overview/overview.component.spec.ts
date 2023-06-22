@@ -218,7 +218,7 @@ describe('Given OverviewComponent', () => {
       const mockedError: Error = {
         name: 'Error',
         message: 'rest API error'
-      }
+      };
 
       const handleErrorSpy = jasmine.createSpy('handleError');
 

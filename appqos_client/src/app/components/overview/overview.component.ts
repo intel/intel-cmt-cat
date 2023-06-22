@@ -33,10 +33,10 @@ import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { SystemTopology, MBACTRL, resMessage, PowerProfiles, SSTBF, EnergyPerformPref } from '../system-caps/system-caps.model';
+import { SystemTopology, MBACTRL, resMessage, PowerProfiles, SSTBF } from '../system-caps/system-caps.model';
 import { Pools } from './overview.model';
 import { AutoUnsubscribe } from 'src/app/services/decorators';
-import { Subscription } from 'rxjs'
+import { Subscription } from 'rxjs';
 
 @Component({
   selector: 'app-overview',

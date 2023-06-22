@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Injectable } from '@angular/core';
-import { BehaviorSubject, Observable, Subject } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 
 import {
   CacheAllocation,
@@ -82,7 +82,7 @@ export class LocalService {
   }
 
   getL3CatCurrentValue(): CacheAllocation | null {
-    return this.l3cat.getValue()
+    return this.l3cat.getValue();
   }
 
   setL2CatEvent(l2cat: CacheAllocation) {
@@ -94,7 +94,7 @@ export class LocalService {
   }
 
   getL2CatCurrentValue(): CacheAllocation | null {
-    return this.l2cat.getValue()
+    return this.l2cat.getValue();
   }
 
   setCapsEvent(caps: string[]) {
@@ -177,7 +177,7 @@ export class LocalService {
    */
   public parseNumberList(numbers: string): number[] {
     const numStrs = numbers.split(',');
-    let numberList: number[] = [];
+    const numberList: number[] = [];
 
     if (!numStrs.length) {
       return numberList;
@@ -199,12 +199,12 @@ export class LocalService {
       } else {
         numberList.push(Number(numStr));
       }
-    })
+    });
 
     // sort list and return unique set of numbers
     numberList.sort((a, b) => a - b);
 
-    return [...new Set(numberList)]
+    return [...new Set(numberList)];
   }
 
   public convertToBitmask(cbm: number | undefined, cw_num: number): number[] | undefined {

@@ -43,7 +43,7 @@ describe('Given LocalService', () => {
     clos_num: 23,
     cw_num: 10,
     cw_size: 30
-  }
+  };
 
   const mockedL2cat: CacheAllocation = {
     cache_size: 20,
@@ -52,13 +52,13 @@ describe('Given LocalService', () => {
     clos_num: 23,
     cw_num: 10,
     cw_size: 30
-  }
+  };
 
   const mockedCaps: string[] = [
     'l3cat',
     'l2cat',
     'mba',
-  ]
+  ];
 
   const mockedSSTBF: SSTBF = {
     configured: true,
@@ -223,11 +223,11 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedL3cat);
 
         done();
-      })
+      });
 
       service.setL3CatEvent(mockedL3cat);
-    })
-  })
+    });
+  });
 
   describe('when getL3CatEvent method is executed', () => {
     it('should detect change', (done: DoneFn) => {
@@ -242,7 +242,7 @@ describe('Given LocalService', () => {
       });
 
       service.l3cat.next(mockedL3cat);
-    })
+    });
   });
 
   describe('when getL3CatCurrentValue method is excuted', () => {
@@ -267,11 +267,11 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedL2cat);
 
         done();
-      })
+      });
 
       service.setL2CatEvent(mockedL2cat);
-    })
-  })
+    });
+  });
 
   describe('when getL2CatEvent method is executed', () => {
     it('should detect change', (done: DoneFn) => {
@@ -283,11 +283,11 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedL2cat);
 
         done();
-      })
+      });
 
       service.l2cat.next(mockedL2cat);
-    })
-  })
+    });
+  });
 
   describe('when getL2CatCurrentValue method is excuted', () => {
     it('it should return current l2cat', () => {
@@ -311,11 +311,11 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedCaps);
 
         done();
-      })
+      });
 
       service.setCapsEvent(mockedCaps);
-    })
-  })
+    });
+  });
 
   describe('when getCapsEvent method is executed', () => {
     it('should detect change', (done: DoneFn) => {
@@ -327,11 +327,11 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedCaps);
 
         done();
-      })
+      });
 
       service.caps.next(mockedCaps);
-    })
-  })
+    });
+  });
 
   describe('when setMbaCtrlEvent method is executed', () => {
     it('it should emit mbaCtrl (Supported & Enabled)', (done: DoneFn) => {
@@ -348,10 +348,10 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedMbaCtrl);
 
         done();
-      })
+      });
 
       service.setMbaCtrlEvent(mockedMbaCtrl);
-    })
+    });
 
     it('it should emit mbaCtrl (Not Supported & Disabled)', (done: DoneFn) => {
       const mockedMbaCtrl: MBACTRL = {
@@ -366,11 +366,11 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedMbaCtrl);
 
         done();
-      })
+      });
 
       service.setMbaCtrlEvent(mockedMbaCtrl);
-    })
-  })
+    });
+  });
 
   describe('when getMbaCtrlEvent method is executed', () => {
     it('should detect change (Supported & Enabled)', (done: DoneFn) => {
@@ -386,10 +386,10 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedMbaCtrl);
 
         done();
-      })
+      });
 
       service.mbaCtrl.next(mockedMbaCtrl);
-    })
+    });
 
     it('should detect change (Not Supported & Disabled)', (done: DoneFn) => {
       const mockedMbaCtrl: MBACTRL = {
@@ -404,11 +404,11 @@ describe('Given LocalService', () => {
         expect(event).toBe(mockedMbaCtrl);
 
         done();
-      })
+      });
 
       service.mbaCtrl.next(mockedMbaCtrl);
-    })
-  })
+    });
+  });
 
   describe('when parseNumberList method is called', () => {
     it('should return array of numbers 1 to 11 when given "1-10,11"', () => {
@@ -422,7 +422,7 @@ describe('Given LocalService', () => {
       expect(
         service.parseNumberList(testString)
       ).toEqual(numbers);
-    })
+    });
 
     it('should return array of numbers 1 to 11 when given "1,2,3,4-11"', () => {
       const {
@@ -433,40 +433,40 @@ describe('Given LocalService', () => {
       const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
       expect(service.parseNumberList(testString)).toEqual(numbers);
-    })
+    });
 
     it('should return array of numbers 1 to 11 when given "11-1"', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const testString = '11-1'
+      const testString = '11-1';
       const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
 
       expect(service.parseNumberList(testString)).toEqual(numbers);
-    })
+    });
 
     it('should return array of numbers 1 to 15 when given "11-7,3,15,12-14,1,2,6-4"', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const testString = '11-7,3,15,12-14,1,2,6-4'
+      const testString = '11-7,3,15,12-14,1,2,6-4';
       const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
 
       expect(service.parseNumberList(testString)).toEqual(numbers);
-    })
+    });
 
     it('should return array of numbers 1 to 5 when given "3,2,1,1,2,3,4,5-1,4"', () => {
       const {
         point: { componentInstance: service }
       } = MockRender(LocalService);
 
-      const testString = '3,2,1,1,2,3,4,5-1,4'
+      const testString = '3,2,1,1,2,3,4,5-1,4';
       const numbers = [1, 2, 3, 4, 5];
 
       expect(service.parseNumberList(testString)).toEqual(numbers);
-    })
+    });
 
     it('should return array of numbers 4156985 to 4156992' +
       'when given "4156985,4156986,4156987,4156988-4156992"', () => {
@@ -479,7 +479,7 @@ describe('Given LocalService', () => {
           4156988, 4156989, 4156990, 4156991, 4156992];
 
         expect(service.parseNumberList(testString)).toEqual(numbers);
-      })
+      });
 
     it('should return an array of numbers 1126973 to 1126984 ' +
       'when given "1126984-1126973"', () => {
@@ -489,11 +489,11 @@ describe('Given LocalService', () => {
 
         const testString = '1126984-1126973';
         const numbers = [1126973, 1126974, 1126975, 1126976,
-          1126977, 1126978, 1126979, 1126980, 1126981, 1126982, 1126983, 1126984]
+          1126977, 1126978, 1126979, 1126980, 1126981, 1126982, 1126983, 1126984];
 
         expect(service.parseNumberList(testString)).toEqual(numbers);
-      })
-  })
+      });
+  });
 
   describe('when convertToBitmask is called', () => {
     it('it should return correct bitmask when given 63 & 12', () => {
@@ -555,7 +555,7 @@ describe('Given LocalService', () => {
 
       expect(service.convertToBitmask(cbm, cw_num)).toEqual(expectedBitmask);
     });
-  })
+  });
 
   describe('when setSstbfEvent method is executed', () => {
     it('should emit SSTBF', (done: DoneFn) => {
@@ -684,4 +684,4 @@ describe('Given LocalService', () => {
       service.apps.next(mockedApps);
     });
   });
-})
+});

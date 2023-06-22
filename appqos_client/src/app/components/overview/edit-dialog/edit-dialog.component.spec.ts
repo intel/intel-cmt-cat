@@ -334,7 +334,7 @@ describe('Given EditDialogComponent', () => {
       const expectedPrams = {
         l3cbm_code: 2047,
         l3cbm_data: 2047,
-      }
+      };
       const mockedPool: Pools[] = [
         {
           id: 0,
@@ -370,10 +370,10 @@ describe('Given EditDialogComponent', () => {
       cbmButton.triggerEventHandler('click', null);
 
       expect(poolsSpy).toHaveBeenCalledWith(expectedPrams, poolId);
-    })
+    });
 
     it('should handle errors', async () => {
-      const mockResponse = 'POOL 0 not updated'
+      const mockResponse = 'POOL 0 not updated';
       const poolsSpy = jasmine.createSpy('poolPut');
       const mockedPool: Pools[] = [
         {
@@ -476,7 +476,7 @@ describe('Given EditDialogComponent', () => {
       const expectedParams = {
         l2cbm_code: 2047,
         l2cbm_data: 4064,
-      }
+      };
 
       const mockedPool: Pools[] = [
         {
@@ -520,7 +520,7 @@ describe('Given EditDialogComponent', () => {
     });
 
     it('should handle errors', async () => {
-      const mockResponse = 'POOL 0 not updated'
+      const mockResponse = 'POOL 0 not updated';
       const poolsSpy = jasmine.createSpy('poolPut');
       const mockedPool: Pools[] = [
         {
@@ -836,7 +836,7 @@ describe('Given EditDialogComponent', () => {
       expect(component.pools[0].l3BitmaskCode).toEqual(
         [0, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1]
       );
-    })
+    });
   });
 
   describe('when onChangeL3CdpData method is called', () => {
@@ -886,7 +886,7 @@ describe('Given EditDialogComponent', () => {
       expect(component.pools[0].l3BitmaskData).toEqual(
         [1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 0]
       );
-    })
+    });
   });
 
   describe('when initialized with MBA', () => {
@@ -1059,7 +1059,7 @@ describe('Given EditDialogComponent', () => {
     });
 
     it('should handle errors', async () => {
-      const mockResponse = 'POOL 0 not updated'
+      const mockResponse = 'POOL 0 not updated';
       const poolsSpy = jasmine.createSpy('poolPut');
       const mockedPool: Pools[] = [
         {
@@ -1205,7 +1205,7 @@ describe('Given EditDialogComponent', () => {
     });
 
     it('should handle errors', async () => {
-      const mockResponse = 'POOL 0 not updated'
+      const mockResponse = 'POOL 0 not updated';
       const poolsSpy = jasmine.createSpy('poolPut');
       const mockedPool: Pools[] = [
         {

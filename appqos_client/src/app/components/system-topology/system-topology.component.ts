@@ -32,7 +32,7 @@ import { Component, Input, OnInit } from '@angular/core';
 import { LocalService } from 'src/app/services/local.service';
 import { Node, SystemTopology, SSTBF } from '../system-caps/system-caps.model';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
-import { Subscription } from 'rxjs'
+import { Subscription } from 'rxjs';
 import { AutoUnsubscribe } from 'src/app/services/decorators';
 
 @Component({

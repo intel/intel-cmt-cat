@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, Input, OnChanges } from '@angular/core';
-import { EnergyPerformPref, PowerProfiles, eppDisplayStr, eppPostStr } from '../system-caps/system-caps.model';
+import { PowerProfiles, eppDisplayStr, eppPostStr } from '../system-caps/system-caps.model';
 import { MatDialog } from '@angular/material/dialog';
 import { PowerProfileDialogComponent } from './power-profiles-dialog/power-profiles-dialog.component';
 
@@ -55,7 +55,7 @@ export class PowerProfilesComponent implements OnChanges {
     this.dialog.open(PowerProfileDialogComponent, {
       height: 'auto',
       width: '35rem',
-    })
+    });
   }
 
 }

@@ -106,7 +106,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
       this.l2cat = l2cat;
     });
 
-    this.subs.push(l3catSub, l2catSub)
+    this.subs.push(l3catSub, l2catSub);
   }
 
   ngOnChanges(): void {

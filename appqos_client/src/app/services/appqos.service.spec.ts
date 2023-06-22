@@ -476,7 +476,7 @@ describe('Given AppqosService', () => {
 
       const mockResponse = {
         message: `POOL ${poolID} deleted`
-      }
+      };
 
       const {
         point: { componentInstance: service }
@@ -488,12 +488,12 @@ describe('Given AppqosService', () => {
 
       service.deletePool(poolID).subscribe((response) => {
         expect(response).toBe(mockResponse);
-      })
+      });
 
       const req = httpMock.expectOne(`${api_url}/pools/${poolID}`);
       req.flush(mockResponse);
       httpMock.verify();
-    })
+    });
   });
 
   describe('when postPool method is called', () => {
@@ -506,13 +506,13 @@ describe('Given AppqosService', () => {
           id: 0,
           message: "New POOL 0 added"
         }
-      }
+      };
       type PostPool = Omit<Pools, 'id'>;
 
       const mockPool: PostPool = {
         name: 'test',
         cores: [1, 2, 3]
-      }
+      };
 
       const {
         point: { componentInstance: service }
@@ -524,21 +524,21 @@ describe('Given AppqosService', () => {
 
       service.postPool(mockPool).subscribe((response: unknown) => {
         expect(response).toBe(mockResponse);
-      })
+      });
 
       const req = httpMock.expectOne(`${api_url}/pools/`);
       req.flush(mockResponse);
-      httpMock.verify()
-    })
-  })
+      httpMock.verify();
+    });
+  });
 
   describe('when getApps method is called ', () => {
     it('it should return a response', () => {
-      const api_url = 'https://localhost:5000'
+      const api_url = 'https://localhost:5000';
 
       const mockedApps: Apps[] = [
         { id: 1, name: 'test', pids: [1, 2, 3], pool_id: 0 }
-      ]
+      ];
 
       const {
         point: { componentInstance: service },
@@ -555,8 +555,8 @@ describe('Given AppqosService', () => {
       const req = httpMock.expectOne(`${api_url}/apps`);
       req.flush(mockedApps);
       httpMock.verify();
-    })
-  })
+    });
+  });
 
   describe('when postApp method is called', () => {
     it('it should return "New APP added to pool 1" message', () => {
@@ -567,7 +567,7 @@ describe('Given AppqosService', () => {
         name: 'test',
         pids: [1, 2, 3],
         pool_id: 2
-      }
+      };
 
       const mockedResponse = {
         status: 201,
@@ -575,7 +575,7 @@ describe('Given AppqosService', () => {
           id: 1,
           message: 'New APP added to pool 1'
         }
-      }
+      };
 
       const {
         point: { componentInstance: service }
@@ -586,7 +586,7 @@ describe('Given AppqosService', () => {
       local.saveData('api_url', api_url);
 
       service.postApp(mockedApps).subscribe((response: unknown) => {
-        expect(response).toBe(mockedResponse)
+        expect(response).toBe(mockedResponse);
       });
 
       const req = httpMock.expectOne(`${api_url}/apps/`);
@@ -605,14 +605,14 @@ describe('Given AppqosService', () => {
         name: 'test',
         pids: [1, 2, 3],
         pool_id: 2
-      }
+      };
 
       const mockedResponse = {
         status: 200,
         body: {
           message: `APP ${appID} updated`
         }
-      }
+      };
 
       const {
         point: { componentInstance: service }
@@ -628,7 +628,7 @@ describe('Given AppqosService', () => {
 
       const req = httpMock.expectOne(`${api_url}/apps/${appID}`);
       req.flush(mockedResponse);
-      httpMock.verify()
+      httpMock.verify();
     });
   });
 
@@ -642,7 +642,7 @@ describe('Given AppqosService', () => {
         body: {
           message: `APP ${appID} deleted`
         }
-      }
+      };
 
       const {
         point: { componentInstance: service }
@@ -654,13 +654,13 @@ describe('Given AppqosService', () => {
 
       service.deleteApp(appID).subscribe((response: unknown) => {
         expect(response).toBe(mockedResponse);
-      })
+      });
 
       const req = httpMock.expectOne(`${api_url}/apps/${appID}`);
       req.flush(mockedResponse);
       httpMock.verify();
-    })
-  })
+    });
+  });
 
   describe('when l3CdpPut method is called', () => {
     it('it should call correct REST API endpoint with PUT method', () => {
@@ -721,7 +721,7 @@ describe('Given AppqosService', () => {
       const mockErrorResponse = {
         status: 0,
         statusText: "Client Error!"
-      }
+      };
       const {
         point: { componentInstance: service },
       } = MockRender(AppqosService);
@@ -741,7 +741,7 @@ describe('Given AppqosService', () => {
         error: {
           message: "Server Error!"
         }
-      }
+      };
       const {
         point: { componentInstance: service },
       } = MockRender(AppqosService);

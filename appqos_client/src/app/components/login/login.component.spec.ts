@@ -71,9 +71,9 @@ describe('Given LoginComponent', () => {
       const mockedError = {
         message: 'REST API error',
         name: 'error'
-      }
+      };
 
-      const loginSpy = jasmine.createSpy('loginSpy').and.returnValue(throwError(() => mockedError))
+      const loginSpy = jasmine.createSpy('loginSpy').and.returnValue(throwError(() => mockedError));
       MockInstance(AppqosService, 'login', loginSpy);
 
       const fixture = MockRender(LoginComponent);

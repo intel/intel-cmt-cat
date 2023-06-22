@@ -62,7 +62,7 @@ export function AutoUnsubscribe(constructor: any) {
     //assigns a new function to OnDestroy
     constructor.prototype.ngOnDestroy = function () {
         //loops over all the properties of the component
-        for (let prop in this) {
+        for (const prop in this) {
             const property = this[prop];
             //checks if the property is an array
             if (Array.isArray(property)) {

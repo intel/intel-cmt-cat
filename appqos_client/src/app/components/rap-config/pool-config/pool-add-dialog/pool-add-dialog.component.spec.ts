@@ -66,7 +66,7 @@ describe('Given poolAddDialogComponent', () => {
     'l3cat',
     'l2cat',
     'mba'
-  ]
+  ];
 
   const mockedMbaCtrl: MBACTRL = {
     enabled: false,
@@ -76,7 +76,7 @@ describe('Given poolAddDialogComponent', () => {
   const mockedData = {
     l2cwNum: 10,
     l3cwNum: 12
-  }
+  };
 
   describe('when initialized', () => {
     it('it should populate the caps array & set mbaCtrl', () => {
@@ -102,8 +102,8 @@ describe('Given poolAddDialogComponent', () => {
 
       expect(getMbaCtrlEventSpy).toHaveBeenCalledTimes(1);
       expect(component.mbaCtrl).toBe(mockedMbaCtrl);
-    })
-  })
+    });
+  });
 
   describe('when savePool method is called', () => {
     MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
@@ -119,7 +119,7 @@ describe('Given poolAddDialogComponent', () => {
         l3cbm: (1 << mockedData.l3cwNum) - 1,
         l2cbm: (1 << mockedData.l2cwNum) - 1,
         mba: 100
-      }
+      };
 
       const {
         point: { componentInstance: component }
@@ -143,7 +143,7 @@ describe('Given poolAddDialogComponent', () => {
       expect(parseNumberListSpy).toHaveBeenCalledWith(cores);
       expect(component.coresList).toEqual(mockedCoresList);
       expect(postPoolSpy).toHaveBeenCalledWith(mockedPool);
-    })
+    });
 
     it('it should save the correct properties when cdp is enabled', () => {
       const name = 'pool_0';
@@ -160,7 +160,7 @@ describe('Given poolAddDialogComponent', () => {
         l2cbm_code: l2cbm,
         l2cbm_data: l2cbm,
         mba: 100
-      }
+      };
 
       const {
         point: { componentInstance: component }
@@ -188,7 +188,7 @@ describe('Given poolAddDialogComponent', () => {
       expect(parseNumberListSpy).toHaveBeenCalledWith(cores);
       expect(component.coresList).toEqual(mockedCoresList);
       expect(postPoolSpy).toHaveBeenCalledWith(mockedPool);
-    })
+    });
 
     it('it should return if the form is not valid', () => {
       const name = '';
@@ -229,7 +229,7 @@ describe('Given poolAddDialogComponent', () => {
 
       expect(parseNumberListSpy).not.toHaveBeenCalled();
       expect(postPoolSpy).not.toHaveBeenCalled();
-    })
+    });
 
     it('it should throw error if the name input field exceeds 80 characters', () => {
       const cores = '11,22-43';
@@ -254,11 +254,11 @@ describe('Given poolAddDialogComponent', () => {
 
       const coresError = ngMocks.formatText(
         ngMocks.find('#max-name-error')
-      )
+      );
 
       expect(coresError).toBe(coresErrorMessage);
       expect(component.form.controls['name'].hasError('maxlength')).toBeTrue();
-    })
+    });
 
     it('it should throw error if cores exceeds MAX_CORES', () => {
       const name = 'pool_0';
@@ -300,7 +300,7 @@ describe('Given poolAddDialogComponent', () => {
       const name = 'pool_0';
       const maxCoresErrorText = 'max length 4096 characters';
 
-      let cores: string = '0';
+      let cores = '0';
       for (let i = 1; i < 5000; i++) {
         cores = `${cores}, ${i}`;
       }
@@ -327,7 +327,7 @@ describe('Given poolAddDialogComponent', () => {
       expect(postPoolSpy).not.toHaveBeenCalled();
       expect(component.form.invalid).toBeTrue();
       expect(component.form.controls['cores'].hasError('maxlength')).toBeTrue();
-    })
+    });
 
     it('it should throw error if cores are not formatted correctly', () => {
       const name = 'pool_0';
@@ -353,7 +353,7 @@ describe('Given poolAddDialogComponent', () => {
 
       expect(coresError).toBe(coresErrorMessage);
       expect(component.form.controls['cores'].hasError('pattern')).toBeTrue();
-    })
+    });
 
     it('it should create a pool', () => {
       const name = 'pool_0';
@@ -365,7 +365,7 @@ describe('Given poolAddDialogComponent', () => {
         l3cbm: (1 << mockedData.l3cwNum) - 1,
         l2cbm: (1 << mockedData.l2cwNum) - 1,
         mba_bw: Math.pow(2, 32) - 1
-      }
+      };
 
       const {
         point: { componentInstance: component }
@@ -391,7 +391,7 @@ describe('Given poolAddDialogComponent', () => {
 
       expect(postPoolSpy).toHaveBeenCalledWith(mockedPool);
       expect(component.form.valid).toBeTrue();
-    })
+    });
   });
 
   describe('when postPool method is called', () => {
@@ -401,7 +401,7 @@ describe('Given poolAddDialogComponent', () => {
       mba: 100,
       l3cbm: 12,
       l2cbm: 10
-    }
+    };
 
     MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
     MockInstance(LocalService, 'getMbaCtrlEvent', () => of(mockedMbaCtrl));
@@ -410,7 +410,7 @@ describe('Given poolAddDialogComponent', () => {
       const mockedResponse = {
         status: 200,
         message: 'NEW POOL 0 added'
-      }
+      };
 
       const postPoolSpy = jasmine.createSpy().and.returnValue(of(mockedResponse));
       const displayInfoSpy = jasmine.createSpy();
@@ -436,13 +436,13 @@ describe('Given poolAddDialogComponent', () => {
       expect(postPoolSpy).toHaveBeenCalledOnceWith(mockedPool);
       expect(displayInfoSpy).toHaveBeenCalledOnceWith(mockedResponse.message);
       expect(closeSpy).toHaveBeenCalledOnceWith(mockedResponse);
-    })
+    });
 
     it('it should handle error', () => {
       const mockedError: Error = {
         name: 'error',
         message: 'poolPut error'
-      }
+      };
 
       const postPoolSpy = jasmine.createSpy().and.returnValue(
         throwError(() => mockedError)
@@ -460,6 +460,6 @@ describe('Given poolAddDialogComponent', () => {
 
       expect(postPoolSpy).toHaveBeenCalledOnceWith(mockedPool);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    })
-  })
+    });
+  });
 });

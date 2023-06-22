@@ -100,14 +100,14 @@ export class SystemCapsComponent implements OnInit {
     });
 
     const rdtIfaceSub = this.localService.getRdtIfaceEvent().subscribe((rdtIFace) => {
-      this.rdtIface = rdtIFace
+      this.rdtIface = rdtIFace;
     });
 
     const mbaSub = combineLatest([
       this.localService.getMbaEvent(),
       this.localService.getMbaCtrlEvent()
     ]).subscribe(([mba, mbaCtrl]) => {
-      this.mba = { ...mba, ...mbaCtrl } as MBA & MBACTRL
+      this.mba = { ...mba, ...mbaCtrl } as MBA & MBACTRL;
     });
 
     this.loading = false;
@@ -162,7 +162,7 @@ export class SystemCapsComponent implements OnInit {
         this.snackBar.handleError(error.message);
         this.loading = false;
       }
-    })
+    });
   }
 
   l2CdpOnChange(event: MatSlideToggleChange) {
@@ -178,7 +178,7 @@ export class SystemCapsComponent implements OnInit {
         this.snackBar.handleError(error.message);
         this.loading = false;
       }
-    })
+    });
   }
 
   private _getMbaData() {
@@ -213,7 +213,7 @@ export class SystemCapsComponent implements OnInit {
     if (!this.caps!.includes('sstbf')) return;
 
     this.service.getSstbf().subscribe({
-      next: (sstbf) => { this.sstbf = sstbf },
+      next: (sstbf) => { this.sstbf = sstbf; },
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
         this.loading = false;
@@ -250,6 +250,6 @@ export class SystemCapsComponent implements OnInit {
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
       }
-    })
+    });
   }
 }
