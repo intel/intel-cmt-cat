@@ -716,6 +716,36 @@ describe('Given AppqosService', () => {
     });
   });
 
+  describe('when deletePowerProfile method is called', () => {
+    it('it should return "Power Profile 0 deleted" message', () => {
+      const api_url = 'https://localhost:5000';
+      const profileID = 0;
+
+      const mockedResponse = {
+        status: 200,
+        body: {
+          message: `Power Profile ${profileID} deleted`
+        }
+      };
+
+      const {
+        point: { componentInstance: service }
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.deletePowerProfile(profileID).subscribe((response: unknown) => {
+        expect(response).toBe(mockedResponse);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/power_profiles/${profileID}`);
+      req.flush(mockedResponse);
+      httpMock.verify();
+    });
+  });
+ 
   describe('when handleError() is called with client side error', () => {
     it('it should return error status text', () => {
       const mockErrorResponse = {

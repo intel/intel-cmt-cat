@@ -31,7 +31,7 @@ import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
 import { PowerProfilesComponent } from "./power-profiles.component";
 import { SharedModule } from "src/app/shared/shared.module";
 import { Router } from "@angular/router";
-import { PowerProfiles } from "../system-caps/system-caps.model";
+import { PowerProfiles, resMessage } from "../system-caps/system-caps.model";
 import { HarnessLoader } from "@angular/cdk/testing";
 import { TestbedHarnessEnvironment } from "@angular/cdk/testing/testbed";
 import { MatTableHarness } from "@angular/material/table/testing";
@@ -39,6 +39,9 @@ import { MatTableModule } from "@angular/material/table";
 import { MatDialog } from "@angular/material/dialog";
 import { PowerProfileDialogComponent } from "./power-profiles-dialog/power-profiles-dialog.component";
 import { MatButtonModule } from "@angular/material/button";
+import { AppqosService } from "src/app/services/appqos.service";
+import { SnackBarService } from "src/app/shared/snack-bar.service";
+import { of, throwError } from "rxjs";
 
 describe('Given PowerProfilesComponent', () => {
   beforeEach(() =>
@@ -173,6 +176,59 @@ describe('Given PowerProfilesComponent', () => {
 
       expect(addDialogSpy).toHaveBeenCalledTimes(1);
       expect(openSpy).toHaveBeenCalledOnceWith(PowerProfileDialogComponent, params);
+    });
+  });
+
+  describe('when the delete button is clicked', () => {
+    it('it should send a delete request', () => {
+      const mockedResponse: resMessage = {
+        message: 'REST API message'
+      };
+      const deletePowerProfileSpy = jasmine.createSpy('deletePowerProfile')
+        .and.returnValue(of(mockedResponse));
+      const getPowerProfileSpy = jasmine.createSpy('getPowerProfileSpy')
+        .and.returnValue(of(mockedPwrProfiles));
+      const displayInfoSpy = jasmine.createSpy('displayInfoSpy');
+
+      MockInstance(AppqosService, 'deletePowerProfile', deletePowerProfileSpy);
+      MockInstance(AppqosService, 'getPowerProfile', getPowerProfileSpy);
+      MockInstance(SnackBarService, 'displayInfo', displayInfoSpy);
+
+      MockRender(PowerProfilesComponent, params);
+
+      const deleteButton = ngMocks.findAll('.delete-button');
+      deleteButton.forEach((button, index) => {
+        button.triggerEventHandler('click', null);
+
+        expect(deletePowerProfileSpy).toHaveBeenCalledWith(index);
+        expect(getPowerProfileSpy).toHaveBeenCalled();
+        expect(displayInfoSpy).toHaveBeenCalledWith(mockedResponse.message);
+      });
+
+      expect(deletePowerProfileSpy).toHaveBeenCalledTimes(mockedPwrProfiles.length);
+      expect(getPowerProfileSpy).toHaveBeenCalledTimes(mockedPwrProfiles.length);
+      expect(displayInfoSpy).toHaveBeenCalledTimes(mockedPwrProfiles.length);
+    });
+
+    it('it should handle error from delete request', () => {
+      const mockedError: Error = {
+        message: 'REST API message',
+        name: 'error'
+      };
+      const deletePowerProfileSpy = jasmine.createSpy('deletePowerProfile')
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('displayInfoSpy');
+
+      MockInstance(AppqosService, 'deletePowerProfile', deletePowerProfileSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(PowerProfilesComponent, params);
+
+      const deleteButton = ngMocks.find('.delete-button');
+      deleteButton.triggerEventHandler('click', null);
+
+      expect(deletePowerProfileSpy).toHaveBeenCalledOnceWith(0);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });
 });
