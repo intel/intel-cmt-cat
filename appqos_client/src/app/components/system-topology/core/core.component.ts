@@ -17,6 +17,4 @@ export class CoreComponent {
   @Input() detailedView!: boolean;
   // @todo extend colors to allow setting color for each pool
   colors: CoreColor[] = [{ bgColor: '#50e1ff', fontColor: 'black' }];
-
-  constructor() { }
 }

@@ -27,3 +27,112 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
+import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
+import { MatGridListHarness } from '@angular/material/grid-list/testing';
+import { CoreComponent } from './core.component';
+import { CoreInfo } from '../../system-caps/system-caps.model';
+import { SharedModule } from 'src/app/shared/shared.module';
+import { By } from '@angular/platform-browser';
+
+describe('Given NodeComponent', () => {
+  beforeEach(() =>
+    MockBuilder(CoreComponent).keep(SharedModule)
+  );
+
+  const mockedCores: CoreInfo[] = [
+    {
+      "socket": 0,
+      "lcore": 2,
+      "L2ID": 1,
+      "L3ID": 0,
+      "sstbfHP": false
+    },
+    {
+      "socket": 0,
+      "lcore": 3,
+      "L2ID": 1,
+      "L3ID": 0,
+      "sstbfHP": true
+    },
+  ];
+
+  MockInstance.scope('case');
+
+  describe('when initialized', () => {
+    it('should display the correct lcore IDs', async () => {
+
+      const fixture = MockRender(CoreComponent, {
+        L2ID: mockedCores[0].L2ID,
+        cores: mockedCores,
+        detailedView: false,
+      });
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      const grid = await loader.getHarness(MatGridListHarness);
+      const tiles = await grid.getTiles();
+
+      expect(tiles.length).toBe(mockedCores.length);
+
+      tiles.forEach(async (tile, i) => {
+        const tileText = await tile.host().then((elem) => elem.text());
+        expect(tileText).toBe(mockedCores[i].lcore.toString());
+      });
+    });
+
+    it('should display the correct L2ID if detailedView is true', async () => {
+
+      const fixture = MockRender(CoreComponent, {
+        L2ID: mockedCores[0].L2ID,
+        cores: mockedCores,
+        detailedView: true,
+      });
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      const grid = await loader.getHarness(MatGridListHarness);
+      const lcoreTileRows = await grid.getTiles().then((tiles) => tiles[0].getRowspan());
+      const l2idTile = await grid.getTileAtPosition({ row: lcoreTileRows + 1, column: 0 });
+
+      const tileText = await l2idTile.host().then((elem) => elem.text());
+      expect(tileText).toBe('L2ID: ' + fixture.componentInstance.L2ID.toString());
+    });
+
+    it('should not display the L2ID if detailedView is false', async () => {
+
+      let errorMessage = '';
+      const fixture = MockRender(CoreComponent, {
+        L2ID: mockedCores[0].L2ID,
+        cores: mockedCores,
+        detailedView: false,
+      });
+      const loader = TestbedHarnessEnvironment.loader(fixture);
+      const grid = await loader.getHarness(MatGridListHarness);
+      const lcoreTileRows = await grid.getTiles().then((tiles) => tiles[0].getRowspan());
+
+      try {
+        await grid.getTileAtPosition({ row: lcoreTileRows + 1, column: 0 });
+      } catch (e: any) {
+        errorMessage = e.message;
+      }
+      expect(errorMessage).toBe("Could not find tile at given position.");
+    });
+
+    it('should highlight SST-BF high priority cores', async () => {
+      const fixture = MockRender(CoreComponent, {
+        L2ID: mockedCores[0].L2ID,
+        cores: mockedCores,
+        detailedView: false,
+      });
+
+      const debugElem = fixture.debugElement;
+      const componentElem = debugElem.queryAll(By.css('.lcore'));
+
+      componentElem.forEach((elem, i) => {
+        if (mockedCores[i].sstbfHP) {
+          expect(elem.styles['borderBottom']?.toString().includes('solid')).toBeTrue();
+        } else {
+          expect(elem.styles['borderBottom']).toBe('none');
+        }
+      });
+    });
+  });
+
+});
