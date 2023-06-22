@@ -501,7 +501,7 @@ hw_cap_l3ca_model(void)
                 int model;
                 int family;
         } supported_cpus[] = {
-            {.family = CPU_FAMILY_HSX, .model = CPU_MODEL_HSX}};
+            {.family = CPU_FAMILY_06, .model = CPU_MODEL_HSX}};
 
         for (unsigned i = 0; i < DIM(supported_cpus); i++) {
                 if (supported_cpus[i].model == cpu_model &&
