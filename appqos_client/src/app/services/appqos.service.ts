@@ -307,6 +307,13 @@ export class AppqosService {
       .pipe(catchError(this.handleError));
   }
 
+  /* Delete Power Profile by id */
+  deletePowerProfile(id: number): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.delete<resMessage>(`${api_url}/power_profiles/${id}`)
+      .pipe(catchError(this.handleError));
+  }
+
   handleError(error: HttpErrorResponse): Observable<any> {
     if (!error.status) {
       //client / network error

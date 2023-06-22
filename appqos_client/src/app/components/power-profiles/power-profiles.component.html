@@ -86,7 +86,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           </button>
           <mat-menu #menu="matMenu">
             <button mat-menu-item>Edit</button>
-            <button mat-menu-item>Delete</button>
+            <button mat-menu-item (click)="deletePwrProfile(profile.id)">Delete</button>
           </mat-menu>
         </td>
       </ng-container>
