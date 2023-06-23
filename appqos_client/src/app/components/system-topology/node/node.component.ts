@@ -34,7 +34,7 @@ import {
   OnChanges,
   SimpleChanges,
 } from '@angular/core';
-import { CoreInfo, Node, SSTBF } from '../../system-caps/system-caps.model';
+import { CoreInfo, Node } from '../../system-caps/system-caps.model';
 
 const DEFAULT_COLS = 8;
 const ROW_HEIGHT_SMALL = '20px';
@@ -47,16 +47,12 @@ const ROW_HEIGHT_LARGE = '30px';
 })
 export class NodeComponent implements OnInit, OnChanges {
   @Input() node!: Node;
-  @Input() numNodes!: number;
   @Input() detailedView!: boolean;
-  @Input() sstbf!: SSTBF | null;
   L2IDS: number[] = [];
   L3IDS: number[] = [];
   // set default row/col values
   numCols: number = DEFAULT_COLS;
   rowHeight: string = ROW_HEIGHT_SMALL;
-
-  constructor() { }
 
   ngOnInit(): void {
     if (!this.node.cores) return;
@@ -80,7 +76,7 @@ export class NodeComponent implements OnInit, OnChanges {
     }
 
     // calculate columns
-    this.numCols = this.getNumRows();
+    this.numCols = this.getNumCols();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -102,7 +98,7 @@ export class NodeComponent implements OnInit, OnChanges {
    * determine number of colums that results
    * in all rows and columns occupied
    */
-  getNumRows(): number {
+  getNumCols(): number {
     const numL2IDS = this.L2IDS.length;
     const numCores = this.node.cores?.length;
     let maxCols = DEFAULT_COLS;
