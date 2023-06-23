@@ -27,14 +27,25 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit } from '@angular/core';
+import { Component, Inject, OnInit } from '@angular/core';
 import { FormControl, FormGroup, Validators } from '@angular/forms';
-import { EnergyPerformPref, PowerProfiles, Standards, eppDisplayStr, eppPostStr } from '../../system-caps/system-caps.model';
+import {
+  EnergyPerformPref,
+  PostProfile,
+  PowerProfiles,
+  Standards,
+  eppDisplayStr,
+  eppPostStr,
+  resMessage
+} from '../../system-caps/system-caps.model';
 import { AppqosService } from 'src/app/services/appqos.service';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 
-type PostProfile = Omit<PowerProfiles, 'id'>
+type dialogDataType = {
+  profile: PowerProfiles,
+  edit: boolean
+}
 
 @Component({
   selector: 'app-power-profiles-dialog',
@@ -44,7 +55,7 @@ type PostProfile = Omit<PowerProfiles, 'id'>
 export class PowerProfileDialogComponent implements OnInit {
   form!: FormGroup;
   epp: string[] = eppDisplayStr;
-  
+
   MIN_FREQ: Standards = Standards.MIN_FREQ;
   MAX_FREQ: Standards = Standards.MAX_FREQ;
 
@@ -52,30 +63,32 @@ export class PowerProfileDialogComponent implements OnInit {
     private service: AppqosService,
     private snackbar: SnackBarService,
     public dialogRef: MatDialogRef<PowerProfileDialogComponent>,
+    @Inject(MAT_DIALOG_DATA) public data: dialogDataType
   ) { }
 
   ngOnInit(): void {
     this.form = new FormGroup({
-      name: new FormControl('', [
+      name: new FormControl((this.data.edit) ? this.data.profile.name : '', [
         Validators.required,
         Validators.pattern('^[ -~]+$'),
         Validators.maxLength(Standards.MAX_CHARS)
       ]),
-      minFreq: new FormControl('', [
+      minFreq: new FormControl((this.data.edit) ? this.data.profile.min_freq : '', [
         Validators.required,
         Validators.pattern('^[0-9]+$'),
         Validators.min(Standards.MIN_FREQ),
         Validators.max(Standards.MAX_FREQ),
       ]),
-      maxFreq: new FormControl('', [
+      maxFreq: new FormControl((this.data.edit) ? this.data.profile.max_freq : '', [
         Validators.required,
         Validators.pattern('^[0-9]+$'),
         Validators.min(Standards.MIN_FREQ),
         Validators.max(Standards.MAX_FREQ),
       ]),
-      epp: new FormControl(this.epp[EnergyPerformPref.balancePerformance], [
-        Validators.required,
-      ])
+      epp: new FormControl(
+        (this.data.edit) ? this.data.profile.epp : this.epp[EnergyPerformPref.balancePerformance],
+        [Validators.required]
+      )
     });
   }
 
@@ -91,16 +104,29 @@ export class PowerProfileDialogComponent implements OnInit {
       ]
     };
 
-    this.service.postPowerProfiles(profile).subscribe({
-      next: (res) => {
-        this.snackbar.displayInfo(res.message);
-        this.service.getPowerProfile().subscribe();
-        this.dialogRef.close();
-      },
-      error: (error: Error) => {
-        this.snackbar.handleError(error.message);
-      }
-    });
+    if (this.data.edit) {
+      this.service.putPowerProfile(profile, this.data.profile.id).subscribe({
+        next: (res: resMessage) => {
+          this.snackbar.displayInfo(res.message);
+          this.service.getPowerProfile().subscribe();
+          this.dialogRef.close();
+        },
+        error: (error: Error) => {
+          this.snackbar.handleError(error.message);
+        }
+      });
+    } else {
+      this.service.postPowerProfiles(profile).subscribe({
+        next: (res: resMessage) => {
+          this.snackbar.displayInfo(res.message);
+          this.service.getPowerProfile().subscribe();
+          this.dialogRef.close();
+        },
+        error: (error: Error) => {
+          this.snackbar.handleError(error.message);
+        }
+      });
+    }
   }
 
   checkFreq() {

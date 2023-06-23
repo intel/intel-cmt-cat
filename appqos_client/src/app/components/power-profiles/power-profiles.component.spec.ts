@@ -86,7 +86,8 @@ describe('Given PowerProfilesComponent', () => {
   ];
 
   const params = {
-    pwrProfiles: mockedPwrProfiles
+    pwrProfiles: mockedPwrProfiles,
+    edit: false
   };
 
   describe('when initialized', () => {
@@ -156,9 +157,12 @@ describe('Given PowerProfilesComponent', () => {
 
   describe('when add button is clicked', () => {
     it('it should open power profiles dialog', () => {
-      const params = {
+      const dialogParams = {
         height: 'auto',
         width: '35rem',
+        data: {
+          edit: false
+        }
       };
 
       const openSpy = jasmine.createSpy('openSpy');
@@ -175,7 +179,7 @@ describe('Given PowerProfilesComponent', () => {
       addButton.triggerEventHandler('click', null);
 
       expect(addDialogSpy).toHaveBeenCalledTimes(1);
-      expect(openSpy).toHaveBeenCalledOnceWith(PowerProfileDialogComponent, params);
+      expect(openSpy).toHaveBeenCalledOnceWith(PowerProfileDialogComponent, dialogParams);
     });
   });
 

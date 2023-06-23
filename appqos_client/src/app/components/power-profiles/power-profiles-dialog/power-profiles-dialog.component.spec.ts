@@ -32,7 +32,7 @@ import { SharedModule } from "src/app/shared/shared.module";
 import { AppqosService } from "src/app/services/appqos.service";
 import { PowerProfileDialogComponent } from "./power-profiles-dialog.component";
 import { MatError, MatFormField } from "@angular/material/form-field";
-import { MatDialogRef } from "@angular/material/dialog";
+import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { SnackBarService } from "src/app/shared/snack-bar.service";
 import { MatButtonModule } from "@angular/material/button";
 import { resMessage } from "../../system-caps/system-caps.model";
@@ -40,7 +40,7 @@ import { of, throwError } from "rxjs";
 import { MatSelect } from "@angular/material/select";
 import { MatOption } from "@angular/material/core";
 
-describe('Given PowerPorfilesComponent', () => {
+describe('Given PowerProfileDialogComponent', () => {
   beforeEach(() => {
     return MockBuilder(PowerProfileDialogComponent)
       .mock(SharedModule)
@@ -53,9 +53,20 @@ describe('Given PowerPorfilesComponent', () => {
 
   MockInstance.scope('case');
 
+  const mockedData = {
+    edit: false
+  };
+
   describe('when initialized', () => {
     it('it should populate EPP dropdown', () => {
-      MockRender(PowerProfileDialogComponent);
+      MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
 
       const eppOptions = ngMocks.findAll(MatOption);
       const eppText = ngMocks.formatText(eppOptions);
@@ -77,7 +88,14 @@ describe('Given PowerPorfilesComponent', () => {
       const nameError = 'name is required';
       const freqError = 'frequency is required';
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({ name, minFreq, maxFreq });
@@ -97,7 +115,14 @@ describe('Given PowerPorfilesComponent', () => {
 
       const nameError = 'max length 80 characters';
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({ name, minFreq, maxFreq });
@@ -116,7 +141,14 @@ describe('Given PowerPorfilesComponent', () => {
 
       const minFreqError = 'frequency must be 400MHz or above';
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({ name, minFreq, maxFreq });
@@ -135,7 +167,14 @@ describe('Given PowerPorfilesComponent', () => {
 
       const maxFreqError = 'frequency must be 5000Mhz or below';
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({ name, minFreq, maxFreq });
@@ -154,7 +193,14 @@ describe('Given PowerPorfilesComponent', () => {
 
       const lessThanMinError = 'maximum is below minimum';
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({ name, minFreq, maxFreq });
@@ -192,7 +238,14 @@ describe('Given PowerPorfilesComponent', () => {
       MockInstance(AppqosService, 'getPowerProfile', getPowerProfileSpy);
       MockInstance(MatDialogRef, 'close', closeSpy);
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({
@@ -231,7 +284,14 @@ describe('Given PowerPorfilesComponent', () => {
       MockInstance(AppqosService, 'postPowerProfiles', postPowerProfileSpy);
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({
@@ -261,7 +321,14 @@ describe('Given PowerPorfilesComponent', () => {
 
       MockInstance(AppqosService, 'postPowerProfiles', postPowerProfilesSpy);
 
-      const fixture = MockRender(PowerProfileDialogComponent);
+      const fixture = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
       const component = fixture.point.componentInstance;
 
       component.form.patchValue({

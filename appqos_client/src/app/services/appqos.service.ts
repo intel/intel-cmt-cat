@@ -41,6 +41,7 @@ import {
   resMessage,
   SSTBF,
   PowerProfiles,
+  PostProfile,
 } from '../components/system-caps/system-caps.model';
 import { LocalService } from './local.service';
 import { Apps, Pools } from '../components/overview/overview.model';
@@ -311,6 +312,13 @@ export class AppqosService {
   deletePowerProfile(id: number): Observable<resMessage> {
     const api_url = this.local.getData('api_url');
     return this.http.delete<resMessage>(`${api_url}/power_profiles/${id}`)
+      .pipe(catchError(this.handleError));
+  }
+  
+  /* Update existing Power Profile by id */
+  putPowerProfile(profile: PostProfile, id: number): Observable<resMessage> {
+    const api_url = this.local.getData('api_url');
+    return this.http.put<resMessage>(`${api_url}/power_profiles/${id}`, profile)
       .pipe(catchError(this.handleError));
   }
 

@@ -117,6 +117,8 @@ export interface PowerProfiles {
   epp: string,
 }
 
+export type PostProfile = Omit<PowerProfiles, 'id'>
+
 /* energy performance preference (EPP) */
 export enum EnergyPerformPref {
   performance = 0,

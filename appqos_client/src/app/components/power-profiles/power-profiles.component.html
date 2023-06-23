@@ -85,7 +85,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             <mat-icon>more_horiz</mat-icon>
           </button>
           <mat-menu #menu="matMenu">
-            <button mat-menu-item>Edit</button>
+            <button mat-menu-item (click)="pwrProfileEditDialog(profile)">Edit</button>
             <button mat-menu-item class="delete-button" (click)="deletePwrProfile(profile.id)">Delete</button>
           </mat-menu>
         </td>

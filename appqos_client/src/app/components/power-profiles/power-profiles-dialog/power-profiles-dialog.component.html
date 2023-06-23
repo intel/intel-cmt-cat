@@ -29,7 +29,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-<h2>Add New Power Profile</h2>
+<h2>{{(data.edit) ? 'Edit' : 'Add New'}} Power Profile</h2>
 <div mat-dialog-content>
   <div class="text">
     Please specify the name, minimum and maximum frequency and the Energy
@@ -114,6 +114,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     [disabled]="!form.valid"
     (click)="savePwrProfile()"
   >
-    Save
+    {{(data.edit) ? 'Update' : 'Save'}}
   </button>
 </div>

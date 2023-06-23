@@ -61,6 +61,20 @@ export class PowerProfilesComponent implements OnChanges {
     this.dialog.open(PowerProfileDialogComponent, {
       height: 'auto',
       width: '35rem',
+      data: {
+        edit: false
+      }
+    });
+  }
+
+  pwrProfileEditDialog(profile: PowerProfiles) {
+    this.dialog.open(PowerProfileDialogComponent, {
+      height: 'auto',
+      width: '35rem',
+      data: {
+        profile,
+        edit: true
+      }
     });
   }
 
