@@ -43,6 +43,7 @@ import {
   MBACTRL,
   RDTIface,
   SSTBF,
+  SystemTopology,
 } from '../components/system-caps/system-caps.model';
 import { AppqosService } from './appqos.service';
 import { LocalService } from './local.service';
@@ -475,11 +476,11 @@ describe('Given AppqosService', () => {
       const poolID = 0;
 
       const mockResponse = {
-        message: `POOL ${poolID} deleted`
+        message: `POOL ${poolID} deleted`,
       };
 
       const {
-        point: { componentInstance: service }
+        point: { componentInstance: service },
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
@@ -504,18 +505,18 @@ describe('Given AppqosService', () => {
         status: 201,
         body: {
           id: 0,
-          message: "New POOL 0 added"
-        }
+          message: 'New POOL 0 added',
+        },
       };
       type PostPool = Omit<Pools, 'id'>;
 
       const mockPool: PostPool = {
         name: 'test',
-        cores: [1, 2, 3]
+        cores: [1, 2, 3],
       };
 
       const {
-        point: { componentInstance: service }
+        point: { componentInstance: service },
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
@@ -537,7 +538,7 @@ describe('Given AppqosService', () => {
       const api_url = 'https://localhost:5000';
 
       const mockedApps: Apps[] = [
-        { id: 1, name: 'test', pids: [1, 2, 3], pool_id: 0 }
+        { id: 1, name: 'test', pids: [1, 2, 3], pool_id: 0 },
       ];
 
       const {
@@ -566,19 +567,19 @@ describe('Given AppqosService', () => {
         id: 1,
         name: 'test',
         pids: [1, 2, 3],
-        pool_id: 2
+        pool_id: 2,
       };
 
       const mockedResponse = {
         status: 201,
         body: {
           id: 1,
-          message: 'New APP added to pool 1'
-        }
+          message: 'New APP added to pool 1',
+        },
       };
 
       const {
-        point: { componentInstance: service }
+        point: { componentInstance: service },
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
@@ -604,18 +605,18 @@ describe('Given AppqosService', () => {
         id: 1,
         name: 'test',
         pids: [1, 2, 3],
-        pool_id: 2
+        pool_id: 2,
       };
 
       const mockedResponse = {
         status: 200,
         body: {
-          message: `APP ${appID} updated`
-        }
+          message: `APP ${appID} updated`,
+        },
       };
 
       const {
-        point: { componentInstance: service }
+        point: { componentInstance: service },
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
@@ -640,12 +641,12 @@ describe('Given AppqosService', () => {
       const mockedResponse = {
         status: 200,
         body: {
-          message: `APP ${appID} deleted`
-        }
+          message: `APP ${appID} deleted`,
+        },
       };
 
       const {
-        point: { componentInstance: service }
+        point: { componentInstance: service },
       } = MockRender(AppqosService);
 
       const httpMock = TestBed.inject(HttpTestingController);
@@ -750,7 +751,7 @@ describe('Given AppqosService', () => {
     it('it should return error status text', () => {
       const mockErrorResponse = {
         status: 0,
-        statusText: "Client Error!"
+        statusText: 'Client Error!',
       };
       const {
         point: { componentInstance: service },
@@ -758,8 +759,7 @@ describe('Given AppqosService', () => {
 
       service.handleError(mockErrorResponse as HttpErrorResponse).subscribe({
         // error response should be called
-        error: (err) => expect(err.message)
-        .toBe(mockErrorResponse.statusText)
+        error: (err) => expect(err.message).toBe(mockErrorResponse.statusText),
       });
     });
   });
@@ -769,8 +769,8 @@ describe('Given AppqosService', () => {
       const mockErrorResponse = {
         status: 400,
         error: {
-          message: "Server Error!"
-        }
+          message: 'Server Error!',
+        },
       };
       const {
         point: { componentInstance: service },
@@ -778,9 +778,116 @@ describe('Given AppqosService', () => {
 
       service.handleError(mockErrorResponse as HttpErrorResponse).subscribe({
         // error response should be called
-        error: (err) => expect(err.message)
-        .toBe(mockErrorResponse.error.message)
+        error: (err) =>
+          expect(err.message).toBe(mockErrorResponse.error.message),
       });
+    });
+  });
+
+  const mockedTopology = {
+    vendor: 'INTEL',
+    cache: [
+      {
+        level: 2,
+        num_ways: 20,
+        num_sets: 1024,
+        num_partitions: 1,
+        line_size: 64,
+        total_size: 1310720,
+        way_size: 65536,
+      },
+      {
+        level: 3,
+        num_ways: 12,
+        num_sets: 57344,
+        num_partitions: 1,
+        line_size: 64,
+        total_size: 44040192,
+        way_size: 3670016,
+      },
+    ],
+    core: [
+      {
+        socket: 0,
+        lcore: 0,
+        L2ID: 0,
+        L3ID: 0,
+      },
+      {
+        socket: 0,
+        lcore: 1,
+        L2ID: 1,
+        L3ID: 0,
+      },
+      {
+        socket: 1,
+        lcore: 2,
+        L2ID: 2,
+        L3ID: 1,
+      },
+      {
+        socket: 1,
+        lcore: 3,
+        L2ID: 3,
+        L3ID: 1,
+      },
+    ],
+  };
+
+  describe('when getSystemTopology method is called', () => {
+    it('should make http request if topology not in local storage', () => {
+      const saveDataSpy = spyOn(
+        LocalService.prototype,
+        'saveData'
+      ).and.callThrough();
+      const api_url = 'https://localhost:5000';
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.clearData();
+      local.saveData('api_url', api_url);
+
+      service.getSystemTopology().subscribe((topo: SystemTopology) => {
+        expect(topo).toBe(mockedTopology);
+        expect(saveDataSpy)
+          .withContext('should store topology to local storage')
+          .toHaveBeenCalledWith(
+            'system_topology',
+            JSON.stringify(mockedTopology)
+          );
+      });
+      const req = httpMock.expectOne(`${api_url}/caps/cpu`);
+      req.flush(mockedTopology);
+      httpMock.verify();
+    });
+
+    it('it should retrieve topology from local storage if present', () => {
+      const getDataSpy = spyOn(LocalService.prototype, 'getData').and.callThrough();
+      const api_url = 'https://localhost:5000';
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.clearData();
+      local.saveData('api_url', api_url);
+
+      // store topology in local storage
+      local.saveData('system_topology', JSON.stringify(mockedTopology));
+
+      service.getSystemTopology().subscribe((topo: SystemTopology) => {
+        expect(topo).toEqual(mockedTopology);
+        expect(getDataSpy)
+          .withContext('should not get api_url from local storage')
+          .not.toHaveBeenCalledWith('api_url');
+      });
+      // expect no http request to have been made
+      httpMock.expectNone(`${api_url}/caps/cpu`);
+      httpMock.verify();
     });
   });
 });
