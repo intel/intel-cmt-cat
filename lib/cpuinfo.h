@@ -47,8 +47,8 @@
 extern "C" {
 #endif
 
-#define CPU_MODEL_SKX  0x55
-#define CPU_MODEL_HSX  0x3f
+#define CPU_MODEL_SKX 0x55
+#define CPU_MODEL_HSX 0x3f
 #define CPU_FAMILY_06 0x06
 
 /**
