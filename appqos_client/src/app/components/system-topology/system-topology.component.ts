@@ -72,13 +72,13 @@ export class SystemTopologyComponent implements OnInit {
 
     // populate node cores
     this.nodes.forEach((node) => {
-      node.cores = this.systemTopology?.core.filter(
+      node.cores = this.systemTopology.core.filter(
         (core) => core.socket === node.nodeID
       );
       // set SST-BF high priority cores if configured
       if (this.sstbf?.configured) {
-        node.cores?.forEach((core) => {
-          core.sstbfHP = !!this.sstbf?.hp_cores.find(
+        node.cores.forEach((core) => {
+          core.sstbfHP = !!this.sstbf!.hp_cores.find(
             (sstbfHPCore) => sstbfHPCore === core.lcore
           );
         });
