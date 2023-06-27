@@ -35,7 +35,7 @@ import { MatError, MatFormField } from "@angular/material/form-field";
 import { MAT_DIALOG_DATA, MatDialogRef } from "@angular/material/dialog";
 import { SnackBarService } from "src/app/shared/snack-bar.service";
 import { MatButtonModule } from "@angular/material/button";
-import { resMessage } from "../../system-caps/system-caps.model";
+import { PostProfile, resMessage } from "../../system-caps/system-caps.model";
 import { of, throwError } from "rxjs";
 import { MatSelect } from "@angular/material/select";
 import { MatOption } from "@angular/material/core";
@@ -52,6 +52,14 @@ describe('Given PowerProfileDialogComponent', () => {
   });
 
   MockInstance.scope('case');
+
+  const mockedProfile = {
+    id: 0,
+    name: 'profile_0',
+    min_freq: 1000,
+    max_freq: 1200,
+    epp: 'balance_power'
+  };
 
   const mockedData = {
     edit: false
@@ -76,6 +84,113 @@ describe('Given PowerProfileDialogComponent', () => {
       expect(eppText.includes('Balance Performance')).toBeTrue();
       expect(eppText.includes('Balance Power')).toBeTrue();
       expect(eppText.includes('Power')).toBeTrue();
+    });
+
+    it('it should display correct title when edit is false', () => {
+      MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
+
+      const title = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(title).toBe('Add New Power Profile');
+    });
+
+    it('it should display correct title when edit is true', () => {
+      MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: {
+              profile: mockedProfile,
+              edit: true
+            }
+          }
+        ]
+      });
+
+      const title = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(title).toBe('Edit Power Profile');
+    });
+
+    it('it should display correct button when edit is false', () => {
+      MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: mockedData
+          }
+        ]
+      });
+
+      const buttonText = ngMocks.formatText(ngMocks.find('.mat-flat-button'));
+
+      expect(buttonText).toBe('Save');
+    });
+
+    it('it should display correct button when edit is true', () => {
+      MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: {
+              profile: mockedProfile,
+              edit: true
+            }
+          }
+        ]
+      });
+
+      const buttonText = ngMocks.formatText(ngMocks.find('.mat-flat-button'));
+
+      expect(buttonText).toBe('Update');
+    });
+
+    it('it should display power profile properties when edit is true', () => {
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: {
+              profile: mockedProfile,
+              edit: true
+            }
+          }
+        ]
+      });
+
+      expect(component.form.controls['name'].value).toBe(mockedProfile.name);
+      expect(component.form.controls['minFreq'].value).toBe(mockedProfile.min_freq);
+      expect(component.form.controls['maxFreq'].value).toBe(mockedProfile.max_freq);
+      expect(component.form.controls['epp'].value).toBe(mockedProfile.epp);
+    });
+
+    it('it should display empty input fields when edit is false', () => {
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: {
+              edit: false
+            }
+          }
+        ]
+      });
+
+      expect(component.form.controls['name'].value).toBe('');
+      expect(component.form.controls['minFreq'].value).toBe('');
+      expect(component.form.controls['maxFreq'].value).toBe('');
+      expect(component.form.controls['epp'].value).toBe('Balance Performance');
     });
   });
 
@@ -214,8 +329,8 @@ describe('Given PowerProfileDialogComponent', () => {
     });
   });
 
-  describe('when save button is clicked', () => {
-    it('it should save the power profile', () => {
+  describe('when action button is clicked', () => {
+    it('it should save the power profile when edit is false', () => {
       const mockedProfile = {
         name: 'profile_0',
         min_freq: '800',
@@ -265,6 +380,57 @@ describe('Given PowerProfileDialogComponent', () => {
       expect(closeSpy).toHaveBeenCalledTimes(1);
     });
 
+    it('it should update the power profile when edit is true', () => {
+      const mockedProfile = {
+        id: 0,
+        name: 'profile_0',
+        min_freq: 800,
+        max_freq: 1200,
+        epp: 'Power'
+      };
+      const mockedPostProfile: PostProfile = {
+        name: mockedProfile.name,
+        min_freq: mockedProfile.min_freq,
+        max_freq: mockedProfile.max_freq,
+        epp: 'power'
+      };
+      const mockedMessage: resMessage = {
+        message: 'REST API'
+      };
+
+      const putPowerProfilesSpy = jasmine.createSpy('putPowerProfileSpy')
+        .and.returnValue(of(mockedMessage));
+      const displayInfoSpy = jasmine.createSpy('displayInfoSpy');
+      const getPowerProfileSpy = jasmine.createSpy('getPowerProfileSpy')
+        .and.returnValue(of());
+      const closeSpy = jasmine.createSpy('closeSpy');
+
+      MockInstance(AppqosService, 'putPowerProfile', putPowerProfilesSpy);
+      MockInstance(SnackBarService, 'displayInfo', displayInfoSpy);
+      MockInstance(AppqosService, 'getPowerProfile', getPowerProfileSpy);
+      MockInstance(MatDialogRef, 'close', closeSpy);
+
+      MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: {
+              profile: mockedProfile,
+              edit: true
+            }
+          }
+        ]
+      });
+
+      const saveButton = ngMocks.find('.mat-flat-button');
+      saveButton.triggerEventHandler('click', null);
+
+      expect(putPowerProfilesSpy).toHaveBeenCalledOnceWith(mockedPostProfile, mockedProfile.id);
+      expect(displayInfoSpy).toHaveBeenCalledOnceWith(mockedMessage.message);
+      expect(getPowerProfileSpy).toHaveBeenCalledTimes(1);
+      expect(closeSpy).toHaveBeenCalledTimes(1);
+    });
+
     it('it should handle POST power profiles error', () => {
       const mockedProfile = {
         name: 'profile_0',
@@ -306,6 +472,51 @@ describe('Given PowerProfileDialogComponent', () => {
       saveButton.triggerEventHandler('click', null);
 
       expect(postPowerProfileSpy).toHaveBeenCalledOnceWith(mockedProfile);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('it should handle PUT power profiles error', () => {
+      const mockedProfile = {
+        id: 0,
+        name: 'profile_0',
+        min_freq: 800,
+        max_freq: 1200,
+        epp: 'Power'
+      };
+      const mockedPostProfile: PostProfile = {
+        name: mockedProfile.name,
+        min_freq: mockedProfile.min_freq,
+        max_freq: mockedProfile.max_freq,
+        epp: 'power'
+      };
+      const mockedError: Error = {
+        name: 'error',
+        message: 'REST API'
+      };
+
+      const putPowerProfileSpy = jasmine.createSpy('putPowerProfileSpy')
+        .and.returnValue(throwError(() => mockedError));
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+
+      MockInstance(AppqosService, 'putPowerProfile', putPowerProfileSpy);
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      MockRender(PowerProfileDialogComponent, {}, {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: {
+              profile: mockedProfile,
+              edit: true
+            }
+          }
+        ]
+      });
+
+      const saveButton = ngMocks.find('.mat-flat-button');
+      saveButton.triggerEventHandler('click', null);
+
+      expect(putPowerProfileSpy).toHaveBeenCalledOnceWith(mockedPostProfile, mockedProfile.id);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
 

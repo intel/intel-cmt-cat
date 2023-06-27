@@ -31,7 +31,7 @@ import { MockBuilder, MockInstance, MockRender, ngMocks } from "ng-mocks";
 import { PowerProfilesComponent } from "./power-profiles.component";
 import { SharedModule } from "src/app/shared/shared.module";
 import { Router } from "@angular/router";
-import { PowerProfiles, resMessage } from "../system-caps/system-caps.model";
+import { PowerProfiles, eppDisplayStr, eppPostStr, resMessage } from "../system-caps/system-caps.model";
 import { HarnessLoader } from "@angular/cdk/testing";
 import { TestbedHarnessEnvironment } from "@angular/cdk/testing/testbed";
 import { MatTableHarness } from "@angular/material/table/testing";
@@ -235,4 +235,47 @@ describe('Given PowerProfilesComponent', () => {
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });
+    
+  describe('when the edit button is clicked', () => {
+    it('it should open the edit Power Profile dialog', () => {
+      const dialogParams = {
+        height: 'auto',
+        width: '35rem'
+      };
+
+      const openSpy = jasmine.createSpy('openSpy');
+      MockInstance(MatDialog, 'open', openSpy);
+
+      const {
+        point: { componentInstance: component }
+      } = MockRender(PowerProfilesComponent, params);
+
+      const editDialogSpy = spyOn(component, 'pwrProfileEditDialog')
+        .and.callThrough();
+
+      const editButtons = ngMocks.findAll('.edit-button');
+
+      editButtons.forEach((button, index) => {
+        button.triggerEventHandler('click', null);
+
+        const profile = {
+          ...mockedPwrProfiles[index],
+          epp: eppDisplayStr[eppPostStr.indexOf(mockedPwrProfiles[index].epp)]
+        };
+
+        expect(editDialogSpy).toHaveBeenCalledWith(profile);
+        expect(openSpy).toHaveBeenCalledWith(PowerProfileDialogComponent, {
+          ...dialogParams,
+          data: {
+            profile: profile,
+            edit: true
+          }
+        });
+      });
+
+      expect(editDialogSpy).toHaveBeenCalledTimes(mockedPwrProfiles.length);
+      expect(openSpy).toHaveBeenCalledTimes(mockedPwrProfiles.length);
+    });
+  });
+    
 });

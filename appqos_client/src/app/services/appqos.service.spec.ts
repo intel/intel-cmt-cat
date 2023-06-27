@@ -41,6 +41,8 @@ import {
   Caps,
   MBA,
   MBACTRL,
+  PostProfile,
+  PowerProfiles,
   RDTIface,
   SSTBF,
   SystemTopology,
@@ -717,6 +719,75 @@ describe('Given AppqosService', () => {
     });
   });
 
+  describe('when getPowerProfile method is called ', () => {
+    it('it should return a response', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedProfile: PowerProfiles[] = [
+        {
+          id: 0,
+          name: 'profile_0',
+          min_freq: 1000,
+          max_freq: 1200,
+          epp: 'balance_power'
+        }
+      ];
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.getPowerProfile().subscribe((profiles: PowerProfiles[]) => {
+        expect(profiles).toBe(mockedProfile);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/power_profiles`);
+      req.flush(mockedProfile);
+      httpMock.verify();
+    });
+  });
+
+  describe('when postPowerProfiles method is called', () => {
+    it('it should return "NEW Power Profile added" message', () => {
+      const api_url = 'https://localhost:5000';
+
+      const mockedProfile: PostProfile = {
+        name: 'profile_0',
+        min_freq: 1000,
+        max_freq: 1200,
+        epp: 'power'
+      };
+
+      const mockedResponse = {
+        status: 201,
+        body: {
+          id: 1,
+          message: 'NEW Power Profile added',
+        },
+      };
+
+      const {
+        point: { componentInstance: service },
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.postPowerProfiles(mockedProfile).subscribe((response: unknown) => {
+        expect(response).toBe(mockedResponse);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/power_profiles`);
+      req.flush(mockedResponse);
+      httpMock.verify();
+    });
+  });
+
   describe('when deletePowerProfile method is called', () => {
     it('it should return "Power Profile 0 deleted" message', () => {
       const api_url = 'https://localhost:5000';
@@ -746,7 +817,43 @@ describe('Given AppqosService', () => {
       httpMock.verify();
     });
   });
- 
+
+  describe('when putPowerProfile method is called', () => {
+    it('it should return "Power Profile 0 updated" message', () => {
+      const api_url = 'https://localhost:5000';
+      const profileID = 0;
+      const mockedProfile: PostProfile = {
+        name: 'profile_0',
+        min_freq: 1000,
+        max_freq: 1200,
+        epp: 'power'
+      };
+
+      const mockedResponse = {
+        status: 200,
+        body: {
+          message: `Power Profile ${profileID} updated`
+        }
+      };
+
+      const {
+        point: { componentInstance: service }
+      } = MockRender(AppqosService);
+
+      const httpMock = TestBed.inject(HttpTestingController);
+      const local = ngMocks.findInstance(LocalService);
+      local.saveData('api_url', api_url);
+
+      service.putPowerProfile(mockedProfile, profileID).subscribe((response: unknown) => {
+        expect(response).toBe(mockedResponse);
+      });
+
+      const req = httpMock.expectOne(`${api_url}/power_profiles/${profileID}`);
+      req.flush(mockedResponse);
+      httpMock.verify();
+    });
+  });
+
   describe('when handleError() is called with client side error', () => {
     it('it should return error status text', () => {
       const mockErrorResponse = {
