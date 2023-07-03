@@ -29,7 +29,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 import { PoolConfigComponent } from './pool-config.component';
-import { CacheAllocation, resMessage } from '../../system-caps/system-caps.model';
+import { CacheAllocation, PowerProfiles, SSTBF, resMessage } from '../../system-caps/system-caps.model';
 import { Pools } from '../../overview/overview.model';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { AppqosService } from 'src/app/services/appqos.service';
@@ -55,16 +55,44 @@ describe('Given poolConfigComponent', () => {
         getL2CatEvent: () => EMPTY,
         getL3CatCurrentValue: () => mockedCache,
         getL2CatCurrentValue: () => mockedCache,
+        getPowerProfilesEvent: () => of(mockedPowerProfiles),
+        getSstbfEvent: () => of(mockedSSTBF),
+        getCapsEvent: () => EMPTY,
         convertToBitmask: LocalService.prototype.convertToBitmask
       })
       .keep(MatSliderModule);
   });
+
+  const mockedCaps = ['l3cat', 'l2cat', 'power'];
+
+  const mockedSSTBF: SSTBF = {
+    configured: false,
+    hp_cores: [2, 3, 5, 7, 9, 12],
+    std_cores: [0, 1, 4, 6, 8, 10, 11, 13, 14, 15],
+  };
 
   const mockedPools: Pools[] = [
     { id: 0, name: 'pool_0', cores: [1, 2, 3] },
     { id: 1, name: 'pool_1', cores: [4, 5, 6] },
     { id: 2, name: 'pool_2', cores: [7, 8, 9] },
     { id: 3, name: 'pool_3', cores: [10, 11, 12] }
+  ];
+
+  const mockedPowerProfiles: PowerProfiles[] = [
+    {
+      id: 0,
+      name: 'profile_0',
+      min_freq: 1000,
+      max_freq: 1200,
+      epp: 'balance_power'
+    },
+    {
+      id: 1,
+      name: 'profile_1',
+      min_freq: 800,
+      max_freq: 1000,
+      epp: 'power'
+    }
   ];
 
   const mockedCache: CacheAllocation = {
@@ -971,13 +999,86 @@ describe('Given poolConfigComponent', () => {
 
       MockInstance(LocalService, 'getL3CatEvent', () => catEvent);
       MockRender(PoolConfigComponent, params);
-      
+
       const label = ngMocks.formatText(
         ngMocks.find('.cbm-label')
       );
 
       expect(label).toContain('Code');
       expect(label).toContain('Data');
+    });
+  });
+
+  describe('when power profile is supported', () => {
+    it('it should display the power profile dropdown', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
+      MockInstance(LocalService, 'getPowerProfilesEvent', () => of(mockedPowerProfiles));
+
+      MockRender(PoolConfigComponent, params);
+
+      const profileNames = mockedPowerProfiles.map((profile) => profile.name);
+      const options = ngMocks.findAll('.profile > mat-form-field > mat-select > mat-option');
+      const optionText = ngMocks.formatText(options);
+
+      expect(options.length).toBe(mockedPowerProfiles.length);
+      expect(optionText).toEqual(profileNames);
+    });
+  });
+
+  describe('when savePowerProfile method is called', () => {
+    it('it should update power profile id', () => {
+      const poolID = 3;
+      const powerProfileID = 0;
+      const mockedResponse: resMessage = {
+        message: 'POOL 0 updated'
+      };
+
+      const poolPutSpy = jasmine.createSpy('poolPutSpy')
+        .and.returnValue(of(mockedResponse));
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
+
+      const fixture = MockRender(PoolConfigComponent, params);
+      const component = fixture.point.componentInstance;
+
+      const nextHandlerSpy = spyOn(component, 'nextHandler');
+
+      component.poolId = poolID;
+      component.profileControl.setValue(powerProfileID);
+
+      const saveButton = ngMocks.find('.profile > button');
+      saveButton.triggerEventHandler('click', null);
+
+      expect(poolPutSpy).toHaveBeenCalledOnceWith({ power_profile: powerProfileID }, poolID);
+      expect(nextHandlerSpy).toHaveBeenCalledOnceWith(mockedResponse);
+    });
+
+    it('it should handle putPool error', () => {
+      const poolID = 3;
+      const power_profileID = 0;
+      const mockedError: Error = {
+        name: 'API Error',
+        message: 'PUT error'
+      };
+
+      const poolPutSpy = jasmine.createSpy('poolPutSpy')
+        .and.returnValue(throwError(() => mockedError));
+      MockInstance(AppqosService, 'poolPut', poolPutSpy);
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
+
+      const fixture = MockRender(PoolConfigComponent, params);
+      const component = fixture.point.componentInstance;
+
+      const errorHandlerSpy = spyOn(component, 'errorHandler');
+
+      component.poolId = poolID;
+      component.profileControl.setValue(power_profileID);
+
+      const saveButton = ngMocks.find('.profile > button');
+      saveButton.triggerEventHandler('click', null);
+
+      expect(poolPutSpy).toHaveBeenCalledOnceWith({ power_profile: power_profileID }, poolID);
+      expect(errorHandlerSpy).toHaveBeenCalledOnceWith(mockedError);
     });
   });
 });

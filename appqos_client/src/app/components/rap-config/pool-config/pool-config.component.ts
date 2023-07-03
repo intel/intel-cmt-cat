@@ -321,11 +321,11 @@ export class PoolConfigComponent implements OnChanges, OnInit {
       power_profile: this.profileControl.value
     }, this.pool.id).subscribe({
       next: (response) => {
-          this.nextHandler(response);
-        },
-        error: (error) => {
-          this.errorHandler(error);
-        },
+        this.nextHandler(response);
+      },
+      error: (error) => {
+        this.errorHandler(error);
+      },
     });
   }
 
