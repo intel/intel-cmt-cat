@@ -104,12 +104,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
         position: relative;
         margin-right: 2.5rem;
       }
-  
+
       .cbm-code {
         position: absolute;
         margin-top: -2.2rem;
       }
-  
+
       .cbm-data {
         position: absolute;
         margin-top: 1.1rem;
@@ -153,6 +153,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
       @include pool-flex;
       align-items: center;
       padding: 0.5rem 0 0 0;
+      margin-bottom: 1rem;
 
       .pool-cores {
         display: flex;
@@ -170,6 +171,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
           margin-top: 0.3rem;
         }
       }
+    }
+
+    .profile {
+      @include pool-flex;
+      align-items: center;
+      padding-bottom: 0.5rem;
     }
   }
 }

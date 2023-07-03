@@ -57,6 +57,7 @@ type poolPutType = {
   mba_bw?: number;
   name?: string;
   cores?: number[];
+  power_profile?: number;
 };
 
 @Injectable({

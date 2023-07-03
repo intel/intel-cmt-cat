@@ -28,7 +28,6 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import {
-  ChangeDetectionStrategy,
   Component,
   EventEmitter,
   Input,
@@ -47,7 +46,9 @@ import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Apps, Pools } from '../../overview/overview.model';
 import {
   CacheAllocation,
+  PowerProfiles,
   resMessage,
+  SSTBF,
   Standards,
 } from '../../system-caps/system-caps.model';
 import { CoresEditDialogComponent } from './cores-edit-dialog/cores-edit-dialog.component';
@@ -59,7 +60,6 @@ import { Subscription } from 'rxjs';
   selector: 'app-pool-config',
   templateUrl: './pool-config.component.html',
   styleUrls: ['./pool-config.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 @AutoUnsubscribe
 export class PoolConfigComponent implements OnChanges, OnInit {
@@ -76,6 +76,10 @@ export class PoolConfigComponent implements OnChanges, OnInit {
   l2numCacheWays!: number;
   l3cat!: CacheAllocation | null;
   l2cat!: CacheAllocation | null;
+  profiles!: PowerProfiles[];
+  profileID!: number | undefined;
+  caps!: string[];
+  sstbf!: SSTBF | null;
   mbaBwDefNum = Math.pow(2, 32) - 1;
   mbaBwControl = new FormControl('', [
     Validators.required,
@@ -88,6 +92,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     Validators.required,
     Validators.maxLength(Standards.MAX_CHARS),
   ]);
+  profileControl = new FormControl('');
   subs: Subscription[] = [];
 
   constructor(
@@ -106,7 +111,19 @@ export class PoolConfigComponent implements OnChanges, OnInit {
       this.l2cat = l2cat;
     });
 
-    this.subs.push(l3catSub, l2catSub);
+    const capsSub = this.localService.getCapsEvent().subscribe((caps) => {
+      this.caps = caps;
+    });
+
+    const profilesSub = this.localService.getPowerProfilesEvent().subscribe((profiles) => {
+      this.profiles = profiles;
+    });
+
+    const sstbfSub = this.localService.getSstbfEvent().subscribe((sstbf) => {
+      this.sstbf = sstbf;
+    });
+
+    this.subs.push(l3catSub, l2catSub, capsSub, profilesSub, sstbfSub);
   }
 
   ngOnChanges(): void {
@@ -135,12 +152,16 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     this.poolId = id;
     this.pool = { ...this.pools.find((pool: Pools) => pool.id === id) } as Pools;
 
+    this.profileID = this.pool.power_profile;
     this.poolApps = this.apps.filter((app) => app.pool_id === id);
     this.selected = this.pool.name;
     this.mbaBwControl.setValue(
       this.pool.mba_bw === this.mbaBwDefNum ? '' : this.pool.mba_bw
     );
     this.nameControl.setValue(this.pool.name);
+    this.profileControl.setValue(
+      this.profileID === undefined ? '' : this.profileID
+    );
 
     if (this.pool.l3cbm || this.pool.l3cbm_code) {
       this.l3cat = this.localService.getL3CatCurrentValue();
@@ -293,6 +314,19 @@ export class PoolConfigComponent implements OnChanges, OnInit {
           this.errorHandler(error);
         },
       });
+  }
+
+  savePowerProfile() {
+    this.service.poolPut({
+      power_profile: this.profileControl.value
+    }, this.pool.id).subscribe({
+      next: (response) => {
+          this.nextHandler(response);
+        },
+        error: (error) => {
+          this.errorHandler(error);
+        },
+    });
   }
 
   nextHandler(response: resMessage) {

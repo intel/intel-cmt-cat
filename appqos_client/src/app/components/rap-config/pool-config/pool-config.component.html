@@ -294,8 +294,34 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
           </button>
         </div>
       </div>
+      <div *ngIf="caps.includes('power') && !sstbf?.configured" >
+        <span>Speed Select Technology - Core Power (SST-CP)</span>
+        <br />
+        <span class="power-text" *ngIf="!profiles.length">No profiles are currently configured</span>
+        <div class="profile" *ngIf="profiles.length">
+          <mat-form-field appearance="fill">
+            <mat-label>Select a Power Profile</mat-label>
+            <mat-select
+              [(value)]="profileID === undefined ? '' : profileID"
+              [formControl]="profileControl"
+            >
+              <mat-option *ngFor="let profile of profiles" [value]="profile.id">
+                {{ profile.name }}
+              </mat-option>
+            </mat-select>
+          </mat-form-field>
+          <button
+            mat-raised-button
+            color="primary"
+            (click)="savePowerProfile()"
+          >
+            APPLY
+          </button>
+        </div>
+      </div>
+      <br *ngIf="!profiles.length"/>
       <span>Apps</span>
-      <br />
+      <br/>
       <span *ngIf="!poolApps.length">No apps currently assigned to pool</span>
       <div class="pool-apps">
         <button

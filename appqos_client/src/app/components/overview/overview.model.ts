@@ -46,6 +46,7 @@ export interface Pools {
   name: string;
   cores: number[];
   apps?: number[];
+  power_profile?: number;
 }
 
 export interface Apps {
