@@ -72,7 +72,7 @@ style:
 	${MAKE} codespell
 
 run:
-	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m appqos
+	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m appqos $(APPQOS_RUN_OPTS)
 help:
 	WORKON_HOME=$(VENV_DIR) pipenv run python3 -m appqos --help
 
