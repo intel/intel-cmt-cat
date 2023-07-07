@@ -32,37 +32,24 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
     <button mat-icon-button (click)="logout()">
       <mat-icon class="logout">keyboard_backspace</mat-icon>
     </button>
-    <img
-      class="logo-intel"
-      src="../../../assets/toolbar_intel_logo.png"
-      alt="Intel"
-    />
+    <img class="logo-intel" src="../../../assets/toolbar_intel_logo.png" alt="Intel" />
 
     <div class="navigation-buttons">
-      <button
-        mat-flat-button
-        [ngClass]="{ active: enableOverview, inactive: !enableOverview }"
-        (click)="switchContent(true)"
-      >
+      <button mat-flat-button [ngClass]="{ active: enableOverview, inactive: !enableOverview }"
+        (click)="switchContent(true)">
         OVERVIEW
       </button>
       <mat-divider vertical></mat-divider>
-      <button
-        mat-flat-button
-        [ngClass]="{ active: !enableOverview, inactive: enableOverview }"
-        (click)="switchContent(false)"
-      >
+      <button mat-flat-button [ngClass]="{ active: !enableOverview, inactive: enableOverview }"
+        (click)="switchContent(false)">
         POOL CONFIG
       </button>
     </div>
-    <div class="import-export-btns">
-      <button mat-button matTooltip="Importing configuration not currently supported" class="import-button">
-        <mat-icon class="icon">archive</mat-icon>
-        Import
-      </button>
-      <button mat-button matTooltip="Exporting configuration not currently supported" class="export-button">
-        <mat-icon class="icon">unarchive</mat-icon>
-        <span>Export</span>
+    <div class="show-config-btn">
+      <button mat-button matTooltip="Display current AppQoS configuration" class="export-button"
+        (click)="showConfig()">
+        <mat-icon class="icon">settings_applications</mat-icon>
+        <span>Show Config</span>
       </button>
     </div>
   </mat-toolbar-row>

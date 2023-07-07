@@ -1,6 +1,6 @@
 /*BSD LICENSE
 
-Copyright(c) 2022 Intel Corporation. All rights reserved.
+Copyright(c) 2023 Intel Corporation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -27,56 +27,3 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.logo-intel {
-  height: 9rem;
-}
-
-.material-icons.logout:before {
-  content: none;
-}
-
-.mat-button-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-
-  .icon {
-    height: 1rem;
-  }
-}
-
-.navigation-buttons {
-  margin: auto;
-  display: flex;
-  flex-direction: row;
-}
-
-.show-config-btn {
-  flex-basis: 15%;
-}
-
-.mat-divider-vertical {
-  border-color: #fff;
-}
-
-.active {
-  background-color: #0068b5;
-  color: #50e1ff;
-}
-
-.inactive {
-  background-color: #0068b5;
-  color: #fff;
-}
-
-.logout {
-  transform: scale(1.4);
-}
-
-.warning-msg {
-  background-color: #fdb913;
-  color: black;
-  height: fit-content;
-  justify-content: center;
-  font-size: 15px;
-}

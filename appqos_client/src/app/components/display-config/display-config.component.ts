@@ -1,6 +1,7 @@
-/*BSD LICENSE
+/*
+BSD LICENSE
 
-Copyright(c) 2022 Intel Corporation. All rights reserved.
+Copyright(c) 2023 Intel Corporation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -25,58 +26,24 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
 
-.logo-intel {
-  height: 9rem;
-}
+import { Component, Inject } from '@angular/core';
+import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 
-.material-icons.logout:before {
-  content: none;
-}
+type dialogDataType = {
+  config: string;
+};
 
-.mat-button-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+@Component({
+  selector: 'app-display-config',
+  templateUrl: './display-config.component.html',
+  styleUrls: ['./display-config.component.scss']
+})
+export class DisplayConfigComponent {
 
-  .icon {
-    height: 1rem;
-  }
-}
-
-.navigation-buttons {
-  margin: auto;
-  display: flex;
-  flex-direction: row;
-}
-
-.show-config-btn {
-  flex-basis: 15%;
-}
-
-.mat-divider-vertical {
-  border-color: #fff;
-}
-
-.active {
-  background-color: #0068b5;
-  color: #50e1ff;
-}
-
-.inactive {
-  background-color: #0068b5;
-  color: #fff;
-}
-
-.logout {
-  transform: scale(1.4);
-}
-
-.warning-msg {
-  background-color: #fdb913;
-  color: black;
-  height: fit-content;
-  justify-content: center;
-  font-size: 15px;
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: dialogDataType,
+  ) { }
 }

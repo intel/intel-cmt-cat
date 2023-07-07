@@ -27,6 +27,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { Apps, Pools } from "../overview/overview.model";
+
 export interface Caps {
   capabilities: string[];
 }
@@ -115,6 +117,17 @@ export interface PowerProfiles {
   min_freq: number,
   max_freq: number,
   epp: string,
+}
+
+export interface AppqosConfig {
+  rdt_iface: {"interface": string},
+  mba_ctrl?: { "enabled": boolean },
+  apps: Apps[],
+  pools: Pools[],
+  power_profiles?: PowerProfiles[],
+  sstbf?: { "configured": boolean },
+  power_profiles_expert_mode?: boolean,
+  power_profiles_verify?: boolean
 }
 
 export type PostProfile = Omit<PowerProfiles, 'id'>

@@ -79,6 +79,7 @@ import { NodeComponent } from '../components/system-topology/node/node.component
 import { CoreComponent } from '../components/system-topology/core/core.component';
 import { PowerProfilesComponent } from '../components/power-profiles/power-profiles.component';
 import { PowerProfileDialogComponent } from '../components/power-profiles/power-profiles-dialog/power-profiles-dialog.component';
+import { DisplayConfigComponent } from '../components/display-config/display-config.component';
 
 @NgModule({
   declarations: [
@@ -108,6 +109,7 @@ import { PowerProfileDialogComponent } from '../components/power-profiles/power-
     CoreComponent,
     PowerProfilesComponent,
     PowerProfileDialogComponent,
+    DisplayConfigComponent,
   ],
   imports: [
     MatInputModule,
