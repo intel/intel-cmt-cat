@@ -119,12 +119,14 @@ export class SystemCapsComponent implements OnInit {
     this.loading = true;
     this.service.rdtIfacePut(event.value).subscribe({
       next: (res: resMessage) => {
+        this.service.getCaps().subscribe(() => {
+          this._getMbaData();
+          this._getSstbf();
+          this._getL3cat();
+          this._getL2cat();
+          this._getRdtIface();
+        });
         this.snackBar.displayInfo(res.message);
-        this._getMbaData();
-        this._getSstbf();
-        this._getL3cat();
-        this._getL2cat();
-        this._getRdtIface();
         this.loading = false;
       },
       error: (error: Error) => {
