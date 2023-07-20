@@ -91,6 +91,17 @@ export class OverviewComponent implements OnInit {
     });
   }
 
+  getSstbf(): void {
+    this.service.getSstbf().subscribe({
+      next: (sstbf: SSTBF) => {
+        this.sstbf = sstbf;
+      },
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      }
+    });
+  }
+
   getTopology(): void {
     this.service.getSystemTopology().subscribe((topo: SystemTopology) => {
       this.topology = topo;
@@ -103,6 +114,18 @@ export class OverviewComponent implements OnInit {
         this.snackBar.displayInfo(res.message);
         this.getMbaCtrl();
         this._getPools();
+      },
+      error: (error: Error) => {
+        this.snackBar.handleError(error.message);
+      },
+    });
+  }
+
+  sstbfOnChange(event: MatSlideToggleChange) {
+    this.service.sstbfPut(event.checked).subscribe({
+      next: (res: resMessage) => {
+        this.snackBar.displayInfo(res.message);
+        this.getSstbf();
       },
       error: (error: Error) => {
         this.snackBar.handleError(error.message);

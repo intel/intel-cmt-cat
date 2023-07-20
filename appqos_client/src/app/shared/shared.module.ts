@@ -80,6 +80,7 @@ import { CoreComponent } from '../components/system-topology/core/core.component
 import { PowerProfilesComponent } from '../components/power-profiles/power-profiles.component';
 import { PowerProfileDialogComponent } from '../components/power-profiles/power-profiles-dialog/power-profiles-dialog.component';
 import { DisplayConfigComponent } from '../components/display-config/display-config.component';
+import { SstBfComponent } from '../components/overview/sst-bf/sst-bf.component';
 
 @NgModule({
   declarations: [
@@ -110,6 +111,7 @@ import { DisplayConfigComponent } from '../components/display-config/display-con
     PowerProfilesComponent,
     PowerProfileDialogComponent,
     DisplayConfigComponent,
+    SstBfComponent,
   ],
   imports: [
     MatInputModule,

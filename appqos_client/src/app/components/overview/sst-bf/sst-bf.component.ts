@@ -1,7 +1,6 @@
-<!--
-BSD LICENSE
+/*BSD LICENSE
 
-Copyright(c) 2022 Intel Corporation. All rights reserved.
+Copyright(c) 2023 Intel Corporation. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions
@@ -18,6 +17,7 @@ are met:
     
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
 OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
@@ -26,36 +26,29 @@ LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
 DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
--->
-<div class="overview-container">
-  <app-system-topology
-    *ngIf="topology"
-    [systemTopology]="topology"
-    >
-  </app-system-topology>
-  <app-l3-cache-allocation
-    *ngIf="caps?.includes('l3cat')"
-    [pools]="pools"
-  ></app-l3-cache-allocation>
-  <app-l2-cache-allocation
-    *ngIf="caps?.includes('l2cat')"
-    [pools]="pools"
-  >
-  </app-l2-cache-allocation>
-  <app-mba-allocation
-    *ngIf="caps?.includes('mba')"
-    [pools]="pools"
-    [mbaCtrl]="mbaCtrl!"
-    (mbaCtrlEvent)="mbaOnChange($event)"
-  ></app-mba-allocation>
-  <app-sst-bf
-    *ngIf="caps?.includes('sstbf')"
-    [sstbf]="sstbf!"
-    (sstbfEvent)="sstbfOnChange($event)">
-  </app-sst-bf>
-  <app-power-profiles
-    [pwrProfiles]="pwrProfiles"
-    *ngIf="caps?.includes('power') && !sstbf?.configured"
-  ></app-power-profiles>
-</div>
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
+import {
+  Component,
+  EventEmitter,
+  Input,
+  Output,
+} from '@angular/core';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { SSTBF } from '../../system-caps/system-caps.model';
+
+@Component({
+  selector: 'app-sst-bf',
+  templateUrl: './sst-bf.component.html',
+  styleUrls: ['./sst-bf.component.scss']
+})
+export class SstBfComponent {
+  @Input() sstbf!: SSTBF;
+  @Output() sstbfEvent = new EventEmitter<MatSlideToggleChange>();
+  constructor() { }
+
+  sstbfOnChange(event: MatSlideToggleChange) {
+    event.source.checked = this.sstbf.configured;
+
+    this.sstbfEvent.emit(event);
+  }
+}
