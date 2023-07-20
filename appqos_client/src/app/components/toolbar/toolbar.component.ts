@@ -97,9 +97,9 @@ export class ToolbarComponent {
         if (caps.includes('power')) {
           if (result.power_profiles.length) {
             config.power_profiles = result.power_profiles;
-            config.power_profiles_expert_mode = true;
-            config.power_profiles_verify = true;
           }
+          config.power_profiles_expert_mode = true;
+          config.power_profiles_verify = true;
         }
 
         // set sst-bf setting if supported

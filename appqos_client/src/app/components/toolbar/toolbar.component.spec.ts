@@ -28,17 +28,98 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { TestBed } from '@angular/core/testing';
+import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { first, tap } from 'rxjs';
+import { first, of, tap, throwError } from 'rxjs';
+import { LocalService } from 'src/app/services/local.service';
 
 import { SharedModule } from 'src/app/shared/shared.module';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { Apps, Pools } from '../overview/overview.model';
+import {
+  AppqosConfig,
+  MBACTRL,
+  PowerProfiles,
+  RDTIface,
+  SSTBF,
+} from '../system-caps/system-caps.model';
 import { ToolbarComponent } from './toolbar.component';
 
 describe('Given ToolbarComponent', () => {
   beforeEach(() =>
-    MockBuilder(ToolbarComponent).mock(Router).mock(SharedModule)
-  );
+    MockBuilder(ToolbarComponent)
+      .mock(Router)
+      .mock(SharedModule)
+      .mock(SnackBarService)
+      .mock(LocalService, {
+        getCapsEvent: () => of([]),
+        getRdtIfaceEvent: () => of(mockedIface),
+        getMbaCtrlEvent: () => of(null),
+        getPoolsEvent: () => of(mockedPools),
+        getPowerProfilesEvent: () => of([]),
+        getAppsEvent: () => of([]),
+        getSstbfEvent: () => of(null),
+      }));
+
+  const mockedIface: RDTIface = {
+    interface: 'msr',
+    interface_supported: ['msr', 'os'],
+  };
+
+  const mockedSSTBF: SSTBF = {
+    configured: false,
+    hp_cores: [2, 3],
+    std_cores: [0, 1],
+  };
+
+  const mockedApps: Apps[] = [
+    {
+      id: 1,
+      name: 'app1',
+      pids: [1, 2, 3],
+      pool_id: 0,
+    },
+  ];
+
+  const mockedPools: Pools[] = [
+    {
+      id: 0,
+      l3cbm: 4095,
+      name: 'Default',
+      cores: [0, 1, 2, 3],
+    },
+  ];
+
+  const mockedPowerProfiles: PowerProfiles[] = [
+    {
+      id: 0,
+      name: 'profile_0',
+      min_freq: 1000,
+      max_freq: 1200,
+      epp: 'balance_power',
+    },
+  ];
+
+  const mockedMbaCtrl: MBACTRL = {
+    enabled: false,
+    supported: false,
+  };
+
+  const baseConfig: AppqosConfig = {
+    rdt_iface: {
+      interface: 'msr',
+    },
+    apps: [],
+    pools: [
+      {
+        id: 0,
+        l3cbm: 4095,
+        name: 'Default',
+        cores: [0, 1, 2, 3],
+      },
+    ],
+  };
 
   MockInstance.scope('case');
 
@@ -99,6 +180,226 @@ describe('Given ToolbarComponent', () => {
       const overviewButton = ngMocks.find('.inactive');
 
       overviewButton.triggerEventHandler('click', null);
+    });
+  });
+
+  describe('when show config button is clicked with only l3cat support', () => {
+    it('should display l3cat only config', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat']));
+      // verify changes dispayed
+      const matDialogSpy = jasmine.createSpy('open');
+      MockInstance(MatDialog, 'open', matDialogSpy);
+
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+      spyOn(component, 'showConfig').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(matDialogSpy).toHaveBeenCalledTimes(1);
+      expect(component.showConfig).toHaveBeenCalledTimes(1);
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(baseConfig, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked with power support (no profiles defined)', () => {
+    it('should display config with power settings (without profiles)', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'power']));
+
+      // add expected output with power support when no profiles defined
+      const config: AppqosConfig = {
+        ...baseConfig,
+        power_profiles_expert_mode: true,
+        power_profiles_verify: true
+      };
+
+      // verify changes dispayed
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked with power support', () => {
+    it('should display config with power settings (with profiles)', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'power']));
+      MockInstance(LocalService, 'getPowerProfilesEvent', () =>
+        of(mockedPowerProfiles)
+      );
+
+      // add expected output with power support when profiles are defined
+      const config: AppqosConfig = {
+        ...baseConfig,
+        power_profiles: [...mockedPowerProfiles],
+        power_profiles_expert_mode: true,
+        power_profiles_verify: true
+      };
+
+      // verify changes dispayed
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked with sstbf support', () => {
+    it('should display config with sstbf settings', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'sstbf']));
+      MockInstance(LocalService, 'getSstbfEvent', () =>
+        of(mockedSSTBF)
+      );
+
+      // add sstbf support to expected output
+      const config: AppqosConfig = {
+        ...baseConfig,
+        sstbf: {
+          configured: mockedSSTBF.configured
+        }
+      };
+
+      // verify changes dispayed
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked with mba controller support', () => {
+    it('should display config with mba controller settings', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'sstbf', 'mba']));
+      MockInstance(LocalService, 'getMbaCtrlEvent', () => of(mockedMbaCtrl));
+
+      // add mba ctrl support to expected output
+      const config: AppqosConfig = {
+        ...baseConfig,
+        mba_ctrl: { enabled: mockedMbaCtrl.enabled }
+      };
+
+      // verify changes dispayed
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked with apps defined', () => {
+    it('should display config with app configs', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat']));
+      MockInstance(LocalService, 'getAppsEvent', () => of(mockedApps));
+
+      // add app definitions to expected output
+      const config: AppqosConfig = {
+        ...baseConfig,
+        apps: mockedApps
+      };
+
+      // verify changes dispayed
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked with support for multiple technologies', () => {
+    it('should display config with settings for all supported technologies', () => {
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'sstbf', 'mba', 'sstbf', 'power']));
+      MockInstance(LocalService, 'getMbaCtrlEvent', () => of(mockedMbaCtrl));
+      MockInstance(LocalService, 'getSstbfEvent', () => of(mockedSSTBF));
+      MockInstance(LocalService, 'getPowerProfilesEvent', () => of(mockedPowerProfiles));
+      MockInstance(LocalService, 'getAppsEvent', () => of(mockedApps));
+
+      // extend expected output
+      const config: AppqosConfig = {
+        ...baseConfig,
+        apps: mockedApps,
+        power_profiles: [...mockedPowerProfiles],
+        power_profiles_expert_mode: true,
+        power_profiles_verify: true,
+        sstbf: {
+          configured: mockedSSTBF.configured
+        },
+        mba_ctrl: { enabled: mockedMbaCtrl.enabled }
+      };
+
+      // verify changes dispayed
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked and an error occurs', () => {
+    it('should display error message to the user', () => {
+      const handleErrorSpy = jasmine.createSpy();
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'sstbf', 'mba']));
+      MockInstance(LocalService, 'getMbaCtrlEvent', () => throwError(() => new Error('error')));
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+
+      // verify error message dispayed
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith('Failed to generate configuration');
+
+      expect(component.openDialog).not.toHaveBeenCalled();
     });
   });
 });
