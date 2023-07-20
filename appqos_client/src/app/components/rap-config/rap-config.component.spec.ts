@@ -79,11 +79,10 @@ describe('Given RapConfigComponent', () => {
       },
     ];
 
+    it('should populate list of apps and pools', () => {
     // set mock app and pool data to be returned from AppqosService
     MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
     MockInstance(LocalService, 'getAppsEvent', () => of(mockedApps));
-
-    it('should populate list of apps and pools', () => {
       const component = MockRender(RapConfigComponent).point.componentInstance;
 
       expect(component.apps)
