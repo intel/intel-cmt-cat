@@ -44,7 +44,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       system resources such as L2 & L3 caches. Use the toggle to view more
       detailed information.
     </div>
-    <div *ngIf="sstbf" style="display: flex; justify-content: right">
+    <div *ngIf="sstbf?.configured" style="display: flex; justify-content: right">
       <span class="sstbf-legend">SST-BF high priority cores</span>
     </div>
   </mat-card-content>
