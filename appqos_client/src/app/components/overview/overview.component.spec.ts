@@ -39,7 +39,7 @@ import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
-import { MBACTRL } from '../system-caps/system-caps.model';
+import { MBACTRL, SSTBF } from '../system-caps/system-caps.model';
 import { OverviewComponent } from './overview.component';
 import { Pools } from './overview.model';
 
@@ -53,6 +53,7 @@ describe('Given OverviewComponent', () => {
         getPools: () => EMPTY,
         getMbaCtrl: () => EMPTY,
         getCaps: () => EMPTY,
+        getSstbf: () => EMPTY,
       })
       .mock(LocalService, {
         getCapsEvent: () => EMPTY,
@@ -62,6 +63,17 @@ describe('Given OverviewComponent', () => {
         getSstbfEvent: () => EMPTY
       })
   );
+
+  const mockedError: Error = {
+    name: 'Error',
+    message: 'rest API error',
+  };
+
+  const mockedSSTBF: SSTBF = {
+    configured: false,
+    hp_cores: [1, 2],
+    std_cores: [1, 2],
+  };
 
   MockInstance.scope('case');
 
@@ -241,6 +253,103 @@ describe('Given OverviewComponent', () => {
       component.mbaOnChange(event);
 
       expect(mbaCtrlSpy).toHaveBeenCalledWith(event.checked);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+  });
+
+  describe('when sstbfOnChange method is called', () => {
+    it('it should call sstbfPut with correct value', () => {
+      const mockResponse = 'SST-BF caps modified';
+      const sstbfPutSpy = jasmine.createSpy('sstbfPut');
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(OverviewComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+    });
+
+    it('it should catch error', () => {
+      const handleErrorSpy = jasmine.createSpy();
+      const sstbfPutSpy = jasmine.createSpy();
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(throwError(() => mockedError));
+
+      const fixture = MockRender(OverviewComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+
+    it('it should call getSstbf', () => {
+      const mockResponse = 'SST-BF caps modified';
+      const sstbfPutSpy = jasmine.createSpy('sstbfPutSpy');
+      const getSstbfSpy = jasmine.createSpy('getSstbfSpy')
+        .and.returnValue(of(mockedSSTBF));
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      // MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
+      MockInstance(AppqosService, 'getSstbf', getSstbfSpy);
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(OverviewComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getSstbfSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('it should handle getSstbf error', () => {
+      const mockResponse = 'SST-BF caps modified';
+      const sstbfPutSpy = jasmine.createSpy('sstbfPutSpy');
+      const getSstbfSpy = jasmine.createSpy('getSstbfSpy');
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(AppqosService, 'getSstbf', getSstbfSpy)
+        .and.returnValue(throwError(() => mockedError));
+      MockInstance(AppqosService, 'sstbfPut', sstbfPutSpy)
+        .withArgs(event.checked)
+        .and.returnValue(of(mockResponse));
+
+      const fixture = MockRender(OverviewComponent);
+      const component = fixture.point.componentInstance;
+
+      component.sstbfOnChange(event);
+
+      expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(getSstbfSpy).toHaveBeenCalledTimes(1);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
   });

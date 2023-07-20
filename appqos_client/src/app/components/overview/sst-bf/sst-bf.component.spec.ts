@@ -27,3 +27,77 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
+import { of } from 'rxjs';
+
+import {
+  MatSlideToggle,
+  MatSlideToggleChange,
+} from '@angular/material/slide-toggle';
+
+import { AppqosService } from 'src/app/services/appqos.service';
+import { SharedModule } from 'src/app/shared/shared.module';
+import { SSTBF } from '../../system-caps/system-caps.model';
+import { SstBfComponent } from './sst-bf.component';
+
+describe('Given SstBfComponent', () => {
+  beforeEach(() => MockBuilder(SstBfComponent).mock(SharedModule));
+
+  MockInstance.scope('case');
+
+  describe('when initialized', () => {
+    it('should display "SST-BF" title', () => {
+      const mockedSSTBF: SSTBF = {
+        configured: true,
+        hp_cores: [1, 2],
+        std_cores: [1, 2],
+      };
+
+      MockRender(SstBfComponent, {
+        isSupported: true,
+        sstbf: mockedSSTBF,
+      });
+
+      const expectValue = ngMocks.formatText(ngMocks.find('mat-card-title'));
+
+      expect(expectValue).toEqual('Speed Select Technology - Base Frequency (SST-BF)');
+    });
+  });
+
+  describe('when slide toggle is clicked', () => {
+    it('should emit "onChange" event with correct value', (done) => {
+      const mockedSSTBF: SSTBF = {
+        configured: true,
+        hp_cores: [1, 2],
+        std_cores: [1, 2],
+      };
+
+      const event: MatSlideToggleChange = {
+        checked: false,
+        source: {} as MatSlideToggle,
+      };
+
+      const RDTSpy = jasmine.createSpy('getSstbf');
+
+      MockInstance(AppqosService, 'getSstbf', RDTSpy).and.returnValue(
+        of(mockedSSTBF)
+      );
+
+      const fixture = MockRender(SstBfComponent, {
+        isSupported: true,
+        sstbf: mockedSSTBF,
+      });
+
+      const component = fixture.point.componentInstance;
+      const toggle = ngMocks.find('mat-slide-toggle');
+
+      component.sstbfEvent.subscribe((value) => {
+        expect(value.checked).toBeFalse();
+
+        done();
+      });
+
+      toggle.triggerEventHandler('change', event);
+    });
+  });
+});

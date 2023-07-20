@@ -28,14 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
-import { of } from 'rxjs';
 
-import {
-  MatSlideToggle,
-  MatSlideToggleChange,
-} from '@angular/material/slide-toggle';
-
-import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { SSTBF } from '../system-caps.model';
 import { SstbfComponent } from './sstbf.component';
@@ -86,7 +79,7 @@ describe('Given SstbfComponent', () => {
   describe('when initialized and SST-BF is NOT supported', () => {
     it('should NOT display SST-BF details', () => {
       const mockedSSTBF: SSTBF = {
-        configured: true,
+        configured: false,
         hp_cores: [1, 2],
         std_cores: [1, 2],
       };
@@ -103,7 +96,7 @@ describe('Given SstbfComponent', () => {
 
     it('should display "Available No" text', () => {
       const mockedSSTBF: SSTBF = {
-        configured: true,
+        configured: false,
         hp_cores: [1, 2],
         std_cores: [1, 2],
       };
@@ -119,40 +112,25 @@ describe('Given SstbfComponent', () => {
     });
   });
 
-  describe('when slide toggle is clicked', () => {
-    it('should emit "onChange" event with correct value', (done) => {
+  describe('when initialized and SST-BF is supported and configured', () => {
+    it('should display "Available Yes" and "Configured Yes" text', () => {
       const mockedSSTBF: SSTBF = {
         configured: true,
         hp_cores: [1, 2],
         std_cores: [1, 2],
       };
 
-      const event: MatSlideToggleChange = {
-        checked: false,
-        source: {} as MatSlideToggle,
-      };
-
-      const RDTSpy = jasmine.createSpy('getSstbf');
-
-      MockInstance(AppqosService, 'getSstbf', RDTSpy).and.returnValue(
-        of(mockedSSTBF)
-      );
-
-      const fixture = MockRender(SstbfComponent, {
+      MockRender(SstbfComponent, {
         isSupported: true,
         sstbf: mockedSSTBF,
       });
 
-      const component = fixture.point.componentInstance;
-      const toggle = ngMocks.find('mat-slide-toggle');
+      const templates = ngMocks.formatText(ngMocks.findAll('.positive'));
 
-      component.changeEvent.subscribe((value) => {
-        expect(value.checked).toBeFalse();
-
-        done();
+      expect(templates.length).toBe(2);
+      templates.forEach((template)=> {
+        expect(template).toEqual('Yes');
       });
-
-      toggle.triggerEventHandler('change', event);
     });
   });
 });
