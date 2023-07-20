@@ -28,13 +28,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import {
-  ChangeDetectionStrategy,
   Component,
-  EventEmitter,
   Input,
-  Output,
 } from '@angular/core';
-import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
 import { SSTBF } from '../system-caps.model';
 
@@ -42,15 +38,8 @@ import { SSTBF } from '../system-caps.model';
   selector: 'app-sstbf',
   templateUrl: './sstbf.component.html',
   styleUrls: ['./sstbf.component.scss'],
-  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SstbfComponent {
   @Input() isSupported!: boolean;
-  @Output() changeEvent = new EventEmitter<MatSlideToggleChange>();
   @Input() sstbf!: SSTBF;
-
-  sstbfOnChange(event: MatSlideToggleChange) {
-    event.source.checked = this.sstbf.configured;
-    this.changeEvent.emit(event);
-  }
 }

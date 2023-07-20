@@ -32,22 +32,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
   <mat-divider [inset]="true"></mat-divider>
   <div class="list">
     <span>Available</span>
-    <span [ngClass]="isSupported ? 'positive' : 'negative'">{{
-      isSupported ? "Yes" : "No"
-    }}</span>
+    <span [ngClass]="isSupported ? 'positive' : 'negative'">
+      {{ isSupported ? "Yes" : "No" }}
+    </span>
   </div>
   <div *ngIf="isSupported">
     <mat-list-item *ngIf="sstbf">
       <div matLine>
         <span>Configured</span>
-        <span>
-          <mat-slide-toggle
-            color="primary"
-            name="configured"
-            [checked]="sstbf.configured"
-            (change)="sstbfOnChange($event)"
-          >
-          </mat-slide-toggle>
+        <span [ngClass]="sstbf.configured ? 'positive' : 'negative'">
+          {{ sstbf.configured ? "Yes" : "No" }}
         </span>
       </div>
     </mat-list-item>

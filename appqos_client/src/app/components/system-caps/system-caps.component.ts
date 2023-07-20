@@ -136,21 +136,6 @@ export class SystemCapsComponent implements OnInit {
     });
   }
 
-  sstbfOnChange(event: MatSlideToggleChange) {
-    this.loading = true;
-    this.service.sstbfPut(event.checked).subscribe({
-      next: (res: resMessage) => {
-        this.snackBar.displayInfo(res.message);
-        this._getSstbf();
-        this.loading = false;
-      },
-      error: (error: Error) => {
-        this.snackBar.handleError(error.message);
-        this.loading = false;
-      },
-    });
-  }
-
   l3CdpOnChange(event: MatSlideToggleChange) {
     this.loading = true;
     this.service.l3CdpPut(event.checked).subscribe({
