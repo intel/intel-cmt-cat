@@ -27,3 +27,58 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
+import { AppqosConfig } from '../../components/system-caps/system-caps.model';
+import { SharedModule } from '../../shared/shared.module';
+import { DisplayConfigComponent } from './display-config.component';
+
+describe('Given DisplayConfigComponent', () => {
+  beforeEach(() =>
+    MockBuilder(DisplayConfigComponent)
+      .mock(SharedModule)
+      .mock(MAT_DIALOG_DATA, {})
+      .mock(MatDialogRef, {})
+      .keep(BrowserAnimationsModule)
+  );
+
+  MockInstance.scope('case');
+
+  it('should display the config', async () => {
+  const baseConfig: AppqosConfig = {
+    rdt_iface: {
+      interface: 'msr',
+    },
+    apps: [],
+    pools: [
+      {
+        id: 0,
+        l3cbm: 4095,
+        name: 'Default',
+        cores: [0, 1, 2, 3],
+      },
+    ],
+  };
+    const fixture = MockRender(
+      DisplayConfigComponent,
+      {},
+      {
+        providers: [
+          {
+            provide: MAT_DIALOG_DATA,
+            useValue: { config: JSON.stringify(baseConfig, null, 2) },
+          },
+        ],
+      }
+    );
+
+    await fixture.whenStable();
+
+    const expectedConfig = ngMocks.formatText(ngMocks.find('div.config'));
+
+    expect(expectedConfig).toContain('"interface": "msr"');
+    expect(expectedConfig).toContain('"name": "Default"');
+    expect(expectedConfig).toContain('"l3cbm": 4095');
+  });
+});
