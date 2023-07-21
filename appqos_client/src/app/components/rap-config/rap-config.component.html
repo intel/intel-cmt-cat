@@ -29,15 +29,12 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
 
 <div class="container">
-  <app-pool-config
-    *ngIf="pools"
-    [apps]="apps"
-    [pools]="pools"
-    (poolEvent)="getConfigData()"
-  ></app-pool-config>
-  <app-apps-config
-    [apps]="apps"
-    [pools]="pools"
-    (appEvent)="getConfigData()"
-  ></app-apps-config>
+  <mat-tab-group dynamicHeight mat-stretch-tabs animationDuration="150ms">
+    <mat-tab  label="Pools">
+      <app-pool-config *ngIf="pools" [apps]="apps" [pools]="pools" (poolEvent)="getConfigData()"></app-pool-config>
+    </mat-tab>
+    <mat-tab label="Apps">
+      <app-apps-config [apps]="apps" [pools]="pools" (appEvent)="getConfigData()"></app-apps-config>
+    </mat-tab>
+  </mat-tab-group>
 </div>
