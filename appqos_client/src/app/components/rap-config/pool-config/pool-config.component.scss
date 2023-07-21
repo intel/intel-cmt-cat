@@ -173,6 +173,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
       }
     }
 
+    .none-text {
+      font-size: small;
+      font-style: italic;
+      opacity: 0.7;
+      margin-top: 0.3rem;
+    }
+
     .profile {
       @include pool-flex;
       align-items: center;

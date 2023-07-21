@@ -297,7 +297,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       <div *ngIf="caps.includes('power') && !sstbf?.configured" >
         <span>Speed Select Technology - Core Power (SST-CP)</span>
         <br />
-        <span class="power-text" *ngIf="!profiles.length">No profiles are currently configured</span>
+        <div class="none-text" *ngIf="!profiles.length">No profiles are currently configured</div>
         <div class="profile" *ngIf="profiles.length">
           <mat-form-field appearance="fill">
             <mat-label>Select a Power Profile</mat-label>
@@ -322,7 +322,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.-->
       <br *ngIf="!profiles.length"/>
       <span>Apps</span>
       <br/>
-      <span *ngIf="!poolApps.length">No apps currently assigned to pool</span>
+      <div class="none-text" *ngIf="!poolApps.length">No apps currently assigned to pool</div>
       <div class="pool-apps">
         <button
           mat-stroked-button
