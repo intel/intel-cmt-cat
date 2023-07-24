@@ -71,19 +71,27 @@ export class ToolbarComponent {
 
   showConfig() {
     const config: AppqosConfig = {
-      rdt_iface: {"interface": "os"},
+      rdt_iface: { interface: "os" },
+      rdt: undefined,
+      mba_ctrl: undefined,
+      sstbf: undefined,
+      power_profiles_expert_mode: undefined,
+      power_profiles_verify: undefined,
+      power_profiles: undefined,
       apps: [],
       pools: [],
     };
 
     forkJoin({
+      caps: this.local.getCapsEvent().pipe(first()),
+      l3cat: this.local.getL3CatEvent().pipe(first()),
+      l2cat: this.local.getL2CatEvent().pipe(first()),
       rdt_iface: this.local.getRdtIfaceEvent().pipe(first()),
       mba_ctrl: this.local.getMbaCtrlEvent().pipe(first()),
-      apps: this.local.getAppsEvent().pipe(first()),
-      pools: this.local.getPoolsEvent().pipe(first()),
-      power_profiles: this.local.getPowerProfilesEvent().pipe(first()),
       sstbf: this.local.getSstbfEvent().pipe(first()),
-      caps: this.local.getCapsEvent().pipe(first())
+      power_profiles: this.local.getPowerProfilesEvent().pipe(first()),
+      apps: this.local.getAppsEvent().pipe(first()),
+      pools: this.local.getPoolsEvent().pipe(first())
     }).subscribe({
       next: result => {
         const caps: string[] = result.caps;
@@ -92,6 +100,39 @@ export class ToolbarComponent {
         config.rdt_iface.interface = result.rdt_iface!.interface;
         config.pools = result.pools;
         config.apps = result.apps;
+
+        // set l3cdp settings
+        if (caps.includes('l3cat')) {
+          if (result.l3cat?.cdp_supported) {
+            config.rdt = { l3cdp: result.l3cat.cdp_enabled };
+          }
+          // remove unneeded field if cdp enabled
+          if (result.l3cat?.cdp_enabled) {
+            config.pools.map((pool) => {
+              delete pool.l3cbm;
+            });
+          }
+        }
+
+        // set l2cdp settings
+        if (caps.includes('l2cat')) {
+          if (result.l2cat?.cdp_supported) {
+            config.rdt = { ...config.rdt, l2cdp: result.l2cat.cdp_enabled };
+          }
+          // remove unneeded field if cdp enabled
+          if (result.l2cat?.cdp_enabled) {
+            config.pools.map((pool) => {
+              delete pool.l2cbm;
+            });
+          }
+        }
+
+        // set mba ctrl setting if mba supported
+        if (caps.includes('mba')) {
+          if (result.mba_ctrl) {
+            config.mba_ctrl = { enabled: result.mba_ctrl.enabled };
+          }
+        }
 
         // set power profile settings if supported
         if (caps.includes('power')) {
@@ -106,13 +147,6 @@ export class ToolbarComponent {
         if (caps.includes('sstbf')) {
           if (result.sstbf) {
             config.sstbf = { "configured": result.sstbf.configured };
-          }
-        }
-
-        // set mba ctrl setting if mba supported
-        if (caps.includes('mba')) {
-          if (result.mba_ctrl) {
-            config.mba_ctrl = { "enabled": result.mba_ctrl.enabled };
           }
         }
 
