@@ -304,6 +304,65 @@ describe('Given ToolbarComponent', () => {
     });
   });
 
+  describe('when show config button is clicked with l3cat and l2cat support (with CDP enabled)', () => {
+    it('should display config with CDP set to true for l3 and l2 cat', () => {
+      const mockedPools = [{
+        id: 0,
+        l3cbm_code: 2047,
+        l3cbm_data: 2047,
+        l2cbm_code: 3,
+        l2cbm_data: 3,
+        name: "Default",
+        cores: [0,1]
+      }];
+      MockInstance(LocalService, 'getCapsEvent', () => of(
+        ['l3cat', 'l3cdp', 'l2cat', 'l2cdp']
+      ));
+      MockInstance(LocalService, 'getL3CatEvent', () => of({
+        cache_size: 37486592,
+        cw_size: 3407872,
+        cw_num: 11,
+        clos_num: 8,
+        cdp_supported: true,
+        cdp_enabled: true
+      }));
+      MockInstance(LocalService, 'getL2CatEvent', () => of({
+        cache_size: 44040192,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016,
+        cdp_enabled: true,
+        cdp_supported: true,
+      }));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
+
+      const config: AppqosConfig = {
+        ...baseConfig,
+        rdt: { l3cdp : true, l2cdp: true },
+        pools: mockedPools
+      };
+
+      // verify changes dispayed
+      const matDialogSpy = jasmine.createSpy('open');
+      MockInstance(MatDialog, 'open', matDialogSpy);
+
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+      spyOn(component, 'showConfig').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(matDialogSpy).toHaveBeenCalledTimes(1);
+      expect(component.showConfig).toHaveBeenCalledTimes(1);
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+  });
+
   describe('when show config button is clicked with power support (no profiles defined)', () => {
     it('should display config with power settings (without profiles)', () => {
       MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'power']));
