@@ -189,7 +189,7 @@ describe('Given ToolbarComponent', () => {
     });
   });
 
-  describe('when show config button is clicked with only l3cat support', () => {
+  describe('when show config button is clicked with only l3cat support (no CDP))', () => {
     it('should display l3cat only config', () => {
       MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat']));
       // verify changes dispayed
@@ -209,6 +209,97 @@ describe('Given ToolbarComponent', () => {
       expect(component.showConfig).toHaveBeenCalledTimes(1);
       expect(component.openDialog).toHaveBeenCalledWith(
         JSON.stringify(baseConfig, null, 2)
+      );
+    });
+  });
+
+  describe('when show config button is clicked with only l3cat support (with CDP)', () => {
+    it('should display l3cat config with CDP set to true when enabled', () => {
+      const mockedPools = [{
+        id: 0,
+        l3cbm_code: 2047,
+        l3cbm_data: 2047,
+        name: "Default",
+        cores: [0,1]
+      }];
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'l3cdp']));
+      MockInstance(LocalService, 'getL3CatEvent', () => of({
+        cache_size: 37486592,
+        cw_size: 3407872,
+        cw_num: 11,
+        clos_num: 8,
+        cdp_supported: true,
+        cdp_enabled: true
+      }));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
+
+      const config: AppqosConfig = {
+        ...baseConfig,
+        rdt: { l3cdp : true },
+        pools: mockedPools
+      };
+
+      // verify changes dispayed
+      const matDialogSpy = jasmine.createSpy('open');
+      MockInstance(MatDialog, 'open', matDialogSpy);
+
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+      spyOn(component, 'showConfig').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(matDialogSpy).toHaveBeenCalledTimes(1);
+      expect(component.showConfig).toHaveBeenCalledTimes(1);
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
+      );
+    });
+
+    it('should display l3cat config with CDP set to false when disable', () => {
+      const mockedPools = [{
+        id: 0,
+        l3cbm: 2047,
+        name: "Default",
+        cores: [0,1]
+      }];
+      MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat', 'l3cdp']));
+      MockInstance(LocalService, 'getL3CatEvent', () => of({
+        cache_size: 37486592,
+        cw_size: 3407872,
+        cw_num: 11,
+        clos_num: 8,
+        cdp_supported: true,
+        cdp_enabled: false
+      }));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
+
+      const config: AppqosConfig = {
+        ...baseConfig,
+        rdt: { l3cdp : false },
+        pools: mockedPools
+      };
+
+      // verify changes dispayed
+      const matDialogSpy = jasmine.createSpy('open');
+      MockInstance(MatDialog, 'open', matDialogSpy);
+
+      const fixture = MockRender(ToolbarComponent);
+      const component = fixture.componentInstance;
+
+      spyOn(component, 'openDialog').and.callThrough();
+      spyOn(component, 'showConfig').and.callThrough();
+
+      const showConfigButton = ngMocks.find('#show-config-button');
+      showConfigButton.triggerEventHandler('click', null);
+
+      expect(matDialogSpy).toHaveBeenCalledTimes(1);
+      expect(component.showConfig).toHaveBeenCalledTimes(1);
+      expect(component.openDialog).toHaveBeenCalledWith(
+        JSON.stringify(config, null, 2)
       );
     });
   });
