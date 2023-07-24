@@ -112,22 +112,23 @@ export interface Node {
 
 /* power profile information */
 export interface PowerProfiles {
-  id: number,
-  name: string,
-  min_freq: number,
-  max_freq: number,
-  epp: string,
+  id: number;
+  name: string;
+  min_freq: number;
+  max_freq: number;
+  epp: string;
 }
 
 export interface AppqosConfig {
-  rdt_iface: {"interface": string},
-  mba_ctrl?: { "enabled": boolean },
-  apps: Apps[],
-  pools: Pools[],
-  power_profiles?: PowerProfiles[],
-  sstbf?: { "configured": boolean },
-  power_profiles_expert_mode?: boolean,
-  power_profiles_verify?: boolean
+  rdt_iface: { interface: string };
+  rdt?: { l3cdp?: boolean; l2cdp?: boolean };
+  mba_ctrl?: { enabled: boolean };
+  sstbf?: { configured: boolean };
+  power_profiles_expert_mode?: boolean;
+  power_profiles_verify?: boolean;
+  power_profiles?: PowerProfiles[];
+  apps: Apps[];
+  pools: Pools[];
 }
 
 export type PostProfile = Omit<PowerProfiles, 'id'>
