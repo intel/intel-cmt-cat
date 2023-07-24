@@ -60,6 +60,8 @@ describe('Given ToolbarComponent', () => {
         getPowerProfilesEvent: () => of([]),
         getAppsEvent: () => of([]),
         getSstbfEvent: () => of(null),
+        getL3CatEvent: () => of(null),
+        getL2CatEvent: () => of(null)
       }));
 
   const mockedIface: RDTIface = {
@@ -107,9 +109,13 @@ describe('Given ToolbarComponent', () => {
   };
 
   const baseConfig: AppqosConfig = {
-    rdt_iface: {
-      interface: 'msr',
-    },
+    rdt_iface: { interface: 'msr' },
+    rdt: undefined,
+    mba_ctrl: undefined,
+    sstbf: undefined,
+    power_profiles_expert_mode: undefined,
+    power_profiles_verify: undefined,
+    power_profiles: undefined,
     apps: [],
     pools: [
       {
