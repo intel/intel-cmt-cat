@@ -200,20 +200,6 @@ describe('Given DashboardPageComponent', () => {
       expect(getPoolsSpy).toHaveBeenCalledTimes(1);
     });
 
-    it('it should handle GET pools error', () => {
-      const getPoolsSpy = jasmine.createSpy('getPoolsSpy')
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
-
-      MockInstance(AppqosService, 'getPools', getPoolsSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(DashboardPageComponent);
-
-      expect(getPoolsSpy).toHaveBeenCalledTimes(1);
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    });
-
     it('it should call GET Apps', () => {
       const getAppsSpy = jasmine.createSpy('getAppsSpy')
         .and.returnValue(of(mockedApps));
@@ -252,20 +238,6 @@ describe('Given DashboardPageComponent', () => {
       expect(getL3catSpy).toHaveBeenCalledTimes(0);
     });
 
-    it('it should handle GET L3cat error', () => {
-      const getL3catSpy = jasmine.createSpy('getL3catSpy')
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
-
-      MockInstance(AppqosService, 'getL3cat', getL3catSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(DashboardPageComponent);
-
-      expect(getL3catSpy).toHaveBeenCalledTimes(1);
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
-    });
-
     it('it should call GET L2cat if supported', () => {
       const getL2catSpy = jasmine.createSpy('getL2catSpy')
         .and.returnValue(of(mockedCache));
@@ -291,20 +263,6 @@ describe('Given DashboardPageComponent', () => {
       MockRender(DashboardPageComponent);
 
       expect(getL2catSpy).toHaveBeenCalledTimes(0);
-    });
-
-    it('it should handle GET L2cat error', () => {
-      const getL2catSpy = jasmine.createSpy('getL2catSpy')
-        .and.returnValue(throwError(() => mockedError));
-      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
-
-      MockInstance(AppqosService, 'getL2cat', getL2catSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(DashboardPageComponent);
-
-      expect(getL2catSpy).toHaveBeenCalledTimes(1);
-      expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
 
     it('it should call GET Sstbf if supported', () => {
@@ -381,36 +339,6 @@ describe('Given DashboardPageComponent', () => {
 
       expect(getMbaSpy).toHaveBeenCalledTimes(0);
       expect(getMbaCtrlSpy).toHaveBeenCalledTimes(0);
-    });
-
-    it('it should handle GET Mba error', () => {
-      const mockedMbaError: Error = {
-        name: 'Error',
-        message: 'Mba GET Error',
-      };
-      const mockedMbaCtrlError: Error = {
-        name: 'Error',
-        message: 'MbaCtrl GET Error',
-      };
-
-      const getMbaSpy = jasmine.createSpy('getMbaSpy')
-        .and.returnValue(throwError(() => mockedMbaError));
-      const getMbaCtrlSpy = jasmine.createSpy('getMbaCtrlSpy')
-        .and.returnValue(throwError(() => mockedMbaCtrlError));
-
-      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
-
-      MockInstance(AppqosService, 'getMba', getMbaSpy);
-      MockInstance(AppqosService, 'getMbaCtrl', getMbaCtrlSpy);
-      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
-
-      MockRender(DashboardPageComponent);
-
-      expect(getMbaSpy).toHaveBeenCalledTimes(1);
-      expect(getMbaCtrlSpy).toHaveBeenCalledTimes(1);
-
-      expect(handleErrorSpy).toHaveBeenCalledWith(mockedMbaError.message);
-      expect(handleErrorSpy).toHaveBeenCalledWith(mockedMbaCtrlError.message);
     });
   });
 

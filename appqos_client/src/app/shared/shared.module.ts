@@ -83,6 +83,7 @@ import { PowerProfilesComponent } from '../components/power-profiles/power-profi
 import { PowerProfileDialogComponent } from '../components/power-profiles/power-profiles-dialog/power-profiles-dialog.component';
 import { DisplayConfigComponent } from '../components/display-config/display-config.component';
 import { SstBfComponent } from '../components/overview/sst-bf/sst-bf.component';
+import { ErrorDialogComponent } from '../components/error-dialog/error-dialog.component';
 
 @NgModule({
   declarations: [
@@ -114,6 +115,7 @@ import { SstBfComponent } from '../components/overview/sst-bf/sst-bf.component';
     PowerProfileDialogComponent,
     DisplayConfigComponent,
     SstBfComponent,
+    ErrorDialogComponent
   ],
   imports: [
     MatInputModule,

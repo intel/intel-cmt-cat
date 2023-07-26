@@ -27,11 +27,13 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { AppqosService } from 'src/app/services/appqos.service';
-import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
+import { ErrorDialogComponent } from '../error-dialog/error-dialog.component';
+import { forkJoin, of } from 'rxjs';
 
 @Component({
   selector: 'app-dashboard-page',
@@ -40,17 +42,15 @@ import { Router } from '@angular/router';
 })
 
 /* Component used to display Dashboard page*/
-export class DashboardPageComponent implements OnInit {
+export class DashboardPageComponent {
   showContent = true;
 
   constructor(
     private service: AppqosService,
-    private localService: LocalService,
+    public dialog: MatDialog,
     private snackBar: SnackBarService,
     private router: Router
-  ) { }
-
-  ngOnInit(): void {
+  ) {
     this._getCaps();
   }
 
@@ -62,22 +62,26 @@ export class DashboardPageComponent implements OnInit {
     this.service.getCaps().subscribe(
       {
         next: (caps) => {
+          forkJoin({
+            pools: this.service.getPools(),
+            l3cat: (caps.capabilities.includes('l3cat'))
+              ? this.service.getL3cat() : of([]),
+            l2cat: (caps.capabilities.includes('l2cat'))
+              ? this.service.getL2cat() : of([]),
+            mbaCtrl: (caps.capabilities.includes('mba'))
+              ? this.service.getMbaCtrl() : of([])
+          }).subscribe((data) => {
+            this._checkPools(data, caps.capabilities);
+          });
+
           this._getRdtIface();
-          this._getPools();
           this._getApps();
-
-          if (caps.capabilities.includes('l3cat'))
-            this._getL3Cat();
-
-          if (caps.capabilities.includes('l2cat'))
-            this._getL2Cat();
 
           if (caps.capabilities.includes('sstbf'))
             this._getSstbf();
 
           if (caps.capabilities.includes('mba')) {
             this._getMba();
-            this._getMbaCtrl();
           }
 
           if (caps.capabilities.includes('power'))
@@ -91,32 +95,8 @@ export class DashboardPageComponent implements OnInit {
       });
   }
 
-  private _getL3Cat() {
-    this.service.getL3cat().subscribe({
-      error: (error: Error) => {
-        this.snackBar.handleError(error.message);
-      }
-    });
-  }
-
-  private _getL2Cat() {
-    this.service.getL2cat().subscribe({
-      error: (error: Error) => {
-        this.snackBar.handleError(error.message);
-      }
-    });
-  }
-
   private _getMba() {
     this.service.getMba().subscribe({
-      error: (error: Error) => {
-        this.snackBar.handleError(error.message);
-      }
-    });
-  }
-
-  private _getMbaCtrl() {
-    this.service.getMbaCtrl().subscribe({
       error: (error: Error) => {
         this.snackBar.handleError(error.message);
       }
@@ -139,19 +119,66 @@ export class DashboardPageComponent implements OnInit {
     });
   }
 
-  private _getPools() {
-    this.service.getPools().subscribe({
-      error: (error: Error) => {
-        this.snackBar.handleError(error.message);
-      }
-    });
-  }
-
   private _getApps() {
     this.service.getApps().subscribe();
   }
 
   private _getPwrProfiles() {
     this.service.getPowerProfile().subscribe();
+  }
+
+  private _checkPools(data: any, caps: string[]) {
+
+    const fields = ['name'];
+
+    if (caps.includes('l3cat')) {
+      if (data.l3cat.cdp_enabled) {
+        fields.push('l3cbm_code', 'l3cbm_data');
+      } else {
+        fields.push('l3cbm');
+      }
+    }
+
+    if (caps.includes('l2cat')) {
+      if (data.l2cat.cdp_enabled) {
+        fields.push('l2cbm_code', 'l2cbm_data');
+      } else {
+        fields.push('l2cbm');
+      }
+    }
+
+    if (caps.includes('mba')) {
+      if (data.mbaCtrl?.enabled) {
+        fields.push('mba_bw');
+      } else {
+        fields.push('mba');
+      }
+    }
+
+    const config: { id: number, fields: string[] }[] = [];
+
+    data.pools.forEach((pool: any) => {
+      const obj: { id: number, fields: string[] } = {
+        id: pool.id,
+        fields: []
+      };
+      fields.forEach((field) => {
+        if (!(field in pool)) obj.fields.push(field);
+      });
+
+      if (obj.fields.length !== 0) config.push(obj);
+    });
+
+    if (config.length === 0) return;
+
+    this.dialog.open(ErrorDialogComponent, {
+      height: 'auto',
+      width: '26rem',
+      data: {
+        pools: config
+      }
+    });
+
+    this.router.navigate(['/login']);
   }
 }
