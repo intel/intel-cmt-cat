@@ -45,7 +45,7 @@ describe('Given SstBfComponent', () => {
 
   MockInstance.scope('case');
 
-  describe('when initialized', () => {
+  describe('when initialized and available', () => {
     it('should display "SST-BF" title', () => {
       const mockedSSTBF: SSTBF = {
         configured: true,
@@ -54,13 +54,32 @@ describe('Given SstBfComponent', () => {
       };
 
       MockRender(SstBfComponent, {
-        isSupported: true,
+        available: true,
         sstbf: mockedSSTBF,
       });
 
       const expectValue = ngMocks.formatText(ngMocks.find('mat-card-title'));
 
       expect(expectValue).toEqual('Speed Select Technology - Base Frequency (SST-BF)');
+    });
+  });
+
+  describe('when initialized and NOT available', () => {
+    it('should display "Not currently available or supported" message', () => {
+      const message = 'Not currently available or supported...';
+      MockRender(SstBfComponent, { available: false });
+
+      const expectedTitle = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(expectedTitle).toEqual(message);
+    });
+
+    it('should disabled SST-BF enable toggle', () => {
+      MockRender(SstBfComponent, { available: false });
+
+      const template = ngMocks.find('mat-slide-toggle');
+
+      expect(template.attributes['ng-reflect-disabled']).toEqual('true');
     });
   });
 
@@ -84,7 +103,7 @@ describe('Given SstBfComponent', () => {
       );
 
       const fixture = MockRender(SstBfComponent, {
-        isSupported: true,
+        available: true,
         sstbf: mockedSSTBF,
       });
 

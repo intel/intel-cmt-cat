@@ -62,10 +62,10 @@ describe('Given MbaAllocationComponent', () => {
 
   MockInstance.scope('case');
 
-  describe('when initialized', () => {
+  describe('when initialized and MBA is available', () => {
     it('should display "Memory Bandwidth Allocation (MBA)" title', () => {
       const title = 'Memory Bandwidth Allocation (MBA)';
-      MockRender(MbaAllocationComponent);
+      MockRender(MbaAllocationComponent, { available: true });
 
       const expectedTitle = ngMocks.formatText(ngMocks.find('mat-card-title'));
 
@@ -97,7 +97,7 @@ describe('Given MbaAllocationComponent', () => {
         },
       ];
 
-      MockRender(MbaAllocationComponent, { pools: mockedPool });
+      MockRender(MbaAllocationComponent, { available: true, pools: mockedPool });
 
       const expectedPoolNameList = ngMocks
         .findAll('.pool-name')
@@ -122,6 +122,41 @@ describe('Given MbaAllocationComponent', () => {
     });
   });
 
+  describe('when initialized and MBA is NOT available', () => {
+    it('should display "Not currently available or supported" message', () => {
+      const message = 'Not currently available or supported...';
+      MockRender(MbaAllocationComponent, { available: false });
+
+      const expectedTitle = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(expectedTitle).toEqual(message);
+    });
+
+    it('should display "MBA controller disabled" toggle', () => {
+      const mockedMbaData: MBACTRL = {
+        enabled: false,
+        supported: false,
+      };
+
+      MockRender(MbaAllocationComponent, {
+        available: false,
+        mbaCtrl: mockedMbaData,
+      });
+
+      const template = ngMocks.find('mat-slide-toggle');
+
+      expect(template.attributes['ng-reflect-disabled']).toEqual('true');
+    });
+
+    it('should not display edit button', () => {
+      MockRender(MbaAllocationComponent, { available: false });
+
+      const editButton = ngMocks.find('.action-button', null);
+
+      expect(editButton).toBeNull();
+    });
+  });
+
   describe('when initialized and MBA CTRL disabled', () => {
     it('should display pool mba', () => {
       const mockedPool: Pools[] = [
@@ -141,7 +176,10 @@ describe('Given MbaAllocationComponent', () => {
         },
       ];
 
-      MockRender(MbaAllocationComponent, { pools: mockedPool });
+      MockRender(MbaAllocationComponent, {
+        available: true,
+        pools: mockedPool
+      });
 
       const expectedMbaList = ngMocks
         .findAll('.pool-mba')
@@ -223,7 +261,10 @@ describe('Given MbaAllocationComponent', () => {
         },
       ];
 
-      const fixture = MockRender(MbaAllocationComponent, { pools: mockedPool });
+      const fixture = MockRender(MbaAllocationComponent, {
+        available: true,
+        pools: mockedPool
+      });
       const loader = TestbedHarnessEnvironment.loader(fixture);
       await fixture.whenStable();
       const inputs = await loader.getAllHarnesses(MatInputHarness);
@@ -245,7 +286,10 @@ describe('Given MbaAllocationComponent', () => {
         },
       ];
 
-      const fixture = MockRender(MbaAllocationComponent, { pools: mockedPool });
+      const fixture = MockRender(MbaAllocationComponent, {
+        available: true,
+        pools: mockedPool
+      });
       const loader = TestbedHarnessEnvironment.loader(fixture);
       await fixture.whenStable();
       const inputs = await loader.getAllHarnesses(MatInputHarness);
@@ -286,6 +330,7 @@ describe('Given MbaAllocationComponent', () => {
       });
 
       MockRender(MbaAllocationComponent, {
+        available: true,
         pools: mockedPool,
         mbaCtrl: { enabled: true, supported: true },
       });

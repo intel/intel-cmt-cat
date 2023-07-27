@@ -60,10 +60,10 @@ describe('Given L2CacheAllocationComponent', () => {
 
   MockInstance.scope('case');
 
-  describe('when initialized', () => {
+  describe('when initialized and available', () => {
     it('should display "L2 Cache Allocation Technology (CAT)" title', () => {
       const title = 'L2 Cache Allocation Technology (CAT)';
-      MockRender(L2CacheAllocationComponent);
+      MockRender(L2CacheAllocationComponent, { available: true });
 
       const expectedTitle = ngMocks.formatText(ngMocks.find('mat-card-title'));
 
@@ -83,7 +83,10 @@ describe('Given L2CacheAllocationComponent', () => {
 
       const {
         point: { componentInstance: component },
-      } = MockRender(L2CacheAllocationComponent, { pools: mockedPool });
+      } = MockRender(L2CacheAllocationComponent, {
+        available: true,
+        pools: mockedPool
+      });
 
       expect(component.l2cat!.cw_num).toEqual(12);
     });
@@ -113,7 +116,10 @@ describe('Given L2CacheAllocationComponent', () => {
         },
       ];
 
-      MockRender(L2CacheAllocationComponent, { pools: mockedPool });
+      MockRender(L2CacheAllocationComponent, {
+        available: true,
+        pools: mockedPool
+      });
 
       const expectedPoolName = ngMocks
         .findAll('.pool-name')
@@ -148,6 +154,7 @@ describe('Given L2CacheAllocationComponent', () => {
       ];
 
       MockRender(L2CacheAllocationComponent, {
+        available: true,
         pools: mockedPool,
       });
 
@@ -202,6 +209,7 @@ describe('Given L2CacheAllocationComponent', () => {
       ];
 
       MockRender(L2CacheAllocationComponent, {
+        available: true,
         pools: mockedPool,
       });
 
@@ -217,6 +225,25 @@ describe('Given L2CacheAllocationComponent', () => {
         '0 0 0 0 1 1 1 1 0 0 0 0',
         '0 0 0 0 0 0 0 0 1 1 1 1',
       ]);
+    });
+  });
+  
+  describe('when initialized and NOT available', () => {
+    it('should display "Not currently available or supported" message', () => {
+      const message = 'Not currently available or supported...';
+      MockRender(L2CacheAllocationComponent, { available: false });
+
+      const expectedTitle = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(expectedTitle).toEqual(message);
+    });
+ 
+    it('should not display edit button', () => {
+      MockRender(L2CacheAllocationComponent, { available: false });
+
+      const editButton = ngMocks.find('.action-button', null);
+
+      expect(editButton).toBeNull();
     });
   });
 
@@ -238,7 +265,10 @@ describe('Given L2CacheAllocationComponent', () => {
         afterClosed: () => of(null),
       });
 
-      MockRender(L2CacheAllocationComponent, { pools: mockedPool });
+      MockRender(L2CacheAllocationComponent, {
+        available: true,
+        pools: mockedPool
+      });
 
       const editButton = ngMocks.find('.action-button');
 
@@ -258,7 +288,7 @@ describe('Given L2CacheAllocationComponent', () => {
 
   describe('when click "See more"', () => {
     it('should redirect to wiki page', () => {
-      MockRender(L2CacheAllocationComponent);
+      MockRender(L2CacheAllocationComponent, { available: true });
 
       const infoUrl = ngMocks.find('a').nativeElement.getAttribute('href');
 

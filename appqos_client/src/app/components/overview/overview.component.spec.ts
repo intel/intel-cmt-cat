@@ -127,7 +127,7 @@ describe('Given OverviewComponent', () => {
   });
 
   describe('when initialized and L3 CAT is supported', () => {
-    it('should render L3CacheAllocationComponent', () => {
+    it('should pass available true to L3CacheAllocationComponent', () => {
       const mockedCaps = ['l3cat', 'mba', 'sstbf', 'power'];
 
       MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
@@ -135,25 +135,25 @@ describe('Given OverviewComponent', () => {
 
       const expectValue = ngMocks.find('app-l3-cache-allocation');
 
-      expect(expectValue).toBeTruthy();
+      expect(expectValue.attributes['ng-reflect-available']).toEqual('true');
     });
   });
 
   describe('when initialized and L3 CAT is NOT supported', () => {
-    it('should NOT render L3CacheAllocationComponent', () => {
+    it('should pass available false to L3CacheAllocationComponent', () => {
       const mockedCaps = ['l2cat', 'mba', 'sstbf', 'power'];
 
       MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
-      const expectValue = ngMocks.find('app-l3-cache-allocation', null);
+      const expectValue = ngMocks.find('app-l3-cache-allocation');
 
-      expect(expectValue).toBeNull();
+      expect(expectValue.attributes['ng-reflect-available']).toEqual('false');
     });
   });
 
   describe('when initialized and L2 CAT is supported', () => {
-    it('should render L2CacheAllocationComponent', () => {
+    it('should pass available true to L2CacheAllocationComponent', () => {
       const mockedCaps = ['l2cat', 'mba', 'sstbf', 'power'];
 
       MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
@@ -161,25 +161,25 @@ describe('Given OverviewComponent', () => {
 
       const expectValue = ngMocks.find('app-l2-cache-allocation');
 
-      expect(expectValue).toBeTruthy();
+      expect(expectValue.attributes['ng-reflect-available']).toEqual('true');
     });
   });
 
   describe('when initialized and L2 CAT is NOT supported', () => {
-    it('should NOT render L2CacheAllocationComponent', () => {
+    it('should pass available false to L2CacheAllocationComponent', () => {
       const mockedCaps = ['l3cat', 'mba', 'sstbf', 'power'];
 
       MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
-      const expectValue = ngMocks.find('app-l2-cache-allocation', null);
+      const expectValue = ngMocks.find('app-l2-cache-allocation');
 
-      expect(expectValue).toBeNull();
+      expect(expectValue.attributes['ng-reflect-available']).toEqual('false');
     });
   });
 
   describe('when initialized and MBA is supported', () => {
-    it('should render MbaAllocationComponent', () => {
+    it('should pass available true to MbaAllocationComponent', () => {
       const mockedCaps = ['l3cat', 'mba', 'sstbf', 'power'];
 
       MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
@@ -187,20 +187,20 @@ describe('Given OverviewComponent', () => {
 
       const expectValue = ngMocks.find('app-mba-allocation');
 
-      expect(expectValue).toBeTruthy();
+      expect(expectValue.attributes['ng-reflect-available']).toEqual('true');
     });
   });
 
   describe('when initialized and MBA is NOT supported', () => {
-    it('should NOT render MbaAllocationComponent', () => {
+    it('should pass available false to MbaAllocationComponent', () => {
       const mockedCaps = ['l3cat', 'l2cat', 'sstbf', 'power'];
 
       MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
       MockRender(OverviewComponent);
 
-      const expectValue = ngMocks.find('app-mba-allocation', null);
+      const expectValue = ngMocks.find('app-mba-allocation');
 
-      expect(expectValue).toBeNull();
+      expect(expectValue.attributes['ng-reflect-available']).toEqual('false');
     });
   });
 

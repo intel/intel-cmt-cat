@@ -86,6 +86,7 @@ describe('Given PowerProfilesComponent', () => {
   ];
 
   const params = {
+    available: true,
     pwrProfiles: mockedPwrProfiles,
     edit: false
   };
@@ -129,6 +130,7 @@ describe('Given PowerProfilesComponent', () => {
 
     it('it should not display table if there are no power profiles', () => {
       const params = {
+        available: true,
         pwrProfiles: []
       };
       const msg = 'No profiles currently configured';
@@ -140,6 +142,25 @@ describe('Given PowerProfilesComponent', () => {
 
       expect(expectedMsg).toEqual(msg);
       expect(table).toBeNull();
+    });
+  });
+
+  describe('when initialized and SST-CP is NOT available', () => {
+    it('should display "Not currently available or supported" message', () => {
+      const message = 'Not currently available or supported...';
+      MockRender(PowerProfilesComponent, { ...params, available: false  });
+
+      const expectedTitle = ngMocks.formatText(ngMocks.find('h2'));
+
+      expect(expectedTitle).toEqual(message);
+    });
+
+    it('should not display edit button', () => {
+      MockRender(PowerProfilesComponent, { ...params, available: false });
+
+      const addButton = ngMocks.find('.mat-mini-fab', null);
+
+      expect(addButton?.attributes['ng-reflect-disabled']).toEqual('true');
     });
   });
 
