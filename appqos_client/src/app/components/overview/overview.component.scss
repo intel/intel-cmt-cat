@@ -28,17 +28,46 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-.overview-container {
-  display: flex;
-  flex-direction: column;
-  row-gap: 1rem;
+.info-text {
+  margin-top: 1rem;
+  font-size: small;
+  width: min-content;
+  min-width: fit-content;
+  mat-icon {
+    font-size: 1.2em;
+    height: 1em;
+    width: 1em;
+  }
+}
+
+.line-through .mat-tab-label {
+  text-decoration: line-through;
+}
+
+.system-tech-container{
+  min-height: 80vh;
+  mat-card {
+    width: auto;
+  }
+}
+
+.section-container {
   min-width: 35rem;
   margin-bottom: 1rem;
+  app-system-topology {
+    width: auto;
+  }
+}
+
+.tech-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  min-width: 35rem;
 
   app-mba-allocation,
   app-l3-cache-allocation,
-  app-l2-cache-allocation,
-  app-system-topology {
+  app-l2-cache-allocation {
     width: auto;
   }
 }

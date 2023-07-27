@@ -52,6 +52,8 @@ export class OverviewComponent implements OnInit {
   pwrProfiles!: PowerProfiles[];
   sstbf!: SSTBF | null;
   subs: Subscription[] = [];
+  rdtSupported = false;
+  sstSupported = false;
 
   constructor(
     private service: AppqosService,
@@ -64,6 +66,8 @@ export class OverviewComponent implements OnInit {
 
     const capsSub = this.localService.getCapsEvent().subscribe((caps) => {
       this.caps = caps;
+      this.rdtSupported = ['l3cat', 'l2cat', 'mba'].some((feat) => this.caps.includes(feat));
+      this.sstSupported = ['sstbf', 'power'].some((feat) => this.caps.includes(feat));
     });
 
     const mbaCtrlSub = this.localService.getMbaCtrlEvent().subscribe((mbaCtrl) => {

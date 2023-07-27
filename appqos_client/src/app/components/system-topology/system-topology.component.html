@@ -29,14 +29,13 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
 
-<mat-card class="sys-topo-container">
-  <div class="sys-topo-header">
-    <mat-card-title>System Overview</mat-card-title>
-
-    <mat-slide-toggle color="primary" [checked]="detailedView" (change)="changeView($event)"
-      matTooltip="Toggle system topology details" matTooltipPosition="right">
-    </mat-slide-toggle>
-  </div>
+<div class="sys-topo-container">
+    <div class="sys-topo-header">
+      <mat-card-title style="font-size: medium">Processor Topology</mat-card-title>
+      <mat-slide-toggle color="primary" [checked]="detailedView" (change)="changeView($event)"
+                        matTooltip="Toggle system topology details" matTooltipPosition="right">
+      </mat-slide-toggle>
+    </div>
   <mat-card-content>
     <div class="info-text">
       Overview of system processor topology displaying logical cores grouped by
@@ -53,4 +52,4 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       *ngFor="let node of nodes">
     </app-node>
   </div>
-</mat-card>
+</div>

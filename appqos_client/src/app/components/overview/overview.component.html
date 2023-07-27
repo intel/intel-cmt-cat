@@ -28,34 +28,74 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 -->
-<div class="overview-container">
-  <app-system-topology
-    *ngIf="topology"
-    [systemTopology]="topology"
-    >
-  </app-system-topology>
-  <app-l3-cache-allocation
-    *ngIf="caps?.includes('l3cat')"
-    [pools]="pools"
-  ></app-l3-cache-allocation>
-  <app-l2-cache-allocation
-    *ngIf="caps?.includes('l2cat')"
-    [pools]="pools"
-  >
-  </app-l2-cache-allocation>
-  <app-mba-allocation
-    *ngIf="caps?.includes('mba')"
-    [pools]="pools"
-    [mbaCtrl]="mbaCtrl!"
-    (mbaCtrlEvent)="mbaOnChange($event)"
-  ></app-mba-allocation>
-  <app-sst-bf
-    *ngIf="caps?.includes('sstbf')"
-    [sstbf]="sstbf!"
-    (sstbfEvent)="sstbfOnChange($event)">
-  </app-sst-bf>
-  <app-power-profiles
-    [pwrProfiles]="pwrProfiles"
-    *ngIf="caps?.includes('power') && !sstbf?.configured"
-  ></app-power-profiles>
+<div class="section-container" *ngIf="topology">
+  <mat-expansion-panel expanded="true">
+    <mat-expansion-panel-header>
+      <mat-panel-title>
+        <mat-card-title>System Overview</mat-card-title>
+      </mat-panel-title>
+    </mat-expansion-panel-header>
+    <app-system-topology [systemTopology]="topology"> </app-system-topology>
+  </mat-expansion-panel>
+</div>
+<div class="system-tech-container">
+  <mat-card>
+    <mat-card-title>System Technologies</mat-card-title>
+    <mat-tab-group class="section-container" dynamicHeight mat-stretch-tabs animationDuration="150ms">
+      <mat-tab label="Intel&reg; RDT">
+        <div class="tech-container">
+          <div class="info-text">
+            Intel&reg; Resource Director Technology (RDT) provides a framework
+            with several component features for cache and memory monitoring and
+            allocation capabilities, including CMT, CAT, CDP, MBM, and MBA.
+            These technologies enable tracking and control of shared resources,
+            such as the Last Level Cache (LLC) and main memory (DRAM)
+            bandwidth...
+            <a href="https://www.intel.com/content/www/us/en/architecture-and-technology/resource-director-technology.html"
+              target="_blank" rel="noopener noreferrer">
+               See more.
+            </a>
+          </div>
+          <mat-tab-group class="section-container" dynamicHeight mat-stretch-tabs animationDuration="150ms">
+            <mat-tab label="L3 CAT">
+              <app-l3-cache-allocation [available]="caps.includes('l3cat')" [pools]="pools"></app-l3-cache-allocation>
+            </mat-tab>
+            <mat-tab label="L2 CAT">
+              <app-l2-cache-allocation [available]="caps.includes('l2cat')" [pools]="pools"></app-l2-cache-allocation>
+            </mat-tab>
+            <mat-tab label="MBA">
+              <app-mba-allocation [available]="caps.includes('mba')" [pools]="pools" [mbaCtrl]="mbaCtrl!"
+                (mbaCtrlEvent)="mbaOnChange($event)">
+              </app-mba-allocation>
+            </mat-tab>
+          </mat-tab-group>
+        </div>
+      </mat-tab>
+
+      <mat-tab label="Intel&reg; SST">
+        <div class="tech-container">
+          <div class="info-text">
+            Intel&reg; Speed Select Technology (SST) provides a collection of
+            processor power management features, including SST-BF, SST-CP,
+            SST-PP and SST-TP, that give more granular control over CPU
+            performance for optimized total cost of ownership...
+            <a href="https://www.intel.com/content/www/us/en/architecture-and-technology/speed-select-technology-article.html"
+              target="_blank" rel="noopener noreferrer">
+               See more.
+            </a>
+          </div>
+          <mat-tab-group class="section-container" dynamicHeight mat-stretch-tabs animationDuration="150ms">
+            <mat-tab label="SST-BF">
+              <app-sst-bf [available]="caps.includes('sstbf')" [sstbf]="sstbf!" (sstbfEvent)="sstbfOnChange($event)">
+              </app-sst-bf>
+            </mat-tab>
+            <mat-tab label="SST-CP">
+              <app-power-profiles [available]="caps.includes('power') && !sstbf?.configured"
+                [pwrProfiles]="pwrProfiles"></app-power-profiles>
+            </mat-tab>
+          </mat-tab-group>
+        </div>
+      </mat-tab>
+    </mat-tab-group>
+  </mat-card>
 </div>

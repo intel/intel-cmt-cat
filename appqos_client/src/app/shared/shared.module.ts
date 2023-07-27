@@ -50,6 +50,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTabsModule } from '@angular/material/tabs';
+import {MatExpansionModule} from '@angular/material/expansion';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -138,6 +139,7 @@ import { SstBfComponent } from '../components/overview/sst-bf/sst-bf.component';
     MatTableModule,
     MatMenuModule,
     MatTabsModule,
+    MatExpansionModule,
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],
