@@ -40,9 +40,20 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </div>
 <div class="system-tech-container">
   <mat-card>
+  <div class="tech-header">
     <mat-card-title>System Technologies</mat-card-title>
+    <mat-slide-toggle
+      color="primary"
+      [checked]="hideUnsupported"
+      (change)="hideUnsupportedEvent($event)"
+      matTooltip="Only show available or supported features"
+      labelPosition="before"
+    >
+    Show Only Available
+    </mat-slide-toggle>
+  </div>
     <mat-tab-group class="section-container" dynamicHeight mat-stretch-tabs animationDuration="150ms">
-      <mat-tab label="Intel&reg; RDT">
+      <mat-tab label="Intel&reg; RDT" *ngIf="rdtSupported || !hideUnsupported">
         <div class="tech-container">
           <div class="info-text">
             Intel&reg; Resource Director Technology (RDT) provides a framework
@@ -57,13 +68,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             </a>
           </div>
           <mat-tab-group class="section-container" dynamicHeight mat-stretch-tabs animationDuration="150ms">
-            <mat-tab label="L3 CAT">
+            <mat-tab label="L3 CAT" *ngIf="caps.includes('l3cat') || !hideUnsupported" >
               <app-l3-cache-allocation [available]="caps.includes('l3cat')" [pools]="pools"></app-l3-cache-allocation>
             </mat-tab>
-            <mat-tab label="L2 CAT">
+            <mat-tab label="L2 CAT" *ngIf="caps.includes('l2cat') || !hideUnsupported">
               <app-l2-cache-allocation [available]="caps.includes('l2cat')" [pools]="pools"></app-l2-cache-allocation>
             </mat-tab>
-            <mat-tab label="MBA">
+            <mat-tab label="MBA" *ngIf="caps.includes('mba') || !hideUnsupported">
               <app-mba-allocation [available]="caps.includes('mba')" [pools]="pools" [mbaCtrl]="mbaCtrl!"
                 (mbaCtrlEvent)="mbaOnChange($event)">
               </app-mba-allocation>
@@ -72,7 +83,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         </div>
       </mat-tab>
 
-      <mat-tab label="Intel&reg; SST">
+      <mat-tab label="Intel&reg; SST" *ngIf="sstSupported || !hideUnsupported">
         <div class="tech-container">
           <div class="info-text">
             Intel&reg; Speed Select Technology (SST) provides a collection of
@@ -85,11 +96,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             </a>
           </div>
           <mat-tab-group class="section-container" dynamicHeight mat-stretch-tabs animationDuration="150ms">
-            <mat-tab label="SST-BF">
+            <mat-tab label="SST-BF" *ngIf="caps.includes('sstbf') || !hideUnsupported">
               <app-sst-bf [available]="caps.includes('sstbf')" [sstbf]="sstbf!" (sstbfEvent)="sstbfOnChange($event)">
               </app-sst-bf>
             </mat-tab>
-            <mat-tab label="SST-CP">
+            <mat-tab label="SST-CP" *ngIf="(caps.includes('power') && !sstbf?.configured) || !hideUnsupported">
               <app-power-profiles [available]="caps.includes('power') && !sstbf?.configured"
                 [pwrProfiles]="pwrProfiles"></app-power-profiles>
             </mat-tab>

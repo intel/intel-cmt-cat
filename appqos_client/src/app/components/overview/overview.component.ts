@@ -52,6 +52,7 @@ export class OverviewComponent implements OnInit {
   pwrProfiles!: PowerProfiles[];
   sstbf!: SSTBF | null;
   subs: Subscription[] = [];
+  hideUnsupported = false;
   rdtSupported = false;
   sstSupported = false;
 
@@ -143,5 +144,10 @@ export class OverviewComponent implements OnInit {
         this.snackBar.handleError(error.message);
       }
     });
+  }
+
+  hideUnsupportedEvent(event: MatSlideToggleChange) {
+    event.source.checked = this.hideUnsupported;
+    this.hideUnsupported = !this.hideUnsupported;
   }
 }

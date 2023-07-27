@@ -49,6 +49,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   mat-card {
     width: auto;
   }
+  .tech-header {
+    display: flex;
+    justify-content: space-between;
+    mat-slide-toggle {
+      font-size: 0.6rem;
+    }
+  }
 }
 
 .section-container {
