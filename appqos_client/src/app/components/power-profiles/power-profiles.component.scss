@@ -42,6 +42,12 @@ table {
   min-width: fit-content;
 }
 
+h2 {
+  font-size: medium;
+  font-style: italic;
+  color: grey;
+}
+
 .header {
   display: flex;
   flex-direction: row;

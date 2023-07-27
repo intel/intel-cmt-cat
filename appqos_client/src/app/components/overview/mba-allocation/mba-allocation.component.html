@@ -42,7 +42,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         mbaCtrl.supported ? 'MBA controller enabled' : 'MBA controller disabled'
       "
       matTooltipPosition="right"
-      [disabled]="!mbaCtrl.supported"
+      [disabled]="!mbaCtrl.supported || !available"
     >
     </mat-slide-toggle>
   </div>
@@ -53,12 +53,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       bandwidth management and is a valuable tool to help control data center…
       <a
         href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-memory-bandwidth-allocation.html"
-        class="contact-text"
         target="_blank"
         rel="noopener noreferrer"
-        >See more</a
+        > See more.</a
       >
     </div>
+  </mat-card-content>
+  <mat-card-content *ngIf="available">
     <div class="pool" *ngFor="let pool of pools; index as i">
       <span class="pool-name">
         {{ pool.name }}
@@ -83,7 +84,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </div>
     </div>
   </mat-card-content>
-  <mat-card-actions class="action-button">
+  <mat-card-actions *ngIf="available" class="action-button">
     <button mat-button color="primary" (click)="openDialog()">EDIT</button>
   </mat-card-actions>
+  <h2 *ngIf="!available">
+    Not currently available or supported...
+  </h2>
 </mat-card>

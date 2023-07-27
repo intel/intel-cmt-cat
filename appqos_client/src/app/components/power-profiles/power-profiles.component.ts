@@ -40,6 +40,7 @@ import { SnackBarService } from 'src/app/shared/snack-bar.service';
   styleUrls: ['./power-profiles.component.scss']
 })
 export class PowerProfilesComponent implements OnChanges {
+  @Input() available?: boolean;
   @Input() pwrProfiles!: PowerProfiles[];
   tableData!: PowerProfiles[];
   tableHeaders: string[] = ['id', 'name', 'minFreq', 'maxFreq', 'epp', 'action'];

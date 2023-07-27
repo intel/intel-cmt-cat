@@ -42,12 +42,13 @@ import { SSTBF } from '../../system-caps/system-caps.model';
   styleUrls: ['./sst-bf.component.scss']
 })
 export class SstBfComponent {
-  @Input() sstbf!: SSTBF;
+  @Input() available?: boolean;
+  @Input() sstbf!: SSTBF | null;
   @Output() sstbfEvent = new EventEmitter<MatSlideToggleChange>();
   constructor() { }
 
   sstbfOnChange(event: MatSlideToggleChange) {
-    event.source.checked = this.sstbf.configured;
+    event.source.checked = this.sstbf?.configured;
 
     this.sstbfEvent.emit(event);
   }

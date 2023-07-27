@@ -49,6 +49,7 @@ import { Pools } from '../overview.model';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MbaAllocationComponent {
+  @Input() available?: boolean;
   @Input() pools!: Pools[];
   @Input() mbaCtrl!: MBACTRL;
   @Output() poolEvent = new EventEmitter<unknown>();

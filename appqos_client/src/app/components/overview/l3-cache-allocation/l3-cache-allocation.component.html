@@ -37,10 +37,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       where data is allocated into the last-level cache (LLC), enabling
       isolation and prioritization of key applications...<a
         href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-cache-allocation-technology.html?wapkw=introduction%20to%20cache%20allocation"
-        class="contact-text"
         target="_blank"
         rel="noopener noreferrer"
-        >See more</a
+        > See more.</a
       >
     </div>
     <div class="info-text" *ngIf="l3cat?.cdp_enabled">
@@ -49,11 +48,12 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       data placement in the LLC...
       <a
         href="https://www.intel.com/content/www/us/en/developer/articles/technical/introduction-to-code-and-data-prioritization-with-usage-models.html"
-        class="contact-text"
         target="_blank"
         rel="noopener noreferrer"
-      >See more</a>
+      > See more.</a>
     </div>
+  </mat-card-content>
+  <mat-card-content *ngIf="available">
     <div class="pool" *ngFor="let pool of poolsList">
       <span
         class="pool-name"
@@ -95,7 +95,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       </div>
     </div>
   </mat-card-content>
-  <mat-card-actions>
+  <mat-card-actions *ngIf="available">
     <button
       mat-button
       class="action-button"
@@ -105,4 +105,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       EDIT
     </button>
   </mat-card-actions>
+  <h2 *ngIf="!available">
+    Not currently available or supported...
+  </h2>
 </mat-card>

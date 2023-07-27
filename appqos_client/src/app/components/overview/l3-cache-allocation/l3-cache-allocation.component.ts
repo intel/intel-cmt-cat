@@ -52,6 +52,7 @@ import { AutoUnsubscribe } from 'src/app/services/decorators';
 })
 @AutoUnsubscribe
 export class L3CacheAllocationComponent implements OnInit, OnChanges {
+  @Input() available?: boolean;
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
   poolsList!: Pools[];

@@ -35,8 +35,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       Speed Select Technology - Base Frequency (SST-BF)
     </mat-card-title>
 
-    <mat-slide-toggle color="primary" *ngIf="sstbf" [checked]="sstbf.configured" (change)="sstbfOnChange($event)"
-      [matTooltip]="sstbf.configured ? 'SST-BF enabled' : 'Enable SST-BF'" matTooltipPosition="right">
+    <mat-slide-toggle color="primary" [disabled]="!available" [checked]="sstbf?.configured" (change)="sstbfOnChange($event)"
+      [matTooltip]="sstbf?.configured ? 'SST-BF enabled' : 'Enable SST-BF'" matTooltipPosition="right">
     </mat-slide-toggle>
   </div>
   <mat-card-content>
@@ -50,8 +50,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         SST-BF high priority cores are highlighted in the system overview when
         enabled and configured...
         <a href="https://www.intel.com/content/www/us/en/architecture-and-technology/speed-select-technology-article.html"
-          class="contact-text" target="_blank" rel="noopener noreferrer">See more</a>
+          target="_blank" rel="noopener noreferrer"> See more.</a>
       </p>
     </div>
   </mat-card-content>
+  <h2 *ngIf="!available">
+    Not currently available or supported...
+  </h2>
 </mat-card>
