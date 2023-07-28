@@ -31,6 +31,8 @@ import {
   MatSlideToggle,
   MatSlideToggleChange,
 } from '@angular/material/slide-toggle';
+import { MatTab, MatTabGroup } from '@angular/material/tabs';
+import { By } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
 import { EMPTY, of, throwError } from 'rxjs';
@@ -351,6 +353,64 @@ describe('Given OverviewComponent', () => {
       expect(sstbfPutSpy).toHaveBeenCalledWith(event.checked);
       expect(getSstbfSpy).toHaveBeenCalledTimes(1);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
+    });
+  });
+
+  describe('when slide toggle is clicked', () => {
+    it('should only display supported features', () => {
+      const mockedCaps = ['l3cat', 'sstbf'];
+      const event: MatSlideToggleChange = {
+        source: {} as MatSlideToggle,
+        checked: true,
+      };
+
+      MockInstance(LocalService, 'getCapsEvent', () => of(mockedCaps));
+      const fixture = MockRender(OverviewComponent);
+
+      let tabGroup: any[]  = fixture.debugElement.queryAll(By.directive(MatTabGroup));
+      let tabLabels: string[] = [];
+
+      // put all tab labels in to array
+      tabGroup.forEach((_group: any) => {
+        const group: MatTabGroup = _group.componentInstance;
+        const tabs: MatTab[] = group._allTabs.toArray();
+        tabs.forEach((tab: MatTab) => {
+          tabLabels.push(tab.textLabel);
+        });
+      });
+
+      // all features displayed by default
+      expect(tabLabels.includes('L3 CAT')).toBeTrue();
+      expect(tabLabels.includes('L2 CAT')).toBeTrue();
+      expect(tabLabels.includes('MBA')).toBeTrue();
+      expect(tabLabels.includes('SST-BF')).toBeTrue();
+      expect(tabLabels.includes('SST-CP')).toBeTrue();
+
+      // toggle switch to show only supported features
+      const toggle = ngMocks.find('mat-slide-toggle');
+      toggle.triggerEventHandler('change', event);
+      fixture.detectChanges();
+
+      // get new tab labels
+      tabGroup = fixture.debugElement.queryAll(By.directive(MatTabGroup));
+      tabLabels = [];
+
+      tabGroup.forEach((_group: any) => {
+        const group: MatTabGroup = _group.componentInstance;
+        const tabs: MatTab[] = group._allTabs.toArray();
+        tabs.forEach((tab: MatTab) => {
+          tabLabels.push(tab.textLabel);
+        });
+      });
+
+      // should only display l3cat and sstbf
+      expect(tabLabels.includes('L3 CAT')).toBeTrue();
+      expect(tabLabels.includes('SST-BF')).toBeTrue();
+
+      // other other should not be displayed
+      expect(tabLabels.includes('L2 CAT')).toBeFalse();
+      expect(tabLabels.includes('MBA')).toBeFalse();
+      expect(tabLabels.includes('SST-CP')).toBeFalse();
     });
   });
 });
