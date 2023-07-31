@@ -28,8 +28,6 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, OnInit } from '@angular/core';
-import { MatSlideToggleChange } from '@angular/material/slide-toggle';
-
 import { AppqosService } from 'src/app/services/appqos.service';
 import { LocalService } from 'src/app/services/local.service';
 import { SnackBarService } from 'src/app/shared/snack-bar.service';
@@ -37,6 +35,7 @@ import { SystemTopology, MBACTRL, resMessage, PowerProfiles, SSTBF } from '../sy
 import { Pools } from './overview.model';
 import { AutoUnsubscribe } from 'src/app/services/decorators';
 import { Subscription } from 'rxjs';
+import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 
 @Component({
   selector: 'app-overview',
@@ -113,8 +112,8 @@ export class OverviewComponent implements OnInit {
     });
   }
 
-  mbaOnChange(event: MatSlideToggleChange) {
-    this.service.mbaCtrlPut(event.checked).subscribe({
+  mbaOnChange() {
+    this.service.mbaCtrlPut(!this.mbaCtrl?.enabled).subscribe({
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
         this.getMbaCtrl();
@@ -126,8 +125,8 @@ export class OverviewComponent implements OnInit {
     });
   }
 
-  sstbfOnChange(event: MatSlideToggleChange) {
-    this.service.sstbfPut(event.checked).subscribe({
+  sstbfOnChange() {
+    this.service.sstbfPut(!this.sstbf?.configured).subscribe({
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
         this.getSstbf();

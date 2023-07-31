@@ -29,7 +29,6 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import { Component, OnInit, ViewEncapsulation } from '@angular/core';
 import { MatButtonToggleChange } from '@angular/material/button-toggle';
-import { MatSlideToggleChange } from '@angular/material/slide-toggle';
 import { combineLatest, Subscription } from 'rxjs';
 
 import { AppqosService } from 'src/app/services/appqos.service';
@@ -136,9 +135,9 @@ export class SystemCapsComponent implements OnInit {
     });
   }
 
-  l3CdpOnChange(event: MatSlideToggleChange) {
+  l3CdpOnChange() {
     this.loading = true;
-    this.service.l3CdpPut(event.checked).subscribe({
+    this.service.l3CdpPut(!this.l3cat?.cdp_enabled).subscribe({
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
         this._getL3cat();
@@ -152,9 +151,9 @@ export class SystemCapsComponent implements OnInit {
     });
   }
 
-  l2CdpOnChange(event: MatSlideToggleChange) {
+  l2CdpOnChange() {
     this.loading = true;
-    this.service.l2CdpPut(event.checked).subscribe({
+    this.service.l2CdpPut(!this.l2cat?.cdp_enabled).subscribe({
       next: (res: resMessage) => {
         this.snackBar.displayInfo(res.message);
         this._getL2cat();

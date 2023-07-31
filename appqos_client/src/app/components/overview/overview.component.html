@@ -76,7 +76,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             </mat-tab>
             <mat-tab label="MBA" *ngIf="caps.includes('mba') || !hideUnsupported">
               <app-mba-allocation [available]="caps.includes('mba')" [pools]="pools" [mbaCtrl]="mbaCtrl!"
-                (mbaCtrlEvent)="mbaOnChange($event)">
+                (mbaCtrlEvent)="mbaOnChange()">
               </app-mba-allocation>
             </mat-tab>
           </mat-tab-group>
@@ -97,7 +97,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           </div>
           <mat-tab-group class="section-container" dynamicHeight mat-stretch-tabs animationDuration="150ms">
             <mat-tab label="SST-BF" *ngIf="caps.includes('sstbf') || !hideUnsupported">
-              <app-sst-bf [available]="caps.includes('sstbf')" [sstbf]="sstbf!" (sstbfEvent)="sstbfOnChange($event)">
+              <app-sst-bf [available]="caps.includes('sstbf')" [sstbf]="sstbf!" (sstbfEvent)="sstbfOnChange()">
               </app-sst-bf>
             </mat-tab>
             <mat-tab label="SST-CP" *ngIf="(caps.includes('power') && !sstbf?.configured) || !hideUnsupported">

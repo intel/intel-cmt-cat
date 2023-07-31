@@ -34,10 +34,6 @@ import {
   MatButtonToggle,
   MatButtonToggleChange,
 } from '@angular/material/button-toggle';
-import {
-  MatSlideToggle,
-  MatSlideToggleChange,
-} from '@angular/material/slide-toggle';
 
 import { AppqosService } from 'src/app/services/appqos.service';
 import { SharedModule } from 'src/app/shared/shared.module';
@@ -469,67 +465,80 @@ describe('Given SystemCapsComponent', () => {
     it('it should call l3CdpPut with correct value', () => {
       const mockResponse = 'L3 CAT status changed';
       const l3CdpPutSpy = jasmine.createSpy();
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
+
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
       };
 
+      MockInstance(LocalService, 'getL3CatEvent', () => of(mockedCache));
       MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(of(mockResponse));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l3CdpOnChange(event);
+      component.l3CdpOnChange();
 
-      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
     });
 
     it('it should catch error', () => {
       const handleErrorSpy = jasmine.createSpy();
       const l3CdpPutSpy = jasmine.createSpy();
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
       };
 
+      MockInstance(LocalService, 'getL3CatEvent', () => of(mockedCache));
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
       MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(throwError(() => mockedError));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l3CdpOnChange(event);
+      component.l3CdpOnChange();
 
-      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
 
     it('it should call _getL3cat', () => {
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
+      };
+
       const mockResponse = 'L3 CAT status changed';
       const l3CdpPutSpy = jasmine.createSpy('l3CdpPutSpy');
       const getL3catSpy = jasmine.createSpy('getL3catSpy')
         .and.returnValue(of(mockedCache));
 
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
-      };
-
+      MockInstance(LocalService, 'getL3CatEvent', () => of(mockedCache));
       MockInstance(AppqosService, 'getL3cat', getL3catSpy);
       MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(of(mockResponse));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l3CdpOnChange(event);
+      component.l3CdpOnChange();
 
-      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
       expect(getL3catSpy).toHaveBeenCalledTimes(1);
     });
 
@@ -540,23 +549,27 @@ describe('Given SystemCapsComponent', () => {
       const getL3catSpy = jasmine.createSpy('getL3catSpy')
         .and.returnValue(throwError(() => mockedError));
 
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
       };
 
+      MockInstance(LocalService, 'getL3CatEvent', () => of(mockedCache));
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
       MockInstance(AppqosService, 'getL3cat', getL3catSpy);
       MockInstance(AppqosService, 'l3CdpPut', l3CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(of(mockResponse));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l3CdpOnChange(event);
+      component.l3CdpOnChange();
 
-      expect(l3CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l3CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
       expect(getL3catSpy).toHaveBeenCalledTimes(1);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
@@ -566,67 +579,80 @@ describe('Given SystemCapsComponent', () => {
     it('it should call l2CdpPut with correct value', () => {
       const mockResponse = 'L2 CAT status changed';
       const l2CdpPutSpy = jasmine.createSpy();
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
       };
 
+      MockInstance(LocalService, 'getL2CatEvent', () => of(mockedCache));
       MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(of(mockResponse));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l2CdpOnChange(event);
+      component.l2CdpOnChange();
 
-      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
     });
 
     it('it should catch error', () => {
       const handleErrorSpy = jasmine.createSpy();
       const l2CdpPutSpy = jasmine.createSpy();
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
       };
+
+      MockInstance(LocalService, 'getL2CatEvent', () => of(mockedCache));
 
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
       MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(throwError(() => mockedError));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l2CdpOnChange(event);
+      component.l2CdpOnChange();
 
-      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
 
     it('it should call _getL2cat', () => {
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
+      };
+
       const mockResponse = 'L2 CAT status changed';
       const l2CdpPutSpy = jasmine.createSpy('l2CdpPutSpy');
       const getL2catSpy = jasmine.createSpy('getL2catSpy')
         .and.returnValue(of(mockedCache));
 
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
-      };
-
+      MockInstance(LocalService, 'getL2CatEvent', () => of(mockedCache));
       MockInstance(AppqosService, 'getL2cat', getL2catSpy);
       MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(of(mockResponse));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l2CdpOnChange(event);
+      component.l2CdpOnChange();
 
-      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
       expect(getL2catSpy).toHaveBeenCalledTimes(1);
     });
 
@@ -637,23 +663,27 @@ describe('Given SystemCapsComponent', () => {
       const getL2catSpy = jasmine.createSpy('getL2catSpy')
         .and.returnValue(throwError(() => mockedError));
 
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: false,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
       };
 
+      MockInstance(LocalService, 'getL2CatEvent', () => of(mockedCache));
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
       MockInstance(AppqosService, 'getL2cat', getL2catSpy);
       MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(of(mockResponse));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l2CdpOnChange(event);
+      component.l2CdpOnChange();
 
-      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
       expect(getL2catSpy).toHaveBeenCalledTimes(1);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
@@ -665,23 +695,27 @@ describe('Given SystemCapsComponent', () => {
       const getPoolsSpy = jasmine.createSpy('getPoolsSpy')
         .and.returnValue(throwError(() => mockedError));
 
-      const event: MatSlideToggleChange = {
-        source: {} as MatSlideToggle,
-        checked: true,
+      const mockedCache: CacheAllocation = {
+        cache_size: 44040192,
+        cdp_enabled: true,
+        cdp_supported: true,
+        clos_num: 15,
+        cw_num: 12,
+        cw_size: 3670016
       };
 
+      MockInstance(LocalService, 'getL2CatEvent', () => of(mockedCache));
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
       MockInstance(AppqosService, 'getPools', getPoolsSpy);
       MockInstance(AppqosService, 'l2CdpPut', l2CdpPutSpy)
-        .withArgs(event.checked)
         .and.returnValue(of(mockResponse));
 
       const fixture = MockRender(SystemCapsComponent);
       const component = fixture.point.componentInstance;
 
-      component.l2CdpOnChange(event);
+      component.l2CdpOnChange();
 
-      expect(l2CdpPutSpy).toHaveBeenCalledWith(event.checked);
+      expect(l2CdpPutSpy).toHaveBeenCalledWith(!mockedCache.cdp_enabled);
       expect(getPoolsSpy).toHaveBeenCalledTimes(1);
       expect(handleErrorSpy).toHaveBeenCalledOnceWith(mockedError.message);
     });
