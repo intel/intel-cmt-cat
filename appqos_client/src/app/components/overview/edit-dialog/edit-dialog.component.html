@@ -94,7 +94,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
   <mat-divider class="divider"></mat-divider>
   <mat-dialog-content class="mat-typography">
-    <div class="pool" *ngFor="let pool of pools; index as poolIndex">
+    <div class="pool" *ngFor="let pool of pools; index as poolIndex"
+      [style.background]="localservice.getPoolBgColor(pool.id)"
+      >
       <ul *ngIf="pool.isValid" class="error">
         <li>MBps is required!</li>
         <li>MBps value too large</li>
@@ -109,13 +111,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <div class="cbm" *ngIf="data.l3cbm && !data.l3cdp">
         <div class="pool-cbm">
           <button
+            disableRipple="true"
             mat-flat-button
             [ngClass]="
               data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
             "
             *ngFor="let bit of pool.l3Bitmask; index as bitIndex"
-            [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
             (click)="onChangeL3CBM(bit, poolIndex, bitIndex)"
+            [style.color]="bit ? 'black' : 'grey'"
+            [style.borderColor]="bit ? 'black' : 'lightgrey'"
+            [style.background]="bit ? '#f0f0f0' : 'white'"
           >
             {{ bit }}
           </button>
@@ -139,13 +144,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <div class="pool-cdp">
             <button
               mat-flat-button
+              disableRipple="true"
               class="cdp-code-button"
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
               *ngFor="let bit of pool.l3BitmaskCode; index as bitIndex"
-              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
               (click)="onChangeL3CdpCode(bit, poolIndex, bitIndex)"
+              [style.color]="bit ? 'black' : 'grey'"
+              [style.borderColor]="bit ? 'black' : 'lightgrey'"
+              [style.background]="bit ? '#f0f0f0' : 'white'"
             >
               {{ bit }}
             </button>
@@ -153,13 +161,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <div class="pool-cdp">
             <button
               mat-flat-button
+              disableRipple="true"
               class="cdp-data-button"
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
               *ngFor="let bit of pool.l3BitmaskData; index as bitIndex"
-              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
               (click)="onChangeL3CdpData(bit, poolIndex, bitIndex)"
+              [style.color]="bit ? 'black' : 'grey'"
+              [style.borderColor]="bit ? 'black' : 'lightgrey'"
+              [style.background]="bit ? '#f0f0f0' : 'white'"
             >
               {{ bit }}
             </button>
@@ -180,12 +191,15 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
         <div class="pool-cbm">
           <button
             mat-flat-button
+            disableRipple="true"
             [ngClass]="
               data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
             "
             *ngFor="let n of pool.l2Bitmask; index as j"
-            [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
             (click)="onChangeL2CBM(n, poolIndex, j)"
+            [style.color]="n ? 'black' : 'grey'"
+            [style.borderColor]="n ? 'black' : 'lightgrey'"
+            [style.background]="n ? '#f0f0f0' : 'white'"
           >
             {{ n }}
           </button>
@@ -209,13 +223,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <div class="pool-cdp">
             <button
               mat-flat-button
+              disableRipple="true"
               class="cdp-code-button"
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
               *ngFor="let bit of pool.l2BitmaskCode; index as bitIndex"
-              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
               (click)="onChangeL2CdpCode(bit, poolIndex, bitIndex)"
+              [style.color]="bit ? 'black' : 'grey'"
+              [style.borderColor]="bit ? 'black' : 'lightgrey'"
+              [style.background]="bit ? '#f0f0f0' : 'white'"
             >
               {{ bit }}
             </button>
@@ -223,13 +240,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           <div class="pool-cdp">
             <button
               mat-flat-button
+              disableRipple="true"
               class="cdp-data-button"
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
               *ngFor="let bit of pool.l2BitmaskData; index as bitIndex"
-              [ngStyle]="{ 'background-color': bit ? '#50e1ff' : '#e0e0e0' }"
               (click)="onChangeL2CdpData(bit, poolIndex, bitIndex)"
+              [style.color]="bit ? 'black' : 'grey'"
+              [style.borderColor]="bit ? 'black' : 'lightgrey'"
+              [style.background]="bit ? '#f0f0f0' : 'white'"
             >
               {{ bit }}
             </button>

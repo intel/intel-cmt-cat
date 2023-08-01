@@ -28,7 +28,7 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
-import { Component, Inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Inject, OnInit } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { MatSliderChange } from '@angular/material/slider';
 
@@ -56,6 +56,7 @@ type Pool = Pools & {
   selector: 'app-edit-dialog',
   templateUrl: './edit-dialog.component.html',
   styleUrls: ['./edit-dialog.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 @AutoUnsubscribe
 export class EditDialogComponent implements OnInit {
@@ -68,7 +69,7 @@ export class EditDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: dialogDataType,
     private service: AppqosService,
     private snackBar: SnackBarService,
-    private localservice: LocalService
+    public localservice: LocalService
   ) { }
 
   ngOnInit(): void {

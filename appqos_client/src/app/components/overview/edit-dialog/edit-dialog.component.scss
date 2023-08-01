@@ -33,7 +33,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 }
 
 .pool {
-  padding: 1rem 1rem 0 0;
+  padding: 1rem;
+  margin-top: 0.5rem;
+  border-radius: 5px;
 }
 
 .pool-name {
@@ -43,12 +45,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 .cbm-button {
   border-radius: 0%;
-  border: 1px solid #6b6b6b;
+  border: 1px solid;
   min-width: 25px;
   padding: 0 0.2rem;
   line-height: 30px;
   margin-right: 2px;
-  margin-top: 2px;
 }
 
 .cbm-button.large {
@@ -89,6 +90,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   .pool-mba-mbps {
     display: flex;
     align-items: center;
+    justify-content: space-evenly;
 
     .apply-button {
       line-height: 2.1rem;
@@ -140,7 +142,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   }
 
   .mat-slider-horizontal {
-    width: 30rem;
+    min-width: 30rem;
   }
 }
 
