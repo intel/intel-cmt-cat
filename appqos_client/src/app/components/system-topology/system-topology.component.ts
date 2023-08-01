@@ -32,8 +32,9 @@ import { Component, Input, OnInit } from '@angular/core';
 import { LocalService } from 'src/app/services/local.service';
 import { Node, SystemTopology, SSTBF } from '../system-caps/system-caps.model';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
-import { Subscription } from 'rxjs';
+import { combineLatest, Observable, Subscription } from 'rxjs';
 import { AutoUnsubscribe } from 'src/app/services/decorators';
+import { Pools } from '../overview/overview.model';
 
 @Component({
   selector: 'app-system-topology',
@@ -46,16 +47,21 @@ export class SystemTopologyComponent implements OnInit {
   nodes: Node[] = [];
   detailedView = false;
   sstbf!: SSTBF | null;
-  sstbfSub!: Subscription;
+  pools!: Pools[] | null;
+  sstbf$!: Observable<SSTBF | null>;
+  pools$!: Observable<Pools[]>;
+  subs!: Subscription;
 
   constructor(private local: LocalService) { }
 
   ngOnInit(): void {
-    this.sstbfSub = this.local.getSstbfEvent().subscribe({
-      next: (sstbf) => {
-        this.sstbf = sstbf;
-        this.setNodeInfo();
-      },
+    this.sstbf$ = this.local.getSstbfEvent();
+    this.pools$ = this.local.getPoolsEvent();
+
+    this.subs = combineLatest([this.sstbf$, this.pools$]).subscribe(([sstbf, pools]) => {
+      this.sstbf = sstbf;
+      this.pools = pools;
+      this.setNodeInfo();
     });
   }
 
@@ -63,15 +69,18 @@ export class SystemTopologyComponent implements OnInit {
    * parse system topology and populate node list
    */
   setNodeInfo() {
+    // create local copy
+    const nodes: Node[] = [ ...this.nodes ];
+
     // get node ID's (currently socket ID's)
     this.systemTopology.core.forEach((core) => {
-      if (!this.nodes.find((node) => node.nodeID === core.socket)) {
-        this.nodes.push({ nodeID: core.socket });
+      if (!nodes.find((node) => node.nodeID === core.socket)) {
+        nodes.push({ nodeID: core.socket });
       }
     });
 
     // populate node cores
-    this.nodes.forEach((node) => {
+    nodes.forEach((node) => {
       node.cores = this.systemTopology.core.filter(
         (core) => core.socket === node.nodeID
       );
@@ -87,7 +96,20 @@ export class SystemTopologyComponent implements OnInit {
           core.sstbfHP = false;
         });
       }
+      // set core pool IDs
+      if (this.pools?.length) {
+        node.cores.forEach((core) => {
+          const pool = this.pools?.find((pool) => {
+            return pool.cores.includes(core.lcore);
+          });
+
+          if (pool) core.poolID = pool.id;
+        });
+      }
     });
+
+    // replace existing nodes to force change detection in core component
+    nodes.forEach((node, i ) => this.nodes[i] = { ...node });
   }
 
   /*
