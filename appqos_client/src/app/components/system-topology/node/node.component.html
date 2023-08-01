@@ -35,7 +35,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       <div>Node {{ node.nodeID }}</div>
     </mat-grid-tile>
     <mat-grid-tile *ngFor="let id of L2IDS" [colspan]="1" [rowspan]="2">
-      <app-core class="core" [L2ID]="id" [cores]="getL2IDCores(id)" [detailedView]="detailedView"></app-core>
+      <app-core class="core" [L2ID]="id" [node]="node" [detailedView]="detailedView"></app-core>
     </mat-grid-tile>
     <div *ngIf="detailedView">
       <mat-grid-tile *ngFor="let id of L3IDS" [colspan]="numCols" [rowspan]="1">

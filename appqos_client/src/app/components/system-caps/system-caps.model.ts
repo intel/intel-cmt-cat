@@ -95,6 +95,7 @@ export interface CoreInfo {
   L2ID: number;
   L3ID?: number;
   sstbfHP?: boolean;
+  poolID?: number;
 }
 
 /* system information  */
@@ -154,3 +155,4 @@ export const eppPostStr: string[] = [
   'balance_power',
   'power'
 ];
+

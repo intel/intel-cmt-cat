@@ -33,8 +33,9 @@ import {
   Input,
   OnChanges,
   SimpleChanges,
+  ChangeDetectionStrategy,
 } from '@angular/core';
-import { CoreInfo, Node } from '../../system-caps/system-caps.model';
+import { Node } from '../../system-caps/system-caps.model';
 
 const DEFAULT_COLS = 8;
 const ROW_HEIGHT_SMALL = '20px';
@@ -44,6 +45,7 @@ const ROW_HEIGHT_LARGE = '30px';
   selector: 'app-node',
   templateUrl: './node.component.html',
   styleUrls: ['./node.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class NodeComponent implements OnInit, OnChanges {
   @Input() node!: Node;
@@ -85,13 +87,6 @@ export class NodeComponent implements OnInit, OnChanges {
     } else {
       this.rowHeight = ROW_HEIGHT_SMALL;
     }
-  }
-
-  /*
-   * get list of cores with common L2ID
-   */
-  getL2IDCores(id: number): CoreInfo[] {
-    return this.node.cores!.filter((core) => core.L2ID === id);
   }
 
   /*

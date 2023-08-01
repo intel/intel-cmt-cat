@@ -43,4 +43,5 @@ $min-core-width: 25px;
 .lcore {
   box-sizing: border-box;
   min-width: $min-core-width;
+  border: 1px solid lightgrey;
 }

@@ -212,4 +212,27 @@ export class LocalService {
       .padStart(cw_num, '0')
       .split('').map(Number);
   }
+
+  public getPoolBgColor(poolID: number): string {
+    const bgColors: string[] = [
+      'rgb(189, 189, 189, 0.3)',
+      'rgb(67, 61, 172, 0.3)',
+      'rgb(219, 76, 50, 0.3)',
+      'rgb(109, 75, 64, 0.3',
+      'rgb(93, 112, 127, 0.3)',
+      'rgb(236, 150, 4, 0.3)',
+      'rgb(76, 160, 147, 0.3)',
+      'rgb(94, 172, 246, 0.3)',
+      'rgb(67, 61, 172, 0.2)',
+      'rgb(219, 76, 50, 0.2)',
+      'rgb(109, 75, 64, 0.2',
+      'rgb(93, 112, 127, 0.2)',
+      'rgb(236, 150, 4, 0.2)',
+      'rgb(76, 160, 147, 0.2)',
+      'rgb(94, 172, 246, 0.2)',
+      'rgb(33, 33, 33, 0.3)',
+    ];
+
+    return bgColors[poolID % bgColors.length];
+  }
 }
