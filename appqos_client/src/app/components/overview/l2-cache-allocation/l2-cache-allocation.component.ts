@@ -29,6 +29,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   EventEmitter,
   Input,
@@ -48,25 +50,28 @@ import { AutoUnsubscribe } from 'src/app/services/decorators';
   selector: 'app-l2-cache-allocation',
   templateUrl: './l2-cache-allocation.component.html',
   styleUrls: ['./l2-cache-allocation.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 @AutoUnsubscribe
 export class L2CacheAllocationComponent implements OnInit, OnChanges {
   @Input() available?: boolean;
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
-  poolsList!: Pools[];
+  poolsList: Pools[] = [];
   l2cat!: CacheAllocation | null;
   l2catSub!: Subscription;
 
   constructor(
     public dialog: MatDialog,
-    private localService: LocalService
+    public localService: LocalService,
+    private changeDetector: ChangeDetectorRef
   ) { }
 
   ngOnInit(): void {
     this.l2catSub = this.localService.getL2CatEvent().subscribe((l2cat) => {
       this.l2cat = l2cat;
       this._convertToBitmask();
+      this.changeDetector.detectChanges();
     });
   }
 

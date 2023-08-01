@@ -54,7 +54,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     </div>
   </mat-card-content>
   <mat-card-content *ngIf="available">
-    <div class="pool" *ngFor="let pool of poolsList">
+    <ng-container *ngIf="poolsList.length">
+
+    <div class="pool" *ngFor="let pool of poolsList"
+      [style.background]="localService.getPoolBgColor(pool.id)"
+      >
       <span class="pool-name" [ngStyle]="{ 'padding-left': l2cat!.cdp_enabled ? '3rem' : '0rem' }">
         {{ pool.name }}
       </span>
@@ -63,7 +67,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
           mat-flat-button
           class="l2cbm-button"
           *ngFor="let n of pool.l2Bitmask"
-          [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+          [style.color]="n ? 'black' : 'grey'"
+          [style.borderColor]="n ? 'black' : 'lightgrey'"
+          [style.background]="n ? '#f0f0f0' : 'white'"
         >
           {{ n }}
         </button>
@@ -78,7 +84,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             mat-flat-button
             class="l2cbm-button"
             *ngFor="let n of pool.l2BitmaskCode"
-            [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            [style.color]="n ? 'black' : 'grey'"
+            [style.borderColor]="n ? 'black' : 'lightgrey'"
+            [style.background]="n ? '#f0f0f0' : 'white'"
           >
             {{ n }}
           </button>
@@ -88,13 +96,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             mat-flat-button
             class="l2cbm-button"
             *ngFor="let n of pool.l2BitmaskData"
-            [ngStyle]="{ 'background-color': n ? '#50e1ff' : '#e0e0e0' }"
+            [style.color]="n ? 'black' : 'grey'"
+            [style.borderColor]="n ? 'black' : 'lightgrey'"
+            [style.background]="n ? '#f0f0f0' : 'white'"
           >
             {{ n }}
           </button>
         </div>
       </div>
     </div>
+    </ng-container>
   </mat-card-content>
   <mat-card-actions *ngIf="available">
     <button
