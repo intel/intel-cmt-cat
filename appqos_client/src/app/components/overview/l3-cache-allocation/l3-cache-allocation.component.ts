@@ -29,12 +29,14 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
 import {
+  ChangeDetectionStrategy,
   Component,
   EventEmitter,
   Input,
   OnChanges,
   OnInit,
-  Output
+  Output,
+  ChangeDetectorRef
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 
@@ -49,25 +51,28 @@ import { AutoUnsubscribe } from 'src/app/services/decorators';
   selector: 'app-l3-cache-allocation',
   templateUrl: './l3-cache-allocation.component.html',
   styleUrls: ['./l3-cache-allocation.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 @AutoUnsubscribe
 export class L3CacheAllocationComponent implements OnInit, OnChanges {
   @Input() available?: boolean;
   @Input() pools!: Pools[];
   @Output() poolEvent = new EventEmitter<unknown>();
-  poolsList!: Pools[];
+  poolsList: Pools[] = [];
   l3cat!: CacheAllocation | null;
   l3catSub!: Subscription;
 
   constructor(
     public dialog: MatDialog,
-    private localService: LocalService
+    public localService: LocalService,
+    private changeDetector: ChangeDetectorRef
   ) { }
 
   ngOnInit(): void {
     this.l3catSub = this.localService.getL3CatEvent().subscribe((l3cat) => {
       this.l3cat = l3cat;
       this._convertToBitmask();
+      this.changeDetector.detectChanges();
     });
   }
 

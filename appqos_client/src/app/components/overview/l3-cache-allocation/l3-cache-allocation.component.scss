@@ -47,7 +47,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   }
 
   .pool {
-    padding: 2rem 1rem 0 1rem;
+    padding: 1rem;
+    border-radius: 5px;
+    margin-top: 0.5rem;
   }
 
   .pool-name {
@@ -57,11 +59,10 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
   .l3cbm-button {
     border-radius: 0%;
-    border: 1px solid #6b6b6b;
+    border: 1px solid;
     min-width: 25px;
     line-height: 30px;
     margin-right: 2px;
-    margin-top: 2px;
     cursor: default;
     pointer-events: none;
   }
