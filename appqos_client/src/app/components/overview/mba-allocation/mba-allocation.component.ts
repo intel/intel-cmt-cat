@@ -37,6 +37,7 @@ import {
 } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSlideToggleChange } from '@angular/material/slide-toggle';
+import { LocalService } from 'src/app/services/local.service';
 
 import { MBACTRL } from '../../system-caps/system-caps.model';
 import { EditDialogComponent } from '../edit-dialog/edit-dialog.component';
@@ -56,7 +57,7 @@ export class MbaAllocationComponent {
   @Output() mbaCtrlEvent = new EventEmitter<MatSlideToggleChange>();
   mbaBwDefNum = Math.pow(2, 32) - 1;
 
-  constructor(public dialog: MatDialog) {}
+  constructor(public dialog: MatDialog, public localService: LocalService) { }
 
   mbaOnChange(event: MatSlideToggleChange) {
     event.source.checked = this.mbaCtrl.enabled;
@@ -67,7 +68,7 @@ export class MbaAllocationComponent {
   openDialog(): void {
     const dialogRef = this.dialog.open(EditDialogComponent, {
       height: 'auto',
-      width: '40rem',
+      width: '50rem',
       data: { mba: true },
     });
 

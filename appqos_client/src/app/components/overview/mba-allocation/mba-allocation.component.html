@@ -60,7 +60,9 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     </div>
   </mat-card-content>
   <mat-card-content *ngIf="available">
-    <div class="pool" *ngFor="let pool of pools; index as i">
+    <div class="pool" *ngFor="let pool of pools; index as i"
+      [style.background]="localService.getPoolBgColor(pool.id)"
+      >
       <span class="pool-name">
         {{ pool.name }}
       </span>
