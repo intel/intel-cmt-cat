@@ -341,7 +341,7 @@ describe('Given MbaAllocationComponent', () => {
 
       expect(dialogSpy).toHaveBeenCalledWith(EditDialogComponent, {
         height: 'auto',
-        width: '40rem',
+        width: '50rem',
         data: { mba: true },
       });
     });

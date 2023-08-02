@@ -31,7 +31,7 @@ import { MockBuilder, MockInstance, MockRender } from 'ng-mocks';
 import { TestbedHarnessEnvironment } from '@angular/cdk/testing/testbed';
 import { MatGridListHarness } from '@angular/material/grid-list/testing';
 import { CoreComponent } from './core.component';
-import { CoreInfo } from '../../system-caps/system-caps.model';
+import { Node, CoreInfo } from '../../system-caps/system-caps.model';
 import { SharedModule } from 'src/app/shared/shared.module';
 import { By } from '@angular/platform-browser';
 
@@ -57,6 +57,11 @@ describe('Given NodeComponent', () => {
     },
   ];
 
+  const mockedNode: Node = {
+    nodeID: 0,
+    cores: mockedCores,
+  };
+
   MockInstance.scope('case');
 
   describe('when initialized', () => {
@@ -64,7 +69,7 @@ describe('Given NodeComponent', () => {
 
       const fixture = MockRender(CoreComponent, {
         L2ID: mockedCores[0].L2ID,
-        cores: mockedCores,
+        node: mockedNode,
         detailedView: false,
       });
       const loader = TestbedHarnessEnvironment.loader(fixture);
@@ -83,7 +88,7 @@ describe('Given NodeComponent', () => {
 
       const fixture = MockRender(CoreComponent, {
         L2ID: mockedCores[0].L2ID,
-        cores: mockedCores,
+        node: mockedNode,
         detailedView: true,
       });
       const loader = TestbedHarnessEnvironment.loader(fixture);
@@ -100,7 +105,7 @@ describe('Given NodeComponent', () => {
       let errorMessage = '';
       const fixture = MockRender(CoreComponent, {
         L2ID: mockedCores[0].L2ID,
-        cores: mockedCores,
+        node: mockedNode,
         detailedView: false,
       });
       const loader = TestbedHarnessEnvironment.loader(fixture);
@@ -118,7 +123,7 @@ describe('Given NodeComponent', () => {
     it('should highlight SST-BF high priority cores', async () => {
       const fixture = MockRender(CoreComponent, {
         L2ID: mockedCores[0].L2ID,
-        cores: mockedCores,
+        node: mockedNode,
         detailedView: false,
       });
 
@@ -129,7 +134,7 @@ describe('Given NodeComponent', () => {
         if (mockedCores[i].sstbfHP) {
           expect(elem.styles['borderBottom']?.toString().includes('solid')).toBeTrue();
         } else {
-          expect(elem.styles['borderBottom']).toBe('none');
+          expect(elem.styles['borderBottom']).toBe('1px solid lightgrey');
         }
       });
     });

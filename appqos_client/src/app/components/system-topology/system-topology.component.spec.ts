@@ -36,6 +36,7 @@ import {
   MatSlideToggle,
   MatSlideToggleChange,
 } from '@angular/material/slide-toggle';
+import { Pools } from '../overview/overview.model';
 
 describe('Given SystemTopologyComponent', () => {
   beforeEach(() =>
@@ -43,6 +44,7 @@ describe('Given SystemTopologyComponent', () => {
       .keep(SharedModule)
       .mock(LocalService, {
         getSstbfEvent: () => EMPTY,
+        getPoolsEvent: () => EMPTY,
       })
   );
 
@@ -174,11 +176,31 @@ describe('Given SystemTopologyComponent', () => {
     std_cores: [0, 1, 4, 6, 8, 10, 11, 13, 14, 15],
   };
 
+  const mockedPools: Pools[] = [
+    {
+      id: 0,
+      mba_bw: 4294967295,
+      l3cbm_code: 2047,
+      l3cbm_data: 511,
+      name: 'Default',
+      cores: [0, 1, 45, 46, 47],
+    },
+    {
+      id: 1,
+      mba_bw: 4294967295,
+      l3cbm_code: 15,
+      l3cbm_data: 4088,
+      name: 'HP',
+      cores: [10, 12, 15],
+    }
+  ];
+
   MockInstance.scope('case');
 
   describe('when initialized', () => {
     it('should populate nodes', async () => {
       MockInstance(LocalService, 'getSstbfEvent', () => of(mockedSstbf));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
 
       const component = MockRender(SystemTopologyComponent, {
         systemTopology: mockedTopology,
@@ -189,6 +211,7 @@ describe('Given SystemTopologyComponent', () => {
 
     it('should populate node cores', async () => {
       MockInstance(LocalService, 'getSstbfEvent', () => of(mockedSstbf));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
 
       const component = MockRender(SystemTopologyComponent, {
         systemTopology: mockedTopology,
@@ -210,10 +233,15 @@ describe('Given SystemTopologyComponent', () => {
       MockInstance(LocalService, 'getSstbfEvent', () =>
         of(mockedSstbfConfigured)
       );
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
 
-      const component = MockRender(SystemTopologyComponent, {
+      const fixture = MockRender(SystemTopologyComponent, {
         systemTopology: mockedTopology,
-      }).point.componentInstance;
+      });
+
+      const component = fixture.point.componentInstance;
+
+      fixture.detectChanges();
 
       let sstbfHPCores: number[] = [];
 
@@ -236,6 +264,7 @@ describe('Given SystemTopologyComponent', () => {
       };
 
       MockInstance(LocalService, 'getSstbfEvent', () => of(mockedSstbf));
+      MockInstance(LocalService, 'getPoolsEvent', () => of(mockedPools));
 
       const component = MockRender(SystemTopologyComponent, {
         systemTopology: mockedTopology,
