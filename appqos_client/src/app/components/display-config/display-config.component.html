@@ -36,8 +36,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 </div>
 <mat-divider [inset]="true" class="divider"></mat-divider>
 <div mat-dialog-content class="config">
-{{ data.config }}
+  {{ data.config }}
 </div>
 <div mat-dialog-actions align="end">
-  <button mat-button mat-dialog-close color="primary">Close</button>
+  <button mat-flat-button color="accent" (click)="copyToClipboard()">
+    Copy to clipboard
+  </button>
+  <button mat-flat-button mat-dialog-close color="primary">Close</button>
 </div>

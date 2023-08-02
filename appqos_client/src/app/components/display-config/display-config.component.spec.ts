@@ -27,9 +27,11 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
 
+import { Clipboard } from '@angular/cdk/clipboard';
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { MockBuilder, MockInstance, MockRender, ngMocks } from 'ng-mocks';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
 import { AppqosConfig } from '../../components/system-caps/system-caps.model';
 import { SharedModule } from '../../shared/shared.module';
 import { DisplayConfigComponent } from './display-config.component';
@@ -40,12 +42,11 @@ describe('Given DisplayConfigComponent', () => {
       .mock(SharedModule)
       .mock(MAT_DIALOG_DATA, {})
       .mock(MatDialogRef, {})
+      .mock(Clipboard)
+      .mock(SnackBarService)
       .keep(BrowserAnimationsModule)
   );
 
-  MockInstance.scope('case');
-
-  it('should display the config', async () => {
   const baseConfig: AppqosConfig = {
     rdt_iface: {
       interface: 'msr',
@@ -60,25 +61,87 @@ describe('Given DisplayConfigComponent', () => {
       },
     ],
   };
-    const fixture = MockRender(
-      DisplayConfigComponent,
-      {},
-      {
-        providers: [
-          {
-            provide: MAT_DIALOG_DATA,
-            useValue: { config: JSON.stringify(baseConfig, null, 2) },
-          },
-        ],
-      }
-    );
 
-    await fixture.whenStable();
+  MockInstance.scope('case');
 
-    const expectedConfig = ngMocks.formatText(ngMocks.find('div.config'));
+  describe('when initialized', () => {
+    it('should display the config', async () => {
+      const fixture = MockRender(
+        DisplayConfigComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { config: JSON.stringify(baseConfig, null, 2) },
+            },
+          ],
+        }
+      );
 
-    expect(expectedConfig).toContain('"interface": "msr"');
-    expect(expectedConfig).toContain('"name": "Default"');
-    expect(expectedConfig).toContain('"l3cbm": 4095');
+      await fixture.whenStable();
+
+      const expectedConfig = ngMocks.formatText(ngMocks.find('div.config'));
+
+      expect(expectedConfig).toContain('"interface": "msr"');
+      expect(expectedConfig).toContain('"name": "Default"');
+      expect(expectedConfig).toContain('"l3cbm": 4095');
+    });
+  });
+
+  describe('when Copy to clipboard button is clicked and copy succeeds', () => {
+    it('should display Config copied to clipboard message', async () => {
+      const displayInfoSpy = jasmine.createSpy('displayInfoSpy');
+      MockInstance(SnackBarService, 'displayInfo', displayInfoSpy);
+      MockInstance(Clipboard, 'copy', () => true);
+
+      const fixture = MockRender(
+        DisplayConfigComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { config: JSON.stringify(baseConfig, null, 2) },
+            },
+          ],
+        }
+      );
+      await fixture.whenStable();
+
+      const copyButton = ngMocks.find('button');
+      copyButton.triggerEventHandler('click', null);
+
+      expect(displayInfoSpy).toHaveBeenCalledWith('Config copied to clipboard');
+    });
+  });
+
+  describe('when Copy to clipboard button is clicked and copy fails', () => {
+    it('should display Config copied to clipboard message', async () => {
+      const handleErrorSpy = jasmine.createSpy('handleErrorSpy');
+      MockInstance(SnackBarService, 'handleError', handleErrorSpy);
+      MockInstance(Clipboard, 'copy', () => false);
+
+      const fixture = MockRender(
+        DisplayConfigComponent,
+        {},
+        {
+          providers: [
+            {
+              provide: MAT_DIALOG_DATA,
+              useValue: { config: JSON.stringify(baseConfig, null, 2) },
+            },
+          ],
+        }
+      );
+      await fixture.whenStable();
+
+      const copyButton = ngMocks.find('button');
+      copyButton.triggerEventHandler('click', null);
+
+      expect(handleErrorSpy).toHaveBeenCalledWith(
+        'Failed to copy to clipboard'
+      );
+    });
   });
 });

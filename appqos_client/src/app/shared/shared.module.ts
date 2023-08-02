@@ -50,7 +50,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTabsModule } from '@angular/material/tabs';
-import {MatExpansionModule} from '@angular/material/expansion';
+import { MatExpansionModule } from '@angular/material/expansion';
+import { ClipboardModule } from '@angular/cdk/clipboard';
 
 import { LoginComponent } from '../components/login/login.component';
 import { AppqosService } from '../services/appqos.service';
@@ -142,6 +143,7 @@ import { ErrorDialogComponent } from '../components/error-dialog/error-dialog.co
     MatMenuModule,
     MatTabsModule,
     MatExpansionModule,
+    ClipboardModule
   ],
   exports: [LoginComponent, HttpClientModule, DashboardPageComponent],
   providers: [AppqosService, LocalService, PermissionsGuard],

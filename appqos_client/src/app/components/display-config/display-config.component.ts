@@ -31,6 +31,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import { Component, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { SnackBarService } from 'src/app/shared/snack-bar.service';
+import { Clipboard } from '@angular/cdk/clipboard';
 
 type dialogDataType = {
   config: string;
@@ -39,11 +41,20 @@ type dialogDataType = {
 @Component({
   selector: 'app-display-config',
   templateUrl: './display-config.component.html',
-  styleUrls: ['./display-config.component.scss']
+  styleUrls: ['./display-config.component.scss'],
 })
 export class DisplayConfigComponent {
-
   constructor(
     @Inject(MAT_DIALOG_DATA) public data: dialogDataType,
+    private snackBar: SnackBarService,
+    private clipboard: Clipboard
   ) { }
+
+  copyToClipboard() {
+    if (this.clipboard.copy(this.data.config)) {
+      this.snackBar.displayInfo('Config copied to clipboard');
+    } else {
+      this.snackBar.handleError('Failed to copy to clipboard');
+    }
+  }
 }
