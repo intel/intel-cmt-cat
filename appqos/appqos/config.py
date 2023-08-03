@@ -339,8 +339,6 @@ class Config(UserDict):
         Returns:
             Pool ID or None on error
         """
-        if not app:
-            return None
 
         for pool in self.data['pools']:
             if not ('id' in pool and 'apps' in pool):

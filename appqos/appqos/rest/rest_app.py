@@ -252,6 +252,8 @@ class Apps(Resource):
             raise BadRequest(f"Request validation failed - {error}") from error
 
         data = deepcopy(ConfigStore.get_config())
+        if 'apps' not in data:
+            data['apps'] = []
 
         if 'pools' not in data:
             raise NotFound("No pools in config file")

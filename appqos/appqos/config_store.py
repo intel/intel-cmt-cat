@@ -572,6 +572,10 @@ class ConfigStore:
 
         data = ConfigStore.get_config()
 
+        # no apps found in config
+        if 'apps' not in data:
+            return 0
+
         # put all ids into list
         app_ids = []
         for app in data['apps']:
@@ -579,7 +583,7 @@ class ConfigStore:
         app_ids = sorted(app_ids)
         # no app found in config
         if not app_ids:
-            return 1
+            return 0
 
         # add new app to apps
         # find an id
