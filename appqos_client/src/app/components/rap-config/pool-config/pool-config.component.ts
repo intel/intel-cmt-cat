@@ -88,7 +88,7 @@ export class PoolConfigComponent implements OnChanges, OnInit {
     Validators.pattern('^[0-9]+$'),
   ]);
   nameControl = new FormControl('', [
-    Validators.pattern('^[0-9a-zA-Z]+[ -~]+$'),
+    Validators.pattern('^[ -~]+$'),
     Validators.required,
     Validators.maxLength(Standards.MAX_CHARS),
   ]);
