@@ -116,13 +116,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             [ngClass]="
               data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
             "
-            *ngFor="let bit of pool.l3Bitmask; index as bitIndex"
-            (click)="onChangeL3CBM(bit, poolIndex, bitIndex)"
-            [style.color]="bit ? 'black' : 'grey'"
-            [style.borderColor]="bit ? 'black' : 'lightgrey'"
-            [style.background]="bit ? '#f0f0f0' : 'white'"
+            *ngFor="let n of pool.l3Bitmask; index as bitIndex"
+            (click)="onChangeL3CBM(n, poolIndex, bitIndex)"
+            [style.color]="n ? 'black' : 'grey'"
+            [style.borderColor]="n ? 'black' : 'grey'"
+            [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
           >
-            {{ bit }}
+            {{ n }}
           </button>
         </div>
         <button
@@ -149,13 +149,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
-              *ngFor="let bit of pool.l3BitmaskCode; index as bitIndex"
-              (click)="onChangeL3CdpCode(bit, poolIndex, bitIndex)"
-              [style.color]="bit ? 'black' : 'grey'"
-              [style.borderColor]="bit ? 'black' : 'lightgrey'"
-              [style.background]="bit ? '#f0f0f0' : 'white'"
+              *ngFor="let n of pool.l3BitmaskCode; index as bitIndex"
+              (click)="onChangeL3CdpCode(n, poolIndex, bitIndex)"
+              [style.color]="n ? 'black' : 'grey'"
+              [style.borderColor]="n ? 'black' : 'grey'"
+              [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
             >
-              {{ bit }}
+              {{ n }}
             </button>
           </div>
           <div class="pool-cdp">
@@ -166,13 +166,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
-              *ngFor="let bit of pool.l3BitmaskData; index as bitIndex"
-              (click)="onChangeL3CdpData(bit, poolIndex, bitIndex)"
-              [style.color]="bit ? 'black' : 'grey'"
-              [style.borderColor]="bit ? 'black' : 'lightgrey'"
-              [style.background]="bit ? '#f0f0f0' : 'white'"
+              *ngFor="let n of pool.l3BitmaskData; index as bitIndex"
+              (click)="onChangeL3CdpData(n, poolIndex, bitIndex)"
+              [style.color]="n ? 'black' : 'grey'"
+              [style.borderColor]="n ? 'black' : 'grey'"
+              [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
             >
-              {{ bit }}
+              {{ n }}
             </button>
           </div>
           <button
@@ -198,8 +198,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
             *ngFor="let n of pool.l2Bitmask; index as j"
             (click)="onChangeL2CBM(n, poolIndex, j)"
             [style.color]="n ? 'black' : 'grey'"
-            [style.borderColor]="n ? 'black' : 'lightgrey'"
-            [style.background]="n ? '#f0f0f0' : 'white'"
+            [style.borderColor]="n ? 'black' : 'grey'"
+            [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
           >
             {{ n }}
           </button>
@@ -228,13 +228,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
-              *ngFor="let bit of pool.l2BitmaskCode; index as bitIndex"
-              (click)="onChangeL2CdpCode(bit, poolIndex, bitIndex)"
-              [style.color]="bit ? 'black' : 'grey'"
-              [style.borderColor]="bit ? 'black' : 'lightgrey'"
-              [style.background]="bit ? '#f0f0f0' : 'white'"
+              *ngFor="let n of pool.l2BitmaskCode; index as bitIndex"
+              (click)="onChangeL2CdpCode(n, poolIndex, bitIndex)"
+              [style.color]="n ? 'black' : 'grey'"
+              [style.borderColor]="n ? 'black' : 'grey'"
+              [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
             >
-              {{ bit }}
+              {{ n }}
             </button>
           </div>
           <div class="pool-cdp">
@@ -245,13 +245,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
               [ngClass]="
                 data.numCacheWays > 12 ? 'cbm-button small' : 'cbm-button large'
               "
-              *ngFor="let bit of pool.l2BitmaskData; index as bitIndex"
-              (click)="onChangeL2CdpData(bit, poolIndex, bitIndex)"
-              [style.color]="bit ? 'black' : 'grey'"
-              [style.borderColor]="bit ? 'black' : 'lightgrey'"
-              [style.background]="bit ? '#f0f0f0' : 'white'"
+              *ngFor="let n of pool.l2BitmaskData; index as bitIndex"
+              (click)="onChangeL2CdpData(n, poolIndex, bitIndex)"
+              [style.color]="n ? 'black' : 'grey'"
+              [style.borderColor]="n ? 'black' : 'grey'"
+              [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
             >
-              {{ bit }}
+              {{ n }}
             </button>
           </div>
           <button

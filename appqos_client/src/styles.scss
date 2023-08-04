@@ -79,6 +79,10 @@ $intel-theme: mat-light-theme($intel-primary, $intel-accent, $intel-warn);
 
 @include angular-material-theme($intel-theme);
 
+:root {
+    --cbm-disabled-bg: rgb(0, 0, 0, 0.07);
+}
+
 html,
 body {
   height: 100%;

@@ -81,8 +81,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
                   : pool.l3BitmaskCode
               "
               [style.color]="n ? 'black' : 'grey'"
-              [style.borderColor]="n ? 'black' : 'lightgrey'"
-              [style.background]="n ? '#f0f0f0' : 'white'"
+              [style.borderColor]="n ? 'black' : 'grey'"
+              [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
             >
               {{ n }}
             </button>
@@ -93,8 +93,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
               class="l3cbm-button"
               *ngFor="let n of pool.l3BitmaskData"
               [style.color]="n ? 'black' : 'grey'"
-              [style.borderColor]="n ? 'black' : 'lightgrey'"
-              [style.background]="n ? '#f0f0f0' : 'white'"
+              [style.borderColor]="n ? 'black' : 'grey'"
+              [style.background]="n ? 'white' : 'var(--cbm-disabled-bg)'"
             >
               {{ n }}
             </button>
