@@ -208,7 +208,7 @@ class Powers(Resource):
         """
         data = ConfigStore.get_config()
         if 'power_profiles' not in data:
-            raise NotFound("No power profiles in config file")
+            return [], 200
 
         return data['power_profiles'], 200
 

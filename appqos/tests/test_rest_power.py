@@ -189,7 +189,10 @@ class TestRestPowerProfiles:
     @mock.patch("appqos.caps.sstcp_enabled", mock.MagicMock(return_value=True))
     def test_get_epp_no_profiles_configured(self):
         response = Rest().get("/power_profiles")
-        assert response.status_code == 404
+        data = json.loads(response.data.decode('utf-8'))
+
+        assert response.status_code == 200
+        assert not data
 
         for id in range(5):
             response = Rest().get("/power_profiles/{}".format(id))

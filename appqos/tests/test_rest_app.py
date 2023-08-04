@@ -69,8 +69,8 @@ class TestAppsGet:
         data = json.loads(response.data.decode('utf-8'))
 
         # assert 0 apps are returned
-        assert response.status_code == 404
-        assert "No apps in config" in data["message"]
+        assert response.status_code == 200
+        assert not data
 
 
 class TestAppPost:

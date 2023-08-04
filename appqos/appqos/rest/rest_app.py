@@ -221,7 +221,7 @@ class Apps(Resource):
         """
         data = ConfigStore.get_config()
         if 'apps' not in data or not data['apps']:
-            raise NotFound("No apps in config file")
+            return ([]), 200
 
         apps = data['apps']
 
