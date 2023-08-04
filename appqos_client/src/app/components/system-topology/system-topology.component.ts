@@ -52,7 +52,7 @@ export class SystemTopologyComponent implements OnInit {
   pools$!: Observable<Pools[]>;
   subs!: Subscription;
 
-  constructor(private local: LocalService) { }
+  constructor(public local: LocalService) { }
 
   ngOnInit(): void {
     this.sstbf$ = this.local.getSstbfEvent();

@@ -52,4 +52,13 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       *ngFor="let node of nodes">
     </app-node>
   </div>
+
+  <div class="pools-legend" *ngIf="pools?.length">
+    <label
+        *ngFor="let pool of pools"
+        [style.background]="local.getPoolBgColor(pool.id)"
+        >
+        {{ pool.name }}
+    </label>
+  </div>
 </div>

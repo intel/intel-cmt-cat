@@ -61,3 +61,19 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.*/
   flex-direction: column;
   gap: 10px;
 }
+
+.pools-legend {
+  margin-top: 0.5rem;
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  max-width: 40rem;
+  label {
+    border-style: solid;
+    border-color: grey;
+    border-width: 1px;
+    border-radius: 3px;
+    padding: 0.2rem;
+    font-size: x-small;
+  }
+}
