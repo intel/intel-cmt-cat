@@ -1,7 +1,8 @@
 # Introduction
 
 App QoS is a software created to demonstrate the use of Intel(R) RDT
-technologies (CAT, MBA) to improve QoS for applications via partitioning system
+technologies (CAT, MBA) and Intel(R) SST technologies Base Frequency (BF),
+Core Power (CP) to improve QoS for applications via partitioning system
 resources.
 
 _NOTE: This is just a quick start-up guide. For more information about App QoS please see [Advanced_AppQoS_Usage_Guide.txt](https://raw.githubusercontent.com/intel/intel-cmt-cat/master/appqos/doc/Advanced_AppQoS_Usage_Guide.txt)_
@@ -106,7 +107,7 @@ WORKON_HOME=../venv/appqos_localhost pipenv run python3 ./appqos
 2021-05-07 16:58:37,499 INFO  Supported RDT interfaces: ['msr', 'os']
 2021-05-07 16:58:37,508 INFO  RDT initialized with 'os' interface
 2021-05-07 16:58:37,665 INFO  Supported capabilities:
-2021-05-07 16:58:37,665 INFO  ['cat', 'mba']
+2021-05-07 16:58:37,665 INFO  ['l3cat', 'mba']
 2021-05-07 16:58:37,700 INFO  SST-BF not enabled
 2021-05-07 16:58:37,700 INFO  Power Profiles/EPP not enabled
 2021-05-07 16:58:37,701 INFO  Configuring RDT
@@ -127,7 +128,7 @@ System supports RDT MSR and OS interfaces. MBA BW/MBA CTRL is supported only for
 ```
 2020-12-14 19:30:52,539 INFO  RDT initialized with 'os' interface
 2020-12-14 19:30:52,701 INFO  Supported capabilities:
-2020-12-14 19:30:52,701 INFO  ['cat', 'mba']
+2020-12-14 19:30:52,701 INFO  ['l3cat', 'mba']
 ```
 RDT is initialized with OS interface and supports both CAT and MBA.
 
@@ -191,7 +192,7 @@ $ curl https://localhost:5000/caps -X GET --cert client_appqos.crt --key client_
 
 {
   "capabilities": [
-    "cat",
+    "l3cat",
     "mba"
   ]
 }
@@ -217,7 +218,7 @@ $ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client
   {
     "id": 0,
     "mba": 100,
-    "cbm": 2047,
+    "l3cbm": 2047,
     "name": "Default",
     "cores": [
       0,
@@ -251,7 +252,7 @@ $ curl https://localhost:5000/pools/0 -X GET --cert client_appqos.crt --key clie
 {
   "id": 0,
   "mba": 100,
-  "cbm": 2047,
+  "l3cbm": 2047,
   "name": "Default",
   "cores": [
     5,
@@ -271,7 +272,7 @@ _NOTE: New cores configuration `"cores": [5, 6, 7, ... , 45, 46, 47].`_
 **Create new pool**
 
 ```
-$ curl https://localhost:5000/pools -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "HP", "cores": [0,1,2,3,4], "mba": 100, "cbm": 2047}'
+$ curl https://localhost:5000/pools -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "HP", "cores": [0,1,2,3,4], "mba": 100, "l3cbm": 2047}'
 
 {"id": 7, "message": "New POOL 7 added"}
 ```
@@ -293,7 +294,7 @@ $ curl https://localhost:5000/pools/7 -X GET --cert client_appqos.crt --key clie
     4
   ],
   "mba": 100,
-  "cbm": 2047,
+  "l3cbm": 2047,
   "id": 7
 }
 ```
@@ -320,7 +321,7 @@ $ curl https://localhost:5000/pools/7 -X GET --cert client_appqos.crt --key clie
     4
   ],
   "mba": 70,
-  "cbm": 2047,
+  "l3cbm": 2047,
   "id": 7
 }
 ```
@@ -331,7 +332,7 @@ _NOTE: New pool's MBA is configured to 70% `"mba": 70`._
 Set HP pool to use 7 (isolated) LLC Cache Ways
 
 ```
-$ curl https://localhost:5000/pools/7 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"cbm": "0x7F0"}'
+$ curl https://localhost:5000/pools/7 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"l3cbm": "0x7F0"}'
 
 {"message": "POOL 7 updated"}
 ```
@@ -351,12 +352,12 @@ $ curl https://localhost:5000/pools/7 -X GET --cert client_appqos.crt --key clie
     4
   ],
   "mba": 70,
-  "cbm": 2032,
+  "l3cbm": 2032,
   "id": 7
 }
 ```
 
-_NOTE: New pool's CBM value is updated `"cbm": 2032 (0x7F0)`_
+_NOTE: New pool's CBM value is updated `"l3cbm": 2032 (0x7F0)`_
 
 ### Enable MBA CTRL
 
@@ -413,7 +414,7 @@ $ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client
   {
     "id": 0,
     "mba_bw": 4294967295,
-    "cbm": 2047,
+    "l3cbm": 2047,
     "name": "Default",
     "cores": [
       0,
@@ -441,7 +442,7 @@ $ curl https://localhost:5000/pools/0 -X PUT --cert client_appqos.crt --key clie
 
 Create new pool with 5GBps MBA limit
 ```
-$ curl https://localhost:5000/pools -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "HP", "cores": [0,1,2,3,4,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40], "mba_bw": 5000, "cbm": 2047}'
+$ curl https://localhost:5000/pools -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "HP", "cores": [0,1,2,3,4,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40], "mba_bw": 5000, "l3cbm": 2047}'
 
 {"id": 7, "message": "New POOL 7 added"}
 ```
@@ -462,7 +463,7 @@ $ curl https://localhost:5000/pools/7 -X GET --cert client_appqos.crt --key clie
     40
   ],
   "mba_bw": 5000,
-  "cbm": 2047,
+  "l3cbm": 2047,
   "id": 7
 }
 
@@ -496,7 +497,7 @@ $ curl https://localhost:5000/pools/7 -X GET --cert client_appqos.crt --key clie
     40
   ],
   "mba_bw": 10000,
-  "cbm": 2047,
+  "l3cbm": 2047,
   "id": 7
 }
 

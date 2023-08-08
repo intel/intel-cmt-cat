@@ -103,9 +103,9 @@ EXAMPLE CONFIG
 "apps": [{"id": 1, "name": "App1", "pids": [1979, 1980]},
          {"id": 2, "cores": [4], "name": "App2", "pids": [1592, 1593, 1594]},
          {"id": 3, "cores": [5], "name": "App3", "pids": [1576, 1577, 1578]}],
-"pools": [{"id": 1, "cores": [1, 2, 3], "name": "HP", "mba": 100, "cbm": "0xFF0", "apps": [1], "power_profile": 1},
-          {"id": 2, "cores": [4, 5, 6], "name": "MP", "mba": 50, "cbm": "0xC", "apps": [2, 3]},
-          {"id": 3, "cores": [7, 8, 9], "name": "LP", "mba": 10, "cbm": "0x3", "apps": []}],
+"pools": [{"id": 1, "cores": [1, 2, 3], "name": "HP", "mba": 100, "l3cbm": "0xFF0", "apps": [1], "power_profile": 1},
+          {"id": 2, "cores": [4, 5, 6], "name": "MP", "mba": 50, "l3cbm": "0xC", "apps": [2, 3]},
+          {"id": 3, "cores": [7, 8, 9], "name": "LP", "mba": 10, "l3cbm": "0x3", "apps": []}],
 "power_profiles": [{"id": 1, "min_freq": 2500, "max_freq": 2500, "epp": "performance", "name": "HP"}],
 "sstbf": {"configured": false},
 "power_profiles_expert_mode": false,
@@ -128,7 +128,7 @@ EXAMPLE CONFIG
  - "id" - Pool's ID
  - "name" - Pool's name
  - "apps" - list of Apps being part of the Pool
- - "cbm" - Intel RDT CAT CacheWayBitmask assigned to Pool
+ - "l3cbm" - Intel RDT CAT CacheWayBitmask assigned to Pool
  - MBA related configuration:
     - "mba" - Intel RDT MBA rate [%] assigned to Pool (default, 1 - 100 [%])
    OR
@@ -264,7 +264,7 @@ JSON Schema files for REST API commands and responses are available in "./schema
 
 - GET /caps - get system capabilities
  Example response:
-  {"capabilities": ["cat","mba","sstbf","power"]
+  {"capabilities": ["l3cat","mba","sstbf","power"]
   }
 
 
@@ -380,7 +380,7 @@ INFO  Interface OS, MBA BW: supported.
 INFO  Supported RDT interfaces: ['msr', 'os']
 INFO  RDT initialized with 'msr' interface
 INFO  Supported capabilities:
-INFO  ['cat', 'mba', 'sstbf', 'power']
+INFO  ['l3cat', 'mba', 'sstbf', 'power']
  * Serving Flask app "rest.rest_server" (lazy loading)
  * Environment: production
    WARNING: This is a development server. Do not use it in a production deployment.
@@ -404,7 +404,7 @@ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_a
   {
     "id": 0,
     "mba": 100,
-    "cbm": 2047,
+    "l3cbm": 2047,
     "name": "Default",
     "cores": [
       0,
@@ -438,7 +438,7 @@ curl https://localhost:5000/caps -X GET --cert client_appqos.crt --key client_ap
 
 {
     "capabilities": [
-        "cat",
+        "l3cat",
         "mba",
         "sstbf",
         "power"
@@ -625,7 +625,7 @@ curl https://localhost:5000/caps/sstbf -X GET --cert client_appqos.crt --key cli
 
 Modify "Default" pool to exclude HP cores, assign 50% of MBA and 4 LLC CWs (CBM: 0xF/15)
 
-curl https://localhost:5000/pools/0 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"cores": [0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47], "mba": 50, "cbm": "0xf"}'
+curl https://localhost:5000/pools/0 -X PUT --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"cores": [0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47], "mba": 50, "l3cbm": "0xf"}'
 
 "POOL 0 updated"
 
@@ -635,7 +635,7 @@ curl https://localhost:5000/pools/0 -X GET --cert client_appqos.crt --key client
 
 {"id":0,
 "mba":50,
-"cbm":15,
+"l3cbm":15,
 "name":"Default",
 "cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47],
 "apps":[1,2]}
@@ -685,7 +685,7 @@ curl https://localhost:5000/caps/sstbf -X GET --cert client_appqos.crt --key cli
 
 Create HP Pool, with 7 (isolated) LLC CWs allocated and 100% of MBA
 
-curl https://localhost:5000/pools -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "HP", "cores": [2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40], "cbm": "0x7F0", "mba": 100}'
+curl https://localhost:5000/pools -X POST --cert client_appqos.crt --key client_appqos.key --cacert ca.crt -H "Content-Type: application/json" -d '{"name": "HP", "cores": [2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40], "l3cbm": "0x7F0", "mba": 100}'
 
 {
     "id": 7
@@ -699,13 +699,13 @@ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_a
 
 [{"id":0,
 "mba":50,
-"cbm":15,
+"l3cbm":15,
 "name":"Default",
 "cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47],
 "apps":[1,2]},
 {"name":"HP",
 "cores":[2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40],
-"cbm":2032,
+"l3cbm":2032,
 "mba":100,
 "id":7}]
 
@@ -834,13 +834,13 @@ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_a
 
 [{"id":0,
 "mba":50,
-"cbm":15,
+"l3cbm":15,
 "name":"Default",
 "cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47],
 "apps":[1]},
 {"name":"HP",
 "cores":[2,10,11,12,13,14,15,16,25,34,35,36,37,38,39,40],
-"cbm":2032,
+"l3cbm":2032,
 "mba":100,
 "id":7,
 "apps":[2]}]
@@ -958,7 +958,7 @@ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_a
 
 [{"id":0,
 "mba":50,
-"cbm":15,
+"l3cbm":15,
 "name":"Default",
 "cores":[0,1,3,4,5,6,7,8,9,17,18,19,20,21,22,23,24,26,27,28,29,30,31,32,33,41,42,43,44,45,46,47],
 "apps":[1]}]
@@ -987,7 +987,7 @@ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_a
 
 [{"id":0,
 "mba":100,
-"cbm":2047,
+"l3cbm":2047,
 "name":"Default",
 "cores":[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47]}]
 
@@ -1078,7 +1078,7 @@ curl https://localhost:5000/pools -X GET --cert client_appqos.crt --key client_a
   {
     "id": 0,
     "mba_bw": 4294967295,
-    "cbm": 2047,
+    "l3cbm": 2047,
     "name": "Default",
     "cores": [
       0,
@@ -1106,7 +1106,7 @@ curl https://localhost:5000/pools/0 -X GET --cert client_appqos.crt --key client
 {
   "id": 0,
   "mba_bw": 5000,
-  "cbm": 2047,
+  "l3cbm": 2047,
   "name": "Default",
   "cores": [
     0,
