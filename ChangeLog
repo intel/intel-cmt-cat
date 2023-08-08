@@ -1,4 +1,22 @@
 =======================================================================
+Release  v23.08 Aug 2023
+=======================================================================
+
+Contributors (alphabetical order):
+        Corey Shanahan <corey.shanahan@intel.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Marcin Klosowski <marcinx.klosowski@intel.com>
+        Raghavan Kanagaraj <raghavan.kanagaraj@intel.com>
+        Ularbek Zairbekov <ularbekx.zairbekov@intel.com>
+
+1. Library:
+        - Fix incorrect detection of L3CAT
+2. App QoS
+        - Fix incorrect REST API error codes
+3. App QoS Client
+        - Add new App QoS client web application
+
+=======================================================================
 Release  v4.6.0 2023-05-29
 =======================================================================
 
