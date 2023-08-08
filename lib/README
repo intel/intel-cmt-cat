@@ -3,7 +3,7 @@
 ========================================================================
 README for PQoS/Intel(R) RDT library
 
-April 2016
+Aug 2023
 ========================================================================
 
 
@@ -20,7 +20,8 @@ Overview
 
 PQoS library provides API to detect and configure Intel(R) RDT including:
 Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
-Cache Allocation Technology (CAT), Code and Data Prioritization (CDP) Technology.
+Cache Allocation Technology (CAT), Code and Data Prioritization (CDP)
+and Memory Bandwidth Allocation (MBA).
 For more information about Intel(R) RDT please see top level README.
 
 
