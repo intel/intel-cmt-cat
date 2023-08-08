@@ -49,7 +49,7 @@
  * Local data types
  * ---------------------------------------
  */
-#define AP_BUFFER_SIZE 256
+#define AP_BUFFER_SIZE 320
 
 /**
  * ---------------------------------------

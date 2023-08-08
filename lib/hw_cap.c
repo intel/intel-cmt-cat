@@ -473,6 +473,13 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
                 LOG_WARN("Cache allocation not supported on model name '%s'!\n",
                          brand_str);
                 return PQOS_RETVAL_RESOURCE;
+        } else {
+                LOG_WARN(
+                    "Detected model specific non-architectural features (L3 "
+                    "CAT).\n      Intel recommends validating that the feature "
+                    "provides the\n      performance necessary for your "
+                    "use-case. Non-architectural\n      features may not "
+                    "behave as expected in all scenarios.\n");
         }
 
         /**
