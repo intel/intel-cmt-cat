@@ -3,7 +3,7 @@ README for Intel(R) RDT Software Package
 
 [![Coverity Status](https://scan.coverity.com/projects/intel-cmt-cat/badge.svg)](https://scan.coverity.com/projects/intel-cmt-cat)
 [![License](https://img.shields.io/badge/Licence-BSD%203--Clause-blue)](https://github.com/intel/intel-cmt-cat/blob/master/lib/python/LICENSE)
-October 2021
+Aug 2023
 
 
 
@@ -47,10 +47,10 @@ available OS interfaces (perf and resctrl on Linux). The library detects
 presence of these interfaces and allows to select the preferred one through
 a configuration option.
 As the result, existing tools like 'pqos' or 'rdtset' can also be used
-to manage Intel(R) RDT in an OS compatible way. MSR interface remains
-the default option for now. 'pqos' tool wrappers have been added to help with
-the interface selection. 'pqos-os' and 'pqos-msr' for OS and MSR interface
-operations respectively.
+to manage Intel(R) RDT in an OS compatible way. As of release v4.3.0, OS
+interface became the default option. 'pqos' tool wrappers have been added to
+help with the interface selection. 'pqos-os' and 'pqos-msr' for OS and MSR
+interface operations respectively.
 
 PID API compile time option has been removed and the APIs are always available.
 Note that proper operation of these APIs depends on availability and
@@ -82,7 +82,7 @@ Includes PQoS library Python 3.x wrapper.
 Please refer to the interface README for more details (lib/python/README.md).
 
 **"pqos" directory:** \
-Includes utility files providing command line access to
+Includes source files for a utility that provides command line access to
 Intel(R) RDT. The utility links against the library and programs
 the technologies via its API's.
 Please refer to the utility README for more details "pqos/README".
@@ -90,13 +90,25 @@ Manual page of "pqos" utility also provides information about tool usage:
 $ man pqos
 
 **"rdtset" directory:** \
-Includes files of utility that provides "taskset"-like functionality and
-CAT configuration.
+Includes source files for a utility that provides "taskset"-like functionality
+for RDT configuration.
 The utility links against the library and programs the technologies
 via its API's.
 Please refer to the utility README for more details "rdtset/README".
 Manual page of "rdtset" utility also provides information about tool usage:
 $ man rdtset
+
+**"appqos" directory:**\
+Includes source files for an application that allows to group apps into
+priority based pools. Each pool is assigned an Intel(R) RDT and Intel(R) SST
+configuration that can be set on startup or at runtime through a REST API.
+Please refer to the application README for more details "appqos/README".
+
+**"appqos_client" directory:**\
+Includes source files for an App QoS client web application. The app
+provides a simple user interface to remotely configure Intel(R) RDT and
+Intel(R) SST on systems where App QoS is running.
+Please refer to the application README for more details "appqos_client/README".
 
 **"examples" directory:** \
 Includes C and Perl examples of Intel(R) RDT usage via the library API's.
@@ -108,7 +120,7 @@ the PQoS library Perl wrapper API.
 Please refer to README file for more details "snmp/README".
 
 **"tools" directory:** \
-Includes membw tool for stressing memory bandwidth with different operations
+Includes membw tool for stressing memory bandwidth with different operations.
 
 **"srpm" directory:** \
 Includes *.src *.rpm and *.spec files for the software package.
