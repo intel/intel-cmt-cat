@@ -1,9 +1,12 @@
 # App QoS Client
 
-App QoS client is a web application that provides a Graphical User Interface (GUI) to configure Intel(R) Resource Director Technology (RDT). The application acts as a frontend to [App QoS](https://github.com/intel/intel-cmt-cat/tree/master/appqos), therefore requires a running instance of App QoS in order to make platform configuration changes via its REST API.
+App QoS client is a web application that provides a Graphical User Interface (GUI) to configure Intel(R) Resource Director Technology (RDT) and Intel(R) Speed Select Technology (SST). The application acts as a frontend to [App QoS](https://github.com/intel/intel-cmt-cat/tree/master/appqos), therefore requires a running instance of App QoS in order to make platform configuration changes via its REST API.
 
 For more information on the App QoS client application, visit the wiki at: https://github.com/intel/intel-cmt-cat/wiki/AppQoS-Client  
 _NOTE:_ App QoS client is intended for evaluating Intel(R) platform technologies and should not be deployed in production environments.
+
+#### Browser Support
+Google Chrome is the recommended browser for running AppQoS client application.
 
 ## Security
 All communication between App QoS and the client application is sent securely over HTTPS (TLS v1.2 and later supported). Mutual TLS (mTLS) provides mutual authentication. This requires the generation of a client TLS certificate that can be imported into the browser in order to authenticate the client and establish a secure connection to the App QoS instance.
