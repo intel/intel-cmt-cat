@@ -56,7 +56,7 @@ export class RdtIfaceComponent {
 
     //Every time when we will click it will change state of Toggle butto value.
     //If response will failure then it will equal current state because rdtIface is not changed.
-    //If response success then our rdtIface will updated and will eqaul new value.
+    //If response success then our rdtIface will updated and will equal new value.
     event.source.buttonToggleGroup.value = this.rdtIface.interface;
   }
 }

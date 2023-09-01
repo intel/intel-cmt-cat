@@ -100,13 +100,13 @@ describe('Given RdtIfaceComponent', () => {
       const group = await loader.getHarness(MatButtonToggleGroupHarness);
       const toggles = await group.getToggles();
 
-      const lables = await Promise.all(
+      const labels = await Promise.all(
         toggles.map(
           async (toggle: MatButtonToggleHarness) => await toggle.getText()
         )
       );
 
-      expect(lables).toEqual(['msr', 'os']);
+      expect(labels).toEqual(['msr', 'os']);
     });
   });
 

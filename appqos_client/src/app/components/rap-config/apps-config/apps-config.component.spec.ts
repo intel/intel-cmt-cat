@@ -103,7 +103,7 @@ describe('Given AppConfigComponent', () => {
 
   describe('when initialized with existing apps', () => {
     it('should display correct app details after init', async () => {
-      // initialize component with mocked initail apps and pools
+      // initialize component with mocked initial apps and pools
       const fixture = MockRender(AppsConfigComponent, params);
       const loader: HarnessLoader = TestbedHarnessEnvironment.loader(fixture);
 
@@ -136,7 +136,7 @@ describe('Given AppConfigComponent', () => {
         apps: [...mockedApps],
       };
 
-      // initialize component with mocked initail apps and pools
+      // initialize component with mocked initial apps and pools
       const fixture = MockRender(AppsConfigComponent, params);
       const loader: HarnessLoader = TestbedHarnessEnvironment.loader(fixture);
 

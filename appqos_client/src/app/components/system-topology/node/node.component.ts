@@ -90,7 +90,7 @@ export class NodeComponent implements OnInit, OnChanges {
   }
 
   /*
-   * determine number of colums that results
+   * determine number of columns that results
    * in all rows and columns occupied
    */
   getNumCols(): number {
@@ -106,7 +106,7 @@ export class NodeComponent implements OnInit, OnChanges {
       return numL2IDS;
     }
 
-    // calculate number of colums
+    // calculate number of columns
     for (let i = maxCols; i > 0; i--) {
       if (numL2IDS % i === 0) {
         return i;

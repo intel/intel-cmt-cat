@@ -192,7 +192,7 @@ describe('Given ToolbarComponent', () => {
   describe('when show config button is clicked with only l3cat support (no CDP))', () => {
     it('should display l3cat only config', () => {
       MockInstance(LocalService, 'getCapsEvent', () => of(['l3cat']));
-      // verify changes dispayed
+      // verify changes displayed
       const matDialogSpy = jasmine.createSpy('open');
       MockInstance(MatDialog, 'open', matDialogSpy);
 
@@ -239,7 +239,7 @@ describe('Given ToolbarComponent', () => {
         pools: mockedPools
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const matDialogSpy = jasmine.createSpy('open');
       MockInstance(MatDialog, 'open', matDialogSpy);
 
@@ -283,7 +283,7 @@ describe('Given ToolbarComponent', () => {
         pools: mockedPools
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const matDialogSpy = jasmine.createSpy('open');
       MockInstance(MatDialog, 'open', matDialogSpy);
 
@@ -342,7 +342,7 @@ describe('Given ToolbarComponent', () => {
         pools: mockedPools
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const matDialogSpy = jasmine.createSpy('open');
       MockInstance(MatDialog, 'open', matDialogSpy);
 
@@ -374,7 +374,7 @@ describe('Given ToolbarComponent', () => {
         power_profiles_verify: true
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const fixture = MockRender(ToolbarComponent);
       const component = fixture.componentInstance;
 
@@ -404,7 +404,7 @@ describe('Given ToolbarComponent', () => {
         power_profiles_verify: true
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const fixture = MockRender(ToolbarComponent);
       const component = fixture.componentInstance;
 
@@ -434,7 +434,7 @@ describe('Given ToolbarComponent', () => {
         }
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const fixture = MockRender(ToolbarComponent);
       const component = fixture.componentInstance;
 
@@ -460,7 +460,7 @@ describe('Given ToolbarComponent', () => {
         mba_ctrl: { enabled: mockedMbaCtrl.enabled }
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const fixture = MockRender(ToolbarComponent);
       const component = fixture.componentInstance;
 
@@ -486,7 +486,7 @@ describe('Given ToolbarComponent', () => {
         apps: mockedApps
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const fixture = MockRender(ToolbarComponent);
       const component = fixture.componentInstance;
 
@@ -522,7 +522,7 @@ describe('Given ToolbarComponent', () => {
         mba_ctrl: { enabled: mockedMbaCtrl.enabled }
       };
 
-      // verify changes dispayed
+      // verify changes displayed
       const fixture = MockRender(ToolbarComponent);
       const component = fixture.componentInstance;
 
@@ -544,7 +544,7 @@ describe('Given ToolbarComponent', () => {
       MockInstance(LocalService, 'getMbaCtrlEvent', () => throwError(() => new Error('error')));
       MockInstance(SnackBarService, 'handleError', handleErrorSpy);
 
-      // verify error message dispayed
+      // verify error message displayed
       const fixture = MockRender(ToolbarComponent);
       const component = fixture.componentInstance;
 
