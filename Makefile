@@ -83,6 +83,7 @@ style:
 	$(MAKE) -C examples/c/CMT_MBM style
 	$(MAKE) -C examples/c/PSEUDO_LOCK style
 	$(MAKE) -C appqos style
+	$(MAKE) -C appqos_client style
 	$(MAKE) -C tests style
 	$(MAKE) -C unit-test style
 
