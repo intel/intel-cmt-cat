@@ -35,14 +35,21 @@
 
 #include "hw_monitoring.h"
 
-int __wrap_hw_mon_reset(void);
-int __wrap_hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
+int __wrap_hw_mon_reset(const struct pqos_mon_config *cfg);
+int __wrap_hw_mon_assoc_get_core(const unsigned lcore, pqos_rmid_t *rmid);
+int __wrap_hw_mon_assoc_get_channel(const pqos_channel_t channel_id,
+                                    pqos_rmid_t *rmid);
 int __wrap_hw_mon_start_cores(const unsigned num_cores,
                               const unsigned *cores,
                               const enum pqos_mon_event event,
                               void *context,
                               struct pqos_mon_data *group,
                               const struct pqos_mon_options *opt);
+int __wrap_hw_mon_start_channels(const unsigned num_channels,
+                                 const pqos_channel_t *channels,
+                                 const enum pqos_mon_event event,
+                                 void *context,
+                                 struct pqos_mon_data *group);
 int __wrap_hw_mon_stop(struct pqos_mon_data *group);
 int __wrap_hw_mon_poll(struct pqos_mon_data *group,
                        const enum pqos_mon_event event);

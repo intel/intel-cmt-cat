@@ -204,7 +204,7 @@ test_os_mon_reset(void **state __attribute__((unused)))
 
         will_return(__wrap_resctrl_mon_reset, PQOS_RETVAL_OK);
 
-        ret = os_mon_reset();
+        ret = os_mon_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 

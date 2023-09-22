@@ -34,13 +34,13 @@
  * @brief Platform QoS utility - allocation module
  *
  */
-
 #include "alloc.h"
 
 #include "common.h"
 #include "main.h"
 #include "pqos.h"
 
+#include <inttypes.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -110,6 +110,34 @@ static struct {
         pid_t task_id;
         unsigned class_id;
 } sel_assoc_pid_tab[128];
+
+/**
+ * Number of IO RDT Channel to COS associations to be done
+ */
+static int sel_assoc_channel_num = 0;
+
+/**
+ * IO RDT Channel to COS associations details
+ */
+static struct {
+        pqos_channel_t channel;
+        unsigned class_id;
+} sel_assoc_channel_tab[128];
+
+/**
+ * Number of IO RDT Device to COS associations to be done
+ */
+static int sel_assoc_dev_num = 0;
+
+/**
+ * IO RDT Device to COS associations details
+ */
+static struct {
+        uint16_t segment;
+        uint16_t bdf;
+        unsigned vc;
+        unsigned class_id;
+} sel_assoc_dev_tab[128];
 
 /**
  * Maintains alloc option - allocate cores or task id's
@@ -606,7 +634,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
 /**
  * @brief Parse and apply selected allocation options
  *
- * @param cpu cpu topology structure
+ * @param cpu CPU topology structure
  *
  * @return Number of modified classes
  * @retval Positive on success
@@ -670,21 +698,49 @@ selfn_allocation_class(const char *arg)
 }
 
 /**
+ * @brief Retrieve device information
+ *
+ * @param [in] segment Device segment/domain
+ * @param [in] bdf Device ID
+ *
+ * @return Device information structure
+ * @retval NULL on error
+ */
+static const struct pqos_dev *
+_devinfo_get_dev(const struct pqos_devinfo *dev, uint16_t segment, uint16_t bdf)
+{
+        unsigned i;
+
+        if (dev == NULL)
+                return NULL;
+        for (i = 0; i < dev->num_devs; ++i) {
+                const struct pqos_dev *device = &dev->devs[i];
+
+                if (device->segment == segment && device->bdf == bdf)
+                        return device;
+        }
+
+        return NULL;
+}
+
+/**
  * @brief Sets up association between cores/tasks and allocation
  *        classes of service
  *
+ * @param dev device information
  * @return Number of associations made
  * @retval 0 no association made (nor requested)
  * @retval negative error
  * @retval positive success
  */
 static int
-set_allocation_assoc(void)
+set_allocation_assoc(const struct pqos_devinfo *dev)
 {
         int i;
-        int ret;
 
         for (i = 0; i < sel_assoc_core_num; i++) {
+                int ret;
+
                 ret = pqos_alloc_assoc_set(sel_assoc_tab[i].core,
                                            sel_assoc_tab[i].class_id);
                 if (ret == PQOS_RETVAL_PARAM) {
@@ -698,6 +754,8 @@ set_allocation_assoc(void)
         }
 
         for (i = 0; i < sel_assoc_pid_num; i++) {
+                int ret;
+
                 ret = pqos_alloc_assoc_set_pid(sel_assoc_pid_tab[i].task_id,
                                                sel_assoc_pid_tab[i].class_id);
                 if (ret == PQOS_RETVAL_PARAM) {
@@ -710,11 +768,67 @@ set_allocation_assoc(void)
                         return -1;
                 }
         }
-        if (sel_assoc_tab != NULL) {
-                free(sel_assoc_tab);
-                sel_assoc_tab = NULL;
+
+        for (i = 0; i < sel_assoc_channel_num; i++) {
+                int ret;
+
+                ret = pqos_alloc_assoc_set_channel(
+                    sel_assoc_channel_tab[i].channel,
+                    sel_assoc_channel_tab[i].class_id);
+                if (ret == PQOS_RETVAL_PARAM) {
+                        printf("Channel or class id is out of "
+                               "bounds!\n");
+                        return -1;
+                } else if (ret != PQOS_RETVAL_OK) {
+                        printf("Setting allocation class of service "
+                               "association failed!\n");
+                        return -1;
+                }
         }
-        return sel_assoc_core_num | sel_assoc_pid_num;
+
+        for (i = 0; i < sel_assoc_dev_num; i++) {
+                int ret = PQOS_RETVAL_OK;
+                uint16_t segment = sel_assoc_dev_tab[i].segment;
+                uint16_t bdf = sel_assoc_dev_tab[i].bdf;
+                unsigned vc = sel_assoc_dev_tab[i].vc;
+                unsigned cos = sel_assoc_dev_tab[i].class_id;
+
+                const struct pqos_dev *device =
+                    _devinfo_get_dev(dev, segment, bdf);
+
+                if (device == NULL) {
+                        printf("Invalid device!\n");
+                        return -1;
+                }
+
+                /* All device channels */
+                if (vc == DEV_ALL_VCS) {
+                        unsigned c;
+
+                        for (c = 0; c < PQOS_DEV_MAX_CHANNELS; ++c) {
+                                if (device->channel[c] == 0)
+                                        continue;
+
+                                ret = pqos_alloc_assoc_set_dev(segment, bdf, c,
+                                                               cos);
+                                if (ret != PQOS_RETVAL_OK)
+                                        break;
+                        }
+                } else
+                        ret = pqos_alloc_assoc_set_dev(segment, bdf, vc, cos);
+
+                if (ret == PQOS_RETVAL_PARAM) {
+                        printf("Channel or class id is out of bounds!\n");
+                        return -1;
+                } else if (ret != PQOS_RETVAL_OK) {
+                        printf("Setting allocation class of service "
+                               "association failed!\n");
+                        return -1;
+                }
+        }
+
+        return sel_assoc_core_num | sel_assoc_pid_num | sel_assoc_channel_num |
+               sel_assoc_dev_num;
 }
 
 /**
@@ -899,6 +1013,218 @@ fill_pid_tab(char *str)
 }
 
 /**
+ * @brief Adds channel and COS to internal channel table.
+ *
+ * @param channel channel to be added
+ * @param cos COS for channel
+ */
+static void
+add_channel_channel_tab(const pqos_channel_t channel, const unsigned cos)
+{
+        ASSERT(channel);
+
+        if (sel_assoc_channel_num <= 0) {
+                sel_assoc_channel_num = 0;
+                sel_assoc_channel_tab[sel_assoc_channel_num].channel = channel;
+                sel_assoc_channel_tab[sel_assoc_channel_num].class_id = cos;
+                sel_assoc_channel_num++;
+                return;
+        }
+
+        size_t i;
+
+        for (i = 0; i < (size_t)sel_assoc_channel_num; i++)
+                if (sel_assoc_channel_tab[i].channel == channel)
+                        break;
+
+        if (i < (size_t)sel_assoc_channel_num) {
+                /**
+                 * this channel is already on the list
+                 * - update COS but warn about it
+                 */
+                printf("warn: updating COS for channel 0x%" PRIx64
+                       " from %u to %u\n",
+                       channel, sel_assoc_channel_tab[i].class_id, cos);
+
+                sel_assoc_channel_tab[i].class_id = cos;
+        } else {
+                /**
+                 * New channel is selected - extend the list
+                 */
+                size_t j = (size_t)sel_assoc_channel_num;
+
+                if (j >= DIM(sel_assoc_channel_tab)) {
+                        printf("warn: too many channels selected for "
+                               "allocation association!\n");
+                        return;
+                }
+
+                sel_assoc_channel_tab[j].channel = channel;
+                sel_assoc_channel_tab[j].class_id = cos;
+                sel_assoc_channel_num++;
+        }
+}
+
+/**
+ * @brief Verifies and translates allocation association config string into
+ *        internal dev table.
+ *
+ * @param str string passed to -a command line option
+ */
+static void
+fill_dev_tab(char *str)
+{
+        unsigned cos = 0;
+        uint16_t segment = 0;
+        uint16_t bus, device, function;
+        uint16_t bdf = 0;
+        unsigned vc = DEV_ALL_VCS; /* All channels by default */
+        char *p = NULL;
+
+        str += strlen("dev:");
+        p = strchr(str, '=');
+        if (p == NULL)
+                parse_error(str, "Invalid allocation class of service "
+                                 "association format.");
+        *p = '\0';
+
+        cos = (unsigned)strtouint64(str);
+
+        str = ++p;
+
+        /* Rough PCI ID validation */
+        size_t colon_count = 0;
+        size_t point_count = 0;
+
+        while (*p) {
+                if (*p == ':')
+                        ++colon_count;
+                if (*p == '.')
+                        ++point_count;
+                ++p;
+        }
+
+        if (!colon_count || (colon_count > 2) || (point_count != 1))
+                parse_error(str, "Invalid PCI ID format.");
+
+        /* PCI segment */
+        if (colon_count > 1) {
+                p = strchr(str, ':');
+                if (p == NULL)
+                        parse_error(str, "Invalid PCI ID format.");
+                *p = '\0';
+                segment = (uint16_t)strhextouint64(str);
+                str = p + 1;
+        }
+
+        /* PCI bus */
+        p = strchr(str, ':');
+        if (p == NULL)
+                parse_error(str, "Invalid PCI ID format.");
+        *p = '\0';
+        bus = (uint16_t)strhextouint64(str);
+        str = p + 1;
+
+        /* PCI device */
+        p = strchr(str, '.');
+        if (p == NULL)
+                parse_error(str, "Invalid PCI ID format.");
+        *p = '\0';
+        device = (uint16_t)strhextouint64(str);
+        str = p + 1;
+
+        /* PCI virtual channel */
+        p = strchr(str, '@');
+        if (p) {
+                *p = '\0';
+                vc = (unsigned)strtouint64(p + 1);
+        }
+
+        /* PCI function */
+        function = (uint16_t)strhextouint64(str);
+
+        /* PCI BDF */
+        bdf |= bus << 8;
+        bdf |= (device & 0x1F) << 3;
+        bdf |= function & 0x7;
+
+        if (sel_assoc_dev_num <= 0) {
+                sel_assoc_dev_num = 0;
+                sel_assoc_dev_tab[sel_assoc_dev_num].segment = segment;
+                sel_assoc_dev_tab[sel_assoc_dev_num].bdf = bdf;
+                sel_assoc_dev_tab[sel_assoc_dev_num].vc = vc;
+                sel_assoc_dev_tab[sel_assoc_dev_num].class_id = cos;
+                sel_assoc_dev_num++;
+                return;
+        }
+
+        size_t i;
+
+        for (i = 0; i < (size_t)sel_assoc_dev_num; i++)
+                if ((sel_assoc_dev_tab[i].segment == segment) &&
+                    (sel_assoc_dev_tab[i].bdf == bdf) &&
+                    (sel_assoc_dev_tab[i].vc == vc))
+                        break;
+
+        if (i < (size_t)sel_assoc_dev_num) {
+                /**
+                 * this dev is already on the list
+                 * - update COS but warn about it
+                 */
+                printf("warn: updating COS for dev %.4x:%.4x:%.2x.%x", segment,
+                       bus, device, function);
+                if (vc != DEV_ALL_VCS)
+                        printf("@%u", vc);
+                printf(" from %u to %u.\n", sel_assoc_dev_tab[i].class_id, cos);
+
+                sel_assoc_dev_tab[i].class_id = cos;
+        } else {
+                /**
+                 * New dev is selected - extend the list
+                 */
+                i = (size_t)sel_assoc_dev_num;
+
+                if (i >= DIM(sel_assoc_dev_tab)) {
+                        printf("warn: too many devs selected for allocation "
+                               "association.\n");
+                        return;
+                }
+
+                sel_assoc_dev_tab[i].segment = segment;
+                sel_assoc_dev_tab[i].bdf = bdf;
+                sel_assoc_dev_tab[i].vc = vc;
+                sel_assoc_dev_tab[i].class_id = cos;
+                sel_assoc_dev_num++;
+        }
+}
+
+/**
+ * @brief Verifies and translates allocation association config string into
+ *        internal channel table.
+ *
+ * @param str string passed to -a command line option
+ */
+static void
+fill_channel_tab(char *str)
+{
+        pqos_channel_t channel;
+        unsigned cos = 0;
+        char *p = NULL;
+
+        str += strlen("channel:");
+        p = strchr(str, '=');
+        if (p == NULL)
+                parse_error(str, "Invalid allocation class of service "
+                                 "association format");
+        *p = '\0';
+
+        cos = (unsigned)strtouint64(str);
+        channel = (pqos_channel_t)strtouint64(p + 1);
+
+        add_channel_channel_tab(channel, cos);
+}
+
+/**
  * @brief Verifies allocation association config string.
  *
  * @param str string passed to -a command line option
@@ -914,6 +1240,12 @@ parse_allocation_assoc(char *str)
         } else if (strncasecmp(str, "pid:", 4) == 0) {
                 alloc_pid_flag = 1;
                 fill_pid_tab(str);
+        } else if (strncasecmp(str, "dev:", 4) == 0) {
+                alloc_pid_flag = 0;
+                fill_dev_tab(str);
+        } else if (strncasecmp(str, "channel:", 8) == 0) {
+                alloc_pid_flag = 0;
+                fill_channel_tab(str);
         } else
                 parse_error(str, "Unrecognized allocation type");
 }
@@ -1127,12 +1459,170 @@ print_core_assoc(const int is_alloc,
                 printf("\n");
 }
 
+/**
+ * @brief Retrieves and prints device association
+ *
+ * @param [in] is_alloc indicates if allocation technology is present
+ * @param [in] is_mon indicates if monitoring technology is present
+ * @param [in] dev device info structure
+ * @param [in] devinfo IO RDT info structure
+ */
+static void
+print_dev_assoc(const int is_alloc,
+                const int is_mon,
+                const struct pqos_dev *dev,
+                const struct pqos_devinfo *devinfo)
+{
+        unsigned vc;
+
+        if (!dev || !devinfo || !(is_alloc || is_mon))
+                return;
+
+        for (vc = 0; vc < PQOS_DEV_MAX_CHANNELS; ++vc) {
+                if (!dev->channel[vc])
+                        continue;
+
+                const struct pqos_channel *channel =
+                    pqos_devinfo_get_channel(devinfo, dev->channel[vc]);
+
+                if (!channel)
+                        continue;
+
+                const int print_clos = is_alloc && channel->clos_tagging;
+                const int print_rmid = is_mon && channel->rmid_tagging;
+
+                if (!(print_clos || print_rmid))
+                        continue;
+
+                printf("    Device %.4x:%.4x:%.2x.%x@%u, Channel 0x%" PRIx64
+                       " => ",
+                       dev->segment, BDF_BUS(dev->bdf), BDF_DEV(dev->bdf),
+                       BDF_FUNC(dev->bdf), vc, dev->channel[vc]);
+
+                if (print_clos) {
+                        unsigned class_id = 0;
+                        int ret = pqos_alloc_assoc_get_dev(
+                            dev->segment, dev->bdf, vc, &class_id);
+
+                        if (ret == PQOS_RETVAL_OK)
+                                printf("COS%u", class_id);
+                        else if (ret == PQOS_RETVAL_RESOURCE)
+                                printf("NOCOS");
+                        else
+                                printf("ERROR");
+                }
+
+                if (print_rmid) {
+                        pqos_rmid_t rmid = 0;
+                        int ret = pqos_mon_assoc_get_dev(dev->segment, dev->bdf,
+                                                         vc, &rmid);
+
+                        if (print_clos)
+                                printf(", ");
+                        if (ret == PQOS_RETVAL_OK)
+                                printf("RMID%u", (unsigned)rmid);
+                        else if (ret == PQOS_RETVAL_RESOURCE)
+                                printf("NORMID");
+                        else
+                                printf("ERROR");
+                }
+
+                printf("\n");
+        }
+}
+
+/**
+ * @brief Retrieves and prints channel association
+ *
+ * @param [in] is_alloc indicates if allocation technology is present
+ * @param [in] is_mon indicates if monitoring technology is present
+ * @param [in] channel channel info structure
+ */
+static void
+print_channel_assoc(const int is_alloc,
+                    const int is_mon,
+                    const struct pqos_channel *channel)
+{
+        pqos_rmid_t rmid = 0;
+        int ret = PQOS_RETVAL_OK;
+
+        if (!channel)
+                return;
+
+        const int print_clos = is_alloc && channel->clos_tagging;
+        const int print_rmid = is_mon && channel->rmid_tagging;
+
+        if (!(print_clos || print_rmid))
+                return;
+
+        printf("    Channel 0x%" PRIx64 " => ", channel->channel_id);
+
+        if (print_clos) {
+                unsigned class_id = 0;
+                int ret = pqos_alloc_assoc_get_channel(channel->channel_id,
+                                                       &class_id);
+
+                if (ret == PQOS_RETVAL_OK)
+                        printf("COS%u", class_id);
+                else if (ret == PQOS_RETVAL_RESOURCE)
+                        printf("NOCOS");
+                else
+                        printf("ERROR");
+        }
+
+        if (print_rmid) {
+                ret = pqos_mon_assoc_get_channel(channel->channel_id, &rmid);
+
+                if (print_clos)
+                        printf(", ");
+                if (ret == PQOS_RETVAL_OK)
+                        printf("RMID%u", (unsigned)rmid);
+                else if (ret == PQOS_RETVAL_RESOURCE)
+                        printf("NORMID");
+                else
+                        printf("ERROR");
+        }
+
+        printf("\n");
+}
+
+/**
+ * @brief Retrieves and prints IO RDT association info
+ *
+ * @param [in] cap_mon monitoring capabilities
+ * @param [in] cap_l3ca L3CA capabilities
+ * @param [in] dev_info IO RDT device info
+ */
+static void
+print_iordt_alloc(const struct pqos_capability *cap_mon,
+                  const struct pqos_capability *cap_l3ca,
+                  const struct pqos_devinfo *dev_info)
+{
+        size_t i;
+        const int is_iordt_alloc = cap_l3ca && cap_l3ca->u.l3ca->iordt_on;
+        const int is_iordt_mon = cap_mon && cap_mon->u.mon->iordt_on;
+
+        if (!(is_iordt_alloc || is_iordt_mon) || !dev_info)
+                return;
+
+        printf("Device information:\n");
+        for (i = 0; i < dev_info->num_devs; ++i)
+                print_dev_assoc(is_iordt_alloc, is_iordt_mon,
+                                &dev_info->devs[i], dev_info);
+
+        printf("Control channel information:\n");
+        for (i = 0; i < dev_info->num_channels; ++i)
+                print_channel_assoc(is_iordt_alloc, is_iordt_mon,
+                                    &dev_info->channels[i]);
+}
+
 void
 alloc_print_config(const struct pqos_capability *cap_mon,
                    const struct pqos_capability *cap_l3ca,
                    const struct pqos_capability *cap_l2ca,
                    const struct pqos_capability *cap_mba,
                    const struct pqos_cpuinfo *cpu_info,
+                   const struct pqos_devinfo *dev_info,
                    const int verbose)
 {
         int ret;
@@ -1250,6 +1740,9 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                 }
         }
 
+        /* Print IO RDT associations */
+        print_iordt_alloc(cap_mon, cap_l3ca, dev_info);
+
 free_and_return:
         if (sockets)
                 free(sockets);
@@ -1259,7 +1752,8 @@ int
 alloc_apply(const struct pqos_capability *cap_l3ca,
             const struct pqos_capability *cap_l2ca,
             const struct pqos_capability *cap_mba,
-            const struct pqos_cpuinfo *cpu)
+            const struct pqos_cpuinfo *cpu,
+            const struct pqos_devinfo *dev)
 {
         if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL) {
                 /**
@@ -1274,7 +1768,7 @@ alloc_apply(const struct pqos_capability *cap_l3ca,
                         printf("Allocation configuration error!\n");
                         return -1;
                 }
-                ret_assoc = set_allocation_assoc();
+                ret_assoc = set_allocation_assoc(dev);
                 if (ret_assoc < 0) {
                         printf("Allocation association error!\n");
                         return -1;
@@ -1288,7 +1782,7 @@ alloc_apply(const struct pqos_capability *cap_l3ca,
                 }
         } else {
                 if (sel_assoc_core_num > 0 || sel_alloc_opt_num > 0 ||
-                    sel_assoc_pid_num > 0) {
+                    sel_assoc_pid_num > 0 || sel_assoc_channel_num > 0) {
                         printf("Allocation capability not detected!\n");
                         return -1;
                 }

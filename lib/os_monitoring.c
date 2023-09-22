@@ -296,8 +296,13 @@ os_mon_fini(void)
 }
 
 int
-os_mon_reset(void)
+os_mon_reset(const struct pqos_mon_config *cfg)
 {
+        if (cfg != NULL && cfg->l3_iordt == PQOS_REQUIRE_IORDT_ON) {
+                LOG_ERROR("I/O RDT monitoring requested but not supported by "
+                          "the platform!\n");
+                return PQOS_RETVAL_PARAM;
+        }
         return resctrl_mon_reset();
 }
 

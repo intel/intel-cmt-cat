@@ -115,6 +115,20 @@ hw_cap_l3ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled)
 }
 
 int
+hw_cap_l3ca_iordt(const struct pqos_cpuinfo *cpu, int *enabled)
+{
+        int ret;
+
+        assert_non_null(cpu);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *enabled = mock_type(int);
+
+        return ret;
+}
+
+int
 hw_cap_l2ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled)
 {
         int ret;
@@ -493,6 +507,56 @@ test_hw_cap_l3ca_discover_non_contiguous_cbm(void **state)
                          NON_CONTIGUOUS_CBM_SUPPORTED);
 }
 
+static void
+test_hw_cap_l3ca_discover_iordt(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_l3ca cap_l3ca;
+        int ret;
+        uint32_t num_classes = 16;
+        uint32_t num_ways = 11;
+        uint32_t way_contention = 0x600;
+
+        _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x2, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x1, num_ways - 1, way_contention, 0x2,
+                    num_classes - 1);
+
+        /* I/O RDT enabled */
+        will_return(hw_cap_l3ca_iordt, PQOS_RETVAL_OK);
+        will_return(hw_cap_l3ca_iordt, 1);
+
+        ret = hw_cap_l3ca_discover(&cap_l3ca, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_l3ca.num_classes, num_classes);
+        assert_int_equal(cap_l3ca.num_ways, num_ways);
+        assert_int_equal(cap_l3ca.cdp, 0);
+        assert_int_equal(cap_l3ca.cdp_on, 0);
+        assert_int_equal(cap_l3ca.iordt, 1);
+        assert_int_equal(cap_l3ca.iordt_on, 1);
+        assert_int_equal(cap_l3ca.way_contention, way_contention);
+
+        /* I/O RDT disabled */
+        will_return(hw_cap_l3ca_iordt, PQOS_RETVAL_OK);
+        will_return(hw_cap_l3ca_iordt, 0);
+
+        ret = hw_cap_l3ca_discover(&cap_l3ca, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_l3ca.num_classes, num_classes);
+        assert_int_equal(cap_l3ca.num_ways, num_ways);
+        assert_int_equal(cap_l3ca.cdp, 0);
+        assert_int_equal(cap_l3ca.cdp_on, 0);
+        assert_int_equal(cap_l3ca.iordt, 1);
+        assert_int_equal(cap_l3ca.iordt_on, 0);
+        assert_int_equal(cap_l3ca.way_contention, way_contention);
+
+        /* I/O RDT conflict */
+        will_return(hw_cap_l3ca_iordt, PQOS_RETVAL_ERROR);
+
+        ret = hw_cap_l3ca_discover(&cap_l3ca, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
 /* ======== test_hw_cap_l2ca_discover ======== */
 
 static void
@@ -707,6 +771,7 @@ main(void)
             cmocka_unit_test_setup(test_hw_cap_l3ca_discover_cdp, _init),
             cmocka_unit_test_setup(test_hw_cap_l3ca_discover_non_contiguous_cbm,
                                    _init),
+            cmocka_unit_test_setup(test_hw_cap_l3ca_discover_iordt, _init),
             cmocka_unit_test_setup(test_hw_cap_l2ca_discover_alloc_unsupported,
                                    _init),
             cmocka_unit_test_setup(test_hw_cap_l2ca_discover_unsupported,

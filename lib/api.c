@@ -43,6 +43,7 @@
 #include "os_allocation.h"
 #include "os_monitoring.h"
 #include "pqos_internal.h"
+#include "utils.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -58,10 +59,11 @@
  * PQoS API functions
  */
 static struct pqos_api {
-        /** Resets monitoring */
-        int (*mon_reset)(void);
         /** Reads RMID association lcore */
         int (*mon_assoc_get)(const unsigned lcore, pqos_rmid_t *rmid);
+        /** Gets RMID association of the channel */
+        int (*mon_assoc_get_channel)(const pqos_channel_t channel_id,
+                                     pqos_rmid_t *rmid);
         /** Starts resource monitoring on selected group of cores */
         int (*mon_start_cores)(const unsigned num_cores,
                                const unsigned *cores,
@@ -75,6 +77,13 @@ static struct pqos_api {
                               const enum pqos_mon_event event,
                               void *context,
                               struct pqos_mon_data *group);
+        /** Starts resource monitoring on selected channels */
+        int (*mon_start_channels)(const unsigned num_channels,
+                                  const pqos_channel_t *channels,
+                                  const enum pqos_mon_event event,
+                                  void *context,
+                                  struct pqos_mon_data *group,
+                                  const struct pqos_mon_options *opt);
         /** Adds pids to the resource monitoring grpup */
         int (*mon_add_pids)(const unsigned num_pids,
                             const pid_t *pids,
@@ -91,6 +100,8 @@ static struct pqos_api {
                                 struct pqos_mon_data *group);
         /** Stops resource monitoring data for selected monitoring group */
         int (*mon_stop)(struct pqos_mon_data *group);
+        /** Resets monitoring */
+        int (*mon_reset)(const struct pqos_mon_config *cfg);
 
         /** Associates lcore with given class of service */
         int (*alloc_assoc_set)(const unsigned lcore, const unsigned class_id);
@@ -100,6 +111,12 @@ static struct pqos_api {
         int (*alloc_assoc_set_pid)(const pid_t task, const unsigned class_id);
         /** Read association of task with class of service */
         int (*alloc_assoc_get_pid)(const pid_t task, unsigned *class_id);
+        /** Reads association of channel with class of service */
+        int (*alloc_assoc_get_channel)(const pqos_channel_t channel,
+                                       unsigned *class_id);
+        /** Associates channel with given class of service */
+        int (*alloc_assoc_set_channel)(const pqos_channel_t channel,
+                                       const unsigned class_id);
         /** Assign first available COS */
         int (*alloc_assign)(const unsigned technology,
                             const unsigned *core_array,
@@ -153,11 +170,9 @@ static struct pqos_api {
                        const unsigned num_cos,
                        const struct pqos_mba *requested,
                        struct pqos_mba *actual);
-
         /** Retrieves tasks associated with COS */
         unsigned *(*pid_get_pid_assoc)(const unsigned class_id,
                                        unsigned *count);
-
 } api;
 
 /*
@@ -176,11 +191,17 @@ api_init(int interface, enum pqos_vendor vendor)
 
         if (interface == PQOS_INTER_MSR) {
                 api.mon_reset = hw_mon_reset;
-                api.mon_assoc_get = hw_mon_assoc_get;
+                api.mon_assoc_get = hw_mon_assoc_get_core;
+                api.mon_assoc_get_channel = hw_mon_assoc_get_channel;
                 api.mon_start_cores = hw_mon_start_cores;
+                api.mon_start_channels = hw_mon_start_channels;
                 api.mon_stop = hw_mon_stop;
+                api.mon_reset = hw_mon_reset;
+
                 api.alloc_assoc_set = hw_alloc_assoc_set;
                 api.alloc_assoc_get = hw_alloc_assoc_get;
+                api.alloc_assoc_get_channel = hw_alloc_assoc_get_channel;
+                api.alloc_assoc_set_channel = hw_alloc_assoc_set_channel;
                 api.alloc_assign = hw_alloc_assign;
                 api.alloc_release = hw_alloc_release;
                 api.alloc_reset = hw_alloc_reset;
@@ -190,6 +211,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.l2ca_set = hw_l2ca_set;
                 api.l2ca_get = hw_l2ca_get;
                 api.l2ca_get_min_cbm_bits = hw_l2ca_get_min_cbm_bits;
+
                 if (vendor == PQOS_VENDOR_AMD) {
                         api.mba_get = hw_mba_get_amd;
                         api.mba_set = hw_mba_set_amd;
@@ -198,7 +220,6 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = hw_mba_get;
                         api.mba_set = hw_mba_set;
                 }
-
 #ifdef __linux__
         } else if (interface == PQOS_INTER_OS ||
                    interface == PQOS_INTER_OS_RESCTRL_MON) {
@@ -223,6 +244,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.l2ca_set = os_l2ca_set;
                 api.l2ca_get = os_l2ca_get;
                 api.l2ca_get_min_cbm_bits = os_l2ca_get_min_cbm_bits;
+
                 if (vendor == PQOS_VENDOR_AMD) {
                         api.mba_get = os_mba_get_amd;
                         api.mba_set = os_mba_set_amd;
@@ -230,6 +252,7 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = os_mba_get;
                         api.mba_set = os_mba_set;
                 }
+
                 api.pid_get_pid_assoc = os_pid_get_pid_assoc;
 #endif
         }
@@ -372,6 +395,15 @@ pqos_alloc_reset_config(const struct pqos_alloc_config *cfg)
                         LOG_ERROR(
                             "Unrecognized L3 CDP configuration setting %d!\n",
                             cfg->l3_cdp);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (cfg->l3_iordt != PQOS_REQUIRE_IORDT_ON &&
+                    cfg->l3_iordt != PQOS_REQUIRE_IORDT_OFF &&
+                    cfg->l3_iordt != PQOS_REQUIRE_IORDT_ANY) {
+                        LOG_ERROR("Unrecognized L3 I/O RDT configuration "
+                                  "setting %d!\n",
+                                  cfg->l3_iordt);
                         return PQOS_RETVAL_PARAM;
                 }
 
@@ -610,6 +642,122 @@ pqos_mba_get(const unsigned mba_id,
 
 /*
  * =======================================
+ * IO RDT Allocation
+ * =======================================
+ */
+
+int
+pqos_alloc_assoc_get_channel(const pqos_channel_t channel, unsigned *class_id)
+{
+        if (class_id == NULL || channel == 0)
+                return PQOS_RETVAL_PARAM;
+
+        return API_CALL(alloc_assoc_get_channel, channel, class_id);
+}
+
+int
+pqos_alloc_assoc_get_dev(const uint16_t segment,
+                         const uint16_t bdf,
+                         const unsigned vc,
+                         unsigned *class_id)
+{
+        int ret;
+
+        if (class_id == NULL || vc >= PQOS_DEV_MAX_CHANNELS)
+                return PQOS_RETVAL_PARAM;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        if (api.alloc_assoc_get_channel != NULL) {
+                const struct pqos_devinfo *dev = _pqos_get_dev();
+                pqos_channel_t channel_id =
+                    pqos_devinfo_get_channel_id(dev, segment, bdf, vc);
+
+                if (channel_id == 0)
+                        ret = PQOS_RETVAL_PARAM;
+                else
+                        ret = api.alloc_assoc_get_channel(channel_id, class_id);
+        } else {
+                LOG_INFO(UNSUPPORTED_INTERFACE);
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+        lock_release();
+
+        return ret;
+}
+
+int
+pqos_alloc_assoc_set_channel(const pqos_channel_t channel,
+                             const unsigned class_id)
+{
+        if (channel == 0)
+                return PQOS_RETVAL_PARAM;
+
+        return API_CALL(alloc_assoc_set_channel, channel, class_id);
+}
+
+int
+pqos_alloc_assoc_set_dev(const uint16_t segment,
+                         const uint16_t bdf,
+                         const unsigned vc,
+                         const unsigned class_id)
+{
+        int ret;
+
+        if (vc >= PQOS_DEV_MAX_CHANNELS)
+                return PQOS_RETVAL_PARAM;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        if (api.alloc_assoc_set_channel != NULL) {
+                const struct pqos_devinfo *dev = _pqos_get_dev();
+                pqos_channel_t channel_id =
+                    pqos_devinfo_get_channel_id(dev, segment, bdf, vc);
+
+                if (channel_id == 0)
+                        ret = PQOS_RETVAL_PARAM;
+                else {
+                        int shared;
+
+                        /* Check if channel is shared */
+                        ret = pqos_devinfo_get_channel_shared(dev, channel_id,
+                                                              &shared);
+                        if (ret != PQOS_RETVAL_OK) {
+                                lock_release();
+                                return ret;
+                        }
+                        if (shared)
+                                LOG_WARN("Changing association of shared "
+                                         "channel %lX\n",
+                                         channel_id);
+
+                        ret = api.alloc_assoc_set_channel(channel_id, class_id);
+                }
+        } else {
+                LOG_INFO(UNSUPPORTED_INTERFACE);
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+        lock_release();
+
+        return ret;
+}
+
+/*
+ * =======================================
  * Monitoring
  * =======================================
  */
@@ -617,7 +765,25 @@ pqos_mba_get(const unsigned mba_id,
 int
 pqos_mon_reset(void)
 {
-        return API_CALL(mon_reset);
+        return pqos_mon_reset_config(NULL);
+}
+
+int
+pqos_mon_reset_config(const struct pqos_mon_config *cfg)
+{
+        /* validate parameters */
+        if (cfg != NULL) {
+                if (cfg->l3_iordt != PQOS_REQUIRE_IORDT_ON &&
+                    cfg->l3_iordt != PQOS_REQUIRE_IORDT_OFF &&
+                    cfg->l3_iordt != PQOS_REQUIRE_IORDT_ANY) {
+                        LOG_ERROR("Unrecognized I/O RDT Monitoring "
+                                  "configuration setting %d!\n",
+                                  cfg->l3_iordt);
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
+        return API_CALL(mon_reset, cfg);
 }
 
 int
@@ -627,6 +793,53 @@ pqos_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
                 return PQOS_RETVAL_PARAM;
 
         return API_CALL(mon_assoc_get, lcore, rmid);
+}
+
+int
+pqos_mon_assoc_get_channel(const pqos_channel_t channel_id, pqos_rmid_t *rmid)
+{
+        if (channel_id == 0 || rmid == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        return API_CALL(mon_assoc_get_channel, channel_id, rmid);
+}
+
+int
+pqos_mon_assoc_get_dev(const uint16_t segment,
+                       const uint16_t bdf,
+                       const unsigned vc,
+                       pqos_rmid_t *rmid)
+{
+        int ret;
+
+        if (rmid == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        if (api.mon_assoc_get_channel != NULL) {
+                const struct pqos_devinfo *dev = _pqos_get_dev();
+                pqos_channel_t channel_id =
+                    pqos_devinfo_get_channel_id(dev, segment, bdf, vc);
+
+                if (channel_id == 0)
+                        ret = PQOS_RETVAL_PARAM;
+                else
+                        ret = api.mon_assoc_get_channel(channel_id, rmid);
+        } else {
+                LOG_INFO(UNSUPPORTED_INTERFACE);
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+        lock_release();
+
+        return ret;
 }
 
 int
@@ -853,7 +1066,10 @@ pqos_mon_start_pid(const pid_t pid,
                    void *context,
                    struct pqos_mon_data *group)
 {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
         return pqos_mon_start_pids(1, &pid, event, context, group);
+#pragma GCC diagnostic pop
 }
 
 int
@@ -1039,6 +1255,119 @@ pqos_mon_start_uncore(const unsigned num_sockets,
                 *group = data;
         } else if (data != NULL)
                 free(data);
+
+        return ret;
+}
+
+int
+pqos_mon_start_channels(const unsigned num_channels,
+                        const pqos_channel_t *channels,
+                        const enum pqos_mon_event event,
+                        void *context,
+                        struct pqos_mon_data **group)
+{
+        struct pqos_mon_options opt;
+
+        memset(&opt, 0, sizeof(opt));
+
+        return pqos_mon_start_channels_ext(num_channels, channels, event,
+                                           context, group, &opt);
+}
+
+int
+pqos_mon_start_channels_ext(const unsigned num_channels,
+                            const pqos_channel_t *channels,
+                            const enum pqos_mon_event event,
+                            void *context,
+                            struct pqos_mon_data **group,
+                            const struct pqos_mon_options *opt)
+{
+        int ret;
+        struct pqos_mon_data *data = NULL;
+
+        if (group == NULL || channels == NULL || num_channels == 0 ||
+            event == 0 || opt == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        /* Validate event parameter */
+        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)))
+                return PQOS_RETVAL_PARAM;
+
+        data = calloc(1, sizeof(*data) + sizeof(struct pqos_mon_data_internal));
+        if (data == NULL)
+                return PQOS_RETVAL_RESOURCE;
+        data->intl = (struct pqos_mon_data_internal *)(&data[1]);
+        data->intl->manage_memory = 1;
+
+        ret = API_CALL(mon_start_channels, num_channels, channels, event,
+                       context, data, opt);
+        if (ret == PQOS_RETVAL_OK) {
+                data->valid = GROUP_VALID_MARKER;
+                *group = data;
+        } else if (data != NULL)
+                free(data);
+
+        return ret;
+}
+
+int
+pqos_mon_start_dev(const uint16_t segment,
+                   const uint16_t bdf,
+                   const uint8_t channel,
+                   const enum pqos_mon_event event,
+                   void *context,
+                   struct pqos_mon_data **group)
+{
+        int ret;
+        struct pqos_mon_data *data = NULL;
+
+        if (group == NULL || event == 0 || channel >= PQOS_DEV_MAX_CHANNELS)
+                return PQOS_RETVAL_PARAM;
+
+        /* Validate event parameter */
+        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)))
+                return PQOS_RETVAL_PARAM;
+
+        data = calloc(1, sizeof(*data) + sizeof(struct pqos_mon_data_internal));
+        if (data == NULL)
+                return PQOS_RETVAL_RESOURCE;
+        data->intl = (struct pqos_mon_data_internal *)(&data[1]);
+        data->intl->manage_memory = 1;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK)
+                goto pqos_mon_start_dev_exit;
+
+        if (api.mon_start_channels != NULL) {
+                const struct pqos_devinfo *dev = _pqos_get_dev();
+                pqos_channel_t channel_id =
+                    pqos_devinfo_get_channel_id(dev, segment, bdf, channel);
+                struct pqos_mon_options opt;
+
+                memset(&opt, 0, sizeof(opt));
+
+                if (channel_id == 0)
+                        ret = PQOS_RETVAL_PARAM;
+                else
+                        ret = api.mon_start_channels(1, &channel_id, event,
+                                                     context, data, &opt);
+        } else {
+                LOG_INFO(UNSUPPORTED_INTERFACE);
+                ret = PQOS_RETVAL_RESOURCE;
+        }
+
+pqos_mon_start_dev_exit:
+        if (ret == PQOS_RETVAL_OK) {
+                data->valid = GROUP_VALID_MARKER;
+                *group = data;
+        } else if (data != NULL)
+                free(data);
+
+        lock_release();
 
         return ret;
 }

@@ -40,6 +40,10 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from pqos import Pqos, CPqosConfig
+from pqos.native_struct import (
+    CPqosSysconfig, CPqosCap, CPqosCpuInfo, CPqosDevinfo
+)
+
 
 class TestPqos(unittest.TestCase):
     "Tests for Pqos class."
@@ -142,3 +146,63 @@ class TestPqos(unittest.TestCase):
     def test_init_verbose_super(self, _load_lib):
         "Tests if 'super' verbosity level is properly handled."
         self._test_init_verbose('super', CPqosConfig.LOG_VER_SUPER_VERBOSE)
+
+    @patch('ctypes.cdll.LoadLibrary')
+    def test_get_sysconfig(self, _load_lib):
+        "Tests get_sysconfig() method."
+
+        def pqos_init_mock(_cfg_ref):
+            "Mock pqos_init()."
+
+            return 0
+
+        def pqos_fini_mock():
+            "Mock pqos_fini()."
+
+            return 0
+
+        # Build stub system configuration
+        cap = CPqosCap(mem_size=5, version=2, num_cap=0)
+        cpu = CPqosCpuInfo(mem_size=7, vendor=3, num_cores=0)
+        dev = CPqosDevinfo(num_channels=3, num_devs=1)
+        cfg = CPqosSysconfig(cap=ctypes.pointer(cap), cpu=ctypes.pointer(cpu),
+                             dev=ctypes.pointer(dev))
+
+        def pqos_sysconfig_get_mock(cfg_ref):
+            "Mock pqos_sysconfig_get()."
+
+            cfg_ptr = ctypes.pointer(cfg)
+            addr = ctypes.addressof(cfg_ptr)
+            size = ctypes.sizeof(cfg_ptr)
+            ctypes.memmove(cfg_ref, addr, size)
+
+            return 0
+
+        pqos = Pqos()
+
+        # Setup mock functions
+        pqos.lib.pqos_init = MagicMock(side_effect=pqos_init_mock)
+        pqos.lib.pqos_sysconfig_get = MagicMock(side_effect=pqos_sysconfig_get_mock)
+        pqos.lib.pqos_fini = MagicMock(side_effect=pqos_fini_mock)
+
+        # Get system configuration
+        pqos.init('OS')
+        syscfg = pqos.get_sysconfig()
+        pqos.fini()
+
+        # Ensure mock function has been called
+        pqos.lib.pqos_sysconfig_get.assert_called_once()
+
+        # Verify capabilities
+        self.assertEqual(syscfg.cap.contents.mem_size, 5)
+        self.assertEqual(syscfg.cap.contents.version, 2)
+        self.assertEqual(syscfg.cap.contents.num_cap, 0)
+
+        # Verify cpuinfo
+        self.assertEqual(syscfg.cpu.contents.mem_size, 7)
+        self.assertEqual(syscfg.cpu.contents.vendor, 3)
+        self.assertEqual(syscfg.cpu.contents.num_cores, 0)
+
+        # Verify devinfo
+        self.assertEqual(syscfg.dev.contents.num_channels, 3)
+        self.assertEqual(syscfg.dev.contents.num_devs, 1)

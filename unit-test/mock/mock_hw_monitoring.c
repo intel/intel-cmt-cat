@@ -35,18 +35,35 @@
 #include "mock_test.h"
 
 int
-__wrap_hw_mon_reset(void)
+__wrap_hw_mon_reset(const struct pqos_mon_config *cfg)
 {
+        check_expected_ptr(cfg);
         return mock_type(int);
 }
 
 int
-__wrap_hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
+__wrap_hw_mon_assoc_get_core(const unsigned lcore, pqos_rmid_t *rmid)
 {
         check_expected(lcore);
         check_expected_ptr(rmid);
 
         return mock_type(int);
+}
+
+int
+__wrap_hw_mon_assoc_get_channel(const pqos_channel_t channel_id,
+                                pqos_rmid_t *rmid)
+{
+        int ret;
+
+        check_expected(channel_id);
+        assert_non_null(rmid);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *rmid = mock_type(int);
+
+        return ret;
 }
 
 int
@@ -63,6 +80,22 @@ __wrap_hw_mon_start_cores(const unsigned num_cores,
         check_expected_ptr(context);
         assert_non_null(group);
         assert_non_null(opt);
+
+        return mock_type(int);
+}
+
+int
+__wrap_hw_mon_start_channels(const unsigned num_channels,
+                             const pqos_channel_t *channels,
+                             const enum pqos_mon_event event,
+                             void *context,
+                             struct pqos_mon_data *group)
+{
+        assert_non_null(group);
+        check_expected(num_channels);
+        check_expected_ptr(channels);
+        check_expected(event);
+        check_expected_ptr(context);
 
         return mock_type(int);
 }

@@ -72,6 +72,19 @@ PQOS_LOCAL FILE *pqos_fopen(const char *name, const char *mode);
 PQOS_LOCAL int pqos_fclose(FILE *stream);
 
 /**
+ * @brief Wrapper around open() that additionally checks if a given path
+ * contains any symbolic links and fails if it does.
+ *
+ * @param [in] pathname a path to a file
+ * @param [in] flags file access flags
+ *
+ * @return A file descriptor
+ * @retval A valid file descriptor or -1 on error (e.g. when the path
+ * contains any symbolic links).
+ */
+PQOS_LOCAL int pqos_open(const char *pathname, int flags);
+
+/**
  * @brief Wrapper around strcat
  *
  * @param [out] dst Output buffer
@@ -145,6 +158,47 @@ PQOS_LOCAL int pqos_dir_exists(const char *path);
  */
 PQOS_LOCAL int
 pqos_file_contains(const char *fname, const char *str, int *found);
+
+/**
+ * @brief Map physical memory for reading
+ * @param[in] address Physical memory address
+ * @param[in] size Memory size
+ *
+ * @return Mapped memory
+ */
+PQOS_LOCAL uint8_t *pqos_mmap_read(uint64_t address, const uint64_t size);
+
+/**
+ * @brief Map physical memory for writing
+ * @param[in] address Physical memory address
+ * @param[in] size Memory size
+ *
+ * @return Mapped memory
+ */
+PQOS_LOCAL uint8_t *pqos_mmap_write(uint64_t address, const uint64_t size);
+
+/**
+ * @brief Unmap physical memory
+ *
+ * @param[in] mem logical memory address
+ * @param[in] size Memory size
+ */
+PQOS_LOCAL void pqos_munmap(void *mem, const uint64_t size);
+
+/**
+ * @brief Wrapper around read(2) that reads exactly count bytes
+ * from the file handling exceptional situations and fails if it
+ * cannot revover from those
+ *
+ * @param [in] fd file descriptor to read from
+ * @param [in] buf buffer to read to
+ * @param [in] count number of bytes to read
+ *
+ * @return Number of bytes read
+ * @retval Number of bytes read equal 'count' param
+ * @retval -1 if it couldn't read 'count' bytes
+ */
+PQOS_LOCAL ssize_t pqos_read(int fd, void *buf, size_t count);
 
 #ifdef __cplusplus
 }

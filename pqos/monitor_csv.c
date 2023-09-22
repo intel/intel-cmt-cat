@@ -46,19 +46,25 @@ monitor_csv_begin(FILE *fp)
 
         ASSERT(fp != NULL);
 
-        if (monitor_core_mode()) {
+        if (monitor_core_mode())
                 fprintf(fp, "Time,Core");
+        else if (monitor_process_mode())
+                fprintf(fp, "Time,PID,Core");
+        else if (monitor_iordt_mode())
+                fprintf(fp, "Time,Channel");
+        else if (monitor_uncore_mode())
+                fprintf(fp, "Time,Socket");
+
 #ifdef PQOS_RMID_CUSTOM
+        if (monitor_core_mode() || monitor_iordt_mode()) {
                 enum pqos_interface iface;
 
                 pqos_inter_get(&iface);
+
                 if (iface == PQOS_INTER_MSR)
                         fprintf(fp, ",RMID");
+        }
 #endif
-        } else if (monitor_process_mode())
-                fprintf(fp, "Time,PID,Core");
-        else if (monitor_uncore_mode())
-                fprintf(fp, "Time,Socket");
 
         if (events & PQOS_PERF_EVENT_IPC)
                 fprintf(fp, ",IPC");
@@ -159,13 +165,20 @@ monitor_csv_row(FILE *fp,
         enum pqos_interface iface;
 
         pqos_inter_get(&iface);
-        if (iface == PQOS_INTER_MSR && monitor_core_mode()) {
-                pqos_rmid_t rmid;
-                int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+        if (iface == PQOS_INTER_MSR) {
+                pqos_rmid_t rmid = 0;
+                int ret = -1;
 
-                offset += fillin_csv_column(
-                    ",%.0f", rmid, data + offset, sz_data - offset,
-                    ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR);
+                if (monitor_core_mode())
+                        ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+                else if (monitor_iordt_mode())
+                        ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
+                                                         &rmid);
+
+                if (ret != -1)
+                        offset += fillin_csv_column(
+                            ",%.0f", rmid, data + offset, sz_data - offset,
+                            ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR);
         }
 #endif
 
@@ -196,7 +209,8 @@ monitor_csv_row(FILE *fp,
                                             events & output[i].event);
         }
 
-        if (monitor_core_mode() || monitor_uncore_mode())
+        if (monitor_core_mode() || monitor_uncore_mode() ||
+            monitor_iordt_mode())
                 fprintf(fp, "%s,\"%s\"%s\n", timestamp,
                         (char *)mon_data->context, data);
         else if (monitor_process_mode()) {

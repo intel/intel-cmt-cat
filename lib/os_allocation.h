@@ -182,14 +182,18 @@ PQOS_LOCAL int os_alloc_reset_tasks(void);
 /**
  * @brief OS interface to reset configuration of allocation technologies
  *
+
  * Reverts allocation state to the one after reset:
  * - all cores associated with COS0
  *
  * As part of allocation reset CDP reconfiguration can be performed.
- * This can be requested via \a l3_cdp_cfg or \a l2_cdp_cfg.
+ * This can be requested via \a cfg.
  *
  * As part of allocation reset MBA reconfiguration can be performed.
- * This can be requested via \a mba_cfg.
+ * This can be requested via \a cfg.
+ *
+ * As part of allocation reset I/O RDT reconfiguration can be performed.
+ * This can be requested via \a cfg.
  *
  * @param [in] cfg requested configuration
  *

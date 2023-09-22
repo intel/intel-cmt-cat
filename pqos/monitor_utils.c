@@ -45,11 +45,29 @@
 int
 monitor_utils_uinttostr(char *buf, const int buf_len, const unsigned val)
 {
-        ASSERT(buf != NULL);
         int ret;
+
+        ASSERT(buf != NULL);
 
         memset(buf, 0, buf_len);
         ret = snprintf(buf, buf_len, "%u", val);
+
+        /* Return -1 when output was truncated */
+        if (ret >= buf_len)
+                ret = -1;
+
+        return ret;
+}
+
+int
+monitor_utils_uinttohexstr(char *buf, const int buf_len, const unsigned val)
+{
+        int ret;
+
+        ASSERT(buf != NULL);
+
+        memset(buf, 0, buf_len);
+        ret = snprintf(buf, buf_len, "0x%x", val);
 
         /* Return -1 when output was truncated */
         if (ret >= buf_len)

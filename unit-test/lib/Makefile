@@ -40,7 +40,9 @@ endif
 # common function wrap
 WRAP = \
 	-Wl,--wrap=_pqos_get_cap \
-	-Wl,--wrap=_pqos_get_cpu
+	-Wl,--wrap=_pqos_get_cpu \
+	-Wl,--wrap=_pqos_get_dev \
+	-Wl,--wrap=_pqos_get_inter
 
 CFLAGS += -g -ggdb -O0
 
@@ -57,13 +59,18 @@ $(OBJ_DIR)/allocation.o: $(LIB_DIR)/allocation.c $(OBJ_DIR)/allocation.d
 		--globalize-symbol=hw_alloc_reset_cos --weaken-symbol=hw_alloc_reset_cos \
 		--globalize-symbol=hw_alloc_reset_l2cdp --weaken-symbol=hw_alloc_reset_l2cdp \
 		--globalize-symbol=hw_alloc_reset_l3cdp --weaken-symbol=hw_alloc_reset_l3cdp \
+		--globalize-symbol=hw_alloc_reset_l3iordt --weaken-symbol=hw_alloc_reset_l3iordt \
 		--globalize-symbol=hw_alloc_reset_assoc --weaken-symbol=hw_alloc_reset_assoc \
+		--globalize-symbol=hw_alloc_reset_assoc_cores --weaken-symbol=hw_alloc_reset_assoc_cores \
+		--globalize-symbol=hw_alloc_reset_assoc_channels --weaken-symbol=hw_alloc_reset_assoc_channels \
 		--globalize-symbol=hw_alloc_assoc_unused --weaken-symbol=hw_alloc_assoc_unused \
 		--globalize-symbol=hw_l3ca_set --weaken-symbol=hw_l3ca_set \
 		--globalize-symbol=hw_l3ca_set --weaken-symbol=hw_l3ca_set \
 		--globalize-symbol=hw_l3ca_get --weaken-symbol=hw_l3ca_get \
 		--globalize-symbol=hw_l2ca_set --weaken-symbol=hw_l2ca_set \
 		--globalize-symbol=hw_l2ca_get --weaken-symbol=hw_l2ca_get \
+		--globalize-symbol=hw_alloc_assoc_set_channel --weaken-symbol=hw_alloc_assoc_set_channel \
+		--globalize-symbol=hw_alloc_assoc_get_channel --weaken-symbol=hw_alloc_assoc_get_channel \
 		$@
 
 $(OBJ_DIR)/common.o: $(LIB_DIR)/common.c $(OBJ_DIR)/common.d
@@ -77,6 +84,8 @@ $(OBJ_DIR)/cap.o: $(LIB_DIR)/cap.c $(OBJ_DIR)/cap.d
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=_pqos_check_init --weaken-symbol=_pqos_check_init \
+		--globalize-symbol=discover_interface --weaken-symbol=discover_interface \
+		--globalize-symbol=discover_capabilities --weaken-symbol=discover_capabilities \
 		$@
 
 $(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.d
@@ -90,12 +99,14 @@ $(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.
 		--globalize-symbol=hw_mon_stop_perf --weaken-symbol=hw_mon_stop_perf \
 		--globalize-symbol=hw_mon_start_counter --weaken-symbol=hw_mon_start_counter \
 		--globalize-symbol=hw_mon_read_counter --weaken-symbol=hw_mon_read_counter \
+		--globalize-symbol=hw_mon_reset_iordt --weaken-symbol=hw_mon_reset_iordt \
 		$@
 
 $(OBJ_DIR)/hw_cap.o: $(LIB_DIR)/hw_cap.c $(OBJ_DIR)/hw_cap.d
 	$(CC) $(CFLAGS) -c $< -o $@
 	objcopy $@ \
 		--globalize-symbol=hw_cap_l3ca_cdp --weaken-symbol=hw_cap_l3ca_cdp \
+		--globalize-symbol=hw_cap_l3ca_iordt --weaken-symbol=hw_cap_l3ca_iordt \
 		--globalize-symbol=hw_cap_l2ca_cdp --weaken-symbol=hw_cap_l2ca_cdp \
 		$@
 
@@ -191,9 +202,11 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 		-Wl,--wrap=cpuinfo_get_config \
 		-Wl,--wrap=hw_mon_reset \
 		-Wl,--wrap=os_mon_reset \
-		-Wl,--wrap=hw_mon_assoc_get \
+		-Wl,--wrap=hw_mon_assoc_get_core \
+		-Wl,--wrap=hw_mon_assoc_get_channel \
 		-Wl,--wrap=hw_mon_start_cores \
 		-Wl,--wrap=os_mon_start_cores \
+		-Wl,--wrap=hw_mon_start_channels \
 		-Wl,--wrap=hw_mon_stop \
 		-Wl,--wrap=os_mon_stop \
 		-Wl,--wrap=pqos_mon_poll_events \
@@ -201,14 +214,16 @@ $(BIN_DIR)/test_api: test_api.c $(LIB_OBJS)
 		-Wl,--wrap=os_mon_add_pids \
 		-Wl,--wrap=os_mon_remove_pids \
 		-Wl,--wrap=hw_mon_start_uncore \
-		-Wl,--wrap=_pqos_inter_get \
+		-Wl,--wrap=hw_alloc_assoc_get_channel \
+		-Wl,--wrap=hw_alloc_assoc_get_dev \
+		-Wl,--wrap=hw_alloc_assoc_set_channel \
+		-Wl,--wrap=hw_alloc_assoc_set_dev \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
 $(BIN_DIR)/test_allocation: test_allocation.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
-		-Wl,--wrap=_pqos_get_inter \
 		-Wl,--wrap=os_alloc_init \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
@@ -248,6 +263,14 @@ $(BIN_DIR)/test_hw_alloc_reset_l3cdp: test_hw_alloc_reset_l3cdp.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_hw_alloc_reset_l3iordt: test_hw_alloc_reset_l3iordt.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_hw_alloc_reset_l2cdp: test_hw_alloc_reset_l2cdp.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
@@ -258,9 +281,16 @@ $(BIN_DIR)/test_hw_alloc_reset_l2cdp: test_hw_alloc_reset_l2cdp.c $(LIB_OBJS)
 
 $(BIN_DIR)/test_hw_alloc_reset_assoc: test_hw_alloc_reset_assoc.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_hw_alloc_reset_assoc_cores_channels: test_hw_alloc_reset_assoc_cores_channels.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
-		-Wl,--wrap=msr_write \
-		-Wl,--wrap=msr_read \
+		-Wl,--wrap=_pqos_get_sysconfig \
+		-Wl,--wrap=pqos_l3ca_iordt_enabled \
+		-Wl,--wrap=iordt_assoc_reset \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -292,6 +322,16 @@ $(BIN_DIR)/test_hw_alloc_reset_cos: test_hw_alloc_reset_cos.c $(LIB_OBJS)
 $(BIN_DIR)/test_hw_alloc_assign: test_hw_alloc_assign.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_hw_mon_reset_iordt: test_hw_mon_reset_iordt.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=msr_write \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=_pqos_get_cap \
+		-Wl,--wrap=_pqos_get_cpu \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -386,6 +426,11 @@ $(BIN_DIR)/test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
 		-Wl,--wrap=perf_mon_fini \
 		-Wl,--wrap=perf_mon_is_event_supported \
 		-Wl,--wrap=perf_mon_start \
+		-Wl,--wrap=perf_mon_stop \
+		-Wl,--wrap=iordt_mon_assoc_write \
+		-Wl,--wrap=iordt_mon_assoc_read \
+		-Wl,--wrap=iordt_get_numa \
+		-Wl,--wrap=iordt_mon_assoc_reset \
 		-Wl,--wrap=uncore_mon_discover \
 		-Wl,--wrap=uncore_mon_init \
 		-Wl,--wrap=uncore_mon_fini \
@@ -408,6 +453,14 @@ $(BIN_DIR)/test_hw_cap: test_hw_cap.c $(LIB_OBJS)
 $(BIN_DIR)/test_hw_cap_l3ca_cdp: test_hw_cap_l3ca_cdp.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=msr_read \
+		-Wl,--wrap=msr_write \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_hw_cap_l3ca_iordt: test_hw_cap_l3ca_iordt.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_read \
 		-Wl,--wrap=msr_write \
 		-Wl,--start-group \
@@ -610,12 +663,67 @@ $(BIN_DIR)/test_os_cap_mon: test_os_cap_mon.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_iordt: test_iordt.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=acpi_init \
+		-Wl,--wrap=acpi_fini \
+		-Wl,--wrap=acpi_free \
+		-Wl,--wrap=acpi_get_sig \
+		-Wl,--wrap=acpi_print \
+		-Wl,--wrap=pci_init \
+		-Wl,--wrap=pci_fini \
+		-Wl,--wrap=pci_dev_get \
+		-Wl,--wrap=pci_dev_release \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_iordt_assoc: test_iordt_assoc.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=acpi_init \
+		-Wl,--wrap=acpi_fini \
+		-Wl,--wrap=acpi_free \
+		-Wl,--wrap=acpi_get_sig \
+		-Wl,--wrap=pci_init \
+		-Wl,--wrap=pci_fini \
+		-Wl,--wrap=pci_dev_get \
+		-Wl,--wrap=pci_dev_release \
+		-Wl,--wrap=pqos_mmap_read \
+		-Wl,--wrap=pqos_mmap_write \
+		-Wl,--wrap=pqos_munmap \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_acpi: test_acpi.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=munmap \
+		-Wl,--wrap=free \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_hw_alloc_assoc_channel: test_hw_alloc_assoc_channel.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=_pqos_get_sysconfig \
+		-Wl,--wrap=pqos_l3ca_iordt_enabled \
+		-Wl,--wrap=iordt_assoc_read \
+		-Wl,--wrap=iordt_assoc_write \
+		-Wl,--start-group \
+		-Wl,--wrap=_pqos_get_cap \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=os_cap_init \
+		-Wl,--wrap=machine_init \
+		-Wl,--wrap=machine_fini \
 		-Wl,--wrap=cpuinfo_init \
 		-Wl,--wrap=cpuinfo_fini \
+		-Wl,--wrap=iordt_init \
+		-Wl,--wrap=iordt_fini \
 		-Wl,--wrap=hw_cap_mon_discover \
 		-Wl,--wrap=os_cap_mon_discover \
 		-Wl,--wrap=hw_cap_l3ca_discover \
@@ -625,7 +733,9 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=hw_cap_mba_discover \
 		-Wl,--wrap=os_cap_mba_discover \
 		-Wl,--wrap=pqos_mon_init \
+		-Wl,--wrap=pqos_mon_fini \
 		-Wl,--wrap=pqos_alloc_init \
+		-Wl,--wrap=pqos_alloc_fini \
 		-Wl,--wrap=lock_init \
 		-Wl,--wrap=lock_fini \
 		-Wl,--wrap=lock_get \
@@ -895,7 +1005,7 @@ clang-format:
 CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . --skip $(OBJ_DIR) -q 2
+	$(CODESPELL) . --skip $(OBJ_DIR) -q 2 -Lclos
 
 .PHONY: style
 style:

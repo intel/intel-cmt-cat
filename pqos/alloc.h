@@ -68,13 +68,15 @@ void selfn_allocation_assoc(const char *arg);
  * @param [in] cap_l2ca L2 CAT capability structures
  * @param [in] cap_mba MBA capability structures
  * @param [in] cpu_info cpu information structure
- * @param [in] verbose verbose mode flag
+ * @param [in] dev_info IO RDT device information structure
+ * @param [in] verbose enable verbose mode
  */
 void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_l2ca,
                         const struct pqos_capability *cap_mba,
                         const struct pqos_cpuinfo *cpu_info,
+                        const struct pqos_devinfo *dev_info,
                         const int verbose);
 
 /**
@@ -84,7 +86,8 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
  * @param [in] cap_l3ca CAT capability structures
  * @param [in] cap_l2ca CAT capability structures
  * @param [in] cap_mba MBA capability structures
- * @param [in] cpu cpu information structure
+ * @param [in] cpu CPU information structure
+ * @param [in] dev Device information structure
  *
  * @return Operation status
  * @retval 0 there was no new config to apply
@@ -94,7 +97,8 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
 int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_capability *cap_l2ca,
                 const struct pqos_capability *cap_mba,
-                const struct pqos_cpuinfo *cpu);
+                const struct pqos_cpuinfo *cpu,
+                const struct pqos_devinfo *dev);
 
 #ifdef __cplusplus
 }

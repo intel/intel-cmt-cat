@@ -427,3 +427,25 @@ class TestPqosCap(unittest.TestCase):
 
         self.assertEqual(supported, True)
         self.assertEqual(enabled, None)
+
+    @patch('pqos.capability.Pqos')
+    def test_is_l3ca_iordt_enabled(self, pqos_mock_cls):
+        "Tests is_l3ca_iordt_enabled() method."
+
+        def pqos_l3ca_iordt_enabled_m(_cap_ref, supported_ref, enabled_ref):
+            "Mock pqos_l3ca_iordt_enabled()."
+
+            ctypes_ref_set_int(supported_ref, 1)
+            ctypes_ref_set_int(enabled_ref, -1)
+            return 0
+
+        lib = pqos_mock_cls.return_value.lib
+        lib.pqos_cap_get = MagicMock(return_value=0)
+        func_mock = MagicMock(side_effect=pqos_l3ca_iordt_enabled_m)
+        lib.pqos_l3ca_iordt_enabled = func_mock
+
+        pqos_cap = PqosCap()
+        supported, enabled = pqos_cap.is_l3ca_iordt_enabled()
+
+        self.assertEqual(supported, True)
+        self.assertEqual(enabled, None)

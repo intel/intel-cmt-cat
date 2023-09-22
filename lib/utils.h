@@ -56,6 +56,48 @@ extern "C" {
 PQOS_LOCAL int _pqos_utils_init(int interface);
 
 /**
+ * @brief Retrieves L3 MON I/O RDT status
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] supported place to store I/O RDT monitoring support status
+ * @param [out] enabled place to store I/O RDT monitoring enable status
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_iordt_enabled(const struct pqos_cap *cap,
+                           int *supported,
+                           int *enabled);
+
+/**
+ * @brief Retrieves channel information from dev info structure
+ *
+ * @param [in] dev Device information structure
+ * @param [in] channel_id channel id
+ *
+ * @return Channel information structure
+ * @retval NULL on error
+ */
+const struct pqos_channel *
+pqos_devinfo_get_channel(const struct pqos_devinfo *dev,
+                         const pqos_channel_t channel_id);
+
+/**
+ * @brief Checks if channel is shared between multiple devices
+ *
+ * @param [in] dev Device information structure
+ * @param [in] channel_id channel id
+ * @param [out] shared 1 if channel is shared
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int pqos_devinfo_get_channel_shared(const struct pqos_devinfo *dev,
+                                               const pqos_channel_t channel_id,
+                                               int *shared);
+
+/*
  * @brief Internal API to retrieve \a type of capability
  *
  * @param [in] type capability type to look for

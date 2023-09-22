@@ -41,6 +41,20 @@ extern "C" {
 #include "types.h"
 
 /**
+ * @brief Checks L3 I/O RDT monitoring enable status across all CPU sockets
+ *
+ * It also validates if I/O RDT enabling is consistent across CPU sockets.
+ * At the moment, such scenario is considered as error that requires CAT reset.
+ *
+ * @param cpu detected CPU topology
+ * @param enabled place to store I/O RDT monitoring enabling status
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_cap_mon_iordt(const struct pqos_cpuinfo *cpu, int *enabled);
+
+/**
  * @brief Discovers HW monitoring support
  *
  * @param r_cap place to store monitoring capabilities structure
@@ -55,10 +69,8 @@ PQOS_LOCAL int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
 /**
  * @brief Checks L3 CDP enable status across all CPU sockets
  *
- * It also validates if L3 CDP enabling is consistent across
- * CPU sockets.
- * At the moment, such scenario is considered as error
- * that requires CAT reset.
+ * It also validates if L3 CDP enabling is consistent across CPU sockets.
+ * At the moment, such scenario is considered as error that requires CAT reset.
  *
  * @param cpu detected CPU topology
  * @param enabled place to store L3 CDP enabling status
@@ -67,6 +79,20 @@ PQOS_LOCAL int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
  * @retval PQOS_RETVAL_OK on success
  */
 PQOS_LOCAL int hw_cap_l3ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled);
+
+/**
+ * @brief Checks L3 I/O RDT enable status across all CPU sockets
+ *
+ * It also validates if I/O RDT enabling is consistent across CPU sockets.
+ * At the moment, such scenario is considered as error that requires CAT reset.
+ *
+ * @param cpu detected CPU topology
+ * @param enabled place to store I/O RDT enabling status
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_cap_l3ca_iordt(const struct pqos_cpuinfo *cpu, int *enabled);
 
 /**
  * @brief Discovers HW support of L3 CAT

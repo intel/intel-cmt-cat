@@ -597,8 +597,7 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
  * and their location.
  */
 int
-cpuinfo_init(enum pqos_interface interface,
-             const struct pqos_cpuinfo **topology)
+cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
 {
         int ret;
         enum pqos_vendor vendor;

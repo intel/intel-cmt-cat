@@ -111,6 +111,7 @@ test_hw_alloc_assoc_unused(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         will_return_count(hw_mon_assoc_read, PQOS_RETVAL_OK,
                           data->cpu->num_cores);
@@ -144,6 +145,7 @@ test_hw_alloc_assoc_unused_invalid_cluster(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         ctx.lcore = 1;
         ctx.cluster = 5;
@@ -167,6 +169,7 @@ test_hw_alloc_assoc_unused_range(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         will_return_count(hw_mon_assoc_read, PQOS_RETVAL_OK,
                           data->cpu->num_cores / 2);
@@ -194,6 +197,7 @@ test_hw_alloc_assoc_unused_not_found(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         will_return_count(hw_mon_assoc_read, PQOS_RETVAL_OK,
                           data->cpu->num_cores / 2);
@@ -203,6 +207,7 @@ test_hw_alloc_assoc_unused_not_found(void **state)
 
         ret = hw_mon_assoc_unused(&ctx, PQOS_MON_EVENT_TMEM_BW, rmid_min,
                                   rmid_max, &opt);
+        fprintf(stderr, "===> rmid %u\n", ctx.rmid);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 

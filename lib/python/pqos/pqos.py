@@ -41,7 +41,7 @@ import ctypes
 import sys
 
 from pqos.common import pqos_handle_error
-from pqos.native_struct import CPqosConfig
+from pqos.native_struct import CPqosConfig, CPqosSysconfig
 
 class Pqos(object):
     """
@@ -85,7 +85,7 @@ class Pqos(object):
     def __init__(self):
         "Finds PQoS library and constructs a new object."
 
-        self.lib = ctypes.cdll.LoadLibrary('libpqos.so.4')
+        self.lib = ctypes.cdll.LoadLibrary('libpqos.so.5')
 
     def init(self, interface, log_file=None, log_callback=None,
              log_context=None, verbose='default'):
@@ -165,3 +165,13 @@ class Pqos(object):
 
         ret = self.lib.pqos_fini()
         pqos_handle_error('pqos_fini', ret)
+
+    def get_sysconfig(self):
+        "Returns system configuration."
+
+        sysconfig = CPqosSysconfig()
+        sysconfig_ptr = ctypes.pointer(sysconfig)
+        sysconfig_ref = ctypes.byref(sysconfig_ptr)
+        ret = self.lib.pqos_sysconfig_get(sysconfig_ref)
+        pqos_handle_error('pqos_get_sysconfig', ret)
+        return sysconfig_ptr.contents

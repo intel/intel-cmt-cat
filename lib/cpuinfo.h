@@ -76,7 +76,7 @@ struct cpuinfo_config {
  * @retval -EFAULT error building & discovering the topology
  */
 PQOS_LOCAL int cpuinfo_init(enum pqos_interface interface,
-                            const struct pqos_cpuinfo **topology);
+                            struct pqos_cpuinfo **topology);
 
 /**
  * @brief Shuts down CPU information module

@@ -262,8 +262,7 @@ close_timer(void)
 static int
 init_pqos(void)
 {
-        const struct pqos_cpuinfo *p_cpu = NULL;
-        const struct pqos_cap *p_cap = NULL;
+        const struct pqos_sysconfig *sysconf = NULL;
         struct pqos_config cfg;
         int ret;
 
@@ -277,7 +276,7 @@ init_pqos(void)
         }
 
         /* Get CMT capability and CPU info pointer */
-        ret = pqos_cap_get(&p_cap, &p_cpu);
+        ret = pqos_sysconfig_get(&sysconf);
         if (ret != PQOS_RETVAL_OK) {
                 pqos_fini();
                 printf("Error retrieving PQoS capabilities!\n");

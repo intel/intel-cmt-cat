@@ -70,14 +70,16 @@ class CPqosCapabilityL3(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('num_classes', ctypes.c_uint),
-        ('num_ways', ctypes.c_uint),
-        ('way_size', ctypes.c_uint),
-        ('way_contention', ctypes.c_uint64),
-        ('cdp', ctypes.c_int),
-        ('cdp_on', ctypes.c_int),
+        ("mem_size", ctypes.c_uint),
+        ("num_classes", ctypes.c_uint),
+        ("num_ways", ctypes.c_uint),
+        ("way_size", ctypes.c_uint),
+        ("way_contention", ctypes.c_uint64),
+        ("cdp", ctypes.c_int),
+        ("cdp_on", ctypes.c_int),
         ('non_contiguous_cbm', ctypes.c_uint),
+        ("iordt", ctypes.c_int),
+        ("iordt_on", ctypes.c_int),
     ]
 
 
@@ -102,13 +104,13 @@ class CPqosCapabilityMBA(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('num_classes', ctypes.c_uint),
-        ('throttle_max', ctypes.c_uint),
-        ('throttle_step', ctypes.c_uint),
-        ('is_linear', ctypes.c_int),
-        ('ctrl', ctypes.c_int),
-        ('ctrl_on', ctypes.c_int),
+        ("mem_size", ctypes.c_uint),
+        ("num_classes", ctypes.c_uint),
+        ("throttle_max", ctypes.c_uint),
+        ("throttle_step", ctypes.c_uint),
+        ("is_linear", ctypes.c_int),
+        ("ctrl", ctypes.c_int),
+        ("ctrl_on", ctypes.c_int),
     ]
 
 
@@ -124,12 +126,14 @@ class CPqosMonitor(ctypes.Structure):
     RESERVED2 = 0x2000
     PQOS_PERF_EVENT_LLC_MISS = 0x4000
     PQOS_PERF_EVENT_IPC = 0x8000
+    PQOS_PERF_EVENT_LLC_REF = 0x10000
 
     _fields_ = [
-        ('type', ctypes.c_int),
-        ('max_rmid', ctypes.c_uint),
-        ('scale_factor', ctypes.c_uint32),
-        ('counter_length', ctypes.c_uint),
+        ("type", ctypes.c_int),
+        ("max_rmid", ctypes.c_uint),
+        ("scale_factor", ctypes.c_uint32),
+        ("counter_length", ctypes.c_uint),
+        ("iordt", ctypes.c_int),
     ]
 
 
@@ -138,11 +142,13 @@ class CPqosCapabilityMonitoring(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('max_rmid', ctypes.c_uint),
-        ('l3_size', ctypes.c_uint),
-        ('num_events', ctypes.c_uint),
-        ('events', CPqosMonitor * 0),
+        ("mem_size", ctypes.c_uint),
+        ("max_rmid", ctypes.c_uint),
+        ("l3_size", ctypes.c_uint),
+        ("num_events", ctypes.c_uint),
+        ("iordt", ctypes.c_int),
+        ("iordt_on", ctypes.c_int),
+        ("events", CPqosMonitor * 0),
     ]
 
 
@@ -151,11 +157,11 @@ class CPqosCapabilityUnion(ctypes.Union):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('mon', ctypes.POINTER(CPqosCapabilityMonitoring)),
-        ('l3ca', ctypes.POINTER(CPqosCapabilityL3)),
-        ('l2ca', ctypes.POINTER(CPqosCapabilityL2)),
-        ('mba', ctypes.POINTER(CPqosCapabilityMBA)),
-        ('generic_ptr', ctypes.c_void_p),
+        ("mon", ctypes.POINTER(CPqosCapabilityMonitoring)),
+        ("l3ca", ctypes.POINTER(CPqosCapabilityL3)),
+        ("l2ca", ctypes.POINTER(CPqosCapabilityL2)),
+        ("mba", ctypes.POINTER(CPqosCapabilityMBA)),
+        ("generic_ptr", ctypes.c_void_p),
     ]
 
 
@@ -170,8 +176,8 @@ class CPqosCapability(ctypes.Structure):
     PQOS_CAP_TYPE_NUMOF = 4
 
     _fields_ = [
-        ('type', ctypes.c_int),
-        ('u', CPqosCapabilityUnion)
+        ("type", ctypes.c_int),
+        ("u", CPqosCapabilityUnion)
     ]
 
 
@@ -180,10 +186,10 @@ class CPqosCap(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('mem_size', ctypes.c_uint),
-        ('version', ctypes.c_uint),
-        ('num_cap', ctypes.c_uint),
-        ('capabilities', CPqosCapability * 0)
+        ("mem_size", ctypes.c_uint),
+        ("version", ctypes.c_uint),
+        ("num_cap", ctypes.c_uint),
+        ("capabilities", CPqosCapability * 0)
     ]
 
 # CPU info
@@ -193,12 +199,12 @@ class CPqosCoreInfo(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('lcore', ctypes.c_uint),    # Logical core id
-        ('socket', ctypes.c_uint),   # Socket id in the system
-        ('l3_id', ctypes.c_uint),    # L3/LLC cluster id
-        ('l2_id', ctypes.c_uint),    # L2 cluster id
-        ('l3cat_id', ctypes.c_uint), # L3 CAT classes id
-        ('mba_id', ctypes.c_uint),   # MBA id
+        ("lcore", ctypes.c_uint),    # Logical core id
+        ("socket", ctypes.c_uint),   # Socket id in the system
+        ("l3_id", ctypes.c_uint),    # L3/LLC cluster id
+        ("l2_id", ctypes.c_uint),    # L2 cluster id
+        ("l3cat_id", ctypes.c_uint), # L3 CAT classes id
+        ("mba_id", ctypes.c_uint),   # MBA id
     ]
 
 
@@ -232,6 +238,117 @@ class CPqosCpuInfo(ctypes.Structure):
         ("vendor", ctypes.c_int),      # CPU vendor
         ("num_cores", ctypes.c_uint),  # Number of cores in the system
         ("cores", CPqosCoreInfo * 0)   # Core information
+    ]
+
+# I/O RDT
+
+PQOS_DEV_MAX_CHANNELS = 8
+PqosChannelT = ctypes.c_uint64
+
+class CPqosIordtConfig:
+    "pqos_iordt_config enumeration"
+    native_type = ctypes.c_int
+    PQOS_REQUIRE_IORDT_ANY = 0
+    PQOS_REQUIRE_IORDT_OFF = 1
+    PQOS_REQUIRE_IORDT_ON = 2
+
+    values = [
+        ('any', PQOS_REQUIRE_IORDT_ANY),
+        ('off', PQOS_REQUIRE_IORDT_OFF),
+        ('on', PQOS_REQUIRE_IORDT_ON)
+    ]
+
+    @classmethod
+    def get_value(cls, label):
+        """
+        Converts text label ('any', 'off' or 'on') to its native
+        representation.
+
+        Parameters:
+            label: a text label
+
+        Returns:
+            native representation of configuration or None
+        """
+
+        for cfg_label, cfg_value in cls.values:
+            if cfg_label == label:
+                return cfg_value
+
+        return None
+
+    @classmethod
+    def get_label(cls, value):
+        """
+        Converts native representation to a text label ('any', 'off' or 'on').
+
+        Parameters:
+            native representation of configuration
+
+        Returns:
+            label: a text label or None
+        """
+
+        for cfg_label, cfg_value in cls.values:
+            if cfg_value == value:
+                return cfg_label
+
+        return None
+
+class CPqosChannel(ctypes.Structure):
+    "pqos_channel structure"
+    # pylint: disable=too-few-public-methods
+
+    _fields_ = [
+        ('channel_id', PqosChannelT),
+        ('rmid_tagging', ctypes.c_int),
+        ('clos_tagging', ctypes.c_int),
+        ('min_rmid', ctypes.c_uint),
+        ('max_rmid', ctypes.c_uint),
+        ('min_clos', ctypes.c_uint),
+        ('max_clos', ctypes.c_uint)
+    ]
+
+class CPqosDevType:
+    "pqos_dev_type enumeration"
+    # pylint: disable=too-few-public-methods
+
+    native_type = ctypes.c_int
+    PQOS_DEVICE_TYPE_PCI = 1
+    PQOS_DEVICE_TYPE_PCI_BRIDGE = 2
+
+class CPqosDev(ctypes.Structure):
+    "pqos_dev structure"
+    # pylint: disable=too-few-public-methods
+
+    _fields_ = [
+        ('type', CPqosDevType.native_type),
+        ('segment', ctypes.c_uint16),
+        ('bdf', ctypes.c_uint16),
+        ('channel', PqosChannelT * PQOS_DEV_MAX_CHANNELS)
+    ]
+
+class CPqosDevinfo(ctypes.Structure):
+    "pqos_devinfo structure"
+    # pylint: disable=too-few-public-methods
+
+    _fields_ = [
+        ('num_channels', ctypes.c_uint),
+        ('channels', ctypes.POINTER(CPqosChannel)),
+        ('num_devs', ctypes.c_uint),
+        ('devs', ctypes.POINTER(CPqosDev))
+    ]
+
+# System configuration
+
+class CPqosSysconfig(ctypes.Structure):
+    "pqos_sysconfig structure"
+    # pylint: disable=too-few-public-methods
+
+    _fields_ = [
+        ("cap", ctypes.POINTER(CPqosCap)),
+        ("cpu", ctypes.POINTER(CPqosCpuInfo)),
+        ("dev", ctypes.POINTER(CPqosDevinfo)),
     ]
 
 # Allocation
@@ -344,6 +461,7 @@ class CPqosAllocConfig(ctypes.Structure):
 
     _fields_ = [
         ('l3_cdp', CPqosCdpConfig.native_type),
+        ('l3_iordt', CPqosIordtConfig.native_type),
         ('l2_cdp', CPqosCdpConfig.native_type),
         ('mba', CPqosMbaConfig.native_type),
     ]
@@ -357,6 +475,16 @@ class CPqosAllocConfig(ctypes.Structure):
         """
 
         self.l3_cdp = CPqosCdpConfig.get_value(l3_cdp)
+
+    def set_l3_iordt(self, l3_iordt):
+        """
+        Sets L3 I/O RDT configuration.
+
+        Parameter:
+            l3_iordt: L3 I/O RDT configuration ('any', 'on' or 'off')
+        """
+
+        self.l3_iordt = CPqosIordtConfig.get_value(l3_iordt)
 
     def set_l2_cdp(self, l2_cdp):
         """
@@ -385,8 +513,8 @@ class CPqosL2CaMaskCDP(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('data_mask', ctypes.c_uint64),
-        ('code_mask', ctypes.c_uint64),
+        ("data_mask", ctypes.c_uint64),
+        ("code_mask", ctypes.c_uint64),
     ]
 
 
@@ -395,8 +523,8 @@ class CPqosL2CaMask(ctypes.Union):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('ways_mask', ctypes.c_uint64),
-        ('s', CPqosL2CaMaskCDP)
+        ("ways_mask", ctypes.c_uint64),
+        ("s", CPqosL2CaMaskCDP)
     ]
 
 
@@ -404,9 +532,9 @@ class CPqosL2Ca(ctypes.Structure):
     "pqos_l2ca structure"
 
     _fields_ = [
-        ('class_id', ctypes.c_uint),
-        ('cdp', ctypes.c_int),
-        ('u', CPqosL2CaMask),
+        ("class_id", ctypes.c_uint),
+        ("cdp", ctypes.c_int),
+        ("u", CPqosL2CaMask),
     ]
 
     @classmethod
@@ -427,8 +555,8 @@ class CPqosL3CaMaskCDP(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('data_mask', ctypes.c_uint64),
-        ('code_mask', ctypes.c_uint64),
+        ("data_mask", ctypes.c_uint64),
+        ("code_mask", ctypes.c_uint64),
     ]
 
 
@@ -437,8 +565,8 @@ class CPqosL3CaMask(ctypes.Union):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ('ways_mask', ctypes.c_uint64),
-        ('s', CPqosL3CaMaskCDP)
+        ("ways_mask", ctypes.c_uint64),
+        ("s", CPqosL3CaMaskCDP)
     ]
 
 
@@ -446,9 +574,9 @@ class CPqosL3Ca(ctypes.Structure):
     "pqos_l3ca structure"
 
     _fields_ = [
-        ('class_id', ctypes.c_uint),
-        ('cdp', ctypes.c_int),
-        ('u', CPqosL3CaMask),
+        ("class_id", ctypes.c_uint),
+        ("cdp", ctypes.c_int),
+        ("u", CPqosL3CaMask),
     ]
 
     @classmethod
@@ -468,9 +596,9 @@ class CPqosMba(ctypes.Structure):
     "pqos_mba structure"
 
     _fields_ = [
-        ('class_id', ctypes.c_uint),
-        ('mb_max', ctypes.c_uint),
-        ('ctrl', ctypes.c_int)
+        ("class_id", ctypes.c_uint),
+        ("mb_max", ctypes.c_uint),
+        ("ctrl", ctypes.c_int)
     ]
 
     @classmethod
@@ -510,4 +638,25 @@ class CPqosEventValues(ctypes.Structure):
         ('ipc', ctypes.c_double),
         ('llc_misses', ctypes.c_uint64),
         ('llc_misses_delta', ctypes.c_uint64),
+        ('llc_references', ctypes.c_uint64),
+        ('llc_references_delta', ctypes.c_uint64),
     ]
+
+class CPqosMonConfig(ctypes.Structure):
+    "pqos_mon_config structure"
+    # pylint: disable=too-few-public-methods
+    # pylint: disable=attribute-defined-outside-init
+
+    _fields_ = [
+        ('l3_iordt', CPqosIordtConfig.native_type)
+    ]
+
+    def set_l3_iordt(self, l3_iordt):
+        """
+        Sets L3 I/O RDT configuration.
+
+        Parameter:
+            l3_iordt: L3 I/O RDT configuration ('any', 'on' or 'off')
+        """
+
+        self.l3_iordt = CPqosIordtConfig.get_value(l3_iordt)

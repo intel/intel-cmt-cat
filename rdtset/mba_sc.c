@@ -48,7 +48,7 @@ static const struct pqos_capability *m_cap_mba;
 static const struct pqos_capability *m_cap_mon;
 
 struct mba_sc_state {
-        struct pqos_mon_data group;
+        struct pqos_mon_data *group;
         cpu_set_t cpumask;
         unsigned prev_rate;
         uint64_t prev_time;
@@ -73,7 +73,7 @@ static int supported = 0;
  * @retval negative on error (-errno)
  */
 static int
-mba_sc_mon_start(const cpu_set_t cpumask, struct pqos_mon_data *group)
+mba_sc_mon_start(const cpu_set_t cpumask, struct pqos_mon_data **group)
 {
         unsigned *cores = NULL;
         unsigned num_cores = 0;
@@ -92,8 +92,8 @@ mba_sc_mon_start(const cpu_set_t cpumask, struct pqos_mon_data *group)
                 cores[num_cores++] = i;
         }
 
-        ret = pqos_mon_start(num_cores, cores, PQOS_MON_EVENT_LMEM_BW, NULL,
-                             group);
+        ret = pqos_mon_start_cores(num_cores, cores, PQOS_MON_EVENT_LMEM_BW,
+                                   NULL, group);
         if (ret != PQOS_RETVAL_OK)
                 ret = -EFAULT;
 
@@ -227,7 +227,7 @@ mba_sc_stop(void)
                 return 0;
 
         for (i = 0; i < state_num; i++) {
-                int retval = mba_sc_mon_stop(&state[i].group);
+                int retval = mba_sc_mon_stop(state[i].group);
 
                 if (retval < 0)
                         ret = retval;
@@ -375,14 +375,14 @@ mba_sc_update(struct mba_sc_state *state)
         uint64_t prev_bw = state->prev_bw;
         uint64_t cur_bw;
         int ret;
-        const struct pqos_event_values *pv = &state->group.values;
+        const struct pqos_event_values *pv = &state->group->values;
         const unsigned min_rate = m_cap_mba->u.mba->throttle_step;
         const unsigned step_rate = m_cap_mba->u.mba->throttle_step;
         const unsigned max_rate = 100;
 
         mba_cfg.ctrl = 0;
 
-        ret = mba_sc_mon_poll(&state->group);
+        ret = mba_sc_mon_poll(state->group);
         if (ret != 0)
                 return ret;
 

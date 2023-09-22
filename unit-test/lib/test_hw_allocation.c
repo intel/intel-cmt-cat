@@ -98,6 +98,18 @@ hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
 }
 
 int
+hw_alloc_reset_l3iordt(const unsigned l3cat_id_num,
+                       const unsigned *l3cat_ids,
+                       const int enable)
+{
+        check_expected(l3cat_id_num);
+        assert_non_null(l3cat_ids);
+        check_expected(enable);
+
+        return mock_type(int);
+}
+
+int
 hw_alloc_reset_l2cdp(const unsigned l2id_num,
                      const unsigned *l2ids,
                      const int enable)
@@ -1173,21 +1185,31 @@ test_hw_alloc_reset_unsupported_l3ca(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap_cpuinfo_get_config, &data->config);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = PQOS_REQUIRE_CDP_OFF;
+
+        ret = hw_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+
+        ret = hw_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_OFF;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
@@ -1199,19 +1221,35 @@ test_hw_alloc_reset_unsupported_l3cdp(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         data->cap_l3ca.cdp = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+
+        ret = hw_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_hw_alloc_reset_unsupported_l3iordt(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_alloc_config cfg;
+
+        data->cap_l3ca.iordt = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_always(__wrap_cpuinfo_get_config, &data->config);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
@@ -1223,21 +1261,19 @@ test_hw_alloc_reset_unsupported_l2ca(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l2_cdp = PQOS_REQUIRE_CDP_OFF;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
@@ -1249,17 +1285,14 @@ test_hw_alloc_reset_unsupported_l2cdp(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
-
         data->cap_l2ca.cdp = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_always(__wrap_cpuinfo_get_config, &data->config);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
 
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -1272,21 +1305,19 @@ test_hw_alloc_reset_unsupported_mba(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.mba = PQOS_MBA_DEFAULT;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.mba = PQOS_MBA_CTRL;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
@@ -1298,19 +1329,15 @@ test_hw_alloc_reset_unsupported_mba_ctrl(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         data->cap_mba.ctrl = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_always(__wrap_cpuinfo_get_config, &data->config);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.mba = PQOS_MBA_CTRL;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
@@ -1369,13 +1396,6 @@ test_hw_alloc_reset_l3cdp_enable(void **state)
         unsigned i;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
-
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 0;
         l3cat_ids = pqos_cpu_get_l3cat_ids(data->cpu, &l3cat_id_num);
@@ -1409,6 +1429,9 @@ test_hw_alloc_reset_l3cdp_enable(void **state)
 
         expect_value(__wrap__pqos_cap_l3cdp_change, cdp, PQOS_REQUIRE_CDP_ON);
 
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
@@ -1425,13 +1448,6 @@ test_hw_alloc_reset_l3cdp_disable(void **state)
         unsigned l3cat_id_num = 0;
         unsigned i;
         struct pqos_alloc_config cfg;
-
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_OFF;
 
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 1;
@@ -1466,6 +1482,9 @@ test_hw_alloc_reset_l3cdp_disable(void **state)
 
         expect_value(__wrap__pqos_cap_l3cdp_change, cdp, PQOS_REQUIRE_CDP_OFF);
 
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_OFF;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
@@ -1481,6 +1500,7 @@ test_hw_alloc_reset_l2ca(void **state)
         unsigned *l2ids = NULL;
         unsigned l2id_num = 0;
         unsigned i;
+        struct pqos_alloc_config cfg;
 
         data->cap_l2ca.cdp = 0;
         l2ids = pqos_cpu_get_l2ids(data->cpu, &l2id_num);
@@ -1509,7 +1529,10 @@ test_hw_alloc_reset_l2ca(void **state)
 
         expect_value(__wrap__pqos_cap_l2cdp_change, cdp, PQOS_REQUIRE_CDP_ANY);
 
-        ret = hw_alloc_reset(NULL);
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
+
+        ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (l2ids != NULL)
@@ -1525,13 +1548,6 @@ test_hw_alloc_reset_l2cdp_enable(void **state)
         unsigned l2id_num = 0;
         unsigned i;
         struct pqos_alloc_config cfg;
-
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
 
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 0;
@@ -1565,6 +1581,9 @@ test_hw_alloc_reset_l2cdp_enable(void **state)
 
         expect_value(__wrap__pqos_cap_l2cdp_change, cdp, PQOS_REQUIRE_CDP_ON);
 
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
@@ -1581,13 +1600,6 @@ test_hw_alloc_reset_l2cdp_disable(void **state)
         unsigned l2id_num = 0;
         unsigned i;
         struct pqos_alloc_config cfg;
-
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_OFF;
 
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 1;
@@ -1621,6 +1633,9 @@ test_hw_alloc_reset_l2cdp_disable(void **state)
 
         expect_value(__wrap__pqos_cap_l2cdp_change, cdp, PQOS_REQUIRE_CDP_OFF);
 
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_OFF;
+
         ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
@@ -1636,6 +1651,7 @@ test_hw_alloc_reset_mba(void **state)
         unsigned *mba_ids = NULL;
         unsigned mba_id_num = 0;
         unsigned i;
+        struct pqos_alloc_config cfg;
 
         data->cap_mba.ctrl = 0;
         mba_ids = pqos_cpu_get_mba_ids(data->cpu, &mba_id_num);
@@ -1663,7 +1679,10 @@ test_hw_alloc_reset_mba(void **state)
 
         will_return(hw_alloc_reset_assoc, PQOS_RETVAL_OK);
 
-        ret = hw_alloc_reset(NULL);
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.mba = PQOS_MBA_ANY;
+
+        ret = hw_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (mba_ids != NULL)
@@ -1691,6 +1710,7 @@ main(void)
             cmocka_unit_test(test_hw_alloc_reset_unsupported_l2ca),
             cmocka_unit_test(test_hw_alloc_reset_unsupported_mba),
             cmocka_unit_test(test_hw_alloc_reset_unsupported_l3cdp),
+            cmocka_unit_test(test_hw_alloc_reset_unsupported_l3iordt),
             cmocka_unit_test(test_hw_alloc_reset_l3ca),
             cmocka_unit_test(test_hw_alloc_reset_l3cdp_enable),
             cmocka_unit_test(test_hw_alloc_reset_l3cdp_disable)};

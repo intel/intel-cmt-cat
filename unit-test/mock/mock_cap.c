@@ -42,6 +42,12 @@ __wrap__pqos_check_init(const int expect)
         return mock_type(int);
 }
 
+const struct pqos_sysconfig *
+__wrap__pqos_get_sysconfig(void)
+{
+        return mock_ptr_type(const struct pqos_sysconfig *);
+}
+
 const struct pqos_cap *
 __wrap__pqos_get_cap(void)
 {
@@ -52,6 +58,12 @@ const struct pqos_cpuinfo *
 __wrap__pqos_get_cpu(void)
 {
         return mock_ptr_type(const struct pqos_cpuinfo *);
+}
+
+const struct pqos_devinfo *
+__wrap__pqos_get_dev(void)
+{
+        return mock_ptr_type(const struct pqos_devinfo *);
 }
 
 enum pqos_interface
@@ -78,9 +90,17 @@ __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg)
         check_expected(cfg);
 }
 
-void
-__wrap__pqos_inter_get(enum pqos_interface *interface)
+int
+__wrap_pqos_sysconfig_get(const struct pqos_sysconfig **sysconf)
 {
-        if (interface != NULL)
-                *interface = mock_type(enum pqos_interface);
+        int ret;
+
+        function_called();
+        assert_non_null(sysconf);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *sysconf = mock_ptr_type(const struct pqos_sysconfig *);
+
+        return ret;
 }

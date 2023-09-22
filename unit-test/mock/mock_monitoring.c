@@ -35,6 +35,28 @@
 #include "mock_test.h"
 
 int
+__wrap_pqos_mon_init(const struct pqos_cpuinfo *cpu,
+                     const struct pqos_cap *cap,
+                     const struct pqos_config *cfg)
+{
+        function_called();
+
+        assert_non_null(cpu);
+        assert_non_null(cap);
+        assert_non_null(cfg);
+
+        return mock_type(int);
+}
+
+int
+__wrap_pqos_mon_fini(void)
+{
+        function_called();
+
+        return mock_type(int);
+}
+
+int
 __wrap_pqos_mon_poll_events(struct pqos_mon_data *group)
 {
         check_expected_ptr(group);

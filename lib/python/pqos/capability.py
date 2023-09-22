@@ -41,6 +41,7 @@ from pqos.common import pqos_handle_error
 from pqos.pqos import Pqos
 from pqos.native_struct import CPqosCap, CPqosCapability, CPqosMonitor
 
+
 class PqosCapabilityMonitoring(object):
     "PQoS monitoring capability"
     # pylint: disable=too-few-public-methods
@@ -332,5 +333,23 @@ class PqosCap(object):
                                                   ctypes.byref(supported),
                                                   ctypes.byref(enabled))
         pqos_handle_error('pqos_mba_ctrl_enabled', ret)
+        return (_get_tristate_bool(supported.value),
+                _get_tristate_bool(enabled.value))
+
+    def is_l3ca_iordt_enabled(self):
+        """
+        Retrieves L3 cache allocation I/O RDT status.
+
+        Returns:
+            a tuple of two values: supported (True, False or None)
+              and enabled (True, False or None)
+        """
+
+        supported = ctypes.c_int(0)
+        enabled = ctypes.c_int(0)
+        ret = self.pqos.lib.pqos_l3ca_iordt_enabled(self.p_cap,
+                                                    ctypes.byref(supported),
+                                                    ctypes.byref(enabled))
+        pqos_handle_error('pqos_l3ca_iordt_enabled', ret)
         return (_get_tristate_bool(supported.value),
                 _get_tristate_bool(enabled.value))

@@ -30,8 +30,183 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "pqos.h"
 #include "test.h"
 #include "utils.h"
+
+/* ======== pqos_l3ca_iordt_enabled ======== */
+
+void
+test_pqos_l3ca_iordt_enabled(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        int enabled;
+        int supported;
+
+        ret = pqos_l3ca_iordt_enabled(data->cap, &enabled, &supported);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(enabled, data->cap_l3ca.iordt);
+        assert_int_equal(supported, data->cap_l3ca.iordt_on);
+
+        data->cap_l3ca.iordt = 1;
+
+        ret = pqos_l3ca_iordt_enabled(data->cap, &enabled, &supported);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(enabled, data->cap_l3ca.iordt);
+        assert_int_equal(supported, data->cap_l3ca.iordt_on);
+
+        data->cap_l3ca.iordt = 1;
+        data->cap_l3ca.iordt_on = 1;
+
+        ret = pqos_l3ca_iordt_enabled(data->cap, &enabled, &supported);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(enabled, data->cap_l3ca.iordt);
+        assert_int_equal(supported, data->cap_l3ca.iordt_on);
+
+        ret = pqos_l3ca_iordt_enabled(data->cap, NULL, &supported);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(supported, data->cap_l3ca.iordt_on);
+
+        ret = pqos_l3ca_iordt_enabled(data->cap, &enabled, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(enabled, data->cap_l3ca.iordt);
+}
+
+void
+test_pqos_l3ca_iordt_enabled_param(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        int enabled;
+        int supported;
+
+        ret = pqos_l3ca_iordt_enabled(data->cap, NULL, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_l3ca_iordt_enabled(NULL, &enabled, &supported);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+void
+test_pqos_l3ca_iordt_enabled_unsupported(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        int enabled;
+        int supported;
+
+        ret = pqos_l3ca_iordt_enabled(data->cap, &enabled, &supported);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+void
+test_pqos_devinfo_get_channel_id(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t channel;
+        unsigned vc;
+
+        assert_non_null(data);
+        assert_non_null(data->dev);
+        assert_non_null(data->dev->devs);
+
+        for (vc = 0; vc < 2; ++vc) {
+                channel = pqos_devinfo_get_channel_id(
+                    data->dev, data->dev->devs[0].segment,
+                    data->dev->devs[0].bdf, vc);
+                assert_int_equal(channel, data->dev->devs[0].channel[vc]);
+        }
+}
+
+void
+test_pqos_devinfo_get_channel_id_param(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t channel;
+        const unsigned vc = 0;
+
+        channel = pqos_devinfo_get_channel_id(NULL, data->dev->devs[0].segment,
+                                              data->dev->devs[0].bdf, vc);
+        assert_int_equal(channel, 0);
+}
+
+void
+test_pqos_devinfo_get_channel_ids(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t *channels = NULL;
+        unsigned num_channels;
+
+        assert_non_null(data);
+        assert_non_null(data->dev);
+        assert_non_null(data->dev->devs);
+
+        channels =
+            pqos_devinfo_get_channel_ids(data->dev, data->dev->devs[0].segment,
+                                         data->dev->devs[0].bdf, &num_channels);
+        assert_non_null(channels);
+        assert_int_equal(num_channels, 3);
+
+        size_t i;
+
+        for (i = 0; i < data->dev->num_channels; i++)
+                assert_int_equal(channels[i], data->dev->devs[0].channel[i]);
+
+        free(channels);
+}
+
+static void
+test_pqos_devinfo_get_channel_ids_param(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t *channels = NULL;
+        unsigned num_channels;
+
+        assert_non_null(data);
+        assert_non_null(data->dev);
+        assert_non_null(data->dev->devs);
+
+        channels =
+            pqos_devinfo_get_channel_ids(NULL, data->dev->devs[0].segment,
+                                         data->dev->devs[0].bdf, &num_channels);
+        assert_null(channels);
+
+        channels =
+            pqos_devinfo_get_channel_ids(data->dev, data->dev->devs[0].segment,
+                                         data->dev->devs[0].bdf, NULL);
+        assert_null(channels);
+}
+
+static void
+test_pqos_devinfo_get_channel_shared(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        int shared;
+
+        ret = pqos_devinfo_get_channel_shared(data->dev, 0x201, &shared);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(shared, 0);
+
+        ret = pqos_devinfo_get_channel_shared(data->dev, 0x202, &shared);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(shared, 1);
+}
+
+static void
+test_pqos_devinfo_get_channel_shared_param(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        int shared;
+
+        ret = pqos_devinfo_get_channel_shared(NULL, 0x202, &shared);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_devinfo_get_channel_shared(data->dev, 0xDEAD, &shared);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
 
 /* ======== _pqos_cap_get_type ======== */
 
@@ -664,6 +839,19 @@ main(void)
 {
         int result = 0;
 
+        const struct CMUnitTest tests_l3[] = {
+            cmocka_unit_test(test_pqos_l3ca_iordt_enabled),
+            cmocka_unit_test(test_pqos_l3ca_iordt_enabled_param),
+            cmocka_unit_test(test_pqos_devinfo_get_channel_id),
+            cmocka_unit_test(test_pqos_devinfo_get_channel_id_param),
+            cmocka_unit_test(test_pqos_devinfo_get_channel_ids),
+            cmocka_unit_test(test_pqos_devinfo_get_channel_ids_param),
+            cmocka_unit_test(test_pqos_devinfo_get_channel_shared),
+            cmocka_unit_test(test_pqos_devinfo_get_channel_shared_param)};
+
+        const struct CMUnitTest tests_unsupported[] = {
+            cmocka_unit_test(test_pqos_l3ca_iordt_enabled_unsupported)};
+
 #if PQOS_VERSION >= 50000
         const struct CMUnitTest tests_snc[] = {
             cmocka_unit_test(test_utils_pqos_cpu_get_numa_empty),
@@ -717,6 +905,9 @@ main(void)
             cmocka_unit_test(test_pqos_mba_ctrl_enabled_unsupported),
         };
 
+        result += cmocka_run_group_tests(tests_l3, test_init_l3ca, test_fini);
+        result += cmocka_run_group_tests(tests_unsupported,
+                                         test_init_unsupported, test_fini);
 #if PQOS_VERSION >= 50000
         result += cmocka_run_group_tests(tests_snc, NULL, NULL);
 #endif

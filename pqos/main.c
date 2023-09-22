@@ -63,8 +63,15 @@
  */
 static struct pqos_alloc_config sel_alloc_config = {
     .l3_cdp = PQOS_REQUIRE_CDP_ANY,
+    .l3_iordt = PQOS_REQUIRE_IORDT_ANY,
     .l2_cdp = PQOS_REQUIRE_CDP_ANY,
     .mba = PQOS_MBA_ANY};
+
+/**
+ * Default configuration of monitoring
+ */
+static struct pqos_mon_config sel_mon_config = {.l3_iordt =
+                                                    PQOS_REQUIRE_IORDT_ANY};
 
 /**
  * Monitoring reset
@@ -126,11 +133,13 @@ static int sel_interface_selected = 0;
  */
 static int sel_print_version = 0;
 
+static uint64_t strtouint64_base(const char *s, int default_base);
+
 /**
  * @brief Function to check if a value is already contained in a table
  *
  * @param tab table of values to check
- * @param size size of the table
+ * @param size table size
  * @param val value to search for
  *
  * @return If the value is already in the table
@@ -151,8 +160,20 @@ isdup(const uint64_t *tab, const unsigned size, const uint64_t val)
 uint64_t
 strtouint64(const char *s)
 {
+        return strtouint64_base(s, 10);
+}
+
+uint64_t
+strhextouint64(const char *s)
+{
+        return strtouint64_base(s, 16);
+}
+
+static uint64_t
+strtouint64_base(const char *s, int default_base)
+{
         const char *str = s;
-        int base = 10;
+        int base = default_base;
         uint64_t n = 0;
         char *endptr = NULL;
 
@@ -433,6 +454,7 @@ selfn_reset_alloc(const char *arg)
 
                 selfn_strdup(&s, arg);
 
+                /* L3 CDP reset options */
                 const struct {
                         const char *name;
                         enum pqos_cdp_config cdp;
@@ -442,6 +464,7 @@ selfn_reset_alloc(const char *arg)
                     {"l3cdp-any", PQOS_REQUIRE_CDP_ANY},
                 };
 
+                /* L2 CDP reset options */
                 const struct {
                         const char *name;
                         enum pqos_cdp_config cdp;
@@ -451,6 +474,7 @@ selfn_reset_alloc(const char *arg)
                     {"l2cdp-any", PQOS_REQUIRE_CDP_ANY},
                 };
 
+                /* MBA CTRL reset options */
                 const struct {
                         const char *name;
                         enum pqos_mba_config mba;
@@ -458,6 +482,16 @@ selfn_reset_alloc(const char *arg)
                     {"mbaCtrl-on", PQOS_MBA_CTRL},
                     {"mbaCtrl-off", PQOS_MBA_DEFAULT},
                     {"mbaCtrl-any", PQOS_MBA_ANY},
+                };
+
+                /* L3 I/O RDT reset options */
+                const struct {
+                        const char *name;
+                        enum pqos_iordt_config iordt;
+                } patterniordt[] = {
+                    {"l3iordt-on", PQOS_REQUIRE_IORDT_ON},
+                    {"l3iordt-off", PQOS_REQUIRE_IORDT_OFF},
+                    {"l3iordt-any", PQOS_REQUIRE_IORDT_ANY},
                 };
 
                 tok = s;
@@ -470,17 +504,22 @@ selfn_reset_alloc(const char *arg)
                                         valid = 1;
                                         break;
                                 }
-
                         for (i = 0; i < DIM(patternsl2); i++)
                                 if (strcasecmp(tok, patternsl2[i].name) == 0) {
                                         cfg->l2_cdp = patternsl2[i].cdp;
                                         valid = 1;
                                         break;
                                 }
-
                         for (i = 0; i < DIM(patternsmb); i++)
                                 if (strcasecmp(tok, patternsmb[i].name) == 0) {
                                         cfg->mba = patternsmb[i].mba;
+                                        valid = 1;
+                                        break;
+                                }
+                        for (i = 0; i < DIM(patterniordt); i++)
+                                if (strcasecmp(tok, patterniordt[i].name) ==
+                                    0) {
+                                        cfg->l3_iordt = patterniordt[i].iordt;
                                         valid = 1;
                                         break;
                                 }
@@ -499,6 +538,62 @@ selfn_reset_alloc(const char *arg)
                 free(s);
         }
         sel_reset_alloc = 1;
+}
+
+/**
+ * @brief Sets monitoring reset flag
+ *
+ * @param [in] arg optional configuration string
+ *             if NULL or zero length  then configuration check is skipped
+ */
+static void
+selfn_reset_mon(const char *arg)
+{
+        if (arg != NULL && *arg != '\0') {
+                unsigned i;
+                char *tok = NULL;
+                char *saveptr = NULL;
+                char *s = NULL;
+                struct pqos_mon_config *cfg = &sel_mon_config;
+
+                selfn_strdup(&s, arg);
+
+                /* L3 I/O RDT reset options */
+                const struct {
+                        const char *name;
+                        enum pqos_iordt_config iordt;
+                } patterniordt[] = {
+                    {"l3iordt-on", PQOS_REQUIRE_IORDT_ON},
+                    {"l3iordt-off", PQOS_REQUIRE_IORDT_OFF},
+                    {"l3iordt-any", PQOS_REQUIRE_IORDT_ANY},
+                };
+
+                tok = s;
+                while ((tok = strtok_r(tok, ",", &saveptr)) != NULL) {
+                        unsigned valid = 0;
+
+                        for (i = 0; i < DIM(patterniordt); i++)
+                                if (strcasecmp(tok, patterniordt[i].name) ==
+                                    0) {
+                                        cfg->l3_iordt = patterniordt[i].iordt;
+                                        valid = 1;
+                                        break;
+                                }
+
+                        if (!valid) {
+                                printf("Unrecognized '%s' monitoring "
+                                       "reset option!\n",
+                                       tok);
+                                free(s);
+                                exit(EXIT_FAILURE);
+                        }
+
+                        tok = NULL;
+                }
+
+                free(s);
+        }
+        sel_mon_reset = 1;
 }
 
 /**
@@ -619,6 +714,7 @@ parse_config_file(const char *fname)
                 void (*fn)(const char *arg);
         } optab[] = {
             /* clang-format off */
+
             {"show-alloc:",         selfn_show_allocation },   /**< -s */
             {"display:",            selfn_display },           /**< -d */
             {"display-verbose:",    selfn_display_verbose },   /**< -D */
@@ -631,8 +727,11 @@ parse_config_file(const char *fname)
             {"monitor-pids:",       selfn_monitor_pids },      /**< -p */
             {"monitor-cores:",      selfn_monitor_cores },     /**< -m */
 #ifdef PQOS_RMID_CUSTOM
-            {"monitor-rmid:",       selfn_monitor_rmid_cores },
+            {"monitor-rmid:",          selfn_monitor_rmid_cores },
+            {"monitor-rmid-channels:", selfn_monitor_rmid_channels },
 #endif
+            {"monitor-devs:",       selfn_monitor_devs },
+            {"monitor-channels:",   selfn_monitor_channels },
             {"monitor-time:",       selfn_monitor_time },      /**< -t */
             {"monitor-interval:",   selfn_monitor_interval },  /**< -i */
             {"monitor-file:",       selfn_monitor_file },      /**< -o */
@@ -716,8 +815,10 @@ static const char help_printf_short[] =
     "       %s [-m EVTCORES] [--mon-core=EVTCORES] |\n"
     "          [-p [EVTPIDS]] [--mon-pid[=EVTPIDS]] |\n"
     "          [--mon-uncore[=EVTUNCORE]]\n"
+    "          [--mon-dev=EVTDEVICES] [--mon-channel=EVTCHANNELS]\n"
 #ifdef PQOS_RMID_CUSTOM
-    "       %s [--rmid=RMIDCORES]\n"
+    "          [--rmid=RMIDCORES]\n"
+    "          [--rmid-channels=RMIDCORES]\n"
 #endif
     "       %s [--disable-mon-ipc] [--disable-mon-llc_miss]\n"
     "          [-t SECONDS] [--mon-time=SECONDS]\n"
@@ -769,6 +870,7 @@ static const char help_printf_long[] =
     "          CONFIG can be: l3cdp-on, l3cdp-off, l3cdp-any,\n"
     "                         l2cdp-on, l2cdp-off, l2cdp-any,\n"
     "                         mbaCtrl-on, mbaCtrl-off, mbaCtrl-any\n"
+    "                         l3iordt-on, l3iordt-off, l3iordt-any,\n"
     "          (default l3cdp-any,l2cdp-any,mbaCtrl-any).\n"
     "  -m EVTCORES, --mon-core=EVTCORES\n"
     "          select cores and events for monitoring.\n"
@@ -788,6 +890,9 @@ static const char help_printf_long[] =
     "          assign RMID for cores\n"
     "          RMIDCORES format is 'RMID_NUMBER=CORE_LIST'\n"
     "          Example \"10=0,2,4;11=1,3,5 \"\n"
+    "  --rmid-channels=RMIDCHANNELS\n"
+    "          assign RMID for channels\n"
+    "          RMIDCHANNELS format is 'RMID_NUMBER=CHANNEL_LIST'\n"
 #endif
     "  --disable-mon-ipc\n"
     "          Disable IPC monitoring\n"
@@ -806,6 +911,14 @@ static const char help_printf_long[] =
     "               Requires Linux and kernel versions 4.10 and newer.\n"
     "               The -I option must be used for PID monitoring.\n"
     "               Processes and cores cannot be monitored together.\n"
+    "  --mon-dev=EVTDEVICES\n"
+    "          select I/O RDT devices and events for monitoring.\n"
+    "          EVTDEVICES format is 'EVENT:DEVICE_LIST'.\n"
+    "          Example: \"all:0000:0010:04.0@1;llc:0000:0010:05.0\"."
+    "  --mon-channel=EVTCHANNELS\n"
+    "          select I/O RDT channels and events for monitoring.\n"
+    "          EVTCHANNELS format is 'EVENT:CHANNEL_LIST'.\n"
+    "          Channels can be grouped by enclosing them in square brackets.\n"
     "  --mon-uncore[=EVTUNCORE]\n"
     "          select sockets and uncore events for monitoring.\n"
     "          Example: all:0.\n"
@@ -825,7 +938,11 @@ static const char help_printf_long[] =
     "  -t SECONDS, --mon-time=SECONDS\n"
     "          set monitoring time in seconds. Use 'inf' or 'infinite'\n"
     "          for infinite monitoring. CTRL+C stops monitoring.\n"
-    "  -r, --mon-reset             monitoring reset, claim all RMID's\n"
+    "  -r [CONFIG], --mon-reset[=CONFIG]\n"
+    "          monitoring reset, claim all RMID's\n"
+    "          CONFIG can be: l3iordt-on, l3iordt-off, l3iordt-any\n"
+    "          (default l3iordt-on)\n"
+
     "  -H, --profile-list          list supported allocation profiles\n"
     "  -c PROFILE, --profile-set=PROFILE\n"
     "          select a PROFILE of predefined allocation classes.\n"
@@ -845,6 +962,8 @@ static const char help_printf_long[] =
     "                  2) Selects OS interface if the kernel interface\n"
     "                     is supported\n"
     "                  3) Selects MSR interface otherwise\n";
+/* clang-format on */
+
 /**
  * @brief Displays help information
  *
@@ -855,11 +974,8 @@ static void
 print_help(const int is_long)
 {
         printf(help_printf_short, m_cmd_name, m_cmd_name, m_cmd_name,
-               m_cmd_name, m_cmd_name,
-#ifdef PQOS_RMID_CUSTOM
-               m_cmd_name,
-#endif
-               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name);
+               m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
+               m_cmd_name, m_cmd_name);
         if (is_long)
                 printf("%s", help_printf_long);
 }
@@ -893,13 +1009,16 @@ print_lib_version(const struct pqos_cap *p_cap)
 }
 
 #ifdef PQOS_RMID_CUSTOM
-#define OPTION_RMID 1000
+#define OPTION_RMID          1000
+#define OPTION_RMID_CHANNELS 1001
 #endif
-#define OPTION_DISABLE_MON_IPC      1001
-#define OPTION_DISABLE_MON_LLC_MISS 1002
-#define OPTION_VERSION              1003
-#define OPTION_INTERFACE            1004
-#define OPTION_MON_UNCORE           1005
+#define OPTION_DISABLE_MON_IPC      1002
+#define OPTION_DISABLE_MON_LLC_MISS 1003
+#define OPTION_VERSION              1004
+#define OPTION_INTERFACE            1005
+#define OPTION_MON_UNCORE           1006
+#define OPTION_MON_DEVS             1007
+#define OPTION_MON_CHANNELS         1008
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -915,6 +1034,8 @@ static struct option long_cmd_opts[] = {
     {"mon-pid",              required_argument, 0, 'p'},
     {"mon-core",             required_argument, 0, 'm'},
     {"mon-uncore",           optional_argument, 0, OPTION_MON_UNCORE},
+    {"mon-dev",              required_argument, 0, OPTION_MON_DEVS},
+    {"mon-channel",          required_argument, 0, OPTION_MON_CHANNELS},
     {"mon-time",             required_argument, 0, 't'},
     {"mon-top",              no_argument,       0, 'T'},
     {"mon-file",             required_argument, 0, 'o'},
@@ -933,6 +1054,7 @@ static struct option long_cmd_opts[] = {
     {"version",              no_argument,       0, OPTION_VERSION},
 #ifdef PQOS_RMID_CUSTOM
     {"rmid",                 required_argument, 0, OPTION_RMID},
+    {"rmid-channels",        required_argument, 0, OPTION_RMID_CHANNELS},
 #endif
     {0, 0, 0, 0} /* end */
     /* clang-format on */
@@ -942,8 +1064,7 @@ int
 main(int argc, char **argv)
 {
         struct pqos_config cfg;
-        const struct pqos_cpuinfo *p_cpu = NULL;
-        const struct pqos_cap *p_cap = NULL;
+        const struct pqos_sysconfig *p_sys = NULL;
         const struct pqos_capability *cap_mon = NULL;
         const struct pqos_capability *cap_l3ca = NULL;
         const struct pqos_capability *cap_l2ca = NULL;
@@ -958,7 +1079,7 @@ main(int argc, char **argv)
         memset(&cfg, 0, sizeof(cfg));
 
         while ((cmd = getopt_long(argc, argv,
-                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDrvVIPR:",
+                                  ":Hhf:i:m:Tt:l:o:u:e:c:a:p:sdDr:vVIPR:",
                                   long_cmd_opts, &opt_index)) != -1) {
                 switch (cmd) {
                 case 'h':
@@ -1033,7 +1154,16 @@ main(int argc, char **argv)
                         selfn_allocation_class(optarg);
                         break;
                 case 'r':
-                        sel_mon_reset = 1;
+                        /*
+                         * Next switch option wrongly assumed
+                         * to be argument to '-r'.
+                         */
+                        if (optarg != NULL && *optarg == '-') {
+                                selfn_reset_mon(NULL);
+                                optind--;
+                                break;
+                        }
+                        selfn_reset_mon(optarg);
                         break;
                 case 'R':
                         if (optarg != NULL) {
@@ -1060,6 +1190,8 @@ main(int argc, char **argv)
                          */
                         if (optopt == 'R') {
                                 selfn_reset_alloc(NULL);
+                        } else if (optopt == 'r') {
+                                selfn_reset_mon(NULL);
                         } else if (optopt == 'p') {
                                 /**
                                  * Top pids mode - in case of '-I -p' top N
@@ -1121,9 +1253,18 @@ main(int argc, char **argv)
                 case OPTION_DISABLE_MON_LLC_MISS:
                         selfn_monitor_disable_llc_miss(NULL);
                         break;
+                case OPTION_MON_DEVS:
+                        selfn_monitor_devs(optarg);
+                        break;
+                case OPTION_MON_CHANNELS:
+                        selfn_monitor_channels(optarg);
+                        break;
 #ifdef PQOS_RMID_CUSTOM
                 case OPTION_RMID:
                         selfn_monitor_rmid_cores(optarg);
+                        break;
+                case OPTION_RMID_CHANNELS:
+                        selfn_monitor_rmid_channels(optarg);
                         break;
 #endif
                 default:
@@ -1179,42 +1320,42 @@ main(int argc, char **argv)
                 goto error_exit_2;
         }
 
-        ret = pqos_cap_get(&p_cap, &p_cpu);
+        ret = pqos_sysconfig_get(&p_sys);
         if (ret != PQOS_RETVAL_OK) {
                 printf("Error retrieving PQoS capabilities!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
 
-        l3cat_ids = pqos_cpu_get_l3cat_ids(p_cpu, &l3cat_id_count);
+        l3cat_ids = pqos_cpu_get_l3cat_ids(p_sys->cpu, &l3cat_id_count);
         if (l3cat_ids == NULL) {
                 printf("Error retrieving CPU socket information!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
 
-        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MON, &cap_mon);
+        ret = pqos_cap_get_type(p_sys->cap, PQOS_CAP_TYPE_MON, &cap_mon);
         if (ret == PQOS_RETVAL_PARAM) {
                 printf("Error retrieving monitoring capabilities!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
 
-        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
+        ret = pqos_cap_get_type(p_sys->cap, PQOS_CAP_TYPE_L3CA, &cap_l3ca);
         if (ret == PQOS_RETVAL_PARAM) {
                 printf("Error retrieving L3 allocation capabilities!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
 
-        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_L2CA, &cap_l2ca);
+        ret = pqos_cap_get_type(p_sys->cap, PQOS_CAP_TYPE_L2CA, &cap_l2ca);
         if (ret == PQOS_RETVAL_PARAM) {
                 printf("Error retrieving L2 allocation capabilities!\n");
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }
 
-        ret = pqos_cap_get_type(p_cap, PQOS_CAP_TYPE_MBA, &cap_mba);
+        ret = pqos_cap_get_type(p_sys->cap, PQOS_CAP_TYPE_MBA, &cap_mba);
         if (ret == PQOS_RETVAL_PARAM) {
                 printf("Error retrieving MB allocation capabilities!\n");
                 exit_val = EXIT_FAILURE;
@@ -1222,13 +1363,13 @@ main(int argc, char **argv)
         }
 
         if (sel_print_version) {
-                print_lib_version(p_cap);
+                print_lib_version(p_sys->cap);
                 exit_val = EXIT_SUCCESS;
                 goto error_exit_2;
         }
 
         if (sel_mon_reset && cap_mon != NULL) {
-                ret = pqos_mon_reset();
+                ret = pqos_mon_reset_config(&sel_mon_config);
                 if (sel_interface != PQOS_INTER_MSR &&
                     ret == PQOS_RETVAL_RESOURCE) {
                         exit_val = EXIT_FAILURE;
@@ -1259,8 +1400,8 @@ main(int argc, char **argv)
                 /**
                  * Show info about allocation config and exit
                  */
-                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba, p_cpu,
-                                   sel_verbose_mode);
+                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
+                                   p_sys->cpu, p_sys->dev, sel_verbose_mode);
                 goto allocation_exit;
         }
 
@@ -1268,7 +1409,7 @@ main(int argc, char **argv)
                 /**
                  * Display info about supported capabilities
                  */
-                cap_print_features(p_cap, p_cpu, sel_display_verbose);
+                cap_print_features(p_sys, sel_display_verbose);
                 goto allocation_exit;
         }
 
@@ -1279,7 +1420,8 @@ main(int argc, char **argv)
                 }
         }
 
-        switch (alloc_apply(cap_l3ca, cap_l2ca, cap_mba, p_cpu)) {
+        ret = alloc_apply(cap_l3ca, cap_l2ca, cap_mba, p_sys->cpu, p_sys->dev);
+        switch (ret) {
         case 0: /* nothing to apply */
                 break;
         case 1: /* new allocation config applied and all is good */
@@ -1307,7 +1449,7 @@ main(int argc, char **argv)
                 goto error_exit_2;
         }
 
-        if (monitor_setup(p_cpu, cap_mon) != 0) {
+        if (monitor_setup(p_sys->cpu, cap_mon, p_sys->dev) != 0) {
                 exit_val = EXIT_FAILURE;
                 goto error_exit_2;
         }

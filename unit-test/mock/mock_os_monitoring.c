@@ -35,8 +35,9 @@
 #include "mock_test.h"
 
 int
-__wrap_os_mon_reset(void)
+__wrap_os_mon_reset(const struct pqos_mon_config *cfg)
 {
+        check_expected_ptr(cfg);
         return mock_type(int);
 }
 

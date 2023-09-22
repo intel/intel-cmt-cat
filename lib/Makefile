@@ -34,8 +34,8 @@
 ###############################################################################
 
 LIB = libpqos
-VERSION = 4.6.1
-SO_VERSION = 4
+VERSION = 5.0.0
+SO_VERSION = 5
 SHARED ?= y
 LDFLAGS = -L. -lpthread -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ -D_GNU_SOURCE \
@@ -230,7 +230,7 @@ clang-format:
 CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . --skip python -q 2
+	$(CODESPELL) . --skip python -q 2 -L clos,mmapped,uint
 
 .PHONY: style
 style:
@@ -263,7 +263,9 @@ cppcheck:
 	resctrl_monitoring.h resctrl_monitoring.c \
 	resctrl_schemata.h resctrl_schemata.c \
 	resctrl_utils.h resctrl_utils.c \
-	uncore_monitoring.h -f uncore_monitoring.c
+	acpi.h acpi.c acpi_table.h \
+	iordt.h iordt.c \
+	uncore_monitoring.h uncore_monitoring.c
 
 # if target not clean or rinse then make dependencies
 ifneq ($(MAKECMDGOALS),clean)

@@ -21,7 +21,8 @@ Overview
 --------
 
 This software package provides basic support for
-Intel(R) Resource Director Technology (Intel(R) RDT) including:
+Intel(R) Resource Director Technology (Intel(R) RDT) and
+Intel(R) I/O Resource Director Technology (Intel(R) I/O RDT) including:
 Cache Monitoring Technology (CMT), Memory Bandwidth Monitoring (MBM),
 Cache Allocation Technology (CAT), Code and Data Prioritization (CDP)
 and Memory Bandwidth Allocation (MBA).
@@ -133,6 +134,8 @@ Installation instructions.
 **"LICENSE" file:** \
 License of the package.
 
+**"unit-test" directory:** \
+Unit tests
 
 Hardware Support
 ----------------
@@ -273,6 +276,7 @@ Please see the tables below for more information on when Intel(R) RDT feature
 | 0.1.5                  | L2 CAT                   | Any                     |
 | 1.2.0                  | MBA                      | Any                     |
 | 2.0.0                  | L2 CDP                   | Any                     |
+| 5.0.0                  | I/O RDT                  | Any                     |
 
 
 ###### Table 3. OS interface feature support
