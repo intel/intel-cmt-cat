@@ -112,12 +112,12 @@ class Resctrl:
         if options:
             options_str = ' -o ' + ','.join(options)
 
-        command = f"sudo mount -t resctrl resctrl{options_str} {self.root}"
+        command = f"mount -t resctrl resctrl{options_str} {self.root}"
         self.run_cmd(command)
         return self.is_mounted()
 
     def umount(self):
-        command = "sudo umount -a -t resctrl"
+        command = "umount -a -t resctrl"
         self.run_cmd(command)
         return not self.is_mounted()
 

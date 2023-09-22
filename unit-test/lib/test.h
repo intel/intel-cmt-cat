@@ -52,6 +52,8 @@ struct test_data {
         struct pqos_cap_l2ca cap_l2ca;
         struct pqos_cap_mba cap_mba;
         struct pqos_cap_mon *cap_mon;
+        struct pqos_devinfo *dev;
+        struct pqos_sysconfig *sys;
         enum pqos_interface interface;
 };
 
@@ -121,6 +123,7 @@ test_cap_init(struct test_data *data, unsigned technology)
                 data->cap_l3ca.cdp = 0;
                 data->cap_l3ca.cdp_on = 0;
                 data->cap_l3ca.way_contention = 0xc000;
+                data->cap_l3ca.iordt = 1;
 
                 cap->capabilities[cap_num].type = PQOS_CAP_TYPE_L3CA;
                 cap->capabilities[cap_num].u.l3ca = &data->cap_l3ca;
@@ -157,13 +160,17 @@ test_cap_init(struct test_data *data, unsigned technology)
                 unsigned num_events = 7;
                 unsigned i;
                 struct pqos_cap_mon *mon =
-                    malloc(num_events * sizeof(struct pqos_monitor) +
-                           sizeof(struct pqos_cap_mon));
+                    calloc(1, num_events * sizeof(struct pqos_monitor) +
+                                  sizeof(struct pqos_cap_mon));
 
                 mon->events[0].type = PQOS_MON_EVENT_L3_OCCUP;
+                mon->events[0].iordt = 1;
                 mon->events[1].type = PQOS_MON_EVENT_TMEM_BW;
+                mon->events[1].iordt = 1;
                 mon->events[2].type = PQOS_MON_EVENT_LMEM_BW;
+                mon->events[2].iordt = 1;
                 mon->events[3].type = PQOS_MON_EVENT_RMEM_BW;
+                mon->events[3].iordt = 1;
                 mon->events[4].type = PQOS_PERF_EVENT_IPC;
                 mon->events[5].type = PQOS_PERF_EVENT_LLC_MISS;
                 mon->events[6].type = PQOS_PERF_EVENT_LLC_REF;
@@ -176,6 +183,7 @@ test_cap_init(struct test_data *data, unsigned technology)
 
                 mon->num_events = num_events;
                 mon->max_rmid = 32;
+                mon->iordt = 1;
 
                 data->cap_mon = mon;
 
@@ -187,6 +195,48 @@ test_cap_init(struct test_data *data, unsigned technology)
         cap->num_cap = cap_num;
 
         data->cap = cap;
+
+        return 0;
+}
+
+static inline int
+test_dev_init(struct test_data *data)
+{
+        const uint16_t bdf = 0x22;
+        const pqos_channel_t channel = 0x201;
+
+        /* Populate devinfo struct with single dev */
+        data->dev =
+            (struct pqos_devinfo *)calloc(sizeof(struct pqos_devinfo), 1);
+        assert_non_null(data->dev);
+
+        data->dev->num_devs = 2;
+        data->dev->devs = (struct pqos_dev *)calloc(sizeof(struct pqos_dev),
+                                                    data->dev->num_devs);
+        assert_non_null(data->dev->devs);
+
+        data->dev->devs[0].bdf = bdf;
+        data->dev->devs[0].channel[0] = channel;
+        data->dev->devs[0].channel[1] = channel + 1;
+        data->dev->devs[0].channel[2] = channel + 2;
+
+        data->dev->devs[1].bdf = bdf + 1;
+        data->dev->devs[1].channel[0] = channel + 1;
+
+        /* Populate devinfo struct with channels */
+        data->dev->num_channels = 3;
+        data->dev->channels = (struct pqos_channel *)calloc(
+            data->dev->num_channels, sizeof(struct pqos_channel));
+        assert_non_null(data->dev->channels);
+        data->dev->channels[0].channel_id = channel;
+        data->dev->channels[0].clos_tagging = 1;
+        data->dev->channels[0].rmid_tagging = 1;
+
+        data->dev->channels[1].channel_id = channel + 1;
+        data->dev->channels[1].clos_tagging = 1;
+
+        data->dev->channels[2].channel_id = channel + 2;
+        data->dev->channels[2].rmid_tagging = 1;
 
         return 0;
 }
@@ -211,6 +261,16 @@ test_fini(void **state)
                         free(data->cap);
                 if (data->cap_mon != NULL)
                         free(data->cap_mon);
+                if (data->dev != NULL) {
+                        if (data->dev->channels != NULL)
+                                free(data->dev->channels);
+                        if (data->dev->devs != NULL)
+                                free(data->dev->devs);
+                        free(data->dev);
+                }
+                if (data->sys != NULL)
+                        free(data->sys);
+
                 free(data);
         }
 
@@ -241,10 +301,19 @@ test_init(void **state, unsigned technology)
                 if (ret != 0)
                         break;
 
+                ret = test_dev_init(data);
+                if (ret != 0)
+                        break;
+
                 ret = test_interface_init(data);
                 if (ret != 0)
                         break;
         } while (0);
+
+        data->sys = calloc(sizeof(struct pqos_sysconfig), 1);
+        data->sys->cap = data->cap;
+        data->sys->cpu = data->cpu;
+        data->sys->dev = data->dev;
 
         if (ret != 0)
                 test_fini(state);

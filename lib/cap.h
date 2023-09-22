@@ -56,6 +56,16 @@ extern "C" {
 PQOS_LOCAL void _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
 
 /**
+ * @brief Modifies L3 I/O RDT capability structure upon I/O RDT config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for L3 CAT & I/O RDT support.
+ *
+ * @param [in] iordt L3 I/O RDT configuration
+ */
+void _pqos_cap_l3iordt_change(const enum pqos_iordt_config iordt);
+
+/**
  * @brief Modifies L2 CAT capability structure upon CDP config change
  *
  * Limited error checks done in this function and no errors reported.
@@ -76,6 +86,16 @@ PQOS_LOCAL void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 PQOS_LOCAL void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
 
 /**
+ * @brief Modifies Mon I/O RDT capability structure upon I/O RDT config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for MON & I/O RDT support.
+ *
+ * @param [in] iordt L3 I/O RDT configuration
+ */
+void _pqos_cap_mon_iordt_change(const enum pqos_iordt_config iordt);
+
+/**
  * @brief Checks library initialization state
  *
  * @param expect expected stated of library initialization state
@@ -94,6 +114,13 @@ PQOS_LOCAL int _pqos_check_init(const int expect);
 PQOS_LOCAL enum pqos_interface _pqos_get_inter(void);
 
 /**
+ * @brief Internal API to retrieve PQoS system configuration
+ *
+ * @return PQoS system configuration
+ */
+PQOS_LOCAL const struct pqos_sysconfig *_pqos_get_sysconfig(void);
+
+/**
  * @brief Internal API to retrieve PQoS capabilities data
  *
  * @return PQoS capabilities data
@@ -106,6 +133,13 @@ PQOS_LOCAL const struct pqos_cap *_pqos_get_cap(void);
  * @return CPU information
  */
 PQOS_LOCAL const struct pqos_cpuinfo *_pqos_get_cpu(void);
+
+/**
+ * @brief Internal API to retrieve Device information
+ *
+ * @return Device information
+ */
+PQOS_LOCAL const struct pqos_devinfo *_pqos_get_dev(void);
 
 /**
  * @brief Returns value of L3 Non-Contiguous CBM(Cache Bit Mask) support

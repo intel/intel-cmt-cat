@@ -137,13 +137,21 @@ monitor_xml_row(FILE *fp,
         enum pqos_interface iface;
 
         pqos_inter_get(&iface);
-        if (iface == PQOS_INTER_MSR && monitor_core_mode()) {
-                pqos_rmid_t rmid;
-                int ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+        if (iface == PQOS_INTER_MSR) {
+                pqos_rmid_t rmid = 0;
+                int ret = -1;
 
-                offset += fillin_xml_column(
-                    "%.0f", rmid, data + offset, sz_data - offset,
-                    ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR, "rmid");
+                if (monitor_core_mode())
+                        ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+                else if (monitor_iordt_mode())
+                        ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
+                                                         &rmid);
+
+                if (ret != -1)
+                        offset += fillin_xml_column(
+                            "%.0f", rmid, data + offset, sz_data - offset,
+                            ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR,
+                            "rmid");
         }
 #endif
 
@@ -216,8 +224,14 @@ monitor_xml_row(FILE *fp,
                         "\t<pid>%s</pid>\n"
                         "\t<core>%s</core>\n"
                         "%s",
+
                         (char *)mon_data->context, core_list, data);
-        } else if (monitor_uncore_mode())
+        } else if (monitor_iordt_mode())
+                fprintf(fp,
+                        "\t<channel>%s</channel>\n"
+                        "%s",
+                        (char *)mon_data->context, data);
+        else if (monitor_uncore_mode())
                 fprintf(fp,
                         "\t<socket>%s</socket>\n"
                         "%s",

@@ -114,6 +114,22 @@ void selfn_monitor_rmid_cores(const char *arg);
 #endif
 
 /**
+ * @brief Translates multiple monitoring request strings into
+ *        internal device monitoring request structures
+ *
+ * @param str string passed to --mon-dev command line option
+ */
+void selfn_monitor_devs(const char *arg);
+
+/**
+ * @brief Translates multiple monitoring request strings into
+ *        internal channel monitoring request structures
+ *
+ * @param str string passed to --mon-channel command line option
+ */
+void selfn_monitor_channels(const char *arg);
+
+/**
  * @brief Translates multiple ddio monitoring request strings into
  *        internal monitoring request structures
  *
@@ -138,10 +154,21 @@ void selfn_monitor_disable_ipc(const char *arg);
  */
 void selfn_monitor_disable_llc_miss(const char *arg);
 
+#ifdef PQOS_RMID_CUSTOM
+/**
+ * @brief Selects custom RMID mapping for channels
+ *
+ * @param arg string passed to --rmid-channels command line option
+ */
+void selfn_monitor_rmid_channels(const char *arg);
+#endif
+
 /**
  * @brief Check to determine if processes are monitored
  *
  * @return Process monitoring mode status
+ * @retval 0 not monitoring processes
+ * @retval 1 monitoring processes
  */
 int monitor_process_mode(void);
 
@@ -149,8 +176,19 @@ int monitor_process_mode(void);
  * @brief Check to determine if cores are monitored
  *
  * @return Core monitoring mode status
+ * @retval 0 not monitoring cores
+ * @retval 1 monitoring cores
  */
 int monitor_core_mode(void);
+
+/**
+ * @brief Check to determine if channel/devices are monitored
+ *
+ * @return Process monitoring mode status
+ * @retval 0 not monitoring channel/devices
+ * @retval 1 monitoring channel/devices
+ */
+int monitor_iordt_mode(void);
 
 /**
  * @brief Check to determine if uncore monitoring is started
@@ -169,13 +207,15 @@ void monitor_stop(void);
  *
  * @param [in] cpu_info cpu information structure
  * @param [in] cap_mon monitoring capability
+ * @param [in] dev_info IO RDT topology
  *
  * @return Operation status
  * @retval 0 OK
  * @retval -1 error
  */
 int monitor_setup(const struct pqos_cpuinfo *cpu_info,
-                  const struct pqos_capability *const cap_mon);
+                  const struct pqos_capability *const cap_mon,
+                  const struct pqos_devinfo *dev_info);
 
 /**
  * @brief Frees any allocated memory during parameter selection and

@@ -946,11 +946,14 @@ test_os_alloc_reset_unsupported_all(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        ret = os_alloc_reset(NULL);
+        memset(&cfg, 0, sizeof(cfg));
+
+        ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
@@ -961,20 +964,30 @@ test_os_alloc_reset_unsupported_l3ca(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = PQOS_REQUIRE_CDP_OFF;
+
+        ret = os_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+
+        ret = os_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_OFF;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
@@ -986,20 +999,35 @@ test_os_alloc_reset_unsupported_l3cdp(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
+        data->cap_l3ca.cdp = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+
         memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+
+        ret = os_alloc_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_os_alloc_reset_unsupported_l3iordt(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_alloc_config cfg;
 
         data->cap_l3ca.cdp = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+
         ret = os_alloc_reset(&cfg);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 static void
@@ -1009,20 +1037,18 @@ test_os_alloc_reset_unsupported_l2ca(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l2_cdp = PQOS_REQUIRE_CDP_OFF;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
@@ -1034,18 +1060,14 @@ test_os_alloc_reset_unsupported_l2cdp(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         data->cap_l2ca.cdp = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
@@ -1057,20 +1079,18 @@ test_os_alloc_reset_unsupported_mba(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.mba = PQOS_MBA_DEFAULT;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.mba = PQOS_MBA_CTRL;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
@@ -1082,19 +1102,14 @@ test_os_alloc_reset_unsupported_mba_ctrl(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.mba = PQOS_MBA_DEFAULT;
-
         data->cap_mba.ctrl = 0;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
+        memset(&cfg, 0, sizeof(cfg));
         cfg.mba = PQOS_MBA_CTRL;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
@@ -1168,19 +1183,16 @@ test_os_alloc_reset_full(struct test_data *data,
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 0);
 
-        if (l3_cdp_cfg != PQOS_REQUIRE_CDP_ANY)
-                expect_value(__wrap__pqos_cap_l3cdp_change, cdp, l3_cdp_cfg);
-        if (l2_cdp_cfg != PQOS_REQUIRE_CDP_ANY)
-                expect_value(__wrap__pqos_cap_l2cdp_change, cdp, l2_cdp_cfg);
-        if (mba_cfg != PQOS_MBA_ANY)
-                expect_value(__wrap__pqos_cap_mba_change, cfg, mba_cfg);
-
         if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ANY)
                 l3_cdp_cfg = PQOS_REQUIRE_CDP_OFF;
         if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ANY)
                 l2_cdp_cfg = PQOS_REQUIRE_CDP_OFF;
         if (mba_cfg == PQOS_MBA_ANY)
                 mba_cfg = PQOS_MBA_DEFAULT;
+
+        expect_value(__wrap__pqos_cap_l3cdp_change, cdp, l3_cdp_cfg);
+        expect_value(__wrap__pqos_cap_l2cdp_change, cdp, l2_cdp_cfg);
+        expect_value(__wrap__pqos_cap_mba_change, cfg, mba_cfg);
 
         will_return(os_alloc_reset_cores, PQOS_RETVAL_OK);
 
@@ -1200,10 +1212,10 @@ test_os_alloc_reset_l3cdp_enable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ON;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
-        struct pqos_alloc_config cfg;
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = l3_cdp_cfg;
@@ -1224,10 +1236,10 @@ test_os_alloc_reset_l3cdp_disable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_OFF;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
-        struct pqos_alloc_config cfg;
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = l3_cdp_cfg;
@@ -1250,13 +1262,6 @@ test_os_alloc_reset_l3cdp_mon(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
-
         data->cap_l3ca.cdp = 1;
         data->cap_l3ca.cdp_on = 0;
 
@@ -1270,6 +1275,9 @@ test_os_alloc_reset_l3cdp_mon(void **state)
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 1);
 
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
@@ -1279,15 +1287,16 @@ test_os_alloc_reset_l2cdp_enable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ON;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
-        struct pqos_alloc_config cfg;
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = l3_cdp_cfg;
         cfg.l2_cdp = l2_cdp_cfg;
         cfg.mba = mba_cfg;
+
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 0;
 
@@ -1302,10 +1311,10 @@ test_os_alloc_reset_l2cdp_disable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_OFF;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
-        struct pqos_alloc_config cfg;
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = l3_cdp_cfg;
@@ -1326,14 +1335,8 @@ test_os_alloc_reset_l2cdp_mon(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
-        struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+        struct pqos_alloc_config cfg;
 
         data->cap_l2ca.cdp = 1;
         data->cap_l2ca.cdp_on = 0;
@@ -1348,6 +1351,9 @@ test_os_alloc_reset_l2cdp_mon(void **state)
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 1);
 
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
+
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
@@ -1357,10 +1363,10 @@ test_os_alloc_reset_mba_ctrl_enable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_CTRL;
-        struct pqos_alloc_config cfg;
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = l3_cdp_cfg;
@@ -1381,10 +1387,10 @@ test_os_alloc_reset_mba_ctrl_disable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
+        struct pqos_alloc_config cfg;
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_DEFAULT;
-        struct pqos_alloc_config cfg;
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_cdp = l3_cdp_cfg;
@@ -1407,13 +1413,6 @@ test_os_alloc_reset_mba_ctrl_mon(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
-        memset(&cfg, 0, sizeof(cfg));
-#if PQOS_VERSION < 50000
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-#endif
-        cfg.mba = PQOS_MBA_CTRL;
-
         data->cap_mba.ctrl = 1;
         data->cap_mba.ctrl_on = 0;
 
@@ -1426,6 +1425,9 @@ test_os_alloc_reset_mba_ctrl_mon(void **state)
         /* check if monitoring is active */
         will_return(__wrap_resctrl_mon_active, PQOS_RETVAL_OK);
         will_return(__wrap_resctrl_mon_active, 1);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.mba = PQOS_MBA_CTRL;
 
         ret = os_alloc_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
@@ -1628,6 +1630,7 @@ main(void)
             cmocka_unit_test(test_os_alloc_reset_unsupported_l3ca),
             cmocka_unit_test(test_os_alloc_reset_unsupported_l2ca),
             cmocka_unit_test(test_os_alloc_reset_unsupported_mba_ctrl),
+            cmocka_unit_test(test_os_alloc_reset_unsupported_l3iordt),
             cmocka_unit_test(test_os_alloc_reset_light),
             cmocka_unit_test(test_os_alloc_reset_mba_ctrl_enable),
             cmocka_unit_test(test_os_alloc_reset_mba_ctrl_disable),

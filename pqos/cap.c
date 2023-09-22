@@ -34,13 +34,13 @@
  * @brief Platform QoS utility - capability module
  *
  */
-
 #include "cap.h"
 
 #include "common.h"
 #include "main.h"
 #include "pqos.h"
 
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,14 +49,14 @@
 #include <sys/utsname.h>
 #endif
 
-#define BUFFER_SIZE 512
+#define BUFFER_SIZE 1024
 #define NON_VERBOSE 0
 
 /**
  * @brief Print line with indentation
  *
  * @param [in] indent indentation level
- * @param [in] format format to produce output according to,
+ * @param [in] format output format to produce output according to,
  *                    variable number of arguments
  */
 static void
@@ -75,7 +75,7 @@ printf_indent(const unsigned indent, const char *format, ...)
  * @brief Print cache information
  *
  * @param [in] indent indentation level
- * @param [in] cache cache information structure
+ * @param [in] cache CPU cache information structure
  */
 static void
 cap_print_cacheinfo(const unsigned indent, const struct pqos_cacheinfo *cache)
@@ -132,7 +132,7 @@ get_mon_event_name(int event)
  *
  * @param [in] indent indentation level
  * @param [in] mon monitoring capability structure
- * @param [in] verbose verbose mode
+ * @param [in] verbose enable verbose mode
  */
 static void
 cap_print_features_mon(const unsigned indent,
@@ -152,17 +152,20 @@ cap_print_features_mon(const unsigned indent,
          */
         for (i = 0; i < mon->num_events; i++) {
                 const struct pqos_monitor *monitor = &(mon->events[i]);
+                int iordt = 0;
                 char *buffer = NULL;
 
                 switch (monitor->type) {
                 case PQOS_MON_EVENT_L3_OCCUP:
                         buffer = buffer_cache;
+                        iordt = 1;
                         break;
 
                 case PQOS_MON_EVENT_LMEM_BW:
                 case PQOS_MON_EVENT_TMEM_BW:
                 case PQOS_MON_EVENT_RMEM_BW:
                         buffer = buffer_memory;
+                        iordt = 1;
                         break;
 
                 case PQOS_PERF_EVENT_LLC_MISS:
@@ -185,6 +188,14 @@ cap_print_features_mon(const unsigned indent,
                 snprintf(buffer + strlen(buffer), BUFFER_SIZE - strlen(buffer),
                          "%*s%s\n", indent + 8, "",
                          get_mon_event_name(monitor->type));
+
+                if (iordt)
+                        snprintf(buffer + strlen(buffer),
+                                 BUFFER_SIZE - strlen(buffer),
+                                 "%*s I/O RDT: %s\n", indent + 12, "",
+                                 monitor->iordt
+                                     ? (mon->iordt_on ? "enabled" : "disabled")
+                                     : "unsupported");
 
                 if (verbose) {
                         if (monitor->scale_factor != 0)
@@ -231,7 +242,7 @@ cap_print_features_mon(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] l3ca L3 CAT capability structure
- * @param [in] verbose verbose mode
+ * @param [in] verbose enable verbose mode
  */
 static void
 cap_print_features_l3ca(const unsigned indent,
@@ -248,6 +259,9 @@ cap_print_features_l3ca(const unsigned indent,
                                 : "unsupported");
         printf_indent(indent + 4, "Non-Contiguous CBM: %s\n",
                       l3ca->non_contiguous_cbm ? "supported" : "unsupported");
+        printf_indent(indent + 4, "I/O RDT: %s\n",
+                      l3ca->iordt ? (l3ca->iordt_on ? "enabled" : "disabled")
+                                  : "unsupported");
         printf_indent(indent + 4, "Num COS: %u\n", l3ca->num_classes);
 
         if (!verbose)
@@ -268,7 +282,7 @@ cap_print_features_l3ca(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] l2ca L2 CAT capability structure
- * @param [in] verbose verbose mode
+ * @param [in] verbose enable verbose mode
  */
 static void
 cap_print_features_l2ca(const unsigned indent,
@@ -306,7 +320,7 @@ cap_print_features_l2ca(const unsigned indent,
  *
  * @param [in] indent indentation level
  * @param [in] mba MBA capability structure
- * @param [in] verbose verbose mode
+ * @param [in] verbose enable verbose mode
  */
 static void
 cap_print_features_mba(const unsigned indent,
@@ -342,16 +356,79 @@ cap_print_features_mba(const unsigned indent,
 }
 
 /**
+ * @brief Print IO RDT devices
+ *
+ * @param [in] indent indentation level
+ * @param [in] devinfo IO RDT topology structure
+ */
+static void
+cap_print_devinfo_channel(const unsigned indent,
+                          const struct pqos_devinfo *devinfo)
+{
+        size_t i;
+
+        for (i = 0; i < devinfo->num_channels; i++) {
+                const struct pqos_channel *chan = &devinfo->channels[i];
+
+                printf_indent(indent, "Channel 0x%" PRIx64 "\n",
+                              chan->channel_id);
+
+                if (chan->rmid_tagging)
+                        printf_indent(indent + 4,
+                                      "RMID tagging is supported\n");
+                else
+                        printf_indent(indent + 4,
+                                      "RMID tagging is not supported\n");
+
+                if (chan->clos_tagging)
+                        printf_indent(indent + 4,
+                                      "CLOS tagging is supported\n");
+                else
+                        printf_indent(indent + 4,
+                                      "CLOS tagging is not supported\n");
+        }
+}
+
+/**
+ * @brief Print IO RDT channels
+ *
+ * @param [in] indent indentation level
+ * @param [in] devinfo IO RDT topology structure
+ */
+static void
+cap_print_devinfo_device(const unsigned indent,
+                         const struct pqos_devinfo *devinfo)
+{
+        size_t i, j;
+
+        for (i = 0; i < devinfo->num_devs; i++) {
+                const struct pqos_dev *dev = &devinfo->devs[i];
+                uint8_t pci_bus = dev->bdf >> 8;
+                uint8_t pci_dev = (dev->bdf & 0xF8) >> 3;
+                uint8_t pci_fun = dev->bdf & 0x7;
+
+                printf_indent(indent, "Device %.4X:%.4X:%.2X.%X\n",
+                              dev->segment, pci_bus, pci_dev, pci_fun);
+
+                for (j = 0; j < PQOS_DEV_MAX_CHANNELS; j++) {
+                        if (!dev->channel[j])
+                                continue;
+                        printf_indent(indent + 4, "Channel 0x%" PRIx64 "\n",
+                                      dev->channel[j]);
+                }
+        }
+}
+
+/**
  * @brief Print capabilities
  *
  * @param [in] cap system capability structure
  * @param [in] cpu CPU topology structure
- * @param [in] verbose verbose mode
+ * @param [in] dev IO RDT topology structure
+ * @param [in] verbose enable verbose mode
  */
 void
-cap_print_features(const struct pqos_cap *cap,
-                   const struct pqos_cpuinfo *cpu,
-                   const int verbose)
+cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
 {
         unsigned i;
         const struct pqos_capability *cap_mon = NULL;
@@ -361,22 +438,22 @@ cap_print_features(const struct pqos_cap *cap,
         enum pqos_interface interface;
         int ret;
 
-        if (cap == NULL || cpu == NULL)
+        if (!sys || !sys->cap || !sys->cpu)
                 return;
 
-        for (i = 0; i < cap->num_cap; i++)
-                switch (cap->capabilities[i].type) {
+        for (i = 0; i < sys->cap->num_cap; i++)
+                switch (sys->cap->capabilities[i].type) {
                 case PQOS_CAP_TYPE_MON:
-                        cap_mon = &(cap->capabilities[i]);
+                        cap_mon = &(sys->cap->capabilities[i]);
                         break;
                 case PQOS_CAP_TYPE_L3CA:
-                        cap_l3ca = &(cap->capabilities[i]);
+                        cap_l3ca = &(sys->cap->capabilities[i]);
                         break;
                 case PQOS_CAP_TYPE_L2CA:
-                        cap_l2ca = &(cap->capabilities[i]);
+                        cap_l2ca = &(sys->cap->capabilities[i]);
                         break;
                 case PQOS_CAP_TYPE_MBA:
-                        cap_mba = &(cap->capabilities[i]);
+                        cap_mba = &(sys->cap->capabilities[i]);
                         break;
                 default:
                         break;
@@ -436,13 +513,25 @@ cap_print_features(const struct pqos_cap *cap,
 
         printf("Cache information\n");
 
-        if (cpu->l3.detected) {
+        if (sys->cpu->l3.detected) {
                 printf_indent(4, "L3 Cache\n");
-                cap_print_cacheinfo(8, &(cpu->l3));
+                cap_print_cacheinfo(8, &(sys->cpu->l3));
         }
 
-        if (cpu->l2.detected) {
+        if (sys->cpu->l2.detected) {
                 printf_indent(4, "L2 Cache\n");
-                cap_print_cacheinfo(8, &(cpu->l2));
+                cap_print_cacheinfo(8, &(sys->cpu->l2));
+        }
+
+        if (sys->dev) {
+                if (sys->dev->num_channels > 0) {
+                        printf("Control channel information\n");
+                        cap_print_devinfo_channel(4, sys->dev);
+                }
+
+                if (sys->dev->num_devs > 0) {
+                        printf("Device information\n");
+                        cap_print_devinfo_device(4, sys->dev);
+                }
         }
 }

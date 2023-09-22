@@ -62,7 +62,7 @@ extern "C" {
  * =======================================
  */
 
-#define PQOS_VERSION      40601 /**< version 4.6.1 */
+#define PQOS_VERSION      50000 /**< version 5.0.0 */
 #define PQOS_MAX_COS      16    /**< 16 x COS */
 #define PQOS_MAX_L3CA_COS PQOS_MAX_COS
 #define PQOS_MAX_L2CA_COS PQOS_MAX_COS
@@ -101,21 +101,28 @@ enum pqos_interface {
  * =======================================
  */
 
-#if PQOS_VERSION >= 50000
 enum pqos_cdp_config {
         PQOS_REQUIRE_CDP_ANY = 0, /**< app will work with any CDP
                                      setting */
         PQOS_REQUIRE_CDP_OFF,     /**< app not compatible with CDP */
-        PQOS_REQUIRE_CDP_ON       /**< app requires CDP */
-};
-#else
-enum pqos_cdp_config {
-        PQOS_REQUIRE_CDP_OFF = 0, /**< app not compatible with CDP */
         PQOS_REQUIRE_CDP_ON,      /**< app requires CDP */
-        PQOS_REQUIRE_CDP_ANY      /**< app will work with any CDP
-                                     setting */
 };
-#endif
+
+/**
+ * Memory Bandwidth Allocation configuration enumeration
+ */
+enum pqos_mba_config {
+        PQOS_MBA_ANY,     /**< currently enabled configuration */
+        PQOS_MBA_DEFAULT, /**< direct MBA hardware configuration
+                             (percentage) */
+        PQOS_MBA_CTRL     /**< MBA controller configuration (MBps) */
+};
+
+enum pqos_iordt_config {
+        PQOS_REQUIRE_IORDT_ANY = 0, /**< currently enabled configuration */
+        PQOS_REQUIRE_IORDT_OFF,     /**< I/O RDT disabled */
+        PQOS_REQUIRE_IORDT_ON,      /**< I/O RDT enabled */
+};
 
 /**
  * Resource Monitoring ID (RMID) definition
@@ -215,6 +222,8 @@ struct pqos_cap_l3ca {
                                         support */
         int cdp_on;                  /**< code data prioritization on or off */
         unsigned non_contiguous_cbm; /**< Non-Contiguous CBM support */
+        int iordt;                   /**< I/O RDT feature support */
+        int iordt_on;                /**< I/O RDT on or off */
 };
 
 /**
@@ -230,16 +239,6 @@ struct pqos_cap_l2ca {
                                         support */
         int cdp_on;                  /**< code data prioritization on or off */
         unsigned non_contiguous_cbm; /**< Non-Contiguous CBM support */
-};
-
-/**
- * Memory Bandwidth Allocation configuration enumeration
- */
-enum pqos_mba_config {
-        PQOS_MBA_ANY = 0, /**< currently enabled configuration */
-        PQOS_MBA_DEFAULT, /**< direct MBA hardware configuration
-                             (percentage) */
-        PQOS_MBA_CTRL     /**< MBA controller configuration (MBps) */
 };
 
 /**
@@ -264,7 +263,7 @@ enum pqos_mon_event {
         PQOS_MON_EVENT_LMEM_BW = 2,  /**< Local memory bandwidth */
         PQOS_MON_EVENT_TMEM_BW = 4,  /**< Total memory bandwidth */
         PQOS_MON_EVENT_RMEM_BW = 8,  /**< Remote memory bandwidth
-                                        (virtual event) */
+                                          (virtual event) */
         RESERVED1 = 0x1000,
         RESERVED2 = 0x2000,
         PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC misses */
@@ -297,6 +296,7 @@ struct pqos_monitor {
         unsigned max_rmid;        /**< max RMID supported for this event */
         uint32_t scale_factor;    /**< factor to scale RMID value to bytes */
         unsigned counter_length;  /**< counter bit length */
+        int iordt;                /**< I/O RDT monitoring is supported */
 };
 
 struct pqos_cap_mon {
@@ -304,6 +304,8 @@ struct pqos_cap_mon {
         unsigned max_rmid;   /**< max RMID supported by socket */
         unsigned l3_size;    /**< L3 cache size in bytes */
         unsigned num_events; /**< number of supported events */
+        int iordt;           /**< I/O RDT monitoring is supported */
+        int iordt_on;        /**< I/O RDT monitoring is enabled */
         struct pqos_monitor events[0];
 };
 
@@ -381,6 +383,62 @@ struct pqos_cpuinfo {
         struct pqos_coreinfo cores[0];
 };
 
+#define PQOS_DEV_MAX_CHANNELS 8
+
+/**
+ * I/O RDT channel ID
+ */
+typedef uint64_t pqos_channel_t;
+
+/**
+ * I/O RDT channel information
+ */
+struct pqos_channel {
+        pqos_channel_t channel_id; /**< Channel ID */
+        int rmid_tagging;          /**< RMID tagging is supported */
+        int clos_tagging;          /**< CLOS tagging is supported */
+};
+
+/**
+ * Device type
+ */
+enum pqos_dev_type {
+        PQOS_DEVICE_TYPE_PCI = 1,
+        PQOS_DEVICE_TYPE_PCI_BRIDGE = 2,
+};
+
+/**
+ * I/O RDT device information
+ */
+struct pqos_dev {
+        enum pqos_dev_type type; /**< Device type */
+        uint16_t segment;        /**< PCI segment */
+        uint16_t bdf;            /**< Bus Device Function */
+        /**
+         * Channel enabled/valid if value > 0
+         */
+        pqos_channel_t channel[PQOS_DEV_MAX_CHANNELS];
+};
+
+/**
+ * Device information
+ */
+struct pqos_devinfo {
+        unsigned num_channels;         /**< Number of I/O RDT channels */
+        struct pqos_channel *channels; /**< List of I/O RDT channels */
+        unsigned num_devs;             /**< Number of I/O devices */
+        struct pqos_dev *devs;         /**< List of I/O devices */
+};
+
+/**
+ * System configuration structure
+ */
+struct pqos_sysconfig {
+        struct pqos_cap *cap;     /**< CPU capabilities */
+        struct pqos_cpuinfo *cpu; /**< CPU topology */
+        struct pqos_devinfo *dev; /**< PCI device info */
+};
+
 /**
  * @brief Retrieves PQoS capabilities data
  *
@@ -397,6 +455,16 @@ struct pqos_cpuinfo {
 int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
 
 /**
+ * @brief Retrieves PQoS system configuration data
+ *
+ * @param sysconfig [out] Location to store PQoS system configuration data
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_sysconfig_get(const struct pqos_sysconfig **sysconf);
+
+/*
  * @brief Retrieves PQoS interface
  *
  * @param [out] interface PQoS interface
@@ -465,6 +533,12 @@ struct pqos_mon_data {
         unsigned *cores;    /**< list of cores in the group */
         unsigned num_cores; /**< number of cores in the group */
 
+        /**
+         * I/O RDT specific section
+         */
+        pqos_channel_t *channels; /**< list of channels in the group */
+        unsigned num_channels;    /**< number of channels in the group */
+
         struct pqos_mon_data_internal *intl; /**< internal data */
 };
 
@@ -477,6 +551,26 @@ struct pqos_mon_data {
 int pqos_mon_reset(void);
 
 /**
+ * Monitoring configuration
+ */
+struct pqos_mon_config {
+        enum pqos_iordt_config l3_iordt; /**< requested I/O RDT configuration */
+};
+
+/**
+ * @brief Resets monitoring by binding all cores with RMID0
+ *
+ * As part of monitoring reset I/O RDT reconfiguration can be performed. This
+ * can be requested via \a cfg.
+ *
+ * @param [in] cfg requested configuration
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_reset_config(const struct pqos_mon_config *cfg);
+
+/**
  * @brief Reads RMID association of the \a lcore
  *
  * @param [in] lcore CPU logical core id
@@ -486,6 +580,34 @@ int pqos_mon_reset(void);
  * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
+
+/**
+ * @brief Reads RMID association of \a channel
+ *
+ * @param [in] channel_id Control channel
+ * @param [out] rmid associated RMID
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_assoc_get_channel(const pqos_channel_t channel_id,
+                               pqos_rmid_t *rmid);
+
+/**
+ * @brief Reads RMID association of device channel
+ *
+ * @param [in] segment Device segment/domain
+ * @param [in] bdf Device ID
+ * @param [in] vc Device virtual channel
+ * @param [out] rmid associated RMID
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_assoc_get_dev(const uint16_t segment,
+                           const uint16_t bdf,
+                           const unsigned vc,
+                           pqos_rmid_t *rmid);
 
 /**
  * @brief Starts resource monitoring on selected group of cores
@@ -664,6 +786,50 @@ int pqos_mon_start_uncore(const unsigned num_sockets,
                           struct pqos_mon_data **group);
 
 /**
+ * @brief Starts resource monitoring on selected group of channels
+ *
+ * The function sets up content of the \a group structure.
+ *
+ * @param [in] num_channels number of channels in \a channels array
+ * @param [in] channels array of channel id's
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [out] group a pointer to monitoring structure
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_start_channels(const unsigned num_channels,
+                            const pqos_channel_t *channels,
+                            const enum pqos_mon_event event,
+                            void *context,
+                            struct pqos_mon_data **group);
+
+/**
+ * @brief Starts resource monitoring on selected device channel
+ *
+ * The function sets up content of the \a group structure.
+ *
+ * @param [in] segment PCI segment
+ * @param [in] bdf Device BDF
+ * @param [in] channel Device virtual channel
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [out] group a pointer to monitoring structure
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_start_dev(const uint16_t segment,
+                       const uint16_t bdf,
+                       const uint8_t channel,
+                       const enum pqos_mon_event event,
+                       void *context,
+                       struct pqos_mon_data **group);
+
+/**
  * @brief Stops resource monitoring data for selected monitoring group
  *
  * @param [in] group monitoring context for selected number of cores
@@ -812,6 +978,7 @@ int pqos_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
  * Reverts CAT/MBA state to the one after reset:
  * - all cores associated with COS0
  * - all COS are set to give access to entire resource
+ * - all device channels associated with COS0
  *
  * As part of allocation reset CDP reconfiguration can be performed.
  * This can be requested via \a l3_cdp_cfg, \a l2_cdp_cfg and \a mba_cfg.
@@ -837,10 +1004,11 @@ int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
  * Configuration of allocation
  */
 struct pqos_alloc_config {
-        enum pqos_cdp_config l3_cdp; /**< requested L3 CAT CDP config */
-        enum pqos_cdp_config l2_cdp; /**< requested L2 CAT CDP config */
-        enum pqos_mba_config mba;    /**< requested MBA config */
-        int reserved[5];             /**< reserved for future use */
+        enum pqos_cdp_config l3_cdp;     /**< requested L3 CAT CDP config */
+        enum pqos_cdp_config l2_cdp;     /**< requested L2 CAT CDP config */
+        enum pqos_mba_config mba;        /**< requested MBA config */
+        enum pqos_iordt_config l3_iordt; /**< requested L3 I/O RDT config */
+        int reserved[4];                 /**< reserved for future use */
 };
 
 /**
@@ -1041,9 +1209,113 @@ int pqos_mba_get(const unsigned mba_id,
 
 /*
  * =======================================
+ * IO RDT Allocation
+ * =======================================
+ */
+
+/**
+ * @brief Reads association of \a channel with class of service
+ *
+ * @param [in] channel Control channel
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_alloc_assoc_get_channel(const pqos_channel_t channel,
+                                 unsigned *class_id);
+
+/**
+ * @brief Reads association of device channel with class of service
+ *
+ * @param [in] segment Device segment/domain
+ * @param [in] bdf Device ID
+ * @param [in] vc Device virtual channel
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_alloc_assoc_get_dev(const uint16_t segment,
+                             const uint16_t bdf,
+                             const unsigned vc,
+                             unsigned *class_id);
+
+/**
+ * @brief Associates \a channel with given class of service
+ *
+ * @param [in] channel Control channel id
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ */
+int pqos_alloc_assoc_set_channel(const pqos_channel_t channel,
+                                 const unsigned class_id);
+
+/**
+ * @brief Associates device with given class of service
+ *
+ * @param [in] segment Device segment/domain
+ * @param [in] bdf Device ID
+ * @param [in] vc Device virtual channel
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ */
+int pqos_alloc_assoc_set_dev(const uint16_t segment,
+                             const uint16_t bdf,
+                             const unsigned vc,
+                             const unsigned class_id);
+
+/*
+ * =======================================
  * Utility API
  * =======================================
  */
+
+/**
+ * @brief Reads control channel for device's virtual channel
+ *
+ * @param [in] segment Device segment/domain
+ * @param [in] bdf Device ID
+ * @param [in] vc Device virtual channel
+ * @param [out] channel control channel
+ *
+ * @return Channel
+ * @retval 0 on error
+ */
+pqos_channel_t pqos_devinfo_get_channel_id(const struct pqos_devinfo *devinfo,
+                                           const uint16_t segment,
+                                           const uint16_t bdf,
+                                           const unsigned vc);
+
+/**
+ * @brief Reads control channels for device
+ *
+ * @param [in] segment Device segment/domain
+ * @param [in] bdf Device ID
+ * @param [out] num_channels number of control channels
+ *
+ * @return Pointer to control channels' array
+ * @retval NULL on error
+ */
+pqos_channel_t *pqos_devinfo_get_channel_ids(const struct pqos_devinfo *devinfo,
+                                             const uint16_t segment,
+                                             const uint16_t bdf,
+                                             unsigned *num_channels);
+
+/**
+ * @brief Retrieves channel information from dev info structure
+ *
+ * @param [in] dev Device information structure
+ * @param [in] channel_id channel id
+ *
+ * @return Channel information structure
+ * @retval NULL on error
+ */
+const struct pqos_channel *
+pqos_devinfo_get_channel(const struct pqos_devinfo *dev,
+                         const pqos_channel_t channel_id);
 
 /**
  * @brief Retrieves mba id's from cpu info structure
@@ -1367,6 +1639,21 @@ int pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
                           int *cdp_enabled);
 
 /**
+ * @brief Retrieves L3 I/O RDT status
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] supported place to store L3 I/O RDT support status
+ * @param [out] enabled place to store L3 I/O RDT enable status
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_l3ca_iordt_enabled(const struct pqos_cap *cap,
+                            int *supported,
+                            int *enabled);
+
+/**
  * @brief Retrieves L2 CDP status
  *
  * @param [in] cap platform QoS capabilities structure
@@ -1403,61 +1690,6 @@ int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
  * @return 2 if the vendor is AMD
  */
 enum pqos_vendor pqos_get_vendor(const struct pqos_cpuinfo *cpu);
-
-#if PQOS_VERSION < 50000
-/**
- * @brief Retrieves a monitoring value from a group for a specific event.
- * @param [out] value monitoring value
- * @param [in] event_id event being monitored
- * @param [in] group monitoring group
- *
- * @deprecated Will be removed in 5.0.0 release
- * @see pqos_mon_get_value
- * @see pqos_mon_get_ipc
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-#if !defined(SWIG) && !defined(SWIGPERL)
-__attribute__((deprecated))
-#endif
-static inline int
-pqos_mon_get_event_value(void *const value,
-                         const enum pqos_mon_event event_id,
-                         const struct pqos_mon_data *const group)
-{
-        uint64_t *const p_64 = (uint64_t *)value;
-        double *const p_dbl = (double *)value;
-
-        if (group == NULL || value == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        switch (event_id) {
-        case PQOS_MON_EVENT_L3_OCCUP:
-                *p_64 = group->values.llc;
-                break;
-        case PQOS_MON_EVENT_LMEM_BW:
-                *p_64 = group->values.mbm_local_delta;
-                break;
-        case PQOS_MON_EVENT_TMEM_BW:
-                *p_64 = group->values.mbm_total_delta;
-                break;
-        case PQOS_MON_EVENT_RMEM_BW:
-                *p_64 = group->values.mbm_remote_delta;
-                break;
-        case PQOS_PERF_EVENT_IPC:
-                *p_dbl = group->values.ipc;
-                break;
-        case PQOS_PERF_EVENT_LLC_MISS:
-                *p_64 = group->values.llc_misses_delta;
-                break;
-        default:
-                return PQOS_RETVAL_PARAM;
-        }
-
-        return PQOS_RETVAL_OK;
-}
-#endif
 
 /*
  * @brief Retrieves a monitoring value from a group for a specific event.

@@ -37,9 +37,13 @@
 #include "pqos.h"
 
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <unistd.h>
 
 FILE *
 pqos_fopen(const char *name, const char *mode)
@@ -87,6 +91,41 @@ int
 pqos_fclose(FILE *stream)
 {
         return fclose(stream);
+}
+
+int
+pqos_open(const char *pathname, int flags)
+{
+        int fd;
+        struct stat lstat_val;
+        struct stat fstat_val;
+
+        /* collect any link info about the file */
+        /* coverity[fs_check_call] */
+        if (lstat(pathname, &lstat_val) == -1)
+                return -1;
+
+        /* open the file */
+        fd = open(pathname, flags);
+        if (fd == -1)
+                return -1;
+
+        /* collect info about the opened file */
+        if (fstat(fd, &fstat_val) == -1) {
+                close(fd);
+                return -1;
+        }
+
+        /* we should not have followed a symbolic link */
+        if (lstat_val.st_mode != fstat_val.st_mode ||
+            lstat_val.st_ino != fstat_val.st_ino ||
+            lstat_val.st_dev != fstat_val.st_dev) {
+                printf("File %s is a symlink\n", pathname);
+                close(fd);
+                return -1;
+        }
+
+        return fd;
 }
 
 char *
@@ -253,4 +292,103 @@ pqos_file_contains(const char *fname, const char *str, int *found)
 
         fclose(fd);
         return PQOS_RETVAL_OK;
+}
+
+#define DEV_MEM "/dev/mem"
+
+uint8_t *
+pqos_mmap_read(uint64_t address, const uint64_t size)
+{
+        uint32_t offset;
+        uint64_t page_size;
+        uint8_t *mem;
+        int fd;
+
+        fd = pqos_open(DEV_MEM, O_RDONLY);
+        if (fd < 0) {
+                LOG_ERROR("Could not open %s\n", DEV_MEM);
+                return NULL;
+        }
+
+        page_size = sysconf(_SC_PAGESIZE);
+        offset = address % page_size;
+        mem = mmap(NULL, size + offset, PROT_READ, MAP_PRIVATE, fd,
+                   address - offset);
+
+        if (mem == MAP_FAILED) {
+                LOG_ERROR("Memory map failed, address=%llx size=%llu\n",
+                          (unsigned long long)address,
+                          (unsigned long long)size);
+                close(fd);
+                return NULL;
+        }
+
+        close(fd);
+        return mem + offset;
+}
+
+uint8_t *
+pqos_mmap_write(uint64_t address, const uint64_t size)
+{
+        uint32_t offset;
+        uint64_t page_size;
+        uint8_t *mem;
+        int fd;
+
+        fd = pqos_open(DEV_MEM, O_RDWR);
+        if (fd < 0) {
+                LOG_ERROR("Could not open %s\n", DEV_MEM);
+                return NULL;
+        }
+
+        page_size = sysconf(_SC_PAGESIZE);
+        offset = address % page_size;
+        mem = mmap(NULL, size + offset, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+                   address - offset);
+
+        if (mem == MAP_FAILED) {
+                LOG_ERROR("Memory map failed, address=%llx size=%llu\n",
+                          (unsigned long long)address,
+                          (unsigned long long)size);
+                close(fd);
+                return NULL;
+        }
+
+        close(fd);
+        return mem + offset;
+}
+
+void
+pqos_munmap(void *mem, const uint64_t size)
+{
+        uint64_t offset;
+        uint64_t page_size;
+
+        page_size = sysconf(_SC_PAGESIZE);
+        offset = (uint64_t)mem % page_size;
+        munmap((uint8_t *)mem - offset, size + offset);
+}
+
+ssize_t
+pqos_read(int fd, void *buf, size_t count)
+{
+        int len = count;
+        char *byte_ptr = (char *)buf;
+        int ret;
+
+        if (buf == NULL)
+                return -1;
+
+        while (len != 0 && (ret = read(fd, byte_ptr, len)) != 0) {
+                if (ret == -1) {
+                        if (errno == EINTR)
+                                continue;
+                        return ret;
+                }
+
+                len -= ret;
+                byte_ptr += ret;
+        }
+
+        return count;
 }

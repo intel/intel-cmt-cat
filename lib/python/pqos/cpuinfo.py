@@ -39,9 +39,10 @@ from __future__ import absolute_import, division, print_function
 import ctypes
 
 from pqos.common import pqos_handle_error, free_memory
-from pqos.error import PqosError, PqosErrorResource, PqosErrorParam
 from pqos.native_struct import CPqosCpuInfo, CPqosCoreInfo
+from pqos.error import PqosError, PqosErrorParam, PqosErrorResource
 from pqos.pqos import Pqos
+
 
 class PqosCoreInfo(object):
     "Core information"

@@ -440,7 +440,7 @@ pqos_cpu_get_one_by_l2id(const struct pqos_cpuinfo *cpu,
 int
 pqos_cpu_check_core(const struct pqos_cpuinfo *cpu, const unsigned lcore)
 {
-        unsigned i = 0;
+        unsigned i;
 
         ASSERT(cpu != NULL);
         if (cpu == NULL)
@@ -675,6 +675,30 @@ pqos_l3ca_cdp_enabled(const struct pqos_cap *cap,
 }
 
 int
+pqos_l3ca_iordt_enabled(const struct pqos_cap *cap,
+                        int *supported,
+                        int *enabled)
+{
+        const struct pqos_capability *item = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        if (cap == NULL || (supported == NULL && enabled == NULL))
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &item);
+        if (ret != PQOS_RETVAL_OK)
+                return ret; /**< no L3CA capability */
+
+        if (supported != NULL)
+                *supported = item->u.l3ca->iordt;
+
+        if (enabled != NULL)
+                *enabled = item->u.l3ca->iordt_on;
+
+        return ret;
+}
+
+int
 pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
                       int *cdp_supported,
                       int *cdp_enabled)
@@ -726,6 +750,28 @@ pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
         return PQOS_RETVAL_OK;
 }
 
+int
+pqos_mon_iordt_enabled(const struct pqos_cap *cap, int *supported, int *enabled)
+{
+        const struct pqos_capability *item = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        if (cap == NULL || (supported == NULL && enabled == NULL))
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &item);
+        if (ret != PQOS_RETVAL_OK)
+                return ret; /**< no L3CA capability */
+
+        if (supported != NULL)
+                *supported = item->u.mon->iordt;
+
+        if (enabled != NULL)
+                *enabled = item->u.mon->iordt_on;
+
+        return ret;
+}
+
 enum pqos_vendor
 pqos_get_vendor(const struct pqos_cpuinfo *cpu)
 {
@@ -736,4 +782,132 @@ void
 pqos_free(void *ptr)
 {
         free(ptr);
+}
+
+#include "log.h"
+
+pqos_channel_t
+pqos_devinfo_get_channel_id(const struct pqos_devinfo *devinfo,
+                            const uint16_t segment,
+                            const uint16_t bdf,
+                            const unsigned vc)
+{
+        size_t i;
+
+        if (!devinfo || !devinfo->devs || vc >= PQOS_DEV_MAX_CHANNELS)
+                return 0;
+
+        for (i = 0; i < devinfo->num_devs; i++) {
+                const struct pqos_dev *dev = &devinfo->devs[i];
+
+                if (dev->segment != segment)
+                        continue;
+
+                if (dev->bdf != bdf)
+                        continue;
+
+                return dev->channel[vc];
+        }
+
+        return 0;
+}
+
+pqos_channel_t *
+pqos_devinfo_get_channel_ids(const struct pqos_devinfo *devinfo,
+                             const uint16_t segment,
+                             const uint16_t bdf,
+                             unsigned *num_channels)
+{
+        size_t i;
+
+        if (!devinfo || !devinfo->devs || !num_channels)
+                return NULL;
+
+        for (i = 0; i < devinfo->num_devs; i++) {
+                const struct pqos_dev *dev = &devinfo->devs[i];
+
+                if (dev->segment != segment)
+                        continue;
+
+                if (dev->bdf != bdf)
+                        continue;
+
+                pqos_channel_t *channels = NULL;
+                unsigned num_chan;
+                size_t j;
+
+                for (j = 0, num_chan = 0; j < devinfo->num_channels; j++) {
+                        if (!dev->channel[j])
+                                continue;
+                        num_chan++;
+
+                        pqos_channel_t *channels_tmp = realloc(
+                            channels, sizeof(pqos_channel_t) * num_chan);
+
+                        if (!channels_tmp) {
+                                free(channels);
+                                return NULL;
+                        }
+                        channels = channels_tmp;
+                        channels[num_chan - 1] = dev->channel[j];
+                }
+
+                *num_channels = num_chan;
+                return channels;
+        }
+
+        return NULL;
+}
+
+const struct pqos_channel *
+pqos_devinfo_get_channel(const struct pqos_devinfo *dev,
+                         const pqos_channel_t channel_id)
+{
+        unsigned i;
+
+        if (dev == NULL || channel_id == 0 || dev->num_channels == 0 ||
+            dev->channels == NULL)
+                return NULL;
+
+        for (i = 0; i < dev->num_channels; i++)
+                if (dev->channels[i].channel_id == channel_id)
+                        return &dev->channels[i];
+
+        return NULL;
+}
+
+int
+pqos_devinfo_get_channel_shared(const struct pqos_devinfo *dev,
+                                const pqos_channel_t channel_id,
+                                int *shared)
+{
+        unsigned d;
+        unsigned count = 0;
+
+        ASSERT(shared != NULL);
+
+        if (dev == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (d = 0; d < dev->num_devs; d++) {
+                const struct pqos_dev *device = &dev->devs[d];
+                unsigned c;
+
+                for (c = 0; c < PQOS_DEV_MAX_CHANNELS; c++)
+                        if (device->channel[c] == channel_id) {
+                                ++count;
+
+                                if (count > 1) {
+                                        *shared = 1;
+                                        return PQOS_RETVAL_OK;
+                                }
+                        }
+        }
+
+        if (count == 1) {
+                *shared = 0;
+                return PQOS_RETVAL_OK;
+        }
+
+        return PQOS_RETVAL_PARAM;
 }

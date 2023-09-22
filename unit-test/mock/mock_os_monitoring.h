@@ -35,7 +35,7 @@
 
 #include "os_monitoring.h"
 
-int __wrap_os_mon_reset(void);
+int __wrap_os_mon_reset(const struct pqos_mon_config *cfg);
 int __wrap_os_mon_start_cores(const unsigned num_cores,
                               const unsigned *cores,
                               const enum pqos_mon_event event,

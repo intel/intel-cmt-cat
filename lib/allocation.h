@@ -71,7 +71,7 @@ enum pqos_technology {
 /**
  * @brief Initializes allocation sub-module of PQoS library
  *
- * @param cpu cpu topology structure
+ * @param cpu CPU topology structure
  * @param cap capabilities structure
  * @param cfg library configuration structure
  *
@@ -199,12 +199,13 @@ PQOS_LOCAL int hw_alloc_release(const unsigned *core_array,
  * @brief Hardware interface to reset configuration
  *        of allocation technologies
  *
- * Reverts allocation state to the one after reset:
+ * Reverts CAT/MBA state to the one after reset:
  * - all cores associated with COS0
  * - all COS are set to give access to entire resource
+ * - all device channels associated with COS0
  *
- * As part of allocation reset CDP reconfiguration can be performed.
- * This can be requested via \a l3_cdp_cfg or \a l2_cdp_cfg.
+ * As part of allocation reset CDP, MBA, I/O RDT reconfiguration
+ * can be performed. This can be requested via \a cfg.
  *
  * @param [in] cfg requested configuration
  *
@@ -229,6 +230,21 @@ PQOS_LOCAL int hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
                                     const int enable);
 
 /**
+ * @brief Enables or disables L3 I/O RDT across selected CPU sockets
+ *
+ * @param [in] l3cat_id_num dimension of \a l3cat_ids array
+ * @param [in] l3cat_ids array with L3 ids to change I/O RDT config on
+ * @param [in] enable I/O RDT enable/disable flag, 1 - enable, 0 - disable
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ */
+PQOS_LOCAL int hw_alloc_reset_l3iordt(const unsigned l3cat_id_num,
+                                      const unsigned *l3cat_ids,
+                                      const int enable);
+
+/**
  * @brief Enables or disables L2 CDP across selected CPU clusters
  *
  * @param [in] l2id_num dimension of \a l2ids array
@@ -244,6 +260,17 @@ PQOS_LOCAL int hw_alloc_reset_l2cdp(const unsigned l2id_num,
                                     const int enable);
 
 /**
+ * @brief Associates each of the cores and channels with COS0
+ *
+ * Operates on m_cpu structure.
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on error
+ */
+PQOS_LOCAL int hw_alloc_reset_assoc(void);
+
+/**
  * @brief Associates each of the cores with COS0
  *
  * Operates on m_cpu structure.
@@ -252,7 +279,18 @@ PQOS_LOCAL int hw_alloc_reset_l2cdp(const unsigned l2id_num,
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR on MSR write error
  */
-PQOS_LOCAL int hw_alloc_reset_assoc(void);
+PQOS_LOCAL int hw_alloc_reset_assoc_cores(void);
+
+/**
+ * @brief Associates each of the channels with COS0
+ *
+ * Operates on m_cpu structure.
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on error
+ */
+PQOS_LOCAL int hw_alloc_reset_assoc_channels(void);
 
 /**
  * @brief Writes range of MBA/CAT COS MSR's with \a msr_val value
@@ -450,6 +488,60 @@ PQOS_LOCAL int hw_mba_get_amd(const unsigned mba_id,
  * @retval 1 contiguous
  */
 PQOS_LOCAL int alloc_is_bitmask_contiguous(uint64_t bitmask);
+
+/*
+ * @brief Hardware interface to read association of \a channel with
+ *        class of service
+ *
+ * @param [in] channel Control channel
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_alloc_assoc_get_channel(const pqos_channel_t channel,
+                                          unsigned *class_id);
+
+/**
+ * @brief Hardware interface to read association of device channel with
+ *        class of service
+ *
+ * @param [in] bdf Device id
+ * @param [in] vc Device virtual channel
+ * @param [out] class_id class of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_alloc_assoc_get_dev(const uint16_t segment,
+                                      const uint16_t bdf,
+                                      const unsigned vc,
+                                      unsigned *class_id);
+
+/**
+ * @brief Hardware interface to associate \a channel with given class of service
+ *
+ * @param [in] channel Control channel id
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ */
+PQOS_LOCAL int hw_alloc_assoc_set_channel(const pqos_channel_t channel,
+                                          const unsigned class_id);
+
+/**
+ * @brief Hardware interface to associate device with given class of service
+ *
+ * @param [in] bdf Device id
+ * @param [in] vc Device virtual channel
+ * @param [in] class_id class of service
+ *
+ * @return Operations status
+ */
+PQOS_LOCAL int hw_alloc_assoc_set_dev(const uint16_t segment,
+                                      const uint16_t bdf,
+                                      const unsigned vc,
+                                      const unsigned class_id);
 
 #ifdef __cplusplus
 }

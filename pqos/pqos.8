@@ -147,25 +147,34 @@ The \-I option must be used for PID association.
 .RE
 .TP
 .B \-R [CONFIG[,CONFIG]], \-\-alloc\-reset[=CONFIG[,CONFIG]]
-reset allocation setting (L3 CAT, L2 CAT, MBA) and reconfigure L3 CDP. CONFIG is one of the following options:
+reset allocation setting (L3 CAT, L2 CAT, MBA) and reconfigure allocation. CONFIG is one of the following options:
+.RS
+.RS
+l3cdp-on        sets L3 CDP on
 .br
-l3cdp-on	sets L3 CDP on
+l3cdp-off       sets L3 CDP off
 .br
-l3cdp-off	sets L3 CDP off
+l3cdp-any       keeps current L3 CDP setting (default)
 .br
-l3cdp-any	keeps current L3 CDP setting (default)
+l3iordt-on      sets L3 I/O RDT on
 .br
-l2cdp-on	sets L2 CDP on
+l3iordt-off     sets L3 I/O RDT off
 .br
-l2cdp-off	sets L2 CDP off
+l3iordt-any     keeps current L3 I/O RDT setting (default)
 .br
-l2cdp-any	keeps current L2 CDP setting (default)
+l2cdp-on        sets L2 CDP on
 .br
-mbaCtrl-on	sets MBA CTRL on
+l2cdp-off       sets L2 CDP off
 .br
-mbaCtrl-off	sets MBA CTRL off
+l2cdp-any       keeps current L2 CDP setting (default)
 .br
-mbaCtrl-any	keeps current MBA CTRL setting (default)
+mbaCtrl-on      sets MBA CTRL on
+.br
+mbaCtrl-off     sets MBA CTRL off
+.br
+mbaCtrl-any     keeps current MBA CTRL setting (default)
+.RE
+.RE
 .TP
 .B \-m EVTCORES, \-\-mon\-core=EVTCORES
 select the cores and events for monitoring, EVTCORES format is "EVENT:CORE_LIST". Valid EVENT settings are:
@@ -241,6 +250,32 @@ It is not possible to track both sockets and cores at the same time.
 .B \-T, \-\-mon-top
 enable top like monitoring output sorted by highest LLC occupancy
 .TP
+.B \-\-mon\-dev=EVTDEVICES"
+select I/O RDT devices and events to monitor, EVTDEVICES format is
+'EVENT:DEVICE_LIST'".
+.br
+See \-m option for valid EVENT settings. DEVICE_LIST is comma separated list of
+I/O RDT devices.
+.br
+Examples:
+.RS
+.RS
+"--mon-dev all:0000:0010:04.0@1"
+.br
+"--mon-dev llc:0000:0010:05.0"
+.RE
+.RE
+.PP
+.TP
+.B \-\-mon-channel=EVTCHANNELS
+select I/O RDT channels and events to monitor, EVTCHANNELS format is
+'EVENT:CHANNEL_LIST
+.br
+See \-m option for valid EVENT settings. CHANNEL_LIST is comma separated list of
+I/O RDT channels.
+.br
+Channels can be grouped by enclosing them in square brackets.
+.TP
 .B \-o FILE, \-\-mon-file FILE
 select output FILE to store monitored data in, the default is 'stdout'
 .TP
@@ -253,8 +288,18 @@ define monitoring sampling INTERVAL in 100ms units, 1=100ms, default 10=10x100ms
 .B \-t SECONDS, \-\-mon-time=SECONDS
 define monitoring time in seconds, use 'inf' or 'infinite' for infinite monitoring. Use CTRL+C to stop monitoring at any time.
 .TP
-.B \-r, \-\-mon\-reset
-reset monitoring and use all RMID's and cores in the system
+.B \-r, \-\-mon\-reset[=CONFIG[,CONFIG]]
+reset monitoring and use all RMID's in the system and reconfigure allocation.
+CONFIG is one of the following options:
+.RS
+.RS
+l3iordt-on      sets L3 I/O RDT on
+.br
+l3iordt-off     sets L3 I/O RDT off
+.br
+l3iordt-any     keeps current L3 I/O RDT setting (default)
+.RE
+.RE
 .TP
 .B \-\-disable-mon-ipc
 Disable IPC monitoring
@@ -304,7 +349,11 @@ If you require system wide interface enforcement you can do so by setting the "R
 .BR msr (4)
 .SH AUTHOR
 pqos was written by Tomasz Kantecki <tomasz.kantecki@intel.com>,
-Marcel Cornu <marcel.d.cornu@intel.com>, Aaron Hetherington <aaron.hetherington@intel.com>
+Marcel Cornu <marcel.d.cornu@intel.com>,
+Aaron Hetherington <aaron.hetherington@intel.com>,
+Michal Aleksinski <michalx.aleksinski@intel.com>,
+Wojciech Andralojc <wojciechx.andralojc@intel.com>,
+Adrian Boczkowski <adrianx.boczkowski@intel.com>
 .P
 This is free software; see the source for copying conditions.  There is NO
 warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

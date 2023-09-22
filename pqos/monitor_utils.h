@@ -50,6 +50,19 @@
 int monitor_utils_uinttostr(char *buf, const int buf_len, const unsigned val);
 
 /**
+ * @brief Function to safely translate an unsigned int value to a hex string
+ *
+ * @param buf buffer string will be copied into
+ * @param buf_len length of buffer
+ * @param val value to be translated
+ *
+ * @return length of generated string
+ * @retval < 0 on error
+ */
+int
+monitor_utils_uinttohexstr(char *buf, const int buf_len, const unsigned val);
+
+/**
  * @brief Get monitoring value to be displayed for the event
  *
  * @param data monitoring data

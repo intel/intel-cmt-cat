@@ -72,6 +72,10 @@ extern "C" {
 #define PQOS_MSR_L3_QOS_CFG        0xC81 /**< L3 CAT config register */
 #define PQOS_MSR_L3_QOS_CFG_CDP_EN 1ULL  /**< L3 CDP enable bit */
 
+#define PQOS_MSR_L3_IO_QOS_CFG    0xC83 /**< L3 I/O RDT config register */
+#define PQOS_MSR_L3_IO_QOS_CA_EN  1ULL  /**< I/O RDT allocation enable bit */
+#define PQOS_MSR_L3_IO_QOS_MON_EN 2ULL  /**< I/O RDT monitoring enable bit */
+
 #define PQOS_MSR_L2_QOS_CFG        0xC82 /**< L2 CAT config register */
 #define PQOS_MSR_L2_QOS_CFG_CDP_EN 1ULL  /**< L2 CDP enable bit */
 
@@ -94,7 +98,8 @@ extern "C" {
 #define PQOS_RES_ID_L2_ALLOCATION 2 /**< L2 cache allocation */
 #define PQOS_RES_ID_MB_ALLOCATION 3 /**< Memory BW allocation */
 
-#define PQOS_CPUID_CAT_CDP_BIT 2 /**< CDP supported bit */
+#define PQOS_CPUID_CAT_IORDT_BIT 1 /**< I/O RDT supported bit */
+#define PQOS_CPUID_CAT_CDP_BIT   2 /**< CDP supported bit */
 /* Non-Contiguous 1s value supported bit */
 #define PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT_BIT 3
 
@@ -102,6 +107,14 @@ extern "C" {
  * Non-Contiguous 1s value support in CBM(Cache Bit Mask)
  */
 #define PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT 1
+
+#define PQOS_CPUID_MON_L3_OCCUP_BIT 0x1 /**< LLC occupancy supported bit */
+#define PQOS_CPUID_MON_TMEM_BW_BIT  0x2 /**< TMEM B/W supported bit */
+#define PQOS_CPUID_MON_LMEM_BW_BIT  0x4 /**< LMEM B/W supported bit */
+#define PQOS_CPUID_MON_IO_OCCUP_BIT                                            \
+        0x200 /**< I/O RDT cache occupancy supported bit */
+#define PQOS_CPUID_MON_IO_MEM_BW                                               \
+        0x400 /**< I/O RDT B/W monitoring supported bit */
 
 /**
  * Monitoring data read MSR register

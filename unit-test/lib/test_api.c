@@ -636,6 +636,8 @@ test_pqos_alloc_release_pid_os(void **state __attribute__((unused)))
 
 /* ======== pqos_alloc_reset ======== */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static void
 test_pqos_alloc_reset_init(void **state __attribute__((unused)))
 {
@@ -643,9 +645,6 @@ test_pqos_alloc_reset_init(void **state __attribute__((unused)))
         struct pqos_alloc_config cfg;
 
         memset(&cfg, 0, sizeof(cfg));
-        cfg.l3_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.l2_cdp = PQOS_REQUIRE_CDP_ANY;
-        cfg.mba = PQOS_MBA_ANY;
 
         wrap_check_init(1, PQOS_RETVAL_INIT);
 
@@ -765,6 +764,16 @@ test_pqos_alloc_reset_param(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
         memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = -1;
+        ret = pqos_alloc_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l2_cdp = -1;
+        ret = pqos_alloc_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        memset(&cfg, 0, sizeof(cfg));
         cfg.l2_cdp = -1;
         ret = pqos_alloc_reset_config(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -774,6 +783,7 @@ test_pqos_alloc_reset_param(void **state __attribute__((unused)))
         ret = pqos_alloc_reset_config(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
+#pragma GCC diagnostic pop
 
 /* ======== pqos_pid_get_pid_assoc ======== */
 
@@ -1613,6 +1623,7 @@ test_pqos_mon_reset_os(void **state __attribute__((unused)))
 
         wrap_check_init(1, PQOS_RETVAL_OK);
 
+        expect_value(__wrap_os_mon_reset, cfg, NULL);
         will_return(__wrap_os_mon_reset, PQOS_RETVAL_OK);
 
         ret = pqos_mon_reset();
@@ -1626,16 +1637,98 @@ test_pqos_mon_reset_hw(void **state __attribute__((unused)))
 
         wrap_check_init(1, PQOS_RETVAL_OK);
 
+        expect_value(__wrap_hw_mon_reset, cfg, NULL);
         will_return(__wrap_hw_mon_reset, PQOS_RETVAL_OK);
 
         ret = pqos_mon_reset();
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
-/* ======== pqos_mon_assoc_get ======== */
+/* ======== pqos_mon_reset_config ======== */
+static void
+test_pqos_mon_reset_config_init(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_config cfg;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+        ret = pqos_mon_reset_config(NULL);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ANY;
+        ret = pqos_mon_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+        ret = pqos_mon_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_OFF;
+        ret = pqos_mon_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
 
 static void
-test_pqos_mon_assoc_get_init(void **state __attribute__((unused)))
+test_pqos_mon_reset_config_param(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_config cfg;
+
+        cfg.l3_iordt = -1;
+        ret = pqos_mon_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_pqos_mon_reset_config_os(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_config cfg;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        expect_value(__wrap_os_mon_reset, cfg, NULL);
+        will_return(__wrap_os_mon_reset, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_reset_config(NULL);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        expect_value(__wrap_os_mon_reset, cfg, &cfg);
+        will_return(__wrap_os_mon_reset, PQOS_RETVAL_OK);
+
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ANY;
+        ret = pqos_mon_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_pqos_mon_reset_config_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        struct pqos_mon_config cfg;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        expect_value(__wrap_hw_mon_reset, cfg, NULL);
+        will_return(__wrap_hw_mon_reset, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_reset_config(NULL);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+        expect_value(__wrap_hw_mon_reset, cfg, &cfg);
+        will_return(__wrap_hw_mon_reset, PQOS_RETVAL_OK);
+
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ANY;
+        ret = pqos_mon_reset_config(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+/* ======== pqos_mon_assoc_get_core ======== */
+
+static void
+test_pqos_mon_assoc_get_core_init(void **state __attribute__((unused)))
 {
         int ret;
         unsigned lcore = 1;
@@ -1648,7 +1741,7 @@ test_pqos_mon_assoc_get_init(void **state __attribute__((unused)))
 }
 
 static void
-test_pqos_mon_assoc_get_hw(void **state __attribute__((unused)))
+test_pqos_mon_assoc_get_core_hw(void **state __attribute__((unused)))
 {
         int ret;
         unsigned lcore = 1;
@@ -1656,16 +1749,16 @@ test_pqos_mon_assoc_get_hw(void **state __attribute__((unused)))
 
         wrap_check_init(1, PQOS_RETVAL_OK);
 
-        expect_value(__wrap_hw_mon_assoc_get, lcore, lcore);
-        expect_value(__wrap_hw_mon_assoc_get, rmid, &rmid);
-        will_return(__wrap_hw_mon_assoc_get, PQOS_RETVAL_OK);
+        expect_value(__wrap_hw_mon_assoc_get_core, lcore, lcore);
+        expect_value(__wrap_hw_mon_assoc_get_core, rmid, &rmid);
+        will_return(__wrap_hw_mon_assoc_get_core, PQOS_RETVAL_OK);
 
         ret = pqos_mon_assoc_get(lcore, &rmid);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
 static void
-test_pqos_mon_assoc_get_os(void **state __attribute__((unused)))
+test_pqos_mon_assoc_get_core_os(void **state __attribute__((unused)))
 {
         int ret;
         unsigned lcore = 1;
@@ -1678,7 +1771,7 @@ test_pqos_mon_assoc_get_os(void **state __attribute__((unused)))
 }
 
 static void
-test_pqos_mon_assoc_get_param(void **state __attribute__((unused)))
+test_pqos_mon_assoc_get_core_param(void **state __attribute__((unused)))
 {
         int ret;
         unsigned lcore = 1;
@@ -1689,6 +1782,8 @@ test_pqos_mon_assoc_get_param(void **state __attribute__((unused)))
 
 /* ======== pqos_mon_start ======== */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static void
 test_pqos_mon_start_init(void **state __attribute__((unused)))
 {
@@ -1706,6 +1801,7 @@ test_pqos_mon_start_init(void **state __attribute__((unused)))
         ret = pqos_mon_start(num_cores, cores, event, context, &group);
         assert_int_equal(ret, PQOS_RETVAL_INIT);
 }
+#pragma GCC diagnostic pop
 
 static void
 test_pqos_mon_start_os(void **state __attribute__((unused)))
@@ -1757,6 +1853,8 @@ test_pqos_mon_start_hw(void **state __attribute__((unused)))
                 free(group);
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static void
 test_pqos_mon_start_param(void **state __attribute__((unused)))
 {
@@ -1798,6 +1896,64 @@ test_pqos_mon_start_param(void **state __attribute__((unused)))
 
         ret = pqos_mon_start(num_cores, cores, PQOS_PERF_EVENT_LLC_REF, context,
                              &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+#pragma GCC diagnostic pop
+
+/* ======== pqos_mon_start_cores ======== */
+
+static void
+test_pqos_mon_start_cores_init(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_cores = 1;
+        unsigned cores[] = {1};
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data *group;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_mon_start_cores(num_cores, cores, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_mon_start_cores_param(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_cores = 1;
+        unsigned cores[] = {1};
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data *group;
+
+        ret = pqos_mon_start_cores(num_cores, cores, event, context, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, NULL, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(0, cores, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, cores, 0, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, cores, (uint32_t)-1, context,
+                                   &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, cores, PQOS_PERF_EVENT_IPC,
+                                   context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, cores, PQOS_PERF_EVENT_LLC_MISS,
+                                   context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, cores, PQOS_PERF_EVENT_LLC_REF,
+                                   context, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
@@ -1952,6 +2108,8 @@ test_pqos_mon_poll_param(void **state __attribute__((unused)))
 
 /* ======== pqos_mon_start_pids ======== */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static void
 test_pqos_mon_start_pids_init(void **state __attribute__((unused)))
 {
@@ -2057,6 +2215,7 @@ test_pqos_mon_start_pids_param(void **state __attribute__((unused)))
                                   context, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
+#pragma GCC diagnostic pop
 
 /* ======== pqos_mon_start_pids2 ======== */
 
@@ -2159,6 +2318,8 @@ test_pqos_mon_start_pids2_param(void **state __attribute__((unused)))
 
 /* ======== pqos_mon_start_pid ======== */
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 static void
 test_pqos_mon_start_pid_os(void **state __attribute__((unused)))
 {
@@ -2200,6 +2361,7 @@ test_pqos_mon_start_pid_hw(void **state __attribute__((unused)))
         ret = pqos_mon_start_pid(pid, event, context, &group);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
+#pragma GCC diagnostic pop
 
 /* ======== pqos_mon_add_pids ======== */
 
@@ -2452,26 +2614,461 @@ test_pqos_mon_start_uncore_hw(void **state __attribute__((unused)))
                 free(group);
 }
 
-/* ======== pqos_mon_get_value ======== */
+/* ======== pqos_alloc_assoc_get_channel ======== */
 
 static void
-test_pqos_mon_get_value_init(void **state __attribute__((unused)))
+test_pqos_alloc_assoc_get_channel_init(void **state __attribute__((unused)))
 {
         int ret;
-        uint64_t value;
-        uint64_t delta;
-        struct pqos_mon_data group;
-
-        memset(&group, 0, sizeof(group));
-        group.valid = 0x00DEAD00;
-        group.event = PQOS_MON_EVENT_LMEM_BW;
+        unsigned class_id = 0;
+        const pqos_channel_t channel = 0x101;
 
         wrap_check_init(1, PQOS_RETVAL_INIT);
 
-        ret =
-            pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, &value, &delta);
+        ret = pqos_alloc_assoc_get_channel(channel, &class_id);
         assert_int_equal(ret, PQOS_RETVAL_INIT);
 }
+
+static void
+test_pqos_alloc_assoc_get_channel_os(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned class_id = 0;
+        const pqos_channel_t channel = 0x101;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_alloc_assoc_get_channel(channel, &class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_alloc_assoc_get_channel_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned class_id = 0;
+        const pqos_channel_t channel = 0x101;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_hw_alloc_assoc_get_channel, channel, channel);
+        expect_value(__wrap_hw_alloc_assoc_get_channel, class_id, &class_id);
+
+        will_return(__wrap_hw_alloc_assoc_get_channel, PQOS_RETVAL_OK);
+        will_return(__wrap_hw_alloc_assoc_get_channel, 4);
+
+        ret = pqos_alloc_assoc_get_channel(channel, &class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(class_id, 4);
+}
+
+static void
+test_pqos_alloc_assoc_get_channel_param(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned class_id = 0;
+        const pqos_channel_t channel = 0x101;
+
+        ret = pqos_alloc_assoc_get_channel(0, &class_id);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_alloc_assoc_get_channel(channel, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_alloc_assoc_get_dev ======== */
+
+static void
+test_pqos_alloc_assoc_get_dev_init(void **state __attribute__((unused)))
+{
+        int ret;
+        const uint16_t segment = 0;
+        const uint16_t bdf = 0x101;
+        const unsigned vc = 1;
+        unsigned class_id = 0;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_alloc_assoc_get_dev(segment, bdf, vc, &class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_alloc_assoc_get_dev_os(void **state __attribute__((unused)))
+{
+        int ret;
+        const uint16_t segment = 0;
+        const uint16_t bdf = 0x101;
+        const unsigned vc = 1;
+        unsigned class_id = 0;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_alloc_assoc_get_dev(segment, bdf, vc, &class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_alloc_assoc_get_dev_param(void **state __attribute__((unused)))
+{
+        int ret;
+        const uint16_t segment = 0;
+        const uint16_t bdf = 0x101;
+        const unsigned vc = 1;
+
+        ret = pqos_alloc_assoc_get_dev(segment, bdf, vc, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_alloc_assoc_set_channel ======== */
+
+static void
+test_pqos_alloc_assoc_set_channel_init(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned class_id = 0;
+        const pqos_channel_t channel = 0x101;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_alloc_assoc_set_channel(channel, class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_alloc_assoc_set_channel_os(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned class_id = 0;
+        const pqos_channel_t channel = 0x101;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_alloc_assoc_set_channel(channel, class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_alloc_assoc_set_channel_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned class_id = 0;
+        const pqos_channel_t channel = 0x101;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_hw_alloc_assoc_set_channel, channel, channel);
+        expect_value(__wrap_hw_alloc_assoc_set_channel, class_id, class_id);
+
+        will_return(__wrap_hw_alloc_assoc_set_channel, PQOS_RETVAL_OK);
+
+        ret = pqos_alloc_assoc_set_channel(channel, class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_pqos_alloc_assoc_set_channel_param(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned class_id = 0;
+
+        ret = pqos_alloc_assoc_set_channel(0, class_id);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_alloc_assoc_set_dev ======== */
+
+static void
+test_pqos_alloc_assoc_set_dev_init(void **state __attribute__((unused)))
+{
+        int ret;
+        const uint16_t segment = 0;
+        const uint16_t bdf = 0x101;
+        const unsigned vc = 1;
+        unsigned class_id = 0;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_alloc_assoc_set_dev(segment, bdf, vc, class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_alloc_assoc_set_dev_os(void **state __attribute__((unused)))
+{
+        int ret;
+        const uint16_t segment = 0;
+        const uint16_t bdf = 0x101;
+        const unsigned vc = 1;
+        unsigned class_id = 0;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_alloc_assoc_set_dev(segment, bdf, vc, class_id);
+
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_alloc_assoc_set_dev_param(void **state __attribute__((unused)))
+{
+        int ret;
+        const uint16_t segment = 0;
+        const uint16_t bdf = 0x101;
+        unsigned class_id = 0;
+
+        ret = pqos_alloc_assoc_set_dev(segment, bdf, PQOS_DEV_MAX_CHANNELS,
+                                       class_id);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_mon_assoc_get_channel ======== */
+
+static void
+test_pqos_mon_assoc_get_channel_init(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_channel_t channel_id = 0x201;
+        pqos_rmid_t rmid;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_mon_assoc_get_channel(channel_id, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_mon_assoc_get_channel_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_channel_t channel_id = 0x201;
+        pqos_rmid_t rmid;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_hw_mon_assoc_get_channel, channel_id, channel_id);
+        will_return(__wrap_hw_mon_assoc_get_channel, PQOS_RETVAL_OK);
+        will_return(__wrap_hw_mon_assoc_get_channel, 10);
+
+        ret = pqos_mon_assoc_get_channel(channel_id, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(rmid, 10);
+}
+
+static void
+test_pqos_mon_assoc_get_channel_os(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_channel_t channel_id = 0x201;
+        pqos_rmid_t rmid;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_assoc_get_channel(channel_id, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_mon_assoc_get_channel_param(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_channel_t channel_id = 0x201;
+        pqos_rmid_t rmid;
+
+        ret = pqos_mon_assoc_get_channel(0, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_assoc_get_channel(channel_id, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_mon_assoc_get_dev ======== */
+
+static void
+test_pqos_mon_assoc_get_dev_init(void **state __attribute__((unused)))
+{
+        int ret;
+        uint16_t segment = 0x0;
+        uint16_t bdf = 0x1020;
+        unsigned vc = 0;
+        pqos_rmid_t rmid;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_mon_assoc_get_dev(segment, bdf, vc, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_mon_assoc_get_dev_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        pqos_channel_t channel_id = 0x201;
+        uint16_t segment = 0x0;
+        uint16_t bdf = 0x1020;
+        unsigned vc = 0;
+        pqos_rmid_t rmid;
+        struct pqos_devinfo devinfo;
+        struct pqos_dev devs[1];
+
+        memset(&devinfo, 0, sizeof(devinfo));
+        devinfo.num_devs = 1;
+        devinfo.devs = devs;
+        memset(devs, 0, sizeof(*devs));
+        devs[0].type = PQOS_DEVICE_TYPE_PCI;
+        devs[0].segment = segment;
+        devs[0].bdf = bdf;
+        devs[0].channel[vc] = channel_id;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_hw_mon_assoc_get_channel, channel_id, channel_id);
+        will_return(__wrap_hw_mon_assoc_get_channel, PQOS_RETVAL_OK);
+        will_return(__wrap_hw_mon_assoc_get_channel, 10);
+
+        will_return(__wrap__pqos_get_dev, &devinfo);
+
+        ret = pqos_mon_assoc_get_dev(segment, bdf, vc, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(rmid, 10);
+}
+
+static void
+test_pqos_mon_assoc_get_dev_os(void **state __attribute__((unused)))
+{
+        int ret;
+        uint16_t segment = 0x0;
+        uint16_t bdf = 0x1020;
+        unsigned vc = 0;
+        pqos_rmid_t rmid;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_assoc_get_dev(segment, bdf, vc, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_mon_assoc_get_dev_param(void **state __attribute__((unused)))
+{
+        int ret;
+        uint16_t segment = 0x0;
+        uint16_t bdf = 0x1020;
+        unsigned vc = 0;
+
+        ret = pqos_mon_assoc_get_dev(segment, bdf, vc, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_mon_start_channels ======== */
+
+static void
+test_pqos_mon_start_channels_init(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_channels = 1;
+        pqos_channel_t channels[] = {0x201};
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret = pqos_mon_start_channels(num_channels, channels, event, context,
+                                      &group);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
+static void
+test_pqos_mon_start_channels_os(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_channels = 1;
+        pqos_channel_t channels[] = {0x201};
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_start_channels(num_channels, channels, event, context,
+                                      &group);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_pqos_mon_start_channels_hw(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_channels = 1;
+        pqos_channel_t channels[] = {0x201};
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
+        expect_value(__wrap_hw_mon_start_channels, num_channels, num_channels);
+        expect_value(__wrap_hw_mon_start_channels, channels, channels);
+        expect_value(__wrap_hw_mon_start_channels, event, event);
+        expect_value(__wrap_hw_mon_start_channels, context, context);
+        will_return(__wrap_hw_mon_start_channels, PQOS_RETVAL_OK);
+
+        ret = pqos_mon_start_channels(num_channels, channels, event, context,
+                                      &group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        if (group != NULL)
+                free(group);
+}
+
+static void
+test_pqos_mon_start_channels_param(void **state __attribute__((unused)))
+{
+        int ret;
+        unsigned num_channels = 1;
+        pqos_channel_t channels[] = {0x201};
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        void *context = NULL;
+        struct pqos_mon_data *group = NULL;
+
+        ret = pqos_mon_start_channels(num_channels, channels, event, context,
+                                      NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret =
+            pqos_mon_start_channels(num_channels, NULL, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_channels(0, channels, event, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret =
+            pqos_mon_start_channels(num_channels, channels, 0, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_channels(num_channels, channels, (uint32_t)-1,
+                                      context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_channels(num_channels, channels,
+                                      PQOS_PERF_EVENT_IPC, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_channels(
+            num_channels, channels, PQOS_PERF_EVENT_LLC_MISS, context, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== pqos_mon_get_value ======== */
 
 static void
 test_pqos_mon_get_value_param(void **state __attribute__((unused)))
@@ -2644,6 +3241,25 @@ test_pqos_mon_get_value(void **state __attribute__((unused)))
                          group.intl->values.pcie.llc_references.write_delta);
 }
 
+static void
+test_pqos_mon_get_value_init(void **state __attribute__((unused)))
+{
+        int ret;
+        uint64_t value;
+        uint64_t delta;
+        struct pqos_mon_data group;
+
+        memset(&group, 0, sizeof(group));
+        group.valid = 0x00DEAD00;
+        group.event = PQOS_MON_EVENT_LMEM_BW;
+
+        wrap_check_init(1, PQOS_RETVAL_INIT);
+
+        ret =
+            pqos_mon_get_value(&group, PQOS_MON_EVENT_LMEM_BW, &value, &delta);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
+}
+
 /* ======== pqos_mon_get_ipc ======== */
 
 static void
@@ -2730,14 +3346,23 @@ main(void)
             cmocka_unit_test(test_pqos_mba_set_init),
             cmocka_unit_test(test_pqos_mba_get_init),
             cmocka_unit_test(test_pqos_mon_reset_init),
-            cmocka_unit_test(test_pqos_mon_assoc_get_init),
+            cmocka_unit_test(test_pqos_mon_reset_config_init),
+            cmocka_unit_test(test_pqos_mon_assoc_get_core_init),
+            cmocka_unit_test(test_pqos_mon_assoc_get_channel_init),
+            cmocka_unit_test(test_pqos_mon_assoc_get_dev_init),
             cmocka_unit_test(test_pqos_mon_start_init),
+            cmocka_unit_test(test_pqos_mon_start_cores_init),
+            cmocka_unit_test(test_pqos_mon_start_channels_init),
             cmocka_unit_test(test_pqos_mon_stop_init),
             cmocka_unit_test(test_pqos_mon_poll_init),
             cmocka_unit_test(test_pqos_mon_start_pids_init),
             cmocka_unit_test(test_pqos_mon_start_pids2_init),
             cmocka_unit_test(test_pqos_mon_add_pids_init),
             cmocka_unit_test(test_pqos_mon_remove_pids_init),
+            cmocka_unit_test(test_pqos_alloc_assoc_get_channel_init),
+            cmocka_unit_test(test_pqos_alloc_assoc_get_dev_init),
+            cmocka_unit_test(test_pqos_alloc_assoc_set_channel_init),
+            cmocka_unit_test(test_pqos_alloc_assoc_set_dev_init),
             cmocka_unit_test(test_pqos_mon_start_uncore_init),
             cmocka_unit_test(test_pqos_mon_get_value_init),
             cmocka_unit_test(test_pqos_mon_get_ipc_init),
@@ -2764,14 +3389,23 @@ main(void)
             cmocka_unit_test(test_pqos_l2ca_get_min_cbm_bits_param),
             cmocka_unit_test(test_pqos_mba_set_param),
             cmocka_unit_test(test_pqos_mba_get_param),
-            cmocka_unit_test(test_pqos_mon_assoc_get_param),
+            cmocka_unit_test(test_pqos_mon_reset_config_param),
+            cmocka_unit_test(test_pqos_mon_assoc_get_core_param),
+            cmocka_unit_test(test_pqos_mon_assoc_get_channel_param),
+            cmocka_unit_test(test_pqos_mon_assoc_get_dev_param),
             cmocka_unit_test(test_pqos_mon_start_param),
+            cmocka_unit_test(test_pqos_mon_start_cores_param),
+            cmocka_unit_test(test_pqos_mon_start_channels_param),
             cmocka_unit_test(test_pqos_mon_stop_param),
             cmocka_unit_test(test_pqos_mon_poll_param),
             cmocka_unit_test(test_pqos_mon_start_pids_param),
             cmocka_unit_test(test_pqos_mon_start_pids2_param),
             cmocka_unit_test(test_pqos_mon_add_pids_param),
             cmocka_unit_test(test_pqos_mon_remove_pids_param),
+            cmocka_unit_test(test_pqos_alloc_assoc_get_channel_param),
+            cmocka_unit_test(test_pqos_alloc_assoc_get_dev_param),
+            cmocka_unit_test(test_pqos_alloc_assoc_set_channel_param),
+            cmocka_unit_test(test_pqos_alloc_assoc_set_dev_param),
             cmocka_unit_test(test_pqos_mon_start_uncore_param),
             cmocka_unit_test(test_pqos_mon_get_value_param),
             cmocka_unit_test(test_pqos_mon_get_ipc_param),
@@ -2799,8 +3433,12 @@ main(void)
             cmocka_unit_test(test_pqos_mba_set_hw),
             cmocka_unit_test(test_pqos_mba_get_hw),
             cmocka_unit_test(test_pqos_mon_reset_hw),
-            cmocka_unit_test(test_pqos_mon_assoc_get_hw),
+            cmocka_unit_test(test_pqos_mon_reset_config_hw),
+            cmocka_unit_test(test_pqos_mon_assoc_get_core_hw),
+            cmocka_unit_test(test_pqos_mon_assoc_get_channel_hw),
+            cmocka_unit_test(test_pqos_mon_assoc_get_dev_hw),
             cmocka_unit_test(test_pqos_mon_start_hw),
+            cmocka_unit_test(test_pqos_mon_start_channels_hw),
             cmocka_unit_test(test_pqos_mon_stop_hw),
             cmocka_unit_test(test_pqos_mon_poll),
             cmocka_unit_test(test_pqos_mon_start_pids_hw),
@@ -2808,6 +3446,8 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_pid_hw),
             cmocka_unit_test(test_pqos_mon_add_pids_hw),
             cmocka_unit_test(test_pqos_mon_remove_pids_hw),
+            cmocka_unit_test(test_pqos_alloc_assoc_get_channel_hw),
+            cmocka_unit_test(test_pqos_alloc_assoc_set_channel_hw),
             cmocka_unit_test(test_pqos_mon_start_uncore_hw),
             cmocka_unit_test(test_pqos_mon_get_value),
             cmocka_unit_test(test_pqos_mon_get_ipc)};
@@ -2834,8 +3474,12 @@ main(void)
             cmocka_unit_test(test_pqos_mba_set_os_ctrl),
             cmocka_unit_test(test_pqos_mba_get_os),
             cmocka_unit_test(test_pqos_mon_reset_os),
-            cmocka_unit_test(test_pqos_mon_assoc_get_os),
+            cmocka_unit_test(test_pqos_mon_reset_config_os),
+            cmocka_unit_test(test_pqos_mon_assoc_get_core_os),
+            cmocka_unit_test(test_pqos_mon_assoc_get_channel_os),
+            cmocka_unit_test(test_pqos_mon_assoc_get_dev_os),
             cmocka_unit_test(test_pqos_mon_start_os),
+            cmocka_unit_test(test_pqos_mon_start_channels_os),
             cmocka_unit_test(test_pqos_mon_stop_os),
             cmocka_unit_test(test_pqos_mon_poll),
             cmocka_unit_test(test_pqos_mon_start_pids_os),
@@ -2843,6 +3487,10 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_pid_os),
             cmocka_unit_test(test_pqos_mon_add_pids_os),
             cmocka_unit_test(test_pqos_mon_remove_pids_os),
+            cmocka_unit_test(test_pqos_alloc_assoc_get_channel_os),
+            cmocka_unit_test(test_pqos_alloc_assoc_get_dev_os),
+            cmocka_unit_test(test_pqos_alloc_assoc_set_channel_os),
+            cmocka_unit_test(test_pqos_alloc_assoc_set_dev_os),
             cmocka_unit_test(test_pqos_mon_start_uncore_os),
         };
 #endif

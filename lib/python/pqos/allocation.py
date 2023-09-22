@@ -40,6 +40,7 @@ import ctypes
 
 from pqos.capability import pqos_get_type_enum
 from pqos.common import pqos_handle_error, free_memory
+from pqos.native_struct import PqosChannelT
 from pqos.pqos import Pqos
 
 
@@ -66,9 +67,9 @@ def _get_list_of_pids(pids):
 
 def _get_cdp_config(cdp_config):
     cdp_config_map = {
-        'off': 0,
-        'on': 1,
-        'any': 2
+        'any': 0,
+        'off': 1,
+        'on': 2
     }
 
     return cdp_config_map[cdp_config.lower()]
@@ -301,3 +302,81 @@ class PqosAlloc(object):
         cfg_ptr = ctypes.pointer(cfg)
         ret = self.pqos.lib.pqos_alloc_reset_config(cfg_ptr)
         pqos_handle_error('pqos_alloc_reset_config', ret)
+
+    def assoc_get_channel(self, channel):
+        """
+        Gets a class of service associated with a given channel.
+
+        Parameters:
+            channel: a channel
+
+        Returns:
+            a class of service
+        """
+
+        class_id = ctypes.c_uint(0)
+        ref = ctypes.byref(class_id)
+        argtypes = [PqosChannelT, ctypes.POINTER(ctypes.c_uint)]
+        self.pqos.lib.pqos_alloc_assoc_get_channel.argtypes = argtypes
+        ret = self.pqos.lib.pqos_alloc_assoc_get_channel(channel, ref)
+        pqos_handle_error('pqos_alloc_assoc_get_channel', ret)
+        return class_id.value
+
+    def assoc_get_dev(self, segment, bdf, virtual_channel):
+        """
+        Gets a class of service associated with a given device virtual channel.
+
+        Parameters:
+            segment: device segment/domain
+            bdf: device ID
+            virtual_channel: device virtual channel
+
+        Returns:
+            a class of service
+        """
+
+        class_id = ctypes.c_uint(0)
+        ref = ctypes.byref(class_id)
+        argtypes = [ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint,
+                    ctypes.POINTER(ctypes.c_uint)]
+        self.pqos.lib.pqos_alloc_assoc_get_dev.argtypes = argtypes
+        ret = self.pqos.lib.pqos_alloc_assoc_get_dev(segment, bdf,
+                                                     virtual_channel, ref)
+        pqos_handle_error('pqos_alloc_assoc_get_dev', ret)
+        return class_id.value
+
+    def assoc_set_channel(self, channel, class_id):
+        """
+        Associates a channel with a given class of service.
+
+        Parameters:
+            channel: a channel
+            class_id: a class of service
+        """
+
+        argtypes = [PqosChannelT, ctypes.c_uint]
+        self.pqos.lib.pqos_alloc_assoc_set_channel.argtypes = argtypes
+        ret = self.pqos.lib.pqos_alloc_assoc_set_channel(channel, class_id)
+        pqos_handle_error('pqos_alloc_assoc_set_channel', ret)
+
+    def assoc_set_dev(self, segment, bdf, virtual_channel, class_id):
+        """
+        Associates a channel with a given class of service.
+
+        Parameters:
+            segment: device segment/domain
+            bdf: device ID
+            virtual_channel: device virtual channel
+            class_id: a class of service
+        """
+
+        segment = ctypes.c_uint16(segment)
+        bdf = ctypes.c_uint16(bdf)
+        virtual_channel = ctypes.c_uint(virtual_channel)
+        class_id = ctypes.c_uint(class_id)
+        argtypes = [ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint,
+                    ctypes.c_uint]
+        self.pqos.lib.pqos_alloc_assoc_set_dev.argtypes = argtypes
+        ret = self.pqos.lib.pqos_alloc_assoc_set_dev(segment, bdf,
+                                                     virtual_channel, class_id)
+        pqos_handle_error('pqos_alloc_assoc_set_dev', ret)

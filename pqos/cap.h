@@ -49,14 +49,11 @@ extern "C" {
 /**
  * @brief Print information about supported RDT features
  *
- * @param [in] cap platform QoS capabilities structure
- *                 returned by \a pqos_cap_get
- * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param [in] verbose verbose mode
+ * @param [in] sys PQoS system configuration struct
+ *                 returned by \a pqos_sysconfig_get
+ * @param [in] verbose enable verbose mode
  */
-void cap_print_features(const struct pqos_cap *cap,
-                        const struct pqos_cpuinfo *cpu,
-                        const int verbose);
+void cap_print_features(const struct pqos_sysconfig *sys, const int verbose);
 
 #ifdef __cplusplus
 }

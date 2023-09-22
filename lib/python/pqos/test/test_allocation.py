@@ -44,7 +44,8 @@ from pqos.test.helper import ctypes_ref_set_uint, ctypes_build_array
 
 from pqos.allocation import PqosAlloc
 from pqos.native_struct import (
-    CPqosAllocConfig, CPqosCapability, CPqosCdpConfig, CPqosMbaConfig
+    CPqosAllocConfig, CPqosCapability, CPqosCdpConfig, CPqosIordtConfig,
+    CPqosMbaConfig
 )
 
 
@@ -265,8 +266,8 @@ class TestPqosAlloc(unittest.TestCase):
         def pqos_alloc_reset_m(l3_cdp_cfg, l2_cdp_cfg, mba_cfg):
             "Mock pqos_alloc_reset()."
 
-            self.assertEqual(l3_cdp_cfg, 1)
-            self.assertEqual(l2_cdp_cfg, 2)
+            self.assertEqual(l3_cdp_cfg, 2)
+            self.assertEqual(l2_cdp_cfg, 0)
             self.assertEqual(mba_cfg, 2)
 
             return 0
@@ -289,6 +290,8 @@ class TestPqosAlloc(unittest.TestCase):
 
             cfg = config.contents
             self.assertEqual(cfg.l3_cdp, CPqosCdpConfig.PQOS_REQUIRE_CDP_ANY)
+            self.assertEqual(cfg.l3_iordt,
+                             CPqosIordtConfig.PQOS_REQUIRE_IORDT_ON)
             self.assertEqual(cfg.l2_cdp, CPqosCdpConfig.PQOS_REQUIRE_CDP_OFF)
             self.assertEqual(cfg.mba, CPqosMbaConfig.PQOS_MBA_CTRL)
 
@@ -302,6 +305,7 @@ class TestPqosAlloc(unittest.TestCase):
         # Build reset configuration
         cfg = CPqosAllocConfig()
         cfg.set_l3_cdp('any')
+        cfg.set_l3_iordt('on')
         cfg.set_l2_cdp('off')
         cfg.set_mba('ctrl')
 
@@ -311,3 +315,78 @@ class TestPqosAlloc(unittest.TestCase):
 
         # Ensure mock function has been called
         lib.pqos_alloc_reset_config.assert_called_once()
+
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_set_channel(self, pqos_mock_cls):
+        "Tests assoc_set_channel() method."
+        # pylint: disable=no-self-use
+
+        lib = pqos_mock_cls.return_value.lib
+        lib.pqos_alloc_assoc_set_channel = MagicMock(return_value=0)
+
+        alloc = PqosAlloc()
+        alloc.assoc_set_channel(3, 7)
+
+        lib.pqos_alloc_assoc_set_channel.assert_called_once_with(3, 7)
+
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_set_dev(self, pqos_mock_cls):
+        "Tests assoc_set_dev() method."
+        # pylint: disable=no-self-use
+
+        lib = pqos_mock_cls.return_value.lib
+        lib.pqos_alloc_assoc_set_dev = MagicMock(return_value=0)
+
+        alloc = PqosAlloc()
+        alloc.assoc_set_dev(0xaa, 0xae, 1, 2)
+
+        lib.pqos_alloc_assoc_set_dev.assert_called_once()
+        call_args = lib.pqos_alloc_assoc_set_dev.call_args[0]
+        self.assertEqual(call_args[0].value, 0xaa)
+        self.assertEqual(call_args[1].value, 0xae)
+        self.assertEqual(call_args[2].value, 1)
+        self.assertEqual(call_args[3].value, 2)
+
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_get_channel(self, pqos_mock_cls):
+        "Tests assoc_get_channel() method."
+
+        def pqos_allc_assoc_get_channel_m(channel, class_id_ref):
+            "Mock pqos_alloc_assoc_get_channel()."
+
+            self.assertEqual(channel, 3)
+            ctypes_ref_set_uint(class_id_ref, 2)
+            return 0
+
+        lib = pqos_mock_cls.return_value.lib
+        mock_func = MagicMock(side_effect=pqos_allc_assoc_get_channel_m)
+        lib.pqos_alloc_assoc_get_channel = mock_func
+
+        alloc = PqosAlloc()
+        class_id = alloc.assoc_get_channel(3)
+
+        lib.pqos_alloc_assoc_get_channel.assert_called_once()
+        self.assertEqual(class_id, 2)
+
+    @patch('pqos.allocation.Pqos')
+    def test_assoc_get_dev(self, pqos_mock_cls):
+        "Tests assoc_get_dev() method."
+
+        def pqos_allc_assoc_get_dev_m(segment, bdf, virt_chan, class_id_ref):
+            "Mock pqos_alloc_assoc_get_dev()."
+
+            self.assertEqual(segment, 0xba)
+            self.assertEqual(bdf, 0xde)
+            self.assertEqual(virt_chan, 2)
+            ctypes_ref_set_uint(class_id_ref, 4)
+            return 0
+
+        lib = pqos_mock_cls.return_value.lib
+        mock_func = MagicMock(side_effect=pqos_allc_assoc_get_dev_m)
+        lib.pqos_alloc_assoc_get_dev = mock_func
+
+        alloc = PqosAlloc()
+        class_id = alloc.assoc_get_dev(0xba, 0xde, 2)
+
+        lib.pqos_alloc_assoc_get_dev.assert_called_once()
+        self.assertEqual(class_id, 4)

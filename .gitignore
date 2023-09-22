@@ -43,6 +43,7 @@ lib/python/test_env
 lib/python/venv_*
 lib/python/dist
 lib/python/pqos.egg-info
+lib/python/build
 
 lib/perl/Makefile
 lib/perl/Makefile.old
@@ -60,3 +61,13 @@ venv
 unit-test/lib/obj
 unit-test/lib/bin
 unit-test/pqos/bin
+
+lib/perl/Makefile.old
+lib/perl/MYMETA.json
+lib/perl/MYMETA.yml
+lib/perl/Makefile
+lib/perl/blib
+lib/perl/pm_to_blib
+lib/perl/pqos.bs
+lib/perl/pqos_wrap.c
+

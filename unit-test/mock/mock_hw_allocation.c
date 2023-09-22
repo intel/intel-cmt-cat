@@ -208,3 +208,63 @@ __wrap_hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id)
 
         return mock_type(int);
 }
+
+int
+__wrap_hw_alloc_assoc_get_channel(const pqos_channel_t channel,
+                                  unsigned *class_id)
+{
+        int ret;
+
+        check_expected(channel);
+        check_expected_ptr(class_id);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *class_id = mock_type(int);
+
+        return ret;
+}
+
+int
+__wrap_hw_alloc_assoc_get_dev(const uint16_t segment,
+                              const uint16_t bdf,
+                              const unsigned vc,
+                              unsigned *class_id)
+{
+        int ret;
+
+        check_expected(segment);
+        check_expected(bdf);
+        check_expected(vc);
+        check_expected_ptr(class_id);
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                *class_id = mock_type(int);
+
+        return ret;
+}
+
+int
+__wrap_hw_alloc_assoc_set_channel(const pqos_channel_t channel,
+                                  const unsigned class_id)
+{
+        check_expected(channel);
+        check_expected(class_id);
+
+        return mock_type(int);
+}
+
+int
+__wrap_hw_alloc_assoc_set_dev(const uint16_t segment,
+                              const uint16_t bdf,
+                              const unsigned vc,
+                              const unsigned class_id)
+{
+        check_expected(segment);
+        check_expected(bdf);
+        check_expected(vc);
+        check_expected(class_id);
+
+        return mock_type(int);
+}

@@ -136,6 +136,9 @@ mount:
         if (mba_cfg == PQOS_MBA_CTRL) {
                 struct resctrl_schemata *schmt;
                 struct pqos_mba mba;
+                const struct cpuinfo_config *vconfig;
+
+                cpuinfo_get_config(&vconfig);
 
                 schmt = resctrl_schemata_alloc(cap, cpu);
                 if (schmt == NULL) {
@@ -220,14 +223,15 @@ os_alloc_check(const struct pqos_cap *cap)
  * @brief Prepares and authenticates resctrl file system
  *        used for OS allocation interface
  *
+ * @param [in] cap platform QoS capabilities structure
+ *
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
 static int
-os_alloc_prep(void)
+os_alloc_prep(const struct pqos_cap *cap)
 {
         unsigned i, num_grps = 0;
-        const struct pqos_cap *cap = _pqos_get_cap();
         int ret;
 
         ret = resctrl_alloc_get_grps_num(cap, &num_grps);
@@ -276,7 +280,7 @@ os_alloc_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        ret = os_alloc_prep();
+        ret = os_alloc_prep(cap);
 
         return ret;
 }
@@ -785,9 +789,7 @@ mba_cfg_update(const enum pqos_mba_config mba_cfg,
  * @param [in] l3_cdp_cfg requested L3 CAT CDP config
  * @param [in] l2_cdp_cfg requested L2 CAT CDP config
  * @param [in] mba_cfg requested MBA config
- * @param [in] l3_cap l3 capability
- * @param [in] l2_cap l2 capability
- * @param [in] mba_cap mba capability
+ * @param [in] cap platform QoS capabilities structure
  *
  * @return Operation status
  */
@@ -795,9 +797,7 @@ static int
 os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
                     const enum pqos_cdp_config l2_cdp_cfg,
                     const enum pqos_mba_config mba_cfg,
-                    const struct pqos_cap_l3ca *l3_cap,
-                    const struct pqos_cap_l2ca *l2_cap,
-                    const struct pqos_cap_mba *mba_cap)
+                    const struct pqos_cap *cap)
 {
         int ret;
 
@@ -834,18 +834,15 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
                 goto os_alloc_reset_full_exit;
         }
 
-        if (l3_cap != NULL)
-                _pqos_cap_l3cdp_change(l3_cdp_cfg);
-        if (l2_cap != NULL)
-                _pqos_cap_l2cdp_change(l2_cdp_cfg);
-        if (mba_cap != NULL)
-                _pqos_cap_mba_change(mba_cfg);
+        _pqos_cap_l3cdp_change(l3_cdp_cfg);
+        _pqos_cap_l2cdp_change(l2_cdp_cfg);
+        _pqos_cap_mba_change(mba_cfg);
 
         /**
          * Create the COS dir's in resctrl.
          */
         LOG_INFO("OS alloc reset - prepare resctrl fs\n");
-        ret = os_alloc_prep();
+        ret = os_alloc_prep(cap);
         if (ret != PQOS_RETVAL_OK)
                 LOG_ERROR("OS alloc prep error!\n");
 
@@ -869,11 +866,13 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         int ret;
         const struct pqos_cap *cap = _pqos_get_cap();
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
+        enum pqos_iordt_config l3_iordt_cfg = PQOS_REQUIRE_IORDT_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
 
         if (cfg != NULL) {
                 l3_cdp_cfg = cfg->l3_cdp;
+                l3_iordt_cfg = cfg->l3_iordt;
                 l2_cdp_cfg = cfg->l2_cdp;
                 mba_cfg = cfg->mba;
         }
@@ -918,10 +917,24 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
                 ret = PQOS_RETVAL_RESOURCE;
                 goto os_alloc_reset_exit;
         }
+        /* Check L3 I/O RDT requested while not present */
+        if (l3_cap == NULL && l3_iordt_cfg != PQOS_REQUIRE_IORDT_ANY) {
+                LOG_ERROR(
+                    "L3 I/O RDT setting requested but no L3 CAT present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_alloc_reset_exit;
+        }
         /* Check against erroneous CDP request */
         if (l3_cap != NULL && l3_cdp_cfg == PQOS_REQUIRE_CDP_ON &&
             !l3_cap->cdp) {
                 LOG_ERROR("L3 CAT/CDP requested but not supported by the "
+                          "platform!\n");
+                ret = PQOS_RETVAL_PARAM;
+                goto os_alloc_reset_exit;
+        }
+        /* Check against erroneous L3 I/O RDT request */
+        if (l3_iordt_cfg == PQOS_REQUIRE_IORDT_ON && !l3_cap->iordt) {
+                LOG_ERROR("L3 I/O RDT requested but not supported by the "
                           "platform!\n");
                 ret = PQOS_RETVAL_PARAM;
                 goto os_alloc_reset_exit;
@@ -980,8 +993,8 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
                                   "settings\n");
                         ret = PQOS_RETVAL_ERROR;
                 } else
-                        ret = os_alloc_reset_full(l3_cdp, l2_cdp, mba_ctrl,
-                                                  l3_cap, l2_cap, mba_cap);
+                        ret =
+                            os_alloc_reset_full(l3_cdp, l2_cdp, mba_ctrl, cap);
         } else
                 ret = os_alloc_reset_light(l3_cap, l2_cap, mba_cap);
 

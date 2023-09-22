@@ -59,6 +59,12 @@ extern "C" {
         })
 #endif /* !MAX */
 
+#define BDF_BUS(bdf)  (bdf >> 8)
+#define BDF_DEV(bdf)  ((bdf >> 3) & 0x1F)
+#define BDF_FUNC(bdf) (bdf & 0x7)
+
+#define DEV_ALL_VCS ((uint32_t)(-1))
+
 /**
  * Maintains alloc option - allocate cores or task id's
  */
@@ -81,6 +87,19 @@ extern enum pqos_interface sel_interface;
  * @return Numeric value of the string representing the number
  */
 uint64_t strtouint64(const char *s);
+
+/**
+ * @brief Converts string into 64-bit unsigned number.
+ *
+ * For numbers in hexadecimal format only.
+ *
+ * On error, this functions causes process to exit with FAILURE code.
+ *
+ * @param s string to be converted into 64-bit unsigned number
+ *
+ * @return Numeric value of the string representing the number
+ */
+uint64_t strhextouint64(const char *s);
 
 /**
  * @brief Converts string of characters representing list of

@@ -72,5 +72,16 @@ int __wrap_hw_alloc_assoc_write(const unsigned lcore, const unsigned class_id);
 int __real_hw_alloc_assoc_write(const unsigned lcore, const unsigned class_id);
 int __wrap_hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id);
 int __real_hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id);
-
+int __wrap_hw_alloc_assoc_get_channel(const pqos_channel_t channel,
+                                      unsigned *class_id);
+int __wrap_hw_alloc_assoc_get_dev(const uint16_t segment,
+                                  const uint16_t bdf,
+                                  const unsigned vc,
+                                  unsigned *class_id);
+int __wrap_hw_alloc_assoc_set_channel(const pqos_channel_t channel,
+                                      const unsigned class_id);
+int __wrap_hw_alloc_assoc_set_dev(const uint16_t segment,
+                                  const uint16_t bdf,
+                                  const unsigned vc,
+                                  const unsigned class_id);
 #endif /* MOCK_HW_ALLOCATION_H_ */

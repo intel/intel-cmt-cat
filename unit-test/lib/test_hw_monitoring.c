@@ -39,39 +39,6 @@
 
 /* ======== init ======== */
 
-static int
-wrap_init_mon(void **state)
-{
-        int ret;
-
-        expect_any_always(__wrap_perf_mon_init, cpu);
-        expect_any_always(__wrap_perf_mon_init, cap);
-        will_return_always(__wrap_perf_mon_init, PQOS_RETVAL_OK);
-
-        ret = test_init(state, 1 << PQOS_CAP_TYPE_MON);
-        if (ret == 0) {
-                struct test_data *data = (struct test_data *)*state;
-
-                ret = hw_mon_init(data->cpu, data->cap);
-                assert_int_equal(ret, PQOS_RETVAL_OK);
-        }
-
-        return ret;
-}
-
-static int
-wrap_fini_mon(void **state)
-{
-        int ret;
-
-        will_return_always(__wrap_perf_mon_fini, PQOS_RETVAL_OK);
-
-        ret = hw_mon_fini();
-        assert_int_equal(ret, PQOS_RETVAL_OK);
-
-        return test_fini(state);
-}
-
 /* ======== mock ======== */
 
 int
@@ -99,15 +66,19 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
                     pqos_rmid_t max_rmid,
                     const struct pqos_mon_options *opt)
 {
+        int ret;
+
         assert_non_null(ctx);
         check_expected(event);
-        assert_int_equal(min_rmid, 1);
-        assert_int_equal(max_rmid, UINT32_MAX);
+        check_expected(min_rmid);
+        check_expected(max_rmid);
         assert_non_null(opt);
 
-        ctx->rmid = mock_type(int);
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK)
+                ctx->rmid = mock_type(int);
 
-        return mock_type(int);
+        return ret;
 }
 
 int
@@ -167,10 +138,19 @@ hw_mon_stop_perf(struct pqos_mon_data *group)
         return mock_type(int);
 }
 
-/* ======== hw_mon_assoc_get ======== */
+int
+hw_mon_reset_iordt(const struct pqos_cpuinfo *cpu, const int enable)
+{
+        assert_non_null(cpu);
+        check_expected(enable);
+
+        return mock_type(int);
+}
+
+/* ======== hw_mon_assoc_get_core ======== */
 
 static void
-test_hw_mon_assoc_get(void **state)
+test_hw_mon_assoc_get_core(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
@@ -179,18 +159,19 @@ test_hw_mon_assoc_get(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         expect_value(hw_mon_assoc_read, lcore, lcore);
         will_return(hw_mon_assoc_read, 2);
         will_return(hw_mon_assoc_read, PQOS_RETVAL_OK);
 
-        ret = hw_mon_assoc_get(lcore, &rmid);
+        ret = hw_mon_assoc_get_core(lcore, &rmid);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(rmid, 2);
 }
 
 static void
-test_hw_mon_assoc_get_param(void **state)
+test_hw_mon_assoc_get_core_param(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
@@ -199,34 +180,109 @@ test_hw_mon_assoc_get_param(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
-        ret = hw_mon_assoc_get(200, &rmid);
+        ret = hw_mon_assoc_get_core(200, &rmid);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
         assert_int_equal(rmid, 1);
 
-        ret = hw_mon_assoc_get(lcore, NULL);
+        ret = hw_mon_assoc_get_core(lcore, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+/* ======== hw_mon_assoc_get_channel ======== */
+
+static void
+test_hw_mon_assoc_get_channel(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        pqos_rmid_t rmid = 1;
+        pqos_channel_t channel_id = 0x201;
+
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        expect_value(__wrap_iordt_mon_assoc_read, channel_id, channel_id);
+        will_return(__wrap_iordt_mon_assoc_read, PQOS_RETVAL_OK);
+        will_return(__wrap_iordt_mon_assoc_read, 2);
+
+        ret = hw_mon_assoc_get_channel(channel_id, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(rmid, 2);
+}
+
+static void
+test_hw_mon_assoc_get_channel_param(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        pqos_rmid_t rmid = 1;
+        pqos_channel_t channel_id = 0x201;
+
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        /* Invalid channel Id */
+        ret = hw_mon_assoc_get_channel(0xDEAD, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(rmid, 1);
+
+        /* NULL param */
+        ret = hw_mon_assoc_get_channel(channel_id, NULL);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* channel not supporting RMID tagging */
+        ret = hw_mon_assoc_get_channel(0x202, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* I/O RDT monitoring disabled */
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 0;
+        ret = hw_mon_assoc_get_channel(channel_id, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+
+        /* I/O RDT monitoring unsupported */
+        data->cap_mon->iordt = 0;
+        data->cap_mon->iordt_on = 0;
+        ret = hw_mon_assoc_get_channel(channel_id, &rmid);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 /* ======== hw_mon_reset ======== */
 
 static void
-test_hw_mon_reset(void **state)
+hw_mon_reset_mock(const struct pqos_cpuinfo *cpu)
 {
-        struct test_data *data = (struct test_data *)*state;
-        struct pqos_cpuinfo *cpu = data->cpu;
-        int ret;
         unsigned i;
-
-        will_return_maybe(__wrap__pqos_get_cap, data->cap);
-        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         for (i = 0; i < cpu->num_cores; ++i)
                 expect_value(hw_mon_assoc_write, lcore, cpu->cores[i].lcore);
         expect_value_count(hw_mon_assoc_write, rmid, 0, cpu->num_cores);
         will_return_count(hw_mon_assoc_write, PQOS_RETVAL_OK, cpu->num_cores);
+}
 
-        ret = hw_mon_reset();
+static void
+test_hw_mon_reset(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        hw_mon_reset_mock(data->cpu);
+
+        ret = hw_mon_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
@@ -240,6 +296,7 @@ test_hw_mon_reset_error(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         for (i = 0; i < cpu->num_cores; ++i)
                 expect_value(hw_mon_assoc_write, lcore, cpu->cores[i].lcore);
@@ -248,11 +305,157 @@ test_hw_mon_reset_error(void **state)
         will_return_count(hw_mon_assoc_write, PQOS_RETVAL_OK,
                           cpu->num_cores - 1);
 
-        ret = hw_mon_reset();
+        ret = hw_mon_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
+static void
+test_hw_mon_reset_unsupported(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        ret = hw_mon_reset(NULL);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_hw_mon_reset_iordt_unsupported(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_mon_config cfg;
+
+        data->cap_mon->iordt = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+
+        ret = hw_mon_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_hw_mon_reset_iordt_enable(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_mon_config cfg;
+
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        expect_function_call(__wrap_iordt_mon_assoc_reset);
+        will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
+
+        expect_value(hw_mon_reset_iordt, enable, 1);
+        will_return(hw_mon_reset_iordt, PQOS_RETVAL_OK);
+        hw_mon_reset_mock(data->cpu);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+
+        ret = hw_mon_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        /* I/O RDT already enabled */
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 1;
+        expect_function_call(__wrap_iordt_mon_assoc_reset);
+        will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
+
+        hw_mon_reset_mock(data->cpu);
+
+        ret = hw_mon_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_hw_mon_reset_iordt_disable(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret;
+        struct pqos_mon_config cfg;
+
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        expect_function_call(__wrap_iordt_mon_assoc_reset);
+        will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
+
+        expect_value(hw_mon_reset_iordt, enable, 0);
+        will_return(hw_mon_reset_iordt, PQOS_RETVAL_OK);
+        hw_mon_reset_mock(data->cpu);
+
+        memset(&cfg, 0, sizeof(cfg));
+        cfg.l3_iordt = PQOS_REQUIRE_IORDT_OFF;
+
+        ret = hw_mon_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        /* I/O RDT already disabled */
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 0;
+        hw_mon_reset_mock(data->cpu);
+        ret = hw_mon_reset(&cfg);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 /* ======== hw_mon_start ======== */
+
+static void
+test_hw_mon_start_param(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        int ret;
+        unsigned num_cores = 1;
+        unsigned cores[] = {1};
+        enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
+        struct pqos_mon_options opt;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        memset(&opt, 0, sizeof(opt));
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+
+        /* Invalid event */
+        ret = hw_mon_start_cores(num_cores, cores, 0xDEAD, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* Core already monitored */
+        expect_value(hw_mon_assoc_read, lcore, cores[0]);
+        will_return(hw_mon_assoc_read, 1);
+        will_return(hw_mon_assoc_read, PQOS_RETVAL_OK);
+        ret = hw_mon_start_cores(num_cores, cores, event, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        /* Invalid core */
+        cores[0] = 1000000;
+        ret = hw_mon_start_cores(num_cores, cores, 0xDEAD, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
 
 static void
 test_hw_mon_start_mbm(void **state)
@@ -275,6 +478,7 @@ test_hw_mon_start_mbm(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         expect_any(hw_mon_start_perf, event);
         will_return(hw_mon_start_perf, PQOS_RETVAL_OK);
@@ -324,6 +528,7 @@ test_hw_mon_start_perf(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         expect_value(hw_mon_assoc_read, lcore, cores[0]);
         will_return(hw_mon_assoc_read, 0);
@@ -384,21 +589,201 @@ test_hw_mon_poll(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
+/* ======== hw_mon_start_channels ======== */
+
+static void
+test_hw_mon_start_channels_unsupported(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t channel_id = 0x201;
+        enum pqos_mon_event event =
+            PQOS_PERF_EVENT_IPC | PQOS_MON_EVENT_TMEM_BW;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        struct pqos_mon_options opt;
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+        memset(&opt, 0, sizeof(opt));
+
+        data->cap_mon->iordt = 0;
+        data->cap_mon->iordt_on = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        ret = hw_mon_start_channels(1, &channel_id, event, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+static void
+test_hw_mon_start_channels_disabled(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t channel_id = 0x201;
+        enum pqos_mon_event event =
+            PQOS_PERF_EVENT_IPC | PQOS_MON_EVENT_TMEM_BW;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        struct pqos_mon_options opt;
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+        memset(&opt, 0, sizeof(opt));
+
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 0;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        ret = hw_mon_start_channels(1, &channel_id, event, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_ERROR);
+}
+
+static void
+test_hw_mon_start_channels_param(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t channel_id = 0x201;
+        enum pqos_mon_event event = PQOS_MON_EVENT_TMEM_BW;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        struct pqos_mon_options opt;
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+        memset(&opt, 0, sizeof(opt));
+
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        /* Invalid event */
+        ret = hw_mon_start_channels(1, &channel_id, 0xDEAD, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* Unsupported event */
+        ret = hw_mon_start_channels(1, &channel_id, PQOS_PERF_EVENT_IPC, NULL,
+                                    &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        /* Channel already monitored */
+        expect_value(__wrap_iordt_mon_assoc_read, channel_id, channel_id);
+        will_return(__wrap_iordt_mon_assoc_read, PQOS_RETVAL_OK);
+        will_return(__wrap_iordt_mon_assoc_read, 2);
+        ret = hw_mon_start_channels(1, &channel_id, event, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        /* No rmid tagging support */
+        channel_id = 0x202;
+        ret = hw_mon_start_channels(1, &channel_id, event, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+
+        /* Invalid channel */
+        channel_id = 0xDEAD;
+        ret = hw_mon_start_channels(1, &channel_id, event, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+}
+
+static void
+test_hw_mon_start_channels(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        pqos_channel_t channel_id = 0x201;
+        enum pqos_mon_event event = PQOS_MON_EVENT_TMEM_BW;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        struct pqos_mon_options opt;
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+        memset(&opt, 0, sizeof(opt));
+
+        data->cap_mon->iordt = 1;
+        data->cap_mon->iordt_on = 1;
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        /* Channel is not monitored */
+        expect_value(__wrap_iordt_mon_assoc_read, channel_id, channel_id);
+        will_return(__wrap_iordt_mon_assoc_read, PQOS_RETVAL_OK);
+        will_return(__wrap_iordt_mon_assoc_read, 0);
+
+        expect_value(hw_mon_assoc_unused, event, event);
+        expect_value(hw_mon_assoc_unused, min_rmid, 0);
+        expect_value(hw_mon_assoc_unused, max_rmid, 32);
+        will_return(hw_mon_assoc_unused, PQOS_RETVAL_OK);
+        will_return(hw_mon_assoc_unused, 0);
+
+        expect_value(__wrap_iordt_get_numa, channel_id, channel_id);
+        will_return(__wrap_iordt_get_numa, PQOS_RETVAL_OK);
+        will_return(__wrap_iordt_get_numa, 0);
+
+        expect_value(__wrap_iordt_mon_assoc_write, channel_id, channel_id);
+        expect_value(__wrap_iordt_mon_assoc_write, rmid, 0);
+        will_return(__wrap_iordt_mon_assoc_write, PQOS_RETVAL_OK);
+
+        ret = hw_mon_start_channels(1, &channel_id, event, NULL, &group, &opt);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(group.num_channels, 1);
+        assert_int_equal(group.channels[0], channel_id);
+
+        /* Free memory */
+        expect_value(__wrap_iordt_mon_assoc_write, channel_id, channel_id);
+        expect_value(__wrap_iordt_mon_assoc_write, rmid, 0);
+        will_return(__wrap_iordt_mon_assoc_write, PQOS_RETVAL_OK);
+        will_return(hw_mon_stop_perf, PQOS_RETVAL_OK);
+
+        ret = hw_mon_stop(&group);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 int
 main(void)
 {
         int result = 0;
 
         const struct CMUnitTest tests[] = {
-            cmocka_unit_test(test_hw_mon_assoc_get),
-            cmocka_unit_test(test_hw_mon_assoc_get_param),
+            cmocka_unit_test(test_hw_mon_assoc_get_core),
+            cmocka_unit_test(test_hw_mon_assoc_get_core_param),
+            cmocka_unit_test(test_hw_mon_assoc_get_channel),
+            cmocka_unit_test(test_hw_mon_assoc_get_channel_param),
             cmocka_unit_test(test_hw_mon_reset),
             cmocka_unit_test(test_hw_mon_reset_error),
+            cmocka_unit_test(test_hw_mon_start_param),
             cmocka_unit_test(test_hw_mon_start_mbm),
             cmocka_unit_test(test_hw_mon_start_perf),
-            cmocka_unit_test(test_hw_mon_poll)};
+            cmocka_unit_test(test_hw_mon_poll),
+            cmocka_unit_test(test_hw_mon_reset_iordt_disable),
+            cmocka_unit_test(test_hw_mon_reset_iordt_enable),
+            cmocka_unit_test(test_hw_mon_reset_iordt_unsupported),
+            cmocka_unit_test(test_hw_mon_start_channels_unsupported),
+            cmocka_unit_test(test_hw_mon_start_channels_disabled),
+            cmocka_unit_test(test_hw_mon_start_channels_param),
+            cmocka_unit_test(test_hw_mon_start_channels)};
 
-        result += cmocka_run_group_tests(tests, wrap_init_mon, wrap_fini_mon);
+        const struct CMUnitTest tests_unsupported[] = {
+            cmocka_unit_test(test_hw_mon_reset_unsupported)};
+
+        result += cmocka_run_group_tests(tests, test_init_mon, test_fini);
+        result += cmocka_run_group_tests(tests_unsupported,
+                                         test_init_unsupported, test_fini);
 
         return result;
 }

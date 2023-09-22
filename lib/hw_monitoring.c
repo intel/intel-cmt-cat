@@ -42,12 +42,15 @@
 
 #include "cap.h"
 #include "cpu_registers.h"
+#include "iordt.h"
 #include "log.h"
 #include "machine.h"
 #include "monitoring.h"
 #include "perf_monitoring.h"
 #include "uncore_monitoring.h"
+#include "utils.h"
 
+#include <limits.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -229,6 +232,33 @@ rmid_get_event_max(const struct pqos_cap *cap,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Obtain socket number for \a numa
+ *
+ * @param [in] cpu CPU information structure
+ * @param [in] numa NUMA node
+ * @param [out] socket obtained socket id
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+get_socket(const struct pqos_cpuinfo *cpu, unsigned numa, unsigned *socket)
+{
+        unsigned i;
+
+        for (i = 0; i < cpu->num_cores; ++i) {
+                const struct pqos_coreinfo *coreinfo = &(cpu->cores[i]);
+
+                if (coreinfo->numa == numa) {
+                        *socket = coreinfo->socket;
+                        return PQOS_RETVAL_OK;
+                }
+        }
+
+        return PQOS_RETVAL_ERROR;
+}
+
 int
 hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
                     const enum pqos_mon_event event,
@@ -238,11 +268,13 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
 {
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_devinfo *dev = _pqos_get_dev();
         int ret = PQOS_RETVAL_OK;
-        pqos_rmid_t rmid;
+        unsigned rmid = 0;
         unsigned *core_list = NULL;
         unsigned i, core_count;
         uint8_t *rmid_list = NULL;
+        int iordt;
 
         ASSERT(ctx != NULL);
 
@@ -259,8 +291,12 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
         if (min_rmid < 1)
                 min_rmid = 1;
 
+        ret = pqos_mon_iordt_enabled(cap, NULL, &iordt);
+        if (ret != PQOS_RETVAL_OK)
+                goto rmid_alloc_error;
+
         /* list of used RMIDs */
-        rmid_list = (uint8_t *)calloc(max_rmid + 2, sizeof(*rmid_list));
+        rmid_list = (uint8_t *)calloc(max_rmid + 2, sizeof(rmid_list[0]));
         if (rmid_list == NULL)
                 return PQOS_RETVAL_RESOURCE;
 
@@ -273,6 +309,7 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
                 goto rmid_alloc_error;
         }
         ASSERT(core_count > 0);
+
         /* Mark RMIDs used for core monitoring */
         for (i = 0; i < core_count; i++) {
                 pqos_rmid_t rmid;
@@ -283,6 +320,34 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
                 if (rmid <= max_rmid)
                         rmid_list[rmid] = 1;
         }
+
+        /* mark used RMIDs for channels */
+        if (iordt && dev != NULL)
+                for (i = 0; i < dev->num_channels; ++i) {
+                        const struct pqos_channel *channel = &dev->channels[i];
+                        pqos_rmid_t rmid;
+                        unsigned socket;
+                        unsigned numa;
+
+                        if (!channel->rmid_tagging)
+                                continue;
+
+                        ret = iordt_get_numa(dev, channel->channel_id, &numa);
+                        if (ret == PQOS_RETVAL_OK)
+                                ret = get_socket(cpu, numa, &socket);
+                        if (ret == PQOS_RETVAL_OK) {
+                                if (socket != ctx->cluster)
+                                        continue;
+                        } else if (ret != PQOS_RETVAL_RESOURCE)
+                                goto rmid_alloc_error;
+
+                        ret = iordt_mon_assoc_read(channel->channel_id, &rmid);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto rmid_alloc_error;
+
+                        if (rmid <= max_rmid)
+                                rmid_list[rmid] = 1;
+                }
 
 #ifdef PQOS_RMID_CUSTOM
         if (opt->rmid.type == PQOS_RMID_TYPE_MAP) {
@@ -406,7 +471,7 @@ hw_mon_assoc_read(const unsigned lcore, pqos_rmid_t *rmid)
 }
 
 int
-hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
+hw_mon_assoc_get_core(const unsigned lcore, pqos_rmid_t *rmid)
 {
         int ret = PQOS_RETVAL_OK;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
@@ -424,12 +489,95 @@ hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid)
 }
 
 int
-hw_mon_reset(void)
+hw_mon_assoc_get_channel(const pqos_channel_t channel_id, pqos_rmid_t *rmid)
+{
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_devinfo *dev = _pqos_get_dev();
+        const struct pqos_channel *channel;
+        int ret;
+        int supported;
+        int enabled;
+
+        if (rmid == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        channel = pqos_devinfo_get_channel(dev, channel_id);
+        if (channel == NULL)
+                return PQOS_RETVAL_PARAM;
+        if (!channel->rmid_tagging)
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_mon_iordt_enabled(cap, &supported, &enabled);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (!supported)
+                return PQOS_RETVAL_RESOURCE;
+        if (!enabled)
+                return PQOS_RETVAL_ERROR;
+
+        return iordt_mon_assoc_read(channel_id, rmid);
+}
+
+int
+hw_mon_reset_iordt(const struct pqos_cpuinfo *cpu, const int enable)
+{
+        unsigned *sockets = NULL;
+        unsigned sockets_num;
+        unsigned j = 0;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cpu != NULL);
+
+        LOG_INFO("%s I/O RDT monitoring across sockets...\n",
+                 (enable) ? "Enabling" : "Disabling");
+
+        sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
+        if (sockets == NULL || sockets_num == 0) {
+                ret = PQOS_RETVAL_ERROR;
+                goto hw_mon_reset_iordt_exit;
+        }
+
+        for (j = 0; j < sockets_num; j++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_core(cpu, sockets[j], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_reset_iordt_exit;
+
+                ret = msr_read(core, PQOS_MSR_L3_IO_QOS_CFG, &reg);
+                if (ret != MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto hw_mon_reset_iordt_exit;
+                }
+
+                if (enable)
+                        reg |= PQOS_MSR_L3_IO_QOS_MON_EN;
+                else
+                        reg &= ~PQOS_MSR_L3_IO_QOS_MON_EN;
+
+                ret = msr_write(core, PQOS_MSR_L3_IO_QOS_CFG, reg);
+                if (ret != MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto hw_mon_reset_iordt_exit;
+                }
+        }
+
+hw_mon_reset_iordt_exit:
+        if (sockets != NULL)
+                free(sockets);
+
+        return ret;
+}
+
+int
+hw_mon_reset(const struct pqos_mon_config *cfg)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned i;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_devinfo *dev = _pqos_get_dev();
         const struct pqos_capability *cap_mon;
 
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &cap_mon);
@@ -438,11 +586,58 @@ hw_mon_reset(void)
                 return ret;
         }
 
+        if (cfg != NULL && cfg->l3_iordt == PQOS_REQUIRE_IORDT_ON &&
+            !cap_mon->u.mon->iordt) {
+                LOG_ERROR("I/O RDT monitoring requested but not supported by "
+                          "the platform!\n");
+                return PQOS_RETVAL_PARAM;
+        }
+
+        /* reset core assoc */
         for (i = 0; i < cpu->num_cores; i++) {
                 int retval = hw_mon_assoc_write(cpu->cores[i].lcore, RMID0);
 
                 if (retval != PQOS_RETVAL_OK)
                         ret = retval;
+        }
+
+        /* reset I/O RDT channel assoc */
+        if (cap_mon->u.mon->iordt && cap_mon->u.mon->iordt_on && dev != NULL) {
+                int retval = iordt_mon_assoc_reset(dev);
+
+                if (retval != PQOS_RETVAL_OK)
+                        ret = retval;
+        }
+
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (cfg != NULL) {
+                if (cfg->l3_iordt == PQOS_REQUIRE_IORDT_ON &&
+                    !cap_mon->u.mon->iordt_on) {
+                        LOG_INFO("Turning I/O RDT Monitoring ON ...\n");
+                        ret = hw_mon_reset_iordt(cpu, 1);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("I/O RDT Monitoring enable error!\n");
+                                return ret;
+                        }
+
+                        /* reset channel assoc - initialize mmio tables */
+                        if (dev != NULL)
+                                ret = iordt_mon_assoc_reset(dev);
+                }
+
+                if (cfg->l3_iordt == PQOS_REQUIRE_IORDT_OFF &&
+                    cap_mon->u.mon->iordt_on) {
+                        LOG_INFO("Turning I/O RDT Monitoring OFF ...\n");
+                        ret = hw_mon_reset_iordt(cpu, 0);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("I/O RDT Monitoring disable "
+                                          "error!\n");
+                                return ret;
+                        }
+                }
+                _pqos_cap_mon_iordt_change(cfg->l3_iordt);
         }
 
         return ret;
@@ -883,31 +1078,38 @@ hw_mon_start_counter_exit:
 }
 
 /**
- * @brief Validate if event is listed in capabilities
+ * @brief Validate if event list contains events listed in capabilities
  *
- * @param [in[ cap capabilities structure
- * @param [in] event monitoring event id
+ * @param [in] event combination of monitoring events
+ * @param [in] iordt require I/O RDT support
  *
- * @return Operational status
- * @retval PQOS_RETVAL_OK success
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
  */
 static int
-validate_event(const struct pqos_cap *cap, const enum pqos_mon_event event)
+hw_mon_events_valid(const struct pqos_cap *cap,
+                    const enum pqos_mon_event event,
+                    const int iordt)
 {
         unsigned i;
 
-        for (i = 0; i < (sizeof(event) * 8); i++) {
+        /**
+         * Validate if event is listed in capabilities
+         */
+        for (i = 0; i < (sizeof(event) * CHAR_BIT); i++) {
+                int retval;
                 const enum pqos_mon_event evt_mask =
                     (enum pqos_mon_event)(1U << i);
                 const struct pqos_monitor *ptr = NULL;
-                int retval;
 
                 if (!(evt_mask & event))
                         continue;
 
                 retval = pqos_cap_get_event(cap, evt_mask, &ptr);
                 if (retval != PQOS_RETVAL_OK || ptr == NULL)
-                        return PQOS_RETVAL_PARAM;
+                        return PQOS_RETVAL_ERROR;
+                if (iordt && !ptr->iordt)
+                        return PQOS_RETVAL_ERROR;
         }
 
         return PQOS_RETVAL_OK;
@@ -934,6 +1136,9 @@ hw_mon_start_cores(const unsigned num_cores,
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
 
+        if (num_cores == 0)
+                return PQOS_RETVAL_PARAM;
+
         req_events = event;
 
         if (req_events & PQOS_MON_EVENT_RMEM_BW)
@@ -943,9 +1148,12 @@ hw_mon_start_cores(const unsigned num_cores,
                 req_events |= (enum pqos_mon_event)(
                     PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_INSTRUCTIONS);
 
-        ret = validate_event(cap, event);
+        /**
+         * Validate if event is listed in capabilities
+         */
+        ret = hw_mon_events_valid(cap, event, 0);
         if (ret != PQOS_RETVAL_OK)
-                return ret;
+                return PQOS_RETVAL_PARAM;
 
         /**
          * Check if all requested cores are valid
@@ -1056,7 +1264,7 @@ hw_mon_start_uncore(const unsigned num_sockets,
         ASSERT(num_sockets > 0);
         ASSERT(event > 0);
 
-        ret = validate_event(cap, event);
+        ret = hw_mon_events_valid(cap, event, 0);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
@@ -1107,6 +1315,207 @@ hw_mon_start_uncore__exit:
 }
 
 int
+hw_mon_start_channels(const unsigned num_channels,
+                      const pqos_channel_t *channels,
+                      const enum pqos_mon_event event,
+                      void *context,
+                      struct pqos_mon_data *group,
+                      const struct pqos_mon_options *opt)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+        const struct pqos_devinfo *dev = _pqos_get_dev();
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        struct pqos_mon_poll_ctx *ctxs = NULL;
+        unsigned num_ctx = 0;
+        int enabled;
+        int supported;
+        enum pqos_mon_event req_events;
+
+        ASSERT(group != NULL);
+        ASSERT(channels != NULL);
+        ASSERT(num_channels > 0);
+        ASSERT(event > 0);
+        ASSERT(opt != NULL);
+
+#ifdef PQOS_RMID_CUSTOM
+        if (opt->rmid.type != PQOS_RMID_TYPE_DEFAULT &&
+            opt->rmid.type != PQOS_RMID_TYPE_MAP)
+                return PQOS_RETVAL_PARAM;
+#endif
+
+        req_events = event;
+        if (req_events & PQOS_MON_EVENT_RMEM_BW)
+                req_events |= (enum pqos_mon_event)(PQOS_MON_EVENT_LMEM_BW |
+                                                    PQOS_MON_EVENT_TMEM_BW);
+
+        /* Check for I/O RDT support */
+        ret = pqos_mon_iordt_enabled(cap, &supported, &enabled);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (!supported) {
+                LOG_ERROR("I/O RDT monitoring is not supported!\n");
+                return PQOS_RETVAL_RESOURCE;
+        } else if (!enabled) {
+                LOG_ERROR("I/O RDT monitoring is disabled!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        /* Validate if event is listed in capabilities */
+        ret = hw_mon_events_valid(cap, event, 1);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_PARAM;
+
+        /* Check if all requested channels are valid */
+        for (i = 0; i < num_channels; ++i) {
+                const pqos_channel_t channel_id = channels[i];
+                const struct pqos_channel *channel;
+                pqos_rmid_t rmid;
+
+                channel = pqos_devinfo_get_channel(dev, channel_id);
+                if (channel == NULL)
+                        return PQOS_RETVAL_PARAM;
+                if (!channel->rmid_tagging) {
+                        LOG_ERROR(
+                            "Channel %016llx does not support monitoring\n",
+                            (unsigned long long)channel_id);
+                        return PQOS_RETVAL_RESOURCE;
+                }
+
+                ret = iordt_mon_assoc_read(channel_id, &rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_PARAM;
+
+                if (rmid != RMID0) {
+                        /* If not RMID0 then it is already monitored */
+                        LOG_INFO("Channel %16llx is already monitored with "
+                                 "RMID%u.\n",
+                                 (unsigned long long)channel, rmid);
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        }
+
+        ctxs = (struct pqos_mon_poll_ctx *)calloc(num_channels, sizeof(*ctxs));
+        if (ctxs == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        for (i = 0; i < num_channels; ++i) {
+                const pqos_channel_t channel_id = channels[i];
+                const struct pqos_channel *channel =
+                    pqos_devinfo_get_channel(dev, channel_id);
+                struct pqos_mon_poll_ctx *ctx = NULL;
+                const struct pqos_capability *item = NULL;
+                unsigned numa;
+                unsigned socket;
+                unsigned c;
+
+                if (channel == NULL) {
+                        ret = PQOS_RETVAL_PARAM;
+                        goto hw_mon_start_channels_exit;
+                }
+
+                /* Device assigned to numa */
+                ret = iordt_get_numa(dev, channel_id, &numa);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_start_channels_exit;
+
+                /* Obtain socket number */
+                ret = get_socket(cpu, numa, &socket);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_start_channels_exit;
+
+                ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &item);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_start_channels_exit;
+
+                if (item->u.mon->max_rmid == 0) {
+                        ret = PQOS_RETVAL_PARAM;
+                        goto hw_mon_start_channels_exit;
+                }
+
+                /* check if we can reuse context already exists */
+                for (c = 0; c < num_ctx; ++c)
+                        if (ctxs[c].cluster == socket &&
+                            ctxs[c].rmid <= item->u.mon->max_rmid)
+                                ctx = &ctxs[c];
+                if (ctx != NULL) {
+                        ret = iordt_mon_assoc_write(channel_id, ctx->rmid);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto hw_mon_start_channels_exit;
+                        continue;
+                }
+
+                ctx = &ctxs[num_ctx++];
+                ctx->cluster = socket;
+
+                ret = pqos_cpu_get_one_core(cpu, ctx->cluster, &ctx->lcore);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_start_channels_exit;
+
+                ret = hw_mon_assoc_unused(ctx, event, 0, item->u.mon->max_rmid,
+                                          opt);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_start_channels_exit;
+
+                ret = iordt_mon_assoc_write(channel_id, ctx->rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_mon_start_channels_exit;
+        }
+
+        /* shrink memory used by ctx */
+        /* ignore scan-build false positives due to realloc use */
+#ifndef __clang_analyzer__
+        {
+                struct pqos_mon_poll_ctx *ctxs_ptr =
+                    (struct pqos_mon_poll_ctx *)realloc(
+                        ctxs, num_ctx * sizeof(*ctxs));
+
+                if (ctxs_ptr == NULL) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto hw_mon_start_channels_exit;
+                }
+
+                ctxs = ctxs_ptr;
+        }
+#endif
+
+        /* Fill in the monitoring group structure */
+        group->event = event;
+        group->context = context;
+        group->num_channels = num_channels;
+        group->channels =
+            (pqos_channel_t *)malloc(sizeof(group->channels[0]) * num_channels);
+        if (group->channels == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto hw_mon_start_channels_exit;
+        }
+        for (i = 0; i < group->num_channels; i++)
+                group->channels[i] = channels[i];
+
+        group->intl->hw.num_ctx = num_ctx;
+        group->intl->hw.ctx = ctxs;
+        group->intl->hw.event |= req_events;
+
+hw_mon_start_channels_exit:
+        if (ret != PQOS_RETVAL_OK) {
+                if (ctxs != NULL) {
+                        /* Assign channels back to RMID0 */
+                        for (i = 0; i < num_channels; ++i) {
+                                const pqos_channel_t channel_id = channels[i];
+
+                                iordt_mon_assoc_write(channel_id, RMID0);
+                        }
+                        free(ctxs);
+                }
+                if (group->channels != NULL)
+                        free(group->channels);
+        }
+
+        return ret;
+}
+
+int
 hw_mon_stop(struct pqos_mon_data *group)
 {
         int ret = PQOS_RETVAL_OK;
@@ -1116,11 +1525,18 @@ hw_mon_stop(struct pqos_mon_data *group)
 
         ASSERT(group != NULL);
 
-        if (group->num_cores == 0 && group->intl->uncore.num_sockets == 0) {
+        if ((group->num_cores == 0 && group->num_channels == 0 &&
+             group->intl->uncore.num_sockets == 0))
                 return PQOS_RETVAL_PARAM;
-        } else if (group->num_cores > 0 &&
-                   (group->cores == NULL || group->intl->hw.num_ctx == 0 ||
-                    group->intl->hw.ctx == NULL))
+        if (group->num_cores != 0 && group->cores == NULL)
+                return PQOS_RETVAL_PARAM;
+        if (group->num_channels != 0 && group->channels == NULL)
+                return PQOS_RETVAL_PARAM;
+        if (group->intl->uncore.num_sockets != 0 &&
+            group->intl->uncore.sockets == NULL)
+                return PQOS_RETVAL_PARAM;
+        if ((group->num_cores > 0 || group->num_channels > 0) &&
+            (group->intl->hw.num_ctx == 0 || group->intl->hw.ctx == NULL))
                 return PQOS_RETVAL_PARAM;
 
         for (i = 0; i < group->intl->hw.num_ctx; i++) {
@@ -1129,6 +1545,9 @@ hw_mon_stop(struct pqos_mon_data *group)
                  */
                 const unsigned lcore = group->intl->hw.ctx[i].lcore;
                 pqos_rmid_t rmid = RMID0;
+
+                if (!group->num_cores)
+                        break;
 
                 ret = pqos_cpu_check_core(cpu, lcore);
                 if (ret != PQOS_RETVAL_OK)
@@ -1142,14 +1561,21 @@ hw_mon_stop(struct pqos_mon_data *group)
                                  lcore, group->intl->hw.ctx[i].rmid, rmid);
         }
 
-        for (i = 0; i < group->num_cores; i++) {
-                /**
-                 * Associate cores from the group back with RMID0
-                 */
-                ret = hw_mon_assoc_write(group->cores[i], RMID0);
-                if (ret != PQOS_RETVAL_OK)
-                        retval = PQOS_RETVAL_RESOURCE;
-        }
+        /* Associate cores from the group back with RMID0 */
+        if (group->cores != NULL)
+                for (i = 0; i < group->num_cores; ++i) {
+                        ret = hw_mon_assoc_write(group->cores[i], RMID0);
+                        if (ret != PQOS_RETVAL_OK)
+                                retval = PQOS_RETVAL_RESOURCE;
+                }
+
+        /* Associate channels from the group back with RMID0 */
+        if (group->channels != NULL)
+                for (i = 0; i < group->num_channels; ++i) {
+                        ret = iordt_mon_assoc_write(group->channels[i], RMID0);
+                        if (ret != PQOS_RETVAL_OK)
+                                retval = PQOS_RETVAL_RESOURCE;
+                }
 
         /* stop perf counters */
         ret = hw_mon_stop_perf(group);
@@ -1164,7 +1590,10 @@ hw_mon_stop(struct pqos_mon_data *group)
         /**
          * Free poll contexts, core list and clear the group structure
          */
-        free(group->cores);
+        if (group->cores != NULL)
+                free(group->cores);
+        if (group->channels != NULL)
+                free(group->channels);
         free(group->intl->hw.ctx);
 
         return retval;
@@ -1208,7 +1637,7 @@ hw_mon_read_counter(struct pqos_mon_data *group,
 
         switch (event) {
         case PQOS_MON_EVENT_L3_OCCUP:
-                pv->llc = scale_event(PQOS_MON_EVENT_L3_OCCUP, value);
+                pv->llc = scale_event(event, value);
                 break;
         case PQOS_MON_EVENT_LMEM_BW:
                 if (pmon->counter_length == 32 && pv->mbm_local > value)

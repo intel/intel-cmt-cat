@@ -35,6 +35,10 @@
 
 #include "monitoring.h"
 
+int __wrap_pqos_mon_init(const struct pqos_cpuinfo *cpu,
+                         const struct pqos_cap *cap,
+                         const struct pqos_config *cfg);
+int __wrap_pqos_mon_fini(void);
 int __wrap_pqos_mon_poll_events(struct pqos_mon_data *group);
 int __wrap_resctrl_mon_active(unsigned *monitoring_status);
 

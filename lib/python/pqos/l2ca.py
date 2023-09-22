@@ -43,6 +43,7 @@ from pqos.common import pqos_handle_error, COSBase
 from pqos.native_struct import CPqosL2Ca
 from pqos.pqos import Pqos
 
+
 class PqosCatL2(object):
     "PQoS L2 Cache Allocation Technology"
 

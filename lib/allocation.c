@@ -43,6 +43,7 @@
 #include "cap.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "iordt.h"
 #include "log.h"
 #include "machine.h"
 #include "os_allocation.h"
@@ -1315,6 +1316,45 @@ hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
 }
 
 int
+hw_alloc_reset_l3iordt(const unsigned l3cat_id_num,
+                       const unsigned *l3cat_ids,
+                       const int enable)
+{
+        unsigned j = 0;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+
+        ASSERT(l3cat_id_num > 0 && l3cat_ids != NULL);
+
+        LOG_INFO("%s L3 I/O RDT across sockets...\n",
+                 (enable) ? "Enabling" : "Disabling");
+
+        for (j = 0; j < l3cat_id_num; j++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+                int ret = PQOS_RETVAL_OK;
+
+                ret = pqos_cpu_get_one_by_l3cat_id(cpu, l3cat_ids[j], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                ret = msr_read(core, PQOS_MSR_L3_IO_QOS_CFG, &reg);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                if (enable)
+                        reg |= PQOS_MSR_L3_IO_QOS_CA_EN;
+                else
+                        reg &= ~PQOS_MSR_L3_IO_QOS_CA_EN;
+
+                ret = msr_write(core, PQOS_MSR_L3_IO_QOS_CFG, reg);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
 hw_alloc_reset_l2cdp(const unsigned l2id_num,
                      const unsigned *l2ids,
                      const int enable)
@@ -1376,13 +1416,56 @@ int
 hw_alloc_reset_assoc(void)
 {
         int ret = PQOS_RETVAL_OK;
-        unsigned i;
+        int retval;
+
+        retval = hw_alloc_reset_assoc_cores();
+        if (retval != PQOS_RETVAL_OK)
+                ret = retval;
+
+        retval = hw_alloc_reset_assoc_channels();
+        if (retval != PQOS_RETVAL_OK)
+                ret = retval;
+
+        return ret;
+}
+
+int
+hw_alloc_reset_assoc_cores(void)
+{
+        int ret = PQOS_RETVAL_OK;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        unsigned i;
 
         for (i = 0; i < cpu->num_cores; i++)
                 if (hw_alloc_assoc_write(cpu->cores[i].lcore, 0) !=
                     PQOS_RETVAL_OK)
                         ret = PQOS_RETVAL_ERROR;
+
+        return ret;
+}
+
+int
+hw_alloc_reset_assoc_channels(void)
+{
+        int ret = PQOS_RETVAL_OK;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_devinfo *dev = _pqos_get_dev();
+        int iordt_enabled;
+        int iordt_supported;
+
+        ret = pqos_l3ca_iordt_enabled(cap, &iordt_supported, &iordt_enabled);
+        /* If L3CA not supported */
+        if (ret == PQOS_RETVAL_RESOURCE)
+                return PQOS_RETVAL_OK;
+        else if (ret != PQOS_RETVAL_OK)
+                return ret;
+        else if (!iordt_supported || !iordt_enabled)
+                return PQOS_RETVAL_OK;
+
+        if (dev == NULL)
+                return PQOS_RETVAL_OK;
+
+        ret = iordt_assoc_reset(dev);
 
         return ret;
 }
@@ -1407,8 +1490,8 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         unsigned max_l3_cos = 0;
         unsigned max_l2_cos = 0;
         unsigned j;
-        int cdp_supported;
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
+        enum pqos_iordt_config l3_iordt_cfg = PQOS_REQUIRE_IORDT_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
 
@@ -1427,6 +1510,7 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
 
         if (cfg != NULL) {
                 l3_cdp_cfg = cfg->l3_cdp;
+                l3_iordt_cfg = cfg->l3_iordt;
                 l2_cdp_cfg = cfg->l2_cdp;
                 mba_cfg = cfg->mba;
         }
@@ -1460,6 +1544,13 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 ret = PQOS_RETVAL_RESOURCE;
                 goto pqos_alloc_reset_exit;
         }
+        /* Check L3 I/O RDT requested while not present */
+        if (l3_cap == NULL && l3_iordt_cfg != PQOS_REQUIRE_IORDT_ANY) {
+                LOG_ERROR(
+                    "L3 I/O RDT setting requested but no L3 CAT present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_alloc_reset_exit;
+        }
         /* Check L2 CDP requested while not present */
         if (l2_cap == NULL && l2_cdp_cfg != PQOS_REQUIRE_CDP_ANY) {
                 LOG_ERROR("L2 CDP setting requested but no L2 CAT present!\n");
@@ -1473,13 +1564,17 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 goto pqos_alloc_reset_exit;
         }
         if (l3_cap != NULL) {
-                ret = pqos_l3ca_cdp_enabled(cap, &cdp_supported, NULL);
-                if (ret != PQOS_RETVAL_OK)
-                        goto pqos_alloc_reset_exit;
-
                 /* Check against erroneous L3 CDP request */
-                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !cdp_supported) {
+                if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
                         LOG_ERROR("L3 CAT/CDP requested but not supported by "
+                                  "the platform!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto pqos_alloc_reset_exit;
+                }
+
+                /* Check against erroneous L3 I/O RDT request */
+                if (l3_iordt_cfg == PQOS_REQUIRE_IORDT_ON && !l3_cap->iordt) {
+                        LOG_ERROR("L3 I/O RDT requested but not supported by "
                                   "the platform!\n");
                         ret = PQOS_RETVAL_PARAM;
                         goto pqos_alloc_reset_exit;
@@ -1491,12 +1586,8 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                         max_l3_cos = max_l3_cos * 2;
         }
         if (l2_cap != NULL) {
-                ret = pqos_l2ca_cdp_enabled(cap, &cdp_supported, NULL);
-                if (ret != PQOS_RETVAL_OK)
-                        goto pqos_alloc_reset_exit;
-
                 /* Check against erroneous L2 CDP request */
-                if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON && !cdp_supported) {
+                if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l2_cap->cdp) {
                         LOG_ERROR("L2 CAT/CDP requested but not supported by "
                                   "the platform!\n");
                         ret = PQOS_RETVAL_PARAM;
@@ -1635,6 +1726,43 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         }
 
         /**
+         * Turn L3 I/O RDT ON or OFF upon the request
+         */
+        if (l3_cap != NULL) {
+                if (l3_iordt_cfg == PQOS_REQUIRE_IORDT_ON &&
+                    !l3_cap->iordt_on) {
+                        /**
+                         * Turn on L3 CDP
+                         */
+                        LOG_INFO("Turning L3 I/O RDT ON ...\n");
+                        ret =
+                            hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 1);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("L3 I/O RDT enable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+
+                        /* reset channel assoc - initialize mmio tables */
+                        ret = hw_alloc_reset_assoc_channels();
+                }
+
+                if (l3_iordt_cfg == PQOS_REQUIRE_IORDT_OFF &&
+                    l3_cap->iordt_on) {
+                        /**
+                         * Turn off L3 CDP
+                         */
+                        LOG_INFO("Turning L3 I/O RDT OFF ...\n");
+                        ret =
+                            hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 0);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("L3 I/O RDT disable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+                }
+                _pqos_cap_l3iordt_change(l3_iordt_cfg);
+        }
+
+        /**
          * Turn L2 CDP ON or OFF upon the request
          */
         if (l2_cap != NULL) {
@@ -1687,4 +1815,90 @@ alloc_is_bitmask_contiguous(uint64_t bitmask)
                 bitmask >>= 1;
 
         return (bitmask) ? 0 : 1; /**< non-zero bitmask is not contiguous */
+}
+
+int
+hw_alloc_assoc_get_channel(const pqos_channel_t channel, unsigned *class_id)
+{
+        ASSERT(channel != 0);
+        ASSERT(class_id != NULL);
+
+        const struct pqos_sysconfig *sys = _pqos_get_sysconfig();
+
+        if (!sys || !sys->cap || !sys->dev)
+                return PQOS_RETVAL_ERROR;
+
+        int iordt_enabled;
+        int ret = pqos_l3ca_iordt_enabled(sys->cap, NULL, &iordt_enabled);
+
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (!iordt_enabled) {
+                LOG_ERROR("I/O RDT is unsupported or disabled!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        size_t i;
+
+        for (i = 0; i < sys->dev->num_channels; ++i) {
+                if (sys->dev->channels[i].channel_id != channel)
+                        continue;
+
+                if (!sys->dev->channels[i].clos_tagging)
+                        break;
+
+                return iordt_assoc_read(channel, class_id);
+        }
+
+        return PQOS_RETVAL_PARAM;
+}
+
+int
+hw_alloc_assoc_set_channel(const pqos_channel_t channel,
+                           const unsigned class_id)
+{
+        size_t i;
+        const struct pqos_sysconfig *sys = _pqos_get_sysconfig();
+
+        ASSERT(channel != 0);
+
+        if (!sys || !sys->cap || !sys->dev)
+                return PQOS_RETVAL_ERROR;
+
+        int iordt_enabled;
+        int ret = pqos_l3ca_iordt_enabled(sys->cap, NULL, &iordt_enabled);
+
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (!iordt_enabled) {
+                LOG_ERROR("I/O RDT is unsupported or disabled!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        unsigned num_l3_cos = 0;
+        const struct pqos_cap *cap = _pqos_get_cap();
+
+        ret = pqos_l3ca_get_cos_num(cap, &num_l3_cos);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                return ret;
+
+        if (class_id != 0 && class_id >= num_l3_cos)
+                /* class_id is out of bounds */
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < sys->dev->num_channels; ++i) {
+                if (sys->dev->channels[i].channel_id != channel)
+                        continue;
+
+                struct pqos_channel chan = sys->dev->channels[i];
+
+                if (!chan.clos_tagging)
+                        break;
+
+                return iordt_assoc_write(channel, class_id);
+        }
+
+        return PQOS_RETVAL_PARAM;
 }

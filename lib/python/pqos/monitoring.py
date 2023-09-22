@@ -40,9 +40,10 @@ import ctypes
 
 from pqos.common import pqos_handle_error
 from pqos.native_struct import (
-    CPqosEventValues, CPqosMonitor, RmidT
+    CPqosEventValues, CPqosMonitor, PqosChannelT, RmidT
 )
 from pqos.pqos import Pqos
+
 
 class CPqosMonData(ctypes.Structure):
     """
@@ -62,12 +63,13 @@ class CPqosMonData(ctypes.Structure):
         ('tid_map', ctypes.POINTER(ctypes.c_uint)),
         ('cores', ctypes.POINTER(ctypes.c_uint)),
         ('num_cores', ctypes.c_uint),
+        ('channels', ctypes.POINTER(PqosChannelT)),
+        ('num_channels', ctypes.c_uint),
         ('intl', ctypes.c_void_p)
     ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.pqos = Pqos()
 
     def stop(self):
         """
@@ -75,7 +77,7 @@ class CPqosMonData(ctypes.Structure):
         """
 
         ref = self.get_ref()
-        ret = self.pqos.lib.pqos_mon_stop(ref)
+        ret = Pqos().lib.pqos_mon_stop(ref)
         pqos_handle_error('pqos_mon_stop', ret)
 
     def add_pids(self, pids):
@@ -85,7 +87,7 @@ class CPqosMonData(ctypes.Structure):
         ref = self.get_ref()
         num_pids = len(pids)
         pids_arr = (ctypes.c_uint * num_pids)(*pids)
-        ret = self.pqos.lib.pqos_mon_add_pids(num_pids, pids_arr, ref)
+        ret = Pqos().lib.pqos_mon_add_pids(num_pids, pids_arr, ref)
         pqos_handle_error('pqos_mon_add_pids', ret)
 
     def remove_pids(self, pids):
@@ -95,7 +97,7 @@ class CPqosMonData(ctypes.Structure):
         ref = self.get_ref()
         num_pids = len(pids)
         pids_arr = (ctypes.c_uint * num_pids)(*pids)
-        ret = self.pqos.lib.pqos_mon_remove_pids(num_pids, pids_arr, ref)
+        ret = Pqos().lib.pqos_mon_remove_pids(num_pids, pids_arr, ref)
         pqos_handle_error('pqos_mon_remove_pids', ret)
 
     def get_ref(self):
@@ -125,7 +127,8 @@ class CPqosMonData(ctypes.Structure):
             'tmem_bw': 'mbm_total_delta',
             'rmem_bw': 'mbm_remote_delta',
             'perf_ipc': 'ipc',
-            'perf_llc_miss': 'llc_misses_delta'
+            'perf_llc_miss': 'llc_misses_delta',
+            'perf_llc_ref': 'llc_references_delta'
         }
 
         counter = event_counter_map.get(event)
@@ -144,6 +147,7 @@ def _get_event_mask(events):
         'tmem_bw': CPqosMonitor.PQOS_MON_EVENT_TMEM_BW,
         'rmem_bw': CPqosMonitor.PQOS_MON_EVENT_RMEM_BW,
         'perf_llc_miss': CPqosMonitor.PQOS_PERF_EVENT_LLC_MISS,
+        'perf_llc_ref': CPqosMonitor.PQOS_PERF_EVENT_LLC_REF,
         'perf_ipc': CPqosMonitor.PQOS_PERF_EVENT_IPC
     }
 
@@ -168,6 +172,19 @@ class PqosMon:
         ret = self.pqos.lib.pqos_mon_reset()
         pqos_handle_error('pqos_mon_reset', ret)
 
+    def reset_config(self, cfg):
+        """
+        Resets monitoring configuration.
+        As part of monitoring reset I/O RDT reconfiguration can be performed.
+
+        Parameters:
+            cfg: CPqosMonConfig object
+        """
+
+        cfg_ptr = ctypes.pointer(cfg)
+        ret = self.pqos.lib.pqos_mon_reset_config(cfg_ptr)
+        pqos_handle_error('pqos_mon_reset_config', ret)
+
     def assoc_get(self, core):
         """
         Reads associated RMID for a given core.
@@ -185,6 +202,53 @@ class PqosMon:
         pqos_handle_error('pqos_mon_assoc_get', ret)
         return rmid.value
 
+    def assoc_get_channel(self, channel_id):
+        """
+        Reads RMID association of a specified channel.
+
+        Parameters:
+            channel_id: control channel
+
+        Returns:
+            associated RMID
+        """
+
+        func_name = 'pqos_mon_assoc_get_channel'
+        func = getattr(self.pqos.lib, func_name)
+        func.restype = ctypes.c_int
+        func.argtypes = [PqosChannelT, ctypes.POINTER(RmidT)]
+        rmid = RmidT(0)
+        rmid_ref = ctypes.byref(rmid)
+        ret = func(channel_id, rmid_ref)
+        pqos_handle_error(func_name, ret)
+        return rmid.value
+
+    def assoc_get_dev(self, segment, bdf, virtual_channel):
+        """
+        Reads RMID association of device channel.
+
+        Parameters:
+            segment: device segment/domain
+            bdf: device ID
+            virtual_channel: device virtual channel
+
+        Returns:
+            associated RMID
+        """
+
+        func_name = 'pqos_mon_assoc_get_dev'
+        func = getattr(self.pqos.lib, func_name)
+        func.restype = ctypes.c_int
+        func.argtypes = [
+            ctypes.c_uint16, ctypes.c_uint16, ctypes.c_uint,
+            ctypes.POINTER(RmidT)
+        ]
+        rmid = RmidT(0)
+        rmid_ref = ctypes.byref(rmid)
+        ret = func(segment, bdf, virtual_channel, rmid_ref)
+        pqos_handle_error(func_name, ret)
+        return rmid.value
+
     def start(self, cores, events, context=None):
         """
         Starts resource monitoring on selected group of cores.
@@ -192,22 +256,36 @@ class PqosMon:
         Parameters:
             cores: a list of core IDs
             events: a list of events, available options: 'l3_occup', 'lmem_bw',
-                    'tmem_bw', 'rmem_bw', 'perf_llc_miss', 'perf_ipc'
+                    'tmem_bw', 'rmem_bw', 'perf_llc_miss', 'perf_ipc', 'perf_llc_ref'
             context: a pointer to additional information, by default None
 
         Returns:
             CPqosMonData monitoring data
         """
+        return self.start_cores(cores, events, context)
 
-        group = CPqosMonData()
-        group_ref = group.get_ref()
+    def start_cores(self, cores, events, context=None):
+        """
+        Starts resource monitoring on selected group of cores.
+
+        Parameters:
+            cores: a list of core IDs
+            events: a list of events, available options: 'l3_occup', 'lmem_bw',
+                    'tmem_bw', 'rmem_bw', 'perf_llc_miss', 'perf_ipc', 'perf_llc_ref'
+            context: a pointer to additional information, by default None
+
+        Returns:
+            CPqosMonData monitoring data
+        """
+        group = ctypes.POINTER(CPqosMonData)()
         num_cores = len(cores)
         cores_arr = (ctypes.c_uint * num_cores)(*cores)
         event = _get_event_mask(events)
-        ret = self.pqos.lib.pqos_mon_start(num_cores, cores_arr, event, context,
-                                           group_ref)
+        ret = self.pqos.lib.pqos_mon_start_cores(num_cores, cores_arr, event, context,
+                                                 ctypes.byref(group))
         pqos_handle_error('pqos_mon_start', ret)
-        return group
+        return group.contents
+
 
     def start_pids(self, pids, events, context=None):
         """
@@ -223,15 +301,81 @@ class PqosMon:
             CPqosMonData monitoring data
         """
 
-        group = CPqosMonData()
-        group_ref = group.get_ref()
+        group = ctypes.POINTER(CPqosMonData)()
         num_pids = len(pids)
         pids_arr = (ctypes.c_uint * num_pids)(*pids)
         event = _get_event_mask(events)
-        ret = self.pqos.lib.pqos_mon_start_pids(num_pids, pids_arr, event,
-                                                context, group_ref)
+        ret = self.pqos.lib.pqos_mon_start_pids2(num_pids, pids_arr, event,
+                                                 context, ctypes.byref(group))
         pqos_handle_error('pqos_mon_start_pids', ret)
-        return group
+        return group.contents
+
+    def start_channels(self, channels, events, context=None):
+        """
+        Starts resource monitoring on selected group of channels.
+
+        Parameters:
+            channels: a list of channel IDs
+            events: a list of events, available options: 'l3_occup', 'lmem_bw',
+                    'tmem_bw', 'rmem_bw', 'perf_llc_miss', 'perf_ipc'
+            context: a pointer to additional information, by default None
+
+        Returns:
+            CPqosMonData monitoring data
+        """
+
+        func_name = 'pqos_mon_start_channels'
+        func = getattr(self.pqos.lib, func_name)
+        func.restype = ctypes.c_int
+        func.argtypes = [
+            ctypes.c_uint,
+            ctypes.POINTER(PqosChannelT),
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.POINTER(CPqosMonData)
+        ]
+
+        group = ctypes.POINTER(CPqosMonData)()
+        num_channels = len(channels)
+        channels_arr = (PqosChannelT * num_channels)(*channels)
+        event = _get_event_mask(events)
+        ret = func(num_channels, channels_arr, event, context, ctypes.byref(group))
+        pqos_handle_error(func_name, ret)
+        return group.contents
+
+    def start_dev(self, segment, bdf, virtual_channel, events, context=None):
+        # pylint: disable=too-many-arguments
+        """
+        Starts resource monitoring on selected device channel.
+
+        Parameters:
+            segment: device segment/domain
+            bdf: device ID
+            virtual_channel: device virtual channel
+            events: a list of events, available options: 'l3_occup', 'lmem_bw',
+                    'tmem_bw', 'rmem_bw', 'perf_llc_miss', 'perf_ipc'
+            context: a pointer to additional information, by default None
+
+        Returns:
+            CPqosMonData monitoring data
+        """
+
+        func_name = 'pqos_mon_start_dev'
+        func = getattr(self.pqos.lib, func_name)
+        func.argtypes = [
+            ctypes.c_uint16,
+            ctypes.c_uint16,
+            ctypes.c_uint8,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.POINTER(CPqosMonData)
+        ]
+
+        group = ctypes.POINTER(CPqosMonData)()
+        event = _get_event_mask(events)
+        ret = func(segment, bdf, virtual_channel, event, context, ctypes.byref(group))
+        pqos_handle_error(func_name, ret)
+        return group.contents
 
     def poll(self, groups):
         """

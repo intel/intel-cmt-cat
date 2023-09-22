@@ -84,4 +84,30 @@ pqos_mon_start_cores_ext(const unsigned num_cores,
                          struct pqos_mon_data **group,
                          const struct pqos_mon_options *opt);
 
+/**
+ * @brief Starts resource monitoring on selected group of channels
+ *
+ * The function sets up content of the \a group structure.
+ *
+ * @param [in] num_channels number of channels in \a channels array
+ * @param [in] channels array of channel id's
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [out] group a pointer to monitoring structure
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+#ifndef PQOS_RMID_CUSTOM
+__attribute__((visibility("hidden")))
+#endif /* PQOS_RMID_CUSTOM */
+int
+pqos_mon_start_channels_ext(const unsigned num_channels,
+                            const pqos_channel_t *channels,
+                            const enum pqos_mon_event event,
+                            void *context,
+                            struct pqos_mon_data **group,
+                            const struct pqos_mon_options *opt);
+
 #endif /* __PQOS_INTERNAL_H__ */

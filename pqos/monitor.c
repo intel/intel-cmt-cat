@@ -50,6 +50,7 @@
 #include <ctype.h>  /**< isspace() */
 #include <dirent.h> /**< for dir list*/
 #include <fcntl.h>
+#include <inttypes.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,6 +119,17 @@ enum mon_group_type {
         MON_GROUP_TYPE_CORE = 0x1,
         MON_GROUP_TYPE_PID = 0x2,
         MON_GROUP_TYPE_UNCORE = 0x4,
+        MON_GROUP_TYPE_CHANNEL = 0x8,
+        MON_GROUP_TYPE_DEVICE = 0x10,
+};
+
+union pqos_device {
+        uint64_t raw;
+        struct __attribute__((__packed__)) {
+                uint16_t segment;
+                uint16_t bdf;
+                uint32_t vc;
+        };
 };
 
 /**
@@ -134,10 +146,11 @@ static struct mon_group {
         union {
                 unsigned *cores;
                 pid_t *pids;
+                pqos_channel_t *channels;
+                union pqos_device *devices;
                 unsigned *sockets;
                 void *generic_res;
         };
-
         unsigned num_res;
 
 #ifdef PQOS_RMID_CUSTOM
@@ -217,6 +230,13 @@ struct slist {
  */
 static enum monitor_llc_format sel_llc_format = LLC_FORMAT_KILOBYTES;
 
+/**
+ * @brief Check to determine if processes are monitored
+ *
+ * @return Process monitoring mode status
+ * @retval 0 not monitoring processes
+ * @retval 1 monitoring processes
+ */
 int
 monitor_process_mode(void)
 {
@@ -227,6 +247,13 @@ int
 monitor_core_mode(void)
 {
         return (sel_monitor_type == MON_GROUP_TYPE_CORE);
+}
+
+int
+monitor_iordt_mode(void)
+{
+        return (sel_monitor_type == MON_GROUP_TYPE_CHANNEL ||
+                sel_monitor_type == MON_GROUP_TYPE_DEVICE);
 }
 
 int
@@ -249,6 +276,25 @@ uinttostr(const unsigned val)
         char buf[16], *str = NULL;
 
         (void)monitor_utils_uinttostr(buf, sizeof(buf), val);
+        selfn_strdup(&str, buf);
+
+        return str;
+}
+
+/**
+ * @brief Function to safely translate an unsigned int
+ *        value to a hex string
+ *
+ * @param val value to be translated
+ *
+ * @return Pointer to allocated string
+ */
+static char *
+uinttohexstr(const unsigned val)
+{
+        char buf[16], *str = NULL;
+
+        (void)monitor_utils_uinttohexstr(buf, sizeof(buf), val);
         selfn_strdup(&str, buf);
 
         return str;
@@ -278,8 +324,6 @@ grp_set_core(struct mon_group *cg,
         ASSERT(desc != NULL);
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
-
-        memset(cg, 0, sizeof(*cg));
 
         cg->type = MON_GROUP_TYPE_CORE;
         cg->desc = desc;
@@ -323,8 +367,6 @@ grp_set_pid(struct mon_group *pg,
         ASSERT(pids != NULL);
         ASSERT(num_pids > 0);
 
-        memset(pg, 0, sizeof(*pg));
-
         pg->type = MON_GROUP_TYPE_PID;
         pg->desc = desc;
         pg->pids = malloc(sizeof(*pg->pids) * num_pids);
@@ -342,7 +384,6 @@ grp_set_pid(struct mon_group *pg,
 
         return 0;
 }
-
 /**
  * @brief Function to set uncore group values
  *
@@ -355,6 +396,7 @@ grp_set_pid(struct mon_group *pg,
  * @retval 0 on success
  * @retval -1 on error
  */
+
 static int
 grp_set_uncore(struct mon_group *group,
                char *desc,
@@ -367,8 +409,6 @@ grp_set_uncore(struct mon_group *group,
         ASSERT(desc != NULL);
         ASSERT(sockets != NULL);
         ASSERT(num_socktets > 0);
-
-        memset(group, 0, sizeof(*group));
 
         group->type = MON_GROUP_TYPE_UNCORE;
         group->desc = desc;
@@ -384,6 +424,89 @@ grp_set_uncore(struct mon_group *group,
          */
         for (i = 0; i < num_socktets; i++)
                 group->sockets[i] = (unsigned)sockets[i];
+
+        return 0;
+}
+
+/**
+ * @brief Function to set channel group values
+ *
+ * @param chg pointer to channel_group structure
+ * @param desc string containing channel group description
+ * @param channels pointer to table of channel values
+ * @param num_channels number of channels contained in the table
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+static int
+grp_set_channel(struct mon_group *chp,
+                char *desc,
+                const uint64_t *channels,
+                const int num_channels)
+{
+        int i;
+
+        ASSERT(chp != NULL);
+        ASSERT(desc != NULL);
+        ASSERT(channels != NULL);
+        ASSERT(num_channels > 0);
+
+        chp->type = MON_GROUP_TYPE_CHANNEL;
+        chp->desc = desc;
+        chp->channels = malloc(sizeof(pqos_channel_t) * num_channels);
+        if (chp->channels == NULL) {
+                printf("Error allocating channel group table\n");
+                return -1;
+        }
+        chp->num_res = num_channels;
+
+        /**
+         * Transfer channels from buffer to table
+         */
+        for (i = 0; i < num_channels; i++)
+                chp->channels[i] = (pqos_channel_t)channels[i];
+
+        return 0;
+}
+
+/**
+ * @brief Function to set device group values
+ *
+ * @param chg pointer to channel_group structure
+ * @param desc string containing channel group description
+ * @param [in] devices Device Id
+ * @param [in] num_devices Number of devices
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+static int
+grp_set_device(struct mon_group *grp,
+               char *desc,
+               const uint64_t *devices,
+               const int num_devices)
+{
+        int i;
+
+        ASSERT(grp != NULL);
+        ASSERT(desc != NULL);
+        ASSERT(devices != NULL);
+        ASSERT(num_devices > 0);
+
+        grp->type = MON_GROUP_TYPE_DEVICE;
+        grp->desc = desc;
+        grp->devices = malloc(sizeof(union pqos_device) * num_devices);
+        if (grp->channels == NULL) {
+                printf("Error allocating device group table\n");
+                return -1;
+        }
+        grp->num_res = num_devices;
+
+        for (i = 0; i < num_devices; i++)
+                grp->devices[i].raw = devices[i];
 
         return 0;
 }
@@ -506,6 +629,7 @@ grp_cmp_uncore(const struct mon_group *cg_a, const struct mon_group *cg_b)
                         if (tab_a[i] == tab_b[j])
                                 found++;
         }
+
         /* if no cores are the same */
         if (!found)
                 return 0;
@@ -517,6 +641,102 @@ grp_cmp_uncore(const struct mon_group *cg_a, const struct mon_group *cg_b)
 }
 
 /**
+ * @brief Function to compare channels in 2 channel groups
+ *
+ * This function takes 2 channel groups and compares their channel values
+ *
+ * @param cg_a pointer to channel group a
+ * @param cg_b pointer to channel group b
+ *
+ * @return Whether both groups contain some/none/all of the same channel
+ * @retval 1 if both groups contain the same channels
+ * @retval 0 if none of their channel match
+ * @retval -1 if some but not all channels match
+ */
+static int
+grp_cmp_channel(const struct mon_group *cg_a, const struct mon_group *cg_b)
+{
+        int i, found = 0;
+
+        ASSERT(cg_a != NULL);
+        ASSERT(cg_b != NULL);
+
+        const int sz_a = cg_a->num_res;
+        const int sz_b = cg_b->num_res;
+        const pqos_channel_t *tab_a = cg_a->channels;
+        const pqos_channel_t *tab_b = cg_b->channels;
+
+        for (i = 0; i < sz_a; i++) {
+                int j;
+
+                for (j = 0; j < sz_b; j++)
+                        if (tab_a[i] == tab_b[j])
+                                found++;
+        }
+        /* if no channels are the same */
+        if (!found)
+                return 0;
+        /* if group contains same channels */
+        if (sz_a == sz_b && sz_b == found)
+                return 1;
+        /* if not all channels are the same */
+        return -1;
+}
+
+/**
+ * @brief Function to compare device in 2 device groups
+ *
+ * This function takes 2 device groups and compares their device values
+ *
+ * @param dg_a pointer to device group a
+ * @param dg_b pointer to device group b
+ *
+ * @return Whether both groups contain some/none/all of the same device and vc
+ * @retval 1 if both groups contain the same device and vc
+ * @retval 0 if none of their device match
+ * @retval -1 if some but not all devices' vc match
+ */
+static int
+grp_cmp_device(const struct mon_group *dg_a, const struct mon_group *dg_b)
+{
+        int i, found = 0;
+
+        ASSERT(dg_a != NULL);
+        ASSERT(dg_b != NULL);
+
+        const int sz_a = dg_a->num_res;
+        const int sz_b = dg_b->num_res;
+        const union pqos_device *tab_a = dg_a->devices;
+        const union pqos_device *tab_b = dg_b->devices;
+
+        for (i = 0; i < sz_a; i++) {
+                int j;
+
+                for (j = 0; j < sz_b; j++) {
+                        if (tab_a[i].segment != tab_b[j].segment)
+                                continue;
+                        if (tab_a[i].bdf != tab_b[j].bdf)
+                                continue;
+
+                        if (tab_a[i].vc == tab_b[j].vc)
+                                found++;
+                        else if (tab_a[i].vc == DEV_ALL_VCS ||
+                                 tab_b[j].vc == DEV_ALL_VCS)
+                                return -1;
+                }
+        }
+
+        /* if no devices are the same */
+        if (!found)
+                return 0;
+        /* if group contains same devices */
+        if (sz_a == sz_b && sz_b == found)
+                return 1;
+        /* if not all devices are the same */
+        return -1;
+}
+
+/*
  * @brief Function to compare resources in 2 groups
  *
  * @param grp_a pointer to group a
@@ -544,6 +764,12 @@ grp_cmp(const struct mon_group *grp_a, const struct mon_group *grp_b)
         case MON_GROUP_TYPE_UNCORE:
                 return grp_cmp_uncore(grp_a, grp_b);
                 break;
+        case MON_GROUP_TYPE_CHANNEL:
+                return grp_cmp_channel(grp_a, grp_b);
+                break;
+        case MON_GROUP_TYPE_DEVICE:
+                return grp_cmp_device(grp_a, grp_b);
+                break;
         }
 
         return -2;
@@ -565,6 +791,10 @@ grp_free(struct mon_group *grp)
                 free(grp->pids);
         else if (grp->type == MON_GROUP_TYPE_CORE)
                 free(grp->cores);
+        else if (grp->type == MON_GROUP_TYPE_CHANNEL)
+                free(grp->channels);
+        else if (grp->type == MON_GROUP_TYPE_DEVICE)
+                free(grp->devices);
         else if (grp->type == MON_GROUP_TYPE_UNCORE)
                 free(grp->sockets);
 #endif
@@ -579,9 +809,7 @@ grp_free(struct mon_group *grp)
  * @param res pointer to table of resource values
  * @param num_res number of resources contained in the table
  *
- * @return Operational status
- * @retval 0 on success
- * @retval -1 on error
+ * @return Pointer to added group
  */
 static struct mon_group *
 grp_add(enum mon_group_type type,
@@ -596,6 +824,7 @@ grp_add(enum mon_group_type type,
         struct mon_group new_grp;
 
         memset(&new_grp, 0, sizeof(new_grp));
+
         switch (type) {
         case MON_GROUP_TYPE_CORE:
                 sel_monitor_type |= MON_GROUP_TYPE_CORE;
@@ -604,6 +833,14 @@ grp_add(enum mon_group_type type,
         case MON_GROUP_TYPE_PID:
                 sel_monitor_type |= MON_GROUP_TYPE_PID;
                 ret = grp_set_pid(&new_grp, desc, res, num_res);
+                break;
+        case MON_GROUP_TYPE_CHANNEL:
+                sel_monitor_type |= MON_GROUP_TYPE_CHANNEL;
+                ret = grp_set_channel(&new_grp, desc, res, num_res);
+                break;
+        case MON_GROUP_TYPE_DEVICE:
+                sel_monitor_type |= MON_GROUP_TYPE_CHANNEL;
+                ret = grp_set_device(&new_grp, desc, res, num_res);
                 break;
         case MON_GROUP_TYPE_UNCORE:
                 sel_monitor_type |= MON_GROUP_TYPE_UNCORE;
@@ -645,6 +882,16 @@ grp_add(enum mon_group_type type,
                                 fprintf(stderr, "Error: cannot monitor same "
                                                 "pids in different groups\n");
                                 break;
+                        case MON_GROUP_TYPE_CHANNEL:
+                                fprintf(stderr,
+                                        "Error: cannot monitor same "
+                                        "channels in different groups\n");
+                                break;
+                        case MON_GROUP_TYPE_DEVICE:
+                                fprintf(stderr,
+                                        "Error: cannot monitor same "
+                                        "devices in different groups\n");
+                                break;
                         case MON_GROUP_TYPE_UNCORE:
                                 fprintf(stderr,
                                         "Error: cannot monitor same "
@@ -676,12 +923,66 @@ grp_add(enum mon_group_type type,
 }
 
 /**
+ * @brief Converts device monitoring group to channel
+ *
+ * @param type monitoring group type
+ * @param event monitoring event
+ * @param desc string containing group description
+ * @param res pointer to table of resource values
+ * @param num_res number of resources contained in the table
+ *
+ * @return Operational status
+ * @retval 0 on success
+ * @retval -1 on error
+ */
+static int
+grp_device_to_channel(struct mon_group *grp, const struct pqos_devinfo *devinfo)
+{
+        union pqos_device *devices = grp->devices;
+        pqos_channel_t *channels = NULL;
+        unsigned num_channels;
+
+        /* currently parser supports single device */
+        if (grp->num_res != 1)
+                return PQOS_RETVAL_PARAM;
+
+        if (devices->vc != DEV_ALL_VCS) {
+                channels = calloc(1, sizeof(*channels));
+                if (!channels) {
+                        printf("Error allocating memory\n");
+                        exit(EXIT_FAILURE);
+                }
+
+                num_channels = 1;
+                channels[0] = pqos_devinfo_get_channel_id(
+                    devinfo, devices->segment, devices->bdf, devices->vc);
+                if (channels[0] == 0) {
+                        free(channels);
+                        channels = NULL;
+                }
+
+        } else
+                channels = pqos_devinfo_get_channel_ids(
+                    devinfo, devices->segment, devices->bdf, &num_channels);
+
+        if (channels == NULL) {
+                printf("Failed to get channels for %s\n", grp->desc);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        grp->type = MON_GROUP_TYPE_CHANNEL;
+        grp->channels = channels;
+        grp->num_res = num_channels;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Common function to parse selected events
  *
  * @param str string of the event
  * @param evt pointer to the selected events so far
  */
-
 static void
 parse_event(const char *str, enum pqos_mon_event *evt)
 {
@@ -729,7 +1030,6 @@ parse_monitor_group(char *str, enum mon_group_type type)
         char *non_grp = NULL;
 
         parse_event(str, &evt);
-
         str = strchr(str, ':') + 1;
 
         while ((non_grp = strsep(&str, "[")) != NULL) {
@@ -746,12 +1046,19 @@ parse_monitor_group(char *str, enum mon_group_type type)
 
                         /* set group info */
                         for (i = 0; i < new_groups_count; i++) {
+                                char *desc;
                                 const struct mon_group *grp;
-                                char *desc = uinttostr((unsigned)cbuf[i]);
+
+                                if (type != MON_GROUP_TYPE_CHANNEL)
+                                        desc = uinttostr((unsigned)cbuf[i]);
+                                else
+                                        desc = uinttohexstr((unsigned)cbuf[i]);
 
                                 grp = grp_add(type, evt, desc, &cbuf[i], 1);
-                                if (grp == NULL)
+                                if (grp == NULL) {
+                                        free(desc);
                                         return -1;
+                                }
 
                                 group_count++;
                         }
@@ -962,11 +1269,13 @@ selfn_monitor_uncore(const char *arg)
  * @param [in] type monitoring group type
  * @param [in,out] events List of monitoring events
  * @param [in] cap_mon monitoring capability
+ * @param [in] iordt I/O rdt support required
  */
 static void
 monitor_setup_events(enum mon_group_type type,
                      enum pqos_mon_event *events,
-                     const struct pqos_capability *const cap_mon)
+                     const struct pqos_capability *const cap_mon,
+                     int iordt)
 {
         unsigned i;
         enum pqos_mon_event all_evts = (enum pqos_mon_event)0;
@@ -976,6 +1285,9 @@ monitor_setup_events(enum mon_group_type type,
          */
         for (i = 0; i < cap_mon->u.mon->num_events; i++) {
                 struct pqos_monitor *mon = &cap_mon->u.mon->events[i];
+
+                if (iordt && !mon->iordt)
+                        continue;
 
                 all_evts |= mon->type;
         }
@@ -995,8 +1307,8 @@ monitor_setup_events(enum mon_group_type type,
         if ((*events & PQOS_MON_EVENT_ALL) == PQOS_MON_EVENT_ALL) {
                 *events = (enum pqos_mon_event)(all_evts & *events);
 
-                /* Start IPC and LLC miss monitoring if available */
         } else {
+                /* Start IPC and LLC miss monitoring if available */
                 if (all_evts & PQOS_PERF_EVENT_IPC)
                         *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
                 if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
@@ -1008,10 +1320,14 @@ monitor_setup_events(enum mon_group_type type,
 
 int
 monitor_setup(const struct pqos_cpuinfo *cpu_info,
-              const struct pqos_capability *const cap_mon)
+              const struct pqos_capability *const cap_mon,
+              const struct pqos_devinfo *dev_info)
 {
         unsigned i;
         int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cpu_info != NULL);
+        ASSERT(cap_mon != NULL);
 
         /**
          * Check output file type
@@ -1052,7 +1368,7 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
         }
 
         /**
-         * If no cores and events selected through command line
+         * If no monitoring mode selected through command line
          * by default let's monitor all cores
          */
         if (sel_monitor_num == 0 && sel_monitor_type == 0) {
@@ -1069,6 +1385,7 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 exit(EXIT_FAILURE);
                         }
                 }
+
         } else if (sel_monitor_num == 0 &&
                    sel_monitor_type == MON_GROUP_TYPE_UNCORE) {
                 for (i = 0; i < cpu_info->num_cores; i++) {
@@ -1086,8 +1403,10 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
         }
         if (sel_monitor_type != MON_GROUP_TYPE_CORE &&
             sel_monitor_type != MON_GROUP_TYPE_PID &&
+            sel_monitor_type != MON_GROUP_TYPE_CHANNEL &&
+            sel_monitor_type != MON_GROUP_TYPE_DEVICE &&
             sel_monitor_type != MON_GROUP_TYPE_UNCORE) {
-                printf("Monitoring start error, process and core"
+                printf("Monitoring start error, process, core, channel/device"
                        " tracking can not be done simultaneously\n");
                 return -1;
         }
@@ -1095,7 +1414,15 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
         for (i = 0; i < sel_monitor_num; i++) {
                 struct mon_group *grp = &sel_monitor_group[i];
 
-                monitor_setup_events(grp->type, &grp->events, cap_mon);
+                /* Convert device group to channel group */
+                if (grp->type == MON_GROUP_TYPE_DEVICE) {
+                        ret = grp_device_to_channel(grp, dev_info);
+                        if (ret != PQOS_RETVAL_OK)
+                                break;
+                }
+
+                monitor_setup_events(grp->type, &grp->events, cap_mon,
+                                     monitor_iordt_mode());
 
                 if (grp->type == MON_GROUP_TYPE_CORE) {
                         /**
@@ -1144,6 +1471,32 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                         } else
                                 grp->started = 1;
 
+                } else if (grp->type == MON_GROUP_TYPE_CHANNEL) {
+                        /*
+                         * Make calls to pqos_mon_start_channels
+                         *  - track channels
+                         */
+#ifdef PQOS_RMID_CUSTOM
+                        ret = pqos_mon_start_channels_ext(
+                            grp->num_res, grp->channels, grp->events,
+                            (void *)grp->desc, &grp->data, &grp->opt);
+#else
+                        ret = pqos_mon_start_channels(
+                            grp->num_res, grp->channels, grp->events,
+                            (void *)grp->desc, &grp->data);
+#endif
+
+                        /*
+                         * Any problem with monitoring channels?
+                         */
+                        if (ret != PQOS_RETVAL_OK) {
+                                printf("Channel %s monitoring start error,"
+                                       "status %d\n",
+                                       grp->desc, ret);
+                                break;
+                        } else
+                                grp->started = 1;
+
                 } else if (grp->type == MON_GROUP_TYPE_UNCORE) {
                         ret = pqos_mon_start_uncore(
                             grp->num_res, grp->sockets, grp->events,
@@ -1168,6 +1521,7 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 continue;
                         pqos_mon_stop(grp->data);
                 }
+
                 return -1;
         }
         return 0;
@@ -1267,6 +1621,256 @@ selfn_monitor_pids(const char *arg)
                         break;
 
                 parse_monitor_pids(token);
+        }
+
+        free(cp);
+}
+
+/**
+ * @brief Verifies and translates monitoring config string into
+ *        internal channel monitoring configuration.
+ *
+ * @param str single channel string passed to --mon-channel command line option
+ */
+static void
+parse_monitor_channel(char *str)
+{
+        int ret = parse_monitor_group(str, MON_GROUP_TYPE_CHANNEL);
+
+        if (ret > 0)
+                return;
+        if (ret == 0)
+                parse_error(str, "No channel id selected for monitoring");
+
+        exit(EXIT_FAILURE);
+
+        return;
+}
+
+void
+selfn_monitor_channels(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+        char *saveptr = NULL;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&cp, arg);
+
+        for (str = cp;; str = NULL) {
+                char *token = NULL;
+
+                token = strtok_r(str, ";", &saveptr);
+                if (token == NULL)
+                        break;
+                parse_monitor_channel(token);
+        }
+
+        free(cp);
+}
+
+#ifdef PQOS_RMID_CUSTOM
+#define DEFAULT_TABLE_SIZE 128
+
+void
+selfn_monitor_rmid_channels(const char *arg)
+{
+        char *cp = NULL;
+        char *str = NULL;
+        char *saveptr = NULL;
+        uint64_t *channels = NULL;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&cp, arg);
+
+        for (str = cp;; str = NULL) {
+                char *token = NULL;
+                char *p = NULL;
+                pqos_rmid_t rmid;
+                unsigned count;
+                unsigned channel_list_size = DEFAULT_TABLE_SIZE;
+                char *desc = NULL;
+                struct mon_group *grp;
+
+                token = strtok_r(str, ";", &saveptr);
+                if (token == NULL)
+                        break;
+                if (channels == NULL) {
+                        channels = calloc(channel_list_size, sizeof(*channels));
+                        if (channels == NULL) {
+                                printf("Error with memory allocation!\n");
+                                goto error_exit;
+                        }
+                }
+                p = strchr(token, '=');
+                if (p == NULL)
+                        parse_error(str, "Invalid RMID association format");
+                *p = '\0';
+
+                rmid = (pqos_rmid_t)strtouint64(token);
+
+                selfn_strdup(&desc, p + 1);
+                count =
+                    strlisttotabrealloc(p + 1, &channels, &channel_list_size);
+                grp = grp_add(MON_GROUP_TYPE_CHANNEL, 0, desc, channels, count);
+                if (grp == NULL) {
+                        free(desc);
+                        goto error_exit;
+                }
+
+                grp->opt.rmid.type = PQOS_RMID_TYPE_MAP;
+                grp->opt.rmid.rmid = rmid;
+
+                free(channels);
+                channels = NULL;
+        }
+        free(cp);
+        return;
+error_exit:
+        if (channels != NULL)
+                free(channels);
+        free(cp);
+        exit(EXIT_FAILURE);
+}
+#endif
+
+/**
+ * @brief Verifies and translates monitoring config string into
+ *        internal device monitoring configuration.
+ *
+ * @param str single dev string passed to --mon-dev command line option
+ */
+static void
+parse_monitor_dev(char *str)
+{
+        uint16_t segment = 0;
+        uint16_t bus, device, function;
+        uint16_t bdf = 0;
+        unsigned vc = DEV_ALL_VCS; /* All channels by default */
+        enum pqos_mon_event evt = (enum pqos_mon_event)0;
+        char *desc = NULL;
+        char *p;
+
+        parse_event(str, &evt);
+
+        p = strchr(str, ':');
+        if (p == NULL)
+                parse_error(str, "Invalid device format");
+        str = p + 1;
+        selfn_strdup(&desc, str);
+        p = str;
+
+        /* Rough PCI ID validation */
+        size_t colon_count = 0;
+        size_t point_count = 0;
+
+        while (*p) {
+                if (*p == ':')
+                        ++colon_count;
+                if (*p == '.')
+                        ++point_count;
+                ++p;
+        }
+
+        if (!colon_count || (colon_count > 2) || (point_count != 1))
+                parse_error(str, "Invalid PCI ID format.");
+
+        /* PCI segment */
+        if (colon_count > 1) {
+                p = strchr(str, ':');
+                if (p == NULL)
+                        parse_error(str, "Invalid PCI ID format.");
+                *p = '\0';
+                segment = (uint16_t)strhextouint64(str);
+                str = p + 1;
+        }
+
+        /* PCI bus */
+        p = strchr(str, ':');
+        if (p == NULL)
+                parse_error(str, "Invalid PCI ID format.");
+        *p = '\0';
+        bus = (uint16_t)strhextouint64(str);
+        str = p + 1;
+
+        /* PCI device */
+        p = strchr(str, '.');
+        if (p == NULL)
+                parse_error(str, "Invalid PCI ID format.");
+        *p = '\0';
+        device = (uint16_t)strhextouint64(str);
+        str = p + 1;
+
+        /* PCI virtual channel */
+        p = strchr(str, '@');
+        if (p) {
+                *p = '\0';
+                vc = (unsigned)strtouint64(p + 1);
+        }
+
+        /* PCI function */
+        function = (uint16_t)strhextouint64(str);
+
+        /* PCI BDF */
+        bdf |= bus << 8;
+        bdf |= (device & 0x1F) << 3;
+        bdf |= function & 0x7;
+
+        printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x@", segment,
+               BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
+        if (vc != DEV_ALL_VCS)
+                printf("%u", vc);
+        else
+                printf("ALL");
+        printf("\n");
+
+        union pqos_device dev;
+
+        dev.segment = segment;
+        dev.bdf = bdf;
+        dev.vc = vc;
+
+        {
+                const struct mon_group *grp;
+
+                grp = grp_add(MON_GROUP_TYPE_DEVICE, evt, desc, &dev.raw, 1);
+                if (grp == NULL) {
+                        printf("Device group setup error!\n");
+                        exit(EXIT_FAILURE);
+                }
+        }
+}
+
+void
+selfn_monitor_devs(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+        char *saveptr = NULL;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&cp, arg);
+
+        for (str = cp;; str = NULL) {
+                char *token = NULL;
+
+                token = strtok_r(str, ";", &saveptr);
+                if (token == NULL)
+                        break;
+                parse_monitor_dev(token);
         }
 
         free(cp);
@@ -1393,7 +1997,7 @@ slist_create_elem(void *data)
  * @brief Looks for an element with given pid in slist of proc_stats elements
  *
  * @param pslist pointer to beginning of a slist
- * @param pid pid to be searched in the slist
+ * @param pid process identifier to be searched in the slist
  *
  * @return ptr to found struct proc_stats or NULL in case element with given PID
  *         has not been found in the slist
@@ -1446,7 +2050,7 @@ fill_cpu_avg_ratio(struct proc_stats *pstat, const time_t proc_start_time)
  *               filled with new proc_stats entry. If it equals NULL,
  *               new list will be started with given element
  * @param pid process pid to be added
- * @param cputicks cputicks spent by this process
+ * @param cputicks cpu ticks spent by this process
  * @param proc_start_time time of process creation(seconds since the Epoch)
  *
  * @return pointer to beginning of process statistics slist
@@ -1484,13 +2088,13 @@ add_proc_cpu_stat(struct slist *pslist,
 }
 
 /**
- * @brief Updates statistics for given pid in in slist
+ * @brief Updates statistics for given pid in slist
  *
  * @param pslist pointer to slist of proc_stats. Only internal data
  *               will be updated, no new list entries will be created
  *               or removed.
- * @param pid pid number of a process to be updated
- * @param cputicks cputicks spent by this process
+ * @param pid process identifier of a process to be updated
+ * @param cputicks cpu ticks spent by this process
  */
 static void
 update_proc_cpu_stat(const struct slist *pslist,
@@ -1829,7 +2433,7 @@ selfn_monitor_top_pids(void)
          * did some work in last interval (and this is the reason for sleep
          * here) but in case that there is not enough processes which reported
          * cpu ticks, we are checking average ticks ratio for process lifetime.
-         * So the more time time we are sleeping here, the more processes will
+         * So the more time we are sleeping here, the more processes will
          * report ticks during this sleep interval and less processes will be
          * found by checking average ticks ratio(it is less accurate method)
          */
@@ -1944,6 +2548,7 @@ get_mon_arrays(struct pqos_mon_data ***parray1, struct pqos_mon_data ***parray2)
         struct pqos_mon_data **p1, **p2;
 
         ASSERT(parray1 != NULL && parray2 != NULL);
+
         p1 = malloc(sizeof(p1[0]) * sel_monitor_num);
         p2 = malloc(sizeof(p2[0]) * sel_monitor_num);
         if (p1 == NULL || p2 == NULL) {
@@ -2106,7 +2711,7 @@ monitor_loop(void)
                 if (sel_mon_top_like)
                         qsort(mon_data, mon_number, sizeof(mon_data[0]),
                               mon_qsort_llc_cmp_desc);
-                else if (sel_monitor_type == MON_GROUP_TYPE_CORE)
+                else if (monitor_core_mode())
                         qsort(mon_data, mon_number, sizeof(mon_data[0]),
                               mon_qsort_coreid_cmp_asc);
 

@@ -51,11 +51,14 @@ test_pqos_inter_get_os(void **state __attribute__((unused)))
         enum pqos_interface interface;
 
         _pqos_set_inter(PQOS_INTER_OS);
+        assert_int_equal(__real__pqos_get_inter(), PQOS_INTER_OS);
 
         expect_function_call(__wrap_lock_get);
         expect_value(__wrap__pqos_check_init, expect, 1);
         will_return(__wrap__pqos_check_init, PQOS_RETVAL_OK);
         expect_function_call(__wrap_lock_release);
+
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         ret = pqos_inter_get(&interface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -69,11 +72,14 @@ test_pqos_inter_get_msr(void **state __attribute__((unused)))
         enum pqos_interface interface;
 
         _pqos_set_inter(PQOS_INTER_MSR);
+        assert_int_equal(__real__pqos_get_inter(), PQOS_INTER_MSR);
 
         expect_function_call(__wrap_lock_get);
         expect_value(__wrap__pqos_check_init, expect, 1);
         will_return(__wrap__pqos_check_init, PQOS_RETVAL_OK);
         expect_function_call(__wrap_lock_release);
+
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_MSR);
 
         ret = pqos_inter_get(&interface);
         assert_int_equal(ret, PQOS_RETVAL_OK);

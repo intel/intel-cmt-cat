@@ -36,58 +36,60 @@
 /* ======== mock ======== */
 
 int
-hw_alloc_assoc_write(const unsigned lcore, const unsigned class_id)
+hw_alloc_reset_assoc_cores(void)
 {
-        check_expected(lcore);
-        check_expected(class_id);
+        function_called();
+        return mock_type(int);
+}
 
+int
+hw_alloc_reset_assoc_channels(void)
+{
+        function_called();
         return mock_type(int);
 }
 
 /* ======== hw_alloc_reset_assoc ======== */
 
 static void
-test_hw_alloc_reset_assoc(void **state)
+test_hw_alloc_reset_assoc(void **state __attribute__((unused)))
 {
-        struct test_data *data = (struct test_data *)*state;
         int ret;
-        unsigned i;
 
-        will_return_maybe(__wrap__pqos_get_cap, data->cap);
-        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        expect_function_call(hw_alloc_reset_assoc_cores);
+        will_return(hw_alloc_reset_assoc_cores, PQOS_RETVAL_OK);
 
-        for (i = 0; i < data->cpu->num_cores; i++) {
-                unsigned lcore = data->cpu->cores[i].lcore;
-
-                expect_value(hw_alloc_assoc_write, lcore, lcore);
-                expect_value(hw_alloc_assoc_write, class_id, 0);
-                will_return(hw_alloc_assoc_write, PQOS_RETVAL_OK);
-        }
+        expect_function_call(hw_alloc_reset_assoc_channels);
+        will_return(hw_alloc_reset_assoc_channels, PQOS_RETVAL_OK);
 
         ret = hw_alloc_reset_assoc();
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
 static void
-test_hw_alloc_reset_assoc_error(void **state)
+test_hw_alloc_reset_assoc_error(void **state __attribute__((unused)))
 {
-        struct test_data *data = (struct test_data *)*state;
         int ret;
-        unsigned i;
 
-        will_return_maybe(__wrap__pqos_get_cap, data->cap);
-        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        /* hw_alloc_reset_assoc_cores fails */
+        expect_function_call(hw_alloc_reset_assoc_cores);
+        will_return(hw_alloc_reset_assoc_cores, PQOS_RETVAL_ERROR);
 
-        for (i = 0; i < data->cpu->num_cores; i++) {
-                unsigned lcore = data->cpu->cores[i].lcore;
-
-                expect_value(hw_alloc_assoc_write, lcore, lcore);
-                expect_value(hw_alloc_assoc_write, class_id, 0);
-                will_return(hw_alloc_assoc_write, PQOS_RETVAL_ERROR);
-        }
+        expect_function_call(hw_alloc_reset_assoc_channels);
+        will_return(hw_alloc_reset_assoc_channels, PQOS_RETVAL_OK);
 
         ret = hw_alloc_reset_assoc();
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
+
+        /* hw_alloc_reset_assoc_channels fails */
+        expect_function_call(hw_alloc_reset_assoc_cores);
+        will_return(hw_alloc_reset_assoc_cores, PQOS_RETVAL_OK);
+
+        expect_function_call(hw_alloc_reset_assoc_channels);
+        will_return(hw_alloc_reset_assoc_channels, PQOS_RETVAL_RESOURCE);
+
+        ret = hw_alloc_reset_assoc();
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 int
@@ -99,7 +101,7 @@ main(void)
             cmocka_unit_test(test_hw_alloc_reset_assoc),
             cmocka_unit_test(test_hw_alloc_reset_assoc_error)};
 
-        result += cmocka_run_group_tests(tests, test_init_l3ca, test_fini);
+        result += cmocka_run_group_tests(tests, NULL, NULL);
 
         return result;
 }

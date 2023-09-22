@@ -67,12 +67,28 @@ PQOS_LOCAL int hw_mon_init(const struct pqos_cpuinfo *cpu,
 PQOS_LOCAL int hw_mon_fini(void);
 
 /**
- * @brief Hardware interface to reset monitoring by binding all cores with RMID0
+ * @brief Enables or disables I/O RDT monitoring across selected CPU sockets
+ *
+ * @param [in] cpu CPU information
+ * @param [in] enable I/O RDT enable/disable flag, 1 - enable, 0 - disable
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
  */
-PQOS_LOCAL int hw_mon_reset(void);
+PQOS_LOCAL int hw_mon_reset_iordt(const struct pqos_cpuinfo *cpu,
+                                  const int enable);
+/**
+ * @brief Hardware interface to reset monitoring by binding all cores with RMID0
+ *
+ * As part of monitoring reset I/O RDT reconfiguration can be performed. This
+ * can be requested via \a cfg.
+ *
+ * @param [in] cfg requested configuration
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_reset(const struct pqos_mon_config *cfg);
 
 /**
  * @brief Writes \a lcore to RMID association
@@ -125,7 +141,19 @@ PQOS_LOCAL int hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-PQOS_LOCAL int hw_mon_assoc_get(const unsigned lcore, pqos_rmid_t *rmid);
+PQOS_LOCAL int hw_mon_assoc_get_core(const unsigned lcore, pqos_rmid_t *rmid);
+
+/**
+ * @brief Hardware interface to read RMID association of \a channel
+ *
+ * @param [in] channel_id Control channel id
+ * @param [out] rmid associated RMID
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_assoc_get_channel(const pqos_channel_t channel_id,
+                                        pqos_rmid_t *rmid);
 
 /**
  * @brief Start perf monitoring counters
@@ -190,6 +218,30 @@ PQOS_LOCAL int hw_mon_start_cores(const unsigned num_cores,
                                   void *context,
                                   struct pqos_mon_data *group,
                                   const struct pqos_mon_options *opt);
+
+/**
+ * @brief Hardware interface to start resource monitoring on selected
+ * group of channels
+ *
+ * The function sets up content of the \a group structure.
+ *
+ * @param [in] num_channels number of channels in \a channels array
+ * @param [in] channels array of channel id's
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [in,out] group a pointer to monitoring structure
+ * @param [in] opt extended options
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_mon_start_channels(const unsigned num_channels,
+                                     const pqos_channel_t *channels,
+                                     const enum pqos_mon_event event,
+                                     void *context,
+                                     struct pqos_mon_data *group,
+                                     const struct pqos_mon_options *opt);
 
 /**
  * @brief Hardware interface to stop resource monitoring data for selected

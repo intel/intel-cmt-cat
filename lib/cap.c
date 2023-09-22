@@ -55,6 +55,7 @@
 #include "cpu_registers.h"
 #include "cpuinfo.h"
 #include "hw_cap.h"
+#include "iordt.h"
 #include "lock.h"
 #include "log.h"
 #include "machine.h"
@@ -88,17 +89,10 @@
  */
 
 /**
- * This pointer is allocated and initialized in this module.
- * Then other sub-modules get this pointer in order to retrieve
- * capability information.
+ * This structure is initialized in this module. Then other sub-modules get this
+ * structure in order to retrieve capability and CPU information.
  */
-static struct pqos_cap *m_cap = NULL;
-
-/**
- * This gets allocated and initialized in this module.
- * This hold information about CPU topology in PQoS format.
- */
-static const struct pqos_cpuinfo *m_cpu = NULL;
+static struct pqos_sysconfig m_sysconf;
 
 /**
  * Library initialization status.
@@ -364,6 +358,8 @@ discover_capabilities(struct pqos_cap **p_cap,
                          "way size %u bytes\n",
                          det_l3ca->way_size * det_l3ca->num_ways,
                          det_l3ca->way_size);
+                LOG_INFO("L3 CAT details: I/O RDT support=%d, I/O RDT on=%d\n",
+                         det_l3ca->iordt, det_l3ca->iordt_on);
                 sz += sizeof(struct pqos_capability);
                 break;
         case PQOS_RETVAL_RESOURCE:
@@ -616,6 +612,9 @@ pqos_init(const struct pqos_config *config)
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0, max_core = 0;
         int cat_init = 0, mon_init = 0;
+        struct pqos_cap *cap = NULL;
+        struct pqos_cpuinfo *cpu = NULL;
+        struct pqos_devinfo *dev = NULL;
         enum pqos_interface interface;
 
         if (config == NULL)
@@ -635,6 +634,8 @@ pqos_init(const struct pqos_config *config)
                 return ret;
         }
 
+        memset(&m_sysconf, 0, sizeof(m_sysconf));
+
         ret = log_init(config->fd_log, config->callback_log,
                        config->context_log, config->verbose);
         if (ret != LOG_RETVAL_OK) {
@@ -652,8 +653,8 @@ pqos_init(const struct pqos_config *config)
          * Topology not provided through config.
          * CPU discovery done through internal mechanism.
          */
-        ret = cpuinfo_init(interface, &m_cpu);
-        if (ret != 0 || m_cpu == NULL) {
+        ret = cpuinfo_init(interface, &cpu);
+        if (ret != 0 || cpu == NULL) {
                 LOG_ERROR("cpuinfo_init() error %d\n", ret);
                 ret = PQOS_RETVAL_ERROR;
                 goto log_init_error;
@@ -662,9 +663,9 @@ pqos_init(const struct pqos_config *config)
         /**
          * Find max core id in the topology
          */
-        for (i = 0; i < m_cpu->num_cores; i++)
-                if (m_cpu->cores[i].lcore > max_core)
-                        max_core = m_cpu->cores[i].lcore;
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].lcore > max_core)
+                        max_core = cpu->cores[i].lcore;
 
         ret = machine_init(max_core);
         if (ret != PQOS_RETVAL_OK) {
@@ -686,7 +687,7 @@ pqos_init(const struct pqos_config *config)
                          "and cause unexpected behaviour\n");
 #endif
 
-        ret = discover_capabilities(&m_cap, m_cpu, interface);
+        ret = discover_capabilities(&cap, cpu, interface);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("discover_capabilities() error %d\n", ret);
                 goto machine_init_error;
@@ -698,7 +699,7 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
-        ret = api_init(interface, m_cpu->vendor);
+        ret = api_init(interface, cpu->vendor);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("lock_init() error %d\n", ret);
                 goto machine_init_error;
@@ -706,7 +707,7 @@ pqos_init(const struct pqos_config *config)
 
         _pqos_set_inter(interface);
 
-        ret = pqos_alloc_init(m_cpu, m_cap, config);
+        ret = pqos_alloc_init(cpu, cap, config);
         switch (ret) {
         case PQOS_RETVAL_BUSY:
                 LOG_ERROR("OS allocation init error!\n");
@@ -725,11 +726,10 @@ pqos_init(const struct pqos_config *config)
          * then get max RMID supported by a CPU socket
          * and allocate memory for RMID table
          */
-        ret = pqos_mon_init(m_cpu, m_cap, config);
+        ret = pqos_mon_init(cpu, cap, config);
         switch (ret) {
         case PQOS_RETVAL_RESOURCE:
                 LOG_DEBUG("monitoring init aborted: feature not present\n");
-                ret = PQOS_RETVAL_OK;
                 break;
         case PQOS_RETVAL_OK:
                 LOG_DEBUG("monitoring init OK\n");
@@ -745,8 +745,28 @@ pqos_init(const struct pqos_config *config)
                 LOG_ERROR("None of detected capabilities could be "
                           "initialized!\n");
                 ret = PQOS_RETVAL_ERROR;
+                goto machine_init_error;
         }
 
+        ret = iordt_init(cap, &dev);
+        switch (ret) {
+        case PQOS_RETVAL_RESOURCE:
+                LOG_DEBUG("I/O RDT init aborted: feature not present\n");
+                break;
+        case PQOS_RETVAL_OK:
+                LOG_DEBUG("I/O RDT init OK\n");
+                break;
+        case PQOS_RETVAL_ERROR:
+        default:
+                LOG_ERROR("I/O RDT init error %d\n", ret);
+                break;
+        }
+
+        if (ret == PQOS_RETVAL_RESOURCE)
+                ret = PQOS_RETVAL_OK;
+
+        if (ret != PQOS_RETVAL_OK)
+                iordt_fini();
 machine_init_error:
         if (ret != PQOS_RETVAL_OK)
                 (void)machine_fini();
@@ -758,17 +778,19 @@ log_init_error:
                 (void)log_fini();
 init_error:
         if (ret != PQOS_RETVAL_OK) {
-                if (m_cap != NULL) {
-                        for (i = 0; i < m_cap->num_cap; i++)
-                                free(m_cap->capabilities[i].u.generic_ptr);
-                        free(m_cap);
+                if (cap != NULL) {
+                        for (i = 0; i < cap->num_cap; i++)
+                                free(cap->capabilities[i].u.generic_ptr);
+                        free(cap);
                 }
-                m_cpu = NULL;
-                m_cap = NULL;
         }
 
-        if (ret == PQOS_RETVAL_OK)
+        if (ret == PQOS_RETVAL_OK) {
                 m_init_done = 1;
+                m_sysconf.cap = cap;
+                m_sysconf.cpu = cpu;
+                m_sysconf.dev = dev;
+        }
 
         lock_release();
 
@@ -797,6 +819,12 @@ pqos_fini(void)
         pqos_mon_fini();
         pqos_alloc_fini();
 
+        ret = iordt_fini();
+        if (ret != 0) {
+                retval = PQOS_RETVAL_ERROR;
+                LOG_ERROR("iordt_fini() error %d\n", ret);
+        }
+
         ret = cpuinfo_fini();
         if (ret != 0) {
                 retval = PQOS_RETVAL_ERROR;
@@ -813,14 +841,13 @@ pqos_fini(void)
         if (ret != PQOS_RETVAL_OK)
                 retval = ret;
 
-        m_cpu = NULL;
-
-        if (m_cap != NULL) {
-                for (i = 0; i < m_cap->num_cap; i++)
-                        free(m_cap->capabilities[i].u.generic_ptr);
-                free((void *)m_cap);
-                m_cap = NULL;
-        };
+        if (m_sysconf.cap)
+                for (i = 0; i < m_sysconf.cap->num_cap; i++)
+                        free(m_sysconf.cap->capabilities[i].u.generic_ptr);
+        free(m_sysconf.cap);
+        m_sysconf.cap = NULL;
+        m_sysconf.cpu = NULL;
+        m_sysconf.dev = NULL;
 
         m_init_done = 0;
 
@@ -871,6 +898,28 @@ pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu)
         return PQOS_RETVAL_OK;
 }
 
+int
+pqos_sysconfig_get(const struct pqos_sysconfig **sysconf)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        if (sysconf == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        *sysconf = _pqos_get_sysconfig();
+
+        lock_release();
+        return PQOS_RETVAL_OK;
+}
+
 void
 _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 {
@@ -882,26 +931,26 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 
         ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
                cdp == PQOS_REQUIRE_CDP_ANY);
-        ASSERT(m_cap != NULL);
+        ASSERT(m_sysconf.cap != NULL);
 
-        if (m_cap == NULL)
+        if (m_sysconf.cap == NULL)
                 return;
 
-        for (i = 0; i < m_cap->num_cap && l3_cap == NULL; i++)
-                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
-                        l3_cap = m_cap->capabilities[i].u.l3ca;
+        for (i = 0; i < m_sysconf.cap->num_cap && l3_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                        l3_cap = m_sysconf.cap->capabilities[i].u.l3ca;
 
         if (l3_cap == NULL)
                 return;
 
         switch (interface) {
         case PQOS_INTER_MSR:
-                ret = hw_cap_l3ca_discover(&cap, m_cpu);
+                ret = hw_cap_l3ca_discover(&cap, m_sysconf.cpu);
                 break;
 #ifdef __linux__
         case PQOS_INTER_OS: /* fall through */
         case PQOS_INTER_OS_RESCTRL_MON:
-                ret = os_cap_l3ca_discover(&cap, m_cpu);
+                ret = os_cap_l3ca_discover(&cap, m_sysconf.cpu);
                 break;
 #endif
         default:
@@ -928,6 +977,37 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 }
 
 void
+_pqos_cap_l3iordt_change(const enum pqos_iordt_config iordt)
+{
+        struct pqos_cap_l3ca *l3_cap = NULL;
+        struct pqos_cap *cap = m_sysconf.cap;
+        unsigned i;
+
+        ASSERT(iordt == PQOS_REQUIRE_IORDT_ON ||
+               iordt == PQOS_REQUIRE_IORDT_OFF ||
+               iordt == PQOS_REQUIRE_IORDT_ANY);
+        ASSERT(m_sysconf.cap != NULL);
+
+        if (cap == NULL)
+                return;
+
+        for (i = 0; i < cap->num_cap && l3_cap == NULL; i++)
+                if (cap->capabilities[i].type == PQOS_CAP_TYPE_L3CA)
+                        l3_cap = cap->capabilities[i].u.l3ca;
+
+        if (l3_cap == NULL)
+                return;
+
+        /* turn on */
+        if (iordt == PQOS_REQUIRE_IORDT_ON && !l3_cap->iordt_on)
+                l3_cap->iordt_on = 1;
+
+        /* turn off */
+        if (iordt == PQOS_REQUIRE_IORDT_OFF && l3_cap->iordt_on)
+                l3_cap->iordt_on = 0;
+}
+
+void
 _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
 {
         struct pqos_cap_l2ca *l2_cap = NULL;
@@ -938,26 +1018,26 @@ _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp)
 
         ASSERT(cdp == PQOS_REQUIRE_CDP_ON || cdp == PQOS_REQUIRE_CDP_OFF ||
                cdp == PQOS_REQUIRE_CDP_ANY);
-        ASSERT(m_cap != NULL);
+        ASSERT(m_sysconf.cap != NULL);
 
-        if (m_cap == NULL)
+        if (m_sysconf.cap == NULL)
                 return;
 
-        for (i = 0; i < m_cap->num_cap && l2_cap == NULL; i++)
-                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
-                        l2_cap = m_cap->capabilities[i].u.l2ca;
+        for (i = 0; i < m_sysconf.cap->num_cap && l2_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_L2CA)
+                        l2_cap = m_sysconf.cap->capabilities[i].u.l2ca;
 
         if (l2_cap == NULL)
                 return;
 
         switch (interface) {
         case PQOS_INTER_MSR:
-                ret = hw_cap_l2ca_discover(&cap, m_cpu);
+                ret = hw_cap_l2ca_discover(&cap, m_sysconf.cpu);
                 break;
 #ifdef __linux__
         case PQOS_INTER_OS:
         case PQOS_INTER_OS_RESCTRL_MON:
-                ret = os_cap_l2ca_discover(&cap, m_cpu);
+                ret = os_cap_l2ca_discover(&cap, m_sysconf.cpu);
                 break;
 #endif
         default:
@@ -994,14 +1074,14 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
 
         ASSERT(cfg == PQOS_MBA_DEFAULT || cfg == PQOS_MBA_CTRL ||
                cfg == PQOS_MBA_ANY);
-        ASSERT(m_cap != NULL);
+        ASSERT(m_sysconf.cap != NULL);
 
-        if (m_cap == NULL)
+        if (m_sysconf.cap == NULL)
                 return;
 
-        for (i = 0; i < m_cap->num_cap && mba_cap == NULL; i++)
-                if (m_cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
-                        mba_cap = m_cap->capabilities[i].u.mba;
+        for (i = 0; i < m_sysconf.cap->num_cap && mba_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_MBA)
+                        mba_cap = m_sysconf.cap->capabilities[i].u.mba;
 
         if (mba_cap == NULL)
                 return;
@@ -1030,18 +1110,60 @@ _pqos_cap_mba_change(const enum pqos_mba_config cfg)
         }
 }
 
+void
+_pqos_cap_mon_iordt_change(const enum pqos_iordt_config iordt)
+{
+        struct pqos_cap_mon *mon_cap = NULL;
+        unsigned i;
+
+        ASSERT(iordt == PQOS_REQUIRE_IORDT_ON ||
+               iordt == PQOS_REQUIRE_IORDT_OFF ||
+               iordt == PQOS_REQUIRE_IORDT_ANY);
+        ASSERT(m_sysconf.cap != NULL);
+
+        if (m_sysconf.cap == NULL)
+                return;
+
+        for (i = 0; i < m_sysconf.cap->num_cap && mon_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_MON)
+                        mon_cap = m_sysconf.cap->capabilities[i].u.mon;
+
+        if (mon_cap == NULL)
+                return;
+
+        /* turn on */
+        if (iordt == PQOS_REQUIRE_IORDT_ON && !mon_cap->iordt_on)
+                mon_cap->iordt_on = 1;
+
+        /* turn off */
+        if (iordt == PQOS_REQUIRE_IORDT_OFF && mon_cap->iordt_on)
+                mon_cap->iordt_on = 0;
+}
+
+const struct pqos_sysconfig *
+_pqos_get_sysconfig(void)
+{
+        return &m_sysconf;
+}
+
 const struct pqos_cap *
 _pqos_get_cap(void)
 {
-        ASSERT(m_cap != NULL);
-        return m_cap;
+        ASSERT(m_sysconf.cap != NULL);
+        return m_sysconf.cap;
 }
 
 const struct pqos_cpuinfo *
 _pqos_get_cpu(void)
 {
-        ASSERT(m_cpu != NULL);
-        return m_cpu;
+        ASSERT(m_sysconf.cpu != NULL);
+        return m_sysconf.cpu;
+}
+
+const struct pqos_devinfo *
+_pqos_get_dev(void)
+{
+        return m_sysconf.dev;
 }
 
 int

@@ -36,15 +36,19 @@
 #include "pqos.h"
 
 int __wrap__pqos_check_init(const int expect);
+const struct pqos_sysconfig *__wrap__pqos_get_sysconfig(void);
 const struct pqos_cap *__wrap__pqos_get_cap(void);
 const struct pqos_cpuinfo *__wrap__pqos_get_cpu(void);
+const struct pqos_devinfo *__wrap__pqos_get_dev(void);
 const struct pqos_cap *__real__pqos_get_cap(void);
 const struct pqos_cpuinfo *__real__pqos_get_cpu(void);
+enum pqos_interface __real__pqos_get_inter(void);
 enum pqos_interface __wrap__pqos_get_inter(void);
 void __wrap__pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 void __wrap__pqos_cap_mba_change(const enum pqos_mba_config cfg);
-void __wrap__pqos_inter_get(enum pqos_interface *interface);
+int __wrap_pqos_sysconfig_get(const struct pqos_sysconfig **sysconf);
+enum pqos_interface __wrap__pqos_get_inter(void);
 
 /* static functions declaration */
 int _pqos_api_init(void);

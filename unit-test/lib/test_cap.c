@@ -147,22 +147,6 @@ __wrap_os_cap_mba_discover(struct pqos_cap_mba *cap,
 }
 
 int
-__wrap_pqos_mon_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
-                     const struct pqos_cap *cap __attribute__((unused)),
-                     const struct pqos_config *cfg __attribute__((unused)))
-{
-        return PQOS_RETVAL_OK;
-}
-
-int
-__wrap_pqos_alloc_init(const struct pqos_cpuinfo *cpu __attribute__((unused)),
-                       const struct pqos_cap *cap __attribute__((unused)),
-                       const struct pqos_config *cfg __attribute__((unused)))
-{
-        return PQOS_RETVAL_OK;
-}
-
-int
 __wrap_os_cap_init(const enum pqos_interface inter)
 {
         const LargestIntegralType valid_inters[] = {PQOS_INTER_OS,
@@ -328,7 +312,13 @@ test_pqos_init(void **state __attribute__((unused)))
         cfg.fd_log = -1;
         cfg.interface = data->interface;
 
+        expect_function_call(__wrap_lock_init);
+        will_return(__wrap_lock_init, 0);
+        expect_function_call(__wrap_lock_get);
+
         will_return(__wrap_cpuinfo_init, data->cpu);
+        will_return(__wrap_machine_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_machine_init);
         if (data->interface == PQOS_INTER_MSR) {
                 will_return(__wrap_hw_cap_mon_discover, data->cap_mon);
                 will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
@@ -344,9 +334,6 @@ test_pqos_init(void **state __attribute__((unused)))
                 will_return(__wrap_os_cap_mba_discover, &(data->cap_mba));
         };
 #endif
-        expect_function_call(__wrap_lock_init);
-        will_return(__wrap_lock_init, 0);
-        expect_function_call(__wrap_lock_get);
 #ifdef __linux__
         if (data->interface != PQOS_INTER_MSR)
                 expect_function_call(__wrap_os_cap_init);
@@ -358,6 +345,12 @@ test_pqos_init(void **state __attribute__((unused)))
                  data->interface == PQOS_INTER_OS_RESCTRL_MON)
                 expect_function_call(__wrap_os_cap_mon_discover);
 #endif
+        expect_function_call(__wrap_pqos_alloc_init);
+        will_return(__wrap_pqos_alloc_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_pqos_mon_init);
+        will_return(__wrap_pqos_mon_init, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_iordt_init);
+        will_return(__wrap_iordt_init, PQOS_RETVAL_OK);
         expect_function_call(__wrap_lock_release);
 
         ret = pqos_init(&cfg);
@@ -372,6 +365,14 @@ test_pqos_fini(void **state __attribute__((unused)))
         int ret;
 
         expect_function_call(__wrap_lock_get);
+        expect_function_call(__wrap_pqos_mon_fini);
+        will_return(__wrap_pqos_mon_fini, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_pqos_alloc_fini);
+        will_return(__wrap_pqos_alloc_fini, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_iordt_fini);
+        will_return(__wrap_iordt_fini, PQOS_RETVAL_OK);
+        expect_function_call(__wrap_machine_fini);
+        will_return(__wrap_machine_fini, PQOS_RETVAL_OK);
         expect_function_call(__wrap_lock_release);
         expect_function_call(__wrap_lock_fini);
         will_return(__wrap_lock_fini, 0);

@@ -75,6 +75,7 @@ test_hw_alloc_assoc_unused_l2ca(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
@@ -97,6 +98,7 @@ test_hw_alloc_assoc_unused_l3ca(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
@@ -118,6 +120,7 @@ test_hw_alloc_assoc_unused_mba(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 
@@ -139,6 +142,7 @@ test_hw_alloc_assoc_unused_l2ca_when_l3_present(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
         will_return_always(hw_alloc_assoc_read, PQOS_RETVAL_OK);
 

@@ -68,10 +68,12 @@ PQOS_LOCAL int os_mon_fini(void);
 /**
  * @brief OS interface to reset monitoring
  *
+ * @param [in] cfg Monitoring configuration
+ *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-PQOS_LOCAL int os_mon_reset(void);
+PQOS_LOCAL int os_mon_reset(const struct pqos_mon_config *cfg);
 
 /*
  * @brief This function stops all perf counters

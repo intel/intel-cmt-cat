@@ -78,6 +78,85 @@ get_cache_info(const struct pqos_cacheinfo *cache_info,
 }
 
 /**
+ * @brief Checks L3 feature enable status across all CPU sockets
+ *
+ * It also validates if L3 feature enabling is consistent across CPU sockets.
+ * At the moment, such scenario is considered as error that requires CAT reset.
+ *
+ * @param [in] cpu detected CPU topology
+ * @param [in] feature_name printable feature name
+ * @param [in] reg configuration register address
+ * @param [in] bit configuration bit
+ * @param [out] enabled place to store L3 feature enabling status
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+hw_cap_l3_feature(const struct pqos_cpuinfo *cpu,
+                  const char *feature_name,
+                  uint32_t reg,
+                  uint64_t bit,
+                  int *enabled)
+{
+        unsigned *l3cat_ids = NULL;
+        unsigned l3cat_id_num = 0;
+        unsigned enabled_num = 0, disabled_num = 0;
+        unsigned j;
+        int ret = PQOS_RETVAL_OK;
+
+        if (enabled == NULL || cpu == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Get list of l3cat id's
+         */
+        l3cat_ids = pqos_cpu_get_l3cat_ids(cpu, &l3cat_id_num);
+        if (l3cat_ids == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        for (j = 0; j < l3cat_id_num; j++) {
+                uint64_t value = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_l3cat_id(cpu, l3cat_ids[j], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        goto hw_cap_l3_feature_exit;
+
+                if (msr_read(core, reg, &value) != MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto hw_cap_l3_feature_exit;
+                }
+
+                if (value & bit)
+                        enabled_num++;
+                else
+                        disabled_num++;
+        }
+
+        if (disabled_num > 0 && enabled_num > 0) {
+                LOG_ERROR("Inconsistent %s settings across l3cat_ids."
+                          "Please reset CAT or reboot your system!\n",
+                          feature_name);
+                ret = PQOS_RETVAL_ERROR;
+
+        } else if (enabled_num > 0)
+                *enabled = 1;
+        else
+                *enabled = 0;
+
+        if (ret == PQOS_RETVAL_OK)
+                LOG_INFO("%s is %s\n", feature_name,
+                         (*enabled) ? "enabled" : "disabled");
+
+hw_cap_l3_feature_exit:
+        if (l3cat_ids != NULL)
+                free(l3cat_ids);
+
+        return ret;
+}
+
+/**
  * @brief Adds new event type to \a mon monitoring structure
  *
  * @param mon Monitoring structure which is to be updated with the new
@@ -88,6 +167,7 @@ get_cache_info(const struct pqos_cacheinfo *cache_info,
  * @param scale_factor event specific scale factor
  * @param counter_length counter bit length for the event
  * @param max_num_events maximum number of events that \a mon can accommodate
+ * @param iordt I/O RDT support
  */
 static void
 add_monitoring_event(struct pqos_cap_mon *mon,
@@ -96,7 +176,8 @@ add_monitoring_event(struct pqos_cap_mon *mon,
                      const unsigned max_rmid,
                      const uint32_t scale_factor,
                      const unsigned counter_length,
-                     const unsigned max_num_events)
+                     const unsigned max_num_events,
+                     const int iordt)
 {
         if (mon->num_events >= max_num_events) {
                 LOG_WARN("%s() no space for event type %d (resource id %u)!\n",
@@ -105,14 +186,26 @@ add_monitoring_event(struct pqos_cap_mon *mon,
         }
 
         LOG_DEBUG("Adding monitoring event: resource ID %u, "
-                  "type %x to table index %u\n",
-                  res_id, event_type, mon->num_events);
+                  "type 0x%x, iordt %d\n",
+                  res_id, event_type, iordt);
 
         mon->events[mon->num_events].type = (enum pqos_mon_event)event_type;
         mon->events[mon->num_events].max_rmid = max_rmid;
         mon->events[mon->num_events].scale_factor = scale_factor;
         mon->events[mon->num_events].counter_length = counter_length;
+        mon->events[mon->num_events].iordt = iordt;
         mon->num_events++;
+
+        if (iordt)
+                mon->iordt = 1;
+}
+
+int
+hw_cap_mon_iordt(const struct pqos_cpuinfo *cpu, int *enabled)
+{
+        return hw_cap_l3_feature(cpu, "L3 I/O RDT monitoring",
+                                 PQOS_MSR_L3_IO_QOS_CFG,
+                                 PQOS_MSR_L3_IO_QOS_MON_EN, enabled);
 }
 
 /**
@@ -179,13 +272,14 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
          */
         lcpuid(0xf, 1, &cpuid_0xf_1); /**< query resource monitoring */
 
-        if (cpuid_0xf_1.edx & 1)
+        if (cpuid_0xf_1.edx & PQOS_CPUID_MON_L3_OCCUP_BIT)
                 num_events++; /**< LLC occupancy */
-        if (cpuid_0xf_1.edx & 2)
+        if (cpuid_0xf_1.edx & PQOS_CPUID_MON_TMEM_BW_BIT)
                 num_events++; /**< total memory bandwidth event */
-        if (cpuid_0xf_1.edx & 4)
+        if (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT)
                 num_events++; /**< local memory bandwidth event */
-        if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
+        if ((cpuid_0xf_1.edx & PQOS_CPUID_MON_TMEM_BW_BIT) &&
+            (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT))
                 num_events++; /**< remote memory bandwidth virtual event */
 
         ret = uncore_mon_discover(&uncore_events);
@@ -238,49 +332,75 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                 const uint32_t scale_factor = cpuid_0xf_1.ebx;
                 const unsigned counter_length = (cpuid_0xf_1.eax & 0x7f) + 24;
 
-                if (cpuid_0xf_1.edx & 1)
+                if (cpuid_0xf_1.edx & PQOS_CPUID_MON_L3_OCCUP_BIT) {
+                        int iordt =
+                            cpuid_0xf_1.eax & PQOS_CPUID_MON_IO_OCCUP_BIT ? 1
+                                                                          : 0;
+
                         add_monitoring_event(mon, 1, PQOS_MON_EVENT_L3_OCCUP,
                                              max_rmid, scale_factor,
-                                             counter_length, num_events);
-                if (cpuid_0xf_1.edx & 2)
+                                             counter_length, num_events, iordt);
+                }
+                if (cpuid_0xf_1.edx & PQOS_CPUID_MON_TMEM_BW_BIT) {
+
+                        int iordt =
+                            cpuid_0xf_1.eax & PQOS_CPUID_MON_IO_MEM_BW ? 1 : 0;
+
                         add_monitoring_event(mon, 1, PQOS_MON_EVENT_TMEM_BW,
                                              max_rmid, scale_factor,
-                                             counter_length, num_events);
-                if (cpuid_0xf_1.edx & 4)
+                                             counter_length, num_events, iordt);
+                }
+                if (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT) {
+                        int iordt =
+                            cpuid_0xf_1.eax & PQOS_CPUID_MON_IO_MEM_BW ? 1 : 0;
+
                         add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
                                              max_rmid, scale_factor,
-                                             counter_length, num_events);
+                                             counter_length, num_events, iordt);
+                }
+                if ((cpuid_0xf_1.edx & PQOS_CPUID_MON_TMEM_BW_BIT) &&
+                    (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT)) {
+                        int iordt =
+                            cpuid_0xf_1.eax & PQOS_CPUID_MON_IO_MEM_BW ? 1 : 0;
 
-                if ((cpuid_0xf_1.edx & 2) && (cpuid_0xf_1.edx & 4))
                         add_monitoring_event(mon, 1, PQOS_MON_EVENT_RMEM_BW,
                                              max_rmid, scale_factor,
-                                             counter_length, num_events);
+                                             counter_length, num_events, iordt);
+                }
         }
 
         if (((cpuid_0xa.ebx & 3) == 0) && ((cpuid_0xa.edx & 31) > 1))
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_IPC, 0, 0, 0,
-                                     num_events);
+                                     num_events, 0);
 
         if (((cpuid_0xa.eax >> 8) & 0xff) > 1) {
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS, 0, 0, 0,
-                                     num_events);
+                                     num_events, 0);
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_REF, 0, 0, 0,
-                                     num_events);
+                                     num_events, 0);
+        }
+
+        if (mon->iordt) {
+                ret = hw_cap_mon_iordt(cpu, &mon->iordt_on);
+                if (ret != PQOS_RETVAL_OK) {
+                        free(mon);
+                        return ret;
+                }
         }
 
         if (uncore_events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
-                                     0, 0, 0, num_events);
+                                     0, 0, 0, num_events, 0);
         if (uncore_events & PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE)
                 add_monitoring_event(mon, 0,
                                      PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE, 0, 0,
-                                     0, num_events);
+                                     0, num_events, 0);
         if (uncore_events & PQOS_PERF_EVENT_LLC_REF_PCIE_READ)
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_REF_PCIE_READ,
-                                     0, 0, 0, num_events);
+                                     0, 0, 0, num_events, 0);
         if (uncore_events & PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)
                 add_monitoring_event(mon, 0, PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
-                                     0, 0, 0, num_events);
+                                     0, 0, 0, num_events, 0);
 
         (*r_mon) = mon;
         return PQOS_RETVAL_OK;
@@ -289,60 +409,16 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
 int
 hw_cap_l3ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled)
 {
-        unsigned *l3cat_ids = NULL;
-        unsigned l3cat_id_num = 0, j = 0;
-        unsigned enabled_num = 0, disabled_num = 0;
-        int ret = PQOS_RETVAL_OK;
+        return hw_cap_l3_feature(cpu, "L3 CDP", PQOS_MSR_L3_QOS_CFG,
+                                 PQOS_MSR_L3_QOS_CFG_CDP_EN, enabled);
+}
 
-        if (enabled == NULL || cpu == NULL)
-                return PQOS_RETVAL_PARAM;
-
-        /**
-         * Get list of l3cat id's
-         */
-        l3cat_ids = pqos_cpu_get_l3cat_ids(cpu, &l3cat_id_num);
-        if (l3cat_ids == NULL)
-                return PQOS_RETVAL_RESOURCE;
-
-        for (j = 0; j < l3cat_id_num; j++) {
-                uint64_t reg = 0;
-                unsigned core = 0;
-
-                ret = pqos_cpu_get_one_by_l3cat_id(cpu, l3cat_ids[j], &core);
-                if (ret != PQOS_RETVAL_OK)
-                        goto l3cdp_is_enabled_exit;
-
-                if (msr_read(core, PQOS_MSR_L3_QOS_CFG, &reg) !=
-                    MACHINE_RETVAL_OK) {
-                        ret = PQOS_RETVAL_ERROR;
-                        goto l3cdp_is_enabled_exit;
-                }
-
-                if (reg & PQOS_MSR_L3_QOS_CFG_CDP_EN)
-                        enabled_num++;
-                else
-                        disabled_num++;
-        }
-
-        if (disabled_num > 0 && enabled_num > 0) {
-                LOG_ERROR("Inconsistent L3 CDP settings across l3cat_ids."
-                          "Please reset CAT or reboot your system!\n");
-                ret = PQOS_RETVAL_ERROR;
-                goto l3cdp_is_enabled_exit;
-        }
-
-        if (enabled_num > 0)
-                *enabled = 1;
-        else
-                *enabled = 0;
-
-        LOG_INFO("L3 CDP is %s\n", (*enabled) ? "enabled" : "disabled");
-
-l3cdp_is_enabled_exit:
-        if (l3cat_ids != NULL)
-                free(l3cat_ids);
-
-        return ret;
+int
+hw_cap_l3ca_iordt(const struct pqos_cpuinfo *cpu, int *enabled)
+{
+        return hw_cap_l3_feature(cpu, "L3 I/O RDT allocation",
+                                 PQOS_MSR_L3_IO_QOS_CFG,
+                                 PQOS_MSR_L3_IO_QOS_CA_EN, enabled);
 }
 
 /**
@@ -558,6 +634,8 @@ hw_cap_l3ca_cpuid(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         cap->way_contention = (uint64_t)res.ebx;
         cap->non_contiguous_cbm =
             (res.ecx >> PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT_BIT) & 1;
+        cap->iordt = (res.ecx >> PQOS_CPUID_CAT_IORDT_BIT) & 1;
+        cap->iordt_on = 0;
 
         if (cap->cdp) {
                 /**
@@ -573,6 +651,15 @@ hw_cap_l3ca_cpuid(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                 cap->cdp_on = cdp_on;
                 if (cdp_on)
                         cap->num_classes = cap->num_classes / 2;
+        }
+
+        /* Detect if I/O RDT is enabled */
+        if (cap->iordt) {
+                ret = hw_cap_l3ca_iordt(cpu, &cap->iordt_on);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("L3 I/O RDT detection error!\n");
+                        return ret;
+                }
         }
 
         return ret;
