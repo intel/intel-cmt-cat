@@ -148,7 +148,9 @@ class CPqosCapabilityMonitoring(ctypes.Structure):
         ("num_events", ctypes.c_uint),
         ("iordt", ctypes.c_int),
         ("iordt_on", ctypes.c_int),
-        ("events", CPqosMonitor * 0),
+        ('snc_num', ctypes.c_uint),
+        ('snc_mode', ctypes.c_uint),
+        ('events', CPqosMonitor * 0),
     ]
 
 
@@ -199,12 +201,13 @@ class CPqosCoreInfo(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ("lcore", ctypes.c_uint),    # Logical core id
-        ("socket", ctypes.c_uint),   # Socket id in the system
-        ("l3_id", ctypes.c_uint),    # L3/LLC cluster id
-        ("l2_id", ctypes.c_uint),    # L2 cluster id
-        ("l3cat_id", ctypes.c_uint), # L3 CAT classes id
-        ("mba_id", ctypes.c_uint),   # MBA id
+        ('lcore', ctypes.c_uint),    # Logical core id
+        ('socket', ctypes.c_uint),   # Socket id in the system
+        ('l3_id', ctypes.c_uint),    # L3/LLC cluster id
+        ('l2_id', ctypes.c_uint),    # L2 cluster id
+        ('l3cat_id', ctypes.c_uint), # L3 CAT classes id
+        ('mba_id', ctypes.c_uint),   # MBA id
+        ('numa', ctypes.c_uint)      # Numa node
     ]
 
 
@@ -642,13 +645,60 @@ class CPqosEventValues(ctypes.Structure):
         ('llc_references_delta', ctypes.c_uint64),
     ]
 
+class CPqosSNCConfig:
+    "pqos_iordt_config enumeration"
+    native_type = ctypes.c_int
+    PQOS_REQUIRE_SNC_ANY = 0
+    PQOS_REQUIRE_SNC_LOCAL = 1
+    PQOS_REQUIRE_SNC_TOTAL = 2
+
+    values = [
+        ('any', PQOS_REQUIRE_SNC_ANY),
+        ('local', PQOS_REQUIRE_SNC_LOCAL),
+        ('total', PQOS_REQUIRE_SNC_TOTAL)
+    ]
+
+    @classmethod
+    def get_value(cls, label):
+        """
+        Converts text label ('any', 'local' or 'total') to its native
+        representation.
+        Parameters:
+            label: a text label
+        Returns:
+            native representation of configuration or None
+        """
+
+        for cfg_label, cfg_value in cls.values:
+            if cfg_label == label:
+                return cfg_value
+
+        return None
+
+    @classmethod
+    def get_label(cls, value):
+        """
+        Converts native representation to a text label ('any', 'local' or 'total').
+        Parameters:
+            native representation of configuration
+        Returns:
+            label: a text label or None
+        """
+
+        for cfg_label, cfg_value in cls.values:
+            if cfg_value == value:
+                return cfg_label
+
+        return None
+
 class CPqosMonConfig(ctypes.Structure):
     "pqos_mon_config structure"
     # pylint: disable=too-few-public-methods
     # pylint: disable=attribute-defined-outside-init
 
     _fields_ = [
-        ('l3_iordt', CPqosIordtConfig.native_type)
+        ('l3_iordt', CPqosIordtConfig.native_type),
+        ('snc', CPqosSNCConfig.native_type)
     ]
 
     def set_l3_iordt(self, l3_iordt):
@@ -660,3 +710,12 @@ class CPqosMonConfig(ctypes.Structure):
         """
 
         self.l3_iordt = CPqosIordtConfig.get_value(l3_iordt)
+
+    def set_snc(self, snc):
+        """
+        Sets SNC configuration.
+        Parameter:
+            snc: SNC configuration ('any', 'local' or 'total')
+        """
+
+        self.snc = CPqosSNCConfig.get_value(snc)

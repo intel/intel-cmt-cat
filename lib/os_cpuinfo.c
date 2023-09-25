@@ -33,6 +33,7 @@
 
 #include "os_cpuinfo.h"
 
+#include "assert.h"
 #include "common.h"
 #include "log.h"
 
@@ -43,7 +44,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define SYSTEM_CPU "/sys/devices/system/cpu"
+#define SYSTEM_CPU  "/sys/devices/system/cpu"
+#define SYSTEM_NODE "/sys/devices/system/node"
 
 /**
  * @brief Filter directory filenames
@@ -63,9 +65,7 @@
         }
 
 FILTER(cpu)
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 FILTER(node)
-#endif
 FILTER(index)
 
 /**
@@ -142,7 +142,6 @@ os_cpuinfo_cpu_online(unsigned lcore)
         return online;
 }
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 /**
  * @brief Detects node of \a lcore
  *
@@ -172,7 +171,6 @@ os_cpuinfo_cpu_node(unsigned lcore, unsigned *node)
 
         return ret;
 }
-#endif
 
 /**
  * @brief Detects socket of \a lcore
@@ -298,11 +296,9 @@ os_cpuinfo_topology(void)
                 if (retval != PQOS_RETVAL_OK)
                         break;
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
                 retval = os_cpuinfo_cpu_node(lcore, &info->numa);
                 if (retval != PQOS_RETVAL_OK)
                         break;
-#endif
 
                 retval =
                     os_cpuinfo_cpu_cache(lcore, &info->l3_id, &info->l2_id);
@@ -312,15 +308,10 @@ os_cpuinfo_topology(void)
                 info->lcore = lcore;
 
                 LOG_DEBUG("Detected core %u, socket %u, "
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
                           "NUMAnode %u, "
-#endif
                           "L2 ID %u, L3 ID %u\n",
-                          info->lcore, info->socket,
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
-                          info->numa,
-#endif
-                          info->l2_id, info->l3_id);
+                          info->lcore, info->socket, info->numa, info->l2_id,
+                          info->l3_id);
 
                 cpu->num_cores++;
         }
@@ -335,4 +326,91 @@ os_cpuinfo_topology(void)
         }
 
         return cpu;
+}
+
+/**
+ * @brief Provides total NUMA nodes count
+ *
+ * @return Total NUMA nodes count
+ */
+
+int
+os_cpuinfo_get_numa_num(void)
+{
+        int count;
+        struct dirent **namelist = NULL;
+        int i;
+
+        count = scandir(SYSTEM_NODE, &namelist, filter_node, NULL);
+        for (i = 0; i < count; ++i)
+                free(namelist[i]);
+        free(namelist);
+        return count;
+}
+
+/**
+ * @brief Provides total sockets count
+ *
+ * @return Total sockets count
+ */
+int
+os_cpuinfo_get_socket_num(void)
+{
+        struct dirent **namelist = NULL;
+        int max_core_count;
+        int num_cpus;
+        unsigned num_sockets = 0;
+        unsigned *sockets;
+        int i;
+        int retval = PQOS_RETVAL_OK;
+
+        max_core_count = sysconf(_SC_NPROCESSORS_CONF);
+        if (max_core_count < 0) {
+                LOG_ERROR("Failed to get number of processors!\n");
+                return -1;
+        } else if (max_core_count == 0) {
+                LOG_ERROR("Zero processors in the system!\n");
+                return -1;
+        }
+
+        num_cpus = scandir(SYSTEM_CPU, &namelist, filter_cpu, cpu_sort);
+        if (num_cpus <= 0 || max_core_count < num_cpus) {
+                LOG_ERROR("Failed to read proc cpus!\n");
+                return -1;
+        }
+
+        sockets = malloc(sizeof(*sockets) * num_cpus);
+
+        for (i = 0; i < num_cpus; i++) {
+                unsigned lcore = atoi(namelist[i]->d_name + 3);
+                unsigned socket;
+                unsigned s;
+
+                if (!os_cpuinfo_cpu_online(lcore))
+                        continue;
+
+                retval = os_cpuinfo_cpu_socket(lcore, &socket);
+                if (retval != PQOS_RETVAL_OK)
+                        break;
+
+                /* Check if this socket id is already on the list */
+                for (s = 0; s < num_sockets; ++s)
+                        if (socket == sockets[s])
+                                break;
+
+                if (s >= num_sockets || num_sockets == 0) {
+                        /* This socket wasn't reported before */
+                        sockets[num_sockets++] = socket;
+                }
+        }
+
+        for (i = 0; i < num_cpus; i++)
+                free(namelist[i]);
+        free(namelist);
+        free(sockets);
+
+        if (retval != PQOS_RETVAL_OK)
+                return -1;
+
+        return num_sockets;
 }

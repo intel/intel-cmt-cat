@@ -98,6 +98,18 @@ PQOS_LOCAL int pqos_devinfo_get_channel_shared(const struct pqos_devinfo *dev,
                                                int *shared);
 
 /*
+ * @brief Retrieves numa id's from cpu info structure
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [out] count place to store actual number of sockets returned
+ *
+ * @return Allocated array of size \a count populated with numa id's
+ * @retval NULL on error
+ */
+PQOS_LOCAL unsigned *pqos_cpu_get_numa(const struct pqos_cpuinfo *cpu,
+                                       unsigned *count);
+
+/**
  * @brief Internal API to retrieve \a type of capability
  *
  * @param [in] type capability type to look for

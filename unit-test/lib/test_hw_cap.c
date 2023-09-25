@@ -142,6 +142,18 @@ hw_cap_l2ca_cdp(const struct pqos_cpuinfo *cpu, int *enabled)
         return ret;
 }
 
+int
+hw_cap_mon_snc_state(const struct pqos_cpuinfo *cpu,
+                     unsigned *snc_num,
+                     enum pqos_snc_mode *snc_mode)
+{
+        assert_non_null(cpu);
+        *snc_num = 1;
+        *snc_mode = PQOS_SNC_LOCAL;
+
+        return PQOS_RETVAL_OK;
+}
+
 /* ======== hw_cap_mon_discover ======== */
 
 static void

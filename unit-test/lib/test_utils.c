@@ -628,7 +628,7 @@ test_pqos_get_vendor(void **state)
 }
 
 /* ======== pqos_cpu_get_numa ======== */
-#if PQOS_VERSION >= 50000
+
 static void
 test_utils_pqos_cpu_get_numa_empty(void **state __attribute__((unused)))
 {
@@ -694,11 +694,9 @@ test_utils_pqos_cpu_get_numa_param(void **state __attribute__((unused)))
         if (numa != NULL)
                 free(numa);
 }
-#endif
 
 /* ======== pqos_cpu_get_numaid ======== */
 
-#if PQOS_VERSION >= 50000
 static void
 test_utils_pqos_cpu_get_numaid_empty(void **state __attribute__((unused)))
 {
@@ -761,11 +759,9 @@ test_utils_pqos_cpu_get_numaid_param(void **state __attribute__((unused)))
         ret = pqos_cpu_get_numaid(&cpu, 1, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
-#endif
 
 /* ======== pqos_cpu_get_one_by_numaid ======== */
 
-#if PQOS_VERSION >= 50000
 static void
 test_pqos_cpu_get_one_by_numaid_empty(void **state __attribute__((unused)))
 {
@@ -832,7 +828,6 @@ test_pqos_cpu_get_one_by_numaid_param(void **state __attribute__((unused)))
         ret = pqos_cpu_get_one_by_numaid(NULL, numaid, &lcore);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
-#endif
 
 int
 main(void)
@@ -865,6 +860,7 @@ main(void)
             cmocka_unit_test(test_pqos_cpu_get_one_by_numaid_param),
         };
 #endif
+
         const struct CMUnitTest tests_all[] = {
             cmocka_unit_test(test__pqos_cap_get_type_param),
             cmocka_unit_test(test__pqos_cap_get_type),

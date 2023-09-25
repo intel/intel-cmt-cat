@@ -303,6 +303,12 @@ os_mon_reset(const struct pqos_mon_config *cfg)
                           "the platform!\n");
                 return PQOS_RETVAL_PARAM;
         }
+
+        if (cfg != NULL && cfg->snc != PQOS_REQUIRE_SNC_ANY) {
+                LOG_ERROR("SNC requested but not supported by the platform!\n");
+                return PQOS_RETVAL_PARAM;
+        }
+
         return resctrl_mon_reset();
 }
 

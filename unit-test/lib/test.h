@@ -184,6 +184,8 @@ test_cap_init(struct test_data *data, unsigned technology)
                 mon->num_events = num_events;
                 mon->max_rmid = 32;
                 mon->iordt = 1;
+                mon->snc_num = 1;
+                mon->snc_mode = PQOS_SNC_LOCAL;
 
                 data->cap_mon = mon;
 

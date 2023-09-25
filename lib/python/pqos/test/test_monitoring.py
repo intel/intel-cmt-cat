@@ -42,7 +42,7 @@ from unittest.mock import MagicMock, patch
 from pqos.test.helper import ctypes_ref_set_uint
 from pqos.monitoring import PqosMon, CPqosMonData
 from pqos.native_struct import (
-    CPqosEventValues, CPqosIordtConfig, CPqosMonConfig, CPqosMonitor
+    CPqosEventValues, CPqosIordtConfig, CPqosMonConfig, CPqosMonitor, CPqosSNCConfig
 )
 
 class TestPqosMon(unittest.TestCase):
@@ -356,6 +356,34 @@ class TestPqosMon(unittest.TestCase):
         # Build reset configuration
         cfg = CPqosMonConfig()
         cfg.set_l3_iordt('on')
+
+        # Reset using configuration
+        mon = PqosMon()
+        mon.reset_config(cfg)
+
+        # Ensure mock function has been called
+        lib.pqos_mon_reset_config.assert_called_once()
+
+    @patch('pqos.monitoring.Pqos')
+    def test_reset_config_snc(self, pqos_mock_cls):
+        "Tests reset_config() method."
+
+        def pqos_mon_reset_cfg_m(config):
+            "Mock pqos_mon_reset_config()."
+
+            self.assertEqual(config.contents.snc,
+                             CPqosSNCConfig.PQOS_REQUIRE_SNC_TOTAL)
+
+            return 0
+
+        # Setup mock function
+        lib = pqos_mock_cls.return_value.lib
+        func_mock = MagicMock(side_effect=pqos_mon_reset_cfg_m)
+        lib.pqos_mon_reset_config = func_mock
+
+        # Build reset configuration
+        cfg = CPqosMonConfig()
+        cfg.set_snc('total')
 
         # Reset using configuration
         mon = PqosMon()

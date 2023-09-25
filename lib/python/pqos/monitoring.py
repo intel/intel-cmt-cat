@@ -175,7 +175,7 @@ class PqosMon:
     def reset_config(self, cfg):
         """
         Resets monitoring configuration.
-        As part of monitoring reset I/O RDT reconfiguration can be performed.
+        As part of monitoring reset I/O RDT & SNC reconfiguration can be performed.
 
         Parameters:
             cfg: CPqosMonConfig object

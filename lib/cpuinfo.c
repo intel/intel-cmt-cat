@@ -44,6 +44,7 @@
 #include "machine.h"
 #include "os_allocation.h"
 #include "os_cpuinfo.h"
+#include "utils.h"
 
 #include <errno.h>
 #include <limits.h>
@@ -399,25 +400,18 @@ detect_cpu(const int cpu,
         info->l3_id = apicid >> apic->l3_shift;
         info->l2_id = apicid >> apic->l2_shift;
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 #if defined __linux__ && defined __NR_getcpu
-        syscall(__NR_getcpu, NULL, &info->numa, NULL);
+        if (syscall(__NR_getcpu, NULL, &info->numa, NULL) != 0)
+                return -1;
 #else
         if (getcpu(NULL, &info->numa) != 0)
                 return -1;
 #endif
-#endif
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
         LOG_DEBUG("Detected core %u, socket %u, NUMAnode %u, "
                   "L2 ID %u, L3 ID %u, APICID %u\n",
                   info->lcore, info->socket, info->numa, info->l2_id,
                   info->l3_id, apicid);
-#else
-        LOG_DEBUG("Detected core %u, socket %u, "
-                  "L2 ID %u, L3 ID %u, APICID %u\n",
-                  info->lcore, info->socket, info->l2_id, info->l3_id, apicid);
-#endif
 
         return 0;
 }
@@ -677,4 +671,42 @@ cpuinfo_get_config(const struct cpuinfo_config **config)
         ASSERT(config != NULL);
 
         *config = &m_config;
+}
+
+int
+cpuinfo_get_numa_num(const struct pqos_cpuinfo *cpu)
+{
+        unsigned *numa;
+        unsigned count;
+
+        /* Not all CPUs are online fallback to read from OS */
+        if (sysconf(_SC_NPROCESSORS_CONF) != sysconf(_SC_NPROCESSORS_ONLN))
+                return os_cpuinfo_get_numa_num();
+
+        numa = pqos_cpu_get_numa(cpu, &count);
+        if (numa != NULL) {
+                free(numa);
+                return count;
+        }
+
+        return -1;
+}
+
+int
+cpuinfo_get_socket_num(const struct pqos_cpuinfo *cpu)
+{
+        unsigned *socket;
+        unsigned count;
+
+        /* Not all CPUs are online fallback to read from OS */
+        if (sysconf(_SC_NPROCESSORS_CONF) != sysconf(_SC_NPROCESSORS_ONLN))
+                return os_cpuinfo_get_socket_num();
+
+        socket = pqos_cpu_get_sockets(cpu, &count);
+        if (socket != NULL) {
+                free(socket);
+                return count;
+        }
+
+        return -1;
 }

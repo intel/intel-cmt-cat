@@ -38,6 +38,7 @@
 #include "os_monitoring.h"
 #include "perf_monitoring.h"
 #include "types.h"
+#include "utils.h"
 #ifdef __linux__
 #include "resctrl.h"
 #include "resctrl_monitoring.h"
@@ -200,6 +201,8 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
          * Calculate values of virtual events
          */
         if (group->event & PQOS_MON_EVENT_RMEM_BW) {
+                const struct pqos_capability *cap_mon =
+                    _pqos_cap_get_type(PQOS_CAP_TYPE_MON);
                 const struct pqos_cap *cap = _pqos_get_cap();
                 const struct pqos_monitor *pmon;
                 uint64_t max_value = 0;
@@ -210,6 +213,10 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
                         group->values.mbm_remote_delta =
                             group->values.mbm_total_delta -
                             group->values.mbm_local_delta;
+
+                if (cap_mon->u.mon->snc_mode == PQOS_SNC_LOCAL)
+                        group->values.mbm_remote_delta *=
+                            cap_mon->u.mon->snc_num;
 
                 ret = pqos_cap_get_event(cap, PQOS_MON_EVENT_RMEM_BW, &pmon);
                 if (ret == PQOS_RETVAL_OK)

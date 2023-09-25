@@ -88,11 +88,6 @@ ifeq ($(RMID_CUSTOM),y)
 CFLAGS += -DPQOS_RMID_CUSTOM
 endif
 
-# SNC
-ifeq ($(PQOS_SNC),y)
-CFLAGS += -DPQOS_SNC
-endif
-
 # Build targets and dependencies
 APP = pqos
 MAN = pqos.8

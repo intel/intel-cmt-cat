@@ -71,7 +71,8 @@ static struct pqos_alloc_config sel_alloc_config = {
  * Default configuration of monitoring
  */
 static struct pqos_mon_config sel_mon_config = {.l3_iordt =
-                                                    PQOS_REQUIRE_IORDT_ANY};
+                                                    PQOS_REQUIRE_IORDT_ANY,
+                                                .snc = PQOS_REQUIRE_SNC_ANY};
 
 /**
  * Monitoring reset
@@ -568,6 +569,16 @@ selfn_reset_mon(const char *arg)
                     {"l3iordt-any", PQOS_REQUIRE_IORDT_ANY},
                 };
 
+                /* SNC reset options */
+                const struct {
+                        const char *name;
+                        enum pqos_snc_config snc;
+                } patternsnc[] = {
+                    {"snc-local", PQOS_REQUIRE_SNC_LOCAL},
+                    {"snc-total", PQOS_REQUIRE_SNC_TOTAL},
+                    {"snc-any", PQOS_REQUIRE_SNC_ANY},
+                };
+
                 tok = s;
                 while ((tok = strtok_r(tok, ",", &saveptr)) != NULL) {
                         unsigned valid = 0;
@@ -576,6 +587,13 @@ selfn_reset_mon(const char *arg)
                                 if (strcasecmp(tok, patterniordt[i].name) ==
                                     0) {
                                         cfg->l3_iordt = patterniordt[i].iordt;
+                                        valid = 1;
+                                        break;
+                                }
+
+                        for (i = 0; i < DIM(patternsnc); i++)
+                                if (strcasecmp(tok, patternsnc[i].name) == 0) {
+                                        cfg->snc = patternsnc[i].snc;
                                         valid = 1;
                                         break;
                                 }
@@ -939,10 +957,9 @@ static const char help_printf_long[] =
     "          set monitoring time in seconds. Use 'inf' or 'infinite'\n"
     "          for infinite monitoring. CTRL+C stops monitoring.\n"
     "  -r [CONFIG], --mon-reset[=CONFIG]\n"
-    "          monitoring reset, claim all RMID's\n"
+    "          reset monitoring configuration, claim all RMID's\n"
     "          CONFIG can be: l3iordt-on, l3iordt-off, l3iordt-any\n"
-    "          (default l3iordt-on)\n"
-
+    "                         snc-local, snc-total, snc-any\n"
     "  -H, --profile-list          list supported allocation profiles\n"
     "  -c PROFILE, --profile-set=PROFILE\n"
     "          select a PROFILE of predefined allocation classes.\n"
@@ -1040,7 +1057,7 @@ static struct option long_cmd_opts[] = {
     {"mon-top",              no_argument,       0, 'T'},
     {"mon-file",             required_argument, 0, 'o'},
     {"mon-file-type",        required_argument, 0, 'u'},
-    {"mon-reset",            no_argument,       0, 'r'},
+    {"mon-reset",            optional_argument, 0, 'r'},
     {"disable-mon-ipc",      no_argument,       0, OPTION_DISABLE_MON_IPC},
     {"disable-mon-llc_miss", no_argument,       0, OPTION_DISABLE_MON_LLC_MISS},
     {"alloc-class",          required_argument, 0, 'e'},

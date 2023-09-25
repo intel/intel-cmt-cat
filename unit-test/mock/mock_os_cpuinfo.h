@@ -39,8 +39,6 @@
 int os_cpuinfo_cpu_online(unsigned lcore);
 int os_cpuinfo_cpu_socket(unsigned lcore, unsigned *socket);
 int os_cpuinfo_cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2);
-#if PQOS_VERSION >= 50000
 int os_cpuinfo_cpu_node(unsigned lcore, unsigned *node);
-#endif
 
 #endif /* MOCK_OS_MONITORING_H_ */
