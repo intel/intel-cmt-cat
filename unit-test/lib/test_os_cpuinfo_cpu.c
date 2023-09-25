@@ -290,7 +290,6 @@ test_os_cpuinfo_cpu_cache_error(void **state __attribute__((unused)))
         }
 }
 
-#if PQOS_VERSION >= 50000
 /* ======== os_cpuinfo_cpu_node ======== */
 
 static void
@@ -307,7 +306,6 @@ test_os_cpuinfo_cpu_node(void **state __attribute__((unused)))
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(node, 5);
 }
-#endif
 
 int
 main(void)
@@ -315,18 +313,16 @@ main(void)
         int result = 0;
 
         const struct CMUnitTest tests[] = {
-                cmocka_unit_test(test_os_cpuinfo_cpu_online),
-                cmocka_unit_test(test_os_cpuinfo_cpu_online_error),
-                cmocka_unit_test(test_os_cpuinfo_cpu_online_resource),
-                cmocka_unit_test(test_os_cpuinfo_cpu_socket),
-                cmocka_unit_test(test_os_cpuinfo_cpu_socket_error),
-                cmocka_unit_test(test_os_cpuinfo_cpu_cache_level_1),
-                cmocka_unit_test(test_os_cpuinfo_cpu_cache_level_2),
-                cmocka_unit_test(test_os_cpuinfo_cpu_cache_level_3),
-                cmocka_unit_test(test_os_cpuinfo_cpu_cache_error),
-#if PQOS_VERSION >= 50000
-                cmocka_unit_test(test_os_cpuinfo_cpu_node),
-#endif
+            cmocka_unit_test(test_os_cpuinfo_cpu_online),
+            cmocka_unit_test(test_os_cpuinfo_cpu_online_error),
+            cmocka_unit_test(test_os_cpuinfo_cpu_online_resource),
+            cmocka_unit_test(test_os_cpuinfo_cpu_socket),
+            cmocka_unit_test(test_os_cpuinfo_cpu_socket_error),
+            cmocka_unit_test(test_os_cpuinfo_cpu_cache_level_1),
+            cmocka_unit_test(test_os_cpuinfo_cpu_cache_level_2),
+            cmocka_unit_test(test_os_cpuinfo_cpu_cache_level_3),
+            cmocka_unit_test(test_os_cpuinfo_cpu_cache_error),
+            cmocka_unit_test(test_os_cpuinfo_cpu_node),
         };
 
         result += cmocka_run_group_tests(tests, NULL, NULL);

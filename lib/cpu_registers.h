@@ -80,6 +80,7 @@ extern "C" {
 #define PQOS_MSR_L2_QOS_CFG_CDP_EN 1ULL  /**< L2 CDP enable bit */
 
 #define PQOS_MSR_MBA_CFG 0xC84 /**< MBA config register */
+#define PQOS_MSR_SNC_CFG 0xCA0 /**< SNC config register */
 /**
  * MBA linear max value
  */

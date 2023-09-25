@@ -781,6 +781,15 @@ pqos_mon_reset_config(const struct pqos_mon_config *cfg)
                                   cfg->l3_iordt);
                         return PQOS_RETVAL_PARAM;
                 }
+
+                if (cfg->snc != PQOS_REQUIRE_SNC_LOCAL &&
+                    cfg->snc != PQOS_REQUIRE_SNC_TOTAL &&
+                    cfg->snc != PQOS_REQUIRE_SNC_ANY) {
+                        LOG_ERROR("Unrecognized SNC Monitoring "
+                                  "configuration setting %d!\n",
+                                  cfg->snc);
+                        return PQOS_RETVAL_PARAM;
+                }
         }
 
         return API_CALL(mon_reset, cfg);

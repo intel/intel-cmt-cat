@@ -38,6 +38,7 @@
 
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "hw_monitoring.h"
 #include "log.h"
 #include "machine.h"
 #include "uncore_monitoring.h"
@@ -209,6 +210,85 @@ hw_cap_mon_iordt(const struct pqos_cpuinfo *cpu, int *enabled)
 }
 
 /**
+ * @brief Discovers HW monitoring SNC support
+ *
+ * @param [in] cpu detected CPU topology
+ * @param [out] snc_num Number of monitoring clusters
+ * @param [out] snc_mode SNC monitoring mode
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_STATIC int
+hw_cap_mon_snc_state(const struct pqos_cpuinfo *cpu,
+                     unsigned *snc_num,
+                     enum pqos_snc_mode *snc_mode)
+{
+        int numa_num = cpuinfo_get_numa_num(cpu);
+        int socket_num = cpuinfo_get_socket_num(cpu);
+        unsigned i, sock_count, *sockets = NULL;
+        int ret = PQOS_RETVAL_OK;
+        enum pqos_snc_mode st;
+        enum pqos_snc_mode mode = (enum pqos_snc_mode)(-1);
+
+        if (cpu == NULL || snc_num == NULL || snc_mode == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (numa_num < 0 || socket_num < 0)
+                return PQOS_RETVAL_ERROR;
+        if (numa_num == 0 || socket_num == 0 || numa_num == socket_num) {
+                *snc_num = 1;
+                *snc_mode = PQOS_SNC_LOCAL;
+                return PQOS_RETVAL_OK;
+        }
+
+        sockets = pqos_cpu_get_sockets(cpu, &sock_count);
+        if (sockets == NULL || sock_count == 0) {
+                printf("Error retrieving information for Sockets\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto hw_cap_mon_snc_state_exit;
+        }
+
+        for (i = 0; i < sock_count; i++) {
+                unsigned lcore;
+                uint64_t val = 0;
+                uint32_t reg = PQOS_MSR_SNC_CFG;
+
+                ret = pqos_cpu_get_one_core(cpu, sockets[i], &lcore);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Error retrieving lcore for socket %u\n",
+                               sockets[i]);
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
+                };
+
+                if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
+                }
+
+                st = (val & 1) ? PQOS_SNC_LOCAL : PQOS_SNC_TOTAL;
+                if (mode == (enum pqos_snc_mode)(-1))
+                        mode = st;
+                else if (mode != st) {
+                        printf("Error inconsistent SNC mode\n");
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
+                };
+        };
+
+        if (ret == PQOS_RETVAL_OK) {
+                *snc_num = numa_num / socket_num;
+                *snc_mode = mode;
+        }
+
+hw_cap_mon_snc_state_exit:
+        if (sockets)
+                free(sockets);
+        return ret;
+}
+
+/**
  * @brief Discovers monitoring capabilities
  *
  * Runs series of CPUID instructions to discover system CMT
@@ -326,6 +406,14 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
         mon->mem_size = sz;
         mon->max_rmid = max_rmid;
         mon->l3_size = l3_size;
+
+        /* Detect SNC state */
+        ret = hw_cap_mon_snc_state(cpu, &mon->snc_num, &mon->snc_mode);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Error reading SNC information!\n");
+                free(mon);
+                return PQOS_RETVAL_ERROR;
+        }
 
         {
                 const unsigned max_rmid = cpuid_0xf_1.ecx + 1;

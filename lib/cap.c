@@ -1140,6 +1140,36 @@ _pqos_cap_mon_iordt_change(const enum pqos_iordt_config iordt)
                 mon_cap->iordt_on = 0;
 }
 
+void
+_pqos_cap_mon_snc_change(const enum pqos_snc_config cfg)
+{
+        struct pqos_cap_mon *mon_cap = NULL;
+        unsigned i;
+
+        ASSERT(cfg == PQOS_REQUIRE_SNC_LOCAL || cfg == PQOS_REQUIRE_SNC_TOTAL ||
+               cfg == PQOS_REQUIRE_SNC_ANY);
+        ASSERT(m_sysconf.cap != NULL);
+
+        if (m_sysconf.cap == NULL)
+                return;
+
+        for (i = 0; i < m_sysconf.cap->num_cap && mon_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_MON)
+                        mon_cap = m_sysconf.cap->capabilities[i].u.mon;
+
+        if (mon_cap == NULL)
+                return;
+
+        if (mon_cap->snc_num == 1)
+                return;
+
+        if (cfg == PQOS_REQUIRE_SNC_TOTAL)
+                mon_cap->snc_mode = PQOS_SNC_TOTAL;
+
+        if (cfg == PQOS_REQUIRE_SNC_LOCAL)
+                mon_cap->snc_mode = PQOS_SNC_LOCAL;
+}
+
 const struct pqos_sysconfig *
 _pqos_get_sysconfig(void)
 {

@@ -95,6 +95,26 @@ PQOS_LOCAL int cpuinfo_fini(void);
 PQOS_LOCAL void cpuinfo_get_config(const struct cpuinfo_config **config);
 
 /**
+ * @brief Helper function to get number of numa nodes in the system
+ *
+ * @param [in] cpu CPU topology structure
+ *
+ * @return Number of numa nodes in the system
+ * @retval 0 if not successful
+ */
+PQOS_LOCAL int cpuinfo_get_numa_num(const struct pqos_cpuinfo *cpu);
+
+/**
+ * @brief Helper function to get number of sockets in the system
+ *
+ * @param [in] cpu CPU topology structure
+ *
+ * @return Number of sockets in the system
+ * @retval 0 if not successful
+ */
+PQOS_LOCAL int cpuinfo_get_socket_num(const struct pqos_cpuinfo *cpu);
+
+/**
  * @brief Detect cpu model
  *
  * @return detected cpu model

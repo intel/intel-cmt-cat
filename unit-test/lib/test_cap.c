@@ -395,17 +395,17 @@ test_pqos_cap_get_before_init(void **state __attribute__((unused)))
         expect_function_call(__wrap_lock_get);
         expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(&p_cap, &p_cpu);
-        assert_int_not_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
 
         expect_function_call(__wrap_lock_get);
         expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(&p_cap, NULL);
-        assert_int_not_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
 
         expect_function_call(__wrap_lock_get);
         expect_function_call(__wrap_lock_release);
         ret = pqos_cap_get(NULL, &p_cpu);
-        assert_int_not_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(ret, PQOS_RETVAL_INIT);
 }
 
 static void

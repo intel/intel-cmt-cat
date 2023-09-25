@@ -1651,6 +1651,8 @@ test_pqos_mon_reset_config_init(void **state __attribute__((unused)))
         int ret;
         struct pqos_mon_config cfg;
 
+        memset(&cfg, 0, sizeof(cfg));
+
         wrap_check_init(1, PQOS_RETVAL_INIT);
         ret = pqos_mon_reset_config(NULL);
         assert_int_equal(ret, PQOS_RETVAL_INIT);
@@ -1688,6 +1690,8 @@ test_pqos_mon_reset_config_os(void **state __attribute__((unused)))
         int ret;
         struct pqos_mon_config cfg;
 
+        memset(&cfg, 0, sizeof(cfg));
+
         wrap_check_init(1, PQOS_RETVAL_OK);
         expect_value(__wrap_os_mon_reset, cfg, NULL);
         will_return(__wrap_os_mon_reset, PQOS_RETVAL_OK);
@@ -1709,6 +1713,8 @@ test_pqos_mon_reset_config_hw(void **state __attribute__((unused)))
 {
         int ret;
         struct pqos_mon_config cfg;
+
+        memset(&cfg, 0, sizeof(cfg));
 
         wrap_check_init(1, PQOS_RETVAL_OK);
         expect_value(__wrap_hw_mon_reset, cfg, NULL);

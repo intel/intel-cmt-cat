@@ -124,6 +124,17 @@ enum pqos_iordt_config {
         PQOS_REQUIRE_IORDT_ON,      /**< I/O RDT enabled */
 };
 
+enum pqos_snc_mode {
+        PQOS_SNC_LOCAL = 0, /**< Monitor local numa node only */
+        PQOS_SNC_TOTAL,     /**< Monitor all numa nodes */
+};
+
+enum pqos_snc_config {
+        PQOS_REQUIRE_SNC_ANY = 0,   /**< currently enabled configuration */
+        PQOS_REQUIRE_SNC_LOCAL = 1, /**< SNC monitoring local mode */
+        PQOS_REQUIRE_SNC_TOTAL = 2, /**< SNC monitoring total mode */
+};
+
 /**
  * Resource Monitoring ID (RMID) definition
  */
@@ -300,12 +311,14 @@ struct pqos_monitor {
 };
 
 struct pqos_cap_mon {
-        unsigned mem_size;   /**< byte size of the structure */
-        unsigned max_rmid;   /**< max RMID supported by socket */
-        unsigned l3_size;    /**< L3 cache size in bytes */
-        unsigned num_events; /**< number of supported events */
-        int iordt;           /**< I/O RDT monitoring is supported */
-        int iordt_on;        /**< I/O RDT monitoring is enabled */
+        unsigned mem_size;           /**< byte size of the structure */
+        unsigned max_rmid;           /**< max RMID supported by socket */
+        unsigned l3_size;            /**< L3 cache size in bytes */
+        unsigned num_events;         /**< number of supported events */
+        int iordt;                   /**< I/O RDT monitoring is supported */
+        int iordt_on;                /**< I/O RDT monitoring is enabled */
+        unsigned snc_num;            /**< Number of monitoring clusters */
+        enum pqos_snc_mode snc_mode; /**< SNC mode */
         struct pqos_monitor events[0];
 };
 
@@ -344,9 +357,7 @@ struct pqos_coreinfo {
         unsigned l2_id;    /**< L2 cluster id */
         unsigned l3cat_id; /**< L3 CAT classes id */
         unsigned mba_id;   /**< MBA id */
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
-        unsigned numa; /**< numa node in the system */
-#endif
+        unsigned numa;     /**< numa node in the system */
 };
 
 /**
@@ -555,6 +566,7 @@ int pqos_mon_reset(void);
  */
 struct pqos_mon_config {
         enum pqos_iordt_config l3_iordt; /**< requested I/O RDT configuration */
+        enum pqos_snc_config snc;        /**< requested SNC configuration */
 };
 
 /**
@@ -1351,7 +1363,6 @@ unsigned *pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu,
  */
 unsigned *pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu, unsigned *count);
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 /**
  * @brief Retrieves numa id's from cpu info structure
  *
@@ -1362,7 +1373,6 @@ unsigned *pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu, unsigned *count);
  * @retval NULL on error
  */
 unsigned *pqos_cpu_get_numa(const struct pqos_cpuinfo *cpu, unsigned *count);
-#endif
 
 /**
  * @brief Retrieves L2 id's from cpu info structure
@@ -1456,7 +1466,6 @@ int pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
                           const unsigned socket,
                           unsigned *lcore);
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 /**
  * @brief Retrieves one core id from cpu info structure for \a numaid
  *
@@ -1470,7 +1479,6 @@ int pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
 int pqos_cpu_get_one_by_numaid(const struct pqos_cpuinfo *cpu,
                                const unsigned numaid,
                                unsigned *lcore);
-#endif
 
 /**
  * @brief Retrieves one core id from cpu info structure for \a l3cat id
@@ -1524,7 +1532,6 @@ int pqos_cpu_get_socketid(const struct pqos_cpuinfo *cpu,
                           const unsigned lcore,
                           unsigned *socket);
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 /**
  * @brief Retrieves NUMA cluster id for given logical core id
  *
@@ -1538,7 +1545,20 @@ int pqos_cpu_get_socketid(const struct pqos_cpuinfo *cpu,
 int pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
                         const unsigned lcore,
                         unsigned *numa);
-#endif
+
+/**
+ * @brief Retrieves NUMA cluster id for given logical core id
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [in] lcore logical core id
+ * @param [out] numa location to store numa id at
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
+                        const unsigned lcore,
+                        unsigned *numa);
 
 /**
  * @brief Retrieves monitoring cluster id for given logical core id

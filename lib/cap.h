@@ -96,6 +96,16 @@ PQOS_LOCAL void _pqos_cap_mba_change(const enum pqos_mba_config cfg);
 void _pqos_cap_mon_iordt_change(const enum pqos_iordt_config iordt);
 
 /**
+ * @brief Modifies Mon SNC capability structure upon SNC config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for MON & SNC support.
+ *
+ * @param [in] snc SNC configuration
+ */
+PQOS_LOCAL void _pqos_cap_mon_snc_change(const enum pqos_snc_config cfg);
+
+/**
  * @brief Checks library initialization state
  *
  * @param expect expected stated of library initialization state

@@ -97,11 +97,6 @@ ifeq ($(RMID_CUSTOM),y)
 CFLAGS += -DPQOS_RMID_CUSTOM
 endif
 
-# SNC
-ifeq ($(PQOS_SNC),y)
-CFLAGS += -DPQOS_SNC
-endif
-
 # Build targets and dependencies
 SRCS = $(sort $(wildcard *.c))
 OBJS = $(SRCS:.c=.o)

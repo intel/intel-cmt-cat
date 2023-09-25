@@ -42,6 +42,7 @@
 
 #include "cap.h"
 #include "cpu_registers.h"
+#include "cpuinfo.h"
 #include "iordt.h"
 #include "log.h"
 #include "machine.h"
@@ -50,15 +51,10 @@
 #include "uncore_monitoring.h"
 #include "utils.h"
 
+#include <dirent.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
-
-/**
- * ---------------------------------------
- * Local macros
- * ---------------------------------------
- */
 
 /**
  * Special RMID - after reset all cores are associated with it.
@@ -207,6 +203,7 @@ rmid_get_event_max(const struct pqos_cap *cap,
         ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &item);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
+
         ASSERT(item != NULL);
         mon = item->u.mon;
 
@@ -281,7 +278,6 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
 #ifndef PQOS_RMID_CUSTOM
         UNUSED_PARAM(opt);
 #endif
-
         /* Getting max RMID for given event */
         ret = rmid_get_event_max(cap, &rmid, event);
         if (ret != PQOS_RETVAL_OK)
@@ -416,17 +412,20 @@ static uint64_t
 scale_event(const enum pqos_mon_event event, const uint64_t val)
 {
         const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_capability *cap_mon =
+            _pqos_cap_get_type(PQOS_CAP_TYPE_MON);
         const struct pqos_monitor *pmon;
         int ret;
 
         ASSERT(cap != NULL);
+        ASSERT(cap_mon != NULL);
 
         ret = pqos_cap_get_event(cap, event, &pmon);
         ASSERT(ret == PQOS_RETVAL_OK);
         if (ret != PQOS_RETVAL_OK)
                 return val;
         else
-                return val * pmon->scale_factor;
+                return val * pmon->scale_factor / cap_mon->u.mon->snc_num;
 }
 
 int
@@ -484,6 +483,62 @@ hw_mon_assoc_get_core(const unsigned lcore, pqos_rmid_t *rmid)
                 return PQOS_RETVAL_PARAM;
 
         ret = hw_mon_assoc_read(lcore, rmid);
+
+        return ret;
+}
+
+static int
+hw_mon_set_snc_mode(const struct pqos_cpuinfo *cpu, enum pqos_snc_config ns)
+{
+        uint64_t val = 0;
+        uint32_t reg = PQOS_MSR_SNC_CFG;
+        unsigned i, sock_count, *sockets = NULL;
+        int ret;
+
+        if (ns != PQOS_REQUIRE_SNC_TOTAL && ns != PQOS_REQUIRE_SNC_LOCAL)
+                return PQOS_RETVAL_PARAM;
+
+        if (ns == PQOS_REQUIRE_SNC_LOCAL)
+                LOG_INFO("Turning SNC to local mode ...\n");
+        else if (ns == PQOS_REQUIRE_SNC_TOTAL)
+                LOG_INFO("Turning SNC to total mode ...\n");
+
+        sockets = pqos_cpu_get_sockets(cpu, &sock_count);
+        if (sockets == NULL || sock_count == 0) {
+                printf("Error retrieving information for Sockets\n");
+                goto return_error;
+        }
+
+        for (i = 0; i < sock_count; i++) {
+                unsigned lcore;
+
+                ret = pqos_cpu_get_one_core(cpu, sockets[i], &lcore);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Error retrieving lcore for socket %u\n",
+                               sockets[i]);
+                        goto return_error;
+                };
+
+                if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK)
+                        goto return_error;
+
+                val &= ~1;
+                if (ns == PQOS_REQUIRE_SNC_LOCAL)
+                        val |= 1;
+
+                if (msr_write(lcore, reg, val) != MACHINE_RETVAL_OK)
+                        goto return_error;
+        };
+
+        _pqos_cap_mon_snc_change(ns);
+
+        ret = PQOS_RETVAL_OK;
+        goto clean_up;
+return_error:
+        ret = PQOS_RETVAL_ERROR;
+clean_up:
+        if (sockets)
+                free(sockets);
 
         return ret;
 }
@@ -638,6 +693,15 @@ hw_mon_reset(const struct pqos_mon_config *cfg)
                         }
                 }
                 _pqos_cap_mon_iordt_change(cfg->l3_iordt);
+
+                if (cfg->snc != PQOS_REQUIRE_SNC_ANY) {
+                        if (cap_mon->u.mon->snc_num == 1) {
+                                LOG_ERROR("SNC requested but not supported by "
+                                          "the platform!\n");
+                                ret = PQOS_RETVAL_PARAM;
+                        } else
+                                ret = hw_mon_set_snc_mode(cpu, cfg->snc);
+                }
         }
 
         return ret;
@@ -981,16 +1045,24 @@ hw_mon_start_counter(struct pqos_mon_data *group,
 {
         const unsigned num_cores = group->num_cores;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
-        unsigned core2cluster[num_cores];
-        struct pqos_mon_poll_ctx ctxs[num_cores];
+        const struct pqos_capability *cap_mon =
+            _pqos_cap_get_type(PQOS_CAP_TYPE_MON);
+        pqos_rmid_t core2rmid[num_cores];
+        struct pqos_mon_poll_ctx *ctxs = NULL;
         unsigned num_ctxs = 0;
         unsigned i;
         int ret = PQOS_RETVAL_OK;
         enum pqos_mon_event ctx_event = (enum pqos_mon_event)(
             event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW));
+        pqos_rmid_t rmid_min = 1;
+        pqos_rmid_t rmid_numa =
+            cap_mon->u.mon->max_rmid / cap_mon->u.mon->snc_num;
+        pqos_rmid_t rmid_max = rmid_numa - 1;
 
-        memset(ctxs, 0, sizeof(ctxs));
+        ctxs = calloc(num_cores * cap_mon->u.mon->snc_num, sizeof(*ctxs));
+        if (ctxs == NULL)
+                return PQOS_RETVAL_RESOURCE;
 
         /*
          * Initialize poll context table:
@@ -1001,18 +1073,41 @@ hw_mon_start_counter(struct pqos_mon_data *group,
                 const unsigned lcore = group->cores[i];
                 unsigned j;
                 unsigned cluster = 0;
+                unsigned numa = 0;
 
                 ret = pqos_cpu_get_clusterid(cpu, lcore, &cluster);
-                if (ret != PQOS_RETVAL_OK)
-                        return PQOS_RETVAL_PARAM;
-                core2cluster[i] = cluster;
+                if (ret != PQOS_RETVAL_OK) {
+                        ret = PQOS_RETVAL_PARAM;
+                        goto hw_mon_start_counter_exit;
+                }
 
+                /* When SNC in default mode RMID's are assigned on numa node
+                 * basis
+                 */
+                if (cap_mon->u.mon->snc_num > 1 &&
+                    cap_mon->u.mon->snc_mode == PQOS_SNC_LOCAL) {
+                        ret = pqos_cpu_get_numaid(cpu, lcore, &numa);
+                        if (ret != PQOS_RETVAL_OK) {
+                                ret = PQOS_RETVAL_PARAM;
+                                goto hw_mon_start_counter_exit;
+                        }
+                        numa = numa % cap_mon->u.mon->snc_num;
+                        rmid_min = rmid_numa * numa + 1;
+                        rmid_max = rmid_numa * (numa + 1) - 1;
+                }
+
+                /* CORES in the same coluster/numa node share RMID */
                 for (j = 0; j < num_ctxs; j++)
                         if (ctxs[j].lcore == lcore ||
-                            ctxs[j].cluster == cluster)
+                            (ctxs[j].cluster == cluster &&
+                             ctxs[j].numa == numa)) {
+                                core2rmid[i] = ctxs[j].rmid;
                                 break;
+                        }
 
                 if (j >= num_ctxs) {
+                        struct pqos_mon_poll_ctx *ctx = &ctxs[num_ctxs];
+
                         /**
                          * New cluster is found
                          * - save cluster id in the table
@@ -1020,20 +1115,36 @@ hw_mon_start_counter(struct pqos_mon_data *group,
                          */
                         ctxs[num_ctxs].lcore = lcore;
                         ctxs[num_ctxs].cluster = cluster;
+                        ctxs[num_ctxs].numa = numa;
 
-                        ret = hw_mon_assoc_unused(&ctxs[num_ctxs], ctx_event, 1,
-                                                  UINT32_MAX, opt);
+                        ret = hw_mon_assoc_unused(&ctxs[num_ctxs], ctx_event,
+                                                  rmid_min, rmid_max, opt);
                         if (ret != PQOS_RETVAL_OK)
-                                return ret;
+                                goto hw_mon_start_counter_exit;
 
+                        core2rmid[i] = ctx->rmid;
                         num_ctxs++;
+
+                        /* In shared mode - monitor all numa nodes */
+                        if (cap_mon->u.mon->snc_mode == PQOS_SNC_TOTAL) {
+                                unsigned c;
+
+                                for (c = 1; c < cap_mon->u.mon->snc_num; ++c) {
+                                        ctxs[num_ctxs] = ctxs[num_ctxs - 1];
+                                        ctxs[num_ctxs].rmid += rmid_numa;
+                                        ctxs[num_ctxs].quiet = 1;
+                                        num_ctxs++;
+                                }
+                        }
                 }
         }
 
-        group->intl->hw.ctx = (struct pqos_mon_poll_ctx *)calloc(
-            num_ctxs, sizeof(group->intl->hw.ctx[0]));
-        if (group->intl->hw.ctx == NULL)
-                return PQOS_RETVAL_RESOURCE;
+        group->intl->hw.ctx = realloc(ctxs, num_ctxs * sizeof(*ctxs));
+        if (group->intl->hw.ctx == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto hw_mon_start_counter_exit;
+        }
+        ctxs = NULL;
 
         /**
          * Associate requested cores with
@@ -1041,38 +1152,26 @@ hw_mon_start_counter(struct pqos_mon_data *group,
          */
         group->num_cores = num_cores;
         for (i = 0; i < num_cores; i++) {
-                unsigned cluster, j;
-                pqos_rmid_t rmid;
-
-                cluster = core2cluster[i];
-                for (j = 0; j < num_ctxs; j++)
-                        if (ctxs[j].cluster == cluster)
-                                break;
-                if (j >= num_ctxs) {
-                        ret = PQOS_RETVAL_ERROR;
-                        goto hw_mon_start_counter_exit;
-                }
-                rmid = ctxs[j].rmid;
+                pqos_rmid_t rmid = core2rmid[i];
 
                 ret = hw_mon_assoc_write(group->cores[i], rmid);
                 if (ret != PQOS_RETVAL_OK)
-                        goto hw_mon_start_counter_exit;
+                        break;
         }
 
-        group->intl->hw.num_ctx = num_ctxs;
-        for (i = 0; i < num_ctxs; i++)
-                group->intl->hw.ctx[i] = ctxs[i];
-
-        group->intl->hw.event |= ctx_event;
-
-hw_mon_start_counter_exit:
-        if (ret != PQOS_RETVAL_OK) {
+        if (ret == PQOS_RETVAL_OK) {
+                group->intl->hw.num_ctx = num_ctxs;
+                group->intl->hw.event |= ctx_event;
+        } else {
                 for (i = 0; i < num_cores; i++)
                         (void)hw_mon_assoc_write(group->cores[i], RMID0);
-
                 if (group->intl->hw.ctx != NULL)
                         free(group->intl->hw.ctx);
         }
+
+hw_mon_start_counter_exit:
+        if (ctxs != NULL)
+                free(ctxs);
 
         return ret;
 }
@@ -1555,7 +1654,8 @@ hw_mon_stop(struct pqos_mon_data *group)
                 ret = hw_mon_assoc_read(lcore, &rmid);
                 if (ret != PQOS_RETVAL_OK)
                         return PQOS_RETVAL_PARAM;
-                if (rmid != group->intl->hw.ctx[i].rmid)
+                if (rmid != group->intl->hw.ctx[i].rmid &&
+                    !group->intl->hw.ctx[i].quiet)
                         LOG_WARN("Core %u RMID association changed from %u "
                                  "to %u! The core has been hijacked!\n",
                                  lcore, group->intl->hw.ctx[i].rmid, rmid);

@@ -219,6 +219,21 @@ cap_print_features_mon(const unsigned indent,
 
         printf_indent(indent, "Monitoring\n");
 
+        if (mon->snc_num > 1) {
+                const char *snc_state = "";
+
+                switch (mon->snc_mode) {
+                case PQOS_SNC_LOCAL:
+                        snc_state = "local";
+                        break;
+                case PQOS_SNC_TOTAL:
+                        snc_state = "total";
+                        break;
+                };
+                printf_indent(indent + 4, "Sub-NUMA Clustering: %s\n",
+                              snc_state);
+        }
+
         if (strlen(buffer_cache) > 0) {
                 printf_indent(indent + 4,
                               "Cache Monitoring Technology (CMT) events:\n");

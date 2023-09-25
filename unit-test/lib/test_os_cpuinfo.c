@@ -42,65 +42,59 @@
 #define CORE_OFFLINE 3
 #define CORE_COUNT   6
 struct pqos_coreinfo cores[CORE_COUNT] = {
-    {.lcore = 0,
-     .socket = 0,
-     .l3_id = 0,
-     .l2_id = 0,
-     .l3cat_id = 0,
-     .mba_id = 0,
-#if PQOS_VERSION >= 50000
-     .numa = 0
-#endif
+    {
+        .lcore = 0,
+        .socket = 0,
+        .l3_id = 0,
+        .l2_id = 0,
+        .l3cat_id = 0,
+        .mba_id = 0,
+        .numa = 0,
     },
-    {.lcore = 1,
-     .socket = 0,
-     .l3_id = 0,
-     .l2_id = 0,
-     .l3cat_id = 0,
-     .mba_id = 0,
-#if PQOS_VERSION >= 50000
-     .numa = 0
-#endif
+    {
+        .lcore = 1,
+        .socket = 0,
+        .l3_id = 0,
+        .l2_id = 0,
+        .l3cat_id = 0,
+        .mba_id = 0,
+        .numa = 0,
     },
-    {.lcore = 2,
-     .socket = 0,
-     .l3_id = 0,
-     .l2_id = 1,
-     .l3cat_id = 0,
-     .mba_id = 0,
-#if PQOS_VERSION >= 50000
-     .numa = 1
-#endif
+    {
+        .lcore = 2,
+        .socket = 0,
+        .l3_id = 0,
+        .l2_id = 1,
+        .l3cat_id = 0,
+        .mba_id = 0,
+        .numa = 1,
     },
-    {.lcore = 3,
-     .socket = 0,
-     .l3_id = 0,
-     .l2_id = 1,
-     .l3cat_id = 0,
-     .mba_id = 0,
-#if PQOS_VERSION >= 50000
-     .numa = 1
-#endif
+    {
+        .lcore = 3,
+        .socket = 0,
+        .l3_id = 0,
+        .l2_id = 1,
+        .l3cat_id = 0,
+        .mba_id = 0,
+        .numa = 1,
     },
-    {.lcore = 4,
-     .socket = 1,
-     .l3_id = 1,
-     .l2_id = 2,
-     .l3cat_id = 0,
-     .mba_id = 1,
-#if PQOS_VERSION >= 50000
-     .numa = 2
-#endif
+    {
+        .lcore = 4,
+        .socket = 1,
+        .l3_id = 1,
+        .l2_id = 2,
+        .l3cat_id = 0,
+        .mba_id = 1,
+        .numa = 2,
     },
-    {.lcore = 5,
-     .socket = 1,
-     .l3_id = 1,
-     .l2_id = 2,
-     .l3cat_id = 0,
-     .mba_id = 1,
-#if PQOS_VERSION >= 50000
-     .numa = 2
-#endif
+    {
+        .lcore = 5,
+        .socket = 1,
+        .l3_id = 1,
+        .l2_id = 2,
+        .l3cat_id = 0,
+        .mba_id = 1,
+        .numa = 2,
     },
 };
 
@@ -165,7 +159,6 @@ os_cpuinfo_cpu_cache(unsigned lcore, unsigned *l3, unsigned *l2)
         return mock_type(int);
 }
 
-#if PQOS_VERSION >= 50000
 int
 os_cpuinfo_cpu_node(unsigned lcore, unsigned *node)
 {
@@ -175,7 +168,6 @@ os_cpuinfo_cpu_node(unsigned lcore, unsigned *node)
 
         return mock_type(int);
 }
-#endif
 
 /* ======== os_cpuinfo_topology ======== */
 
@@ -189,9 +181,7 @@ test_os_cpuinfo_topology(void **state __attribute__((unused)))
         will_return(__wrap_scandir, CORE_COUNT);
 
         will_return_always(os_cpuinfo_cpu_socket, PQOS_RETVAL_OK);
-#if PQOS_VERSION >= 50000
         will_return_always(os_cpuinfo_cpu_node, PQOS_RETVAL_OK);
-#endif
         will_return_always(os_cpuinfo_cpu_cache, PQOS_RETVAL_OK);
 
         cpuinfo = os_cpuinfo_topology();
@@ -204,9 +194,7 @@ test_os_cpuinfo_topology(void **state __attribute__((unused)))
                 assert_int_equal(cpuinfo->cores[i].socket, cores[lcore].socket);
                 assert_int_equal(cpuinfo->cores[i].l3_id, cores[lcore].l3_id);
                 assert_int_equal(cpuinfo->cores[i].l2_id, cores[lcore].l2_id);
-#if PQOS_VERSION >= 50000
                 assert_int_equal(cpuinfo->cores[i].numa, cores[lcore].numa);
-#endif
         }
 
         free(cpuinfo);
@@ -229,19 +217,15 @@ test_os_cpuinfo_topology_error(void **state __attribute__((unused)))
         assert_null(cpuinfo);
 
         will_return_always(os_cpuinfo_cpu_socket, PQOS_RETVAL_OK);
-#if PQOS_VERSION >= 50000
         expect_string(__wrap_scandir, dirp, SYSTEM_CPU);
         will_return(__wrap_scandir, CORE_COUNT);
         will_return(os_cpuinfo_cpu_node, PQOS_RETVAL_ERROR);
         cpuinfo = os_cpuinfo_topology();
         assert_null(cpuinfo);
-#endif
 
         expect_string(__wrap_scandir, dirp, SYSTEM_CPU);
         will_return(__wrap_scandir, CORE_COUNT);
-#if PQOS_VERSION >= 50000
         will_return_always(os_cpuinfo_cpu_node, PQOS_RETVAL_OK);
-#endif
         will_return(os_cpuinfo_cpu_cache, PQOS_RETVAL_ERROR);
         cpuinfo = os_cpuinfo_topology();
         assert_null(cpuinfo);

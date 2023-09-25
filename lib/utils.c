@@ -170,7 +170,6 @@ pqos_cpu_get_sockets(const struct pqos_cpuinfo *cpu, unsigned *count)
         return sockets;
 }
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 unsigned *
 pqos_cpu_get_numa(const struct pqos_cpuinfo *cpu, unsigned *count)
 {
@@ -202,7 +201,6 @@ pqos_cpu_get_numa(const struct pqos_cpuinfo *cpu, unsigned *count)
         *count = ncount;
         return numa;
 }
-#endif /* PQOS_SNC */
 
 unsigned *
 pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu, unsigned *count)
@@ -347,7 +345,6 @@ pqos_cpu_get_one_core(const struct pqos_cpuinfo *cpu,
         return PQOS_RETVAL_ERROR;
 }
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 int
 pqos_cpu_get_one_by_numaid(const struct pqos_cpuinfo *cpu,
                            const unsigned numaid,
@@ -369,7 +366,6 @@ pqos_cpu_get_one_by_numaid(const struct pqos_cpuinfo *cpu,
 
         return PQOS_RETVAL_ERROR;
 }
-#endif
 
 int
 pqos_cpu_get_one_by_l3cat_id(const struct pqos_cpuinfo *cpu,
@@ -472,7 +468,6 @@ pqos_cpu_get_socketid(const struct pqos_cpuinfo *cpu,
         return PQOS_RETVAL_ERROR;
 }
 
-#if (PQOS_VERSION >= 50000 || defined PQOS_SNC)
 int
 pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
                     const unsigned lcore,
@@ -491,7 +486,6 @@ pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
 
         return PQOS_RETVAL_ERROR;
 }
-#endif /* PQOS_SNC */
 
 int
 pqos_cpu_get_clusterid(const struct pqos_cpuinfo *cpu,
@@ -520,16 +514,12 @@ pqos_cap_get_type(const struct pqos_cap *cap,
         int ret = PQOS_RETVAL_RESOURCE;
         unsigned i;
 
-        ASSERT(cap != NULL && cap_item != NULL);
         if (cap == NULL || cap_item == NULL)
                 return PQOS_RETVAL_PARAM;
-
-        *cap_item = NULL;
-
-        ASSERT(type < PQOS_CAP_TYPE_NUMOF);
         if (type >= PQOS_CAP_TYPE_NUMOF)
                 return PQOS_RETVAL_PARAM;
 
+        *cap_item = NULL;
         for (i = 0; i < cap->num_cap; i++) {
                 if (cap->capabilities[i].type != type)
                         continue;

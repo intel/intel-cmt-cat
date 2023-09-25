@@ -81,8 +81,8 @@ PQOS_LOCAL int hw_mon_reset_iordt(const struct pqos_cpuinfo *cpu,
 /**
  * @brief Hardware interface to reset monitoring by binding all cores with RMID0
  *
- * As part of monitoring reset I/O RDT reconfiguration can be performed. This
- * can be requested via \a cfg.
+ * As part of monitoring reset I/O RDT * SNC reconfiguration can be performed.
+ * This can be requested via \a cfg.
  *
  * @param [in] cfg requested configuration
  * @return Operations status

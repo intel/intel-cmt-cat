@@ -50,6 +50,8 @@ extern "C" {
 struct pqos_mon_poll_ctx {
         unsigned lcore;
         unsigned cluster;
+        unsigned numa;
+        uint8_t quiet; /**< Do not warn abut RMID hijacking */
         pqos_rmid_t rmid;
 };
 

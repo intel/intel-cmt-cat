@@ -108,6 +108,7 @@ $(OBJ_DIR)/hw_cap.o: $(LIB_DIR)/hw_cap.c $(OBJ_DIR)/hw_cap.d
 		--globalize-symbol=hw_cap_l3ca_cdp --weaken-symbol=hw_cap_l3ca_cdp \
 		--globalize-symbol=hw_cap_l3ca_iordt --weaken-symbol=hw_cap_l3ca_iordt \
 		--globalize-symbol=hw_cap_l2ca_cdp --weaken-symbol=hw_cap_l2ca_cdp \
+		--globalize-symbol=hw_cap_mon_snc_state --weaken-symbol=hw_cap_mon_snc_state \
 		$@
 
 $(OBJ_DIR)/resctrl_alloc.o: $(LIB_DIR)/resctrl_alloc.c $(OBJ_DIR)/resctrl_alloc.d

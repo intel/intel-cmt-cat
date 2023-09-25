@@ -49,6 +49,24 @@ extern "C" {
  */
 PQOS_LOCAL struct pqos_cpuinfo *os_cpuinfo_topology(void);
 
+/**
+ * @brief Helper function to get number of numa nodes in the system form
+ *        kernel filesystem
+ *
+ * @return Number of numa nodes in the system
+ * @retval -1 if not successful
+ */
+PQOS_LOCAL int os_cpuinfo_get_numa_num(void);
+
+/**
+ * @brief Helper function to get number of sockets in the system
+ *
+ * @return Number of sockets in the system
+ * @retval 0 if not successful
+ */
+
+PQOS_LOCAL int os_cpuinfo_get_socket_num(void);
+
 #ifdef __cplusplus
 }
 #endif

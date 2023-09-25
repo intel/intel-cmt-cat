@@ -89,7 +89,7 @@ hw_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
         assert_non_null(ctx);
         check_expected(event);
         assert_int_equal(min_rmid, 1);
-        assert_int_equal(max_rmid, UINT32_MAX);
+        check_expected(max_rmid);
         assert_non_null(opt);
 
         ctx->rmid = mock_type(int);
@@ -123,6 +123,8 @@ test_hw_mon_start_counter(void **state)
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_assoc_unused, event, event);
+        expect_value(hw_mon_assoc_unused, max_rmid,
+                     data->cap_mon->max_rmid - 1);
         will_return(hw_mon_assoc_unused, 1);
         will_return(hw_mon_assoc_unused, PQOS_RETVAL_OK);
 
@@ -165,10 +167,14 @@ test_hw_mon_start_counter_core_group(void **state)
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
 
         expect_value(hw_mon_assoc_unused, event, event);
+        expect_value(hw_mon_assoc_unused, max_rmid,
+                     data->cap_mon->max_rmid - 1);
         will_return(hw_mon_assoc_unused, 1);
         will_return(hw_mon_assoc_unused, PQOS_RETVAL_OK);
 
         expect_value(hw_mon_assoc_unused, event, event);
+        expect_value(hw_mon_assoc_unused, max_rmid,
+                     data->cap_mon->max_rmid - 1);
         will_return(hw_mon_assoc_unused, 2);
         will_return(hw_mon_assoc_unused, PQOS_RETVAL_OK);
 
