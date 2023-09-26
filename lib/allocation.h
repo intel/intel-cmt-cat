@@ -312,6 +312,23 @@ PQOS_LOCAL int hw_alloc_reset_cos(const unsigned msr_start,
                                   const uint64_t msr_val);
 
 /**
+ * @brief Writes range of MBA/CAT COS MSR's with \a msr_val value
+ *
+ * Used as part of CAT/MBA reset process.
+ *
+ * @param [in] mba_ids_num Number of items in \a mba_ids array
+ * @param [in] mba_ids Array with MBA IDs
+ * @param [in] enable MBA 4.0 enable flag, 1 - enable, 0 - disable
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ */
+PQOS_LOCAL int hw_alloc_reset_mba40(const unsigned mba_ids_num,
+                                    const unsigned *mba_ids,
+                                    const int enable);
+
+/**
  * @brief Hardware interface to set classes of service
  *        defined by \a ca on \a l3cat_id
  *

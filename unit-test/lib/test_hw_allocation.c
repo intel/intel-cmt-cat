@@ -1185,6 +1185,8 @@ test_hw_alloc_reset_unsupported_l3ca(void **state)
         int ret;
         struct pqos_alloc_config cfg;
 
+        memset(&cfg, 0, sizeof(cfg));
+
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap_cpuinfo_get_config, &data->config);
@@ -1263,7 +1265,7 @@ test_hw_alloc_reset_unsupported_l2ca(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
-        will_return_always(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap_cpuinfo_get_config, &data->config);
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.l2_cdp = PQOS_REQUIRE_CDP_ON;
@@ -1307,7 +1309,7 @@ test_hw_alloc_reset_unsupported_mba(void **state)
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
-        will_return_always(__wrap_cpuinfo_get_config, &data->config);
+        will_return_maybe(__wrap_cpuinfo_get_config, &data->config);
 
         memset(&cfg, 0, sizeof(cfg));
         cfg.mba = PQOS_MBA_DEFAULT;

@@ -963,6 +963,73 @@ hw_cap_l2ca_discover(struct pqos_cap_l2ca *cap, const struct pqos_cpuinfo *cpu)
         return ret;
 }
 
+static int
+is_mba40_supported(unsigned core, unsigned *supported)
+{
+        int ret;
+        uint64_t reg = 0;
+
+        *supported = 0;
+
+        ret = msr_read(core, PQOS_MSR_CORE_CAPABILITIES, &reg);
+        if (ret != MACHINE_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
+
+        if (reg & PQOS_MSR_CORE_CAPABILITIES_MBA40_EN)
+                *supported = 1;
+
+        return PQOS_RETVAL_OK;
+}
+
+static int
+detect_mba40(const struct pqos_cpuinfo *cpu, unsigned *supported)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned *mba_ids;
+        unsigned mba_id_num;
+        unsigned i;
+
+        *supported = 0;
+
+        /* MBA IDs */
+        mba_ids = pqos_cpu_get_mba_ids(cpu, &mba_id_num);
+        if (mba_ids == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        /*
+         * Detect MBA 4.0 extensions support
+         * Checking all cores to log a debug message
+         */
+        for (i = 0; i < mba_id_num; i++) {
+                unsigned core_supported = 0;
+                unsigned num_cores = 0;
+                unsigned *cores = NULL;
+                unsigned j;
+
+                cores = pqos_cpu_get_cores(cpu, mba_ids[i], &num_cores);
+                if (cores == NULL) {
+                        *supported = 0;
+                        ret = PQOS_RETVAL_ERROR;
+                        break;
+                }
+
+                for (j = 0; j < num_cores; j++) {
+                        ret = is_mba40_supported(cores[j], &core_supported);
+                        if (ret == PQOS_RETVAL_OK && core_supported) {
+                                *supported = 1;
+                                LOG_DEBUG("MBA 4.0 available for core %u\n",
+                                          cores[j]);
+                        }
+                }
+
+                free(cores);
+        }
+
+        free(mba_ids);
+
+        return ret;
+}
+
 int
 hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
@@ -970,6 +1037,8 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         int ret = PQOS_RETVAL_OK;
         unsigned version;
         unsigned mba_thread_ctrl = 0;
+        unsigned msr_core_caps_available = 0;
+        unsigned mba40_supported = 0;
 
         ASSERT(cpu != NULL);
         ASSERT(cap != NULL);
@@ -987,6 +1056,13 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         if (!(res.ebx & (1 << 15))) {
                 LOG_INFO("CPUID.0x7.0: MBA not supported\n");
                 return PQOS_RETVAL_RESOURCE;
+        }
+
+        if (res.edx & (1 << 30)) {
+                msr_core_caps_available = 1;
+                LOG_INFO("CPUID.0x7.0: CORE_CAPABILITIES MSR (0x%X) "
+                         "available\n",
+                         PQOS_MSR_CORE_CAPABILITIES);
         }
 
         /**
@@ -1012,10 +1088,18 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 
         /*
          * Detect MBA version
+         *  - MBA4.0 extensions
          *  - MBA3.0 introduces per-thread MBA controls
          *  - MBA2.0 increases number of MBA COS to 15
          */
-        if (res.ecx & 0x1) {
+        if (msr_core_caps_available)
+                detect_mba40(cpu, &mba40_supported);
+
+        if (mba40_supported) {
+                version = 4;
+                cap->mba40 = 1;
+                mba_thread_ctrl = 1;
+        } else if (res.ecx & 0x1) {
                 version = 3;
                 mba_thread_ctrl = 1;
         } else if (cap->num_classes > 8)
@@ -1027,7 +1111,7 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         LOG_INFO("Detected Per-%s MBA controls\n",
                  mba_thread_ctrl ? "Thread" : "Core");
 
-        if (version == 2) {
+        if ((version == 2) || (version >= 4)) {
                 unsigned *mba_ids;
                 unsigned mba_id_num;
                 unsigned i;
@@ -1053,10 +1137,23 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
                                 break;
                         }
 
-                        if (reg & 0x2)
+                        if ((version == 2) && (reg & 0x2))
                                 LOG_INFO(
                                     "MBA Legacy Mode enabled on socket %u\n",
                                     mba_ids[i]);
+
+                        if (version >= 4) {
+                                if (reg & PQOS_MSR_MBA_CFG_MBA40_EN)
+                                        cap->mba40_on = 1;
+                                else
+                                        cap->mba40_on = 0;
+
+                                LOG_INFO(
+                                    "MBA 4.0 extensions %s for socket %u\n",
+                                    cap->mba40_on ? "enabled" : "disabled",
+                                    mba_ids[i]);
+                        }
+
                         if (!mba_thread_ctrl)
                                 LOG_INFO("%s MBA delay enabled on socket %u\n",
                                          (reg & 0x1) ? "Min" : "Max",

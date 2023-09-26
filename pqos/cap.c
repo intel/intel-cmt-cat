@@ -342,6 +342,8 @@ cap_print_features_mba(const unsigned indent,
                        const struct pqos_cap_mba *mba,
                        const int verbose)
 {
+        const char *mba40_status = "unsupported";
+
         ASSERT(mba != NULL);
 
         printf_indent(indent, "Memory Bandwidth Allocation (MBA)\n");
@@ -368,6 +370,15 @@ cap_print_features_mba(const unsigned indent,
         printf_indent(indent + 4, "Min B/W: %u\n", 100 - mba->throttle_max);
         printf_indent(indent + 4, "Type: %s\n",
                       mba->is_linear ? "linear" : "nonlinear");
+
+        if (mba->mba40) {
+                if (mba->mba40_on)
+                        mba40_status = "enabled";
+                else
+                        mba40_status = "disabled";
+        }
+
+        printf_indent(indent + 4, "MBA 4.0 extensions: %s\n", mba40_status);
 }
 
 /**

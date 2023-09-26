@@ -1471,6 +1471,45 @@ hw_alloc_reset_assoc_channels(void)
 }
 
 int
+hw_alloc_reset_mba40(const unsigned mba_ids_num,
+                     const unsigned *mba_ids,
+                     const int enable)
+{
+        unsigned i = 0;
+        int ret;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+
+        ASSERT(mba_ids_num > 0 && mba_ids != NULL);
+
+        LOG_INFO("%s MBA 4.0 across clusters...\n",
+                 (enable) ? "Enabling" : "Disabling");
+
+        for (i = 0; i < mba_ids_num; i++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_mba_id(cpu, mba_ids[i], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                ret = msr_read(core, PQOS_MSR_MBA_CFG, &reg);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                if (enable)
+                        reg |= PQOS_MSR_MBA_CFG_MBA40_EN;
+                else
+                        reg &= ~PQOS_MSR_MBA_CFG_MBA40_EN;
+
+                ret = msr_write(core, PQOS_MSR_MBA_CFG, reg);
+                if (ret != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
 hw_alloc_reset(const struct pqos_alloc_config *cfg)
 {
         unsigned *l3cat_ids = NULL;
@@ -1494,6 +1533,7 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         enum pqos_iordt_config l3_iordt_cfg = PQOS_REQUIRE_IORDT_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        enum pqos_feature_cfg mba40_cfg = PQOS_FEATURE_ANY;
 
         ASSERT(cfg == NULL || cfg->l3_cdp == PQOS_REQUIRE_CDP_ON ||
                cfg->l3_cdp == PQOS_REQUIRE_CDP_OFF ||
@@ -1506,6 +1546,10 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
         ASSERT(cfg == NULL || cfg->mba == PQOS_MBA_DEFAULT ||
                cfg->mba == PQOS_MBA_CTRL || cfg->mba == PQOS_MBA_ANY);
 
+        ASSERT(cfg == NULL || cfg->mba40 == PQOS_FEATURE_ON ||
+               cfg->mba40 == PQOS_FEATURE_OFF ||
+               cfg->mba40 == PQOS_FEATURE_ANY);
+
         cpuinfo_get_config(&vconfig);
 
         if (cfg != NULL) {
@@ -1513,6 +1557,7 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 l3_iordt_cfg = cfg->l3_iordt;
                 l2_cdp_cfg = cfg->l2_cdp;
                 mba_cfg = cfg->mba;
+                mba40_cfg = cfg->mba40;
         }
 
         /* Get L3 CAT capabilities */
@@ -1563,6 +1608,13 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 ret = PQOS_RETVAL_RESOURCE;
                 goto pqos_alloc_reset_exit;
         }
+        /* Check MBA 4.0 requested while not present */
+        if (mba_cap == NULL && mba40_cfg != PQOS_FEATURE_ANY) {
+                LOG_ERROR("MBA 4.0 setting requested but no MBA present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto pqos_alloc_reset_exit;
+        }
+
         if (l3_cap != NULL) {
                 /* Check against erroneous L3 CDP request */
                 if (l3_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l3_cap->cdp) {
@@ -1585,6 +1637,7 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 if (l3_cap->cdp && l3_cap->cdp_on)
                         max_l3_cos = max_l3_cos * 2;
         }
+
         if (l2_cap != NULL) {
                 /* Check against erroneous L2 CDP request */
                 if (l2_cdp_cfg == PQOS_REQUIRE_CDP_ON && !l2_cap->cdp) {
@@ -1599,11 +1652,21 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                 if (l2_cap->cdp && l2_cap->cdp_on)
                         max_l2_cos = max_l2_cos * 2;
         }
-        if (mba_cap != NULL && mba_cfg == PQOS_MBA_CTRL) {
-                LOG_ERROR("MBA CTRL requested but not supported by the "
-                          "platform!\n");
-                ret = PQOS_RETVAL_PARAM;
-                goto pqos_alloc_reset_exit;
+
+        if (mba_cap != NULL) {
+                if (mba_cfg == PQOS_MBA_CTRL) {
+                        LOG_ERROR("MBA CTRL requested but not supported by the "
+                                  "platform!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto pqos_alloc_reset_exit;
+                }
+
+                if (!mba_cap->mba40 && mba40_cfg == PQOS_FEATURE_ON) {
+                        LOG_ERROR("MBA 4.0 extensions requested but "
+                                  "not supported by the platform!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto pqos_alloc_reset_exit;
+                }
         }
 
         if (l3_cap != NULL) {
@@ -1790,6 +1853,29 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
                         }
                 }
                 _pqos_cap_l2cdp_change(l2_cdp_cfg);
+        }
+
+        /**
+         * Enable/disable MBA 4.0 extensions as requested
+         */
+        if (mba_cap != NULL) {
+                if (mba40_cfg == PQOS_FEATURE_ON && !mba_cap->mba40_on) {
+                        LOG_INFO("Enabling MBA 4.0 extensions...\n");
+                        ret = hw_alloc_reset_mba40(mba_id_num, mba_ids, 1);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("MBA 4.0 enable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+                }
+
+                if (mba40_cfg == PQOS_FEATURE_OFF && mba_cap->mba40_on) {
+                        LOG_INFO("Disabling MBA 4.0 extensions...\n");
+                        ret = hw_alloc_reset_mba40(mba_id_num, mba_ids, 0);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("MBA 4.0 disable error!\n");
+                                goto pqos_alloc_reset_exit;
+                        }
+                }
         }
 
 pqos_alloc_reset_exit:

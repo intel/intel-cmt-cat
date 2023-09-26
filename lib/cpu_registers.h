@@ -79,8 +79,20 @@ extern "C" {
 #define PQOS_MSR_L2_QOS_CFG        0xC82 /**< L2 CAT config register */
 #define PQOS_MSR_L2_QOS_CFG_CDP_EN 1ULL  /**< L2 CDP enable bit */
 
-#define PQOS_MSR_MBA_CFG 0xC84 /**< MBA config register */
-#define PQOS_MSR_SNC_CFG 0xCA0 /**< SNC config register */
+#define PQOS_MSR_SNC_CFG          0xCA0       /**< SNC config register */
+#define PQOS_MSR_MBA_CFG          0xC84       /**< MBA config register */
+#define PQOS_MSR_MBA_CFG_MBA40_EN (1ULL << 2) /**< MBA 4.0 enable bit */
+
+/**
+ * Core Capabilities MSR register
+ */
+#define PQOS_MSR_CORE_CAPABILITIES 0xCF
+
+/**
+ * MBA 4.0 presence bit
+ */
+#define PQOS_MSR_CORE_CAPABILITIES_MBA40_EN (1ULL << 10)
+
 /**
  * MBA linear max value
  */

@@ -101,11 +101,18 @@ enum pqos_interface {
  * =======================================
  */
 
+enum pqos_feature_cfg {
+        PQOS_FEATURE_ANY = 0, /**< feature status does not matter */
+        PQOS_FEATURE_OFF,     /**< feature disabled */
+        PQOS_FEATURE_ON,      /**< feature enabled */
+};
+
 enum pqos_cdp_config {
-        PQOS_REQUIRE_CDP_ANY = 0, /**< app will work with any CDP
-                                     setting */
-        PQOS_REQUIRE_CDP_OFF,     /**< app not compatible with CDP */
-        PQOS_REQUIRE_CDP_ON,      /**< app requires CDP */
+        PQOS_REQUIRE_CDP_OFF = PQOS_FEATURE_OFF, /**< app not compatible
+                                                    with CDP */
+        PQOS_REQUIRE_CDP_ON = PQOS_FEATURE_ON,   /**< app requires CDP */
+        PQOS_REQUIRE_CDP_ANY = PQOS_FEATURE_ANY  /**< app will work with any
+                                                    CDP setting */
 };
 
 /**
@@ -263,6 +270,8 @@ struct pqos_cap_mba {
         int is_linear;          /**< the type of MBA linear/nonlinear */
         int ctrl;               /**< MBA controller support */
         int ctrl_on;            /**< MBA controller enabled */
+        int mba40;              /**< MBA 4.0 extensions support */
+        int mba40_on;           /**< MBA 4.0 extensions enabled */
 };
 
 /**
@@ -1005,12 +1014,9 @@ int pqos_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-#if PQOS_VERSION >= 50000
-PQOS_DEPRECATED
-#endif
-int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                     const enum pqos_cdp_config l2_cdp_cfg,
-                     const enum pqos_mba_config mba_cfg);
+PQOS_DEPRECATED int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+                                     const enum pqos_cdp_config l2_cdp_cfg,
+                                     const enum pqos_mba_config mba_cfg);
 
 /**
  * Configuration of allocation
@@ -1019,8 +1025,9 @@ struct pqos_alloc_config {
         enum pqos_cdp_config l3_cdp;     /**< requested L3 CAT CDP config */
         enum pqos_cdp_config l2_cdp;     /**< requested L2 CAT CDP config */
         enum pqos_mba_config mba;        /**< requested MBA config */
+        enum pqos_feature_cfg mba40;     /**< requested MBA 4.0 config */
         enum pqos_iordt_config l3_iordt; /**< requested L3 I/O RDT config */
-        int reserved[4];                 /**< reserved for future use */
+        int reserved[5];                 /**< reserved for future use */
 };
 
 /**
@@ -1700,6 +1707,19 @@ int pqos_l2ca_cdp_enabled(const struct pqos_cap *cap,
 int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
                           int *ctrl_supported,
                           int *ctrl_enabled);
+
+/**
+ * @brief Retrieved MBA 4.0 extensions configuration status
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] mba40_supported place to store MBA 4.0 support status
+ * @param [out] mba40_enabled place to store MBA 4.0 enable status
+ *
+ */
+int pqos_mba40_enabled(const struct pqos_cap *cap,
+                       int *mba40_supported,
+                       int *mba40_enabled);
 
 /**
  * @brief returns the CPU vendor identification

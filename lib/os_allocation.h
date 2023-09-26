@@ -195,6 +195,9 @@ PQOS_LOCAL int os_alloc_reset_tasks(void);
  * As part of allocation reset I/O RDT reconfiguration can be performed.
  * This can be requested via \a cfg.
  *
+ * As part of allocation reset MBA 4.0 reconfiguration can be performed.
+ * This can be requested via \a cfg.
+ *
  * @param [in] cfg requested configuration
  *
  * @return Operation status
