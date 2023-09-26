@@ -1457,13 +1457,8 @@ pqos_mon_get_value(const struct pqos_mon_data *const group,
                 _delta = group->values.llc_misses_delta;
                 break;
         case PQOS_PERF_EVENT_LLC_REF:
-#if PQOS_VERSION >= 50000
                 _value = group->values.llc_references;
                 _delta = group->values.llc_references_delta;
-#else
-                _value = group->intl->values.llc_references;
-                _delta = group->intl->values.llc_references_delta;
-#endif
                 break;
         case PQOS_PERF_EVENT_LLC_MISS_PCIE_READ:
                 _value = group->intl->values.pcie.llc_misses.read;

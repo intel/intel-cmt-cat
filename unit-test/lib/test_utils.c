@@ -847,7 +847,6 @@ main(void)
         const struct CMUnitTest tests_unsupported[] = {
             cmocka_unit_test(test_pqos_l3ca_iordt_enabled_unsupported)};
 
-#if PQOS_VERSION >= 50000
         const struct CMUnitTest tests_snc[] = {
             cmocka_unit_test(test_utils_pqos_cpu_get_numa_empty),
             cmocka_unit_test(test_utils_pqos_cpu_get_numa),
@@ -859,7 +858,6 @@ main(void)
             cmocka_unit_test(test_pqos_cpu_get_one_by_numaid),
             cmocka_unit_test(test_pqos_cpu_get_one_by_numaid_param),
         };
-#endif
 
         const struct CMUnitTest tests_all[] = {
             cmocka_unit_test(test__pqos_cap_get_type_param),
@@ -904,9 +902,7 @@ main(void)
         result += cmocka_run_group_tests(tests_l3, test_init_l3ca, test_fini);
         result += cmocka_run_group_tests(tests_unsupported,
                                          test_init_unsupported, test_fini);
-#if PQOS_VERSION >= 50000
         result += cmocka_run_group_tests(tests_snc, NULL, NULL);
-#endif
         result += cmocka_run_group_tests(tests_all, test_init_all, test_fini);
         result += cmocka_run_group_tests(tests_l3ca, test_init_l3ca, test_fini);
         result += cmocka_run_group_tests(tests_l2ca, test_init_l2ca, test_fini);

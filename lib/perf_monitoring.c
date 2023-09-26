@@ -674,17 +674,10 @@ perf_mon_poll(struct pqos_mon_data *group, enum pqos_mon_event event)
                     get_delta(old_value, group->values.llc_misses);
                 break;
         case PQOS_PERF_EVENT_LLC_REF:
-#if PQOS_VERSION < 50000
-                old_value = group->intl->values.llc_references;
-                group->intl->values.llc_references = value;
-                group->intl->values.llc_references_delta =
-                    get_delta(old_value, group->intl->values.llc_references);
-#else
                 old_value = group->values.llc_references;
                 group->values.llc_references = value;
                 group->values.llc_references_delta =
                     get_delta(old_value, group->values.llc_references);
-#endif
                 break;
         case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 old_value = group->values.ipc_unhalted;

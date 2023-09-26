@@ -1818,13 +1818,8 @@ hw_mon_read_perf(struct pqos_mon_data *group, const enum pqos_mon_event event)
                 break;
         case PQOS_PERF_EVENT_LLC_REF:
                 reg = IA32_MSR_PMC1;
-#if PQOS_VERSION < 50000
-                value = &group->intl->values.llc_references;
-                delta = &group->intl->values.llc_references_delta;
-#else
                 value = &values->llc_references;
                 delta = &values->llc_references_delta;
-#endif
                 break;
         default:
                 return PQOS_RETVAL_PARAM;

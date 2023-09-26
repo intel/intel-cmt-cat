@@ -3146,13 +3146,8 @@ test_pqos_mon_get_value(void **state __attribute__((unused)))
         group.values.mbm_remote_delta = 7;
         group.values.llc_misses = 8;
         group.values.llc_misses_delta = 9;
-#if PQOS_VERSION >= 50000
         group.values.llc_references = 10;
         group.values.llc_references_delta = 11;
-#else
-        group.intl->values.llc_references = 10;
-        group.intl->values.llc_references_delta = 11;
-#endif
         group.intl->values.pcie.llc_misses.read = 12;
         group.intl->values.pcie.llc_misses.read_delta = 13;
         group.intl->values.pcie.llc_misses.write = 14;
@@ -3219,13 +3214,8 @@ test_pqos_mon_get_value(void **state __attribute__((unused)))
         ret =
             pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_REF, &value, &delta);
         assert_int_equal(ret, PQOS_RETVAL_OK);
-#if PQOS_VERSION >= 50000
         assert_int_equal(value, group.values.llc_references);
         assert_int_equal(delta, group.values.llc_references_delta);
-#else
-        assert_int_equal(value, group.intl->values.llc_references);
-        assert_int_equal(delta, group.intl->values.llc_references_delta);
-#endif
         group.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ;
         wrap_check_init(1, PQOS_RETVAL_OK);
         ret = pqos_mon_get_value(&group, PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
