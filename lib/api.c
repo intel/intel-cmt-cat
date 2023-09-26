@@ -380,6 +380,7 @@ pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
         cfg.l3_cdp = l3_cdp_cfg;
         cfg.l2_cdp = l2_cdp_cfg;
         cfg.mba = mba_cfg;
+        cfg.mba40 = PQOS_FEATURE_ANY;
 
         return pqos_alloc_reset_config(&cfg);
 }
@@ -413,6 +414,23 @@ pqos_alloc_reset_config(const struct pqos_alloc_config *cfg)
                         LOG_ERROR(
                             "Unrecognized L2 CDP configuration setting %d!\n",
                             cfg->l2_cdp);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (cfg->mba != PQOS_MBA_ANY && cfg->mba != PQOS_MBA_DEFAULT &&
+                    cfg->mba != PQOS_MBA_CTRL) {
+                        LOG_ERROR(
+                            "Unrecognized MBA configuration setting %d!\n",
+                            cfg->mba);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                if (cfg->mba40 != PQOS_FEATURE_ANY &&
+                    cfg->mba40 != PQOS_FEATURE_ON &&
+                    cfg->mba40 != PQOS_FEATURE_OFF) {
+                        LOG_ERROR(
+                            "Unrecognized MBA 4.0 configuration setting %d!\n",
+                            cfg->mba40);
                         return PQOS_RETVAL_PARAM;
                 }
 

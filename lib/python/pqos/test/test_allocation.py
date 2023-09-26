@@ -41,13 +41,11 @@ import unittest
 from unittest.mock import MagicMock, patch
 
 from pqos.test.helper import ctypes_ref_set_uint, ctypes_build_array
-
 from pqos.allocation import PqosAlloc
 from pqos.native_struct import (
     CPqosAllocConfig, CPqosCapability, CPqosCdpConfig, CPqosIordtConfig,
-    CPqosMbaConfig
+    CPqosMbaConfig, CPqosFeatureConfig
 )
-
 
 class TestPqosAlloc(unittest.TestCase):
     "Tests for PqosAlloc class."
@@ -294,6 +292,7 @@ class TestPqosAlloc(unittest.TestCase):
                              CPqosIordtConfig.PQOS_REQUIRE_IORDT_ON)
             self.assertEqual(cfg.l2_cdp, CPqosCdpConfig.PQOS_REQUIRE_CDP_OFF)
             self.assertEqual(cfg.mba, CPqosMbaConfig.PQOS_MBA_CTRL)
+            self.assertEqual(cfg.mba40, CPqosFeatureConfig.PQOS_FEATURE_ON)
 
             return 0
 
@@ -308,6 +307,7 @@ class TestPqosAlloc(unittest.TestCase):
         cfg.set_l3_iordt('on')
         cfg.set_l2_cdp('off')
         cfg.set_mba('ctrl')
+        cfg.set_mba40('on')
 
         # Reset using configuration
         alloc = PqosAlloc()

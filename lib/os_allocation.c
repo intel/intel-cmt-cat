@@ -869,12 +869,14 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         enum pqos_iordt_config l3_iordt_cfg = PQOS_REQUIRE_IORDT_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        enum pqos_feature_cfg mba40_cfg = PQOS_FEATURE_ANY;
 
         if (cfg != NULL) {
                 l3_cdp_cfg = cfg->l3_cdp;
                 l3_iordt_cfg = cfg->l3_iordt;
                 l2_cdp_cfg = cfg->l2_cdp;
                 mba_cfg = cfg->mba;
+                mba40_cfg = cfg->mba40;
         }
 
         ASSERT(l3_cdp_cfg == PQOS_REQUIRE_CDP_ON ||
@@ -887,6 +889,9 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
 
         ASSERT(mba_cfg == PQOS_MBA_DEFAULT || mba_cfg == PQOS_MBA_CTRL ||
                mba_cfg == PQOS_MBA_ANY);
+
+        ASSERT(mba40_cfg == PQOS_FEATURE_ON || mba40_cfg == PQOS_FEATURE_OFF ||
+               mba40_cfg == PQOS_FEATURE_ANY);
 
         /* Get L3 CAT capabilities */
         (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
@@ -962,6 +967,12 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         /* Check against erroneous MBA CTRL request */
         if (mba_cap != NULL && mba_cfg == PQOS_MBA_CTRL && mba_cap->ctrl == 0) {
                 LOG_ERROR("MBA CTRL requested but not supported!\n");
+                ret = PQOS_RETVAL_PARAM;
+                goto os_alloc_reset_exit;
+        }
+        /* Check if MBA 4.0 extensions have been requested */
+        if (mba40_cfg != PQOS_FEATURE_ANY) {
+                LOG_ERROR("MBA 4.0 extensions requested but not supported!\n");
                 ret = PQOS_RETVAL_PARAM;
                 goto os_alloc_reset_exit;
         }

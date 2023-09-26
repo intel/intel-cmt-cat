@@ -44,36 +44,17 @@ from pqos.native_struct import PqosChannelT
 from pqos.pqos import Pqos
 
 
-def _get_technology_mask(technologies):
-    mask = 0
-    for technology in technologies:
-        tech_mask = 1 << pqos_get_type_enum(technology)
-        mask |= tech_mask
-
-    return mask
-
-
-def _get_list_of_cores(cores):
-    core_array_len = len(cores)
-    core_array = (ctypes.c_uint * core_array_len)(*cores)
-    return core_array
-
-
-def _get_list_of_pids(pids):
-    pid_array_len = len(pids)
-    pid_array = (ctypes.c_uint * pid_array_len)(*pids)
-    return pid_array
-
-
-def _get_cdp_config(cdp_config):
-    cdp_config_map = {
+def _get_feature_config(feature_cfg):
+    feature_cfg_map = {
         'any': 0,
         'off': 1,
         'on': 2
     }
 
-    return cdp_config_map[cdp_config.lower()]
+    return feature_cfg_map[feature_cfg.lower()]
 
+def _get_cdp_config(cdp_config):
+    return _get_feature_config(cdp_config)
 
 def _get_mba_config(mba_config):
     mba_config_map = {
@@ -84,6 +65,74 @@ def _get_mba_config(mba_config):
 
     return mba_config_map[mba_config.lower()]
 
+class CPqosAllocConfig(ctypes.Structure):
+    "pqos_alloc_config structure"
+    # pylint: disable=attribute-defined-outside-init
+
+    _fields_ = [
+        ("l3_cdp", ctypes.c_int),
+        ("l2_cdp", ctypes.c_int),
+        ("mba", ctypes.c_int),
+        ("mba40", ctypes.c_int)
+    ]
+
+    def set_l3_cdp(self, l3_cdp):
+        """
+        Sets L3 CDP configuration.
+
+        Parameter:
+            l3_cdp: L3 CDP configuration ('any', 'on' or 'off')
+        """
+
+        self.l3_cdp = _get_cdp_config(l3_cdp)
+
+    def set_l2_cdp(self, l2_cdp):
+        """
+        Sets L2 CDP configuration.
+
+        Parameter:
+            l2_cdp: L2 CDP configuration ('any', 'on' or 'off')
+        """
+
+        self.l2_cdp = _get_cdp_config(l2_cdp)
+
+    def set_mba(self, mba):
+        """
+        Sets MBA configuration.
+
+        Parameter:
+            mba: MBA configuration ('any', 'ctrl' or 'default')
+        """
+
+        self.mba = _get_mba_config(mba)
+
+    def set_mba40(self, mba40):
+        """
+        Sets MBA 4.0 configuration.
+
+        Parameter:
+            mba40: MBA 4.0 configuration ('any', 'on' or 'off')
+        """
+
+        self.mba40 = _get_feature_config(mba40)
+
+def _get_technology_mask(technologies):
+    mask = 0
+    for technology in technologies:
+        tech_mask = 1 << pqos_get_type_enum(technology)
+        mask |= tech_mask
+
+    return mask
+
+def _get_list_of_cores(cores):
+    core_array_len = len(cores)
+    core_array = (ctypes.c_uint * core_array_len)(*cores)
+    return core_array
+
+def _get_list_of_pids(pids):
+    pid_array_len = len(pids)
+    pid_array = (ctypes.c_uint * pid_array_len)(*pids)
+    return pid_array
 
 class PqosAlloc(object):
     """
@@ -290,6 +339,7 @@ class PqosAlloc(object):
         ret = self.pqos.lib.pqos_alloc_reset(l3_cdp_cfg_enum, l2_cdp_cfg_enum,
                                              mba_cfg_enum)
         pqos_handle_error('pqos_alloc_reset', ret)
+
 
     def reset_config(self, cfg):
         """

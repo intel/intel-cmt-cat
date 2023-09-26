@@ -104,13 +104,15 @@ class CPqosCapabilityMBA(ctypes.Structure):
     # pylint: disable=too-few-public-methods
 
     _fields_ = [
-        ("mem_size", ctypes.c_uint),
-        ("num_classes", ctypes.c_uint),
-        ("throttle_max", ctypes.c_uint),
-        ("throttle_step", ctypes.c_uint),
-        ("is_linear", ctypes.c_int),
-        ("ctrl", ctypes.c_int),
-        ("ctrl_on", ctypes.c_int),
+        ('mem_size', ctypes.c_uint),
+        ('num_classes', ctypes.c_uint),
+        ('throttle_max', ctypes.c_uint),
+        ('throttle_step', ctypes.c_uint),
+        ('is_linear', ctypes.c_int),
+        ('ctrl', ctypes.c_int),
+        ('ctrl_on', ctypes.c_int),
+        ('mba40', ctypes.c_int),
+        ('mba40_on', ctypes.c_int),
     ]
 
 
@@ -356,18 +358,18 @@ class CPqosSysconfig(ctypes.Structure):
 
 # Allocation
 
-class CPqosCdpConfig:
-    "pqos_cdp_config enumeration"
+class CPqosFeatureConfig:
+    "pqos_feature_config enumeration"
 
     native_type = ctypes.c_int
-    PQOS_REQUIRE_CDP_ANY = 0
-    PQOS_REQUIRE_CDP_OFF = 1
-    PQOS_REQUIRE_CDP_ON = 2
+    PQOS_FEATURE_ANY = 0
+    PQOS_FEATURE_OFF = 1
+    PQOS_FEATURE_ON = 2
 
     values = [
-        ('any', PQOS_REQUIRE_CDP_ANY),
-        ('off', PQOS_REQUIRE_CDP_OFF),
-        ('on', PQOS_REQUIRE_CDP_ON)
+        ('any', PQOS_FEATURE_ANY),
+        ('off', PQOS_FEATURE_OFF),
+        ('on', PQOS_FEATURE_ON)
     ]
 
     @classmethod
@@ -406,6 +408,14 @@ class CPqosCdpConfig:
                 return cfg_label
 
         return None
+
+class CPqosCdpConfig(CPqosFeatureConfig):
+    "pqos_cdp_config enumeration"
+
+    native_type = ctypes.c_int
+    PQOS_REQUIRE_CDP_ANY = CPqosFeatureConfig.PQOS_FEATURE_ANY
+    PQOS_REQUIRE_CDP_OFF = CPqosFeatureConfig.PQOS_FEATURE_OFF
+    PQOS_REQUIRE_CDP_ON = CPqosFeatureConfig.PQOS_FEATURE_ON
 
 class CPqosMbaConfig:
     "pqos_mba_config enumeration"
@@ -467,6 +477,7 @@ class CPqosAllocConfig(ctypes.Structure):
         ('l3_iordt', CPqosIordtConfig.native_type),
         ('l2_cdp', CPqosCdpConfig.native_type),
         ('mba', CPqosMbaConfig.native_type),
+        ('mba40', CPqosMbaConfig.native_type),
     ]
 
     def set_l3_cdp(self, l3_cdp):
@@ -508,6 +519,16 @@ class CPqosAllocConfig(ctypes.Structure):
         """
 
         self.mba = CPqosMbaConfig.get_value(mba)
+
+    def set_mba40(self, mba40):
+        """
+        Sets MBA 4.0 CDP configuration.
+
+        Parameter:
+            l2_cdp: MBA 4.0 configuration ('any', 'on' or 'off')
+        """
+
+        self.mba40 = CPqosFeatureConfig.get_value(mba40)
 
 # Allocation - L2 CAT
 

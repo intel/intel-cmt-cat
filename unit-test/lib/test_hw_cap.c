@@ -761,6 +761,97 @@ test_hw_cap_mba_discover_non_linear(void **state)
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
+static void
+_test_hw_cap_mba_discover_mba40_supported(void **state, unsigned enabled)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        int ret;
+        uint32_t num_classes = 8;
+        uint32_t throttle_max = 90;
+        uint32_t is_linear = 1;
+        unsigned *mba_ids;
+        unsigned mba_id_num;
+        unsigned *cores = NULL;
+        unsigned num_cores = 0;
+        unsigned i;
+        unsigned j;
+
+        _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 1U << 30);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x8, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x3, throttle_max - 1, 0x0, is_linear << 2,
+                    num_classes - 1);
+
+        mba_ids = pqos_cpu_get_mba_ids(data->cpu, &mba_id_num);
+
+        assert_non_null(mba_ids);
+
+        for (i = 0; i < mba_id_num; i++) {
+                cores = pqos_cpu_get_cores(data->cpu, mba_ids[i], &num_cores);
+                assert_non_null(cores);
+
+                for (j = 0; j < num_cores; j++) {
+                        expect_value(__wrap_msr_read, lcore, cores[j]);
+                        expect_value(__wrap_msr_read, reg,
+                                     PQOS_MSR_CORE_CAPABILITIES);
+                        will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+                        will_return(__wrap_msr_read,
+                                    PQOS_MSR_CORE_CAPABILITIES_MBA40_EN);
+                }
+        }
+
+        for (i = 0; i < mba_id_num; i++) {
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_by_mba_id(data->cpu, mba_ids[i], &core);
+                assert_int_equal(ret, PQOS_RETVAL_OK);
+
+                expect_value(__wrap_msr_read, lcore, core);
+                expect_value(__wrap_msr_read, reg, PQOS_MSR_MBA_CFG);
+                will_return(__wrap_msr_read, MACHINE_RETVAL_OK);
+                will_return(__wrap_msr_read,
+                            enabled ? PQOS_MSR_MBA_CFG_MBA40_EN : 0);
+        }
+
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_mba.mba40, 1);
+        assert_int_equal(cap_mba.mba40_on, enabled);
+}
+
+static void
+test_hw_cap_mba_discover_mba40_supported_enabled(void **state)
+{
+        _test_hw_cap_mba_discover_mba40_supported(state, 1);
+}
+
+static void
+test_hw_cap_mba_discover_mba40_supported_disabled(void **state)
+{
+        _test_hw_cap_mba_discover_mba40_supported(state, 0);
+}
+
+static void
+test_hw_cap_mba_discover_mba40_unsupported(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap_mba;
+        int ret;
+        uint32_t num_classes = 8;
+        uint32_t throttle_max = 90;
+        uint32_t is_linear = 1;
+
+        _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x8, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x3, throttle_max - 1, 0x0, is_linear << 2,
+                    num_classes - 1);
+
+        ret = hw_cap_mba_discover(&cap_mba, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap_mba.mba40, 0);
+        assert_int_equal(cap_mba.mba40_on, 0);
+}
+
 int
 main(void)
 {
@@ -796,7 +887,14 @@ main(void)
                                    _init),
             cmocka_unit_test_setup(test_hw_cap_mba_discover_unsupported, _init),
             cmocka_unit_test_setup(test_hw_cap_mba_discover_linear, _init),
-            cmocka_unit_test_setup(test_hw_cap_mba_discover_non_linear, _init)};
+            cmocka_unit_test_setup(test_hw_cap_mba_discover_non_linear, _init),
+            cmocka_unit_test_setup(
+                test_hw_cap_mba_discover_mba40_supported_enabled, _init),
+            cmocka_unit_test_setup(
+                test_hw_cap_mba_discover_mba40_supported_disabled, _init),
+            cmocka_unit_test_setup(test_hw_cap_mba_discover_mba40_unsupported,
+                                   _init),
+        };
 
         result +=
             cmocka_run_group_tests(tests, test_init_unsupported, test_fini);

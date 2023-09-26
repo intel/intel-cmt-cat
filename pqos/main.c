@@ -65,7 +65,8 @@ static struct pqos_alloc_config sel_alloc_config = {
     .l3_cdp = PQOS_REQUIRE_CDP_ANY,
     .l3_iordt = PQOS_REQUIRE_IORDT_ANY,
     .l2_cdp = PQOS_REQUIRE_CDP_ANY,
-    .mba = PQOS_MBA_ANY};
+    .mba = PQOS_MBA_ANY,
+    .mba40 = PQOS_FEATURE_ANY};
 
 /**
  * Default configuration of monitoring
@@ -495,6 +496,16 @@ selfn_reset_alloc(const char *arg)
                     {"l3iordt-any", PQOS_REQUIRE_IORDT_ANY},
                 };
 
+                /* MBA CTRL 4.0 reset options */
+                const struct {
+                        const char *name;
+                        enum pqos_feature_cfg cfg;
+                } pattsmba40[] = {
+                    {"mba40-on", PQOS_FEATURE_ON},
+                    {"mba40-off", PQOS_FEATURE_OFF},
+                    {"mba40-any", PQOS_FEATURE_ANY},
+                };
+
                 tok = s;
                 while ((tok = strtok_r(tok, ",", &saveptr)) != NULL) {
                         unsigned valid = 0;
@@ -521,6 +532,13 @@ selfn_reset_alloc(const char *arg)
                                 if (strcasecmp(tok, patterniordt[i].name) ==
                                     0) {
                                         cfg->l3_iordt = patterniordt[i].iordt;
+                                        valid = 1;
+                                        break;
+                                }
+
+                        for (i = 0; i < DIM(pattsmba40); i++)
+                                if (strcasecmp(tok, pattsmba40[i].name) == 0) {
+                                        cfg->mba40 = pattsmba40[i].cfg;
                                         valid = 1;
                                         break;
                                 }
@@ -889,6 +907,7 @@ static const char help_printf_long[] =
     "                         l2cdp-on, l2cdp-off, l2cdp-any,\n"
     "                         mbaCtrl-on, mbaCtrl-off, mbaCtrl-any\n"
     "                         l3iordt-on, l3iordt-off, l3iordt-any,\n"
+    "                         mba40-on, mba40-off, mba40-any\n"
     "          (default l3cdp-any,l2cdp-any,mbaCtrl-any).\n"
     "  -m EVTCORES, --mon-core=EVTCORES\n"
     "          select cores and events for monitoring.\n"
