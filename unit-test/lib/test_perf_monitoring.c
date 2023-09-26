@@ -705,11 +705,7 @@ test_perf_mon_poll_core_event(enum pqos_mon_event event)
                 assert_int_equal(grp.values.llc_misses, value);
                 break;
         case PQOS_PERF_EVENT_LLC_REF:
-#if PQOS_VERSION < 50000
-                assert_int_equal(grp.intl->values.llc_references, value);
-#else
                 assert_int_equal(grp.values.llc_references, value);
-#endif
                 break;
         case (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES:
                 assert_int_equal(grp.values.ipc_unhalted, value);

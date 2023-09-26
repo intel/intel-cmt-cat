@@ -76,10 +76,6 @@ struct pqos_mon_data_internal {
          * The structure to store monitoring data
          */
         struct {
-#if PQOS_VERSION < 50000
-                uint64_t llc_references;       /**< LLC references - reading */
-                uint64_t llc_references_delta; /**< LLC references - delta */
-#endif
                 struct {
                         struct {
                                 uint64_t read;

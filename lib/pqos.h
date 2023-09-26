@@ -504,24 +504,22 @@ int pqos_inter_get(enum pqos_interface *interface);
  * The structure to store monitoring data for all of the events
  */
 struct pqos_event_values {
-        uint64_t llc;                /**< cache occupancy */
-        uint64_t mbm_local;          /**< bandwidth local - reading */
-        uint64_t mbm_total;          /**< bandwidth total - reading */
-        uint64_t mbm_remote;         /**< bandwidth remote - reading */
-        uint64_t mbm_local_delta;    /**< bandwidth local - delta */
-        uint64_t mbm_total_delta;    /**< bandwidth total - delta */
-        uint64_t mbm_remote_delta;   /**< bandwidth remote - delta */
-        uint64_t ipc_retired;        /**< instructions retired - reading */
-        uint64_t ipc_retired_delta;  /**< instructions retired - delta */
-        uint64_t ipc_unhalted;       /**< unhalted cycles - reading */
-        uint64_t ipc_unhalted_delta; /**< unhalted cycles - delta */
-        double ipc;                  /**< retired instructions / cycles */
-        uint64_t llc_misses;         /**< LLC misses - reading */
-        uint64_t llc_misses_delta;   /**< LLC misses - delta */
-#if PQOS_VERSION >= 50000
+        uint64_t llc;                  /**< cache occupancy */
+        uint64_t mbm_local;            /**< bandwidth local - reading */
+        uint64_t mbm_total;            /**< bandwidth total - reading */
+        uint64_t mbm_remote;           /**< bandwidth remote - reading */
+        uint64_t mbm_local_delta;      /**< bandwidth local - delta */
+        uint64_t mbm_total_delta;      /**< bandwidth total - delta */
+        uint64_t mbm_remote_delta;     /**< bandwidth remote - delta */
+        uint64_t ipc_retired;          /**< instructions retired - reading */
+        uint64_t ipc_retired_delta;    /**< instructions retired - delta */
+        uint64_t ipc_unhalted;         /**< unhalted cycles - reading */
+        uint64_t ipc_unhalted_delta;   /**< unhalted cycles - delta */
+        double ipc;                    /**< retired instructions / cycles */
+        uint64_t llc_misses;           /**< LLC misses - reading */
+        uint64_t llc_misses_delta;     /**< LLC misses - delta */
         uint64_t llc_references;       /**< LLC references - reading */
         uint64_t llc_references_delta; /**< LLC references - delta */
-#endif
 };
 
 struct pqos_mon_data_internal;
@@ -655,9 +653,7 @@ int pqos_mon_assoc_get_dev(const uint16_t segment,
  * @note As of Kernel 4.10, Intel(R) RDT perf results per core are found to
  *       be incorrect.
  */
-#if PQOS_VERSION >= 50000
 PQOS_DEPRECATED
-#endif
 int pqos_mon_start(const unsigned num_cores,
                    const unsigned *cores,
                    const enum pqos_mon_event event,
@@ -707,9 +703,7 @@ int pqos_mon_start_cores(const unsigned num_cores,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-#if PQOS_VERSION >= 50000
 PQOS_DEPRECATED
-#endif
 int pqos_mon_start_pid(const pid_t pid,
                        const enum pqos_mon_event event,
                        void *context,
@@ -731,9 +725,7 @@ int pqos_mon_start_pid(const pid_t pid,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
-#if PQOS_VERSION >= 50000
 PQOS_DEPRECATED
-#endif
 int pqos_mon_start_pids(const unsigned num_pids,
                         const pid_t *pids,
                         const enum pqos_mon_event event,
