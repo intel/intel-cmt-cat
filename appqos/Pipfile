@@ -16,7 +16,7 @@ pqos = {path = "../lib/python"}
 pwr = {git = "https://github.com/intel/CommsPowerManagement.git", ref = "pwr-v0.2.2", subdirectory = "pwr"}
 flask-cors = "*"
 bandit = "*"
-pylint = "*"
+pylint = "==2.17.0"
 pytest = "*"
 pytest-cov = "*"
 mock = "*"

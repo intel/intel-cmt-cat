@@ -7,7 +7,7 @@ name = "pypi"
 
 [dev-packages]
 bandit = "*"
-pylint = ">=2.5.0"
+pylint = "==2.17.0"
 coverage = "*"
 caniusepython3 = "*"
 build = "*"

@@ -45,7 +45,7 @@ cors = [
 ]
 dev = [
     "bandit",
-    "pylint",
+    "pylint ==2.17.0",
     "pytest",
     "pytest-cov",
     "mock",
