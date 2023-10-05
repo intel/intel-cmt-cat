@@ -58,6 +58,19 @@ CFLAGS = -I$(LIB_DIR) -I$(PQOS_DIR) -I$(MOCK_DIR) -I$(GRAB_OUTPUT_DIR) -I$(APP_M
 	-Wformat -Wformat-security -fstack-protector \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels
 
+
+IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
+IS_CLANG = $(shell $(CC) -v 2>&1 | grep -c "^clang version ")
+
+# GCC-only options
+ifeq ($(IS_GCC),1)
+CFLAGS += -fno-strict-overflow \
+    -fno-delete-null-pointer-checks \
+    -fwrapv \
+    -fstack-protector-strong \
+    -fcf-protection=full
+endif
+
 CFLAGS += -g -ggdb -O0
 
 all: $(TESTS)
