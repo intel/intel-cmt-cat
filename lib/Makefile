@@ -43,8 +43,7 @@ CFLAGS = -pthread -I./ -D_GNU_SOURCE \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector \
-	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-fcf-protection=full
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -71,7 +70,8 @@ ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
-    -fstack-protector-strong
+    -fstack-protector-strong \
+    -fcf-protection=full
 endif
 
 # so or static build

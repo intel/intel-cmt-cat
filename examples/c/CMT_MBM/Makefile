@@ -61,7 +61,8 @@ IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
 ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
-    -fwrapv
+    -fwrapv \
+    -fcf-protection=full
 endif
 
 # Build targets and dependencies

@@ -75,7 +75,8 @@ CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
     -fno-expensive-optimizations \
-    -fstack-protector-strong
+    -fstack-protector-strong \
+    -fcf-protection=full
 endif
 
 SRCS = $(sort $(wildcard *.c))
