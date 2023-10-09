@@ -653,7 +653,9 @@ int pqos_mon_assoc_get_dev(const uint16_t segment,
  * @note As of Kernel 4.10, Intel(R) RDT perf results per core are found to
  *       be incorrect.
  */
+#if !defined(SWIG) && !defined(SWIGPERL)
 PQOS_DEPRECATED
+#endif
 int pqos_mon_start(const unsigned num_cores,
                    const unsigned *cores,
                    const enum pqos_mon_event event,
@@ -703,7 +705,9 @@ int pqos_mon_start_cores(const unsigned num_cores,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
+#if !defined(SWIG) && !defined(SWIGPERL)
 PQOS_DEPRECATED
+#endif
 int pqos_mon_start_pid(const pid_t pid,
                        const enum pqos_mon_event event,
                        void *context,
@@ -725,7 +729,9 @@ int pqos_mon_start_pid(const pid_t pid,
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  */
+#if !defined(SWIG) && !defined(SWIGPERL)
 PQOS_DEPRECATED
+#endif
 int pqos_mon_start_pids(const unsigned num_pids,
                         const pid_t *pids,
                         const enum pqos_mon_event event,
@@ -1006,9 +1012,12 @@ int pqos_alloc_release_pid(const pid_t *task_array, const unsigned task_num);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-PQOS_DEPRECATED int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
-                                     const enum pqos_cdp_config l2_cdp_cfg,
-                                     const enum pqos_mba_config mba_cfg);
+#if !defined(SWIG) && !defined(SWIGPERL)
+PQOS_DEPRECATED
+#endif
+int pqos_alloc_reset(const enum pqos_cdp_config l3_cdp_cfg,
+                     const enum pqos_cdp_config l2_cdp_cfg,
+                     const enum pqos_mba_config mba_cfg);
 
 /**
  * Configuration of allocation
