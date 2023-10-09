@@ -1546,20 +1546,6 @@ int pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
                         unsigned *numa);
 
 /**
- * @brief Retrieves NUMA cluster id for given logical core id
- *
- * @param [in] cpu CPU information structure from \a pqos_cap_get
- * @param [in] lcore logical core id
- * @param [out] numa location to store numa id at
- *
- * @return Operation status
- * @retval PQOS_RETVAL_OK on success
- */
-int pqos_cpu_get_numaid(const struct pqos_cpuinfo *cpu,
-                        const unsigned lcore,
-                        unsigned *numa);
-
-/**
  * @brief Retrieves monitoring cluster id for given logical core id
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
