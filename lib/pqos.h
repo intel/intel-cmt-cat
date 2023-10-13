@@ -1696,19 +1696,6 @@ int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
                           int *ctrl_enabled);
 
 /**
- * @brief Retrieved MBA 4.0 extensions configuration status
- *
- * @param [in] cap platform QoS capabilities structure
- *                 returned by \a pqos_cap_get
- * @param [out] mba40_supported place to store MBA 4.0 support status
- * @param [out] mba40_enabled place to store MBA 4.0 enable status
- *
- */
-int pqos_mba40_enabled(const struct pqos_cap *cap,
-                       int *mba40_supported,
-                       int *mba40_enabled);
-
-/**
  * @brief returns the CPU vendor identification
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
