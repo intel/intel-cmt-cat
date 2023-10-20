@@ -140,87 +140,13 @@ Unit tests
 Hardware Support
 ----------------
 
-###### Table 1. Intel(R) RDT hardware support
+Supported products can be found in Addendum A of the Intel® Resource Director Technology (Intel® RDT) Architecture Specification:
+https://www.intel.com/content/www/us/en/content-details/789566/intel-resource-director-technology-intel-rdt-architecture-specification.html
 
-|                                                        | CMT | MBM | L3 CAT | L3 CDP | L2 CAT | L2 CDP | MBA    |
-|:-------------------------------------------------------| :-: | :-: | :----: | :----: | :----: | :----: | :----: |
-|Intel(R) Xeon(R) processor E5 v3                        | Yes | No  | Yes (1)| No     | No     | No     | No     |
-|Intel(R) Xeon(R) processor D                            | Yes | Yes | Yes (2)| No     | No     | No     | No     |
-|Intel(R) Xeon(R) processor E3 v4                        | No  | No  | Yes (3)| No     | No     | No     | No     |
-|Intel(R) Xeon(R) processor E5 v4                        | Yes | Yes | Yes (2)| Yes    | No     | No     | No     |
-|Intel(R) Xeon(R) Scalable Processors (6)                | Yes | Yes | Yes (2)| Yes    | No     | No     | Yes (5)|
-|Intel(R) Xeon(R) 2nd Generation Scalable Processors (7) | Yes | Yes | Yes (2)| Yes    | No     | No     | Yes (5)|
-|Intel(R) Atom(R) processor for Server C3000             | No  | No  | No     | No     | Yes (4)| No     | No     |
-|11th Generation Intel(R) Core(TM) i3 Processors (8)     | No  | No  | Yes    | No     | Yes    | Yes    | No     |
-|11th Generation Intel(R) Core(TM) i5 Processors (8)     | No  | No  | Yes    | No     | Yes    | Yes    | No     |
-|11th Generation Intel(R) Core(TM) i7 Processors (8)     | No  | No  | Yes    | No     | Yes    | Yes    | No     |
-|Intel(R) Atom(R) Processor X Series (9)                 | No  | No  | Yes    | No     | Yes    | Yes    | No     |
-|Intel(R) Xeon(R) W Processors (8)                       | No  | No  | Yes    | No     | Yes    | Yes    | No     |
-
-***References:***
-
-1. *Selected SKU's only:*
-    - *Intel(R) Xeon(R) processor E5-2658 v3*
-    - *Intel(R) Xeon(R) processor E5-2648L v3*
-    - *Intel(R) Xeon(R) processor E5-2628L v3*
-    - *Intel(R) Xeon(R) processor E5-2618L v3*
-    - *Intel(R) Xeon(R) processor E5-2608L v3*
-    - *Intel(R) Xeon(R) processor E5-2658A v3*
-
-    *Four L3 CAT classes of service (CLOS) and a set of pre-defined classes that
-    should not be changed at run time.
-    L3 CAT CLOS to hardware thread association can be changed at run time.*
-
-2. *Sixteen L3 CAT classes of service (CLOS). There are no pre-defined
-    classes of service and they can be changed at run time.
-    L3 CAT CLOS to hardware thread association can be changed at run time.*
-
-3. *Selected SKU's only:*
-    - *Intel(R) Xeon(R) processor E3-1258L v4*
-    - *Intel(R) Xeon(R) processor E3-1278L v4*
-
-    *Four L3 CAT classes of service (CLOS) and a set of pre-defined classes that
-    should not be changed at run time.
-    L3 CAT CLOS to hardware thread association can be changed at run time.*
-
-4. *Four L2 CAT classes of service (CLOS) per L2 cluster.
-    L2 CAT CLOS to hardware thread association can be changed at run time.*
-
-5. *Eight MBA classes of service (CLOS). There are no pre-defined
-    classes of service and they can be changed at run time.
-    MBA CLOS to hardware thread association can be changed at run time.*
-
-6. *Please find errata for Intel(R) Xeon(R) Processor Scalable Family at:*
-    https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/xeon-scalable-spec-update.pdf?asset=14615
-
-7. *Please find errata for Second Generation Intel(R) Xeon(R) Scalable Processors at:*
-    https://www.intel.com/content/dam/www/public/us/en/documents/specification-updates/2nd-gen-xeon-scalable-spec-update.pdf
-
-8. *Selected SKU's only:*
-    - *11th Generation Intel(R) Core(TM) i3-1115GRE Processor*
-    - *11th Generation Intel(R) Core(TM) i5-1145GRE Processor*
-    - *11th Generation Intel(R) Core(TM) i7-1185GRE Processor*
-    - *Intel(R) Xeon(R) W-11865MRE*
-    - *Intel(R) Xeon(R) W-11865MLE*
-    - *Intel(R) Xeon(R) W-11555MRE*
-    - *Intel(R) Xeon(R) W-11555MLE*
-    - *Intel(R) Xeon(R) W-11155MRE*
-    - *Intel(R) Xeon(R) W-11155MLE*
-
-    *Four L3 CAT classes of service (CLOS).
-    Eight L2 CAT classes of service (CLOS) per L2 cluster.
-    CLOS to hardware thread association can be changed at run time.*
-
-9. *Selected SKU's only:*
-    - *Intel(R) Atom(R) x6200FE Processor*
-    - *Intel(R) Atom(R) x6212RE Processor*
-    - *Intel(R) Atom(R) x6414RE Processor*
-    - *Intel(R) Atom(R) x6425RE Processor*
-    - *Intel(R) Atom(R) x6427FE Processor*
-
-    *Four L3 CAT classes of service (CLOS).
-    Sixteen L2 CAT classes of service (CLOS) per L2 cluster.
-    CLOS to hardware thread association can be changed at run time.*
+Addendum B contains a list of processors with model-specific Intel® RDT Features.  
+**Note:** Detection of model-specific features requires the `RDT_PROBE_MSR` environment variable to be set when using the library and utilities. 
+These features are only available when using the MSR interface. See the "Interfaces" section below for more information.
+See the [wiki](https://github.com/intel/intel-cmt-cat/wiki/Usage-Examples#18-using-model-specific-non-architectural-features) for usage examples.
 
 For additional Intel(R) RDT details please refer to the Intel(R)
 Architecture Software Development Manuals available at:
