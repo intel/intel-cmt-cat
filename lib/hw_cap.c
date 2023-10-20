@@ -582,12 +582,8 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
 #define CPUID_LEAF_BRAND_NUM (CPUID_LEAF_BRAND_END - CPUID_LEAF_BRAND_START + 1)
 #define MAX_BRAND_STRING_LEN (CPUID_LEAF_BRAND_NUM * 4 * sizeof(uint32_t))
         static const char *const supported_brands[] = {
-            "E5-2658 v3", "E5-2648L v3", "E5-2628L v3", "E5-2618L v3",
-            "E5-2608L v3", "E5-2658A v3", "E3-1258L v4", "E3-1278L v4",
-            /* Tiger Lake and Elkhart Lake brand strings */
-            "i3-1115GRE", "i5-1145GRE", "i7-1185GRE", "x6212RE", "x6414RE",
-            "x6425RE", "x6427FE", "x6200FE", "W-11865MRE", "W-11865MLE",
-            "W-11555MRE", "W-11555MLE", "W-11155MRE", "W-11155MLE"};
+            "E5-2658 v3",  "E5-2648L v3", "E5-2628L v3", "E5-2618L v3",
+            "E5-2608L v3", "E5-2658A v3", "E3-1258L v4", "E3-1278L v4"};
         struct cpuid_out res;
         int ret = PQOS_RETVAL_OK;
         int match_found = 0;
@@ -637,13 +633,6 @@ hw_cap_l3ca_brandstr(struct pqos_cap_l3ca *cap)
                 LOG_WARN("Cache allocation not supported on model name '%s'!\n",
                          brand_str);
                 return PQOS_RETVAL_RESOURCE;
-        } else {
-                LOG_WARN(
-                    "Detected model specific non-architectural features (L3 "
-                    "CAT).\n      Intel recommends validating that the feature "
-                    "provides the\n      performance necessary for your "
-                    "use-case. Non-architectural\n      features may not "
-                    "behave as expected in all scenarios.\n");
         }
 
         /**
@@ -822,9 +811,20 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
                         LOG_INFO("Probing msr....\n");
                         ret = hw_cap_l3ca_probe(cap, cpu);
                 }
-                if (ret == PQOS_RETVAL_OK)
+                if (ret == PQOS_RETVAL_OK) {
                         ret =
                             get_cache_info(&cpu->l3, &cap->num_ways, &l3_size);
+
+                        LOG_WARN("Detected model specific non-architectural "
+                                 "features (L3 "
+                                 "CAT).\n      Intel recommends validating "
+                                 "that the feature "
+                                 "provides the\n      performance necessary "
+                                 "for your "
+                                 "use-case. Non-architectural\n      features "
+                                 "may not "
+                                 "behave as expected in all scenarios.\n");
+                }
         }
 
         if (cap->num_ways > 0)
