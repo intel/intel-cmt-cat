@@ -1055,10 +1055,8 @@ parse_monitor_group(char *str, enum mon_group_type type)
                                         desc = uinttohexstr((unsigned)cbuf[i]);
 
                                 grp = grp_add(type, evt, desc, &cbuf[i], 1);
-                                if (grp == NULL) {
-                                        free(desc);
+                                if (grp == NULL)
                                         return -1;
-                                }
 
                                 group_count++;
                         }
