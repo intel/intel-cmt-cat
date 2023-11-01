@@ -1,4 +1,22 @@
 =======================================================================
+Release  v23.11 Nov 2023
+=======================================================================
+
+Contributors (alphabetical order):
+        Corey Shanahan <corey.shanahan@intel.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Michal Aleksiński <michalx.aleksinski@intel.com>
+        Raghavan Kanagaraj <raghavan.kanagaraj@intel.com>
+        Roman Storozhenko <roman.storozhenko@intel.com>
+
+1. Library:
+        - Added I/O RDT, SNC & MBA 4.0 support
+2. PQoS
+        - Added I/O RDT, SNC & MBA 4.0 support
+3. General:
+        - Bug fixes
+
+=======================================================================
 Release  v23.08 Aug 2023
 =======================================================================
 

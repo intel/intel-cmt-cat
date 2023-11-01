@@ -181,6 +181,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Wed Nov 1 2023  Raghavan Kanagaraj <raghavan.kanagaraj@intel.com> 5.0.0-1
+- New release 5.0.0
+
 * Thu Aug 3 2023  Marcel Cornu <marcel.d.cornu@intel.com> 4.6.1-1
 - New release 4.6.1
 
