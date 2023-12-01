@@ -9,7 +9,7 @@ authors = [
     { name = "Khawar Abbasi", email = "khawar.abbasi@intel.com"}
 ]
 maintainers = [
-    { name = "Michal Aleksinski", email = "michalx.aleksinski@intel.com"}
+    { name = "Raghavan Kanagaraj", email = "raghavan.kanagaraj@intel.com"}
 ]
 license = { file = "LICENSE" }
 readme = "README.md"
