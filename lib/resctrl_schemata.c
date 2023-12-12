@@ -441,6 +441,26 @@ resctrl_schemata_smba_get(const struct resctrl_schemata *schemata,
         return PQOS_RETVAL_OK;
 }
 
+int
+resctrl_schemata_smba_set(struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          const struct pqos_mba *ca)
+{
+        int index;
+
+        ASSERT(schemata != NULL);
+        ASSERT(ca != NULL);
+        ASSERT(schemata->smba != NULL);
+
+        index = get_smba_index(schemata, resource_id);
+        if (index < 0)
+                return PQOS_RETVAL_ERROR;
+
+        schemata->smba[index] = *ca;
+
+        return PQOS_RETVAL_OK;
+}
+
 /**
  * @brief Schemata type
  */
@@ -652,6 +672,7 @@ resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata)
         resctrl_schemata_l2ca_write(fd, schemata);
         resctrl_schemata_l3ca_write(fd, schemata);
         resctrl_schemata_mba_write(fd, schemata);
+        resctrl_schemata_smba_write(fd, schemata);
 
         return PQOS_RETVAL_OK;
 }
@@ -781,6 +802,27 @@ resctrl_schemata_mba_write(FILE *fd, const struct resctrl_schemata *schemata)
                         fprintf(fd, ";");
                 separator = 1;
                 fprintf(fd, "%u=%u", id, value);
+        }
+        fprintf(fd, "\n");
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_schemata_smba_write(FILE *fd, const struct resctrl_schemata *schemata)
+{
+        unsigned i;
+
+        if (schemata->smba == NULL)
+                return PQOS_RETVAL_OK;
+
+        fprintf(fd, "SMBA:");
+        for (i = 0; i < schemata->smbaids_num; i++) {
+                unsigned id = schemata->smbaids[i];
+
+                if (i > 0)
+                        fprintf(fd, ";");
+                fprintf(fd, "%u=%u", id, schemata->smba[i].mb_max);
         }
         fprintf(fd, "\n");
 
