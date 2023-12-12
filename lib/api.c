@@ -226,6 +226,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 if (vendor == PQOS_VENDOR_AMD) {
                         api.mba_get = hw_mba_get_amd;
                         api.mba_set = hw_mba_set_amd;
+                        api.smba_get = hw_smba_get_amd;
                 } else {
                         api.mon_start_uncore = hw_mon_start_uncore;
                         api.mba_get = hw_mba_get;
