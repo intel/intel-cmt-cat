@@ -218,12 +218,14 @@ int pqos_fini(void);
  * - L3 cache allocation capability
  * - L2 cache allocation capability
  * - Memory Bandwidth Allocation
+ * - Slow Memory Bandwidth Allocation
  */
 enum pqos_cap_type {
         PQOS_CAP_TYPE_MON = 0, /**< QoS monitoring */
         PQOS_CAP_TYPE_L3CA,    /**< L3/LLC cache allocation */
         PQOS_CAP_TYPE_L2CA,    /**< L2 cache allocation */
         PQOS_CAP_TYPE_MBA,     /**< Memory Bandwidth Allocation */
+        PQOS_CAP_TYPE_SMBA,    /**< Slow Memory Bandwidth Allocation */
         PQOS_CAP_TYPE_NUMOF
 };
 
@@ -342,6 +344,7 @@ struct pqos_capability {
                 struct pqos_cap_l3ca *l3ca;
                 struct pqos_cap_l2ca *l2ca;
                 struct pqos_cap_mba *mba;
+                struct pqos_cap_mba *smba;
                 void *generic_ptr;
         } u;
 };
@@ -366,6 +369,7 @@ struct pqos_coreinfo {
         unsigned l2_id;    /**< L2 cluster id */
         unsigned l3cat_id; /**< L3 CAT classes id */
         unsigned mba_id;   /**< MBA id */
+        unsigned smba_id;  /**< SMBA id */
         unsigned numa;     /**< numa node in the system */
 };
 

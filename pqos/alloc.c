@@ -63,7 +63,7 @@
 /**
  * Allocation type selected
  */
-enum sel_alloc_type { L3CA, L2CA, MBA, MBA_CTRL };
+enum sel_alloc_type { L3CA, L2CA, MBA, MBA_CTRL, SMBA };
 
 /**
  * Array to store allocation options
