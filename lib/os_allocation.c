@@ -1994,6 +1994,119 @@ os_smba_get_exit:
 }
 
 int
+os_smba_set_amd(const unsigned smba_id,
+                const unsigned num_cos,
+                const struct pqos_mba *requested,
+                struct pqos_mba *actual)
+{
+        int ret;
+        unsigned i;
+        unsigned num_grps = 0;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        const struct pqos_capability *smba_cap = NULL;
+
+        ASSERT(requested != NULL);
+        ASSERT(num_cos != 0);
+
+        /**
+         * Check if SMBA is supported
+         */
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &smba_cap);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_RESOURCE; /* SMBA not supported */
+
+        ret = resctrl_alloc_get_grps_num(cap, &num_grps);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (num_cos > num_grps)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Check if class id's are within allowed range.
+         */
+        for (i = 0; i < num_cos; i++)
+                if (requested[i].class_id >= num_grps) {
+                        LOG_ERROR(
+                            "SMBA COS%u is out of range (COS%u is max)!\n",
+                            requested[i].class_id, num_grps - 1);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+        ret = verify_smba_id(smba_id, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_set_exit;
+
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_set_exit;
+
+        for (i = 0; i < num_cos; i++) {
+                struct resctrl_schemata *schmt;
+
+                if (smba_cap->u.smba->ctrl_on == 0 && requested[i].ctrl) {
+                        LOG_ERROR("SMBA controller requested but not "
+                                  "enabled!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto os_mba_set_unlock;
+                }
+
+                if (smba_cap->u.smba->ctrl_on == 1 && !requested[i].ctrl) {
+                        LOG_ERROR("Expected SMBA controller but not "
+                                  "requested!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto os_mba_set_unlock;
+                }
+
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
+
+                /* read schemata file */
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_read(requested[i].class_id,
+                                                          schmt);
+
+                /* update and write schemata */
+                if (ret == PQOS_RETVAL_OK) {
+                        struct pqos_mba smba = requested[i];
+
+                        ret = resctrl_schemata_smba_set(schmt, smba_id, &smba);
+                }
+
+                /* write schemata */
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_write(
+                            requested[i].class_id, PQOS_TECHNOLOGY_SMBA, schmt);
+
+                if (actual != NULL) {
+                        /* read actual schemata */
+                        if (ret == PQOS_RETVAL_OK)
+                                ret = resctrl_alloc_schemata_read(
+                                    requested[i].class_id, schmt);
+
+                        /* update actual schemata */
+                        if (ret == PQOS_RETVAL_OK) {
+                                ret = resctrl_schemata_smba_get(schmt, smba_id,
+                                                                &actual[i]);
+                                actual[i].class_id = requested[i].class_id;
+                        }
+                }
+                resctrl_schemata_free(schmt);
+
+                if (ret != PQOS_RETVAL_OK)
+                        goto os_mba_set_unlock;
+        }
+
+os_mba_set_unlock:
+        resctrl_lock_release();
+
+os_mba_set_exit:
+        return ret;
+}
+
+int
 os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
 {
         int ret;
