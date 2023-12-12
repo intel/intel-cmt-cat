@@ -578,6 +578,23 @@ PQOS_LOCAL int hw_smba_get_amd(const unsigned smba_id,
                                const unsigned max_num_cos,
                                unsigned *num_cos,
                                struct pqos_mba *smba_tab);
+/**
+ * @brief Hardware interface to set classes of service
+ *        defined by \a requested on \a smba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  smba_id
+ * @param [in]  num_cos number of classes of service at \a ca
+ * @param [in]  requested table with class of service definitions
+ * @param [out] actual table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_smba_set_amd(const unsigned smba_id,
+                               const unsigned num_cos,
+                               const struct pqos_mba *requested,
+                               struct pqos_mba *actual);
 
 #ifdef __cplusplus
 }
