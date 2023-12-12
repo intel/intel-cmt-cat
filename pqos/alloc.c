@@ -459,6 +459,78 @@ set_mba_cos(const unsigned class_id,
 }
 
 /**
+ * @brief Set SMBA class definitions on selected sockets
+ *
+ * @param class_id SMBA class ID to set
+ * @param available_bw to set
+ * @param sock_ids Array of socket ID's to set class definition
+ * @param sock_num Number of socket ID's in the array
+ * @param ctrl Flag indicating a use of MBA controller
+ * @param cpu pqos_cpuinfo list containing all the cores
+ *
+ * @return Number of classes set
+ * @retval -1 on error
+ */
+static int
+set_smba_cos(const unsigned class_id,
+             const uint64_t available_bw,
+             const unsigned *sock_ids,
+             const unsigned sock_num,
+             int ctrl,
+             const struct pqos_cpuinfo *cpu)
+{
+        unsigned i, set = 0;
+        struct pqos_mba smba, actual;
+
+        if (sock_ids == NULL || available_bw == 0) {
+                printf("Failed to set MBA configuration!\n");
+                return -1;
+        }
+        smba.ctrl = ctrl;
+        smba.class_id = class_id;
+        smba.mb_max = available_bw;
+
+        /**
+         * Set all selected classes
+         */
+        for (i = 0; i < sock_num; i++) {
+                const char *unit;
+                const char *package;
+                int ret = pqos_smba_set(sock_ids[i], 1, &smba, &actual);
+
+                if (cpu->vendor == PQOS_VENDOR_AMD) {
+                        package = "Core Complex";
+                        unit = "";
+                } else {
+                        package = "SOCKET";
+                        unit = "%";
+                }
+
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("%s %u SMBA COS%u - FAILED!\n", package,
+                               sock_ids[i], smba.class_id);
+                        break;
+                }
+
+                printf("%s %u SMBA COS%u => ", package, sock_ids[i],
+                       actual.class_id);
+
+                if (ctrl == 1)
+                        printf("%u MBps\n", smba.mb_max);
+                else
+                        printf("%u%s requested, %u%s applied\n", smba.mb_max,
+                               unit, actual.mb_max, unit);
+
+                set++;
+        }
+        sel_alloc_mod += set;
+        if (set < sock_num)
+                return -1;
+
+        return (int)set;
+}
+
+/**
  * @brief Verifies and translates definition of single allocation
  *        class of service from text string into internal configuration
  *        for specified sockets and set selected classes.
@@ -507,6 +579,22 @@ set_allocation_cos(char *str,
                         return -1;
                 }
                 ret = set_mba_cos(class_id, mask, ids, n, ctrl, cpu);
+                if (res_ids == NULL && ids != NULL)
+                        free(ids);
+                return ret;
+        }
+
+        /* if SMBA selected, set SMBA classes */
+        if (type == SMBA) {
+                int ctrl = 0;
+
+                if (ids == NULL)
+                        ids = pqos_cpu_get_smba_ids(cpu, &n);
+                if (ids == NULL) {
+                        printf("Failed to retrieve socket info!\n");
+                        return -1;
+                }
+                ret = set_smba_cos(class_id, mask, ids, n, ctrl, cpu);
                 if (res_ids == NULL && ids != NULL)
                         free(ids);
                 return ret;
