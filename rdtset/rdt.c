@@ -51,6 +51,7 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 static const struct pqos_capability *m_cap_l2ca = NULL;
 static const struct pqos_capability *m_cap_l3ca = NULL;
 static const struct pqos_capability *m_cap_mba = NULL;
+static const struct pqos_capability *m_cap_smba = NULL;
 
 /**
  * @brief Prints L2, L3 or MBA configuration in \a cfg
@@ -1999,7 +2000,10 @@ alloc_fini(void)
 
         m_cap = NULL;
         m_cpu = NULL;
+        m_cap_l2ca = NULL;
         m_cap_l3ca = NULL;
+        m_cap_mba = NULL;
+        m_cap_smba = NULL;
         memset(g_cfg.config, 0, sizeof(g_cfg.config));
         g_cfg.config_count = 0;
 }
@@ -2087,7 +2091,13 @@ alloc_init(void)
         if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_mba == NULL))
                 printf("Allocation: MBA capability not supported.\n");
 
-        if (m_cap_l3ca == NULL && m_cap_l2ca == NULL && m_cap_mba == NULL) {
+        /* Get SMBA capabilities */
+        ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_SMBA, &m_cap_smba);
+        if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_smba == NULL))
+                printf("Allocation: SMBA capability not supported.\n");
+
+        if (m_cap_l3ca == NULL && m_cap_l2ca == NULL && m_cap_mba == NULL &&
+            m_cap_smba == NULL) {
                 fprintf(stderr, "Allocation capabilities not supported!\n");
                 ret = -EFAULT;
                 goto err;
