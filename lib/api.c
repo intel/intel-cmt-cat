@@ -343,9 +343,10 @@ pqos_alloc_assign(const unsigned technology,
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
         const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+        const int smba_req = ((technology & (1 << PQOS_CAP_TYPE_SMBA)) != 0);
 
         if (core_num == 0 || core_array == NULL || class_id == NULL ||
-            !(l2_req || l3_req || mba_req))
+            !(l2_req || l3_req || mba_req || smba_req))
                 return PQOS_RETVAL_PARAM;
 
         return API_CALL(alloc_assign, technology, core_array, core_num,

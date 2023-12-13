@@ -1852,7 +1852,8 @@ cfg_set_cores_msr(const unsigned technology,
                   const cpu_set_t *cores,
                   const struct pqos_l2ca *l2ca,
                   const struct pqos_l3ca *l3ca,
-                  const struct pqos_mba *mba)
+                  const struct pqos_mba *mba,
+                  const struct pqos_mba *smba)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned res_id, max_id;
@@ -1877,6 +1878,9 @@ cfg_set_cores_msr(const unsigned technology,
                 } else if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
                         ret = get_l2id_cores(cores, res_id, &core_num,
                                              core_array);
+                } else if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                        ret = get_smba_id_cores(cores, res_id, &core_num,
+                                                core_array);
                 }
                 if (ret != 0)
                         return ret;
@@ -1902,7 +1906,7 @@ cfg_set_cores_msr(const unsigned technology,
 
                 /* Configure COS on res ID i */
                 for (i = 0; i < core_num; i++) {
-                        ret = cfg_configure_cos(l2ca, l3ca, mba, NULL,
+                        ret = cfg_configure_cos(l2ca, l3ca, mba, smba,
                                                 core_array[i], cos_id);
                         if (ret != 0)
                                 return ret;
@@ -1919,6 +1923,7 @@ cfg_set_cores_msr(const unsigned technology,
  * @param [in] l2ca L2 CAT configuration table
  * @param [in] l3ca L3 CAT configuration table
  * @param [in] mba MBA configuration table
+ * @param [in] smba MBA configuration table
  *
  * @return Operation status
  * @retval 0 on success
@@ -2112,7 +2117,7 @@ alloc_configure(void)
                                            &mba[i], &smba[i]);
                 else if (g_cfg.interface == PQOS_INTER_MSR)
                         ret = cfg_set_cores_msr(technology, &cpu[i], &l2ca[i],
-                                                &l3ca[i], &mba[i]);
+                                                &l3ca[i], &mba[i], &smba[i]);
                 else
                         ret = cfg_set_cores_os(technology, &cpu[i], &l2ca[i],
                                                &l3ca[i], &mba[i], &smba[i]);
