@@ -1428,6 +1428,7 @@ print_l2ca_config(const struct pqos_l2ca *ca, const int is_error)
 static void
 print_per_socket_config(const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_mba,
+                        const struct pqos_capability *cap_smba,
                         const struct pqos_cpuinfo *cpu_info,
                         const unsigned sock_count,
                         const unsigned *sockets)
@@ -1438,7 +1439,7 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
         if (cpu_info == NULL || sockets == NULL)
                 return;
 
-        if (cap_l3ca == NULL && cap_mba == NULL)
+        if (cap_l3ca == NULL && cap_mba == NULL && cap_smba == NULL)
                 return;
 
         for (i = 0; i < sock_count; i++) {
@@ -1494,6 +1495,41 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                                tab[n].class_id);
                                 else
                                         printf("    MBA COS%u => %u%s%s\n",
+                                               tab[n].class_id, tab[n].mb_max,
+                                               unit, available);
+                        }
+                }
+
+                if (cap_smba != NULL) {
+                        const struct pqos_cap_mba *smba = cap_smba->u.smba;
+                        struct pqos_mba tab[smba->num_classes];
+                        unsigned num = 0;
+                        unsigned n = 0;
+                        const char *unit;
+                        const char *available;
+
+                        if (smba->ctrl_on == 1) {
+                                unit = " MBps";
+                                available = "";
+                        } else {
+                                available = " available";
+                                if (cpu_info->vendor == PQOS_VENDOR_AMD)
+                                        unit = "";
+                                else
+                                        unit = "%";
+                        }
+
+                        ret = pqos_smba_get(sockets[i], smba->num_classes, &num,
+                                            tab);
+                        if (ret != PQOS_RETVAL_OK)
+                                num = smba->num_classes;
+
+                        for (n = 0; n < num; n++) {
+                                if (ret != PQOS_RETVAL_OK)
+                                        printf("    SMBA COS%u => ERROR\n",
+                                               tab[n].class_id);
+                                else
+                                        printf("    SMBA COS%u => %u%s%s\n",
                                                tab[n].class_id, tab[n].mb_max,
                                                unit, available);
                         }
@@ -1712,6 +1748,7 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                    const struct pqos_capability *cap_l3ca,
                    const struct pqos_capability *cap_l2ca,
                    const struct pqos_capability *cap_mba,
+                   const struct pqos_capability *cap_smba,
                    const struct pqos_cpuinfo *cpu_info,
                    const struct pqos_devinfo *dev_info,
                    const int verbose)
@@ -1726,8 +1763,8 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                 return;
         }
 
-        print_per_socket_config(cap_l3ca, cap_mba, cpu_info, sock_count,
-                                sockets);
+        print_per_socket_config(cap_l3ca, cap_mba, cap_smba, cpu_info,
+                                sock_count, sockets);
 
         if (cap_l2ca != NULL) {
                 /* Print L2 CAT class definitions per L2 cluster */
