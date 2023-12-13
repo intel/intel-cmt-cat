@@ -1255,6 +1255,52 @@ _pqos_get_sysconfig(void)
         return &m_sysconf;
 }
 
+void
+_pqos_cap_smba_change(const enum pqos_mba_config cfg)
+{
+        struct pqos_cap_mba *smba_cap = NULL;
+        unsigned i;
+#ifdef __linux__
+        enum pqos_interface interface = _pqos_get_inter();
+#endif
+        ASSERT(cfg == PQOS_MBA_DEFAULT || cfg == PQOS_MBA_CTRL ||
+               cfg == PQOS_MBA_ANY);
+        ASSERT(m_sysconf.cap != NULL);
+
+        if (m_sysconf.cap == NULL)
+                return;
+
+        for (i = 0; i < m_sysconf.cap->num_cap && smba_cap == NULL; i++)
+                if (m_sysconf.cap->capabilities[i].type == PQOS_CAP_TYPE_SMBA)
+                        smba_cap = m_sysconf.cap->capabilities[i].u.smba;
+
+        if (smba_cap == NULL)
+                return;
+
+#ifdef __linux__
+        /* refresh number of classes */
+        if (interface == PQOS_INTER_OS ||
+            interface == PQOS_INTER_OS_RESCTRL_MON) {
+                int ret;
+                unsigned num_classes;
+
+                ret = resctrl_alloc_get_num_closids(&num_classes);
+                if (ret == PQOS_RETVAL_OK)
+                        smba_cap->num_classes = num_classes;
+        }
+#endif
+
+        if (cfg == PQOS_MBA_DEFAULT)
+                smba_cap->ctrl_on = 0;
+        else if (cfg == PQOS_MBA_CTRL) {
+#ifdef __linux__
+                if (interface != PQOS_INTER_MSR)
+                        smba_cap->ctrl = 1;
+#endif
+                smba_cap->ctrl_on = 1;
+        }
+}
+
 const struct pqos_cap *
 _pqos_get_cap(void)
 {
