@@ -10,15 +10,11 @@ jobs:
   style:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.x'
+    - uses: actions/checkout@v3
     - name: Install dependencies
       run: |
-        sudo apt install clang-format-11 codespell
-        python -m pip install --upgrade pip
+        sudo apt install clang-format-11 codespell wget git python3-pip
+        python3 -m pip install --upgrade pip
         pip install pipenv
         make setup-dev
         wget -P /tmp/ https://raw.githubusercontent.com/torvalds/linux/184b8f7f91ca7938c09533df83ce84817e682975/scripts/checkpatch.pl && chmod a+x /tmp/checkpatch.pl
