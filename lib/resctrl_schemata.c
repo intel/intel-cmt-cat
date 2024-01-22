@@ -92,6 +92,7 @@ resctrl_schemata_alloc(const struct pqos_cap *cap,
         const struct pqos_capability *cap_l2ca;
         const struct pqos_capability *cap_l3ca;
         const struct pqos_capability *cap_mba;
+        const struct pqos_capability *cap_smba;
         unsigned i;
 
         schemata = (struct resctrl_schemata *)calloc(1, sizeof(*schemata));
@@ -149,6 +150,27 @@ resctrl_schemata_alloc(const struct pqos_cap *cap,
                 /* fill ctrl and class_id */
                 for (i = 0; i < schemata->mbaids_num; i++)
                         schemata->mba[i].ctrl = ctrl_enabled;
+        }
+
+        /* sMBA */
+        retval = pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &cap_smba);
+        if (retval == PQOS_RETVAL_OK && cap_smba != NULL) {
+
+                if (schemata->smbaids == NULL) {
+                        schemata->smbaids =
+                            pqos_cpu_get_smba_ids(cpu, &schemata->smbaids_num);
+                        if (schemata->smbaids == NULL)
+                                goto resctrl_schemata_alloc_error;
+                }
+
+                schemata->smba =
+                    calloc(schemata->smbaids_num, sizeof(struct pqos_mba));
+                if (schemata->smba == NULL)
+                        goto resctrl_schemata_alloc_error;
+
+                /* fill smba flag */
+                for (i = 0; i < schemata->smbaids_num; i++)
+                        schemata->smba[i].smba = 1;
         }
 
         return schemata;
