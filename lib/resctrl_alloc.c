@@ -119,6 +119,17 @@ resctrl_alloc_get_grps_num(const struct pqos_cap *cap, unsigned *grps_num)
                         else if (num_cos < max_rctl_grps)
                                 max_rctl_grps = num_cos;
                 }
+                /* get SMBA COS num */
+                if (p_cap->type == PQOS_CAP_TYPE_SMBA) {
+                        ret = pqos_smba_get_cos_num(cap, &num_cos);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+
+                        if (max_rctl_grps == 0)
+                                max_rctl_grps = num_cos;
+                        else if (num_cos < max_rctl_grps)
+                                max_rctl_grps = num_cos;
+                }
         }
         *grps_num = max_rctl_grps;
         return PQOS_RETVAL_OK;
