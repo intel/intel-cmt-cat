@@ -43,9 +43,10 @@ architecture-and-technology/resource-director-technology.html
 .br
 or https://github.com/intel/intel-cmt-cat/wiki
 .PP
-The rdtset tool provides support to set up the CAT (Cache Allocation Technology) and MBA (Memory
-Bandwidth Allocation) capabilities for a task and set its CPU affinity. For MBA, rdtset offers two modes of operation, fixed MBA rate
-or closed-loop one monitoring local memory B/W usage and adjust MBA accordingly.
+The rdtset tool provides support to set up the CAT (Cache Allocation Technology), MBA (Memory
+Bandwidth Allocation) and SMBA (Slow Memory Bandwidth Allocation) capabilities for a task and
+set its CPU affinity. For MBA, rdtset offers two modes of operation, fixed MBA rate or
+closed-loop one monitoring local memory B/W usage and adjust MBA accordingly.
 For OS interface, it uses MBA CTRL via libpqos (OS support available in Linux kernel 4.18 or later).
 For MSRs, the tool adjusts MBA configuration by itself based on local memory B/W.
 Intel(R) RDT/AMD PQoS allocation operations of the utility are done via libpqos library. Class of service 0 (CLOS0)
@@ -88,6 +89,8 @@ Accepted values for features:
 .br
 .B m, mba  for MBA
 .br
+.B s, smba  for SMBA
+.br
 .B b, mba_max for max allowable local memory bandwidth
 
 For example:
@@ -115,6 +118,10 @@ data and code cache-ways are non-overlapping
 .B \-t\ 'mba=70;cpu=0-2'
 .br
 CPUs 0-2 can utilize up to 70% of available memory bandwidth
+
+.B \-t\ 'smba=64;cpu=0-2'
+.br
+CPUs 0-2 can utilize up to 64 units of available slow memory bandwidth
 
 .B \-t\ 'mba=50;l3=0xf;cpu=1'
 .br
