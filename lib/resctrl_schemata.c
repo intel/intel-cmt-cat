@@ -477,6 +477,8 @@ resctrl_schemata_type_get(const char *str)
                 type = RESCTRL_SCHEMATA_TYPE_L3DATA;
         else if (strcasecmp(str, "MB") == 0)
                 type = RESCTRL_SCHEMATA_TYPE_MB;
+        else if (strcasecmp(str, "SMBA") == 0)
+                type = RESCTRL_SCHEMATA_TYPE_SMBA;
 
         return type;
 }
@@ -514,6 +516,9 @@ resctrl_schemata_set(const unsigned res_id,
         case RESCTRL_SCHEMATA_TYPE_MB:
                 index = get_mba_index(schemata, res_id);
                 break;
+        case RESCTRL_SCHEMATA_TYPE_SMBA:
+                index = get_smba_index(schemata, res_id);
+                break;
         }
 
         if (index < 0)
@@ -546,6 +551,9 @@ resctrl_schemata_set(const unsigned res_id,
                 break;
         case RESCTRL_SCHEMATA_TYPE_MB:
                 schemata->mba[index].mb_max = value;
+                break;
+        case RESCTRL_SCHEMATA_TYPE_SMBA:
+                schemata->smba[index].mb_max = value;
                 break;
         }
 
@@ -596,8 +604,10 @@ resctrl_schemata_read(FILE *fd, struct resctrl_schemata *schemata)
                         char *token = NULL;
                         uint64_t id = 0;
                         uint64_t value = 0;
-                        unsigned base =
-                            (type == RESCTRL_SCHEMATA_TYPE_MB ? 10 : 16);
+                        unsigned base = ((type == RESCTRL_SCHEMATA_TYPE_MB ||
+                                          type == RESCTRL_SCHEMATA_TYPE_SMBA)
+                                             ? 10
+                                             : 16);
 
                         token = strtok_r(p, ";", &saveptr);
                         if (token == NULL)
