@@ -109,6 +109,7 @@ hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id)
  * @param [in] l3cat_id L3 CAT resource id
  * @param [in] l2cat_id L2 CAT resource id
  * @param [in] mba_id MBA resource id
+ * @param [in] smba_id SMBA resource id
  * @param [out] class_id unused COS
  *
  * NOTE: It is our assumption that mba id and cat ids are same for
@@ -122,18 +123,22 @@ hw_alloc_assoc_unused(const unsigned technology,
                       unsigned l3cat_id,
                       unsigned l2cat_id,
                       unsigned mba_id,
+                      unsigned smba_id,
                       unsigned *class_id)
 {
-        unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0;
+        unsigned num_l2_cos = 0, num_l3_cos = 0, num_mba_cos = 0,
+                 num_smba_cos = 0;
         unsigned num_cos = 0;
         unsigned i, cos;
         int ret;
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
         const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
+        const int smba_req = ((technology & (1 << PQOS_CAP_TYPE_SMBA)) != 0);
         int l2cat_id_set = l2_req;
         int l3cat_id_set = l3_req;
         int mba_id_set = mba_req;
+        int smba_id_set = smba_req;
         const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
         unsigned used_classes[PQOS_MAX_COS];
@@ -155,6 +160,10 @@ hw_alloc_assoc_unused(const unsigned technology,
         if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 return ret;
 
+        ret = pqos_smba_get_cos_num(cap, &num_smba_cos);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                return ret;
+
         /* Obtain highest COS number for requested technologies */
         {
                 if (l3_req)
@@ -166,12 +175,15 @@ hw_alloc_assoc_unused(const unsigned technology,
                 if (mba_req && (num_cos == 0 || num_cos > num_mba_cos))
                         num_cos = num_mba_cos;
 
+                if (smba_req && (num_cos == 0 || num_cos > num_smba_cos))
+                        num_cos = num_smba_cos;
+
                 if (num_cos == 0)
                         return PQOS_RETVAL_ERROR;
         }
 
         /* Obtain L3 and MBA ids for L2 cluster*/
-        if (l2_req && !l3cat_id_set && !mba_id_set) {
+        if (l2_req && !l3cat_id_set && !mba_id_set && !smba_id_set) {
                 for (i = 0; i < cpu->num_cores; i++)
                         if (cpu->cores[i].l2_id == l2cat_id) {
 
@@ -185,6 +197,11 @@ hw_alloc_assoc_unused(const unsigned technology,
                                         mba_id_set = 1;
                                         break;
                                 }
+                                if (num_smba_cos > 0 && !smba_id_set) {
+                                        smba_id = cpu->cores[i].smba_id;
+                                        smba_id_set = 1;
+                                        break;
+                                }
                         }
         }
 
@@ -193,6 +210,8 @@ hw_alloc_assoc_unused(const unsigned technology,
                 if (l3cat_id_set && cpu->cores[i].l3cat_id != l3cat_id)
                         continue;
                 if (mba_id_set && cpu->cores[i].mba_id != mba_id)
+                        continue;
+                if (smba_id_set && cpu->cores[i].smba_id != smba_id)
                         continue;
 
                 ret = hw_alloc_assoc_read(cpu->cores[i].lcore, &cos);
@@ -204,7 +223,8 @@ hw_alloc_assoc_unused(const unsigned technology,
 
                 /* COS does not support L3CAT and MBA need to check
                 L2 cluster only */
-                if (cos >= num_l3_cos && cos >= num_mba_cos && l2cat_id_set &&
+                if (cos >= num_l3_cos && cos >= num_mba_cos &&
+                    cos >= num_smba_cos && l2cat_id_set &&
                     cpu->cores[i].l2_id != l2cat_id)
                         continue;
 
@@ -468,7 +488,7 @@ hw_l3ca_get_min_cbm_bits(unsigned *min_cbm_bits)
          * Find free COS
          */
         for (l3cat_id = 0; l3cat_id < l3cat_id_num; l3cat_id++) {
-                ret = hw_alloc_assoc_unused(technology, l3cat_id, 0, 0,
+                ret = hw_alloc_assoc_unused(technology, l3cat_id, 0, 0, 0,
                                             &class_id);
                 if (ret == PQOS_RETVAL_OK)
                         break;
@@ -764,7 +784,8 @@ hw_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits)
          * Find free COS
          */
         for (l2id = 0; l2id < l2id_num; l2id++) {
-                ret = hw_alloc_assoc_unused(technology, 0, l2id, 0, &class_id);
+                ret =
+                    hw_alloc_assoc_unused(technology, 0, l2id, 0, 0, &class_id);
                 if (ret == PQOS_RETVAL_OK)
                         break;
                 if (ret != PQOS_RETVAL_RESOURCE)
@@ -1285,6 +1306,7 @@ hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
         const struct pqos_capability *l3_cap = NULL;
         const struct pqos_capability *l2_cap = NULL;
         const struct pqos_capability *mba_cap = NULL;
+        const struct pqos_capability *smba_cap = NULL;
         int ret = PQOS_RETVAL_OK;
         const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
@@ -1307,6 +1329,10 @@ hw_alloc_assoc_get(const unsigned lcore, unsigned *class_id)
         if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
                 return ret;
 
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &smba_cap);
+        if (ret != PQOS_RETVAL_OK && ret != PQOS_RETVAL_RESOURCE)
+                return ret;
+
         if (l2_cap == NULL && l3_cap == NULL && mba_cap == NULL)
                 /* no L2/L3 CAT or MBA detected */
                 return PQOS_RETVAL_RESOURCE;
@@ -1325,7 +1351,8 @@ hw_alloc_assign(const unsigned technology,
         const int l3_req = ((technology & (1 << PQOS_CAP_TYPE_L3CA)) != 0);
         const int l2_req = ((technology & (1 << PQOS_CAP_TYPE_L2CA)) != 0);
         const int mba_req = ((technology & (1 << PQOS_CAP_TYPE_MBA)) != 0);
-        unsigned l3cat_id = 0, l2cat_id = 0, mba_id = 0;
+        const int smba_req = ((technology & (1 << PQOS_CAP_TYPE_SMBA)) != 0);
+        unsigned l3cat_id = 0, l2cat_id = 0, mba_id = 0, smba_id = 0;
         unsigned i;
         int ret;
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
@@ -1359,7 +1386,14 @@ hw_alloc_assign(const unsigned technology,
                         }
                         mba_id = pi->mba_id;
                 }
-                if (l2_req && !l3_req && !mba_req) {
+                if (smba_req) {
+                        if (i != 0 && smba_id != pi->smba_id) {
+                                ret = PQOS_RETVAL_PARAM;
+                                goto pqos_alloc_assign_exit;
+                        }
+                        smba_id = pi->smba_id;
+                }
+                if (l2_req && !l3_req && !mba_req && !smba_req) {
                         /* only L2 is requested
                          * The smallest manageable entity is L2 cluster
                          */
@@ -1373,7 +1407,7 @@ hw_alloc_assign(const unsigned technology,
 
         /* find an unused class from highest down */
         ret = hw_alloc_assoc_unused(technology, l3cat_id, l2cat_id, mba_id,
-                                    class_id);
+                                    smba_id, class_id);
         if (ret != PQOS_RETVAL_OK)
                 goto pqos_alloc_assign_exit;
 
