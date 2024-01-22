@@ -86,6 +86,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
  * @param [in] cap_l3ca CAT capability structures
  * @param [in] cap_l2ca CAT capability structures
  * @param [in] cap_mba MBA capability structures
+ * @param [in] cap_smba SMBA capability structures
  * @param [in] cpu CPU information structure
  * @param [in] dev Device information structure
  *
@@ -97,6 +98,7 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
 int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_capability *cap_l2ca,
                 const struct pqos_capability *cap_mba,
+                const struct pqos_capability *cap_smba,
                 const struct pqos_cpuinfo *cpu,
                 const struct pqos_devinfo *dev);
 
