@@ -166,6 +166,19 @@ PQOS_LOCAL int resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
                                         unsigned resource_id,
                                         const struct pqos_mba *ca);
 
+/*
+ * @brief Reads SMBA class of service from schemata
+ *
+ * @param [in] schemata Schemata structure
+ * @param [in] resource_id unique L3 cache identifier
+ * @param [out] ca class of service definition
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int
+resctrl_schemata_smba_get(const struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          struct pqos_mba *ca);
 /**
  * @brief Read schemata from file
  *
