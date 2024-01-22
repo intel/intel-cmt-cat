@@ -53,6 +53,10 @@ struct resctrl_schemata {
         unsigned *mbaids;
         struct pqos_mba *mba; /**< MBA COS definitions */
 
+        unsigned smbaids_num; /**< Number of smba ids */
+        unsigned *smbaids;
+        struct pqos_mba *smba; /**< SMBA COS definitions */
+
         unsigned l2ids_num; /**< Number of L2 clusters */
         unsigned *l2ids;
         struct pqos_l2ca *l2ca; /**< L2 COS definitions */
@@ -388,6 +392,7 @@ enum resctrl_schemata_type {
         RESCTRL_SCHEMATA_TYPE_L3CODE, /**< L3 CAT code */
         RESCTRL_SCHEMATA_TYPE_L3DATA, /**< L3 CAT data */
         RESCTRL_SCHEMATA_TYPE_MB,     /**< MBA data */
+        RESCTRL_SCHEMATA_TYPE_SMBA,   /**< SMBA data */
 };
 
 /**
