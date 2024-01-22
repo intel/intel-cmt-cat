@@ -446,6 +446,46 @@ cap_print_devinfo_device(const unsigned indent,
 }
 
 /**
+ * @brief Print SMBA capabilities
+ *
+ * @param [in] indent indentation level
+ * @param [in] smba SMBA capability structure
+ * @param [in] verbose verbose mode
+ */
+static void
+cap_print_features_smba(const unsigned indent,
+                        const struct pqos_cap_mba *smba,
+                        const int verbose)
+{
+        ASSERT(smba != NULL);
+
+        printf_indent(indent, "Slow Memory Bandwidth Allocation (SMBA)\n");
+        printf_indent(indent + 4, "Num COS: %u\n", smba->num_classes);
+
+        if (smba->ctrl != -1) {
+                const char *ctrl_status = NULL;
+
+                if (!smba->ctrl)
+                        ctrl_status = "unsupported";
+                else if (!smba->ctrl_on)
+                        ctrl_status = "disabled";
+                else if (smba->ctrl_on == 1)
+                        ctrl_status = "enabled";
+
+                if (ctrl_status)
+                        printf_indent(indent + 4, "CTRL: %s\n", ctrl_status);
+        }
+
+        if (!verbose)
+                return;
+
+        printf_indent(indent + 4, "Granularity: %u\n", smba->throttle_step);
+        printf_indent(indent + 4, "Min B/W: %u\n", 100 - smba->throttle_max);
+        printf_indent(indent + 4, "Type: %s\n",
+                      smba->is_linear ? "linear" : "nonlinear");
+}
+
+/**
  * @brief Print capabilities
  *
  * @param [in] cap system capability structure
@@ -461,6 +501,7 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
         const struct pqos_capability *cap_l3ca = NULL;
         const struct pqos_capability *cap_l2ca = NULL;
         const struct pqos_capability *cap_mba = NULL;
+        const struct pqos_capability *cap_smba = NULL;
         enum pqos_interface interface;
         int ret;
 
@@ -481,12 +522,15 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
                 case PQOS_CAP_TYPE_MBA:
                         cap_mba = &(sys->cap->capabilities[i]);
                         break;
+                case PQOS_CAP_TYPE_SMBA:
+                        cap_smba = &(sys->cap->capabilities[i]);
+                        break;
                 default:
                         break;
                 }
 
         if (cap_mon == NULL && cap_l3ca == NULL && cap_l2ca == NULL &&
-            cap_mba == NULL)
+            cap_mba == NULL && cap_smba == NULL)
                 return;
 
         ret = pqos_inter_get(&interface);
@@ -533,6 +577,12 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
          */
         if (cap_mba != NULL)
                 cap_print_features_mba(8, cap_mba->u.mba, verbose);
+
+        /**
+         * Slow Memory Bandwidth Allocation capabilities
+         */
+        if (cap_smba != NULL)
+                cap_print_features_smba(8, cap_smba->u.smba, verbose);
 
         if (!verbose)
                 return;
