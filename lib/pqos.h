@@ -1032,7 +1032,8 @@ struct pqos_alloc_config {
         enum pqos_mba_config mba;        /**< requested MBA config */
         enum pqos_feature_cfg mba40;     /**< requested MBA 4.0 config */
         enum pqos_iordt_config l3_iordt; /**< requested L3 I/O RDT config */
-        int reserved[5];                 /**< reserved for future use */
+        enum pqos_mba_config smba;       /**< requested SMBA config */
+        int reserved[4];                 /**< reserved for future use */
 };
 
 /**

@@ -165,12 +165,14 @@ PQOS_LOCAL int os_alloc_reset_cores(void);
  * @param [in] l3_cap l3 cache capability
  * @param [in] l2_cap l2 cache capability
  * @param [in] mba_cap mba capability
+ * @param [in] smba_cap smba capability
  *
  * @return Operation status
  */
 PQOS_LOCAL int os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
                                         const struct pqos_cap_l2ca *l2_cap,
-                                        const struct pqos_cap_mba *mba_cap);
+                                        const struct pqos_cap_mba *mba_cap,
+                                        const struct pqos_cap_mba *smba_cap);
 
 /**
  * @brief Move all tasks to COS0 (default)

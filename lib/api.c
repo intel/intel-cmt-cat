@@ -441,6 +441,15 @@ pqos_alloc_reset_config(const struct pqos_alloc_config *cfg)
                             cfg->mba);
                         return PQOS_RETVAL_PARAM;
                 }
+
+                if (cfg->smba != PQOS_MBA_ANY &&
+                    cfg->smba != PQOS_MBA_DEFAULT &&
+                    cfg->smba != PQOS_MBA_CTRL) {
+                        LOG_ERROR(
+                            "Unrecognized SMBA configuration setting %d!\n",
+                            cfg->mba);
+                        return PQOS_RETVAL_PARAM;
+                }
         }
 
         return API_CALL(alloc_reset, cfg);
