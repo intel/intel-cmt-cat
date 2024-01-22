@@ -380,6 +380,40 @@ resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
         return PQOS_RETVAL_OK;
 }
 
+static int
+get_smba_index(const struct resctrl_schemata *schemata, unsigned resource_id)
+{
+        unsigned i;
+
+        ASSERT(schemata->smbaids != NULL);
+
+        for (i = 0; i < schemata->smbaids_num; ++i)
+                if (schemata->smbaids[i] == resource_id)
+                        return i;
+
+        return -1;
+}
+
+int
+resctrl_schemata_smba_get(const struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          struct pqos_mba *ca)
+{
+        int index;
+
+        ASSERT(schemata != NULL);
+        ASSERT(ca != NULL);
+        ASSERT(schemata->smba != NULL);
+
+        index = get_smba_index(schemata, resource_id);
+        if (index < 0)
+                return PQOS_RETVAL_ERROR;
+
+        *ca = schemata->smba[index];
+
+        return PQOS_RETVAL_OK;
+}
+
 /**
  * @brief Schemata type
  */
