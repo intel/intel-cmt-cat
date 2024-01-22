@@ -414,6 +414,9 @@ set_mba_cos(const unsigned class_id,
                 printf("Failed to set MBA configuration!\n");
                 return -1;
         }
+
+        memset(&mba, 0, sizeof(struct pqos_mba));
+        memset(&actual, 0, sizeof(struct pqos_mba));
         mba.ctrl = ctrl;
         mba.class_id = class_id;
         mba.mb_max = available_bw;
