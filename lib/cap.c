@@ -295,6 +295,48 @@ cap_mba_discover(struct pqos_cap_mba **r_cap,
 }
 
 /**
+ * @brief Discovers support of SMBA
+ *
+ * @param[out] r_cap place to store SMBA capabilities structure
+ * @param[in] cpu detected cpu topology
+ * @param[in] iface Selected interface
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+static int
+cap_smba_discover(struct pqos_cap_mba **r_cap,
+                  const struct pqos_cpuinfo *cpu,
+                  const enum pqos_interface iface)
+{
+        struct pqos_cap_mba *cap = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        cap = (struct pqos_cap_mba *)malloc(sizeof(*cap));
+        if (cap == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        switch (iface) {
+        case PQOS_INTER_MSR:
+                if (cpu->vendor == PQOS_VENDOR_AMD)
+                        ret = amd_cap_smba_discover(cap, cpu);
+                else
+                        ret = PQOS_RETVAL_RESOURCE;
+                break;
+        default:
+                ret = PQOS_RETVAL_RESOURCE;
+                break;
+        }
+
+        if (ret == PQOS_RETVAL_OK)
+                *r_cap = cap;
+        else
+                free(cap);
+
+        return ret;
+}
+
+/**
  * @brief Runs detection of platform monitoring and allocation capabilities
  *
  * @param p_cap place to store allocated capabilities structure
@@ -313,6 +355,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         struct pqos_cap_l3ca *det_l3ca = NULL;
         struct pqos_cap_l2ca *det_l2ca = NULL;
         struct pqos_cap_mba *det_mba = NULL;
+        struct pqos_cap_mba *det_smba = NULL;
         struct pqos_cap *_cap = NULL;
         unsigned sz = 0;
         int ret = PQOS_RETVAL_RESOURCE;
@@ -420,6 +463,29 @@ discover_capabilities(struct pqos_cap **p_cap,
                 goto error_exit;
         }
 
+        /**
+         * Slow Memory bandwidth allocation init
+         */
+        ret = cap_smba_discover(&det_smba, cpu, inter);
+        switch (ret) {
+        case PQOS_RETVAL_OK:
+                LOG_INFO("SMBA capability detected\n");
+                LOG_INFO("SMBA details: "
+                         "#COS=%u, %slinear, max=%u, step=%u\n",
+                         det_smba->num_classes,
+                         det_smba->is_linear ? "" : "non-",
+                         det_smba->throttle_max, det_smba->throttle_step);
+                sz += sizeof(struct pqos_capability);
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                LOG_INFO("SMBA capability not detected\n");
+                break;
+        default:
+                LOG_ERROR("Fatal error encounter in SMBA discovery!\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto error_exit;
+        }
+
         if (sz == 0) {
                 LOG_ERROR("No Platform QoS capability discovered\n");
                 ret = PQOS_RETVAL_ERROR;
@@ -476,6 +542,13 @@ discover_capabilities(struct pqos_cap **p_cap,
                                 goto error_exit;
                 }
 #endif
+        }
+
+        if (det_smba != NULL) {
+                _cap->capabilities[_cap->num_cap].type = PQOS_CAP_TYPE_SMBA;
+                _cap->capabilities[_cap->num_cap].u.smba = det_smba;
+                _cap->num_cap++;
+                ret = PQOS_RETVAL_OK;
         }
 
         (*p_cap) = _cap;
