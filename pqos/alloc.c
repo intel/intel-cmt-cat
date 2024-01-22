@@ -1392,6 +1392,9 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                         unit = "%";
                         }
 
+                        memset(&tab, 0,
+                               sizeof(struct pqos_mba) * mba->num_classes);
+
                         ret = pqos_mba_get(sockets[i], mba->num_classes, &num,
                                            tab);
                         if (ret != PQOS_RETVAL_OK)

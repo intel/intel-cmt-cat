@@ -1069,6 +1069,11 @@ hw_mba_get_amd(const unsigned mba_id,
         ASSERT(mba_tab != NULL);
         ASSERT(max_num_cos != 0);
 
+        if (mba_tab->smba) {
+                ret = hw_smba_get_amd(mba_id, max_num_cos, num_cos, mba_tab);
+                return ret;
+        }
+
         ret = pqos_mba_get_cos_num(cap, &count);
         if (ret != PQOS_RETVAL_OK)
                 return ret; /**< no MBA capability */
@@ -1091,6 +1096,49 @@ hw_mba_get_amd(const unsigned mba_id,
                 mba_tab[i].ctrl = 0;
                 mba_tab[i].class_id = i;
                 mba_tab[i].mb_max = val;
+        }
+        *num_cos = count;
+
+        return ret;
+}
+
+int
+hw_smba_get_amd(const unsigned smba_id,
+                const unsigned max_num_cos,
+                unsigned *num_cos,
+                struct pqos_mba *smba_tab)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0, count = 0, core = 0;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+
+        ASSERT(num_cos != NULL);
+        ASSERT(smba_tab != NULL);
+        ASSERT(max_num_cos != 0);
+
+        ret = pqos_smba_get_cos_num(cap, &count);
+        if (ret != PQOS_RETVAL_OK)
+                return ret; /**< no SMBA capability */
+
+        if (count > max_num_cos)
+                return PQOS_RETVAL_ERROR;
+
+        ret = pqos_cpu_get_one_by_smba_id(cpu, smba_id, &core);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        for (i = 0; i < count; i++) {
+                const uint32_t reg = PQOS_MSR_SMBA_MASK_START_AMD + i;
+                uint64_t val = 0;
+                int retval = msr_read(core, reg, &val);
+
+                if (retval != MACHINE_RETVAL_OK)
+                        return PQOS_RETVAL_ERROR;
+
+                smba_tab[i].ctrl = 0;
+                smba_tab[i].class_id = i;
+                smba_tab[i].mb_max = val;
         }
         *num_cos = count;
 
