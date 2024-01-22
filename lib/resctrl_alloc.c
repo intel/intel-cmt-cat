@@ -359,8 +359,14 @@ resctrl_alloc_schemata_write(const unsigned class_id,
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_alloc_schemata_write_exit;
         }
-        if ((technology & PQOS_TECHNOLOGY_MBA) == PQOS_TECHNOLOGY_MBA)
+        if ((technology & PQOS_TECHNOLOGY_MBA) == PQOS_TECHNOLOGY_MBA) {
                 ret = resctrl_schemata_mba_write(fd, schemata);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_alloc_schemata_write_exit;
+        }
+
+        if ((technology & PQOS_TECHNOLOGY_SMBA) == PQOS_TECHNOLOGY_SMBA)
+                ret = resctrl_schemata_smba_write(fd, schemata);
 
 resctrl_alloc_schemata_write_exit:
 
