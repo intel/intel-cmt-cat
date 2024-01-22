@@ -96,6 +96,7 @@ struct rdt_cfg {
                 struct pqos_l2ca *l2;
                 struct pqos_l3ca *l3;
                 struct pqos_mba *mba;
+                struct pqos_mba *smba;
                 void *generic_ptr;
         } u;
 };
@@ -151,12 +152,30 @@ wrap_mba(struct pqos_mba *mba)
         return result;
 }
 
+/**
+ * @brief Creates \a rdt_cfg struct from \a pqos_mba struct
+ *
+ * @param [in] smba SMBA class configuration
+ *
+ * @return rdt_cfg struct
+ */
+static inline struct rdt_cfg
+wrap_smba(struct pqos_mba *smba)
+{
+        struct rdt_cfg result;
+
+        result.type = PQOS_CAP_TYPE_SMBA;
+        result.u.smba = smba;
+        return result;
+}
+
 struct rdt_config {
-        cpu_set_t cpumask;   /**< CPUs bitmask */
-        struct pqos_l3ca l3; /**< L3 configuration */
-        struct pqos_l2ca l2; /**< L2 configuration */
-        struct pqos_mba mba; /**< MBA configuration */
-        int pid_cfg;         /**< associate PIDs to this cfg */
+        cpu_set_t cpumask;    /**< CPUs bitmask */
+        struct pqos_l3ca l3;  /**< L3 configuration */
+        struct pqos_l2ca l2;  /**< L2 configuration */
+        struct pqos_mba mba;  /**< MBA configuration */
+        struct pqos_mba smba; /**< SMBA configuration */
+        int pid_cfg;          /**< associate PIDs to this cfg */
 };
 
 /* rdtset command line configuration structure */
