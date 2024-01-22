@@ -231,7 +231,7 @@ static void
 test_alloc_print_config_negative(void **state)
 {
         run_void_function(alloc_print_config, NULL, NULL, NULL, NULL, NULL,
-                          NULL, 0);
+                          NULL, NULL, 0);
         assert_string_equal(output_get(),
                             "Error retrieving information for Sockets\n");
 
@@ -331,8 +331,8 @@ test_alloc_print_config_msr(void **state)
         }
 
         run_void_function(alloc_print_config, data->cap_mon, data->cap_l3ca,
-                          data->cap_l2ca, data->cap_mba, data->cpu_info, NULL,
-                          1);
+                          data->cap_l2ca, data->cap_mba, data->cap_smba,
+                          data->cpu_info, NULL, 1);
 
         /* check output */
         assert_true(
@@ -465,8 +465,8 @@ test_alloc_print_config_os(void **state)
         }
 
         run_void_function(alloc_print_config, data->cap_mon, data->cap_l3ca,
-                          data->cap_l2ca, data->cap_mba, data->cpu_info, NULL,
-                          1);
+                          data->cap_l2ca, data->cap_mba, data->cap_smba,
+                          data->cpu_info, NULL, 1);
 
         /* check output */
         assert_true(output_has_text("L3CA/MBA COS definitions for Socket 0:\n"
