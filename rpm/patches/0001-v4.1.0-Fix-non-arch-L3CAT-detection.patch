@@ -1,0 +1,92 @@
+From 8b269ce1c5e3df74be85e549c6cd6280e34a00f4 Mon Sep 17 00:00:00 2001
+From: Marcel Cornu <marcel.d.cornu@intel.com>
+Date: Fri, 26 Jan 2024 13:59:07 +0000
+Subject: [PATCH] v4.1.0: Fix non-arch L3CAT detection
+
+Fix for detection of non-architectural L3CAT on intel-cmt-cat v4.1.0.
+Note: The RDT_PROBE_MSR environment variable must be set with the MSR
+interface for correct detection.
+---
+ lib/hw_cap.c | 35 ++++++++++++++++++++++++++++-------
+ lib/log.c    |  2 +-
+ 2 files changed, 29 insertions(+), 8 deletions(-)
+
+diff --git a/lib/hw_cap.c b/lib/hw_cap.c
+index b1444e45..a6b33b60 100644
+--- a/lib/hw_cap.c
++++ b/lib/hw_cap.c
+@@ -524,6 +524,7 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
+ {
+         struct cpuid_out res;
+         unsigned l3_size = 0;
++        unsigned check_brand_str = 0;
+         int ret = PQOS_RETVAL_OK;
+ 
+         ASSERT(cap != NULL);
+@@ -542,23 +543,43 @@ hw_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
+                 /**
+                  * Use CPUID method
+                  */
+-                LOG_INFO("CPUID.0x7.0: L3 CAT supported\n");
+                 ret = hw_cap_l3ca_cpuid(cap, cpu);
+-                if (ret == PQOS_RETVAL_OK)
++                if (ret == PQOS_RETVAL_RESOURCE)
++                        check_brand_str = 1;
++                else if (ret == PQOS_RETVAL_OK)
+                         ret = get_cache_info(&cpu->l3, NULL, &l3_size);
+         } else {
++                LOG_INFO("CPUID.0x7.0: L3 CAT not detected.\n");
++                check_brand_str = 1;
++        }
++        if (check_brand_str) {
++                LOG_INFO("Checking brand string...\n");
+                 /**
+                  * Use brand string matching method 1st.
+-                 * If it fails then try register probing.
+                  */
+-                LOG_INFO("CPUID.0x7.0: L3 CAT not detected. "
+-                         "Checking brand string...\n");
+                 ret = hw_cap_l3ca_brandstr(cap);
+-                if (ret != PQOS_RETVAL_OK)
++                /**
++                 * If brand string check fails then probe MSRs
++                 * Note: RDT_PROBE_MSR env var must also be set
++                 */
++                if (ret != PQOS_RETVAL_OK && getenv("RDT_PROBE_MSR") != NULL) {
++                        LOG_INFO("Probing msr....\n");
+                         ret = hw_cap_l3ca_probe(cap, cpu);
+-                if (ret == PQOS_RETVAL_OK)
++                }
++                if (ret == PQOS_RETVAL_OK) {
+                         ret =
+                             get_cache_info(&cpu->l3, &cap->num_ways, &l3_size);
++
++                        LOG_WARN("Detected model specific non-architectural "
++                                 "features (L3 "
++                                 "CAT).\n      Intel recommends validating "
++                                 "that the feature "
++                                 "provides the\n      performance necessary "
++                                 "for your "
++                                 "use-case. Non-architectural\n      features "
++                                 "may not "
++                                 "behave as expected in all scenarios.\n");
++                }
+         }
+ 
+         if (cap->num_ways > 0)
+diff --git a/lib/log.c b/lib/log.c
+index 735131dd..c3d33c21 100644
+--- a/lib/log.c
++++ b/lib/log.c
+@@ -51,7 +51,7 @@
+  * Local data types
+  * ---------------------------------------
+  */
+-#define AP_BUFFER_SIZE 256
++#define AP_BUFFER_SIZE 320
+ 
+ /**
+  * ---------------------------------------
+-- 
+2.34.1
+
