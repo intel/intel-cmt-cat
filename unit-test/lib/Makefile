@@ -1,3 +1,4 @@
+include ../../pre-build.mk
 
 LIB_DIR = ../../lib
 OBJ_DIR = ./obj

@@ -33,6 +33,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
+include ../../pre-build.mk
+
 PQOS_DIR = ../../pqos
 LIB_DIR = ../../lib
 OBJ_DIR = ./obj

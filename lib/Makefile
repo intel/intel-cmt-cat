@@ -33,6 +33,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
+include ../pre-build.mk
+
 LIB = libpqos
 VERSION = 5.0.0
 SO_VERSION = 5
@@ -136,6 +138,7 @@ else
 endif
 
 install: $(LIBNAME)
+
 # Install on FreeBSD
 ifeq ($(shell uname), FreeBSD)
 	install -d $(LIB_INSTALL_DIR)

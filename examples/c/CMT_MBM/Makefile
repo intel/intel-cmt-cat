@@ -34,6 +34,8 @@
 #
 ###############################################################################
 
+include ../../../pre-build.mk
+
 LIBDIR ?= ../../../lib
 CFLAGS =-I$(LIBDIR) -pthread \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \

@@ -34,6 +34,8 @@
 #
 ###############################################################################
 
+include ../pre-build.mk
+
 OBJDIR = obj
 LIBDIR ?= ../lib
 LDFLAGS = -L$(LIBDIR) -pie -z noexecstack -z relro -z now

@@ -33,6 +33,8 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ###############################################################################
 
+include ../../pre-build.mk
+
 LIB = libgraboutput
 SHARED ?= y
 LDFLAGS = -L. -lpthread -z noexecstack -z relro -z now

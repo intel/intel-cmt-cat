@@ -34,6 +34,8 @@
 #
 ###############################################################################
 
+include pre-build.mk
+
 # XXX: modify as desired
 PREFIX ?= /usr/local
 export PREFIX
