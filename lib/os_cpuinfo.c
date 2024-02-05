@@ -43,6 +43,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/resource.h>
 
 #define SYSTEM_CPU  "/sys/devices/system/cpu"
 #define SYSTEM_NODE "/sys/devices/system/node"
@@ -264,6 +265,11 @@ os_cpuinfo_topology(void)
                 return NULL;
         } else if (max_core_count == 0) {
                 LOG_ERROR("Zero processors in the system!\n");
+                return NULL;
+        }
+
+        if (pqos_set_no_files_limit(max_core_count)) {
+                LOG_ERROR("Open files limit not sufficient!\n");
                 return NULL;
         }
 

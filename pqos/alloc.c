@@ -840,7 +840,7 @@ set_allocation_assoc(const struct pqos_devinfo *dev)
 static void
 fill_core_tab(char *str)
 {
-        unsigned max_cores_count = 128;
+        unsigned max_cores_count = sysconf(_SC_NPROCESSORS_CONF);
         uint64_t *cores = calloc(max_cores_count, sizeof(uint64_t));
         unsigned i = 0, n = 0, cos = 0;
         char *p = NULL;
