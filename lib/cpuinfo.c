@@ -39,6 +39,7 @@
 
 #include "allocation.h"
 #include "cap.h"
+#include "common.h"
 #include "cpu_registers.h"
 #include "log.h"
 #include "machine.h"
@@ -449,6 +450,11 @@ cpuinfo_build_topo(struct apic_info *apic)
         max_core_count = sysconf(_SC_NPROCESSORS_CONF);
         if (max_core_count <= 0) {
                 LOG_ERROR("Zero processors in the system!");
+                return NULL;
+        }
+
+        if (pqos_set_no_files_limit(max_core_count)) {
+                LOG_ERROR("Open files limit not sufficient!\n");
                 return NULL;
         }
 

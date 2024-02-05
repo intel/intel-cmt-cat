@@ -43,7 +43,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <unistd.h>
+
+/* Maximum required file descriptors per core */
+#define MAX_FD_PER_CORE 5
+/* pqos tool opens some file descriptors while using msr interface */
+#define MAX_PQOS_FD 100
 
 FILE *
 pqos_fopen(const char *name, const char *mode)
@@ -391,4 +397,29 @@ pqos_read(int fd, void *buf, size_t count)
         }
 
         return count;
+}
+
+int
+pqos_set_no_files_limit(unsigned long max_core_count)
+{
+        struct rlimit files_limit;
+        const rlim_t required_fd =
+            (max_core_count * MAX_FD_PER_CORE) + MAX_PQOS_FD;
+
+        if (getrlimit(RLIMIT_NOFILE, &files_limit))
+                return PQOS_RETVAL_ERROR;
+
+        /* Check Kernel allows to open required file descriptors */
+        if (files_limit.rlim_max < required_fd ||
+            files_limit.rlim_cur < required_fd) {
+                if (files_limit.rlim_max < required_fd)
+                        files_limit.rlim_max = required_fd;
+
+                files_limit.rlim_cur = required_fd;
+
+                if (setrlimit(RLIMIT_NOFILE, &files_limit))
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
 }
