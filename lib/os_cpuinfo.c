@@ -267,6 +267,11 @@ os_cpuinfo_topology(void)
                 return NULL;
         }
 
+        if (pqos_set_no_files_limit(max_core_count)) {
+                LOG_ERROR("Open files limit not sufficient!\n");
+                return NULL;
+        }
+
         const size_t mem_sz =
             sizeof(*cpu) + (max_core_count * sizeof(struct pqos_coreinfo));
 

@@ -200,6 +200,17 @@ PQOS_LOCAL void pqos_munmap(void *mem, const uint64_t size);
  */
 PQOS_LOCAL ssize_t pqos_read(int fd, void *buf, size_t count);
 
+/**
+ * @brief Increase the number of open files limit to handle more
+ * than 256 CPUs.
+ *
+ * @param [in] Max CPUs on the system
+ *
+ * @return PQOS_RETVAL_OK for success
+ * @retval PQOS_RETVAL_ERROR for failure
+ */
+PQOS_LOCAL int pqos_set_no_files_limit(unsigned long max_core_count);
+
 #ifdef __cplusplus
 }
 #endif
