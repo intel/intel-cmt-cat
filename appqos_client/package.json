@@ -1,6 +1,6 @@
 {
   "name": "appqos-client",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "scripts": {
     "ng": "ng",
     "start": "ng serve",
@@ -66,6 +66,9 @@
   "overrides": {
     "semver": ">=7.5.2",
     "postcss": ">=8.4.31",
-    "@babel/traverse": ">=7.23.2"
+    "@babel/traverse": ">=7.23.2",
+    "axios": ">=1.6.0",
+    "follow-redirects": ">=1.15.4",
+    "ip": ">=1.1.9"
   }
 }
