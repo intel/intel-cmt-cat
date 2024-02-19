@@ -1,4 +1,20 @@
 =======================================================================
+Release  v23.11.1 Feb 2024
+=======================================================================
+
+Security release to address vulnerabilities in third party dependencies.
+
+Contributors:
+        Marcel Cornu <marcel.d.cornu@intel.com>
+
+1. AppQoS Client:
+        - Upgraded the following third party dependencies to fix known
+          security vulnerabilities:
+          - axios
+          - follow-redirects
+          - ip
+
+=======================================================================
 Release  v23.11 Nov 2023
 =======================================================================
 
