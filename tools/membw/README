@@ -1,7 +1,7 @@
 ========================================================================
 README for Membw tool
 
-Jan 2019
+Mar 2024
 
 ========================================================================
 
@@ -11,6 +11,7 @@ Contents
 - Overview
 - Requirements and Installation
 - Usage
+- Limitations
 - Legal Disclaimer
 
 
@@ -64,6 +65,19 @@ Usage: For Membw:
           --nt-write-avx512  AVX512 NT stores
           --nt-write-clwb    x86 NT stores + clwb
           --nt-write-sse     SSE NT stores
+
+Limitations
+===========
+
+The tool allocates a chunk of memory as much as twice of LLC physical cache size.
+It uses standard means of the C library for that allocation. Therefore it is
+affected by all OS placement policy limitations such as NUMA-awareness, etc...
+For example, when SNC is enabled NUMA-aware OS allocates only addresses local to
+the SNC-domain and only SNC-domain local cache slices are populated. In the case
+of SNC-2 it populates 50% of cache slices. For SNC-3 the population will be 33%.
+For SNC-4 only 25% of the cache will be populated.
+Possibly there are other limitations exist/will exist on OS or/and hardware level
+that will prevent the tool from populating 100% of cache/memory bandwidth.
 
 Legal Disclaimer
 ================
