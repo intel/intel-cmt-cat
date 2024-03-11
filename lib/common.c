@@ -43,6 +43,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/resource.h>
 #include <unistd.h>
 
 FILE *
@@ -391,4 +392,25 @@ pqos_read(int fd, void *buf, size_t count)
         }
 
         return count;
+}
+
+int
+pqos_set_no_files_limit(unsigned long max_core_count)
+{
+        struct rlimit files_limit;
+
+        if (getrlimit(RLIMIT_NOFILE, &files_limit))
+                return PQOS_RETVAL_ERROR;
+
+        /* Check if rlim_max can handle the number of CPUs */
+        if (files_limit.rlim_max < max_core_count * 4)
+                return PQOS_RETVAL_ERROR;
+
+        if (files_limit.rlim_cur < max_core_count * 4) {
+                files_limit.rlim_cur = max_core_count * 4;
+                if (setrlimit(RLIMIT_NOFILE, &files_limit))
+                        return PQOS_RETVAL_ERROR;
+        }
+
+        return PQOS_RETVAL_OK;
 }
