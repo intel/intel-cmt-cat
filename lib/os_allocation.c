@@ -502,7 +502,8 @@ os_alloc_reset_cores(void)
 int
 os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
                          const struct pqos_cap_l2ca *l2_cap,
-                         const struct pqos_cap_mba *mba_cap)
+                         const struct pqos_cap_mba *mba_cap,
+                         const struct pqos_cap_mba *smba_cap)
 {
         unsigned grps;
         unsigned i;
@@ -535,7 +536,8 @@ os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
                         goto os_alloc_reset_light_schematas_exit;
                 }
 
-                ret = resctrl_schemata_reset(schmt, l3_cap, l2_cap, mba_cap);
+                ret = resctrl_schemata_reset(schmt, l3_cap, l2_cap, mba_cap,
+                                             smba_cap);
                 if (ret == PQOS_RETVAL_OK)
                         ret = resctrl_alloc_schemata_write(
                             i, PQOS_TECHNOLOGY_ALL, schmt);
@@ -634,13 +636,15 @@ os_alloc_reset_tasks(void)
  * @param [in] l3_cap L3 CAT capability
  * @param [in] l2_cap L2 CAT capability
  * @param [in] mba_cap MBA capability
+ * @param [in] smba_cap SMBA capability
  *
  * @return Operation status
  */
 static int
 os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
                      const struct pqos_cap_l2ca *l2_cap,
-                     const struct pqos_cap_mba *mba_cap)
+                     const struct pqos_cap_mba *mba_cap,
+                     const struct pqos_cap_mba *smba_cap)
 {
         int ret = PQOS_RETVAL_OK;
         int step_result;
@@ -651,7 +655,8 @@ os_alloc_reset_light(const struct pqos_cap_l3ca *l3_cap,
         if (step_result != PQOS_RETVAL_OK)
                 ret = step_result;
 
-        step_result = os_alloc_reset_schematas(l3_cap, l2_cap, mba_cap);
+        step_result =
+            os_alloc_reset_schematas(l3_cap, l2_cap, mba_cap, smba_cap);
         if (step_result != PQOS_RETVAL_OK)
                 ret = step_result;
 
@@ -781,6 +786,46 @@ mba_cfg_update(const enum pqos_mba_config mba_cfg,
 }
 
 /**
+ * @brief updates SMBA configuration for MBA capability
+ *
+ * @param [in] smba_cfg requested MBA configuration
+ * @param [in] smba_cap MBA capability
+ * @param [out] smba_ctrl updated MBA config
+ *
+ * @retval > 0 smba_ctrl change
+ * @retval 0 no change
+ */
+static int
+smba_cfg_update(const enum pqos_mba_config smba_cfg,
+                const struct pqos_cap_mba *smba_cap,
+                enum pqos_mba_config *smba_ctrl)
+{
+        int ret = 0;
+
+        if (smba_cap == NULL)
+                return 0;
+
+        switch (smba_cfg) {
+        case PQOS_MBA_CTRL:
+                *smba_ctrl = smba_cfg;
+                ret = (smba_cap->ctrl_on != 1);
+                break;
+        case PQOS_MBA_ANY:
+                if (smba_cap->ctrl_on == 1)
+                        *smba_ctrl = PQOS_MBA_CTRL;
+                else
+                        *smba_ctrl = PQOS_MBA_DEFAULT;
+                break;
+        case PQOS_MBA_DEFAULT:
+                *smba_ctrl = smba_cfg;
+                ret = (smba_cap->ctrl_on != 0);
+                break;
+        }
+
+        return ret;
+}
+
+/**
  * @brief Performs "full reset" of CAT.
  *
  * Allocs all cores to default COS
@@ -797,6 +842,7 @@ static int
 os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
                     const enum pqos_cdp_config l2_cdp_cfg,
                     const enum pqos_mba_config mba_cfg,
+                    const enum pqos_mba_config smba_cfg,
                     const struct pqos_cap *cap)
 {
         int ret;
@@ -837,6 +883,7 @@ os_alloc_reset_full(const enum pqos_cdp_config l3_cdp_cfg,
         _pqos_cap_l3cdp_change(l3_cdp_cfg);
         _pqos_cap_l2cdp_change(l2_cdp_cfg);
         _pqos_cap_mba_change(mba_cfg);
+        _pqos_cap_smba_change(smba_cfg);
 
         /**
          * Create the COS dir's in resctrl.
@@ -857,18 +904,22 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         const struct pqos_cap_l3ca *l3_cap = NULL;
         const struct pqos_cap_l2ca *l2_cap = NULL;
         const struct pqos_cap_mba *mba_cap = NULL;
+        const struct pqos_cap_mba *smba_cap = NULL;
         enum pqos_cdp_config l3_cdp = PQOS_REQUIRE_CDP_OFF;
         enum pqos_cdp_config l2_cdp = PQOS_REQUIRE_CDP_OFF;
         enum pqos_mba_config mba_ctrl = PQOS_MBA_DEFAULT;
+        enum pqos_mba_config smba_ctrl = PQOS_MBA_DEFAULT;
         int l3_cdp_changed = 0;
         int l2_cdp_changed = 0;
         int mba_changed = 0;
+        int smba_changed = 0;
         int ret;
         const struct pqos_cap *cap = _pqos_get_cap();
         enum pqos_cdp_config l3_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_iordt_config l3_iordt_cfg = PQOS_REQUIRE_IORDT_ANY;
         enum pqos_cdp_config l2_cdp_cfg = PQOS_REQUIRE_CDP_ANY;
         enum pqos_mba_config mba_cfg = PQOS_MBA_ANY;
+        enum pqos_mba_config smba_cfg = PQOS_MBA_ANY;
         enum pqos_feature_cfg mba40_cfg = PQOS_FEATURE_ANY;
 
         if (cfg != NULL) {
@@ -876,6 +927,7 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
                 l3_iordt_cfg = cfg->l3_iordt;
                 l2_cdp_cfg = cfg->l2_cdp;
                 mba_cfg = cfg->mba;
+                smba_cfg = cfg->smba;
                 mba40_cfg = cfg->mba40;
         }
 
@@ -893,6 +945,9 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         ASSERT(mba40_cfg == PQOS_FEATURE_ON || mba40_cfg == PQOS_FEATURE_OFF ||
                mba40_cfg == PQOS_FEATURE_ANY);
 
+        ASSERT(smba_cfg == PQOS_MBA_DEFAULT || smba_cfg == PQOS_MBA_CTRL ||
+               smba_cfg == PQOS_MBA_ANY);
+
         /* Get L3 CAT capabilities */
         (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_L3CA, &alloc_cap);
         if (alloc_cap != NULL)
@@ -909,6 +964,12 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_MBA, &alloc_cap);
         if (alloc_cap != NULL)
                 mba_cap = alloc_cap->u.mba;
+
+        /* Get SMBA capabilities */
+        alloc_cap = NULL;
+        (void)pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &alloc_cap);
+        if (alloc_cap != NULL)
+                smba_cap = alloc_cap->u.smba;
 
         /* Check if either L2 CAT or L3 CAT is supported */
         if (l2_cap == NULL && l3_cap == NULL && mba_cap == NULL) {
@@ -977,6 +1038,13 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
                 goto os_alloc_reset_exit;
         }
 
+        /* Check SMBA requested while not present */
+        if (smba_cap == NULL && smba_cfg != PQOS_MBA_ANY) {
+                LOG_ERROR("SMBA setting requested but no SMBA present!\n");
+                ret = PQOS_RETVAL_RESOURCE;
+                goto os_alloc_reset_exit;
+        }
+
         /** Check if resctrl is in use */
         ret = resctrl_lock_exclusive();
         if (ret != PQOS_RETVAL_OK)
@@ -986,8 +1054,9 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         l3_cdp_changed = l3_cdp_update(l3_cdp_cfg, l3_cap, &l3_cdp);
         l2_cdp_changed = l2_cdp_update(l2_cdp_cfg, l2_cap, &l2_cdp);
         mba_changed = mba_cfg_update(mba_cfg, mba_cap, &mba_ctrl);
+        smba_changed = smba_cfg_update(smba_cfg, smba_cap, &smba_ctrl);
 
-        if (l3_cdp_changed || l2_cdp_changed || mba_changed) {
+        if (l3_cdp_changed || l2_cdp_changed || mba_changed | smba_changed) {
 
                 unsigned monitoring_active = 0;
 
@@ -1004,10 +1073,10 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
                                   "settings\n");
                         ret = PQOS_RETVAL_ERROR;
                 } else
-                        ret =
-                            os_alloc_reset_full(l3_cdp, l2_cdp, mba_ctrl, cap);
+                        ret = os_alloc_reset_full(l3_cdp, l2_cdp, mba_ctrl,
+                                                  smba_ctrl, cap);
         } else
-                ret = os_alloc_reset_light(l3_cap, l2_cap, mba_cap);
+                ret = os_alloc_reset_light(l3_cap, l2_cap, mba_cap, smba_cap);
 
 os_alloc_reset_exit:
         return ret;
@@ -1075,6 +1144,39 @@ verify_mba_id(const unsigned mba_id, const struct pqos_cpuinfo *cpu)
                 }
 
         free(mba_ids);
+
+        return ret;
+}
+
+/*
+ * @brief Check if smba_id is correct
+ *
+ * @param [in] smba_id SMBA resource id
+ * @param [in] CPU information structure from \a pqos_cap_get
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+verify_smba_id(const unsigned smba_id, const struct pqos_cpuinfo *cpu)
+{
+        int ret = PQOS_RETVAL_PARAM;
+        unsigned i;
+        unsigned smba_id_num;
+        unsigned *smba_ids;
+
+        /* Get smba ids in the system */
+        smba_ids = pqos_cpu_get_smba_ids(cpu, &smba_id_num);
+        if (smba_ids == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        for (i = 0; i < smba_id_num; ++i)
+                if (smba_id == smba_ids[i]) {
+                        ret = PQOS_RETVAL_OK;
+                        break;
+                }
+
+        free(smba_ids);
 
         return ret;
 }
@@ -1657,6 +1759,11 @@ os_mba_set_amd(const unsigned mba_id,
         ASSERT(requested != NULL);
         ASSERT(num_cos != 0);
 
+        if (requested->smba) {
+                ret = os_smba_set_amd(mba_id, num_cos, requested, actual);
+                return ret;
+        }
+
         /**
          * Check if MBA is supported
          */
@@ -1839,6 +1946,11 @@ os_mba_get_amd(const unsigned mba_id,
         ASSERT(max_num_cos != 0);
         ASSERT(mba_tab != NULL);
 
+        if (mba_tab->smba) {
+                ret = os_smba_get_amd(mba_id, max_num_cos, num_cos, mba_tab);
+                return ret;
+        }
+
         /**
          * Check if MBA is supported
          */
@@ -1888,6 +2000,188 @@ os_mba_get_unlock:
         resctrl_lock_release();
 
 os_mba_get_exit:
+        return ret;
+}
+
+int
+os_smba_get_amd(const unsigned smba_id,
+                const unsigned max_num_cos,
+                unsigned *num_cos,
+                struct pqos_mba *smba_tab)
+{
+        int ret;
+        unsigned class_id;
+        unsigned count = 0;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        const struct pqos_capability *smba_cap = NULL;
+
+        ASSERT(num_cos != NULL);
+        ASSERT(max_num_cos != 0);
+        ASSERT(smba_tab != NULL);
+
+        /**
+         * Check if SMBA is supported
+         */
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &smba_cap);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_RESOURCE; /* SMBA not supported */
+
+        ret = resctrl_alloc_get_grps_num(cap, &count);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (count > max_num_cos)
+                return PQOS_RETVAL_ERROR;
+
+        ret = verify_smba_id(smba_id, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_smba_get_exit;
+
+        ret = resctrl_lock_shared();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_smba_get_exit;
+
+        for (class_id = 0; class_id < count; class_id++) {
+                struct resctrl_schemata *schmt;
+
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
+
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_read(class_id, schmt);
+
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_schemata_smba_get(schmt, smba_id,
+                                                        &smba_tab[class_id]);
+
+                smba_tab[class_id].class_id = class_id;
+
+                resctrl_schemata_free(schmt);
+
+                if (ret != PQOS_RETVAL_OK)
+                        goto os_smba_get_unlock;
+        }
+        *num_cos = count;
+
+os_smba_get_unlock:
+        resctrl_lock_release();
+
+os_smba_get_exit:
+        return ret;
+}
+
+int
+os_smba_set_amd(const unsigned smba_id,
+                const unsigned num_cos,
+                const struct pqos_mba *requested,
+                struct pqos_mba *actual)
+{
+        int ret;
+        unsigned i;
+        unsigned num_grps = 0;
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        const struct pqos_capability *smba_cap = NULL;
+
+        ASSERT(requested != NULL);
+        ASSERT(num_cos != 0);
+
+        /**
+         * Check if SMBA is supported
+         */
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &smba_cap);
+        if (ret != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_RESOURCE; /* SMBA not supported */
+
+        ret = resctrl_alloc_get_grps_num(cap, &num_grps);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (num_cos > num_grps)
+                return PQOS_RETVAL_PARAM;
+
+        /**
+         * Check if class id's are within allowed range.
+         */
+        for (i = 0; i < num_cos; i++)
+                if (requested[i].class_id >= num_grps) {
+                        LOG_ERROR(
+                            "SMBA COS%u is out of range (COS%u is max)!\n",
+                            requested[i].class_id, num_grps - 1);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+        ret = verify_smba_id(smba_id, cpu);
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_set_exit;
+
+        ret = resctrl_lock_exclusive();
+        if (ret != PQOS_RETVAL_OK)
+                goto os_mba_set_exit;
+
+        for (i = 0; i < num_cos; i++) {
+                struct resctrl_schemata *schmt;
+
+                if (smba_cap->u.smba->ctrl_on == 0 && requested[i].ctrl) {
+                        LOG_ERROR("SMBA controller requested but not "
+                                  "enabled!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto os_mba_set_unlock;
+                }
+
+                if (smba_cap->u.smba->ctrl_on == 1 && !requested[i].ctrl) {
+                        LOG_ERROR("Expected SMBA controller but not "
+                                  "requested!\n");
+                        ret = PQOS_RETVAL_PARAM;
+                        goto os_mba_set_unlock;
+                }
+
+                schmt = resctrl_schemata_alloc(cap, cpu);
+                if (schmt == NULL)
+                        ret = PQOS_RETVAL_ERROR;
+
+                /* read schemata file */
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_read(requested[i].class_id,
+                                                          schmt);
+
+                /* update and write schemata */
+                if (ret == PQOS_RETVAL_OK) {
+                        struct pqos_mba smba = requested[i];
+
+                        ret = resctrl_schemata_smba_set(schmt, smba_id, &smba);
+                }
+
+                /* write schemata */
+                if (ret == PQOS_RETVAL_OK)
+                        ret = resctrl_alloc_schemata_write(
+                            requested[i].class_id, PQOS_TECHNOLOGY_SMBA, schmt);
+
+                if (actual != NULL) {
+                        /* read actual schemata */
+                        if (ret == PQOS_RETVAL_OK)
+                                ret = resctrl_alloc_schemata_read(
+                                    requested[i].class_id, schmt);
+
+                        /* update actual schemata */
+                        if (ret == PQOS_RETVAL_OK) {
+                                ret = resctrl_schemata_smba_get(schmt, smba_id,
+                                                                &actual[i]);
+                                actual[i].class_id = requested[i].class_id;
+                        }
+                }
+                resctrl_schemata_free(schmt);
+
+                if (ret != PQOS_RETVAL_OK)
+                        goto os_mba_set_unlock;
+        }
+
+os_mba_set_unlock:
+        resctrl_lock_release();
+
+os_mba_set_exit:
         return ret;
 }
 

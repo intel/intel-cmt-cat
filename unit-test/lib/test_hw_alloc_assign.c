@@ -49,6 +49,7 @@ hw_alloc_assoc_unused(const unsigned technology,
                       unsigned l3cat_id,
                       unsigned l2cat_id,
                       unsigned mba_id,
+                      unsigned smba_id,
                       unsigned *class_id)
 {
         int ret;
@@ -57,6 +58,7 @@ hw_alloc_assoc_unused(const unsigned technology,
         check_expected(l3cat_id);
         check_expected(l2cat_id);
         check_expected(mba_id);
+        check_expected(smba_id);
 
         ret = mock_type(int);
         if (ret == PQOS_RETVAL_OK)

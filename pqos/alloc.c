@@ -63,7 +63,7 @@
 /**
  * Allocation type selected
  */
-enum sel_alloc_type { L3CA, L2CA, MBA, MBA_CTRL };
+enum sel_alloc_type { L3CA, L2CA, MBA, MBA_CTRL, SMBA };
 
 /**
  * Array to store allocation options
@@ -414,6 +414,9 @@ set_mba_cos(const unsigned class_id,
                 printf("Failed to set MBA configuration!\n");
                 return -1;
         }
+
+        memset(&mba, 0, sizeof(struct pqos_mba));
+        memset(&actual, 0, sizeof(struct pqos_mba));
         mba.ctrl = ctrl;
         mba.class_id = class_id;
         mba.mb_max = available_bw;
@@ -447,6 +450,79 @@ set_mba_cos(const unsigned class_id,
                         printf("%u MBps\n", mba.mb_max);
                 else
                         printf("%u%s requested, %u%s applied\n", mba.mb_max,
+                               unit, actual.mb_max, unit);
+
+                set++;
+        }
+        sel_alloc_mod += set;
+        if (set < sock_num)
+                return -1;
+
+        return (int)set;
+}
+
+/**
+ * @brief Set SMBA class definitions on selected sockets
+ *
+ * @param class_id SMBA class ID to set
+ * @param available_bw to set
+ * @param sock_ids Array of socket ID's to set class definition
+ * @param sock_num Number of socket ID's in the array
+ * @param ctrl Flag indicating a use of MBA controller
+ * @param cpu pqos_cpuinfo list containing all the cores
+ *
+ * @return Number of classes set
+ * @retval -1 on error
+ */
+static int
+set_smba_cos(const unsigned class_id,
+             const uint64_t available_bw,
+             const unsigned *sock_ids,
+             const unsigned sock_num,
+             int ctrl,
+             const struct pqos_cpuinfo *cpu)
+{
+        unsigned i, set = 0;
+        struct pqos_mba smba, actual;
+
+        if (sock_ids == NULL || available_bw == 0) {
+                printf("Failed to set MBA configuration!\n");
+                return -1;
+        }
+        smba.ctrl = ctrl;
+        smba.class_id = class_id;
+        smba.mb_max = available_bw;
+        smba.smba = 1;
+
+        /**
+         * Set all selected classes
+         */
+        for (i = 0; i < sock_num; i++) {
+                const char *unit;
+                const char *package;
+                int ret = pqos_mba_set(sock_ids[i], 1, &smba, &actual);
+
+                if (cpu->vendor == PQOS_VENDOR_AMD) {
+                        package = "Core Complex";
+                        unit = "";
+                } else {
+                        package = "SOCKET";
+                        unit = "%";
+                }
+
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("%s %u SMBA COS%u - FAILED!\n", package,
+                               sock_ids[i], smba.class_id);
+                        break;
+                }
+
+                printf("%s %u SMBA COS%u => ", package, sock_ids[i],
+                       actual.class_id);
+
+                if (ctrl == 1)
+                        printf("%u MBps\n", smba.mb_max);
+                else
+                        printf("%u%s requested, %u%s applied\n", smba.mb_max,
                                unit, actual.mb_max, unit);
 
                 set++;
@@ -507,6 +583,22 @@ set_allocation_cos(char *str,
                         return -1;
                 }
                 ret = set_mba_cos(class_id, mask, ids, n, ctrl, cpu);
+                if (res_ids == NULL && ids != NULL)
+                        free(ids);
+                return ret;
+        }
+
+        /* if SMBA selected, set SMBA classes */
+        if (type == SMBA) {
+                int ctrl = 0;
+
+                if (ids == NULL)
+                        ids = pqos_cpu_get_smba_ids(cpu, &n);
+                if (ids == NULL) {
+                        printf("Failed to retrieve socket info!\n");
+                        return -1;
+                }
+                ret = set_smba_cos(class_id, mask, ids, n, ctrl, cpu);
                 if (res_ids == NULL && ids != NULL)
                         free(ids);
                 return ret;
@@ -607,6 +699,8 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                 type = L2CA;
         else if (strcasecmp(str, "mba") == 0)
                 type = MBA;
+        else if (strcasecmp(str, "smba") == 0)
+                type = SMBA;
         else if (strcasecmp(str, "mba_max") == 0)
                 type = MBA_CTRL;
         else {
@@ -1325,18 +1419,20 @@ print_l2ca_config(const struct pqos_l2ca *ca, const int is_error)
 }
 
 /**
- * @brief Per socket L3 CAT and MBA class definition printing
+ * @brief Per socket L3 CAT, MBA and SMBA class definition printing
  *
  * If new per socket technologies appear they should be added here, too.
  *
  * @param [in] cap_l3ca pointer to L3 CAT capability structure
  * @param [in] cap_mba pointer to MBA capability structure
+ * @param [in] cap_smba pointer to SMBA capability structure
  * @param [in] sock_count number of socket id's in \a sockets
  * @param [in] sockets arrays of socket id's
  */
 static void
 print_per_socket_config(const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_mba,
+                        const struct pqos_capability *cap_smba,
                         const struct pqos_cpuinfo *cpu_info,
                         const unsigned sock_count,
                         const unsigned *sockets)
@@ -1347,7 +1443,7 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
         if (cpu_info == NULL || sockets == NULL)
                 return;
 
-        if (cap_l3ca == NULL && cap_mba == NULL)
+        if (cap_l3ca == NULL && cap_mba == NULL && cap_smba == NULL)
                 return;
 
         for (i = 0; i < sock_count; i++) {
@@ -1392,6 +1488,9 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                         unit = "%";
                         }
 
+                        memset(&tab, 0,
+                               sizeof(struct pqos_mba) * mba->num_classes);
+
                         ret = pqos_mba_get(sockets[i], mba->num_classes, &num,
                                            tab);
                         if (ret != PQOS_RETVAL_OK)
@@ -1403,6 +1502,44 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                                tab[n].class_id);
                                 else
                                         printf("    MBA COS%u => %u%s%s\n",
+                                               tab[n].class_id, tab[n].mb_max,
+                                               unit, available);
+                        }
+                }
+
+                if (cap_smba != NULL) {
+                        const struct pqos_cap_mba *smba = cap_smba->u.smba;
+                        struct pqos_mba tab[smba->num_classes];
+                        unsigned num = 0;
+                        unsigned n = 0;
+                        const char *unit;
+                        const char *available;
+
+                        if (smba->ctrl_on == 1) {
+                                unit = " MBps";
+                                available = "";
+                        } else {
+                                available = " available";
+                                if (cpu_info->vendor == PQOS_VENDOR_AMD)
+                                        unit = "";
+                                else
+                                        unit = "%";
+                        }
+
+                        for (n = 0; n < smba->num_classes; n++)
+                                tab[n].smba = 1;
+
+                        ret = pqos_mba_get(sockets[i], smba->num_classes, &num,
+                                           tab);
+                        if (ret != PQOS_RETVAL_OK)
+                                num = smba->num_classes;
+
+                        for (n = 0; n < num; n++) {
+                                if (ret != PQOS_RETVAL_OK)
+                                        printf("    SMBA COS%u => ERROR\n",
+                                               tab[n].class_id);
+                                else
+                                        printf("    SMBA COS%u => %u%s%s\n",
                                                tab[n].class_id, tab[n].mb_max,
                                                unit, available);
                         }
@@ -1621,6 +1758,7 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                    const struct pqos_capability *cap_l3ca,
                    const struct pqos_capability *cap_l2ca,
                    const struct pqos_capability *cap_mba,
+                   const struct pqos_capability *cap_smba,
                    const struct pqos_cpuinfo *cpu_info,
                    const struct pqos_devinfo *dev_info,
                    const int verbose)
@@ -1635,8 +1773,8 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                 return;
         }
 
-        print_per_socket_config(cap_l3ca, cap_mba, cpu_info, sock_count,
-                                sockets);
+        print_per_socket_config(cap_l3ca, cap_mba, cap_smba, cpu_info,
+                                sock_count, sockets);
 
         if (cap_l2ca != NULL) {
                 /* Print L2 CAT class definitions per L2 cluster */
@@ -1752,10 +1890,12 @@ int
 alloc_apply(const struct pqos_capability *cap_l3ca,
             const struct pqos_capability *cap_l2ca,
             const struct pqos_capability *cap_mba,
+            const struct pqos_capability *cap_smba,
             const struct pqos_cpuinfo *cpu,
             const struct pqos_devinfo *dev)
 {
-        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL) {
+        if (cap_l3ca != NULL || cap_l2ca != NULL || cap_mba != NULL ||
+            cap_smba != NULL) {
                 /**
                  * If allocation config changed then exit.
                  * For monitoring, start the program again unless

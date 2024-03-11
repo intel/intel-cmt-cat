@@ -165,12 +165,14 @@ PQOS_LOCAL int os_alloc_reset_cores(void);
  * @param [in] l3_cap l3 cache capability
  * @param [in] l2_cap l2 cache capability
  * @param [in] mba_cap mba capability
+ * @param [in] smba_cap smba capability
  *
  * @return Operation status
  */
 PQOS_LOCAL int os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap,
                                         const struct pqos_cap_l2ca *l2_cap,
-                                        const struct pqos_cap_mba *mba_cap);
+                                        const struct pqos_cap_mba *mba_cap,
+                                        const struct pqos_cap_mba *smba_cap);
 
 /**
  * @brief Move all tasks to COS0 (default)
@@ -357,6 +359,41 @@ PQOS_LOCAL int os_mba_get_amd(const unsigned mba_id,
                               const unsigned max_num_cos,
                               unsigned *num_cos,
                               struct pqos_mba *mba_tab);
+
+/**
+ * @brief OS interface to read MBA from \a mba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  mba_id MBA resource id
+ * @param [in]  max_num_cos maximum number of classes of service
+ *              that can be accommodated at \a mba_tab
+ * @param [out] num_cos number of classes of service read into \a mba_tab
+ * @param [out] mba_tab table with read classes of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int os_smba_get_amd(const unsigned mba_id,
+                               const unsigned max_num_cos,
+                               unsigned *num_cos,
+                               struct pqos_mba *smba_tab);
+
+/**
+ * @brief OS interface to set classes of service defined by \a smba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  smba_id MBA resource id
+ * @param [in]  num_cos number of classes of service at \a ca
+ * @param [in]  requested table with class of service definitions
+ * @param [out] actual table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int os_smba_set_amd(const unsigned smba_id,
+                               const unsigned num_cos,
+                               const struct pqos_mba *requested,
+                               struct pqos_mba *actual);
 
 /**
  * @brief OS interface to associate \a lcore

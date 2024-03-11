@@ -67,12 +67,11 @@ os_alloc_reset_cores(void)
 }
 
 int
-os_alloc_reset_schematas(const struct pqos_cap_l3ca *l3_cap
-                         __attribute__((unused)),
-                         const struct pqos_cap_l2ca *l2_cap
-                         __attribute__((unused)),
-                         const struct pqos_cap_mba *mba_cap
-                         __attribute__((unused)))
+os_alloc_reset_schematas(
+    const struct pqos_cap_l3ca *l3_cap __attribute__((unused)),
+    const struct pqos_cap_l2ca *l2_cap __attribute__((unused)),
+    const struct pqos_cap_mba *mba_cap __attribute__((unused)),
+    const struct pqos_cap_mba *smba_cap __attribute__((unused)))
 {
         return mock_type(int);
 }

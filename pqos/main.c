@@ -66,6 +66,7 @@ static struct pqos_alloc_config sel_alloc_config = {
     .l3_iordt = PQOS_REQUIRE_IORDT_ANY,
     .l2_cdp = PQOS_REQUIRE_CDP_ANY,
     .mba = PQOS_MBA_ANY,
+    .smba = PQOS_MBA_ANY,
     .mba40 = PQOS_FEATURE_ANY};
 
 /**
@@ -1105,6 +1106,7 @@ main(int argc, char **argv)
         const struct pqos_capability *cap_l3ca = NULL;
         const struct pqos_capability *cap_l2ca = NULL;
         const struct pqos_capability *cap_mba = NULL;
+        const struct pqos_capability *cap_smba = NULL;
         unsigned l3cat_id_count, *l3cat_ids = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
         int opt_index = 0, pid_flag = 0;
@@ -1398,6 +1400,13 @@ main(int argc, char **argv)
                 goto error_exit_2;
         }
 
+        ret = pqos_cap_get_type(p_sys->cap, PQOS_CAP_TYPE_SMBA, &cap_smba);
+        if (ret == PQOS_RETVAL_PARAM) {
+                printf("Error retrieving SMBA allocation capabilities!\n");
+                exit_val = EXIT_FAILURE;
+                goto error_exit_2;
+        }
+
         if (sel_print_version) {
                 print_lib_version(p_sys->cap);
                 exit_val = EXIT_SUCCESS;
@@ -1437,7 +1446,8 @@ main(int argc, char **argv)
                  * Show info about allocation config and exit
                  */
                 alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
-                                   p_sys->cpu, p_sys->dev, sel_verbose_mode);
+                                   cap_smba, p_sys->cpu, p_sys->dev,
+                                   sel_verbose_mode);
                 goto allocation_exit;
         }
 
@@ -1456,7 +1466,8 @@ main(int argc, char **argv)
                 }
         }
 
-        ret = alloc_apply(cap_l3ca, cap_l2ca, cap_mba, p_sys->cpu, p_sys->dev);
+        ret = alloc_apply(cap_l3ca, cap_l2ca, cap_mba, cap_smba, p_sys->cpu,
+                          p_sys->dev);
         switch (ret) {
         case 0: /* nothing to apply */
                 break;

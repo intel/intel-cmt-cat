@@ -97,6 +97,43 @@ pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
 }
 
 unsigned *
+pqos_cpu_get_smba_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
+{
+        unsigned smba_id_count = 0, i = 0;
+        unsigned *smba_ids = NULL;
+
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+        if (cpu == NULL || count == NULL)
+                return NULL;
+
+        smba_ids = (unsigned *)malloc(sizeof(smba_ids[0]) * cpu->num_cores);
+        if (smba_ids == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++) {
+                unsigned j = 0;
+
+                /**
+                 * Check if this smba id is already on the \a mbas list
+                 */
+                for (j = 0; j < smba_id_count && smba_id_count > 0; j++)
+                        if (cpu->cores[i].smba_id == smba_ids[j])
+                                break;
+
+                if (j >= smba_id_count || smba_id_count == 0) {
+                        /**
+                         * This smba_id wasn't reported before
+                         */
+                        smba_ids[smba_id_count++] = cpu->cores[i].smba_id;
+                }
+        }
+
+        *count = smba_id_count;
+        return smba_ids;
+}
+
+unsigned *
 pqos_cpu_get_l3cat_ids(const struct pqos_cpuinfo *cpu, unsigned *count)
 {
         unsigned l3cat_count = 0, i = 0;
@@ -412,6 +449,28 @@ pqos_cpu_get_one_by_mba_id(const struct pqos_cpuinfo *cpu,
 }
 
 int
+pqos_cpu_get_one_by_smba_id(const struct pqos_cpuinfo *cpu,
+                            const unsigned smba_id,
+                            unsigned *lcore)
+{
+        unsigned i = 0;
+
+        ASSERT(cpu != NULL);
+        ASSERT(lcore != NULL);
+
+        if (cpu == NULL || lcore == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        for (i = 0; i < cpu->num_cores; i++)
+                if (cpu->cores[i].smba_id == smba_id) {
+                        *lcore = cpu->cores[i].lcore;
+                        return PQOS_RETVAL_OK;
+                }
+
+        return PQOS_RETVAL_ERROR;
+}
+
+int
 pqos_cpu_get_one_by_l2id(const struct pqos_cpuinfo *cpu,
                          const unsigned l2id,
                          unsigned *lcore)
@@ -635,6 +694,25 @@ pqos_mba_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num)
 
         ASSERT(item != NULL);
         *cos_num = item->u.mba->num_classes;
+        return ret;
+}
+
+int
+pqos_smba_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num)
+{
+        const struct pqos_capability *item = NULL;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cap != NULL && cos_num != NULL);
+        if (cap == NULL || cos_num == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &item);
+        if (ret != PQOS_RETVAL_OK)
+                return ret; /**< no MBA capability */
+
+        ASSERT(item != NULL);
+        *cos_num = item->u.smba->num_classes;
         return ret;
 }
 

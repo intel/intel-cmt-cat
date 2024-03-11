@@ -218,12 +218,14 @@ int pqos_fini(void);
  * - L3 cache allocation capability
  * - L2 cache allocation capability
  * - Memory Bandwidth Allocation
+ * - Slow Memory Bandwidth Allocation
  */
 enum pqos_cap_type {
         PQOS_CAP_TYPE_MON = 0, /**< QoS monitoring */
         PQOS_CAP_TYPE_L3CA,    /**< L3/LLC cache allocation */
         PQOS_CAP_TYPE_L2CA,    /**< L2 cache allocation */
         PQOS_CAP_TYPE_MBA,     /**< Memory Bandwidth Allocation */
+        PQOS_CAP_TYPE_SMBA,    /**< Slow Memory Bandwidth Allocation */
         PQOS_CAP_TYPE_NUMOF
 };
 
@@ -342,6 +344,7 @@ struct pqos_capability {
                 struct pqos_cap_l3ca *l3ca;
                 struct pqos_cap_l2ca *l2ca;
                 struct pqos_cap_mba *mba;
+                struct pqos_cap_mba *smba;
                 void *generic_ptr;
         } u;
 };
@@ -367,6 +370,7 @@ struct pqos_coreinfo {
         unsigned l3cat_id; /**< L3 CAT classes id */
         unsigned mba_id;   /**< MBA id */
         unsigned numa;     /**< numa node in the system */
+        unsigned smba_id;  /**< SMBA id */
 };
 
 /**
@@ -1028,7 +1032,8 @@ struct pqos_alloc_config {
         enum pqos_mba_config mba;        /**< requested MBA config */
         enum pqos_feature_cfg mba40;     /**< requested MBA 4.0 config */
         enum pqos_iordt_config l3_iordt; /**< requested L3 I/O RDT config */
-        int reserved[5];                 /**< reserved for future use */
+        enum pqos_mba_config smba;       /**< requested SMBA config */
+        int reserved[4];                 /**< reserved for future use */
 };
 
 /**
@@ -1192,6 +1197,7 @@ struct pqos_mba {
                               (with MBA controller), depending on ctrl
                               flag */
         int ctrl;          /**< MBA controller flag */
+        int smba;          /**< SMBA clos */
 };
 
 /**
@@ -1349,6 +1355,18 @@ pqos_devinfo_get_channel(const struct pqos_devinfo *dev,
 unsigned *pqos_cpu_get_mba_ids(const struct pqos_cpuinfo *cpu, unsigned *count);
 
 /**
+ * @brief Retrieves smba id's from cpu info structure
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [out] count place to store actual number of smba ids returned
+ *
+ * @return Allocated array of size \a count populated with mba id's
+ * @retval NULL on error
+ */
+unsigned *pqos_cpu_get_smba_ids(const struct pqos_cpuinfo *cpu,
+                                unsigned *count);
+
+/**
  * @brief Retrieves l3cat id's from cpu info structure
  *
  * @param [in] cpu CPU information structure from \a pqos_cap_get
@@ -1448,6 +1466,19 @@ unsigned *pqos_pid_get_pid_assoc(const unsigned class_id, unsigned *count);
 int pqos_cpu_get_one_by_mba_id(const struct pqos_cpuinfo *cpu,
                                const unsigned mba_id,
                                unsigned *lcore);
+/**
+ * @brief Retrieves one core id from cpu info structure for \a smba_id
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [in] mba to enumerate
+ * @param [out] lcore place to store returned core id
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_cpu_get_one_by_smba_id(const struct pqos_cpuinfo *cpu,
+                                const unsigned smba_id,
+                                unsigned *lcore);
 /**
  * @brief Retrieves core information from cpu info structure for \a lcore
  *
@@ -1636,6 +1667,19 @@ int pqos_l2ca_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num);
  * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mba_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num);
+
+/**
+ * @brief Retrieves number of "slow" memory B/W allocation classes of service
+ * from \a cap structure.
+ *
+ * @param [in] cap platform QoS capabilities structure
+ *                 returned by \a pqos_cap_get
+ * @param [out] cos_num place to store number of classes of service
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_smba_get_cos_num(const struct pqos_cap *cap, unsigned *cos_num);
 
 /**
  * @brief Retrieves L3 CDP status

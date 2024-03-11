@@ -76,6 +76,16 @@ void _pqos_cap_l3iordt_change(const enum pqos_iordt_config iordt);
 PQOS_LOCAL void _pqos_cap_l2cdp_change(const enum pqos_cdp_config cdp);
 
 /**
+ * @brief Modifies SMBA capability structure upon MBA CTRL config change
+ *
+ * Limited error checks done in this function and no errors reported.
+ * It is up to caller to check for SMBA & CTRL support.
+ *
+ * @param [in] cfg SMBA CTRL configuration
+ */
+PQOS_LOCAL void _pqos_cap_smba_change(const enum pqos_mba_config cfg);
+
+/**
  * @brief Modifies MBA capability structure upon MBA CTRL config change
  *
  * Limited error checks done in this function and no errors reported.

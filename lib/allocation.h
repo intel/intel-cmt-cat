@@ -65,6 +65,7 @@ enum pqos_technology {
         PQOS_TECHNOLOGY_L3CA = 1 << PQOS_CAP_TYPE_L3CA,
         PQOS_TECHNOLOGY_L2CA = 1 << PQOS_CAP_TYPE_L2CA,
         PQOS_TECHNOLOGY_MBA = 1 << PQOS_CAP_TYPE_MBA,
+        PQOS_TECHNOLOGY_SMBA = 1 << PQOS_CAP_TYPE_SMBA,
         PQOS_TECHNOLOGY_ALL = -1
 };
 
@@ -120,6 +121,7 @@ PQOS_LOCAL int hw_alloc_assoc_read(const unsigned lcore, unsigned *class_id);
  * @param [in] l3cat_id L3 CAT resource id
  * @param [in] l2cat_id L2 CAT resource id
  * @param [in] mba_id MBA resource id
+ * @param [in] smba_id SMBA resource id
  * @param [out] class_id unused COS
  *
  * NOTE: It is our assumption that mba id and cat ids are same for
@@ -132,6 +134,7 @@ PQOS_LOCAL int hw_alloc_assoc_unused(const unsigned technology,
                                      unsigned l3cat_id,
                                      unsigned l2cat_id,
                                      unsigned mba_id,
+                                     unsigned smba_id,
                                      unsigned *class_id);
 
 /**
@@ -559,6 +562,41 @@ PQOS_LOCAL int hw_alloc_assoc_set_dev(const uint16_t segment,
                                       const uint16_t bdf,
                                       const unsigned vc,
                                       const unsigned class_id);
+
+/**
+ * @brief Hardware interface to read SMBA from \a smba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  smba_id SMBA resource id
+ * @param [in]  max_num_cos maximum number of classes of service
+ *              that can be accommodated at \a smba_tab
+ * @param [out] num_cos number of classes of service read into \a smba_tab
+ * @param [out] smba_tab table with read classes of service
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_smba_get_amd(const unsigned smba_id,
+                               const unsigned max_num_cos,
+                               unsigned *num_cos,
+                               struct pqos_mba *smba_tab);
+/**
+ * @brief Hardware interface to set classes of service
+ *        defined by \a requested on \a smba_id
+ * @NOTE: This function is specific to AMD
+ *
+ * @param [in]  smba_id
+ * @param [in]  num_cos number of classes of service at \a ca
+ * @param [in]  requested table with class of service definitions
+ * @param [out] actual table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int hw_smba_set_amd(const unsigned smba_id,
+                               const unsigned num_cos,
+                               const struct pqos_mba *requested,
+                               struct pqos_mba *actual);
 
 #ifdef __cplusplus
 }

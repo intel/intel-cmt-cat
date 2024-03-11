@@ -53,6 +53,10 @@ struct resctrl_schemata {
         unsigned *mbaids;
         struct pqos_mba *mba; /**< MBA COS definitions */
 
+        unsigned smbaids_num; /**< Number of smba ids */
+        unsigned *smbaids;
+        struct pqos_mba *smba; /**< SMBA COS definitions */
+
         unsigned l2ids_num; /**< Number of L2 clusters */
         unsigned *l2ids;
         struct pqos_l2ca *l2ca; /**< L2 COS definitions */
@@ -88,6 +92,7 @@ resctrl_schemata_alloc(const struct pqos_cap *cap,
         const struct pqos_capability *cap_l2ca;
         const struct pqos_capability *cap_l3ca;
         const struct pqos_capability *cap_mba;
+        const struct pqos_capability *cap_smba;
         unsigned i;
 
         schemata = (struct resctrl_schemata *)calloc(1, sizeof(*schemata));
@@ -147,6 +152,27 @@ resctrl_schemata_alloc(const struct pqos_cap *cap,
                         schemata->mba[i].ctrl = ctrl_enabled;
         }
 
+        /* sMBA */
+        retval = pqos_cap_get_type(cap, PQOS_CAP_TYPE_SMBA, &cap_smba);
+        if (retval == PQOS_RETVAL_OK && cap_smba != NULL) {
+
+                if (schemata->smbaids == NULL) {
+                        schemata->smbaids =
+                            pqos_cpu_get_smba_ids(cpu, &schemata->smbaids_num);
+                        if (schemata->smbaids == NULL)
+                                goto resctrl_schemata_alloc_error;
+                }
+
+                schemata->smba =
+                    calloc(schemata->smbaids_num, sizeof(struct pqos_mba));
+                if (schemata->smba == NULL)
+                        goto resctrl_schemata_alloc_error;
+
+                /* fill smba flag */
+                for (i = 0; i < schemata->smbaids_num; i++)
+                        schemata->smba[i].smba = 1;
+        }
+
         return schemata;
 
 resctrl_schemata_alloc_error:
@@ -158,7 +184,8 @@ int
 resctrl_schemata_reset(struct resctrl_schemata *schmt,
                        const struct pqos_cap_l3ca *l3ca_cap,
                        const struct pqos_cap_l2ca *l2ca_cap,
-                       const struct pqos_cap_mba *mba_cap)
+                       const struct pqos_cap_mba *mba_cap,
+                       const struct pqos_cap_mba *smba_cap)
 {
         unsigned j;
 
@@ -209,6 +236,25 @@ resctrl_schemata_reset(struct resctrl_schemata *schmt,
 
                 for (j = 0; j < schmt->mbaids_num; j++)
                         schmt->mba[j].mb_max = default_mba;
+        }
+
+        /* Reset SMBA */
+        if (smba_cap != NULL) {
+                const struct cpuinfo_config *vconfig;
+                uint32_t default_smba;
+
+                cpuinfo_get_config(&vconfig);
+                default_smba = vconfig->mba_max;
+
+                /* kernel always rounds up value to MBA granularity */
+                if (smba_cap->ctrl_on)
+                        default_smba =
+                            UINT32_MAX - UINT32_MAX % smba_cap->throttle_step;
+
+                for (j = 0; j < schmt->mbaids_num; j++) {
+                        schmt->smba[j].mb_max = default_smba;
+                        schmt->smba[j].smba = 1;
+                }
         }
 
         return PQOS_RETVAL_OK;
@@ -376,6 +422,60 @@ resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
         return PQOS_RETVAL_OK;
 }
 
+static int
+get_smba_index(const struct resctrl_schemata *schemata, unsigned resource_id)
+{
+        unsigned i;
+
+        ASSERT(schemata->smbaids != NULL);
+
+        for (i = 0; i < schemata->smbaids_num; ++i)
+                if (schemata->smbaids[i] == resource_id)
+                        return i;
+
+        return -1;
+}
+
+int
+resctrl_schemata_smba_get(const struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          struct pqos_mba *ca)
+{
+        int index;
+
+        ASSERT(schemata != NULL);
+        ASSERT(ca != NULL);
+        ASSERT(schemata->smba != NULL);
+
+        index = get_smba_index(schemata, resource_id);
+        if (index < 0)
+                return PQOS_RETVAL_ERROR;
+
+        *ca = schemata->smba[index];
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_schemata_smba_set(struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          const struct pqos_mba *ca)
+{
+        int index;
+
+        ASSERT(schemata != NULL);
+        ASSERT(ca != NULL);
+        ASSERT(schemata->smba != NULL);
+
+        index = get_smba_index(schemata, resource_id);
+        if (index < 0)
+                return PQOS_RETVAL_ERROR;
+
+        schemata->smba[index] = *ca;
+
+        return PQOS_RETVAL_OK;
+}
+
 /**
  * @brief Schemata type
  */
@@ -388,6 +488,7 @@ enum resctrl_schemata_type {
         RESCTRL_SCHEMATA_TYPE_L3CODE, /**< L3 CAT code */
         RESCTRL_SCHEMATA_TYPE_L3DATA, /**< L3 CAT data */
         RESCTRL_SCHEMATA_TYPE_MB,     /**< MBA data */
+        RESCTRL_SCHEMATA_TYPE_SMBA,   /**< SMBA data */
 };
 
 /**
@@ -416,6 +517,8 @@ resctrl_schemata_type_get(const char *str)
                 type = RESCTRL_SCHEMATA_TYPE_L3DATA;
         else if (strcasecmp(str, "MB") == 0)
                 type = RESCTRL_SCHEMATA_TYPE_MB;
+        else if (strcasecmp(str, "SMBA") == 0)
+                type = RESCTRL_SCHEMATA_TYPE_SMBA;
 
         return type;
 }
@@ -453,6 +556,9 @@ resctrl_schemata_set(const unsigned res_id,
         case RESCTRL_SCHEMATA_TYPE_MB:
                 index = get_mba_index(schemata, res_id);
                 break;
+        case RESCTRL_SCHEMATA_TYPE_SMBA:
+                index = get_smba_index(schemata, res_id);
+                break;
         }
 
         if (index < 0)
@@ -485,6 +591,9 @@ resctrl_schemata_set(const unsigned res_id,
                 break;
         case RESCTRL_SCHEMATA_TYPE_MB:
                 schemata->mba[index].mb_max = value;
+                break;
+        case RESCTRL_SCHEMATA_TYPE_SMBA:
+                schemata->smba[index].mb_max = value;
                 break;
         }
 
@@ -535,8 +644,10 @@ resctrl_schemata_read(FILE *fd, struct resctrl_schemata *schemata)
                         char *token = NULL;
                         uint64_t id = 0;
                         uint64_t value = 0;
-                        unsigned base =
-                            (type == RESCTRL_SCHEMATA_TYPE_MB ? 10 : 16);
+                        unsigned base = ((type == RESCTRL_SCHEMATA_TYPE_MB ||
+                                          type == RESCTRL_SCHEMATA_TYPE_SMBA)
+                                             ? 10
+                                             : 16);
 
                         token = strtok_r(p, ";", &saveptr);
                         if (token == NULL)
@@ -576,6 +687,7 @@ resctrl_schemata_write(FILE *fd, const struct resctrl_schemata *schemata)
         resctrl_schemata_l2ca_write(fd, schemata);
         resctrl_schemata_l3ca_write(fd, schemata);
         resctrl_schemata_mba_write(fd, schemata);
+        resctrl_schemata_smba_write(fd, schemata);
 
         return PQOS_RETVAL_OK;
 }
@@ -705,6 +817,27 @@ resctrl_schemata_mba_write(FILE *fd, const struct resctrl_schemata *schemata)
                         fprintf(fd, ";");
                 separator = 1;
                 fprintf(fd, "%u=%u", id, value);
+        }
+        fprintf(fd, "\n");
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+resctrl_schemata_smba_write(FILE *fd, const struct resctrl_schemata *schemata)
+{
+        unsigned i;
+
+        if (schemata->smba == NULL)
+                return PQOS_RETVAL_OK;
+
+        fprintf(fd, "SMBA:");
+        for (i = 0; i < schemata->smbaids_num; i++) {
+                unsigned id = schemata->smbaids[i];
+
+                if (i > 0)
+                        fprintf(fd, ";");
+                fprintf(fd, "%u=%u", id, schemata->smba[i].mb_max);
         }
         fprintf(fd, "\n");
 

@@ -78,13 +78,15 @@ PQOS_LOCAL void resctrl_schemata_free(struct resctrl_schemata *schemata);
  * @param [in] l3ca_cap l3 cache capability
  * @param [in] l2ca_cap l2 cache capability
  * @param [in] mba_cap mba capability
+ * @param [in] smba_cap smba capability
  *
  * @return Operation status
  */
 PQOS_LOCAL int resctrl_schemata_reset(struct resctrl_schemata *schemata,
                                       const struct pqos_cap_l3ca *l3ca_cap,
                                       const struct pqos_cap_l2ca *l2ca_cap,
-                                      const struct pqos_cap_mba *mba_cap);
+                                      const struct pqos_cap_mba *mba_cap,
+                                      const struct pqos_cap_mba *smba_cap);
 
 /*
  * @brief Reads L2 class of service from schemata
@@ -166,6 +168,32 @@ PQOS_LOCAL int resctrl_schemata_mba_set(struct resctrl_schemata *schemata,
                                         unsigned resource_id,
                                         const struct pqos_mba *ca);
 
+/*
+ * @brief Reads SMBA class of service from schemata
+ *
+ * @param [in] schemata Schemata structure
+ * @param [in] resource_id unique L3 cache identifier
+ * @param [out] ca class of service definition
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int
+resctrl_schemata_smba_get(const struct resctrl_schemata *schemata,
+                          unsigned resource_id,
+                          struct pqos_mba *ca);
+
+/*
+ * @brief Updates MBA class of service in schemata
+ *
+ * @param [in,out] schemata Schemata structure
+ * @param [in] resource_id unique L3 cache identifier
+ * @param [in] ca class of service definition
+ *
+ * @return Operation status
+ */
+PQOS_LOCAL int resctrl_schemata_smba_set(struct resctrl_schemata *schemata,
+                                         unsigned resource_id,
+                                         const struct pqos_mba *ca);
 /**
  * @brief Read schemata from file
  *
@@ -225,6 +253,18 @@ resctrl_schemata_l2ca_write(FILE *fd, const struct resctrl_schemata *schemata);
  */
 PQOS_LOCAL int
 resctrl_schemata_mba_write(FILE *fd, const struct resctrl_schemata *schemata);
+
+/**
+ * @brief Write mba schemata to file
+ *
+ * @param [in] fd write file descriptor
+ * @param [in] schemata schemata to write
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int
+resctrl_schemata_smba_write(FILE *fd, const struct resctrl_schemata *schemata);
 
 #ifdef __cplusplus
 }

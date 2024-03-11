@@ -231,7 +231,7 @@ static void
 test_alloc_print_config_negative(void **state)
 {
         run_void_function(alloc_print_config, NULL, NULL, NULL, NULL, NULL,
-                          NULL, 0);
+                          NULL, NULL, 0);
         assert_string_equal(output_get(),
                             "Error retrieving information for Sockets\n");
 
@@ -331,8 +331,8 @@ test_alloc_print_config_msr(void **state)
         }
 
         run_void_function(alloc_print_config, data->cap_mon, data->cap_l3ca,
-                          data->cap_l2ca, data->cap_mba, data->cpu_info, NULL,
-                          1);
+                          data->cap_l2ca, data->cap_mba, data->cap_smba,
+                          data->cpu_info, NULL, 1);
 
         /* check output */
         assert_true(
@@ -465,8 +465,8 @@ test_alloc_print_config_os(void **state)
         }
 
         run_void_function(alloc_print_config, data->cap_mon, data->cap_l3ca,
-                          data->cap_l2ca, data->cap_mba, data->cpu_info, NULL,
-                          1);
+                          data->cap_l2ca, data->cap_mba, data->cap_smba,
+                          data->cpu_info, NULL, 1);
 
         /* check output */
         assert_true(output_has_text("L3CA/MBA COS definitions for Socket 0:\n"
@@ -521,7 +521,8 @@ test_alloc_apply_cap_not_detected(void **state)
         /* set static data */
         sel_alloc_opt_num = 1;
 
-        run_function(alloc_apply, ret, NULL, NULL, NULL, data->cpu_info, NULL);
+        run_function(alloc_apply, ret, NULL, NULL, NULL, NULL, data->cpu_info,
+                     NULL);
         assert_int_equal(ret, -1);
         assert_true(output_has_text("Allocation capability not detected!"));
 
@@ -606,7 +607,7 @@ test_alloc_apply_mba(void **state)
         will_return(__wrap_pqos_mba_set, &actual_mbas[2]);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text(
@@ -705,7 +706,7 @@ test_alloc_apply_mba_max(void **state)
         will_return(__wrap_pqos_mba_set, &actual_mbas[0]);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("SOCKET 0 MBA COS2 => 10 MBps"));
@@ -829,7 +830,7 @@ test_alloc_apply_l3ca(void **state)
         will_return(__wrap_pqos_l3ca_set, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("SOCKET 0 L3CA COS1 => MASK 0xf"));
@@ -927,7 +928,7 @@ test_alloc_apply_l3ca_cdp(void **state)
         will_return(__wrap_pqos_l3ca_set, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("SOCKET 0 L3CA COS1 => DATA 0xff,CODE "
@@ -1050,7 +1051,7 @@ test_alloc_apply_l2(void **state)
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("L2ID 0 L2CA COS0 => MASK 0x1"));
@@ -1149,7 +1150,7 @@ test_alloc_apply_l2_dcp(void **state)
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("L2ID 0 L2CA COS1 => DATA 0xff,CODE "
@@ -1175,7 +1176,7 @@ test_alloc_apply_unrecognized_alloc_type(void **state)
         alloc_opts[0] = strdup("uat:0=0x1");
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, -1);
         assert_true(output_has_text("Unrecognized allocation type: uat"));
@@ -1205,7 +1206,7 @@ test_alloc_apply_set_core_to_class_id(void **state)
         will_return(__wrap_pqos_alloc_assoc_set, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("Allocation configuration altered"));
@@ -1232,14 +1233,14 @@ test_alloc_apply_set_core_to_class_id_neg(void **state)
         will_return(__wrap_pqos_alloc_assoc_set, PQOS_RETVAL_ERROR);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, -1);
         assert_true(output_has_text("Core number or class id is out of "
                                     "bounds!"));
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, -1);
         assert_true(output_has_text("Setting allocation class of service "
@@ -1270,7 +1271,7 @@ test_alloc_apply_set_pid_to_class_id(void **state)
         will_return(__wrap_pqos_alloc_assoc_set_pid, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
         assert_true(output_has_text("Allocation configuration altered"));
@@ -1297,14 +1298,14 @@ test_alloc_apply_set_pid_to_class_id_neg(void **state)
         will_return(__wrap_pqos_alloc_assoc_set_pid, PQOS_RETVAL_ERROR);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, -1);
         assert_true(output_has_text("Task ID number or class id is out of "
                                     "bounds!"));
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
-                     data->cap_mba, data->cpu_info, NULL);
+                     data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, -1);
         assert_true(output_has_text("Setting allocation class of service "

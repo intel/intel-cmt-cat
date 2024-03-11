@@ -51,6 +51,7 @@ static const struct pqos_cpuinfo *m_cpu = NULL;
 static const struct pqos_capability *m_cap_l2ca = NULL;
 static const struct pqos_capability *m_cap_l3ca = NULL;
 static const struct pqos_capability *m_cap_mba = NULL;
+static const struct pqos_capability *m_cap_smba = NULL;
 
 /**
  * @brief Prints L2, L3 or MBA configuration in \a cfg
@@ -160,6 +161,9 @@ rdt_cfg_is_valid(const struct rdt_cfg cfg)
         case PQOS_CAP_TYPE_MBA:
                 return cfg.u.mba != NULL && cfg.u.mba->mb_max > 0;
 
+        case PQOS_CAP_TYPE_SMBA:
+                return cfg.u.smba != NULL && cfg.u.smba->mb_max > 0;
+
         default:
                 break;
         }
@@ -213,6 +217,18 @@ get_max_res_id(unsigned technology, unsigned *max_res_id)
         /* get number of mba_ids */
         if (technology & (1 << PQOS_CAP_TYPE_MBA)) {
                 ids = pqos_cpu_get_mba_ids(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return -EFAULT;
+
+                for (i = 0; i < num_ids; i++)
+                        max = ids[i] > max ? ids[i] : max;
+
+                free(ids);
+        }
+
+        /* get number of smba_ids */
+        if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                ids = pqos_cpu_get_smba_ids(m_cpu, &num_ids);
                 if (ids == NULL)
                         return -EFAULT;
 
@@ -453,6 +469,37 @@ rdt_mba_str_to_rate(const char *param, struct rdt_cfg mba)
 }
 
 /**
+ * @brief Parses rate string \a param and stores in \a mba
+ *
+ * @param [in] param rate string
+ * @param [out] smba to store result
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+rdt_smba_str_to_rate(const char *param, struct rdt_cfg smba)
+{
+        uint64_t rate;
+        int ret;
+
+        if (PQOS_CAP_TYPE_SMBA != smba.type || NULL == smba.u.generic_ptr ||
+            NULL == param)
+                return -EINVAL;
+
+        ret = str_to_uint64(param, 10, &rate);
+        if (ret < 0 || rate == 0)
+                return -EINVAL;
+
+        smba.u.smba->ctrl = 0;
+        smba.u.smba->mb_max = rate;
+        smba.u.smba->smba = 1;
+
+        return 0;
+}
+
+/**
  * @brief Parses mbps string \a param and stores in \a mba
  *
  * @param [in] param mbps string
@@ -504,6 +551,7 @@ simplify_feature_str(const char *feature)
             {"l3", '3'},
             {"mba", 'm'},
             {"mba_max", 'b'},
+            {"smba", 's'},
             {NULL, 0}
             /* clang-format on */
         };
@@ -535,6 +583,7 @@ parse_rdt(char *rdtstr)
         const struct rdt_cfg l2ca = wrap_l2ca(&g_cfg.config[idx].l2);
         const struct rdt_cfg l3ca = wrap_l3ca(&g_cfg.config[idx].l3);
         const struct rdt_cfg mba = wrap_mba(&g_cfg.config[idx].mba);
+        const struct rdt_cfg smba = wrap_smba(&g_cfg.config[idx].smba);
         const unsigned min_len_group = strlen("3=f");
         int ret;
 
@@ -610,6 +659,15 @@ parse_rdt(char *rdtstr)
                                 return ret;
                         break;
 
+                case 's':
+                        if (rdt_cfg_is_valid(smba))
+                                return -EINVAL;
+
+                        ret = rdt_smba_str_to_rate(param, smba);
+                        if (ret < 0)
+                                return ret;
+                        break;
+
                 default:
                         fprintf(stderr, "Invalid option: \"%s\"\n", feature);
                         return -EINVAL;
@@ -623,7 +681,7 @@ parse_rdt(char *rdtstr)
                 g_cfg.config[idx].pid_cfg = 1;
 
         if (!(rdt_cfg_is_valid(l2ca) || rdt_cfg_is_valid(l3ca) ||
-              rdt_cfg_is_valid(mba)))
+              rdt_cfg_is_valid(mba) || rdt_cfg_is_valid(smba)))
                 return -EINVAL;
 
         g_cfg.config_count++;
@@ -1199,6 +1257,48 @@ get_mba_id_cores(const cpu_set_t *cores,
 }
 
 /**
+ * @brief Gets cores from \a cores set which belong to \a smab_id
+ *
+ * @param [in] cores set of cores
+ * @param [in] smba_id to get cores from
+ * @param [out] core_num number of cores in \a core_array
+ * @param [out] core_array array of cores
+ *
+ * @return status
+ * @retval 0 on success
+ * @retval negative on error (-errno)
+ */
+static int
+get_smba_id_cores(const cpu_set_t *cores,
+                  const unsigned smba_id,
+                  unsigned *core_num,
+                  unsigned core_array[CPU_SETSIZE])
+{
+        unsigned i;
+
+        if (cores == NULL || core_num == NULL || core_array == NULL)
+                return -EINVAL;
+
+        if (m_cpu == NULL)
+                return -EFAULT;
+
+        if (CPU_COUNT(cores) == 0) {
+                *core_num = 0;
+                return 0;
+        }
+
+        for (i = 0, *core_num = 0; i < m_cpu->num_cores; i++) {
+                if (m_cpu->cores[i].smba_id != smba_id ||
+                    0 == CPU_ISSET(m_cpu->cores[i].lcore, cores))
+                        continue;
+
+                core_array[(*core_num)++] = m_cpu->cores[i].lcore;
+        }
+
+        return 0;
+}
+
+/**
  * @brief Gets cores from \a cores set which belong to \a l2_id
  *
  * @param [in] cores set of cores
@@ -1295,15 +1395,18 @@ alloc_release(const cpu_set_t *cores)
 static int
 alloc_get_default_cos(struct pqos_l2ca *l2_def,
                       struct pqos_l3ca *l3_def,
-                      struct pqos_mba *mba_def)
+                      struct pqos_mba *mba_def,
+                      struct pqos_mba *smba_def)
 {
         if (m_cpu == NULL)
                 return -EINVAL;
 
-        if (l2_def == NULL && l3_def == NULL && mba_def == NULL)
+        if (l2_def == NULL && l3_def == NULL && mba_def == NULL &&
+            smba_def == NULL)
                 return -EINVAL;
 
-        if (m_cap_l2ca == NULL && m_cap_l3ca == NULL && m_cap_mba == NULL)
+        if (m_cap_l2ca == NULL && m_cap_l3ca == NULL && m_cap_mba == NULL &&
+            m_cap_smba == NULL)
                 return -EFAULT;
 
         if (m_cap_l2ca != NULL && l2_def != NULL) {
@@ -1345,6 +1448,18 @@ alloc_get_default_cos(struct pqos_l2ca *l2_def,
                                               : RDT_MAX_MBA;
         }
 
+        if (m_cap_smba != NULL && smba_def != NULL) {
+                memset(smba_def, 0, sizeof(*smba_def));
+                smba_def->smba = 1;
+                if (m_cap_smba->u.smba->ctrl_on == 1) {
+                        smba_def->ctrl = 1;
+                        smba_def->mb_max = UINT32_MAX;
+                } else
+                        smba_def->mb_max = (m_cpu->vendor == PQOS_VENDOR_AMD)
+                                               ? RDT_MAX_MBA_AMD
+                                               : RDT_MAX_MBA;
+        }
+
         return 0;
 }
 
@@ -1366,22 +1481,25 @@ static int
 cfg_configure_cos(const struct pqos_l2ca *l2ca,
                   const struct pqos_l3ca *l3ca,
                   const struct pqos_mba *mba,
+                  const struct pqos_mba *smba,
                   const unsigned core_id,
                   const unsigned cos_id)
 {
         struct pqos_l2ca l2_defs;
         struct pqos_l3ca l3_defs;
         struct pqos_mba mba_defs;
+        struct pqos_mba smba_defs;
         const struct pqos_coreinfo *ci = NULL;
         int ret;
 
         if (m_cpu == NULL)
                 return -EINVAL;
 
-        if (NULL == l2ca && NULL == l3ca && NULL == mba)
+        if (NULL == l2ca && NULL == l3ca && NULL == mba && NULL == smba)
                 return -EINVAL;
 
-        if (NULL == m_cap_l2ca && NULL == m_cap_l3ca && NULL == m_cap_mba)
+        if (NULL == m_cap_l2ca && NULL == m_cap_l3ca && NULL == m_cap_mba &&
+            NULL == smba)
                 return -EFAULT;
 
         ci = pqos_cpu_get_core_info(m_cpu, core_id);
@@ -1392,7 +1510,7 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
         }
 
         /* Get default COS values */
-        ret = alloc_get_default_cos(&l2_defs, &l3_defs, &mba_defs);
+        ret = alloc_get_default_cos(&l2_defs, &l3_defs, &mba_defs, &smba_defs);
         if (ret != 0)
                 return ret;
 
@@ -1535,6 +1653,53 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 }
         }
 
+        if (smba != NULL && m_cap_smba != NULL &&
+            m_cap_smba->u.smba->num_classes > cos_id) {
+                const unsigned smba_id = ci->smba_id;
+                struct pqos_mba smba_requested = *smba;
+                struct pqos_mba smba_actual;
+
+                /* if COS is not configured, set it to default */
+                if (!rdt_cfg_is_valid(wrap_smba(&smba_requested)))
+                        smba_requested = smba_defs;
+
+                /* set proper COS id */
+                smba_requested.class_id = cos_id;
+
+                ret = pqos_mba_set(smba_id, 1, &smba_requested, &smba_actual);
+                if (ret == PQOS_RETVAL_PARAM) {
+                        fprintf(stderr, "Invalid RDT parameters!\n");
+                        return -EINVAL;
+                }
+                if (ret != PQOS_RETVAL_OK) {
+                        fprintf(stderr,
+                                "Error setting SMBA COS#%u on smba id %u!\n",
+                                cos_id, smba_id);
+                        return -EFAULT;
+                }
+                if (g_cfg.verbose) {
+                        const char *unit;
+                        const char *package;
+
+                        if (m_cpu->vendor == PQOS_VENDOR_AMD) {
+                                package = "Core Complex";
+                                unit = "";
+                        } else {
+                                package = "SOCKET";
+                                unit = "%";
+                        }
+                        printf("%s %u MBA COS%u => ", package, smba_id,
+                               smba_actual.class_id);
+
+                        if (smba_requested.ctrl == 1)
+                                printf("%u MBps\n", smba_requested.mb_max);
+                        else
+                                printf("%u%s requested, %u%s applied\n",
+                                       smba_requested.mb_max, unit,
+                                       smba_actual.mb_max, unit);
+                }
+        }
+
         return 0;
 }
 
@@ -1557,7 +1722,8 @@ cfg_set_cores_os(const unsigned technology,
                  const cpu_set_t *cores,
                  const struct pqos_l2ca *l2ca,
                  const struct pqos_l3ca *l3ca,
-                 const struct pqos_mba *mba)
+                 const struct pqos_mba *mba,
+                 const struct pqos_mba *smba)
 {
         int ret;
         unsigned i, max_id, core_num, cos_id;
@@ -1605,8 +1771,8 @@ cfg_set_cores_os(const unsigned technology,
                                 continue;
 
                         /* Configure COS on res ID i */
-                        ret = cfg_configure_cos(l2ca, NULL, NULL, core_array[0],
-                                                cos_id);
+                        ret = cfg_configure_cos(l2ca, NULL, NULL, NULL,
+                                                core_array[0], cos_id);
                         if (ret != 0)
                                 return ret;
                 }
@@ -1623,8 +1789,8 @@ cfg_set_cores_os(const unsigned technology,
                                 continue;
 
                         /* Configure COS on res ID i */
-                        ret = cfg_configure_cos(NULL, l3ca, NULL, core_array[0],
-                                                cos_id);
+                        ret = cfg_configure_cos(NULL, l3ca, NULL, NULL,
+                                                core_array[0], cos_id);
                         if (ret != 0)
                                 return ret;
                 }
@@ -1640,8 +1806,27 @@ cfg_set_cores_os(const unsigned technology,
                                 continue;
 
                         /* Configure COS on res ID i */
-                        ret = cfg_configure_cos(NULL, NULL, mba, core_array[0],
-                                                cos_id);
+                        ret = cfg_configure_cos(NULL, NULL, mba, NULL,
+                                                core_array[0], cos_id);
+                        if (ret != 0)
+                                return ret;
+                }
+
+                if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                        memset(core_array, 0, sizeof(core_array));
+
+                        /* Get cores on res id i */
+                        ret =
+                            get_smba_id_cores(cores, i, &core_num, core_array);
+                        if (ret != 0)
+                                return ret;
+
+                        if (core_num == 0)
+                                continue;
+
+                        /* Configure COS on res ID i */
+                        ret = cfg_configure_cos(NULL, NULL, NULL, smba,
+                                                core_array[0], cos_id);
                         if (ret != 0)
                                 return ret;
                 }
@@ -1669,7 +1854,8 @@ cfg_set_cores_msr(const unsigned technology,
                   const cpu_set_t *cores,
                   const struct pqos_l2ca *l2ca,
                   const struct pqos_l3ca *l3ca,
-                  const struct pqos_mba *mba)
+                  const struct pqos_mba *mba,
+                  const struct pqos_mba *smba)
 {
         int ret = PQOS_RETVAL_OK;
         unsigned res_id, max_id;
@@ -1694,6 +1880,9 @@ cfg_set_cores_msr(const unsigned technology,
                 } else if (technology & (1 << PQOS_CAP_TYPE_L2CA)) {
                         ret = get_l2id_cores(cores, res_id, &core_num,
                                              core_array);
+                } else if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                        ret = get_smba_id_cores(cores, res_id, &core_num,
+                                                core_array);
                 }
                 if (ret != 0)
                         return ret;
@@ -1719,8 +1908,8 @@ cfg_set_cores_msr(const unsigned technology,
 
                 /* Configure COS on res ID i */
                 for (i = 0; i < core_num; i++) {
-                        ret = cfg_configure_cos(l2ca, l3ca, mba, core_array[i],
-                                                cos_id);
+                        ret = cfg_configure_cos(l2ca, l3ca, mba, smba,
+                                                core_array[i], cos_id);
                         if (ret != 0)
                                 return ret;
                 }
@@ -1736,6 +1925,7 @@ cfg_set_cores_msr(const unsigned technology,
  * @param [in] l2ca L2 CAT configuration table
  * @param [in] l3ca L3 CAT configuration table
  * @param [in] mba MBA configuration table
+ * @param [in] smba MBA configuration table
  *
  * @return Operation status
  * @retval 0 on success
@@ -1745,7 +1935,8 @@ static int
 cfg_set_pids(const unsigned technology,
              const struct pqos_l3ca *l3ca,
              const struct pqos_l2ca *l2ca,
-             const struct pqos_mba *mba)
+             const struct pqos_mba *mba,
+             const struct pqos_mba *smba)
 {
         int ret = 0;
         unsigned i, cos_id, num_pids = 1;
@@ -1789,7 +1980,8 @@ cfg_set_pids(const unsigned technology,
                                 break;
 
                         /* Configure COS on res L2 ID i */
-                        ret = cfg_configure_cos(l2ca, NULL, NULL, core, cos_id);
+                        ret = cfg_configure_cos(l2ca, NULL, NULL, NULL, core,
+                                                cos_id);
                         if (ret != 0)
                                 break;
                 }
@@ -1813,7 +2005,8 @@ cfg_set_pids(const unsigned technology,
                                 break;
 
                         /* Configure COS on res L3 ID i */
-                        ret = cfg_configure_cos(NULL, l3ca, NULL, core, cos_id);
+                        ret = cfg_configure_cos(NULL, l3ca, NULL, NULL, core,
+                                                cos_id);
                         if (ret != 0)
                                 break;
                 }
@@ -1836,12 +2029,38 @@ cfg_set_pids(const unsigned technology,
                                 break;
 
                         /* Configure COS on res L3 ID i */
-                        ret = cfg_configure_cos(NULL, NULL, mba, core, cos_id);
+                        ret = cfg_configure_cos(NULL, NULL, mba, NULL, core,
+                                                cos_id);
                         if (ret != 0)
                                 break;
                 }
                 free(ids);
         }
+
+        /* Set COS definitions across all res L3 IDs */
+        if (technology & (1 << PQOS_CAP_TYPE_SMBA)) {
+                unsigned num_ids, *ids;
+
+                ids = pqos_cpu_get_smba_ids(m_cpu, &num_ids);
+                if (ids == NULL)
+                        return -EFAULT;
+
+                for (i = 0; i < num_ids; i++) {
+                        unsigned core;
+
+                        ret = pqos_cpu_get_one_by_smba_id(m_cpu, ids[i], &core);
+                        if (ret != 0)
+                                break;
+
+                        /* Configure COS on res L3 ID i */
+                        ret = cfg_configure_cos(NULL, NULL, NULL, smba, core,
+                                                cos_id);
+                        if (ret != 0)
+                                break;
+                }
+                free(ids);
+        }
+
 set_pids_exit:
         if (ret != 0)
                 (void)pqos_alloc_release_pid(p, num_pids);
@@ -1855,6 +2074,7 @@ alloc_configure(void)
         struct pqos_l3ca l3ca[g_cfg.config_count];
         struct pqos_l2ca l2ca[g_cfg.config_count];
         struct pqos_mba mba[g_cfg.config_count];
+        struct pqos_mba smba[g_cfg.config_count];
         cpu_set_t cpu[g_cfg.config_count];
         int pid_cfg[g_cfg.config_count];
         unsigned i = 0;
@@ -1873,6 +2093,7 @@ alloc_configure(void)
                 l3ca[i] = g_cfg.config[i].l3;
                 l2ca[i] = g_cfg.config[i].l2;
                 mba[i] = g_cfg.config[i].mba;
+                smba[i] = g_cfg.config[i].smba;
                 cpu[i] = g_cfg.config[i].cpumask;
                 pid_cfg[i] = g_cfg.config[i].pid_cfg;
         }
@@ -1889,16 +2110,19 @@ alloc_configure(void)
                 if (rdt_cfg_is_valid(wrap_mba(&mba[i])))
                         technology |= (1 << PQOS_CAP_TYPE_MBA);
 
+                if (rdt_cfg_is_valid(wrap_smba(&smba[i])))
+                        technology |= (1 << PQOS_CAP_TYPE_SMBA);
+
                 /* If pid config selected then assign tasks otherwise cores */
                 if (pid_cfg[i])
                         ret = cfg_set_pids(technology, &l3ca[i], &l2ca[i],
-                                           &mba[i]);
+                                           &mba[i], &smba[i]);
                 else if (g_cfg.interface == PQOS_INTER_MSR)
                         ret = cfg_set_cores_msr(technology, &cpu[i], &l2ca[i],
-                                                &l3ca[i], &mba[i]);
+                                                &l3ca[i], &mba[i], &smba[i]);
                 else
                         ret = cfg_set_cores_os(technology, &cpu[i], &l2ca[i],
-                                               &l3ca[i], &mba[i]);
+                                               &l3ca[i], &mba[i], &smba[i]);
 
                 /* If assign fails then free already assigned cpus */
                 if (ret != 0) {
@@ -1955,7 +2179,10 @@ alloc_fini(void)
 
         m_cap = NULL;
         m_cpu = NULL;
+        m_cap_l2ca = NULL;
         m_cap_l3ca = NULL;
+        m_cap_mba = NULL;
+        m_cap_smba = NULL;
         memset(g_cfg.config, 0, sizeof(g_cfg.config));
         g_cfg.config_count = 0;
 }
@@ -2043,7 +2270,13 @@ alloc_init(void)
         if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_mba == NULL))
                 printf("Allocation: MBA capability not supported.\n");
 
-        if (m_cap_l3ca == NULL && m_cap_l2ca == NULL && m_cap_mba == NULL) {
+        /* Get SMBA capabilities */
+        ret = pqos_cap_get_type(m_cap, PQOS_CAP_TYPE_SMBA, &m_cap_smba);
+        if (g_cfg.verbose && (ret != PQOS_RETVAL_OK || m_cap_smba == NULL))
+                printf("Allocation: SMBA capability not supported.\n");
+
+        if (m_cap_l3ca == NULL && m_cap_l2ca == NULL && m_cap_mba == NULL &&
+            m_cap_smba == NULL) {
                 fprintf(stderr, "Allocation capabilities not supported!\n");
                 ret = -EFAULT;
                 goto err;

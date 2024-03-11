@@ -93,7 +93,7 @@ test_os_alloc_reset_schematas(void **state)
         }
 
         ret = os_alloc_reset_schematas(&data->cap_l3ca, &data->cap_l2ca,
-                                       &data->cap_mba);
+                                       &data->cap_mba, &data->cap_smba);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 

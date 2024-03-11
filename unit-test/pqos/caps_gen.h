@@ -43,6 +43,7 @@ struct test_data {
         struct pqos_capability *cap_l3ca;
         struct pqos_capability *cap_l2ca;
         struct pqos_capability *cap_mba;
+        struct pqos_capability *cap_smba;
         unsigned num_socket;
 };
 

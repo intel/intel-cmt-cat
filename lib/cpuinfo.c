@@ -578,6 +578,7 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
                 config->mba_max = PQOS_MBA_MAX_AMD;
                 config->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
                 config->mba_default_val = PQOS_MBA_MAX_AMD;
+                config->smba_msr_reg = PQOS_MSR_SMBA_MASK_START_AMD;
         } else {
                 LOG_ERROR("init_config: init failed!");
                 return -EFAULT;
@@ -645,6 +646,7 @@ cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
                 if (vendor == PQOS_VENDOR_AMD) {
                         info->l3cat_id = info->l3_id;
                         info->mba_id = info->l3_id;
+                        info->smba_id = info->l3_id;
                 } else {
                         info->l3cat_id = info->socket;
                         info->mba_id = info->socket;

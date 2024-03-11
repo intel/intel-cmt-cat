@@ -772,3 +772,46 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 
         return ret;
 }
+
+int
+os_cap_smba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
+{
+        uint64_t val;
+        int ret = PQOS_RETVAL_OK;
+
+        UNUSED_PARAM(cpu);
+        ASSERT(cap != NULL);
+
+        if (!pqos_dir_exists(RESCTRL_PATH_INFO_SMBA))
+                return PQOS_RETVAL_RESOURCE;
+
+        memset(cap, 0, sizeof(*cap));
+        cap->mem_size = sizeof(*cap);
+
+        ret = resctrl_alloc_get_num_closids(&cap->num_classes);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = pqos_fread_uint64(RESCTRL_PATH_INFO_SMBA "/min_bandwidth", 10,
+                                &val);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        else
+                cap->throttle_max = 100 - val;
+
+        ret = pqos_fread_uint64(RESCTRL_PATH_INFO_SMBA "/bandwidth_gran", 10,
+                                &val);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        else
+                cap->throttle_step = val;
+
+        ret =
+            pqos_fread_uint64(RESCTRL_PATH_INFO_SMBA "/delay_linear", 10, &val);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        else
+                cap->is_linear = (val == 1);
+
+        return ret;
+}

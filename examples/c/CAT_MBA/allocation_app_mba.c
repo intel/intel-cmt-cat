@@ -177,6 +177,8 @@ print_allocation_config(const struct pqos_cap *p_cap,
                 struct pqos_mba tab[mba_cap->num_classes];
                 unsigned num = 0;
 
+                memset(&tab, 0, sizeof(struct pqos_mba) * mba_cap->num_classes);
+
                 ret = pqos_mba_get(mba_ids[i], mba_cap->num_classes, &num, tab);
                 if (ret == PQOS_RETVAL_OK) {
                         unsigned n = 0;
