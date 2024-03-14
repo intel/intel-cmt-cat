@@ -49,8 +49,7 @@ CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-Winline -msse4.2 \
-	-fcf-protection=full
+	-Winline -msse4.2
 
 ifeq ($(DEBUG),y)
 CFLAGS += -O0 -g -DDEBUG
@@ -77,8 +76,7 @@ CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
     -fno-expensive-optimizations \
-    -fstack-protector-strong \
-    -fcf-protection=full
+    -fstack-protector-strong
 endif
 
 SRCS = $(sort $(wildcard *.c))

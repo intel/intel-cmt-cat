@@ -45,8 +45,7 @@ CFLAGS = -I$(LIBDIR) \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
 	-Wformat -Wformat-security -fstack-protector -fPIE \
-	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
-	-fcf-protection=full
+	-Wunreachable-code -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)
 endif
@@ -70,8 +69,7 @@ ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
-    -fstack-protector-strong \
-    -fcf-protection=full
+    -fstack-protector-strong
 endif
 
 ifeq ($(shell uname), FreeBSD)
