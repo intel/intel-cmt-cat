@@ -36,6 +36,7 @@ import re
 import test
 import pytest
 from priority import PRIORITY_HIGH
+from snc import snc_enabled
 
 class TestPqosMBM(test.Test):
 
@@ -88,6 +89,8 @@ class TestPqosMBM(test.Test):
     #  Value in MBL column for core 4 is much higher than for other cores
     @PRIORITY_HIGH
     @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_total")
+    @pytest.mark.skipif(snc_enabled(),
+        reason="Test won't work if SNC is enabled. Remove this when SNC is implemented in resctrl")
     def test_pqos_mbm_cores(self, iface):
         def get_mbm(output, core):
             mbl = None
@@ -132,6 +135,8 @@ class TestPqosMBM(test.Test):
     @PRIORITY_HIGH
     @pytest.mark.iface_os
     @pytest.mark.rdt_supported("cqm_mbm_local", "cqm_mbm_total")
+    @pytest.mark.skipif(snc_enabled(),
+        reason="Test won't work if SNC is enabled. Remove this when SNC is implemented in resctrl")
     def test_pqos_mbm_tasks(self, iface):
         def get_mbm(output, pid):
             mbl = None

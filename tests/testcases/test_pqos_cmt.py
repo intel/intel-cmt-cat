@@ -36,6 +36,7 @@ import time
 import test
 import pytest
 from priority import PRIORITY_HIGH
+from snc import snc_enabled
 
 class TestPqosCMT(test.Test):
 
@@ -132,6 +133,8 @@ class TestPqosCMT(test.Test):
     @PRIORITY_HIGH
     @pytest.mark.iface_os
     @pytest.mark.rdt_supported("cqm_occup_llc")
+    @pytest.mark.skipif(snc_enabled(),
+        reason="Test won't work if SNC is enabled. Remove this when SNC is implemented in resctrl")
     def test_pqos_cmt_llc_occupancy_tasks(self, iface):
         def get_cmt(output, pid):
             cmt = None
@@ -184,6 +187,8 @@ class TestPqosCMT(test.Test):
     @PRIORITY_HIGH
     @pytest.mark.iface_os
     @pytest.mark.rdt_supported("cqm_occup_llc")
+    @pytest.mark.skipif(snc_enabled(),
+        reason="Test won't work if SNC is enabled. Remove this when SNC is implemented in resctrl")
     def test_pqos_cmt_llc_occupancy_tasks_percent(self, iface):
         def get_cmt_percent(output, pid):
             cmt = None
