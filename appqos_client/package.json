@@ -70,6 +70,7 @@
     "axios": ">=1.6.0",
     "follow-redirects": ">=1.15.6",
     "ip": ">=1.1.9",
-    "webpack-dev-middleware": "5.3.4"
+    "webpack-dev-middleware": "5.3.4",
+    "express": ">=4.19.2"
   }
 }
