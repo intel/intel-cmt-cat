@@ -49,13 +49,14 @@ class PqosMba(object):
     class COS:  # pylint: disable=too-few-public-methods
         "MBA class of service configuration"
 
-        def __init__(self, class_id, mb_max, ctrl=False):
+        def __init__(self, class_id, mb_max, ctrl=False, smba=False):
             self.class_id = class_id  # class of service
             self.mb_max = mb_max      # maximum available bandwidth
                                       # in percentage (without MBA controller)
                                       # or in MBps (with MBA controller),
                                       # depending on ctrl flag
             self.ctrl = ctrl          # MBA controller flag
+            self.smba = smba          # SMBA controller flag
 
     def __init__(self):
         self.pqos = Pqos()

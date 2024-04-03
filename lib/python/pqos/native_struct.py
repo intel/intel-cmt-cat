@@ -165,6 +165,7 @@ class CPqosCapabilityUnion(ctypes.Union):
         ("l3ca", ctypes.POINTER(CPqosCapabilityL3)),
         ("l2ca", ctypes.POINTER(CPqosCapabilityL2)),
         ("mba", ctypes.POINTER(CPqosCapabilityMBA)),
+        ("smba", ctypes.POINTER(CPqosCapabilityMBA)),
         ("generic_ptr", ctypes.c_void_p),
     ]
 
@@ -177,7 +178,8 @@ class CPqosCapability(ctypes.Structure):
     PQOS_CAP_TYPE_L3CA = 1
     PQOS_CAP_TYPE_L2CA = 2
     PQOS_CAP_TYPE_MBA = 3
-    PQOS_CAP_TYPE_NUMOF = 4
+    PQOS_CAP_TYPE_SMBA = 4
+    PQOS_CAP_TYPE_NUMOF = 5
 
     _fields_ = [
         ("type", ctypes.c_int),
@@ -209,7 +211,8 @@ class CPqosCoreInfo(ctypes.Structure):
         ('l2_id', ctypes.c_uint),    # L2 cluster id
         ('l3cat_id', ctypes.c_uint), # L3 CAT classes id
         ('mba_id', ctypes.c_uint),   # MBA id
-        ('numa', ctypes.c_uint)      # Numa node
+        ('numa', ctypes.c_uint),      # Numa node
+        ('smba_id', ctypes.c_uint),   # SMBA id
     ]
 
 
@@ -474,10 +477,11 @@ class CPqosAllocConfig(ctypes.Structure):
 
     _fields_ = [
         ('l3_cdp', CPqosCdpConfig.native_type),
-        ('l3_iordt', CPqosIordtConfig.native_type),
         ('l2_cdp', CPqosCdpConfig.native_type),
         ('mba', CPqosMbaConfig.native_type),
         ('mba40', CPqosMbaConfig.native_type),
+        ('l3_iordt', CPqosIordtConfig.native_type),
+        ('smba', CPqosMbaConfig.native_type),
     ]
 
     def set_l3_cdp(self, l3_cdp):
@@ -622,7 +626,8 @@ class CPqosMba(ctypes.Structure):
     _fields_ = [
         ("class_id", ctypes.c_uint),
         ("mb_max", ctypes.c_uint),
-        ("ctrl", ctypes.c_int)
+        ("ctrl", ctypes.c_int),
+        ("smba", ctypes.c_int),
     ]
 
     @classmethod
@@ -630,13 +635,15 @@ class CPqosMba(ctypes.Structure):
         "Creates CPqosMba object from PqosMba.COS object."
 
         ctrl = 1 if cos.ctrl else 0
-        return cls(class_id=cos.class_id, mb_max=cos.mb_max, ctrl=ctrl)
+        smba = 1 if cos.smba else 0
+        return cls(class_id=cos.class_id, mb_max=cos.mb_max, ctrl=ctrl, smba=smba)
 
     def to_cos(self, cls):
         "Creates PqosMba.COS object from CPqosMba object."
 
         ctrl = bool(self.ctrl)
-        return cls(self.class_id, self.mb_max, ctrl)
+        smba = bool(self.smba)
+        return cls(self.class_id, self.mb_max, ctrl, smba)
 
 # Monitoring
 
