@@ -1461,12 +1461,13 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
 
                         ret = pqos_l3ca_get(sockets[i], l3ca->num_classes, &num,
                                             tab);
-                        if (ret != PQOS_RETVAL_OK)
-                                num = l3ca->num_classes;
 
-                        for (n = 0; n < num; n++)
-                                print_l3ca_config(&tab[n],
-                                                  (ret != PQOS_RETVAL_OK));
+                        if (ret == PQOS_RETVAL_OK) {
+                                for (n = 0; n < num; n++)
+                                        print_l3ca_config(&tab[n], 0);
+                        } else {
+                                printf("L3CA: Couldn't obtain info.\n");
+                        }
                 }
 
                 if (cap_mba != NULL) {
