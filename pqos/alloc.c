@@ -1494,17 +1494,14 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
 
                         ret = pqos_mba_get(sockets[i], mba->num_classes, &num,
                                            tab);
-                        if (ret != PQOS_RETVAL_OK)
-                                num = mba->num_classes;
 
-                        for (n = 0; n < num; n++) {
-                                if (ret != PQOS_RETVAL_OK)
-                                        printf("    MBA COS%u => ERROR\n",
-                                               tab[n].class_id);
-                                else
+                        if (ret == PQOS_RETVAL_OK) {
+                                for (n = 0; n < num; n++)
                                         printf("    MBA COS%u => %u%s%s\n",
                                                tab[n].class_id, tab[n].mb_max,
                                                unit, available);
+                        } else {
+                                printf("MBA: Couldn't obtain info.\n");
                         }
                 }
 
