@@ -1529,17 +1529,14 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
 
                         ret = pqos_mba_get(sockets[i], smba->num_classes, &num,
                                            tab);
-                        if (ret != PQOS_RETVAL_OK)
-                                num = smba->num_classes;
 
-                        for (n = 0; n < num; n++) {
-                                if (ret != PQOS_RETVAL_OK)
-                                        printf("    SMBA COS%u => ERROR\n",
-                                               tab[n].class_id);
-                                else
+                        if (ret == PQOS_RETVAL_OK) {
+                                for (n = 0; n < num; n++)
                                         printf("    SMBA COS%u => %u%s%s\n",
                                                tab[n].class_id, tab[n].mb_max,
                                                unit, available);
+                        } else {
+                                printf("SMBA: Couldn't obtain info.\n");
                         }
                 }
         }
