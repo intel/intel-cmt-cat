@@ -1,0 +1,9 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/appqos_client"
+    schedule:
+      interval: "weekly"
+    allow:
+      # update production dependencies
+      - dependency-type: "production"
