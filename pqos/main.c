@@ -306,6 +306,15 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                         uint64_t n, start, end;
                         *p = '\0';
                         start = strtouint64(token);
+                        if (*(p + 1) == '\0')
+                                parse_error(
+                                    token,
+                                    "Incomplete cores association format");
+
+                        if (!(*(p + 1) >= '0' && *(p + 1) <= '9'))
+                                parse_error(p + 1,
+                                            "Invalid cores association format");
+
                         end = strtouint64(p + 1);
                         if (start > end) {
                                 /**
