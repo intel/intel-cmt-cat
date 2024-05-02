@@ -752,6 +752,17 @@ pqos_init(const struct pqos_config *config)
                 goto cpuinfo_init_error;
         }
 
+        if (hw_detect_hybrid())
+                LOG_WARN(
+                    "Hybrid part with L2 CAT support detected.\n"
+                    "      L2 CAT on hybrid parts is not yet supported in "
+                    "pqos\n"
+                    "      tools and may not behave as expected and cause\n"
+                    "      performance degradation. For more information, "
+                    "see:\n"
+                    "      "
+                    "https://github.com/intel/intel-cmt-cat/issues/272\n");
+
 #ifdef __linux__
         if (interface == PQOS_INTER_OS ||
             interface == PQOS_INTER_OS_RESCTRL_MON) {

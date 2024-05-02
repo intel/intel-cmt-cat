@@ -55,6 +55,17 @@ extern "C" {
 PQOS_LOCAL int hw_cap_mon_iordt(const struct pqos_cpuinfo *cpu, int *enabled);
 
 /**
+ * @brief Detects if the platform has hybrid architecture
+ *
+ * Runs CPUID instruction and return bit shows the platorm
+ * hybrid status. For example whether the platform has both
+ * P-cores and E-cores on board.
+ *
+ * @return 1 if the platform is a hybrid one, 0 - otherwise
+ */
+PQOS_LOCAL int hw_detect_hybrid(void);
+
+/**
  * @brief Discovers HW monitoring support
  *
  * @param r_cap place to store monitoring capabilities structure

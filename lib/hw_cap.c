@@ -289,6 +289,24 @@ hw_cap_mon_snc_state_exit:
 }
 
 /**
+ * @brief Detects if the platform has hybrid architecture
+ *
+ * Runs CPUID instruction and return bit shows the platorm
+ * hybrid status. For example whether the platform has both
+ * P-cores and E-cores on board.
+ *
+ * @return 1 if the platform is a hybrid one, 0 - otherwise
+ */
+int
+hw_detect_hybrid(void)
+{
+        struct cpuid_out res;
+
+        lcpuid(0x7, 0x0, &res);
+        return res.edx & (1 << 15);
+}
+
+/**
  * @brief Discovers monitoring capabilities
  *
  * Runs series of CPUID instructions to discover system CMT
