@@ -64,6 +64,7 @@ ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
+    -fstack-protector-strong \
     -fcf-protection=full
 endif
 
