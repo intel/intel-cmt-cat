@@ -43,6 +43,7 @@ WriteMakefile(
 	'NAME'    => 'pqos',
 	'VERSION' => "0.1",
 	'CCFLAGS' => "$Config{ccflags} -Wno-unused-variable -Wno-unused-value -Wno-misleading-indentation",
+	'LDDLFLAGS' => "$Config{lddlflags} -z now",
 	'LIBS'    => ['-lpqos', '-L/usr/local/lib -lpqos'],
 	'OBJECT'  => 'pqos_wrap.o',
 	'clean'   => {FILES => "pqos_wrap.c"},
