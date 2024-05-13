@@ -77,6 +77,7 @@ CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
     -fno-expensive-optimizations \
+    -fstack-clash-protection \
     -fcf-protection=full
 endif
 
