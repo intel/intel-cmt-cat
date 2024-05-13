@@ -42,7 +42,7 @@ CFLAGS = -pthread -D_GNU_SOURCE \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
-	-Wformat -Wformat-security -fstack-protector \
+	-Wformat -Wformat-security -fstack-protector-strong \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels
 ifneq ($(EXTRA_CFLAGS),)
 CFLAGS += $(EXTRA_CFLAGS)

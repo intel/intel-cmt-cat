@@ -47,7 +47,7 @@ MAN_DIR = $(PREFIX)/man/man8
 CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
-	-Wformat -Wformat-security -fstack-protector -fPIE \
+	-Wformat -Wformat-security -fstack-protector-strong -fPIE \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
 	-Winline -msse4.2 \
 	-fcf-protection=full
@@ -77,7 +77,6 @@ CFLAGS += -fno-strict-overflow \
     -fno-delete-null-pointer-checks \
     -fwrapv \
     -fno-expensive-optimizations \
-    -fstack-protector-strong \
     -fcf-protection=full
 endif
 

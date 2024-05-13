@@ -19,7 +19,7 @@ CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
 	-W -Wall -Wextra -Wstrict-prototypes \
 	-Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings \
-	-Wformat -Wformat-security -fstack-protector \
+	-Wformat -Wformat-security -fstack-protector-strong \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
 	-D'PQOS_LOCAL=' \
 	-D'PQOS_API=' \
@@ -34,7 +34,6 @@ ifeq ($(IS_GCC),1)
 CFLAGS += -fno-strict-overflow \
 	-fno-delete-null-pointer-checks \
 	-fwrapv \
-	-fstack-protector-strong \
 	-fcf-protection=full
 endif
 

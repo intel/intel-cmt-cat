@@ -43,7 +43,7 @@ CFLAGS = -I$(LIBDIR) \
 	-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Wmissing-declarations -Wold-style-definition -Wpointer-arith \
 	-Wcast-qual -Wundef -Wwrite-strings  \
-	-Wformat -Wformat-security -fstack-protector -fPIE -D_FORTIFY_SOURCE=2 \
+	-Wformat -Wformat-security -fstack-protector-strong -fPIE -D_FORTIFY_SOURCE=2 \
 	-Wunreachable-code -Wsign-compare -Wno-endif-labels \
 	-g -O2
 ifneq ($(EXTRA_CFLAGS),)
