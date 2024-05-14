@@ -3,7 +3,11 @@ updates:
   - package-ecosystem: "npm"
     directory: "/appqos_client"
     schedule:
-      interval: "weekly"
+      interval: "daily"
     allow:
       # update production dependencies
       - dependency-type: "production"
+    ignore:
+      # ignore major version updates
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
