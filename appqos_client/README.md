@@ -16,8 +16,8 @@ The App QoS client application temporarily stores data in the browser local stor
 ## Prerequisites
 
 ```
-Node: 16.15.0 (node -v)
-Package Manager: npm 8.12.1 (npm -v)
+Node: 18.20.2 (node -v)
+Package Manager: npm 10.5.0 (npm -v)
 ```
 
 ## Setup
