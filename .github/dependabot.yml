@@ -5,9 +5,7 @@ updates:
     schedule:
       interval: "daily"
     allow:
-      # update production dependencies
+      # Only update production dependencies
       - dependency-type: "production"
-    ignore:
-      # ignore major version updates
-      - dependency-name: "*"
-        update-types: ["version-update:semver-major"]
+    # Disable version updates (security updates only)
+    open-pull-requests-limit: 0
