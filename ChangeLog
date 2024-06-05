@@ -1,4 +1,21 @@
 =======================================================================
+Release  v24.05 Jun 2024
+=======================================================================
+
+Contributors (alphabetical order):
+        Babu Moger <babu.moger@amd.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Raghavan Kanagaraj <raghavan.kanagaraj@intel.com>
+        Roman Storozhenko <roman.storozhenko@intel.com>
+
+1. Library:
+        - Added AMD SMBA support
+2. PQoS
+        - Added AMD SMBA support
+3. General:
+        - Bug fixes
+
+=======================================================================
 Release  v23.11 Nov 2023
 =======================================================================
 

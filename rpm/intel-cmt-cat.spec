@@ -24,7 +24,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 %global githubname   intel-cmt-cat
-%global githubver    4.6.1
+%global githubver    6.0.0
 
 %if %{defined githubsubver}
 %global githubfull   %{githubname}-%{githubver}.%{githubsubver}
@@ -181,6 +181,9 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %doc %{_usrsrc}/%{githubfull}/LICENSE
 
 %changelog
+* Wed Jun 05 2024  Raghavan Kanagaraj <raghavan.kanagaraj@intel.com> 6.0.0-1
+- New release 6.0.0
+
 * Wed Nov 1 2023  Raghavan Kanagaraj <raghavan.kanagaraj@intel.com> 5.0.0-1
 - New release 5.0.0
 

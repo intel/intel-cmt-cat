@@ -85,7 +85,7 @@ class Pqos(object):
     def __init__(self):
         "Finds PQoS library and constructs a new object."
 
-        self.lib = ctypes.cdll.LoadLibrary('libpqos.so.5')
+        self.lib = ctypes.cdll.LoadLibrary('libpqos.so.6')
 
     def init(self, interface, log_file=None, log_callback=None,
              log_context=None, verbose='default'):
