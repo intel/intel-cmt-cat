@@ -13,7 +13,7 @@ psutil = "*"
 pqos = {path = "../lib/python"}
 
 [dev-packages]
-pwr = {git = "https://github.com/intel/CommsPowerManagement.git", ref = "pwr-v0.2.2", subdirectory = "pwr"}
+pwr = {git = "https://github.com/intel/CommsPowerManagement.git@pwr-v0.2.2", subdirectory = "pwr"}
 flask-cors = "*"
 bandit = "*"
 pylint = "==2.17.0"

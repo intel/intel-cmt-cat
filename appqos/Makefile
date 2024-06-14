@@ -60,7 +60,7 @@ bandit:
 
 .PHONY: codespell
 codespell:
-	WORKON_HOME=$(VENV_DIR) pipenv run codespell -L unit --skip ca -q 3
+	WORKON_HOME=$(VENV_DIR) pipenv run codespell -L unit,astroid --skip ca -q 3
 
 .PHONY: build
 build: $(VENV_DIR)
