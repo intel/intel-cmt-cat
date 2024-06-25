@@ -547,21 +547,27 @@ test_alloc_apply_mba(void **state)
         requested_mbas[0].class_id = 2;
         requested_mbas[0].ctrl = 0;
         requested_mbas[0].mb_max = 10;
+        requested_mbas[0].smba = 0;
         requested_mbas[1].class_id = 2;
         requested_mbas[1].ctrl = 0;
         requested_mbas[1].mb_max = 64;
+        requested_mbas[1].smba = 0;
         requested_mbas[2].class_id = 3;
         requested_mbas[2].ctrl = 0;
         requested_mbas[2].mb_max = 85;
+        requested_mbas[2].smba = 0;
         actual_mbas[0].class_id = 2;
         actual_mbas[0].ctrl = 0;
         actual_mbas[0].mb_max = 10;
+        actual_mbas[0].smba = 0;
         actual_mbas[1].class_id = 2;
         actual_mbas[1].ctrl = 0;
         actual_mbas[1].mb_max = 60;
+        actual_mbas[1].smba = 0;
         actual_mbas[2].class_id = 3;
         actual_mbas[2].ctrl = 0;
         actual_mbas[2].mb_max = 90;
+        actual_mbas[2].smba = 0;
 
         /* mock pqos_mba_set */
         expect_value(__wrap_pqos_mba_set, mba_id, 0);
@@ -646,21 +652,27 @@ test_alloc_apply_mba_max(void **state)
         requested_mbas[0].class_id = 2;
         requested_mbas[0].ctrl = 1;
         requested_mbas[0].mb_max = 10;
+        requested_mbas[0].smba = 0;
         requested_mbas[1].class_id = 2;
         requested_mbas[1].ctrl = 1;
         requested_mbas[1].mb_max = 64;
+        requested_mbas[1].smba = 0;
         requested_mbas[2].class_id = 3;
         requested_mbas[2].ctrl = 1;
         requested_mbas[2].mb_max = 85;
+        requested_mbas[2].smba = 0;
         actual_mbas[0].class_id = 2;
         actual_mbas[0].ctrl = 1;
         actual_mbas[0].mb_max = 10;
+        actual_mbas[0].smba = 0;
         actual_mbas[1].class_id = 2;
         actual_mbas[1].ctrl = 1;
         actual_mbas[1].mb_max = 60;
+        actual_mbas[1].smba = 0;
         actual_mbas[2].class_id = 3;
         actual_mbas[2].ctrl = 1;
         actual_mbas[2].mb_max = 90;
+        actual_mbas[2].smba = 0;
 
         /* mock pqos_mba_set */
         expect_value(__wrap_pqos_mba_set, mba_id, 0);

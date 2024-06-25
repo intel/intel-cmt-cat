@@ -227,11 +227,17 @@ test__pqos_cap_get_type(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         const struct pqos_capability *p_cap_item;
+        const struct pqos_cpuinfo *cpu = data->cpu;
+        enum pqos_vendor vendor;
         unsigned i;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
 
+        vendor = pqos_get_vendor(cpu);
+
         for (i = 0; i < PQOS_CAP_TYPE_NUMOF; i++) {
+                if (i == PQOS_CAP_TYPE_SMBA && vendor != PQOS_VENDOR_AMD)
+                        continue;
                 p_cap_item = _pqos_cap_get_type(i);
                 assert_non_null(p_cap_item);
                 assert_int_equal(p_cap_item->type, i);
@@ -274,12 +280,18 @@ test_pqos_cap_get_type(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         const struct pqos_capability *p_cap_item;
+        const struct pqos_cpuinfo *cpu = data->cpu;
+        enum pqos_vendor vendor;
         int ret;
         unsigned i;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
 
+        vendor = pqos_get_vendor(cpu);
+
         for (i = 0; i < PQOS_CAP_TYPE_NUMOF; i++) {
+                if (i == PQOS_CAP_TYPE_SMBA && vendor != PQOS_VENDOR_AMD)
+                        continue;
                 ret = pqos_cap_get_type(data->cap, i, &p_cap_item);
                 assert_int_equal(ret, PQOS_RETVAL_OK);
                 assert_int_equal(p_cap_item->type, i);

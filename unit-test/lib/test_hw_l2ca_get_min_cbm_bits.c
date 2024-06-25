@@ -105,6 +105,7 @@ test_hw_l2ca_get_min_cbm_bits(void **state)
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
         expect_value(hw_alloc_assoc_unused, l2cat_id, l2cat_id);
         expect_value(hw_alloc_assoc_unused, mba_id, 0);
+        expect_value(hw_alloc_assoc_unused, smba_id, 0);
         will_return(hw_alloc_assoc_unused, PQOS_RETVAL_OK);
         will_return(hw_alloc_assoc_unused, 1);
 
@@ -141,6 +142,7 @@ test_hw_l2ca_get_min_cbm_bits_no_free_cos(void **state)
                 expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
                 expect_value(hw_alloc_assoc_unused, l2cat_id, i);
                 expect_value(hw_alloc_assoc_unused, mba_id, 0);
+                expect_value(hw_alloc_assoc_unused, smba_id, 0);
                 will_return(hw_alloc_assoc_unused, PQOS_RETVAL_RESOURCE);
         }
 

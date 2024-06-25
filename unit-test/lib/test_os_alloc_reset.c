@@ -72,6 +72,8 @@ static void
 test_os_alloc_reset_schematas(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        const struct pqos_cpuinfo *cpu = data->cpu;
+        enum pqos_vendor vendor;
         int ret;
         unsigned grps;
         unsigned i;
@@ -92,8 +94,15 @@ test_os_alloc_reset_schematas(void **state)
                             PQOS_RETVAL_OK);
         }
 
-        ret = os_alloc_reset_schematas(&data->cap_l3ca, &data->cap_l2ca,
-                                       &data->cap_mba, &data->cap_smba);
+        vendor = pqos_get_vendor(cpu);
+
+        if (vendor != PQOS_VENDOR_AMD)
+                ret = os_alloc_reset_schematas(&data->cap_l3ca, &data->cap_l2ca,
+                                               &data->cap_mba, NULL);
+        else
+                ret = os_alloc_reset_schematas(&data->cap_l3ca, &data->cap_l2ca,
+                                               &data->cap_mba, &data->cap_smba);
+
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 

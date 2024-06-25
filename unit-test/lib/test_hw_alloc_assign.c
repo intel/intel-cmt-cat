@@ -86,6 +86,7 @@ hw_alloc_assign_l2ca(void **state)
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
         expect_value(hw_alloc_assoc_unused, l2cat_id, 1);
         expect_value(hw_alloc_assoc_unused, mba_id, 0);
+        expect_value(hw_alloc_assoc_unused, smba_id, 0);
         will_return(hw_alloc_assoc_unused, PQOS_RETVAL_OK);
         will_return(hw_alloc_assoc_unused, 1);
 
@@ -115,6 +116,7 @@ hw_alloc_assign_l3ca(void **state)
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
         expect_value(hw_alloc_assoc_unused, l2cat_id, 0);
         expect_value(hw_alloc_assoc_unused, mba_id, 0);
+        expect_value(hw_alloc_assoc_unused, smba_id, 0);
         will_return(hw_alloc_assoc_unused, PQOS_RETVAL_OK);
         will_return(hw_alloc_assoc_unused, 1);
 
@@ -144,6 +146,7 @@ hw_alloc_assign_mba(void **state)
         expect_value(hw_alloc_assoc_unused, l3cat_id, 0);
         expect_value(hw_alloc_assoc_unused, l2cat_id, 0);
         expect_value(hw_alloc_assoc_unused, mba_id, 1);
+        expect_value(hw_alloc_assoc_unused, smba_id, 0);
         will_return(hw_alloc_assoc_unused, PQOS_RETVAL_OK);
         will_return(hw_alloc_assoc_unused, 1);
 
