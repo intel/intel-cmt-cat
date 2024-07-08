@@ -31,7 +31,7 @@ bandit:
 
 .PHONY: codespell
 codespell:
-	WORKON_HOME=$(VENV_DIR) pipenv run codespell . -L unit,astroid -q 2
+	WORKON_HOME=$(VENV_DIR) pipenv run codespell . -L unit,astroid,CLOS -q 2
 
 style:
 	${MAKE} pylint
