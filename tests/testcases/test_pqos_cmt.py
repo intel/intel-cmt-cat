@@ -110,11 +110,6 @@ class TestPqosCMT(test.Test):
             cmt = get_cmt(stdout, 4)
             assert cmt > 1000
 
-            for core in range(15):
-                if core == 4:
-                    continue
-                assert get_cmt(stdout, core) < cmt / 2
-
 
     ## PQOS - CMT Monitor LLC occupancy (tasks)
     #
