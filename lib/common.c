@@ -382,8 +382,10 @@ pqos_read(int fd, void *buf, size_t count)
         char *byte_ptr = (char *)buf;
         ssize_t ret;
 
-        if (buf == NULL)
+        if (buf == NULL) {
+                errno = EFAULT;
                 return -1;
+        }
 
         while (len != 0 && (ret = read(fd, byte_ptr, len)) != 0) {
                 if (ret == -1) {
