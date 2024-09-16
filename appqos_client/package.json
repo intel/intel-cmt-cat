@@ -70,13 +70,15 @@
     "axios": ">=1.7.4",
     "follow-redirects": ">=1.15.6",
     "webpack-dev-middleware": "5.3.4",
-    "express": ">=4.19.2",
+    "express": ">4.19.2",
     "ejs": ">=3.1.10",
     "tar": ">=6.2.1",
     "core-js": ">=3.23.3",
     "ws": ">=8.17.1",
     "braces": ">=3.0.3",
     "dns-packet": ">=5.3.0",
-    "socks": ">=2.8.3"
+    "socks": ">=2.8.3",
+    "webpack": ">=5.94.0",
+    "micromatch": ">=4.0.8"
   }
 }
