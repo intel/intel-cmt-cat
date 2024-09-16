@@ -378,12 +378,14 @@ pqos_munmap(void *mem, const uint64_t size)
 ssize_t
 pqos_read(int fd, void *buf, size_t count)
 {
-        int len = count;
+        size_t len = count;
         char *byte_ptr = (char *)buf;
-        int ret;
+        ssize_t ret;
 
-        if (buf == NULL)
+        if (buf == NULL) {
+                errno = EFAULT;
                 return -1;
+        }
 
         while (len != 0 && (ret = read(fd, byte_ptr, len)) != 0) {
                 if (ret == -1) {
