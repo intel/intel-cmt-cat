@@ -101,12 +101,13 @@ class TestPqosCMT(test.Test):
 
         command = "taskset -c 4 memtester 100M"
         with subprocess.Popen(command.split(), stdin=subprocess.PIPE, stdout=subprocess.PIPE):
-            time.sleep(2)
+            time.sleep(5)
 
-            (stdout, _, exitcode) = self.run_pqos(iface, "-m llc:0-15 -t 1")
+            (stdout, _, exitcode) = self.run_pqos(iface, "--mon-reset -m llc:0-15 -t 10")
             assert exitcode == 0
             assert re.search(r"CORE\s*IPC\s*MISSES\s*LLC\[KB\]", stdout)
 
+            self.run("killall memtester")
             cmt = get_cmt(stdout, 4)
             assert cmt > 1000
 
