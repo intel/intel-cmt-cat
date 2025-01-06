@@ -438,13 +438,13 @@ iordt_init(const struct pqos_cap *cap, struct pqos_devinfo **devinfo)
 
         acpi_print(table);
 
-        m_devinfo = (struct pqos_devinfo *)calloc(sizeof(*m_devinfo), 1);
+        m_devinfo = (struct pqos_devinfo *)calloc(1, sizeof(*m_devinfo));
         if (m_devinfo == NULL) {
                 acpi_free(table);
                 return PQOS_RETVAL_ERROR;
         }
 
-        m_mmioinfo = (struct iordt_mmioinfo *)calloc(sizeof(*m_mmioinfo), 1);
+        m_mmioinfo = (struct iordt_mmioinfo *)calloc(1, sizeof(*m_mmioinfo));
         if (m_mmioinfo == NULL) {
                 acpi_free(table);
                 free(m_devinfo);

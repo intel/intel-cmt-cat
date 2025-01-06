@@ -586,7 +586,7 @@ acpi_get_irdt_chms(struct acpi_table_irdt_device *dev,
         size_t chms_len = dev->length - dss_size;
 
         *num = chms_len / sizeof(struct acpi_table_irdt_chms);
-        *chms = calloc(sizeof(struct acpi_table_irdt_chms *), *num);
+        *chms = calloc(*num, sizeof(struct acpi_table_irdt_chms *));
         if (!*chms) {
                 LOG_ERROR("Memory allocation failed!\n");
                 *num = 0;
