@@ -108,12 +108,17 @@ typedef cpuset_t cpu_set_t; /* stick with Linux typedef */
  * @retval 0 OK
  */
 static int
-set_affinity_mask(const cpu_set_t *p_set)
+set_affinity_mask(const cpu_set_t *p_set, int max_core_count)
 {
+        size_t cpusetsize;
+
         if (p_set == NULL)
                 return -EINVAL;
+
+        cpusetsize = CPU_ALLOC_SIZE(max_core_count);
+
 #if defined(__linux__)
-        return sched_setaffinity(0, sizeof(*p_set), p_set);
+        return sched_setaffinity(0, cpusetsize, p_set);
 #elif defined(__FreeBSD__)
         return cpuset_setaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
                                   sizeof(*p_set), p_set);
@@ -131,13 +136,18 @@ set_affinity_mask(const cpu_set_t *p_set)
  * @retval 0 OK
  */
 static int
-set_affinity(const int id)
+set_affinity(const int id, int max_core_count)
 {
-        cpu_set_t cpuset;
+        int ret = 0;
+        cpu_set_t *cpuset = CPU_ALLOC(max_core_count);
+        size_t size = CPU_ALLOC_SIZE(max_core_count);
 
-        CPU_ZERO(&cpuset);
-        CPU_SET(id, &cpuset);
-        return set_affinity_mask(&cpuset);
+        CPU_ZERO_S(size, cpuset);
+        CPU_SET_S(id, size, cpuset);
+        ret = set_affinity_mask(cpuset, max_core_count);
+        CPU_FREE(cpuset);
+
+        return ret;
 }
 
 /**
@@ -149,14 +159,17 @@ set_affinity(const int id)
  * @retval 0 OK
  */
 static int
-get_affinity(cpu_set_t *p_set)
+get_affinity(cpu_set_t *p_set, int max_core_count)
 {
+        size_t cpusetsize;
+
         if (p_set == NULL)
                 return -EFAULT;
 
-        CPU_ZERO(p_set);
+        cpusetsize = CPU_ALLOC_SIZE(max_core_count);
+        CPU_ZERO_S(cpusetsize, p_set);
 #ifdef __linux__
-        return sched_getaffinity(0, sizeof(*p_set), p_set);
+        return sched_getaffinity(0, cpusetsize, p_set);
 #endif
 #ifdef __FreeBSD__
         return cpuset_getaffinity(CPU_LEVEL_WHICH, CPU_WHICH_TID, -1,
@@ -385,12 +398,13 @@ detect_apic_masks(struct apic_info *apic)
 static int
 detect_cpu(const int cpu,
            const struct apic_info *apic,
-           struct pqos_coreinfo *info)
+           struct pqos_coreinfo *info,
+           int max_core_count)
 {
         struct cpuid_out leafB;
         uint32_t apicid;
 
-        if (set_affinity(cpu) != 0)
+        if (set_affinity(cpu, max_core_count) != 0)
                 return -1;
 
         lcpuid(0xb, 0, &leafB);
@@ -440,12 +454,7 @@ cpuinfo_build_topo(struct apic_info *apic)
         int i, max_core_count;
         unsigned core_count = 0;
         struct pqos_cpuinfo *l_cpu = NULL;
-        cpu_set_t current_mask;
-
-        if (get_affinity(&current_mask) != 0) {
-                LOG_ERROR("Error retrieving CPU affinity mask!");
-                return NULL;
-        }
+        cpu_set_t *current_mask = NULL;
 
         max_core_count = sysconf(_SC_NPROCESSORS_CONF);
         if (max_core_count <= 0) {
@@ -453,8 +462,16 @@ cpuinfo_build_topo(struct apic_info *apic)
                 return NULL;
         }
 
+        current_mask = CPU_ALLOC(max_core_count);
+        if (get_affinity(current_mask, max_core_count) != 0) {
+                LOG_ERROR("Error retrieving CPU affinity mask!");
+                CPU_FREE(current_mask);
+                return NULL;
+        }
+
         if (pqos_set_no_files_limit(max_core_count)) {
                 LOG_ERROR("Open files limit not sufficient!\n");
+                CPU_FREE(current_mask);
                 return NULL;
         }
 
@@ -464,21 +481,25 @@ cpuinfo_build_topo(struct apic_info *apic)
         l_cpu = (struct pqos_cpuinfo *)malloc(mem_sz);
         if (l_cpu == NULL) {
                 LOG_ERROR("Couldn't allocate CPU topology structure!");
+                CPU_FREE(current_mask);
                 return NULL;
         }
         l_cpu->mem_size = (unsigned)mem_sz;
         memset(l_cpu, 0, mem_sz);
 
         for (i = 0; i < max_core_count; ++i)
-                if (detect_cpu(i, apic, &l_cpu->cores[core_count]) == 0)
+                if (detect_cpu(i, apic, &l_cpu->cores[core_count],
+                               max_core_count) == 0)
                         core_count++;
 
-        if (set_affinity_mask(&current_mask) != 0) {
+        if (set_affinity_mask(current_mask, max_core_count) != 0) {
                 LOG_ERROR("Couldn't restore original CPU affinity mask!");
+                CPU_FREE(current_mask);
                 free(l_cpu);
                 return NULL;
         }
 
+        CPU_FREE(current_mask);
         l_cpu->num_cores = core_count;
         if (core_count == 0) {
                 free(l_cpu);
