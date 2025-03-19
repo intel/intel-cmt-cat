@@ -184,7 +184,8 @@ int
 api_init(int interface, enum pqos_vendor vendor)
 {
         if (interface != PQOS_INTER_MSR && interface != PQOS_INTER_OS &&
-            interface != PQOS_INTER_OS_RESCTRL_MON)
+            interface != PQOS_INTER_OS_RESCTRL_MON &&
+            interface != PQOS_INTER_MMIO)
                 return PQOS_RETVAL_PARAM;
 
         memset(&api, 0, sizeof(api));

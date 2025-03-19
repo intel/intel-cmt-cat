@@ -54,12 +54,14 @@
 #include "api.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "erdt.h"
 #include "hw_cap.h"
 #include "iordt.h"
 #include "lock.h"
 #include "log.h"
 #include "machine.h"
 #include "monitoring.h"
+#include "mrrm.h"
 #include "os_cap.h"
 #include "resctrl.h"
 #include "resctrl_alloc.h"
@@ -371,7 +373,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         /**
          * Monitoring init
          */
-        if (inter == PQOS_INTER_MSR)
+        if (inter == PQOS_INTER_MSR || inter == PQOS_INTER_MMIO)
                 ret = hw_cap_mon_discover(&det_mon, cpu);
 #ifdef __linux__
         else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
@@ -595,6 +597,8 @@ _cap_interface_to_string(enum pqos_interface interface)
                 return "OS_RESCTRL_MON";
         case PQOS_INTER_AUTO:
                 return "AUTO";
+        case PQOS_INTER_MMIO:
+                return "MMIO";
         default:
                 return "Unknown";
         }
@@ -624,9 +628,11 @@ discover_interface(enum pqos_interface requested_interface,
         if (requested_interface != PQOS_INTER_MSR &&
             requested_interface != PQOS_INTER_OS &&
             requested_interface != PQOS_INTER_OS_RESCTRL_MON &&
+            requested_interface != PQOS_INTER_MMIO &&
             requested_interface != PQOS_INTER_AUTO)
 #else
         if (requested_interface != PQOS_INTER_MSR &&
+            requested_interface != PQOS_INTER_MMIO &&
             requested_interface != PQOS_INTER_AUTO)
 #endif
                 return PQOS_RETVAL_PARAM;
@@ -653,6 +659,15 @@ discover_interface(enum pqos_interface requested_interface,
                         }
 
                         *interface = PQOS_INTER_MSR;
+                } else if (strncasecmp(environment, "MMIO", 4) == 0) {
+                        if (requested_interface != PQOS_INTER_MSR &&
+                            requested_interface != PQOS_INTER_AUTO) {
+                                LOG_ERROR("Interface initialization error!\n"
+                                          "Your system has been restricted "
+                                          "to use the MMIO interface only!\n");
+                                return PQOS_RETVAL_ERROR;
+                        }
+                        *interface = PQOS_INTER_MMIO;
                 } else {
                         LOG_ERROR("Interface initialization error!\n"
                                   "Invalid interface enforcement selection.\n");
@@ -694,6 +709,8 @@ pqos_init(const struct pqos_config *config)
         struct pqos_cap *cap = NULL;
         struct pqos_cpuinfo *cpu = NULL;
         struct pqos_devinfo *dev = NULL;
+        struct pqos_erdt_info *erdt = NULL;
+        struct pqos_mrrm_info *mrrm = NULL;
         enum pqos_interface interface;
 
         if (config == NULL)
@@ -838,6 +855,34 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
+        ret = mrrm_init(cap, &mrrm);
+        switch (ret) {
+        case PQOS_RETVAL_RESOURCE:
+                LOG_DEBUG("MRRM init aborted: feature not present\n");
+                break;
+        case PQOS_RETVAL_OK:
+                LOG_DEBUG("MRRM init OK\n");
+                break;
+        case PQOS_RETVAL_ERROR:
+        default:
+                LOG_ERROR("MRRM init error %d\n", ret);
+                break;
+        }
+
+        ret = erdt_init(cap, cpu, &erdt);
+        switch (ret) {
+        case PQOS_RETVAL_RESOURCE:
+                LOG_DEBUG("ERDT init aborted: feature not present\n");
+                break;
+        case PQOS_RETVAL_OK:
+                LOG_DEBUG("ERDT init OK\n");
+                break;
+        case PQOS_RETVAL_ERROR:
+        default:
+                LOG_ERROR("ERDT init error %d\n", ret);
+                break;
+        }
+
         ret = iordt_init(cap, &dev);
         switch (ret) {
         case PQOS_RETVAL_RESOURCE:
@@ -880,6 +925,8 @@ init_error:
                 m_sysconf.cap = cap;
                 m_sysconf.cpu = cpu;
                 m_sysconf.dev = dev;
+                m_sysconf.erdt = erdt;
+                m_sysconf.mrrm = mrrm;
         }
 
         lock_release();
@@ -1330,6 +1377,18 @@ const struct pqos_devinfo *
 _pqos_get_dev(void)
 {
         return m_sysconf.dev;
+}
+
+const struct pqos_erdt_info *
+_pqos_get_erdt(void)
+{
+        return m_sysconf.erdt;
+}
+
+const struct pqos_mrrm_info *
+_pqos_get_mrrm(void)
+{
+        return m_sysconf.mrrm;
 }
 
 int

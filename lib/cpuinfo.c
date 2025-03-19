@@ -643,7 +643,7 @@ cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
                 return -EFAULT;
         }
 
-        if (interface == PQOS_INTER_MSR)
+        if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO)
                 m_cpu = cpuinfo_build_topo(&apic);
 #ifdef __linux__
         else if (interface == PQOS_INTER_OS ||

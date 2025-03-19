@@ -162,6 +162,20 @@ PQOS_LOCAL const struct pqos_cpuinfo *_pqos_get_cpu(void);
 PQOS_LOCAL const struct pqos_devinfo *_pqos_get_dev(void);
 
 /**
+ * @brief Internal API to retrieve ERDT information
+ *
+ * @return ERDT information
+ */
+PQOS_LOCAL const struct pqos_erdt_info *_pqos_get_erdt(void);
+
+/**
+ * @brief Internal API to retrieve MRRM information
+ *
+ * @return MRRM information
+ */
+PQOS_LOCAL const struct pqos_mrrm_info *_pqos_get_mrrm(void);
+
+/**
  * @brief Returns value of L3 Non-Contiguous CBM(Cache Bit Mask) support
  *
  * @return Operation status

@@ -66,6 +66,7 @@ extern "C" {
 #define PQOS_MAX_COS      16    /**< 16 x COS */
 #define PQOS_MAX_L3CA_COS PQOS_MAX_COS
 #define PQOS_MAX_L2CA_COS PQOS_MAX_COS
+#define IMH_MAX_PATH      256
 
 /*
  * =======================================
@@ -92,7 +93,8 @@ enum pqos_interface {
         PQOS_INTER_MSR = 0,            /**< MSR */
         PQOS_INTER_OS = 1,             /**< OS */
         PQOS_INTER_OS_RESCTRL_MON = 2, /**< OS with resctrl monitoring */
-        PQOS_INTER_AUTO = 3            /**< Auto detection */
+        PQOS_INTER_AUTO = 3,           /**< Auto detection */
+        PQOS_INTER_MMIO = 4            /**< MMIO */
 };
 
 /*
@@ -455,12 +457,210 @@ struct pqos_devinfo {
 };
 
 /**
+ * Cache Allocation Registers for Device Agents Description Structure
+ */
+struct pqos_erdt_card {
+        uint32_t flags;
+        uint32_t contention_bitmask;
+        uint8_t reg_index_func_ver;
+        uint64_t reg_base_addr;
+        uint32_t reg_block_size;
+        uint16_t cat_reg_offsets;
+        uint16_t cat_reg_block_size;
+};
+
+/**
+ * IO Bandwidth Monitoring Registers for Device Agents Description Structure
+ */
+struct pqos_erdt_ibrd {
+        uint32_t flags;
+        uint8_t reg_index_func_ver;
+        uint64_t reg_base_addr;
+        uint32_t reg_block_size;
+        uint16_t bw_reg_offset;
+        uint16_t miss_bw_reg_offset;
+        uint16_t bw_reg_clump_size;
+        uint16_t miss_reg_clump_size;
+        uint8_t counter_width;
+        uint64_t upscaling_factor;
+        uint32_t correction_factor_length;
+        uint32_t *correction_factor;
+};
+
+/**
+ * Cache Monitoring Registers for Device Agents Description Structure
+ */
+struct pqos_erdt_cmrd {
+        uint32_t flags;
+        uint8_t reg_index_func_ver;
+        uint64_t reg_base_addr;
+        uint32_t reg_block_size;
+        uint16_t offset;
+        uint16_t clump_size;
+        uint64_t upscaling_factor;
+};
+
+/**
+ * Memory-bandwidth Allocation Registers for CPU Agents Description Structure
+ */
+struct pqos_erdt_marc {
+        uint16_t flags;
+        uint8_t reg_index_func_ver;
+        uint64_t opt_bw_reg_block_base_addr;
+        uint64_t min_bw_reg_block_base_addr;
+        uint64_t max_bw_reg_block_base_addr;
+        uint32_t reg_block_size;
+        uint32_t control_window_range;
+};
+
+/**
+ * Memory-bandwidth Monitoring Registers for CPU Agents Description Structure
+ */
+struct pqos_erdt_mmrc {
+        uint32_t flags;
+        uint8_t reg_index_func_ver;
+        uint64_t reg_block_base_addr;
+        uint32_t reg_block_size;
+        uint8_t counter_width;
+        uint64_t upscaling_factor;
+        uint32_t correction_factor_length;
+        uint32_t *correction_factor;
+};
+
+/**
+ * Cache Monitoring Registers for CPU Agents Description Structure
+ */
+struct pqos_erdt_cmrc {
+        uint32_t flags;
+        uint8_t reg_index_func_ver;
+        uint64_t block_base_addr;
+        uint32_t block_size;
+        uint16_t clump_size;
+        uint16_t clump_stride;
+        uint64_t upscaling_factor;
+};
+
+/**
+ * The hierarchical path from the Host Bridge to the device structure
+ */
+struct pqos_erdt_path_entry {
+        uint16_t segment;
+        uint8_t bus;
+        uint8_t device;
+        uint8_t function;
+};
+
+/**
+ * Device Agent Scope Entry (DASE) Structure
+ */
+struct pqos_erdt_device_entry {
+        uint8_t type;
+        uint8_t length;
+        uint16_t segment_number;
+        uint8_t start_bus_number;
+        struct pqos_erdt_path_entry path[IMH_MAX_PATH];
+        uint8_t pathNumber;
+};
+
+/**
+ * Device Agent Collection Description Structure
+ */
+struct pqos_erdt_dacd {
+        uint16_t type;
+        uint16_t length;
+        uint16_t rmdd_domain_id;
+};
+
+/**
+ * CPU Agent Collection Description Structure
+ */
+struct pqos_erdt_cacd {
+        uint16_t rmdd_domain_id;
+        uint32_t *enumeration_ids;
+        uint32_t enum_ids_length;
+};
+
+/**
+ * Resource Management Domain Description Structure
+ */
+struct pqos_erdt_rmdd {
+        uint16_t flags;
+        uint16_t num_io_l3_slices;
+        uint8_t num_io_l3_sets;
+        uint8_t num_io_l3_ways;
+        uint16_t domain_id;
+        uint32_t max_rmids;
+        uint64_t control_reg_base_addr;
+        uint16_t control_reg_size;
+};
+
+/**
+ * ERDT CPU Agents Structure
+ */
+struct pqos_cpu_agent_info {
+        struct pqos_erdt_rmdd rmdd;
+        struct pqos_erdt_cacd cacd;
+        struct pqos_erdt_cmrc cmrc;
+        struct pqos_erdt_mmrc mmrc;
+        struct pqos_erdt_marc marc;
+};
+
+/**
+ * ERDT Device Agents Structure
+ */
+struct pqos_device_agent_info {
+        struct pqos_erdt_rmdd rmdd;
+        struct pqos_erdt_dacd dacd;
+        struct pqos_erdt_cmrd cmrd;
+        struct pqos_erdt_ibrd ibrd;
+        struct pqos_erdt_card card;
+};
+
+/**
+ * ERDT Top-Level ACPI Structure
+ */
+struct pqos_erdt_info {
+        uint32_t max_clos;
+        uint32_t num_cpu_agents;
+        uint32_t num_dev_agents;
+        struct pqos_cpu_agent_info *cpu_agents;
+        struct pqos_device_agent_info *dev_agents;
+};
+
+/**
+ * Memory Range Entry (MRE) Structure
+ */
+struct pqos_mre_info {
+        uint32_t base_address_low;
+        uint32_t base_address_high;
+        uint32_t length_low;
+        uint32_t length_high;
+        uint16_t region_id_flags;
+        uint8_t local_region_id;
+        uint8_t remote_region_id;
+        uint32_t regs_length;
+        uint8_t *programming_regs;
+};
+
+/**
+ * Memory Range and Region Mapping (MRRM) Structure
+ */
+struct pqos_mrrm_info {
+        uint8_t max_memory_regions_supported;
+        uint8_t flags;
+        uint32_t num_mres;
+        struct pqos_mre_info *mre;
+};
+
+/**
  * System configuration structure
  */
 struct pqos_sysconfig {
-        struct pqos_cap *cap;     /**< CPU capabilities */
-        struct pqos_cpuinfo *cpu; /**< CPU topology */
-        struct pqos_devinfo *dev; /**< PCI device info */
+        struct pqos_cap *cap;        /**< CPU capabilities */
+        struct pqos_cpuinfo *cpu;    /**< CPU topology */
+        struct pqos_devinfo *dev;    /**< PCI device info */
+        struct pqos_erdt_info *erdt; /**< ERDT ACPI table info */
+        struct pqos_mrrm_info *mrrm; /**< Memory range & Region IDs info */
 };
 
 /**

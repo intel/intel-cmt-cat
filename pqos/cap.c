@@ -41,6 +41,7 @@
 #include "pqos.h"
 
 #include <inttypes.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -49,8 +50,21 @@
 #include <sys/utsname.h>
 #endif
 
-#define BUFFER_SIZE 1024
-#define NON_VERBOSE 0
+#define BUFFER_SIZE            1024
+#define NON_VERBOSE            0
+#define VALID_LOCAL_REGION_ID  1
+#define VALID_REMOTE_REGION_ID 2
+
+#define UNAVAILABLE_BIT_SUPPORT 1
+#define OVERFLOW_BIT_SUPPORT    2
+
+#define MBA_OPTIMAL_CONTROL_WINDOW 1
+#define MBA_MINIMUM_CONTROL_WINDOW 2
+#define MBA_MAXIMUM_CONTROL_WINDOW 4
+
+#define CONTENTION_BITMASK     1
+#define NON_CONTIGUOUS_BITMASK 2
+#define ZERO_LENGTH_BITMASK    4
 
 /**
  * @brief Print line with indentation
@@ -537,7 +551,7 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
         if (ret != PQOS_RETVAL_OK)
                 return;
 
-        if (interface == PQOS_INTER_MSR)
+        if (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO)
                 printf("Hardware capabilities\n");
 
 #ifdef __linux__
@@ -610,4 +624,347 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
                         cap_print_devinfo_device(4, sys->dev);
                 }
         }
+}
+
+static void
+cap_print_mrrm_info_regions(const struct pqos_mrrm_info *mrrm)
+{
+        uint32_t idx = 0;
+        uint32_t low = 0;
+        uint32_t high = 0;
+        uint64_t base_addr = 0;
+        uint64_t length = 0;
+
+        printf("Total Memory Regions:  %d\n",
+               mrrm->max_memory_regions_supported);
+        if (mrrm->flags == 0)
+                printf("Region ID Type:        Static\n");
+        else
+                printf("Region ID Type:        Dynamic\n");
+
+        printf("\n\n");
+        for (idx = 0; idx < mrrm->num_mres; idx++) {
+
+                /* Log Region's Base Address */
+                low = mrrm->mre[idx].base_address_low;
+                high = mrrm->mre[idx].base_address_high;
+                base_addr =
+                    ((uint64_t)high << (sizeof(uint32_t) * CHAR_BIT)) | low;
+                printf("\n\n\nBase Address     : 0x%lx\n", base_addr);
+
+                /* Log Region's  Length */
+                low = mrrm->mre[idx].length_low;
+                high = mrrm->mre[idx].length_high;
+                length =
+                    ((uint64_t)high << (sizeof(uint32_t) * CHAR_BIT)) | low;
+                printf("Length           : 0x%lx\n", length);
+
+                /* Local Region ID Info */
+                if (mrrm->mre[idx].region_id_flags & VALID_LOCAL_REGION_ID) {
+                        printf("Local Region ID  : 0x%x\n",
+                               mrrm->mre[idx].local_region_id);
+                } else
+                        printf("Local Region ID  : Not Valid\n");
+
+                /* Remote Region ID Info */
+                if (mrrm->mre[idx].region_id_flags & VALID_REMOTE_REGION_ID)
+                        printf("Remote Region ID: 0x%x\n",
+                               mrrm->mre[idx].remote_region_id);
+                else
+                        printf("Remote Region ID : Not Valid\n");
+        }
+
+        printf("\n");
+}
+
+/**
+ * @brief Print capabilities
+ *
+ * @param [in] cap system capability structure
+ * @param [in] cpu CPU topology structure
+ * @param [in] dev IO RDT topology structure
+ * @param [in] verbose enable verbose mode
+ */
+void
+cap_print_mem_regions(const struct pqos_sysconfig *sys)
+{
+        enum pqos_interface interface;
+        int ret;
+
+        if (!sys || !sys->mrrm)
+                return;
+
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK)
+                return;
+
+        if (interface != PQOS_INTER_MMIO) {
+                printf("MMIO interface provides Memory Regions\n");
+                return;
+        }
+
+        if (sys->mrrm)
+                cap_print_mrrm_info_regions(sys->mrrm);
+}
+
+static void
+cap_print_cpu_agents_info(const struct pqos_cpu_agent_info *cpu_agent)
+{
+        uint32_t idx = 0;
+
+        printf("    CACD Info:\n");
+        printf("        Domanin ID:                                    %d\n",
+               cpu_agent->cacd.rmdd_domain_id);
+        printf("        Enumeration IDs:                               ");
+        for (idx = 0; idx < cpu_agent->cacd.enum_ids_length; idx++)
+                printf("0x%x ", cpu_agent->cacd.enumeration_ids[idx]);
+        printf("\n\n");
+
+        printf("    CMRC Info:\n");
+        printf("        Unavilabe Bit Support:                         ");
+        if (cpu_agent->cmrc.flags == 1)
+                printf("Yes\n");
+        else
+                printf("No\n");
+        printf("        Indexing Function Version:                     %d\n",
+               cpu_agent->cmrc.reg_index_func_ver);
+        printf("        CMT Register Block Base Address:               0x%lx\n",
+               cpu_agent->cmrc.block_base_addr);
+        printf("        CMT Register Block Size:                       0x%x\n",
+               cpu_agent->cmrc.block_size);
+        printf("        CMT Register Clump Size:                       0x%x\n",
+               cpu_agent->cmrc.clump_size);
+        printf("        CMT Register Clump Stride:                     0x%x\n",
+               cpu_agent->cmrc.clump_stride);
+        printf("        CMT Counter Upscaling Factor:                  0x%lx\n",
+               cpu_agent->cmrc.upscaling_factor);
+
+        printf("\n\n    MMRC Info:\n");
+        printf("        Unavilabe Bit Support:                         ");
+        if (cpu_agent->mmrc.flags & UNAVAILABLE_BIT_SUPPORT)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Overflow Bit Support:                          ");
+        if (cpu_agent->mmrc.flags & OVERFLOW_BIT_SUPPORT)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Indexing Function Version:                     %d\n",
+               cpu_agent->mmrc.reg_index_func_ver);
+        printf("        MBM Register Block Base Address:               0x%lx\n",
+               cpu_agent->mmrc.reg_block_base_addr);
+        printf("        MBM Register Block Size:                       0x%x\n",
+               cpu_agent->mmrc.reg_block_size);
+        printf("        MBM Counter Width:                             0x%x\n",
+               cpu_agent->mmrc.counter_width);
+        printf("        MBM Counter Upscaling Factor:                  0x%lx\n",
+               cpu_agent->mmrc.upscaling_factor);
+        printf("        MBM Correction Factor List Length:             %d\n",
+               cpu_agent->mmrc.correction_factor_length);
+
+        if (cpu_agent->mmrc.correction_factor_length != 0) {
+                printf("        MBM Correction Factor:                 ");
+                idx = 0;
+                while (idx < cpu_agent->mmrc.correction_factor_length) {
+                        printf("0x%x ", cpu_agent->mmrc.correction_factor[idx]);
+                        idx++;
+                }
+        }
+
+        printf("\n\n");
+
+        printf("\n\n    MARC Info:\n");
+        printf("        MBA Optimal Control Window:                    ");
+        if (cpu_agent->marc.flags & MBA_OPTIMAL_CONTROL_WINDOW)
+                printf("Yes\n");
+        else
+                printf("No\n");
+        printf("        MBA Minimum Control Window:                    ");
+        if (cpu_agent->marc.flags & MBA_MINIMUM_CONTROL_WINDOW)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        MBA Maximum Control Window:                    ");
+        if (cpu_agent->marc.flags & MBA_MAXIMUM_CONTROL_WINDOW)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Indexing Function Version:                     %d\n",
+               cpu_agent->marc.reg_index_func_ver);
+        printf("        MBA Optimal BW Register Block Base Address:    0x%lx\n",
+               cpu_agent->marc.opt_bw_reg_block_base_addr);
+        printf("        MBA Minimum BW Register Block Base Address:    0x%lx\n",
+               cpu_agent->marc.opt_bw_reg_block_base_addr);
+        printf("        MBA Maximum BW Register Block Base Address:    0x%lx\n",
+               cpu_agent->marc.opt_bw_reg_block_base_addr);
+        printf("        MBA Register Block Size:                       0x%x\n",
+               cpu_agent->marc.reg_block_size);
+        printf("        MBA BW Control Window Range:                   %d\n",
+               cpu_agent->marc.control_window_range);
+
+        printf("\n\n");
+}
+
+static void
+cap_print_device_agents_info(const struct pqos_device_agent_info *dev_agent)
+{
+        uint32_t idx = 0;
+
+        printf("\n\n    CMRD Info:\n");
+        printf("        Unavilabe Bit Support:                         ");
+        if (dev_agent->cmrd.flags == 1)
+                printf("Yes\n");
+        else
+                printf("No\n");
+        printf("        Indexing Function Version:                     %d\n",
+               dev_agent->cmrd.reg_index_func_ver);
+        printf("        Register Base Address:                         "
+               "0x%lx\n",
+               dev_agent->cmrd.reg_base_addr);
+        printf("        Register Block Size:                           0x%x\n",
+               dev_agent->cmrd.reg_block_size);
+        printf("        CMT Register Clump Size:                       0x%x\n",
+               dev_agent->cmrd.offset);
+        printf("        CMT Register Clump Size:                       0x%x\n",
+               dev_agent->cmrd.clump_size);
+        printf("        CMT Counter Upscaling Factor:                  "
+               "0x%lx\n",
+               dev_agent->cmrd.upscaling_factor);
+
+        printf("\n\n    IBRD Info:\n");
+        printf("        Unavilabe Bit Support:                         ");
+        if (dev_agent->ibrd.flags & UNAVAILABLE_BIT_SUPPORT)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Overflow Bit Support:                          ");
+        if (dev_agent->ibrd.flags & OVERFLOW_BIT_SUPPORT)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Indexing Function Version:                     %d\n",
+               dev_agent->ibrd.reg_index_func_ver);
+        printf("        Register Base Address:                         0x%lx\n",
+               dev_agent->ibrd.reg_base_addr);
+        printf("        Register Block Size:                           0x%x\n",
+               dev_agent->ibrd.reg_block_size);
+        printf("        Total I/O BW Register Offset:                  0x%x\n",
+               dev_agent->ibrd.bw_reg_offset);
+        printf("        I/O Miss BW Register Offset:                   0x%x\n",
+               dev_agent->ibrd.miss_bw_reg_offset);
+        printf("        Total I/O BW  Register Clump Size:             0x%x\n",
+               dev_agent->ibrd.bw_reg_clump_size);
+        printf("        I/O Miss Register Clump Size:                  0x%x\n",
+               dev_agent->ibrd.miss_reg_clump_size);
+        printf("        I/O BW Counter Width:                          0x%x\n",
+               dev_agent->ibrd.counter_width);
+        printf("        I/O BW Counter Upscaling Factor:               0x%lx\n",
+               dev_agent->ibrd.upscaling_factor);
+        printf("        I/O BW Counter Correction Factor List Length:  %d\n",
+               dev_agent->ibrd.correction_factor_length);
+
+        if (dev_agent->ibrd.correction_factor_length != 0) {
+                printf("        I/O BW Counter Correction Factor:      ");
+                idx = 0;
+                while (idx < dev_agent->ibrd.correction_factor_length) {
+                        printf("0x%x ", dev_agent->ibrd.correction_factor[idx]);
+                        idx++;
+                }
+        }
+
+        printf("\n\n    CARD Info:\n");
+        printf("        Contention Bitmask Valid:                      ");
+        if (dev_agent->card.flags & CONTENTION_BITMASK)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Non-Contiguous Bitmasks Supported:             ");
+        if (dev_agent->card.flags & NON_CONTIGUOUS_BITMASK)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Zero-length Bitmask:                           ");
+        if (dev_agent->card.flags & ZERO_LENGTH_BITMASK)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
+        printf("        Contention Bitmask:                            0x%x\n",
+               dev_agent->card.contention_bitmask);
+        printf("        Indexing Function Version:                     %d\n",
+               dev_agent->card.reg_index_func_ver);
+        printf("        Register Base Address:                         0x%lx\n",
+               dev_agent->card.reg_base_addr);
+        printf("        Register Block Size:                           0x%x\n",
+               dev_agent->card.reg_block_size);
+        printf("        CAT Register Offset:                           0x%x\n",
+               dev_agent->card.cat_reg_offsets);
+        printf("        CAT Register Block Size:                       0x%x\n",
+               dev_agent->card.cat_reg_block_size);
+
+        printf("\n\n");
+}
+
+static void
+cap_print_erdt_info_topology(const struct pqos_erdt_info *erdt)
+{
+        uint32_t idx = 0;
+
+        printf("CLOS:           %d\n", erdt->max_clos);
+        printf("CPU Agents:     %d\n", erdt->num_cpu_agents);
+        printf("Device Agents:  %d\n", erdt->num_dev_agents);
+
+        printf("\n\n\n");
+        for (idx = 0; idx < erdt->num_cpu_agents; idx++) {
+                printf("\n\nCPU Agent %d\n", idx);
+                cap_print_cpu_agents_info(
+                    (const struct pqos_cpu_agent_info *)&erdt->cpu_agents[idx]);
+        }
+
+        printf("\n\n\n");
+        for (idx = 0; idx < erdt->num_dev_agents; idx++) {
+                printf("\n\nDevice Agent %d\n", idx);
+                cap_print_device_agents_info(
+                    (const struct pqos_device_agent_info *)&erdt
+                        ->dev_agents[idx]);
+        }
+}
+
+/**
+ * @brief Print capabilities
+ *
+ * @param [in] cap system capability structure
+ * @param [in] cpu CPU topology structure
+ * @param [in] dev IO RDT topology structure
+ * @param [in] verbose enable verbose mode
+ */
+void
+cap_print_topology(const struct pqos_sysconfig *sys)
+{
+        enum pqos_interface interface;
+        int ret;
+
+        if (!sys || !sys->erdt)
+                return;
+
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK)
+                return;
+
+        if (interface != PQOS_INTER_MMIO) {
+                printf("MMIO interface provides Memory Regions\n");
+                return;
+        }
+
+        if (sys->erdt)
+                cap_print_erdt_info_topology(sys->erdt);
 }

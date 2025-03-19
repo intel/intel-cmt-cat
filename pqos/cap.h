@@ -50,10 +50,26 @@ extern "C" {
  * @brief Print information about supported RDT features
  *
  * @param [in] sys PQoS system configuration struct
- *                 returned by \a pqos_sysconfig_get
+ *                 returned by a pqos_sysconfig_get
  * @param [in] verbose enable verbose mode
  */
 void cap_print_features(const struct pqos_sysconfig *sys, const int verbose);
+
+/**
+ * @brief Print information about Memory Regions from MRRM ACPI table
+ *
+ * @param [in] sys PQoS system configuration struct
+ *                 returned by a pqos_sysconfig_get
+ */
+void cap_print_mem_regions(const struct pqos_sysconfig *sys);
+
+/**
+ * @brief Print information about Processor topology from ERDT ACPI table
+ *
+ * @param [in] sys PQoS system configuration struct
+ *                 returned by a pqos_sysconfig_get
+ */
+void cap_print_topology(const struct pqos_sysconfig *sys);
 
 #ifdef __cplusplus
 }

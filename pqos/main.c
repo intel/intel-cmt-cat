@@ -137,6 +137,16 @@ static int sel_interface_selected = 0;
  */
 static int sel_print_version = 0;
 
+/**
+ * Enable displaying memory regions
+ */
+static int sel_print_mem_regions = 0;
+
+/**
+ * Enable displaying processor topology
+ */
+static int sel_print_topology = 0;
+
 static uint64_t strtouint64_base(const char *s, int default_base);
 
 /**
@@ -735,6 +745,8 @@ selfn_iface(const char *arg)
                 sel_interface = PQOS_INTER_MSR;
         else if (strcasecmp(arg, "os") == 0)
                 sel_interface = PQOS_INTER_OS;
+        else if (strcasecmp(arg, "mmio") == 0)
+                sel_interface = PQOS_INTER_MMIO;
         else {
                 parse_error(
                     arg,
@@ -755,6 +767,30 @@ selfn_print_version(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_print_version = 1;
+}
+
+/**
+ * @brief Selects displaying supported capabilities
+ *
+ * @param arg not used
+ */
+static void
+selfn_print_mem_regions(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_print_mem_regions = 1;
+}
+
+/**
+ * @brief Selects displaying available topology
+ *
+ * @param arg not used
+ */
+static void
+selfn_print_topology(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_print_topology = 1;
 }
 
 /**
@@ -1078,6 +1114,8 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_MON_UNCORE           1006
 #define OPTION_MON_DEVS             1007
 #define OPTION_MON_CHANNELS         1008
+#define OPTION_PRINT_MEM_REGIONS    1009
+#define OPTION_PRINT_TOPOLOGY       1010
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -1115,6 +1153,8 @@ static struct option long_cmd_opts[] = {
     {"rmid",                 required_argument, 0, OPTION_RMID},
     {"rmid-channels",        required_argument, 0, OPTION_RMID_CHANNELS},
 #endif
+    {"print-mem-regions",    no_argument,       0, OPTION_PRINT_MEM_REGIONS},
+    {"print-topology",       no_argument,       0, OPTION_PRINT_TOPOLOGY},
     {0, 0, 0, 0} /* end */
     /* clang-format on */
 };
@@ -1327,6 +1367,12 @@ main(int argc, char **argv)
                         selfn_monitor_rmid_channels(optarg);
                         break;
 #endif
+                case OPTION_PRINT_MEM_REGIONS:
+                        selfn_print_mem_regions(NULL);
+                        break;
+                case OPTION_PRINT_TOPOLOGY:
+                        selfn_print_topology(NULL);
+                        break;
                 default:
                         printf("Unsupported option: -%c. "
                                "See option -h for help.\n",
@@ -1340,7 +1386,7 @@ main(int argc, char **argv)
                 }
         }
 
-        if (pid_flag == 1 && sel_interface == PQOS_INTER_MSR) {
+        if (pid_flag == 1 && sel_interface != PQOS_INTER_OS) {
                 printf("Error! OS interface option [-I] needed for PID"
                        " operations. Please re-run with the -I option.\n");
                 exit_val = EXIT_FAILURE;
@@ -1478,6 +1524,16 @@ main(int argc, char **argv)
                  * Display info about supported capabilities
                  */
                 cap_print_features(p_sys, sel_display_verbose);
+                goto allocation_exit;
+        }
+
+        if (sel_print_mem_regions) {
+                cap_print_mem_regions(p_sys);
+                goto allocation_exit;
+        }
+
+        if (sel_print_topology) {
+                cap_print_topology(p_sys);
                 goto allocation_exit;
         }
 

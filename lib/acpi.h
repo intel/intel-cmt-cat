@@ -67,6 +67,8 @@ struct acpi_table {
                 struct acpi_table_rsdt *rsdt;
                 struct acpi_table_xsdt *xsdt;
                 struct acpi_table_irdt *irdt;
+                struct acpi_table_erdt *erdt;
+                struct acpi_table_mrrm *mrrm;
                 char *signature;
                 uint8_t *generic;
         };
