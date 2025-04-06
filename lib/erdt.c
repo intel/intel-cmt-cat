@@ -298,7 +298,7 @@ erdt_populate_card(struct pqos_erdt_card *p_card,
             p_acpi_card->register_indexing_function_version;
         p_card->reg_base_addr = p_acpi_card->register_base_address;
         p_card->reg_block_size = p_acpi_card->register_block_size;
-        p_card->cat_reg_offsets =
+        p_card->cat_reg_offset =
             p_acpi_card->cache_allocation_rgister_ofsets_for_io;
         p_card->cat_reg_block_size =
             p_acpi_card->cache_allocation_register_block_size;
@@ -538,7 +538,7 @@ erdt_init(const struct pqos_cap *cap,
 
         if (table == NULL) {
                 LOG_WARN("Could not obtain %s table\n", ACPI_TABLE_SIG_ERDT);
-                return PQOS_RETVAL_ERROR;
+                return PQOS_RETVAL_RESOURCE;
         }
 
         acpi_print(table);

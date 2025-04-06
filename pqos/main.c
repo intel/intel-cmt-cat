@@ -834,7 +834,7 @@ parse_config_file(const char *fname)
             {"monitor-top-like:",   selfn_monitor_top_like },  /**< -T */
             {"reset-cat:",          selfn_reset_alloc },       /**< -R */
             {"iface-os:",           selfn_iface_os },          /**< -I */
-	    {"iface:",              selfn_iface },
+            {"iface:",              selfn_iface },
             /* clang-format on */
         };
         FILE *fp = NULL;
@@ -1116,6 +1116,13 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_MON_CHANNELS         1008
 #define OPTION_PRINT_MEM_REGIONS    1009
 #define OPTION_PRINT_TOPOLOGY       1010
+#define OPTION_MON_CPU_AGENT        1011
+#define OPTION_MON_DEV_AGENT        1012
+#define OPTION_MON_MEM_REGIONS      1013
+#define OPTION_ALLOC_MEM_REGIONS    1014
+#define OPTION_ALLOC_OPT_BW         1015
+#define OPTION_ALLOC_MIN_BW         1016
+#define OPTION_ALLOC_MAX_BW         1017
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -1155,6 +1162,13 @@ static struct option long_cmd_opts[] = {
 #endif
     {"print-mem-regions",    no_argument,       0, OPTION_PRINT_MEM_REGIONS},
     {"print-topology",       no_argument,       0, OPTION_PRINT_TOPOLOGY},
+    {"mon-cpu-agents",       required_argument, 0, OPTION_MON_CPU_AGENT},
+    {"mon-dev-agents",       required_argument, 0, OPTION_MON_DEV_AGENT},
+    {"mon-mem-regions",      required_argument, 0, OPTION_MON_MEM_REGIONS},
+    {"alloc-mem-regions",    required_argument, 0, OPTION_ALLOC_MEM_REGIONS},
+    {"alloc-opt-bw",         no_argument,       0, OPTION_ALLOC_OPT_BW},
+    {"alloc-min-bw",         no_argument,       0, OPTION_ALLOC_MIN_BW},
+    {"alloc-max-bw",         no_argument,       0, OPTION_ALLOC_MAX_BW},
     {0, 0, 0, 0} /* end */
     /* clang-format on */
 };
@@ -1372,6 +1386,18 @@ main(int argc, char **argv)
                         break;
                 case OPTION_PRINT_TOPOLOGY:
                         selfn_print_topology(NULL);
+                        break;
+                case OPTION_ALLOC_MEM_REGIONS:
+                        selfn_alloc_mem_regions(optarg);
+                        break;
+                case OPTION_ALLOC_OPT_BW:
+                        selfn_alloc_opt_bw(NULL);
+                        break;
+                case OPTION_ALLOC_MIN_BW:
+                        selfn_alloc_min_bw(NULL);
+                        break;
+                case OPTION_ALLOC_MAX_BW:
+                        selfn_alloc_max_bw(NULL);
                         break;
                 default:
                         printf("Unsupported option: -%c. "

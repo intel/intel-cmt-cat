@@ -84,6 +84,12 @@ extern "C" {
 #define PQOS_RETVAL_INTER     8 /**< Interface not supported */
 #define PQOS_RETVAL_OVERFLOW  9 /**< Data overflow */
 
+#define PQOS_MAX_MEM_REGIONS      4
+#define PQOS_BW_CTRL_TYPE_COUNT   3
+#define PQOS_BW_CTRL_TYPE_OPT_IDX 0
+#define PQOS_BW_CTRL_TYPE_MIN_IDX 1
+#define PQOS_BW_CTRL_TYPE_MAX_IDX 2
+
 /*
  * =======================================
  * Interface values
@@ -465,7 +471,7 @@ struct pqos_erdt_card {
         uint8_t reg_index_func_ver;
         uint64_t reg_base_addr;
         uint32_t reg_block_size;
-        uint16_t cat_reg_offsets;
+        uint16_t cat_reg_offset;
         uint16_t cat_reg_block_size;
 };
 
@@ -1388,16 +1394,29 @@ int pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
  */
 
 /**
+ * Memory regions data structure with bandwidth control type
+ */
+struct pqos_mem_region {
+        int bw_ctrl_val[PQOS_BW_CTRL_TYPE_COUNT]; /**< Q value: 0 - 0x1FF.
+                                                     Invalid value is -1 */
+        int region_num; /**< Memory region number: 0 or 1 or 2 or 3.
+                           Invalid value is -1 */
+};
+
+/**
  * MBA class of service data structure
  */
 struct pqos_mba {
-        unsigned class_id; /**< class of service */
-        unsigned mb_max;   /**< maximum available bandwidth in percentage
-                              (without MBA controller) or in MBps
-                              (with MBA controller), depending on ctrl
-                              flag */
-        int ctrl;          /**< MBA controller flag */
-        int smba;          /**< SMBA clos */
+        unsigned class_id;   /**< class of service */
+        unsigned mb_max;     /**< maximum available bandwidth in percentage
+                                (without MBA controller) or in MBps
+                                (with MBA controller), depending on ctrl
+                                flag */
+        int ctrl;            /**< MBA controller flag */
+        int smba;            /**< SMBA clos */
+        int num_mem_regions; /**< Total regions from command line */
+        /**< Region number & BW Ctrl type */
+        struct pqos_mem_region mem_regions[PQOS_MAX_MEM_REGIONS];
 };
 
 /**

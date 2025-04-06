@@ -61,6 +61,37 @@ void selfn_allocation_class(const char *arg);
 void selfn_allocation_assoc(const char *arg);
 
 /**
+ * @brief Selects memory regions for allocation
+ *
+ * @param arg not used
+ */
+void selfn_alloc_mem_regions(const char *arg);
+
+/**
+ * @brief Selects optimal bandwidth in memory regions for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_opt_bw(const char *arg);
+
+/**
+ * @brief Selects minimum bandwidth in memory regions for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_min_bw(const char *arg);
+
+/**
+ * @brief Selects maximum bandwidth in memory regions for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_max_bw(const char *arg);
+
+/**
  * @brief Prints information about cache allocation settings in the system
  *
  * @param [in] cap_mon monitoring capability structure

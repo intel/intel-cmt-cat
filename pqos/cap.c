@@ -907,7 +907,7 @@ cap_print_device_agents_info(const struct pqos_device_agent_info *dev_agent)
         printf("        Register Block Size:                           0x%x\n",
                dev_agent->card.reg_block_size);
         printf("        CAT Register Offset:                           0x%x\n",
-               dev_agent->card.cat_reg_offsets);
+               dev_agent->card.cat_reg_offset);
         printf("        CAT Register Block Size:                       0x%x\n",
                dev_agent->card.cat_reg_block_size);
 

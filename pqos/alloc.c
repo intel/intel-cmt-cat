@@ -71,6 +71,17 @@ enum sel_alloc_type { L3CA, L2CA, MBA, MBA_CTRL, SMBA };
 static char *alloc_opts[32];
 
 /**
+ * Memory regions info for allocation
+ */
+static struct sel_alloc_mem_regions_info {
+        int opt_bw_limit_flag;
+        int min_bw_limit_flag;
+        int max_bw_limit_flag;
+        int num_mem_regions;
+        int region_num[PQOS_MAX_MEM_REGIONS];
+} sel_alloc_mem_regions;
+
+/**
  * Number of allocation options selected
  */
 static unsigned sel_alloc_opt_num = 0;
@@ -405,9 +416,11 @@ set_mba_cos(const unsigned class_id,
             const unsigned *sock_ids,
             const unsigned sock_num,
             int ctrl,
+            struct sel_alloc_mem_regions_info *mem_regions,
             const struct pqos_cpuinfo *cpu)
 {
         unsigned i, set = 0;
+        int idx = 0;
         struct pqos_mba mba, actual;
 
         if (sock_ids == NULL || available_bw == 0) {
@@ -417,9 +430,56 @@ set_mba_cos(const unsigned class_id,
 
         memset(&mba, 0, sizeof(struct pqos_mba));
         memset(&actual, 0, sizeof(struct pqos_mba));
+        /* Initialize memory regions info with invalid values */
+        memset(&mba.mem_regions[0], -1, sizeof(mba.mem_regions));
+        memset(&actual.mem_regions[0], -1, sizeof(actual.mem_regions));
+
         mba.ctrl = ctrl;
         mba.class_id = class_id;
         mba.mb_max = available_bw;
+
+        /* Copy memory regions & bandwidth control limits */
+        for (idx = 0; idx < mem_regions->num_mem_regions; idx++) {
+                mba.mem_regions[idx].region_num = mem_regions->region_num[idx];
+                /* Check optimal bandwidth limit selection */
+                if (mem_regions->opt_bw_limit_flag == 1)
+                        /* Assign provided Q value to optimal bandwidth limit */
+                        mba.mem_regions[idx]
+                            .bw_ctrl_val[PQOS_BW_CTRL_TYPE_OPT_IDX] =
+                            available_bw;
+                /* Check minimum bandwidth limit selection */
+                if (mem_regions->min_bw_limit_flag == 1)
+                        /* Assign provided Q value to minimum bandwidth limit */
+                        mba.mem_regions[idx]
+                            .bw_ctrl_val[PQOS_BW_CTRL_TYPE_MIN_IDX] =
+                            available_bw;
+                /* Check maximum bandwidth limit selection */
+                if (mem_regions->max_bw_limit_flag == 1)
+                        /* Assign provided Q value to maximum bandwidth limit */
+                        mba.mem_regions[idx]
+                            .bw_ctrl_val[PQOS_BW_CTRL_TYPE_MAX_IDX] =
+                            available_bw;
+
+                /**
+                 * Assign provided Q value to all bandwidth limits,
+                 * if no specific bandwidth limit selection
+                 */
+                if (mem_regions->opt_bw_limit_flag == 0 &&
+                    mem_regions->min_bw_limit_flag == 0 &&
+                    mem_regions->max_bw_limit_flag == 0) {
+                        mba.mem_regions[idx]
+                            .bw_ctrl_val[PQOS_BW_CTRL_TYPE_OPT_IDX] =
+                            available_bw;
+                        mba.mem_regions[idx]
+                            .bw_ctrl_val[PQOS_BW_CTRL_TYPE_MIN_IDX] =
+                            available_bw;
+                        mba.mem_regions[idx]
+                            .bw_ctrl_val[PQOS_BW_CTRL_TYPE_MAX_IDX] =
+                            available_bw;
+                }
+        }
+        /* Copy memory regions count */
+        mba.num_mem_regions = mem_regions->num_mem_regions;
 
         /**
          * Set all selected classes
@@ -554,6 +614,7 @@ set_allocation_cos(char *str,
                    unsigned *res_ids,
                    const unsigned res_num,
                    const enum sel_alloc_type type,
+                   struct sel_alloc_mem_regions_info *mem_regions,
                    const struct pqos_cpuinfo *cpu)
 {
         char *p = NULL;
@@ -582,7 +643,8 @@ set_allocation_cos(char *str,
                         printf("Failed to retrieve socket info!\n");
                         return -1;
                 }
-                ret = set_mba_cos(class_id, mask, ids, n, ctrl, cpu);
+                ret =
+                    set_mba_cos(class_id, mask, ids, n, ctrl, mem_regions, cpu);
                 if (res_ids == NULL && ids != NULL)
                         free(ids);
                 return ret;
@@ -643,7 +705,9 @@ set_allocation_cos(char *str,
  * @retval Negative on error
  */
 static int
-set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
+set_allocation_class(char *str,
+                     struct sel_alloc_mem_regions_info *mem_regions,
+                     const struct pqos_cpuinfo *cpu)
 {
         int ret = -1;
         char *q = NULL, *p = NULL;
@@ -717,7 +781,7 @@ set_allocation_class(char *str, const struct pqos_cpuinfo *cpu)
                 token = strtok_r(p, ",", &saveptr);
                 if (token == NULL)
                         break;
-                ret = set_allocation_cos(token, sp, n, type, cpu);
+                ret = set_allocation_cos(token, sp, n, type, mem_regions, cpu);
                 if (ret <= 0)
                         break;
         }
@@ -745,7 +809,8 @@ set_alloc(const struct pqos_cpuinfo *cpu)
 
         /* for each alloc option set selected class definitions */
         for (i = 0; i < sel_alloc_opt_num; i++) {
-                ret = set_allocation_class(alloc_opts[i], cpu);
+                ret = set_allocation_class(alloc_opts[i],
+                                           &sel_alloc_mem_regions, cpu);
                 if (ret <= 0)
                         break;
         }
@@ -1879,6 +1944,124 @@ alloc_print_config(const struct pqos_capability *cap_mon,
 free_and_return:
         if (sockets)
                 free(sockets);
+}
+
+/**
+ * @brief Verifies and translates monitoring config string into
+ *        internal channel monitoring configuration.
+ *
+ * @param str single channel string passed to --mon-channel command line option
+ */
+static void
+parse_alloc_mem_regions(char *str)
+{
+        static int idx = 0;
+        unsigned int mem_region;
+        int i = 0;
+
+        mem_region = strtouint64(str);
+        if (mem_region < PQOS_MAX_MEM_REGIONS) {
+                /* Check duplicate memry region entry */
+                for (i = 0; i < sel_alloc_mem_regions.num_mem_regions; i++) {
+                        if (mem_region ==
+                            (unsigned int)sel_alloc_mem_regions.region_num[i]) {
+                                parse_error(
+                                    str, "Duplicate memory region selection");
+                                printf("The memory region %d "
+                                       "is entered 2 times\n",
+                                       mem_region);
+                                exit(EXIT_FAILURE);
+                        }
+                }
+                sel_alloc_mem_regions.region_num[idx] = mem_region;
+                idx++;
+                sel_alloc_mem_regions.num_mem_regions++;
+        } else {
+                parse_error(str, "Wrong memory region selection");
+                exit(EXIT_FAILURE);
+        }
+
+        return;
+}
+
+/**
+ * @brief Selects memory regions for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_mem_regions(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+        char *saveptr = NULL;
+        unsigned int idx = 0;
+        unsigned int i = 0;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&cp, arg);
+
+        sel_alloc_mem_regions.num_mem_regions = 0;
+        for (idx = 0; idx < PQOS_MAX_MEM_REGIONS; idx++)
+                sel_alloc_mem_regions.region_num[idx] = -1;
+
+        for (idx = 0, str = cp;; str = NULL, idx++) {
+                char *token = NULL;
+
+                token = strtok_r(str, ",", &saveptr);
+                if (token == NULL)
+                        break;
+                if (idx >= PQOS_MAX_MEM_REGIONS) {
+                        parse_error(token, "Wrong memory region selection");
+                        printf("Available Memory Regions: ");
+                        for (i = 0; i < PQOS_MAX_MEM_REGIONS; i++)
+                                printf("%d ", idx);
+                        exit(EXIT_FAILURE);
+                }
+                parse_alloc_mem_regions(token);
+        }
+
+        free(cp);
+}
+
+/**
+ * @brief Selects optimal bandwidth in memory regions for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_opt_bw(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_alloc_mem_regions.opt_bw_limit_flag = 1;
+}
+
+/**
+ * @brief Selects minimum bandwidth in memory regions for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_min_bw(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_alloc_mem_regions.min_bw_limit_flag = 1;
+}
+
+/**
+ * @brief Selects maximum bandwidth in memory regions for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_max_bw(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_alloc_mem_regions.max_bw_limit_flag = 1;
 }
 
 int

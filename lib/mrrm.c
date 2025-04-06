@@ -170,9 +170,7 @@ mrrm_init(const struct pqos_cap *cap, struct pqos_mrrm_info **mrrm_info)
         }
 
         acpi_print(table);
-
         ret = mrrm_populate(mrrm_info, table->mrrm);
-
         acpi_free(table);
 
         return ret;
