@@ -80,6 +80,7 @@
     "socks": ">=2.8.3",
     "webpack": ">=5.94.0",
     "micromatch": ">=4.0.8",
-    "esbuild": ">=0.25.0"
+    "esbuild": ">=0.25.0",
+    "@babel/runtime": ">7.26.0"
   }
 }
