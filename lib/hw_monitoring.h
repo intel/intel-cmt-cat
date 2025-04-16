@@ -216,6 +216,7 @@ PQOS_LOCAL int hw_mon_start_cores(const unsigned num_cores,
                                   const unsigned *cores,
                                   const enum pqos_mon_event event,
                                   void *context,
+                                  struct pqos_mon_mem_region *mem_region,
                                   struct pqos_mon_data *group,
                                   const struct pqos_mon_options *opt);
 

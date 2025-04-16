@@ -1219,6 +1219,7 @@ hw_mon_start_cores(const unsigned num_cores,
                    const unsigned *cores,
                    const enum pqos_mon_event event,
                    void *context,
+                   struct pqos_mon_mem_region *mem_region,
                    struct pqos_mon_data *group,
                    const struct pqos_mon_options *opt)
 {
@@ -1234,6 +1235,8 @@ hw_mon_start_cores(const unsigned num_cores,
         ASSERT(cores != NULL);
         ASSERT(num_cores > 0);
         ASSERT(event > 0);
+
+        UNUSED_PARAM(mem_region);
 
         if (num_cores == 0)
                 return PQOS_RETVAL_PARAM;

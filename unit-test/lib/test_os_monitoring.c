@@ -289,8 +289,8 @@ test_os_mon_start_cores_param(void **state)
                 unsigned cores[] = {1};
                 enum pqos_mon_event event = 0xDEAD;
 
-                ret = os_mon_start_cores(num_cores, cores, event, NULL, &group,
-                                         NULL);
+                ret = os_mon_start_cores(num_cores, cores, event, NULL, NULL,
+                                         &group, NULL);
                 assert_int_equal(ret, PQOS_RETVAL_PARAM);
         }
 
@@ -300,8 +300,8 @@ test_os_mon_start_cores_param(void **state)
                 unsigned cores[] = {1024};
                 enum pqos_mon_event event = PQOS_MON_EVENT_L3_OCCUP;
 
-                ret = os_mon_start_cores(num_cores, cores, event, NULL, &group,
-                                         NULL);
+                ret = os_mon_start_cores(num_cores, cores, event, NULL, NULL,
+                                         &group, NULL);
                 assert_int_equal(ret, PQOS_RETVAL_PARAM);
         }
 }
@@ -327,7 +327,8 @@ test_os_mon_start_cores_already_started(void **state)
         expect_value(__wrap_resctrl_mon_assoc_get, lcore, cores[0]);
         will_return(__wrap_resctrl_mon_assoc_get, PQOS_RETVAL_OK);
 
-        ret = os_mon_start_cores(num_cores, cores, event, NULL, &group, NULL);
+        ret = os_mon_start_cores(num_cores, cores, event, NULL, NULL, &group,
+                                 NULL);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
@@ -354,7 +355,8 @@ test_os_mon_start_cores(void **state)
         expect_value(os_mon_start_events, group, &group);
         will_return(os_mon_start_events, PQOS_RETVAL_OK);
 
-        ret = os_mon_start_cores(num_cores, cores, event, NULL, &group, NULL);
+        ret = os_mon_start_cores(num_cores, cores, event, NULL, NULL, &group,
+                                 NULL);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(group.num_cores, num_cores);
         assert_int_equal(group.event, event);
@@ -369,7 +371,8 @@ test_os_mon_start_cores(void **state)
         expect_value(os_mon_start_events, group, &group);
         will_return(os_mon_start_events, PQOS_RETVAL_ERROR);
 
-        ret = os_mon_start_cores(num_cores, cores, event, NULL, &group, NULL);
+        ret = os_mon_start_cores(num_cores, cores, event, NULL, NULL, &group,
+                                 NULL);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
         assert_null(group.cores);
 }

@@ -50,8 +50,12 @@ void monitor_xml_begin(FILE * fp);
  *
  * @param fp file descriptor
  * @param [in] timestamp data timestamp
+ * @param [in] data monitoring data
  */
-void monitor_xml_header(FILE *fp, const char *timestamp);
+void monitor_xml_header(FILE *fp,
+                        const char *timestamp,
+                        const int num_mem_regions,
+                        const int *region_num);
 
 /**
  * @brief Print monitoring data in xml format

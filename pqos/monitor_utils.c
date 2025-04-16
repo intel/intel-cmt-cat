@@ -169,6 +169,65 @@ monitor_utils_get_value(const struct pqos_mon_data *const group,
         return value;
 }
 
+double
+monitor_utils_get_region_value(const struct pqos_mon_data *const group,
+                               const enum pqos_mon_event event,
+                               int region_num)
+{
+        int ret;
+        uint64_t delta;
+        double value;
+
+        /** Coefficient to display the data as MB/s */
+        const double coeff = 10.0 / (double)monitor_get_interval();
+
+        if ((group->event & event) == 0)
+                return 0.0;
+
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                ret = pqos_mon_get_region_value(group, event, region_num,
+                                                &delta, NULL);
+                if (ret == PQOS_RETVAL_OK) {
+                        enum monitor_llc_format format =
+                            monitor_get_llc_format();
+                        unsigned cache_total;
+
+                        ret = monitor_utils_get_cache_size(&cache_total);
+                        if (ret != PQOS_RETVAL_OK)
+                                break;
+
+                        switch (format) {
+                        case LLC_FORMAT_KILOBYTES:
+                                value = bytes_to_kb(delta);
+                                break;
+                        case LLC_FORMAT_PERCENT:
+                                value = delta * 100 / cache_total;
+                                break;
+                        default:
+                                printf("Incorrect llc_format: %i\n", format);
+                                ret = PQOS_RETVAL_PARAM;
+                        }
+                }
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
+        case PQOS_MON_EVENT_TMEM_BW:
+        case PQOS_MON_EVENT_RMEM_BW:
+                ret = pqos_mon_get_region_value(group, event, region_num, NULL,
+                                                &delta);
+                if (ret == PQOS_RETVAL_OK)
+                        value = bytes_to_mb(delta) * coeff;
+                break;
+        default:
+                ret = PQOS_RETVAL_PARAM;
+        }
+
+        if (ret != PQOS_RETVAL_OK)
+                return 0;
+
+        return value;
+}
+
 int
 monitor_utils_get_cache_size(unsigned *p_cache_size)
 {

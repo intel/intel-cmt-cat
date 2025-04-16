@@ -267,7 +267,7 @@ setup_monitoring(const struct pqos_cpuinfo *cpu_info,
                         int ret;
 
                         ret = pqos_mon_start_cores(1, &lcore, sel_events_max,
-                                                   NULL, &m_mon_grps[i]);
+                                                   NULL, NULL, &m_mon_grps[i]);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Monitoring start error on core %u,"
                                        "status %d\n",

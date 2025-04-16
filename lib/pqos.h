@@ -732,6 +732,30 @@ struct pqos_event_values {
         uint64_t llc_references_delta; /**< LLC references - delta */
 };
 
+/**
+ * The structure to store region aware monitoring data for all of the events
+ */
+struct pqos_region_aware_event_values {
+        uint64_t mbm_local[PQOS_MAX_MEM_REGIONS];
+        uint64_t mbm_local_delta[PQOS_MAX_MEM_REGIONS];
+        uint64_t mbm_remote;
+        uint64_t mbm_remote_delta;
+        uint64_t mbm_total;
+        uint64_t mbm_total_delta;
+        uint64_t llc;
+};
+
+/**
+ * Memory Regions information data structure
+ */
+struct pqos_mon_mem_region {
+        /**
+         * Region Aware MBM specific section
+         */
+        int region_num[PQOS_MAX_MEM_REGIONS];
+        int num_mem_regions;
+};
+
 struct pqos_mon_data_internal;
 
 /**
@@ -768,6 +792,11 @@ struct pqos_mon_data {
         unsigned num_channels;    /**< number of channels in the group */
 
         struct pqos_mon_data_internal *intl; /**< internal data */
+        /**
+         * RMID events' values for memory regions
+         */
+        struct pqos_region_aware_event_values region_values;
+        struct pqos_mon_mem_region regions; /**< memory regions information */
 };
 
 /**
@@ -898,6 +927,7 @@ int pqos_mon_start_cores(const unsigned num_cores,
                          const unsigned *cores,
                          const enum pqos_mon_event event,
                          void *context,
+                         struct pqos_mon_mem_region *mem_region,
                          struct pqos_mon_data **group);
 
 /**
@@ -1396,7 +1426,7 @@ int pqos_l2ca_get_min_cbm_bits(unsigned *min_cbm_bits);
 /**
  * Memory regions data structure with bandwidth control type
  */
-struct pqos_mem_region {
+struct pqos_mba_mem_region {
         int bw_ctrl_val[PQOS_BW_CTRL_TYPE_COUNT]; /**< Q value: 0 - 0x1FF.
                                                      Invalid value is -1 */
         int region_num; /**< Memory region number: 0 or 1 or 2 or 3.
@@ -1416,7 +1446,7 @@ struct pqos_mba {
         int smba;            /**< SMBA clos */
         int num_mem_regions; /**< Total regions from command line */
         /**< Region number & BW Ctrl type */
-        struct pqos_mem_region mem_regions[PQOS_MAX_MEM_REGIONS];
+        struct pqos_mba_mem_region mem_regions[PQOS_MAX_MEM_REGIONS];
 };
 
 /**
@@ -1985,6 +2015,27 @@ int pqos_mon_get_value(const struct pqos_mon_data *const group,
                        const enum pqos_mon_event event_id,
                        uint64_t *value,
                        uint64_t *delta);
+
+/*
+ * @brief Retrieves a memory region monitoring value from a group
+ * for a specific event.
+ *
+ * @note Update event values using \a pqos_mon_poll
+ *
+ * @param [in] group monitoring group
+ * @param [in] event_id event being monitored
+ * @param [in] region_num memory region being monitored
+ * @param [out] value memory region monitoring counter value
+ * @param [out] delta memory region monitoring counter delta
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_mon_get_region_value(const struct pqos_mon_data *const group,
+                              const enum pqos_mon_event event_id,
+                              int region_num,
+                              uint64_t *value,
+                              uint64_t *delta);
 
 /*
  * @brief Retrieves a IPC value from a monitoring group.

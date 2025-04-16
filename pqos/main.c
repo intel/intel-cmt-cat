@@ -1116,13 +1116,11 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_MON_CHANNELS         1008
 #define OPTION_PRINT_MEM_REGIONS    1009
 #define OPTION_PRINT_TOPOLOGY       1010
-#define OPTION_MON_CPU_AGENT        1011
-#define OPTION_MON_DEV_AGENT        1012
-#define OPTION_MON_MEM_REGIONS      1013
-#define OPTION_ALLOC_MEM_REGIONS    1014
-#define OPTION_ALLOC_OPT_BW         1015
-#define OPTION_ALLOC_MIN_BW         1016
-#define OPTION_ALLOC_MAX_BW         1017
+#define OPTION_MON_MEM_REGIONS      1011
+#define OPTION_ALLOC_MEM_REGIONS    1012
+#define OPTION_ALLOC_OPT_BW         1013
+#define OPTION_ALLOC_MIN_BW         1014
+#define OPTION_ALLOC_MAX_BW         1015
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -1162,8 +1160,6 @@ static struct option long_cmd_opts[] = {
 #endif
     {"print-mem-regions",    no_argument,       0, OPTION_PRINT_MEM_REGIONS},
     {"print-topology",       no_argument,       0, OPTION_PRINT_TOPOLOGY},
-    {"mon-cpu-agents",       required_argument, 0, OPTION_MON_CPU_AGENT},
-    {"mon-dev-agents",       required_argument, 0, OPTION_MON_DEV_AGENT},
     {"mon-mem-regions",      required_argument, 0, OPTION_MON_MEM_REGIONS},
     {"alloc-mem-regions",    required_argument, 0, OPTION_ALLOC_MEM_REGIONS},
     {"alloc-opt-bw",         no_argument,       0, OPTION_ALLOC_OPT_BW},
@@ -1372,6 +1368,9 @@ main(int argc, char **argv)
                         break;
                 case OPTION_MON_CHANNELS:
                         selfn_monitor_channels(optarg);
+                        break;
+                case OPTION_MON_MEM_REGIONS:
+                        selfn_mon_mem_regions(optarg);
                         break;
 #ifdef PQOS_RMID_CUSTOM
                 case OPTION_RMID:

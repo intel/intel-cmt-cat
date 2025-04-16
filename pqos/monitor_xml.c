@@ -53,10 +53,15 @@ monitor_xml_begin(FILE *fp)
 }
 
 void
-monitor_xml_header(FILE *fp, const char *timestamp)
+monitor_xml_header(FILE *fp,
+                   const char *timestamp,
+                   const int num_mem_regions,
+                   const int *region_num)
 {
         UNUSED_ARG(fp);
         UNUSED_ARG(timestamp);
+        UNUSED_ARG(num_mem_regions);
+        UNUSED_ARG(region_num);
 }
 
 /**

@@ -69,6 +69,7 @@ static struct pqos_api {
                                const unsigned *cores,
                                const enum pqos_mon_event event,
                                void *context,
+                               struct pqos_mon_mem_region *mem_region,
                                struct pqos_mon_data *group,
                                const struct pqos_mon_options *opt);
         /** Starts resource monitoring of selected pids */
@@ -936,7 +937,7 @@ pqos_mon_start(const unsigned num_cores,
         memset(&opt, 0, sizeof(opt));
         if (api.mon_start_cores != NULL)
                 ret = api.mon_start_cores(num_cores, cores, event, context,
-                                          group, &opt);
+                                          NULL, group, &opt);
         else {
                 LOG_INFO(UNSUPPORTED_INTERFACE);
                 ret = PQOS_RETVAL_RESOURCE;
@@ -957,14 +958,15 @@ pqos_mon_start_cores(const unsigned num_cores,
                      const unsigned *cores,
                      const enum pqos_mon_event event,
                      void *context,
+                     struct pqos_mon_mem_region *mem_region,
                      struct pqos_mon_data **group)
 {
         struct pqos_mon_options opt;
 
         memset(&opt, 0, sizeof(opt));
 
-        return pqos_mon_start_cores_ext(num_cores, cores, event, context, group,
-                                        &opt);
+        return pqos_mon_start_cores_ext(num_cores, cores, event, context,
+                                        mem_region, group, &opt);
 }
 
 int
@@ -972,6 +974,7 @@ pqos_mon_start_cores_ext(const unsigned num_cores,
                          const unsigned *cores,
                          const enum pqos_mon_event event,
                          void *context,
+                         struct pqos_mon_mem_region *mem_region,
                          struct pqos_mon_data **group,
                          const struct pqos_mon_options *opt)
 {
@@ -1008,8 +1011,8 @@ pqos_mon_start_cores_ext(const unsigned num_cores,
         data->intl = (struct pqos_mon_data_internal *)(&data[1]);
         data->intl->manage_memory = 1;
 
-        ret = API_CALL(mon_start_cores, num_cores, cores, event, context, data,
-                       opt);
+        ret = API_CALL(mon_start_cores, num_cores, cores, event, context,
+                       mem_region, data, opt);
 
         if (ret == PQOS_RETVAL_OK) {
                 data->valid = GROUP_VALID_MARKER;
@@ -1486,6 +1489,71 @@ pqos_mon_get_value(const struct pqos_mon_data *const group,
         case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
                 _value = group->intl->values.pcie.llc_references.write;
                 _delta = group->intl->values.pcie.llc_references.write_delta;
+                break;
+        default:
+                LOG_ERROR("Unknown event %x\n", event_id);
+                ret = PQOS_RETVAL_PARAM;
+        }
+
+        if (ret == PQOS_RETVAL_OK) {
+                if (value != NULL)
+                        *value = _value;
+                if (delta != NULL)
+                        *delta = _delta;
+        }
+
+        lock_release();
+
+        return ret;
+}
+
+int
+pqos_mon_get_region_value(const struct pqos_mon_data *const group,
+                          const enum pqos_mon_event event_id,
+                          int region_num,
+                          uint64_t *value,
+                          uint64_t *delta)
+{
+        int ret;
+        uint64_t _value;
+        uint64_t _delta;
+
+        if (group == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        if (group->valid != GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
+        if ((group->event & event_id) == 0)
+                return PQOS_RETVAL_PARAM;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        switch (event_id) {
+        case PQOS_MON_EVENT_L3_OCCUP:
+                if (delta != NULL)
+                        LOG_WARN("Counter delta is undefined for "
+                                 "PQOS_MON_EVENT_L3_OCCUP\n");
+                _value = group->region_values.llc;
+                _delta = 0;
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
+                _value = group->region_values.mbm_local[region_num];
+                _delta = group->region_values.mbm_local_delta[region_num];
+                break;
+        case PQOS_MON_EVENT_TMEM_BW:
+                _value = group->region_values.mbm_total;
+                _delta = group->region_values.mbm_total_delta;
+                break;
+        case PQOS_MON_EVENT_RMEM_BW:
+                _value = group->region_values.mbm_remote;
+                _delta = group->region_values.mbm_remote_delta;
                 break;
         default:
                 LOG_ERROR("Unknown event %x\n", event_id);

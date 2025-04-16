@@ -74,6 +74,19 @@ double monitor_utils_get_value(const struct pqos_mon_data *const data,
                                const enum pqos_mon_event event);
 
 /**
+ * @brief Get memory region monitoring value to be displayed for the event
+ *
+ * @param data monitoring data
+ * @param event monitoring event ID
+ * @param region_num memory region number to be monitoring
+ *
+ * @return value to be displayed
+ */
+double monitor_utils_get_region_value(const struct pqos_mon_data *const data,
+                                      const enum pqos_mon_event event,
+                                      int region_num);
+
+/**
  * @brief Gets total l3 cache value
  *
  * @param[in] p_cache_size pointer to cache-size value to be filled.

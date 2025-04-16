@@ -164,6 +164,13 @@ void selfn_monitor_rmid_channels(const char *arg);
 #endif
 
 /**
+ * @brief Selects memory regions for monitoring
+ *
+ * @param arg not used
+ */
+void selfn_mon_mem_regions(const char *arg);
+
+/**
  * @brief Check to determine if processes are monitored
  *
  * @return Process monitoring mode status

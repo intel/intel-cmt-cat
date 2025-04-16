@@ -93,7 +93,7 @@ mba_sc_mon_start(const cpu_set_t cpumask, struct pqos_mon_data **group)
         }
 
         ret = pqos_mon_start_cores(num_cores, cores, PQOS_MON_EVENT_LMEM_BW,
-                                   NULL, group);
+                                   NULL, NULL, group);
         if (ret != PQOS_RETVAL_OK)
                 ret = -EFAULT;
 

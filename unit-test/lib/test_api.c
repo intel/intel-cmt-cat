@@ -1852,6 +1852,7 @@ test_pqos_mon_start_os(void **state __attribute__((unused)))
         unsigned cores[] = {1};
         enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
         void *context = NULL;
+        struct pqos_mon_mem_region *mem_regions = NULL;
         struct pqos_mon_data *group = NULL;
 
         wrap_check_init(1, PQOS_RETVAL_OK);
@@ -1860,9 +1861,11 @@ test_pqos_mon_start_os(void **state __attribute__((unused)))
         expect_value(__wrap_os_mon_start_cores, cores, cores);
         expect_value(__wrap_os_mon_start_cores, event, event);
         expect_value(__wrap_os_mon_start_cores, context, context);
+        expect_value(__wrap_os_mon_start_cores, mem_regions, mem_regions);
         will_return(__wrap_os_mon_start_cores, PQOS_RETVAL_OK);
 
-        ret = pqos_mon_start_cores(num_cores, cores, event, context, &group);
+        ret = pqos_mon_start_cores(num_cores, cores, event, context,
+                                   mem_regions, &group);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (group != NULL)
@@ -1877,6 +1880,7 @@ test_pqos_mon_start_hw(void **state __attribute__((unused)))
         unsigned cores[] = {1};
         enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
         void *context = NULL;
+        struct pqos_mon_mem_region *mem_regions = NULL;
         struct pqos_mon_data *group = NULL;
 
         wrap_check_init(1, PQOS_RETVAL_OK);
@@ -1885,9 +1889,11 @@ test_pqos_mon_start_hw(void **state __attribute__((unused)))
         expect_value(__wrap_hw_mon_start_cores, cores, cores);
         expect_value(__wrap_hw_mon_start_cores, event, event);
         expect_value(__wrap_hw_mon_start_cores, context, context);
+        expect_value(__wrap_hw_mon_start_cores, mem_regions, mem_regions);
         will_return(__wrap_hw_mon_start_cores, PQOS_RETVAL_OK);
 
-        ret = pqos_mon_start_cores(num_cores, cores, event, context, &group);
+        ret = pqos_mon_start_cores(num_cores, cores, event, context,
+                                   mem_regions, &group);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (group != NULL)
@@ -1951,11 +1957,13 @@ test_pqos_mon_start_cores_init(void **state __attribute__((unused)))
         unsigned cores[] = {1};
         enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
         void *context = NULL;
+        struct pqos_mon_mem_region *mem_regions = NULL;
         struct pqos_mon_data *group;
 
         wrap_check_init(1, PQOS_RETVAL_INIT);
 
-        ret = pqos_mon_start_cores(num_cores, cores, event, context, &group);
+        ret = pqos_mon_start_cores(num_cores, cores, event, context,
+                                   mem_regions, &group);
         assert_int_equal(ret, PQOS_RETVAL_INIT);
 }
 
@@ -1967,34 +1975,39 @@ test_pqos_mon_start_cores_param(void **state __attribute__((unused)))
         unsigned cores[] = {1};
         enum pqos_mon_event event = PQOS_MON_EVENT_LMEM_BW;
         void *context = NULL;
+        struct pqos_mon_mem_region *mem_regions = NULL;
         struct pqos_mon_data *group;
 
-        ret = pqos_mon_start_cores(num_cores, cores, event, context, NULL);
+        ret = pqos_mon_start_cores(num_cores, cores, event, context,
+                                   mem_regions, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
-        ret = pqos_mon_start_cores(num_cores, NULL, event, context, &group);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        ret = pqos_mon_start_cores(0, cores, event, context, &group);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        ret = pqos_mon_start_cores(num_cores, cores, 0, context, &group);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
-
-        ret = pqos_mon_start_cores(num_cores, cores, (uint32_t)-1, context,
+        ret = pqos_mon_start_cores(num_cores, NULL, event, context, mem_regions,
                                    &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
+        ret =
+            pqos_mon_start_cores(0, cores, event, context, mem_regions, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, cores, 0, context, mem_regions,
+                                   &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        ret = pqos_mon_start_cores(num_cores, cores, (uint32_t)-1, context,
+                                   mem_regions, &group);
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
         ret = pqos_mon_start_cores(num_cores, cores, PQOS_PERF_EVENT_IPC,
-                                   context, &group);
+                                   context, mem_regions, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
         ret = pqos_mon_start_cores(num_cores, cores, PQOS_PERF_EVENT_LLC_MISS,
-                                   context, &group);
+                                   context, mem_regions, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
         ret = pqos_mon_start_cores(num_cores, cores, PQOS_PERF_EVENT_LLC_REF,
-                                   context, &group);
+                                   context, mem_regions, &group);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 

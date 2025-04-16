@@ -71,6 +71,7 @@ __wrap_hw_mon_start_cores(const unsigned num_cores,
                           const unsigned *cores,
                           const enum pqos_mon_event event,
                           void *context,
+                          struct pqos_mon_mem_region *mem_regions,
                           struct pqos_mon_data *group,
                           const struct pqos_mon_options *opt)
 {
@@ -78,6 +79,7 @@ __wrap_hw_mon_start_cores(const unsigned num_cores,
         check_expected_ptr(cores);
         check_expected(event);
         check_expected_ptr(context);
+        check_expected_ptr(mem_regions);
         assert_non_null(group);
         assert_non_null(opt);
 

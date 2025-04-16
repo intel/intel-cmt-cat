@@ -441,19 +441,22 @@ test_hw_mon_start_param(void **state)
         memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
 
         /* Invalid event */
-        ret = hw_mon_start_cores(num_cores, cores, 0xDEAD, NULL, &group, &opt);
+        ret = hw_mon_start_cores(num_cores, cores, 0xDEAD, NULL, NULL, &group,
+                                 &opt);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
         /* Core already monitored */
         expect_value(hw_mon_assoc_read, lcore, cores[0]);
         will_return(hw_mon_assoc_read, 1);
         will_return(hw_mon_assoc_read, PQOS_RETVAL_OK);
-        ret = hw_mon_start_cores(num_cores, cores, event, NULL, &group, &opt);
+        ret = hw_mon_start_cores(num_cores, cores, event, NULL, NULL, &group,
+                                 &opt);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
         /* Invalid core */
         cores[0] = 1000000;
-        ret = hw_mon_start_cores(num_cores, cores, 0xDEAD, NULL, &group, &opt);
+        ret = hw_mon_start_cores(num_cores, cores, 0xDEAD, NULL, NULL, &group,
+                                 &opt);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
 
@@ -490,7 +493,8 @@ test_hw_mon_start_mbm(void **state)
         expect_value(hw_mon_start_counter, event, event);
         will_return(hw_mon_start_counter, PQOS_RETVAL_OK);
 
-        ret = hw_mon_start_cores(num_cores, cores, event, NULL, &group, &opt);
+        ret = hw_mon_start_cores(num_cores, cores, event, NULL, NULL, &group,
+                                 &opt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(group.num_cores, num_cores);
 
@@ -544,7 +548,8 @@ test_hw_mon_start_perf(void **state)
                          PQOS_PERF_EVENT_INSTRUCTIONS);
         will_return(hw_mon_start_perf, PQOS_RETVAL_OK);
 
-        ret = hw_mon_start_cores(num_cores, cores, event, NULL, &group, &opt);
+        ret = hw_mon_start_cores(num_cores, cores, event, NULL, NULL, &group,
+                                 &opt);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(group.num_cores, num_cores);
 

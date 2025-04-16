@@ -79,7 +79,7 @@ monitor_csv_begin(FILE *fp)
                         fprintf(fp, ",LLC[%%]");
         }
         if (events & PQOS_MON_EVENT_LMEM_BW)
-                fprintf(fp, ",MBL[MB/s]");
+                fprintf(fp, "   MBL[MB/s]");
         if (events & PQOS_MON_EVENT_RMEM_BW)
                 fprintf(fp, ",MBR[MB/s]");
         if (events & PQOS_MON_EVENT_TMEM_BW)
@@ -98,10 +98,15 @@ monitor_csv_begin(FILE *fp)
 }
 
 void
-monitor_csv_header(FILE *fp, const char *timestamp)
+monitor_csv_header(FILE *fp,
+                   const char *timestamp,
+                   const int num_mem_regions,
+                   const int *region_num)
 {
         UNUSED_ARG(fp);
         UNUSED_ARG(timestamp);
+        UNUSED_ARG(num_mem_regions);
+        UNUSED_ARG(region_num);
 }
 
 /**

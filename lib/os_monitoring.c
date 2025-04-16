@@ -379,6 +379,7 @@ os_mon_start_cores(const unsigned num_cores,
                    const unsigned *cores,
                    const enum pqos_mon_event event,
                    void *context,
+                   struct pqos_mon_mem_region *mem_region,
                    struct pqos_mon_data *group,
                    const struct pqos_mon_options *opt)
 {
@@ -392,6 +393,7 @@ os_mon_start_cores(const unsigned num_cores,
         ASSERT(event > 0);
 
         UNUSED_PARAM(opt);
+        UNUSED_PARAM(mem_region);
 
         /* Validate if event is listed in capabilities */
         ret = os_mon_validate_event(event);

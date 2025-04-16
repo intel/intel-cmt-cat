@@ -50,8 +50,12 @@ void monitor_csv_begin(FILE * fp);
  *
  * @param fp file descriptor
  * @param [in] timestamp data timestamp
+ * @param [in] data monitoring data
  */
-void monitor_csv_header(FILE *fp, const char *timestamp);
+void monitor_csv_header(FILE *fp,
+                        const char *timestamp,
+                        const int num_mem_regions,
+                        const int *region_num);
 
 /**
  * @brief Print monitoring data in CSV format

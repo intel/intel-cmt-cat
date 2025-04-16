@@ -50,8 +50,12 @@ void monitor_text_begin(FILE * fp);
  *
  * @param fp file descriptor
  * @param [in] timestamp data timestamp
+ * @param [in] mem_region memory regions information
  */
-void monitor_text_header(FILE *fp, const char *timestamp);
+void monitor_text_header(FILE *fp,
+                         const char *timestamp,
+                         const int num_mem_regions,
+                         const int *region_num);
 
 /**
  * @brief Print monitoring data in text format
@@ -63,6 +67,17 @@ void monitor_text_header(FILE *fp, const char *timestamp);
 void monitor_text_row(FILE *fp,
                       const char *timestamp,
                       const struct pqos_mon_data *data);
+
+/**
+ * @brief Print region monitoring data in text format
+ *
+ * @param fp file descriptor
+ * @param [in] timestamp data timestamp
+ * @param [in] data monitoring data
+ */
+void monitor_text_region_row(FILE *fp,
+                             const char *timestamp,
+                             const struct pqos_mon_data *data);
 
 /**
  * @brief Print text footer

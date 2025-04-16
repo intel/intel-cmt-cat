@@ -156,7 +156,16 @@ static struct mon_group {
 #ifdef PQOS_RMID_CUSTOM
         struct pqos_mon_options opt;
 #endif
+        struct pqos_mon_mem_region mem_region;
 } *sel_monitor_group = NULL;
+
+/**
+ * Memory regions info for allocation
+ */
+static struct sel_mon_mem_regions_info {
+        int num_mem_regions;
+        int region_num[PQOS_MAX_MEM_REGIONS];
+} sel_mon_mem_region;
 
 /**
  * Maintains the number of monitoring groups
@@ -1323,9 +1332,16 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
 {
         unsigned i;
         int ret = PQOS_RETVAL_OK;
+        enum pqos_interface interface;
 
         ASSERT(cpu_info != NULL);
         ASSERT(cap_mon != NULL);
+
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("Unable to retrieve PQoS interface!\n");
+                return -1;
+        }
 
         /**
          * Check output file type
@@ -1409,6 +1425,29 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 return -1;
         }
 
+        if (interface == PQOS_INTER_MMIO) {
+                int j;
+                /* All memory regions are selected, if none is specified
+                 * in command line
+                 */
+                if (sel_mon_mem_region.num_mem_regions == 0) {
+                        sel_mon_mem_region.num_mem_regions =
+                            PQOS_MAX_MEM_REGIONS;
+                        for (i = 0; i < PQOS_MAX_MEM_REGIONS; i++)
+                                sel_mon_mem_region.region_num[i] = i;
+                }
+                for (i = 0; i < sel_monitor_num; i++) {
+                        for (j = 0; j < sel_mon_mem_region.num_mem_regions;
+                             j++) {
+                                sel_monitor_group[i].mem_region.region_num[j] =
+                                    sel_mon_mem_region.region_num[j];
+                                sel_monitor_group[i]
+                                    .mem_region.num_mem_regions =
+                                    sel_mon_mem_region.num_mem_regions;
+                        }
+                }
+        }
+
         for (i = 0; i < sel_monitor_num; i++) {
                 struct mon_group *grp = &sel_monitor_group[i];
 
@@ -1429,11 +1468,12 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
 #ifdef PQOS_RMID_CUSTOM
                         ret = pqos_mon_start_cores_ext(
                             grp->num_res, grp->cores, grp->events,
-                            (void *)grp->desc, &grp->data, &grp->opt);
+                            (void *)grp->desc, &grp->mem_region, &grp->data,
+                            &grp->opt);
 #else
                         ret = pqos_mon_start_cores(
                             grp->num_res, grp->cores, grp->events,
-                            (void *)grp->desc, &grp->data);
+                            (void *)grp->desc, &grp->mem_region, &grp->data);
 #endif
 
                         if (ret == PQOS_RETVAL_PERF_CTR)
@@ -1869,6 +1909,88 @@ selfn_monitor_devs(const char *arg)
                 if (token == NULL)
                         break;
                 parse_monitor_dev(token);
+        }
+
+        free(cp);
+}
+
+/**
+ * @brief Verifies and translates monitoring config string into
+ *        internal channel monitoring configuration.
+ *
+ * @param str single channel string passed to --mon-channel command line option
+ */
+static void
+parse_mon_mem_regions(char *str)
+{
+        static int idx = 0;
+        unsigned int mem_region;
+        int i = 0;
+
+        mem_region = strtouint64(str);
+        if (mem_region < PQOS_MAX_MEM_REGIONS) {
+                /* Check duplicate memry region entry */
+                for (i = 0; i < sel_mon_mem_region.num_mem_regions; i++) {
+                        if (mem_region ==
+                            (unsigned int)sel_mon_mem_region.region_num[i]) {
+                                parse_error(
+                                    str, "Duplicate memory region selection");
+                                printf("The memory region %d "
+                                       "is entered 2 times\n",
+                                       mem_region);
+                                exit(EXIT_FAILURE);
+                        }
+                }
+                sel_mon_mem_region.region_num[idx] = mem_region;
+                idx++;
+                sel_mon_mem_region.num_mem_regions++;
+        } else {
+                parse_error(str, "Wrong memory region selection");
+                exit(EXIT_FAILURE);
+        }
+
+        return;
+}
+
+/**
+ * @brief Selects memory regions for monitoring
+ *
+ * @param arg argument passed by --mon-mem-regions command line option
+ */
+void
+selfn_mon_mem_regions(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+        char *saveptr = NULL;
+        unsigned int idx = 0;
+        unsigned int i = 0;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&cp, arg);
+
+        sel_mon_mem_region.num_mem_regions = 0;
+        for (idx = 0; idx < PQOS_MAX_MEM_REGIONS; idx++)
+                sel_mon_mem_region.region_num[idx] = -1;
+
+        for (idx = 0, str = cp;; str = NULL, idx++) {
+                char *token = NULL;
+
+                token = strtok_r(str, ",", &saveptr);
+                if (token == NULL)
+                        break;
+                if (idx >= PQOS_MAX_MEM_REGIONS) {
+                        parse_error(token, "Wrong memory region selection");
+                        printf("Available Memory Regions: ");
+                        for (i = 0; i < PQOS_MAX_MEM_REGIONS; i++)
+                                printf("%d ", idx);
+                        exit(EXIT_FAILURE);
+                }
+                parse_mon_mem_regions(token);
         }
 
         free(cp);
@@ -2587,10 +2709,14 @@ monitor_loop(void)
 #endif
         int retval;
         struct itimerspec timer_spec;
+        enum pqos_interface interface;
 
         struct {
                 void (*begin)(FILE *fp);
-                void (*header)(FILE *fp, const char *timestamp);
+                void (*header)(FILE *fp,
+                               const char *timestamp,
+                               const int num_mem_regions,
+                               const int *region_num);
                 void (*row)(FILE *fp,
                             const char *timestamp,
                             const struct pqos_mon_data *data);
@@ -2598,10 +2724,19 @@ monitor_loop(void)
                 void (*end)(FILE *fp);
         } output;
 
+        retval = pqos_inter_get(&interface);
+        if (retval != PQOS_RETVAL_OK) {
+                printf("Unable to retrieve PQoS interface!\n");
+                return;
+        }
+
         if (strcasecmp(sel_output_type, "text") == 0) {
                 output.begin = monitor_text_begin;
                 output.header = monitor_text_header;
-                output.row = monitor_text_row;
+                if (interface == PQOS_INTER_MMIO)
+                        output.row = monitor_text_region_row;
+                else
+                        output.row = monitor_text_row;
                 output.footer = monitor_text_footer;
                 output.end = monitor_text_end;
         } else if (strcasecmp(sel_output_type, "csv") == 0) {
@@ -2724,7 +2859,9 @@ monitor_loop(void)
                 else
                         strncpy(cb_time, "error", sizeof(cb_time) - 1);
 
-                output.header(fp_monitor, cb_time);
+                output.header(fp_monitor, cb_time,
+                              sel_mon_mem_region.num_mem_regions,
+                              sel_mon_mem_region.region_num);
                 for (i = 0; i < display_num; i++) {
 #ifndef __clang_analyzer__
                         const struct pqos_mon_data *data = mon_data[i];
