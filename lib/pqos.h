@@ -84,6 +84,11 @@ extern "C" {
 #define PQOS_RETVAL_INTER     8 /**< Interface not supported */
 #define PQOS_RETVAL_OVERFLOW  9 /**< Data overflow */
 
+/*
+ * =======================================
+ * MBA
+ * =======================================
+ */
 #define PQOS_MAX_MEM_REGIONS      4
 #define PQOS_BW_CTRL_TYPE_COUNT   3
 #define PQOS_BW_CTRL_TYPE_OPT_IDX 0
@@ -1437,13 +1442,15 @@ struct pqos_mba_mem_region {
  * MBA class of service data structure
  */
 struct pqos_mba {
-        unsigned class_id;   /**< class of service */
-        unsigned mb_max;     /**< maximum available bandwidth in percentage
-                                (without MBA controller) or in MBps
-                                (with MBA controller), depending on ctrl
-                                flag */
-        int ctrl;            /**< MBA controller flag */
-        int smba;            /**< SMBA clos */
+        unsigned class_id; /**< class of service */
+        unsigned mb_max;   /**< maximum available bandwidth in percentage
+                              (without MBA controller) or in MBps
+                              (with MBA controller), depending on ctrl
+                              flag */
+        int ctrl;          /**< MBA controller flag */
+        int smba;          /**< SMBA clos */
+        /* MMIO section */
+        unsigned domain_id;  /**< RMDD, resource management domain id */
         int num_mem_regions; /**< Total regions from command line */
         /**< Region number & BW Ctrl type */
         struct pqos_mba_mem_region mem_regions[PQOS_MAX_MEM_REGIONS];
