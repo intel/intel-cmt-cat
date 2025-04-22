@@ -44,6 +44,7 @@
 #include "profiles.h"
 
 #include <ctype.h> /**< isspace() */
+#include <errno.h>
 #include <fcntl.h>
 #include <getopt.h> /**< getopt_long() */
 #include <limits.h>
@@ -187,7 +188,19 @@ strtouint64_base(const char *s, int default_base)
                 s += 2;
         }
 
+        errno = 0;
         n = strtoull(s, &endptr, base);
+
+        /* Check for various possible errors */
+        if ((errno == ERANGE && n == ULLONG_MAX) || (errno != 0 && n == 0)) {
+                perror("strtoull");
+                exit(EXIT_FAILURE);
+        }
+
+        if (endptr == s) {
+                printf("No digits were found\n");
+                exit(EXIT_FAILURE);
+        }
 
         if (!(*s != '\0' && *endptr == '\0')) {
                 printf("Error converting '%s' to unsigned number!\n", str);

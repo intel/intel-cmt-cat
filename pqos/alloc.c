@@ -966,7 +966,7 @@ fill_core_tab(char *str)
         *p = '\0';
 
         cos = (unsigned)strtouint64(str);
-        n = strlisttotabrealloc(p + 1, &cores, &max_cores_count);
+        n = strlisttotab(p + 1, cores, max_cores_count);
 
         if (n == 0)
                 goto normal_exit;
