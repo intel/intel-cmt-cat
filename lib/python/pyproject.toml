@@ -1,6 +1,6 @@
 [project]
 name = "pqos"
-version = "6.0.0"
+version = "6.0.1"
 description = "Python interface for Intel(R) RDT PQoS library"
 authors = [
     { name = "Michal Aleksinski", email = "michalx.aleksinski@intel.com"},

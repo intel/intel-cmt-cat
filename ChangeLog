@@ -1,4 +1,18 @@
 =======================================================================
+Release  v25.04 Apr 2025
+=======================================================================
+
+Contributors (alphabetical order):
+        Colin Ian King <colin.i.king@gmail.com>
+        Eugene Syromiatnikov <esyr@redhat.com>
+        Marcel Cornu <marcel.d.cornu@intel.com>
+        Raghavan Kanagaraj <raghavan.kanagaraj@intel.com>
+        Roman Storozhenko <roman.storozhenko@intel.com>
+
+1. General:
+        - Bug fixes
+
+=======================================================================
 Release  v24.05 Jun 2024
 =======================================================================
 
