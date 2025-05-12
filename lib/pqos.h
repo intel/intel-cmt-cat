@@ -736,11 +736,6 @@ struct pqos_event_values {
 struct pqos_region_aware_event_values {
         uint64_t mbm_local[PQOS_MAX_MEM_REGIONS];
         uint64_t mbm_local_delta[PQOS_MAX_MEM_REGIONS];
-        uint64_t mbm_remote;
-        uint64_t mbm_remote_delta;
-        uint64_t mbm_total;
-        uint64_t mbm_total_delta;
-        uint64_t llc;
 };
 
 /**

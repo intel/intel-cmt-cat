@@ -1532,7 +1532,7 @@ pqos_mon_get_region_value(const struct pqos_mon_data *const group,
                 if (delta != NULL)
                         LOG_WARN("Counter delta is undefined for "
                                  "PQOS_MON_EVENT_L3_OCCUP\n");
-                _value = group->region_values.llc;
+                _value = group->values.llc;
                 _delta = 0;
                 break;
         case PQOS_MON_EVENT_LMEM_BW:
@@ -1540,12 +1540,12 @@ pqos_mon_get_region_value(const struct pqos_mon_data *const group,
                 _delta = group->region_values.mbm_local_delta[region_num];
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
-                _value = group->region_values.mbm_total;
-                _delta = group->region_values.mbm_total_delta;
+                _value = group->values.mbm_total;
+                _delta = group->values.mbm_total_delta;
                 break;
         case PQOS_MON_EVENT_RMEM_BW:
-                _value = group->region_values.mbm_remote;
-                _delta = group->region_values.mbm_remote_delta;
+                _value = group->values.mbm_remote;
+                _delta = group->values.mbm_remote_delta;
                 break;
         default:
                 LOG_ERROR("Unknown event %x\n", event_id);
