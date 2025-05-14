@@ -657,6 +657,14 @@ struct pqos_mrrm_info {
 };
 
 /**
+ * Cores to Domains Mapping Structure
+ */
+struct pqos_cores_domains {
+        unsigned int num_cores;
+        unsigned int *domains;
+};
+
+/**
  * System configuration structure
  */
 struct pqos_sysconfig {
@@ -665,6 +673,7 @@ struct pqos_sysconfig {
         struct pqos_devinfo *dev;    /**< PCI device info */
         struct pqos_erdt_info *erdt; /**< ERDT ACPI table info */
         struct pqos_mrrm_info *mrrm; /**< Memory range & Region IDs info */
+        struct pqos_cores_domains *cores_domains; /**< Cores to domains info */
 };
 
 /**

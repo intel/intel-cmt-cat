@@ -54,6 +54,7 @@
 #include "api.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "cores_domains.h"
 #include "erdt.h"
 #include "hw_cap.h"
 #include "iordt.h"
@@ -722,6 +723,7 @@ pqos_init(const struct pqos_config *config)
         struct pqos_devinfo *dev = NULL;
         struct pqos_erdt_info *erdt = NULL;
         struct pqos_mrrm_info *mrrm = NULL;
+        struct pqos_cores_domains *cores_domains = NULL;
         enum pqos_interface interface;
 
         if (config == NULL)
@@ -894,6 +896,13 @@ pqos_init(const struct pqos_config *config)
                 break;
         }
 
+        if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
+                /* Must be initialized after ERDT due to its data usage */
+                ret = cores_domains_init(cpu->num_cores, erdt, &cores_domains);
+                if (ret != PQOS_RETVAL_OK)
+                        goto machine_init_error;
+        }
+
         ret = iordt_init(cap, &dev);
         switch (ret) {
         case PQOS_RETVAL_RESOURCE:
@@ -938,6 +947,7 @@ init_error:
                 m_sysconf.dev = dev;
                 m_sysconf.erdt = erdt;
                 m_sysconf.mrrm = mrrm;
+                m_sysconf.cores_domains = cores_domains;
         }
 
         lock_release();
@@ -954,6 +964,7 @@ pqos_fini(void)
         int ret = PQOS_RETVAL_OK;
         int retval = PQOS_RETVAL_OK;
         unsigned i = 0;
+        enum pqos_interface interface = _pqos_get_inter();
 
         lock_get();
 
@@ -966,6 +977,9 @@ pqos_fini(void)
 
         pqos_mon_fini();
         pqos_alloc_fini();
+
+        if (interface == PQOS_INTER_MMIO)
+                cores_domains_fini();
 
         ret = iordt_fini();
         if (ret != 0) {
@@ -996,6 +1010,7 @@ pqos_fini(void)
         m_sysconf.cap = NULL;
         m_sysconf.cpu = NULL;
         m_sysconf.dev = NULL;
+        m_sysconf.cores_domains = NULL;
 
         m_init_done = 0;
 
@@ -1401,6 +1416,12 @@ const struct pqos_mrrm_info *
 _pqos_get_mrrm(void)
 {
         return m_sysconf.mrrm;
+}
+
+const struct pqos_cores_domains *
+_pqos_get_cores_domains(void)
+{
+        return m_sysconf.cores_domains;
 }
 
 int

@@ -169,6 +169,13 @@ PQOS_LOCAL const struct pqos_devinfo *_pqos_get_dev(void);
 PQOS_LOCAL const struct pqos_erdt_info *_pqos_get_erdt(void);
 
 /**
+ * @brief Internal API to retrieve cores to domains information
+ *
+ * @return cores to domains information
+ */
+PQOS_LOCAL const struct pqos_cores_domains *_pqos_get_cores_domains(void);
+
+/**
  * @brief Internal API to retrieve MRRM information
  *
  * @return MRRM information
