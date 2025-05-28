@@ -60,6 +60,8 @@
  */
 #define MAX_COS_MASK_STR_LEN 22
 
+#define MAX_DOMAIN_IDS 64
+
 /**
  * Allocation type selected
  */
@@ -80,6 +82,14 @@ static struct sel_alloc_mem_regions_info {
         int num_mem_regions;
         int region_num[PQOS_MAX_MEM_REGIONS];
 } sel_alloc_mem_regions;
+
+/**
+ * Domain IDs info for allocation
+ */
+static struct sel_alloc_domain_ids_info {
+        uint64_t domain_ids[MAX_DOMAIN_IDS];
+        int num_domain_ids;
+} sel_alloc_domain_id;
 
 /**
  * Number of allocation options selected
@@ -422,6 +432,9 @@ set_mba_cos(const unsigned class_id,
         unsigned i, set = 0;
         int idx = 0;
         struct pqos_mba mba, actual;
+        unsigned int count = 0;
+        int ret = PQOS_RETVAL_OK;
+        enum pqos_interface interface;
 
         if (sock_ids == NULL || available_bw == 0) {
                 printf("Failed to set MBA configuration!\n");
@@ -481,13 +494,29 @@ set_mba_cos(const unsigned class_id,
         /* Copy memory regions count */
         mba.num_mem_regions = mem_regions->num_mem_regions;
 
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK)
+                return -1;
+
+        if (interface == PQOS_INTER_MMIO)
+                count = sel_alloc_domain_id.num_domain_ids;
+        else
+                count = sock_num;
+
         /**
          * Set all selected classes
          */
-        for (i = 0; i < sock_num; i++) {
+        for (i = 0; i < count; i++) {
                 const char *unit;
                 const char *package;
-                int ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
+                int ret = 0;
+
+                if (interface == PQOS_INTER_MMIO) {
+                        mba.domain_id = sel_alloc_domain_id.domain_ids[i];
+                        ret = pqos_mba_set(sel_alloc_domain_id.domain_ids[i], 1,
+                                           &mba, &actual);
+                } else
+                        ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
 
                 if (cpu->vendor == PQOS_VENDOR_AMD) {
                         package = "Core Complex";
@@ -2062,6 +2091,62 @@ selfn_alloc_max_bw(const char *arg)
 {
         UNUSED_ARG(arg);
         sel_alloc_mem_regions.max_bw_limit_flag = 1;
+}
+
+/**
+ * @brief Selects domain id for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_domain_id(const char *arg)
+{
+        char *str = NULL;
+        unsigned int i = 0;
+        unsigned int j = 0;
+        unsigned int n = 0;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&str, arg);
+
+        printf("RAG: arg %s  str %s\n", arg, str);
+
+        n = strlisttotab(str, sel_alloc_domain_id.domain_ids, MAX_DOMAIN_IDS);
+        if (n == 0) {
+                printf("No Domain ID specified: %s\n", str);
+                exit(EXIT_FAILURE);
+        }
+
+        sel_alloc_domain_id.num_domain_ids = n;
+
+        /* check for invalid resource ID */
+        for (i = 0; i < n; i++) {
+                if (sel_alloc_domain_id.domain_ids[i] >= UINT_MAX) {
+                        printf("Domain ID out of range: %s\n", str);
+                        exit(EXIT_FAILURE);
+                }
+        }
+
+        /* Check duplicate memry region entry */
+        for (i = 0; i < n; i++) {
+                for (j = i + 1; j < n; j++) {
+                        if (sel_alloc_domain_id.domain_ids[i] ==
+                            sel_alloc_domain_id.domain_ids[j]) {
+                                parse_error(str,
+                                            "Duplicate Domain ID selection");
+                                printf("The Domain ID %ld is entered 2 times\n",
+                                       sel_alloc_domain_id.domain_ids[i]);
+                                exit(EXIT_FAILURE);
+                        }
+                }
+        }
+
+        free(str);
 }
 
 int

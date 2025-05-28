@@ -1121,6 +1121,7 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_ALLOC_OPT_BW         1013
 #define OPTION_ALLOC_MIN_BW         1014
 #define OPTION_ALLOC_MAX_BW         1015
+#define OPTION_ALLOC_DOMAIN_ID      1016
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -1165,6 +1166,7 @@ static struct option long_cmd_opts[] = {
     {"alloc-opt-bw",         no_argument,       0, OPTION_ALLOC_OPT_BW},
     {"alloc-min-bw",         no_argument,       0, OPTION_ALLOC_MIN_BW},
     {"alloc-max-bw",         no_argument,       0, OPTION_ALLOC_MAX_BW},
+    {"alloc-domain-id",      required_argument, 0, OPTION_ALLOC_DOMAIN_ID},
     {0, 0, 0, 0} /* end */
     /* clang-format on */
 };
@@ -1397,6 +1399,9 @@ main(int argc, char **argv)
                         break;
                 case OPTION_ALLOC_MAX_BW:
                         selfn_alloc_max_bw(NULL);
+                        break;
+                case OPTION_ALLOC_DOMAIN_ID:
+                        selfn_alloc_domain_id(optarg);
                         break;
                 default:
                         printf("Unsupported option: -%c. "

@@ -92,6 +92,14 @@ void
 selfn_alloc_max_bw(const char *arg);
 
 /**
+ * @brief Selects domain id for allocation
+ *
+ * @param arg not used
+ */
+void
+selfn_alloc_domain_id(const char *arg);
+
+/**
  * @brief Prints information about cache allocation settings in the system
  *
  * @param [in] cap_mon monitoring capability structure
