@@ -398,7 +398,7 @@ int get_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
  */
 int set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
                          unsigned int clos_number,
-                         uint32_t value);
+                         uint64_t value);
 
 /* Helper functions */
 
