@@ -24,20 +24,6 @@ examples/c/PSEUDO_LOCK/pseudo_lock
 
 tools/membw/membw
 
-appqos/appqos.crt
-appqos/appqos.key
-appqos/ca/*.key
-appqos/ca/*.crt
-appqos/ca/*.csr
-appqos/ca/*.srl
-appqos/env_*
-appqos/venv_*
-appqos/.coverage
-appqos/dist
-appqos/appqos.egg-info
-appqos/Pipfile.lock
-appqos/build
-
 lib/python/.coverage
 lib/python/test_env
 lib/python/venv_*

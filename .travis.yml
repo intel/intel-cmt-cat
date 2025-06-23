@@ -15,7 +15,6 @@ script:
     - make
     - sudo make install
     - LD_LIBRARY_PATH=`pwd`/lib make -C lib/python test
-    - LD_LIBRARY_PATH=`pwd`/lib make -C appqos test
     - cd lib/perl && perl Makefile.PL && make && sudo make install
 language: c
 compiler:

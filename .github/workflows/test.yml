@@ -40,22 +40,3 @@ jobs:
       run: make -C lib
     - name: Execute
       run: LD_LIBRARY_PATH=`pwd`/lib make -C lib/python test
-
-  appqos:
-    name: Execute App QoS unit tests
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5 # v2.7.0
-    - uses: actions/setup-python@e9aba2c848f5ebd159c070c61ea2c4e2b122355e # v2.3.4
-      with:
-        python-version: '3.x'
-    - name: Install Dependencies
-      run: |
-        sudo apt install gcc
-        python -m pip install --upgrade pip
-        pip install pipenv
-        make -C appqos setup-dev
-    - name: Build
-      run: make -C lib
-    - name: Execute
-      run: LD_LIBRARY_PATH=`pwd`/lib make -C appqos test

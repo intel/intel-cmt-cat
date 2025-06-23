@@ -98,18 +98,6 @@ Please refer to the utility README for more details "rdtset/README".
 Manual page of "rdtset" utility also provides information about tool usage:
 $ man rdtset
 
-**"appqos" directory:**\
-Includes source files for an application that allows to group apps into
-priority based pools. Each pool is assigned an Intel(R) RDT and Intel(R) SST
-configuration that can be set on startup or at runtime through a REST API.
-Please refer to the application README for more details "appqos/README".
-
-**"appqos_client" directory:**\
-Includes source files for an App QoS client web application. The app
-provides a simple user interface to remotely configure Intel(R) RDT and
-Intel(R) SST on systems where App QoS is running.
-Please refer to the application README for more details "appqos_client/README".
-
 **"examples" directory:** \
 Includes C and Perl examples of Intel(R) RDT usage via the library API's.
 Please refer to README file for more details "examples/README".

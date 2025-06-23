@@ -1,1 +1,0 @@
-Please see collection README.

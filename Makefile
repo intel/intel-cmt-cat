@@ -60,7 +60,6 @@ all:
 	$(MAKE) -C examples/c/PSEUDO_LOCK
 
 setup-dev:
-	$(MAKE) -C appqos setup-dev
 	$(MAKE) -C lib/python setup-dev
 	$(MAKE) -C tests setup-dev
 
@@ -73,7 +72,6 @@ clean:
 	$(MAKE) -C examples/c/CMT_MBM clean
 	$(MAKE) -C examples/c/PSEUDO_LOCK clean
 	$(MAKE) -C tests clean
-	$(MAKE) -C appqos clean
 	$(MAKE) -C unit-test clean
 
 style:
@@ -84,8 +82,6 @@ style:
 	$(MAKE) -C examples/c/CAT_MBA style
 	$(MAKE) -C examples/c/CMT_MBM style
 	$(MAKE) -C examples/c/PSEUDO_LOCK style
-	$(MAKE) -C appqos style
-	$(MAKE) -C appqos_client style
 	$(MAKE) -C tests style
 	$(MAKE) -C unit-test style
 
