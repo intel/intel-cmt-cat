@@ -106,6 +106,8 @@ static int m_init_done = 0;
  *   0  PQOS_INTER_MSR
  *   1  PQOS_INTER_OS
  *   2  PQOS_INTER_OS_RESCTRL_MON
+ *   3  PQOS_INTER_AUTO
+ *   4  PQOS_INTER_MMIO
  */
 static enum pqos_interface m_interface = PQOS_INTER_MSR;
 
@@ -176,6 +178,9 @@ cap_l3ca_discover(struct pqos_cap_l3ca **r_cap,
 
         switch (iface) {
         case PQOS_INTER_MSR:
+        /* MMIO interface shares similar L3 CAT functionality with MSR
+         * interface, so it uses the same l3ca discovery function. */
+        case PQOS_INTER_MMIO:
                 ret = hw_cap_l3ca_discover(cap, cpu);
                 break;
 #ifdef __linux__
@@ -224,6 +229,9 @@ cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
 
         switch (iface) {
         case PQOS_INTER_MSR:
+        /* MMIO interface shares same L2 CAT functionality with MSR interface,
+         * so it uses the same l2ca discovery function. */
+        case PQOS_INTER_MMIO:
                 ret = hw_cap_l2ca_discover(cap, cpu);
                 break;
 #ifdef __linux__
@@ -272,6 +280,9 @@ cap_mba_discover(struct pqos_cap_mba **r_cap,
 
         switch (iface) {
         case PQOS_INTER_MSR:
+        /* MMIO interface shares similar MBA functionality with MSR interface,
+         * so it uses the same mba discovery function. */
+        case PQOS_INTER_MMIO:
                 if (cpu->vendor == PQOS_VENDOR_AMD)
                         ret = amd_cap_mba_discover(cap, cpu);
                 else
@@ -1082,6 +1093,7 @@ _pqos_cap_l3cdp_change(const enum pqos_cdp_config cdp)
 
         switch (interface) {
         case PQOS_INTER_MSR:
+        case PQOS_INTER_MMIO:
                 ret = hw_cap_l3ca_discover(&cap, m_sysconf.cpu);
                 break;
 #ifdef __linux__

@@ -257,6 +257,9 @@ api_init(int interface, enum pqos_vendor vendor)
 
                 api.pid_get_pid_assoc = os_pid_get_pid_assoc;
 #endif
+        } else if (interface == PQOS_INTER_MMIO) {
+                api.mon_reset = hw_mon_reset;
+                api.alloc_reset = hw_alloc_reset;
         }
 
         return PQOS_RETVAL_OK;
