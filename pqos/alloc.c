@@ -230,21 +230,50 @@ set_l3_cos(const unsigned class_id,
 {
         unsigned i, set = 0;
         const char *package;
+        unsigned count;
+        int ret = PQOS_RETVAL_OK;
+        enum pqos_interface interface;
+        unsigned id = 0;
 
-        if (sock_ids == NULL || mask == 0) {
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("%s(): Failed to get interface!\n", __func__);
+                return -1;
+        }
+
+        if (sock_ids == NULL || (mask == 0 && interface != PQOS_INTER_MMIO)) {
                 printf("Failed to set L3 CAT configuration!\n");
                 return -1;
         }
 
+        if (interface == PQOS_INTER_MMIO) {
+                if (sel_alloc_domain_id.num_domain_ids == 0) {
+                        printf("--alloc-domain-id option is missing in command "
+                               "line. Failed to set IORDT L3 CAT "
+                               "configuration!\n");
+                        return -1;
+                }
+                count = sel_alloc_domain_id.num_domain_ids;
+        } else
+                count = sock_num;
+
         /**
          * Loop through each socket and set selected classes
          */
-        for (i = 0; i < sock_num; i++) {
-                int ret;
+        for (i = 0; i < count; i++) {
                 unsigned j, num_ca;
                 struct pqos_l3ca ca, sock_l3ca[PQOS_MAX_L3CA_COS];
 
+                ret = PQOS_RETVAL_OK;
                 memset(&ca, 0, sizeof(ca));
+                memset(sock_l3ca, 0, sizeof(sock_l3ca));
+
+                if (interface == PQOS_INTER_MMIO) {
+                        for (j = 0; j < PQOS_MAX_L3CA_COS; j++) {
+                                sock_l3ca[j].domain_id =
+                                    sel_alloc_domain_id.domain_ids[i];
+                        }
+                }
 
                 /* get current L3 definitions for this socket */
                 ret = pqos_l3ca_get(sock_ids[i], DIM(sock_l3ca), &num_ca,
@@ -286,24 +315,33 @@ set_l3_cos(const unsigned class_id,
 
                 /* set new L3 class definition */
                 ret = pqos_l3ca_set(sock_ids[i], 1, &ca);
-                if (cpu->vendor == PQOS_VENDOR_AMD)
+                if (cpu->vendor == PQOS_VENDOR_AMD &&
+                    interface != PQOS_INTER_MMIO)
                         package = "Core Complex";
-                else
+                else if (interface != PQOS_INTER_MMIO)
                         package = "SOCKET";
+                else
+                        package = "Domain id ";
+
+                if (interface == PQOS_INTER_MMIO)
+                        id = ca.domain_id;
+                else
+                        id = sock_ids[i];
 
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("%s %u L3CA COS%u - FAILED!\n", package,
-                               sock_ids[i], ca.class_id);
+                        printf("%s%u L3CA COS%u - FAILED!\n", package, id,
+                               ca.class_id);
                         break;
                 }
+
                 if (ca.cdp)
-                        printf("%s %u L3CA COS%u => DATA 0x%lx,CODE "
+                        printf("%s%u L3CA COS%u => DATA 0x%lx,CODE "
                                "0x%lx\n",
-                               package, sock_ids[i], ca.class_id,
-                               (long)ca.u.s.data_mask, (long)ca.u.s.code_mask);
+                               package, id, ca.class_id, (long)ca.u.s.data_mask,
+                               (long)ca.u.s.code_mask);
                 else
-                        printf("%s %u L3CA COS%u => MASK 0x%lx\n", package,
-                               sock_ids[i], ca.class_id, (long)ca.u.ways_mask);
+                        printf("%s%u L3CA COS%u => MASK 0x%lx\n", package, id,
+                               ca.class_id, (long)ca.u.ways_mask);
                 set++;
         }
         sel_alloc_mod += set;
@@ -495,8 +533,10 @@ set_mba_cos(const unsigned class_id,
         mba.num_mem_regions = mem_regions->num_mem_regions;
 
         ret = pqos_inter_get(&interface);
-        if (ret != PQOS_RETVAL_OK)
+        if (ret != PQOS_RETVAL_OK) {
+                printf("%s(): Failed to get interface!\n", __func__);
                 return -1;
+        }
 
         if (interface == PQOS_INTER_MMIO)
                 count = sel_alloc_domain_id.num_domain_ids;
@@ -1656,8 +1696,10 @@ print_core_assoc(const int is_alloc,
         enum pqos_interface interface;
 
         ret = pqos_inter_get(&interface);
-        if (ret != PQOS_RETVAL_OK)
+        if (ret != PQOS_RETVAL_OK) {
+                printf("%s(): Failed to get interface!\n", __func__);
                 return;
+        }
 
         if (is_alloc)
                 ret = pqos_alloc_assoc_get(ci->lcore, &class_id);
@@ -2113,8 +2155,6 @@ selfn_alloc_domain_id(const char *arg)
                 parse_error(arg, "Empty string!");
 
         selfn_strdup(&str, arg);
-
-        printf("RAG: arg %s  str %s\n", arg, str);
 
         n = strlisttotab(str, sel_alloc_domain_id.domain_ids, MAX_DOMAIN_IDS);
         if (n == 0) {

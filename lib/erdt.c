@@ -292,7 +292,21 @@ erdt_populate_card(struct pqos_erdt_card *p_card,
                 return PQOS_RETVAL_ERROR;
         }
 
-        p_card->flags = p_acpi_card->flags;
+        if (p_acpi_card->flags & CARD_CONTENTION_BITMASKS_VALID_BIT)
+                p_card->contention_bitmask_valid = 1;
+        else
+                p_card->contention_bitmask_valid = 0;
+
+        if (p_acpi_card->flags & CARD_NON_CONTIGUOUS_BITMASKS_SUPPORTED_BIT)
+                p_card->non_contiguous_cbm = 1;
+        else
+                p_card->non_contiguous_cbm = 0;
+
+        if (p_acpi_card->flags & CARD_ZERO_LENGTH_BITMASKS_BIT)
+                p_card->zero_length_bitmask = 1;
+        else
+                p_card->zero_length_bitmask = 0;
+
         p_card->contention_bitmask = p_acpi_card->contention_bitmask;
         p_card->reg_index_func_ver =
             p_acpi_card->register_indexing_function_version;

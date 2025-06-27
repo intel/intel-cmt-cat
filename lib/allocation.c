@@ -312,6 +312,24 @@ hw_l3ca_set(const unsigned l3cat_id,
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
 
+        /**
+         * Check if class bitmasks are zero.
+         */
+        for (i = 0; i < num_ca; i++) {
+                int is_non_zero = 0;
+
+                if (ca[i].cdp)
+                        is_non_zero =
+                            ca[i].u.s.data_mask && ca[i].u.s.code_mask;
+                else
+                        is_non_zero = ca[i].u.ways_mask;
+
+                if (!is_non_zero) {
+                        LOG_ERROR("L3 COS%u bit mask is 0!\n", ca[i].class_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
         /* Check L3 CBM is non-contiguous */
         if (!cap_get_l3ca_non_contignous()) {
                 unsigned idx;

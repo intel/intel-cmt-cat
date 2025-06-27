@@ -39,6 +39,7 @@
 #include "hw_monitoring.h"
 #include "lock.h"
 #include "log.h"
+#include "mmio_allocation.h"
 #include "monitoring.h"
 #include "os_allocation.h"
 #include "os_monitoring.h"
@@ -258,8 +259,13 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.pid_get_pid_assoc = os_pid_get_pid_assoc;
 #endif
         } else if (interface == PQOS_INTER_MMIO) {
+
                 api.mon_reset = hw_mon_reset;
+                api.alloc_assoc_get_channel = hw_alloc_assoc_get_channel;
+                api.alloc_assoc_set_channel = hw_alloc_assoc_set_channel;
                 api.alloc_reset = hw_alloc_reset;
+                api.l3ca_set = mmio_l3ca_set;
+                api.l3ca_get = mmio_l3ca_get;
         }
 
         return PQOS_RETVAL_OK;
@@ -501,28 +507,8 @@ pqos_l3ca_set(const unsigned l3cat_id,
               const unsigned num_cos,
               const struct pqos_l3ca *ca)
 {
-        unsigned i;
-
         if (ca == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
-
-        /**
-         * Check if class bitmasks are zero.
-         */
-        for (i = 0; i < num_cos; i++) {
-                int is_non_zero = 0;
-
-                if (ca[i].cdp)
-                        is_non_zero =
-                            ca[i].u.s.data_mask && ca[i].u.s.code_mask;
-                else
-                        is_non_zero = ca[i].u.ways_mask;
-
-                if (!is_non_zero) {
-                        LOG_ERROR("L3 COS%u bit mask is 0!\n", ca[i].class_id);
-                        return PQOS_RETVAL_PARAM;
-                }
-        }
 
         return API_CALL(l3ca_set, l3cat_id, num_cos, ca);
 }

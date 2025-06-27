@@ -587,8 +587,9 @@ get_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
                      uint64_t *value)
 {
         uint64_t *mem;
+        uint64_t size = (uint64_t)card->reg_block_size * (uint64_t)PAGE_SIZE;
 
-        mem = (uint64_t *)pqos_mmap_read(card->reg_base_addr, RDT_REG_SIZE);
+        mem = (uint64_t *)pqos_mmap_read(card->reg_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -600,11 +601,11 @@ get_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
                  card->reg_base_addr, card->reg_block_size,
                  card->cat_reg_offset, card->cat_reg_block_size);
 
-        *value = *(uint64_t *)(mem + card->cat_reg_offset + clos_number * 8 +
-                               PAGE_SIZE * block_number);
+        *value = *(uint64_t *)((uint8_t *)mem + card->cat_reg_offset +
+                               (clos_number * 8) + (PAGE_SIZE * block_number));
         *value = *value >> IOL3_CBM_SHIFT;
 
-        pqos_munmap(mem, RDT_REG_SIZE);
+        pqos_munmap(mem, size);
 
         return PQOS_RETVAL_OK;
 }
@@ -616,8 +617,9 @@ set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
 {
         uint64_t *clos_addr;
         uint64_t *mem;
+        uint64_t size = (uint64_t)card->reg_block_size * (uint64_t)PAGE_SIZE;
 
-        mem = (uint64_t *)pqos_mmap_write(card->reg_base_addr, RDT_REG_SIZE);
+        mem = (uint64_t *)pqos_mmap_write(card->reg_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -629,8 +631,6 @@ set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
                  card->reg_base_addr, card->reg_block_size,
                  card->cat_reg_offset, card->cat_reg_block_size);
 
-        clos_addr = (uint64_t *)(mem + card->cat_reg_offset + clos_number * 8);
-
         if (card->reg_block_size == 0) {
                 LOG_ERROR("%s: Register Block Size is 0. "
                           "Unable to write IO L3 CBM.\n",
@@ -640,11 +640,12 @@ set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
         }
 
         for (unsigned i = 0; i < card->reg_block_size; i++) {
-                clos_addr += PAGE_SIZE * i;
+                clos_addr = (uint64_t *)((uint8_t *)mem + card->cat_reg_offset +
+                                         (clos_number * 8) + (PAGE_SIZE * i));
                 *clos_addr = value << IOL3_CBM_SHIFT;
         }
 
-        pqos_munmap(mem, RDT_REG_SIZE);
+        pqos_munmap(mem, size);
 
         return PQOS_RETVAL_OK;
 }

@@ -38,7 +38,9 @@
 
 #include "mmio_allocation.h"
 
+#include "allocation.h"
 #include "cap.h"
+#include "erdt.h"
 #include "log.h"
 #include "mmio.h"
 
@@ -89,6 +91,60 @@ _get_regions_mba(const struct pqos_erdt_info *erdt,
         }
 
         return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Returns value of L3 Non-Contiguous CBM(Cache Bit Mask) support
+ *
+ * @param [in]  domain_id Resource allocation domain's ID
+ *
+ * @return Operation status
+ * @retval struct pqos_erdt_card member non_contiguous_cbm on success
+ */
+static int
+cap_get_mmio_l3ca_non_contiguous(unsigned domain_id)
+{
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        unsigned idx = 0;
+
+        if (erdt == NULL) {
+                LOG_ERROR("ERDT is unavailable\n");
+                return !ERDT_CAT_NON_CONTIGUOUS_CBM_SUPPORT;
+        }
+
+        for (idx = 0; idx < erdt->num_dev_agents; idx++)
+                if (domain_id == erdt->dev_agents[idx].rmdd.domain_id)
+                        return erdt->dev_agents[idx].card.non_contiguous_cbm;
+
+        LOG_ERROR("Domain ID is unavailable\n");
+        return !ERDT_CAT_NON_CONTIGUOUS_CBM_SUPPORT;
+}
+
+/**
+ * @brief Returns value of L3 Zero-length CBM(Cache Bit Mask) support
+ *
+ * @param [in]  domain_id Resource allocation domain's ID
+ *
+ * @return Operation status
+ * @retval struct pqos_erdt_card member zero_length_bitmask on success
+ */
+static int
+cap_get_mmio_l3ca_zero_length(unsigned domain_id)
+{
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        unsigned idx = 0;
+
+        if (erdt == NULL) {
+                LOG_ERROR("ERDT is unavailable\n");
+                return !ERDT_CAT_ZERO_LENGTH_CBM_SUPPORT;
+        }
+
+        for (idx = 0; idx < erdt->num_dev_agents; idx++)
+                if (domain_id == erdt->dev_agents[idx].rmdd.domain_id)
+                        return erdt->dev_agents[idx].card.zero_length_bitmask;
+
+        LOG_ERROR("Domain ID is unavailable\n");
+        return !ERDT_CAT_ZERO_LENGTH_CBM_SUPPORT;
 }
 
 int
@@ -244,6 +300,128 @@ mmio_mba_get(const unsigned mba_id,
         }
 
         *num_cos = max_num_cos;
+
+        return ret;
+}
+
+/**
+ * =======================================
+ * I/O L3 cache allocation
+ * =======================================
+ */
+int
+mmio_l3ca_set(const unsigned l3cat_id,
+              const unsigned num_ca,
+              const struct pqos_l3ca *ca)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0;
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+
+        ASSERT(ca != NULL);
+        ASSERT(num_ca != 0);
+        UNUSED_PARAM(l3cat_id);
+
+        if (erdt == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        if (num_ca > erdt->max_clos)
+                return PQOS_RETVAL_ERROR;
+
+        for (i = 0; i < num_ca; i++) {
+                unsigned idx;
+                int domain_id_found = 0;
+
+                for (idx = 0; idx < erdt->num_dev_agents; idx++)
+                        if (ca[i].domain_id ==
+                            erdt->dev_agents[idx].rmdd.domain_id) {
+                                domain_id_found = 1;
+                                break;
+                        }
+                if (domain_id_found == 0) {
+                        LOG_ERROR("Domain id %u is unavailable\n",
+                                  ca[i].domain_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                /* Check L3 CBM is non-contiguous */
+                if (!cap_get_mmio_l3ca_non_contiguous(ca[i].domain_id)) {
+                        /* Check all COS CBM are contiguous */
+                        if (!IS_CONTIGNOUS(ca[i])) {
+                                LOG_ERROR("L3 CAT COS%u bit mask is not "
+                                          "contiguous!\n",
+                                          ca[i].class_id);
+                                return PQOS_RETVAL_PARAM;
+                        }
+                }
+
+                /* Check L3 CBM is zero-length bitmask */
+                if (ca[i].u.ways_mask == 0 &&
+                    !cap_get_mmio_l3ca_zero_length(ca[i].domain_id)) {
+                        LOG_ERROR("L3 CAT COS%u bit mask is 0 and Zero-length "
+                                  "bitmask is not supported in Domain id %d.\n",
+                                  ca[i].class_id, ca[i].domain_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                ret = set_iol3_cbm_clos_v1(&erdt->dev_agents[idx].card,
+                                           ca[i].class_id, ca[i].u.ways_mask);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        return ret;
+}
+
+int
+mmio_l3ca_get(const unsigned l3cat_id,
+              const unsigned max_num_ca,
+              unsigned *num_ca,
+              struct pqos_l3ca *ca)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0;
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        uint64_t value = 0;
+
+        ASSERT(num_ca != NULL);
+        ASSERT(ca != NULL);
+        ASSERT(max_num_ca != 0);
+        UNUSED_PARAM(l3cat_id);
+
+        if (erdt == NULL)
+                return PQOS_RETVAL_ERROR;
+
+        if (erdt->max_clos > max_num_ca)
+                return PQOS_RETVAL_ERROR;
+
+        for (i = 0; i < max_num_ca; i++) {
+                unsigned idx;
+                int domain_id_found = 0;
+
+                for (idx = 0; idx < erdt->num_dev_agents; idx++)
+                        if (ca[i].domain_id ==
+                            erdt->dev_agents[idx].rmdd.domain_id) {
+                                domain_id_found = 1;
+                                break;
+                        }
+                if (domain_id_found == 0) {
+                        LOG_ERROR("Domain id %u is unavailable\n",
+                                  ca[i].domain_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                ret = get_iol3_cbm_clos_v1(&erdt->dev_agents[idx].card, i,
+                                           REG_BLOCK_SIZE_ZERO, &value);
+
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                ca[i].cdp = 0;
+                ca[i].class_id = i;
+                ca[i].u.ways_mask = value;
+        }
+        *num_ca = max_num_ca;
 
         return ret;
 }

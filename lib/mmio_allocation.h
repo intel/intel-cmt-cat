@@ -35,8 +35,8 @@
  * @brief Internal header file to PQoS MBA allocation initialization
  */
 
-#ifndef __PQOS_ALLOC_H__
-#define __PQOS_ALLOC_H__
+#ifndef __PQOS_MMIO_ALLOC_H__
+#define __PQOS_MMIO_ALLOC_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,8 +98,42 @@ PQOS_LOCAL int mmio_mba_get(const unsigned mba_id,
                             const unsigned max_num_cos,
                             unsigned *num_cos,
                             struct pqos_mba *mba_tab);
+
+/**
+ * @brief Hardware interface to set classes of service
+ *        defined by a ca in Resource Allocation Domain
+ *
+ * @param [in] l3cat_id L3 CAT resource id
+ * @param [in] num_ca number of classes of service at \a ca
+ * @param [in] ca table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int mmio_l3ca_set(const unsigned l3cat_id,
+                             const unsigned num_ca,
+                             const struct pqos_l3ca *ca);
+
+/**
+ * @brief Hardware interface to get classes of service
+ *        defined by a ca in Resource Allocation Domain
+ *
+ * @param [in] l3cat_id L3 CAT resource id
+ * @param [in] max_num_ca maximum number of classes of service
+ *             that can be accommodated at \a ca
+ * @param [in] num_ca number of classes of service at \a ca
+ * @param [in] ca table with class of service definitions
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int mmio_l3ca_get(const unsigned l3cat_id,
+                             const unsigned max_num_ca,
+                             unsigned *num_ca,
+                             struct pqos_l3ca *ca);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __PQOS_ALLOC_H__ */
+#endif /* __PQOS_MMIO_ALLOC_H__ */

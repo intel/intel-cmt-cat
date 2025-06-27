@@ -98,6 +98,8 @@ extern "C" {
 #define IOL3_CBM_MASK       0x0fffffff00000000ULL
 #define IOL3_CBM_RESET_MASK ~IOL3_CBM_MASK
 #define IOL3_CBM_SHIFT      0x20
+/* First CAT Register Block of MMIO registers for CLOS */
+#define REG_BLOCK_SIZE_ZERO 0
 
 /* MMIO RMID types */
 typedef uint64_t l3_cmt_rmid_t;

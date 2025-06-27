@@ -471,7 +471,9 @@ struct pqos_devinfo {
  * Cache Allocation Registers for Device Agents Description Structure
  */
 struct pqos_erdt_card {
-        uint32_t flags;
+        uint32_t contention_bitmask_valid;
+        uint32_t non_contiguous_cbm;
+        uint32_t zero_length_bitmask;
         uint32_t contention_bitmask;
         uint8_t reg_index_func_ver;
         uint64_t reg_base_addr;
@@ -1304,8 +1306,9 @@ int pqos_alloc_reset_config(const struct pqos_alloc_config *cfg);
  * L3 cache allocation class of service data structure
  */
 struct pqos_l3ca {
-        unsigned class_id; /**< class of service */
-        int cdp;           /**< data & code masks used if true */
+        unsigned domain_id; /**< RMDD, resource management domain id */
+        unsigned class_id;  /**< class of service */
+        int cdp;            /**< data & code masks used if true */
         union {
                 uint64_t ways_mask; /**< bit mask for L3 cache ways */
                 struct {

@@ -64,6 +64,20 @@ extern "C" {
 #define ACPI_ERDT_STRUCT_IBAD_TYPE 9
 #define ACPI_ERDT_STRUCT_CARD_TYPE 10
 
+/**
+ * Non-Contiguous 1s value support in CBM(Cache Bit Mask)
+ */
+#define ERDT_CAT_NON_CONTIGUOUS_CBM_SUPPORT 1
+
+/**
+ * Zero-length Bitmask support in CBM(Cache Bit Mask)
+ */
+#define ERDT_CAT_ZERO_LENGTH_CBM_SUPPORT 1
+
+#define CARD_CONTENTION_BITMASKS_VALID_BIT         1
+#define CARD_NON_CONTIGUOUS_BITMASKS_SUPPORTED_BIT 2
+#define CARD_ZERO_LENGTH_BITMASKS_BIT              4
+
 #define IMH_MAX_PATH 256
 
 /**
@@ -76,7 +90,7 @@ struct __attribute__((__packed__)) acpi_table_erdt_card {
         uint32_t flags;
         uint32_t contention_bitmask;
         uint8_t register_indexing_function_version;
-        uint8_t reserved2[11];
+        uint8_t reserved2[7];
         uint64_t register_base_address;
         uint32_t register_block_size;
         uint16_t cache_allocation_rgister_ofsets_for_io;

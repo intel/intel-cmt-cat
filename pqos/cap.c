@@ -62,10 +62,6 @@
 #define MBA_MINIMUM_CONTROL_WINDOW 2
 #define MBA_MAXIMUM_CONTROL_WINDOW 4
 
-#define CONTENTION_BITMASK     1
-#define NON_CONTIGUOUS_BITMASK 2
-#define ZERO_LENGTH_BITMASK    4
-
 /**
  * @brief Print line with indentation
  *
@@ -881,19 +877,19 @@ cap_print_device_agents_info(const struct pqos_device_agent_info *dev_agent)
 
         printf("\n\n    CARD Info:\n");
         printf("        Contention Bitmask Valid:                      ");
-        if (dev_agent->card.flags & CONTENTION_BITMASK)
+        if (dev_agent->card.contention_bitmask_valid)
                 printf("Yes\n");
         else
                 printf("No\n");
 
         printf("        Non-Contiguous Bitmasks Supported:             ");
-        if (dev_agent->card.flags & NON_CONTIGUOUS_BITMASK)
+        if (dev_agent->card.non_contiguous_cbm)
                 printf("Yes\n");
         else
                 printf("No\n");
 
         printf("        Zero-length Bitmask:                           ");
-        if (dev_agent->card.flags & ZERO_LENGTH_BITMASK)
+        if (dev_agent->card.zero_length_bitmask)
                 printf("Yes\n");
         else
                 printf("No\n");
