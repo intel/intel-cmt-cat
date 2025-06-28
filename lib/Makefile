@@ -245,7 +245,7 @@ cppcheck:
 	--std=c99 --template=gcc \
 	--suppress=missingIncludeSystem \
 	api.c api.h cap.c cap.h common.h common.c allocation.c perf.c perf.h \
-	allocation.h monitoring.c monitoring.h \
+	allocation.h allocation_common.c allocation_common.h monitoring.c monitoring.h \
 	log.c log.h types.h machine.c machine.h \
 	utils.c utils.h \
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \

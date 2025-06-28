@@ -46,21 +46,16 @@ extern "C" {
 #include "types.h"
 
 /**
- * @brief Writes range of MBA/CAT COS MSR's with \a msr_val value
+ * @brief Writes default values into Optimal, Minimum and Maximum MBA Registers
+ * for CPU agents
  *
  * Used as part of CAT/MBA reset process.
  *
- * @param [in] mba_ids_num Number of items in \a mba_ids array
- * @param [in] mba_ids Array with MBA IDs
- * @param [in] enable MBA 4.0 enable flag, 1 - enable, 0 - disable
- *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
- * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ * @retval PQOS_RETVAL_ERROR on failure
  */
-PQOS_LOCAL int mmio_alloc_reset_mba(const unsigned mba_ids_num,
-                                    const unsigned *mba_ids,
-                                    const int enable);
+PQOS_LOCAL int mmio_alloc_reset_mba(void);
 
 /**
  * @brief Hardware interface to set classes of service
@@ -131,6 +126,35 @@ PQOS_LOCAL int mmio_l3ca_get(const unsigned l3cat_id,
                              const unsigned max_num_ca,
                              unsigned *num_ca,
                              struct pqos_l3ca *ca);
+
+/**
+ * @brief Writes default values into Cache Allocation Registers
+ * for Non-CPu agents
+ *
+ * Used as part of CAT/MBA reset process.
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure
+ */
+PQOS_LOCAL int mmio_alloc_reset_cat(void);
+
+/**
+ * @brief Hardware/MMIO interface to reset configuration of
+ * allocation technologies
+ *
+ * Reverts CAT/MBA state to the one after reset:
+ * - all cores associated with COS0
+ * - all COS are set to give access to entire resource
+ * - all device channels associated with COS0
+ *
+ * As part of allocation reset CDP, MBA, I/O RDT reconfiguration
+ * can be performed. This can be requested via \a cfg.
+ *
+ * @param [in] cfg requested configuration
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int mmio_alloc_reset(const struct pqos_alloc_config *cfg);
 
 #ifdef __cplusplus
 }

@@ -39,6 +39,7 @@
 #include "mmio_allocation.h"
 
 #include "allocation.h"
+#include "allocation_common.h"
 #include "cap.h"
 #include "erdt.h"
 #include "log.h"
@@ -148,16 +149,12 @@ cap_get_mmio_l3ca_zero_length(unsigned domain_id)
 }
 
 int
-mmio_alloc_reset_mba(const unsigned mba_ids_num,
-                     const unsigned *mba_ids,
-                     const int enable)
+mmio_alloc_reset_mba(void)
 {
         int ret;
         const struct pqos_erdt_info *erdt = _pqos_get_erdt();
 
-        UNUSED_PARAM(mba_ids_num);
-        UNUSED_PARAM(mba_ids);
-        UNUSED_PARAM(enable);
+        ASSERT(erdt != NULL);
 
         for (unsigned domain = 0; domain < erdt->num_cpu_agents; domain++) {
                 for (unsigned i = 0; i < erdt->max_clos; i++) {
@@ -204,6 +201,7 @@ mmio_mba_set(const unsigned mba_id,
 
         ASSERT(actual != NULL);
         ASSERT(num_cos != 0);
+        ASSERT(erdt != NULL);
         UNUSED_PARAM(mba_id);
 
         for (unsigned i = 0; i < num_cos; i++) {
@@ -286,6 +284,7 @@ mmio_mba_get(const unsigned mba_id,
         ASSERT(num_cos != NULL);
         ASSERT(mba_tab != NULL);
         ASSERT(max_num_cos != 0);
+        ASSERT(erdt != NULL);
         UNUSED_PARAM(mba_id);
 
         for (unsigned i = 0; i < max_num_cos; i++) {
@@ -320,6 +319,7 @@ mmio_l3ca_set(const unsigned l3cat_id,
 
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
+        ASSERT(erdt != NULL);
         UNUSED_PARAM(l3cat_id);
 
         if (erdt == NULL)
@@ -387,6 +387,7 @@ mmio_l3ca_get(const unsigned l3cat_id,
         ASSERT(num_ca != NULL);
         ASSERT(ca != NULL);
         ASSERT(max_num_ca != 0);
+        ASSERT(erdt != NULL);
         UNUSED_PARAM(l3cat_id);
 
         if (erdt == NULL)
@@ -424,4 +425,58 @@ mmio_l3ca_get(const unsigned l3cat_id,
         *num_ca = max_num_ca;
 
         return ret;
+}
+
+int
+mmio_alloc_reset_cat(void)
+{
+        int ret;
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+
+        ASSERT(erdt != NULL);
+
+        for (unsigned domain = 0; domain < erdt->num_dev_agents; domain++) {
+                for (unsigned i = 0; i < erdt->max_clos; i++) {
+                        /* Reset I/ORDT L3 CAT */
+                        ret = set_iol3_cbm_clos_v1(
+                            (const struct pqos_erdt_card *)&erdt
+                                ->dev_agents[domain]
+                                .card,
+                            i, (uint64_t)IOL3_CBM_RESET_MASK);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+                }
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+mmio_alloc_reset(const struct pqos_alloc_config *cfg)
+{
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cfg != NULL);
+
+        ret = alloc_reset(cfg);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Failed to reset allocation configuration\n");
+                return ret;
+        }
+
+        /* Reset Region Aware MBA */
+        ret = mmio_alloc_reset_mba();
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Failed to reset MBA configuration\n");
+                return ret;
+        }
+
+        /* Reset I/O L3 CAT */
+        ret = mmio_alloc_reset_cat();
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Failed to reset L3 CAT configuration\n");
+                return ret;
+        }
+
+        return PQOS_RETVAL_OK;
 }

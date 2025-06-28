@@ -263,7 +263,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.mon_reset = hw_mon_reset;
                 api.alloc_assoc_get_channel = hw_alloc_assoc_get_channel;
                 api.alloc_assoc_set_channel = hw_alloc_assoc_set_channel;
-                api.alloc_reset = hw_alloc_reset;
+                api.alloc_reset = mmio_alloc_reset;
                 api.l3ca_set = mmio_l3ca_set;
                 api.l3ca_get = mmio_l3ca_get;
         }
