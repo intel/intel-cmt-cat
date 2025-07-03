@@ -206,16 +206,137 @@ erdt_populate_marc(struct pqos_erdt_marc *p_marc,
 }
 
 static int
+erdt_calculate_num_dases(uint32_t length,
+                         struct acpi_table_erdt_dase *p_acpi_dase,
+                         uint32_t *num_dases)
+{
+        uint32_t dase_length = 0;
+        uint32_t count = 0;
+        struct acpi_table_erdt_dase *p_dase = p_acpi_dase;
+
+        if (p_acpi_dase == NULL) {
+                printf("Invalid DASE pointer\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        if (length < ACPI_ERDT_STRUCT_DASE_HEADER_LENGTH) {
+                printf("Invalid DASE length %u\n", length);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        dase_length = p_acpi_dase->length;
+        if (dase_length < ACPI_ERDT_STRUCT_DASE_HEADER_LENGTH) {
+                printf("Invalid DASE length %u\n", dase_length);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        if (dase_length > length) {
+                printf("Invalid DASE length %u, expected less than %u\n",
+                       dase_length, length);
+                return PQOS_RETVAL_ERROR;
+        }
+
+        /* Calculate number of DASEs in the DACD structure */
+        while (length > 0) {
+                dase_length = p_dase->length;
+                if (dase_length > length) {
+                        printf("Invalid DASE length %u, "
+                               "exceeds remaining length %u\n",
+                               dase_length, length);
+                        return PQOS_RETVAL_ERROR;
+                }
+                length = length - dase_length;
+                p_dase =
+                    (struct acpi_table_erdt_dase *)((unsigned char *)p_dase +
+                                                    dase_length);
+                count++;
+        }
+
+        *num_dases = count;
+
+        return PQOS_RETVAL_OK;
+}
+
+static int
 erdt_populate_dacd(struct pqos_erdt_dacd *p_dacd,
                    struct acpi_table_erdt_dacd *p_acpi_dacd)
 {
+        uint32_t num_dases = 0;
+        uint32_t idx = 0;
+        uint32_t length = 0;
+        int ret = PQOS_RETVAL_OK;
+        struct acpi_table_erdt_dase *p_acpi_dase = NULL;
+
         if (p_acpi_dacd->type != ACPI_ERDT_STRUCT_DACD_TYPE) {
                 printf("Incorrect DACD structure type 0x%x\n",
                        p_acpi_dacd->type);
                 return PQOS_RETVAL_ERROR;
         }
 
+        if (p_acpi_dacd->length < ACPI_ERDT_STRUCT_DACD_HEADER_LENGTH) {
+                printf("Invalid DACD length %u\n", p_acpi_dacd->length);
+                return PQOS_RETVAL_ERROR;
+        }
+
         p_dacd->rmdd_domain_id = p_acpi_dacd->rmdd_domain_id;
+
+        length = p_acpi_dacd->length - ACPI_ERDT_STRUCT_DACD_HEADER_LENGTH;
+        if (length == 0) {
+                p_dacd->num_dases = length;
+                p_dacd->dase = NULL;
+                return PQOS_RETVAL_OK;
+        }
+        ret =
+            erdt_calculate_num_dases(length, &p_acpi_dacd->dase[0], &num_dases);
+        if (ret == PQOS_RETVAL_ERROR) {
+                printf("Error calculating number of DASEs\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        p_dacd->dase = (struct pqos_erdt_dase *)calloc(
+            1, sizeof(struct pqos_erdt_dase) * num_dases);
+        if (p_dacd->dase == NULL) {
+                printf("Can't allocate memory for DASEs\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        p_dacd->num_dases = num_dases;
+
+        p_acpi_dase = &p_acpi_dacd->dase[0];
+        for (idx = 0; idx < num_dases; idx++) {
+                p_dacd->dase[idx].type = p_acpi_dase->type;
+                p_dacd->dase[idx].segment_number = p_acpi_dase->segment_number;
+                p_dacd->dase[idx].start_bus_number =
+                    p_acpi_dase->start_bus_number;
+                p_dacd->dase[idx].path_length =
+                    p_acpi_dase->length - ACPI_ERDT_STRUCT_DASE_HEADER_LENGTH;
+
+                if (p_dacd->dase[idx].path_length == 0) {
+                        p_dacd->dase[idx].path = NULL;
+                        p_acpi_dase = (struct acpi_table_erdt_dase
+                                           *)((uint8_t *)p_acpi_dase +
+                                              p_acpi_dase->length);
+                        continue;
+                }
+
+                p_dacd->dase[idx].path =
+                    (uint8_t *)calloc(1, p_dacd->dase[idx].path_length);
+                if (p_dacd->dase[idx].path == NULL) {
+                        printf("Can't allocate memory for DASE path\n");
+                        for (uint32_t cleanup_idx = 0; cleanup_idx < idx;
+                             cleanup_idx++)
+                                free(p_dacd->dase[cleanup_idx].path);
+                        free(p_dacd->dase);
+                        return PQOS_RETVAL_ERROR;
+                }
+
+                memcpy(p_dacd->dase[idx].path, p_acpi_dase->path,
+                       p_dacd->dase[idx].path_length);
+
+                p_acpi_dase =
+                    (struct acpi_table_erdt_dase *)((uint8_t *)p_acpi_dase +
+                                                    p_acpi_dase->length);
+        }
+
         return PQOS_RETVAL_OK;
 }
 

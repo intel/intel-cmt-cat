@@ -64,6 +64,9 @@ extern "C" {
 #define ACPI_ERDT_STRUCT_IBAD_TYPE 9
 #define ACPI_ERDT_STRUCT_CARD_TYPE 10
 
+#define ACPI_ERDT_STRUCT_DACD_HEADER_LENGTH 8
+#define ACPI_ERDT_STRUCT_DASE_HEADER_LENGTH 6
+
 /**
  * Non-Contiguous 1s value support in CBM(Cache Bit Mask)
  */
@@ -191,25 +194,15 @@ struct __attribute__((__packed__)) acpi_table_erdt_cmrc {
 };
 
 /**
- * The hierarchical path from the Host Bridge to the device structure
- */
-struct __attribute__((__packed__)) acpi_table_erdt_path_entry {
-        uint16_t segment;
-        uint8_t bus;
-        uint8_t device;
-        uint8_t function;
-};
-
-/**
  * Device Agent Scope Entry (DASE) Structure
  */
-struct __attribute__((__packed__)) acpi_table_erdt_device_entry {
+struct __attribute__((__packed__)) acpi_table_erdt_dase {
         uint8_t type;
         uint8_t length;
-        uint16_t segmentNumber;
-        uint8_t startBusNumber;
-        struct acpi_table_erdt_path_entry path[IMH_MAX_PATH];
-        uint8_t pathNumber;
+        uint16_t segment_number;
+        uint8_t reserved;
+        uint8_t start_bus_number;
+        uint8_t path[0];
 };
 
 /**
@@ -220,6 +213,7 @@ struct __attribute__((__packed__)) acpi_table_erdt_dacd {
         uint16_t length;
         uint8_t reserved[2];
         uint16_t rmdd_domain_id;
+        struct acpi_table_erdt_dase dase[0];
 };
 
 /**

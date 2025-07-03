@@ -554,25 +554,14 @@ struct pqos_erdt_cmrc {
 };
 
 /**
- * The hierarchical path from the Host Bridge to the device structure
- */
-struct pqos_erdt_path_entry {
-        uint16_t segment;
-        uint8_t bus;
-        uint8_t device;
-        uint8_t function;
-};
-
-/**
  * Device Agent Scope Entry (DASE) Structure
  */
-struct pqos_erdt_device_entry {
+struct pqos_erdt_dase {
         uint8_t type;
-        uint8_t length;
         uint16_t segment_number;
         uint8_t start_bus_number;
-        struct pqos_erdt_path_entry path[IMH_MAX_PATH];
-        uint8_t pathNumber;
+        uint8_t *path;
+        uint16_t path_length;
 };
 
 /**
@@ -582,6 +571,8 @@ struct pqos_erdt_dacd {
         uint16_t type;
         uint16_t length;
         uint16_t rmdd_domain_id;
+        uint32_t num_dases;
+        struct pqos_erdt_dase *dase;
 };
 
 /**

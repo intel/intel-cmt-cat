@@ -717,7 +717,7 @@ cap_print_cpu_agents_info(const struct pqos_cpu_agent_info *cpu_agent)
         printf("\n\n");
 
         printf("    CMRC Info:\n");
-        printf("        Unavilabe Bit Support:                         ");
+        printf("        Unavailable Bit Support:                       ");
         if (cpu_agent->cmrc.flags == 1)
                 printf("Yes\n");
         else
@@ -736,7 +736,7 @@ cap_print_cpu_agents_info(const struct pqos_cpu_agent_info *cpu_agent)
                cpu_agent->cmrc.upscaling_factor);
 
         printf("\n\n    MMRC Info:\n");
-        printf("        Unavilabe Bit Support:                         ");
+        printf("        Unavailable Bit Support:                       ");
         if (cpu_agent->mmrc.flags & UNAVAILABLE_BIT_SUPPORT)
                 printf("Yes\n");
         else
@@ -795,9 +795,9 @@ cap_print_cpu_agents_info(const struct pqos_cpu_agent_info *cpu_agent)
         printf("        MBA Optimal BW Register Block Base Address:    0x%lx\n",
                cpu_agent->marc.opt_bw_reg_block_base_addr);
         printf("        MBA Minimum BW Register Block Base Address:    0x%lx\n",
-               cpu_agent->marc.opt_bw_reg_block_base_addr);
+               cpu_agent->marc.min_bw_reg_block_base_addr);
         printf("        MBA Maximum BW Register Block Base Address:    0x%lx\n",
-               cpu_agent->marc.opt_bw_reg_block_base_addr);
+               cpu_agent->marc.max_bw_reg_block_base_addr);
         printf("        MBA Register Block Size:                       0x%x\n",
                cpu_agent->marc.reg_block_size);
         printf("        MBA BW Control Window Range:                   %d\n",
@@ -811,8 +811,27 @@ cap_print_device_agents_info(const struct pqos_device_agent_info *dev_agent)
 {
         uint32_t idx = 0;
 
+        printf("\n\n    DACD Info:\n");
+        printf("        Domain ID:                                    %d\n",
+               dev_agent->dacd.rmdd_domain_id);
+        printf("        Number of DASEs:                              %d\n",
+               dev_agent->dacd.num_dases);
+        for (idx = 0; idx < dev_agent->dacd.num_dases; idx++) {
+                printf("\n        DASE %d:\n", idx);
+                printf("             Type:             %x\n",
+                       dev_agent->dacd.dase[idx].type);
+                printf("             Segment Number:   %x\n",
+                       dev_agent->dacd.dase[idx].segment_number);
+                printf("             Start Bus Number: %x\n",
+                       dev_agent->dacd.dase[idx].start_bus_number);
+                printf("             Path:             ");
+                for (int i = 0; i < dev_agent->dacd.dase[idx].path_length; i++)
+                        printf("0x%02x ", dev_agent->dacd.dase[idx].path[i]);
+                printf("\n");
+        }
+
         printf("\n\n    CMRD Info:\n");
-        printf("        Unavilabe Bit Support:                         ");
+        printf("        Unavailable Bit Support:                       ");
         if (dev_agent->cmrd.flags == 1)
                 printf("Yes\n");
         else
@@ -833,7 +852,7 @@ cap_print_device_agents_info(const struct pqos_device_agent_info *dev_agent)
                dev_agent->cmrd.upscaling_factor);
 
         printf("\n\n    IBRD Info:\n");
-        printf("        Unavilabe Bit Support:                         ");
+        printf("        Unavailable Bit Support:                       ");
         if (dev_agent->ibrd.flags & UNAVAILABLE_BIT_SUPPORT)
                 printf("Yes\n");
         else
@@ -921,14 +940,18 @@ cap_print_erdt_info_topology(const struct pqos_erdt_info *erdt)
 
         printf("\n\n\n");
         for (idx = 0; idx < erdt->num_cpu_agents; idx++) {
-                printf("\n\nCPU Agent %d\n", idx);
+                printf("\n\nDomain ID %d\n",
+                       erdt->cpu_agents[idx].cacd.rmdd_domain_id);
+                printf("\n    Type: CPU\n");
                 cap_print_cpu_agents_info(
                     (const struct pqos_cpu_agent_info *)&erdt->cpu_agents[idx]);
         }
 
         printf("\n\n\n");
         for (idx = 0; idx < erdt->num_dev_agents; idx++) {
-                printf("\n\nDevice Agent %d\n", idx);
+                printf("\n\nDomain ID %d\n",
+                       erdt->dev_agents[idx].dacd.rmdd_domain_id);
+                printf("\n    Type: Device\n");
                 cap_print_device_agents_info(
                     (const struct pqos_device_agent_info *)&erdt
                         ->dev_agents[idx]);
