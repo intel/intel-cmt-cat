@@ -40,6 +40,7 @@
 #include "lock.h"
 #include "log.h"
 #include "mmio_allocation.h"
+#include "mmio_monitoring.h"
 #include "monitoring.h"
 #include "os_allocation.h"
 #include "os_monitoring.h"
@@ -259,8 +260,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.pid_get_pid_assoc = os_pid_get_pid_assoc;
 #endif
         } else if (interface == PQOS_INTER_MMIO) {
-
-                api.mon_reset = hw_mon_reset;
+                api.mon_reset = mmio_mon_reset;
                 api.alloc_assoc_get_channel = hw_alloc_assoc_get_channel;
                 api.alloc_assoc_set_channel = hw_alloc_assoc_set_channel;
                 api.alloc_reset = mmio_alloc_reset;
@@ -268,6 +268,8 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.l3ca_get = mmio_l3ca_get;
                 api.mba_get = mmio_mba_get;
                 api.mba_set = mmio_mba_set;
+                api.mon_start_cores = mmio_mon_start_cores;
+                api.mon_stop = mmio_mon_stop;
         }
 
         return PQOS_RETVAL_OK;

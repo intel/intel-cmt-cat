@@ -144,6 +144,7 @@ struct pqos_mon_data_internal {
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_ERROR if error occurs
  */
 int pqos_mon_init(const struct pqos_cpuinfo *cpu,
                   const struct pqos_cap *cap,

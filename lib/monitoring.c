@@ -35,6 +35,7 @@
 #include "cap.h"
 #include "hw_monitoring.h"
 #include "log.h"
+#include "mmio_monitoring.h"
 #include "os_monitoring.h"
 #include "perf_monitoring.h"
 #include "types.h"
@@ -84,7 +85,7 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
               const struct pqos_config *cfg)
 {
         const struct pqos_capability *item = NULL;
-        int ret;
+        int ret = PQOS_RETVAL_OK;
         enum pqos_interface interface = _pqos_get_inter();
 
         UNUSED_PARAM(cfg);
@@ -112,6 +113,11 @@ pqos_mon_init(const struct pqos_cpuinfo *cpu,
 #endif
         if (interface == PQOS_INTER_MSR)
                 ret = hw_mon_init(cpu, cap);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (interface == PQOS_INTER_MMIO)
+                ret = mmio_mon_init(cpu, cap);
 
 pqos_mon_init_exit:
         return ret;
@@ -129,8 +135,14 @@ pqos_mon_fini(void)
                 ret = os_mon_fini();
         if (interface == PQOS_INTER_MSR)
                 ret = hw_mon_fini();
+
+        if (interface == PQOS_INTER_MMIO)
+                ret = mmio_mon_fini();
 #else
-        ret = hw_mon_fini();
+        if (interface == PQOS_INTER_MMIO)
+                ret = mmio_mon_fini();
+        else if (interface == PQOS_INTER_MSR)
+                ret = hw_mon_fini();
 #endif
 
         return ret;
@@ -141,6 +153,7 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
 {
         unsigned i;
         int ret = PQOS_RETVAL_OK;
+        enum pqos_interface interface = _pqos_get_inter();
 
         /** List of non virtual events */
         const enum pqos_mon_event mon_event[] = {
@@ -171,7 +184,22 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
                  * poll hw event
                  */
                 if (group->intl->hw.event & evt) {
-                        ret = hw_mon_poll(group, evt);
+                        if (interface == PQOS_INTER_MMIO) {
+                                // Skip MMIO events that are not supported
+                                if ((evt ==
+                                     PQOS_PERF_EVENT_LLC_MISS_PCIE_READ) ||
+                                    (evt ==
+                                     PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE) ||
+                                    (evt ==
+                                     PQOS_PERF_EVENT_LLC_REF_PCIE_READ) ||
+                                    (evt == PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE))
+                                        continue;
+
+                                ret = mmio_mon_poll(group, evt);
+                        } else {
+                                ret = hw_mon_poll(group, evt);
+                        }
+
                         if (ret != PQOS_RETVAL_OK)
                                 goto poll_events_exit;
                 }

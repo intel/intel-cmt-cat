@@ -70,12 +70,14 @@ PQOS_LOCAL int hw_detect_hybrid(void);
  *
  * @param r_cap place to store monitoring capabilities structure
  * @param cpu detected cpu topology
+ * @param interface MSR or MMIO interface
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK success
  */
 PQOS_LOCAL int hw_cap_mon_discover(struct pqos_cap_mon **r_cap,
-                                   const struct pqos_cpuinfo *cpu);
+                                   const struct pqos_cpuinfo *cpu,
+                                   enum pqos_interface interface);
 
 /**
  * @brief Checks L3 CDP enable status across all CPU sockets

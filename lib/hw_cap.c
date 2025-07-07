@@ -36,6 +36,7 @@
 
 #include "hw_cap.h"
 
+#include "cap.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
 #include "hw_monitoring.h"
@@ -323,7 +324,9 @@ hw_detect_hybrid(void)
  * @retval PQOS_RETVAL_ERROR enumeration error
  */
 int
-hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
+hw_cap_mon_discover(struct pqos_cap_mon **r_mon,
+                    const struct pqos_cpuinfo *cpu,
+                    enum pqos_interface interface)
 {
         struct cpuid_out res, cpuid_0xa;
         struct cpuid_out cpuid_0xf_1;
@@ -354,7 +357,7 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                 return PQOS_RETVAL_RESOURCE;
         }
 
-        /**
+        /*
          * MAX_RMID for the socket
          */
         max_rmid = (unsigned)res.ebx + 1;
@@ -374,8 +377,14 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                 num_events++; /**< LLC occupancy */
         if (cpuid_0xf_1.edx & PQOS_CPUID_MON_TMEM_BW_BIT)
                 num_events++; /**< total memory bandwidth event */
-        if (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT)
+
+        if (interface == PQOS_INTER_MMIO) {
                 num_events++; /**< local memory bandwidth event */
+        } else {
+                if (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT)
+                        num_events++; /**< local memory bandwidth event */
+        }
+
         if ((cpuid_0xf_1.edx & PQOS_CPUID_MON_TMEM_BW_BIT) &&
             (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT))
                 num_events++; /**< remote memory bandwidth virtual event */
@@ -464,6 +473,16 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
                                              max_rmid, scale_factor,
                                              counter_length, num_events, iordt);
                 }
+
+                if (interface == PQOS_INTER_MMIO) {
+                        int iordt =
+                            cpuid_0xf_1.eax & PQOS_CPUID_MON_IO_MEM_BW ? 1 : 0;
+
+                        add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
+                                             max_rmid, scale_factor,
+                                             counter_length, num_events, iordt);
+                }
+
                 if ((cpuid_0xf_1.edx & PQOS_CPUID_MON_TMEM_BW_BIT) &&
                     (cpuid_0xf_1.edx & PQOS_CPUID_MON_LMEM_BW_BIT)) {
                         int iordt =

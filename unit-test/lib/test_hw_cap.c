@@ -161,11 +161,12 @@ test_hw_cap_mon_discover_unsupported(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_mon *cap_mon = NULL;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         int ret;
 
         _lcpuid_add(0x7, 0x0, 0x0, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
         assert_null(cap_mon);
 }
@@ -175,12 +176,13 @@ test_hw_cap_mon_discover_unsupported2(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         struct pqos_cap_mon *cap_mon = NULL;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         int ret;
 
         _lcpuid_add(0x7, 0x0, 0x0, 0x1000, 0x0, 0x0);
         _lcpuid_add(0xf, 0x0, 0x0, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
         assert_null(cap_mon);
 }
@@ -189,6 +191,7 @@ static void
 test_hw_cap_mon_discover_tmem(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         struct pqos_cap_mon *cap_mon = NULL;
         int ret;
         uint32_t max_rmid = 10;
@@ -201,7 +204,7 @@ test_hw_cap_mon_discover_tmem(void **state)
                     0x2);
         _lcpuid_add(0xa, 0x0, 0x0, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
         assert_int_equal(cap_mon->num_events, 1);
@@ -218,6 +221,7 @@ static void
 test_hw_cap_mon_discover_lmem(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         struct pqos_cap_mon *cap_mon = NULL;
         int ret;
         uint32_t max_rmid = 10;
@@ -230,7 +234,7 @@ test_hw_cap_mon_discover_lmem(void **state)
                     0x4);
         _lcpuid_add(0xa, 0x0, 0x0, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
         assert_int_equal(cap_mon->num_events, 1);
@@ -247,6 +251,7 @@ static void
 test_hw_cap_mon_discover_llc(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         struct pqos_cap_mon *cap_mon = NULL;
         int ret;
         uint32_t max_rmid = 10;
@@ -259,7 +264,7 @@ test_hw_cap_mon_discover_llc(void **state)
                     0x1);
         _lcpuid_add(0xa, 0x0, 0x0, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
         assert_int_equal(cap_mon->num_events, 1);
@@ -276,6 +281,7 @@ static void
 test_hw_cap_mon_discover_rmem(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         struct pqos_cap_mon *cap_mon = NULL;
         int ret;
         unsigned i;
@@ -292,7 +298,7 @@ test_hw_cap_mon_discover_rmem(void **state)
                     0x6);
         _lcpuid_add(0xa, 0x0, 0x0, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
         assert_int_equal(cap_mon->num_events, 3);
@@ -322,6 +328,7 @@ static void
 test_hw_cap_mon_discover_ipc(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         struct pqos_cap_mon *cap_mon = NULL;
         int ret;
         uint32_t max_rmid = 10;
@@ -334,7 +341,7 @@ test_hw_cap_mon_discover_ipc(void **state)
                     0x4);
         _lcpuid_add(0xa, 0x0, 0x0, 0x0, 0x0, 0x603);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
         assert_int_equal(cap_mon->num_events, 2);
@@ -350,6 +357,7 @@ static void
 test_hw_cap_mon_discover_llc_miss(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         struct pqos_cap_mon *cap_mon = NULL;
         int ret;
         uint32_t max_rmid = 10;
@@ -362,7 +370,7 @@ test_hw_cap_mon_discover_llc_miss(void **state)
                     0x4);
         _lcpuid_add(0xa, 0x0, 0x7300803, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
         assert_int_equal(cap_mon->num_events, 3);
@@ -378,6 +386,7 @@ static void
 test_hw_cap_mon_discover_llc_ref(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
+        enum pqos_interface iface = PQOS_INTER_MSR;
         struct pqos_cap_mon *cap_mon = NULL;
         int ret;
         uint32_t max_rmid = 10;
@@ -390,7 +399,7 @@ test_hw_cap_mon_discover_llc_ref(void **state)
                     0x4);
         _lcpuid_add(0xa, 0x0, 0x7300803, 0x0, 0x0, 0x0);
 
-        ret = hw_cap_mon_discover(&cap_mon, data->cpu);
+        ret = hw_cap_mon_discover(&cap_mon, data->cpu, iface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_non_null(cap_mon);
         assert_int_equal(cap_mon->num_events, 3);

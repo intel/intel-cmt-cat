@@ -52,9 +52,9 @@
 
 #include "allocation.h"
 #include "api.h"
+#include "cores_domains.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
-#include "cores_domains.h"
 #include "erdt.h"
 #include "hw_cap.h"
 #include "iordt.h"
@@ -386,7 +386,7 @@ discover_capabilities(struct pqos_cap **p_cap,
          * Monitoring init
          */
         if (inter == PQOS_INTER_MSR || inter == PQOS_INTER_MMIO)
-                ret = hw_cap_mon_discover(&det_mon, cpu);
+                ret = hw_cap_mon_discover(&det_mon, cpu, inter);
 #ifdef __linux__
         else if (inter == PQOS_INTER_OS || inter == PQOS_INTER_OS_RESCTRL_MON)
                 ret = os_cap_mon_discover(&det_mon, cpu);
