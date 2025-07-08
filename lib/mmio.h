@@ -42,9 +42,13 @@ extern "C" {
 #include "types.h"
 
 /* MMIO constants */
-#define RDT_REG_SIZE 8
-#define PAGE_SIZE    4096
-#define MBA_MAX_BW   0x1FF
+#define RDT_REG_SIZE         8
+#define PAGE_SIZE            4096
+#define BYTES_PER_REGION_SET 512
+#define BYTES_PER_CLOS_ENTRY 8
+#define BYTES_PER_RMID_ENTRY 8
+#define MBM_REGION_SIZE      2048
+#define MBA_MAX_BW           0x1FF
 
 /* MMIO registers bit fields */
 

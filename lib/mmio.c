@@ -41,15 +41,31 @@
 #include "log.h"
 #include "string.h"
 
+#include <inttypes.h>
+
 /* Helper functions for MMIO data retriveal */
+
+static uint64_t *
+_get_clos_addr_by_region(uint64_t *mem,
+                         unsigned int region_number,
+                         unsigned int clos_number)
+{
+        LOG_INFO("%s(): mem: %p, region_number: %u, clos_number: %u\n",
+                 __func__, (const void *)mem, region_number, clos_number);
+#include <inttypes.h>
+
+        return (uint64_t *)((uint8_t *)mem +
+                            (region_number / 4) * BYTES_PER_REGION_SET +
+                            clos_number * BYTES_PER_CLOS_ENTRY);
+}
 
 static int
 _get_clos_region_value(uint64_t clos_value,
                        unsigned int region_number,
                        unsigned int *value)
 {
-        LOG_INFO("%s(): clos_value: %#lx, region_number: %u\n", __func__,
-                 clos_value, region_number);
+        LOG_INFO("%s(): clos_value: %#" PRIx64 ", region_number: %u\n",
+                 __func__, clos_value, region_number);
 
         switch (region_number) {
         case 0:
@@ -79,32 +95,32 @@ _get_clos_region_value(uint64_t clos_value,
 }
 
 static int
-_set_clos_region_value(uint64_t clos_addr,
+_set_clos_region_value(uint64_t *clos_addr,
                        unsigned int region_number,
                        uint64_t value)
 {
-        uint64_t clos_value = *(uint64_t *)clos_addr;
+        uint64_t clos_value = *clos_addr;
 
-        LOG_INFO("%s(): clos_addr: %#lx, region_number: %u, value: %#lx\n",
-                 __func__, clos_addr, region_number, value);
+        LOG_INFO("%s(): clos addr %p , region_number: %u, value %#" PRIx64 "\n",
+                 __func__, (void *)clos_addr, region_number, value);
 
         switch (region_number) {
         case 0:
-                *(uint64_t *)clos_addr = (uint64_t)(
+                *clos_addr = (uint64_t)(
                     (clos_value & MBA_BW_ALL_BR0_RESET_MASK) | value);
                 break;
         case 1:
-                *(uint64_t *)clos_addr =
+                *clos_addr =
                     (uint64_t)((clos_value & MBA_BW_ALL_BR1_RESET_MASK) |
                                value << MBA_BW_ALL_BR1_SHIFT);
                 break;
         case 2:
-                *(uint64_t *)clos_addr =
+                *clos_addr =
                     (uint64_t)((clos_value & MBA_BW_ALL_BR2_RESET_MASK) |
                                value << MBA_BW_ALL_BR2_SHIFT);
                 break;
         case 3:
-                *(uint64_t *)clos_addr =
+                *clos_addr =
                     (uint64_t)((clos_value & MBA_BW_ALL_BR3_RESET_MASK) |
                                value << MBA_BW_ALL_BR3_SHIFT);
                 break;
@@ -114,8 +130,8 @@ _set_clos_region_value(uint64_t clos_addr,
                 return PQOS_RETVAL_ERROR;
         }
 
-        LOG_INFO("%s(): output_value: %#lx\n", __func__,
-                 (unsigned long)*(uint64_t *)clos_addr);
+        LOG_INFO("%s(): output_value %#" PRIx64 "\n", __func__,
+                 *(uint64_t *)clos_addr);
 
         return PQOS_RETVAL_OK;
 }
@@ -123,7 +139,7 @@ _set_clos_region_value(uint64_t clos_addr,
 static int
 _copy_generic_rmid_range(unsigned int rmid_first,
                          unsigned int rmid_last,
-                         uint64_t register_base_address,
+                         uint64_t *register_base_address,
                          uint16_t register_clump_size,
                          uint16_t register_clump_stride,
                          uint16_t register_offset,
@@ -131,23 +147,23 @@ _copy_generic_rmid_range(unsigned int rmid_first,
 {
         unsigned int rmid_count = rmid_last - rmid_first + 1;
         unsigned int rmid_idx, rmid_to_copy;
-        uint64_t cur_clump_addr;
+        uint64_t *cur_clump_addr;
 
         LOG_INFO("%s(): rmid_first: %u, rmid_last: %u,"
-                 " register_base_address: %lx,"
+                 " register_base_address: %p,"
                  " register_clump_size: %u,"
                  " register_clump_stride: %u,"
                  " register_offset: %u,"
                  " rmids_val: %p\n",
-                 __func__, rmid_first, rmid_last, register_base_address,
+                 __func__, rmid_first, rmid_last, (void *)register_base_address,
                  register_clump_size, register_clump_stride, register_offset,
                  rmids_val);
 
         /* Initial clump address */
-        cur_clump_addr =
-            register_base_address +
-            (rmid_first / register_clump_size) * register_clump_stride +
-            register_offset;
+        cur_clump_addr = (uint64_t *)((uint8_t *)register_base_address +
+                                      (rmid_first / register_clump_size) *
+                                          register_clump_stride +
+                                      register_offset);
 
         /* First RMID index in the initial clump */
         rmid_idx = rmid_first % register_clump_size;
@@ -158,13 +174,15 @@ _copy_generic_rmid_range(unsigned int rmid_first,
         while (rmid_count > 0) {
                 if (rmid_count <= rmid_to_copy) {
                         memcpy(rmids_val,
-                               (const void *)(cur_clump_addr + rmid_idx * 8),
-                               rmid_count * 8);
+                               (const void *)((uint8_t *)cur_clump_addr +
+                                              rmid_idx * BYTES_PER_RMID_ENTRY),
+                               rmid_count * BYTES_PER_RMID_ENTRY);
                         break;
                 } else {
                         memcpy(rmids_val,
-                               (const void *)(cur_clump_addr + rmid_idx * 8),
-                               rmid_to_copy * 8);
+                               (const void *)((uint8_t *)cur_clump_addr +
+                                              rmid_idx * BYTES_PER_RMID_ENTRY),
+                               rmid_to_copy * BYTES_PER_RMID_ENTRY);
 
                         rmids_val = (uint64_t *)rmids_val + rmid_to_copy;
                         rmid_count -= rmid_to_copy;
@@ -235,12 +253,13 @@ get_l3_cmt_rmid_range_v1(const struct pqos_erdt_cmrc *cmrc,
                  __func__, (const void *)cmrc, rmid_first, rmid_last,
                  rmids_val);
 
-        LOG_INFO("Base Addr: %#lx, Block size in 4k pages: %u, Clump size:"
+        LOG_INFO("Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u, Clump size:"
                  " %u, Clump Stride: %u\n",
                  cmrc->block_base_addr, cmrc->block_size, cmrc->clump_size,
                  cmrc->clump_stride);
 
-        ret = _copy_generic_rmid_range(rmid_first, rmid_last, (uint64_t)mem,
+        ret = _copy_generic_rmid_range(rmid_first, rmid_last, mem,
                                        cmrc->clump_size, cmrc->clump_stride, 0,
                                        (void *)rmids_val);
 
@@ -270,15 +289,18 @@ get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
                  __func__, (const void *)mmrc, rmid_first, rmid_last,
                  region_number, (void *)rmids_val);
 
-        LOG_INFO("Base Addr: %#lx, Block size in 4k pages: %u\n",
+        LOG_INFO("Base Addr: %#" PRIx64 ", Block size in 4k pages: %u\n",
                  mmrc->reg_block_base_addr, mmrc->reg_block_size);
 
         rmid_block_addr = ((rmid_first % 32) / 8) * 4 * PAGE_SIZE;
-        rmid_offset = ((((rmid_first / 32) * 8) + rmid_first % 8) * 8) +
-                      (uint64_t)region_number * 2048;
+        rmid_offset =
+            ((((rmid_first / 32) * BYTES_PER_RMID_ENTRY) + rmid_first % 8) *
+             BYTES_PER_RMID_ENTRY) +
+            (uint64_t)region_number * MBM_REGION_SIZE;
 
-        memcpy(rmids_val, (const void *)(mem + rmid_block_addr + rmid_offset),
-               rmid_count * 8);
+        memcpy(rmids_val,
+               (const void *)((uint8_t *)mem + rmid_block_addr + rmid_offset),
+               rmid_count * BYTES_PER_RMID_ENTRY);
 
         pqos_munmap(mem, size);
 
@@ -291,7 +313,6 @@ get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                                   unsigned int clos_number,
                                   unsigned int *value)
 {
-        uint64_t clos_addr;
         unsigned int ret;
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
@@ -307,13 +328,13 @@ get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                  __func__, (const void *)marc, region_number, clos_number,
                  (void *)value);
 
-        LOG_INFO("Optimal Base Addr: %#lx, Block size in 4k pages: %u\n",
+        LOG_INFO("Optimal Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u\n",
                  marc->opt_bw_reg_block_base_addr, marc->reg_block_size);
 
-        clos_addr = (uint64_t)mem + (region_number / 4) * 512 + clos_number * 8;
-
-        ret = _get_clos_region_value(*(uint64_t *)clos_addr, region_number,
-                                     value);
+        ret = _get_clos_region_value(
+            *_get_clos_addr_by_region(mem, region_number, clos_number),
+            region_number, value);
         pqos_munmap(mem, size);
 
         return ret;
@@ -325,7 +346,6 @@ set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                                   unsigned int clos_number,
                                   unsigned int value)
 {
-        uint64_t clos_addr;
         unsigned ret;
         uint64_t *mem;
 
@@ -340,12 +360,13 @@ set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                  __func__, (const void *)marc, region_number, clos_number,
                  value);
 
-        LOG_INFO("Optimal Base Addr: %#lx, Block size in 4k pages: %u\n",
+        LOG_INFO("Optimal Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u\n",
                  marc->opt_bw_reg_block_base_addr, marc->reg_block_size);
 
-        clos_addr = (uint64_t)mem + (region_number / 4) * 512 + clos_number * 8;
-
-        ret = _set_clos_region_value(clos_addr, region_number, value);
+        ret = _set_clos_region_value(
+            _get_clos_addr_by_region(mem, region_number, clos_number),
+            region_number, value);
 
         pqos_munmap(mem, RDT_REG_SIZE);
 
@@ -358,7 +379,6 @@ get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                               unsigned int clos_number,
                               unsigned int *value)
 {
-        uint64_t clos_addr;
         unsigned ret;
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
@@ -374,13 +394,12 @@ get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                  __func__, (const void *)marc, region_number, clos_number,
                  (void *)value);
 
-        LOG_INFO("Min Base Addr: %#lx, Block size in 4k pages: %u\n",
+        LOG_INFO("Min Base Addr: %#" PRIx64 ", Block size in 4k pages: %u\n",
                  marc->min_bw_reg_block_base_addr, marc->reg_block_size);
 
-        clos_addr = (uint64_t)mem + (region_number / 4) * 512 + clos_number * 8;
-
-        ret = _get_clos_region_value(*(uint64_t *)clos_addr, region_number,
-                                     value);
+        ret = _get_clos_region_value(
+            *_get_clos_addr_by_region(mem, region_number, clos_number),
+            region_number, value);
 
         pqos_munmap(mem, size);
 
@@ -393,7 +412,6 @@ set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                               unsigned int clos_number,
                               unsigned int value)
 {
-        uint64_t clos_addr;
         unsigned ret;
         uint64_t *mem;
 
@@ -407,12 +425,13 @@ set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                  __func__, (const void *)marc, region_number, clos_number,
                  value);
 
-        LOG_INFO("Minimal Base Addr: %#lx, Block size in 4k pages: %u\n",
+        LOG_INFO("Minimal Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u\n",
                  marc->min_bw_reg_block_base_addr, marc->reg_block_size);
 
-        clos_addr = (uint64_t)mem + (region_number / 4) * 512 + clos_number * 8;
-
-        ret = _set_clos_region_value(clos_addr, region_number, value);
+        ret = _set_clos_region_value(
+            _get_clos_addr_by_region(mem, region_number, clos_number),
+            region_number, value);
 
         pqos_munmap(mem, RDT_REG_SIZE);
 
@@ -425,7 +444,6 @@ get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                               unsigned int clos_number,
                               unsigned int *value)
 {
-        uint64_t clos_addr;
         unsigned ret;
         uint64_t *mem;
 
@@ -439,13 +457,12 @@ get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                  __func__, (const void *)marc, region_number, clos_number,
                  (void *)value);
 
-        LOG_INFO("Max Base Addr: %#lx, Block size in 4k pages: %u\n",
+        LOG_INFO("Max Base Addr: %#" PRIx64 ", Block size in 4k pages: %u\n",
                  marc->max_bw_reg_block_base_addr, marc->reg_block_size);
 
-        clos_addr = (uint64_t)mem + (region_number / 4) * 512 + clos_number * 8;
-
-        ret = _get_clos_region_value(*(uint64_t *)clos_addr, region_number,
-                                     value);
+        ret = _get_clos_region_value(
+            *_get_clos_addr_by_region(mem, region_number, clos_number),
+            region_number, value);
         pqos_munmap(mem, RDT_REG_SIZE);
 
         return ret;
@@ -457,7 +474,6 @@ set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                               unsigned int clos_number,
                               unsigned int value)
 {
-        uint64_t clos_addr;
         unsigned ret;
         uint64_t *mem;
 
@@ -471,12 +487,13 @@ set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                  __func__, (const void *)marc, region_number, clos_number,
                  value);
 
-        LOG_INFO("Maximal Base Addr: %#lx, Block size in 4k pages: %u\n",
+        LOG_INFO("Maximal Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u\n",
                  marc->max_bw_reg_block_base_addr, marc->reg_block_size);
 
-        clos_addr = (uint64_t)mem + (region_number / 4) * 512 + clos_number * 8;
-
-        ret = _set_clos_region_value(clos_addr, region_number, value);
+        ret = _set_clos_region_value(
+            _get_clos_addr_by_region(mem, region_number, clos_number),
+            region_number, value);
 
         pqos_munmap(mem, RDT_REG_SIZE);
 
@@ -502,12 +519,13 @@ get_iol3_cmt_rmid_range_v1(const struct pqos_erdt_cmrd *cmrd,
                  __func__, (const void *)cmrd, rmid_first, rmid_last,
                  (void *)rmids_val);
 
-        LOG_INFO("Base Addr: %#lx, Block size in 4k pages: %u, Offset for IO: "
+        LOG_INFO("Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u, Offset for IO: "
                  " %u, Clump Size: %u\n",
                  cmrd->reg_base_addr, cmrd->reg_block_size, cmrd->offset,
                  cmrd->clump_size);
 
-        ret = _copy_generic_rmid_range(rmid_first, rmid_last, (uint64_t)mem,
+        ret = _copy_generic_rmid_range(rmid_first, rmid_last, mem,
                                        cmrd->clump_size, PAGE_SIZE,
                                        cmrd->offset, (void *)rmids_val);
         pqos_munmap(mem, size);
@@ -539,7 +557,7 @@ get_total_iol3_mbm_rmid_range_v1(const struct pqos_erdt_ibrd *ibrd,
                  ibrd->reg_base_addr, ibrd->reg_block_size, ibrd->bw_reg_offset,
                  ibrd->bw_reg_clump_size);
 
-        ret = _copy_generic_rmid_range(rmid_first, rmid_last, (uint64_t)mem,
+        ret = _copy_generic_rmid_range(rmid_first, rmid_last, mem,
                                        ibrd->bw_reg_clump_size, PAGE_SIZE,
                                        ibrd->bw_reg_offset, (void *)rmids_val);
         pqos_munmap(mem, size);
@@ -566,14 +584,15 @@ get_miss_iol3_mbm_rmid_range_v1(const struct pqos_erdt_ibrd *ibrd,
                  __func__, (const void *)ibrd, rmid_first, rmid_last,
                  (void *)rmids_val);
 
-        LOG_INFO("Base Addr: %#lx, Block size in 4k pages: %u, IO Miss BW "
+        LOG_INFO("Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u, IO Miss BW "
                  "register offset: %u, IO miss register Clump Size: %u\n",
                  ibrd->reg_base_addr, ibrd->reg_block_size,
                  ibrd->miss_bw_reg_offset, ibrd->bw_reg_clump_size);
 
         ret = _copy_generic_rmid_range(
-            rmid_first, rmid_last, (uint64_t)mem, ibrd->miss_reg_clump_size,
-            PAGE_SIZE, ibrd->miss_bw_reg_offset, (void *)rmids_val);
+            rmid_first, rmid_last, mem, ibrd->miss_reg_clump_size, PAGE_SIZE,
+            ibrd->miss_bw_reg_offset, (void *)rmids_val);
 
         pqos_munmap(mem, size);
 
@@ -596,13 +615,15 @@ get_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
         LOG_INFO("%s(): card: %p, clos_number: %u, value: %p\n", __func__,
                  (const void *)card, clos_number, (void *)value);
 
-        LOG_INFO("Base Addr: %#lx, Block size in 4k pages: %u\n, CAT register "
+        LOG_INFO("Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u\n, CAT register "
                  "4k page offset for IO %u, CAT register block size: %u\n",
                  card->reg_base_addr, card->reg_block_size,
                  card->cat_reg_offset, card->cat_reg_block_size);
 
         *value = *(uint64_t *)((uint8_t *)mem + card->cat_reg_offset +
-                               (clos_number * 8) + (PAGE_SIZE * block_number));
+                               (clos_number * BYTES_PER_CLOS_ENTRY) +
+                               (PAGE_SIZE * block_number));
         *value = *value >> IOL3_CBM_SHIFT;
 
         pqos_munmap(mem, size);
@@ -626,7 +647,8 @@ set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
         LOG_INFO("%s(): card: %p, clos_number: %u, value: %lu\n", __func__,
                  (const void *)card, clos_number, value);
 
-        LOG_INFO("Base Addr: %#lx, Block size in 4k pages: %u\n, CAT register "
+        LOG_INFO("Base Addr: %#" PRIx64
+                 ", Block size in 4k pages: %u\n, CAT register "
                  "4k page offset for IO %u, CAT register block size: %u\n",
                  card->reg_base_addr, card->reg_block_size,
                  card->cat_reg_offset, card->cat_reg_block_size);
@@ -641,7 +663,8 @@ set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
 
         for (unsigned i = 0; i < card->reg_block_size; i++) {
                 clos_addr = (uint64_t *)((uint8_t *)mem + card->cat_reg_offset +
-                                         (clos_number * 8) + (PAGE_SIZE * i));
+                                         (clos_number * BYTES_PER_CLOS_ENTRY) +
+                                         (PAGE_SIZE * i));
                 *clos_addr = value << IOL3_CBM_SHIFT;
         }
 
