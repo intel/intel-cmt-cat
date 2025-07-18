@@ -266,6 +266,8 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.alloc_reset = mmio_alloc_reset;
                 api.l3ca_set = mmio_l3ca_set;
                 api.l3ca_get = mmio_l3ca_get;
+                api.mba_get = mmio_mba_get;
+                api.mba_set = mmio_mba_set;
         }
 
         return PQOS_RETVAL_OK;
@@ -606,6 +608,7 @@ pqos_mba_set(const unsigned mba_id,
 {
         int ret;
         unsigned i;
+        enum pqos_interface interface = _pqos_get_inter();
 
         if (requested == NULL || num_cos == 0)
                 return PQOS_RETVAL_PARAM;
@@ -621,7 +624,7 @@ pqos_mba_set(const unsigned mba_id,
         /**
          * Check if MBA rate is within allowed range
          */
-        for (i = 0; i < num_cos; i++) {
+        for (i = 0; i < num_cos && interface != PQOS_INTER_MMIO; i++) {
                 const struct cpuinfo_config *vconfig;
 
                 cpuinfo_get_config(&vconfig);

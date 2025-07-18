@@ -447,6 +447,46 @@ set_l2_cos(const unsigned class_id,
 }
 
 /**
+ * @brief Print Region Aware MBA command success log
+ *
+ * @param mba requested table with Domain, CLOS & Memory Regions definition
+ * @param actual actual table with Domain, CLOS & Memory Regions definition
+ */
+static void
+print_mmio_mba_log(const struct pqos_mba *mba, const struct pqos_mba *actual)
+{
+        int region_idx = 0;
+        int ctrl_type_idx = 0;
+        const char *ctrl_type = NULL;
+
+        for (region_idx = 0; region_idx < mba->num_mem_regions; region_idx++)
+                for (ctrl_type_idx = 0; ctrl_type_idx < PQOS_BW_CTRL_TYPE_COUNT;
+                     ctrl_type_idx++) {
+                        if (mba->mem_regions[region_idx]
+                                .bw_ctrl_val[ctrl_type_idx] != -1) {
+                                printf("Domain id %u MBA COS%u "
+                                       "Memory Region %d ",
+                                       mba->domain_id, actual->class_id,
+                                       mba->mem_regions[region_idx].region_num);
+                                if (ctrl_type_idx == PQOS_BW_CTRL_TYPE_OPT_IDX)
+                                        ctrl_type = "Optimal Bandwidth";
+                                else if (ctrl_type_idx ==
+                                         PQOS_BW_CTRL_TYPE_MIN_IDX)
+                                        ctrl_type = "Minimum Bandwidth";
+                                else if (ctrl_type_idx ==
+                                         PQOS_BW_CTRL_TYPE_MAX_IDX)
+                                        ctrl_type = "Maximum Bandwidth";
+                                printf("%s=> ", ctrl_type);
+                                printf("0x%x requested, 0x%x applied\n",
+                                       mba->mem_regions[region_idx]
+                                           .bw_ctrl_val[ctrl_type_idx],
+                                       actual->mem_regions[region_idx]
+                                           .bw_ctrl_val[ctrl_type_idx]);
+                        }
+                }
+}
+
+/**
  * @brief Set MBA class definitions on selected sockets
  *
  * @param class_id MBA class ID to set
@@ -561,25 +601,33 @@ set_mba_cos(const unsigned class_id,
                 if (cpu->vendor == PQOS_VENDOR_AMD) {
                         package = "Core Complex";
                         unit = "";
-                } else {
+                } else if (interface != PQOS_INTER_MMIO) {
                         package = "SOCKET";
                         unit = "%";
-                }
+                } else
+                        package = "Domain id";
 
-                if (ret != PQOS_RETVAL_OK) {
+                if (ret != PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
+                        printf("%s %u MBA COS%u - FAILED!\n", package,
+                               mba.domain_id, mba.class_id);
+                        break;
+                } else if (ret != PQOS_RETVAL_OK) {
                         printf("%s %u MBA COS%u - FAILED!\n", package,
                                sock_ids[i], mba.class_id);
                         break;
                 }
 
-                printf("%s %u MBA COS%u => ", package, sock_ids[i],
-                       actual.class_id);
-
-                if (ctrl == 1)
-                        printf("%u MBps\n", mba.mb_max);
-                else
-                        printf("%u%s requested, %u%s applied\n", mba.mb_max,
-                               unit, actual.mb_max, unit);
+                if (interface == PQOS_INTER_MMIO)
+                        print_mmio_mba_log(&mba, &actual);
+                else {
+                        printf("%s %u MBA COS%u => ", package, sock_ids[i],
+                               actual.class_id);
+                        if (ctrl == 1)
+                                printf("%u MBps\n", mba.mb_max);
+                        else
+                                printf("%u%s requested, %u%s applied\n",
+                                       mba.mb_max, unit, actual.mb_max, unit);
+                }
 
                 set++;
         }
