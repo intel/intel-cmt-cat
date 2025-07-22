@@ -52,8 +52,6 @@ _get_clos_addr_by_region(uint64_t *mem,
 {
         LOG_INFO("%s(): mem: %p, region_number: %u, clos_number: %u\n",
                  __func__, (const void *)mem, region_number, clos_number);
-#include <inttypes.h>
-
         return (uint64_t *)((uint8_t *)mem +
                             (region_number / 4) * BYTES_PER_REGION_SET +
                             clos_number * BYTES_PER_CLOS_ENTRY);
