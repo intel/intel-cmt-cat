@@ -346,9 +346,10 @@ set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 {
         unsigned ret;
         uint64_t *mem;
+        uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
-        mem = (uint64_t *)pqos_mmap_write(marc->opt_bw_reg_block_base_addr,
-                                          RDT_REG_SIZE);
+        mem =
+            (uint64_t *)pqos_mmap_write(marc->opt_bw_reg_block_base_addr, size);
 
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
@@ -366,7 +367,7 @@ set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
             _get_clos_addr_by_region(mem, region_number, clos_number),
             region_number, value);
 
-        pqos_munmap(mem, RDT_REG_SIZE);
+        pqos_munmap(mem, size);
 
         return ret;
 }
@@ -412,9 +413,10 @@ set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 {
         unsigned ret;
         uint64_t *mem;
+        uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
-        mem = (uint64_t *)pqos_mmap_write(marc->min_bw_reg_block_base_addr,
-                                          RDT_REG_SIZE);
+        mem =
+            (uint64_t *)pqos_mmap_write(marc->min_bw_reg_block_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -431,7 +433,7 @@ set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
             _get_clos_addr_by_region(mem, region_number, clos_number),
             region_number, value);
 
-        pqos_munmap(mem, RDT_REG_SIZE);
+        pqos_munmap(mem, size);
 
         return ret;
 }
@@ -444,9 +446,10 @@ get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 {
         unsigned ret;
         uint64_t *mem;
+        uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
-        mem = (uint64_t *)pqos_mmap_read(marc->max_bw_reg_block_base_addr,
-                                         RDT_REG_SIZE);
+        mem =
+            (uint64_t *)pqos_mmap_read(marc->max_bw_reg_block_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -461,7 +464,7 @@ get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         ret = _get_clos_region_value(
             *_get_clos_addr_by_region(mem, region_number, clos_number),
             region_number, value);
-        pqos_munmap(mem, RDT_REG_SIZE);
+        pqos_munmap(mem, size);
 
         return ret;
 }
@@ -474,9 +477,10 @@ set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 {
         unsigned ret;
         uint64_t *mem;
+        uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
-        mem = (uint64_t *)pqos_mmap_write(marc->max_bw_reg_block_base_addr,
-                                          RDT_REG_SIZE);
+        mem =
+            (uint64_t *)pqos_mmap_write(marc->max_bw_reg_block_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
@@ -493,7 +497,7 @@ set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
             _get_clos_addr_by_region(mem, region_number, clos_number),
             region_number, value);
 
-        pqos_munmap(mem, RDT_REG_SIZE);
+        pqos_munmap(mem, size);
 
         return ret;
 }
@@ -655,7 +659,7 @@ set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
                 LOG_ERROR("%s: Register Block Size is 0. "
                           "Unable to write IO L3 CBM.\n",
                           __func__);
-                pqos_munmap(mem, RDT_REG_SIZE);
+                pqos_munmap(mem, size);
                 return PQOS_RETVAL_ERROR;
         }
 
