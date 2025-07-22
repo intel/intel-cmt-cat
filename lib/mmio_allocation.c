@@ -263,7 +263,7 @@ mmio_mba_set(const unsigned mba_id,
                         continue;
 
                 actual[i] = requested[i];
-                _get_regions_mba((const struct pqos_erdt_info *)&erdt,
+                _get_regions_mba((const struct pqos_erdt_info *)erdt,
                                  actual[i].class_id, actual[i].domain_id,
                                  actual[i].num_mem_regions,
                                  actual[i].mem_regions);
