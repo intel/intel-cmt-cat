@@ -205,7 +205,7 @@ mmio_mba_set(const unsigned mba_id,
         UNUSED_PARAM(mba_id);
 
         for (unsigned i = 0; i < num_cos; i++) {
-                for (int j = 0; j < requested[i].num_mem_regions - 1; j++) {
+                for (int j = 0; j < requested[i].num_mem_regions; j++) {
                         if (requested[i].mem_regions[j].region_num == -1)
                                 continue;
 
