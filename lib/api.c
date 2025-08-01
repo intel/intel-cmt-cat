@@ -263,6 +263,8 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.pid_get_pid_assoc = os_pid_get_pid_assoc;
 #endif
         } else if (interface == PQOS_INTER_MMIO) {
+                api.mon_assoc_get = hw_mon_assoc_get_core;
+                api.mon_assoc_get_channel = hw_mon_assoc_get_channel;
                 api.alloc_assoc_get_channel = hw_alloc_assoc_get_channel;
                 api.alloc_assoc_set_channel = hw_alloc_assoc_set_channel;
                 api.alloc_reset = mmio_alloc_reset;

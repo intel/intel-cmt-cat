@@ -84,7 +84,7 @@ monitor_csv_begin(FILE *fp)
 
                 pqos_inter_get(&iface);
 
-                if (iface == PQOS_INTER_MSR)
+                if (iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO)
                         fprintf(fp, ",RMID");
         }
 #endif
@@ -193,7 +193,7 @@ monitor_csv_row(FILE *fp,
         enum pqos_interface iface;
 
         pqos_inter_get(&iface);
-        if (iface == PQOS_INTER_MSR) {
+        if (iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO) {
                 pqos_rmid_t rmid = 0;
                 int ret = -1;
 
@@ -206,7 +206,8 @@ monitor_csv_row(FILE *fp,
                 if (ret != -1)
                         offset += fillin_csv_column(
                             ",%.0f", rmid, data + offset, sz_data - offset,
-                            ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR);
+                            ret == PQOS_RETVAL_OK,
+                            iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO);
         }
 #endif
 
@@ -259,7 +260,7 @@ monitor_csv_region_row(FILE *fp,
         enum pqos_interface iface;
 
         pqos_inter_get(&iface);
-        if (iface == PQOS_INTER_MSR) {
+        if (iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO) {
                 pqos_rmid_t rmid = 0;
                 int ret = PQOS_RETVAL_ERROR;
 

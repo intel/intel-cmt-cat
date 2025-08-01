@@ -122,7 +122,7 @@ monitor_text_header(FILE *fp,
 
                 pqos_inter_get(&iface);
 
-                if (iface == PQOS_INTER_MSR)
+                if (iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO)
                         fprintf(fp, " RMID");
         }
 #endif
@@ -243,7 +243,7 @@ monitor_text_row(FILE *fp,
         enum pqos_interface iface;
 
         pqos_inter_get(&iface);
-        if (iface == PQOS_INTER_MSR) {
+        if (iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO) {
                 pqos_rmid_t rmid = 0;
                 int ret = PQOS_RETVAL_ERROR;
 
@@ -256,7 +256,7 @@ monitor_text_row(FILE *fp,
                         offset += fillin_text_column(
                             " %4.0f", (double)rmid, data + offset,
                             sz_data - offset, ret == PQOS_RETVAL_OK,
-                            iface == PQOS_INTER_MSR);
+                            iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO);
         }
 #endif
 
@@ -309,7 +309,7 @@ monitor_text_region_row(FILE *fp,
         enum pqos_interface iface;
 
         pqos_inter_get(&iface);
-        if (iface == PQOS_INTER_MSR) {
+        if (iface == PQOS_INTER_MSR || iface == PQOS_INTER_MMIO) {
                 pqos_rmid_t rmid = 0;
                 int ret = PQOS_RETVAL_ERROR;
 
