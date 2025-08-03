@@ -1288,7 +1288,8 @@ static void
 monitor_setup_events(enum mon_group_type type,
                      enum pqos_mon_event *events,
                      const struct pqos_capability *const cap_mon,
-                     int iordt)
+                     int iordt,
+                     enum pqos_interface interface)
 {
         unsigned i;
         enum pqos_mon_event all_evts = (enum pqos_mon_event)0;
@@ -1323,6 +1324,11 @@ monitor_setup_events(enum mon_group_type type,
                         *events = PQOS_MON_EVENT_IO_L3_OCCUP |
                                   PQOS_MON_EVENT_IO_TOTAL_MEM_BW |
                                   PQOS_MON_EVENT_IO_MISS_MEM_BW;
+                else if (interface == PQOS_INTER_MMIO)
+                        *events = PQOS_MON_EVENT_L3_OCCUP |
+                                  PQOS_MON_EVENT_LMEM_BW |
+                                  PQOS_PERF_EVENT_LLC_MISS |
+                                  PQOS_PERF_EVENT_IPC;
                 else
                         *events = (enum pqos_mon_event)(all_evts & *events);
         } else {
@@ -1470,7 +1476,7 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 }
 
                 monitor_setup_events(grp->type, &grp->events, cap_mon,
-                                     monitor_iordt_mode());
+                                     monitor_iordt_mode(), interface);
 
                 if (grp->type == MON_GROUP_TYPE_CORE) {
                         /**
