@@ -46,6 +46,8 @@ extern "C" {
 #include <stdint.h>
 #include <stdio.h>
 
+#define MAX_DOMAINS 65535
+
 /**
  * @brief Defines allocation class of service
  *

@@ -2214,7 +2214,7 @@ selfn_alloc_domain_id(const char *arg)
 
         /* check for invalid resource ID */
         for (i = 0; i < n; i++) {
-                if (sel_alloc_domain_id.domain_ids[i] >= UINT_MAX) {
+                if (sel_alloc_domain_id.domain_ids[i] >= MAX_DOMAINS) {
                         printf("Domain ID out of range: %s\n", str);
                         exit(EXIT_FAILURE);
                 }
