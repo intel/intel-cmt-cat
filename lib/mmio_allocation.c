@@ -50,6 +50,44 @@
 #include <string.h>
 
 /**
+ * @brief Returns CPU agent information for a given domain
+ *
+ * @param [in]  domain_id domain to extract CPU agent information for
+ *
+ * @return CPU agent information for a given domain or NULL if not found
+ */
+static struct pqos_cpu_agent_info *
+get_cpu_agent_by_domain(unsigned int domain_id)
+{
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+
+        for (unsigned int i = 0; i < erdt->num_cpu_agents; i++)
+                if (erdt->cpu_agents[i].rmdd.domain_id == domain_id)
+                        return &erdt->cpu_agents[i];
+
+        return NULL;
+}
+
+/**
+ * @brief Returns DEV agent information for a given domain
+ *
+ * @param [in]  domain_id domain to extract DEV agent information for
+ *
+ * @return DEV agent information for a given domain or NULL if not found
+ */
+static struct pqos_device_agent_info *
+get_dev_agent_by_domain(unsigned int domain_id)
+{
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+
+        for (unsigned int i = 0; i < erdt->num_dev_agents; i++)
+                if (erdt->dev_agents[i].rmdd.domain_id == domain_id)
+                        return &erdt->dev_agents[i];
+
+        return NULL;
+}
+
+/**
  * @brief Populate mem_regions data structure for a given CLOS
  *
  * @param [in]  erdt erdt structure to obtain information for all domains
@@ -105,20 +143,15 @@ _get_regions_mba(const struct pqos_erdt_info *erdt,
 static int
 cap_get_mmio_l3ca_non_contiguous(unsigned domain_id)
 {
-        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
-        unsigned idx = 0;
+        struct pqos_device_agent_info *dev_agent;
 
-        if (erdt == NULL) {
-                LOG_ERROR("ERDT is unavailable\n");
+        dev_agent = get_dev_agent_by_domain(domain_id);
+        if (dev_agent == NULL) {
+                LOG_ERROR("domain_id is wrong\n");
                 return !ERDT_CAT_NON_CONTIGUOUS_CBM_SUPPORT;
         }
 
-        for (idx = 0; idx < erdt->num_dev_agents; idx++)
-                if (domain_id == erdt->dev_agents[idx].rmdd.domain_id)
-                        return erdt->dev_agents[idx].card.non_contiguous_cbm;
-
-        LOG_ERROR("Domain ID is unavailable\n");
-        return !ERDT_CAT_NON_CONTIGUOUS_CBM_SUPPORT;
+        return dev_agent->card.non_contiguous_cbm;
 }
 
 /**
@@ -132,20 +165,16 @@ cap_get_mmio_l3ca_non_contiguous(unsigned domain_id)
 static int
 cap_get_mmio_l3ca_zero_length(unsigned domain_id)
 {
-        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
-        unsigned idx = 0;
 
-        if (erdt == NULL) {
-                LOG_ERROR("ERDT is unavailable\n");
+        struct pqos_device_agent_info *dev_agent;
+
+        dev_agent = get_dev_agent_by_domain(domain_id);
+        if (dev_agent == NULL) {
+                LOG_ERROR("domain_id is wrong\n");
                 return !ERDT_CAT_ZERO_LENGTH_CBM_SUPPORT;
         }
 
-        for (idx = 0; idx < erdt->num_dev_agents; idx++)
-                if (domain_id == erdt->dev_agents[idx].rmdd.domain_id)
-                        return erdt->dev_agents[idx].card.zero_length_bitmask;
-
-        LOG_ERROR("Domain ID is unavailable\n");
-        return !ERDT_CAT_ZERO_LENGTH_CBM_SUPPORT;
+        return dev_agent->card.zero_length_bitmask;
 }
 
 int
@@ -203,6 +232,10 @@ mmio_mba_set(const unsigned mba_id,
         ASSERT(num_cos != 0);
         ASSERT(erdt != NULL);
         UNUSED_PARAM(mba_id);
+
+        // Check if domain is valid
+        if (!get_cpu_agent_by_domain(requested->domain_id))
+                return PQOS_RETVAL_PARAM;
 
         for (unsigned i = 0; i < num_cos; i++) {
                 for (int j = 0; j < requested[i].num_mem_regions; j++) {
@@ -287,6 +320,10 @@ mmio_mba_get(const unsigned mba_id,
         ASSERT(erdt != NULL);
         UNUSED_PARAM(mba_id);
 
+        // Check if domain is valid
+        if (!get_cpu_agent_by_domain(mba_tab->domain_id))
+                return PQOS_RETVAL_PARAM;
+
         for (unsigned i = 0; i < max_num_cos; i++) {
                 mba_tab[i].ctrl = 0;
                 mba_tab[i].class_id = i;
@@ -322,28 +359,19 @@ mmio_l3ca_set(const unsigned l3cat_id,
         ASSERT(erdt != NULL);
         UNUSED_PARAM(l3cat_id);
 
-        if (erdt == NULL)
-                return PQOS_RETVAL_ERROR;
-
         if (num_ca > erdt->max_clos)
                 return PQOS_RETVAL_ERROR;
 
-        for (i = 0; i < num_ca; i++) {
-                unsigned idx;
-                int domain_id_found = 0;
-
-                for (idx = 0; idx < erdt->num_dev_agents; idx++)
-                        if (ca[i].domain_id ==
-                            erdt->dev_agents[idx].rmdd.domain_id) {
-                                domain_id_found = 1;
-                                break;
-                        }
-                if (domain_id_found == 0) {
+        // Check if all domains are valid
+        for (unsigned i = 0; i < num_ca; i++) {
+                if (!get_dev_agent_by_domain(ca[i].domain_id)) {
                         LOG_ERROR("Domain id %u is unavailable\n",
                                   ca[i].domain_id);
                         return PQOS_RETVAL_PARAM;
                 }
+        }
 
+        for (i = 0; i < num_ca; i++) {
                 /* Check L3 CBM is non-contiguous */
                 if (!cap_get_mmio_l3ca_non_contiguous(ca[i].domain_id)) {
                         /* Check all COS CBM are contiguous */
@@ -364,8 +392,9 @@ mmio_l3ca_set(const unsigned l3cat_id,
                         return PQOS_RETVAL_PARAM;
                 }
 
-                ret = set_iol3_cbm_clos_v1(&erdt->dev_agents[idx].card,
-                                           ca[i].class_id, ca[i].u.ways_mask);
+                ret = set_iol3_cbm_clos_v1(
+                    &get_dev_agent_by_domain(ca[i].domain_id)->card,
+                    ca[i].class_id, ca[i].u.ways_mask);
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
         }
@@ -390,30 +419,22 @@ mmio_l3ca_get(const unsigned l3cat_id,
         ASSERT(erdt != NULL);
         UNUSED_PARAM(l3cat_id);
 
-        if (erdt == NULL)
-                return PQOS_RETVAL_ERROR;
-
         if (erdt->max_clos > max_num_ca)
                 return PQOS_RETVAL_ERROR;
 
-        for (i = 0; i < max_num_ca; i++) {
-                unsigned idx;
-                int domain_id_found = 0;
-
-                for (idx = 0; idx < erdt->num_dev_agents; idx++)
-                        if (ca[i].domain_id ==
-                            erdt->dev_agents[idx].rmdd.domain_id) {
-                                domain_id_found = 1;
-                                break;
-                        }
-                if (domain_id_found == 0) {
+        // Check if all domains are valid
+        for (unsigned i = 0; i < max_num_ca; i++) {
+                if (!get_dev_agent_by_domain(ca[i].domain_id)) {
                         LOG_ERROR("Domain id %u is unavailable\n",
                                   ca[i].domain_id);
                         return PQOS_RETVAL_PARAM;
                 }
+        }
 
-                ret = get_iol3_cbm_clos_v1(&erdt->dev_agents[idx].card, i,
-                                           REG_BLOCK_SIZE_ZERO, &value);
+        for (i = 0; i < max_num_ca; i++) {
+                ret = get_iol3_cbm_clos_v1(
+                    &get_dev_agent_by_domain(ca[i].domain_id)->card, i,
+                    REG_BLOCK_SIZE_ZERO, &value);
 
                 if (ret != PQOS_RETVAL_OK)
                         return ret;
