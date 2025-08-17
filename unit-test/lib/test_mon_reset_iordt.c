@@ -31,16 +31,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common_monitoring.h"
 #include "cpu_registers.h"
-#include "hw_monitoring.h"
 #include "mock_cap.h"
 #include "mock_machine.h"
 #include "test.h"
 
-/* ======== hw_mon_reset_iordt ======== */
+/* ======== mon_reset_iordt ======== */
 
 static void
-test_hw_mon_reset_iordt_enable(void **state)
+test_mon_reset_iordt_enable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         unsigned *sockets = NULL;
@@ -69,7 +69,7 @@ test_hw_mon_reset_iordt_enable(void **state)
                 will_return(__wrap_msr_write, PQOS_RETVAL_OK);
         }
 
-        ret = hw_mon_reset_iordt(data->cpu, 1);
+        ret = mon_reset_iordt(data->cpu, 1);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (sockets != NULL)
@@ -77,7 +77,7 @@ test_hw_mon_reset_iordt_enable(void **state)
 }
 
 static void
-test_hw_mon_reset_iordt_disable(void **state)
+test_mon_reset_iordt_disable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         unsigned *sockets = NULL;
@@ -106,7 +106,7 @@ test_hw_mon_reset_iordt_disable(void **state)
                 will_return(__wrap_msr_write, PQOS_RETVAL_OK);
         }
 
-        ret = hw_mon_reset_iordt(data->cpu, 0);
+        ret = mon_reset_iordt(data->cpu, 0);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (sockets != NULL)
@@ -114,7 +114,7 @@ test_hw_mon_reset_iordt_disable(void **state)
 }
 
 static void
-test_hw_mon_reset_iordt_error_read(void **state)
+test_mon_reset_iordt_error_read(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
@@ -126,12 +126,12 @@ test_hw_mon_reset_iordt_error_read(void **state)
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_IO_QOS_CFG);
         will_return(__wrap_msr_read, PQOS_RETVAL_ERROR);
 
-        ret = hw_mon_reset_iordt(data->cpu, 0);
+        ret = mon_reset_iordt(data->cpu, 0);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
 static void
-test_hw_mon_reset_iordt_error_write(void **state)
+test_mon_reset_iordt_error_write(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
@@ -149,7 +149,7 @@ test_hw_mon_reset_iordt_error_write(void **state)
         expect_value(__wrap_msr_write, value, 0);
         will_return(__wrap_msr_write, PQOS_RETVAL_ERROR);
 
-        ret = hw_mon_reset_iordt(data->cpu, 0);
+        ret = mon_reset_iordt(data->cpu, 0);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 }
 
@@ -159,10 +159,10 @@ main(void)
         int result = 0;
 
         const struct CMUnitTest tests[] = {
-            cmocka_unit_test(test_hw_mon_reset_iordt_enable),
-            cmocka_unit_test(test_hw_mon_reset_iordt_disable),
-            cmocka_unit_test(test_hw_mon_reset_iordt_error_read),
-            cmocka_unit_test(test_hw_mon_reset_iordt_error_write)};
+            cmocka_unit_test(test_mon_reset_iordt_enable),
+            cmocka_unit_test(test_mon_reset_iordt_disable),
+            cmocka_unit_test(test_mon_reset_iordt_error_read),
+            cmocka_unit_test(test_mon_reset_iordt_error_write)};
 
         result += cmocka_run_group_tests(tests, test_init_mon, test_fini);
 

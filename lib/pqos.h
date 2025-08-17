@@ -300,6 +300,11 @@ enum pqos_mon_event {
         PQOS_MON_EVENT_TMEM_BW = 4,  /**< Total memory bandwidth */
         PQOS_MON_EVENT_RMEM_BW = 8,  /**< Remote memory bandwidth
                                           (virtual event) */
+
+        PQOS_MON_EVENT_IO_L3_OCCUP = 0x10,     /**< LLC occupancy event */
+        PQOS_MON_EVENT_IO_TOTAL_MEM_BW = 0x20, /**< IO total memory bandwidth */
+        PQOS_MON_EVENT_IO_MISS_MEM_BW = 0x40,  /**< IO miss memory bandwidth */
+
         RESERVED1 = 0x1000,
         RESERVED2 = 0x2000,
         PQOS_PERF_EVENT_LLC_MISS = 0x4000, /**< LLC misses */
@@ -666,6 +671,16 @@ struct pqos_cores_domains {
 };
 
 /**
+ * Channels to Domains Mapping Structure
+ */
+struct pqos_channels_domains {
+        unsigned int num_channel_ids;
+        pqos_channel_t *channel_ids;
+        uint16_t *domain_ids;
+        uint16_t *domain_id_idxs;
+};
+
+/**
  * System configuration structure
  */
 struct pqos_sysconfig {
@@ -675,6 +690,8 @@ struct pqos_sysconfig {
         struct pqos_erdt_info *erdt; /**< ERDT ACPI table info */
         struct pqos_mrrm_info *mrrm; /**< Memory range & Region IDs info */
         struct pqos_cores_domains *cores_domains; /**< Cores to domains info */
+        struct pqos_channels_domains *channels_domains; /**< Channels to domains
+                                                           info */
 };
 
 /**
@@ -746,6 +763,11 @@ struct pqos_event_values {
 struct pqos_region_aware_event_values {
         uint64_t mbm_local[PQOS_MAX_MEM_REGIONS];
         uint64_t mbm_local_delta[PQOS_MAX_MEM_REGIONS];
+        uint64_t io_llc;
+        uint64_t io_total;
+        uint64_t io_total_delta;
+        uint64_t io_miss;
+        uint64_t io_miss_delta;
 };
 
 /**

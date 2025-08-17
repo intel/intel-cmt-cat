@@ -46,6 +46,15 @@ extern "C" {
 #include "pqos.h"
 #include "pqos_internal.h"
 #include "types.h"
+
+/**
+ * Special RMID - after reset all cores are associated with it.
+ *
+ * The assumption is that if core is not assigned to it
+ * then it is subject of monitoring activity by a different process.
+ */
+#define RMID0 (0)
+
 /**
  * @brief Writes \a lcore to RMID association
  *
@@ -130,6 +139,30 @@ int PQOS_LOCAL mon_events_valid(const struct pqos_cap *cap,
  */
 PQOS_LOCAL int mon_read_perf(struct pqos_mon_data *group,
                              const enum pqos_mon_event event);
+/**
+ * @brief Enables or disables I/O RDT monitoring across selected CPU sockets
+ *
+ * @param [in] cpu CPU information
+ * @param [in] enable I/O RDT enable/disable flag, 1 - enable, 0 - disable
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
+ */
+PQOS_LOCAL int mon_reset_iordt(const struct pqos_cpuinfo *cpu,
+                               const int enable);
+
+/**
+ * @brief Hardware interface to reset monitoring by binding all cores with RMID0
+ *
+ * As part of monitoring reset I/O RDT * SNC reconfiguration can be performed.
+ * This can be requested via \a cfg.
+ *
+ * @param [in] cfg requested configuration
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int mon_reset(const struct pqos_mon_config *cfg);
 
 #ifdef __cplusplus
 }

@@ -57,6 +57,9 @@ struct {
     {.event = PQOS_MON_EVENT_LMEM_BW, .unit = 1, .format = " %11.1f"},
     {.event = PQOS_MON_EVENT_RMEM_BW, .unit = 1, .format = " %11.1f"},
     {.event = PQOS_MON_EVENT_TMEM_BW, .unit = 1, .format = " %11.1f"},
+    {.event = PQOS_MON_EVENT_IO_L3_OCCUP, .unit = 1, .format = " %11.1f"},
+    {.event = PQOS_MON_EVENT_IO_TOTAL_MEM_BW, .unit = 1, .format = " %11.1f"},
+    {.event = PQOS_MON_EVENT_IO_MISS_MEM_BW, .unit = 1, .format = " %11.1f"},
     {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
      .unit = 1000,
      .format = " %10.0fk"},
@@ -136,6 +139,13 @@ monitor_text_header(FILE *fp,
                 else
                         fprintf(fp, "      LLC[%%]");
         }
+
+        if (events & PQOS_MON_EVENT_IO_L3_OCCUP)
+                fprintf(fp, "     I/O-LLC");
+        if (events & PQOS_MON_EVENT_IO_TOTAL_MEM_BW)
+                fprintf(fp, "   I/O-TOTAL");
+        if (events & PQOS_MON_EVENT_IO_MISS_MEM_BW)
+                fprintf(fp, "    I/O-MISS");
 
         if (events & PQOS_MON_EVENT_LMEM_BW) {
                 enum pqos_interface iface;
@@ -349,6 +359,8 @@ monitor_text_region_row(FILE *fp,
 
         if (monitor_core_mode())
                 fprintf(fp, "\n%8.8s%s", (char *)mon_data->context, data);
+        else if (monitor_iordt_mode())
+                fprintf(fp, "\n%16.16s%s", (char *)mon_data->context, data);
 }
 
 void

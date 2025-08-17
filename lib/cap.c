@@ -724,6 +724,7 @@ pqos_init(const struct pqos_config *config)
         struct pqos_erdt_info *erdt = NULL;
         struct pqos_mrrm_info *mrrm = NULL;
         struct pqos_cores_domains *cores_domains = NULL;
+        struct pqos_channels_domains *channels_domains = NULL;
         enum pqos_interface interface;
 
         if (config == NULL)
@@ -897,7 +898,7 @@ pqos_init(const struct pqos_config *config)
         }
 
         if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
-                /* Must be initialized after ERDT due to its data usage */
+                /* Initialized after ERDT due to its data usage */
                 ret = cores_domains_init(cpu->num_cores, erdt, &cores_domains);
                 if (ret != PQOS_RETVAL_OK)
                         goto machine_init_error;
@@ -915,6 +916,13 @@ pqos_init(const struct pqos_config *config)
         default:
                 LOG_ERROR("I/O RDT init error %d\n", ret);
                 break;
+        }
+
+        if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
+                ret = channels_domains_init(dev->num_channels, erdt, dev,
+                                            &channels_domains);
+                if (ret != PQOS_RETVAL_OK)
+                        goto machine_init_error;
         }
 
         if (ret == PQOS_RETVAL_RESOURCE)
@@ -948,6 +956,7 @@ init_error:
                 m_sysconf.erdt = erdt;
                 m_sysconf.mrrm = mrrm;
                 m_sysconf.cores_domains = cores_domains;
+                m_sysconf.channels_domains = channels_domains;
         }
 
         lock_release();
@@ -978,8 +987,10 @@ pqos_fini(void)
         pqos_mon_fini();
         pqos_alloc_fini();
 
-        if (interface == PQOS_INTER_MMIO)
+        if (interface == PQOS_INTER_MMIO) {
                 cores_domains_fini();
+                channels_domains_fini();
+        }
 
         ret = iordt_fini();
         if (ret != 0) {
@@ -1422,6 +1433,12 @@ const struct pqos_cores_domains *
 _pqos_get_cores_domains(void)
 {
         return m_sysconf.cores_domains;
+}
+
+const struct pqos_channels_domains *
+_pqos_get_channels_domains(void)
+{
+        return m_sysconf.channels_domains;
 }
 
 int

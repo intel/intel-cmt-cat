@@ -450,3 +450,193 @@ mon_read_perf(struct pqos_mon_data *group, const enum pqos_mon_event event)
 
         return PQOS_RETVAL_OK;
 }
+
+static int
+mon_set_snc_mode(const struct pqos_cpuinfo *cpu, enum pqos_snc_config ns)
+{
+        uint64_t val = 0;
+        uint32_t reg = PQOS_MSR_SNC_CFG;
+        unsigned i, sock_count, *sockets = NULL;
+        int ret;
+
+        if (ns != PQOS_REQUIRE_SNC_TOTAL && ns != PQOS_REQUIRE_SNC_LOCAL)
+                return PQOS_RETVAL_PARAM;
+
+        if (ns == PQOS_REQUIRE_SNC_LOCAL)
+                LOG_INFO("Turning SNC to local mode ...\n");
+        else if (ns == PQOS_REQUIRE_SNC_TOTAL)
+                LOG_INFO("Turning SNC to total mode ...\n");
+
+        sockets = pqos_cpu_get_sockets(cpu, &sock_count);
+        if (sockets == NULL || sock_count == 0) {
+                printf("Error retrieving information for Sockets\n");
+                goto return_error;
+        }
+
+        for (i = 0; i < sock_count; i++) {
+                unsigned lcore;
+
+                ret = pqos_cpu_get_one_core(cpu, sockets[i], &lcore);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Error retrieving lcore for socket %u\n",
+                               sockets[i]);
+                        goto return_error;
+                };
+
+                if (msr_read(lcore, reg, &val) != MACHINE_RETVAL_OK)
+                        goto return_error;
+
+                val &= ~1;
+                if (ns == PQOS_REQUIRE_SNC_LOCAL)
+                        val |= 1;
+
+                if (msr_write(lcore, reg, val) != MACHINE_RETVAL_OK)
+                        goto return_error;
+        };
+
+        _pqos_cap_mon_snc_change(ns);
+
+        ret = PQOS_RETVAL_OK;
+        goto clean_up;
+return_error:
+        ret = PQOS_RETVAL_ERROR;
+clean_up:
+        if (sockets)
+                free(sockets);
+
+        return ret;
+}
+
+int
+mon_reset_iordt(const struct pqos_cpuinfo *cpu, const int enable)
+{
+        unsigned *sockets = NULL;
+        unsigned sockets_num;
+        unsigned j = 0;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(cpu != NULL);
+
+        LOG_INFO("%s I/O RDT monitoring across sockets...\n",
+                 (enable) ? "Enabling" : "Disabling");
+
+        sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
+        if (sockets == NULL || sockets_num == 0) {
+                ret = PQOS_RETVAL_ERROR;
+                goto mon_reset_iordt_exit;
+        }
+
+        for (j = 0; j < sockets_num; j++) {
+                uint64_t reg = 0;
+                unsigned core = 0;
+
+                ret = pqos_cpu_get_one_core(cpu, sockets[j], &core);
+                if (ret != PQOS_RETVAL_OK)
+                        goto mon_reset_iordt_exit;
+
+                ret = msr_read(core, PQOS_MSR_L3_IO_QOS_CFG, &reg);
+                if (ret != MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto mon_reset_iordt_exit;
+                }
+
+                if (enable)
+                        reg |= PQOS_MSR_L3_IO_QOS_MON_EN;
+                else
+                        reg &= ~PQOS_MSR_L3_IO_QOS_MON_EN;
+
+                ret = msr_write(core, PQOS_MSR_L3_IO_QOS_CFG, reg);
+                if (ret != MACHINE_RETVAL_OK) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto mon_reset_iordt_exit;
+                }
+        }
+
+mon_reset_iordt_exit:
+        if (sockets != NULL)
+                free(sockets);
+
+        return ret;
+}
+
+int
+mon_reset(const struct pqos_mon_config *cfg)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_devinfo *dev = _pqos_get_dev();
+        const struct pqos_capability *cap_mon;
+
+        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &cap_mon);
+        if (ret != PQOS_RETVAL_OK) {
+                LOG_ERROR("Monitoring not present!\n");
+                return ret;
+        }
+
+        if (cfg != NULL && cfg->l3_iordt == PQOS_REQUIRE_IORDT_ON &&
+            !cap_mon->u.mon->iordt) {
+                LOG_ERROR("I/O RDT monitoring requested but not supported by "
+                          "the platform!\n");
+                return PQOS_RETVAL_PARAM;
+        }
+
+        /* reset core assoc */
+        for (i = 0; i < cpu->num_cores; i++) {
+                int retval = mon_assoc_write(cpu->cores[i].lcore, RMID0);
+
+                if (retval != PQOS_RETVAL_OK)
+                        ret = retval;
+        }
+
+        /* reset I/O RDT channel assoc */
+        if (cap_mon->u.mon->iordt && cap_mon->u.mon->iordt_on && dev != NULL) {
+                int retval = iordt_mon_assoc_reset(dev);
+
+                if (retval != PQOS_RETVAL_OK)
+                        ret = retval;
+        }
+
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        if (cfg != NULL) {
+                if (cfg->l3_iordt == PQOS_REQUIRE_IORDT_ON &&
+                    !cap_mon->u.mon->iordt_on) {
+                        LOG_INFO("Turning I/O RDT Monitoring ON ...\n");
+                        ret = mon_reset_iordt(cpu, 1);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("I/O RDT Monitoring enable error!\n");
+                                return ret;
+                        }
+
+                        /* reset channel assoc - initialize mmio tables */
+                        if (dev != NULL)
+                                ret = iordt_mon_assoc_reset(dev);
+                }
+
+                if (cfg->l3_iordt == PQOS_REQUIRE_IORDT_OFF &&
+                    cap_mon->u.mon->iordt_on) {
+                        LOG_INFO("Turning I/O RDT Monitoring OFF ...\n");
+                        ret = mon_reset_iordt(cpu, 0);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("I/O RDT Monitoring disable "
+                                          "error!\n");
+                                return ret;
+                        }
+                }
+                _pqos_cap_mon_iordt_change(cfg->l3_iordt);
+
+                if (cfg->snc != PQOS_REQUIRE_SNC_ANY) {
+                        if (cap_mon->u.mon->snc_num == 1) {
+                                LOG_ERROR("SNC requested but not supported by "
+                                          "the platform!\n");
+                                ret = PQOS_RETVAL_PARAM;
+                        } else
+                                ret = mon_set_snc_mode(cpu, cfg->snc);
+                }
+        }
+
+        return ret;
+}

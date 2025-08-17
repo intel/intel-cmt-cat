@@ -44,6 +44,7 @@
 #include "common_monitoring.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "iordt.h"
 #include "log.h"
 #include "machine.h"
 #include "mmio.h"
@@ -57,19 +58,16 @@
 #include <string.h>
 
 /**
- * Special RMID - after reset all cores are associated with it.
- *
- * The assumption is that if core is not assigned to it
- * then it is subject of monitoring activity by a different process.
- */
-#define RMID0 (0)
-
-/**
  * ---------------------------------------
  * Local data types
  * ---------------------------------------
  */
 static unsigned m_rmid_max = 0; /**< max RMID */
+
+struct rmid_list_t {
+        uint16_t domain_id;
+        pqos_rmid_t *rmids;
+};
 
 /**
  * ---------------------------------------
@@ -305,6 +303,209 @@ rmid_alloc_error:
         return ret;
 }
 
+/**
+ * @brief Provides Channel's corresponding Domain ID and index of dev_agents
+ * array of structure
+ *
+ * @param [in] channel channel ID
+ * @param [out] domain_id Channel's corresponding Domain ID
+ * @param [out] domain_id_idx Channel's corresponding index of dev_agents index
+ * of dev_agents
+ *
+ * @return Operations status
+ */
+static int
+get_dev_domain_info(pqos_channel_t channel,
+                    uint16_t *domain_id,
+                    uint16_t *domain_id_idx)
+{
+        unsigned int idx = 0;
+        const struct pqos_channels_domains *channels_domains =
+            _pqos_get_channels_domains();
+
+        for (idx = 0; idx < channels_domains->num_channel_ids; idx++)
+                if (channel == channels_domains->channel_ids[idx]) {
+                        if (domain_id != NULL)
+                                *domain_id = channels_domains->domain_ids[idx];
+                        if (domain_id_idx != NULL)
+                                *domain_id_idx =
+                                    channels_domains->domain_id_idxs[idx];
+
+                        /* Channel ID is available in IRDT & ERDT */
+                        return PQOS_RETVAL_OK;
+                }
+
+        /* Channel ID is available in IRDT. But not in ERDT */
+        return PQOS_RETVAL_UNAVAILABLE;
+}
+
+static int
+get_dev_rmid_list(struct pqos_mon_poll_ctx *ctx,
+                  const struct pqos_erdt_info *erdt,
+                  const struct pqos_devinfo *dev,
+                  struct rmid_list_t *dev_rmid_list,
+                  pqos_rmid_t max_rmid)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i = 0;
+
+        for (i = 0; i < dev->num_channels; ++i) {
+                const struct pqos_channel *channel = &dev->channels[i];
+                pqos_rmid_t rmid;
+                uint16_t domain_id = USHRT_MAX;
+                uint16_t domain_id_idx = USHRT_MAX;
+
+                if (!channel->rmid_tagging)
+                        continue;
+
+                ret = get_dev_domain_info(channel->channel_id, &domain_id,
+                                          &domain_id_idx);
+                if (ret == PQOS_RETVAL_OK) {
+                        if (domain_id != ctx->cluster)
+                                continue;
+                } else if (ret == PQOS_RETVAL_UNAVAILABLE)
+                        continue;
+                else
+                        break;
+
+                ret = iordt_mon_assoc_read(channel->channel_id, &rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        break;
+
+                if (rmid <= max_rmid) {
+                        if (domain_id_idx >= erdt->num_dev_agents) {
+                                LOG_ERROR("Wrong domain_id_idx %d "
+                                          "Dev Agents %d\n",
+                                          domain_id_idx, erdt->num_dev_agents);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        }
+
+                        if (dev_rmid_list[domain_id_idx].domain_id == domain_id)
+                                dev_rmid_list[domain_id_idx].rmids[rmid] = 1;
+                        else
+                                LOG_WARN(
+                                    "Wrong Domain ID in dev_rmid_list!. "
+                                    "Channel ID %lx rmid %x Domain ID %x "
+                                    "Domain ID in struct rmid_list_t %x\n",
+                                    channel->channel_id, rmid, domain_id,
+                                    dev_rmid_list[domain_id_idx].domain_id);
+                }
+        }
+
+        return ret;
+}
+
+int
+mmio_mon_channels_assoc_unused(struct pqos_mon_poll_ctx *ctx,
+                               pqos_rmid_t min_rmid,
+                               pqos_rmid_t max_rmid,
+                               const struct pqos_mon_options *opt)
+{
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_devinfo *dev = _pqos_get_dev();
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+        struct rmid_list_t *dev_rmid_list = NULL;
+        int iordt;
+        unsigned idx;
+        uint16_t domain_id_idx = USHRT_MAX;
+
+        ASSERT(ctx != NULL);
+
+#ifndef PQOS_RMID_CUSTOM
+        UNUSED_PARAM(opt);
+#endif
+
+        if (max_rmid == 0) {
+                LOG_ERROR("Maximum RMID is 0!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        if (min_rmid < 1)
+                min_rmid = 1;
+
+        ret = pqos_mon_iordt_enabled(cap, NULL, &iordt);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        dev_rmid_list = (struct rmid_list_t *)calloc(
+            erdt->num_dev_agents, sizeof(struct rmid_list_t));
+        if (dev_rmid_list == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        /* Initialize device domain_ids */
+        for (idx = 0; idx < erdt->num_dev_agents; idx++) {
+                dev_rmid_list[idx].domain_id =
+                    erdt->dev_agents[idx].rmdd.domain_id;
+                dev_rmid_list[idx].rmids = (pqos_rmid_t *)calloc(
+                    erdt->dev_agents[idx].rmdd.max_rmids, sizeof(pqos_rmid_t));
+                if (dev_rmid_list[idx].rmids == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+        }
+
+        /* mark used RMIDs for channels */
+        if (iordt && dev != NULL) {
+                ret =
+                    get_dev_rmid_list(ctx, erdt, dev, dev_rmid_list, max_rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        goto rmid_alloc_error;
+        }
+
+        domain_id_idx = USHRT_MAX;
+        for (idx = 0; idx < erdt->num_dev_agents; idx++)
+                if (ctx->cluster == dev_rmid_list[idx].domain_id)
+                        domain_id_idx = idx;
+
+        if (domain_id_idx == USHRT_MAX) {
+                LOG_ERROR("Unable to find Domain ID in rmid_list\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto rmid_alloc_error;
+        }
+
+#ifdef PQOS_RMID_CUSTOM
+        if (opt->rmid.type == PQOS_RMID_TYPE_MAP) {
+                if (opt->rmid.rmid < min_rmid || opt->rmid.rmid > max_rmid) {
+                        LOG_ERROR("Custom RMID %u not in range %u-%u\n",
+                                  opt->rmid.rmid, min_rmid, max_rmid);
+                        ret = PQOS_RETVAL_PARAM;
+                        goto rmid_alloc_error;
+                }
+
+                if (opt->rmid.rmid > max_rmid ||
+                    dev_rmid_list[domain_id_idx].rmids[opt->rmid.rmid] != 0) {
+                        LOG_ERROR("Custom RMID %u in use\n", opt->rmid.rmid);
+                        ret = PQOS_RETVAL_ERROR;
+                        goto rmid_alloc_error;
+                }
+
+                ctx->rmid = opt->rmid.rmid;
+
+        } else if (opt->rmid.type == PQOS_RMID_TYPE_DEFAULT) {
+#endif
+                ret = PQOS_RETVAL_ERROR;
+                for (i = min_rmid; i <= max_rmid; i++)
+                        if (dev_rmid_list[domain_id_idx].rmids[i] == 0) {
+                                ret = PQOS_RETVAL_OK;
+                                ctx->rmid = i;
+                                break;
+                        }
+#ifdef PQOS_RMID_CUSTOM
+        } else {
+                LOG_ERROR("RMID Custom: Unsupported rmid type: %u\n",
+                          opt->rmid.type);
+        }
+#endif
+
+rmid_alloc_error:
+        if (dev_rmid_list != NULL) {
+                for (idx = 0; idx < erdt->num_dev_agents; idx++)
+                        if (dev_rmid_list[idx].rmids != NULL)
+                                free(dev_rmid_list[idx].rmids);
+                free(dev_rmid_list);
+        }
+        return ret;
+}
+
 /*
  * =======================================
  * =======================================
@@ -368,29 +569,7 @@ mmio_mon_assoc_get_core(const unsigned lcore, pqos_rmid_t *rmid)
 int
 mmio_mon_reset(const struct pqos_mon_config *cfg)
 {
-        int ret = PQOS_RETVAL_OK;
-        unsigned i;
-        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
-        const struct pqos_cap *cap = _pqos_get_cap();
-        const struct pqos_capability *cap_mon;
-
-        UNUSED_PARAM(cfg);
-
-        ret = pqos_cap_get_type(cap, PQOS_CAP_TYPE_MON, &cap_mon);
-        if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("Monitoring not present!\n");
-                return ret;
-        }
-
-        /* reset core assoc */
-        for (i = 0; i < cpu->num_cores; i++) {
-                int retval = mmio_mon_assoc_write(cpu->cores[i].lcore, RMID0);
-
-                if (retval != PQOS_RETVAL_OK)
-                        ret = retval;
-        }
-
-        return ret;
+        return mon_reset(cfg);
 }
 
 /**
@@ -691,6 +870,207 @@ pqos_mon_start_error:
 }
 
 int
+mmio_mon_start_channels(const unsigned num_channels,
+                        const pqos_channel_t *channels,
+                        const enum pqos_mon_event event,
+                        void *context,
+                        struct pqos_mon_data *group,
+                        const struct pqos_mon_options *opt)
+{
+        int ret = PQOS_RETVAL_OK;
+        unsigned i;
+        const struct pqos_devinfo *dev = _pqos_get_dev();
+        const struct pqos_cap *cap = _pqos_get_cap();
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        struct pqos_mon_poll_ctx *ctxs = NULL;
+        unsigned num_ctx = 0;
+        int enabled;
+        int supported;
+        enum pqos_mon_event req_events;
+
+        ASSERT(group != NULL);
+        ASSERT(channels != NULL);
+        ASSERT(num_channels > 0);
+        ASSERT(event > 0);
+        ASSERT(opt != NULL);
+
+#ifdef PQOS_RMID_CUSTOM
+        if (opt->rmid.type != PQOS_RMID_TYPE_DEFAULT &&
+            opt->rmid.type != PQOS_RMID_TYPE_MAP)
+                return PQOS_RETVAL_PARAM;
+#endif
+
+        req_events = event;
+        switch (req_events) {
+        case PQOS_MON_EVENT_RMEM_BW:
+                LOG_ERROR("I/O RDT MBR is not supported in MMIO interface!."
+                          "Use io-llc/iot/iom events\n");
+                return PQOS_RETVAL_RESOURCE;
+        case PQOS_MON_EVENT_LMEM_BW:
+                LOG_ERROR("I/O RDT MBL is not supported in MMIO interface!."
+                          "Use io-llc/iot/iom events\n");
+                return PQOS_RETVAL_RESOURCE;
+        case PQOS_MON_EVENT_TMEM_BW:
+                LOG_ERROR("I/O RDT MBT is not supported in MMIO interface!."
+                          "Use io-llc/iot/iom events\n");
+                return PQOS_RETVAL_RESOURCE;
+        case PQOS_MON_EVENT_L3_OCCUP:
+                LOG_ERROR("I/O RDT LLC is not supported in MMIO interface!."
+                          "Use io-llc/iot/iom events\n");
+                return PQOS_RETVAL_RESOURCE;
+        default:
+                break;
+        }
+
+        /* Check for I/O RDT support */
+        ret = pqos_mon_iordt_enabled(cap, &supported, &enabled);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+        if (!supported) {
+                LOG_ERROR("I/O RDT monitoring is not supported!\n");
+                return PQOS_RETVAL_RESOURCE;
+        } else if (!enabled) {
+                LOG_ERROR("I/O RDT monitoring is disabled!\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        /* Check if all requested channels are valid */
+        for (i = 0; i < num_channels; ++i) {
+                const pqos_channel_t channel_id = channels[i];
+                const struct pqos_channel *channel;
+                pqos_rmid_t rmid;
+
+                channel = pqos_devinfo_get_channel(dev, channel_id);
+                if (channel == NULL)
+                        return PQOS_RETVAL_PARAM;
+                if (!channel->rmid_tagging) {
+                        LOG_ERROR(
+                            "Channel %016llx does not support monitoring\n",
+                            (pqos_channel_t)channel_id);
+                        return PQOS_RETVAL_RESOURCE;
+                }
+
+                ret = iordt_mon_assoc_read(channel_id, &rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        return PQOS_RETVAL_PARAM;
+
+                if (rmid != RMID0) {
+                        /* If not RMID0 then it is already monitored */
+                        LOG_INFO("Channel %016llx is already monitored with "
+                                 "RMID%u.\n",
+                                 (pqos_channel_t)channel_id, rmid);
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        }
+
+        ctxs = (struct pqos_mon_poll_ctx *)calloc(num_channels, sizeof(*ctxs));
+        if (ctxs == NULL)
+                return PQOS_RETVAL_RESOURCE;
+
+        for (i = 0; i < num_channels; ++i) {
+                const pqos_channel_t channel_id = channels[i];
+                const struct pqos_channel *channel =
+                    pqos_devinfo_get_channel(dev, channel_id);
+                struct pqos_mon_poll_ctx *ctx = NULL;
+                pqos_rmid_t max_rmid = 0;
+                uint16_t domain_id;
+                unsigned c;
+                unsigned idx = 0;
+
+                if (channel == NULL) {
+                        ret = PQOS_RETVAL_PARAM;
+                        goto mmio_mon_start_channels_exit;
+                }
+
+                /* Obtain domain number */
+                ret = get_dev_domain_info(channel_id, &domain_id, NULL);
+                if (ret != PQOS_RETVAL_OK)
+                        goto mmio_mon_start_channels_exit;
+
+                for (idx = 0; idx < erdt->num_dev_agents; idx++)
+                        if (erdt->dev_agents[idx].rmdd.domain_id == domain_id) {
+                                max_rmid = erdt->dev_agents[idx].rmdd.max_rmids;
+                                break;
+                        }
+
+                /* check if we can reuse context already exists */
+                for (c = 0; c < num_ctx; ++c)
+                        if (ctxs[c].cluster == domain_id &&
+                            ctxs[c].rmid <= max_rmid)
+                                ctx = &ctxs[c];
+                if (ctx != NULL) {
+                        ret = iordt_mon_assoc_write(channel_id, ctx->rmid);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto mmio_mon_start_channels_exit;
+                        continue;
+                }
+
+                ctx = &ctxs[num_ctx++];
+                ctx->cluster = domain_id;
+                ctx->channel_id = channel_id;
+
+                ret = mmio_mon_channels_assoc_unused(ctx, 1, max_rmid, opt);
+                if (ret != PQOS_RETVAL_OK)
+                        goto mmio_mon_start_channels_exit;
+
+                ret = iordt_mon_assoc_write(channel_id, ctx->rmid);
+                if (ret != PQOS_RETVAL_OK)
+                        goto mmio_mon_start_channels_exit;
+        }
+
+        /* shrink memory used by ctx */
+        /* ignore scan-build false positives due to realloc use */
+#ifndef __clang_analyzer__
+        {
+                struct pqos_mon_poll_ctx *ctxs_ptr =
+                    (struct pqos_mon_poll_ctx *)realloc(
+                        ctxs, num_ctx * sizeof(*ctxs));
+
+                if (ctxs_ptr == NULL) {
+                        ret = PQOS_RETVAL_ERROR;
+                        goto mmio_mon_start_channels_exit;
+                }
+
+                ctxs = ctxs_ptr;
+        }
+#endif
+        /* Fill in the monitoring group structure */
+        group->event = event;
+        group->context = context;
+        group->num_channels = num_channels;
+        group->channels =
+            (pqos_channel_t *)malloc(sizeof(group->channels[0]) * num_channels);
+        if (group->channels == NULL) {
+                ret = PQOS_RETVAL_RESOURCE;
+                goto mmio_mon_start_channels_exit;
+        }
+
+        for (i = 0; i < group->num_channels; i++)
+                group->channels[i] = channels[i];
+
+        group->intl->hw.num_ctx = num_ctx;
+        group->intl->hw.ctx = ctxs;
+        group->intl->hw.event |= req_events;
+
+mmio_mon_start_channels_exit:
+        if (ret != PQOS_RETVAL_OK) {
+                if (ctxs != NULL) {
+                        /* Assign channels back to RMID0 */
+                        for (i = 0; i < num_channels; ++i) {
+                                const pqos_channel_t channel_id = channels[i];
+
+                                iordt_mon_assoc_write(channel_id, RMID0);
+                        }
+                        free(ctxs);
+                }
+                if (group->channels != NULL)
+                        free(group->channels);
+        }
+
+        return ret;
+}
+
+int
 mmio_mon_stop(struct pqos_mon_data *group)
 {
         int ret = PQOS_RETVAL_OK;
@@ -765,15 +1145,22 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
         struct pqos_event_values *pv = &group->values;
         unsigned i;
         int j;
+        uint64_t value = 0;
+        uint64_t tmp_rmid_val = 0;
+        l3_mbm_rmid_t tmp_rmid_values[PQOS_MAX_MEM_REGIONS] = {0};
+        l3_mbm_rmid_t values[PQOS_MAX_MEM_REGIONS] = {0};
+        uint16_t domain_id_idx = USHRT_MAX;
+        int ret = PQOS_RETVAL_OK;
 
         ASSERT(event == PQOS_MON_EVENT_L3_OCCUP ||
                event == PQOS_MON_EVENT_LMEM_BW ||
-               event == PQOS_MON_EVENT_TMEM_BW);
+               event == PQOS_MON_EVENT_TMEM_BW ||
+               event == PQOS_MON_EVENT_IO_L3_OCCUP ||
+               event == PQOS_MON_EVENT_IO_TOTAL_MEM_BW ||
+               event == PQOS_MON_EVENT_IO_MISS_MEM_BW);
 
-        if (event == PQOS_MON_EVENT_L3_OCCUP) {
-                l3_cmt_rmid_t tmp_rmid_val;
-                uint64_t value = 0;
-
+        switch (event) {
+        case PQOS_MON_EVENT_L3_OCCUP:
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
                         const unsigned lcore = group->intl->hw.ctx[i].lcore;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
@@ -793,9 +1180,8 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                         value += l3_cmt_rmid_to_uint64(tmp_rmid_val);
                 };
                 pv->llc = scale_event(event, value);
-        } else if (event == PQOS_MON_EVENT_LMEM_BW) {
-                l3_mbm_rmid_t tmp_rmid_val[PQOS_MAX_MEM_REGIONS],
-                    value[PQOS_MAX_MEM_REGIONS] = {0};
+                break;
+        case PQOS_MON_EVENT_LMEM_BW:
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
                         const unsigned lcore = group->intl->hw.ctx[i].lcore;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
@@ -808,10 +1194,10 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                                           ->domains[lcore]]
                                          .mmrc,
                                     region_number, rmid, rmid,
-                                    &tmp_rmid_val[j]);
+                                    &tmp_rmid_values[j]);
 
                                 if (!is_available_l3_mbm_rmid(
-                                        tmp_rmid_val[j])) {
+                                        tmp_rmid_values[j])) {
                                         LOG_ERROR(
                                             "RMID %u is not available for "
                                             "L3 memory bandwidth monitoring!\n",
@@ -819,7 +1205,8 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                         return PQOS_RETVAL_UNAVAILABLE;
                                 };
 
-                                if (is_overflow_l3_mbm_rmid(tmp_rmid_val[j])) {
+                                if (is_overflow_l3_mbm_rmid(
+                                        tmp_rmid_values[j])) {
                                         LOG_ERROR(
                                             "RMID %u is overflowed for "
                                             "L3 memory bandwidth monitoring!\n",
@@ -827,21 +1214,144 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                         return PQOS_RETVAL_OVERFLOW;
                                 };
 
-                                value[j] +=
-                                    l3_mbm_rmid_to_uint64(tmp_rmid_val[j]);
+                                values[j] +=
+                                    l3_mbm_rmid_to_uint64(tmp_rmid_values[j]);
                         }
                 };
 
                 for (j = 0; j < group->regions.num_mem_regions; j++) {
                         group->region_values.mbm_local[j] =
-                            scale_event(event, value[j]);
-                        group->region_values.mbm_local_delta[j] = get_delta(
-                            event, group->region_values.mbm_local[j], value[j]);
+                            scale_event(event, values[j]);
+                        group->region_values.mbm_local_delta[j] =
+                            get_delta(event, group->region_values.mbm_local[j],
+                                      values[j]);
                         group->region_values.mbm_local_delta[j] = scale_event(
                             event, group->region_values.mbm_local_delta[j]);
                 };
-        } else {
+                break;
+        case PQOS_MON_EVENT_IO_L3_OCCUP:
+                for (i = 0; i < group->intl->hw.num_ctx; i++) {
+                        const pqos_channel_t channel_id =
+                            group->intl->hw.ctx[i].channel_id;
+                        const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+
+                        ret = get_dev_domain_info(channel_id, NULL,
+                                                  &domain_id_idx);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Unable to find Domain ID for Channel"
+                                          " %016llx\n",
+                                          channel_id);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        }
+
+                        if (domain_id_idx >= erdt->num_dev_agents) {
+                                LOG_ERROR("Wrong domain_id_idx %d "
+                                          "Dev Agents %d\n",
+                                          domain_id_idx, erdt->num_dev_agents);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        }
+
+                        get_iol3_cmt_rmid_range_v1(
+                            &erdt->dev_agents[domain_id_idx].cmrd, rmid, rmid,
+                            &tmp_rmid_val);
+
+                        if (!is_available_iol3_cmt_rmid(tmp_rmid_val)) {
+                                LOG_ERROR("RMID %u is not available for "
+                                          "IO L3 occupancy monitoring!\n",
+                                          rmid);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        };
+
+                        value += iol3_cmt_rmid_to_uint64(tmp_rmid_val);
+                };
+                group->region_values.io_llc = scale_event(event, value);
+                break;
+        case PQOS_MON_EVENT_IO_TOTAL_MEM_BW:
+                for (i = 0; i < group->intl->hw.num_ctx; i++) {
+                        const pqos_channel_t channel_id =
+                            group->intl->hw.ctx[i].channel_id;
+                        const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+
+                        ret = get_dev_domain_info(channel_id, NULL,
+                                                  &domain_id_idx);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Unable to find Domain ID for Channel"
+                                          " %016llx\n",
+                                          channel_id);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        }
+
+                        if (domain_id_idx >= erdt->num_dev_agents) {
+                                LOG_ERROR("Wrong domain_id_idx %d "
+                                          "Dev Agents %d\n",
+                                          domain_id_idx, erdt->num_dev_agents);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        }
+
+                        get_total_iol3_mbm_rmid_range_v1(
+                            &erdt->dev_agents[domain_id_idx].ibrd, rmid, rmid,
+                            &tmp_rmid_val);
+
+                        if (!is_available_iol3_mbm_rmid(tmp_rmid_val)) {
+                                LOG_ERROR("RMID %u is not available for "
+                                          "IO L3 total monitoring!\n",
+                                          rmid);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        };
+
+                        value += iol3_mbm_rmid_to_uint64(tmp_rmid_val);
+                };
+                group->region_values.io_total = scale_event(event, value);
+                group->region_values.io_total_delta =
+                    get_delta(event, group->region_values.io_total, value);
+                group->region_values.io_total_delta =
+                    scale_event(event, group->region_values.io_total_delta);
+
+                break;
+        case PQOS_MON_EVENT_IO_MISS_MEM_BW:
+                for (i = 0; i < group->intl->hw.num_ctx; i++) {
+                        const pqos_channel_t channel_id =
+                            group->intl->hw.ctx[i].channel_id;
+                        const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+
+                        ret = get_dev_domain_info(channel_id, NULL,
+                                                  &domain_id_idx);
+                        if (ret != PQOS_RETVAL_OK) {
+                                LOG_ERROR("Unable to find Domain ID for Channel"
+                                          " %016llx\n",
+                                          channel_id);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        }
+
+                        if (domain_id_idx >= erdt->num_dev_agents) {
+                                LOG_ERROR("Wrong domain_id_idx %d "
+                                          "Dev Agents %d\n",
+                                          domain_id_idx, erdt->num_dev_agents);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        }
+
+                        get_miss_iol3_mbm_rmid_range_v1(
+                            &erdt->dev_agents[domain_id_idx].ibrd, rmid, rmid,
+                            &tmp_rmid_val);
+
+                        if (!is_available_iol3_mbm_rmid(tmp_rmid_val)) {
+                                LOG_ERROR("RMID %u is not available for "
+                                          "IO L3 miss monitoring!\n",
+                                          rmid);
+                                return PQOS_RETVAL_UNAVAILABLE;
+                        };
+
+                        value += iol3_mbm_rmid_to_uint64(tmp_rmid_val);
+                };
+                group->region_values.io_miss = scale_event(event, value);
+                group->region_values.io_miss_delta =
+                    get_delta(event, group->region_values.io_miss, value);
+                group->region_values.io_miss_delta =
+                    scale_event(event, group->region_values.io_miss_delta);
+                break;
+        default:
                 pv->mbm_total = 0;
+                break;
         }
 
         return PQOS_RETVAL_OK;
@@ -874,6 +1384,9 @@ mmio_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
         case PQOS_MON_EVENT_L3_OCCUP:
         case PQOS_MON_EVENT_LMEM_BW:
         case PQOS_MON_EVENT_TMEM_BW:
+        case PQOS_MON_EVENT_IO_L3_OCCUP:
+        case PQOS_MON_EVENT_IO_TOTAL_MEM_BW:
+        case PQOS_MON_EVENT_IO_MISS_MEM_BW:
                 ret = mmio_mon_read_counter(group, event);
                 if (ret != PQOS_RETVAL_OK)
                         goto mmio_mon_poll__exit;

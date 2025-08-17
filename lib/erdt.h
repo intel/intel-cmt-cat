@@ -303,6 +303,31 @@ struct __attribute__((__packed__)) acpi_table_erdt {
 };
 
 /**
+ * @brief Initializes Channels to Domains module
+ *
+ * Initialize Channels to Domains module array
+ *
+ * @param [out] channels_domains pqos_channels_domains structure to be
+ * initialized
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL int
+channels_domains_init(unsigned int num_channels,
+                      const struct pqos_erdt_info *erdt,
+                      const struct pqos_devinfo *devinfo,
+                      struct pqos_channels_domains **channels_domains);
+
+/**
+ * @brief Shuts down Cores to Domains module
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL int channels_domains_fini(void);
+
+/**
  * @brief Initializes ERDT module
  *
  * Initialize ERDT module

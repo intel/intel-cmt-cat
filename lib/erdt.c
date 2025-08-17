@@ -35,6 +35,7 @@
 #include "erdt.h"
 
 #include "acpi.h"
+#include "cap.h"
 #include "common.h"
 #include "cpuinfo.h"
 #include "log.h"
@@ -55,11 +56,15 @@
 #define NO_CORRECTION_FACTOR     0
 #define SINGLE_CORRECTION_FACTOR 1
 
+#define PATH_PAIR_LENGTH 2
+
 /**
  * ERDT ACPI table information.
  * This pointer is allocated and initialized in this module.
  */
 static struct pqos_erdt_info *p_erdt_info = NULL;
+
+static struct pqos_channels_domains *p_channels_domains = NULL;
 
 static int
 copy_correction_factor(void *p_pqos_correction_factor,
@@ -645,6 +650,155 @@ erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
         }
 
         return ret;
+}
+
+static int
+check_channel_id_exist(struct pqos_channels_domains *channels_domains,
+                       pqos_channel_t channel_id)
+{
+        for (unsigned idx = 0; idx < channels_domains->num_channel_ids; idx++)
+                if (channels_domains->channel_ids[idx] == channel_id)
+                        return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
+}
+
+static int
+erdt_dev_populate_chans(const struct pqos_erdt_dacd *dacd,
+                        const struct pqos_devinfo *devinfo,
+                        struct pqos_channels_domains *channels_domains,
+                        unsigned dev_agent_idx)
+{
+        uint16_t bdf = 0;
+        uint32_t i = 0;
+        int j = 0;
+        int idx = 0;
+        unsigned ch_idx = 0;
+        unsigned num_channels = 0;
+        pqos_channel_t *channels = NULL;
+        int ret;
+
+        for (i = 0; i < dacd->num_dases; i++) {
+                j = 0;
+                while (j < dacd->dase[i].path_length) {
+                        bdf = 0;
+                        num_channels = 0;
+                        /* PCI BDF */
+                        bdf |= dacd->dase[i].start_bus_number << 8;
+                        bdf |= (dacd->dase[i].path[j] & 0x1F) << 3;
+                        bdf |= dacd->dase[i].path[j + 1] & 0x7;
+                        j += PATH_PAIR_LENGTH;
+
+                        channels = pqos_devinfo_get_channel_ids(
+                            devinfo, dacd->dase[i].segment_number, bdf,
+                            &num_channels);
+
+                        if (channels == NULL) {
+                                LOG_DEBUG("Failed to get channels for "
+                                          "Segment: 0x%x BDF: 0x%x\n",
+                                          dacd->dase[i].segment_number, bdf);
+                                continue;
+                        }
+
+                        idx = channels_domains->num_channel_ids;
+                        for (ch_idx = 0; ch_idx < num_channels; ch_idx++) {
+                                ret = check_channel_id_exist(channels_domains,
+                                                             channels[ch_idx]);
+                                if (ret == PQOS_RETVAL_ERROR)
+                                        continue;
+
+                                channels_domains->channel_ids[idx] =
+                                    channels[ch_idx];
+                                channels_domains->domain_ids[idx] =
+                                    dacd->rmdd_domain_id;
+                                channels_domains->domain_id_idxs[idx] =
+                                    dev_agent_idx;
+                                idx++;
+                                channels_domains->num_channel_ids++;
+                        }
+                }
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+channels_domains_init(unsigned int num_channels,
+                      const struct pqos_erdt_info *erdt,
+                      const struct pqos_devinfo *devinfo,
+                      struct pqos_channels_domains **channels_domains)
+{
+        int ret;
+
+        ASSERT(num_channels > 0);
+        ASSERT(erdt != NULL);
+        ASSERT(channels_domains != NULL);
+
+        p_channels_domains = (struct pqos_channels_domains *)calloc(
+            1, sizeof(struct pqos_channels_domains));
+
+        if (p_channels_domains == NULL) {
+                LOG_ERROR("Can't allocate memory for pqos_channels_domains\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
+        p_channels_domains->num_channel_ids = 0;
+
+        p_channels_domains->channel_ids =
+            (pqos_channel_t *)malloc(num_channels * sizeof(pqos_channel_t));
+        if (p_channels_domains->channel_ids == NULL) {
+                LOG_ERROR("Can't allocate memory for pqos_channel_t\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        memset(p_channels_domains->channel_ids, 0,
+               num_channels * sizeof(pqos_channel_t));
+
+        p_channels_domains->domain_ids =
+            (uint16_t *)malloc(num_channels * sizeof(uint16_t));
+        if (p_channels_domains->domain_ids == NULL) {
+                LOG_ERROR("Can't allocate memory for domains in "
+                          "pqos_channels_domains\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        memset(p_channels_domains->domain_ids, 0,
+               num_channels * sizeof(uint16_t));
+
+        p_channels_domains->domain_id_idxs =
+            (uint16_t *)malloc(num_channels * sizeof(uint16_t));
+        if (p_channels_domains->domain_id_idxs == NULL) {
+                LOG_ERROR("Can't allocate memory for domain_id_idxs in "
+                          "pqos_channels_domains\n");
+                return PQOS_RETVAL_ERROR;
+        }
+        memset(p_channels_domains->domain_id_idxs, 0,
+               num_channels * sizeof(uint16_t));
+
+        for (unsigned i = 0; i < erdt->num_dev_agents; i++) {
+                ret = erdt_dev_populate_chans(&erdt->dev_agents[i].dacd,
+                                              devinfo, p_channels_domains, i);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+        }
+
+        *channels_domains = p_channels_domains;
+
+        return PQOS_RETVAL_OK;
+}
+
+int
+channels_domains_fini(void)
+{
+        ASSERT(p_channels_domains != NULL);
+        ASSERT(p_channels_domains->channel_ids != NULL);
+        ASSERT(p_channels_domains->domain_ids != NULL);
+        ASSERT(p_channels_domains->domain_id_idxs != NULL);
+
+        free(p_channels_domains->channel_ids);
+        free(p_channels_domains->domain_ids);
+        free(p_channels_domains->domain_id_idxs);
+        free(p_channels_domains);
+
+        return PQOS_RETVAL_OK;
 }
 
 int

@@ -49,6 +49,7 @@ extern "C" {
  */
 struct pqos_mon_poll_ctx {
         unsigned lcore;
+        pqos_channel_t channel_id;
         unsigned cluster;
         unsigned numa;
         uint8_t quiet; /**< Do not warn abut RMID hijacking */

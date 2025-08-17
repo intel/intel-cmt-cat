@@ -1014,6 +1014,12 @@ parse_event(const char *str, enum pqos_mon_event *evt)
                 *evt = (enum pqos_mon_event)PQOS_MON_EVENT_ALL;
         else if (strncasecmp(str, "llc_ref:", 8) == 0)
                 *evt = PQOS_PERF_EVENT_LLC_REF;
+        else if (strncasecmp(str, "io-llc:", 7) == 0)
+                *evt = PQOS_MON_EVENT_IO_L3_OCCUP;
+        else if (strncasecmp(str, "iot:", 4) == 0)
+                *evt = PQOS_MON_EVENT_IO_TOTAL_MEM_BW;
+        else if (strncasecmp(str, "iom:", 4) == 0)
+                *evt = PQOS_MON_EVENT_IO_MISS_MEM_BW;
         else
                 parse_error(str, "Unrecognized monitoring event type");
 }
@@ -1298,6 +1304,7 @@ monitor_setup_events(enum mon_group_type type,
 
                 all_evts |= mon->type;
         }
+
         if (type == MON_GROUP_TYPE_UNCORE)
                 all_evts &= PQOS_MON_EVENT_UNCORE;
         else
@@ -1312,8 +1319,12 @@ monitor_setup_events(enum mon_group_type type,
 
         /* check if all available events were selected */
         if ((*events & PQOS_MON_EVENT_ALL) == PQOS_MON_EVENT_ALL) {
-                *events = (enum pqos_mon_event)(all_evts & *events);
-
+                if (iordt)
+                        *events = PQOS_MON_EVENT_IO_L3_OCCUP |
+                                  PQOS_MON_EVENT_IO_TOTAL_MEM_BW |
+                                  PQOS_MON_EVENT_IO_MISS_MEM_BW;
+                else
+                        *events = (enum pqos_mon_event)(all_evts & *events);
         } else {
                 /* Start IPC and LLC miss monitoring if available */
                 if (all_evts & PQOS_PERF_EVENT_IPC)

@@ -30,6 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "common_monitoring.h"
 #include "cpu_registers.h"
 #include "hw_monitoring.h"
 #include "mock_cap.h"
@@ -139,7 +140,7 @@ hw_mon_stop_perf(struct pqos_mon_data *group)
 }
 
 int
-hw_mon_reset_iordt(const struct pqos_cpuinfo *cpu, const int enable)
+mon_reset_iordt(const struct pqos_cpuinfo *cpu, const int enable)
 {
         assert_non_null(cpu);
         check_expected(enable);
@@ -324,7 +325,7 @@ test_hw_mon_reset_unsupported(void **state)
 }
 
 static void
-test_hw_mon_reset_iordt_unsupported(void **state)
+test_mon_reset_iordt_unsupported(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
@@ -344,7 +345,7 @@ test_hw_mon_reset_iordt_unsupported(void **state)
 }
 
 static void
-test_hw_mon_reset_iordt_enable(void **state)
+test_mon_reset_iordt_enable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
@@ -360,8 +361,8 @@ test_hw_mon_reset_iordt_enable(void **state)
         expect_function_call(__wrap_iordt_mon_assoc_reset);
         will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
 
-        expect_value(hw_mon_reset_iordt, enable, 1);
-        will_return(hw_mon_reset_iordt, PQOS_RETVAL_OK);
+        expect_value(mon_reset_iordt, enable, 1);
+        will_return(mon_reset_iordt, PQOS_RETVAL_OK);
         hw_mon_reset_mock(data->cpu);
 
         memset(&cfg, 0, sizeof(cfg));
@@ -383,7 +384,7 @@ test_hw_mon_reset_iordt_enable(void **state)
 }
 
 static void
-test_hw_mon_reset_iordt_disable(void **state)
+test_mon_reset_iordt_disable(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret;
@@ -399,8 +400,8 @@ test_hw_mon_reset_iordt_disable(void **state)
         expect_function_call(__wrap_iordt_mon_assoc_reset);
         will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
 
-        expect_value(hw_mon_reset_iordt, enable, 0);
-        will_return(hw_mon_reset_iordt, PQOS_RETVAL_OK);
+        expect_value(mon_reset_iordt, enable, 0);
+        will_return(mon_reset_iordt, PQOS_RETVAL_OK);
         hw_mon_reset_mock(data->cpu);
 
         memset(&cfg, 0, sizeof(cfg));
@@ -775,9 +776,9 @@ main(void)
             cmocka_unit_test(test_hw_mon_start_mbm),
             cmocka_unit_test(test_hw_mon_start_perf),
             cmocka_unit_test(test_hw_mon_poll),
-            cmocka_unit_test(test_hw_mon_reset_iordt_disable),
-            cmocka_unit_test(test_hw_mon_reset_iordt_enable),
-            cmocka_unit_test(test_hw_mon_reset_iordt_unsupported),
+            cmocka_unit_test(test_mon_reset_iordt_disable),
+            cmocka_unit_test(test_mon_reset_iordt_enable),
+            cmocka_unit_test(test_mon_reset_iordt_unsupported),
             cmocka_unit_test(test_hw_mon_start_channels_unsupported),
             cmocka_unit_test(test_hw_mon_start_channels_disabled),
             cmocka_unit_test(test_hw_mon_start_channels_param),

@@ -260,7 +260,6 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.pid_get_pid_assoc = os_pid_get_pid_assoc;
 #endif
         } else if (interface == PQOS_INTER_MMIO) {
-                api.mon_reset = mmio_mon_reset;
                 api.alloc_assoc_get_channel = hw_alloc_assoc_get_channel;
                 api.alloc_assoc_set_channel = hw_alloc_assoc_set_channel;
                 api.alloc_reset = mmio_alloc_reset;
@@ -269,7 +268,9 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.mba_get = mmio_mba_get;
                 api.mba_set = mmio_mba_set;
                 api.mon_start_cores = mmio_mon_start_cores;
+                api.mon_start_channels = mmio_mon_start_channels;
                 api.mon_stop = mmio_mon_stop;
+                api.mon_reset = mmio_mon_reset;
         }
 
         return PQOS_RETVAL_OK;
@@ -1325,8 +1326,11 @@ pqos_mon_start_channels_ext(const unsigned num_channels,
                 return PQOS_RETVAL_PARAM;
 
         /* Validate event parameter */
-        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)))
+        if (event &
+            (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+               PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
+               PQOS_MON_EVENT_IO_L3_OCCUP | PQOS_MON_EVENT_IO_TOTAL_MEM_BW |
+               PQOS_MON_EVENT_IO_MISS_MEM_BW)))
                 return PQOS_RETVAL_PARAM;
 
         data = calloc(1, sizeof(*data) + sizeof(struct pqos_mon_data_internal));
@@ -1548,6 +1552,21 @@ pqos_mon_get_region_value(const struct pqos_mon_data *const group,
         case PQOS_MON_EVENT_RMEM_BW:
                 _value = group->values.mbm_remote;
                 _delta = group->values.mbm_remote_delta;
+                break;
+        case PQOS_MON_EVENT_IO_L3_OCCUP:
+                if (delta != NULL)
+                        LOG_WARN("Counter delta is undefined for "
+                                 "PQOS_MON_EVENT_IO_L3_OCCUP\n");
+                _value = group->region_values.io_llc;
+                _delta = 0;
+                break;
+        case PQOS_MON_EVENT_IO_TOTAL_MEM_BW:
+                _value = group->region_values.io_total;
+                _delta = group->region_values.io_total_delta;
+                break;
+        case PQOS_MON_EVENT_IO_MISS_MEM_BW:
+                _value = group->region_values.io_miss;
+                _delta = group->region_values.io_miss_delta;
                 break;
         default:
                 LOG_ERROR("Unknown event %x\n", event_id);

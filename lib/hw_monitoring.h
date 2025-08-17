@@ -67,18 +67,6 @@ PQOS_LOCAL int hw_mon_init(const struct pqos_cpuinfo *cpu,
 PQOS_LOCAL int hw_mon_fini(void);
 
 /**
- * @brief Enables or disables I/O RDT monitoring across selected CPU sockets
- *
- * @param [in] cpu CPU information
- * @param [in] enable I/O RDT enable/disable flag, 1 - enable, 0 - disable
- *
- * @return Operations status
- * @retval PQOS_RETVAL_OK on success
- * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
- */
-PQOS_LOCAL int hw_mon_reset_iordt(const struct pqos_cpuinfo *cpu,
-                                  const int enable);
-/**
  * @brief Hardware interface to reset monitoring by binding all cores with RMID0
  *
  * As part of monitoring reset I/O RDT * SNC reconfiguration can be performed.

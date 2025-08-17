@@ -176,6 +176,13 @@ PQOS_LOCAL const struct pqos_erdt_info *_pqos_get_erdt(void);
 PQOS_LOCAL const struct pqos_cores_domains *_pqos_get_cores_domains(void);
 
 /**
+ * @brief Internal API to retrieve channels to domains information
+ *
+ * @return channels to domains information
+ */
+PQOS_LOCAL const struct pqos_channels_domains *_pqos_get_channels_domains(void);
+
+/**
  * @brief Internal API to retrieve MRRM information
  *
  * @return MRRM information

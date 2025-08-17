@@ -100,7 +100,13 @@ $(OBJ_DIR)/hw_monitoring.o: $(LIB_DIR)/hw_monitoring.c $(OBJ_DIR)/hw_monitoring.
 		--globalize-symbol=hw_mon_stop_perf --weaken-symbol=hw_mon_stop_perf \
 		--globalize-symbol=hw_mon_start_counter --weaken-symbol=hw_mon_start_counter \
 		--globalize-symbol=hw_mon_read_counter --weaken-symbol=hw_mon_read_counter \
-		--globalize-symbol=hw_mon_reset_iordt --weaken-symbol=hw_mon_reset_iordt \
+		--globalize-symbol=mon_reset_iordt --weaken-symbol=mon_reset_iordt \
+		$@
+
+$(OBJ_DIR)/common_monitoring.o: $(LIB_DIR)/common_monitoring.c $(OBJ_DIR)/common_monitoring.d
+	$(CC) $(CFLAGS) -c $< -o $@
+	objcopy $@ \
+		--globalize-symbol=mon_reset_iordt --weaken-symbol=mon_reset_iordt \
 		$@
 
 $(OBJ_DIR)/hw_cap.o: $(LIB_DIR)/hw_cap.c $(OBJ_DIR)/hw_cap.d
@@ -327,7 +333,7 @@ $(BIN_DIR)/test_hw_alloc_assign: test_hw_alloc_assign.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
-$(BIN_DIR)/test_hw_mon_reset_iordt: test_hw_mon_reset_iordt.c $(LIB_OBJS)
+$(BIN_DIR)/test_mon_reset_iordt: test_mon_reset_iordt.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
 		-Wl,--wrap=msr_write \

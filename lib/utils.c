@@ -904,7 +904,7 @@ pqos_devinfo_get_channel_ids(const struct pqos_devinfo *devinfo,
                 unsigned num_chan;
                 size_t j;
 
-                for (j = 0, num_chan = 0; j < devinfo->num_channels; j++) {
+                for (j = 0, num_chan = 0; j < PQOS_DEV_MAX_CHANNELS; j++) {
                         if (!dev->channel[j])
                                 continue;
                         num_chan++;

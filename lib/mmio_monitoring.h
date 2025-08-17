@@ -106,7 +106,7 @@ PQOS_LOCAL int mmio_mon_assoc_write(const unsigned lcore,
 PQOS_LOCAL int mmio_mon_assoc_read(const unsigned lcore, pqos_rmid_t *rmid);
 
 /**
- * @brief Get used RMIDs on ctx->cluster
+ * @brief Get used RMIDs on ctx->cluster for cores
  *
  * @param [in,out] ctx poll context
  * @param [in] event Monitoring event type
@@ -120,6 +120,22 @@ PQOS_LOCAL int mmio_mon_assoc_unused(struct pqos_mon_poll_ctx *ctx,
                                      pqos_rmid_t min_rmid,
                                      pqos_rmid_t max_rmid,
                                      const struct pqos_mon_options *opt);
+
+/**
+ * @brief Get used RMIDs on ctx->cluster for I/O RDT channels
+ *
+ * @param [in,out] ctx poll context
+ * @param [in] event Monitoring event type
+ * @param [in] min_rmid min RMID
+ * @param [in] max_rmid max RMID
+ *
+ * @return Operations status
+ */
+PQOS_LOCAL int
+mmio_mon_channels_assoc_unused(struct pqos_mon_poll_ctx *ctx,
+                               pqos_rmid_t min_rmid,
+                               pqos_rmid_t max_rmid,
+                               const struct pqos_mon_options *opt);
 
 /**
  * @brief Hardware interface to read RMID association of the \a lcore
@@ -196,6 +212,30 @@ PQOS_LOCAL int mmio_mon_start_cores(const unsigned num_cores,
                                     struct pqos_mon_mem_region *mem_region,
                                     struct pqos_mon_data *group,
                                     const struct pqos_mon_options *opt);
+
+/**
+ * @brief Hardware interface to start resource monitoring on selected
+ * group of channels
+ *
+ * The function sets up content of the \a group structure.
+ *
+ * @param [in] num_channels number of channels in \a channels array
+ * @param [in] channels array of channel id's
+ * @param [in] event combination of monitoring events
+ * @param [in] context a pointer for application's convenience
+ *            (unused by the library)
+ * @param [in,out] group a pointer to monitoring structure
+ * @param [in] opt extended options
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int mmio_mon_start_channels(const unsigned num_channels,
+                                       const pqos_channel_t *channels,
+                                       const enum pqos_mon_event event,
+                                       void *context,
+                                       struct pqos_mon_data *group,
+                                       const struct pqos_mon_options *opt);
 
 /**
  * @brief Hardware interface to stop resource monitoring data for selected
