@@ -44,6 +44,7 @@
 #include "erdt.h"
 #include "log.h"
 #include "mmio.h"
+#include "mmio_common.h"
 
 #include <pthread.h>
 #include <stdlib.h>

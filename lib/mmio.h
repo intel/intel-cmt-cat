@@ -139,7 +139,7 @@ int get_mba_mode_v1(const struct pqos_erdt_rmdd *rmdd, uint64_t *value);
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
-int set_mba_mode_v1(const struct pqos_erdt_rmdd *rmdd, unsigned int value);
+int set_mbm_mba_mode_v1(const struct pqos_erdt_rmdd *rmdd, unsigned int value);
 
 /**
  * @brief Returns L3 cache RMID subrange n_first...n_last for a given resource

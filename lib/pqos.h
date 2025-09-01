@@ -156,6 +156,11 @@ enum pqos_snc_config {
         PQOS_REQUIRE_SNC_TOTAL = 2, /**< SNC monitoring total mode */
 };
 
+enum pqos_mbm_mba_modes {
+        PQOS_REGION_AWARE_MBM_MBA_MODE = 0, /**< Region-aware MBM & MBA mode */
+        PQOS_TOTAL_MBM_MBA_MODE = 1,        /**< Total MBM & MBA mode */
+};
+
 /**
  * Resource Monitoring ID (RMID) definition
  */

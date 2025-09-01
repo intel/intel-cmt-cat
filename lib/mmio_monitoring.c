@@ -48,6 +48,7 @@
 #include "log.h"
 #include "machine.h"
 #include "mmio.h"
+#include "mmio_common.h"
 #include "monitoring.h"
 #include "perf_monitoring.h"
 #include "utils.h"

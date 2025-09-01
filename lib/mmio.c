@@ -213,7 +213,7 @@ get_mba_mode_v1(const struct pqos_erdt_rmdd *rmdd, uint64_t *value)
 }
 
 int
-set_mba_mode_v1(const struct pqos_erdt_rmdd *rmdd, unsigned int value)
+set_mbm_mba_mode_v1(const struct pqos_erdt_rmdd *rmdd, unsigned int value)
 {
 
         uint64_t *mem;

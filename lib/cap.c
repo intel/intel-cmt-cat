@@ -61,6 +61,7 @@
 #include "lock.h"
 #include "log.h"
 #include "machine.h"
+#include "mmio_common.h"
 #include "monitoring.h"
 #include "mrrm.h"
 #include "os_cap.h"
@@ -828,6 +829,47 @@ pqos_init(const struct pqos_config *config)
 
         _pqos_set_inter(interface);
 
+        ret = erdt_init(cap, cpu, &erdt);
+        switch (ret) {
+        case PQOS_RETVAL_RESOURCE:
+                LOG_DEBUG("ERDT init aborted: feature not present\n");
+                break;
+        case PQOS_RETVAL_OK:
+                LOG_DEBUG("ERDT init OK\n");
+                break;
+        case PQOS_RETVAL_ERROR:
+        default:
+                LOG_ERROR("ERDT init error %d\n", ret);
+                break;
+        }
+
+        /* Must be initialized after ERDT due to its data usage
+         */
+        if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
+                ret = cores_domains_init(cpu->num_cores, erdt, &cores_domains);
+                if (ret != PQOS_RETVAL_OK)
+                        goto machine_init_error;
+
+                /* Set Region Aware MBM and MBA mode, if MMIO interface is
+                 * selected and ERDT table is present
+                 */
+                if (mmio_set_mbm_mba_mode(PQOS_REGION_AWARE_MBM_MBA_MODE,
+                                          erdt) != PQOS_RETVAL_OK) {
+                        LOG_ERROR(
+                            "Region Aware MBM/MBA mode enabling error!\n");
+                        goto machine_init_error;
+                }
+        } else if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MSR) {
+                /* Set Total MBM and MBA mode, if MSR interface is selected
+                 * and ERDT table is present
+                 */
+                if (mmio_set_mbm_mba_mode(PQOS_TOTAL_MBM_MBA_MODE, erdt) !=
+                    PQOS_RETVAL_OK) {
+                        LOG_ERROR("Total MBM/MBA mode enabling error!\n");
+                        goto machine_init_error;
+                }
+        }
+
         ret = pqos_alloc_init(cpu, cap, config);
         switch (ret) {
         case PQOS_RETVAL_BUSY:
@@ -881,27 +923,6 @@ pqos_init(const struct pqos_config *config)
         default:
                 LOG_ERROR("MRRM init error %d\n", ret);
                 break;
-        }
-
-        ret = erdt_init(cap, cpu, &erdt);
-        switch (ret) {
-        case PQOS_RETVAL_RESOURCE:
-                LOG_DEBUG("ERDT init aborted: feature not present\n");
-                break;
-        case PQOS_RETVAL_OK:
-                LOG_DEBUG("ERDT init OK\n");
-                break;
-        case PQOS_RETVAL_ERROR:
-        default:
-                LOG_ERROR("ERDT init error %d\n", ret);
-                break;
-        }
-
-        if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
-                /* Initialized after ERDT due to its data usage */
-                ret = cores_domains_init(cpu->num_cores, erdt, &cores_domains);
-                if (ret != PQOS_RETVAL_OK)
-                        goto machine_init_error;
         }
 
         ret = iordt_init(cap, &dev);
@@ -976,6 +997,9 @@ pqos_fini(void)
         enum pqos_interface interface = _pqos_get_inter();
 
         lock_get();
+
+        if (interface == PQOS_INTER_MMIO)
+                mmio_set_mbm_mba_mode(PQOS_TOTAL_MBM_MBA_MODE, m_sysconf.erdt);
 
         ret = _pqos_check_init(1);
         if (ret != PQOS_RETVAL_OK) {
