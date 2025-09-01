@@ -45,7 +45,7 @@
 
 #define REGION_FORMAT " %15.1f"
 
-struct {
+static struct {
         enum pqos_mon_event event;
         unsigned unit;
         const char *format;
@@ -234,7 +234,7 @@ monitor_text_row(FILE *fp,
         unsigned i;
 
         ASSERT(fp != NULL);
-        ASSERT(data != NULL);
+        ASSERT(mon_data != NULL);
         UNUSED_ARG(timestamp);
 
         memset(data, 0, sz_data);
@@ -300,7 +300,7 @@ monitor_text_region_row(FILE *fp,
         int j = 0;
 
         ASSERT(fp != NULL);
-        ASSERT(data != NULL);
+        ASSERT(mon_data != NULL);
         UNUSED_ARG(timestamp);
 
         memset(data, 0, sz_data);

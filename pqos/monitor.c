@@ -2753,7 +2753,10 @@ monitor_loop(void)
         } else if (strcasecmp(sel_output_type, "csv") == 0) {
                 output.begin = monitor_csv_begin;
                 output.header = monitor_csv_header;
-                output.row = monitor_csv_row;
+                if (interface == PQOS_INTER_MMIO)
+                        output.row = monitor_csv_region_row;
+                else
+                        output.row = monitor_csv_row;
                 output.footer = monitor_csv_footer;
                 output.end = monitor_csv_end;
         } else if (strcasecmp(sel_output_type, "xml") == 0) {

@@ -69,6 +69,17 @@ void monitor_csv_row(FILE *fp,
                      const struct pqos_mon_data *data);
 
 /**
+ * @brief Print region monitoring data in csv format
+ *
+ * @param fp file descriptor
+ * @param [in] timestamp data timestamp
+ * @param [in] data monitoring data
+ */
+void monitor_csv_region_row(FILE *fp,
+                            const char *timestamp,
+                            const struct pqos_mon_data *data);
+
+/**
  * @brief Print CSV footer
  *
  * @param fp file descriptor
