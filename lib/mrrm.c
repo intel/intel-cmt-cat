@@ -139,11 +139,8 @@ mrrm_populate(struct pqos_mrrm_info **mrrm_info,
 
         if (ret == PQOS_RETVAL_OK)
                 *mrrm_info = p_mrrm_info;
-        else {
-                for (idx = 0; idx < mre_idx; idx++)
-                        free(p_mrrm_info->mre[idx].programming_regs);
-                free(p_mrrm_info);
-        }
+        else
+                mrrm_fini();
 
         return ret;
 }
@@ -174,4 +171,22 @@ mrrm_init(const struct pqos_cap *cap, struct pqos_mrrm_info **mrrm_info)
         acpi_free(table);
 
         return ret;
+}
+
+void
+mrrm_fini(void)
+{
+        uint32_t idx = 0;
+
+        if (p_mrrm_info != NULL) {
+                idx = 0;
+                while (idx < p_mrrm_info->num_mres && p_mrrm_info->mre) {
+                        if (p_mrrm_info->mre[idx].programming_regs)
+                                free(p_mrrm_info->mre[idx].programming_regs);
+                        idx++;
+                }
+
+                free(p_mrrm_info->mre);
+                free(p_mrrm_info);
+        }
 }

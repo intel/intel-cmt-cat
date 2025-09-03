@@ -161,12 +161,10 @@ out_apic2cpu:
         return PQOS_RETVAL_ERROR;
 }
 
-int
+void
 cores_domains_fini(void)
 {
         ASSERT(m_cores_domains.domains != NULL);
         free(m_cores_domains.domains);
         free(cpu2apic);
-
-        return PQOS_RETVAL_OK;
 }

@@ -108,6 +108,14 @@ struct __attribute__((__packed__)) acpi_table_mrrm {
 PQOS_LOCAL int mrrm_init(const struct pqos_cap *cap,
                          struct pqos_mrrm_info **pqos_mrrm);
 
+/**
+ * @brief Shuts down MRRM module
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL void mrrm_fini(void);
+
 #ifdef __cplusplus
 }
 #endif

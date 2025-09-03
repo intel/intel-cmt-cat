@@ -571,7 +571,6 @@ erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
         int cpu_idx = 0;
         int dev_idx = 0;
         int rmdd_idx = 0;
-        int idx = 0;
         int total_rmdds =
             socket_num * (CPU_AGENTS_PER_SOCKET + DEVICE_AGENTS_PER_SOCKET);
         void *p_acpi_rmdds = (void *)&p_acpi_erdt->erdt_sub_structures[0];
@@ -633,21 +632,8 @@ erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
 
         if (ret == PQOS_RETVAL_OK)
                 *erdt_info = p_erdt_info;
-        else {
-                for (idx = 0; idx < cpu_idx; idx++) {
-                        free(p_erdt_info->cpu_agents[idx].cacd.enumeration_ids);
-                        free(p_erdt_info->cpu_agents[idx]
-                                 .mmrc.correction_factor);
-                }
-
-                for (idx = 0; idx < dev_idx; idx++)
-                        free(p_erdt_info->dev_agents[idx]
-                                 .ibrd.correction_factor);
-
-                free(p_erdt_info->cpu_agents);
-                free(p_erdt_info->dev_agents);
-                free(p_erdt_info);
-        }
+        else
+                erdt_fini();
 
         return ret;
 }
@@ -716,6 +702,8 @@ erdt_dev_populate_chans(const struct pqos_erdt_dacd *dacd,
                                 idx++;
                                 channels_domains->num_channel_ids++;
                         }
+
+                        free(channels);
                 }
         }
 
@@ -748,6 +736,7 @@ channels_domains_init(unsigned int num_channels,
             (pqos_channel_t *)malloc(num_channels * sizeof(pqos_channel_t));
         if (p_channels_domains->channel_ids == NULL) {
                 LOG_ERROR("Can't allocate memory for pqos_channel_t\n");
+                free(p_channels_domains);
                 return PQOS_RETVAL_ERROR;
         }
         memset(p_channels_domains->channel_ids, 0,
@@ -758,6 +747,8 @@ channels_domains_init(unsigned int num_channels,
         if (p_channels_domains->domain_ids == NULL) {
                 LOG_ERROR("Can't allocate memory for domains in "
                           "pqos_channels_domains\n");
+                free(p_channels_domains->channel_ids);
+                free(p_channels_domains);
                 return PQOS_RETVAL_ERROR;
         }
         memset(p_channels_domains->domain_ids, 0,
@@ -768,6 +759,9 @@ channels_domains_init(unsigned int num_channels,
         if (p_channels_domains->domain_id_idxs == NULL) {
                 LOG_ERROR("Can't allocate memory for domain_id_idxs in "
                           "pqos_channels_domains\n");
+                free(p_channels_domains->domain_ids);
+                free(p_channels_domains->channel_ids);
+                free(p_channels_domains);
                 return PQOS_RETVAL_ERROR;
         }
         memset(p_channels_domains->domain_id_idxs, 0,
@@ -776,8 +770,13 @@ channels_domains_init(unsigned int num_channels,
         for (unsigned i = 0; i < erdt->num_dev_agents; i++) {
                 ret = erdt_dev_populate_chans(&erdt->dev_agents[i].dacd,
                                               devinfo, p_channels_domains, i);
-                if (ret != PQOS_RETVAL_OK)
+                if (ret != PQOS_RETVAL_OK) {
+                        free(p_channels_domains->domain_id_idxs);
+                        free(p_channels_domains->domain_ids);
+                        free(p_channels_domains->channel_ids);
+                        free(p_channels_domains);
                         return ret;
+                }
         }
 
         *channels_domains = p_channels_domains;
@@ -785,7 +784,7 @@ channels_domains_init(unsigned int num_channels,
         return PQOS_RETVAL_OK;
 }
 
-int
+void
 channels_domains_fini(void)
 {
         ASSERT(p_channels_domains != NULL);
@@ -797,8 +796,6 @@ channels_domains_fini(void)
         free(p_channels_domains->domain_ids);
         free(p_channels_domains->domain_id_idxs);
         free(p_channels_domains);
-
-        return PQOS_RETVAL_OK;
 }
 
 int
@@ -806,13 +803,8 @@ erdt_init(const struct pqos_cap *cap,
           struct pqos_cpuinfo *cpu,
           struct pqos_erdt_info **erdt_info)
 {
-        int ret;
-        int socket_num = cpuinfo_get_socket_num(cpu);
-
-        if (socket_num == -1) {
-                printf("Unable to get socket count\n");
-                return PQOS_RETVAL_ERROR;
-        }
+        int ret = PQOS_RETVAL_OK;
+        int socket_num = 0;
 
         if (cap == NULL || cpu == NULL || erdt_info == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -830,9 +822,60 @@ erdt_init(const struct pqos_cap *cap,
                 return PQOS_RETVAL_RESOURCE;
         }
 
+        socket_num = cpuinfo_get_socket_num(cpu);
+        if (socket_num == -1) {
+                printf("Unable to get socket count\n");
+                return PQOS_RETVAL_ERROR;
+        }
+
         acpi_print(table);
         ret = erdt_populate_rmdds(erdt_info, table->erdt, socket_num);
         acpi_free(table);
 
         return ret;
+}
+
+void
+erdt_fini(void)
+{
+        uint32_t idx = 0;
+        uint32_t dase_idx = 0;
+
+        if (p_erdt_info != NULL) {
+                if (p_erdt_info->cpu_agents != NULL) {
+                        idx = 0;
+                        while (idx < p_erdt_info->num_cpu_agents) {
+                                free(p_erdt_info->cpu_agents[idx]
+                                         .cacd.enumeration_ids);
+                                free(p_erdt_info->cpu_agents[idx]
+                                         .mmrc.correction_factor);
+                                idx++;
+                        }
+
+                        free(p_erdt_info->cpu_agents);
+                }
+
+                if (p_erdt_info->dev_agents != NULL) {
+                        idx = 0;
+                        while (idx < p_erdt_info->num_dev_agents) {
+                                free(p_erdt_info->dev_agents[idx]
+                                         .ibrd.correction_factor);
+                                dase_idx = 0;
+                                while (p_erdt_info->dev_agents[idx].dacd.dase &&
+                                       dase_idx < p_erdt_info->dev_agents[idx]
+                                                      .dacd.num_dases) {
+                                        free(p_erdt_info->dev_agents[idx]
+                                                 .dacd.dase[dase_idx]
+                                                 .path);
+                                        dase_idx++;
+                                }
+                                free(p_erdt_info->dev_agents[idx].dacd.dase);
+                                idx++;
+                        }
+
+                        free(p_erdt_info->dev_agents);
+                }
+
+                free(p_erdt_info);
+        }
 }

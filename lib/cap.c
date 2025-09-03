@@ -911,18 +911,20 @@ pqos_init(const struct pqos_config *config)
                 goto machine_init_error;
         }
 
-        ret = mrrm_init(cap, &mrrm);
-        switch (ret) {
-        case PQOS_RETVAL_RESOURCE:
-                LOG_DEBUG("MRRM init aborted: feature not present\n");
-                break;
-        case PQOS_RETVAL_OK:
-                LOG_DEBUG("MRRM init OK\n");
-                break;
-        case PQOS_RETVAL_ERROR:
-        default:
-                LOG_ERROR("MRRM init error %d\n", ret);
-                break;
+        if (interface == PQOS_INTER_MMIO) {
+                ret = mrrm_init(cap, &mrrm);
+                switch (ret) {
+                case PQOS_RETVAL_RESOURCE:
+                        LOG_DEBUG("MRRM init aborted: feature not present\n");
+                        break;
+                case PQOS_RETVAL_OK:
+                        LOG_DEBUG("MRRM init OK\n");
+                        break;
+                case PQOS_RETVAL_ERROR:
+                default:
+                        LOG_ERROR("MRRM init error %d\n", ret);
+                        break;
+                }
         }
 
         ret = iordt_init(cap, &dev);
@@ -939,18 +941,24 @@ pqos_init(const struct pqos_config *config)
                 break;
         }
 
-        if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
-                ret = channels_domains_init(dev->num_channels, erdt, dev,
-                                            &channels_domains);
-                if (ret != PQOS_RETVAL_OK)
-                        goto machine_init_error;
-        }
-
-        if (ret == PQOS_RETVAL_RESOURCE)
+        if (ret == PQOS_RETVAL_RESOURCE && interface != PQOS_INTER_MMIO)
                 ret = PQOS_RETVAL_OK;
 
-        if (ret != PQOS_RETVAL_OK)
+        if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO)
+                ret = channels_domains_init(dev->num_channels, erdt, dev,
+                                            &channels_domains);
+
+        if (ret != PQOS_RETVAL_OK) {
                 iordt_fini();
+                erdt_fini();
+        }
+
+        if (ret != PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
+                cores_domains_fini();
+                mrrm_fini();
+                channels_domains_fini();
+        }
+
 machine_init_error:
         if (ret != PQOS_RETVAL_OK)
                 (void)machine_fini();
@@ -1014,6 +1022,7 @@ pqos_fini(void)
         if (interface == PQOS_INTER_MMIO) {
                 cores_domains_fini();
                 channels_domains_fini();
+                mrrm_fini();
         }
 
         ret = iordt_fini();
@@ -1021,6 +1030,8 @@ pqos_fini(void)
                 retval = PQOS_RETVAL_ERROR;
                 LOG_ERROR("iordt_fini() error %d\n", ret);
         }
+
+        erdt_fini();
 
         ret = cpuinfo_fini();
         if (ret != 0) {

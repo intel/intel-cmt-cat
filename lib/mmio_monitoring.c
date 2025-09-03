@@ -438,13 +438,19 @@ mmio_mon_channels_assoc_unused(struct pqos_mon_poll_ctx *ctx,
         for (idx = 0; idx < erdt->num_dev_agents; idx++) {
                 dev_rmid_list[idx].domain_id =
                     erdt->dev_agents[idx].rmdd.domain_id;
+
                 dev_rmid_list[idx].rmids = (pqos_rmid_t *)calloc(
                     erdt->dev_agents[idx].rmdd.max_rmids, sizeof(pqos_rmid_t));
-                if (dev_rmid_list[idx].rmids == NULL)
-                        return PQOS_RETVAL_RESOURCE;
+                if (dev_rmid_list[idx].rmids == NULL) {
+                        LOG_ERROR("Unable to allocate memory for rmids in "
+                                  "dev_rmid_list idx %d\n",
+                                  idx);
+                        ret = PQOS_RETVAL_RESOURCE;
+                        goto rmid_alloc_error;
+                }
         }
 
-        /* mark used RMIDs for channels */
+        /* Mark used RMIDs for channels */
         if (iordt && dev != NULL) {
                 ret =
                     get_dev_rmid_list(ctx, erdt, dev, dev_rmid_list, max_rmid);

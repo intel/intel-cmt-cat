@@ -66,7 +66,7 @@ PQOS_LOCAL int cores_domains_init(unsigned int num_cores,
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-PQOS_LOCAL int cores_domains_fini(void);
+PQOS_LOCAL void cores_domains_fini(void);
 
 #ifdef __cplusplus
 }

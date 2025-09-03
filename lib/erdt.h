@@ -320,12 +320,12 @@ channels_domains_init(unsigned int num_channels,
                       struct pqos_channels_domains **channels_domains);
 
 /**
- * @brief Shuts down Cores to Domains module
+ * @brief Shuts down Channels to Domains module
  *
  * @return Operational status
  * @retval PQOS_RETVAL_OK success
  */
-PQOS_LOCAL int channels_domains_fini(void);
+PQOS_LOCAL void channels_domains_fini(void);
 
 /**
  * @brief Initializes ERDT module
@@ -345,6 +345,14 @@ PQOS_LOCAL int channels_domains_fini(void);
 PQOS_LOCAL int erdt_init(const struct pqos_cap *cap,
                          struct pqos_cpuinfo *cpu,
                          struct pqos_erdt_info **pqos_erdt);
+
+/**
+ * @brief Shuts down ERDT module
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL void erdt_fini(void);
 
 #ifdef __cplusplus
 }
