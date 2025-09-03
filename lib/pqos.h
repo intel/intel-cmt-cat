@@ -700,6 +700,67 @@ struct pqos_sysconfig {
 };
 
 /**
+ * Dump interface data structures
+ */
+
+/* Topology */
+
+/* MMIO space */
+enum pqos_dump_space {
+        DUMP_SPACE_CMRC,
+        DUMP_SPACE_MMRC,
+        DUMP_SPACE_MARC_OPT,
+        DUMP_SPACE_MARC_MIN,
+        DUMP_SPACE_MARC_MAX,
+        DUMP_SPACE_CMRD,
+        DUMP_SPACE_IBRD_TOTAL_BW,
+        DUMP_SPACE_IBRD_MISS_BW,
+        DUMP_SPACE_CARD,
+        DUMP_SPACE_ALL, // Show all spaces
+};
+
+/* Dump topology */
+struct pqos_dump_topology {
+        unsigned int num_sockets;    // Default: 0 - mean all sockets
+        unsigned int *socket;        // Default: NULL
+        unsigned int num_domain_ids; // Default: 0 - mean all domains
+        uint16_t *domain_ids;        // Default: NULL
+        enum pqos_dump_space space;  // Default DUMP_SPACE_ALL
+};
+
+/* Dump Format */
+
+/* Hex dump width */
+enum pqos_dump_width {
+        DUMP_WIDTH_8BIT,
+        DUMP_WIDTH_64BIT,
+};
+
+/* Dump format */
+struct pqos_dump_format {
+        enum pqos_dump_width dump_width; // default DUMP_WIDTH_64BIT
+        unsigned int le;  // little endian flag. default: 0, means big endian
+        unsigned int bin; // binary flag. default: 0, means hexadecimal
+};
+
+/* View window */
+struct pqos_dump_view {
+        unsigned long offset; // default 0,
+                              // Meaning the beginning of the MMIO space
+        unsigned long length; // default 0. Meaning from the offset till the end
+                              // of the MMIO space
+};
+
+/**
+ * Main dump data structure
+ */
+struct pqos_dump {
+        struct pqos_dump_topology topology;
+        struct pqos_dump_format fmt;
+        struct pqos_dump_view view;
+};
+
+/**
  * @brief Retrieves PQoS capabilities data
  *
  * @param [out] cap location to store PQoS capabilities information at
@@ -785,6 +846,73 @@ struct pqos_mon_mem_region {
         int region_num[PQOS_MAX_MEM_REGIONS];
         int num_mem_regions;
 };
+
+/**
+ * Dump interface data structures
+ */
+
+/* Domain type */
+enum domain_type {
+        DM_TYPE_CPU,
+        DM_TYPE_DEVICE,
+};
+
+/* Entry in the map between ACPI structures and appropriate MMIO space */
+struct dump_space_map_entry {
+        enum pqos_dump_space space;   // dump space
+        enum domain_type domain_type; // domain type
+        const char *space_name;       // dump space name
+        size_t struct_offset;         // offset in cpu_agent or device_agent
+        size_t base_offset;           // offset of MMMIO base address in the
+                                      // structure
+        size_t size_offset;           // offset of MMMIO size in the structure
+        size_t size_adjustment;       // adjustments to bytes
+};
+
+/* Calculate offset of member in structure */
+#define OFFSET_IN_STRUCT(type, member) ((size_t) & (((type *)0)->member))
+
+/* Page size */
+#define PAGE_SIZE 4096
+
+/* Map between ACPI structures and appropriate MMIO spaces */
+static const struct dump_space_map_entry dump_space_map[] = {
+    {DUMP_SPACE_CMRC, DM_TYPE_CPU, "CMRC",
+     OFFSET_IN_STRUCT(struct pqos_cpu_agent_info, cmrc),
+     OFFSET_IN_STRUCT(struct pqos_erdt_cmrc, block_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_cmrc, block_size), PAGE_SIZE},
+    {DUMP_SPACE_MMRC, DM_TYPE_CPU, "MMRC",
+     OFFSET_IN_STRUCT(struct pqos_cpu_agent_info, mmrc),
+     OFFSET_IN_STRUCT(struct pqos_erdt_mmrc, reg_block_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_mmrc, reg_block_size), PAGE_SIZE},
+    {DUMP_SPACE_MARC_OPT, DM_TYPE_CPU, "MARC(OPT)",
+     OFFSET_IN_STRUCT(struct pqos_cpu_agent_info, marc),
+     OFFSET_IN_STRUCT(struct pqos_erdt_marc, opt_bw_reg_block_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_marc, reg_block_size), PAGE_SIZE},
+    {DUMP_SPACE_MARC_MIN, DM_TYPE_CPU, "MARC(MIN)",
+     OFFSET_IN_STRUCT(struct pqos_cpu_agent_info, marc),
+     OFFSET_IN_STRUCT(struct pqos_erdt_marc, min_bw_reg_block_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_marc, reg_block_size), PAGE_SIZE},
+    {DUMP_SPACE_MARC_MAX, DM_TYPE_CPU, "MARC(MAX)",
+     OFFSET_IN_STRUCT(struct pqos_cpu_agent_info, marc),
+     OFFSET_IN_STRUCT(struct pqos_erdt_marc, max_bw_reg_block_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_marc, reg_block_size), PAGE_SIZE},
+    {DUMP_SPACE_CMRD, DM_TYPE_DEVICE, "CMRD",
+     OFFSET_IN_STRUCT(struct pqos_device_agent_info, cmrd),
+     OFFSET_IN_STRUCT(struct pqos_erdt_cmrd, reg_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_cmrd, reg_block_size), PAGE_SIZE},
+    {DUMP_SPACE_IBRD_TOTAL_BW, DM_TYPE_DEVICE, "IBRD(TOTAL)",
+     OFFSET_IN_STRUCT(struct pqos_device_agent_info, ibrd),
+     OFFSET_IN_STRUCT(struct pqos_erdt_ibrd, reg_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_ibrd, reg_block_size), PAGE_SIZE},
+    {DUMP_SPACE_IBRD_MISS_BW, DM_TYPE_DEVICE, "IBRD(MISS)",
+     OFFSET_IN_STRUCT(struct pqos_device_agent_info, ibrd),
+     OFFSET_IN_STRUCT(struct pqos_erdt_ibrd, reg_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_ibrd, reg_block_size), PAGE_SIZE},
+    {DUMP_SPACE_CARD, DM_TYPE_DEVICE, "CARD",
+     OFFSET_IN_STRUCT(struct pqos_device_agent_info, card),
+     OFFSET_IN_STRUCT(struct pqos_erdt_card, reg_base_addr),
+     OFFSET_IN_STRUCT(struct pqos_erdt_card, reg_block_size), PAGE_SIZE}};
 
 struct pqos_mon_data_internal;
 
@@ -2099,6 +2227,22 @@ int pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value);
  * @return Void.
  */
 void pqos_free(void *ptr);
+
+/**
+ * @brief Shows all the available MMIO spaces for each of the domains
+ *
+ * @retval PQOS_RETVAL_OK success
+ **/
+int pqos_dump_mm(void);
+
+/**
+ *  @brief Shows the hex dumps of MMIO spaces according to given parameters
+ *
+ *  @param [in] dump defines dump output
+ *
+ *  @retval PQOS_RETVAL_OK success
+ **/
+int pqos_dump(const struct pqos_dump *dump_cfg);
 
 #ifdef __cplusplus
 }

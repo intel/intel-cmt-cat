@@ -40,6 +40,7 @@
 #include "lock.h"
 #include "log.h"
 #include "mmio_allocation.h"
+#include "mmio_dump.h"
 #include "mmio_monitoring.h"
 #include "monitoring.h"
 #include "os_allocation.h"
@@ -176,6 +177,8 @@ static struct pqos_api {
         /** Retrieves tasks associated with COS */
         unsigned *(*pid_get_pid_assoc)(const unsigned class_id,
                                        unsigned *count);
+        /** Dump a memory region */
+        int (*dump)(const struct pqos_dump *dump);
 } api;
 
 /*
@@ -271,6 +274,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.mon_start_channels = mmio_mon_start_channels;
                 api.mon_stop = mmio_mon_stop;
                 api.mon_reset = mmio_mon_reset;
+                api.dump = mmio_dump;
         }
 
         return PQOS_RETVAL_OK;
@@ -1612,4 +1616,13 @@ pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value)
         lock_release();
 
         return ret;
+}
+
+int
+pqos_dump(const struct pqos_dump *dump_cfg)
+{
+        if (dump_cfg == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        return API_CALL(dump, dump_cfg);
 }

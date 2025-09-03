@@ -37,6 +37,7 @@
 #include "main.h"
 
 #include "alloc.h"
+#include "dump.h"
 #include "cap.h"
 #include "common.h"
 #include "monitor.h"
