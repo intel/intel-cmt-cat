@@ -37,9 +37,9 @@
 #include "main.h"
 
 #include "alloc.h"
-#include "dump.h"
 #include "cap.h"
 #include "common.h"
+#include "dump.h"
 #include "monitor.h"
 #include "pqos.h"
 #include "profiles.h"
@@ -147,6 +147,16 @@ static int sel_print_mem_regions = 0;
  * Enable displaying processor topology
  */
 static int sel_print_topology = 0;
+
+/**
+ * Enable displaying available MMIO registers to dump
+ */
+static int sel_print_dump_info = 0;
+
+/**
+ * Enable MMIO registers dump
+ */
+static int sel_dump = 0;
 
 static uint64_t strtouint64_base(const char *s, int default_base);
 
@@ -795,6 +805,30 @@ selfn_print_topology(const char *arg)
 }
 
 /**
+ * @brief Displays available mmio address spaces to dump
+ *
+ * @param arg not used
+ */
+static void
+selfn_print_dump_info(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_print_dump_info = 1;
+}
+
+/**
+ * @brief Dumps selected mmio address space
+ *
+ * @param arg not used
+ */
+static void
+selfn_dump(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_dump = 1;
+}
+
+/**
  * @brief Opens configuration file and parses its contents
  *
  * @param fname Name of the file with configuration parameters
@@ -1123,6 +1157,16 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_ALLOC_MIN_BW         1014
 #define OPTION_ALLOC_MAX_BW         1015
 #define OPTION_ALLOC_DOMAIN_ID      1016
+#define OPTION_PRINT_DUMP_INFO      1017
+#define OPTION_DUMP                 1018
+#define OPTION_DUMP_SOCKET          1019
+#define OPTION_DUMP_DOMAIN_ID       1020
+#define OPTION_DUMP_SPACE           1021
+#define OPTION_DUMP_OFFSET          1022
+#define OPTION_DUMP_LENGTH          1023
+#define OPTION_DUMP_WIDTH           1024
+#define OPTION_DUMP_BINARY          1025
+#define OPTION_DUMP_LE              1026
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -1168,6 +1212,16 @@ static struct option long_cmd_opts[] = {
     {"alloc-min-bw",         no_argument,       0, OPTION_ALLOC_MIN_BW},
     {"alloc-max-bw",         no_argument,       0, OPTION_ALLOC_MAX_BW},
     {"alloc-domain-id",      required_argument, 0, OPTION_ALLOC_DOMAIN_ID},
+    {"print-dump-info",      no_argument,       0, OPTION_PRINT_DUMP_INFO},
+    {"dump",                 no_argument,       0, OPTION_DUMP},
+    {"socket",               required_argument, 0, OPTION_DUMP_SOCKET},
+    {"dump-domain-id",       required_argument, 0, OPTION_DUMP_DOMAIN_ID},
+    {"space",                required_argument, 0, OPTION_DUMP_SPACE},
+    {"offset",               required_argument, 0, OPTION_DUMP_OFFSET},
+    {"length",               required_argument, 0, OPTION_DUMP_LENGTH},
+    {"width",                required_argument, 0, OPTION_DUMP_WIDTH},
+    {"binary",               no_argument,       0, OPTION_DUMP_BINARY},
+    {"le",                   no_argument,       0, OPTION_DUMP_LE},
     {0, 0, 0, 0} /* end */
     /* clang-format on */
 };
@@ -1404,6 +1458,36 @@ main(int argc, char **argv)
                 case OPTION_ALLOC_DOMAIN_ID:
                         selfn_alloc_domain_id(optarg);
                         break;
+                case OPTION_PRINT_DUMP_INFO:
+                        selfn_print_dump_info(NULL);
+                        break;
+                case OPTION_DUMP:
+                        selfn_dump(NULL);
+                        break;
+                case OPTION_DUMP_SOCKET:
+                        selfn_dump_socket(optarg);
+                        break;
+                case OPTION_DUMP_DOMAIN_ID:
+                        selfn_dump_domain_id(optarg);
+                        break;
+                case OPTION_DUMP_SPACE:
+                        selfn_dump_space(optarg);
+                        break;
+                case OPTION_DUMP_WIDTH:
+                        selfn_dump_width(optarg);
+                        break;
+                case OPTION_DUMP_BINARY:
+                        selfn_dump_binary(NULL);
+                        break;
+                case OPTION_DUMP_LE:
+                        selfn_dump_le(NULL);
+                        break;
+                case OPTION_DUMP_OFFSET:
+                        selfn_dump_offset(optarg);
+                        break;
+                case OPTION_DUMP_LENGTH:
+                        selfn_dump_length(optarg);
+                        break;
                 default:
                         printf("Unsupported option: -%c. "
                                "See option -h for help.\n",
@@ -1565,6 +1649,16 @@ main(int argc, char **argv)
 
         if (sel_print_topology) {
                 cap_print_topology(p_sys);
+                goto allocation_exit;
+        }
+
+        if (sel_print_dump_info) {
+                pqos_print_dump_info(p_sys);
+                goto allocation_exit;
+        }
+
+        if (sel_dump) {
+                dump_mmio_regs(p_sys);
                 goto allocation_exit;
         }
 

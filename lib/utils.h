@@ -107,6 +107,26 @@ PQOS_LOCAL int pqos_devinfo_get_channel_shared(const struct pqos_devinfo *dev,
 PQOS_LOCAL const struct pqos_capability *
 _pqos_cap_get_type(const enum pqos_cap_type type);
 
+/**
+ * @brief Returns CPU agent information for a given domain
+ *
+ * @param [in]  domain_id domain to extract CPU agent information for
+ *
+ * @return CPU agent information for a given domain or NULL if not found
+ */
+PQOS_LOCAL const struct pqos_cpu_agent_info *
+get_cpu_agent_by_domain(uint16_t domain_id);
+
+/**
+ * @brief Returns DEV agent information for a given domain
+ *
+ * @param [in]  domain_id domain to extract DEV agent information for
+ *
+ * @return DEV agent information for a given domain or NULL if not found
+ */
+PQOS_LOCAL const struct pqos_device_agent_info *
+get_dev_agent_by_domain(uint16_t domain_id);
+
 #ifdef __cplusplus
 }
 #endif

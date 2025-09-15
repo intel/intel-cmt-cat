@@ -47,9 +47,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define CPU_AGENTS_PER_SOCKET    4
-#define DEVICE_AGENTS_PER_SOCKET 2
-
 #define RMDD_L3_DOMAIN    1
 #define RMDD_IO_L3_DOMAIN 2
 

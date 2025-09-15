@@ -45,48 +45,11 @@
 #include "log.h"
 #include "mmio.h"
 #include "mmio_common.h"
+#include "utils.h"
 
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
-
-/**
- * @brief Returns CPU agent information for a given domain
- *
- * @param [in]  domain_id domain to extract CPU agent information for
- *
- * @return CPU agent information for a given domain or NULL if not found
- */
-static struct pqos_cpu_agent_info *
-get_cpu_agent_by_domain(unsigned int domain_id)
-{
-        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
-
-        for (unsigned int i = 0; i < erdt->num_cpu_agents; i++)
-                if (erdt->cpu_agents[i].rmdd.domain_id == domain_id)
-                        return &erdt->cpu_agents[i];
-
-        return NULL;
-}
-
-/**
- * @brief Returns DEV agent information for a given domain
- *
- * @param [in]  domain_id domain to extract DEV agent information for
- *
- * @return DEV agent information for a given domain or NULL if not found
- */
-static struct pqos_device_agent_info *
-get_dev_agent_by_domain(unsigned int domain_id)
-{
-        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
-
-        for (unsigned int i = 0; i < erdt->num_dev_agents; i++)
-                if (erdt->dev_agents[i].rmdd.domain_id == domain_id)
-                        return &erdt->dev_agents[i];
-
-        return NULL;
-}
 
 /**
  * @brief Populate mem_regions data structure for a given CLOS
@@ -142,11 +105,11 @@ _get_regions_mba(const struct pqos_erdt_info *erdt,
  * @retval struct pqos_erdt_card member non_contiguous_cbm on success
  */
 static int
-cap_get_mmio_l3ca_non_contiguous(unsigned domain_id)
+cap_get_mmio_l3ca_non_contiguous(uint16_t domain_id)
 {
-        struct pqos_device_agent_info *dev_agent;
+        const struct pqos_device_agent_info *dev_agent =
+            get_dev_agent_by_domain(domain_id);
 
-        dev_agent = get_dev_agent_by_domain(domain_id);
         if (dev_agent == NULL) {
                 LOG_ERROR("domain_id is wrong\n");
                 return !ERDT_CAT_NON_CONTIGUOUS_CBM_SUPPORT;
@@ -164,12 +127,12 @@ cap_get_mmio_l3ca_non_contiguous(unsigned domain_id)
  * @retval struct pqos_erdt_card member zero_length_bitmask on success
  */
 static int
-cap_get_mmio_l3ca_zero_length(unsigned domain_id)
+cap_get_mmio_l3ca_zero_length(uint16_t domain_id)
 {
 
-        struct pqos_device_agent_info *dev_agent;
+        const struct pqos_device_agent_info *dev_agent =
+            get_dev_agent_by_domain(domain_id);
 
-        dev_agent = get_dev_agent_by_domain(domain_id);
         if (dev_agent == NULL) {
                 LOG_ERROR("domain_id is wrong\n");
                 return !ERDT_CAT_ZERO_LENGTH_CBM_SUPPORT;

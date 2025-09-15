@@ -979,3 +979,33 @@ pqos_devinfo_get_channel_shared(const struct pqos_devinfo *dev,
 
         return PQOS_RETVAL_PARAM;
 }
+
+const struct pqos_cpu_agent_info *
+get_cpu_agent_by_domain(uint16_t domain_id)
+{
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+
+        if (erdt == NULL)
+                return NULL;
+
+        for (uint32_t idx = 0; idx < erdt->num_cpu_agents; idx++)
+                if (erdt->cpu_agents[idx].rmdd.domain_id == domain_id)
+                        return &erdt->cpu_agents[idx];
+
+        return NULL;
+}
+
+const struct pqos_device_agent_info *
+get_dev_agent_by_domain(uint16_t domain_id)
+{
+        const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+
+        if (erdt == NULL)
+                return NULL;
+
+        for (uint32_t idx = 0; idx < erdt->num_dev_agents; idx++)
+                if (erdt->dev_agents[idx].rmdd.domain_id == domain_id)
+                        return &erdt->dev_agents[idx];
+
+        return NULL;
+}

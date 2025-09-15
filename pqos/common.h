@@ -64,6 +64,10 @@ extern "C" {
 
 #define UNUSED_ARG(_x) ((void)(_x))
 
+#define MAX_DOMAINS 65535
+
+#define MAX_DOMAIN_IDS 128
+
 /**
  * @brief Wrapper around fopen() that additionally checks if a given path
  * contains any symbolic links and fails if it does.

@@ -178,7 +178,7 @@ static struct pqos_api {
         unsigned *(*pid_get_pid_assoc)(const unsigned class_id,
                                        unsigned *count);
         /** Dump a memory region */
-        int (*dump)(const struct pqos_dump *dump);
+        int (*dump)(const struct pqos_mmio_dump *dump);
 } api;
 
 /*
@@ -1619,7 +1619,7 @@ pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value)
 }
 
 int
-pqos_dump(const struct pqos_dump *dump_cfg)
+pqos_dump(const struct pqos_mmio_dump *dump_cfg)
 {
         if (dump_cfg == NULL)
                 return PQOS_RETVAL_PARAM;

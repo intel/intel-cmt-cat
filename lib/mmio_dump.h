@@ -42,17 +42,13 @@ extern "C" {
 #include "pqos.h"
 
 /**
- * @brief Dump MMIO interface
- */
-
-/**
  *  @brief Shows the hex dumps of MMIO spaces according to given parameters
  *
  *  @param [in] dump defines dump output
  *
  *  @retval PQOS_RETVAL_OK success
  **/
-PQOS_LOCAL int mmio_dump(const struct pqos_dump *dump_cfg);
+PQOS_LOCAL int mmio_dump(const struct pqos_mmio_dump *dump_cfg);
 
 #ifdef __cplusplus
 }
