@@ -63,6 +63,17 @@ static struct pqos_erdt_info *p_erdt_info = NULL;
 
 static struct pqos_channels_domains *p_channels_domains = NULL;
 
+/**
+ * @brief Copies correction factor list from ACPI table to internal structure
+ *
+ * @param p_pqos_correction_factor Pointer to store the correction factor list
+ * @param p_acpi_correction_factor Pointer to the correction factor list in ACPI
+ * @param length Length of the correction factor list
+ * @param max_rmids Maximum number of RMIDs supported
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 copy_correction_factor(void *p_pqos_correction_factor,
                        const void *p_acpi_correction_factor,
@@ -91,6 +102,15 @@ copy_correction_factor(void *p_pqos_correction_factor,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure CACD info
+ *
+ * @param p_cacd struct to be updated with CACD info
+ * @param p_acpi_cacd table to be parsed for CACD info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_cacd(struct pqos_erdt_cacd *p_cacd,
                    struct acpi_table_erdt_cacd *p_acpi_cacd)
@@ -122,6 +142,15 @@ erdt_populate_cacd(struct pqos_erdt_cacd *p_cacd,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure CMRC info
+ *
+ * @param p_cmrc struct to be updated with CMRC info
+ * @param p_acpi_cmrc table to be parsed for CMRC info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_cmrc(struct pqos_erdt_cmrc *p_cmrc,
                    struct acpi_table_erdt_cmrc *p_acpi_cmrc)
@@ -145,6 +174,15 @@ erdt_populate_cmrc(struct pqos_erdt_cmrc *p_cmrc,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure MMRC info
+ *
+ * @param p_mmrc struct to be updated with MMRC info
+ * @param p_acpi_mmrc table to be parsed for MMRC info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_mmrc(struct pqos_erdt_mmrc *p_mmrc,
                    struct acpi_table_erdt_mmrc *p_acpi_mmrc,
@@ -182,6 +220,15 @@ erdt_populate_mmrc(struct pqos_erdt_mmrc *p_mmrc,
         return ret;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure MARC info
+ *
+ * @param p_marc struct to be updated with MARC info
+ * @param p_acpi_marc table to be parsed for MARC info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_marc(struct pqos_erdt_marc *p_marc,
                    struct acpi_table_erdt_marc *p_acpi_marc)
@@ -207,6 +254,16 @@ erdt_populate_marc(struct pqos_erdt_marc *p_marc,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Calculates number of DASE structures in DACD structure
+ *
+ * @param length Length of the DACD structure excluding the header
+ * @param p_acpi_dase Pointer to the first DASE structure in the DACD from ACPI
+ * @param num_dases Pointer to store the number of DASEs found
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_calculate_num_dases(uint32_t length,
                          struct acpi_table_erdt_dase *p_acpi_dase,
@@ -259,6 +316,15 @@ erdt_calculate_num_dases(uint32_t length,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure DACD info
+ *
+ * @param p_dacd struct to be updated with DACD info
+ * @param p_acpi_dacd table to be parsed for DACD info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_dacd(struct pqos_erdt_dacd *p_dacd,
                    struct acpi_table_erdt_dacd *p_acpi_dacd)
@@ -342,6 +408,15 @@ erdt_populate_dacd(struct pqos_erdt_dacd *p_dacd,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure CMRD info
+ *
+ * @param p_cmrd struct to be updated with CMRD info
+ * @param p_acpi_cmrd table to be parsed for CMRD info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_cmrd(struct pqos_erdt_cmrd *p_cmrd,
                    struct acpi_table_erdt_cmrd *p_acpi_cmrd)
@@ -364,6 +439,15 @@ erdt_populate_cmrd(struct pqos_erdt_cmrd *p_cmrd,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure IBRD info
+ *
+ * @param p_ibrd struct to be updated with IBRD info
+ * @param p_acpi_ibrd table to be parsed for IBRD info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_ibrd(struct pqos_erdt_ibrd *p_ibrd,
                    struct acpi_table_erdt_ibrd *p_acpi_ibrd,
@@ -405,6 +489,15 @@ erdt_populate_ibrd(struct pqos_erdt_ibrd *p_ibrd,
         return ret;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure CARD info
+ *
+ * @param p_card struct to be updated with CARD info
+ * @param p_acpi_card table to be parsed for CARD info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_card(struct pqos_erdt_card *p_card,
                    struct acpi_table_erdt_card *p_acpi_card)
@@ -443,6 +536,15 @@ erdt_populate_card(struct pqos_erdt_card *p_card,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structure RMDD info
+ *
+ * @param p_rmdd struct to be updated with RMDD info
+ * @param p_acpi_rmdds table to be parsed for RMDD info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_rmdd(struct pqos_erdt_rmdd *p_rmdd,
                    struct acpi_table_erdt_rmdd *p_acpi_rmdds)
@@ -466,6 +568,16 @@ erdt_populate_rmdd(struct pqos_erdt_rmdd *p_rmdd,
         return 0;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structures info for CPU agent
+ *
+ * @param p_cpu_agent_info struct to be updated with ERDT Sub-structures info
+ *                         for CPU agent
+ * @param p_acpi_rmdds table to be parsed for ERDT Sub-structures info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_rmdd_cpu_agents(struct pqos_cpu_agent_info *p_cpu_agent_info,
                               struct acpi_table_erdt_rmdd *p_acpi_rmdds)
@@ -512,6 +624,17 @@ erdt_populate_rmdd_cpu_agents(struct pqos_cpu_agent_info *p_cpu_agent_info,
         return ret;
 }
 
+/**
+ * @brief Parses ERDT table to extract ERDT Sub-structures info for Device
+ *        agent
+ *
+ * @param p_dev_agent_info struct to be updated with ERDT Sub-structures info
+ *                         for Device agent
+ * @param p_acpi_rmdds table to be parsed for ERDT Sub-structures info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_rmdd_device_agents(
     struct pqos_device_agent_info *p_dev_agent_info,
@@ -559,6 +682,17 @@ erdt_populate_rmdd_device_agents(
         return ret;
 }
 
+/**
+ * @brief Parses ERDT table to extract RMDD Sub-structures info for CPU and
+ *        Device agents
+ *
+ * @param erdt_info Pointer to store the ERDT information
+ * @param p_acpi_erdt ACPI ERDT table to be parsed
+ * @param socket_num Number of sockets in the system
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
                     struct acpi_table_erdt *p_acpi_erdt,
@@ -635,6 +769,15 @@ erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
         return ret;
 }
 
+/**
+ * @brief Checks if channel_id already exists in channels_domains structure
+ *
+ * @param channels_domains Pointer of structure to be checked
+ * @param channel_id Channel ID to be checked
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 check_channel_id_exist(struct pqos_channels_domains *channels_domains,
                        pqos_channel_t channel_id)
@@ -646,6 +789,22 @@ check_channel_id_exist(struct pqos_channels_domains *channels_domains,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief The BDF info is in DACD ERDT Sub-structure.
+ *        The channel ids are in pqos_devinfo structure.
+ *        The function maps BDF to channel ids using pqos_devinfo structure.
+ *        And populates channel_ids count, channel_ids,
+ *        coressponding domain_ids and indexes in channels_domains structure.
+ *
+ * @param dacd Pointer of ERDT Sub-structure DACD
+ * @param devinfo Pointer of IORDT Device information
+ * @param channels_domains Pointer of structure to be populated
+ * @param dev_agent_idx Index of device agent in erdt_info->dev_agents[]
+ *        The dev_agent_idx is tored in channels_domains->domain_id_idx[]
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 erdt_dev_populate_chans(const struct pqos_erdt_dacd *dacd,
                         const struct pqos_devinfo *devinfo,
@@ -822,6 +981,7 @@ erdt_init(const struct pqos_cap *cap,
         socket_num = cpuinfo_get_socket_num(cpu);
         if (socket_num == -1) {
                 printf("Unable to get socket count\n");
+                acpi_free(table);
                 return PQOS_RETVAL_ERROR;
         }
 

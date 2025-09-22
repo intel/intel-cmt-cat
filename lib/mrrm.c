@@ -49,6 +49,16 @@
  */
 static struct pqos_mrrm_info *p_mrrm_info = NULL;
 
+/**
+ * @brief Parses MRRM acpi table to extract MRE information
+ *
+ * @param p_pqos_mre struct to be updated with MRE info
+ * @param p_acpi_mre table to be parsed for MREs info
+ * @param flags region assignment type
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 mrrm_populate_mre(struct pqos_mre_info *p_pqos_mre,
                   struct mrrm_mre_list *p_acpi_mre,
@@ -88,6 +98,15 @@ mrrm_populate_mre(struct pqos_mre_info *p_pqos_mre,
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Parses MRRM acpi table to extract MRRM information
+ *
+ * @param mrrm_info struct to be updated with MRRM info
+ * @param p_acpi_mrrm table to be parsed for MRRM info
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK success
+ */
 static int
 mrrm_populate(struct pqos_mrrm_info **mrrm_info,
               struct acpi_table_mrrm *p_acpi_mrrm)
