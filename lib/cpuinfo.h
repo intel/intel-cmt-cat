@@ -51,6 +51,12 @@ extern "C" {
 #define CPU_MODEL_HSX 0x3f
 #define CPU_FAMILY_06 0x06
 
+/* No MBA 4.0 support family */
+#define CPU_FAMILY_4F 0x4F
+
+/* No MBA 4.0 support model */
+#define CPU_MODEL_01 0x01
+
 /**
  * CPU vendor configuration value
  */

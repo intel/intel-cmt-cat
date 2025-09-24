@@ -1079,6 +1079,34 @@ detect_mba40(const struct pqos_cpuinfo *cpu, unsigned *supported)
         return ret;
 }
 
+/**
+ * @brief Detects presence of MBA 4.0 based on model & family ID.
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ * @retval PQOS_RETVAL_RESOURCE technology not supported
+ */
+static int
+hw_cap_mba40_model(void)
+{
+        const int cpu_model = cpuinfo_get_cpu_model();
+        const int cpu_family = cpuinfo_get_cpu_family();
+
+        const struct {
+                int model;
+                int family;
+        } no_support_cpus[] = {
+            {.family = CPU_FAMILY_4F, .model = CPU_MODEL_01}};
+
+        for (unsigned i = 0; i < DIM(no_support_cpus); i++) {
+                if (no_support_cpus[i].model == cpu_model &&
+                    no_support_cpus[i].family == cpu_family)
+                        return PQOS_RETVAL_RESOURCE;
+        };
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
@@ -1141,7 +1169,7 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
          *  - MBA3.0 introduces per-thread MBA controls
          *  - MBA2.0 increases number of MBA COS to 15
          */
-        if (msr_core_caps_available)
+        if (!hw_cap_mba40_model() && msr_core_caps_available)
                 detect_mba40(cpu, &mba40_supported);
 
         if (mba40_supported) {
@@ -1160,7 +1188,7 @@ hw_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         LOG_INFO("Detected Per-%s MBA controls\n",
                  mba_thread_ctrl ? "Thread" : "Core");
 
-        if ((version == 2) || (version >= 4)) {
+        if ((version == 2) || (version == 4)) {
                 unsigned *mba_ids;
                 unsigned mba_id_num;
                 unsigned i;
