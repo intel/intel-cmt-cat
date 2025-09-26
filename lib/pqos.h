@@ -686,7 +686,7 @@ struct pqos_mrrm_info {
  */
 struct pqos_cores_domains {
         unsigned int num_cores;
-        unsigned int *domains;
+        uint16_t *domains;
 };
 
 /**
@@ -1419,7 +1419,7 @@ int pqos_alloc_reset_config(const struct pqos_alloc_config *cfg);
  * L3 cache allocation class of service data structure
  */
 struct pqos_l3ca {
-        unsigned domain_id; /**< RMDD, resource management domain id */
+        uint16_t domain_id; /**< RMDD, resource management domain id */
         unsigned class_id;  /**< class of service */
         int cdp;            /**< data & code masks used if true */
         union {
@@ -1566,7 +1566,7 @@ struct pqos_mba {
         int ctrl;          /**< MBA controller flag */
         int smba;          /**< SMBA clos */
         /* MMIO section */
-        unsigned domain_id;  /**< RMDD, resource management domain id */
+        uint16_t domain_id;  /**< RMDD, resource management domain id */
         int num_mem_regions; /**< Total regions from command line */
         /**< Region number & BW Ctrl type */
         struct pqos_mba_mem_region mem_regions[PQOS_MAX_MEM_REGIONS];

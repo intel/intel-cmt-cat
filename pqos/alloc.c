@@ -60,8 +60,6 @@
  */
 #define MAX_COS_MASK_STR_LEN 22
 
-#define MAX_DOMAIN_IDS 64
-
 /**
  * Allocation type selected
  */
@@ -1736,7 +1734,8 @@ static void
 print_core_assoc(const int is_alloc,
                  const int is_l3,
                  const int is_mon,
-                 const struct pqos_coreinfo *ci)
+                 const struct pqos_coreinfo *ci,
+                 const struct pqos_cores_domains *cores_domains)
 {
         unsigned class_id = 0;
         pqos_rmid_t rmid = 0;
@@ -1752,8 +1751,19 @@ print_core_assoc(const int is_alloc,
         if (is_alloc)
                 ret = pqos_alloc_assoc_get(ci->lcore, &class_id);
 
-        if (is_mon && ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MSR)
+        if (is_mon && ret == PQOS_RETVAL_OK &&
+            (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO))
                 ret = pqos_mon_assoc_get(ci->lcore, &rmid);
+
+        if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO &&
+            cores_domains != NULL && cores_domains->domains != NULL) {
+                if (ci->lcore < cores_domains->num_cores)
+                        printf("    Domain ID  0x%x => ",
+                               cores_domains->domains[ci->lcore]);
+                else
+                        printf("    Domain ID  [INVALID lcore %u] => ",
+                               ci->lcore);
+        }
 
         if (ret != PQOS_RETVAL_OK) {
                 printf("    Core %u => ERROR\n", ci->lcore);
@@ -1769,7 +1779,8 @@ print_core_assoc(const int is_alloc,
         if (is_alloc)
                 printf("COS%u", class_id);
 
-        if (is_mon && interface == PQOS_INTER_MSR)
+        if (is_mon &&
+            (interface == PQOS_INTER_MSR || interface == PQOS_INTER_MMIO))
                 printf("%sRMID%u\n", is_alloc ? ", " : "", (unsigned)rmid);
         else
                 printf("\n");
@@ -1787,9 +1798,12 @@ static void
 print_dev_assoc(const int is_alloc,
                 const int is_mon,
                 const struct pqos_dev *dev,
-                const struct pqos_devinfo *devinfo)
+                const struct pqos_devinfo *devinfo,
+                const struct pqos_channels_domains *channels_domains,
+                enum pqos_interface interface)
 {
         unsigned vc;
+        unsigned int idx;
 
         if (!dev || !devinfo || !(is_alloc || is_mon))
                 return;
@@ -1809,6 +1823,15 @@ print_dev_assoc(const int is_alloc,
 
                 if (!(print_clos || print_rmid))
                         continue;
+
+                if (interface == PQOS_INTER_MMIO && channels_domains != NULL)
+                        for (idx = 0; idx < channels_domains->num_channel_ids;
+                             idx++)
+                                if (channel->channel_id ==
+                                    channels_domains->channel_ids[idx])
+                                        printf(
+                                            "    Domain ID  0x%x => ",
+                                            channels_domains->domain_ids[idx]);
 
                 printf("    Device %.4x:%.4x:%.2x.%x@%u, Channel 0x%" PRIx64
                        " => ",
@@ -1857,10 +1880,13 @@ print_dev_assoc(const int is_alloc,
 static void
 print_channel_assoc(const int is_alloc,
                     const int is_mon,
-                    const struct pqos_channel *channel)
+                    const struct pqos_channel *channel,
+                    const struct pqos_channels_domains *channels_domains,
+                    enum pqos_interface interface)
 {
         pqos_rmid_t rmid = 0;
         int ret = PQOS_RETVAL_OK;
+        unsigned int idx;
 
         if (!channel)
                 return;
@@ -1870,6 +1896,13 @@ print_channel_assoc(const int is_alloc,
 
         if (!(print_clos || print_rmid))
                 return;
+
+        if (interface == PQOS_INTER_MMIO && channels_domains != NULL)
+                for (idx = 0; idx < channels_domains->num_channel_ids; idx++)
+                        if (channel->channel_id ==
+                            channels_domains->channel_ids[idx])
+                                printf("    Domain ID  0x%x => ",
+                                       channels_domains->domain_ids[idx]);
 
         printf("    Channel 0x%" PRIx64 " => ", channel->channel_id);
 
@@ -1912,11 +1945,22 @@ print_channel_assoc(const int is_alloc,
 static void
 print_iordt_alloc(const struct pqos_capability *cap_mon,
                   const struct pqos_capability *cap_l3ca,
-                  const struct pqos_devinfo *dev_info)
+                  const struct pqos_sysconfig *sys)
 {
         size_t i;
         const int is_iordt_alloc = cap_l3ca && cap_l3ca->u.l3ca->iordt_on;
         const int is_iordt_mon = cap_mon && cap_mon->u.mon->iordt_on;
+        const struct pqos_devinfo *dev_info = sys ? sys->dev : NULL;
+        const struct pqos_channels_domains *channels_domains =
+            sys ? sys->channels_domains : NULL;
+        enum pqos_interface interface;
+        int ret;
+
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("%s(): Failed to get interface!\n", __func__);
+                return;
+        }
 
         if (!(is_iordt_alloc || is_iordt_mon) || !dev_info)
                 return;
@@ -1924,12 +1968,14 @@ print_iordt_alloc(const struct pqos_capability *cap_mon,
         printf("Device information:\n");
         for (i = 0; i < dev_info->num_devs; ++i)
                 print_dev_assoc(is_iordt_alloc, is_iordt_mon,
-                                &dev_info->devs[i], dev_info);
+                                &dev_info->devs[i], dev_info, channels_domains,
+                                interface);
 
         printf("Control channel information:\n");
         for (i = 0; i < dev_info->num_channels; ++i)
                 print_channel_assoc(is_iordt_alloc, is_iordt_mon,
-                                    &dev_info->channels[i]);
+                                    &dev_info->channels[i], channels_domains,
+                                    interface);
 }
 
 void
@@ -1938,28 +1984,27 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                    const struct pqos_capability *cap_l2ca,
                    const struct pqos_capability *cap_mba,
                    const struct pqos_capability *cap_smba,
-                   const struct pqos_cpuinfo *cpu_info,
-                   const struct pqos_devinfo *dev_info,
+                   const struct pqos_sysconfig *sys,
                    const int verbose)
 {
         int ret;
         unsigned i;
         unsigned sock_count, *sockets = NULL;
 
-        sockets = pqos_cpu_get_sockets(cpu_info, &sock_count);
+        sockets = pqos_cpu_get_sockets(sys->cpu, &sock_count);
         if (sockets == NULL) {
                 printf("Error retrieving information for Sockets\n");
                 return;
         }
 
-        print_per_socket_config(cap_l3ca, cap_mba, cap_smba, cpu_info,
+        print_per_socket_config(cap_l3ca, cap_mba, cap_smba, sys->cpu,
                                 sock_count, sockets);
 
         if (cap_l2ca != NULL) {
                 /* Print L2 CAT class definitions per L2 cluster */
                 unsigned *l2id, count = 0;
 
-                l2id = pqos_cpu_get_l2ids(cpu_info, &count);
+                l2id = pqos_cpu_get_l2ids(sys->cpu, &count);
                 if (l2id == NULL) {
                         printf("Error retrieving information for L2\n");
                         goto free_and_return;
@@ -1987,7 +2032,7 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                 unsigned *lcores = NULL;
                 unsigned lcount = 0, n = 0;
 
-                lcores = pqos_cpu_get_cores(cpu_info, sockets[i], &lcount);
+                lcores = pqos_cpu_get_cores(sys->cpu, sockets[i], &lcount);
                 if (lcores == NULL) {
                         printf("Error retrieving core information!\n");
                         goto free_and_return;
@@ -1996,7 +2041,7 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                 for (n = 0; n < lcount; n++) {
                         const struct pqos_coreinfo *core_info = NULL;
 
-                        core_info = pqos_cpu_get_core_info(cpu_info, lcores[n]);
+                        core_info = pqos_cpu_get_core_info(sys->cpu, lcores[n]);
                         if (core_info == NULL) {
                                 printf("Error retrieving information "
                                        "for core %u!\n",
@@ -2005,11 +2050,12 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                                 goto free_and_return;
                         }
 
-                        print_core_assoc(
-                            (cap_l3ca != NULL) || (cap_l2ca != NULL) ||
-                                (cap_mba != NULL) /* is_alloc */,
-                            cpu_info->l3.detected /* is_l3 */,
-                            (cap_mon != NULL) /* is_mon */, core_info);
+                        print_core_assoc((cap_l3ca != NULL) ||
+                                             (cap_l2ca != NULL) ||
+                                             (cap_mba != NULL) /* is_alloc */,
+                                         sys->cpu->l3.detected /* is_l3 */,
+                                         (cap_mon != NULL) /* is_mon */,
+                                         core_info, sys->cores_domains);
                 }
                 free(lcores);
         }
@@ -2058,11 +2104,148 @@ alloc_print_config(const struct pqos_capability *cap_mon,
         }
 
         /* Print IO RDT associations */
-        print_iordt_alloc(cap_mon, cap_l3ca, dev_info);
+        print_iordt_alloc(cap_mon, cap_l3ca, sys);
 
 free_and_return:
         if (sockets)
                 free(sockets);
+}
+
+static void
+print_mba(const struct pqos_mba *mba)
+{
+        int region_idx = 0;
+        int ctrl_type_idx = 0;
+        const char *ctrl_type = NULL;
+
+        for (region_idx = 0; region_idx < mba->num_mem_regions; region_idx++)
+                for (ctrl_type_idx = 0; ctrl_type_idx < PQOS_BW_CTRL_TYPE_COUNT;
+                     ctrl_type_idx++) {
+                        if (mba->mem_regions[region_idx]
+                                .bw_ctrl_val[ctrl_type_idx] != -1) {
+                                printf("Domain id %u MBA COS%u "
+                                       "Memory Region %d ",
+                                       mba->domain_id, mba->class_id,
+                                       mba->mem_regions[region_idx].region_num);
+                                if (ctrl_type_idx == PQOS_BW_CTRL_TYPE_OPT_IDX)
+                                        ctrl_type = "Optimal Bandwidth";
+                                else if (ctrl_type_idx ==
+                                         PQOS_BW_CTRL_TYPE_MIN_IDX)
+                                        ctrl_type = "Minimum Bandwidth";
+                                else if (ctrl_type_idx ==
+                                         PQOS_BW_CTRL_TYPE_MAX_IDX)
+                                        ctrl_type = "Maximum Bandwidth";
+                                printf("%s=> ", ctrl_type);
+                                printf("0x%x\n",
+                                       mba->mem_regions[region_idx]
+                                           .bw_ctrl_val[ctrl_type_idx]);
+                        }
+                }
+}
+
+void
+print_domain_alloc_config(const struct pqos_capability *cap_mon,
+                          const struct pqos_capability *cap_l3ca,
+                          const struct pqos_capability *cap_l2ca,
+                          const struct pqos_capability *cap_mba,
+                          const struct pqos_sysconfig *sys)
+{
+        int ret;
+        unsigned i;
+        unsigned idx;
+        unsigned clos_idx;
+        unsigned clos_num;
+        struct pqos_mba mba;
+        unsigned sock_count, *sockets = NULL;
+
+        if (!sys) {
+                printf("Error: 'sys' (pqos_sysconfig) is not available!\n");
+                return;
+        }
+
+        if (!sys->erdt) {
+                printf("Error: 'erdt' acpi table is not available in 'sys'!\n");
+                return;
+        }
+
+        if (!sys->mrrm) {
+                printf("Error: 'mrrm' acpi table is not available in 'sys'!\n");
+                return;
+        }
+
+        sockets = pqos_cpu_get_sockets(sys->cpu, &sock_count);
+        if (sockets == NULL) {
+                printf("Error retrieving information for Sockets\n");
+                return;
+        }
+
+        for (idx = 0; idx < sys->erdt->num_cpu_agents; idx++) {
+                for (clos_idx = 0; clos_idx < sys->erdt->max_clos; clos_idx++) {
+                        memset(&mba, 0, sizeof(struct pqos_mba));
+
+                        mba.domain_id =
+                            sys->erdt->cpu_agents[idx].rmdd.domain_id;
+                        mba.num_mem_regions =
+                            sys->mrrm->max_memory_regions_supported;
+                        clos_num = clos_idx;
+
+                        ret = pqos_mba_get(
+                            sys->erdt->cpu_agents[idx].rmdd.domain_id, 1,
+                            &clos_num, &mba);
+                        if (ret != PQOS_RETVAL_OK) {
+                                printf(
+                                    "Error retrieving MMIO registers for "
+                                    "Domain ID %x, class ID %u: "
+                                    "pqos_mba_get() returned %d\n",
+                                    sys->erdt->cpu_agents[idx].rmdd.domain_id,
+                                    clos_idx, ret);
+                                return;
+                        }
+
+                        print_mba(&mba);
+                        printf("\n");
+                }
+                printf("\n");
+        }
+
+        /* Print core to class associations */
+        for (i = 0; i < sock_count; i++) {
+                unsigned *lcores = NULL;
+                unsigned lcount = 0, n = 0;
+
+                lcores = pqos_cpu_get_cores(sys->cpu, sockets[i], &lcount);
+                if (lcores == NULL) {
+                        printf("Error retrieving core information!\n");
+                        goto free_and_return;
+                }
+                printf("Core information for socket %u:\n", sockets[i]);
+                for (n = 0; n < lcount; n++) {
+                        const struct pqos_coreinfo *core_info = NULL;
+
+                        core_info = pqos_cpu_get_core_info(sys->cpu, lcores[n]);
+                        if (core_info == NULL) {
+                                printf("Error retrieving information "
+                                       "for core %u!\n",
+                                       lcores[n]);
+                                free(lcores);
+                                goto free_and_return;
+                        }
+
+                        print_core_assoc((cap_l3ca != NULL) ||
+                                             (cap_l2ca != NULL) ||
+                                             (cap_mba != NULL) /* is_alloc */,
+                                         sys->cpu->l3.detected /* is_l3 */,
+                                         (cap_mon != NULL) /* is_mon */,
+                                         core_info, sys->cores_domains);
+                }
+                free(lcores);
+        }
+
+        /* Print IO RDT associations */
+        print_iordt_alloc(cap_mon, cap_l3ca, sys);
+
+free_and_return:
+        free(sockets);
 }
 
 /**

@@ -114,7 +114,7 @@ cores_domains_init(unsigned int num_cores,
                    const struct pqos_erdt_info *erdt,
                    struct pqos_cores_domains **cores_domains)
 {
-        unsigned int *domains;
+        uint16_t *domains;
         struct pqos_erdt_cacd cacd;
 
         ASSERT(num_cores > 0);
@@ -125,11 +125,11 @@ cores_domains_init(unsigned int num_cores,
         if (cpu2apic == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        domains = (unsigned int *)malloc(num_cores * sizeof(unsigned int));
+        domains = (uint16_t *)malloc(num_cores * sizeof(uint16_t));
         if (domains == NULL)
                 goto out_apic2cpu;
 
-        memset(domains, 0, num_cores * sizeof(unsigned int));
+        memset(domains, 0, num_cores * sizeof(uint16_t));
         memset(cpu2apic, 0, num_cores * sizeof(uint32_t));
 
         if (build_apic_to_cpu_map(cpu2apic, num_cores) != PQOS_RETVAL_OK)

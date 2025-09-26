@@ -66,11 +66,12 @@
 static int
 _get_regions_mba(const struct pqos_erdt_info *erdt,
                  unsigned class_id,
-                 unsigned domain_id,
+                 uint16_t domain_id,
                  int num_mem_regions,
                  struct pqos_mba_mem_region *mem_regions)
 {
-        for (int j = 0; j < num_mem_regions - 1; j++) {
+        for (int j = 0; j < num_mem_regions; j++) {
+                mem_regions[j].region_num = j;
                 get_mba_optimal_bw_region_clos_v1(
                     (const struct pqos_erdt_marc *)&erdt->cpu_agents[domain_id]
                         .marc,
@@ -260,8 +261,7 @@ mmio_mba_set(const unsigned mba_id,
                         continue;
 
                 actual[i] = requested[i];
-                _get_regions_mba((const struct pqos_erdt_info *)erdt,
-                                 actual[i].class_id, actual[i].domain_id,
+                _get_regions_mba(erdt, actual[i].class_id, actual[i].domain_id,
                                  actual[i].num_mem_regions,
                                  actual[i].mem_regions);
         }
@@ -290,13 +290,12 @@ mmio_mba_get(const unsigned mba_id,
 
         for (unsigned i = 0; i < max_num_cos; i++) {
                 mba_tab[i].ctrl = 0;
-                mba_tab[i].class_id = i;
+                mba_tab[i].class_id = num_cos[i];
                 mba_tab[i].mb_max = 0;
 
-                _get_regions_mba((const struct pqos_erdt_info *)&erdt,
-                                 mba_tab[i].class_id, mba_tab[i].domain_id,
-                                 mba_tab[i].num_mem_regions,
-                                 mba_tab[i].mem_regions);
+                _get_regions_mba(
+                    erdt, mba_tab[i].class_id, mba_tab[i].domain_id,
+                    mba_tab[i].num_mem_regions, mba_tab[i].mem_regions);
         }
 
         *num_cos = max_num_cos;

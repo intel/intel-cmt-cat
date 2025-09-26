@@ -1624,13 +1624,16 @@ main(int argc, char **argv)
                         printf("Allocation reset successful\n");
         }
 
+        /**
+         * Show info about allocation config and exit
+         */
         if (sel_show_allocation_config) {
-                /**
-                 * Show info about allocation config and exit
-                 */
-                alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
-                                   cap_smba, p_sys->cpu, p_sys->dev,
-                                   sel_verbose_mode);
+                if (sel_interface == PQOS_INTER_MMIO)
+                        print_domain_alloc_config(cap_mon, cap_l3ca, cap_l2ca,
+                                                  cap_mba, p_sys);
+                else
+                        alloc_print_config(cap_mon, cap_l3ca, cap_l2ca, cap_mba,
+                                           cap_smba, p_sys, sel_verbose_mode);
                 goto allocation_exit;
         }
 

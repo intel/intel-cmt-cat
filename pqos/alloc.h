@@ -117,9 +117,26 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
                         const struct pqos_capability *cap_l2ca,
                         const struct pqos_capability *cap_mba,
                         const struct pqos_capability *cap_smba,
-                        const struct pqos_cpuinfo *cpu_info,
-                        const struct pqos_devinfo *dev_info,
+                        const struct pqos_sysconfig *sys,
                         const int verbose);
+
+/**
+ * @brief Prints information about each domain's cache allocation settings
+ *        in the system
+ *
+ * @param [in] cap_mon monitoring capability structure
+ * @param [in] cap_l3ca L3 CAT capability structures
+ * @param [in] cap_l2ca L2 CAT capability structures
+ * @param [in] cap_mba MBA capability structures
+ * @param [in] sys PQoS system configuration structure
+ * @param [in] verbose enable verbose mode
+ */
+void
+print_domain_alloc_config(const struct pqos_capability *cap_mon,
+                          const struct pqos_capability *cap_l3ca,
+                          const struct pqos_capability *cap_l2ca,
+                          const struct pqos_capability *cap_mba,
+                          const struct pqos_sysconfig *sys);
 
 /**
  * @brief Applies allocation settings previously selected via
