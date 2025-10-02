@@ -282,17 +282,17 @@ get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        LOG_INFO("%s(): mmrc->reg_block_base_addr: %p\n"
+        LOG_INFO("%s(): rmid_first: %u, rmid_last: %u,"
+                 " region_number: %u, rmids_val ptr: %x\n",
+                 __func__, rmid_first, rmid_last, region_number,
+                 (void *)rmids_val);
+
+        LOG_INFO("%s(): mmrc->reg_block_base_addr:\n"
                  "Physical: %#" PRIx64 "\n"
                  "Virtual: %#" PRIx64 "\n"
                  "Block size in 4k pages: %u\n",
-                 __func__, mem, mmrc->reg_block_base_addr,
-                 (uint64_t)(uintptr_t)mem, mmrc->reg_block_size);
-
-        LOG_INFO("%s(): rmid_first: %u, rmid_last: %u,"
-                 " region_number: %u, rmids_val ptr: %p\n",
-                 __func__, rmid_first, rmid_last, region_number,
-                 (void *)rmids_val);
+                 __func__, mmrc->reg_block_base_addr, mem,
+                 mmrc->reg_block_size);
 
         rmid_block_addr = ((rmid_first % 32) / 8) * 4 * PAGE_SIZE;
         rmid_offset =
@@ -301,13 +301,16 @@ get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
             (uint64_t)region_number * MBM_REGION_SIZE;
 
         LOG_INFO("%s(): rmid_block_addr: %u, rmid_offset: %u\n"
-                 " rmid range virtual address: %p\n",
+                 " rmids val virtual address: %p\n",
                  __func__, rmid_block_addr, rmid_offset,
                  (void *)((uint8_t *)mem + rmid_block_addr + rmid_offset));
 
         memcpy(rmids_val,
                (const void *)((uint8_t *)mem + rmid_block_addr + rmid_offset),
                rmid_count * BYTES_PER_RMID_ENTRY);
+
+        LOG_INFO("%s(): rmid_first value: %x\n", __func__,
+                 *(uint64_t *)rmids_val);
 
         pqos_munmap(mem, size);
 

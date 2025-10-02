@@ -113,24 +113,35 @@ print_hex_dump(const uint8_t *buf,
             (width_bytes == 8) ? QWORD_ELEMS_PER_LINE : BYTE_ELEMS_PER_LINE;
         size_t line_num = length / elems_per_line;
 
-        LOG_DEBUG("Dumping %zu elements as %s with width %u bytes\n", length,
-                  le ? "little-endian" : "big-endian", width_bytes);
+        LOG_DEBUG(
+            "%s: Addr: %p. Dumping %zu elements as %s with width %u bytes\n",
+            __func__, buf, length, le ? "little-endian" : "big-endian",
+            width_bytes);
         for (i = 0; i < line_num; i++) {
                 size_t offset = i * width_bytes * elems_per_line;
 
+                LOG_DEBUG("offset: %x\n", offset);
                 snprintf(line, sizeof(line), "%06zx ", offset);
                 for (j = 0; j < elems_per_line; j++) {
-                        LOG_DEBUG("elem_idx: %u\n", j);
+                        LOG_DEBUG("elem_idx: %x\n", j);
+                        LOG_DEBUG(
+                            "elem VA: %p\n",
+                            (const void *)(buf + offset + j * width_bytes));
+                        LOG_DEBUG("elem value: %x\n",
+                                  *(const uint64_t *)(buf + offset +
+                                                      j * width_bytes));
+
                         for (k = 0; k < width_bytes; k++) {
-                                LOG_DEBUG("elem_byte_offset: %02x\n",
-                                          (le) ? (offset + j * width_bytes + k)
-                                               : (offset +
-                                                  (j + 1) * width_bytes - k -
-                                                  1));
                                 current_byte =
                                     (le) ? buf[offset + j * width_bytes + k]
                                          : buf[offset + (j + 1) * width_bytes -
                                                k - 1];
+                                LOG_DEBUG(
+                                    "elem_byte.offset: %02x. value: %02x\n",
+                                    (le) ? (offset + j * width_bytes + k)
+                                         : (offset + (j + 1) * width_bytes - k -
+                                            1),
+                                    current_byte);
                                 if (binary) {
                                         for (int b = 7; b >= 0; --b)
                                                 snprintf(
@@ -178,16 +189,25 @@ dump_mmio_range(uint64_t base,
         unsigned int offset_bytes = offset * width_bytes;
         unsigned int length_bytes = length * width_bytes;
 
+        LOG_INFO("%s: base=0x%lx size=0x%x offset=%lu len=%lu "
+                 "width(bytes)=%u le=%d bin=%d\n",
+                 __func__, (unsigned long)base, size, offset, length,
+                 width_bytes, le, binary);
+
         if ((offset + length_bytes) > size) {
                 LOG_ERROR("View port out of range\n");
                 return PQOS_RETVAL_PARAM;
         }
         void *map = pqos_mmap_write(base + offset_bytes, length_bytes);
 
+        LOG_DEBUG("%s: map=0x%p\n", __func__, map);
+
         if (map == NULL)
                 return PQOS_RETVAL_ERROR;
 
         const uint8_t *buf = (const uint8_t *)map;
+
+        LOG_DEBUG("%s: map = 0x%p, buf=0x%p\n", __func__, map, buf);
 
         print_hex_dump(buf, length, width_bytes, le, binary);
 

@@ -50,9 +50,6 @@
 #define RMDD_L3_DOMAIN    1
 #define RMDD_IO_L3_DOMAIN 2
 
-#define NO_CORRECTION_FACTOR     0
-#define SINGLE_CORRECTION_FACTOR 1
-
 #define PATH_PAIR_LENGTH 2
 
 /**

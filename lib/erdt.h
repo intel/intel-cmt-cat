@@ -83,6 +83,15 @@ extern "C" {
 
 #define IMH_MAX_PATH 256
 
+/*
+ * MBM Correction Factor defines
+ */
+/* Do not apply a correction factor to the MBM values */
+#define NO_CORRECTION_FACTOR 0
+/* Apply a single correction factor specified in MBM Correction Factor field to
+ * all the MBM values */
+#define SINGLE_CORRECTION_FACTOR 1
+
 /**
  * Cache Allocation Registers for Device Agents Description Structure
  */

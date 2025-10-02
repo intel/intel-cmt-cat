@@ -54,6 +54,7 @@
 #include "utils.h"
 
 #include <dirent.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,9 +77,19 @@ struct rmid_list_t {
  * ---------------------------------------
  */
 
-static uint64_t scale_event(const enum pqos_mon_event event,
-                            const uint64_t val);
+static uint64_t scale_mbm_value(const struct pqos_erdt_mmrc *mmrc,
+                                const pqos_rmid_t rmid,
+                                const uint64_t val);
 
+static uint64_t scale_llc_value(const struct pqos_erdt_cmrc *cmrc,
+                                const uint64_t val);
+
+static uint64_t scale_io_llc_value(const struct pqos_erdt_cmrd *cmrd,
+                                   const uint64_t val);
+
+static uint64_t scale_io_mbm_value(const struct pqos_erdt_ibrd *ibrd,
+                                   const pqos_rmid_t rmid,
+                                   const uint64_t val);
 /*
  * =======================================
  * =======================================
@@ -524,35 +535,81 @@ rmid_alloc_error:
  */
 
 /**
- * Refactor: Make it according to the spec.
- * @brief Scale event values to bytes
+ * @brief Scale MBM RMID value to bytes
  *
- * Retrieve event scale factor and scale value to bytes
- *
- * @param [in] event event scale factor to retrieve
+ * @param [in] mmrc MMRC table containing scaling factors
+ * @param [in] rmid RMID value to be scaled
  * @param [in] val value to be scaled
  *
- * @return scaled value
- * @retval value in bytes
+ * @return scaled value in bytes
  */
 static uint64_t
-scale_event(const enum pqos_mon_event event, const uint64_t val)
+scale_mbm_value(const struct pqos_erdt_mmrc *mmrc,
+                const pqos_rmid_t rmid,
+                const uint64_t val)
 {
-        const struct pqos_cap *cap = _pqos_get_cap();
-        const struct pqos_capability *cap_mon =
-            _pqos_cap_get_type(PQOS_CAP_TYPE_MON);
-        const struct pqos_monitor *pmon;
-        int ret;
+        uint64_t scaled_val = val * mmrc->upscaling_factor;
 
-        ASSERT(cap != NULL);
-        ASSERT(cap_mon != NULL);
+        if (mmrc->correction_factor_length != NO_CORRECTION_FACTOR)
+                scaled_val *=
+                    (mmrc->correction_factor_length > SINGLE_CORRECTION_FACTOR)
+                        ? mmrc->correction_factor[rmid]
+                        : mmrc->correction_factor[0];
 
-        ret = pqos_cap_get_event(cap, event, &pmon);
-        ASSERT(ret == PQOS_RETVAL_OK);
-        if (ret != PQOS_RETVAL_OK)
-                return val;
-        else
-                return val * pmon->scale_factor / cap_mon->u.mon->snc_num;
+        return scaled_val;
+}
+
+/**
+ * @brief Scale LLC RMID value to bytes
+ *
+ * @param [in] cmrc CMRC table containing scaling factors
+ * @param [in] val value to be scaled
+ *
+ * @return scaled value in bytes
+ */
+static uint64_t
+scale_llc_value(const struct pqos_erdt_cmrc *cmrc, const uint64_t val)
+{
+        return val * cmrc->upscaling_factor;
+}
+
+/**
+ * @brief Scale IO LLC RMID value to bytes
+ *
+ * @param [in] cmrd CMRD table containing scaling factors
+ * @param [in] val value to be scaled
+ *
+ * @return scaled value in bytes
+ */
+static uint64_t
+scale_io_llc_value(const struct pqos_erdt_cmrd *cmrd, const uint64_t val)
+{
+        return val * cmrd->upscaling_factor;
+}
+
+/**
+ * @brief Scale IO MBM RMID value to bytes
+ *
+ * @param [in] ibrd IBRD table containing scaling factors
+ * @param [in] rmid RMID value to be scaled
+ * @param [in] val value to be scaled
+ *
+ * @return scaled value in bytes
+ */
+static uint64_t
+scale_io_mbm_value(const struct pqos_erdt_ibrd *ibrd,
+                   const pqos_rmid_t rmid,
+                   const uint64_t val)
+{
+        uint64_t scaled_val = val * ibrd->upscaling_factor;
+
+        if (ibrd->correction_factor_length != NO_CORRECTION_FACTOR)
+                scaled_val *=
+                    (ibrd->correction_factor_length > SINGLE_CORRECTION_FACTOR)
+                        ? ibrd->correction_factor[rmid]
+                        : ibrd->correction_factor[0];
+
+        return scaled_val;
 }
 
 int
@@ -577,36 +634,6 @@ int
 mmio_mon_reset(const struct pqos_mon_config *cfg)
 {
         return mon_reset(cfg);
-}
-
-/**
- * @brief Gives the difference between two values with regard to the possible
- *        overrun and counter length
- *
- * @param event event counter length to retrieve
- * @param old_value previous value
- * @param new_value current value
- *
- * @return difference between the two values
- */
-static uint64_t
-get_delta(const enum pqos_mon_event event,
-          const uint64_t old_value,
-          const uint64_t new_value)
-{
-        const struct pqos_cap *cap = _pqos_get_cap();
-        const struct pqos_monitor *pmon;
-        int ret;
-        uint64_t max_value = 1LLU << 24;
-
-        ret = pqos_cap_get_event(cap, event, &pmon);
-        if (ret == PQOS_RETVAL_OK)
-                max_value = 1LLU << pmon->counter_length;
-
-        if (old_value > new_value)
-                return (max_value - old_value) + new_value;
-        else
-                return new_value - old_value;
 }
 
 int
@@ -738,7 +765,6 @@ mmio_mon_events_valid(const struct pqos_cap *cap,
         return mon_events_valid(cap, event, iordt);
 }
 
-// Refactor: Adjust to MMIO.
 int
 mmio_mon_start_cores(const unsigned num_cores,
                      const unsigned *cores,
@@ -1150,12 +1176,14 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
             _pqos_get_cores_domains();
         const struct pqos_erdt_info *erdt = _pqos_get_erdt();
         struct pqos_event_values *pv = &group->values;
+        struct pqos_region_aware_event_values *region_values =
+            &group->region_values;
         unsigned i;
         int j;
         uint64_t value = 0;
         uint64_t tmp_rmid_val = 0;
-        l3_mbm_rmid_t tmp_rmid_values[PQOS_MAX_MEM_REGIONS] = {0};
         l3_mbm_rmid_t values[PQOS_MAX_MEM_REGIONS] = {0};
+        l3_mbm_rmid_t tmp_values[PQOS_MAX_MEM_REGIONS] = {0};
         uint16_t domain_id_idx = USHRT_MAX;
         int ret = PQOS_RETVAL_OK;
 
@@ -1168,14 +1196,16 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
 
         switch (event) {
         case PQOS_MON_EVENT_L3_OCCUP:
+                pv->llc = 0;
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
                         const unsigned lcore = group->intl->hw.ctx[i].lcore;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
-
-                        get_l3_cmt_rmid_range_v1(
+                        const struct pqos_erdt_cmrc *cmrc =
                             &erdt->cpu_agents[cores_domains->domains[lcore]]
-                                 .cmrc,
-                            rmid, rmid, &tmp_rmid_val);
+                                 .cmrc;
+
+                        get_l3_cmt_rmid_range_v1(cmrc, rmid, rmid,
+                                                 &tmp_rmid_val);
 
                         if (!is_available_l3_cmt_rmid(tmp_rmid_val)) {
                                 LOG_ERROR("RMID %u is not available for "
@@ -1184,27 +1214,30 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                 return PQOS_RETVAL_UNAVAILABLE;
                         };
 
-                        value += l3_cmt_rmid_to_uint64(tmp_rmid_val);
+                        LOG_INFO("core: %u, rmid: %u, value:%#" PRIx64 "\n",
+                                 lcore, rmid,
+                                 l3_cmt_rmid_to_uint64(tmp_rmid_val));
+
+                        pv->llc += scale_llc_value(
+                            cmrc, l3_cmt_rmid_to_uint64(tmp_rmid_val));
                 };
-                pv->llc = scale_event(event, value);
                 break;
         case PQOS_MON_EVENT_LMEM_BW:
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
                         const unsigned lcore = group->intl->hw.ctx[i].lcore;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+                        const struct pqos_erdt_mmrc *mmrc =
+                            &erdt->cpu_agents[cores_domains->domains[lcore]]
+                                 .mmrc;
 
                         for (j = 0; j < group->regions.num_mem_regions; j++) {
                                 unsigned region_number =
                                     group->regions.region_num[j];
                                 get_l3_mbm_region_rmid_range_v1(
-                                    &erdt->cpu_agents[cores_domains
-                                                          ->domains[lcore]]
-                                         .mmrc,
-                                    region_number, rmid, rmid,
-                                    &tmp_rmid_values[j]);
+                                    mmrc, region_number, rmid, rmid,
+                                    &tmp_values[j]);
 
-                                if (!is_available_l3_mbm_rmid(
-                                        tmp_rmid_values[j])) {
+                                if (!is_available_l3_mbm_rmid(tmp_values[j])) {
                                         LOG_ERROR(
                                             "RMID %u is not available for "
                                             "L3 memory bandwidth monitoring!\n",
@@ -1212,8 +1245,7 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                         return PQOS_RETVAL_UNAVAILABLE;
                                 };
 
-                                if (is_overflow_l3_mbm_rmid(
-                                        tmp_rmid_values[j])) {
+                                if (is_overflow_l3_mbm_rmid(tmp_values[j])) {
                                         LOG_ERROR(
                                             "RMID %u is overflowed for "
                                             "L3 memory bandwidth monitoring!\n",
@@ -1221,26 +1253,26 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                         return PQOS_RETVAL_OVERFLOW;
                                 };
 
-                                values[j] +=
-                                    l3_mbm_rmid_to_uint64(tmp_rmid_values[j]);
+                                values[j] += scale_mbm_value(
+                                    mmrc, rmid,
+                                    l3_mbm_rmid_to_uint64(tmp_values[j]));
                         }
                 };
 
                 for (j = 0; j < group->regions.num_mem_regions; j++) {
-                        group->region_values.mbm_local[j] =
-                            scale_event(event, values[j]);
-                        group->region_values.mbm_local_delta[j] =
-                            get_delta(event, group->region_values.mbm_local[j],
-                                      values[j]);
-                        group->region_values.mbm_local_delta[j] = scale_event(
-                            event, group->region_values.mbm_local_delta[j]);
+                        region_values->mbm_local_delta[j] =
+                            values[j] - region_values->mbm_local[j];
+                        region_values->mbm_local[j] = values[j];
                 };
+
                 break;
         case PQOS_MON_EVENT_IO_L3_OCCUP:
+                group->region_values.io_llc = 0;
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
                         const pqos_channel_t channel_id =
                             group->intl->hw.ctx[i].channel_id;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+                        struct pqos_erdt_cmrd *cmrd;
 
                         ret = get_dev_domain_info(channel_id, NULL,
                                                   &domain_id_idx);
@@ -1258,9 +1290,10 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                 return PQOS_RETVAL_UNAVAILABLE;
                         }
 
-                        get_iol3_cmt_rmid_range_v1(
-                            &erdt->dev_agents[domain_id_idx].cmrd, rmid, rmid,
-                            &tmp_rmid_val);
+                        cmrd = &erdt->dev_agents[domain_id_idx].cmrd;
+
+                        get_iol3_cmt_rmid_range_v1(cmrd, rmid, rmid,
+                                                   &tmp_rmid_val);
 
                         if (!is_available_iol3_cmt_rmid(tmp_rmid_val)) {
                                 LOG_ERROR("RMID %u is not available for "
@@ -1269,15 +1302,16 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                 return PQOS_RETVAL_UNAVAILABLE;
                         };
 
-                        value += iol3_cmt_rmid_to_uint64(tmp_rmid_val);
+                        group->region_values.io_llc += scale_io_llc_value(
+                            cmrd, iol3_cmt_rmid_to_uint64(tmp_rmid_val));
                 };
-                group->region_values.io_llc = scale_event(event, value);
                 break;
         case PQOS_MON_EVENT_IO_TOTAL_MEM_BW:
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
                         const pqos_channel_t channel_id =
                             group->intl->hw.ctx[i].channel_id;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+                        struct pqos_erdt_ibrd *ibrd;
 
                         ret = get_dev_domain_info(channel_id, NULL,
                                                   &domain_id_idx);
@@ -1295,9 +1329,10 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                 return PQOS_RETVAL_UNAVAILABLE;
                         }
 
-                        get_total_iol3_mbm_rmid_range_v1(
-                            &erdt->dev_agents[domain_id_idx].ibrd, rmid, rmid,
-                            &tmp_rmid_val);
+                        ibrd = &erdt->dev_agents[domain_id_idx].ibrd;
+
+                        get_total_iol3_mbm_rmid_range_v1(ibrd, rmid, rmid,
+                                                         &tmp_rmid_val);
 
                         if (!is_available_iol3_mbm_rmid(tmp_rmid_val)) {
                                 LOG_ERROR("RMID %u is not available for "
@@ -1306,13 +1341,13 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                 return PQOS_RETVAL_UNAVAILABLE;
                         };
 
-                        value += iol3_mbm_rmid_to_uint64(tmp_rmid_val);
+                        value += scale_io_mbm_value(
+                            ibrd, rmid, iol3_mbm_rmid_to_uint64(tmp_rmid_val));
                 };
-                group->region_values.io_total = scale_event(event, value);
+
                 group->region_values.io_total_delta =
-                    get_delta(event, group->region_values.io_total, value);
-                group->region_values.io_total_delta =
-                    scale_event(event, group->region_values.io_total_delta);
+                    value - group->region_values.io_total;
+                group->region_values.io_total = value;
 
                 break;
         case PQOS_MON_EVENT_IO_MISS_MEM_BW:
@@ -1320,6 +1355,7 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                         const pqos_channel_t channel_id =
                             group->intl->hw.ctx[i].channel_id;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
+                        const struct pqos_erdt_ibrd *ibrd;
 
                         ret = get_dev_domain_info(channel_id, NULL,
                                                   &domain_id_idx);
@@ -1337,9 +1373,10 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                 return PQOS_RETVAL_UNAVAILABLE;
                         }
 
-                        get_miss_iol3_mbm_rmid_range_v1(
-                            &erdt->dev_agents[domain_id_idx].ibrd, rmid, rmid,
-                            &tmp_rmid_val);
+                        ibrd = &erdt->dev_agents[domain_id_idx].ibrd;
+
+                        get_miss_iol3_mbm_rmid_range_v1(ibrd, rmid, rmid,
+                                                        &tmp_rmid_val);
 
                         if (!is_available_iol3_mbm_rmid(tmp_rmid_val)) {
                                 LOG_ERROR("RMID %u is not available for "
@@ -1348,13 +1385,12 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                 return PQOS_RETVAL_UNAVAILABLE;
                         };
 
-                        value += iol3_mbm_rmid_to_uint64(tmp_rmid_val);
+                        value += scale_io_mbm_value(
+                            ibrd, rmid, iol3_mbm_rmid_to_uint64(tmp_rmid_val));
                 };
-                group->region_values.io_miss = scale_event(event, value);
                 group->region_values.io_miss_delta =
-                    get_delta(event, group->region_values.io_miss, value);
-                group->region_values.io_miss_delta =
-                    scale_event(event, group->region_values.io_miss_delta);
+                    value - group->region_values.io_miss;
+                group->region_values.io_miss = value;
                 break;
         default:
                 pv->mbm_total = 0;

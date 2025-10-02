@@ -41,6 +41,7 @@
 extern "C" {
 #endif
 
+#include "erdt.h"
 #include "monitoring.h"
 #include "pqos.h"
 #include "pqos_internal.h"
