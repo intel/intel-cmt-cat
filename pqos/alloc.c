@@ -1991,6 +1991,11 @@ alloc_print_config(const struct pqos_capability *cap_mon,
         unsigned i;
         unsigned sock_count, *sockets = NULL;
 
+        if (!sys) {
+                printf("Error: 'sys' (pqos_sysconfig) is not available!\n");
+                return;
+        }
+
         sockets = pqos_cpu_get_sockets(sys->cpu, &sock_count);
         if (sockets == NULL) {
                 printf("Error retrieving information for Sockets\n");

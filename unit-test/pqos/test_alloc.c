@@ -231,9 +231,9 @@ static void
 test_alloc_print_config_negative(void **state)
 {
         run_void_function(alloc_print_config, NULL, NULL, NULL, NULL, NULL,
-                          NULL, NULL, 0);
-        assert_string_equal(output_get(),
-                            "Error retrieving information for Sockets\n");
+                          NULL, 0);
+        assert_string_equal(
+            output_get(), "Error: 'sys' (pqos_sysconfig) is not available!\n");
 
         (void)state; /* unused */
 }
@@ -332,7 +332,7 @@ test_alloc_print_config_msr(void **state)
 
         run_void_function(alloc_print_config, data->cap_mon, data->cap_l3ca,
                           data->cap_l2ca, data->cap_mba, data->cap_smba,
-                          data->cpu_info, NULL, 1);
+                          data->sys, 1);
 
         /* check output */
         assert_true(
@@ -466,7 +466,7 @@ test_alloc_print_config_os(void **state)
 
         run_void_function(alloc_print_config, data->cap_mon, data->cap_l3ca,
                           data->cap_l2ca, data->cap_mba, data->cap_smba,
-                          data->cpu_info, NULL, 1);
+                          data->sys, 1);
 
         /* check output */
         assert_true(output_has_text("L3CA/MBA COS definitions for Socket 0:\n"
@@ -630,7 +630,7 @@ test_alloc_apply_mba(void **state)
             "SOCKET 3 MBA COS3 => 85%% requested, 90%% applied"));
         assert_true(output_has_text("Allocation configuration altered"));
 
-        /* clenup before test */
+        /* cleanup before test */
         sel_alloc_opt_num = 0;
 }
 
@@ -804,7 +804,7 @@ test_alloc_apply_l3ca(void **state)
         will_return(__wrap_pqos_l3ca_get, num_ca);
         will_return(__wrap_pqos_l3ca_get, ca);
 
-        // /* mock pqos_l3ca_set */
+        /* mock pqos_l3ca_set */
         expect_value(__wrap_pqos_l3ca_set, l3cat_id, 0);
         expect_value(__wrap_pqos_l3ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l3ca_set, ca, &expected_ca[0],
@@ -1029,37 +1029,37 @@ test_alloc_apply_l2(void **state)
         expect_value(__wrap_pqos_l2ca_set, l2id, 0);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_l2ca_tab[0],
-                      sizeof(struct pqos_l3ca) - 8);
+                      sizeof(struct pqos_l2ca) - 8);
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 1);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_l2ca_tab[0],
-                      sizeof(struct pqos_l3ca) - 8);
+                      sizeof(struct pqos_l2ca) - 8);
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 2);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_l2ca_tab[1],
-                      sizeof(struct pqos_l3ca) - 8);
+                      sizeof(struct pqos_l2ca) - 8);
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 3);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_l2ca_tab[1],
-                      sizeof(struct pqos_l3ca) - 8);
+                      sizeof(struct pqos_l2ca) - 8);
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 4);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_l2ca_tab[2],
-                      sizeof(struct pqos_l3ca) - 8);
+                      sizeof(struct pqos_l2ca) - 8);
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 5);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_l2ca_tab[2],
-                      sizeof(struct pqos_l3ca) - 8);
+                      sizeof(struct pqos_l2ca) - 8);
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
@@ -1078,7 +1078,7 @@ test_alloc_apply_l2(void **state)
 }
 
 static void
-test_alloc_apply_l2_dcp(void **state)
+test_alloc_apply_l2_cdp(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
         int ret = 0;
@@ -1140,25 +1140,25 @@ test_alloc_apply_l2_dcp(void **state)
         expect_value(__wrap_pqos_l2ca_set, l2id, 0);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_ca[0],
-                      sizeof(struct pqos_l3ca));
+                      sizeof(struct pqos_l2ca));
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 1);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_ca[0],
-                      sizeof(struct pqos_l3ca));
+                      sizeof(struct pqos_l2ca));
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 0);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_ca[1],
-                      sizeof(struct pqos_l3ca));
+                      sizeof(struct pqos_l2ca));
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         expect_value(__wrap_pqos_l2ca_set, l2id, 1);
         expect_value(__wrap_pqos_l2ca_set, num_cos, 1);
         expect_memory(__wrap_pqos_l2ca_set, ca, &expected_ca[1],
-                      sizeof(struct pqos_l3ca));
+                      sizeof(struct pqos_l2ca));
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
@@ -1423,7 +1423,7 @@ main(void)
             cmocka_unit_test(test_alloc_apply_l3ca),
             cmocka_unit_test(test_alloc_apply_l3ca_cdp),
             cmocka_unit_test(test_alloc_apply_l2),
-            cmocka_unit_test(test_alloc_apply_l2_dcp),
+            cmocka_unit_test(test_alloc_apply_l2_cdp),
             cmocka_unit_test(test_alloc_apply_unrecognized_alloc_type),
             cmocka_unit_test_setup_teardown(
                 test_alloc_apply_set_core_to_class_id, init_sel_assoc_tab,
