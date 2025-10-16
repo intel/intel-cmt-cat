@@ -1399,8 +1399,6 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
 }
 
 /**
- * Refactor: Make publicly available and move to common code base.
- *
  * @brief Read HW perf counter
  *
  * @param group monitoring structure
