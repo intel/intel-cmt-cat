@@ -155,8 +155,6 @@ mmio_mon_fini(void)
  */
 
 /**
- * Refactor: Connection between max_rmid and event is not clear.
- *
  * @brief Gets max RMID number for given \a event
  *
  * @param [in] cap capabilities structure
