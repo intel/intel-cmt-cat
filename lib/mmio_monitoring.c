@@ -1160,7 +1160,7 @@ mmio_mon_stop(struct pqos_mon_data *group)
          */
         if (group->cores != NULL)
                 free(group->cores);
-        // Refactor: If mmio structure will be introcuced then clear it too.
+
         free(group->intl->hw.ctx);
 
         return retval;
