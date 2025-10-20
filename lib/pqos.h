@@ -790,6 +790,35 @@ struct pqos_mmio_dump {
 };
 
 /**
+ * RMID Dump interface data structures
+ */
+
+/* MMIO RMID types */
+enum pqos_mmio_dump_rmid_type {
+        MMIO_DUMP_RMID_TYPE_MBM, /**< RMID for MBM */
+        MMIO_DUMP_RMID_TYPE_CMT, /**< RMID for CMT */
+        MMIO_DUMP_RMID_IO_L3,    /**< RMID for IO L3 */
+        MMIO_DUMP_RMID_IO_TOTAL, /**< RMID for IO TOTAL */
+        MMIO_DUMP_RMID_IO_MISS,  /**< RMID for IO MISS */
+};
+
+/**
+ * Main RMID dump data structure
+ */
+struct pqos_mmio_dump_rmids {
+        enum pqos_mmio_dump_rmid_type rmid_type; /**< RMIDs type */
+        uint32_t num_domain_ids;                 /**< Number of domain ids */
+        uint16_t *domain_ids;                    /**< List of domain ids */
+        uint32_t num_regions;   /**< Number of memory regions. Used for MBM */
+        uint16_t *regions;      /**< List of memory regions. Used for MBM */
+        unsigned int num_rmids; /**< Number of RMIDs */
+        uint64_t *rmids;        /**< List of RMIDs */
+        unsigned int bin;       /**< Binary flag.  default: 0,
+                                   means hexadecimal */
+        unsigned int upscale;   /**< Upscale raw value. default: 0 */
+};
+
+/**
  * @brief Retrieves PQoS capabilities data
  *
  * @param [out] cap location to store PQoS capabilities information at
@@ -2197,7 +2226,17 @@ void pqos_free(void *ptr);
  *
  *  @retval PQOS_RETVAL_OK success
  **/
+
 int pqos_dump(const struct pqos_mmio_dump *dump_cfg);
+
+/**
+ *  @brief Shows the RMID dumps of a particular type
+ *
+ *  @param [in] dump defines dump output
+ *
+ *  @retval PQOS_RETVAL_OK success
+ **/
+int pqos_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg);
 
 #ifdef __cplusplus
 }

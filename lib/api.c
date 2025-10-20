@@ -41,6 +41,7 @@
 #include "log.h"
 #include "mmio_allocation.h"
 #include "mmio_dump.h"
+#include "mmio_dump_rmids.h"
 #include "mmio_monitoring.h"
 #include "monitoring.h"
 #include "os_allocation.h"
@@ -179,6 +180,9 @@ static struct pqos_api {
                                        unsigned *count);
         /** Dump a memory region */
         int (*dump)(const struct pqos_mmio_dump *dump);
+
+        /** Dump RMIDS */
+        int (*dump_rmids)(const struct pqos_mmio_dump_rmids *dump_cfg);
 } api;
 
 /*
@@ -278,6 +282,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.mon_stop = mmio_mon_stop;
                 api.mon_reset = mmio_mon_reset;
                 api.dump = mmio_dump;
+                api.dump_rmids = mmio_dump_rmids;
         }
 
         return PQOS_RETVAL_OK;
@@ -1628,4 +1633,13 @@ pqos_dump(const struct pqos_mmio_dump *dump_cfg)
                 return PQOS_RETVAL_PARAM;
 
         return API_CALL(dump, dump_cfg);
+}
+
+int
+pqos_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg)
+{
+        if (dump_cfg == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        return API_CALL(dump_rmids, dump_cfg);
 }

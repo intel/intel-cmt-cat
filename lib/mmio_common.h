@@ -104,6 +104,26 @@ PQOS_LOCAL uint64_t scale_io_llc_value(const struct pqos_erdt_cmrd *cmrd,
 PQOS_LOCAL uint64_t scale_io_mbm_value(const struct pqos_erdt_ibrd *ibrd,
                                        const pqos_rmid_t rmid,
                                        const uint64_t val);
+/**
+ * @brief Get CPU index by Domain ID
+ *
+ * @param [in] domain_id Domain ID
+ *
+ * @return CPU index or -1 if not found
+ */
+PQOS_LOCAL
+int get_cpu_agent_idx_by_domain_id(uint16_t domain_id);
+
+/**
+ * @brief Get Device index by Domain ID
+ *
+ * @param [in] domain_id Domain ID
+ *
+ * @return Device index or -1 if not found
+ */
+PQOS_LOCAL
+int get_dev_agent_idx_by_domain_id(uint16_t domain_id);
+
 #ifdef __cplusplus
 }
 #endif
