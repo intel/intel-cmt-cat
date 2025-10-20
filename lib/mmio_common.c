@@ -61,3 +61,47 @@ mmio_set_mbm_mba_mode(enum pqos_mbm_mba_modes mode,
 
         return ret;
 }
+
+uint64_t
+scale_mbm_value(const struct pqos_erdt_mmrc *mmrc,
+                const pqos_rmid_t rmid,
+                const uint64_t val)
+{
+        uint64_t scaled_val = val * mmrc->upscaling_factor;
+
+        if (mmrc->correction_factor_length != NO_CORRECTION_FACTOR)
+                scaled_val *=
+                    (mmrc->correction_factor_length > SINGLE_CORRECTION_FACTOR)
+                        ? mmrc->correction_factor[rmid]
+                        : mmrc->correction_factor[0];
+
+        return scaled_val;
+}
+
+uint64_t
+scale_llc_value(const struct pqos_erdt_cmrc *cmrc, const uint64_t val)
+{
+        return val * cmrc->upscaling_factor;
+}
+
+uint64_t
+scale_io_llc_value(const struct pqos_erdt_cmrd *cmrd, const uint64_t val)
+{
+        return val * cmrd->upscaling_factor;
+}
+
+uint64_t
+scale_io_mbm_value(const struct pqos_erdt_ibrd *ibrd,
+                   const pqos_rmid_t rmid,
+                   const uint64_t val)
+{
+        uint64_t scaled_val = val * ibrd->upscaling_factor;
+
+        if (ibrd->correction_factor_length != NO_CORRECTION_FACTOR)
+                scaled_val *=
+                    (ibrd->correction_factor_length > SINGLE_CORRECTION_FACTOR)
+                        ? ibrd->correction_factor[rmid]
+                        : ibrd->correction_factor[0];
+
+        return scaled_val;
+}

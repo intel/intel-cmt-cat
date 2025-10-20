@@ -57,6 +57,53 @@ extern "C" {
 PQOS_LOCAL int mmio_set_mbm_mba_mode(enum pqos_mbm_mba_modes mode,
                                      const struct pqos_erdt_info *erdt);
 
+/**
+ * @brief Scale MBM RMID value to bytes
+ *
+ * @param [in] mmrc MMRC table containing scaling factors
+ * @param [in] rmid RMID value to be scaled
+ * @param [in] val value to be scaled
+ *
+ * @return scaled value in bytes
+ */
+PQOS_LOCAL uint64_t scale_mbm_value(const struct pqos_erdt_mmrc *mmrc,
+                                    const pqos_rmid_t rmid,
+                                    const uint64_t val);
+
+/**
+ * @brief Scale LLC RMID value to bytes
+ *
+ * @param [in] cmrc CMRC table containing scaling factors
+ * @param [in] val value to be scaled
+ *
+ * @return scaled value in bytes
+ */
+PQOS_LOCAL uint64_t scale_llc_value(const struct pqos_erdt_cmrc *cmrc,
+                                    const uint64_t val);
+
+/**
+ * @brief Scale IO LLC RMID value to bytes
+ *
+ * @param [in] cmrd CMRD table containing scaling factors
+ * @param [in] val value to be scaled
+ *
+ * @return scaled value in bytes
+ */
+PQOS_LOCAL uint64_t scale_io_llc_value(const struct pqos_erdt_cmrd *cmrd,
+                                       const uint64_t val);
+
+/**
+ * @brief Scale IO MBM RMID value to bytes
+ *
+ * @param [in] ibrd IBRD table containing scaling factors
+ * @param [in] rmid RMID value to be scaled
+ * @param [in] val value to be scaled
+ *
+ * @return scaled value in bytes
+ */
+PQOS_LOCAL uint64_t scale_io_mbm_value(const struct pqos_erdt_ibrd *ibrd,
+                                       const pqos_rmid_t rmid,
+                                       const uint64_t val);
 #ifdef __cplusplus
 }
 #endif

@@ -71,25 +71,6 @@ struct rmid_list_t {
         pqos_rmid_t *rmids;
 };
 
-/**
- * ---------------------------------------
- * Local Functions
- * ---------------------------------------
- */
-
-static uint64_t scale_mbm_value(const struct pqos_erdt_mmrc *mmrc,
-                                const pqos_rmid_t rmid,
-                                const uint64_t val);
-
-static uint64_t scale_llc_value(const struct pqos_erdt_cmrc *cmrc,
-                                const uint64_t val);
-
-static uint64_t scale_io_llc_value(const struct pqos_erdt_cmrd *cmrd,
-                                   const uint64_t val);
-
-static uint64_t scale_io_mbm_value(const struct pqos_erdt_ibrd *ibrd,
-                                   const pqos_rmid_t rmid,
-                                   const uint64_t val);
 /*
  * =======================================
  * =======================================
@@ -531,84 +512,6 @@ rmid_alloc_error:
  * =======================================
  * =======================================
  */
-
-/**
- * @brief Scale MBM RMID value to bytes
- *
- * @param [in] mmrc MMRC table containing scaling factors
- * @param [in] rmid RMID value to be scaled
- * @param [in] val value to be scaled
- *
- * @return scaled value in bytes
- */
-static uint64_t
-scale_mbm_value(const struct pqos_erdt_mmrc *mmrc,
-                const pqos_rmid_t rmid,
-                const uint64_t val)
-{
-        uint64_t scaled_val = val * mmrc->upscaling_factor;
-
-        if (mmrc->correction_factor_length != NO_CORRECTION_FACTOR)
-                scaled_val *=
-                    (mmrc->correction_factor_length > SINGLE_CORRECTION_FACTOR)
-                        ? mmrc->correction_factor[rmid]
-                        : mmrc->correction_factor[0];
-
-        return scaled_val;
-}
-
-/**
- * @brief Scale LLC RMID value to bytes
- *
- * @param [in] cmrc CMRC table containing scaling factors
- * @param [in] val value to be scaled
- *
- * @return scaled value in bytes
- */
-static uint64_t
-scale_llc_value(const struct pqos_erdt_cmrc *cmrc, const uint64_t val)
-{
-        return val * cmrc->upscaling_factor;
-}
-
-/**
- * @brief Scale IO LLC RMID value to bytes
- *
- * @param [in] cmrd CMRD table containing scaling factors
- * @param [in] val value to be scaled
- *
- * @return scaled value in bytes
- */
-static uint64_t
-scale_io_llc_value(const struct pqos_erdt_cmrd *cmrd, const uint64_t val)
-{
-        return val * cmrd->upscaling_factor;
-}
-
-/**
- * @brief Scale IO MBM RMID value to bytes
- *
- * @param [in] ibrd IBRD table containing scaling factors
- * @param [in] rmid RMID value to be scaled
- * @param [in] val value to be scaled
- *
- * @return scaled value in bytes
- */
-static uint64_t
-scale_io_mbm_value(const struct pqos_erdt_ibrd *ibrd,
-                   const pqos_rmid_t rmid,
-                   const uint64_t val)
-{
-        uint64_t scaled_val = val * ibrd->upscaling_factor;
-
-        if (ibrd->correction_factor_length != NO_CORRECTION_FACTOR)
-                scaled_val *=
-                    (ibrd->correction_factor_length > SINGLE_CORRECTION_FACTOR)
-                        ? ibrd->correction_factor[rmid]
-                        : ibrd->correction_factor[0];
-
-        return scaled_val;
-}
 
 int
 mmio_mon_assoc_write(const unsigned lcore, const pqos_rmid_t rmid)
