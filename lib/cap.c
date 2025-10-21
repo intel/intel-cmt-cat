@@ -843,6 +843,13 @@ pqos_init(const struct pqos_config *config)
                 break;
         }
 
+        /* ERDT is required for MMIO interface */
+        if (ret != PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
+                LOG_ERROR("ERDT table is required for MMIO "
+                          "interface!\n");
+                goto machine_init_error;
+        }
+
         /* Must be initialized after ERDT due to its data usage
          */
         if (ret == PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
@@ -924,6 +931,13 @@ pqos_init(const struct pqos_config *config)
                 default:
                         LOG_ERROR("MRRM init error %d\n", ret);
                         break;
+                }
+
+                /* MRRM is required for MMIO interface */
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("MRRM table is required for MMIO "
+                                  "interface!\n");
+                        goto machine_init_error;
                 }
         }
 
