@@ -47,7 +47,6 @@
 #include "pqos_internal.h"
 #endif
 
-#include <ctype.h>  /**< isspace() */
 #include <dirent.h> /**< for dir list*/
 #include <fcntl.h>
 #include <inttypes.h>
@@ -86,6 +85,8 @@
 #define REALLOC_ALLOWED    1
 #define REALLOC_DISALLOWED 0
 #define CORE_LIST_SIZE     128
+
+#define NULL_CHAR_LENGTH 1
 
 /**
  * Local data structures
@@ -1798,6 +1799,62 @@ error_exit:
 #endif
 
 /**
+ * @brief Parse input string and fill vc array, return count
+ *
+ * @param str All virtual channels string passed to
+ *            --mon-dev command line option
+ * @param vc converted virtual channel numbers from str
+ * @param max_numbers Maximum virtual channels
+ *
+ * @return count of virtual channels in vc. -1 in error
+ */
+static int
+parse_virtual_channels(char *str, unsigned int *vc, int max_numbers)
+{
+        int count = 0;
+        unsigned int start = 0;
+        unsigned int end = 0;
+        unsigned int n = 0;
+        char *token = strtok(str, ",");
+
+        while (token && count < max_numbers) {
+                token = trim(token);
+                char *dash = strchr(token, '-');
+
+                if (dash) {
+                        /* Range of virtual channels */
+                        *dash = '\0';
+                        start = (unsigned int)strtouint64(token);
+                        end = (unsigned int)strtouint64(dash + 1);
+                        if (start > end) {
+                                /* Range of virtual channels are
+                                 * decremental order
+                                 */
+                                for (n = start; n >= end && count < max_numbers;
+                                     n--) {
+                                        vc[count++] = n;
+                                        if (n == 0)
+                                                break;
+                                }
+                        } else {
+                                /* Range of virtual channels are
+                                 * incremental order
+                                 */
+                                for (n = start; n <= end && count < max_numbers;
+                                     n++)
+                                        vc[count++] = n;
+                        }
+                } else {
+                        /* Single virtual channel */
+                        vc[count++] = (unsigned int)strtouint64(token);
+                }
+                token = strtok(NULL, ",");
+        }
+
+        return count;
+}
+
+/**
  * @brief Verifies and translates monitoring config string into
  *        internal device monitoring configuration.
  *
@@ -1806,13 +1863,18 @@ error_exit:
 static void
 parse_monitor_dev(char *str)
 {
+        union pqos_device dev;
         uint16_t segment = 0;
         uint16_t bus, device, function;
         uint16_t bdf = 0;
-        unsigned vc = DEV_ALL_VCS; /* All channels by default */
+        unsigned vc[PQOS_DEV_MAX_CHANNELS];
+        int vc_count = 0;
+        int idx = 0;
         enum pqos_mon_event evt = (enum pqos_mon_event)0;
         char *desc = NULL;
-        char *p;
+        char *p = NULL;
+        char *vc_desc[PQOS_DEV_MAX_CHANNELS] = {NULL};
+        size_t len = 0;
 
         parse_event(str, &evt);
 
@@ -1868,7 +1930,10 @@ parse_monitor_dev(char *str)
         p = strchr(str, '@');
         if (p) {
                 *p = '\0';
-                vc = (unsigned)strtouint64(p + 1);
+                for (idx = 0; idx < PQOS_DEV_MAX_CHANNELS; idx++)
+                        vc[idx] = DEV_ALL_VCS;
+                vc_count =
+                    parse_virtual_channels(p + 1, vc, PQOS_DEV_MAX_CHANNELS);
         }
 
         /* PCI function */
@@ -1879,27 +1944,49 @@ parse_monitor_dev(char *str)
         bdf |= (device & 0x1F) << 3;
         bdf |= function & 0x7;
 
-        printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x@", segment,
-               BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
-        if (vc != DEV_ALL_VCS)
-                printf("%u", vc);
+        if (vc_count == 0)
+                printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x@ALL",
+                       segment, BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
         else
-                printf("ALL");
-        printf("\n");
-
-        union pqos_device dev;
+                for (idx = 0; idx < vc_count; idx++)
+                        printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x"
+                               "@%u\n",
+                               segment, BDF_BUS(bdf), BDF_DEV(bdf),
+                               BDF_FUNC(bdf), vc[idx]);
 
         dev.segment = segment;
         dev.bdf = bdf;
-        dev.vc = vc;
 
-        {
-                const struct mon_group *grp;
+        if (vc_count == 0) {
+                const struct mon_group *grp = NULL;
 
+                dev.vc = DEV_ALL_VCS;
                 grp = grp_add(MON_GROUP_TYPE_DEVICE, evt, desc, &dev.raw, 1);
                 if (grp == NULL) {
                         printf("Device group setup error!\n");
                         exit(EXIT_FAILURE);
+                }
+        } else {
+                while (desc[len] != '\0') {
+                        len++;
+                        if (desc[len - 1] == '@')
+                                break;
+                }
+
+                for (idx = 0; idx < vc_count; idx++) {
+                        const struct mon_group *grp = NULL;
+
+                        dev.vc = vc[idx];
+                        selfn_strdup(&vc_desc[idx], desc);
+                        snprintf(&vc_desc[idx][len],
+                                 strlen(vc_desc[idx]) + NULL_CHAR_LENGTH - len,
+                                 "%u", dev.vc);
+                        grp = grp_add(MON_GROUP_TYPE_DEVICE, evt, vc_desc[idx],
+                                      &dev.raw, 1);
+                        if (grp == NULL) {
+                                printf("Device group setup error!\n");
+                                exit(EXIT_FAILURE);
+                        }
                 }
         }
 }

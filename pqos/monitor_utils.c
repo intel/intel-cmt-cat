@@ -35,6 +35,7 @@
 #include "common.h"
 #include "monitor.h"
 
+#include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -479,4 +480,24 @@ monitor_utils_get_pid_stat(const char *proc_pid_dir_name,
         } while ((token = strtok_r(NULL, delim, &saveptr)) != NULL);
 
         return -1; /*error if while loop finishes and nothing left in buffer*/
+}
+
+char *
+trim(char *str)
+{
+        char *end;
+
+        while (isspace((unsigned char)*str))
+                str++;
+
+        if (*str == 0)
+                return str;
+
+        end = str + strlen(str) - 1;
+        while (end > str && isspace((unsigned char)*end))
+                end--;
+
+        end[1] = '\0';
+
+        return str;
 }

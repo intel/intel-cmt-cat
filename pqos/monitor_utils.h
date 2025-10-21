@@ -128,4 +128,11 @@ int monitor_utils_get_pid_stat(const char *proc_pid_dir_name,
                                const unsigned len_val,
                                char *val);
 
+/**
+ * @brief Helper to trim leading/trailing whitespace
+ *
+ * @param str String to trim leading/trailing whitespace from
+ */
+char *trim(char *str);
+
 #endif /* __MONITOR_UTILS_H__ */
