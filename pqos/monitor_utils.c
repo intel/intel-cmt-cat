@@ -221,6 +221,9 @@ monitor_utils_get_region_value(const struct pqos_mon_data *const group,
                 if (ret == PQOS_RETVAL_OK)
                         value = bytes_to_mb(delta) * coeff;
                 break;
+        case PQOS_PERF_EVENT_IPC:
+                ret = pqos_mon_get_ipc(group, &value);
+                break;
         default:
                 ret = PQOS_RETVAL_PARAM;
         }
