@@ -1321,7 +1321,7 @@ monitor_setup_events(enum mon_group_type type,
 
         /* check if all available events were selected */
         if ((*events & PQOS_MON_EVENT_ALL) == PQOS_MON_EVENT_ALL) {
-                if (iordt)
+                if (iordt && interface == PQOS_INTER_MMIO)
                         *events = PQOS_MON_EVENT_IO_L3_OCCUP |
                                   PQOS_MON_EVENT_IO_TOTAL_MEM_BW |
                                   PQOS_MON_EVENT_IO_MISS_MEM_BW;
