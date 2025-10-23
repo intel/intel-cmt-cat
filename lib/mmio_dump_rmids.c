@@ -99,7 +99,7 @@ mmio_dump_rmids_cmt(const struct pqos_mmio_dump_rmids *dump_cfg)
                     &erdt->cpu_agents[cpu_agent_idx].cmrc;
                 printf("DOMAIN ID: %u\n", dump_cfg->domain_ids[i]);
                 for (unsigned int j = 0; j < dump_cfg->num_rmids; j++) {
-                        unsigned int rmid = dump_cfg->rmids[j];
+                        pqos_rmid_t rmid = dump_cfg->rmids[j];
 
                         ret = get_l3_cmt_rmid_range_v1(cmrc, rmid, rmid,
                                                        &rmid_raw);
@@ -141,13 +141,13 @@ mmio_dump_rmids_mbm(const struct pqos_mmio_dump_rmids *dump_cfg)
                 const struct pqos_erdt_mmrc *mmrc =
                     &erdt->cpu_agents[cpu_agent_idx].mmrc;
                 printf("DOMAIN ID: %u\n", dump_cfg->domain_ids[i]);
-                for (unsigned int j = 0; j < dump_cfg->num_regions; j++) {
-                        printf("REGION ID: %u\n", dump_cfg->regions[j]);
+                for (int j = 0; j < dump_cfg->num_mem_regions; j++) {
+                        printf("MEM REGION ID: %d\n", dump_cfg->region_num[j]);
                         for (unsigned int k = 0; k < dump_cfg->num_rmids; k++) {
-                                unsigned int rmid = dump_cfg->rmids[k];
+                                pqos_rmid_t rmid = dump_cfg->rmids[k];
 
                                 ret = get_l3_mbm_region_rmid_range_v1(
-                                    mmrc, dump_cfg->regions[j], rmid, rmid,
+                                    mmrc, dump_cfg->region_num[j], rmid, rmid,
                                     &rmid_raw);
 
                                 if (ret != PQOS_RETVAL_OK)
@@ -194,7 +194,7 @@ mmio_dump_rmids_iol3(const struct pqos_mmio_dump_rmids *dump_cfg)
                     &erdt->dev_agents[dev_agent_idx].cmrd;
                 printf("DOMAIN ID: %u\n", dump_cfg->domain_ids[i]);
                 for (unsigned int j = 0; j < dump_cfg->num_rmids; j++) {
-                        unsigned int rmid = dump_cfg->rmids[j];
+                        pqos_rmid_t rmid = dump_cfg->rmids[j];
 
                         ret = get_iol3_cmt_rmid_range_v1(cmrd, rmid, rmid,
                                                          &rmid_raw);
@@ -239,7 +239,7 @@ mmio_dump_rmids_iol3_total(const struct pqos_mmio_dump_rmids *dump_cfg)
                     &erdt->dev_agents[dev_agent_idx].ibrd;
                 printf("DOMAIN ID: %u\n", dump_cfg->domain_ids[i]);
                 for (unsigned int j = 0; j < dump_cfg->num_rmids; j++) {
-                        unsigned int rmid = dump_cfg->rmids[j];
+                        pqos_rmid_t rmid = dump_cfg->rmids[j];
 
                         ret = get_total_iol3_mbm_rmid_range_v1(ibrd, rmid, rmid,
                                                                &rmid_raw);
@@ -284,7 +284,7 @@ mmio_dump_rmids_iol3_miss(const struct pqos_mmio_dump_rmids *dump_cfg)
                     &erdt->dev_agents[dev_agent_idx].ibrd;
                 printf("DOMAIN ID: %u\n", dump_cfg->domain_ids[i]);
                 for (unsigned int j = 0; j < dump_cfg->num_rmids; j++) {
-                        unsigned int rmid = dump_cfg->rmids[j];
+                        pqos_rmid_t rmid = dump_cfg->rmids[j];
 
                         ret = get_miss_iol3_mbm_rmid_range_v1(ibrd, rmid, rmid,
                                                               &rmid_raw);

@@ -40,6 +40,7 @@
 #include "cap.h"
 #include "common.h"
 #include "dump.h"
+#include "dump_rmids.h"
 #include "monitor.h"
 #include "pqos.h"
 #include "profiles.h"
@@ -157,6 +158,11 @@ static int sel_print_dump_info = 0;
  * Enable MMIO registers dump
  */
 static int sel_dump = 0;
+
+/**
+ * Enable RMID registers dump
+ */
+static int sel_dump_rmid_regs = 0;
 
 static uint64_t strtouint64_base(const char *s, int default_base);
 
@@ -829,6 +835,18 @@ selfn_dump(const char *arg)
 }
 
 /**
+ * @brief Dumps selected rmids' mmio registers
+ *
+ * @param arg not used
+ */
+static void
+selfn_dump_rmid_regs(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_dump_rmid_regs = 1;
+}
+
+/**
  * @brief Opens configuration file and parses its contents
  *
  * @param fname Name of the file with configuration parameters
@@ -1142,86 +1160,103 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_RMID          1000
 #define OPTION_RMID_CHANNELS 1001
 #endif
-#define OPTION_DISABLE_MON_IPC      1002
-#define OPTION_DISABLE_MON_LLC_MISS 1003
-#define OPTION_VERSION              1004
-#define OPTION_INTERFACE            1005
-#define OPTION_MON_UNCORE           1006
-#define OPTION_MON_DEVS             1007
-#define OPTION_MON_CHANNELS         1008
-#define OPTION_PRINT_MEM_REGIONS    1009
-#define OPTION_PRINT_TOPOLOGY       1010
-#define OPTION_MON_MEM_REGIONS      1011
-#define OPTION_ALLOC_MEM_REGIONS    1012
-#define OPTION_ALLOC_OPT_BW         1013
-#define OPTION_ALLOC_MIN_BW         1014
-#define OPTION_ALLOC_MAX_BW         1015
-#define OPTION_ALLOC_DOMAIN_ID      1016
-#define OPTION_PRINT_DUMP_INFO      1017
-#define OPTION_DUMP                 1018
-#define OPTION_DUMP_SOCKET          1019
-#define OPTION_DUMP_DOMAIN_ID       1020
-#define OPTION_DUMP_SPACE           1021
-#define OPTION_DUMP_OFFSET          1022
-#define OPTION_DUMP_LENGTH          1023
-#define OPTION_DUMP_WIDTH           1024
-#define OPTION_DUMP_BINARY          1025
-#define OPTION_DUMP_LE              1026
+#define OPTION_DISABLE_MON_IPC       1002
+#define OPTION_DISABLE_MON_LLC_MISS  1003
+#define OPTION_VERSION               1004
+#define OPTION_INTERFACE             1005
+#define OPTION_MON_UNCORE            1006
+#define OPTION_MON_DEVS              1007
+#define OPTION_MON_CHANNELS          1008
+#define OPTION_PRINT_MEM_REGIONS     1009
+#define OPTION_PRINT_TOPOLOGY        1010
+#define OPTION_MON_MEM_REGIONS       1011
+#define OPTION_ALLOC_MEM_REGIONS     1012
+#define OPTION_ALLOC_OPT_BW          1013
+#define OPTION_ALLOC_MIN_BW          1014
+#define OPTION_ALLOC_MAX_BW          1015
+#define OPTION_ALLOC_DOMAIN_ID       1016
+#define OPTION_PRINT_DUMP_INFO       1017
+#define OPTION_DUMP                  1018
+#define OPTION_DUMP_SOCKET           1019
+#define OPTION_DUMP_DOMAIN_ID        1020
+#define OPTION_DUMP_SPACE            1021
+#define OPTION_DUMP_OFFSET           1022
+#define OPTION_DUMP_LENGTH           1023
+#define OPTION_DUMP_WIDTH            1024
+#define OPTION_DUMP_BINARY           1025
+#define OPTION_DUMP_LE               1026
+#define OPTION_DUMP_RMID_REGS        1027
+#define OPTION_DUMP_RMIDS            1028
+#define OPTION_DUMP_RMID_DOMAIN_IDS  1029
+#define OPTION_DUMP_RMID_MEM_REGIONS 1030
+#define OPTION_DUMP_RMID_TYPE        1031
+#define OPTION_DUMP_RMID_BINARY      1032
+#define OPTION_DUMP_RMID_UPSCALING   1033
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
-    {"help",                 no_argument,       0, 'h'},
-    {"log-file",             required_argument, 0, 'l'},
-    {"config-file",          required_argument, 0, 'f'},
-    {"show",                 no_argument,       0, 's'},
-    {"display",              no_argument,       0, 'd'},
-    {"display-verbose",      no_argument,       0, 'D'},
-    {"profile-list",         no_argument,       0, 'H'},
-    {"profile-set",          required_argument, 0, 'c'},
-    {"mon-interval",         required_argument, 0, 'i'},
-    {"mon-pid",              required_argument, 0, 'p'},
-    {"mon-core",             required_argument, 0, 'm'},
-    {"mon-uncore",           optional_argument, 0, OPTION_MON_UNCORE},
-    {"mon-dev",              required_argument, 0, OPTION_MON_DEVS},
-    {"mon-channel",          required_argument, 0, OPTION_MON_CHANNELS},
-    {"mon-time",             required_argument, 0, 't'},
-    {"mon-top",              no_argument,       0, 'T'},
-    {"mon-file",             required_argument, 0, 'o'},
-    {"mon-file-type",        required_argument, 0, 'u'},
-    {"mon-reset",            optional_argument, 0, 'r'},
-    {"disable-mon-ipc",      no_argument,       0, OPTION_DISABLE_MON_IPC},
-    {"disable-mon-llc_miss", no_argument,       0, OPTION_DISABLE_MON_LLC_MISS},
-    {"alloc-class",          required_argument, 0, 'e'},
-    {"alloc-reset",          required_argument, 0, 'R'},
-    {"alloc-assoc",          required_argument, 0, 'a'},
-    {"verbose",              no_argument,       0, 'v'},
-    {"super-verbose",        no_argument,       0, 'V'},
-    {"iface-os",             no_argument,       0, 'I'},
-    {"iface",                required_argument, 0, OPTION_INTERFACE},
-    {"percent-llc",          no_argument,       0, 'P'},
-    {"version",              no_argument,       0, OPTION_VERSION},
+    {"help",                  no_argument,       0, 'h'},
+    {"log-file",              required_argument, 0, 'l'},
+    {"config-file",           required_argument, 0, 'f'},
+    {"show",                  no_argument,       0, 's'},
+    {"display",               no_argument,       0, 'd'},
+    {"display-verbose",       no_argument,       0, 'D'},
+    {"profile-list",          no_argument,       0, 'H'},
+    {"profile-set",           required_argument, 0, 'c'},
+    {"mon-interval",          required_argument, 0, 'i'},
+    {"mon-pid",               required_argument, 0, 'p'},
+    {"mon-core",              required_argument, 0, 'm'},
+    {"mon-uncore",            optional_argument, 0, OPTION_MON_UNCORE},
+    {"mon-dev",               required_argument, 0, OPTION_MON_DEVS},
+    {"mon-channel",           required_argument, 0, OPTION_MON_CHANNELS},
+    {"mon-time",              required_argument, 0, 't'},
+    {"mon-top",               no_argument,       0, 'T'},
+    {"mon-file",              required_argument, 0, 'o'},
+    {"mon-file-type",         required_argument, 0, 'u'},
+    {"mon-reset",             optional_argument, 0, 'r'},
+    {"disable-mon-ipc",       no_argument,       0, OPTION_DISABLE_MON_IPC},
+    {"disable-mon-llc_miss",  no_argument,       0,
+                                              OPTION_DISABLE_MON_LLC_MISS},
+    {"alloc-class",           required_argument, 0, 'e'},
+    {"alloc-reset",           required_argument, 0, 'R'},
+    {"alloc-assoc",           required_argument, 0, 'a'},
+    {"verbose",               no_argument,       0, 'v'},
+    {"super-verbose",         no_argument,       0, 'V'},
+    {"iface-os",              no_argument,       0, 'I'},
+    {"iface",                 required_argument, 0, OPTION_INTERFACE},
+    {"percent-llc",           no_argument,       0, 'P'},
+    {"version",               no_argument,       0, OPTION_VERSION},
 #ifdef PQOS_RMID_CUSTOM
-    {"rmid",                 required_argument, 0, OPTION_RMID},
-    {"rmid-channels",        required_argument, 0, OPTION_RMID_CHANNELS},
+    {"rmid",                  required_argument, 0, OPTION_RMID},
+    {"rmid-channels",         required_argument, 0, OPTION_RMID_CHANNELS},
 #endif
-    {"print-mem-regions",    no_argument,       0, OPTION_PRINT_MEM_REGIONS},
-    {"print-topology",       no_argument,       0, OPTION_PRINT_TOPOLOGY},
-    {"mon-mem-regions",      required_argument, 0, OPTION_MON_MEM_REGIONS},
-    {"alloc-mem-regions",    required_argument, 0, OPTION_ALLOC_MEM_REGIONS},
-    {"alloc-opt-bw",         no_argument,       0, OPTION_ALLOC_OPT_BW},
-    {"alloc-min-bw",         no_argument,       0, OPTION_ALLOC_MIN_BW},
-    {"alloc-max-bw",         no_argument,       0, OPTION_ALLOC_MAX_BW},
-    {"alloc-domain-id",      required_argument, 0, OPTION_ALLOC_DOMAIN_ID},
-    {"print-dump-info",      no_argument,       0, OPTION_PRINT_DUMP_INFO},
-    {"dump",                 no_argument,       0, OPTION_DUMP},
-    {"socket",               required_argument, 0, OPTION_DUMP_SOCKET},
-    {"dump-domain-id",       required_argument, 0, OPTION_DUMP_DOMAIN_ID},
-    {"space",                required_argument, 0, OPTION_DUMP_SPACE},
-    {"offset",               required_argument, 0, OPTION_DUMP_OFFSET},
-    {"length",               required_argument, 0, OPTION_DUMP_LENGTH},
-    {"width",                required_argument, 0, OPTION_DUMP_WIDTH},
-    {"binary",               no_argument,       0, OPTION_DUMP_BINARY},
-    {"le",                   no_argument,       0, OPTION_DUMP_LE},
+    {"print-mem-regions",     no_argument,       0, OPTION_PRINT_MEM_REGIONS},
+    {"print-topology",        no_argument,       0, OPTION_PRINT_TOPOLOGY},
+    {"mon-mem-regions",       required_argument, 0, OPTION_MON_MEM_REGIONS},
+    {"alloc-mem-regions",     required_argument, 0, OPTION_ALLOC_MEM_REGIONS},
+    {"alloc-opt-bw",          no_argument,       0, OPTION_ALLOC_OPT_BW},
+    {"alloc-min-bw",          no_argument,       0, OPTION_ALLOC_MIN_BW},
+    {"alloc-max-bw",          no_argument,       0, OPTION_ALLOC_MAX_BW},
+    {"alloc-domain-id",       required_argument, 0, OPTION_ALLOC_DOMAIN_ID},
+    {"print-dump-info",       no_argument,       0, OPTION_PRINT_DUMP_INFO},
+    {"dump",                  no_argument,       0, OPTION_DUMP},
+    {"socket",                required_argument, 0, OPTION_DUMP_SOCKET},
+    {"dump-domain-id",        required_argument, 0, OPTION_DUMP_DOMAIN_ID},
+    {"space",                 required_argument, 0, OPTION_DUMP_SPACE},
+    {"offset",                required_argument, 0, OPTION_DUMP_OFFSET},
+    {"length",                required_argument, 0, OPTION_DUMP_LENGTH},
+    {"width",                 required_argument, 0, OPTION_DUMP_WIDTH},
+    {"binary",                no_argument,       0, OPTION_DUMP_BINARY},
+    {"le",                    no_argument,       0, OPTION_DUMP_LE},
+    {"dump-rmid-regs",        no_argument,       0, OPTION_DUMP_RMID_REGS},
+    {"dump-rmids",            required_argument, 0, OPTION_DUMP_RMIDS},
+    {"dump-rmid-domain-ids",  required_argument, 0,
+                                              OPTION_DUMP_RMID_DOMAIN_IDS},
+    {"dump-rmid-mem-regions", required_argument, 0,
+                                              OPTION_DUMP_RMID_MEM_REGIONS},
+    {"dump-rmid-type",        required_argument, 0, OPTION_DUMP_RMID_TYPE},
+    {"dump-rmid-binary",      no_argument,       0, OPTION_DUMP_RMID_BINARY},
+    {"dump-rmid-upscaling",   no_argument,       0, OPTION_DUMP_RMID_UPSCALING},
     {0, 0, 0, 0} /* end */
     /* clang-format on */
 };
@@ -1488,6 +1523,27 @@ main(int argc, char **argv)
                 case OPTION_DUMP_LENGTH:
                         selfn_dump_length(optarg);
                         break;
+                case OPTION_DUMP_RMID_REGS:
+                        selfn_dump_rmid_regs(NULL);
+                        break;
+                case OPTION_DUMP_RMIDS:
+                        selfn_dump_rmids(optarg);
+                        break;
+                case OPTION_DUMP_RMID_DOMAIN_IDS:
+                        selfn_dump_rmid_domain_ids(optarg);
+                        break;
+                case OPTION_DUMP_RMID_MEM_REGIONS:
+                        selfn_dump_rmid_mem_regions(optarg);
+                        break;
+                case OPTION_DUMP_RMID_TYPE:
+                        selfn_dump_rmid_type(optarg);
+                        break;
+                case OPTION_DUMP_RMID_BINARY:
+                        selfn_dump_rmid_binary(NULL);
+                        break;
+                case OPTION_DUMP_RMID_UPSCALING:
+                        selfn_dump_rmid_upscaling(NULL);
+                        break;
                 default:
                         printf("Unsupported option: -%c. "
                                "See option -h for help.\n",
@@ -1662,6 +1718,11 @@ main(int argc, char **argv)
 
         if (sel_dump) {
                 dump_mmio_regs(p_sys);
+                goto allocation_exit;
+        }
+
+        if (sel_dump_rmid_regs) {
+                dump_rmid_regs(p_sys);
                 goto allocation_exit;
         }
 

@@ -67,6 +67,7 @@ extern "C" {
 #define MAX_DOMAINS 65535
 
 #define MAX_DOMAIN_IDS 128
+#define MAX_RMIDS      1024
 
 /**
  * @brief Wrapper around fopen() that additionally checks if a given path

@@ -806,16 +806,18 @@ enum pqos_mmio_dump_rmid_type {
  * Main RMID dump data structure
  */
 struct pqos_mmio_dump_rmids {
-        enum pqos_mmio_dump_rmid_type rmid_type; /**< RMIDs type */
-        uint32_t num_domain_ids;                 /**< Number of domain ids */
-        uint16_t *domain_ids;                    /**< List of domain ids */
-        uint32_t num_regions;   /**< Number of memory regions. Used for MBM */
-        uint16_t *regions;      /**< List of memory regions. Used for MBM */
-        unsigned int num_rmids; /**< Number of RMIDs */
-        uint64_t *rmids;        /**< List of RMIDs */
-        unsigned int bin;       /**< Binary flag.  default: 0,
-                                   means hexadecimal */
-        unsigned int upscale;   /**< Upscale raw value. default: 0 */
+        uint32_t num_domain_ids;              /**< Number of domain ids */
+        uint16_t *domain_ids;                 /**< List of domain ids */
+        int num_mem_regions;                  /**< Number of memory regions */
+        int region_num[PQOS_MAX_MEM_REGIONS]; /**< List of memory regions */
+        unsigned int num_rmids;               /**< Number of RMIDs */
+        pqos_rmid_t *rmids;                   /**< List of RMIDs */
+        enum pqos_mmio_dump_rmid_type rmid_type; /**< RMIDs type. Default: 0,
+                                                    means MBM */
+        unsigned int bin;                        /**< Binary flag. Default: 0,
+                                                    means hexadecimal */
+        unsigned int upscale;                    /**< Upscale raw value.
+                                                    Default: 0 */
 };
 
 /**

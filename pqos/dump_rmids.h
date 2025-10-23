@@ -44,12 +44,54 @@ extern "C" {
 #include "pqos.h"
 
 /**
- *  @brief Prints the values of RMIDs --dump-rmid command
+ * @brief Selects domain ids for --dump-rmid-regs command
+ *
+ * @param arg Domain IDs string from --dump-rmid-domain-ids option
+ */
+void selfn_dump_rmid_domain_ids(const char *arg);
+
+/**
+ * @brief Selects rmids for --dump-rmid-regs command
+ *
+ * @param arg RMIDs string from --dump-rmids option
+ */
+void selfn_dump_rmids(const char *arg);
+
+/**
+ * @brief Selects memory regions in --dump-rmid-regs command
+ *
+ * @param arg Memory Regions string from --dump-rmid-mem-regions option
+ */
+void selfn_dump_rmid_mem_regions(const char *arg);
+
+/**
+ * @brief Selects rmid type for --dump-rmid-regs command
+ *
+ * @param arg RMID type string from --dump-rmid-type option
+ */
+void selfn_dump_rmid_type(const char *arg);
+
+/**
+ * @brief Selects binary option in --dump-rmid-regs command
+ *
+ * @param arg not used
+ */
+void selfn_dump_rmid_binary(const char *arg);
+
+/**
+ * @brief Selects upscale option in --dump-rmid-regs command
+ *
+ * @param arg not used
+ */
+void selfn_dump_rmid_upscaling(const char *arg);
+
+/**
+ * @brief Prints the values of RMID registers for the --dump-rmid-regs command
  *
  * @param [in] sys PQoS system configuration struct
  *                 returned by a pqos_sysconfig_get
  */
-void dump_mmio_rmids(const struct pqos_sysconfig *sys);
+void dump_rmid_regs(const struct pqos_sysconfig *sys);
 
 #ifdef __cplusplus
 }
