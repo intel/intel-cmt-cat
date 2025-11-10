@@ -436,7 +436,7 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon, const struct pqos_cpuinfo *cpu)
         {
                 const unsigned max_rmid = cpuid_0xf_1.ecx + 1;
                 const uint32_t scale_factor = cpuid_0xf_1.ebx;
-                const unsigned counter_length = (cpuid_0xf_1.eax & 0x7f) + 24;
+                const unsigned counter_length = (cpuid_0xf_1.eax & 0xff) + 24;
 
                 if (cpuid_0xf_1.edx & PQOS_CPUID_MON_L3_OCCUP_BIT) {
                         int iordt =
