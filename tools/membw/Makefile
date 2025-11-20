@@ -52,6 +52,13 @@ CFLAGS=-W -Wall -Wextra -Wstrict-prototypes -Wmissing-prototypes \
 	-Winline -msse4.2 \
 	-fcf-protection=full
 
+ifneq ($(EXTRA_CFLAGS),)
+CFLAGS += $(EXTRA_CFLAGS)
+endif
+ifneq ($(EXTRA_LDFLAGS),)
+LDFLAGS += $(EXTRA_LDFLAGS)
+endif
+
 ifeq ($(DEBUG),y)
 CFLAGS += -O0 -g -DDEBUG
 else
