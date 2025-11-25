@@ -696,13 +696,25 @@ erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
                     int socket_num)
 {
         int ret = PQOS_RETVAL_OK;
-        int cpu_idx = 0;
-        int dev_idx = 0;
+        uint32_t cpu_idx = 0;
+        uint32_t dev_idx = 0;
         int rmdd_idx = 0;
         int total_rmdds =
             socket_num * (CPU_AGENTS_PER_SOCKET + DEVICE_AGENTS_PER_SOCKET);
         void *p_acpi_rmdds = (void *)&p_acpi_erdt->erdt_sub_structures[0];
         struct acpi_table_erdt_rmdd *p_acpi_rmdd = NULL;
+        uint32_t length = 0;
+        uint32_t max_cpu_agents = 0;
+        uint32_t max_dev_agents = 0;
+
+        if (p_acpi_erdt->header.header.length <
+            sizeof(struct acpi_table_erdt_header)) {
+                printf("Invalid ACPI ERDT header length: %u\n",
+                       p_acpi_erdt->header.header.length);
+                return PQOS_RETVAL_ERROR;
+        }
+        length = p_acpi_erdt->header.header.length -
+                 sizeof(struct acpi_table_erdt_header);
 
         p_erdt_info =
             (struct pqos_erdt_info *)calloc(1, sizeof(struct pqos_erdt_info));
@@ -713,47 +725,75 @@ erdt_populate_rmdds(struct pqos_erdt_info **erdt_info,
         }
 
         p_erdt_info->max_clos = p_acpi_erdt->header.max_clos;
-        p_erdt_info->num_cpu_agents = CPU_AGENTS_PER_SOCKET * socket_num;
-        p_erdt_info->num_dev_agents = DEVICE_AGENTS_PER_SOCKET * socket_num;
+        max_cpu_agents = CPU_AGENTS_PER_SOCKET * socket_num;
+        max_dev_agents = DEVICE_AGENTS_PER_SOCKET * socket_num;
 
         p_erdt_info->cpu_agents = (struct pqos_cpu_agent_info *)calloc(
-            p_erdt_info->num_cpu_agents, sizeof(struct pqos_cpu_agent_info));
+            max_cpu_agents, sizeof(struct pqos_cpu_agent_info));
         if (p_erdt_info->cpu_agents == NULL) {
                 printf("Can't allocate memory for CPU agents\n");
+                free(p_erdt_info);
                 return PQOS_RETVAL_ERROR;
         }
 
         p_erdt_info->dev_agents = (struct pqos_device_agent_info *)calloc(
-            p_erdt_info->num_dev_agents, sizeof(struct pqos_device_agent_info));
+            max_dev_agents, sizeof(struct pqos_device_agent_info));
         if (p_erdt_info->dev_agents == NULL) {
                 printf("Can't allocate memory for Device agents\n");
+                free(p_erdt_info->cpu_agents);
+                free(p_erdt_info);
                 return PQOS_RETVAL_ERROR;
         }
 
         cpu_idx = 0;
         dev_idx = 0;
-        for (rmdd_idx = 0; rmdd_idx < total_rmdds; rmdd_idx++) {
+        for (rmdd_idx = 0; rmdd_idx < total_rmdds && length > 0; rmdd_idx++) {
 
                 p_acpi_rmdd = (struct acpi_table_erdt_rmdd *)p_acpi_rmdds;
 
                 switch (p_acpi_rmdd->flags) {
                 case RMDD_L3_DOMAIN:
+                        if (cpu_idx >= max_cpu_agents) {
+                                printf("ERDT table has more CPU Domain RMDD "
+                                       "structures than available CPU domains "
+                                       "in the machine\n");
+                                erdt_fini();
+                                return PQOS_RETVAL_ERROR;
+                        }
                         ret = erdt_populate_rmdd_cpu_agents(
                             &p_erdt_info->cpu_agents[cpu_idx],
                             (struct acpi_table_erdt_rmdd *)p_acpi_rmdds);
                         cpu_idx++;
+                        p_erdt_info->num_cpu_agents++;
                         break;
                 case RMDD_IO_L3_DOMAIN:
+                        if (dev_idx >= max_dev_agents) {
+                                printf("ERDT table has more I/O Device Domain "
+                                       "RMDD structures than available I/O "
+                                       "Device domains in the machine\n");
+                                erdt_fini();
+                                return PQOS_RETVAL_ERROR;
+                        }
                         ret = erdt_populate_rmdd_device_agents(
                             &p_erdt_info->dev_agents[dev_idx],
                             (struct acpi_table_erdt_rmdd *)p_acpi_rmdds);
                         dev_idx++;
+                        p_erdt_info->num_dev_agents++;
                         break;
                 default:
                         break;
                 }
                 if (ret != PQOS_RETVAL_OK)
                         break;
+
+                if (length < p_acpi_rmdd->length) {
+                        printf("Invalid length in ERDT table\n");
+                        erdt_fini();
+                        return PQOS_RETVAL_ERROR;
+                }
+
+                length -= p_acpi_rmdd->length;
+
                 p_acpi_rmdds = (void *)((unsigned char *)p_acpi_rmdds +
                                         p_acpi_rmdd->length);
         }
