@@ -61,6 +61,8 @@
 
 #define DEFAULT_TABLE_SIZE 128
 
+#define BUF_SIZE 256
+
 /**
  * Default configuration of allocation
  */
@@ -242,9 +244,12 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
 {
         unsigned index = 0;
         char *saveptr = NULL;
+        char tmp[BUF_SIZE] = {0};
 
         if (s == NULL || tab == NULL || max == 0)
                 return index;
+
+        snprintf(tmp, BUF_SIZE, "%s", s);
 
         for (;;) {
                 char *p = NULL;
@@ -285,13 +290,16 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                                 exit(EXIT_FAILURE);
                         }
                         for (n = start; n <= end; n++) {
+                                if (index >= max) {
+                                        printf("Maximum available value is %d\n",
+                                               (max - 1));
+                                        parse_error(
+                                            tmp, "Too many groups selected.\n");
+                                }
                                 if (!(isdup(tab, index, n))) {
                                         tab[index] = n;
                                         index++;
                                 }
-                                if (index >= max)
-                                        parse_error(
-                                            s, "Too many groups selected.\n");
                         }
                 } else {
                         /**
