@@ -270,7 +270,7 @@ monitor_csv_region_row(FILE *fp,
                                                          &rmid);
                 if (ret != -1)
                         offset += fillin_csv_column(
-                            " %.0f", (double)rmid, data + offset,
+                            ",%.0f", (double)rmid, data + offset,
                             sz_data - offset, ret == PQOS_RETVAL_OK,
                             iface == PQOS_INTER_MMIO);
         }

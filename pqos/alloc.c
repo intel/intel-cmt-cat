@@ -517,6 +517,38 @@ set_mba_cos(const unsigned class_id,
                 return -1;
         }
 
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("%s(): Failed to get interface!\n", __func__);
+                return -1;
+        }
+
+        if (interface == PQOS_INTER_MMIO) {
+                if (sel_alloc_domain_id.num_domain_ids == 0 &&
+                    mem_regions->num_mem_regions == 0) {
+                        printf("--alloc-domain-id & --alloc-mem-region options "
+                               "are missing in command line. "
+                               "Failed to set MBA configuration!\n");
+                        return -1;
+                }
+
+                if (sel_alloc_domain_id.num_domain_ids == 0) {
+                        printf("--alloc-domain-id option is missing in command "
+                               "line. Failed to set MBA configuration!\n");
+                        return -1;
+                }
+
+                if (mem_regions->num_mem_regions == 0) {
+                        printf("--alloc-mem-region option is missing in "
+                               "command line. "
+                               "Failed to set MBA configuration!\n");
+                        return -1;
+                }
+
+                count = sel_alloc_domain_id.num_domain_ids;
+        } else
+                count = sock_num;
+
         memset(&mba, 0, sizeof(struct pqos_mba));
         memset(&actual, 0, sizeof(struct pqos_mba));
         /* Initialize memory regions info with invalid values */
@@ -569,17 +601,6 @@ set_mba_cos(const unsigned class_id,
         }
         /* Copy memory regions count */
         mba.num_mem_regions = mem_regions->num_mem_regions;
-
-        ret = pqos_inter_get(&interface);
-        if (ret != PQOS_RETVAL_OK) {
-                printf("%s(): Failed to get interface!\n", __func__);
-                return -1;
-        }
-
-        if (interface == PQOS_INTER_MMIO)
-                count = sel_alloc_domain_id.num_domain_ids;
-        else
-                count = sock_num;
 
         /**
          * Set all selected classes
@@ -1011,6 +1032,28 @@ static int
 set_allocation_assoc(const struct pqos_devinfo *dev)
 {
         int i;
+        int ret = PQOS_RETVAL_OK;
+        enum pqos_interface interface;
+
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("%s(): Failed to get interface!\n", __func__);
+                return -1;
+        }
+
+        if (interface == PQOS_INTER_MMIO &&
+            (sel_assoc_core_num != 0 || sel_assoc_pid_num != 0)) {
+                printf("CAT is not supported in MMIO interface. The cos, llc, "
+                       "core and pid options are not available in MMIO "
+                       "interface.\nOnly I/O RDT CAT is supported. "
+                       "The available options are dev and channel.\n"
+                       "Possible Cache Allocation Commands in MMIO: "
+                       "\n\tpqos --iface=mmio -a \"dev:<CLOS>=<SEGMENT:"
+                       "BUS:DEVICE.FUNCTION@VIRTUAL CHANNEL NUMBERS>\""
+                       "\n\tpqos --iface=mmio -a \"channel:"
+                       "<CLOS>=<CHANNEL NUMBERS>\"\n");
+                return -1;
+        }
 
         for (i = 0; i < sel_assoc_core_num; i++) {
                 int ret;
