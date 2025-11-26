@@ -253,62 +253,76 @@ os_cpuinfo_topology(void)
 {
         struct pqos_cpuinfo *cpu = NULL;
         struct dirent **namelist = NULL;
-        int max_core_count;
         int num_cpus;
         int i;
         int retval = PQOS_RETVAL_OK;
 
-        max_core_count = sysconf(_SC_NPROCESSORS_CONF);
-        if (max_core_count < 0) {
-                LOG_ERROR("Failed to get number of processors!\n");
-                return NULL;
-        } else if (max_core_count == 0) {
-                LOG_ERROR("Zero processors in the system!\n");
+        num_cpus = scandir(SYSTEM_CPU, &namelist, filter_cpu, cpu_sort);
+
+        if (num_cpus < 0) {
+                LOG_ERROR("os_cpuinfo_topology: Failed to read %s cpus!\n",
+                          SYSTEM_CPU);
                 return NULL;
         }
 
-        if (pqos_set_no_files_limit(max_core_count)) {
+        if (num_cpus == 0) {
+                LOG_ERROR("Zero processors in the system!\n");
+                free(namelist);
+                return NULL;
+        }
+
+        if (pqos_set_no_files_limit(num_cpus)) {
                 LOG_ERROR("Open files limit not sufficient!\n");
+                for (i = 0; i < num_cpus; i++)
+                        free(namelist[i]);
+                free(namelist);
                 return NULL;
         }
 
         const size_t mem_sz =
-            sizeof(*cpu) + (max_core_count * sizeof(struct pqos_coreinfo));
+            sizeof(*cpu) + (num_cpus * sizeof(struct pqos_coreinfo));
 
         cpu = (struct pqos_cpuinfo *)malloc(mem_sz);
         if (cpu == NULL) {
                 LOG_ERROR("Couldn't allocate CPU topology structure!\n");
+                for (i = 0; i < num_cpus; i++)
+                        free(namelist[i]);
+                free(namelist);
                 return NULL;
         }
         cpu->mem_size = (unsigned)mem_sz;
         memset(cpu, 0, mem_sz);
 
-        num_cpus = scandir(SYSTEM_CPU, &namelist, filter_cpu, cpu_sort);
-        if (num_cpus <= 0 || max_core_count < num_cpus) {
-                LOG_ERROR("Failed to read proc cpus!\n");
-                free(cpu);
-                return NULL;
-        }
-
         for (i = 0; i < num_cpus; i++) {
                 unsigned lcore = atoi(namelist[i]->d_name + 3);
                 struct pqos_coreinfo *info = &cpu->cores[cpu->num_cores];
 
-                if (!os_cpuinfo_cpu_online(lcore))
+                if (!os_cpuinfo_cpu_online(lcore)) {
+                        LOG_DEBUG("Logical core %u is offline, skipping\n",
+                                  lcore);
                         continue;
+                }
 
                 retval = os_cpuinfo_cpu_socket(lcore, &info->socket);
-                if (retval != PQOS_RETVAL_OK)
+                if (retval != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to get socket for lcore %u\n", lcore);
                         break;
+                }
 
                 retval = os_cpuinfo_cpu_node(lcore, &info->numa);
-                if (retval != PQOS_RETVAL_OK)
+                if (retval != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to get NUMA node for lcore %u\n",
+                                  lcore);
                         break;
+                }
 
                 retval =
                     os_cpuinfo_cpu_cache(lcore, &info->l3_id, &info->l2_id);
-                if (retval != PQOS_RETVAL_OK)
+                if (retval != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to get cache IDs for lcore %u\n",
+                                  lcore);
                         break;
+                }
 
                 info->lcore = lcore;
 
@@ -362,25 +376,24 @@ int
 os_cpuinfo_get_socket_num(void)
 {
         struct dirent **namelist = NULL;
-        int max_core_count;
         int num_cpus;
         unsigned num_sockets = 0;
         unsigned *sockets;
         int i;
         int retval = PQOS_RETVAL_OK;
 
-        max_core_count = sysconf(_SC_NPROCESSORS_CONF);
-        if (max_core_count < 0) {
-                LOG_ERROR("Failed to get number of processors!\n");
-                return -1;
-        } else if (max_core_count == 0) {
-                LOG_ERROR("Zero processors in the system!\n");
+        num_cpus = scandir(SYSTEM_CPU, &namelist, filter_cpu, cpu_sort);
+
+        if (num_cpus < 0) {
+                LOG_ERROR("os_cpuinfo_get_socket_num: Failed to read %s "
+                          "cpus!\n",
+                          SYSTEM_CPU);
                 return -1;
         }
 
-        num_cpus = scandir(SYSTEM_CPU, &namelist, filter_cpu, cpu_sort);
-        if (num_cpus <= 0 || max_core_count < num_cpus) {
-                LOG_ERROR("Failed to read proc cpus!\n");
+        if (num_cpus == 0) {
+                LOG_ERROR("Zero processors in the system!\n");
+                free(namelist);
                 return -1;
         }
 
