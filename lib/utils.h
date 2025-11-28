@@ -127,6 +127,22 @@ get_cpu_agent_by_domain(uint16_t domain_id);
 PQOS_LOCAL const struct pqos_device_agent_info *
 get_dev_agent_by_domain(uint16_t domain_id);
 
+/**
+ * @brief Retrives Domain ID of given PCI device
+ *
+ * @param [in] devinfo Device information structure
+ * @param [in] segment PCI device's segment
+ * @param [in] bdf PCI devices's bus,device and function information
+ * @param [out] domain_id domain id of given PCI device
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int pqos_devinfo_get_domain_id(const struct pqos_devinfo *devinfo,
+                                          const uint16_t segment,
+                                          const uint16_t bdf,
+                                          uint16_t *domain_id);
+
 #ifdef __cplusplus
 }
 #endif

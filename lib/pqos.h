@@ -110,6 +110,11 @@ extern "C" {
 /* Page size */
 #define PAGE_SIZE 4096
 
+/* Buffer sizes */
+#define BUF_SIZE_64  64
+#define BUF_SIZE_128 128
+#define BUF_SIZE_256 256
+
 /*
  * =======================================
  * Interface values
@@ -459,6 +464,8 @@ struct pqos_channel {
         pqos_channel_t channel_id; /**< Channel ID */
         int rmid_tagging;          /**< RMID tagging is supported */
         int clos_tagging;          /**< CLOS tagging is supported */
+        uint64_t mmio_addr;        /**< MMIO physical address */
+        unsigned numa;             /**< numa id in the system */
 };
 
 /**
@@ -818,6 +825,21 @@ struct pqos_mmio_dump_rmids {
                                                     means hexadecimal */
         unsigned int upscale;                    /**< Upscale raw value.
                                                     Default: 0 */
+};
+
+struct pqos_pci_info {
+        unsigned int revision;
+        int numa;
+        int is_pcie;
+        char vendor_name[BUF_SIZE_256];
+        char device_name[BUF_SIZE_256];
+        char subclass_name[BUF_SIZE_256];
+        char kernel_driver[BUF_SIZE_128];
+        char pcie_type[BUF_SIZE_64];
+        unsigned int num_channels;
+        pqos_channel_t channels[PQOS_DEV_MAX_CHANNELS];
+        uint64_t mmio_addr[PQOS_DEV_MAX_CHANNELS];
+        uint16_t domain_id;
 };
 
 /**
@@ -2239,6 +2261,20 @@ int pqos_dump(const struct pqos_mmio_dump *dump_cfg);
  *  @retval PQOS_RETVAL_OK success
  **/
 int pqos_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg);
+
+/**
+ * @brief Get I/O devices' PCI information
+ *
+ * @param [out] pci_info pqos_pci_info structure instance
+ * @param [in] segment PCI segment
+ * @param [in] bdf Bus Device Function
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_io_devs_get(struct pqos_pci_info *pci_info,
+                     uint16_t segment,
+                     uint16_t bdf);
 
 #ifdef __cplusplus
 }

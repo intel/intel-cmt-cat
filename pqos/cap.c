@@ -62,6 +62,9 @@
 #define MBA_MINIMUM_CONTROL_WINDOW 2
 #define MBA_MAXIMUM_CONTROL_WINDOW 4
 
+#define MSR_STR  "msr"
+#define MMIO_STR "mmio"
+
 /**
  * @brief Print line with indentation
  *
@@ -986,4 +989,187 @@ cap_print_topology(const struct pqos_sysconfig *sys)
 
         if (sys->erdt)
                 cap_print_erdt_info_topology(sys->erdt);
+}
+
+void
+cap_print_io_devs(const struct pqos_sysconfig *sys)
+{
+        int ret;
+        uint32_t i;
+        uint16_t j;
+        enum pqos_interface interface;
+        struct pqos_pci_info pci_info;
+        struct pqos_devinfo *dev = NULL;
+        const char *interface_str = NULL;
+        const struct pqos_capability *cap_l3ca = NULL;
+
+        if (!sys || !sys->dev) {
+                printf("IRDT info not available!\n");
+                return;
+        }
+
+        ret = pqos_inter_get(&interface);
+        if (ret != PQOS_RETVAL_OK) {
+                printf("unable to get interface\n");
+                return;
+        }
+
+        if (interface == PQOS_INTER_MSR)
+                interface_str = MSR_STR;
+        else if (interface == PQOS_INTER_MMIO) {
+                if (!sys->erdt) {
+                        printf("ERDT info not available!\n");
+                        return;
+                }
+                interface_str = MMIO_STR;
+	} else {
+                printf("--print-io-devs command is supported in msr and mmio "
+                       "interfaces only\n");
+                return;
+        }
+
+        for (i = 0; sys->cap && (i < sys->cap->num_cap); i++)
+                switch (sys->cap->capabilities[i].type) {
+                case PQOS_CAP_TYPE_L3CA:
+                        cap_l3ca = &(sys->cap->capabilities[i]);
+                        break;
+                default:
+                        break;
+                }
+
+        printf("Enable I/O RDT            : pqos --iface=%s l3iordt-on\n",
+               interface_str);
+        printf("Disable I/O RDT           : pqos --iface=%s l3iordt-off\n",
+               interface_str);
+        printf("Reset I/O RDT Allocation  : pqos --iface=%s --alloc-reset or "
+               "pqos --iface=%s -R\n",
+               interface_str, interface_str);
+        printf("Reset I/O RDT Monitoring  : pqos --iface=%s --mon-reset or "
+               "pqos --iface=%s -r -d\n",
+               interface_str, interface_str);
+
+        dev = sys->dev;
+        for (i = 0; i < dev->num_devs; i++) {
+                printf("\n%.4x:%.2x:%.2x.%x: ", dev->devs[i].segment,
+                       BDF_BUS(dev->devs[i].bdf), BDF_DEV(dev->devs[i].bdf),
+                       BDF_FUNC(dev->devs[i].bdf));
+
+                ret = pqos_io_devs_get(&pci_info, dev->devs[i].segment,
+                                       dev->devs[i].bdf);
+                if (ret != PQOS_RETVAL_OK)
+                        printf("Unable to get I/O device %.4x:%.2x:%.2x.%x PCI "
+                               "information\n",
+                               dev->devs[i].segment, BDF_BUS(dev->devs[i].bdf),
+                               BDF_DEV(dev->devs[i].bdf),
+                               BDF_FUNC(dev->devs[i].bdf));
+
+                printf("%s: %s %s",
+                       pci_info.subclass_name[0] ? pci_info.subclass_name
+                                                 : "PCI device",
+                       pci_info.vendor_name[0] ? pci_info.vendor_name : "",
+                       pci_info.device_name[0] ? pci_info.device_name : "");
+
+                if (pci_info.revision != 0)
+                        printf(" (rev %02x)", pci_info.revision);
+                printf("\n");
+
+                if (pci_info.is_pcie)
+                        printf("\tPCIe                 : %s\n", pci_info.pcie_type);
+                else
+                        printf("\tConventional PCI\n");
+                if (pci_info.numa >= 0)
+                        printf("\tNUMA                 : %d\n", pci_info.numa);
+                if (pci_info.kernel_driver[0])
+                        printf("\tKernel driver in use : %s\n",
+                               pci_info.kernel_driver);
+
+                if (interface == PQOS_INTER_MMIO)
+                        printf("\tDomain ID            : 0x%x\n", pci_info.domain_id);
+
+                printf("\tAssociated Channels  : ");
+                for (j = 0; j < pci_info.num_channels; j++)
+                        if (pci_info.channels[j] > 0)
+                                printf("0x%lx         ", pci_info.channels[j]);
+                printf("\n");
+
+                printf("\tMMIO Addresses       : ");
+                for (j = 0; j < pci_info.num_channels; j++)
+                        printf("0x%lx       ", pci_info.mmio_addr[j]);
+                printf("\n");
+
+                printf("\tMonitoring Commands:\n");
+                for (j = 0; j < PQOS_DEV_MAX_CHANNELS; j++) {
+                        if (dev->devs[i].channel[j] > 0) {
+                                printf("\t\tpqos --iface=%s --mon-dev=all:"
+                                       "%.4x:%.2x:%.2x.%x@%d\n",
+                                       interface_str, dev->devs[i].segment,
+                                       BDF_BUS(dev->devs[i].bdf),
+                                       BDF_DEV(dev->devs[i].bdf),
+                                       BDF_FUNC(dev->devs[i].bdf), j);
+                                printf("\t\tpqos --iface=%s --mon-channel="
+                                       "all:0x%lx\n",
+                                       interface_str, dev->devs[i].channel[j]);
+                        }
+
+                        if (dev->devs[i].channel[j + 1] > 0 &&
+                            ((j + 1) < PQOS_DEV_MAX_CHANNELS))
+                                printf("\n");
+                }
+
+                if (interface == PQOS_INTER_MSR && cap_l3ca != NULL)
+                        printf("\n\tAvailable CLOS: 0 to %d\n",
+                               cap_l3ca->u.l3ca->num_classes - 1);
+                else if (interface == PQOS_INTER_MMIO)
+                        printf("\n\tAvailable CLOS: 0 to %d\n",
+                               sys->erdt->max_clos - 1);
+
+                printf("\tAllocation Commands:\n");
+                for (j = 0; j < pci_info.num_channels; j++) {
+                        if (pci_info.channels[j] > 0) {
+                                printf("\t\tpqos --iface=%s -a channel:<CLOS>="
+                                       "%.4x:%.2x:%.2x.%x@%d\n",
+                                       interface_str, dev->devs[i].segment,
+                                       BDF_BUS(dev->devs[i].bdf),
+                                       BDF_DEV(dev->devs[i].bdf),
+                                       BDF_FUNC(dev->devs[i].bdf), j);
+                                printf("\t\tpqos --iface=%s -a channel:<CLOS>="
+                                       "0x%lx\n",
+                                       interface_str, pci_info.channels[j]);
+                        }
+
+                        if (pci_info.channels[j + 1] > 0 &&
+                            ((j + 1) < PQOS_DEV_MAX_CHANNELS))
+                                printf("\n");
+                }
+                printf("\n\tAfter/Before allocation commands, assign required "
+                       "Cache Ways to CLOS\n");
+                if (interface == PQOS_INTER_MSR && cap_l3ca != NULL)
+                        printf("\tAvailable Cache Ways: %d\n",
+                               cap_l3ca->u.l3ca->num_ways);
+                if (interface == PQOS_INTER_MSR) {
+                        printf("\tFor example, set COS 14 to the first 4 "
+                               "L3 cache ways and COS 10 to the next 8 "
+                               "L3 cache ways\n");
+                        printf("\tpqos --iface=%s -e \"llc:14=0x000f;"
+                               "llc:10=0x0ff0;\"\n",
+                               interface_str);
+                } else if (interface == PQOS_INTER_MMIO) {
+                        for (j = 0; j < sys->erdt->num_dev_agents; j++) {
+                                if (pci_info.domain_id ==
+                                    sys->erdt->dev_agents[j].rmdd.domain_id)
+                                        printf("\tAvailable Cache Ways: %d\n",
+                                               sys->erdt->dev_agents[j]
+                                                   .rmdd.num_io_l3_ways);
+                        }
+
+                        printf("\tFor example, set COS 14 to the first 4 "
+                               "L3 cache ways and COS 10 to the next 8 "
+                               "L3 cache ways in Device Domain 0x%x\n",
+                               pci_info.domain_id);
+                        printf("\tpqos --iface=%s --alloc-domain-id=0x%x -e "
+                               "\"llc:14=0x000f;llc:10=0x0ff0;\"\n",
+                               interface_str, pci_info.domain_id);
+                }
+        }
+        printf("\n");
 }

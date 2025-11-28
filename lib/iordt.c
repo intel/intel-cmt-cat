@@ -88,6 +88,34 @@ static struct pqos_devinfo *m_devinfo = NULL;
 static struct iordt_mmioinfo *m_mmioinfo = NULL;
 
 /**
+ * @brief Get MMIO information for the channel
+ *
+ * @param mmioinfo MMIO information
+ * @param channel_id channel id
+ *
+ * @return MMIO information structure
+ * @retval NULL on error
+ */
+static const struct iordt_mmio *
+get_mmio(const struct iordt_mmioinfo *mmioinfo, pqos_channel_t channel_id)
+{
+        pqos_channel_t id = PQOS_IRDT_CHAN_MMIO(channel_id);
+        unsigned i;
+
+        if (mmioinfo == NULL)
+                return NULL;
+
+        for (i = 0; i < mmioinfo->num_mmio; ++i) {
+                const struct iordt_mmio *mmio = &mmioinfo->mmio[i];
+
+                if (mmio->id == id)
+                        return mmio;
+        }
+
+        return NULL;
+}
+
+/**
  * @brief Check if I/O RDT is supported
  *
  * @param [in] platform QoS capabilities structure
@@ -250,6 +278,7 @@ iordt_populate_chans(struct pqos_devinfo *devinfo,
                      struct acpi_table_irdt_rmud *rmud,
                      size_t rmud_idx)
 {
+        const struct iordt_mmio *mmio = NULL;
         size_t devs_num = 0;
         struct acpi_table_irdt_device **devs;
         size_t dev_idx, chan_idx;
@@ -289,6 +318,16 @@ iordt_populate_chans(struct pqos_devinfo *devinfo,
                         pqos_chan->channel_id = PQOS_IRDT_CHAN_ID(
                             rmud_idx, devs[dev_idx]->rcs.rcs_enumeration_id,
                             chan_idx);
+                        mmio = get_mmio(m_mmioinfo, pqos_chan->channel_id);
+                        if (mmio == NULL) {
+                                LOG_WARN("Unable to get MMIO information for "
+                                         "the channel 0x%lx\n",
+                                         pqos_chan->channel_id);
+                                free(devs);
+                                return PQOS_RETVAL_ERROR;
+                        }
+                        pqos_chan->mmio_addr = mmio->addr;
+                        pqos_chan->numa = mmio->numa;
                 }
         }
 
@@ -463,17 +502,17 @@ iordt_init(const struct pqos_cap *cap, struct pqos_devinfo **devinfo)
         }
 
         for (rmud_idx = 0; rmud_idx < rmuds_num; rmud_idx++) {
+                ret =
+                    iordt_populate_mmio(m_mmioinfo, rmuds[rmud_idx], rmud_idx);
+                if (ret != PQOS_RETVAL_OK)
+                        break;
+
                 ret = iordt_populate_devs(m_devinfo, rmuds[rmud_idx], rmud_idx);
                 if (ret != PQOS_RETVAL_OK)
                         break;
 
                 ret =
                     iordt_populate_chans(m_devinfo, rmuds[rmud_idx], rmud_idx);
-                if (ret != PQOS_RETVAL_OK)
-                        break;
-
-                ret =
-                    iordt_populate_mmio(m_mmioinfo, rmuds[rmud_idx], rmud_idx);
                 if (ret != PQOS_RETVAL_OK)
                         break;
         }
@@ -521,34 +560,6 @@ iordt_fini(void)
         }
 
         return PQOS_RETVAL_OK;
-}
-
-/**
- * @brief Get MMIO information for the channel
- *
- * @param mmioinfo MMIO information
- * @param channel_id channel id
- *
- * @return MMIO information structure
- * @retval NULL on error
- */
-static const struct iordt_mmio *
-get_mmio(const struct iordt_mmioinfo *mmioinfo, pqos_channel_t channel_id)
-{
-        pqos_channel_t id = PQOS_IRDT_CHAN_MMIO(channel_id);
-        unsigned i;
-
-        if (mmioinfo == NULL)
-                return NULL;
-
-        for (i = 0; i < mmioinfo->num_mmio; ++i) {
-                const struct iordt_mmio *mmio = &mmioinfo->mmio[i];
-
-                if (mmio->id == id)
-                        return mmio;
-        }
-
-        return NULL;
 }
 
 int

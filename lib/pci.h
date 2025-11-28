@@ -87,6 +87,46 @@ int pci_fini(void);
 struct pci_dev *pci_dev_get(uint16_t domain, uint16_t bdf);
 
 /**
+ * @brief Get I/O devices' PCI information
+ *
+ * @param [out] pci_info pqos_pci_info structure instance
+ * @param [in] segment PCI segment
+ * @param [in] bdf Bus Device Function
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int
+io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf);
+
+/**
+ * @brief Get I/O devices' PCI information by msr interface
+ *
+ * @param [out] pci_info pqos_pci_info structure instance
+ * @param [in] segment PCI segment
+ * @param [in] bdf Bus Device Function
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int
+hw_io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf);
+
+/**
+ * @brief Get I/O devices' PCI information by mmio interface
+ *
+ * @param [out] pci_info pqos_pci_info structure instance
+ * @param [in] segment PCI segment
+ * @param [in] bdf Bus Device Function
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int mmio_io_devs_get(struct pqos_pci_info *pci_info,
+                                uint16_t segment,
+                                uint16_t bdf);
+
+/**
  * @brief Deallocate memory used for PCI device
  *
  * @param [in] dev PCI device allocated by \a pci_dev_get

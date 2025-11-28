@@ -46,6 +46,7 @@
 #include "monitoring.h"
 #include "os_allocation.h"
 #include "os_monitoring.h"
+#include "pci.h"
 #include "pqos_internal.h"
 #include "utils.h"
 
@@ -183,6 +184,11 @@ static struct pqos_api {
 
         /** Dump RMIDS */
         int (*dump_rmids)(const struct pqos_mmio_dump_rmids *dump_cfg);
+
+        /** Get I/O devices' PCI information */
+        int (*io_devs_get)(struct pqos_pci_info *pci_info,
+                           uint16_t segment,
+                           uint16_t bdf);
 } api;
 
 /*
@@ -231,6 +237,7 @@ api_init(int interface, enum pqos_vendor vendor)
                         api.mba_get = hw_mba_get;
                         api.mba_set = hw_mba_set;
                 }
+                api.io_devs_get = hw_io_devs_get;
 #ifdef __linux__
         } else if (interface == PQOS_INTER_OS ||
                    interface == PQOS_INTER_OS_RESCTRL_MON) {
@@ -283,6 +290,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.mon_reset = mmio_mon_reset;
                 api.dump = mmio_dump;
                 api.dump_rmids = mmio_dump_rmids;
+                api.io_devs_get = mmio_io_devs_get;
         }
 
         return PQOS_RETVAL_OK;
@@ -1642,4 +1650,13 @@ pqos_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg)
                 return PQOS_RETVAL_PARAM;
 
         return API_CALL(dump_rmids, dump_cfg);
+}
+
+int
+pqos_io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
+{
+        if (pci_info == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        return API_CALL(io_devs_get, pci_info, segment, bdf);
 }

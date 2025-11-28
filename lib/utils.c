@@ -1009,3 +1009,31 @@ get_dev_agent_by_domain(uint16_t domain_id)
 
         return NULL;
 }
+
+int
+pqos_devinfo_get_domain_id(const struct pqos_devinfo *devinfo,
+                           const uint16_t segment,
+                           const uint16_t bdf,
+                           uint16_t *domain_id)
+{
+        unsigned int idx = 0;
+        pqos_channel_t channel = 0;
+        const struct pqos_channels_domains *channels_domains =
+            _pqos_get_channels_domains();
+
+        if (!channels_domains || !devinfo || !devinfo->devs || !domain_id)
+                return PQOS_RETVAL_PARAM;
+
+        channel = pqos_devinfo_get_channel_id(devinfo, segment, bdf, 0);
+
+        for (idx = 0; idx < channels_domains->num_channel_ids; idx++)
+                if (channel == channels_domains->channel_ids[idx]) {
+                        *domain_id = channels_domains->domain_ids[idx];
+
+                        /* Channel ID is available in IRDT & ERDT */
+                        return PQOS_RETVAL_OK;
+                }
+
+        /* Channel ID is available in IRDT. But not in ERDT */
+        return PQOS_RETVAL_UNAVAILABLE;
+}
