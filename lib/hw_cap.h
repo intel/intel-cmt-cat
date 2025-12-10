@@ -57,7 +57,7 @@ PQOS_LOCAL int hw_cap_mon_iordt(const struct pqos_cpuinfo *cpu, int *enabled);
 /**
  * @brief Detects if the platform has hybrid architecture
  *
- * Runs CPUID instruction and return bit shows the platorm
+ * Runs CPUID instruction and return bit shows the platform
  * hybrid status. For example whether the platform has both
  * P-cores and E-cores on board.
  *

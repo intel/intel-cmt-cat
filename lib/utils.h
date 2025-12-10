@@ -128,7 +128,7 @@ PQOS_LOCAL const struct pqos_device_agent_info *
 get_dev_agent_by_domain(uint16_t domain_id);
 
 /**
- * @brief Retrives Domain ID of given PCI device
+ * @brief Retrieves Domain ID of given PCI device
  *
  * @param [in] devinfo Device information structure
  * @param [in] segment PCI device's segment
