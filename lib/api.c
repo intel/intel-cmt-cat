@@ -1561,17 +1561,9 @@ pqos_mon_get_region_value(const struct pqos_mon_data *const group,
                 _value = group->values.llc;
                 _delta = 0;
                 break;
-        case PQOS_MON_EVENT_LMEM_BW:
-                _value = group->region_values.mbm_local[region_num];
-                _delta = group->region_values.mbm_local_delta[region_num];
-                break;
         case PQOS_MON_EVENT_TMEM_BW:
-                _value = group->values.mbm_total;
-                _delta = group->values.mbm_total_delta;
-                break;
-        case PQOS_MON_EVENT_RMEM_BW:
-                _value = group->values.mbm_remote;
-                _delta = group->values.mbm_remote_delta;
+                _value = group->region_values.mbm_total[region_num];
+                _delta = group->region_values.mbm_total_delta[region_num];
                 break;
         case PQOS_MON_EVENT_IO_L3_OCCUP:
                 if (delta != NULL)
@@ -1587,6 +1579,10 @@ pqos_mon_get_region_value(const struct pqos_mon_data *const group,
         case PQOS_MON_EVENT_IO_MISS_MEM_BW:
                 _value = group->region_values.io_miss;
                 _delta = group->region_values.io_miss_delta;
+                break;
+        case PQOS_PERF_EVENT_LLC_MISS:
+                _value = group->values.llc_misses;
+                _delta = group->values.llc_misses_delta;
                 break;
         default:
                 LOG_ERROR("Unknown event %x\n", event_id);

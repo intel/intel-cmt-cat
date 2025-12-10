@@ -80,7 +80,7 @@ monitor_text_region_header(FILE *fp,
                            const int *region_num)
 {
         for (int idx = 0; idx < num_mem_regions; idx++)
-                fprintf(fp, "    MBL-r%d[MB/s]", region_num[idx]);
+                fprintf(fp, "    MBT-r%d[MB/s]", region_num[idx]);
 }
 
 void
@@ -147,7 +147,13 @@ monitor_text_header(FILE *fp,
         if (events & PQOS_MON_EVENT_IO_MISS_MEM_BW)
                 fprintf(fp, "    I/O-MISS");
 
-        if (events & PQOS_MON_EVENT_LMEM_BW) {
+        if (events & PQOS_MON_EVENT_LMEM_BW)
+                fprintf(fp, "   MBL[MB/s]");
+
+        if (events & PQOS_MON_EVENT_RMEM_BW)
+                fprintf(fp, "   MBR[MB/s]");
+
+        if (events & PQOS_MON_EVENT_TMEM_BW) {
                 enum pqos_interface iface;
                 int ret = PQOS_RETVAL_OK;
 
@@ -161,13 +167,8 @@ monitor_text_header(FILE *fp,
                         monitor_text_region_header(fp, num_mem_regions,
                                                    region_num);
                 else
-                        fprintf(fp, "   MBL[MB/s]");
+                        fprintf(fp, "   MBT[MB/s]");
         }
-
-        if (events & PQOS_MON_EVENT_RMEM_BW)
-                fprintf(fp, "   MBR[MB/s]");
-        if (events & PQOS_MON_EVENT_TMEM_BW)
-                fprintf(fp, "   MBT[MB/s]");
 
         if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
                 fprintf(fp, " %11s", "MISS_READ");
@@ -327,7 +328,7 @@ monitor_text_region_row(FILE *fp,
 #endif
 
         for (i = 0; i < DIM(output); i++) {
-                if (output[i].event == PQOS_MON_EVENT_LMEM_BW) {
+                if (output[i].event == PQOS_MON_EVENT_TMEM_BW) {
                         for (j = 0; j < mon_data->regions.num_mem_regions;
                              j++) {
 

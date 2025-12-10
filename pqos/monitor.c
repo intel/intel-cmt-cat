@@ -1327,7 +1327,7 @@ monitor_setup_events(enum mon_group_type type,
                                   PQOS_MON_EVENT_IO_MISS_MEM_BW;
                 else if (interface == PQOS_INTER_MMIO)
                         *events =
-                            PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                            PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_TMEM_BW |
                             PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_IPC;
                 else
                         *events = (enum pqos_mon_event)(all_evts & *events);

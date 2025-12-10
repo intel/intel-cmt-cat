@@ -909,8 +909,8 @@ struct pqos_event_values {
  * The structure to store region aware monitoring data for all of the events
  */
 struct pqos_region_aware_event_values {
-        uint64_t mbm_local[PQOS_MAX_MEM_REGIONS];
-        uint64_t mbm_local_delta[PQOS_MAX_MEM_REGIONS];
+        uint64_t mbm_total[PQOS_MAX_MEM_REGIONS];
+        uint64_t mbm_total_delta[PQOS_MAX_MEM_REGIONS];
         uint64_t io_llc;
         uint64_t io_total;
         uint64_t io_total_delta;

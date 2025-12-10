@@ -565,8 +565,7 @@ mmio_mon_start_counter(struct pqos_mon_data *group,
         unsigned i;
         int ret = PQOS_RETVAL_OK;
         enum pqos_mon_event ctx_event = (enum pqos_mon_event)(
-            event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                     PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW));
+            event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_TMEM_BW));
         pqos_rmid_t rmid_min = 1;
 
         ctxs = calloc(num_cores, sizeof(*ctxs));
@@ -695,9 +694,6 @@ mmio_mon_start_cores(const unsigned num_cores,
 
         req_events = event;
 
-        if (req_events & PQOS_MON_EVENT_RMEM_BW)
-                req_events |= (enum pqos_mon_event)(PQOS_MON_EVENT_LMEM_BW |
-                                                    PQOS_MON_EVENT_TMEM_BW);
         if (req_events & PQOS_PERF_EVENT_IPC)
                 req_events |= (enum pqos_mon_event)(
                     PQOS_PERF_EVENT_CYCLES | PQOS_PERF_EVENT_INSTRUCTIONS);
@@ -766,15 +762,6 @@ mmio_mon_start_cores(const unsigned num_cores,
 
         started_evts |= group->intl->perf.event;
         started_evts |= group->intl->hw.event;
-
-        /**
-         * All events required by RMEM has been started
-         */
-        if ((started_evts & PQOS_MON_EVENT_LMEM_BW) &&
-            (started_evts & PQOS_MON_EVENT_TMEM_BW)) {
-                group->values.mbm_remote = 0;
-                started_evts |= (enum pqos_mon_event)PQOS_MON_EVENT_RMEM_BW;
-        }
 
         /**
          * All events required by IPC has been started
@@ -1089,7 +1076,6 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(event == PQOS_MON_EVENT_L3_OCCUP ||
-               event == PQOS_MON_EVENT_LMEM_BW ||
                event == PQOS_MON_EVENT_TMEM_BW ||
                event == PQOS_MON_EVENT_IO_L3_OCCUP ||
                event == PQOS_MON_EVENT_IO_TOTAL_MEM_BW ||
@@ -1123,7 +1109,7 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                             cmrc, l3_cmt_rmid_to_uint64(tmp_rmid_val));
                 };
                 break;
-        case PQOS_MON_EVENT_LMEM_BW:
+        case PQOS_MON_EVENT_TMEM_BW:
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
                         const unsigned lcore = group->intl->hw.ctx[i].lcore;
                         const pqos_rmid_t rmid = group->intl->hw.ctx[i].rmid;
@@ -1161,9 +1147,9 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                 };
 
                 for (j = 0; j < group->regions.num_mem_regions; j++) {
-                        region_values->mbm_local_delta[j] =
-                            values[j] - region_values->mbm_local[j];
-                        region_values->mbm_local[j] = values[j];
+                        region_values->mbm_total_delta[j] =
+                            values[j] - region_values->mbm_total[j];
+                        region_values->mbm_total[j] = values[j];
                 };
 
                 break;
@@ -1324,7 +1310,6 @@ mmio_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
 
         switch (event) {
         case PQOS_MON_EVENT_L3_OCCUP:
-        case PQOS_MON_EVENT_LMEM_BW:
         case PQOS_MON_EVENT_TMEM_BW:
         case PQOS_MON_EVENT_IO_L3_OCCUP:
         case PQOS_MON_EVENT_IO_TOTAL_MEM_BW:

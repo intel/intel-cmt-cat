@@ -212,9 +212,7 @@ monitor_utils_get_region_value(const struct pqos_mon_data *const group,
                         }
                 }
                 break;
-        case PQOS_MON_EVENT_LMEM_BW:
         case PQOS_MON_EVENT_TMEM_BW:
-        case PQOS_MON_EVENT_RMEM_BW:
         case PQOS_MON_EVENT_IO_TOTAL_MEM_BW:
         case PQOS_MON_EVENT_IO_MISS_MEM_BW:
                 ret = pqos_mon_get_region_value(group, event, region_num, NULL,

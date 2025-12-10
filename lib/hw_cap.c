@@ -379,7 +379,6 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon,
                 num_events++; /**< total memory bandwidth event */
 
         if (interface == PQOS_INTER_MMIO) {
-                num_events++; /**< local memory bandwidth event */
                 num_events++; /**< IO LLC memory bandwidth event */
                 num_events++; /**< IO TOTAL memory bandwidth event */
                 num_events++; /**< IO MISS memory bandwidth event */
@@ -481,9 +480,6 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon,
                         int iordt =
                             cpuid_0xf_1.eax & PQOS_CPUID_MON_IO_MEM_BW ? 1 : 0;
 
-                        add_monitoring_event(mon, 1, PQOS_MON_EVENT_LMEM_BW,
-                                             max_rmid, scale_factor,
-                                             counter_length, num_events, iordt);
                         add_monitoring_event(mon, 1, PQOS_MON_EVENT_IO_L3_OCCUP,
                                              max_rmid, scale_factor,
                                              counter_length, num_events, iordt);
