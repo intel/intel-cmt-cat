@@ -199,7 +199,6 @@ doxy:
 
 clean:
 	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
-	$(MAKE) -C python clean
 
 clobber:
 	-rm -f $(CLEAN_OBJS) $(LIB)* $(DEPFILES)
@@ -228,14 +227,13 @@ clang-format:
 CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . --skip python -q 2 -L clos,mmapped,uint
+	$(CODESPELL) . -q 2 -L clos,mmapped,uint
 
 .PHONY: style
 style:
 	$(MAKE) checkpatch
 	$(MAKE) clang-format
 	$(MAKE) codespell
-	$(MAKE) -C python style
 
 CPPCHECK?=cppcheck
 .PHONY: cppcheck
