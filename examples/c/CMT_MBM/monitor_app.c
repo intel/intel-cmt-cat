@@ -101,7 +101,8 @@ static void stop_monitoring(void);
  *
  * @param [in] signo signal number
  */
-static void __attribute__((noreturn)) monitoring_ctrlc(int signo)
+static void __attribute__((noreturn))
+monitoring_ctrlc(int signo)
 {
         printf("\nExiting[%d]...\n", signo);
         stop_monitoring();

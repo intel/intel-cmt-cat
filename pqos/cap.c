@@ -1022,7 +1022,7 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
                         return;
                 }
                 interface_str = MMIO_STR;
-	} else {
+        } else {
                 printf("--print-io-devs command is supported in msr and mmio "
                        "interfaces only\n");
                 return;
@@ -1074,7 +1074,8 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
                 printf("\n");
 
                 if (pci_info.is_pcie)
-                        printf("\tPCIe                 : %s\n", pci_info.pcie_type);
+                        printf("\tPCIe                 : %s\n",
+                               pci_info.pcie_type);
                 else
                         printf("\tConventional PCI\n");
                 if (pci_info.numa >= 0)
@@ -1084,7 +1085,8 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
                                pci_info.kernel_driver);
 
                 if (interface == PQOS_INTER_MMIO)
-                        printf("\tDomain ID            : 0x%x\n", pci_info.domain_id);
+                        printf("\tDomain ID            : 0x%x\n",
+                               pci_info.domain_id);
 
                 printf("\tAssociated Channels  : ");
                 for (j = 0; j < pci_info.num_channels; j++)
