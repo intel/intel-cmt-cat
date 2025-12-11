@@ -73,14 +73,6 @@ Includes software library files providing API's for
 technology detection, monitoring and allocation.
 Please refer to the library README for more details (lib/README).
 
-**“lib/perl” directory:** \
-Includes PQoS library Perl wrapper.
-Please refer to the interface README for more details (lib/perl/README).
-
-**“lib/python” directory:** \
-Includes PQoS library Python 3.x wrapper.
-Please refer to the interface README for more details (lib/python/README.md).
-
 **"pqos" directory:** \
 Includes source files for a utility that provides command line access to
 Intel(R) RDT. The utility links against the library and programs

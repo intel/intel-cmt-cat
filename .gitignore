@@ -24,22 +24,6 @@ examples/c/PSEUDO_LOCK/pseudo_lock
 
 tools/membw/membw
 
-lib/python/.coverage
-lib/python/test_env
-lib/python/venv_*
-lib/python/dist
-lib/python/pqos.egg-info
-lib/python/build
-
-lib/perl/Makefile
-lib/perl/Makefile.old
-lib/perl/pqos.bs
-lib/perl/pqos_wrap.c
-lib/perl/blib
-lib/perl/MYMETA.json
-lib/perl/MYMETA.yml
-lib/perl/pm_to_blib
-
 bat/test_env
 
 venv
@@ -47,13 +31,3 @@ venv
 unit-test/lib/obj
 unit-test/lib/bin
 unit-test/pqos/bin
-
-lib/perl/Makefile.old
-lib/perl/MYMETA.json
-lib/perl/MYMETA.yml
-lib/perl/Makefile
-lib/perl/blib
-lib/perl/pm_to_blib
-lib/perl/pqos.bs
-lib/perl/pqos_wrap.c
-

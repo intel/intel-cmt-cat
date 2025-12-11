@@ -60,7 +60,6 @@ all:
 	$(MAKE) -C examples/c/PSEUDO_LOCK
 
 setup-dev:
-	$(MAKE) -C lib/python setup-dev
 	$(MAKE) -C tests setup-dev
 
 clean:

@@ -14,8 +14,6 @@ script:
     - make style CHECKPATCH=/tmp/checkpatch.pl
     - make
     - sudo make install
-    - LD_LIBRARY_PATH=`pwd`/lib make -C lib/python test
-    - cd lib/perl && perl Makefile.PL && make && sudo make install
 language: c
 compiler:
     - gcc
