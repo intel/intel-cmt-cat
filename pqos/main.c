@@ -171,6 +171,11 @@ static int sel_dump_rmid_regs = 0;
  */
 static int sel_print_io_devs = 0;
 
+/**
+ * Enable displaying specific I/O device
+ */
+static int sel_print_io_dev = 0;
+
 static uint64_t strtouint64_base(const char *s, int default_base);
 
 /**
@@ -873,6 +878,39 @@ selfn_print_io_devs(const char *arg)
 }
 
 /**
+ * @brief Selects displaying specific I/O device
+ *
+ * @param arg PCI Device's Segment and BDF information
+ */
+static void
+selfn_print_io_dev(const char *arg)
+{
+        char *cp = NULL, *str = NULL;
+        char *saveptr = NULL;
+
+        if (arg == NULL)
+                parse_error(arg, "NULL pointer!");
+
+        if (*arg == '\0')
+                parse_error(arg, "Empty string!");
+
+        selfn_strdup(&cp, arg);
+
+        for (str = cp;; str = NULL) {
+                char *token = NULL;
+
+                token = strtok_r(str, ";", &saveptr);
+                if (token == NULL)
+                        break;
+
+                parse_io_dev(token);
+        }
+
+        sel_print_io_dev = 1;
+        free(cp);
+}
+
+/**
  * @brief Opens configuration file and parses its contents
  *
  * @param fname Name of the file with configuration parameters
@@ -1219,6 +1257,7 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_DUMP_RMID_BINARY      1032
 #define OPTION_DUMP_RMID_UPSCALING   1033
 #define OPTION_PRINT_IO_DEVS         1034
+#define OPTION_PRINT_IO_DEV          1035
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -1285,6 +1324,7 @@ static struct option long_cmd_opts[] = {
     {"dump-rmid-binary",      no_argument,       0, OPTION_DUMP_RMID_BINARY},
     {"dump-rmid-upscaling",   no_argument,       0, OPTION_DUMP_RMID_UPSCALING},
     {"print-io-devs",         no_argument,       0, OPTION_PRINT_IO_DEVS},
+    {"print-io-dev",          required_argument, 0, OPTION_PRINT_IO_DEV},
     {0, 0, 0, 0} /* end */
     /* clang-format on */
 };
@@ -1575,6 +1615,9 @@ main(int argc, char **argv)
                 case OPTION_PRINT_IO_DEVS:
                         selfn_print_io_devs(NULL);
                         break;
+                case OPTION_PRINT_IO_DEV:
+                        selfn_print_io_dev(optarg);
+                        break;
                 default:
                         printf("Unsupported option: -%c. "
                                "See option -h for help.\n",
@@ -1759,6 +1802,11 @@ main(int argc, char **argv)
 
         if (sel_print_io_devs) {
                 cap_print_io_devs(p_sys);
+                goto allocation_exit;
+        }
+
+        if (sel_print_io_dev) {
+                cap_print_io_dev(p_sys);
                 goto allocation_exit;
         }
 

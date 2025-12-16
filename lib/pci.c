@@ -460,6 +460,8 @@ io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
 
         dev = pci_dev_get(segment, bdf);
 
+        memset(pci_info, 0, sizeof(struct pqos_pci_info));
+
         pci_read_driver(pci_info, dev);
         pci_info->numa = dev->numa;
         pci_read_config(pci_info, dev);

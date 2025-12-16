@@ -72,12 +72,27 @@ void cap_print_mem_regions(const struct pqos_sysconfig *sys);
 void cap_print_topology(const struct pqos_sysconfig *sys);
 
 /**
+ * @brief Verifies and translates PCI Device's Segment and BDF information
+ *
+ * @param str single dev string passed to --print-io-dev command line option
+ */
+void parse_io_dev(char *str);
+
+/**
  * @brief Print information about I/O devices from ERDT & IRDT ACPI tables
  *
  * @param [in] sys PQoS system configuration struct
  *                 returned by a pqos_sysconfig_get
  */
 void cap_print_io_devs(const struct pqos_sysconfig *sys);
+
+/**
+ * @brief Print information about I/O device from ERDT & IRDT ACPI tables
+ *
+ * @param [in] sys PQoS system configuration struct
+ *                 returned by a pqos_sysconfig_get
+ */
+void cap_print_io_dev(const struct pqos_sysconfig *sys);
 
 #ifdef __cplusplus
 }
