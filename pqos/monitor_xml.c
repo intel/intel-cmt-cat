@@ -44,8 +44,11 @@ static const char *xml_child_open = "<record>";
 static const char *xml_child_close = "</record>";
 
 void
-monitor_xml_begin(FILE *fp)
+monitor_xml_begin(FILE *fp, const int num_mem_regions, const int *region_num)
 {
+        UNUSED_ARG(num_mem_regions);
+        UNUSED_ARG(region_num);
+
         ASSERT(fp != NULL);
 
         fprintf(fp, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n%s\n",

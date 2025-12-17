@@ -41,9 +41,9 @@
  *
  * @param fp file descriptor
  */
-/* clang-format off */
-void monitor_csv_begin(FILE * fp);
-/* clang-format on */
+void monitor_csv_begin(FILE * fp,
+                       const int num_mem_regions,
+                       const int *region_num);
 
 /**
  * @brief Print CSV header

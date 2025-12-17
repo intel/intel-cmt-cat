@@ -84,9 +84,11 @@ monitor_text_region_header(FILE *fp,
 }
 
 void
-monitor_text_begin(FILE *fp)
+monitor_text_begin(FILE *fp, const int num_mem_regions, const int *region_num)
 {
         UNUSED_ARG(fp);
+        UNUSED_ARG(num_mem_regions);
+        UNUSED_ARG(region_num);
 }
 
 void

@@ -61,8 +61,17 @@ static struct {
     {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE, .format = ",%.0f"},
 };
 
+static void
+monitor_csv_region_header(FILE *fp,
+                          const int num_mem_regions,
+                          const int *region_num)
+{
+        for (int idx = 0; idx < num_mem_regions; idx++)
+                fprintf(fp, ",MBT-r%d[MB/s]", region_num[idx]);
+}
+
 void
-monitor_csv_begin(FILE *fp)
+monitor_csv_begin(FILE *fp, const int num_mem_regions, const int *region_num)
 {
         enum pqos_mon_event events = monitor_get_events();
         enum monitor_llc_format format = monitor_get_llc_format();
@@ -102,11 +111,26 @@ monitor_csv_begin(FILE *fp)
                         fprintf(fp, ",LLC[%%]");
         }
         if (events & PQOS_MON_EVENT_LMEM_BW)
-                fprintf(fp, "   MBL[MB/s]");
+                fprintf(fp, ",MBL[MB/s]");
         if (events & PQOS_MON_EVENT_RMEM_BW)
                 fprintf(fp, ",MBR[MB/s]");
-        if (events & PQOS_MON_EVENT_TMEM_BW)
-                fprintf(fp, ",MBT[MB/s]");
+
+        if (events & PQOS_MON_EVENT_TMEM_BW) {
+                enum pqos_interface iface;
+                int ret = PQOS_RETVAL_OK;
+
+                ret = pqos_inter_get(&iface);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Unable to retrieve PQoS interface!\n");
+                        return;
+                }
+
+                if (iface == PQOS_INTER_MMIO)
+                        monitor_csv_region_header(fp, num_mem_regions,
+                                                  region_num);
+                else
+                        fprintf(fp, ",MBT[MB/s]");
+        }
 
         if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
                 fprintf(fp, ",%11s", "LLC Misses Read");
@@ -277,7 +301,7 @@ monitor_csv_region_row(FILE *fp,
 #endif
 
         for (i = 0; i < DIM(output); i++) {
-                if (output[i].event == PQOS_MON_EVENT_LMEM_BW) {
+                if (output[i].event == PQOS_MON_EVENT_TMEM_BW) {
                         for (j = 0; j < mon_data->regions.num_mem_regions;
                              j++) {
 

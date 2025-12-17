@@ -2815,7 +2815,9 @@ monitor_loop(void)
         enum pqos_interface interface;
 
         struct {
-                void (*begin)(FILE *fp);
+                void (*begin)(FILE *fp,
+                             const int num_mem_regions,
+                             const int *region_num);
                 void (*header)(FILE *fp,
                                const char *timestamp,
                                const int num_mem_regions,
@@ -2927,7 +2929,8 @@ monitor_loop(void)
                 stop_monitoring_loop = 1;
         }
 
-        output.begin(fp_monitor);
+        output.begin(fp_monitor, sel_mon_mem_region.num_mem_regions,
+                     sel_mon_mem_region.region_num);
         while (!stop_monitoring_loop) {
                 struct tm *ptm = NULL;
                 unsigned i = 0;
