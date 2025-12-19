@@ -2816,8 +2816,8 @@ monitor_loop(void)
 
         struct {
                 void (*begin)(FILE *fp,
-                             const int num_mem_regions,
-                             const int *region_num);
+                              const int num_mem_regions,
+                              const int *region_num);
                 void (*header)(FILE *fp,
                                const char *timestamp,
                                const int num_mem_regions,
