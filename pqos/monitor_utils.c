@@ -220,6 +220,16 @@ monitor_utils_get_region_value(const struct pqos_mon_data *const group,
                 if (ret == PQOS_RETVAL_OK)
                         value = bytes_to_mb(delta) * coeff;
                 break;
+        case PQOS_PERF_EVENT_LLC_MISS:
+        case PQOS_PERF_EVENT_LLC_REF:
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_READ:
+        case PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE:
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_READ:
+        case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
+                ret = pqos_mon_get_value(group, event, NULL, &delta);
+                if (ret == PQOS_RETVAL_OK)
+                        value = (double)delta;
+                break;
         case PQOS_PERF_EVENT_IPC:
                 ret = pqos_mon_get_ipc(group, &value);
                 break;
