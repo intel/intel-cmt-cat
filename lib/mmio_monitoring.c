@@ -326,6 +326,9 @@ get_dev_domain_info(pqos_channel_t channel,
                         return PQOS_RETVAL_OK;
                 }
 
+        LOG_WARN("Channel ID 0x%lx is available in IRDT but missing in ERDT. "
+                 "I/O RDT monitoring cannot be started for this channel.\n",
+                 channel);
         /* Channel ID is available in IRDT. But not in ERDT */
         return PQOS_RETVAL_UNAVAILABLE;
 }
@@ -361,7 +364,7 @@ get_dev_rmid_list(struct pqos_mon_poll_ctx *ctx,
 
                 ret = iordt_mon_assoc_read(channel->channel_id, &rmid);
                 if (ret != PQOS_RETVAL_OK)
-                        break;
+                        return ret;
 
                 if (rmid <= max_rmid) {
                         if (domain_id_idx >= erdt->num_dev_agents) {
@@ -383,7 +386,7 @@ get_dev_rmid_list(struct pqos_mon_poll_ctx *ctx,
                 }
         }
 
-        return ret;
+        return PQOS_RETVAL_OK;
 }
 
 int
