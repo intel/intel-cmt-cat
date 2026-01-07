@@ -1278,19 +1278,15 @@ selfn_monitor_uncore(const char *arg)
 }
 
 /**
- * Update list of events to be monitored
+ * Get list of events to be monitored available on the platform
  *
- * @param [in] type monitoring group type
- * @param [in,out] events List of monitoring events
- * @param [in] cap_mon monitoring capability
+ * @param [in] cap_mon monitoring capabilities
  * @param [in] iordt I/O rdt support required
+ *
+ * @return available platform events
  */
-static void
-monitor_setup_events(enum mon_group_type type,
-                     enum pqos_mon_event *events,
-                     const struct pqos_capability *const cap_mon,
-                     int iordt,
-                     enum pqos_interface interface)
+static enum pqos_mon_event
+get_available_events(const struct pqos_capability *const cap_mon, int iordt)
 {
         unsigned i;
         enum pqos_mon_event all_evts = (enum pqos_mon_event)0;
@@ -1307,6 +1303,24 @@ monitor_setup_events(enum mon_group_type type,
                 all_evts |= mon->type;
         }
 
+        return all_evts;
+}
+
+/**
+ * Update list of events to be monitored
+ *
+ * @param [in] type monitoring group type
+ * @param [in,out] events List of monitoring events
+ * @param [in] all_evts available monitoring events
+ * @param [in] iordt I/O rdt support required
+ */
+static void
+monitor_setup_events(enum mon_group_type type,
+                     enum pqos_mon_event *events,
+                     enum pqos_mon_event all_evts,
+                     int iordt,
+                     enum pqos_interface interface)
+{
         if (type == MON_GROUP_TYPE_UNCORE)
                 all_evts &= PQOS_MON_EVENT_UNCORE;
         else
@@ -1465,6 +1479,9 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 }
         }
 
+        enum pqos_mon_event avail_evts =
+            get_available_events(cap_mon, monitor_iordt_mode());
+
         for (i = 0; i < sel_monitor_num; i++) {
                 struct mon_group *grp = &sel_monitor_group[i];
 
@@ -1475,10 +1492,23 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 break;
                 }
 
-                monitor_setup_events(grp->type, &grp->events, cap_mon,
+                monitor_setup_events(grp->type, &grp->events, avail_evts,
                                      monitor_iordt_mode(), interface);
 
                 if (grp->type == MON_GROUP_TYPE_CORE) {
+                        /* Check if MBL or MBR events were selected and
+                         * are supported on the current platform
+                         */
+                        if (((grp->events & PQOS_MON_EVENT_LMEM_BW) &&
+                             !(avail_evts & PQOS_MON_EVENT_LMEM_BW)) ||
+                            ((grp->events & PQOS_MON_EVENT_RMEM_BW) &&
+                             !(avail_evts & PQOS_MON_EVENT_RMEM_BW))) {
+                                printf("Error: MBL and MBR events are not "
+                                       "supported on current platform!\n");
+                                ret = PQOS_RETVAL_PARAM;
+                                break;
+                        }
+
                         /**
                          * Make calls to pqos_mon_start - track cores
                          */
@@ -1565,6 +1595,7 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 grp->started = 1;
                 }
         }
+
         if (ret != PQOS_RETVAL_OK) {
                 /**
                  * Stop mon groups that are already started
