@@ -319,7 +319,7 @@ set_l3_cos(const unsigned class_id,
                 else if (interface != PQOS_INTER_MMIO)
                         package = "SOCKET";
                 else
-                        package = "Domain id ";
+                        package = "Domain ID ";
 
                 if (interface == PQOS_INTER_MMIO)
                         id = ca.domain_id;
@@ -462,7 +462,7 @@ print_mmio_mba_log(const struct pqos_mba *mba, const struct pqos_mba *actual)
                      ctrl_type_idx++) {
                         if (mba->mem_regions[region_idx]
                                 .bw_ctrl_val[ctrl_type_idx] != -1) {
-                                printf("Domain id %u MBA COS%u "
+                                printf("Domain ID %u MBA COS%u "
                                        "Memory Region %d ",
                                        mba->domain_id, actual->class_id,
                                        mba->mem_regions[region_idx].region_num);
@@ -624,7 +624,7 @@ set_mba_cos(const unsigned class_id,
                         package = "SOCKET";
                         unit = "%";
                 } else
-                        package = "Domain id";
+                        package = "Domain ID";
 
                 if (ret != PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
                         printf("%s %u MBA COS%u - FAILED!\n", package,
@@ -1600,19 +1600,24 @@ selfn_allocation_assoc(const char *arg)
  * @param [in] is_error indicates error condition when reading L3 CAT class
  */
 static void
-print_l3ca_config(const struct pqos_l3ca *ca, const int is_error)
+print_l3ca_config(const struct pqos_l3ca *ca,
+                  const int is_error,
+                  const int io_l3ca)
 {
+        const char *indent = io_l3ca ? "" : "    ";
+
         if (is_error) {
-                printf("    L3CA COS%u => ERROR\n", ca->class_id);
+                printf("%sL3CA COS%u => ERROR\n", indent, ca->class_id);
                 return;
         }
 
         if (ca->cdp) {
-                printf("    L3CA COS%u => DATA 0x%llx, CODE 0x%llx\n",
-                       ca->class_id, (unsigned long long)ca->u.s.data_mask,
+                printf("%sL3CA COS%u => DATA 0x%llx, CODE 0x%llx\n", indent,
+                       ca->class_id,
+                       (unsigned long long)ca->u.s.data_mask,
                        (unsigned long long)ca->u.s.code_mask);
         } else {
-                printf("    L3CA COS%u => MASK 0x%llx\n", ca->class_id,
+                printf("%sL3CA COS%u => MASK 0x%llx\n", indent, ca->class_id,
                        (unsigned long long)ca->u.ways_mask);
         }
 }
@@ -1687,7 +1692,7 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
 
                         if (ret == PQOS_RETVAL_OK) {
                                 for (n = 0; n < num; n++)
-                                        print_l3ca_config(&tab[n], 0);
+                                        print_l3ca_config(&tab[n], 0, 0);
                         } else {
                                 printf("L3CA: Couldn't obtain info.\n");
                         }
@@ -2171,7 +2176,7 @@ print_mba(const struct pqos_mba *mba)
                      ctrl_type_idx++) {
                         if (mba->mem_regions[region_idx]
                                 .bw_ctrl_val[ctrl_type_idx] != -1) {
-                                printf("Domain id %u MBA COS%u "
+                                printf("Domain ID %u MBA COS%u "
                                        "Memory Region %d ",
                                        mba->domain_id, mba->class_id,
                                        mba->mem_regions[region_idx].region_num);
@@ -2203,8 +2208,11 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
         unsigned idx;
         unsigned clos_idx;
         unsigned clos_num;
+        unsigned num_ca;
+        unsigned sock_count;
+        unsigned *sockets = NULL;
         struct pqos_mba mba;
-        unsigned sock_count, *sockets = NULL;
+        struct pqos_l3ca l3ca[PQOS_MAX_L3CA_COS];
 
         if (!sys) {
                 printf("Error: 'sys' (pqos_sysconfig) is not available!\n");
@@ -2225,6 +2233,29 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
         if (sockets == NULL) {
                 printf("Error retrieving information for Sockets\n");
                 return;
+        }
+
+        for (idx = 0; idx < sys->erdt->num_dev_agents; idx++) {
+                memset(l3ca, 0, sizeof(l3ca));
+                for (clos_idx = 0; clos_idx < sys->erdt->max_clos; clos_idx++)
+                        l3ca[clos_idx].domain_id =
+                            sys->erdt->dev_agents[idx].rmdd.domain_id;
+
+                ret = pqos_l3ca_get(sys->erdt->dev_agents[idx].rmdd.domain_id,
+                                    DIM(l3ca), &num_ca, l3ca);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Error retrieving I/O L3CA configuration for "
+                               "Domain ID 0x%x: pqos_l3ca_get() returned %d\n",
+                               sys->erdt->dev_agents[idx].rmdd.domain_id, ret);
+                        return;
+                }
+
+                for (clos_idx = 0; clos_idx < num_ca; clos_idx++) {
+                        printf("Domain ID 0x%x I/O ", l3ca[clos_idx].domain_id);
+                        print_l3ca_config(&l3ca[clos_idx], 0, 1);
+                }
+
+                printf("\n");
         }
 
         for (idx = 0; idx < sys->erdt->num_cpu_agents; idx++) {

@@ -386,15 +386,15 @@ mmio_l3ca_get(const unsigned l3cat_id,
                 return PQOS_RETVAL_ERROR;
 
         // Check if all domains are valid
-        for (unsigned i = 0; i < max_num_ca; i++) {
+        for (unsigned i = 0; i < erdt->max_clos; i++) {
                 if (!get_dev_agent_by_domain(ca[i].domain_id)) {
-                        LOG_ERROR("Domain id %u is unavailable\n",
+                        LOG_ERROR("Domain ID 0x%x is unavailable\n",
                                   ca[i].domain_id);
                         return PQOS_RETVAL_PARAM;
                 }
         }
 
-        for (i = 0; i < max_num_ca; i++) {
+        for (i = 0; i < erdt->max_clos; i++) {
                 ret = get_iol3_cbm_clos_v1(
                     &get_dev_agent_by_domain(ca[i].domain_id)->card, i,
                     REG_BLOCK_SIZE_ZERO, &value);
@@ -406,7 +406,7 @@ mmio_l3ca_get(const unsigned l3cat_id,
                 ca[i].class_id = i;
                 ca[i].u.ways_mask = value;
         }
-        *num_ca = max_num_ca;
+        *num_ca = erdt->max_clos;
 
         return ret;
 }
