@@ -15,5 +15,7 @@ pytest-rerunfailures = "*"
 codespell = "*"
 bandit = "*"
 pylint = "==2.17.0"
+pexpect = "*"
+psutil = "*"
 
 [requires]

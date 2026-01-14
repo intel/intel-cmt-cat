@@ -227,7 +227,7 @@ clang-format:
 CODESPELL?=codespell
 .PHONY: codespell
 codespell:
-	$(CODESPELL) . -q 2 -L clos,mmapped,uint
+	$(CODESPELL) . -q 2 -L clos,mmapped,uint,te,circularly
 
 .PHONY: style
 style:
