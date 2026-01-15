@@ -1613,8 +1613,7 @@ print_l3ca_config(const struct pqos_l3ca *ca,
 
         if (ca->cdp) {
                 printf("%sL3CA COS%u => DATA 0x%llx, CODE 0x%llx\n", indent,
-                       ca->class_id,
-                       (unsigned long long)ca->u.s.data_mask,
+                       ca->class_id, (unsigned long long)ca->u.s.data_mask,
                        (unsigned long long)ca->u.s.code_mask);
         } else {
                 printf("%sL3CA COS%u => MASK 0x%llx\n", indent, ca->class_id,
