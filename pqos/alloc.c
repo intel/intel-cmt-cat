@@ -1157,13 +1157,21 @@ set_allocation_assoc(const struct pqos_devinfo *dev)
 static void
 fill_core_tab(char *str)
 {
-        unsigned max_cores_count = sysconf(_SC_NPROCESSORS_CONF);
-        uint64_t *cores = calloc(max_cores_count, sizeof(uint64_t));
+        long max_cores_count = sysconf(_SC_NPROCESSORS_CONF);
+        uint64_t *cores = NULL;
         unsigned i = 0, n = 0, cos = 0;
         char *p = NULL;
 
+        if (max_cores_count <= 0) {
+                printf("Failed to get processor count from "
+                       "sysconf(_SC_NPROCESSORS_CONF): returned %ld\n",
+                       max_cores_count);
+                goto error_exit;
+        }
+
+        cores = calloc(max_cores_count, sizeof(uint64_t));
         if (cores == NULL) {
-                printf("Error with memory allocation!\n");
+                printf("Failed to allocate memory for cores array!\n");
                 goto error_exit;
         }
         if (sel_assoc_tab == NULL) {
@@ -2246,7 +2254,7 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                         printf("Error retrieving I/O L3CA configuration for "
                                "Domain ID 0x%x: pqos_l3ca_get() returned %d\n",
                                sys->erdt->dev_agents[idx].rmdd.domain_id, ret);
-                        return;
+                        goto free_and_return;
                 }
 
                 for (clos_idx = 0; clos_idx < num_ca; clos_idx++) {
@@ -2277,7 +2285,7 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                                     "pqos_mba_get() returned %d\n",
                                     sys->erdt->cpu_agents[idx].rmdd.domain_id,
                                     clos_idx, ret);
-                                return;
+                                goto free_and_return;
                         }
 
                         print_mba(&mba);

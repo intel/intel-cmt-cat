@@ -54,6 +54,8 @@
 #define PCI_DEVICES_DIR    "/sys/bus/pci/devices"
 #define PCI_IDS_FILE       "/usr/share/misc/pci.ids"
 
+#define PCI_CONFIG_CAPABILITIES_POINTER 0x34
+
 /** Define file names' strings */
 #define PCI_SYSFS_FILE_STR_VENDOR   "vendor"
 #define PCI_SYSFS_FILE_STR_DEVICE   "device"
@@ -227,7 +229,7 @@ static int
 pci_read_config(struct pqos_pci_info *info, struct pci_dev *dev)
 {
         int fd;
-        int cap_ptr = 0;
+        unsigned int cap_ptr = 0;
         unsigned char cap_id = 0;
         unsigned char dev_type = 0;
         unsigned char config[BUF_SIZE_256] = {0};
@@ -255,7 +257,16 @@ pci_read_config(struct pqos_pci_info *info, struct pci_dev *dev)
 
         close(fd);
 
-        cap_ptr = config[0x34];
+        cap_ptr = config[PCI_CONFIG_CAPABILITIES_POINTER];
+        if (cap_ptr >= BUF_SIZE_256) {
+                LOG_ERROR("PCI %04x:%02x:%02x.%x has wrong config value "
+                          "in capabilities pointer (0x%x). Value is 0x%x\n",
+                          (unsigned)dev->domain, (unsigned)dev->bus,
+                          (unsigned)dev->dev, (unsigned)dev->func,
+                          PCI_CONFIG_CAPABILITIES_POINTER, cap_ptr);
+                return PQOS_RETVAL_ERROR;
+        }
+
         while (cap_ptr) {
                 cap_id = config[cap_ptr];
                 /* PCI Express Capability */
@@ -504,7 +515,8 @@ io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
         for (idx = 0; idx < pci_info->num_channels; idx++) {
                 channel =
                     pqos_devinfo_get_channel(devinfo, pci_info->channels[idx]);
-                pci_info->mmio_addr[idx] = channel->mmio_addr;
+                if (channel != NULL)
+                        pci_info->mmio_addr[idx] = channel->mmio_addr;
         }
 
         free(dev);

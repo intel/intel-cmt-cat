@@ -107,8 +107,8 @@ get_process_start_time(pid_t pid)
                         return 0;
                 ++p;
         }
-        sscanf(p, "%lu", &start_time);
-        return start_time;
+
+        return sscanf(p, "%lu", &start_time) == 1 ? start_time : 0;
 }
 
 /**

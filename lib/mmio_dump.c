@@ -40,6 +40,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <inttypes.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -120,14 +121,14 @@ print_hex_dump(const uint8_t *buf,
         for (i = 0; i < line_num; i++) {
                 size_t offset = i * width_bytes * elems_per_line;
 
-                LOG_DEBUG("offset: %x\n", offset);
+                LOG_DEBUG("offset: 0x%zx\n", offset);
                 snprintf(line, sizeof(line), "%06zx ", offset);
                 for (j = 0; j < elems_per_line; j++) {
-                        LOG_DEBUG("elem_idx: %x\n", j);
+                        LOG_DEBUG("elem_idx: %zu\n", j);
                         LOG_DEBUG(
                             "elem VA: %p\n",
                             (const void *)(buf + offset + j * width_bytes));
-                        LOG_DEBUG("elem value: %x\n",
+                        LOG_DEBUG("elem value: %#" PRIx64 "\n",
                                   *(const uint64_t *)(buf + offset +
                                                       j * width_bytes));
 
