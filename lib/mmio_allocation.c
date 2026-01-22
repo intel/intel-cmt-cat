@@ -216,7 +216,8 @@ mmio_mba_set(const unsigned mba_id,
                                     (const struct pqos_erdt_marc *)&erdt
                                         ->cpu_agents[requested[i].domain_id]
                                         .marc,
-                                    j, requested[i].class_id, current_bw);
+                                    requested[i].mem_regions[j].region_num,
+                                    requested[i].class_id, current_bw);
 
                                 if (ret != PQOS_RETVAL_OK)
                                         return ret;
@@ -233,7 +234,8 @@ mmio_mba_set(const unsigned mba_id,
                                     (const struct pqos_erdt_marc *)&erdt
                                         ->cpu_agents[requested[i].domain_id]
                                         .marc,
-                                    j, requested[i].class_id, current_bw);
+                                    requested[i].mem_regions[j].region_num,
+                                    requested[i].class_id, current_bw);
 
                                 if (ret != PQOS_RETVAL_OK)
                                         return ret;
@@ -250,7 +252,8 @@ mmio_mba_set(const unsigned mba_id,
                                     (const struct pqos_erdt_marc *)&erdt
                                         ->cpu_agents[requested[i].domain_id]
                                         .marc,
-                                    j, requested[i].class_id, current_bw);
+                                    requested[i].mem_regions[j].region_num,
+                                    requested[i].class_id, current_bw);
 
                                 if (ret != PQOS_RETVAL_OK)
                                         return ret;
