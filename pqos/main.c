@@ -1173,7 +1173,24 @@ static const char help_printf_long[] =
     "                     into account if this variable is set\n"
     "                  2) Selects OS interface if the kernel interface\n"
     "                     is supported\n"
-    "                  3) Selects MSR interface otherwise\n";
+    "                  3) Selects MSR interface otherwise\n\n"
+    "---------------- MMIO interface help section ----------------\n"
+    "-------------------  Detect capabilities --------------------\n"
+    "  --print-mem-regions         print memory mapped regions\n"
+    "  Example:\n"
+    "      pqos --iface=mmio --print-mem-regions\n\n"
+    "  --print-topology            print available topology\n"
+    "  Example:\n"
+    "      pqos --iface=mmio --print-topology\n\n"
+    "-------------------  Monitoring options --------------------\n"
+    "  No options. Monitor all memory regions\n"
+    "  Example:\n"
+    "      pqos --iface=mmio -m all:0-5\n\n"
+    "  --mon-mem-regions=REGIONS  monitor selected memory regions\n"
+    "  REGIONS format is comma-separated list.\n"
+    "  Examples:\n"
+    "      pqos --iface=mmio --mon-mem-regions=0 -m all:0-5\n"
+    "      pqos --iface=mmio --mon-mem-regions=3,2 -m all:0-5\n\n";
 /* clang-format on */
 
 /**
