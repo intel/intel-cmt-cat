@@ -276,6 +276,45 @@ pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu, unsigned *count)
         return l2ids;
 }
 
+unsigned *
+pqos_cpu_get_l3_clusters(const struct pqos_cpuinfo *cpu, unsigned *count)
+{
+        unsigned l3c_count = 0, i = 0;
+        unsigned *l3_clusters = NULL;
+
+        ASSERT(cpu != NULL);
+        ASSERT(count != NULL);
+        if (cpu == NULL || count == NULL)
+                return NULL;
+
+        l3_clusters =
+            (unsigned *)malloc(sizeof(l3_clusters[0]) * cpu->num_cores);
+
+        if (l3_clusters == NULL)
+                return NULL;
+
+        for (i = 0; i < cpu->num_cores; i++) {
+                unsigned j = 0;
+
+                /**
+                 * Check if this L3 id is already on the \a l3_clusters list
+                 */
+                for (j = 0; j < l3c_count && l3c_count > 0; j++)
+                        if (cpu->cores[i].l3_id == l3_clusters[j])
+                                break;
+
+                if (j >= l3c_count || l3c_count == 0) {
+                        /**
+                         * This l3_id wasn't reported before
+                         */
+                        l3_clusters[l3c_count++] = cpu->cores[i].l3_id;
+                }
+        }
+
+        *count = l3c_count;
+        return l3_clusters;
+}
+
 /**
  * @brief Creates list of cores belonging to given topology object
  *
