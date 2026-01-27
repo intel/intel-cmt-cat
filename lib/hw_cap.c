@@ -447,7 +447,17 @@ hw_cap_mon_discover(struct pqos_cap_mon **r_mon,
         {
                 const unsigned max_rmid = cpuid_0xf_1.ecx + 1;
                 const uint32_t scale_factor = cpuid_0xf_1.ebx;
-                const unsigned counter_length = (cpuid_0xf_1.eax & 0xff) + 24;
+                unsigned counter_offset = cpuid_0xf_1.eax & 0xff;
+                unsigned counter_length = 24;
+
+                /**
+                 * Hygon CPU doesn't support CPUID 0xF.[ECX=1]:EAX as offset
+                 * from 24. It supports fixed counter length of 32 bits.
+                 */
+                if (!counter_offset && cpu->vendor == PQOS_VENDOR_HYGON)
+                        counter_offset = 8;
+
+                counter_length += counter_offset;
 
                 if (cpuid_0xf_1.edx & PQOS_CPUID_MON_L3_OCCUP_BIT) {
                         int iordt =
