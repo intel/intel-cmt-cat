@@ -1838,6 +1838,18 @@ unsigned *pqos_cpu_get_numa(const struct pqos_cpuinfo *cpu, unsigned *count);
 unsigned *pqos_cpu_get_l2ids(const struct pqos_cpuinfo *cpu, unsigned *count);
 
 /**
+ * @brief Retrieves L3 cluster id's from cpu info structure
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [out] count place to store actual number of L3 cluster id's returned
+ *
+ * @return Allocated array of size \a count populated with L3 cluster id's
+ * @retval NULL on error
+ */
+unsigned *pqos_cpu_get_l3_clusters(const struct pqos_cpuinfo *cpu,
+                                   unsigned *count);
+
+/**
  * @brief Creates list of cores belonging to given L3 cluster
  *
  * Function allocates memory for the core list that needs to be freed by
