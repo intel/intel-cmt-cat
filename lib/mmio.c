@@ -225,7 +225,7 @@ set_mbm_mba_mode_v1(const struct pqos_erdt_rmdd *rmdd, unsigned int value)
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        *mem |= (uint64_t)(value << RDT_CTRL_TME_SHIFT);
+        *mem = (*mem & RDT_CTRL_TME_RESET_MASK) | (value << RDT_CTRL_TME_SHIFT);
 
         pqos_munmap(mem, RDT_REG_SIZE);
 
