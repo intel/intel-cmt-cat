@@ -1443,7 +1443,8 @@ alloc_get_default_cos(struct pqos_l2ca *l2_def,
                         mba_def->ctrl = 1;
                         mba_def->mb_max = UINT32_MAX;
                 } else
-                        mba_def->mb_max = (m_cpu->vendor == PQOS_VENDOR_AMD)
+                        mba_def->mb_max = (m_cpu->vendor == PQOS_VENDOR_AMD ||
+                                           m_cpu->vendor == PQOS_VENDOR_HYGON)
                                               ? RDT_MAX_MBA_AMD
                                               : RDT_MAX_MBA;
         }
@@ -1543,7 +1544,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                 if (g_cfg.verbose) {
                         const char *package;
 
-                        if (m_cpu->vendor == PQOS_VENDOR_AMD)
+                        if (m_cpu->vendor == PQOS_VENDOR_AMD ||
+                            m_cpu->vendor == PQOS_VENDOR_HYGON)
                                 package = "Core Complex";
                         else
                                 package = "SOCKET";
@@ -1611,8 +1613,10 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                         mba_requested = mba_defs;
                 else if (mba_sc_mode(&g_cfg)) {
                         mba_requested.mb_max =
-                            (m_cpu->vendor == PQOS_VENDOR_AMD) ? RDT_MAX_MBA_AMD
-                                                               : RDT_MAX_MBA;
+                            (m_cpu->vendor == PQOS_VENDOR_AMD ||
+                             m_cpu->vendor == PQOS_VENDOR_HYGON)
+                                ? RDT_MAX_MBA_AMD
+                                : RDT_MAX_MBA;
                         mba_requested.ctrl = 0;
                 }
 
@@ -1634,7 +1638,8 @@ cfg_configure_cos(const struct pqos_l2ca *l2ca,
                         const char *unit;
                         const char *package;
 
-                        if (m_cpu->vendor == PQOS_VENDOR_AMD) {
+                        if (m_cpu->vendor == PQOS_VENDOR_AMD ||
+                            m_cpu->vendor == PQOS_VENDOR_HYGON) {
                                 package = "Core Complex";
                                 unit = "";
                         } else {

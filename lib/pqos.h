@@ -435,7 +435,8 @@ struct pqos_cacheinfo {
 enum pqos_vendor {
         PQOS_VENDOR_UNKNOWN = 0, /**< UNKNOWN */
         PQOS_VENDOR_INTEL = 1,   /**< INTEL */
-        PQOS_VENDOR_AMD = 2      /**< AMD */
+        PQOS_VENDOR_AMD = 2,     /**< AMD */
+        PQOS_VENDOR_HYGON = 3    /**< HYGON */
 };
 
 /**
@@ -445,7 +446,7 @@ struct pqos_cpuinfo {
         unsigned mem_size;        /**< byte size of the structure */
         struct pqos_cacheinfo l2; /**< L2 cache information */
         struct pqos_cacheinfo l3; /**< L3 cache information */
-        enum pqos_vendor vendor;  /**< vendor Intel/AMD */
+        enum pqos_vendor vendor;  /**< vendor Intel/AMD/Hygon */
         unsigned num_cores;       /**< number of cores in the system */
         struct pqos_coreinfo cores[0];
 };
@@ -2171,6 +2172,7 @@ int pqos_mba_ctrl_enabled(const struct pqos_cap *cap,
  * @retval 0 if vendor unknown
  * @return 1 if the vendor is Intel
  * @return 2 if the vendor is AMD
+ * @return 3 if the vendor is Hygon
  */
 enum pqos_vendor pqos_get_vendor(const struct pqos_cpuinfo *cpu);
 

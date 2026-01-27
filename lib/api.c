@@ -229,7 +229,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.l2ca_get = hw_l2ca_get;
                 api.l2ca_get_min_cbm_bits = hw_l2ca_get_min_cbm_bits;
 
-                if (vendor == PQOS_VENDOR_AMD) {
+                if (vendor == PQOS_VENDOR_AMD || vendor == PQOS_VENDOR_HYGON) {
                         api.mba_get = hw_mba_get_amd;
                         api.mba_set = hw_mba_set_amd;
                 } else {
@@ -263,7 +263,7 @@ api_init(int interface, enum pqos_vendor vendor)
                 api.l2ca_get = os_l2ca_get;
                 api.l2ca_get_min_cbm_bits = os_l2ca_get_min_cbm_bits;
 
-                if (vendor == PQOS_VENDOR_AMD) {
+                if (vendor == PQOS_VENDOR_AMD || vendor == PQOS_VENDOR_HYGON) {
                         api.mba_get = os_mba_get_amd;
                         api.mba_set = os_mba_set_amd;
                 } else {
