@@ -764,8 +764,27 @@ hw_cap_l3ca_cpuid(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         cap->cdp = (res.ecx >> PQOS_CPUID_CAT_CDP_BIT) & 1;
         cap->cdp_on = 0;
         cap->way_contention = (uint64_t)res.ebx;
-        cap->non_contiguous_cbm =
-            (res.ecx >> PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT_BIT) & 1;
+
+        switch (cpu->vendor) {
+        case PQOS_VENDOR_INTEL:
+                cap->non_contiguous_cbm =
+                    (res.ecx >> PQOS_CPUID_CAT_NON_CONTIGUOUS_CBM_SUPPORT_BIT) &
+                    1;
+                break;
+        case PQOS_VENDOR_AMD:
+        case PQOS_VENDOR_HYGON:
+                /**
+                 * AMD and Hygon platforms support L3 cache Non-Contiguous CBM,
+                 * but the Non-Contiguous CBM support bit (CPUID.0x10.1:ECX[3])
+                 * is unused.
+                 */
+                cap->non_contiguous_cbm = 1;
+                break;
+        default:
+                cap->non_contiguous_cbm = 0;
+                break;
+        }
+
         cap->iordt = (res.ecx >> PQOS_CPUID_CAT_IORDT_BIT) & 1;
         cap->iordt_on = 0;
 
