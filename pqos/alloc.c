@@ -2175,6 +2175,7 @@ alloc_print_config(const struct pqos_capability *cap_mon,
         int ret;
         unsigned i;
         unsigned sock_count, *sockets = NULL;
+        unsigned l3c_count, *l3_clusters = NULL;
 
         if (!sys) {
                 printf("Error: 'sys' (pqos_sysconfig) is not available!\n");
@@ -2187,8 +2188,26 @@ alloc_print_config(const struct pqos_capability *cap_mon,
                 return;
         }
 
-        print_per_socket_config(cap_l3ca, cap_mba, cap_smba, sys->cpu,
-                                sock_count, sockets);
+        l3_clusters = pqos_cpu_get_l3_clusters(sys->cpu, &l3c_count);
+        if (l3_clusters == NULL) {
+                printf("Error retrieving information for L3 clusters\n");
+                goto free_sockets;
+        }
+
+        /**
+         * AMD and Hygon Platform QoS allocation configuration is
+         * per L3 cluster (or Core Complex - CCX).
+         *
+         * Each L3 cluster (CCX) has one L3 cluster ID (l3_id)
+         * which is used for both CAT and MBA ids.
+         */
+        if (sys->cpu->vendor == PQOS_VENDOR_AMD ||
+            sys->cpu->vendor == PQOS_VENDOR_HYGON)
+                print_per_l3_cluster_config(cap_l3ca, cap_mba, cap_smba,
+                                            sys->cpu, l3c_count, l3_clusters);
+        else
+                print_per_socket_config(cap_l3ca, cap_mba, cap_smba, sys->cpu,
+                                        sock_count, sockets);
 
         if (cap_l2ca != NULL) {
                 /* Print L2 CAT class definitions per L2 cluster */
@@ -2297,8 +2316,9 @@ alloc_print_config(const struct pqos_capability *cap_mon,
         print_iordt_alloc(cap_mon, cap_l3ca, sys);
 
 free_and_return:
-        if (sockets)
-                free(sockets);
+        free(l3_clusters);
+free_sockets:
+        free(sockets);
 }
 
 static void
