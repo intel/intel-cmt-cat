@@ -266,8 +266,8 @@ nearest_pow2(const unsigned n)
 /**
  * @brief Discovers cache APICID structure information
  *
- * Uses CPUID leaf 0x4(or 0x8000001D for AMD) to find L3 and L2 cache
- * APICID information.
+ * Uses CPUID leaf 0x4(or 0x8000001D for AMD and Hygon) to find L3 and
+ * L2 cache APICID information.
  *
  * Assumes apic->pkg_shift is already set, this is in case
  * L3/LLC is not detected.
@@ -529,6 +529,10 @@ detect_vendor(void)
         } else if (vendor.ebx == 0x68747541 && vendor.edx == 0x69746E65 &&
                    vendor.ecx == 0x444D4163) {
                 cpu_vendor = PQOS_VENDOR_AMD;
+        } else if (vendor.ebx == 0x6f677948 && vendor.edx == 0x6e65476e &&
+                   vendor.ecx == 0x656e6975) {
+                /* Vendor ID: "HygonGenuine" */
+                cpu_vendor = PQOS_VENDOR_HYGON;
         } else {
                 cpu_vendor = PQOS_VENDOR_UNKNOWN;
         }
@@ -606,6 +610,11 @@ init_config(struct cpuinfo_config *config, enum pqos_vendor vendor)
                 config->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
                 config->mba_default_val = PQOS_MBA_MAX_AMD;
                 config->smba_msr_reg = PQOS_MSR_SMBA_MASK_START_AMD;
+        } else if (vendor == PQOS_VENDOR_HYGON) {
+                config->cpuid_cache_leaf = 0x8000001D;
+                config->mba_max = PQOS_MBA_MAX_AMD;
+                config->mba_msr_reg = PQOS_MSR_MBA_MASK_START_AMD;
+                config->mba_default_val = PQOS_MBA_MAX_AMD;
         } else {
                 LOG_ERROR("init_config: init failed!");
                 return -EFAULT;
@@ -663,8 +672,8 @@ cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
 
         /*
          * Update l3cat_id and mba_id. For Intel, CAT and MBA ids are
-         * initialized to socket id. AMD uses l3_id for both CAT and MBA
-         * ids. Right now, both these ids are same. This could change in
+         * initialized to socket id. AMD and Hygon use l3_id for both CAT and
+         * MBA ids. Right now, both these ids are same. This could change in
          * the future.
          */
         for (i = 0; i < m_cpu->num_cores; ++i) {
@@ -674,6 +683,9 @@ cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
                         info->l3cat_id = info->l3_id;
                         info->mba_id = info->l3_id;
                         info->smba_id = info->l3_id;
+                } else if (vendor == PQOS_VENDOR_HYGON) {
+                        info->l3cat_id = info->l3_id;
+                        info->mba_id = info->l3_id;
                 } else {
                         info->l3cat_id = info->socket;
                         info->mba_id = info->socket;

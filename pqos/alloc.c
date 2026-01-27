@@ -313,7 +313,8 @@ set_l3_cos(const unsigned class_id,
 
                 /* set new L3 class definition */
                 ret = pqos_l3ca_set(sock_ids[i], 1, &ca);
-                if (cpu->vendor == PQOS_VENDOR_AMD &&
+                if ((cpu->vendor == PQOS_VENDOR_AMD ||
+                     cpu->vendor == PQOS_VENDOR_HYGON) &&
                     interface != PQOS_INTER_MMIO)
                         package = "Core Complex";
                 else if (interface != PQOS_INTER_MMIO)
@@ -617,7 +618,9 @@ set_mba_cos(const unsigned class_id,
                 } else
                         ret = pqos_mba_set(sock_ids[i], 1, &mba, &actual);
 
-                if (cpu->vendor == PQOS_VENDOR_AMD) {
+                if ((cpu->vendor == PQOS_VENDOR_AMD ||
+                     cpu->vendor == PQOS_VENDOR_HYGON) &&
+                    interface != PQOS_INTER_MMIO) {
                         package = "Core Complex";
                         unit = "";
                 } else if (interface != PQOS_INTER_MMIO) {
@@ -1718,7 +1721,8 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                                 available = "";
                         } else {
                                 available = " available";
-                                if (cpu_info->vendor == PQOS_VENDOR_AMD)
+                                if (cpu_info->vendor == PQOS_VENDOR_AMD ||
+                                    cpu_info->vendor == PQOS_VENDOR_HYGON)
                                         unit = "";
                                 else
                                         unit = "%";

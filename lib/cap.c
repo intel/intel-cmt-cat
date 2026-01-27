@@ -285,7 +285,8 @@ cap_mba_discover(struct pqos_cap_mba **r_cap,
         /* MMIO interface shares similar MBA functionality with MSR interface,
          * so it uses the same mba discovery function. */
         case PQOS_INTER_MMIO:
-                if (cpu->vendor == PQOS_VENDOR_AMD)
+                if (cpu->vendor == PQOS_VENDOR_AMD ||
+                    cpu->vendor == PQOS_VENDOR_HYGON)
                         ret = amd_cap_mba_discover(cap, cpu);
                 else
                         ret = hw_cap_mba_discover(cap, cpu);
