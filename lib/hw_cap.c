@@ -237,6 +237,19 @@ hw_cap_mon_snc_state(const struct pqos_cpuinfo *cpu,
 
         if (numa_num < 0 || socket_num < 0)
                 return PQOS_RETVAL_ERROR;
+
+        /**
+         * On platforms that do not support Sub-NUMA Clustering (SNC)
+         * monitoring (e.g., AMD and Hygon platforms).
+         *
+         * Set snc_num = 1 and return early.
+         */
+        if (cpu->vendor == PQOS_VENDOR_AMD ||
+            cpu->vendor == PQOS_VENDOR_HYGON) {
+                *snc_num = 1;
+                return PQOS_RETVAL_OK;
+        }
+
         if (numa_num == 0 || socket_num == 0 || numa_num == socket_num) {
                 *snc_num = 1;
                 *snc_mode = PQOS_SNC_LOCAL;
