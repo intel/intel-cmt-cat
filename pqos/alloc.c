@@ -1782,6 +1782,132 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
 }
 
 /**
+ * @brief Per L3 cluster L3 CAT, MBA and SMBA class definition printing
+ *
+ * If new per L3 cluster technologies appear they should be added here, too.
+ *
+ * @param [in] cap_l3ca pointer to L3 CAT capability structure
+ * @param [in] cap_mba pointer to MBA capability structure
+ * @param [in] cap_smba pointer to SMBA capability structure
+ * @param [in] l3c_count number of L3 cluster id's in \a l3_clusters
+ * @param [in] l3_clusters arrays of L3 cluster id's
+ */
+static void
+print_per_l3_cluster_config(const struct pqos_capability *cap_l3ca,
+                            const struct pqos_capability *cap_mba,
+                            const struct pqos_capability *cap_smba,
+                            const struct pqos_cpuinfo *cpu_info,
+                            const unsigned l3c_count,
+                            const unsigned *l3_clusters)
+{
+        int ret;
+        unsigned i;
+
+        if (cpu_info == NULL || l3_clusters == NULL)
+                return;
+
+        if (cap_l3ca == NULL && cap_mba == NULL && cap_smba == NULL)
+                return;
+
+        for (i = 0; i < l3c_count; i++) {
+
+                printf("%s%s%s COS definitions for L3 Cluster"
+                       " (or Core Complex) %u:\n",
+                       cap_l3ca != NULL ? "L3CA" : "",
+                       (cap_l3ca != NULL && cap_mba != NULL) ? "/" : "",
+                       cap_mba != NULL ? "MBA" : "", l3_clusters[i]);
+
+                if (cap_l3ca != NULL) {
+                        const struct pqos_cap_l3ca *l3ca = cap_l3ca->u.l3ca;
+                        struct pqos_l3ca tab[l3ca->num_classes];
+                        unsigned num = 0;
+                        unsigned n = 0;
+
+                        ret = pqos_l3ca_get(l3_clusters[i], l3ca->num_classes,
+                                            &num, tab);
+
+                        if (ret == PQOS_RETVAL_OK) {
+                                for (n = 0; n < num; n++)
+                                        print_l3ca_config(&tab[n], 0, 0);
+                        } else {
+                                printf("L3CA: Couldn't obtain info.\n");
+                        }
+                }
+
+                if (cap_mba != NULL) {
+                        const struct pqos_cap_mba *mba = cap_mba->u.mba;
+                        struct pqos_mba tab[mba->num_classes];
+                        unsigned num = 0;
+                        unsigned n = 0;
+                        const char *unit;
+                        const char *available;
+
+                        if (mba->ctrl_on == 1) {
+                                unit = " MBps";
+                                available = "";
+                        } else {
+                                available = " available";
+                                if (cpu_info->vendor == PQOS_VENDOR_AMD ||
+                                    cpu_info->vendor == PQOS_VENDOR_HYGON)
+                                        unit = "";
+                                else
+                                        unit = "%";
+                        }
+
+                        memset(&tab, 0,
+                               sizeof(struct pqos_mba) * mba->num_classes);
+
+                        ret = pqos_mba_get(l3_clusters[i], mba->num_classes,
+                                           &num, tab);
+
+                        if (ret == PQOS_RETVAL_OK) {
+                                for (n = 0; n < num; n++)
+                                        printf("    MBA COS%u => %u%s%s\n",
+                                               tab[n].class_id, tab[n].mb_max,
+                                               unit, available);
+                        } else {
+                                printf("MBA: Couldn't obtain info.\n");
+                        }
+                }
+
+                if (cap_smba != NULL) {
+                        const struct pqos_cap_mba *smba = cap_smba->u.smba;
+                        struct pqos_mba tab[smba->num_classes];
+                        unsigned num = 0;
+                        unsigned n = 0;
+                        const char *unit;
+                        const char *available;
+
+                        if (smba->ctrl_on == 1) {
+                                unit = " MBps";
+                                available = "";
+                        } else {
+                                available = " available";
+                                if (cpu_info->vendor == PQOS_VENDOR_AMD)
+                                        unit = "";
+                                else
+                                        unit = "%";
+                        }
+
+                        for (n = 0; n < smba->num_classes; n++)
+                                tab[n].smba = 1;
+
+                        ret = pqos_mba_get(l3_clusters[i], smba->num_classes,
+                                           &num, tab);
+
+                        if (ret == PQOS_RETVAL_OK) {
+                                for (n = 0; n < num; n++)
+                                        printf("    SMBA COS%u => %u%s%s\n",
+                                               tab[n].class_id, tab[n].mb_max,
+                                               unit, available);
+                        } else {
+                                printf("SMBA: Couldn't obtain info.\n");
+                        }
+                }
+        }
+}
+
+/**
  * @brief Retrieves and prints core association
  *
  * @param [in] is_alloc indicates if any allocation technology is present
