@@ -485,6 +485,8 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         const char *info;
         int cdp_on;
         int ret = PQOS_RETVAL_OK;
+        unsigned val;
+        char path[128];
 
         ASSERT(cap != NULL);
 
@@ -516,8 +518,17 @@ os_cap_l3ca_discover(struct pqos_cap_l3ca *cap, const struct pqos_cpuinfo *cpu)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
+        snprintf(path, sizeof(path) - 1, "%s/sparse_masks", info);
+        ret = pqos_fread_uint(path, &val);
+        if (ret != PQOS_RETVAL_OK)
+                cap->non_contiguous_cbm = 0;
+        else
+                cap->non_contiguous_cbm = val;
+
         if (!cdp_on)
                 ret = pqos_file_contains(PROC_CPUINFO, "cdp_l3", &cap->cdp);
+        else
+                ret = PQOS_RETVAL_OK;
 
         return ret;
 }
