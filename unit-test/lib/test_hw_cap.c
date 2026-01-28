@@ -76,6 +76,9 @@ _init(void **state __attribute__((unused)))
 {
         _cpuid_count = 0;
 
+        /* allow cpuinfo_get_cpu_model()/family() paths used by MBA detection */
+        _lcpuid_add(0x1, 0x0, 0x0, 0x0, 0x0, 0x0);
+
         return 0;
 }
 
@@ -97,7 +100,7 @@ __wrap_lcpuid(const unsigned leaf,
                 }
         }
 
-        fail();
+        fail_msg("Unexpected CPUID leaf=0x%x subleaf=0x%x", leaf, subleaf);
 }
 
 int
@@ -742,7 +745,7 @@ test_hw_cap_mba_discover_linear(void **state)
         uint32_t is_linear = 1;
 
         _lcpuid_add(0x07, 0x0, 0x0, 0x8000, 0x0, 0x0);
-        _lcpuid_add(0x10, 0x0, 0x0, 0x8, 0x0, 0x0);
+        _lcpuid_add(0x10, 0x0, 0x0, 0x8, 0x0, 0x2);
         _lcpuid_add(0x10, 0x3, throttle_max - 1, 0x0, is_linear << 2,
                     num_classes - 1);
 
