@@ -995,24 +995,30 @@ test_pqos_l3ca_set_param(void **state __attribute__((unused)))
         ca[0].cdp = 0;
         ca[0].u.ways_mask = 0;
 
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
         ret = pqos_l3ca_set(l3cat_id, num_cos, ca);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
         ca[0].class_id = 1;
         ca[0].cdp = 1;
         ca[0].u.s.data_mask = 0x0;
         ca[0].u.s.code_mask = 0xf0;
 
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
         ret = pqos_l3ca_set(l3cat_id, num_cos, ca);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 
         ca[0].class_id = 1;
         ca[0].cdp = 1;
         ca[0].u.s.data_mask = 0xf0;
         ca[0].u.s.code_mask = 0x0;
 
+        wrap_check_init(1, PQOS_RETVAL_OK);
+
         ret = pqos_l3ca_set(l3cat_id, num_cos, ca);
-        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
 /* ======== pqos_l3ca_get ======== */
@@ -1422,6 +1428,7 @@ test_pqos_mba_set_init(void **state __attribute__((unused)))
         struct pqos_mba requested[1];
 
         wrap_check_init(1, PQOS_RETVAL_INIT);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         requested[0].class_id = 1;
         requested[0].ctrl = 0;
@@ -1443,6 +1450,7 @@ test_pqos_mba_set_os(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         will_return(__wrap_cpuinfo_get_config, &config);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         expect_value(__wrap_os_mba_set, mba_id, mba_id);
         expect_value(__wrap_os_mba_set, num_cos, num_cos);
@@ -1472,6 +1480,7 @@ test_pqos_mba_set_os_ctrl(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         will_return(__wrap_cpuinfo_get_config, &config);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         expect_value(__wrap_os_mba_set, mba_id, mba_id);
         expect_value(__wrap_os_mba_set, num_cos, num_cos);
@@ -1501,6 +1510,7 @@ test_pqos_mba_set_hw(void **state __attribute__((unused)))
         wrap_check_init(1, PQOS_RETVAL_OK);
 
         will_return(__wrap_cpuinfo_get_config, &config);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         expect_value(__wrap_hw_mba_set, mba_id, mba_id);
         expect_value(__wrap_hw_mba_set, num_cos, num_cos);
@@ -1533,14 +1543,19 @@ test_pqos_mba_set_param(void **state __attribute__((unused)))
         requested[0].ctrl = 0;
         requested[0].mb_max = 50;
 
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
+
         ret = pqos_mba_set(mba_id, 0, requested, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
+
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         ret = pqos_mba_set(mba_id, num_cos, NULL, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 
         wrap_check_init(1, PQOS_RETVAL_OK);
         will_return(__wrap_cpuinfo_get_config, &config);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         requested[0].class_id = 1;
         requested[0].ctrl = 0;
@@ -1551,6 +1566,7 @@ test_pqos_mba_set_param(void **state __attribute__((unused)))
 
         wrap_check_init(1, PQOS_RETVAL_OK);
         will_return(__wrap_cpuinfo_get_config, &config);
+        will_return(__wrap__pqos_get_inter, PQOS_INTER_OS);
 
         requested[0].class_id = 1;
         requested[0].ctrl = 0;
