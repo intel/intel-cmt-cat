@@ -356,8 +356,10 @@ test_discover_interface_param(void **state __attribute__((unused)))
 
         interface = -1;
         expect_function_call(__wrap_log_printf);
-        assert_int_equal(discover_interface(PQOS_INTER_AUTO + 1, &interface),
+        assert_int_equal(discover_interface(9999, &interface),
                          PQOS_RETVAL_PARAM);
+
+        disable_check_log_printf();
 }
 
 static void
