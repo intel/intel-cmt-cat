@@ -25,6 +25,7 @@ CFLAGS = -pthread -I$(LIB_DIR) -I$(MOCK_DIR) \
 	-D'PQOS_API=' \
 	-D'PQOS_STATIC=__attribute__((weak))'
 
+CFLAGS += -DLOCKFILE=\"/tmp/libpqos_test_lockfile\"
 
 IS_GCC = $(shell $(CC) -v 2>&1 | grep -c "^gcc version ")
 IS_CLANG = $(shell $(CC) -v 2>&1 | grep -c "^clang version ")
@@ -445,6 +446,8 @@ $(BIN_DIR)/test_hw_monitoring: test_hw_monitoring.c $(LIB_OBJS)
 		-Wl,--wrap=uncore_mon_is_event_supported \
 		-Wl,--wrap=uncore_mon_start \
 		-Wl,--wrap=uncore_mon_stop \
+		-Wl,--wrap=mon_assoc_get_core \
+		-Wl,--wrap=mon_reset \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
@@ -795,6 +798,9 @@ $(BIN_DIR)/test_lock: test_lock.c $(LIB_OBJS)
 		-Wl,--wrap=open \
 		-Wl,--wrap=close \
 		-Wl,--wrap=lockf \
+		-Wl,--wrap=fprintf \
+		-Wl,--wrap=access \
+		-Wl,--wrap=unlink \
 		-Wl,--wrap=pthread_mutex_init \
 		-Wl,--wrap=pthread_mutex_destroy \
 		-Wl,--wrap=pthread_mutex_lock \

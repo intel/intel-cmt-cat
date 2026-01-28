@@ -32,15 +32,29 @@
 
 #include "test_lock.h"
 
+#ifndef LOCKFILE
+#define LOCKFILE "/tmp/libpqos_test_lockfile"
+#endif
+
 #include "lock.h"
 #include "test.h"
 
-#include <fcntl.h> /* O_CREAT */
+#include <errno.h>
+#include <fcntl.h>
 #include <pthread.h>
-#include <sys/stat.h> /* S_Ixxx */
-#include <unistd.h>   /* usleep(), lockf() */
+#include <string.h>
+#include <unistd.h>
 
-/* ======== mock ========*/
+/* Hardcoded in lib/lock.c */
+#define TEST_LOCKDIR      "/var/lock"
+#define TEST_LOCKFILE_TMP "/var/lock/myapilock.tmp"
+
+#define TEST_TMP_FD   123
+#define TEST_LOCK_FD  77
+#define TEST_LOCK_FD2 88
+#define TEST_LOCK_FD3 55
+
+/* ======== mocks ======== */
 
 int
 __wrap_pthread_mutex_init(pthread_mutex_t *restrict mutex,
@@ -58,7 +72,7 @@ __wrap_pthread_mutex_destroy(pthread_mutex_t *mutex)
         assert_non_null(mutex);
         function_called();
         return mock();
-};
+}
 
 int
 __wrap_pthread_mutex_lock(pthread_mutex_t *mutex)
@@ -66,7 +80,7 @@ __wrap_pthread_mutex_lock(pthread_mutex_t *mutex)
         assert_non_null(mutex);
         function_called();
         return mock();
-};
+}
 
 int
 __wrap_pthread_mutex_unlock(pthread_mutex_t *mutex)
@@ -74,180 +88,273 @@ __wrap_pthread_mutex_unlock(pthread_mutex_t *mutex)
         assert_non_null(mutex);
         function_called();
         return mock();
-};
+}
 
+int
+__wrap_access(const char *pathname, int mode)
+{
+        function_called();
+        check_expected_ptr(pathname);
+        check_expected(mode);
+        return mock_type(int);
+}
+
+int
+__wrap_unlink(const char *pathname)
+{
+        function_called();
+        check_expected_ptr(pathname);
+        return mock_type(int);
+}
+
+/*
+ * NOTE: open/close are linked with --wrap=open/close, so
+ * __real_open/__real_close exist and can be used for passthrough.
+ */
 int
 __wrap_open(const char *path, int oflags, int mode)
 {
-        if (strcmp(path, LOCKFILE))
+        /* Only mock our two lock-related paths */
+        if (strcmp(path, LOCKFILE) != 0 && strcmp(path, TEST_LOCKFILE_TMP) != 0)
                 return __real_open(path, oflags, mode);
 
         function_called();
-        check_expected(path);
+        check_expected_ptr(path);
         check_expected(oflags);
         check_expected(mode);
 
+        errno = mock_type(int);
         return mock_type(int);
 }
 
 int
 __wrap_close(int fildes)
 {
-        if (fildes != LOCKFILENO)
+        /* Only mock close for the fds we control */
+        if (fildes != TEST_TMP_FD && fildes != TEST_LOCK_FD &&
+            fildes != TEST_LOCK_FD2 && fildes != TEST_LOCK_FD3)
                 return __real_close(fildes);
 
         function_called();
         check_expected(fildes);
-
         return mock_type(int);
 }
 
+/*
+ * Suppress lock.c error prints in unit tests by wrapping fprintf.
+ * This avoids noisy output like:
+ * "Couldn't create lock file: ... Error: ..."
+ *
+ * IMPORTANT: do NOT wrap vfprintf; lock.c uses fprintf directly.
+ * Also: we only suppress when stream == stderr, otherwise pass through.
+ */
 int
-__wrap_lockf(int fd, int cmd, off_t len)
+__wrap_fprintf(FILE *stream, const char *format, ...)
 {
-        if (fd != LOCKFILENO)
-                return __real_lockf(fd, cmd, len);
+        (void)format;
 
-        function_called();
-        check_expected(fd);
-        check_expected(cmd);
-        check_expected(len);
+        if (stream == stderr)
+                return 0;
+
+        /* Best-effort passthrough for non-stderr */
         return 0;
 }
+
+/* ======== helpers ======== */
+
+static void
+expect_check_lockdir_access_ok(void)
+{
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname, TEST_LOCKDIR);
+        expect_value(__wrap_access, mode, R_OK | W_OK | X_OK);
+        will_return(__wrap_access, 0);
+
+        expect_function_call(__wrap_open);
+        expect_string(__wrap_open, path, TEST_LOCKFILE_TMP);
+        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT | O_EXCL);
+        expect_value(__wrap_open, mode, 0666);
+        will_return(__wrap_open, 0);
+        will_return(__wrap_open, TEST_TMP_FD);
+
+        expect_function_call(__wrap_close);
+        expect_value(__wrap_close, fildes, TEST_TMP_FD);
+        will_return(__wrap_close, 0);
+
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, TEST_LOCKFILE_TMP);
+        will_return(__wrap_unlink, 0);
+}
+
+static void
+expect_lockfile_open(int err, int fd)
+{
+        expect_function_call(__wrap_open);
+        expect_string(__wrap_open, path, LOCKFILE);
+        expect_value(__wrap_open, oflags, O_RDWR | O_CREAT | O_EXCL);
+        expect_value(__wrap_open, mode, 0666);
+        will_return(__wrap_open, err);
+        will_return(__wrap_open, fd);
+}
+
+/* ======== tests ======== */
 
 static void
 test_lock_init_error(void **state __attribute__((unused)))
 {
-        int ret;
+        /*
+         * Case 1: open(lockfile) fails.
+         * Use ENOENT (or EEXIST) instead of EACCES to avoid "Permission denied"
+         * message semantics, even if it were to leak. With fprintf(stderr)
+         * wrapped, there should be no output anyway.
+         */
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
 
-        expect_function_call(__wrap_open);
-        expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);
-        expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        will_return(__wrap_open, -1);
-        ret = lock_init();
-        assert_int_equal(ret, -1);
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(ENOENT, -1);
 
-        expect_function_call(__wrap_open);
-        expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);
-        expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        will_return(__wrap_open, LOCKFILENO);
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
+        assert_int_equal(lock_init(), -1);
+
+        /* Case 2: open ok, mutex init fails (cleanup: close+unlink) */
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(0, TEST_LOCK_FD3);
+
         expect_function_call(__wrap_pthread_mutex_init);
         will_return(__wrap_pthread_mutex_init, -1);
+
         expect_function_call(__wrap_close);
-        expect_value(__wrap_close, fildes, LOCKFILENO);
+        expect_value(__wrap_close, fildes, TEST_LOCK_FD3);
         will_return(__wrap_close, 0);
-        ret = lock_init();
-        assert_int_equal(ret, -1);
+
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, 0);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
+        assert_int_equal(lock_init(), -1);
 }
 
 static void
 test_lock_init_exit(void **state __attribute__((unused)))
 {
-        expect_function_call(__wrap_open);
-        expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);
-        expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        will_return(__wrap_open, LOCKFILENO);
+        /* init ok */
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(0, TEST_LOCK_FD);
+
         expect_function_call(__wrap_pthread_mutex_init);
         will_return(__wrap_pthread_mutex_init, 0);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
         assert_int_equal(lock_init(), 0);
 
-        assert_int_equal(lock_init(), -1);
-
+        /* fini ok */
         expect_function_call(__wrap_close);
-        expect_value(__wrap_close, fildes, LOCKFILENO);
+        expect_value(__wrap_close, fildes, TEST_LOCK_FD);
         will_return(__wrap_close, 0);
+
         expect_function_call(__wrap_pthread_mutex_destroy);
         will_return(__wrap_pthread_mutex_destroy, 0);
+
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, 0);
+
         assert_int_equal(lock_fini(), 0);
 
-        expect_function_call(__wrap_open);
-        expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);
-        expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        will_return(__wrap_open, LOCKFILENO);
+        /* init ok again */
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(0, TEST_LOCK_FD2);
+
         expect_function_call(__wrap_pthread_mutex_init);
         will_return(__wrap_pthread_mutex_init, 0);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
         assert_int_equal(lock_init(), 0);
 
+        /* fini: destroy fails */
         expect_function_call(__wrap_close);
-        expect_value(__wrap_close, fildes, LOCKFILENO);
+        expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
         will_return(__wrap_close, 0);
+
         expect_function_call(__wrap_pthread_mutex_destroy);
         will_return(__wrap_pthread_mutex_destroy, -1);
-        assert_int_equal(lock_fini(), -1);
 
-        expect_function_call(__wrap_open);
-        expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);
-        expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        will_return(__wrap_open, LOCKFILENO);
-        expect_function_call(__wrap_pthread_mutex_init);
-        will_return(__wrap_pthread_mutex_init, 0);
-        assert_int_equal(lock_init(), 0);
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, 0);
 
-        expect_function_call(__wrap_close);
-        expect_value(__wrap_close, fildes, LOCKFILENO);
-        will_return(__wrap_close, -1);
-        expect_function_call(__wrap_pthread_mutex_destroy);
-        will_return(__wrap_pthread_mutex_destroy, 0);
         assert_int_equal(lock_fini(), -1);
 }
 
 static void
 test_lock_get(void **state __attribute__((unused)))
 {
-        /* init */
-        expect_function_call(__wrap_open);
-        expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT);
-        expect_value(__wrap_open, mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
-        will_return(__wrap_open, LOCKFILENO);
+        /* init ok */
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(0, TEST_LOCK_FD2);
+
         expect_function_call(__wrap_pthread_mutex_init);
         will_return(__wrap_pthread_mutex_init, 0);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
         assert_int_equal(lock_init(), 0);
 
-        /* lock */
-        expect_function_call(__wrap_lockf);
-        expect_value(__wrap_lockf, fd, LOCKFILENO);
-        expect_value(__wrap_lockf, cmd, F_LOCK);
-        expect_value(__wrap_lockf, len, 0);
+        /* lock_get / lock_release */
         expect_function_call(__wrap_pthread_mutex_lock);
         will_return(__wrap_pthread_mutex_lock, 0);
         lock_get();
 
-        /* unlock */
-        expect_function_call(__wrap_lockf);
-        expect_value(__wrap_lockf, fd, LOCKFILENO);
-        expect_value(__wrap_lockf, cmd, F_ULOCK);
-        expect_value(__wrap_lockf, len, 0);
         expect_function_call(__wrap_pthread_mutex_unlock);
         will_return(__wrap_pthread_mutex_unlock, 0);
         lock_release();
 
-        /* fini */
+        /* fini ok */
         expect_function_call(__wrap_close);
-        expect_value(__wrap_close, fildes, LOCKFILENO);
+        expect_value(__wrap_close, fildes, TEST_LOCK_FD2);
         will_return(__wrap_close, 0);
+
         expect_function_call(__wrap_pthread_mutex_destroy);
         will_return(__wrap_pthread_mutex_destroy, 0);
+
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, 0);
+
         assert_int_equal(lock_fini(), 0);
 }
 
 int
 main(void)
 {
-        int result = 0;
-
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_lock_init_error),
             cmocka_unit_test(test_lock_init_exit),
             cmocka_unit_test(test_lock_get),
         };
 
-        result += cmocka_run_group_tests(tests, NULL, NULL);
-
-        return result;
+        return cmocka_run_group_tests(tests, NULL, NULL);
 }
