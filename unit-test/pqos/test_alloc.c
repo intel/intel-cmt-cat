@@ -42,6 +42,17 @@
 /* clang-format on */
 
 static void
+mock_inter_get(const enum pqos_interface inter, unsigned count)
+{
+        unsigned i;
+
+        for (i = 0; i < count; i++) {
+                will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_inter_get, inter);
+        }
+}
+
+static void
 test_selfn_allocation_assoc_negative(void **state)
 {
         run_void_function(selfn_allocation_assoc, NULL);
@@ -310,7 +321,7 @@ test_alloc_print_config_msr(void **state)
         }
 
         /* mock pqos_inter_get */
-        for (i = 0; i < data->cpu_info->num_cores; i++) {
+        for (i = 0; i < data->cpu_info->num_cores + 1; i++) {
                 will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
                 will_return(__wrap_pqos_inter_get, PQOS_INTER_MSR);
         }
@@ -452,7 +463,7 @@ test_alloc_print_config_os(void **state)
         }
 
         /* mock pqos_inter_get */
-        for (i = 0; i < data->cpu_info->num_cores; i++) {
+        for (i = 0; i < data->cpu_info->num_cores + 1; i++) {
                 will_return(__wrap_pqos_inter_get, PQOS_RETVAL_OK);
                 will_return(__wrap_pqos_inter_get, PQOS_INTER_OS);
         }
@@ -536,6 +547,18 @@ test_alloc_apply_mba(void **state)
         int ret = 0;
         struct pqos_mba requested_mbas[3];
         struct pqos_mba actual_mbas[3];
+        unsigned i;
+
+        /* match set_mba_cos() initialization */
+        memset(requested_mbas, 0, sizeof(requested_mbas));
+        for (i = 0; i < 3; i++)
+                memset(requested_mbas[i].mem_regions, -1,
+                       sizeof(requested_mbas[i].mem_regions));
+
+        memset(actual_mbas, 0, sizeof(actual_mbas));
+        for (i = 0; i < 3; i++)
+                memset(actual_mbas[i].mem_regions, -1,
+                       sizeof(actual_mbas[i].mem_regions));
 
         /* set static data */
         sel_alloc_opt_num = 3;
@@ -548,14 +571,20 @@ test_alloc_apply_mba(void **state)
         requested_mbas[0].ctrl = 0;
         requested_mbas[0].mb_max = 10;
         requested_mbas[0].smba = 0;
+        requested_mbas[0].num_mem_regions = 0;
+        actual_mbas[0].num_mem_regions = 0;
         requested_mbas[1].class_id = 2;
         requested_mbas[1].ctrl = 0;
         requested_mbas[1].mb_max = 64;
         requested_mbas[1].smba = 0;
+        requested_mbas[1].num_mem_regions = 0;
+        actual_mbas[1].num_mem_regions = 0;
         requested_mbas[2].class_id = 3;
         requested_mbas[2].ctrl = 0;
         requested_mbas[2].mb_max = 85;
         requested_mbas[2].smba = 0;
+        requested_mbas[2].num_mem_regions = 0;
+        actual_mbas[2].num_mem_regions = 0;
         actual_mbas[0].class_id = 2;
         actual_mbas[0].ctrl = 0;
         actual_mbas[0].mb_max = 10;
@@ -612,6 +641,7 @@ test_alloc_apply_mba(void **state)
         will_return(__wrap_pqos_mba_set, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_mba_set, &actual_mbas[2]);
 
+        mock_inter_get(PQOS_INTER_MSR, 4);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -641,6 +671,18 @@ test_alloc_apply_mba_max(void **state)
         int ret = 0;
         struct pqos_mba requested_mbas[3];
         struct pqos_mba actual_mbas[3];
+        unsigned i;
+
+        /* match set_mba_cos() initialization */
+        memset(requested_mbas, 0, sizeof(requested_mbas));
+        for (i = 0; i < 3; i++)
+                memset(requested_mbas[i].mem_regions, -1,
+                       sizeof(requested_mbas[i].mem_regions));
+
+        memset(actual_mbas, 0, sizeof(actual_mbas));
+        for (i = 0; i < 3; i++)
+                memset(actual_mbas[i].mem_regions, -1,
+                       sizeof(actual_mbas[i].mem_regions));
 
         /* set static data */
         sel_alloc_opt_num = 3;
@@ -653,14 +695,20 @@ test_alloc_apply_mba_max(void **state)
         requested_mbas[0].ctrl = 1;
         requested_mbas[0].mb_max = 10;
         requested_mbas[0].smba = 0;
+        requested_mbas[0].num_mem_regions = 0;
+        actual_mbas[0].num_mem_regions = 0;
         requested_mbas[1].class_id = 2;
         requested_mbas[1].ctrl = 1;
         requested_mbas[1].mb_max = 64;
         requested_mbas[1].smba = 0;
+        requested_mbas[1].num_mem_regions = 0;
+        actual_mbas[1].num_mem_regions = 0;
         requested_mbas[2].class_id = 3;
         requested_mbas[2].ctrl = 1;
         requested_mbas[2].mb_max = 85;
         requested_mbas[2].smba = 0;
+        requested_mbas[2].num_mem_regions = 0;
+        actual_mbas[2].num_mem_regions = 0;
         actual_mbas[0].class_id = 2;
         actual_mbas[0].ctrl = 1;
         actual_mbas[0].mb_max = 10;
@@ -717,6 +765,7 @@ test_alloc_apply_mba_max(void **state)
         will_return(__wrap_pqos_mba_set, PQOS_RETVAL_OK);
         will_return(__wrap_pqos_mba_set, &actual_mbas[0]);
 
+        mock_inter_get(PQOS_INTER_MSR, 4);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -748,22 +797,29 @@ test_alloc_apply_l3ca(void **state)
         alloc_opts[1] = strdup("llc@0,1:2=0x0ff0");
         alloc_opts[2] = strdup("llc@2-3:3=0x3c");
 
+        memset(ca, 0, sizeof(ca));
         /* generate test data */
         for (i = 0; i < num_ca; i++) {
+                ca[i].domain_id = 0;
                 ca[i].class_id = i;
                 ca[i].cdp = 0;
                 ca[i].u.ways_mask = 0xFFFF;
         }
 
+        memset(expected_ca, 0, sizeof(expected_ca));
+
         expected_ca[0].class_id = 1;
+        expected_ca[0].domain_id = 0;
         expected_ca[0].cdp = 0;
         expected_ca[0].u.ways_mask = 0xf;
 
         expected_ca[1].class_id = 2;
+        expected_ca[1].domain_id = 0;
         expected_ca[1].cdp = 0;
         expected_ca[1].u.ways_mask = 0xff0;
 
         expected_ca[2].class_id = 3;
+        expected_ca[2].domain_id = 0;
         expected_ca[2].cdp = 0;
         expected_ca[2].u.ways_mask = 0x3c;
 
@@ -841,16 +897,17 @@ test_alloc_apply_l3ca(void **state)
                       sizeof(struct pqos_l3ca) - 8);
         will_return(__wrap_pqos_l3ca_set, PQOS_RETVAL_OK);
 
+        mock_inter_get(PQOS_INTER_MSR, 4);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
-        assert_true(output_has_text("SOCKET 0 L3CA COS1 => MASK 0xf"));
-        assert_true(output_has_text("SOCKET 1 L3CA COS1 => MASK 0xf"));
-        assert_true(output_has_text("SOCKET 0 L3CA COS2 => MASK 0xff0"));
-        assert_true(output_has_text("SOCKET 1 L3CA COS2 => MASK 0xff0"));
-        assert_true(output_has_text("SOCKET 2 L3CA COS3 => MASK 0x3c"));
-        assert_true(output_has_text("SOCKET 3 L3CA COS3 => MASK 0x3c"));
+        assert_true(output_has_text("SOCKET0 L3CA COS1 => MASK 0xf"));
+        assert_true(output_has_text("SOCKET1 L3CA COS1 => MASK 0xf"));
+        assert_true(output_has_text("SOCKET0 L3CA COS2 => MASK 0xff0"));
+        assert_true(output_has_text("SOCKET1 L3CA COS2 => MASK 0xff0"));
+        assert_true(output_has_text("SOCKET2 L3CA COS3 => MASK 0x3c"));
+        assert_true(output_has_text("SOCKET3 L3CA COS3 => MASK 0x3c"));
         assert_true(output_has_text("Allocation configuration altered"));
 
         sel_alloc_opt_num = 0;
@@ -871,20 +928,25 @@ test_alloc_apply_l3ca_cdp(void **state)
         alloc_opts[0] = strdup("llc:1d=0xff");
         alloc_opts[1] = strdup("llc:1c=0xf");
 
+        memset(ca, 0, sizeof(ca));
         /* generate test data */
         for (i = 0; i < num_ca; i++) {
                 ca[i].class_id = i;
+                ca[i].domain_id = 0;
                 ca[i].cdp = 1;
                 ca[i].u.s.code_mask = 0xFFFF;
                 ca[i].u.s.data_mask = 0xFFFF;
         }
 
+        memset(expected_ca, 0, sizeof(expected_ca));
         expected_ca[0].class_id = 1;
+        expected_ca[0].domain_id = 0;
         expected_ca[0].cdp = 1;
         expected_ca[0].u.s.code_mask = 0xffff;
         expected_ca[0].u.s.data_mask = 0xff;
 
         expected_ca[1].class_id = 1;
+        expected_ca[1].domain_id = 0;
         expected_ca[1].cdp = 1;
         expected_ca[1].u.s.code_mask = 0xf;
         expected_ca[1].u.s.data_mask = 0xffff;
@@ -939,17 +1001,18 @@ test_alloc_apply_l3ca_cdp(void **state)
                       sizeof(struct pqos_l3ca));
         will_return(__wrap_pqos_l3ca_set, PQOS_RETVAL_OK);
 
+        mock_inter_get(PQOS_INTER_MSR, 3);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
         assert_int_equal(ret, 1);
-        assert_true(output_has_text("SOCKET 0 L3CA COS1 => DATA 0xff,CODE "
+        assert_true(output_has_text("SOCKET0 L3CA COS1 => DATA 0xff,CODE "
                                     "0xffff"));
-        assert_true(output_has_text("SOCKET 1 L3CA COS1 => DATA 0xff,CODE "
+        assert_true(output_has_text("SOCKET1 L3CA COS1 => DATA 0xff,CODE "
                                     "0xffff"));
-        assert_true(output_has_text("SOCKET 0 L3CA COS1 => DATA 0xffff,CODE "
+        assert_true(output_has_text("SOCKET0 L3CA COS1 => DATA 0xffff,CODE "
                                     "0xf"));
-        assert_true(output_has_text("SOCKET 1 L3CA COS1 => DATA 0xffff,CODE "
+        assert_true(output_has_text("SOCKET1 L3CA COS1 => DATA 0xffff,CODE "
                                     "0xf"));
         assert_true(output_has_text("Allocation configuration altered"));
         sel_alloc_opt_num = 2;
@@ -1062,6 +1125,7 @@ test_alloc_apply_l2(void **state)
                       sizeof(struct pqos_l2ca) - 8);
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
+        mock_inter_get(PQOS_INTER_MSR, 1);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -1161,6 +1225,7 @@ test_alloc_apply_l2_cdp(void **state)
                       sizeof(struct pqos_l2ca));
         will_return(__wrap_pqos_l2ca_set, PQOS_RETVAL_OK);
 
+        mock_inter_get(PQOS_INTER_MSR, 1);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -1217,6 +1282,7 @@ test_alloc_apply_set_core_to_class_id(void **state)
         expect_value(__wrap_pqos_alloc_assoc_set, class_id, 2);
         will_return(__wrap_pqos_alloc_assoc_set, PQOS_RETVAL_OK);
 
+        mock_inter_get(PQOS_INTER_MSR, 1);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -1244,6 +1310,7 @@ test_alloc_apply_set_core_to_class_id_neg(void **state)
         expect_value(__wrap_pqos_alloc_assoc_set, class_id, 1);
         will_return(__wrap_pqos_alloc_assoc_set, PQOS_RETVAL_ERROR);
 
+        mock_inter_get(PQOS_INTER_MSR, 1);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -1251,6 +1318,7 @@ test_alloc_apply_set_core_to_class_id_neg(void **state)
         assert_true(output_has_text("Core number or class id is out of "
                                     "bounds!"));
 
+        mock_inter_get(PQOS_INTER_MSR, 1);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -1282,6 +1350,7 @@ test_alloc_apply_set_pid_to_class_id(void **state)
         expect_value(__wrap_pqos_alloc_assoc_set_pid, class_id, 3);
         will_return(__wrap_pqos_alloc_assoc_set_pid, PQOS_RETVAL_OK);
 
+        mock_inter_get(PQOS_INTER_MSR, 1);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
@@ -1309,6 +1378,7 @@ test_alloc_apply_set_pid_to_class_id_neg(void **state)
         expect_value(__wrap_pqos_alloc_assoc_set_pid, class_id, 1);
         will_return(__wrap_pqos_alloc_assoc_set_pid, PQOS_RETVAL_ERROR);
 
+        mock_inter_get(PQOS_INTER_MSR, 2);
         run_function(alloc_apply, ret, data->cap_l3ca, data->cap_l2ca,
                      data->cap_mba, data->cap_smba, data->cpu_info, NULL);
 
