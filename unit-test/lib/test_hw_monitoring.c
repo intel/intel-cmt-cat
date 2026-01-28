@@ -38,7 +38,28 @@
 #include "perf_monitoring.h"
 #include "test.h"
 
-/* ======== init ======== */
+/* ======== mock for master forwarding wrappers ======== */
+
+int
+__wrap_mon_assoc_get_core(const unsigned lcore, pqos_rmid_t *rmid)
+{
+        check_expected(lcore);
+
+        if (rmid != NULL)
+                *rmid = mock_type(pqos_rmid_t);
+
+        return mock_type(int);
+}
+
+int
+__wrap_mon_reset(const struct pqos_mon_config *cfg)
+{
+        /* cfg may be NULL */
+        function_called();
+        check_expected_ptr(cfg);
+
+        return mock_type(int);
+}
 
 /* ======== mock ======== */
 
@@ -162,9 +183,9 @@ test_hw_mon_assoc_get_core(void **state)
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
-        expect_value(hw_mon_assoc_read, lcore, lcore);
-        will_return(hw_mon_assoc_read, 2);
-        will_return(hw_mon_assoc_read, PQOS_RETVAL_OK);
+        expect_value(__wrap_mon_assoc_get_core, lcore, lcore);
+        will_return(__wrap_mon_assoc_get_core, 2);
+        will_return(__wrap_mon_assoc_get_core, PQOS_RETVAL_OK);
 
         ret = hw_mon_assoc_get_core(lcore, &rmid);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -183,9 +204,18 @@ test_hw_mon_assoc_get_core_param(void **state)
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
+        /* invalid core id */
+        expect_value(__wrap_mon_assoc_get_core, lcore, 200);
+        will_return(__wrap_mon_assoc_get_core, 1); /* keep rmid */
+        will_return(__wrap_mon_assoc_get_core, PQOS_RETVAL_PARAM);
+
         ret = hw_mon_assoc_get_core(200, &rmid);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
         assert_int_equal(rmid, 1);
+
+        /* NULL param */
+        expect_value(__wrap_mon_assoc_get_core, lcore, lcore);
+        will_return(__wrap_mon_assoc_get_core, PQOS_RETVAL_PARAM);
 
         ret = hw_mon_assoc_get_core(lcore, NULL);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
@@ -261,17 +291,6 @@ test_hw_mon_assoc_get_channel_param(void **state)
 /* ======== hw_mon_reset ======== */
 
 static void
-hw_mon_reset_mock(const struct pqos_cpuinfo *cpu)
-{
-        unsigned i;
-
-        for (i = 0; i < cpu->num_cores; ++i)
-                expect_value(hw_mon_assoc_write, lcore, cpu->cores[i].lcore);
-        expect_value_count(hw_mon_assoc_write, rmid, 0, cpu->num_cores);
-        will_return_count(hw_mon_assoc_write, PQOS_RETVAL_OK, cpu->num_cores);
-}
-
-static void
 test_hw_mon_reset(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
@@ -281,7 +300,9 @@ test_hw_mon_reset(void **state)
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
-        hw_mon_reset_mock(data->cpu);
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, NULL);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_OK);
 
         ret = hw_mon_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -291,20 +312,15 @@ static void
 test_hw_mon_reset_error(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
-        struct pqos_cpuinfo *cpu = data->cpu;
         int ret;
-        unsigned i;
 
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
-        for (i = 0; i < cpu->num_cores; ++i)
-                expect_value(hw_mon_assoc_write, lcore, cpu->cores[i].lcore);
-        expect_value_count(hw_mon_assoc_write, rmid, 0, cpu->num_cores);
-        will_return(hw_mon_assoc_write, PQOS_RETVAL_ERROR);
-        will_return_count(hw_mon_assoc_write, PQOS_RETVAL_OK,
-                          cpu->num_cores - 1);
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, NULL);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_ERROR);
 
         ret = hw_mon_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
@@ -319,6 +335,10 @@ test_hw_mon_reset_unsupported(void **state)
         will_return_maybe(__wrap__pqos_get_cap, data->cap);
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap__pqos_get_dev, data->dev);
+
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, NULL);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_RESOURCE);
 
         ret = hw_mon_reset(NULL);
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
@@ -340,6 +360,10 @@ test_mon_reset_iordt_unsupported(void **state)
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
 
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, &cfg);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_PARAM);
+
         ret = hw_mon_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_PARAM);
 }
@@ -358,15 +382,12 @@ test_mon_reset_iordt_enable(void **state)
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
-        expect_function_call(__wrap_iordt_mon_assoc_reset);
-        will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
-
-        expect_value(mon_reset_iordt, enable, 1);
-        will_return(mon_reset_iordt, PQOS_RETVAL_OK);
-        hw_mon_reset_mock(data->cpu);
-
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_iordt = PQOS_REQUIRE_IORDT_ON;
+
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, &cfg);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_OK);
 
         ret = hw_mon_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -374,10 +395,10 @@ test_mon_reset_iordt_enable(void **state)
         /* I/O RDT already enabled */
         data->cap_mon->iordt = 1;
         data->cap_mon->iordt_on = 1;
-        expect_function_call(__wrap_iordt_mon_assoc_reset);
-        will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
 
-        hw_mon_reset_mock(data->cpu);
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, &cfg);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_OK);
 
         ret = hw_mon_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -397,15 +418,12 @@ test_mon_reset_iordt_disable(void **state)
         will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
         will_return_maybe(__wrap__pqos_get_dev, data->dev);
 
-        expect_function_call(__wrap_iordt_mon_assoc_reset);
-        will_return(__wrap_iordt_mon_assoc_reset, PQOS_RETVAL_OK);
-
-        expect_value(mon_reset_iordt, enable, 0);
-        will_return(mon_reset_iordt, PQOS_RETVAL_OK);
-        hw_mon_reset_mock(data->cpu);
-
         memset(&cfg, 0, sizeof(cfg));
         cfg.l3_iordt = PQOS_REQUIRE_IORDT_OFF;
+
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, &cfg);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_OK);
 
         ret = hw_mon_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
@@ -413,7 +431,11 @@ test_mon_reset_iordt_disable(void **state)
         /* I/O RDT already disabled */
         data->cap_mon->iordt = 1;
         data->cap_mon->iordt_on = 0;
-        hw_mon_reset_mock(data->cpu);
+
+        expect_function_call(__wrap_mon_reset);
+        expect_value(__wrap_mon_reset, cfg, &cfg);
+        will_return(__wrap_mon_reset, PQOS_RETVAL_OK);
+
         ret = hw_mon_reset(&cfg);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
