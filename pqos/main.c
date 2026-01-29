@@ -1231,7 +1231,21 @@ static const char help_printf_long[] =
     "         --alloc-opt-bw -e \"mba:1=80;mba:2=64;mba:3=85\"\n"
     "      5. Use multiple domain-ids and memory regions\n"
     "         pqos --iface=mmio --alloc-domain-id=0-4 --alloc-mem-region=0-3 "
-    "-e \"mba:1=0x50;mba:2=0x70;\"\n\n";
+    "-e \"mba:1=0x50;mba:2=0x70;\"\n\n"
+    "----------------  IORDT Allocation options -----------------\n"
+    "  --alloc-domain-id=DOMAINS domains to apply settings\n"
+    "  DOMAINS format is a comma-separated list or range.\n"
+    "  General MMIO IORDT allocation command format:\n"
+    "  pqos --iface=mmio --alloc-domain-id=DOMAINS -e \"CLASSDEF\"\n"
+    "  CLASSDEF format is 'llc:CLOS_ID=VALUE;'\n"
+    "  Example:\n"
+    "      Allocates channel 0x30000 to CLOS1 in domain 16 and allocates cache "
+    "ways to CLOS1.\n"
+    "      pqos --iface=mmio -R l3iordt-on\n"
+    "      pqos --iface=mmio -a \"channel:1=0x30000;\"\n"
+    "      pqos --iface=mmio --alloc-domain-id=16 -e \"llc:1=0xdeadbeef;\"\n"
+    "      pqos --iface=mmio --alloc-domain-id=16,17 -e "
+    "\"llc:15=0xdeadbeef;\"\n";
 
 /* clang-format on */
 
