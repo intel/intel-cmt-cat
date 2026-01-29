@@ -1245,7 +1245,22 @@ static const char help_printf_long[] =
     "      pqos --iface=mmio -a \"channel:1=0x30000;\"\n"
     "      pqos --iface=mmio --alloc-domain-id=16 -e \"llc:1=0xdeadbeef;\"\n"
     "      pqos --iface=mmio --alloc-domain-id=16,17 -e "
-    "\"llc:15=0xdeadbeef;\"\n";
+    "\"llc:15=0xdeadbeef;\"\n\n"
+    "----------------  IORDT Monitoring options -----------------\n"
+    "  -–mon-channel=CHANNEL a channel to monitor\n"
+    "  CHANNEL format is \"mon_type: channel_id\"\n"
+    "  mon_type is one of the following:\n"
+    "      all - all default events\n"
+    "      llc - Last Level Cache Occupancy\n"
+    "      iot - I/O Total\n"
+    "      iom - I/O Miss\n"
+    "  General MMIO IORDT monitoring command format:\n"
+    "  pqos --iface=mmio --mon-channel=CHANNEL\n"
+    "  Example:\n"
+    "      pqos --iface=mmio -r l3iordt-on\n"
+    "      pqos --iface=mmio --mon-channel=\"all:0x30000\"\n"
+    "      pqos --iface=mmio "
+    "--mon-channel=\"llc:0x30000;iot:0x30000;iom:0x30000\"\n";
 
 /* clang-format on */
 
