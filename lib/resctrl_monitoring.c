@@ -1328,7 +1328,7 @@ resctrl_mon_shared(struct pqos_mon_data *group, unsigned *shared)
 
                                 *shared = 1;
                                 for (j = 0; j < group->num_cores; j++)
-                                        if (group->cores[i] == lcore) {
+                                        if (group->cores[j] == lcore) {
                                                 *shared = 0;
                                                 break;
                                         }
