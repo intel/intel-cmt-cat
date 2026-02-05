@@ -1260,7 +1260,19 @@ static const char help_printf_long[] =
     "      pqos --iface=mmio -r l3iordt-on\n"
     "      pqos --iface=mmio --mon-channel=\"all:0x30000\"\n"
     "      pqos --iface=mmio "
-    "--mon-channel=\"llc:0x30000;iot:0x30000;iom:0x30000\"\n";
+    "--mon-channel=\"llc:0x30000;iot:0x30000;iom:0x30000\"\n"
+    "--------------- IORDT dev exploring options ---------------\n"
+    "  --print-io-devs   print all IORDT devices\n"
+    "  Example:\n"
+    "      pqos --iface=mmio --print-io-devs\n"
+    "  --print-io-dev=DEV print specific IORDT device\n"
+    "  DEV format is DOMAIN:BUS:DEVICE.FUNCTION\n"
+    "      DOMAIN is the PCI domain number in hexadecimal\n"
+    "      BUS is the PCI bus number in hexadecimal\n"
+    "      DEVICE is the PCI device number in hexadecimal\n"
+    "      FUNCTION is the PCI function number in hexadecimal\n"
+    "  Example:\n"
+    "      pqos --iface=mmio --print-io-dev=0000:90:00.0\n\n";
 
 /* clang-format on */
 
