@@ -35,10 +35,59 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+/**
+ * @brief Filter directory filenames
+ *
+ * This function is used by the scandir function to filter directories
+ *
+ * @param dir dirent structure containing directory info
+ *
+ * @return if directory entry should be included in scandir() output list
+ * @retval 0 means don't include the entry
+ * @retval 1 means include the entry
+ */
+int
+pqos_filter_cpu(const struct dirent *dir)
+{
+        return fnmatch("cpu[0-9]*", dir->d_name, 0) == 0;
+}
+
+/**
+ * @brief Converts string into unsigned number.
+ *
+ * @param [in] str string to be converted into unsigned number
+ * @param [out] value Numeric value of the string representing the number
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+pqos_parse_uint(const char *str, unsigned *value)
+{
+        unsigned long val;
+        char *endptr = NULL;
+
+        ASSERT(str != NULL);
+        ASSERT(value != NULL);
+
+        errno = 0;
+        val = strtoul(str, &endptr, 0);
+        if (!(*str != '\0' && (*endptr == '\0' || *endptr == '\n')))
+                return PQOS_RETVAL_ERROR;
+
+        if (val <= UINT_MAX) {
+                *value = val;
+                return PQOS_RETVAL_OK;
+        }
+
+        return PQOS_RETVAL_ERROR;
+}
 
 __attribute__((noreturn)) void
 parse_error(const char *arg, const char *note)
@@ -131,4 +180,16 @@ safe_open(const char *pathname, int flags, mode_t mode)
         }
 
         return fd;
+}
+
+int
+pqos_cpu_sort(const struct dirent **dir1, const struct dirent **dir2)
+{
+        unsigned cpu1 = 0;
+        unsigned cpu2 = 0;
+
+        pqos_parse_uint((*dir1)->d_name + 3, &cpu1);
+        pqos_parse_uint((*dir2)->d_name + 3, &cpu2);
+
+        return cpu1 - cpu2;
 }

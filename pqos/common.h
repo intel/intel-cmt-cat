@@ -46,6 +46,10 @@ extern "C" {
 #include <assert.h>
 #endif
 
+#include "pqos.h"
+
+#include <dirent.h> /**< scandir() */
+#include <fnmatch.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
@@ -68,6 +72,8 @@ extern "C" {
 
 #define MAX_DOMAIN_IDS 128
 #define MAX_RMIDS      1024
+
+#define PQOS_SYSTEM_CPU  "/sys/devices/system/cpu"
 
 /**
  * @brief Wrapper around fopen() that additionally checks if a given path
@@ -107,6 +113,30 @@ int safe_open(const char *pathname, int flags, mode_t mode);
  * @param note context and information about encountered error
  */
 void parse_error(const char *arg, const char *note) __attribute__((noreturn));
+
+/**
+ * @brief Filter directory filenames
+ *
+ * This function is used by the scandir function to filter directories
+ *
+ * @param dir dirent structure containing directory info
+ *
+ * @return if directory entry should be included in scandir() output list
+ * @retval 0 means don't include the entry
+ * @retval 1 means include the entry
+ */
+int pqos_filter_cpu(const struct dirent *dir);
+
+/**
+ * @brief Sort directory filenames
+ *
+ * @param dir1 dirent structure containing directory info
+ * @param dir2 dirent structure containing directory info
+ *
+ * @return directory names comparison result
+ */
+int
+pqos_cpu_sort(const struct dirent **dir1, const struct dirent **dir2);
 
 #ifdef __cplusplus
 }

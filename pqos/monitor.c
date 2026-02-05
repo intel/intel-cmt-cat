@@ -1025,7 +1025,30 @@ parse_event(const char *str, enum pqos_mon_event *evt)
                 parse_error(str, "Unrecognized monitoring event type");
 }
 
-#define PARSE_MON_GRP_BUFF_SIZE 1250
+#define PARSE_MON_GRP_BUFF_SIZE 2048
+
+static int
+get_cpu_count(void)
+{
+        struct dirent **namelist = NULL;
+        int num_cpus;
+        int i;
+
+        num_cpus =
+            scandir(PQOS_SYSTEM_CPU, &namelist, pqos_filter_cpu, pqos_cpu_sort);
+
+        if (num_cpus < 0) {
+                printf("%s: Failed to read %s cpus!\n", __func__,
+                       PQOS_SYSTEM_CPU);
+                return PARSE_MON_GRP_BUFF_SIZE;
+        }
+
+        for (i = 0; i < num_cpus; i++)
+                free(namelist[i]);
+        free(namelist);
+
+        return num_cpus;
+}
 
 /**
  * @brief Function to set the descriptions and cores/pids for each monitoring
@@ -1042,8 +1065,15 @@ parse_monitor_group(char *str, enum mon_group_type type)
         enum pqos_mon_event evt = (enum pqos_mon_event)0;
         unsigned group_count = 0;
         unsigned i;
-        uint64_t cbuf[PARSE_MON_GRP_BUFF_SIZE];
+        uint64_t *cbuf = NULL;
+        const int cbuf_len = get_cpu_count();
         char *non_grp = NULL;
+
+        cbuf = malloc(sizeof(*cbuf) * cbuf_len);
+        if (cbuf == NULL) {
+                printf("Error allocating monitoring parse buffer\n");
+                return -1;
+        }
 
         parse_event(str, &evt);
         str = strchr(str, ':') + 1;
@@ -1058,7 +1088,7 @@ parse_monitor_group(char *str, enum mon_group_type type)
                          * number of new groups
                          */
                         unsigned new_groups_count =
-                            strlisttotab(non_grp, cbuf, DIM(cbuf));
+                            strlisttotab(non_grp, cbuf, cbuf_len);
 
                         /* set group info */
                         for (i = 0; i < new_groups_count; i++) {
@@ -1071,8 +1101,10 @@ parse_monitor_group(char *str, enum mon_group_type type)
                                         desc = uinttohexstr((unsigned)cbuf[i]);
 
                                 grp = grp_add(type, evt, desc, &cbuf[i], 1);
-                                if (grp == NULL)
+                                if (grp == NULL) {
+                                        free(cbuf);
                                         return -1;
+                                }
 
                                 group_count++;
                         }
@@ -1093,16 +1125,19 @@ parse_monitor_group(char *str, enum mon_group_type type)
                          * one group so strlisttotab result is the number
                          * of elements in that one group
                          */
-                        element_count = strlisttotab(grp, cbuf, DIM(cbuf));
+                        element_count = strlisttotab(grp, cbuf, cbuf_len);
 
                         /* set group info */
                         group = grp_add(type, evt, desc, cbuf, element_count);
-                        if (group == NULL)
+                        if (group == NULL) {
+                                free(cbuf);
                                 return -1;
+                        }
                         group_count++;
                 }
         }
 
+        free(cbuf);
         return group_count;
 }
 
