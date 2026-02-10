@@ -429,7 +429,11 @@ mmio_alloc_reset_cat(void)
                             (const struct pqos_erdt_card *)&erdt
                                 ->dev_agents[domain]
                                 .card,
-                            i, (uint64_t)IOL3_CBM_RESET_MASK);
+                            i,
+                            (1ULL
+                             << erdt->dev_agents[domain].rmdd.num_io_l3_ways) -
+                                1ULL);
+
                         if (ret != PQOS_RETVAL_OK)
                                 return ret;
                 }
