@@ -1080,12 +1080,12 @@ print_io_dev(const struct pqos_sysconfig *sys,
                        cap_l3ca->u.l3ca->num_classes - 1);
         else if (interface == PQOS_INTER_MMIO)
                 printf("\n\tAvailable CLOS     : 0 to %d\n",
-                       sys->erdt->max_clos - 1);
+                       sys->erdt->max_clos);
 
         printf("\tAllocation Commands:\n");
         for (j = 0; j < pci_info.num_channels; j++) {
                 if (pci_info.channels[j] > 0) {
-                        printf("\t\tpqos --iface=%s -a channel:<CLOS>="
+                        printf("\t\tpqos --iface=%s -a dev:<CLOS>="
                                "%.4x:%.2x:%.2x.%x@%d\n",
                                interface_str, segment, BDF_BUS(bdf),
                                BDF_DEV(bdf), BDF_FUNC(bdf), j);
