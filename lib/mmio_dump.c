@@ -112,25 +112,39 @@ print_hex_dump(const uint8_t *buf,
         char line[MMIO_DUMP_LINE_LEN];
         size_t elems_per_line =
             (width_bytes == 8) ? QWORD_ELEMS_PER_LINE : BYTE_ELEMS_PER_LINE;
-        size_t line_num = length / elems_per_line;
+        /* ceil(length / elems_per_line) so we also print the remainder */
+        size_t line_num = (length + elems_per_line - 1) / elems_per_line;
 
         LOG_DEBUG(
             "%s: Addr: %p. Dumping %zu elements as %s with width %u bytes\n",
             __func__, buf, length, le ? "little-endian" : "big-endian",
             width_bytes);
+
         for (i = 0; i < line_num; i++) {
-                size_t offset = i * width_bytes * elems_per_line;
+                const size_t elems_done = i * elems_per_line;
+                const size_t elems_left = length - elems_done;
+                const size_t elems_this_line =
+                    (elems_left > elems_per_line) ? elems_per_line : elems_left;
+
+                /* byte offset from start of mapped buffer */
+                const size_t offset = elems_done * width_bytes;
 
                 LOG_DEBUG("offset: 0x%zx\n", offset);
                 snprintf(line, sizeof(line), "%06zx ", offset);
-                for (j = 0; j < elems_per_line; j++) {
+
+                for (j = 0; j < elems_this_line; j++) {
                         LOG_DEBUG("elem_idx: %zu\n", j);
                         LOG_DEBUG(
                             "elem VA: %p\n",
                             (const void *)(buf + offset + j * width_bytes));
-                        LOG_DEBUG("elem value: %#" PRIx64 "\n",
-                                  *(const uint64_t *)(buf + offset +
-                                                      j * width_bytes));
+
+                        if (width_bytes == 8) {
+                                uint64_t v;
+
+                                memcpy(&v, buf + offset + j * width_bytes,
+                                       sizeof(v));
+                                LOG_DEBUG("elem value: %#" PRIx64 "\n", v);
+                        }
 
                         for (k = 0; k < width_bytes; k++) {
                                 current_byte =
@@ -195,7 +209,7 @@ dump_mmio_range(uint64_t base,
                  __func__, (unsigned long)base, size, offset, length,
                  width_bytes, le, binary);
 
-        if ((offset + length_bytes) > size) {
+        if ((offset_bytes + length_bytes) > size) {
                 LOG_ERROR("View port out of range\n");
                 return PQOS_RETVAL_PARAM;
         }
