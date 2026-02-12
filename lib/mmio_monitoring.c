@@ -1150,10 +1150,19 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                 };
 
                 for (j = 0; j < group->regions.num_mem_regions; j++) {
+                        /* Calculate delta and update total value for the region
+                         * If the previous value is valid, calculate the delta,
+                         * otherwise set it to 0 */
                         region_values->mbm_total_delta[j] =
-                            values[j] - region_values->mbm_total[j];
+                            (region_values->valid_mbm_read)
+                                ? values[j] - region_values->mbm_total[j]
+                                : 0;
                         region_values->mbm_total[j] = values[j];
                 };
+
+                /* Mark that we have valid MBM read for the next delta
+                 * calculation */
+                region_values->valid_mbm_read = 1;
 
                 break;
         case PQOS_MON_EVENT_IO_L3_OCCUP:
