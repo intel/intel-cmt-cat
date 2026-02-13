@@ -917,7 +917,6 @@ struct pqos_region_aware_event_values {
         uint64_t io_total_delta;
         uint64_t io_miss;
         uint64_t io_miss_delta;
-        int valid_mbm_read; /**< flag to discard 1st invalid read */
 };
 
 /**
