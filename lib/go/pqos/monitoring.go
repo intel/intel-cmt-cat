@@ -117,6 +117,7 @@ func (p *PQoS) MonStartCores(cores []uint, event uint) (*MonData, error) {
 		&cCores[0],
 		C.enum_pqos_mon_event(event),
 		nil, // context
+		nil, // mem_region
 		&group,
 	)
 

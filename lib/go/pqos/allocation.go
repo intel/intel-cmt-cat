@@ -638,10 +638,11 @@ func (p *PQoS) AllocReset() error {
 		return ErrNotInitialized
 	}
 
-	// Use PQOS_REQUIRE_CDP_ANY and PQOS_MBA_ANY for default reset
-	ret := C.pqos_alloc_reset(C.PQOS_REQUIRE_CDP_ANY, C.PQOS_REQUIRE_CDP_ANY, C.PQOS_MBA_ANY)
+	// Use pqos_alloc_reset_config with NULL to reset to defaults
+	// pqos_alloc_reset is deprecated, use pqos_alloc_reset_config instead
+	ret := C.pqos_alloc_reset_config(nil)
 	if ret != C.PQOS_RETVAL_OK {
-		return retvalToError(ret, "pqos_alloc_reset")
+		return retvalToError(ret, "pqos_alloc_reset_config")
 	}
 
 	return nil
