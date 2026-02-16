@@ -134,6 +134,10 @@ struct pqos_mon_data_internal {
 
         int valid_mbm_read; /**< flag to discard 1st invalid read */
         int manage_memory;  /**< mon data memory is managed by lib */
+
+        /* I/O RDT flags */
+        int valid_io_total_read; /**< flag to discard 1st invalid read */
+        int valid_io_miss_read;  /**< flag to discard 1st invalid read */
 };
 
 /**

@@ -1111,6 +1111,7 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                         pv->llc += scale_llc_value(
                             cmrc, l3_cmt_rmid_to_uint64(tmp_rmid_val));
                 };
+
                 break;
         case PQOS_MON_EVENT_TMEM_BW:
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
@@ -1160,7 +1161,7 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                         region_values->mbm_total[j] = values[j];
                 };
 
-                /* Mark that we have valid MBM read for the next delta
+                /* Mark that valid MBM read is available now for the next delta
                  * calculation */
                 group->intl->valid_mbm_read = 1;
 
@@ -1204,6 +1205,7 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                         group->region_values.io_llc += scale_io_llc_value(
                             cmrd, iol3_cmt_rmid_to_uint64(tmp_rmid_val));
                 };
+
                 break;
         case PQOS_MON_EVENT_IO_TOTAL_MEM_BW:
                 for (i = 0; i < group->intl->hw.num_ctx; i++) {
@@ -1244,9 +1246,18 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                             ibrd, rmid, iol3_mbm_rmid_to_uint64(tmp_rmid_val));
                 };
 
+                /* Calculate delta and update I/O Total value.
+                 * If the previous value is valid, calculate the delta,
+                 * otherwise set it to 0 */
                 group->region_values.io_total_delta =
-                    value - group->region_values.io_total;
+                    (group->intl->valid_io_total_read)
+                        ? value - group->region_values.io_total
+                        : 0;
                 group->region_values.io_total = value;
+
+                /* Mark that valid I/O Total read is available now for
+                 * the next delta calculation */
+                group->intl->valid_io_total_read = 1;
 
                 break;
         case PQOS_MON_EVENT_IO_MISS_MEM_BW:
@@ -1287,9 +1298,20 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                         value += scale_io_mbm_value(
                             ibrd, rmid, iol3_mbm_rmid_to_uint64(tmp_rmid_val));
                 };
+
+                /* Calculate delta and update I/O Miss value.
+                 * If the previous value is valid, calculate the delta,
+                 * otherwise set it to 0 */
                 group->region_values.io_miss_delta =
-                    value - group->region_values.io_miss;
+                    (group->intl->valid_io_miss_read)
+                        ? value - group->region_values.io_miss
+                        : 0;
                 group->region_values.io_miss = value;
+
+                /* Mark that valid I/O Miss read is available now for
+                 * the next delta calculation */
+                group->intl->valid_io_miss_read = 1;
+
                 break;
         default:
                 pv->mbm_total = 0;
