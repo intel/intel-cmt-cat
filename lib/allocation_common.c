@@ -270,6 +270,7 @@ alloc_reset(const struct pqos_alloc_config *cfg)
                 l3cat_ids = pqos_cpu_get_l3cat_ids(cpu, &l3cat_id_num);
                 if (l3cat_ids == NULL || l3cat_id_num == 0)
                         goto pqos_alloc_reset_exit;
+
                 /**
                  * Change L3 COS definition on all l3cat ids
                  * so that each COS allows for access to all cache ways
@@ -411,19 +412,19 @@ alloc_reset(const struct pqos_alloc_config *cfg)
         }
 
         /**
-         * Turn L3 I/O RDT ON or OFF upon the request
+         * Turn L3 I/O RDT allocation ON or OFF upon the request
          */
         if (l3_cap != NULL) {
                 if (l3_iordt_cfg == PQOS_REQUIRE_IORDT_ON &&
                     !l3_cap->iordt_on) {
                         /**
-                         * Turn on L3 CDP
+                         * Turn on I/O RDT allocation in L3 clusters
                          */
-                        LOG_INFO("Turning L3 I/O RDT ON ...\n");
-                        ret =
-                            hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 1);
+                        LOG_INFO("Turning L3 I/O RDT Allocation ON ...\n");
+                        ret = hw_alloc_reset_l3iordt(cpu, 1);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("L3 I/O RDT enable error!\n");
+                                LOG_ERROR("L3 I/O RDT Allocation enable "
+                                          "error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
 
@@ -434,13 +435,13 @@ alloc_reset(const struct pqos_alloc_config *cfg)
                 if (l3_iordt_cfg == PQOS_REQUIRE_IORDT_OFF &&
                     l3_cap->iordt_on) {
                         /**
-                         * Turn off L3 CDP
+                         * Turn off I/O RDT allocation in L3 clusters
                          */
-                        LOG_INFO("Turning L3 I/O RDT OFF ...\n");
-                        ret =
-                            hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 0);
+                        LOG_INFO("Turning L3 I/O RDT Allocation OFF ...\n");
+                        ret = hw_alloc_reset_l3iordt(cpu, 0);
                         if (ret != PQOS_RETVAL_OK) {
-                                LOG_ERROR("L3 I/O RDT disable error!\n");
+                                LOG_ERROR("L3 I/O RDT Allocation disable "
+                                          "error!\n");
                                 goto pqos_alloc_reset_exit;
                         }
                 }
@@ -501,13 +502,9 @@ alloc_reset(const struct pqos_alloc_config *cfg)
         }
 
 pqos_alloc_reset_exit:
-        if (l3cat_ids != NULL)
-                free(l3cat_ids);
-        if (mba_ids != NULL)
-                free(mba_ids);
-        if (smba_ids != NULL)
-                free(smba_ids);
-        if (l2ids != NULL)
-                free(l2ids);
+        free(l3cat_ids);
+        free(mba_ids);
+        free(smba_ids);
+        free(l2ids);
         return ret;
 }

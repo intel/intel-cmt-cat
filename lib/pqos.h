@@ -1970,6 +1970,21 @@ int pqos_cpu_get_one_by_numaid(const struct pqos_cpuinfo *cpu,
 int pqos_cpu_get_one_by_l3cat_id(const struct pqos_cpuinfo *cpu,
                                  const unsigned l3cat_id,
                                  unsigned *lcore);
+
+/**
+ * @brief Retrieves one core id from cpu info structure for \a l3id
+ *
+ * @param [in] cpu CPU information structure from \a pqos_cap_get
+ * @param [in] l3id unique L3 cache identifier
+ * @param [out] lcore place to store returned core id
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+int pqos_cpu_get_one_by_l3id(const struct pqos_cpuinfo *cpu,
+                             const unsigned l3id,
+                             unsigned *lcore);
+
 /**
  * @brief Retrieves one core id from cpu info structure for \a l2id
  *

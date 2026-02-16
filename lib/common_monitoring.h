@@ -140,7 +140,7 @@ int PQOS_LOCAL mon_events_valid(const struct pqos_cap *cap,
 PQOS_LOCAL int mon_read_perf(struct pqos_mon_data *group,
                              const enum pqos_mon_event event);
 /**
- * @brief Enables or disables I/O RDT monitoring across selected CPU sockets
+ * @brief Enables or disables I/O RDT monitoring in all L3 clusters
  *
  * @param [in] cpu CPU information
  * @param [in] enable I/O RDT enable/disable flag, 1 - enable, 0 - disable

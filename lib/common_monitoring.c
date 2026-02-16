@@ -510,32 +510,41 @@ clean_up:
 int
 mon_reset_iordt(const struct pqos_cpuinfo *cpu, const int enable)
 {
-        unsigned *sockets = NULL;
-        unsigned sockets_num;
+        unsigned *l3ids = NULL;
+        unsigned l3id_num = 0;
         unsigned j = 0;
         int ret = PQOS_RETVAL_OK;
 
         ASSERT(cpu != NULL);
 
-        LOG_INFO("%s I/O RDT monitoring across sockets...\n",
+        LOG_INFO("%s I/O RDT monitoring across L3 clusters...\n",
                  (enable) ? "Enabling" : "Disabling");
 
-        sockets = pqos_cpu_get_sockets(cpu, &sockets_num);
-        if (sockets == NULL || sockets_num == 0) {
+        /**
+         * Get number & list of L3ids in the system
+         */
+        l3ids = pqos_cpu_get_l3_clusters(cpu, &l3id_num);
+        if (l3ids == NULL || l3id_num == 0) {
                 ret = PQOS_RETVAL_ERROR;
                 goto mon_reset_iordt_exit;
         }
 
-        for (j = 0; j < sockets_num; j++) {
+        for (j = 0; j < l3id_num; j++) {
                 uint64_t reg = 0;
                 unsigned core = 0;
 
-                ret = pqos_cpu_get_one_core(cpu, sockets[j], &core);
-                if (ret != PQOS_RETVAL_OK)
+                ret = pqos_cpu_get_one_by_l3id(cpu, l3ids[j], &core);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Unable to get one core for L3 ID %u\n",
+                                  l3ids[j]);
                         goto mon_reset_iordt_exit;
+                }
 
                 ret = msr_read(core, PQOS_MSR_L3_IO_QOS_CFG, &reg);
                 if (ret != MACHINE_RETVAL_OK) {
+                        LOG_ERROR("Unable to read MSR 0x%x for core %u in "
+                                  "L3 cluster %u\n",
+                                  PQOS_MSR_L3_IO_QOS_CFG, core, l3ids[j]);
                         ret = PQOS_RETVAL_ERROR;
                         goto mon_reset_iordt_exit;
                 }
@@ -547,14 +556,16 @@ mon_reset_iordt(const struct pqos_cpuinfo *cpu, const int enable)
 
                 ret = msr_write(core, PQOS_MSR_L3_IO_QOS_CFG, reg);
                 if (ret != MACHINE_RETVAL_OK) {
+                        LOG_ERROR("Unable to write MSR 0x%x for core %u in "
+                                  "L3 cluster %u\n",
+                                  PQOS_MSR_L3_IO_QOS_CFG, core, l3ids[j]);
                         ret = PQOS_RETVAL_ERROR;
                         goto mon_reset_iordt_exit;
                 }
         }
 
 mon_reset_iordt_exit:
-        if (sockets != NULL)
-                free(sockets);
+        free(l3ids);
 
         return ret;
 }

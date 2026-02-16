@@ -98,12 +98,9 @@ hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
 }
 
 int
-hw_alloc_reset_l3iordt(const unsigned l3cat_id_num,
-                       const unsigned *l3cat_ids,
-                       const int enable)
+hw_alloc_reset_l3iordt(const struct pqos_cpuinfo *cpu, const int enable)
 {
-        check_expected(l3cat_id_num);
-        assert_non_null(l3cat_ids);
+        assert_non_null(cpu);
         check_expected(enable);
 
         return mock_type(int);

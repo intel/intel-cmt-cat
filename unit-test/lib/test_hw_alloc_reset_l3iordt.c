@@ -71,7 +71,7 @@ test_hw_alloc_reset_l3iordt_enable(void **state)
                 will_return(__wrap_msr_write, PQOS_RETVAL_OK);
         }
 
-        ret = hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 1);
+        ret = hw_alloc_reset_l3iordt(data->cpu, 1);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (l3cat_ids != NULL)
@@ -111,7 +111,7 @@ test_hw_alloc_reset_l3iordt_disable(void **state)
                 will_return(__wrap_msr_write, PQOS_RETVAL_OK);
         }
 
-        ret = hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 0);
+        ret = hw_alloc_reset_l3iordt(data->cpu, 0);
         assert_int_equal(ret, PQOS_RETVAL_OK);
 
         if (l3cat_ids != NULL)
@@ -138,7 +138,7 @@ test_hw_alloc_reset_l3iordt_error_read(void **state)
         expect_value(__wrap_msr_read, reg, PQOS_MSR_L3_IO_QOS_CFG);
         will_return(__wrap_msr_read, PQOS_RETVAL_ERROR);
 
-        ret = hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 0);
+        ret = hw_alloc_reset_l3iordt(data->cpu, 0);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 
         if (l3cat_ids != NULL)
@@ -171,7 +171,7 @@ test_hw_alloc_reset_l3iordt_error_write(void **state)
         expect_value(__wrap_msr_write, value, 0);
         will_return(__wrap_msr_write, PQOS_RETVAL_ERROR);
 
-        ret = hw_alloc_reset_l3iordt(l3cat_id_num, l3cat_ids, 0);
+        ret = hw_alloc_reset_l3iordt(data->cpu, 0);
         assert_int_equal(ret, PQOS_RETVAL_ERROR);
 
         if (l3cat_ids != NULL)

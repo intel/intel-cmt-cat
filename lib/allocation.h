@@ -233,18 +233,16 @@ PQOS_LOCAL int hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
                                     const int enable);
 
 /**
- * @brief Enables or disables L3 I/O RDT across selected CPU sockets
+ * @brief Enables or disables I/O RDT allocation in all L3 clusters
  *
- * @param [in] l3cat_id_num dimension of \a l3cat_ids array
- * @param [in] l3cat_ids array with L3 ids to change I/O RDT config on
+ * @param [in] cpu CPU information
  * @param [in] enable I/O RDT enable/disable flag, 1 - enable, 0 - disable
  *
  * @return Operations status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_ERROR on failure, MSR read/write error
  */
-PQOS_LOCAL int hw_alloc_reset_l3iordt(const unsigned l3cat_id_num,
-                                      const unsigned *l3cat_ids,
+PQOS_LOCAL int hw_alloc_reset_l3iordt(const struct pqos_cpuinfo *cpu,
                                       const int enable);
 
 /**

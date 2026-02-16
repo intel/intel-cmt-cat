@@ -1496,30 +1496,46 @@ hw_alloc_reset_l3cdp(const unsigned l3cat_id_num,
 }
 
 int
-hw_alloc_reset_l3iordt(const unsigned l3cat_id_num,
-                       const unsigned *l3cat_ids,
-                       const int enable)
+hw_alloc_reset_l3iordt(const struct pqos_cpuinfo *cpu, const int enable)
 {
+        unsigned *l3ids = NULL;
+        unsigned l3id_num = 0;
         unsigned j = 0;
-        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        int ret = PQOS_RETVAL_OK;
 
-        ASSERT(l3cat_id_num > 0 && l3cat_ids != NULL);
+        ASSERT(cpu != NULL);
 
-        LOG_INFO("%s L3 I/O RDT across sockets...\n",
+        LOG_INFO("%s L3 I/O RDT across L3 clusters...\n",
                  (enable) ? "Enabling" : "Disabling");
 
-        for (j = 0; j < l3cat_id_num; j++) {
+        /**
+         * Get number & list of L3ids in the system
+         */
+        l3ids = pqos_cpu_get_l3_clusters(cpu, &l3id_num);
+        if (l3ids == NULL || l3id_num == 0) {
+                ret = PQOS_RETVAL_ERROR;
+                goto hw_alloc_reset_l3iordt_exit;
+        }
+
+        for (j = 0; j < l3id_num; j++) {
                 uint64_t reg = 0;
                 unsigned core = 0;
-                int ret = PQOS_RETVAL_OK;
 
-                ret = pqos_cpu_get_one_by_l3cat_id(cpu, l3cat_ids[j], &core);
-                if (ret != PQOS_RETVAL_OK)
-                        return ret;
+                ret = pqos_cpu_get_one_by_l3id(cpu, l3ids[j], &core);
+                if (ret != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Unable to get one core for L3 ID %u\n",
+                                  l3ids[j]);
+                        goto hw_alloc_reset_l3iordt_exit;
+                }
 
                 ret = msr_read(core, PQOS_MSR_L3_IO_QOS_CFG, &reg);
-                if (ret != MACHINE_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
+                if (ret != MACHINE_RETVAL_OK) {
+                        LOG_ERROR("Unable to read MSR 0x%x for core %u in "
+                                  "L3 cluster %u\n",
+                                  PQOS_MSR_L3_IO_QOS_CFG, core, l3ids[j]);
+                        ret = PQOS_RETVAL_ERROR;
+                        goto hw_alloc_reset_l3iordt_exit;
+                }
 
                 if (enable)
                         reg |= PQOS_MSR_L3_IO_QOS_CA_EN;
@@ -1527,11 +1543,19 @@ hw_alloc_reset_l3iordt(const unsigned l3cat_id_num,
                         reg &= ~PQOS_MSR_L3_IO_QOS_CA_EN;
 
                 ret = msr_write(core, PQOS_MSR_L3_IO_QOS_CFG, reg);
-                if (ret != MACHINE_RETVAL_OK)
-                        return PQOS_RETVAL_ERROR;
+                if (ret != MACHINE_RETVAL_OK) {
+                        LOG_ERROR("Unable to write MSR 0x%x for core %u in "
+                                  "L3 cluster %u\n",
+                                  PQOS_MSR_L3_IO_QOS_CFG, core, l3ids[j]);
+                        ret = PQOS_RETVAL_ERROR;
+                        goto hw_alloc_reset_l3iordt_exit;
+                }
         }
 
-        return PQOS_RETVAL_OK;
+hw_alloc_reset_l3iordt_exit:
+        free(l3ids);
+
+        return ret;
 }
 
 int
