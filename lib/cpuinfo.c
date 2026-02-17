@@ -671,25 +671,19 @@ cpuinfo_init(enum pqos_interface interface, struct pqos_cpuinfo **topology)
         m_cpu->l3 = m_l3;
 
         /*
-         * Update l3cat_id and mba_id. For Intel, CAT and MBA ids are
-         * initialized to socket id. AMD and Hygon use l3_id for both CAT and
-         * MBA ids. Right now, both these ids are same. This could change in
-         * the future.
+         * Use the same l3_id to initialize both CAT and
+         * MBA values. This could change in the future.
+         * Initialize SMBA id the same as MBA for AMD,
+         * as it is also based on L3 cluster.
          */
         for (i = 0; i < m_cpu->num_cores; ++i) {
                 struct pqos_coreinfo *info = &m_cpu->cores[i];
 
-                if (vendor == PQOS_VENDOR_AMD) {
-                        info->l3cat_id = info->l3_id;
-                        info->mba_id = info->l3_id;
+                info->l3cat_id = info->l3_id;
+                info->mba_id = info->l3_id;
+
+                if (vendor == PQOS_VENDOR_AMD)
                         info->smba_id = info->l3_id;
-                } else if (vendor == PQOS_VENDOR_HYGON) {
-                        info->l3cat_id = info->l3_id;
-                        info->mba_id = info->l3_id;
-                } else {
-                        info->l3cat_id = info->socket;
-                        info->mba_id = info->socket;
-                }
         }
 
         *topology = m_cpu;
