@@ -129,12 +129,12 @@ struct __attribute__((__packed__)) acpi_table_irdt_chms {
 #define ACPI_TABLE_IRDT_TYPE_DSS 0
 #define ACPI_TABLE_IRDT_TYPE_RCS 1
 
-#define RCS_FLAGS_AQ   1
 #define RCS_FLAGS_RTS  (1 << 1)
 #define RCS_FLAGS_CTS  (1 << 2)
 #define RCS_FLAGS_REGW (1 << 3)
-#define RCS_FLAGS_REF  (1 << 4)
-#define RCS_FLAGS_CEF  (1 << 5)
+#define RCS_FLAGS_CXLD (1 << 4)
+#define RCS_FLAGS_REF  (1 << 5)
+#define RCS_FLAGS_CEF  (1 << 6)
 
 /**
  * I/O RDT Device Scope Structure (DSS), Resource Control Structure (RCS) Table
@@ -212,9 +212,14 @@ struct __attribute__((__packed__)) acpi_table_irdt_device {
                          *      fields, or accessed as 4B fields if clear,
                          *      subject to enumerated valid RMID and CLOS width
                          *      (from the RMUD structure)
+                         * Bit 4: CXLD: if set, indicates that more than one
+                         *      CXL device resides behind the I/O link
+                         *      represented by this RCS, for instance due
+                         *      to link bifurcation. This has implications on
+                         *      the interpretation of the Channel Count field.
                          *
                          * MMIO Interface Parameter Flags:
-                         * Bits 15-4: Reserved
+                         * Bits 15-5: Reserved
                          */
                         uint16_t flags;
 

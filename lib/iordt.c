@@ -297,6 +297,7 @@ iordt_populate_chans(struct pqos_devinfo *devinfo,
                     (devs[dev_idx]->rcs.flags & RCS_FLAGS_RTS) ? 1 : 0;
                 int clos_tag =
                     (devs[dev_idx]->rcs.flags & RCS_FLAGS_CTS) ? 1 : 0;
+                int cxld = (devs[dev_idx]->rcs.flags & RCS_FLAGS_CXLD) ? 1 : 0;
 
                 for (chan_idx = 0; chan_idx < devs[dev_idx]->rcs.channel_count;
                      chan_idx++) {
@@ -315,6 +316,7 @@ iordt_populate_chans(struct pqos_devinfo *devinfo,
 
                         pqos_chan->rmid_tagging = rmid_tag;
                         pqos_chan->clos_tagging = clos_tag;
+                        pqos_chan->cxld = cxld;
                         pqos_chan->channel_id = PQOS_IRDT_CHAN_ID(
                             rmud_idx, devs[dev_idx]->rcs.rcs_enumeration_id,
                             chan_idx);

@@ -1059,6 +1059,12 @@ print_io_dev(const struct pqos_sysconfig *sys,
                 printf("0x%lx       ", pci_info.mmio_addr[j]);
         printf("\n");
 
+        printf("\tCXL Devices Presence : ");
+        if (pci_info.cxld == 1)
+                printf("Yes\n");
+        else
+                printf("No\n");
+
         printf("\n\tMonitoring Commands:\n");
         for (j = 0; j < pci_info.num_channels; j++) {
                 if (pci_info.channels[j] > 0) {

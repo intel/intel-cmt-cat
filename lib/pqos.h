@@ -465,6 +465,7 @@ struct pqos_channel {
         pqos_channel_t channel_id; /**< Channel ID */
         int rmid_tagging;          /**< RMID tagging is supported */
         int clos_tagging;          /**< CLOS tagging is supported */
+        int cxld;                  /**< CXL Device (CXLD) is supported */
         uint64_t mmio_addr;        /**< MMIO physical address */
         unsigned numa;             /**< numa id in the system */
 };
@@ -840,6 +841,7 @@ struct pqos_pci_info {
         unsigned int num_channels;
         pqos_channel_t channels[PQOS_DEV_MAX_CHANNELS];
         uint64_t mmio_addr[PQOS_DEV_MAX_CHANNELS];
+        int cxld;
         uint16_t domain_id;
 };
 

@@ -513,8 +513,10 @@ io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
         for (idx = 0; idx < pci_info->num_channels; idx++) {
                 channel =
                     pqos_devinfo_get_channel(devinfo, pci_info->channels[idx]);
-                if (channel != NULL)
+                if (channel != NULL) {
                         pci_info->mmio_addr[idx] = channel->mmio_addr;
+                        pci_info->cxld = channel->cxld;
+                }
         }
 
         free(dev);
