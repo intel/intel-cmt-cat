@@ -47,6 +47,7 @@
 #include "mmio_common.h"
 #include "utils.h"
 
+#include <inttypes.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -319,6 +320,7 @@ mmio_l3ca_set(const unsigned l3cat_id,
         int ret = PQOS_RETVAL_OK;
         unsigned i = 0;
         const struct pqos_erdt_info *erdt = _pqos_get_erdt();
+        uint64_t io_l3_ways_mask = 0;
 
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
@@ -333,6 +335,19 @@ mmio_l3ca_set(const unsigned l3cat_id,
                 if (!get_dev_agent_by_domain(ca[i].domain_id)) {
                         LOG_ERROR("Domain id %u is unavailable\n",
                                   ca[i].domain_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+
+                io_l3_ways_mask =
+                    (1ULL << get_dev_agent_by_domain(ca[i].domain_id)
+                                 ->rmdd.num_io_l3_ways) -
+                    1ULL;
+                if (ca[i].u.ways_mask > io_l3_ways_mask) {
+                        LOG_ERROR("L3 CAT COS%u Requested Cache Ways "
+                                  "%#" PRIx64 ". But available Cache Ways "
+                                  "%#" PRIx64 ".\n",
+                                  ca[i].class_id, ca[i].u.ways_mask,
+                                  io_l3_ways_mask);
                         return PQOS_RETVAL_PARAM;
                 }
         }
