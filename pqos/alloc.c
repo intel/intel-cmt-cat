@@ -344,7 +344,7 @@ set_l3_cos(const unsigned class_id,
                 set++;
         }
         sel_alloc_mod += set;
-        if (set < sock_num)
+        if (set < count)
                 return -1;
 
         return (int)set;
@@ -654,7 +654,7 @@ set_mba_cos(const unsigned class_id,
                 set++;
         }
         sel_alloc_mod += set;
-        if (set < sock_num)
+        if (set < count)
                 return -1;
 
         return (int)set;
