@@ -49,6 +49,7 @@
 #include "machine.h"
 #include "os_allocation.h"
 
+#include <inttypes.h>
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
@@ -309,6 +310,7 @@ hw_l3ca_set(const unsigned l3cat_id,
         int cdp_enabled = 0;
         const struct pqos_cap *cap = _pqos_get_cap();
         const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        uint64_t l3_ways_mask = 0;
 
         ASSERT(ca != NULL);
         ASSERT(num_ca != 0);
@@ -327,6 +329,35 @@ hw_l3ca_set(const unsigned l3cat_id,
 
                 if (!is_non_zero) {
                         LOG_ERROR("L3 COS%u bit mask is 0!\n", ca[i].class_id);
+                        return PQOS_RETVAL_PARAM;
+                }
+        }
+
+        l3_ways_mask = (1ULL << cpu->l3.num_ways) - 1ULL;
+        for (i = 0; i < num_ca; i++) {
+                if (ca[i].cdp) {
+                        if (ca[i].u.s.code_mask > l3_ways_mask) {
+                                LOG_ERROR("L3 COS%u requested code bit mask is "
+                                          "%#" PRIx64 ". But available bit mask"
+                                          " %#" PRIx64 ".\n",
+                                          ca[i].class_id, ca[i].u.s.code_mask,
+                                          l3_ways_mask);
+                                return PQOS_RETVAL_PARAM;
+                        }
+                        if (ca[i].u.s.data_mask > l3_ways_mask) {
+                                LOG_ERROR("L3 COS%u requested data bit mask is "
+                                          "%#" PRIx64 ". But available bit mask"
+                                          " %#" PRIx64 ".\n",
+                                          ca[i].class_id, ca[i].u.s.data_mask,
+                                          l3_ways_mask);
+                                return PQOS_RETVAL_PARAM;
+                        }
+                } else if (ca[i].u.ways_mask > l3_ways_mask) {
+                        LOG_ERROR("L3 COS%u requested bit mask is "
+                                  "%#" PRIx64 ". But available bit mask"
+                                  " %#" PRIx64 ".\n",
+                                  ca[i].class_id, ca[i].u.ways_mask,
+                                  l3_ways_mask);
                         return PQOS_RETVAL_PARAM;
                 }
         }
