@@ -78,7 +78,7 @@ static struct sel_alloc_mem_regions_info {
         int min_bw_limit_flag;
         int max_bw_limit_flag;
         int num_mem_regions;
-        int region_num[PQOS_MAX_MEM_REGIONS];
+        uint64_t region_num[PQOS_MAX_MEM_REGIONS];
 } sel_alloc_mem_regions;
 
 /**
@@ -2485,44 +2485,6 @@ free_and_return:
 }
 
 /**
- * @brief Verifies and translates monitoring config string into
- *        internal channel monitoring configuration.
- *
- * @param str single channel string passed to --mon-channel command line option
- */
-static void
-parse_alloc_mem_regions(char *str)
-{
-        static int idx = 0;
-        unsigned int mem_region;
-        int i = 0;
-
-        mem_region = strtouint64(str);
-        if (mem_region < PQOS_MAX_MEM_REGIONS) {
-                /* Check duplicate memry region entry */
-                for (i = 0; i < sel_alloc_mem_regions.num_mem_regions; i++) {
-                        if (mem_region ==
-                            (unsigned int)sel_alloc_mem_regions.region_num[i]) {
-                                parse_error(
-                                    str, "Duplicate memory region selection");
-                                printf("The memory region %d "
-                                       "is entered 2 times\n",
-                                       mem_region);
-                                exit(EXIT_FAILURE);
-                        }
-                }
-                sel_alloc_mem_regions.region_num[idx] = mem_region;
-                idx++;
-                sel_alloc_mem_regions.num_mem_regions++;
-        } else {
-                parse_error(str, "Wrong memory region selection");
-                exit(EXIT_FAILURE);
-        }
-
-        return;
-}
-
-/**
  * @brief Selects memory regions for allocation
  *
  * @param arg not used
@@ -2530,10 +2492,10 @@ parse_alloc_mem_regions(char *str)
 void
 selfn_alloc_mem_regions(const char *arg)
 {
-        char *cp = NULL, *str = NULL;
-        char *saveptr = NULL;
-        unsigned int idx = 0;
+        char *str = NULL;
         unsigned int i = 0;
+        unsigned int j = 0;
+        unsigned int n = 0;
 
         if (arg == NULL)
                 parse_error(arg, "NULL pointer!");
@@ -2541,29 +2503,46 @@ selfn_alloc_mem_regions(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
-        selfn_strdup(&cp, arg);
+        selfn_strdup(&str, arg);
 
         sel_alloc_mem_regions.num_mem_regions = 0;
-        for (idx = 0; idx < PQOS_MAX_MEM_REGIONS; idx++)
-                sel_alloc_mem_regions.region_num[idx] = -1;
+        for (i = 0; i < PQOS_MAX_MEM_REGIONS; i++)
+                sel_alloc_mem_regions.region_num[i] = -1;
 
-        for (idx = 0, str = cp;; str = NULL, idx++) {
-                char *token = NULL;
-
-                token = strtok_r(str, ",", &saveptr);
-                if (token == NULL)
-                        break;
-                if (idx >= PQOS_MAX_MEM_REGIONS) {
-                        parse_error(token, "Wrong memory region selection");
-                        printf("Available Memory Regions: ");
-                        for (i = 0; i < PQOS_MAX_MEM_REGIONS; i++)
-                                printf("%d ", idx);
-                        exit(EXIT_FAILURE);
-                }
-                parse_alloc_mem_regions(token);
+        n = strlisttotab(str, sel_alloc_mem_regions.region_num,
+                         PQOS_MAX_MEM_REGIONS);
+        if (n == 0) {
+                printf("No Mem Region specified: %s\n", str);
+                exit(EXIT_FAILURE);
         }
 
-        free(cp);
+        sel_alloc_mem_regions.num_mem_regions = n;
+
+        /* check for invalid memory region */
+        for (i = 0; i < n; i++) {
+                if (sel_alloc_mem_regions.region_num[i] >=
+                    PQOS_MAX_MEM_REGIONS) {
+                        printf("Mem Region out of range: %s\n", str);
+                        exit(EXIT_FAILURE);
+                }
+        }
+
+        /* Check duplicate memory region entry */
+        for (i = 0; i < n; i++) {
+                for (j = i + 1; j < n; j++) {
+                        if (sel_alloc_mem_regions.region_num[i] ==
+                            sel_alloc_mem_regions.region_num[j]) {
+                                parse_error(str,
+                                            "Duplicate Mem Region selection");
+                                printf("The Mem Region %ld is entered two "
+                                       "times\n",
+                                       sel_alloc_mem_regions.region_num[i]);
+                                exit(EXIT_FAILURE);
+                        }
+                }
+        }
+
+        free(str);
 }
 
 /**
