@@ -1,4 +1,27 @@
 =======================================================================
+Release  v26.03 Mar 2026
+=======================================================================
+
+Contributors (alphabetical order):
+        Hongxu Jia <hongxu.jia@windriver.com>
+        Michael Malyshev <mikem@zededa.com>
+        Raghavan Kanagaraj <raghavan.kanagaraj@intel.com>
+        Roman Storozhenko <roman.storozhenko@intel.com>
+        Xiaochen Shen <shenxiaochen@open-hieco.net>
+
+1. Library:
+        - Implemented all features listed in RDT Specification 1.3
+        - Added Region Aware MBM/MBA, I/O RDT Monitoring and CAT
+        - Added new interface MMIO
+        - Removed Perl_wrapper, Appqos and Appqos_client
+2. PQoS
+        - Implemented all features listed in RDT Specification 1.3
+        - Added Region Aware MBM/MBA, I/O RDT Monitoring and CAT
+        - Added new interface MMIO
+3. General:
+        - Bug fixes
+
+=======================================================================
 Release  v25.04 Apr 2025
 =======================================================================
 

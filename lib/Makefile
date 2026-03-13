@@ -36,8 +36,8 @@
 include ../pre-build.mk
 
 LIB = libpqos
-VERSION = 6.0.1
-SO_VERSION = 6
+VERSION = 7.0.0
+SO_VERSION = 7
 SHARED ?= y
 LDFLAGS = -L. -lpthread -z noexecstack -z relro -z now
 CFLAGS = -pthread -I./ -D_GNU_SOURCE \
