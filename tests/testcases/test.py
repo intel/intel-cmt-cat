@@ -44,12 +44,10 @@ logging.basicConfig(level=logging.DEBUG)
 class Test:
     log = logging.getLogger('rdt-test')
     membw = None
-    rdtset = None
     pqos = None
 
     def init(self, request):
         self.membw = request.config.membw
-        self.rdtset = request.config.rdtset
         self.pqos = request.config.pqos
         if os.path.isdir("/sys/fs/resctrl/info"):
             subprocess.call("umount /sys/fs/resctrl".split(),
@@ -116,22 +114,12 @@ class Test:
         return self.cmd(iface, self.pqos, params)
 
 
-    def cmd_rdtset(self, iface, params):
-        return self.cmd(iface, self.rdtset, params)
-
-
     ## Runs pqos command
     def run_pqos(self, iface, params):
         command = self.cmd_pqos(iface, params)
 
         return self.run(command)
 
-
-    ## Runs rdtset command
-    def run_rdtset(self, iface, params):
-        command = self.cmd_rdtset(iface, params)
-
-        return self.run(command)
 
     ## Wait for line in the output
     def stdout_wait(self, process, line):

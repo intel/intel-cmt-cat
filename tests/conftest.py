@@ -39,13 +39,10 @@ pytest_plugins = ["plugins.pytest_report", "plugins.pytest_rdt"]
 def pytest_addoption(parser):
     parser.addoption("--pqos", action="store", default="pqos", dest="pqos",
                      help="Path to pqos utility")
-    parser.addoption("--rdtset", action="store", default="rdtset", dest="rdtset",
-                     help="Path to rdtset utility")
     parser.addoption("--membw", action="store", default="membw", dest="membw",
                      help="Path to membw tool")
 
 
 def pytest_configure(config):
     config.pqos = config.getoption("--pqos")
-    config.rdtset = config.getoption("--rdtset")
     config.membw = config.getoption("--membw")

@@ -29,8 +29,6 @@ installed:
 - PQoS utility MSR wrapper script
 - PQoS utility OS/Kernel wrapper script
 - PQoS man page (pqos.8)
-- rdtset tool executable (rdtset)
-- rdtset man page (rdtset.8)
 
 NOTE to FreeBSD users, remember to replace "make" with "gmake" in
 the steps described below.

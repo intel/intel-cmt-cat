@@ -8,7 +8,6 @@
 <!--- If you're unsure about any of these, don't hesitate to ask. We're here to help! -->
 - [ ] library
 - [ ] pqos utility
-- [ ] rdtset utility
 - [ ] other: (please specify)
 
 ## Motivation and Context

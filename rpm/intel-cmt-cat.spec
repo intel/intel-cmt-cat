@@ -107,12 +107,6 @@ ln -sf %{_mandir}/man8/pqos.8 %{buildroot}/%{_mandir}/man8/pqos-os.8
 ln -sf %{_mandir}/man8/pqos.8 %{buildroot}/%{_mandir}/man8/pqos-msr.8
 
 install -d %{buildroot}/%{_bindir}
-install -s %{_builddir}/%{githubfull}/rdtset/rdtset %{buildroot}/%{_bindir}
-
-install -d %{buildroot}/%{_mandir}/man8
-install -m 0644 %{_builddir}/%{githubfull}/rdtset/rdtset.8  %{buildroot}/%{_mandir}/man8
-
-install -d %{buildroot}/%{_bindir}
 install -s %{_builddir}/%{githubfull}/tools/membw/membw %{buildroot}/%{_bindir}
 
 install -d %{buildroot}/%{_mandir}/man8
@@ -156,8 +150,6 @@ install -m 0644 %{_builddir}/%{githubfull}/examples/c/CMT_MBM/monitor_app.c %{bu
 %{_mandir}/man8/pqos.8.gz
 %{_mandir}/man8/pqos-os.8.gz
 %{_mandir}/man8/pqos-msr.8.gz
-%{_bindir}/rdtset
-%{_mandir}/man8/rdtset.8.gz
 %{_bindir}/membw
 %{_mandir}/man8/membw.8.gz
 %{_libdir}/libpqos.so.*

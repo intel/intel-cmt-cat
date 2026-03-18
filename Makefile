@@ -53,7 +53,6 @@ endif
 all:
 	$(MAKE) -C lib
 	$(MAKE) -C pqos
-	$(MAKE) -C rdtset
 	$(MAKE) -C tools/membw
 	$(MAKE) -C examples/c/CAT_MBA
 	$(MAKE) -C examples/c/CMT_MBM
@@ -65,7 +64,6 @@ setup-dev:
 clean:
 	$(MAKE) -C lib clean
 	$(MAKE) -C pqos clean
-	$(MAKE) -C rdtset clean
 	$(MAKE) -C tools/membw clean
 	$(MAKE) -C examples/c/CAT_MBA clean
 	$(MAKE) -C examples/c/CMT_MBM clean
@@ -76,7 +74,6 @@ clean:
 style:
 	$(MAKE) -C lib style
 	$(MAKE) -C pqos style
-	$(MAKE) -C rdtset style
 	$(MAKE) -C tools/membw style
 	$(MAKE) -C examples/c/CAT_MBA style
 	$(MAKE) -C examples/c/CMT_MBM style
@@ -87,7 +84,6 @@ style:
 cppcheck:
 	$(MAKE) -C lib cppcheck
 	$(MAKE) -C pqos cppcheck
-	$(MAKE) -C rdtset cppcheck
 	$(MAKE) -C tools/membw cppcheck
 	$(MAKE) -C examples/c/CAT_MBA cppcheck
 	$(MAKE) -C examples/c/CMT_MBM cppcheck
@@ -96,13 +92,11 @@ cppcheck:
 install:
 	$(MAKE) -C lib install
 	$(MAKE) -C pqos install
-	$(MAKE) -C rdtset install
 	$(MAKE) -C tools/membw install
 
 uninstall:
 	$(MAKE) -C lib uninstall
 	$(MAKE) -C pqos uninstall
-	$(MAKE) -C rdtset uninstall
 	$(MAKE) -C tools/membw uninstall
 
 TAGS:

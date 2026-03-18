@@ -46,11 +46,11 @@ From software version v1.0.0 the library adds option to use Intel(R) RDT via
 available OS interfaces (perf and resctrl on Linux). The library detects
 presence of these interfaces and allows to select the preferred one through
 a configuration option.
-As the result, existing tools like 'pqos' or 'rdtset' can also be used
-to manage Intel(R) RDT in an OS compatible way. As of release v4.3.0, OS
-interface became the default option. 'pqos' tool wrappers have been added to
-help with the interface selection. 'pqos-os' and 'pqos-msr' for OS and MSR
-interface operations respectively.
+As the result, existing tool 'pqos' can also be used to manage Intel(R) RDT
+in an OS compatible way. As of release v4.3.0, OS interface became the default
+option. 'pqos' tool wrappers have been added to help with the interface
+selection. 'pqos-os' and 'pqos-msr' for OS and MSR interface operations
+respectively.
 
 PID API compile time option has been removed and the APIs are always available.
 Note that proper operation of these APIs depends on availability and
@@ -80,15 +80,6 @@ the technologies via its API's.
 Please refer to the utility README for more details "pqos/README".
 Manual page of "pqos" utility also provides information about tool usage:
 $ man pqos
-
-**"rdtset" directory:** \
-Includes source files for a utility that provides "taskset"-like functionality
-for RDT configuration.
-The utility links against the library and programs the technologies
-via its API's.
-Please refer to the utility README for more details "rdtset/README".
-Manual page of "rdtset" utility also provides information about tool usage:
-$ man rdtset
 
 **"examples" directory:** \
 Includes C and Perl examples of Intel(R) RDT usage via the library API's.
@@ -239,8 +230,6 @@ Table 4. Software interoperability matrix
 
 1. *pqos monitoring from Intel(R) RDT can detect other
     pqos monitoring processes in the system.
-    rdtset from Intel(R) RDT detects other processes started with rdtset and
-    it will not use their CAT/CDP resources.*
 
 2. *pqos from Intel(R) RDT can detect that PCM monitors cores and
     it will not attempt to hijack the cores unless forced.

@@ -52,7 +52,6 @@ Additional Parameters
 =====================
 Custom py.test options:
   --pqos=PQOS           Path to pqos utility
-  --rdtset=RDTSET       Path to rdtset utility
   --membw=MEMBW         Path to membw tool
   --env=ENV             Path to environment file
   --iface-msr           MSR interface
