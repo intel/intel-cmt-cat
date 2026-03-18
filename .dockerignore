@@ -1,7 +1,5 @@
 tests
 unit-test
-snmp
-lib/perl
 rpm
 venv
 .git

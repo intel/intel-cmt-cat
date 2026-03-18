@@ -94,11 +94,6 @@ $ man rdtset
 Includes C and Perl examples of Intel(R) RDT usage via the library API's.
 Please refer to README file for more details "examples/README".
 
-**"snmp" directory:** \
-Includes Net-SNMP AgentX subagent written in Perl to demonstrate the use of
-the PQoS library Perl wrapper API.
-Please refer to README file for more details "snmp/README".
-
 **"tools" directory:** \
 Includes membw tool for stressing memory bandwidth with different operations.
 
