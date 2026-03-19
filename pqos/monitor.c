@@ -2869,6 +2869,7 @@ monitor_loop(void)
         unsigned mon_number = 0, display_num = 0;
         struct pqos_mon_data **mon_data = NULL, **mon_grps = NULL;
         long runtime = 0;
+        int first_measurement = 1; /**< flag to skip first poll output */
 #ifdef __linux__
         int tfd;
 #else
@@ -3014,41 +3015,49 @@ monitor_loop(void)
                         break;
                 }
 
-                memcpy(mon_data, mon_grps, mon_number * sizeof(mon_grps[0]));
-
-                if (sel_mon_top_like)
-                        qsort(mon_data, mon_number, sizeof(mon_data[0]),
-                              mon_qsort_llc_cmp_desc);
-                else if (monitor_core_mode())
-                        qsort(mon_data, mon_number, sizeof(mon_data[0]),
-                              mon_qsort_coreid_cmp_asc);
-
                 /**
-                 * Get time string
+                 * Skip output of the first measurement as memory bandwidth
+                 * values are always zero on the first poll (no prior baseline).
                  */
-                curr_time = time(0);
-                ptm = localtime(&curr_time);
-                if (ptm != NULL)
-                        strftime(cb_time, sizeof(cb_time) - 1,
-                                 "%Y-%m-%d %H:%M:%S", ptm);
-                else
-                        strncpy(cb_time, "error", sizeof(cb_time) - 1);
+                if (!first_measurement) {
+                        memcpy(mon_data, mon_grps,
+                               mon_number * sizeof(mon_grps[0]));
 
-                output.header(fp_monitor, cb_time,
-                              sel_mon_mem_region.num_mem_regions,
-                              sel_mon_mem_region.region_num);
-                for (i = 0; i < display_num; i++) {
+                        if (sel_mon_top_like)
+                                qsort(mon_data, mon_number, sizeof(mon_data[0]),
+                                      mon_qsort_llc_cmp_desc);
+                        else if (monitor_core_mode())
+                                qsort(mon_data, mon_number, sizeof(mon_data[0]),
+                                      mon_qsort_coreid_cmp_asc);
+
+                        /**
+                         * Get time string
+                         */
+                        curr_time = time(0);
+                        ptm = localtime(&curr_time);
+                        if (ptm != NULL)
+                                strftime(cb_time, sizeof(cb_time) - 1,
+                                         "%Y-%m-%d %H:%M:%S", ptm);
+                        else
+                                strncpy(cb_time, "error", sizeof(cb_time) - 1);
+
+                        output.header(fp_monitor, cb_time,
+                                      sel_mon_mem_region.num_mem_regions,
+                                      sel_mon_mem_region.region_num);
+                        for (i = 0; i < display_num; i++) {
 #ifndef __clang_analyzer__
-                        const struct pqos_mon_data *data = mon_data[i];
+                                const struct pqos_mon_data *data = mon_data[i];
 #else
-                        const struct pqos_mon_data *data = NULL;
+                                const struct pqos_mon_data *data = NULL;
 #endif
 
-                        output.row(fp_monitor, cb_time, data);
-                }
-                output.footer(fp_monitor);
+                                output.row(fp_monitor, cb_time, data);
+                        }
+                        output.footer(fp_monitor);
 
-                fflush(fp_monitor);
+                        fflush(fp_monitor);
+                }
+                first_measurement = 0;
 
                 if (stop_monitoring_loop)
                         break;
