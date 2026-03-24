@@ -99,6 +99,11 @@ ifeq ($(RMID_CUSTOM),y)
 CFLAGS += -DPQOS_RMID_CUSTOM
 endif
 
+# UNLOCK CUSTOM (disable API locking)
+ifeq ($(UNLOCK_CUSTOM),y)
+CFLAGS += -DUNLOCK_CUSTOM
+endif
+
 # Build targets and dependencies
 SRCS = $(sort $(wildcard *.c))
 OBJS = $(SRCS:.c=.o)

@@ -39,6 +39,43 @@
 
 #include "lock.h"
 
+#ifdef UNLOCK_CUSTOM
+
+/*
+ * Build-time option to disable PQoS API locking.
+ *
+ * WARNING:
+ * - This removes thread/process safety guarantees.
+ * - Only use when the application guarantees non-overlapped access to the
+ *   resources to be monitored, e.g. RMID range
+ */
+
+int
+lock_init(void)
+{
+        return 0;
+}
+
+int
+lock_fini(void)
+{
+        return 0;
+}
+
+void
+lock_get(void)
+{
+        /* no-op */
+}
+
+void
+lock_release(void)
+{
+        /* no-op */
+}
+
+#else /* UNLOCK_CUSTOM */
+
 #include "log.h"
 
 #include <dirent.h>
@@ -339,3 +376,5 @@ lock_release(void)
                 fprintf(stderr, "API mutex unlock error: %s\n",
                         strerror(errno));
 }
+
+#endif /* UNLOCK_CUSTOM */
