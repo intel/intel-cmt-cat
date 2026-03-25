@@ -107,8 +107,11 @@ pci_parse_pci_ids(struct pqos_pci_info *info,
 
         if (!pqos_file_exists(PCI_IDS_FILE)) {
                 LOG_ERROR("Unable to find %s. PCI device name will not be "
-                          "displayed. Install pciutils.\n",
-                          PCI_IDS_FILE);
+                          "displayed.\nInstall pciutils or download the file"
+                          " manually:\n"
+                          "$ curl -o %s "
+                          "https://pci-ids.ucw.cz/v2.2/pci.ids\n",
+                          PCI_IDS_FILE, PCI_IDS_FILE);
                 return;
         }
 
