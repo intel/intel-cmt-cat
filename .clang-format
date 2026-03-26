@@ -8,9 +8,7 @@ IndentCaseLabels: false
 UseTab: Never
 AlignConsecutiveMacros: true
 AlignTrailingComments: true
-AlignConsecutiveMacros: true
 AlwaysBreakAfterReturnType: AllDefinitions
-SortIncludes: false
 BreakBeforeInheritanceComma: true
 AllowAllParametersOfDeclarationOnNextLine: false
 BinPackParameters: false
