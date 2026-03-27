@@ -104,8 +104,9 @@ _set_clos_region_value(uint64_t *clos_addr,
 
         switch (region_number) {
         case 0:
-                *clos_addr = (uint64_t)(
-                    (clos_value & MBA_BW_ALL_BR0_RESET_MASK) | value);
+                *clos_addr =
+                    (uint64_t)((clos_value & MBA_BW_ALL_BR0_RESET_MASK) |
+                               value);
                 break;
         case 1:
                 *clos_addr =
