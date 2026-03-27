@@ -50,9 +50,8 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define DEV_MEM            "/dev/mem"
-#define EFI_SYSTAB         "/sys/firmware/efi/systab"
-#define ACPI_TABLE_FS_PATH "/sys/firmware/acpi/tables"
+#define DEV_MEM    "/dev/mem"
+#define EFI_SYSTAB "/sys/firmware/efi/systab"
 
 #define BIOS_RO_MEM_ADDR 0x000E0000LLU
 #define BIOS_RO_MEM_SIZE 0x00020000LLU

@@ -50,8 +50,10 @@
 
 #include "cap.h"
 
+#include "acpi.h"
 #include "allocation.h"
 #include "api.h"
+#include "common.h"
 #include "cores_domains.h"
 #include "cpu_registers.h"
 #include "cpuinfo.h"
@@ -71,6 +73,9 @@
 
 #include <stdlib.h>
 #include <string.h>
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 /**
  * ---------------------------------------
@@ -79,6 +84,11 @@
  */
 
 #define PROC_CPUINFO "/proc/cpuinfo"
+
+#ifdef __linux__
+#define ACPI_ERDT_TABLE (ACPI_TABLE_FS_PATH "/" ACPI_TABLE_SIG_ERDT)
+#define ACPI_MRRM_TABLE (ACPI_TABLE_FS_PATH "/" ACPI_TABLE_SIG_MRRM)
+#endif
 
 /**
  * ---------------------------------------
@@ -618,6 +628,26 @@ _cap_interface_to_string(enum pqos_interface interface)
         }
 }
 
+#ifdef __linux__
+/**
+ * @brief Checks if MMIO interface prerequisites are present via Linux sysfs
+ *
+ * MMIO interface requires both ERDT and MRRM ACPI tables.
+ * This mirrors the requirement already enforced in pqos_init() for MMIO.
+ *
+ * @return 1 if MMIO is supported, 0 otherwise
+ */
+PQOS_STATIC int
+mmio_is_supported_sysfs(void)
+{
+        if (!pqos_file_exists(ACPI_ERDT_TABLE) ||
+            !pqos_file_exists(ACPI_MRRM_TABLE))
+                return 0;
+
+        return 1;
+}
+#endif
+
 /**
  * @brief Detects interface
  *
@@ -689,7 +719,10 @@ discover_interface(enum pqos_interface requested_interface,
                 }
         } else if (requested_interface == PQOS_INTER_AUTO) {
 #ifdef __linux__
-                if (resctrl_is_supported() == PQOS_RETVAL_OK)
+                /* Prefer MMIO if platform supports it */
+                if (mmio_is_supported_sysfs())
+                        *interface = PQOS_INTER_MMIO;
+                else if (resctrl_is_supported() == PQOS_RETVAL_OK)
                         *interface = PQOS_INTER_OS;
                 else
                         *interface = PQOS_INTER_MSR;
@@ -700,8 +733,8 @@ discover_interface(enum pqos_interface requested_interface,
                 *interface = requested_interface;
         }
 
-        LOG_INFO("Selected interface: %s\n",
-                 _cap_interface_to_string(*interface));
+        fprintf(stdout, "Selected interface: %s\n",
+                _cap_interface_to_string(*interface));
         return PQOS_RETVAL_OK;
 }
 

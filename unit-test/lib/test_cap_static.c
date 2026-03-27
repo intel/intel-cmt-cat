@@ -35,6 +35,9 @@
 #include "pqos.h"
 #include "test.h"
 #include "test_cap.h"
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 /* ======== helpers ======= */
 
@@ -109,6 +112,17 @@ __wrap_getenv(const char *name)
         function_called();
         return mock_ptr_type(char *);
 }
+
+#ifdef __linux__
+int
+__wrap_access(const char *pathname, int mode)
+{
+        function_called();
+        check_expected_ptr(pathname);
+        check_expected(mode);
+        return mock_type(int);
+}
+#endif
 
 static int log_init_result = LOG_RETVAL_OK;
 int
@@ -534,18 +548,68 @@ test_discover_interface_auto_linux(void **state __attribute__((unused)))
 
         disable_check_log_printf();
 
+        /* MMIO supported (both ERDT and MRRM present) -> select MMIO */
         interface = -1;
         expect_function_call(__wrap_getenv);
         will_return(__wrap_getenv, NULL);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, 0);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/MRRM");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, 0);
+        ret = discover_interface(PQOS_INTER_AUTO, &interface);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(interface, PQOS_INTER_MMIO);
+
+        /* ERDT missing -> fall through to OS if resctrl supported */
+        interface = -1;
+        expect_function_call(__wrap_getenv);
+        will_return(__wrap_getenv, NULL);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, -1);
         expect_function_call(__wrap_resctrl_is_supported);
         will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_OK);
         ret = discover_interface(PQOS_INTER_AUTO, &interface);
         assert_int_equal(ret, PQOS_RETVAL_OK);
         assert_int_equal(interface, PQOS_INTER_OS);
 
+        /* ERDT present but MRRM missing -> fall through to OS if resctrl */
         interface = -1;
         expect_function_call(__wrap_getenv);
         will_return(__wrap_getenv, NULL);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, 0);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/MRRM");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, -1);
+        expect_function_call(__wrap_resctrl_is_supported);
+        will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_OK);
+        ret = discover_interface(PQOS_INTER_AUTO, &interface);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(interface, PQOS_INTER_OS);
+
+        /* MMIO not supported, resctrl not supported -> select MSR */
+        interface = -1;
+        expect_function_call(__wrap_getenv);
+        will_return(__wrap_getenv, NULL);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, -1);
         expect_function_call(__wrap_resctrl_is_supported);
         will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_ERROR);
         ret = discover_interface(PQOS_INTER_AUTO, &interface);

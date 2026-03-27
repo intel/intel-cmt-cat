@@ -758,6 +758,7 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=getenv \
+		-Wl,--wrap=access \
 		-Wl,--wrap=malloc \
 		-Wl,--wrap=hw_cap_l3ca_discover \
 		-Wl,--wrap=os_cap_l3ca_discover \

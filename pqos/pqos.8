@@ -333,9 +333,11 @@ INTERFACE can be set to either 'auto' (default), 'msr' or 'os'. If automatic det
 .br
 1) Takes RDT_IFACE environment variable into account if this variable is set
 .br
-2) Selects OS interface if the kernel interface is supported
+2) Selects MMIO interface if supported (ERDT and MRRM ACPI tables present)
 .br
-3) Selects MSR interface otherwise
+3) Selects OS interface if the kernel interface is supported
+.br
+4) Selects MSR interface otherwise
 .SH NOTES
 .PP
 CMT, MBM and CAT are configured using Model Specific Registers (MSRs). The pqos software

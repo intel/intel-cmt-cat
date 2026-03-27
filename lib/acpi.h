@@ -57,6 +57,9 @@ typedef uint32_t acpi_size;
 #error "Unsupported architecture"
 #endif
 
+/* ACPI tables root directory in sysfs */
+#define ACPI_TABLE_FS_PATH "/sys/firmware/acpi/tables"
+
 /**
  * ACPI Table
  */
