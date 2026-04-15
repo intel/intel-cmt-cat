@@ -1348,8 +1348,11 @@ get_available_events(const struct pqos_capability *const cap_mon, int iordt)
  * @param [in,out] events List of monitoring events
  * @param [in] all_evts available monitoring events
  * @param [in] iordt I/O rdt support required
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE on no RDT events available
  */
-static void
+static int
 monitor_setup_events(enum mon_group_type type,
                      enum pqos_mon_event *events,
                      enum pqos_mon_event all_evts,
@@ -1370,16 +1373,52 @@ monitor_setup_events(enum mon_group_type type,
 
         /* check if all available events were selected */
         if ((*events & PQOS_MON_EVENT_ALL) == PQOS_MON_EVENT_ALL) {
-                if (iordt && interface == PQOS_INTER_MMIO)
+                if (iordt && interface == PQOS_INTER_MMIO) {
                         *events = PQOS_MON_EVENT_IO_L3_OCCUP |
                                   PQOS_MON_EVENT_IO_TOTAL_MEM_BW |
                                   PQOS_MON_EVENT_IO_MISS_MEM_BW;
-                else if (interface == PQOS_INTER_MMIO)
+                } else if (interface == PQOS_INTER_MMIO) {
                         *events =
                             PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_TMEM_BW |
                             PQOS_PERF_EVENT_LLC_MISS | PQOS_PERF_EVENT_IPC;
-                else
+                } else {
                         *events = (enum pqos_mon_event)(all_evts & *events);
+                }
+
+                /* Check after all interface branches: if "all" resolved to
+                 * PMU-only events, RDT monitoring is unavailable under the
+                 * selected interface on this platform.
+                 */
+                const enum pqos_mon_event rdt_events =
+                    PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
+                    PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW;
+                const enum pqos_mon_event pmu_events =
+                    PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
+                    PQOS_PERF_EVENT_LLC_REF;
+
+                if ((*events & rdt_events) == 0 &&
+                    (*events & pmu_events) != 0) {
+                        const char *iface_name =
+                            (interface == PQOS_INTER_OS ||
+                             interface == PQOS_INTER_OS_RESCTRL_MON)
+                                ? "OS"
+                            : (interface == PQOS_INTER_MSR)  ? "MSR"
+                            : (interface == PQOS_INTER_MMIO) ? "MMIO"
+                                                             : "unknown";
+                        fprintf(
+                            stderr,
+                            "No RDT monitoring events (LLC occupancy, memory "
+                            "bandwidth) are available under %s interface on "
+                            "this platform.\n"
+                            "PMU events (IPC, LLC misses) cannot be monitored "
+                            "standalone.\n"
+                            "Use 'pqos --iface=%s -d' to check supported "
+                            "monitoring capabilities.\n",
+                            iface_name, iface_name);
+
+                        return PQOS_RETVAL_RESOURCE;
+                }
+
         } else {
                 /* Start IPC and LLC miss monitoring if available */
                 if (all_evts & PQOS_PERF_EVENT_IPC)
@@ -1389,6 +1428,8 @@ monitor_setup_events(enum mon_group_type type,
                             (enum pqos_mon_event)PQOS_PERF_EVENT_LLC_MISS;
         }
         sel_events_max |= *events;
+
+        return PQOS_RETVAL_OK;
 }
 
 int
@@ -1527,8 +1568,11 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                                 break;
                 }
 
-                monitor_setup_events(grp->type, &grp->events, avail_evts,
-                                     monitor_iordt_mode(), interface);
+                ret = monitor_setup_events(grp->type, &grp->events, avail_evts,
+                                           monitor_iordt_mode(), interface);
+
+                if (ret != PQOS_RETVAL_OK)
+                        break;
 
                 if (grp->type == MON_GROUP_TYPE_CORE) {
                         /* Check if MBL or MBR events were selected and
