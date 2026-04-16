@@ -78,12 +78,13 @@ _get_clos_region_value(uint64_t clos_value,
                                         MBA_BW_ALL_BR2_SHIFT);
                 break;
         case 3:
-                *value = (unsigned int)((clos_value & MBA_BW_ALL_BR2_MASK) >>
-                                        MBA_BW_ALL_BR2_SHIFT);
+                *value = (unsigned int)((clos_value & MBA_BW_ALL_BR3_MASK) >>
+                                        MBA_BW_ALL_BR3_SHIFT);
                 break;
         default:
-                LOG_ERROR("%s: wrong region number provided: %u\n", __func__,
-                          region_number);
+                LOG_ERROR("%s: wrong region number provided: %u. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_number, PQOS_MAX_MEM_REGIONS - 1);
                 return PQOS_RETVAL_ERROR;
         }
 

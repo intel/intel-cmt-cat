@@ -53,6 +53,52 @@
 #include <string.h>
 
 /**
+ * @brief Populate a single mem_region data structure for a given CLOS
+ *        using the region_num already stored in the mem_region.
+ *
+ * @param [in]     erdt erdt structure to obtain information for all domains
+ * @param [in]     class_id COS to extract MBA information for
+ * @param [in]     domain_id domain to extract MBA information for
+ * @param [in,out] mem_region mem region whose region_num identifies the region
+ *                            and whose bw_ctrl_val fields are populated
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+static int
+_get_region_mba(const struct pqos_erdt_info *erdt,
+                unsigned class_id,
+                uint16_t domain_id,
+                struct pqos_mba_mem_region *mem_region)
+{
+        int ret;
+        int region_num = mem_region->region_num;
+
+        ret = get_mba_optimal_bw_region_clos_v1(
+            (const struct pqos_erdt_marc *)&erdt->cpu_agents[domain_id].marc,
+            region_num, class_id,
+            (unsigned *)&mem_region->bw_ctrl_val[PQOS_BW_CTRL_TYPE_OPT_IDX]);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = get_mba_min_bw_region_clos_v1(
+            (const struct pqos_erdt_marc *)&erdt->cpu_agents[domain_id].marc,
+            region_num, class_id,
+            (unsigned *)&mem_region->bw_ctrl_val[PQOS_BW_CTRL_TYPE_MIN_IDX]);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        ret = get_mba_max_bw_region_clos_v1(
+            (const struct pqos_erdt_marc *)&erdt->cpu_agents[domain_id].marc,
+            region_num, class_id,
+            (unsigned *)&mem_region->bw_ctrl_val[PQOS_BW_CTRL_TYPE_MAX_IDX]);
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Populate mem_regions data structure for a given CLOS
  *
  * @param [in]  erdt erdt structure to obtain information for all domains
@@ -71,28 +117,15 @@ _get_regions_mba(const struct pqos_erdt_info *erdt,
                  int num_mem_regions,
                  struct pqos_mba_mem_region *mem_regions)
 {
+        int ret;
+
         for (int j = 0; j < num_mem_regions; j++) {
                 mem_regions[j].region_num = j;
-                get_mba_optimal_bw_region_clos_v1(
-                    (const struct pqos_erdt_marc *)&erdt->cpu_agents[domain_id]
-                        .marc,
-                    j, class_id,
-                    (unsigned *)&mem_regions[j]
-                        .bw_ctrl_val[PQOS_BW_CTRL_TYPE_OPT_IDX]);
 
-                get_mba_min_bw_region_clos_v1(
-                    (const struct pqos_erdt_marc *)&erdt->cpu_agents[domain_id]
-                        .marc,
-                    j, class_id,
-                    (unsigned *)&mem_regions[j]
-                        .bw_ctrl_val[PQOS_BW_CTRL_TYPE_MIN_IDX]);
-
-                get_mba_max_bw_region_clos_v1(
-                    (const struct pqos_erdt_marc *)&erdt->cpu_agents[domain_id]
-                        .marc,
-                    j, class_id,
-                    (unsigned *)&mem_regions[j]
-                        .bw_ctrl_val[PQOS_BW_CTRL_TYPE_MAX_IDX]);
+                ret =
+                    _get_region_mba(erdt, class_id, domain_id, &mem_regions[j]);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
         }
 
         return PQOS_RETVAL_OK;
@@ -265,9 +298,16 @@ mmio_mba_set(const unsigned mba_id,
                         continue;
 
                 actual[i] = requested[i];
-                _get_regions_mba(erdt, actual[i].class_id, actual[i].domain_id,
-                                 actual[i].num_mem_regions,
-                                 actual[i].mem_regions);
+                for (int j = 0; j < actual[i].num_mem_regions; j++) {
+                        if (actual[i].mem_regions[j].region_num == -1)
+                                continue;
+
+                        ret = _get_region_mba(erdt, actual[i].class_id,
+                                              actual[i].domain_id,
+                                              &actual[i].mem_regions[j]);
+                        if (ret != PQOS_RETVAL_OK)
+                                return ret;
+                }
         }
 
         return PQOS_RETVAL_OK;
@@ -297,14 +337,16 @@ mmio_mba_get(const unsigned mba_id,
                 mba_tab[i].class_id = num_cos[i];
                 mba_tab[i].mb_max = 0;
 
-                _get_regions_mba(
+                ret = _get_regions_mba(
                     erdt, mba_tab[i].class_id, mba_tab[i].domain_id,
                     mba_tab[i].num_mem_regions, mba_tab[i].mem_regions);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
         }
 
         *num_cos = max_num_cos;
 
-        return ret;
+        return PQOS_RETVAL_OK;
 }
 
 /**
