@@ -78,7 +78,9 @@ monitor_csv_begin(FILE *fp, const int num_mem_regions, const int *region_num)
 
         ASSERT(fp != NULL);
 
-        if (monitor_core_mode())
+        if (monitor_mixed_mode())
+                fprintf(fp, "Time,Core/Channel");
+        else if (monitor_core_mode())
                 fprintf(fp, "Time,Core");
         else if (monitor_process_mode())
                 fprintf(fp, "Time,PID,Core");
@@ -88,7 +90,8 @@ monitor_csv_begin(FILE *fp, const int num_mem_regions, const int *region_num)
                 fprintf(fp, "Time,Socket");
 
 #ifdef PQOS_RMID_CUSTOM
-        if (monitor_core_mode() || monitor_iordt_mode()) {
+        if (monitor_core_mode() || monitor_iordt_mode() ||
+            monitor_mixed_mode()) {
                 enum pqos_interface iface;
 
                 pqos_inter_get(&iface);
@@ -131,6 +134,13 @@ monitor_csv_begin(FILE *fp, const int num_mem_regions, const int *region_num)
                 else
                         fprintf(fp, ",MBT[MB/s]");
         }
+
+        if (events & PQOS_MON_EVENT_IO_L3_OCCUP)
+                fprintf(fp, ",I/O-LLC");
+        if (events & PQOS_MON_EVENT_IO_TOTAL_MEM_BW)
+                fprintf(fp, ",I/O-TOTAL");
+        if (events & PQOS_MON_EVENT_IO_MISS_MEM_BW)
+                fprintf(fp, ",I/O-MISS");
 
         if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
                 fprintf(fp, ",%11s", "LLC Misses Read");
@@ -331,6 +341,121 @@ monitor_csv_region_row(FILE *fp,
             monitor_iordt_mode())
                 fprintf(fp, "%s,\"%s\"%s\n", timestamp,
                         (char *)mon_data->context, data);
+}
+
+void
+monitor_csv_mixed_row(FILE *fp,
+                      const char *timestamp,
+                      const struct pqos_mon_data *mon_data)
+{
+        const size_t sz_data = REGION_ROW_DATA_SIZE;
+        char data[sz_data];
+        size_t offset = 0;
+        enum pqos_mon_event events = monitor_get_events();
+        const int is_core_group = (mon_data->num_cores > 0);
+        unsigned i = 0;
+        int j = 0;
+        int num_regions;
+
+        ASSERT(fp != NULL);
+        ASSERT(timestamp != NULL);
+        ASSERT(mon_data != NULL);
+
+        memset(data, 0, sz_data);
+
+#ifdef PQOS_RMID_CUSTOM
+        enum pqos_interface iface;
+
+        pqos_inter_get(&iface);
+        if (iface == PQOS_INTER_MMIO) {
+                pqos_rmid_t rmid = 0;
+                int ret = PQOS_RETVAL_ERROR;
+
+                if (is_core_group)
+                        ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+                else
+                        ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
+                                                         &rmid);
+                if (ret != -1)
+                        offset += fillin_csv_column(
+                            ",%.0f", (double)rmid, data + offset,
+                            sz_data - offset, ret == PQOS_RETVAL_OK,
+                            iface == PQOS_INTER_MMIO);
+        }
+#endif
+
+        num_regions = monitor_get_num_mem_regions();
+
+        for (i = 0; i < DIM(output); i++) {
+                const int is_io_event =
+                    (output[i].event & (PQOS_MON_EVENT_IO_L3_OCCUP |
+                                        PQOS_MON_EVENT_IO_TOTAL_MEM_BW |
+                                        PQOS_MON_EVENT_IO_MISS_MEM_BW)) != 0;
+
+                if (output[i].event == PQOS_MON_EVENT_TMEM_BW) {
+                        if (is_core_group) {
+                                /* Print per-region bandwidth values */
+                                for (j = 0;
+                                     j < mon_data->regions.num_mem_regions;
+                                     j++) {
+                                        double value =
+                                            monitor_utils_get_region_value(
+                                                mon_data, output[i].event,
+                                                mon_data->regions
+                                                    .region_num[j]);
+
+                                        offset += fillin_csv_column(
+                                            output[i].format, value,
+                                            data + offset, sz_data - offset,
+                                            mon_data->event & output[i].event,
+                                            events & output[i].event);
+                                }
+                        } else {
+                                /* Channel group: N/A for each region column */
+                                if (events & output[i].event) {
+                                        for (j = 0; j < num_regions; j++) {
+                                                if (sz_data - offset > 5) {
+                                                        strncpy(data + offset,
+                                                                ",N/A",
+                                                                sz_data -
+                                                                    offset - 1);
+                                                        offset += 4;
+                                                }
+                                        }
+                                }
+                        }
+                        continue;
+                }
+
+                if (is_core_group && is_io_event) {
+                        /* Core group: N/A for I/O event columns */
+                        if ((events & output[i].event) &&
+                            sz_data - offset > 5) {
+                                strncpy(data + offset, ",N/A",
+                                        sz_data - offset - 1);
+                                offset += 4;
+                        }
+                } else if (!is_core_group && !is_io_event) {
+                        /* Channel group: N/A for core event columns */
+                        if ((events & output[i].event) &&
+                            sz_data - offset > 5) {
+                                strncpy(data + offset, ",N/A",
+                                        sz_data - offset - 1);
+                                offset += 4;
+                        }
+                } else {
+                        double value = monitor_utils_get_region_value(
+                            mon_data, output[i].event, INVALID_REGION_NUM);
+
+                        offset += fillin_csv_column(
+                            output[i].format, value, data + offset,
+                            sz_data - offset, mon_data->event & output[i].event,
+                            events & output[i].event);
+                }
+        }
+
+        fprintf(fp, "%s,\"%s\"%s\n", timestamp, (char *)mon_data->context,
+                data);
 }
 
 void

@@ -109,7 +109,9 @@ monitor_text_header(FILE *fp,
 
         fprintf(fp, "TIME %s\n", timestamp);
 
-        if (monitor_core_mode())
+        if (monitor_mixed_mode())
+                fprintf(fp, "    CORE/CHANNEL");
+        else if (monitor_core_mode())
                 fprintf(fp, "    CORE");
         else if (monitor_process_mode())
                 fprintf(fp, "     PID     CORE");
@@ -119,7 +121,8 @@ monitor_text_header(FILE *fp,
                 fprintf(fp, "  SOCKET");
 
 #ifdef PQOS_RMID_CUSTOM
-        if (monitor_core_mode() || monitor_iordt_mode()) {
+        if (monitor_core_mode() || monitor_iordt_mode() ||
+            monitor_mixed_mode()) {
                 enum pqos_interface iface;
 
                 pqos_inter_get(&iface);
@@ -141,13 +144,6 @@ monitor_text_header(FILE *fp,
                 else
                         fprintf(fp, "      LLC[%%]");
         }
-
-        if (events & PQOS_MON_EVENT_IO_L3_OCCUP)
-                fprintf(fp, "     I/O-LLC");
-        if (events & PQOS_MON_EVENT_IO_TOTAL_MEM_BW)
-                fprintf(fp, "   I/O-TOTAL");
-        if (events & PQOS_MON_EVENT_IO_MISS_MEM_BW)
-                fprintf(fp, "    I/O-MISS");
 
         if (events & PQOS_MON_EVENT_LMEM_BW)
                 fprintf(fp, "   MBL[MB/s]");
@@ -171,6 +167,13 @@ monitor_text_header(FILE *fp,
                 else
                         fprintf(fp, "   MBT[MB/s]");
         }
+
+        if (events & PQOS_MON_EVENT_IO_L3_OCCUP)
+                fprintf(fp, "     I/O-LLC");
+        if (events & PQOS_MON_EVENT_IO_TOTAL_MEM_BW)
+                fprintf(fp, "   I/O-TOTAL");
+        if (events & PQOS_MON_EVENT_IO_MISS_MEM_BW)
+                fprintf(fp, "    I/O-MISS");
 
         if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
                 fprintf(fp, " %11s", "MISS_READ");
@@ -364,6 +367,169 @@ monitor_text_region_row(FILE *fp,
                 fprintf(fp, "\n%8.8s%s", (char *)mon_data->context, data);
         else if (monitor_iordt_mode())
                 fprintf(fp, "\n%16.16s%s", (char *)mon_data->context, data);
+}
+
+/**
+ * @brief Fills in a "N/A" text column (standard 12-char width)
+ *
+ * @param data place to put the column into
+ * @param sz_data available size for the column
+ * @return Number of characters added
+ */
+static size_t
+fillin_text_na_column(char data[], const size_t sz_data)
+{
+        static const char na_column[] = "         N/A";
+
+        if (sz_data < sizeof(na_column))
+                return 0;
+        snprintf(data, sz_data, "%s", na_column);
+        return strlen(na_column);
+}
+
+/**
+ * @brief Fills in a "N/A" text column for region (16-char width)
+ *
+ * @param data place to put the column into
+ * @param sz_data available size for the column
+ * @return Number of characters added
+ */
+static size_t
+fillin_text_na_region_column(char data[], const size_t sz_data)
+{
+        static const char na_region_column[] = "             N/A";
+
+        if (sz_data < sizeof(na_region_column))
+                return 0;
+        snprintf(data, sz_data, "%s", na_region_column);
+        return strlen(na_region_column);
+}
+
+/**
+ * @brief Fills in a "N/A" text column for regions (16-char width)
+ *
+ * @param num_regions number of memory regions
+ * @param data place to put the column into
+ * @param offset offset in data array
+ * @param sz_data available size for the column
+ * @return Number of characters added
+ */
+static size_t
+fillin_text_na_regions_column(int num_regions,
+                              char *data,
+                              size_t offset,
+                              size_t sz_data)
+{
+        int j = 0;
+
+        for (j = 0; j < num_regions; j++)
+                offset += fillin_text_na_region_column(data + offset,
+                                                       sz_data - offset);
+
+        return offset;
+}
+
+void
+monitor_text_mixed_row(FILE *fp,
+                       const char *timestamp,
+                       const struct pqos_mon_data *mon_data)
+{
+        const size_t sz_data = REGION_ROW_DATA_SIZE;
+        char data[sz_data];
+        size_t offset = 0;
+        enum pqos_mon_event events = monitor_get_events();
+        const int is_core_group = (mon_data->num_cores > 0);
+        unsigned i = 0;
+        int j = 0;
+        int num_regions;
+
+        ASSERT(fp != NULL);
+        ASSERT(mon_data != NULL);
+        UNUSED_ARG(timestamp);
+
+        memset(data, 0, sz_data);
+
+#ifdef PQOS_RMID_CUSTOM
+        enum pqos_interface iface;
+
+        pqos_inter_get(&iface);
+        if (iface == PQOS_INTER_MMIO) {
+                pqos_rmid_t rmid = 0;
+                int ret = PQOS_RETVAL_ERROR;
+
+                if (is_core_group)
+                        ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
+                else
+                        ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
+                                                         &rmid);
+                if (ret != -1)
+                        offset += fillin_text_column(
+                            " %4.0f", (double)rmid, data + offset,
+                            sz_data - offset, ret == PQOS_RETVAL_OK,
+                            iface == PQOS_INTER_MMIO);
+        }
+#endif
+
+        num_regions = monitor_get_num_mem_regions();
+
+        for (i = 0; i < DIM(output); i++) {
+                const int is_io_event =
+                    (output[i].event & (PQOS_MON_EVENT_IO_L3_OCCUP |
+                                        PQOS_MON_EVENT_IO_TOTAL_MEM_BW |
+                                        PQOS_MON_EVENT_IO_MISS_MEM_BW)) != 0;
+
+                if (output[i].event == PQOS_MON_EVENT_TMEM_BW) {
+                        if (is_core_group) {
+                                /* Print per-region bandwidth values */
+                                for (j = 0;
+                                     j < mon_data->regions.num_mem_regions;
+                                     j++) {
+                                        double value =
+                                            monitor_utils_get_region_value(
+                                                mon_data, output[i].event,
+                                                mon_data->regions
+                                                    .region_num[j]) /
+                                            output[i].unit;
+
+                                        offset += fillin_text_column(
+                                            REGION_FORMAT, value, data + offset,
+                                            sz_data - offset,
+                                            mon_data->event & output[i].event,
+                                            events & output[i].event);
+                                }
+                        } else {
+                                /* Channel group: N/A for each region column */
+                                if (events & output[i].event)
+                                        offset = fillin_text_na_regions_column(
+                                            num_regions, data, offset, sz_data);
+                        }
+                        continue;
+                }
+
+                if (is_core_group && is_io_event) {
+                        /* Core group: N/A for I/O event columns */
+                        if (events & output[i].event)
+                                offset += fillin_text_na_column(
+                                    data + offset, sz_data - offset);
+                } else if (!is_core_group && !is_io_event) {
+                        /* Channel group: N/A for core event columns */
+                        if (events & output[i].event)
+                                offset += fillin_text_na_column(
+                                    data + offset, sz_data - offset);
+                } else {
+                        double value =
+                            monitor_utils_get_region_value(
+                                mon_data, output[i].event, INVALID_REGION_NUM) /
+                            output[i].unit;
+
+                        offset += fillin_text_column(
+                            output[i].format, value, data + offset,
+                            sz_data - offset, mon_data->event & output[i].event,
+                            events & output[i].event);
+                }
+        }
+
+        fprintf(fp, "\n%16.16s%s", (char *)mon_data->context, data);
 }
 
 void

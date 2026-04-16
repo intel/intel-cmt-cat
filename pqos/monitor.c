@@ -272,6 +272,13 @@ monitor_uncore_mode(void)
         return (sel_monitor_type == MON_GROUP_TYPE_UNCORE);
 }
 
+int
+monitor_mixed_mode(void)
+{
+        return ((sel_monitor_type & MON_GROUP_TYPE_CORE) != 0 &&
+                (sel_monitor_type & MON_GROUP_TYPE_CHANNEL) != 0);
+}
+
 /**
  * @brief Function to safely translate an unsigned int
  *        value to a string
@@ -1526,7 +1533,8 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
             sel_monitor_type != MON_GROUP_TYPE_PID &&
             sel_monitor_type != MON_GROUP_TYPE_CHANNEL &&
             sel_monitor_type != MON_GROUP_TYPE_DEVICE &&
-            sel_monitor_type != MON_GROUP_TYPE_UNCORE) {
+            sel_monitor_type != MON_GROUP_TYPE_UNCORE &&
+            !(monitor_mixed_mode() && interface == PQOS_INTER_MMIO)) {
                 printf("Monitoring start error, process, core, channel/device"
                        " tracking can not be done simultaneously\n");
                 return -1;
@@ -1569,7 +1577,8 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 }
 
                 ret = monitor_setup_events(grp->type, &grp->events, avail_evts,
-                                           monitor_iordt_mode(), interface);
+                                           grp->type == MON_GROUP_TYPE_CHANNEL,
+                                           interface);
 
                 if (ret != PQOS_RETVAL_OK)
                         break;
@@ -2848,6 +2857,43 @@ mon_qsort_coreid_cmp_asc(const void *a, const void *b)
 }
 
 /**
+ * @brief Compare monitoring data for mixed (core + I/O) mode
+ *
+ * Cores come first (sorted by core id ascending); channels follow.
+ *
+ * @param a monitoring data A
+ * @param b monitoring data B
+ *
+ * @return Compare status for mixed ascending order
+ * @retval -1 if a is a core entry and b is a channel entry
+ * @retval 1 if a is a channel entry and b is a core entry
+ * @retval negative/positive if both are core entries (ascending core id order)
+ * @retval 0 if both are channel entries
+ */
+static int
+mon_qsort_mixed_cmp_asc(const void *a, const void *b)
+{
+        const struct pqos_mon_data *ap =
+            *(const struct pqos_mon_data *const *)a;
+        const struct pqos_mon_data *bp =
+            *(const struct pqos_mon_data *const *)b;
+
+        /* Core entries come before channel entries */
+        if (ap->num_cores > 0 && bp->num_channels > 0)
+                return -1;
+        if (ap->num_channels > 0 && bp->num_cores > 0)
+                return 1;
+
+        /* Both are core entries: sort by ascending core id */
+        if (ap->num_cores > 0 && bp->num_cores > 0)
+                return (int)(((unsigned)ap->cores[0]) -
+                             ((unsigned)bp->cores[0]));
+
+        /* Both are channel entries: preserve original order */
+        return 0;
+}
+
+/**
  * @brief CTRL-C handler for infinite monitoring loop
  *
  * @param signo signal number
@@ -2949,7 +2995,9 @@ monitor_loop(void)
         if (strcasecmp(sel_output_type, "text") == 0) {
                 output.begin = monitor_text_begin;
                 output.header = monitor_text_header;
-                if (interface == PQOS_INTER_MMIO)
+                if (interface == PQOS_INTER_MMIO && monitor_mixed_mode())
+                        output.row = monitor_text_mixed_row;
+                else if (interface == PQOS_INTER_MMIO)
                         output.row = monitor_text_region_row;
                 else
                         output.row = monitor_text_row;
@@ -2958,7 +3006,9 @@ monitor_loop(void)
         } else if (strcasecmp(sel_output_type, "csv") == 0) {
                 output.begin = monitor_csv_begin;
                 output.header = monitor_csv_header;
-                if (interface == PQOS_INTER_MMIO)
+                if (interface == PQOS_INTER_MMIO && monitor_mixed_mode())
+                        output.row = monitor_csv_mixed_row;
+                else if (interface == PQOS_INTER_MMIO)
                         output.row = monitor_csv_region_row;
                 else
                         output.row = monitor_csv_row;
@@ -3073,6 +3123,9 @@ monitor_loop(void)
                         else if (monitor_core_mode())
                                 qsort(mon_data, mon_number, sizeof(mon_data[0]),
                                       mon_qsort_coreid_cmp_asc);
+                        else if (monitor_mixed_mode())
+                                qsort(mon_data, mon_number, sizeof(mon_data[0]),
+                                      mon_qsort_mixed_cmp_asc);
 
                         /**
                          * Get time string
@@ -3161,6 +3214,12 @@ enum pqos_mon_event
 monitor_get_events(void)
 {
         return sel_events_max;
+}
+
+int
+monitor_get_num_mem_regions(void)
+{
+        return sel_mon_mem_region.num_mem_regions;
 }
 
 enum monitor_llc_format

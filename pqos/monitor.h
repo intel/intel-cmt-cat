@@ -205,6 +205,22 @@ int monitor_iordt_mode(void);
 int monitor_uncore_mode(void);
 
 /**
+ * @brief Check to determine if combined core and I/O (MMIO) monitoring is used
+ *
+ * @return Mixed monitoring mode status
+ * @retval 0 not in mixed core + I/O monitoring mode
+ * @retval 1 in mixed core + I/O monitoring mode
+ */
+int monitor_mixed_mode(void);
+
+/**
+ * @brief Retrieve the number of memory regions selected for monitoring
+ *
+ * @return number of memory regions
+ */
+int monitor_get_num_mem_regions(void);
+
+/**
  * @brief Stops monitoring on selected core(s)/pid(s)
  */
 void monitor_stop(void);

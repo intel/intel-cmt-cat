@@ -80,6 +80,19 @@ void monitor_text_region_row(FILE *fp,
                              const struct pqos_mon_data *data);
 
 /**
+ * @brief Print combined core and I/O monitoring data in text format (MMIO)
+ *
+ * Cores show N/A for I/O columns; I/O channels show N/A for core columns.
+ *
+ * @param fp file descriptor
+ * @param [in] timestamp data timestamp
+ * @param [in] data monitoring data
+ */
+void monitor_text_mixed_row(FILE *fp,
+                            const char *timestamp,
+                            const struct pqos_mon_data *data);
+
+/**
  * @brief Print text footer
  *
  * @param fp file descriptor

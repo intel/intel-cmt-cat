@@ -80,6 +80,19 @@ void monitor_csv_region_row(FILE *fp,
                             const struct pqos_mon_data *data);
 
 /**
+ * @brief Print combined core and I/O monitoring data in CSV format (MMIO)
+ *
+ * Cores show N/A for I/O columns; I/O channels show N/A for core columns.
+ *
+ * @param fp file descriptor
+ * @param [in] timestamp data timestamp
+ * @param [in] data monitoring data
+ */
+void monitor_csv_mixed_row(FILE *fp,
+                           const char *timestamp,
+                           const struct pqos_mon_data *data);
+
+/**
  * @brief Print CSV footer
  *
  * @param fp file descriptor
