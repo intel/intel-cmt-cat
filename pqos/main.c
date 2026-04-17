@@ -429,13 +429,37 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
 void *
 realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size)
 {
-        size_t prev_size = elem_size * *elem_count;
-        *elem_count = *elem_count * 2;
-        size_t next_size = elem_size * *elem_count;
-        uint8_t *tmp_ptr = realloc(ptr, next_size);
+        unsigned next_count;
+        const unsigned max_elem_count = UINT_MAX / 2U;
+        size_t prev_size, next_size;
+        uint8_t *tmp_ptr;
 
-        if (tmp_ptr != NULL)
+        if (elem_count == NULL)
+                return NULL;
+
+        if (elem_size != 0 && *elem_count > SIZE_MAX / elem_size)
+                return NULL;
+
+        if (*elem_count == 0)
+                next_count = 1;
+        else {
+                if (*elem_count > max_elem_count)
+                        return NULL;
+
+                next_count = *elem_count * 2;
+        }
+
+        if (elem_size != 0 && next_count > SIZE_MAX / elem_size)
+                return NULL;
+
+        prev_size = elem_size * *elem_count;
+        next_size = elem_size * next_count;
+        tmp_ptr = realloc(ptr, next_size);
+
+        if (tmp_ptr != NULL) {
                 memset(tmp_ptr + prev_size, 0, next_size - prev_size);
+                *elem_count = next_count;
+        }
         return tmp_ptr;
 }
 
