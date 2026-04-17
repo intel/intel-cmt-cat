@@ -123,6 +123,12 @@ $(BIN_DIR)/test_profiles: ./test_profiles.c $(PQOS_OBJS) $(APP_MOCK_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/profiles.o,$(PQOS_OBJS)) $(APP_MOCK_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_main: ./test_main.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
+
 
 .PHONY: run
 run: $(TESTS)
@@ -154,6 +160,7 @@ checkpatch:
 	SPDX_LICENSE_TAG,ARRAY_SIZE,EMBEDDED_FUNCTION_NAME,\
 	SYMBOLIC_PERMS,CONST_STRUCT,SPACING \
 	-f test_alloc.c \
+	-f test_main.c \
 	-f test_profiles.c \
 	-f mock/mock_alloc.c \
 	-f mock/mock_alloc.h \
