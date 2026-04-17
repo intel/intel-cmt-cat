@@ -262,11 +262,9 @@ monitor_text_row(FILE *fp,
                 else if (monitor_iordt_mode())
                         ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
                                                          &rmid);
-                if (ret != -1)
-                        offset += fillin_text_column(
-                            " %4.0f", (double)rmid, data + offset,
-                            sz_data - offset, ret == PQOS_RETVAL_OK,
-                            iface == PQOS_INTER_MSR);
+                offset += fillin_text_column(
+                    " %4.0f", (double)rmid, data + offset, sz_data - offset,
+                    ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR);
         }
 #endif
 
@@ -328,11 +326,9 @@ monitor_text_region_row(FILE *fp,
                 else if (monitor_iordt_mode())
                         ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
                                                          &rmid);
-                if (ret != -1)
-                        offset += fillin_text_column(
-                            " %4.0f", (double)rmid, data + offset,
-                            sz_data - offset, ret == PQOS_RETVAL_OK,
-                            iface == PQOS_INTER_MMIO);
+                offset += fillin_text_column(
+                    " %4.0f", (double)rmid, data + offset, sz_data - offset,
+                    ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MMIO);
         }
 #endif
 
@@ -466,11 +462,9 @@ monitor_text_mixed_row(FILE *fp,
                 else
                         ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
                                                          &rmid);
-                if (ret != -1)
-                        offset += fillin_text_column(
-                            " %4.0f", (double)rmid, data + offset,
-                            sz_data - offset, ret == PQOS_RETVAL_OK,
-                            iface == PQOS_INTER_MMIO);
+                offset += fillin_text_column(
+                    " %4.0f", (double)rmid, data + offset, sz_data - offset,
+                    ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MMIO);
         }
 #endif
 

@@ -147,7 +147,7 @@ monitor_xml_row(FILE *fp,
         pqos_inter_get(&iface);
         if (iface == PQOS_INTER_MSR) {
                 pqos_rmid_t rmid = 0;
-                int ret = -1;
+                int ret = PQOS_RETVAL_ERROR;
 
                 if (monitor_core_mode())
                         ret = pqos_mon_assoc_get(mon_data->cores[0], &rmid);
@@ -155,11 +155,9 @@ monitor_xml_row(FILE *fp,
                         ret = pqos_mon_assoc_get_channel(mon_data->channels[0],
                                                          &rmid);
 
-                if (ret != -1)
-                        offset += fillin_xml_column(
-                            "%.0f", rmid, data + offset, sz_data - offset,
-                            ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR,
-                            "rmid");
+                offset += fillin_xml_column(
+                    "%.0f", rmid, data + offset, sz_data - offset,
+                    ret == PQOS_RETVAL_OK, iface == PQOS_INTER_MSR, "rmid");
         }
 #endif
 
