@@ -135,12 +135,16 @@ monitor_csv_begin(FILE *fp, const int num_mem_regions, const int *region_num)
                         fprintf(fp, ",MBT[MB/s]");
         }
 
-        if (events & PQOS_MON_EVENT_IO_L3_OCCUP)
-                fprintf(fp, ",I/O-LLC");
+        if (events & PQOS_MON_EVENT_IO_L3_OCCUP) {
+                if (format == LLC_FORMAT_KILOBYTES)
+                        fprintf(fp, ",I/O-LLC[KB]");
+                else
+                        fprintf(fp, ",I/O-LLC[%%]");
+        }
         if (events & PQOS_MON_EVENT_IO_TOTAL_MEM_BW)
-                fprintf(fp, ",I/O-TOTAL");
+                fprintf(fp, ",I/O-TOTAL[MB/s]");
         if (events & PQOS_MON_EVENT_IO_MISS_MEM_BW)
-                fprintf(fp, ",I/O-MISS");
+                fprintf(fp, ",I/O-MISS[MB/s]");
 
         if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
                 fprintf(fp, ",%11s", "LLC Misses Read");
