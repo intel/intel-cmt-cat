@@ -57,9 +57,9 @@ static struct {
     {.event = PQOS_MON_EVENT_LMEM_BW, .unit = 1, .format = " %11.1f"},
     {.event = PQOS_MON_EVENT_RMEM_BW, .unit = 1, .format = " %11.1f"},
     {.event = PQOS_MON_EVENT_TMEM_BW, .unit = 1, .format = " %11.1f"},
-    {.event = PQOS_MON_EVENT_IO_L3_OCCUP, .unit = 1, .format = " %11.1f"},
-    {.event = PQOS_MON_EVENT_IO_TOTAL_MEM_BW, .unit = 1, .format = " %11.1f"},
-    {.event = PQOS_MON_EVENT_IO_MISS_MEM_BW, .unit = 1, .format = " %11.1f"},
+    {.event = PQOS_MON_EVENT_IO_L3_OCCUP, .unit = 1, .format = " %15.1f"},
+    {.event = PQOS_MON_EVENT_IO_TOTAL_MEM_BW, .unit = 1, .format = " %15.1f"},
+    {.event = PQOS_MON_EVENT_IO_MISS_MEM_BW, .unit = 1, .format = " %15.1f"},
     {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
      .unit = 1000,
      .format = " %10.0fk"},
@@ -168,12 +168,16 @@ monitor_text_header(FILE *fp,
                         fprintf(fp, "   MBT[MB/s]");
         }
 
-        if (events & PQOS_MON_EVENT_IO_L3_OCCUP)
-                fprintf(fp, "     I/O-LLC");
+        if (events & PQOS_MON_EVENT_IO_L3_OCCUP) {
+                if (format == LLC_FORMAT_KILOBYTES)
+                        fprintf(fp, "     I/O-LLC[KB]");
+                else
+                        fprintf(fp, "      I/O-LLC[%%]");
+        }
         if (events & PQOS_MON_EVENT_IO_TOTAL_MEM_BW)
-                fprintf(fp, "   I/O-TOTAL");
+                fprintf(fp, " I/O-TOTAL[MB/s]");
         if (events & PQOS_MON_EVENT_IO_MISS_MEM_BW)
-                fprintf(fp, "    I/O-MISS");
+                fprintf(fp, "  I/O-MISS[MB/s]");
 
         if (events & PQOS_PERF_EVENT_LLC_MISS_PCIE_READ)
                 fprintf(fp, " %11s", "MISS_READ");
@@ -370,6 +374,24 @@ monitor_text_region_row(FILE *fp,
 }
 
 /**
+ * @brief Fills in a "N/A" text column (standard 16-char width)
+ *
+ * @param data place to put the column into
+ * @param sz_data available size for the column
+ * @return Number of characters added
+ */
+static size_t
+fillin_text_na_16char_column(char data[], const size_t sz_data)
+{
+        static const char na_16char_column[] = "             N/A";
+
+        if (sz_data < sizeof(na_16char_column))
+                return 0;
+        snprintf(data, sz_data, "%s", na_16char_column);
+        return strlen(na_16char_column);
+}
+
+/**
  * @brief Fills in a "N/A" text column (standard 12-char width)
  *
  * @param data place to put the column into
@@ -385,24 +407,6 @@ fillin_text_na_column(char data[], const size_t sz_data)
                 return 0;
         snprintf(data, sz_data, "%s", na_column);
         return strlen(na_column);
-}
-
-/**
- * @brief Fills in a "N/A" text column for region (16-char width)
- *
- * @param data place to put the column into
- * @param sz_data available size for the column
- * @return Number of characters added
- */
-static size_t
-fillin_text_na_region_column(char data[], const size_t sz_data)
-{
-        static const char na_region_column[] = "             N/A";
-
-        if (sz_data < sizeof(na_region_column))
-                return 0;
-        snprintf(data, sz_data, "%s", na_region_column);
-        return strlen(na_region_column);
 }
 
 /**
@@ -423,7 +427,7 @@ fillin_text_na_regions_column(int num_regions,
         int j = 0;
 
         for (j = 0; j < num_regions; j++)
-                offset += fillin_text_na_region_column(data + offset,
+                offset += fillin_text_na_16char_column(data + offset,
                                                        sz_data - offset);
 
         return offset;
@@ -509,7 +513,7 @@ monitor_text_mixed_row(FILE *fp,
                 if (is_core_group && is_io_event) {
                         /* Core group: N/A for I/O event columns */
                         if (events & output[i].event)
-                                offset += fillin_text_na_column(
+                                offset += fillin_text_na_16char_column(
                                     data + offset, sz_data - offset);
                 } else if (!is_core_group && !is_io_event) {
                         /* Channel group: N/A for core event columns */
