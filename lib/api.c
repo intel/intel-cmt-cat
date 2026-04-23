@@ -60,6 +60,18 @@
  */
 #define GROUP_VALID_MARKER (0x00DEAD00)
 
+#define PQOS_MON_EVENTS_NON_PMU                                                \
+        (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |                    \
+         PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |                     \
+         PQOS_MON_EVENT_CORE_ENERGY | PQOS_MON_EVENT_ACTIVITY |                \
+         PQOS_MON_EVENT_POWER)
+
+#define PQOS_MON_EVENTS_PMU                                                    \
+        (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |                      \
+         PQOS_PERF_EVENT_LLC_REF)
+
+#define PQOS_MON_EVENTS_ALLOWED (PQOS_MON_EVENTS_NON_PMU | PQOS_MON_EVENTS_PMU)
+
 /**
  * PQoS API functions
  */
@@ -917,16 +929,11 @@ pqos_mon_start(const unsigned num_cores,
          * - only combinations of events allowed
          * - do not allow non-PQoS events to be monitored on its own
          */
-        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                       PQOS_PERF_EVENT_LLC_REF)))
+        if (event & (~PQOS_MON_EVENTS_ALLOWED))
                 return PQOS_RETVAL_PARAM;
 
-        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+        if ((event & PQOS_MON_EVENTS_NON_PMU) == 0 &&
+            (event & PQOS_MON_EVENTS_PMU) != 0) {
                 LOG_ERROR("Only PMU events selected for monitoring\n");
                 return PQOS_RETVAL_PARAM;
         }
@@ -1005,16 +1012,11 @@ pqos_mon_start_cores_ext(const unsigned num_cores,
          * - only combinations of events allowed
          * - do not allow non-PQoS events to be monitored on its own
          */
-        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                       PQOS_PERF_EVENT_LLC_REF)))
+        if (event & (~PQOS_MON_EVENTS_ALLOWED))
                 return PQOS_RETVAL_PARAM;
 
-        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+        if ((event & PQOS_MON_EVENTS_NON_PMU) == 0 &&
+            (event & PQOS_MON_EVENTS_PMU) != 0) {
                 LOG_ERROR("Only PMU events selected for monitoring\n");
                 return PQOS_RETVAL_PARAM;
         }
@@ -1148,16 +1150,11 @@ pqos_mon_start_pids(const unsigned num_pids,
          * - only combinations of events allowed
          * - do not allow non-PQoS events to be monitored on its own
          */
-        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                       PQOS_PERF_EVENT_LLC_REF)))
+        if (event & (~PQOS_MON_EVENTS_ALLOWED))
                 return PQOS_RETVAL_PARAM;
 
-        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+        if ((event & PQOS_MON_EVENTS_NON_PMU) == 0 &&
+            (event & PQOS_MON_EVENTS_PMU) != 0) {
                 LOG_ERROR("Only PMU events selected for monitoring\n");
                 return PQOS_RETVAL_PARAM;
         }
@@ -1215,16 +1212,11 @@ pqos_mon_start_pids2(const unsigned num_pids,
          * - only combinations of events allowed
          * - do not allow non-PQoS events to be monitored on its own
          */
-        if (event & (~(PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                       PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW |
-                       PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                       PQOS_PERF_EVENT_LLC_REF)))
+        if (event & (~PQOS_MON_EVENTS_ALLOWED))
                 return PQOS_RETVAL_PARAM;
 
-        if ((event & (PQOS_MON_EVENT_L3_OCCUP | PQOS_MON_EVENT_LMEM_BW |
-                      PQOS_MON_EVENT_TMEM_BW | PQOS_MON_EVENT_RMEM_BW)) == 0 &&
-            (event & (PQOS_PERF_EVENT_IPC | PQOS_PERF_EVENT_LLC_MISS |
-                      PQOS_PERF_EVENT_LLC_REF)) != 0) {
+        if ((event & PQOS_MON_EVENTS_NON_PMU) == 0 &&
+            (event & PQOS_MON_EVENTS_PMU) != 0) {
                 LOG_ERROR("Only PMU events selected for monitoring\n");
                 return PQOS_RETVAL_PARAM;
         }
@@ -1599,6 +1591,59 @@ pqos_mon_get_region_value(const struct pqos_mon_data *const group,
         lock_release();
 
         return ret;
+}
+
+int
+pqos_mon_get_tel_value(const struct pqos_mon_data *group,
+                       const enum pqos_mon_event event,
+                       double *value)
+{
+        const struct pqos_mon_data_internal *intl;
+        int slot;
+        int ret;
+
+        if (group == NULL || value == NULL || group->intl == NULL ||
+            group->valid != GROUP_VALID_MARKER)
+                return PQOS_RETVAL_PARAM;
+
+        if ((group->event & event) == 0)
+                return PQOS_RETVAL_PARAM;
+
+        lock_get();
+
+        ret = _pqos_check_init(1);
+        if (ret != PQOS_RETVAL_OK) {
+                lock_release();
+                return ret;
+        }
+
+        intl = group->intl;
+
+        switch (event) {
+        case PQOS_MON_EVENT_CORE_ENERGY:
+                slot = PQOS_TEL_SLOT_CORE_ENERGY;
+                break;
+        case PQOS_MON_EVENT_ACTIVITY:
+                slot = PQOS_TEL_SLOT_ACTIVITY;
+                break;
+        case PQOS_MON_EVENT_POWER:
+                slot = PQOS_TEL_SLOT_POWER;
+                break;
+        default:
+                lock_release();
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (!intl->resctrl.tel[slot].valid) {
+                lock_release();
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        *value = intl->resctrl.tel[slot].current;
+
+        lock_release();
+
+        return PQOS_RETVAL_OK;
 }
 
 int

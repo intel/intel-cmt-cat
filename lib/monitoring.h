@@ -44,6 +44,8 @@ extern "C" {
 
 #include "pqos.h"
 
+#include <time.h>
+
 /**
  * Core monitoring poll context
  */
@@ -72,6 +74,20 @@ struct pqos_mon_perf_ctx {
 /**
  * Internal monitoring group data structure
  */
+
+/** Telemetry slot indices */
+#define PQOS_TEL_SLOT_CORE_ENERGY 0
+#define PQOS_TEL_SLOT_ACTIVITY    1
+#define PQOS_TEL_SLOT_POWER       2
+#define PQOS_TEL_NUM_SLOTS        3
+
+/** Single telemetry measurement slot */
+struct pqos_tel_slot {
+        double current;  /**< current value */
+        double previous; /**< previous value */
+        int valid;       /**< 1 if current is valid for display */
+};
+
 struct pqos_mon_data_internal {
         /**
          * The structure to store monitoring data
@@ -114,6 +130,17 @@ struct pqos_mon_data_internal {
                                                             another COS */
                 unsigned *l3id;    /**< list of l3ids being monitored */
                 unsigned num_l3id; /**< Number of l3ids */
+
+                /* AET telemetry state */
+                struct pqos_tel_slot tel[PQOS_TEL_NUM_SLOTS];
+                struct timespec
+                    tel_ts; /**< timestamp of current telemetry read */
+                struct timespec
+                    prev_tel_ts; /**< timestamp of previous telemetry read */
+
+                /* Package IDs for PERF_PKG telemetry */
+                unsigned *pkgids;
+                unsigned num_pkgids;
 
         } resctrl;
 

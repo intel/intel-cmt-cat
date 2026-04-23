@@ -156,6 +156,20 @@ PQOS_LOCAL int os_cap_mba_discover(struct pqos_cap_mba *cap,
 PQOS_LOCAL int os_cap_smba_discover(struct pqos_cap_mba *cap,
                                     const struct pqos_cpuinfo *cpu);
 
+/**
+ * @brief Checks if a PERF_PKG monitoring event is supported via resctrl
+ *
+ * @param [in] event monitoring event type
+ * @param [out] supported set to 1 if supported
+ * @param [out] scale scale factor (or NULL)
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+PQOS_LOCAL int os_cap_mon_perf_pkg_support(const enum pqos_mon_event event,
+                                           int *supported,
+                                           uint32_t *scale);
+
 #ifdef __cplusplus
 }
 #endif

@@ -59,7 +59,9 @@ static const enum pqos_mon_event os_mon_event[] = {
     PQOS_PERF_EVENT_LLC_MISS,
     PQOS_PERF_EVENT_LLC_REF,
     (enum pqos_mon_event)PQOS_PERF_EVENT_CYCLES,
-    (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS};
+    (enum pqos_mon_event)PQOS_PERF_EVENT_INSTRUCTIONS,
+    PQOS_MON_EVENT_CORE_ENERGY,
+    PQOS_MON_EVENT_ACTIVITY};
 
 /**
  * @brief Filter directory filenames
@@ -194,6 +196,8 @@ os_mon_start_events(struct pqos_mon_data *group)
         if (events & PQOS_PERF_EVENT_IPC)
                 events |= (enum pqos_mon_event)(PQOS_PERF_EVENT_CYCLES |
                                                 PQOS_PERF_EVENT_INSTRUCTIONS);
+        if (events & PQOS_MON_EVENT_POWER)
+                events |= (enum pqos_mon_event)PQOS_MON_EVENT_CORE_ENERGY;
 
         /**
          * Determine selected events and Perf counters
@@ -202,6 +206,20 @@ os_mon_start_events(struct pqos_mon_data *group)
                 enum pqos_mon_event evt = os_mon_event[i];
 
                 if (events & evt) {
+                        /*
+                         * AET telemetry events are provided via resctrl
+                         * PERF_PKG_MON, not perf. Avoid probing perf first,
+                         * as that logs misleading "Unsupported event selected"
+                         * messages during normal backend selection.
+                         */
+                        if (evt == PQOS_MON_EVENT_CORE_ENERGY ||
+                            evt == PQOS_MON_EVENT_ACTIVITY) {
+                                if (resctrl_mon_is_event_supported(evt)) {
+                                        group->intl->resctrl.event |= evt;
+                                        continue;
+                                }
+                        }
+
                         if (perf_mon_is_event_supported(evt)) {
                                 ret = perf_mon_start(group, evt);
                                 if (ret != PQOS_RETVAL_OK)
@@ -233,8 +251,19 @@ os_mon_start_events(struct pqos_mon_data *group)
                 resctrl_lock_release();
                 if (ret != PQOS_RETVAL_OK)
                         goto start_event_error;
+
+                /* Collect package IDs for AET telemetry */
+                if (group->intl->resctrl.event &
+                    (PQOS_MON_EVENT_CORE_ENERGY | PQOS_MON_EVENT_ACTIVITY)) {
+                        ret = resctrl_mon_collect_pkgids(group);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto start_event_error;
+                }
         }
         started_evts |= group->intl->resctrl.event;
+
+        if (started_evts & PQOS_MON_EVENT_CORE_ENERGY)
+                started_evts |= (enum pqos_mon_event)PQOS_MON_EVENT_POWER;
 
         /**
          * All events required by RMEM has been started
@@ -256,19 +285,25 @@ os_mon_start_events(struct pqos_mon_data *group)
 start_event_error:
         /*  Check if all selected events were started */
         if ((group->event & started_evts) != group->event) {
-                os_mon_stop_events(group);
+                const int stop_ret = os_mon_stop_events(group);
+
                 LOG_ERROR("Failed to start all selected "
                           "OS monitoring events\n");
-                free(group->intl->perf.ctx);
-                group->intl->perf.ctx = NULL;
+
+                if (ret == PQOS_RETVAL_OK && stop_ret != PQOS_RETVAL_OK)
+                        ret = stop_ret;
         }
+
         return ret;
 }
 
 int
 os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
-        unsigned ret;
+        int perf_ret;
+        int resctrl_ret;
+        int perf_available = 0;
+        int resctrl_available = 0;
 
         ASSERT(cpu != NULL);
         ASSERT(cap != NULL);
@@ -276,14 +311,31 @@ os_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         if (cpu == NULL || cap == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        ret = perf_mon_init(cpu, cap);
-        if (ret == PQOS_RETVAL_RESOURCE)
-                ret = resctrl_mon_init(cpu, cap);
+        perf_ret = perf_mon_init(cpu, cap);
+        resctrl_ret = resctrl_mon_init(cpu, cap);
 
-        if (ret != PQOS_RETVAL_OK)
-                return ret;
+        if (perf_ret == PQOS_RETVAL_OK)
+                perf_available = 1;
 
-        return ret;
+        if (resctrl_ret == PQOS_RETVAL_OK && resctrl_mon_is_supported())
+                resctrl_available = 1;
+
+        /*
+         * Initialize both backends so mixed monitoring configurations and
+         * so event routing in os_mon_start_events() can select either backend
+         * at runtime. Succeed if at least one backend initialized correctly.
+         */
+        if (perf_available || resctrl_available)
+                return PQOS_RETVAL_OK;
+
+        if (perf_ret != PQOS_RETVAL_OK && perf_ret != PQOS_RETVAL_RESOURCE)
+                return perf_ret;
+
+        if (resctrl_ret != PQOS_RETVAL_OK &&
+            resctrl_ret != PQOS_RETVAL_RESOURCE)
+                return resctrl_ret;
+
+        return PQOS_RETVAL_RESOURCE;
 }
 
 int
@@ -770,8 +822,6 @@ os_mon_add_pids_exit:
                 LOG_ERROR("Memory allocation error!\n");
                 os_mon_stop_events(&added);
         }
-        if (added.intl->perf.ctx != NULL)
-                free(added.intl->perf.ctx);
 
         if (tid_map != NULL)
                 free(tid_map);

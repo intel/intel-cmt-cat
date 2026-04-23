@@ -190,6 +190,23 @@ PQOS_LOCAL int resctrl_mon_assoc_set_pid(const pid_t task, const char *name);
  */
 PQOS_LOCAL int resctrl_mon_active(unsigned *monitoring_status);
 
+/**
+ * @brief Collect unique package IDs for a monitoring group
+ *
+ * Populates group->intl->resctrl.pkgids with the deduplicated set of
+ * physical package (socket) IDs for the monitoring group. If
+ * group->num_cores > 0, the package IDs are collected from the group's
+ * cores. If group->num_cores == 0 (for example, for PID-based monitoring
+ * groups or groups with an empty core list), the package IDs for all
+ * sockets in the system are collected.
+ *
+ * @param group monitoring group
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_LOCAL int resctrl_mon_collect_pkgids(struct pqos_mon_data *group);
+
 #ifdef __cplusplus
 }
 #endif

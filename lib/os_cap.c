@@ -344,6 +344,48 @@ os_cap_mon_perf_support(const enum pqos_mon_event event,
 }
 
 /**
+ * @brief Checks if event is supported via PERF_PKG resctrl monitoring
+ *
+ * @param [in] event monitoring event type
+ * @param [out] supported set to 1 if supported
+ * @param [out] scale scale factor (or NULL)
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK success
+ */
+int
+os_cap_mon_perf_pkg_support(const enum pqos_mon_event event,
+                            int *supported,
+                            uint32_t *scale)
+{
+        const char *feature_name = NULL;
+
+        ASSERT(supported != NULL);
+        *supported = 0;
+
+        switch (event) {
+        case PQOS_MON_EVENT_CORE_ENERGY:
+                feature_name = "core_energy";
+                break;
+        case PQOS_MON_EVENT_ACTIVITY:
+                feature_name = "activity";
+                break;
+        default:
+                return PQOS_RETVAL_OK;
+        }
+
+        if (!pqos_dir_exists(RESCTRL_PATH_INFO_PERF_PKG_MON))
+                return PQOS_RETVAL_OK;
+
+        if (scale != NULL)
+                *scale = 1;
+
+        return pqos_file_contains(RESCTRL_PATH_INFO_PERF_PKG_MON
+                                  "/mon_features",
+                                  feature_name, supported);
+}
+
+/**
  * @brief Checks if event is supported
  *
  * @param [in] event monitoring event type
@@ -361,6 +403,23 @@ detect_mon_support(const enum pqos_mon_event event,
         int ret;
 
         *supported = 0;
+
+        if (event == PQOS_MON_EVENT_POWER) {
+                /*
+                 * POWER is a synthetic telemetry event derived from
+                 * CORE_ENERGY samples. Do not probe it independently.
+                 */
+                ret = detect_mon_support(PQOS_MON_EVENT_CORE_ENERGY, supported,
+                                         scale);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+                return PQOS_RETVAL_OK;
+        }
+
+        if (event == PQOS_MON_EVENT_CORE_ENERGY ||
+            event == PQOS_MON_EVENT_ACTIVITY) {
+                return os_cap_mon_perf_pkg_support(event, supported, scale);
+        }
 
         if (event == PQOS_MON_EVENT_RMEM_BW) {
                 int lmem;
@@ -413,7 +472,9 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
                 PQOS_MON_EVENT_RMEM_BW,
                 PQOS_PERF_EVENT_LLC_MISS,
                 PQOS_PERF_EVENT_LLC_REF,
-                PQOS_PERF_EVENT_IPC
+                PQOS_PERF_EVENT_IPC,
+                PQOS_MON_EVENT_CORE_ENERGY,
+                PQOS_MON_EVENT_ACTIVITY,
             /* clang-format on */
         };
 
@@ -444,6 +505,7 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
         for (i = 0; i < DIM(events); i++) {
                 uint32_t scale;
                 struct pqos_cap_mon *mon;
+                unsigned num_new_events = 1;
                 struct pqos_monitor *monitor;
 
                 ret = detect_mon_support(events[i], &supported, &scale);
@@ -453,7 +515,12 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
                 if (!supported)
                         continue;
 
-                mon = realloc(cap, cap->mem_size + sizeof(struct pqos_monitor));
+                if (events[i] == PQOS_MON_EVENT_CORE_ENERGY)
+                        num_new_events = 2;
+
+                mon = realloc(cap,
+                              cap->mem_size +
+                                  num_new_events * sizeof(struct pqos_monitor));
                 if (mon == NULL) {
                         ret = PQOS_RETVAL_RESOURCE;
                         break;
@@ -465,10 +532,20 @@ os_cap_mon_discover(struct pqos_cap_mon **r_cap, const struct pqos_cpuinfo *cpu)
                 monitor->max_rmid = num_rmids;
                 monitor->scale_factor = scale;
 
-                mon->mem_size += sizeof(struct pqos_monitor);
+                mon->mem_size += num_new_events * sizeof(struct pqos_monitor);
                 mon->num_events++;
 
                 cap = mon;
+
+                if (events[i] == PQOS_MON_EVENT_CORE_ENERGY) {
+                        monitor = &(cap->events[cap->num_events]);
+                        memset(monitor, 0, sizeof(*monitor));
+                        cap->events[cap->num_events].type =
+                            PQOS_MON_EVENT_POWER;
+                        cap->events[cap->num_events].max_rmid = num_rmids;
+                        cap->events[cap->num_events].scale_factor = scale;
+                        cap->num_events++;
+                }
         }
 
         if (ret == PQOS_RETVAL_OK)

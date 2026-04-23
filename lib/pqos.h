@@ -343,6 +343,13 @@ enum pqos_mon_event {
             0x400000, /**< DDIO LLC read references */
         PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE =
             0x800000, /**< DDIO LLC write references */
+
+        PQOS_MON_EVENT_CORE_ENERGY =
+            0x1000000, /**< Core energy (OS telemetry) */
+        PQOS_MON_EVENT_ACTIVITY =
+            0x2000000, /**< Activity counter (OS telemetry) */
+        PQOS_MON_EVENT_POWER =
+            0x4000000, /**< Power (synthetic, OS telemetry) */
 };
 
 /**
@@ -2256,6 +2263,28 @@ int pqos_mon_get_region_value(const struct pqos_mon_data *const group,
  * @retval PQOS_RETVAL_OK on success
  */
 int pqos_mon_get_ipc(const struct pqos_mon_data *const group, double *value);
+
+/**
+ * @brief Retrieves an AET telemetry floating-point value from a monitoring
+ *        group.
+ *
+ * @note Update event values using \a pqos_mon_poll
+ *
+ * Supported events: PQOS_MON_EVENT_CORE_ENERGY, PQOS_MON_EVENT_ACTIVITY,
+ * PQOS_MON_EVENT_POWER.
+ *
+ * @param [in]  group monitoring group
+ * @param [in]  event AET event to retrieve
+ * @param [out] value floating-point value for the event
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM on NULL arguments or unsupported event
+ * @retval PQOS_RETVAL_RESOURCE when no valid reading is available yet
+ */
+int pqos_mon_get_tel_value(const struct pqos_mon_data *group,
+                           const enum pqos_mon_event event,
+                           double *value);
 
 /**
  * @brief Frees memory previously allocated and returned by the library

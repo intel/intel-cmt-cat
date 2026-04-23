@@ -99,6 +99,7 @@ int
 resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
 {
         int ret = PQOS_RETVAL_OK;
+        int have_monitoring_info = 0;
         char buf[64];
         FILE *fd;
 
@@ -110,46 +111,87 @@ resctrl_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         /**
          * Resctrl monitoring not supported
          */
-        if (!pqos_dir_exists(RESCTRL_PATH_INFO_L3_MON))
+        if (!pqos_dir_exists(RESCTRL_PATH_INFO_L3_MON) &&
+            !pqos_dir_exists(RESCTRL_PATH_INFO_PERF_PKG_MON))
                 return PQOS_RETVAL_OK;
 
         /**
-         * Discover supported events
+         * Discover classic L3_MON supported events
          */
-        fd = pqos_fopen(RESCTRL_PATH_INFO_L3_MON "/mon_features", "r");
-        if (fd == NULL) {
-                LOG_ERROR("Failed to obtain resctrl monitoring features\n");
-                return PQOS_RETVAL_ERROR;
+        if (pqos_dir_exists(RESCTRL_PATH_INFO_L3_MON)) {
+                fd = pqos_fopen(RESCTRL_PATH_INFO_L3_MON "/mon_features", "r");
+                if (fd == NULL) {
+                        LOG_ERROR("Failed to obtain resctrl monitoring "
+                                  "features\n");
+                        return PQOS_RETVAL_ERROR;
+                }
+
+                have_monitoring_info = 1;
+
+                while (fgets(buf, sizeof(buf), fd) != NULL) {
+                        if (strcmp(buf, "llc_occupancy\n") == 0) {
+                                LOG_INFO("Detected resctrl support for "
+                                         "LLC Occupancy\n");
+                                supported_events |= PQOS_MON_EVENT_L3_OCCUP;
+                                continue;
+                        }
+
+                        if (strcmp(buf, "mbm_local_bytes\n") == 0) {
+                                LOG_INFO("Detected resctrl support for "
+                                         "Local Memory B/W\n");
+                                supported_events |= PQOS_MON_EVENT_LMEM_BW;
+                                continue;
+                        }
+
+                        if (strcmp(buf, "mbm_total_bytes\n") == 0) {
+                                LOG_INFO("Detected resctrl support for "
+                                         "Total Memory B/W\n");
+                                supported_events |= PQOS_MON_EVENT_TMEM_BW;
+                        }
+                }
+
+                if ((supported_events & PQOS_MON_EVENT_LMEM_BW) &&
+                    (supported_events & PQOS_MON_EVENT_TMEM_BW))
+                        supported_events |= PQOS_MON_EVENT_RMEM_BW;
+
+                pqos_fclose(fd);
         }
 
-        while (fgets(buf, sizeof(buf), fd) != NULL) {
-                if (strncmp(buf, "llc_occupancy\n", sizeof(buf)) == 0) {
-                        LOG_INFO("Detected resctrl support for "
-                                 "LLC Occupancy\n");
-                        supported_events |= PQOS_MON_EVENT_L3_OCCUP;
-                        continue;
+        /**
+         * Discover PERF_PKG_MON telemetry events
+         */
+        if (pqos_dir_exists(RESCTRL_PATH_INFO_PERF_PKG_MON)) {
+                fd = pqos_fopen(RESCTRL_PATH_INFO_PERF_PKG_MON "/mon_features",
+                                "r");
+                if (fd == NULL) {
+                        LOG_ERROR("Failed to obtain PERF_PKG monitoring "
+                                  "features\n");
+                        return PQOS_RETVAL_ERROR;
                 }
 
-                if (strncmp(buf, "mbm_local_bytes\n", sizeof(buf)) == 0) {
-                        LOG_INFO("Detected resctrl support for "
-                                 "Local Memory B/W\n");
-                        supported_events |= PQOS_MON_EVENT_LMEM_BW;
-                        continue;
+                have_monitoring_info = 1;
+
+                while (fgets(buf, sizeof(buf), fd) != NULL) {
+                        if (strcmp(buf, "core_energy\n") == 0) {
+                                LOG_INFO("Detected resctrl support for "
+                                         "Core Energy telemetry\n");
+                                supported_events |= PQOS_MON_EVENT_CORE_ENERGY;
+                                supported_events |= PQOS_MON_EVENT_POWER;
+                                continue;
+                        }
+
+                        if (strcmp(buf, "activity\n") == 0) {
+                                LOG_INFO("Detected resctrl support for "
+                                         "Activity telemetry\n");
+                                supported_events |= PQOS_MON_EVENT_ACTIVITY;
+                        }
                 }
 
-                if (strncmp(buf, "mbm_total_bytes\n", sizeof(buf)) == 0) {
-                        LOG_INFO("Detected resctrl support for "
-                                 "Total Memory B/W\n");
-                        supported_events |= PQOS_MON_EVENT_TMEM_BW;
-                }
+                pqos_fclose(fd);
         }
 
-        if ((supported_events & PQOS_MON_EVENT_LMEM_BW) &&
-            (supported_events & PQOS_MON_EVENT_TMEM_BW))
-                supported_events |= PQOS_MON_EVENT_RMEM_BW;
-
-        pqos_fclose(fd);
-
+        if (!have_monitoring_info)
+                return PQOS_RETVAL_OK;
         return ret;
 }
 
@@ -395,6 +437,87 @@ resctrl_mon_read_counter(const unsigned class_id,
         pqos_fclose(fd);
 
         return PQOS_RETVAL_OK;
+}
+
+/**
+ * @brief Build PERF_PKG domain path for a telemetry file
+ */
+static void
+resctrl_mon_perf_pkg_path(const unsigned class_id,
+                          const char *resctrl_group,
+                          const unsigned pkgid,
+                          const char *filename,
+                          char *path,
+                          const unsigned path_size)
+{
+        char buf[128];
+
+        resctrl_mon_group_path(class_id, resctrl_group, NULL, buf, sizeof(buf));
+        snprintf(path, path_size, "%s/mon_data/mon_PERF_PKG_%02u/%s", buf,
+                 pkgid, filename);
+}
+
+/**
+ * @brief Read a floating-point value from a telemetry file
+ */
+static int
+resctrl_mon_read_double(const char *path, double *value)
+{
+        FILE *fd;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(path != NULL);
+        ASSERT(value != NULL);
+
+        *value = 0.0;
+
+        fd = pqos_fopen(path, "r");
+        if (fd == NULL)
+                return PQOS_RETVAL_ERROR;
+        if (fscanf(fd, "%lf", value) != 1) {
+                *value = 0.0;
+                ret = PQOS_RETVAL_ERROR;
+        }
+        pqos_fclose(fd);
+
+        return ret;
+}
+
+/**
+ * @brief Read and aggregate telemetry event across package domains
+ */
+static int
+resctrl_mon_read_tel_pkgs(const unsigned class_id,
+                          const char *resctrl_group,
+                          const char *filename,
+                          const unsigned *pkgids,
+                          const unsigned num_pkgids,
+                          double *value)
+{
+        unsigned i;
+        int ret = PQOS_RETVAL_OK;
+
+        ASSERT(resctrl_group != NULL);
+        ASSERT(pkgids != NULL);
+        ASSERT(value != NULL);
+
+        *value = 0.0;
+
+        for (i = 0; i < num_pkgids; i++) {
+                char path[PATH_MAX];
+                double pkg_val = 0.0;
+
+                resctrl_mon_perf_pkg_path(class_id, resctrl_group, pkgids[i],
+                                          filename, path, sizeof(path));
+
+                ret = resctrl_mon_read_double(path, &pkg_val);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                *value += pkg_val;
+        }
+
+        return ret;
 }
 
 /**
@@ -924,6 +1047,16 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                 return ret;
 
         grps_size = cap_mon->u.mon->max_rmid;
+        if (grps_size == 0) {
+                /*
+                 * No RMIDs available for building a reusable core monitoring
+                 * group list. Treat as "no existing groups parsed".
+                 */
+                *cgrp = NULL;
+                *cgrp_num = 0;
+                return PQOS_RETVAL_OK;
+        }
+
         grps = calloc(grps_size, sizeof(*grps));
         if (grps == NULL)
                 return PQOS_RETVAL_RESOURCE;
@@ -966,7 +1099,7 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                                 }
                         /* new group */
                         if (grp == NULL) {
-                                if (grps_num + 1 == grps_size) {
+                                if (grps_num >= grps_size) {
                                         ret = PQOS_RETVAL_ERROR;
                                         break;
                                 }
@@ -1351,6 +1484,60 @@ resctrl_mon_shared(struct pqos_mon_data *group, unsigned *shared)
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
+
+/**
+ * @brief Collect unique package IDs for a monitoring group
+ */
+int
+resctrl_mon_collect_pkgids(struct pqos_mon_data *group)
+{
+        const struct pqos_cpuinfo *cpu = _pqos_get_cpu();
+        unsigned i;
+        unsigned *pkgids = NULL;
+        unsigned num_pkgids = 0;
+
+        ASSERT(group != NULL);
+
+        if (group->num_cores > 0) {
+                pkgids = calloc(group->num_cores, sizeof(*pkgids));
+                if (pkgids == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+
+                for (i = 0; i < group->num_cores; i++) {
+                        const struct pqos_coreinfo *ci =
+                            pqos_cpu_get_core_info(cpu, group->cores[i]);
+                        unsigned j;
+                        int found = 0;
+
+                        if (ci == NULL) {
+                                free(pkgids);
+                                return PQOS_RETVAL_ERROR;
+                        }
+                        for (j = 0; j < num_pkgids; j++) {
+                                if (pkgids[j] == ci->socket) {
+                                        found = 1;
+                                        break;
+                                }
+                        }
+                        if (!found)
+                                pkgids[num_pkgids++] = ci->socket;
+                }
+        } else {
+                unsigned num_sockets = 0;
+                unsigned *sockets = pqos_cpu_get_sockets(cpu, &num_sockets);
+
+                if (sockets == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+
+                pkgids = sockets;
+                num_pkgids = num_sockets;
+        }
+
+        group->intl->resctrl.pkgids = pkgids;
+        group->intl->resctrl.num_pkgids = num_pkgids;
+        return PQOS_RETVAL_OK;
+}
+
 int
 resctrl_mon_stop(struct pqos_mon_data *group)
 {
@@ -1436,8 +1623,18 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 group->intl->resctrl.mon_group = NULL;
         }
 
-        if (group->intl->resctrl.l3id != NULL)
+        if (group->intl->resctrl.l3id != NULL) {
                 free(group->intl->resctrl.l3id);
+                group->intl->resctrl.l3id = NULL;
+        }
+        group->intl->resctrl.num_l3id = 0;
+
+        if (group->intl->resctrl.pkgids != NULL) {
+                free(group->intl->resctrl.pkgids);
+                group->intl->resctrl.pkgids = NULL;
+        }
+
+        group->intl->resctrl.num_pkgids = 0;
 
 resctrl_mon_stop_exit:
         return ret;
@@ -1586,6 +1783,69 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                                                 group->intl->resctrl.mon_group);
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_poll_exit;
+        }
+
+        /* PERF_PKG telemetry events use a different read path */
+        if (event == PQOS_MON_EVENT_CORE_ENERGY ||
+            event == PQOS_MON_EVENT_ACTIVITY) {
+                const char *filename = (event == PQOS_MON_EVENT_CORE_ENERGY)
+                                           ? "core_energy"
+                                           : "activity";
+                const int slot = (event == PQOS_MON_EVENT_CORE_ENERGY)
+                                     ? PQOS_TEL_SLOT_CORE_ENERGY
+                                     : PQOS_TEL_SLOT_ACTIVITY;
+                double total = 0.0;
+                unsigned cos2 = 0;
+                unsigned max_cos2;
+                const struct pqos_cap *cap2 = _pqos_get_cap();
+
+                ret = resctrl_alloc_get_grps_num(cap2, &max_cos2);
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_poll_exit;
+
+                do {
+                        char mon_path[128];
+                        double pval = 0.0;
+
+                        resctrl_mon_group_path(
+                            cos2, group->intl->resctrl.mon_group, NULL,
+                            mon_path, sizeof(mon_path));
+                        if (!pqos_dir_exists(mon_path))
+                                continue;
+                        ret = resctrl_mon_read_tel_pkgs(
+                            cos2, group->intl->resctrl.mon_group, filename,
+                            group->intl->resctrl.pkgids,
+                            group->intl->resctrl.num_pkgids, &pval);
+                        if (ret != PQOS_RETVAL_OK)
+                                goto resctrl_mon_poll_exit;
+                        total += pval;
+                } while (++cos2 < max_cos2);
+
+                group->intl->resctrl.tel[slot].previous =
+                    group->intl->resctrl.tel[slot].current;
+                group->intl->resctrl.tel[slot].current = total;
+                group->intl->resctrl.tel[slot].valid = 1;
+
+                if (event == PQOS_MON_EVENT_CORE_ENERGY) {
+                        group->intl->resctrl.prev_tel_ts =
+                            group->intl->resctrl.tel_ts;
+                        clock_gettime(CLOCK_MONOTONIC,
+                                      &group->intl->resctrl.tel_ts);
+                }
+
+                /*
+                 * Keep telemetry-only polling consistent with classic resctrl
+                 * events and purge empty monitoring groups before exiting.
+                 */
+                {
+                        const int purge_ret = resctrl_mon_purge(group);
+
+                        if (ret == PQOS_RETVAL_OK &&
+                            purge_ret != PQOS_RETVAL_OK)
+                                ret = purge_ret;
+                }
+
+                goto resctrl_mon_poll_exit;
         }
 
         /* Search COSes for given resctrl mon group */

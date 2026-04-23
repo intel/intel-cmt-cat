@@ -170,7 +170,9 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
             PQOS_PERF_EVENT_LLC_MISS_PCIE_READ,
             PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE,
             PQOS_PERF_EVENT_LLC_REF_PCIE_READ,
-            PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE};
+            PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
+            PQOS_MON_EVENT_CORE_ENERGY,
+            PQOS_MON_EVENT_ACTIVITY};
 
 #ifdef __linux__
         if (group->intl->resctrl.event != 0) {
@@ -263,6 +265,35 @@ pqos_mon_poll_events(struct pqos_mon_data *group)
                             (double)group->values.ipc_unhalted_delta;
                 else
                         group->values.ipc = 0;
+        }
+
+        if (group->event & PQOS_MON_EVENT_POWER) {
+                struct pqos_tel_slot *energy_slot =
+                    &group->intl->resctrl.tel[PQOS_TEL_SLOT_CORE_ENERGY];
+                struct pqos_tel_slot *power_slot =
+                    &group->intl->resctrl.tel[PQOS_TEL_SLOT_POWER];
+                struct timespec *curr_ts = &group->intl->resctrl.tel_ts;
+                struct timespec *prev_ts = &group->intl->resctrl.prev_tel_ts;
+
+                power_slot->valid = 0;
+                /*
+                 * Power requires two valid energy samples and an initialized
+                 * previous telemetry timestamp.
+                 */
+                if (energy_slot->valid &&
+                    (prev_ts->tv_sec != 0 || prev_ts->tv_nsec != 0)) {
+                        double delta_energy =
+                            energy_slot->current - energy_slot->previous;
+                        double delta_t =
+                            (double)(curr_ts->tv_sec - prev_ts->tv_sec) +
+                            (double)(curr_ts->tv_nsec - prev_ts->tv_nsec) *
+                                1e-9;
+
+                        if (delta_t > 0.0) {
+                                power_slot->current = delta_energy / delta_t;
+                                power_slot->valid = 1;
+                        }
+                }
         }
 
         if (ret == PQOS_RETVAL_OK)
