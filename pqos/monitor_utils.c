@@ -160,6 +160,20 @@ monitor_utils_get_value(const struct pqos_mon_data *const group,
         case PQOS_PERF_EVENT_IPC:
                 ret = pqos_mon_get_ipc(group, &value);
                 break;
+        case PQOS_MON_EVENT_CORE_ENERGY:
+        case PQOS_MON_EVENT_ACTIVITY:
+        case PQOS_MON_EVENT_POWER: {
+                double tel_val = 0.0;
+                int tel_ret = pqos_mon_get_tel_value(group, event, &tel_val);
+
+                if (tel_ret == PQOS_RETVAL_OK) {
+                        value = tel_val;
+                        ret = PQOS_RETVAL_OK;
+                } else {
+                        ret = tel_ret;
+                }
+                break;
+        }
         default:
                 ret = PQOS_RETVAL_PARAM;
         }

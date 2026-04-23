@@ -72,6 +72,9 @@ static struct {
     {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
      .unit = 1000,
      .format = " %10.0fk"},
+    {.event = PQOS_MON_EVENT_CORE_ENERGY, .unit = 1, .format = " %11.3f"},
+    {.event = PQOS_MON_EVENT_ACTIVITY, .unit = 1, .format = " %11.3f"},
+    {.event = PQOS_MON_EVENT_POWER, .unit = 1, .format = " %11.3f"},
 };
 
 static void
@@ -187,6 +190,12 @@ monitor_text_header(FILE *fp,
                 fprintf(fp, " %11s", "REF_READ");
         if (events & PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)
                 fprintf(fp, " %11s", "REF_WRITE");
+        if (events & PQOS_MON_EVENT_CORE_ENERGY)
+                fprintf(fp, " %11s", "CoreEnrg[J]");
+        if (events & PQOS_MON_EVENT_ACTIVITY)
+                fprintf(fp, " %11s", "ACT");
+        if (events & PQOS_MON_EVENT_POWER)
+                fprintf(fp, " %11s", "PWR[W]");
 }
 
 /**

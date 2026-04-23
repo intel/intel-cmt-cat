@@ -200,6 +200,16 @@ select the cores and events for monitoring, EVTCORES format is "EVENT:CORE_LIST"
 .br
 \- "all" or ""  for all detected event types (except MBT)
 .br
+\- AET telemetry is excluded and must be requested explicitly via "cr_en", "act", "pow" or "aet"
+.br
+\- "cr_en" for Core Energy (OS interface only)
+.br
+\- "act" for Activity Counter (OS interface only)
+.br
+\- "pow" for Power derived from Core Energy (OS interface only)
+.br
+\- "aet" alias for cr_en+act+pow (OS interface only)
+.br
 CORE_LIST is comma or dash separated list of cores.
 .br
 Example "-m all:0,2,4-10;llc:1,3;mbr:11-12".

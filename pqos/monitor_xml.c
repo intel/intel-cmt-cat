@@ -199,6 +199,15 @@ monitor_xml_row(FILE *fp,
             {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE,
              .node_name = "llc_references_write",
              .format = "%.0f"},
+            {.event = PQOS_MON_EVENT_CORE_ENERGY,
+             .node_name = "core_energy_J",
+             .format = "%.3f"},
+            {.event = PQOS_MON_EVENT_ACTIVITY,
+             .node_name = "activity",
+             .format = "%.3f"},
+            {.event = PQOS_MON_EVENT_POWER,
+             .node_name = "power_W",
+             .format = "%.3f"},
         };
 
         for (i = 0; i < DIM(output); i++) {

@@ -64,8 +64,10 @@
 #include <unistd.h>
 
 #define PQOS_MON_EVENT_ALL                                                     \
-        ((enum pqos_mon_event) ~(PQOS_MON_EVENT_TMEM_BW |                      \
-                                 PQOS_PERF_EVENT_LLC_REF))
+        ((enum pqos_mon_event) ~(                                              \
+            PQOS_MON_EVENT_TMEM_BW | PQOS_PERF_EVENT_LLC_REF |                 \
+            PQOS_MON_EVENT_CORE_ENERGY | PQOS_MON_EVENT_ACTIVITY |             \
+            PQOS_MON_EVENT_POWER))
 #define PQOS_MON_EVENT_UNCORE                                                  \
         ((enum pqos_mon_event)(PQOS_PERF_EVENT_LLC_MISS_PCIE_READ |            \
                                PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE |           \
@@ -1028,6 +1030,16 @@ parse_event(const char *str, enum pqos_mon_event *evt)
                 *evt = PQOS_MON_EVENT_IO_TOTAL_MEM_BW;
         else if (strncasecmp(str, "iom:", 4) == 0)
                 *evt = PQOS_MON_EVENT_IO_MISS_MEM_BW;
+        else if (strncasecmp(str, "cr_en:", 6) == 0)
+                *evt = PQOS_MON_EVENT_CORE_ENERGY;
+        else if (strncasecmp(str, "act:", 4) == 0)
+                *evt = PQOS_MON_EVENT_ACTIVITY;
+        else if (strncasecmp(str, "pow:", 4) == 0)
+                *evt = PQOS_MON_EVENT_POWER;
+        else if (strncasecmp(str, "aet:", 4) == 0)
+                *evt = (enum pqos_mon_event)(PQOS_MON_EVENT_CORE_ENERGY |
+                                             PQOS_MON_EVENT_ACTIVITY |
+                                             PQOS_MON_EVENT_POWER);
         else
                 parse_error(str, "Unrecognized monitoring event type");
 }
@@ -1349,6 +1361,23 @@ get_available_events(const struct pqos_capability *const cap_mon, int iordt)
 }
 
 /**
+ * @brief Check if events contain only AET telemetry events
+ *
+ * @param [in] events monitoring events bitmask
+ *
+ * @return 1 if only AET events are set, 0 otherwise
+ */
+static int
+monitor_is_aet_only(const enum pqos_mon_event events)
+{
+        const enum pqos_mon_event aet_mask = (enum pqos_mon_event)(
+            PQOS_MON_EVENT_CORE_ENERGY | PQOS_MON_EVENT_ACTIVITY |
+            PQOS_MON_EVENT_POWER);
+
+        return (events & ~aet_mask) == 0 && (events & aet_mask) != 0;
+}
+
+/**
  * Update list of events to be monitored
  *
  * @param [in] type monitoring group type
@@ -1428,11 +1457,14 @@ monitor_setup_events(enum mon_group_type type,
 
         } else {
                 /* Start IPC and LLC miss monitoring if available */
-                if (all_evts & PQOS_PERF_EVENT_IPC)
-                        *events |= (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
-                if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
-                        *events |=
-                            (enum pqos_mon_event)PQOS_PERF_EVENT_LLC_MISS;
+                if (!monitor_is_aet_only(*events)) {
+                        if (all_evts & PQOS_PERF_EVENT_IPC)
+                                *events |=
+                                    (enum pqos_mon_event)PQOS_PERF_EVENT_IPC;
+                        if (all_evts & PQOS_PERF_EVENT_LLC_MISS)
+                                *events |= (enum pqos_mon_event)
+                                    PQOS_PERF_EVENT_LLC_MISS;
+                }
         }
         sel_events_max |= *events;
 
@@ -1455,6 +1487,36 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
         if (ret != PQOS_RETVAL_OK) {
                 printf("Unable to retrieve PQoS interface!\n");
                 return -1;
+        }
+
+        /* Validate AET events require OS interface */
+        {
+                const enum pqos_mon_event aet_mask = (enum pqos_mon_event)(
+                    PQOS_MON_EVENT_CORE_ENERGY | PQOS_MON_EVENT_ACTIVITY |
+                    PQOS_MON_EVENT_POWER);
+                enum pqos_mon_event supported_aet = (enum pqos_mon_event)0;
+                unsigned j;
+
+                for (j = 0; j < cap_mon->u.mon->num_events; j++) {
+                        const enum pqos_mon_event evt =
+                            cap_mon->u.mon->events[j].type;
+
+                        if (evt & aet_mask)
+                                supported_aet |= evt;
+                }
+
+                for (i = 0; i < sel_monitor_num; i++) {
+                        const enum pqos_mon_event requested_aet =
+                            (enum pqos_mon_event)(sel_monitor_group[i].events &
+                                                  aet_mask);
+
+                        if (requested_aet != 0 &&
+                            (requested_aet & supported_aet) != requested_aet) {
+                                printf("Error: requested AET monitoring events "
+                                       "are not supported on this platform\n");
+                                return -1;
+                        }
+                }
         }
 
         /**
@@ -1709,12 +1771,16 @@ monitor_stop(void)
         for (i = 0; i < sel_monitor_num; i++) {
                 struct mon_group *grp = &sel_monitor_group[i];
 
-                int ret = pqos_mon_stop(grp->data);
+                if (grp->started && grp->data != NULL) {
+                        int ret = pqos_mon_stop(grp->data);
 
-                if (ret != PQOS_RETVAL_OK)
-                        printf("Monitoring stop error!\n");
+                        if (ret != PQOS_RETVAL_OK)
+                                printf("Monitoring stop error!\n");
+                }
 
                 /* coverity[double_free] */
+                grp->data = NULL;
+                grp->started = 0;
                 grp_free(grp);
         }
 

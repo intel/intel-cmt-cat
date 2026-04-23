@@ -59,6 +59,9 @@ static struct {
     {.event = PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE, .format = ",%.0f"},
     {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_READ, .format = ",%.0f"},
     {.event = PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE, .format = ",%.0f"},
+    {.event = PQOS_MON_EVENT_CORE_ENERGY, .format = ",%.3f"},
+    {.event = PQOS_MON_EVENT_ACTIVITY, .format = ",%.3f"},
+    {.event = PQOS_MON_EVENT_POWER, .format = ",%.3f"},
 };
 
 static void
@@ -154,6 +157,13 @@ monitor_csv_begin(FILE *fp, const int num_mem_regions, const int *region_num)
                 fprintf(fp, ",%11s", "LLC References Read");
         if (events & PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE)
                 fprintf(fp, ",%11s", "LLC References Write");
+
+        if (events & PQOS_MON_EVENT_CORE_ENERGY)
+                fprintf(fp, ",CoreEnergy[J]");
+        if (events & PQOS_MON_EVENT_ACTIVITY)
+                fprintf(fp, ",Activity");
+        if (events & PQOS_MON_EVENT_POWER)
+                fprintf(fp, ",Power[W]");
 
         fputs("\n", fp);
 }

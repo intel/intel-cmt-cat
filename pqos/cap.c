@@ -143,6 +143,12 @@ get_mon_event_name(int event)
                 return "LLC references - pcie read";
         case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
                 return "LLC references - pcie write";
+        case PQOS_MON_EVENT_CORE_ENERGY:
+                return "Core Energy";
+        case PQOS_MON_EVENT_ACTIVITY:
+                return "Activity Counter";
+        case PQOS_MON_EVENT_POWER:
+                return "Power (synthetic)";
         default:
                 return "unknown";
         }
@@ -164,6 +170,7 @@ cap_print_features_mon(const unsigned indent,
         char buffer_cache[BUFFER_SIZE] = "\0";
         char buffer_memory[BUFFER_SIZE] = "\0";
         char buffer_other[BUFFER_SIZE] = "\0";
+        char buffer_telemetry[BUFFER_SIZE] = "\0";
 
         ASSERT(mon != NULL);
 
@@ -197,6 +204,12 @@ cap_print_features_mon(const unsigned indent,
                 case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
                 case PQOS_PERF_EVENT_LLC_MISS_PCIE_WRITE:
                         buffer = buffer_other;
+                        break;
+
+                case PQOS_MON_EVENT_CORE_ENERGY:
+                case PQOS_MON_EVENT_ACTIVITY:
+                case PQOS_MON_EVENT_POWER:
+                        buffer = buffer_telemetry;
                         break;
 
                 default:
@@ -270,6 +283,11 @@ cap_print_features_mon(const unsigned indent,
         if (strlen(buffer_other) > 0) {
                 printf_indent(indent + 4, "PMU events:\n");
                 printf("%s", buffer_other);
+        }
+
+        if (strlen(buffer_telemetry) > 0) {
+                printf_indent(indent + 4, "AET telemetry events:\n");
+                printf("%s", buffer_telemetry);
         }
 }
 
