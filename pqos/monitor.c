@@ -516,7 +516,7 @@ grp_set_device(struct mon_group *grp,
         grp->type = MON_GROUP_TYPE_DEVICE;
         grp->desc = desc;
         grp->devices = malloc(sizeof(union pqos_device) * num_devices);
-        if (grp->channels == NULL) {
+        if (grp->devices == NULL) {
                 printf("Error allocating device group table\n");
                 return -1;
         }
