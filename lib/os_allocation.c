@@ -1056,7 +1056,7 @@ os_alloc_reset(const struct pqos_alloc_config *cfg)
         mba_changed = mba_cfg_update(mba_cfg, mba_cap, &mba_ctrl);
         smba_changed = smba_cfg_update(smba_cfg, smba_cap, &smba_ctrl);
 
-        if (l3_cdp_changed || l2_cdp_changed || mba_changed | smba_changed) {
+        if (l3_cdp_changed || l2_cdp_changed || mba_changed || smba_changed) {
 
                 unsigned monitoring_active = 0;
 
