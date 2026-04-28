@@ -572,6 +572,23 @@ $(BIN_DIR)/test_resctrl_mon: test_resctrl_mon.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_aet_telemetry: test_aet_telemetry.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=_pqos_check_init \
+		-Wl,--wrap=lock_get \
+		-Wl,--wrap=lock_release \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
+$(BIN_DIR)/test_resctrl_aet_init: test_resctrl_aet_init.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=pqos_dir_exists \
+		-Wl,--wrap=pqos_fopen \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_os_alloc_mount: test_os_alloc_mount.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
