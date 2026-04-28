@@ -143,7 +143,7 @@ perf_read_counter(int counter_fd, uint64_t *value)
         if (counter_fd <= 0 || value == NULL)
                 return PQOS_RETVAL_PARAM;
 
-        if ((read(counter_fd, value, sizeof(*value)) == sizeof(value)) &&
+        if ((read(counter_fd, value, sizeof(*value)) == sizeof(*value)) &&
             *value <= UINT64_MAX)
                 return PQOS_RETVAL_OK;
 
