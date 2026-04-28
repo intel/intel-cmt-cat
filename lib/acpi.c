@@ -187,7 +187,7 @@ acpi_rsdp_address_efi(void)
                 fclose(fd);
         }
 
-        if (!addr && addr > (ULLONG_MAX - sizeof(struct acpi_table_rsdp)))
+        if (!addr || addr > (ULLONG_MAX - sizeof(struct acpi_table_rsdp)))
                 return 0;
 
         return addr;
