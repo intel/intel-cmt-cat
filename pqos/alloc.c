@@ -1664,8 +1664,10 @@ print_l2ca_config(const struct pqos_l2ca *ca, const int is_error)
  * @param [in] cap_l3ca pointer to L3 CAT capability structure
  * @param [in] cap_mba pointer to MBA capability structure
  * @param [in] cap_smba pointer to SMBA capability structure
- * @param [in] sock_count number of socket id's in \a sockets
- * @param [in] sockets arrays of socket id's
+ * @param [in] sock_count number of IDs in \a sockets
+ * @param [in] sockets array of IDs (socket ids or L3 CAT/domain ids)
+ * @param [in] id_label label used to describe the id (e.g. "Socket" or
+ *                      "Domain ID")
  */
 static void
 print_per_socket_config(const struct pqos_capability *cap_l3ca,
@@ -1673,12 +1675,13 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
                         const struct pqos_capability *cap_smba,
                         const struct pqos_cpuinfo *cpu_info,
                         const unsigned sock_count,
-                        const unsigned *sockets)
+                        const unsigned *sockets,
+                        const char *id_label)
 {
         int ret;
         unsigned i;
 
-        if (cpu_info == NULL || sockets == NULL)
+        if (cpu_info == NULL || sockets == NULL || id_label == NULL)
                 return;
 
         if (cap_l3ca == NULL && cap_mba == NULL && cap_smba == NULL)
@@ -1686,10 +1689,10 @@ print_per_socket_config(const struct pqos_capability *cap_l3ca,
 
         for (i = 0; i < sock_count; i++) {
 
-                printf("%s%s%s COS definitions for Socket %u:\n",
+                printf("%s%s%s COS definitions for %s %u:\n",
                        cap_l3ca != NULL ? "L3CA" : "",
                        (cap_l3ca != NULL && cap_mba != NULL) ? "/" : "",
-                       cap_mba != NULL ? "MBA" : "", sockets[i]);
+                       cap_mba != NULL ? "MBA" : "", id_label, sockets[i]);
 
                 if (cap_l3ca != NULL) {
                         const struct pqos_cap_l3ca *l3ca = cap_l3ca->u.l3ca;
@@ -2176,6 +2179,7 @@ alloc_print_config(const struct pqos_capability *cap_mon,
         unsigned i;
         unsigned sock_count, *sockets = NULL;
         unsigned l3c_count, *l3_clusters = NULL;
+        unsigned l3cat_id_count = 0, *l3cat_ids = NULL;
 
         if (!sys) {
                 printf("Error: 'sys' (pqos_sysconfig) is not available!\n");
@@ -2202,12 +2206,26 @@ alloc_print_config(const struct pqos_capability *cap_mon,
          * which is used for both CAT and MBA ids.
          */
         if (sys->cpu->vendor == PQOS_VENDOR_AMD ||
-            sys->cpu->vendor == PQOS_VENDOR_HYGON)
+            sys->cpu->vendor == PQOS_VENDOR_HYGON) {
                 print_per_l3_cluster_config(cap_l3ca, cap_mba, cap_smba,
                                             sys->cpu, l3c_count, l3_clusters);
-        else
-                print_per_socket_config(cap_l3ca, cap_mba, cap_smba, sys->cpu,
-                                        sock_count, sockets);
+        } else {
+                /**
+                 * Some platforms expose multiple L3 cache instances
+                 * (multiple L3 CAT IDs) per socket. In that case the
+                 * COS definitions are reported per L3 CAT/Domain ID
+                 * instead of per Socket.
+                 */
+                l3cat_ids = pqos_cpu_get_l3cat_ids(sys->cpu, &l3cat_id_count);
+                if (l3cat_ids != NULL && l3cat_id_count != sock_count)
+                        print_per_socket_config(cap_l3ca, cap_mba, cap_smba,
+                                                sys->cpu, l3cat_id_count,
+                                                l3cat_ids, "Domain ID");
+                else
+                        print_per_socket_config(cap_l3ca, cap_mba, cap_smba,
+                                                sys->cpu, sock_count, sockets,
+                                                "Socket");
+        }
 
         if (cap_l2ca != NULL) {
                 /* Print L2 CAT class definitions per L2 cluster */
@@ -2316,6 +2334,7 @@ alloc_print_config(const struct pqos_capability *cap_mon,
         print_iordt_alloc(cap_mon, cap_l3ca, sys);
 
 free_and_return:
+        free(l3cat_ids);
         free(l3_clusters);
 free_sockets:
         free(sockets);
