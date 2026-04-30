@@ -484,19 +484,6 @@ selfn_strdup(char **sel, const char *arg)
 }
 
 /**
- * @brief Function to print warning to users as utility begins
- */
-static void
-print_warning(void)
-{
-#ifdef __linux__
-        printf("NOTE:  Mixed use of MSR and kernel interfaces "
-               "to manage\n       CAT or CMT & MBM may lead to "
-               "unexpected behavior.\n");
-#endif
-}
-
-/**
  * @brief Selects log file
  *
  * @param arg string passed to -l command line option
@@ -1520,7 +1507,6 @@ main(int argc, char **argv)
         int opt_index = 0, pid_flag = 0;
 
         m_cmd_name = argv[0];
-        print_warning();
 
         memset(&cfg, 0, sizeof(cfg));
 
