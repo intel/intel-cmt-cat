@@ -317,9 +317,27 @@ set_l3_cos(const unsigned class_id,
                      cpu->vendor == PQOS_VENDOR_HYGON) &&
                     interface != PQOS_INTER_MMIO)
                         package = "Core Complex";
-                else if (interface != PQOS_INTER_MMIO)
-                        package = "SOCKET";
-                else
+                else if (interface != PQOS_INTER_MMIO) {
+                        /**
+                         * On platforms where L3 cache instances do not
+                         * map 1:1 to sockets (multiple L3 CAT IDs per
+                         * socket), the configured IDs are L3 CAT/Domain
+                         * IDs rather than socket IDs. Label the output
+                         * accordingly.
+                         */
+                        unsigned sc = 0, l3c = 0;
+                        unsigned *s_tmp =
+                            pqos_cpu_get_sockets(cpu, &sc);
+                        unsigned *l3_tmp =
+                            pqos_cpu_get_l3cat_ids(cpu, &l3c);
+
+                        if (s_tmp != NULL && l3_tmp != NULL && sc != l3c)
+                                package = "Domain ID ";
+                        else
+                                package = "SOCKET";
+                        free(s_tmp);
+                        free(l3_tmp);
+                } else
                         package = "Domain ID ";
 
                 if (interface == PQOS_INTER_MMIO)
@@ -624,8 +642,25 @@ set_mba_cos(const unsigned class_id,
                         package = "Core Complex";
                         unit = "";
                 } else if (interface != PQOS_INTER_MMIO) {
-                        package = "SOCKET";
+                        /**
+                         * Label the output as "Domain ID" when the
+                         * platform exposes multiple L3 CAT IDs per
+                         * socket; otherwise keep the legacy "SOCKET"
+                         * label.
+                         */
+                        unsigned sc = 0, l3c = 0;
+                        unsigned *s_tmp =
+                            pqos_cpu_get_sockets(cpu, &sc);
+                        unsigned *l3_tmp =
+                            pqos_cpu_get_l3cat_ids(cpu, &l3c);
+
+                        if (s_tmp != NULL && l3_tmp != NULL && sc != l3c)
+                                package = "Domain ID";
+                        else
+                                package = "SOCKET";
                         unit = "%";
+                        free(s_tmp);
+                        free(l3_tmp);
                 } else
                         package = "Domain ID";
 
