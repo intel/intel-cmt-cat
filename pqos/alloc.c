@@ -207,6 +207,39 @@ parse_cos_mask_type(char *str, int *scope, unsigned *id)
 }
 
 /**
+ * @brief Check whether the platform exposes multiple L3 CAT IDs per socket.
+ *
+ * On such platforms the IDs used by the MSR allocation interface are L3
+ * CAT/Domain IDs rather than socket IDs, so output should be labelled
+ * accordingly.
+ *
+ * @param cpu pqos_cpuinfo list containing all the cores
+ *
+ * @retval 1 when L3 CAT ID count differs from socket count
+ * @retval 0 otherwise (or on lookup failure)
+ */
+static int
+msr_l3_id_differs_from_sockets(const struct pqos_cpuinfo *cpu)
+{
+        unsigned sc = 0, l3c = 0;
+        unsigned *s_tmp = NULL, *l3_tmp = NULL;
+        int differs = 0;
+
+        if (cpu == NULL)
+                return 0;
+
+        s_tmp = pqos_cpu_get_sockets(cpu, &sc);
+        l3_tmp = pqos_cpu_get_l3cat_ids(cpu, &l3c);
+
+        if (s_tmp != NULL && l3_tmp != NULL && sc != l3c)
+                differs = 1;
+
+        free(s_tmp);
+        free(l3_tmp);
+        return differs;
+}
+
+/**
  * @brief Set L3 class definitions on selected sockets
  *
  * @param class_id L3 class ID to set
@@ -325,18 +358,10 @@ set_l3_cos(const unsigned class_id,
                          * IDs rather than socket IDs. Label the output
                          * accordingly.
                          */
-                        unsigned sc = 0, l3c = 0;
-                        unsigned *s_tmp =
-                            pqos_cpu_get_sockets(cpu, &sc);
-                        unsigned *l3_tmp =
-                            pqos_cpu_get_l3cat_ids(cpu, &l3c);
-
-                        if (s_tmp != NULL && l3_tmp != NULL && sc != l3c)
+                        if (msr_l3_id_differs_from_sockets(cpu))
                                 package = "Domain ID ";
                         else
                                 package = "SOCKET";
-                        free(s_tmp);
-                        free(l3_tmp);
                 } else
                         package = "Domain ID ";
 
@@ -648,19 +673,11 @@ set_mba_cos(const unsigned class_id,
                          * socket; otherwise keep the legacy "SOCKET"
                          * label.
                          */
-                        unsigned sc = 0, l3c = 0;
-                        unsigned *s_tmp =
-                            pqos_cpu_get_sockets(cpu, &sc);
-                        unsigned *l3_tmp =
-                            pqos_cpu_get_l3cat_ids(cpu, &l3c);
-
-                        if (s_tmp != NULL && l3_tmp != NULL && sc != l3c)
+                        if (msr_l3_id_differs_from_sockets(cpu))
                                 package = "Domain ID";
                         else
                                 package = "SOCKET";
                         unit = "%";
-                        free(s_tmp);
-                        free(l3_tmp);
                 } else
                         package = "Domain ID";
 
