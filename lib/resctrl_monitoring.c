@@ -287,26 +287,25 @@ resctrl_mon_group_path(const unsigned class_id,
                        char *buf,
                        const unsigned buf_size)
 {
+        const char *suffix = (file != NULL) ? file : "";
+
         ASSERT(buf != NULL);
 
         /* Group name not set - get path to mon_groups directory */
         if (resctrl_group == NULL && class_id == 0)
-                snprintf(buf, buf_size, RESCTRL_PATH);
+                snprintf(buf, buf_size, RESCTRL_PATH "%s", suffix);
         else if (resctrl_group == NULL)
-                snprintf(buf, buf_size, RESCTRL_PATH "/COS%u", class_id);
+                snprintf(buf, buf_size, RESCTRL_PATH "/COS%u%s", class_id,
+                         suffix);
 
         /* mon group for COS 0 */
         else if (class_id == 0)
-                snprintf(buf, buf_size, RESCTRL_PATH "/mon_groups/%s",
-                         resctrl_group);
+                snprintf(buf, buf_size, RESCTRL_PATH "/mon_groups/%s%s",
+                         resctrl_group, suffix);
         /* mon group for the other classes */
         else
-                snprintf(buf, buf_size, RESCTRL_PATH "/COS%u/mon_groups/%s",
-                         class_id, resctrl_group);
-
-        /* Append file name */
-        if (file != NULL)
-                strncat(buf, file, buf_size - strlen(buf));
+                snprintf(buf, buf_size, RESCTRL_PATH "/COS%u/mon_groups/%s%s",
+                         class_id, resctrl_group, suffix);
 }
 
 /**
