@@ -276,7 +276,7 @@ alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
  *
  * @param [in] class_id COS id
  * @param [in] resctrl_group mon group name
- * @param [in] file file name insige group
+ * @param [in] file file name inside group
  * @param [out] buf Buffer to store path
  * @param [in] buf_size buffer size
  *
@@ -417,6 +417,7 @@ resctrl_mon_read_counter(const unsigned class_id,
         char path[PATH_MAX];
         FILE *fd;
         unsigned long long counter;
+        int len;
 
         ASSERT(resctrl_group != NULL);
         ASSERT(value != NULL);
@@ -442,8 +443,10 @@ resctrl_mon_read_counter(const unsigned class_id,
         if (resctrl_mon_group_path(class_id, resctrl_group, NULL, buf,
                                    sizeof(buf)) != PQOS_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
-        snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf, l3id,
-                 name);
+        len = snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf,
+                       l3id, name);
+        if (len < 0 || len >= (int) sizeof(path))
+                return PQOS_RETVAL_ERROR;
         fd = pqos_fopen(path, "r");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
@@ -467,13 +470,16 @@ resctrl_mon_perf_pkg_path(const unsigned class_id,
 {
         char buf[128];
         int ret;
+        int len;
 
         ret = resctrl_mon_group_path(class_id, resctrl_group, NULL, buf,
                                      sizeof(buf));
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-        snprintf(path, path_size, "%s/mon_data/mon_PERF_PKG_%02u/%s", buf,
-                 pkgid, filename);
+        len = snprintf(path, path_size, "%s/mon_data/mon_PERF_PKG_%02u/%s", buf,
+                       pkgid, filename);
+        if (len < 0 || len >= (int) path_size)
+                return PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;
 }
@@ -707,7 +713,7 @@ resctrl_mon_empty(const unsigned class_id,
         }
 
         /*
-         *Some tasks are assigned to group?
+         * Some tasks are assigned to group?
          */
         ret = resctrl_mon_group_path(class_id, resctrl_group, "/tasks", path,
                                      sizeof(path));
