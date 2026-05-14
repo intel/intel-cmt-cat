@@ -279,8 +279,11 @@ alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
  * @param [in] file file name insige group
  * @param [out] buf Buffer to store path
  * @param [in] buf_size buffer size
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
  */
-static void
+static int
 resctrl_mon_group_path(const unsigned class_id,
                        const char *resctrl_group,
                        const char *file,
@@ -288,24 +291,31 @@ resctrl_mon_group_path(const unsigned class_id,
                        const unsigned buf_size)
 {
         const char *suffix = (file != NULL) ? file : "";
+        int len;
 
         ASSERT(buf != NULL);
 
         /* Group name not set - get path to mon_groups directory */
         if (resctrl_group == NULL && class_id == 0)
-                snprintf(buf, buf_size, RESCTRL_PATH "%s", suffix);
+                len = snprintf(buf, buf_size, RESCTRL_PATH "%s", suffix);
         else if (resctrl_group == NULL)
-                snprintf(buf, buf_size, RESCTRL_PATH "/COS%u%s", class_id,
-                         suffix);
+                len = snprintf(buf, buf_size, RESCTRL_PATH "/COS%u%s",
+                               class_id, suffix);
 
         /* mon group for COS 0 */
         else if (class_id == 0)
-                snprintf(buf, buf_size, RESCTRL_PATH "/mon_groups/%s%s",
-                         resctrl_group, suffix);
+                len = snprintf(buf, buf_size, RESCTRL_PATH "/mon_groups/%s%s",
+                               resctrl_group, suffix);
         /* mon group for the other classes */
         else
-                snprintf(buf, buf_size, RESCTRL_PATH "/COS%u/mon_groups/%s%s",
-                         class_id, resctrl_group, suffix);
+                len = snprintf(buf, buf_size,
+                               RESCTRL_PATH "/COS%u/mon_groups/%s%s", class_id,
+                               resctrl_group, suffix);
+
+        if (len < 0 || len >= (int) buf_size)
+                return PQOS_RETVAL_ERROR;
+
+        return PQOS_RETVAL_OK;
 }
 
 /**
@@ -329,8 +339,10 @@ resctrl_mon_cpumask_write(const unsigned class_id,
 
         ASSERT(mask != NULL);
 
-        resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
-                               sizeof(path));
+        ret = resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
+                                     sizeof(path));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         fd = pqos_fopen(path, "w");
         if (fd == NULL)
@@ -365,8 +377,10 @@ resctrl_mon_cpumask_read(const unsigned class_id,
 
         ASSERT(mask != NULL);
 
-        resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
-                               sizeof(path));
+        ret = resctrl_mon_group_path(class_id, resctrl_group, "/cpus", path,
+                                     sizeof(path));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
 
         fd = pqos_fopen(path, "r");
         if (fd == NULL)
@@ -425,7 +439,9 @@ resctrl_mon_read_counter(const unsigned class_id,
 
         *value = 0;
 
-        resctrl_mon_group_path(class_id, resctrl_group, NULL, buf, sizeof(buf));
+        if (resctrl_mon_group_path(class_id, resctrl_group, NULL, buf,
+                                   sizeof(buf)) != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
         snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf, l3id,
                  name);
         fd = pqos_fopen(path, "r");
@@ -441,7 +457,7 @@ resctrl_mon_read_counter(const unsigned class_id,
 /**
  * @brief Build PERF_PKG domain path for a telemetry file
  */
-static void
+static int
 resctrl_mon_perf_pkg_path(const unsigned class_id,
                           const char *resctrl_group,
                           const unsigned pkgid,
@@ -450,10 +466,16 @@ resctrl_mon_perf_pkg_path(const unsigned class_id,
                           const unsigned path_size)
 {
         char buf[128];
+        int ret;
 
-        resctrl_mon_group_path(class_id, resctrl_group, NULL, buf, sizeof(buf));
+        ret = resctrl_mon_group_path(class_id, resctrl_group, NULL, buf,
+                                     sizeof(buf));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         snprintf(path, path_size, "%s/mon_data/mon_PERF_PKG_%02u/%s", buf,
                  pkgid, filename);
+
+        return PQOS_RETVAL_OK;
 }
 
 /**
@@ -506,8 +528,11 @@ resctrl_mon_read_tel_pkgs(const unsigned class_id,
                 char path[PATH_MAX];
                 double pkg_val = 0.0;
 
-                resctrl_mon_perf_pkg_path(class_id, resctrl_group, pkgids[i],
-                                          filename, path, sizeof(path));
+                ret = resctrl_mon_perf_pkg_path(class_id, resctrl_group,
+                                                pkgids[i], filename, path,
+                                                sizeof(path));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
 
                 ret = resctrl_mon_read_double(path, &pkg_val);
                 if (ret != PQOS_RETVAL_OK)
@@ -669,8 +694,10 @@ resctrl_mon_empty(const unsigned class_id,
         /*
          * Some cores are assigned to group?
          */
-        resctrl_mon_group_path(class_id, resctrl_group, "/cpus_list", path,
-                               sizeof(path));
+        ret = resctrl_mon_group_path(class_id, resctrl_group, "/cpus_list",
+                                     path, sizeof(path));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         retval = resctrl_mon_file_empty(path);
         if (retval < 0)
                 return PQOS_RETVAL_ERROR;
@@ -682,8 +709,10 @@ resctrl_mon_empty(const unsigned class_id,
         /*
          *Some tasks are assigned to group?
          */
-        resctrl_mon_group_path(class_id, resctrl_group, "/tasks", path,
-                               sizeof(path));
+        ret = resctrl_mon_group_path(class_id, resctrl_group, "/tasks", path,
+                                     sizeof(path));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         retval = resctrl_mon_file_empty(path);
         if (retval < 0)
                 return PQOS_RETVAL_ERROR;
@@ -728,7 +757,9 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
 
         ASSERT(name != NULL);
 
-        resctrl_mon_group_path(class_id, name, NULL, path, sizeof(path));
+        if (resctrl_mon_group_path(class_id, name, NULL, path,
+                                   sizeof(path)) != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
 
         if (mkdir(path, 0755) == -1 && errno != EEXIST)
                 return PQOS_RETVAL_BUSY;
@@ -752,7 +783,9 @@ resctrl_mon_rmdir(const unsigned class_id, const char *name)
 
         ASSERT(name != NULL);
 
-        resctrl_mon_group_path(class_id, name, NULL, path, sizeof(path));
+        if (resctrl_mon_group_path(class_id, name, NULL, path,
+                                   sizeof(path)) != PQOS_RETVAL_OK)
+                return PQOS_RETVAL_ERROR;
 
         if (rmdir(path) == -1 && errno != ENOENT)
                 return PQOS_RETVAL_ERROR;
@@ -781,7 +814,9 @@ resctrl_mon_assoc_get(const unsigned lcore,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        resctrl_mon_group_path(class_id, "", NULL, dir, sizeof(dir));
+        ret = resctrl_mon_group_path(class_id, "", NULL, dir, sizeof(dir));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         num_groups = scandir(dir, &namelist, filter, NULL);
         if (num_groups < 0) {
                 LOG_ERROR("Failed to read monitoring groups for COS %u\n",
@@ -877,7 +912,9 @@ resctrl_mon_assoc_restore(const unsigned lcore, const char *name)
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
+        ret = resctrl_mon_group_path(class_id, name, NULL, buf, sizeof(buf));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         if (!pqos_dir_exists(buf)) {
                 LOG_WARN("Could not restore core association with mon "
                          "group %s does not exists\n",
@@ -911,7 +948,9 @@ resctrl_mon_assoc_get_pid(const pid_t task,
         if (ret != PQOS_RETVAL_OK)
                 return ret;
 
-        resctrl_mon_group_path(class_id, "", NULL, dir, sizeof(dir));
+        ret = resctrl_mon_group_path(class_id, "", NULL, dir, sizeof(dir));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         num_groups = scandir(dir, &namelist, filter, NULL);
         if (num_groups < 0) {
                 LOG_ERROR("Failed to read monitoring groups for COS %u\n",
@@ -928,8 +967,10 @@ resctrl_mon_assoc_get_pid(const pid_t task,
                 if (d_name == NULL)
                         continue;
 
-                resctrl_mon_group_path(class_id, d_name, "/tasks", path,
-                                       sizeof(path));
+                ret = resctrl_mon_group_path(class_id, d_name, "/tasks", path,
+                                             sizeof(path));
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_assoc_get_pid_exit;
 
                 fd = pqos_fopen(path, "r");
                 if (fd == NULL)
@@ -989,7 +1030,10 @@ resctrl_mon_assoc_set_pid(const pid_t task, const char *name)
                 }
         }
 
-        resctrl_mon_group_path(class_id, name, "/tasks", path, sizeof(path));
+        ret = resctrl_mon_group_path(class_id, name, "/tasks", path,
+                                     sizeof(path));
+        if (ret != PQOS_RETVAL_OK)
+                return ret;
         fd = pqos_fopen(path, "w");
         if (fd == NULL)
                 return PQOS_RETVAL_ERROR;
@@ -1068,7 +1112,9 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                 char dir[256];
                 int i;
 
-                resctrl_mon_group_path(cos, "", NULL, dir, sizeof(dir));
+                ret = resctrl_mon_group_path(cos, "", NULL, dir, sizeof(dir));
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_parse_exit;
                 num_groups = scandir(dir, &namelist, filter, NULL);
                 if (num_groups < 0) {
                         LOG_ERROR(
@@ -1111,8 +1157,10 @@ resctrl_mon_parse(struct resctrl_core_group **cgrp, unsigned *cgrp_num)
                                 continue;
 
                         /* Some tasks are assigned to group? */
-                        resctrl_mon_group_path(cos, grp->name, "/tasks", path,
-                                               sizeof(path));
+                        ret = resctrl_mon_group_path(cos, grp->name, "/tasks",
+                                                     path, sizeof(path));
+                        if (ret != PQOS_RETVAL_OK)
+                                break;
                         retval = resctrl_mon_file_empty(path);
                         if (retval < 0) {
                                 ret = PQOS_RETVAL_ERROR;
@@ -1257,9 +1305,11 @@ resctrl_mon_assign(struct pqos_mon_data *group)
                                                 uint64_t val;
                                                 char buf[128];
 
-                                                resctrl_mon_group_path(
+                                                ret = resctrl_mon_group_path(
                                                     cos, grp->name, NULL, buf,
                                                     sizeof(buf));
+                                                if (ret != PQOS_RETVAL_OK)
+                                                        goto mon_assign_exit;
                                                 if (!pqos_dir_exists(buf))
                                                         continue;
 
@@ -1441,8 +1491,10 @@ resctrl_mon_shared(struct pqos_mon_data *group, unsigned *shared)
                 unsigned i;
 
                 /* check if group exists */
-                resctrl_mon_group_path(cos, mon_group, NULL, path,
-                                       sizeof(path));
+                ret = resctrl_mon_group_path(cos, mon_group, NULL, path,
+                                             sizeof(path));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
                 if (!pqos_dir_exists(path))
                         continue;
 
@@ -1581,8 +1633,10 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 do {
                         struct resctrl_cpumask cpumask;
 
-                        resctrl_mon_group_path(cos, mon_group, NULL, path,
-                                               sizeof(path));
+                        ret = resctrl_mon_group_path(cos, mon_group, NULL,
+                                                     path, sizeof(path));
+                        if (ret != PQOS_RETVAL_OK)
+                                goto resctrl_mon_stop_exit;
                         if (!pqos_dir_exists(path))
                                 continue;
 
@@ -1694,7 +1748,9 @@ resctrl_mon_purge(struct pqos_mon_data *group)
                 char buf[128];
                 const char *name = group->intl->resctrl.mon_group;
 
-                resctrl_mon_group_path(cos, name, NULL, buf, sizeof(buf));
+                ret = resctrl_mon_group_path(cos, name, NULL, buf, sizeof(buf));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
                 if (!pqos_dir_exists(buf))
                         continue;
 
@@ -1806,9 +1862,11 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                         char mon_path[128];
                         double pval = 0.0;
 
-                        resctrl_mon_group_path(
+                        ret = resctrl_mon_group_path(
                             cos2, group->intl->resctrl.mon_group, NULL,
                             mon_path, sizeof(mon_path));
+                        if (ret != PQOS_RETVAL_OK)
+                                goto resctrl_mon_poll_exit;
                         if (!pqos_dir_exists(mon_path))
                                 continue;
                         ret = resctrl_mon_read_tel_pkgs(
@@ -1853,8 +1911,11 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                 uint64_t val;
                 char buf[128];
 
-                resctrl_mon_group_path(cos, group->intl->resctrl.mon_group,
-                                       NULL, buf, sizeof(buf));
+                ret = resctrl_mon_group_path(cos,
+                                             group->intl->resctrl.mon_group,
+                                             NULL, buf, sizeof(buf));
+                if (ret != PQOS_RETVAL_OK)
+                        goto resctrl_mon_poll_exit;
                 if (!pqos_dir_exists(buf))
                         continue;
 
@@ -1927,7 +1988,9 @@ resctrl_mon_reset(void)
                 char dir[256];
                 int i;
 
-                resctrl_mon_group_path(cos, "", NULL, dir, sizeof(dir));
+                ret = resctrl_mon_group_path(cos, "", NULL, dir, sizeof(dir));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
                 num_groups = scandir(dir, &namelist, filter, NULL);
                 if (num_groups < 0) {
                         LOG_ERROR("Failed to read monitoring groups for "
@@ -1986,7 +2049,10 @@ resctrl_mon_active(unsigned *monitoring_status)
                 char path[256];
                 struct dirent **mon_group_files = NULL;
 
-                resctrl_mon_group_path(group_idx, "", NULL, path, DIM(path));
+                ret = resctrl_mon_group_path(group_idx, "", NULL, path,
+                                             DIM(path));
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
 
                 /* check content of mon_groups directory */
                 files_count = scandir(path, &mon_group_files, filter, NULL);
