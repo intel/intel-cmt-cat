@@ -299,8 +299,8 @@ resctrl_mon_group_path(const unsigned class_id,
         if (resctrl_group == NULL && class_id == 0)
                 len = snprintf(buf, buf_size, RESCTRL_PATH "%s", suffix);
         else if (resctrl_group == NULL)
-                len = snprintf(buf, buf_size, RESCTRL_PATH "/COS%u%s",
-                               class_id, suffix);
+                len = snprintf(buf, buf_size, RESCTRL_PATH "/COS%u%s", class_id,
+                               suffix);
 
         /* mon group for COS 0 */
         else if (class_id == 0)
@@ -312,7 +312,7 @@ resctrl_mon_group_path(const unsigned class_id,
                                RESCTRL_PATH "/COS%u/mon_groups/%s%s", class_id,
                                resctrl_group, suffix);
 
-        if (len < 0 || len >= (int) buf_size)
+        if (len < 0 || len >= (int)buf_size)
                 return PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;
@@ -445,7 +445,7 @@ resctrl_mon_read_counter(const unsigned class_id,
                 return PQOS_RETVAL_ERROR;
         len = snprintf(path, sizeof(path), "%s/mon_data/mon_L3_%02u/%s", buf,
                        l3id, name);
-        if (len < 0 || len >= (int) sizeof(path))
+        if (len < 0 || len >= (int)sizeof(path))
                 return PQOS_RETVAL_ERROR;
         fd = pqos_fopen(path, "r");
         if (fd == NULL)
@@ -478,7 +478,7 @@ resctrl_mon_perf_pkg_path(const unsigned class_id,
                 return ret;
         len = snprintf(path, path_size, "%s/mon_data/mon_PERF_PKG_%02u/%s", buf,
                        pkgid, filename);
-        if (len < 0 || len >= (int) path_size)
+        if (len < 0 || len >= (int)path_size)
                 return PQOS_RETVAL_ERROR;
 
         return PQOS_RETVAL_OK;
@@ -763,8 +763,8 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
 
         ASSERT(name != NULL);
 
-        if (resctrl_mon_group_path(class_id, name, NULL, path,
-                                   sizeof(path)) != PQOS_RETVAL_OK)
+        if (resctrl_mon_group_path(class_id, name, NULL, path, sizeof(path)) !=
+            PQOS_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
         if (mkdir(path, 0755) == -1 && errno != EEXIST)
@@ -789,8 +789,8 @@ resctrl_mon_rmdir(const unsigned class_id, const char *name)
 
         ASSERT(name != NULL);
 
-        if (resctrl_mon_group_path(class_id, name, NULL, path,
-                                   sizeof(path)) != PQOS_RETVAL_OK)
+        if (resctrl_mon_group_path(class_id, name, NULL, path, sizeof(path)) !=
+            PQOS_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
         if (rmdir(path) == -1 && errno != ENOENT)
@@ -1639,8 +1639,8 @@ resctrl_mon_stop(struct pqos_mon_data *group)
                 do {
                         struct resctrl_cpumask cpumask;
 
-                        ret = resctrl_mon_group_path(cos, mon_group, NULL,
-                                                     path, sizeof(path));
+                        ret = resctrl_mon_group_path(cos, mon_group, NULL, path,
+                                                     sizeof(path));
                         if (ret != PQOS_RETVAL_OK)
                                 goto resctrl_mon_stop_exit;
                         if (!pqos_dir_exists(path))
@@ -1917,9 +1917,9 @@ resctrl_mon_poll(struct pqos_mon_data *group, const enum pqos_mon_event event)
                 uint64_t val;
                 char buf[128];
 
-                ret = resctrl_mon_group_path(cos,
-                                             group->intl->resctrl.mon_group,
-                                             NULL, buf, sizeof(buf));
+                ret =
+                    resctrl_mon_group_path(cos, group->intl->resctrl.mon_group,
+                                           NULL, buf, sizeof(buf));
                 if (ret != PQOS_RETVAL_OK)
                         goto resctrl_mon_poll_exit;
                 if (!pqos_dir_exists(buf))
