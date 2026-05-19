@@ -738,7 +738,7 @@ cap_print_cpu_agents_info(const struct pqos_cpu_agent_info *cpu_agent)
         uint32_t idx = 0;
 
         printf("    CACD Info:\n");
-        printf("        Domanin ID:                                    %d\n",
+        printf("        Domain ID:                                    %d\n",
                cpu_agent->cacd.rmdd_domain_id);
         printf("        Enumeration IDs:                               ");
         for (idx = 0; idx < cpu_agent->cacd.enum_ids_length; idx++)
