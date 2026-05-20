@@ -282,6 +282,18 @@ test_scenario_cdp_reset_picks_msr(void **state)
 }
 
 static void
+test_scenario_print_io_devs_picks_msr(void **state)
+{
+        enum pqos_interface out = PQOS_INTER_AUTO;
+        unsigned m = IFACE_ANY;
+
+        (void)state;
+        m = iface_narrow(m, IFACE_MSR); /* --print-io-devs */
+        assert_int_equal(iface_resolve(m, 0, PQOS_INTER_AUTO, &out), 0);
+        assert_int_equal(out, PQOS_INTER_MSR);
+}
+
+static void
 test_scenario_pid_plus_print_mem_regions_conflict(void **state)
 {
         unsigned m = IFACE_ANY;
@@ -340,6 +352,7 @@ main(void)
             cmocka_unit_test(test_scenario_pid_only),
             cmocka_unit_test(test_scenario_mon_channel_picks_mmio),
             cmocka_unit_test(test_scenario_cdp_reset_picks_msr),
+            cmocka_unit_test(test_scenario_print_io_devs_picks_msr),
             cmocka_unit_test(test_scenario_pid_plus_print_mem_regions_conflict),
             cmocka_unit_test(
                 test_scenario_uncore_aet_plus_explicit_os_conflict),

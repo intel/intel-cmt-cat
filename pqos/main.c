@@ -1608,18 +1608,19 @@ static const char help_printf_long[] =
     "                     force the MMIO interface.\n"
     "                  2) -p / --mon-pid (and PID-based --alloc-assoc)\n"
     "                     force the OS interface.\n"
-    "                  3) --mon-channel, --mon-dev, --rmid,\n"
-    "                     --rmid-channels, --print-io-devs and\n"
-    "                     --print-io-dev restrict the choice to MSR or\n"
-    "                     MMIO.\n"
-    "                  4) -m/--mon-uncore events cr_en, act, pow and aet\n"
+    "                  3) --mon-channel, --mon-dev, --rmid and\n"
+    "                     --rmid-channels restrict the choice to\n"
+    "                     MSR or MMIO.\n"
+    "                  4) --print-io-devs and --print-io-dev force\n"
+    "                     the MSR interface.\n"
+    "                  5) -m/--mon-uncore events cr_en, act, pow and aet\n"
     "                     restrict the choice to MSR or MMIO.\n"
-    "                  5) -R / --alloc-reset values cdp-on/off and\n"
+    "                  6) -R / --alloc-reset values cdp-on/off and\n"
     "                     l2cdp-on/off / l3cdp-on/off restrict the\n"
     "                     choice to MSR or OS.\n"
-    "                  6) When several interfaces remain valid the\n"
+    "                  7) When several interfaces remain valid the\n"
     "                     preference order is mmio > msr > os.\n"
-    "                  7) When no option constrains the interface the\n"
+    "                  8) When no option constrains the interface the\n"
     "                     library's own auto-detection is used:\n"
     "                       a) Takes RDT_IFACE environment variable\n"
     "                          into account if it is set\n"
@@ -1718,7 +1719,7 @@ static const char help_printf_long[] =
     "--------------- IORDT dev exploring options ---------------\n"
     "  --print-io-devs   print all IORDT devices\n"
     "  Example:\n"
-    "      pqos --iface=mmio --print-io-devs\n"
+    "      pqos --iface=msr --print-io-devs\n"
     "  --print-io-dev=DEV print specific IORDT device\n"
     "  DEV format is DOMAIN:BUS:DEVICE.FUNCTION\n"
     "      DOMAIN is the PCI domain number in hexadecimal\n"
@@ -1726,7 +1727,7 @@ static const char help_printf_long[] =
     "      DEVICE is the PCI device number in hexadecimal\n"
     "      FUNCTION is the PCI function number in hexadecimal\n"
     "  Example:\n"
-    "      pqos --iface=mmio --print-io-dev=0000:90:00.0\n\n"
+    "      pqos --iface=msr --print-io-dev=0000:90:00.0\n\n"
     "------------------- Dump MMIO registers --------------------\n"
     "  --print-dump-info   print all available MMIO spaces\n"
     "  Example:\n"
@@ -2240,12 +2241,11 @@ main(int argc, char **argv)
                         selfn_dump_rmid_upscaling(NULL);
                         break;
                 case OPTION_PRINT_IO_DEVS:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO,
-                                     "--print-io-devs");
+                        narrow_iface(IFACE_MSR, "--print-io-devs");
                         selfn_print_io_devs(NULL);
                         break;
                 case OPTION_PRINT_IO_DEV:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--print-io-dev");
+                        narrow_iface(IFACE_MSR, "--print-io-dev");
                         selfn_print_io_dev(optarg);
                         break;
                 default:

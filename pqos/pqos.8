@@ -353,15 +353,17 @@ The auto\-detection rules are:
 .br
 2) \fB\-p\fP / \fB\-\-mon\-pid\fP (and PID\-based \fB\-\-alloc\-assoc\fP) force the OS interface.
 .br
-3) \fB\-\-mon\-channel\fP, \fB\-\-mon\-dev\fP, \fB\-\-rmid\fP, \fB\-\-rmid\-channels\fP, \fB\-\-print\-io\-devs\fP and \fB\-\-print\-io\-dev\fP restrict the choice to MSR or MMIO.
+3) \fB\-\-mon\-channel\fP, \fB\-\-mon\-dev\fP, \fB\-\-rmid\fP and \fB\-\-rmid\-channels\fP restrict the choice to MSR or MMIO.
 .br
-4) \fB\-m\fP/\fB\-\-mon\-uncore\fP events cr_en, act, pow and aet restrict the choice to MSR or MMIO.
+4) \fB\-\-print\-io\-devs\fP and \fB\-\-print\-io\-dev\fP force the MSR interface.
 .br
-5) \fB\-R\fP / \fB\-\-alloc\-reset\fP values cdp\-on/off and l2cdp\-on/off / l3cdp\-on/off restrict the choice to MSR or OS.
+5) \fB\-m\fP/\fB\-\-mon\-uncore\fP events cr_en, act, pow and aet restrict the choice to MSR or MMIO.
 .br
-6) When several interfaces remain valid the preference order is mmio > msr > os.
+6) \fB\-R\fP / \fB\-\-alloc\-reset\fP values cdp\-on/off and l2cdp\-on/off / l3cdp\-on/off restrict the choice to MSR or OS.
 .br
-7) When no option constrains the interface the library's own auto\-detection is used:
+7) When several interfaces remain valid the preference order is mmio > msr > os.
+.br
+8) When no option constrains the interface the library's own auto\-detection is used:
 .br
 \ \ a) Takes RDT_IFACE environment variable into account if it is set
 .br
