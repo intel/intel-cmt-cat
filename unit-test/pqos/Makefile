@@ -133,6 +133,12 @@ $(BIN_DIR)/test_main: ./test_main.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_iface_select: ./test_iface_select.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
+
 
 .PHONY: run
 run: $(TESTS)
@@ -165,6 +171,7 @@ checkpatch:
 	SYMBOLIC_PERMS,CONST_STRUCT,SPACING \
 	-f test_alloc.c \
 	-f test_main.c \
+	-f test_iface_select.c \
 	-f test_profiles.c \
 	-f mock/mock_alloc.c \
 	-f mock/mock_alloc.h \
