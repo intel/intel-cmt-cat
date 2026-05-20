@@ -137,6 +137,45 @@ enum pqos_interface sel_interface = PQOS_INTER_AUTO;
 static int sel_interface_selected = 0;
 
 /**
+ * Interface compatibility bitmask used by the auto-selection logic.
+ *
+ * Each command-line option contributes a mask describing which interfaces
+ * can satisfy it. The accumulated AND across all parsed options yields the
+ * set of interfaces that are still compatible with the request. If the user
+ * also supplies --iface / -I explicitly, the resolver verifies that the
+ * explicit choice is in the accumulated set.
+ */
+#define IFACE_MSR  (1U << 0)
+#define IFACE_OS   (1U << 1)
+#define IFACE_MMIO (1U << 2)
+#define IFACE_ANY  (IFACE_MSR | IFACE_OS | IFACE_MMIO)
+
+/**
+ * Accumulated interface constraint mask. Starts at IFACE_ANY (no constraint)
+ * and is AND-narrowed as options are parsed.
+ */
+static unsigned iface_constraint_mask = IFACE_ANY;
+
+/**
+ * Description of the option that last narrowed @ref iface_constraint_mask
+ * (used in error messages when a subsequent option creates a conflict).
+ */
+static const char *iface_constraint_origin = NULL;
+
+/**
+ * Interface explicitly requested by the user via --iface / -I, valid only
+ * when @ref user_interface_set is non-zero. PQOS_INTER_AUTO means "auto"
+ * and is treated as no explicit override.
+ */
+static enum pqos_interface user_interface = PQOS_INTER_AUTO;
+
+/**
+ * Set when the user supplies an explicit interface (--iface=msr|os|mmio
+ * or -I). --iface=auto leaves this 0.
+ */
+static int user_interface_set = 0;
+
+/**
  * Enable displaying library version
  */
 static int sel_print_version = 0;
@@ -770,6 +809,350 @@ selfn_allocation_select(const char *arg)
 }
 
 /**
+ * @brief Case-insensitive substring search (locale-independent).
+ *
+ * @param haystack string to search in (must be non-NULL)
+ * @param needle   substring to look for (must be non-NULL)
+ *
+ * @return pointer into @a haystack at the start of the first match, or
+ *         NULL if @a needle is not found
+ */
+static const char *
+strcasestr_local(const char *haystack, const char *needle)
+{
+        size_t nlen;
+
+        if (haystack == NULL || needle == NULL)
+                return NULL;
+        if (*needle == '\0')
+                return haystack;
+
+        nlen = strlen(needle);
+        for (; *haystack != '\0'; haystack++)
+                if (strncasecmp(haystack, needle, nlen) == 0)
+                        return haystack;
+        return NULL;
+}
+
+/**
+ * @brief Convert an interface mask to a printable "msr|os|mmio" string.
+ *
+ * @param [in] mask interface bitmask (combination of IFACE_MSR/OS/MMIO)
+ * @param [out] buf destination buffer
+ * @param [in] buf_size size of @a buf in bytes
+ *
+ * @return @a buf (always NUL-terminated)
+ */
+static const char *
+iface_mask_to_str(unsigned mask, char *buf, size_t buf_size)
+{
+        size_t pos = 0;
+        const char *sep = "";
+
+        if (buf == NULL || buf_size == 0)
+                return "";
+
+        buf[0] = '\0';
+        if (mask == 0) {
+                snprintf(buf, buf_size, "<none>");
+                return buf;
+        }
+        if (mask & IFACE_MMIO) {
+                pos += snprintf(buf + pos, buf_size - pos, "%smmio", sep);
+                sep = "|";
+        }
+        if (mask & IFACE_MSR) {
+                pos += snprintf(buf + pos, buf_size - pos, "%smsr", sep);
+                sep = "|";
+        }
+        if (mask & IFACE_OS) {
+                pos += snprintf(buf + pos, buf_size - pos, "%sos", sep);
+                sep = "|";
+        }
+        return buf;
+}
+
+/**
+ * @brief Convert a single resolved interface enum to its short name.
+ */
+static const char *
+iface_enum_to_str(enum pqos_interface iface)
+{
+        switch (iface) {
+        case PQOS_INTER_MSR:
+                return "msr";
+        case PQOS_INTER_OS:
+        case PQOS_INTER_OS_RESCTRL_MON:
+                return "os";
+        case PQOS_INTER_MMIO:
+                return "mmio";
+        case PQOS_INTER_AUTO:
+                return "auto";
+        }
+        return "unknown";
+}
+
+/**
+ * @brief Translate an interface enum to its single-bit mask.
+ *
+ * @return IFACE_MSR / IFACE_OS / IFACE_MMIO or 0 for AUTO/unknown
+ */
+static unsigned
+iface_enum_to_bit(enum pqos_interface iface)
+{
+        switch (iface) {
+        case PQOS_INTER_MSR:
+                return IFACE_MSR;
+        case PQOS_INTER_OS:
+        case PQOS_INTER_OS_RESCTRL_MON:
+                return IFACE_OS;
+        case PQOS_INTER_MMIO:
+                return IFACE_MMIO;
+        case PQOS_INTER_AUTO:
+                return 0;
+        }
+        return 0;
+}
+
+/**
+ * @brief Pure helper: AND-narrow @a current with @a add.
+ *
+ * @param current current mask
+ * @param add     new constraint to apply (subset of IFACE_ANY)
+ *
+ * @return resulting mask. A return value of 0 indicates the two masks are
+ *         incompatible; the caller decides how to surface this. Both
+ *         @c IFACE_ANY and @c 0 in @a add are treated as a no-op (return
+ *         @a current unchanged).
+ */
+unsigned
+iface_narrow(unsigned current, unsigned add)
+{
+        add &= IFACE_ANY;
+        if (add == 0 || add == IFACE_ANY)
+                return current & IFACE_ANY;
+        return (current & IFACE_ANY) & add;
+}
+
+/**
+ * @brief Pure helper: pick a single interface for the given constraint mask.
+ *
+ * Implements the resolution rules used by @ref resolve_interface(),
+ * without any global state, error reporting, or process exit. Useful for
+ * unit testing.
+ *
+ * @param mask constraint mask (subset of IFACE_ANY); 0 is invalid
+ * @param user_set non-zero when the user supplied --iface / -I
+ * @param user explicit interface chosen by the user (only used when
+ *             @a user_set is non-zero); PQOS_INTER_AUTO means no override
+ * @param [out] out resolved interface (only written on success)
+ *
+ * @retval 0 on success (resolution found, written to @a out)
+ * @retval -1 when @a mask is empty
+ * @retval -2 when @a user_set is non-zero and @a user is incompatible with
+ *            @a mask
+ */
+int
+iface_resolve(unsigned mask, int user_set, enum pqos_interface user,
+              enum pqos_interface *out)
+{
+        unsigned bit;
+
+        if (out == NULL)
+                return -1;
+
+        mask &= IFACE_ANY;
+        if (mask == 0)
+                return -1;
+
+        if (user_set && user != PQOS_INTER_AUTO) {
+                bit = iface_enum_to_bit(user);
+                if (bit == 0 || (mask & bit) == 0)
+                        return -2;
+                *out = user;
+                return 0;
+        }
+
+        if (mask == IFACE_ANY) {
+                /* No option narrowed the mask; keep AUTO so the library
+                 * performs its own auto-detection. */
+                *out = PQOS_INTER_AUTO;
+                return 0;
+        }
+
+        /* Preference order: MMIO > MSR > OS. */
+        if (mask & IFACE_MMIO)
+                *out = PQOS_INTER_MMIO;
+        else if (mask & IFACE_MSR)
+                *out = PQOS_INTER_MSR;
+        else if (mask & IFACE_OS)
+                *out = PQOS_INTER_OS;
+        else
+                return -1; /* unreachable: mask is non-empty subset */
+
+        return 0;
+}
+
+/**
+ * @brief Narrow the global interface constraint mask by a per-option mask.
+ *
+ * AND-combines @a mask with @ref iface_constraint_mask. If the result is
+ * empty, prints a descriptive error showing which options conflict and
+ * exits the process with EXIT_FAILURE.
+ *
+ * @param [in] mask interface compatibility mask of the option being parsed
+ * @param [in] opt_descr human-readable name of the option (e.g. "-p" or
+ *                       "--print-mem-regions"); used in error messages
+ */
+static void
+narrow_iface(unsigned mask, const char *opt_descr)
+{
+        unsigned next;
+        char prev_str[32];
+        char new_str[32];
+
+        if (opt_descr == NULL)
+                opt_descr = "<option>";
+
+        mask &= IFACE_ANY;
+        if (mask == 0 || mask == IFACE_ANY)
+                /* IFACE_ANY adds no constraint; treat zero as a no-op too */
+                return;
+
+        next = iface_narrow(iface_constraint_mask, mask);
+        if (next == 0) {
+                iface_mask_to_str(iface_constraint_mask, prev_str,
+                                  sizeof(prev_str));
+                iface_mask_to_str(mask, new_str, sizeof(new_str));
+                fprintf(stderr,
+                        "Error: option '%s' requires interface '%s' but "
+                        "earlier option '%s' requires '%s'. The combination "
+                        "is not supported.\n",
+                        opt_descr, new_str,
+                        iface_constraint_origin != NULL
+                            ? iface_constraint_origin
+                            : "<earlier option>",
+                        prev_str);
+                exit(EXIT_FAILURE);
+        }
+
+        if (next != iface_constraint_mask) {
+                /* Only update origin when the mask actually narrows. */
+                iface_constraint_mask = next;
+                iface_constraint_origin = opt_descr;
+        }
+}
+
+/**
+ * @brief Examine an -R / --alloc-reset argument string and narrow the
+ *        interface constraint when CDP-related tokens are present.
+ *
+ * CDP (l3cdp-on/off, l2cdp-on/off, l3cdp-any, l2cdp-any) configuration
+ * is only available through the MSR or OS interfaces today, so the mask
+ * is narrowed to IFACE_MSR | IFACE_OS when any such token is detected.
+ *
+ * @param [in] arg raw argument string (may be NULL)
+ */
+static void
+narrow_iface_for_reset_alloc(const char *arg)
+{
+        if (arg == NULL || *arg == '\0')
+                return;
+        /* Tokens of interest: l3cdp-*, l2cdp-*. The substring "cdp" uniquely
+         * identifies them inside the comma-separated list. */
+        if (strcasestr_local(arg, "cdp") != NULL)
+                narrow_iface(IFACE_MSR | IFACE_OS, "-R/--alloc-reset (cdp)");
+}
+
+/**
+ * @brief Examine a -m / --mon-core or --mon-uncore argument string and
+ *        narrow the interface constraint when AET/uncore-energy events are
+ *        requested.
+ *
+ * Per project requirements, cr_en, act, pow and aet event types are only
+ * available through the MSR or MMIO interfaces, so the mask is narrowed
+ * accordingly when any of these tokens is detected.
+ *
+ * @param [in] arg raw argument string (may be NULL)
+ * @param [in] opt_descr description used in conflict error messages
+ */
+static void
+narrow_iface_for_mon_events(const char *arg, const char *opt_descr)
+{
+        static const char *const tokens[] = {"cr_en:", "act:", "pow:", "aet:"};
+        unsigned i;
+
+        if (arg == NULL || *arg == '\0')
+                return;
+        for (i = 0; i < DIM(tokens); i++) {
+                /* Match either as the very first token or after a separator
+                 * (',' or ';') so that, for example, "all:0;aet:0" matches
+                 * but a substring inside a list of cores does not. */
+                const char *p = arg;
+                size_t tlen = strlen(tokens[i]);
+
+                while ((p = strcasestr_local(p, tokens[i])) != NULL) {
+                        if (p == arg || p[-1] == ',' || p[-1] == ';' ||
+                            p[-1] == ' ') {
+                                narrow_iface(IFACE_MSR | IFACE_MMIO, opt_descr);
+                                return;
+                        }
+                        p += tlen;
+                }
+        }
+}
+
+/**
+ * @brief Resolve the final interface to use, given the accumulated
+ *        constraint mask and any explicit user override.
+ *
+ * Rules:
+ *   1. If the user supplied --iface / -I, ensure it is compatible with
+ *      the accumulated mask; otherwise print an error and exit.
+ *   2. If no constraint was added (mask == IFACE_ANY) and the user did
+ *      not override, leave the interface as PQOS_INTER_AUTO so the
+ *      library performs its own auto-detection (preserves legacy
+ *      behaviour for callers that just run e.g. "pqos -s").
+ *   3. Otherwise pick from the surviving bits in the preference order
+ *      MMIO > MSR > OS.
+ *
+ * Side effect: updates the global @ref sel_interface.
+ */
+static void
+resolve_interface(void)
+{
+        enum pqos_interface resolved = PQOS_INTER_AUTO;
+        char mask_str[32];
+        int ret;
+
+        ret = iface_resolve(iface_constraint_mask, user_interface_set,
+                            user_interface, &resolved);
+        if (ret == -2) {
+                iface_mask_to_str(iface_constraint_mask, mask_str,
+                                  sizeof(mask_str));
+                fprintf(stderr,
+                        "Error: explicit interface '%s' is not "
+                        "compatible with option '%s' which requires "
+                        "'%s'.\n",
+                        iface_enum_to_str(user_interface),
+                        iface_constraint_origin != NULL
+                            ? iface_constraint_origin
+                            : "<earlier option>",
+                        mask_str);
+                exit(EXIT_FAILURE);
+        }
+        if (ret != 0) {
+                /* Should be unreachable: the constraint mask is non-empty
+                 * by construction (narrow_iface() exits on conflict). */
+                fprintf(stderr,
+                        "Error: failed to resolve PQoS interface from "
+                        "command-line options.\n");
+                exit(EXIT_FAILURE);
+        }
+        sel_interface = resolved;
+}
+
+/**
  * @brief Selects library OS interface
  *
  * @param arg not used
@@ -780,6 +1163,8 @@ selfn_iface_os(const char *arg)
         UNUSED_ARG(arg);
         sel_interface = PQOS_INTER_OS;
         sel_interface_selected = 1;
+        user_interface = PQOS_INTER_OS;
+        user_interface_set = 1;
 }
 
 /**
@@ -796,18 +1181,26 @@ selfn_iface(const char *arg)
                 return;
         }
 
-        if (strcasecmp(arg, "auto") == 0)
+        if (strcasecmp(arg, "auto") == 0) {
                 sel_interface = PQOS_INTER_AUTO;
-        else if (strcasecmp(arg, "msr") == 0)
+                user_interface = PQOS_INTER_AUTO;
+                user_interface_set = 0; /* auto is not an explicit override */
+        } else if (strcasecmp(arg, "msr") == 0) {
                 sel_interface = PQOS_INTER_MSR;
-        else if (strcasecmp(arg, "os") == 0)
+                user_interface = PQOS_INTER_MSR;
+                user_interface_set = 1;
+        } else if (strcasecmp(arg, "os") == 0) {
                 sel_interface = PQOS_INTER_OS;
-        else if (strcasecmp(arg, "mmio") == 0)
+                user_interface = PQOS_INTER_OS;
+                user_interface_set = 1;
+        } else if (strcasecmp(arg, "mmio") == 0) {
                 sel_interface = PQOS_INTER_MMIO;
-        else {
-                parse_error(
-                    arg,
-                    "Unknown interface! Available options: auto, msr, os\n");
+                user_interface = PQOS_INTER_MMIO;
+                user_interface_set = 1;
+        } else {
+                parse_error(arg,
+                            "Unknown interface! Available options: auto, "
+                            "msr, os, mmio\n");
                 return;
         }
 
@@ -1197,21 +1590,44 @@ static const char help_printf_long[] =
     "          Use -H to list available profiles.\n"
     "  -I, --iface-os\n"
     "          set the library interface to use the kernel\n"
-    "          implementation. If not set the default implementation is\n"
-    "          to program the MSR's directly.\n"
+    "          implementation (equivalent to --iface=os). When neither\n"
+    "          -I nor --iface is given, the tool now infers the\n"
+    "          interface automatically from the other options on the\n"
+    "          command line (preference order: mmio > msr > os).\n"
     "  --iface=INTERFACE\n"
-    "          set the library interface to automatically detected one\n"
-    "          ('auto'), MSR ('msr') or kernel interface ('os').\n"
-    "          INTERFACE can be set to either 'auto' (default), 'msr' or "
-    "'os'.\n"
-    "          If automatic detection is selected ('auto'), it:\n"
-    "                  1) Takes RDT_IFACE environment variable\n"
-    "                     into account if this variable is set\n"
-    "                  2) Selects MMIO interface if supported\n"
-    "                     (ERDT and MRRM ACPI tables present)\n"
-    "                  3) Selects OS interface if the kernel interface\n"
-    "                     is supported\n"
-    "                  4) Selects MSR interface otherwise\n\n"
+    "          override the auto-detected library interface.\n"
+    "          INTERFACE can be set to either 'auto', 'msr', 'os' or\n"
+    "          'mmio'. With 'auto' (or when --iface is omitted) the\n"
+    "          interface is selected automatically from the requested\n"
+    "          options. If the supplied options imply two incompatible\n"
+    "          interfaces, the tool fails with a clear error.\n"
+    "          The auto-detection rules are:\n"
+    "                  1) Options that only work under MMIO (e.g.\n"
+    "                     --print-mem-regions, --print-topology, --dump,\n"
+    "                     --alloc-domain-id, --alloc-mem-region, ...)\n"
+    "                     force the MMIO interface.\n"
+    "                  2) -p / --mon-pid (and PID-based --alloc-assoc)\n"
+    "                     force the OS interface.\n"
+    "                  3) --mon-channel, --mon-dev, --rmid,\n"
+    "                     --rmid-channels, --print-io-devs and\n"
+    "                     --print-io-dev restrict the choice to MSR or\n"
+    "                     MMIO.\n"
+    "                  4) -m/--mon-uncore events cr_en, act, pow and aet\n"
+    "                     restrict the choice to MSR or MMIO.\n"
+    "                  5) -R / --alloc-reset values cdp-on/off and\n"
+    "                     l2cdp-on/off / l3cdp-on/off restrict the\n"
+    "                     choice to MSR or OS.\n"
+    "                  6) When several interfaces remain valid the\n"
+    "                     preference order is mmio > msr > os.\n"
+    "                  7) When no option constrains the interface the\n"
+    "                     library's own auto-detection is used:\n"
+    "                       a) Takes RDT_IFACE environment variable\n"
+    "                          into account if it is set\n"
+    "                       b) Selects MMIO interface if supported\n"
+    "                          (ERDT and MRRM ACPI tables present)\n"
+    "                       c) Selects OS interface if the kernel\n"
+    "                          interface is supported\n"
+    "                       d) Selects MSR interface otherwise\n\n"
     "---------------- MMIO interface help section ----------------\n"
     "-------------------  Detect capabilities --------------------\n"
     "  --print-mem-regions         print memory mapped regions\n"
@@ -1551,6 +1967,7 @@ main(int argc, char **argv)
                         break;
                 case 'p':
                         pid_flag = 1;
+                        narrow_iface(IFACE_OS, "-p/--mon-pid");
                         if (optarg != NULL && *optarg == '-') {
                                 /**
                                  * Next switch option wrongly assumed to be
@@ -1570,9 +1987,11 @@ main(int argc, char **argv)
                         selfn_monitor_set_llc_percent();
                         break;
                 case 'm':
+                        narrow_iface_for_mon_events(optarg, "-m/--mon-core");
                         selfn_monitor_cores(optarg);
                         break;
                 case OPTION_MON_UNCORE:
+                        narrow_iface_for_mon_events(optarg, "--mon-uncore");
                         selfn_monitor_uncore(optarg);
                         break;
                 case 't':
@@ -1618,8 +2037,10 @@ main(int argc, char **argv)
                                          */
                                         selfn_reset_alloc(NULL);
                                         optind--;
-                                } else
+                                } else {
+                                        narrow_iface_for_reset_alloc(optarg);
                                         selfn_reset_alloc(optarg);
+                                }
                         } else
                                 selfn_reset_alloc(NULL);
                         break;
@@ -1642,6 +2063,7 @@ main(int argc, char **argv)
                                  */
                                 selfn_monitor_top_pids();
                                 pid_flag = 1;
+                                narrow_iface(IFACE_OS, "-p/--mon-pid");
                         } else {
                                 printf("Option -%c is missing required "
                                        "argument\n",
@@ -1652,6 +2074,9 @@ main(int argc, char **argv)
                 case 'a':
                         selfn_allocation_assoc(optarg);
                         pid_flag |= alloc_pid_flag;
+                        if (alloc_pid_flag)
+                                narrow_iface(IFACE_OS,
+                                             "-a/--alloc-assoc (pid)");
                         break;
                 case 'c':
                         selfn_allocation_select(optarg);
@@ -1696,98 +2121,131 @@ main(int argc, char **argv)
                         selfn_monitor_disable_llc_miss(NULL);
                         break;
                 case OPTION_MON_DEVS:
+                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-dev");
                         selfn_monitor_devs(optarg);
                         break;
                 case OPTION_MON_CHANNELS:
+                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-channel");
                         selfn_monitor_channels(optarg);
                         break;
                 case OPTION_MON_MEM_REGIONS:
+                        narrow_iface(IFACE_MMIO, "--mon-mem-regions");
                         selfn_mon_mem_regions(optarg);
                         break;
 #ifdef PQOS_RMID_CUSTOM
                 case OPTION_RMID:
+                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--rmid");
                         selfn_monitor_rmid_cores(optarg);
                         break;
                 case OPTION_RMID_CHANNELS:
+                        narrow_iface(IFACE_MSR | IFACE_MMIO,
+                                     "--rmid-channels");
                         selfn_monitor_rmid_channels(optarg);
                         break;
 #endif
                 case OPTION_PRINT_MEM_REGIONS:
+                        narrow_iface(IFACE_MMIO, "--print-mem-regions");
                         selfn_print_mem_regions(NULL);
                         break;
                 case OPTION_PRINT_TOPOLOGY:
+                        narrow_iface(IFACE_MMIO, "--print-topology");
                         selfn_print_topology(NULL);
                         break;
                 case OPTION_ALLOC_MEM_REGIONS:
+                        narrow_iface(IFACE_MMIO, "--alloc-mem-regions");
                         selfn_alloc_mem_regions(optarg);
                         break;
                 case OPTION_ALLOC_OPT_BW:
+                        narrow_iface(IFACE_MMIO, "--alloc-opt-bw");
                         selfn_alloc_opt_bw(NULL);
                         break;
                 case OPTION_ALLOC_MIN_BW:
+                        narrow_iface(IFACE_MMIO, "--alloc-min-bw");
                         selfn_alloc_min_bw(NULL);
                         break;
                 case OPTION_ALLOC_MAX_BW:
+                        narrow_iface(IFACE_MMIO, "--alloc-max-bw");
                         selfn_alloc_max_bw(NULL);
                         break;
                 case OPTION_ALLOC_DOMAIN_ID:
+                        narrow_iface(IFACE_MMIO, "--alloc-domain-id");
                         selfn_alloc_domain_id(optarg);
                         break;
                 case OPTION_PRINT_DUMP_INFO:
+                        narrow_iface(IFACE_MMIO, "--print-dump-info");
                         selfn_print_dump_info(NULL);
                         break;
                 case OPTION_DUMP:
+                        narrow_iface(IFACE_MMIO, "--dump");
                         selfn_dump(NULL);
                         break;
                 case OPTION_DUMP_SOCKET:
+                        narrow_iface(IFACE_MMIO, "--socket");
                         selfn_dump_socket(optarg);
                         break;
                 case OPTION_DUMP_DOMAIN_ID:
+                        narrow_iface(IFACE_MMIO, "--dump-domain-id");
                         selfn_dump_domain_id(optarg);
                         break;
                 case OPTION_DUMP_SPACE:
+                        narrow_iface(IFACE_MMIO, "--space");
                         selfn_dump_space(optarg);
                         break;
                 case OPTION_DUMP_WIDTH:
+                        narrow_iface(IFACE_MMIO, "--width");
                         selfn_dump_width(optarg);
                         break;
                 case OPTION_DUMP_BINARY:
+                        narrow_iface(IFACE_MMIO, "--binary");
                         selfn_dump_binary(NULL);
                         break;
                 case OPTION_DUMP_LE:
+                        narrow_iface(IFACE_MMIO, "--le");
                         selfn_dump_le(NULL);
                         break;
                 case OPTION_DUMP_OFFSET:
+                        narrow_iface(IFACE_MMIO, "--offset");
                         selfn_dump_offset(optarg);
                         break;
                 case OPTION_DUMP_LENGTH:
+                        narrow_iface(IFACE_MMIO, "--length");
                         selfn_dump_length(optarg);
                         break;
                 case OPTION_DUMP_RMID_REGS:
+                        narrow_iface(IFACE_MMIO, "--dump-rmid-regs");
                         selfn_dump_rmid_regs(NULL);
                         break;
                 case OPTION_DUMP_RMIDS:
+                        narrow_iface(IFACE_MMIO, "--dump-rmids");
                         selfn_dump_rmids(optarg);
                         break;
                 case OPTION_DUMP_RMID_DOMAIN_IDS:
+                        narrow_iface(IFACE_MMIO, "--dump-rmid-domain-ids");
                         selfn_dump_rmid_domain_ids(optarg);
                         break;
                 case OPTION_DUMP_RMID_MEM_REGIONS:
+                        narrow_iface(IFACE_MMIO, "--dump-rmid-mem-regions");
                         selfn_dump_rmid_mem_regions(optarg);
                         break;
                 case OPTION_DUMP_RMID_TYPE:
+                        narrow_iface(IFACE_MMIO, "--dump-rmid-type");
                         selfn_dump_rmid_type(optarg);
                         break;
                 case OPTION_DUMP_RMID_BINARY:
+                        narrow_iface(IFACE_MMIO, "--dump-rmid-binary");
                         selfn_dump_rmid_binary(NULL);
                         break;
                 case OPTION_DUMP_RMID_UPSCALING:
+                        narrow_iface(IFACE_MMIO, "--dump-rmid-upscaling");
                         selfn_dump_rmid_upscaling(NULL);
                         break;
                 case OPTION_PRINT_IO_DEVS:
+                        narrow_iface(IFACE_MSR | IFACE_MMIO,
+                                     "--print-io-devs");
                         selfn_print_io_devs(NULL);
                         break;
                 case OPTION_PRINT_IO_DEV:
+                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--print-io-dev");
                         selfn_print_io_dev(optarg);
                         break;
                 default:
@@ -1803,12 +2261,15 @@ main(int argc, char **argv)
                 }
         }
 
-        if (pid_flag == 1 && sel_interface != PQOS_INTER_OS) {
-                printf("Error! OS interface option [-I] needed for PID"
-                       " operations. Please re-run with the -I option.\n");
-                exit_val = EXIT_FAILURE;
-                goto error_exit_1;
-        }
+        /*
+         * Resolve the final interface from the per-option constraints
+         * accumulated above. This replaces the older ad-hoc check that
+         * verified -p/--mon-pid implied OS only: any interface conflict
+         * (PID, MMIO-only options, etc.) is now reported by
+         * resolve_interface() with a unified error message.
+         */
+        resolve_interface();
+        (void)pid_flag;
         cfg.verbose = sel_verbose_mode;
         cfg.interface = sel_interface;
         /**

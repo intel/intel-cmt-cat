@@ -76,6 +76,47 @@ extern int alloc_pid_flag;
 extern enum pqos_interface sel_interface;
 
 /**
+ * Interface compatibility bitmask used by the auto-selection logic.
+ * Each command-line option contributes a mask describing which interfaces
+ * can satisfy it. The accumulated AND across all parsed options yields
+ * the set of interfaces that are still compatible with the request.
+ */
+#define IFACE_MSR  (1U << 0)
+#define IFACE_OS   (1U << 1)
+#define IFACE_MMIO (1U << 2)
+#define IFACE_ANY  (IFACE_MSR | IFACE_OS | IFACE_MMIO)
+
+#include "pqos.h"
+
+/**
+ * @brief Pure helper: AND-narrow @a current with @a add.
+ *
+ * @param current current mask
+ * @param add     new constraint to apply (subset of IFACE_ANY)
+ *
+ * @return resulting mask. A return value of 0 indicates the two masks are
+ *         incompatible; the caller decides how to surface this. Both
+ *         @c IFACE_ANY and @c 0 in @a add are treated as a no-op.
+ */
+unsigned iface_narrow(unsigned current, unsigned add);
+
+/**
+ * @brief Pure helper: pick a single interface for a given constraint mask.
+ *
+ * @param mask constraint mask (subset of IFACE_ANY)
+ * @param user_set non-zero when the user supplied --iface / -I
+ * @param user explicit interface chosen by the user (only used when
+ *             @a user_set is non-zero)
+ * @param [out] out resolved interface (only written on success)
+ *
+ * @retval 0 on success
+ * @retval -1 when @a mask is empty / invalid
+ * @retval -2 when the user override conflicts with @a mask
+ */
+int iface_resolve(unsigned mask, int user_set, enum pqos_interface user,
+                  enum pqos_interface *out);
+
+/**
  * @brief Converts string into 64-bit unsigned number.
  *
  * Numbers can be in decimal or hexadecimal format.
