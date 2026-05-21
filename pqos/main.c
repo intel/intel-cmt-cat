@@ -1124,8 +1124,30 @@ resolve_interface(void)
         enum pqos_interface resolved = PQOS_INTER_AUTO;
         char mask_str[32];
         int ret;
+        unsigned mask = iface_constraint_mask;
 
-        ret = iface_resolve(iface_constraint_mask, user_interface_set,
+        /* When no explicit interface is requested and the constraint mask is
+         * not IFACE_ANY, narrow the working mask to only interfaces actually
+         * available on this machine.  This prevents blindly selecting MMIO
+         * when the required ACPI tables are absent, allowing graceful fallback
+         * to MSR or OS. */
+        if (!user_interface_set && mask != IFACE_ANY) {
+                enum pqos_interface avail[4];
+                unsigned n = (unsigned)(sizeof(avail) / sizeof(avail[0]));
+                unsigned avail_mask = 0;
+                unsigned i;
+
+                if (pqos_get_available_interfaces(avail, &n) == PQOS_RETVAL_OK
+                    && n > 0) {
+                        for (i = 0; i < n; i++)
+                                avail_mask |= iface_enum_to_bit(avail[i]);
+                        /* Only narrow if the result is non-empty. */
+                        if ((mask & avail_mask) != 0)
+                                mask &= avail_mask;
+                }
+        }
+
+        ret = iface_resolve(mask, user_interface_set,
                             user_interface, &resolved);
         if (ret == -2) {
                 iface_mask_to_str(iface_constraint_mask, mask_str,
