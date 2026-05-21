@@ -1139,6 +1139,130 @@ test_pqos_fini_negative(void **state __attribute__((unused)))
         assert_int_not_equal(pqos_fini(), PQOS_RETVAL_OK);
 }
 
+/* ======== pqos_get_available_interfaces ======== */
+
+static void
+test_get_available_interfaces_param(void **state __attribute__((unused)))
+{
+        enum pqos_interface ifaces[4];
+        unsigned count = 4;
+
+        /* NULL interfaces pointer */
+        assert_int_equal(pqos_get_available_interfaces(NULL, &count),
+                         PQOS_RETVAL_PARAM);
+
+        /* NULL count pointer */
+        assert_int_equal(pqos_get_available_interfaces(ifaces, NULL),
+                         PQOS_RETVAL_PARAM);
+
+        /* Zero capacity */
+        count = 0;
+        assert_int_equal(pqos_get_available_interfaces(ifaces, &count),
+                         PQOS_RETVAL_PARAM);
+}
+
+#ifdef __linux__
+static void
+test_get_available_interfaces_mmio_msr_os(void **state __attribute__((unused)))
+{
+        enum pqos_interface ifaces[4];
+        unsigned count = 4;
+        int ret;
+
+        /* MMIO supported (ERDT + MRRM present), resctrl supported */
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, 0);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/MRRM");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, 0);
+        expect_function_call(__wrap_resctrl_is_supported);
+        will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_OK);
+
+        ret = pqos_get_available_interfaces(ifaces, &count);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(count, 3);
+        assert_int_equal(ifaces[0], PQOS_INTER_MMIO);
+        assert_int_equal(ifaces[1], PQOS_INTER_MSR);
+        assert_int_equal(ifaces[2], PQOS_INTER_OS);
+}
+
+static void
+test_get_available_interfaces_msr_os(void **state __attribute__((unused)))
+{
+        enum pqos_interface ifaces[4];
+        unsigned count = 4;
+        int ret;
+
+        /* MMIO not supported (ERDT missing), resctrl supported */
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, -1);
+        expect_function_call(__wrap_resctrl_is_supported);
+        will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_OK);
+
+        ret = pqos_get_available_interfaces(ifaces, &count);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(count, 2);
+        assert_int_equal(ifaces[0], PQOS_INTER_MSR);
+        assert_int_equal(ifaces[1], PQOS_INTER_OS);
+}
+
+static void
+test_get_available_interfaces_msr_only(void **state __attribute__((unused)))
+{
+        enum pqos_interface ifaces[4];
+        unsigned count = 4;
+        int ret;
+
+        /* MMIO not supported, resctrl not supported -> MSR only */
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, -1);
+        expect_function_call(__wrap_resctrl_is_supported);
+        will_return(__wrap_resctrl_is_supported, PQOS_RETVAL_RESOURCE);
+
+        ret = pqos_get_available_interfaces(ifaces, &count);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(count, 1);
+        assert_int_equal(ifaces[0], PQOS_INTER_MSR);
+}
+
+static void
+test_get_available_interfaces_respects_capacity(
+    void **state __attribute__((unused)))
+{
+        enum pqos_interface ifaces[1];
+        unsigned count = 1;
+        int ret;
+
+        /* Array capacity 1: only MMIO fits when MMIO is supported */
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/ERDT");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, 0);
+        expect_function_call(__wrap_access);
+        expect_string(__wrap_access, pathname,
+                      "/sys/firmware/acpi/tables/MRRM");
+        expect_value(__wrap_access, mode, F_OK);
+        will_return(__wrap_access, 0);
+
+        ret = pqos_get_available_interfaces(ifaces, &count);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(count, 1);
+        assert_int_equal(ifaces[0], PQOS_INTER_MMIO);
+}
+#endif /* __linux__ */
+
 /* ======== main ======== */
 int
 main(void)
@@ -1170,6 +1294,13 @@ main(void)
             cmocka_unit_test(test_discover_capabilities_malloc_fail),
             cmocka_unit_test(test_pqos_init_negative),
             cmocka_unit_test(test_pqos_fini_negative),
+            cmocka_unit_test(test_get_available_interfaces_param),
+#ifdef __linux__
+            cmocka_unit_test(test_get_available_interfaces_mmio_msr_os),
+            cmocka_unit_test(test_get_available_interfaces_msr_os),
+            cmocka_unit_test(test_get_available_interfaces_msr_only),
+            cmocka_unit_test(test_get_available_interfaces_respects_capacity),
+#endif
         };
 
         result += cmocka_run_group_tests(tests, NULL, NULL);
