@@ -887,6 +887,25 @@ int pqos_sysconfig_get(const struct pqos_sysconfig **sysconf);
  */
 int pqos_inter_get(enum pqos_interface *interface);
 
+/**
+ * @brief Returns interfaces available on the current machine, in priority order.
+ *
+ * Can be called before pqos_init(). Returns available interfaces in
+ * priority order: MMIO first (if ACPI ERDT and MRRM tables are present),
+ * MSR (always available on x86), OS (if the resctrl filesystem is supported).
+ *
+ * @param [out] interfaces array to receive available interface values
+ * @param [in,out] count   on input: capacity of @a interfaces (must be > 0);
+ *                         on output: number of available interfaces written
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK    success
+ * @retval PQOS_RETVAL_PARAM invalid parameter (@a interfaces or @a count is
+ *                           NULL, or @a *count is 0)
+ */
+int pqos_get_available_interfaces(enum pqos_interface *interfaces,
+                                  unsigned *count);
+
 /*
  * =======================================
  * Monitoring
