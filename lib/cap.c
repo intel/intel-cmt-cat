@@ -1581,3 +1581,29 @@ pqos_inter_get(enum pqos_interface *interface)
         lock_release();
         return PQOS_RETVAL_OK;
 }
+
+int
+pqos_get_available_interfaces(enum pqos_interface *interfaces, unsigned *count)
+{
+        unsigned n = 0;
+
+        if (interfaces == NULL || count == NULL || *count == 0)
+                return PQOS_RETVAL_PARAM;
+
+#ifdef __linux__
+        if (n < *count && mmio_is_supported_sysfs())
+                interfaces[n++] = PQOS_INTER_MMIO;
+
+        if (n < *count)
+                interfaces[n++] = PQOS_INTER_MSR;
+
+        if (n < *count && resctrl_is_supported() == PQOS_RETVAL_OK)
+                interfaces[n++] = PQOS_INTER_OS;
+#else
+        if (n < *count)
+                interfaces[n++] = PQOS_INTER_MSR;
+#endif
+
+        *count = n;
+        return PQOS_RETVAL_OK;
+}
