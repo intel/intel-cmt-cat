@@ -408,9 +408,9 @@ resctrl_alloc_task_write(const unsigned class_id, const pid_t task)
         ret = resctrl_alloc_task_validate(task);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_DEBUG("Task %d not found before resctrl tasks-file write "
-                          "(task likely exited concurrently); skipping. This "
-                          "is a benign race and is expected during a global "
-                          "allocation reset.\n",
+                          "(task likely exited concurrently). Returning "
+                          "PQOS_RETVAL_PARAM; this is a benign race expected "
+                          "during a global allocation reset.\n",
                           (int)task);
                 return PQOS_RETVAL_PARAM;
         }

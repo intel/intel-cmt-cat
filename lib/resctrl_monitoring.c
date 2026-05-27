@@ -266,9 +266,10 @@ alloc_assoc_get_pid(const pid_t tid, unsigned *class_id)
 
         ret = resctrl_alloc_assoc_get_pid(tid, class_id);
         if (ret == PQOS_RETVAL_PARAM)
-                LOG_DEBUG("Cannot retrieve association for task %d: task no "
-                          "longer exists (benign race with concurrent exit, "
-                          "e.g. during a global allocation reset).\n",
+                LOG_DEBUG("Cannot retrieve association for task %d: "
+                          "task no longer exists (benign race with "
+                          "concurrent exit, e.g. during a global "
+                          "allocation reset).\n",
                           tid);
         else if (ret != PQOS_RETVAL_OK)
                 LOG_ERROR("Failed to retrieve task %d association\n", tid);
