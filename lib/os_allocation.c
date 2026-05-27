@@ -604,6 +604,20 @@ os_alloc_reset_tasks(void)
 
         for (pid_idx = 0; pid_idx < pid_count; ++pid_idx) {
                 pid = atoi(pids_list[pid_idx]->d_name);
+                /*
+                 * Tasks listed in /proc may exit between scandir() and the
+                 * resctrl association call below. This is expected during a
+                 * global reset, not an error. Skip silently if the task is
+                 * already gone. A small TOCTOU window remains between this
+                 * check and the actual resctrl write; that residual case is
+                 * handled by the callees and logged at DEBUG level.
+                 */
+                if (resctrl_alloc_task_validate(pid) != PQOS_RETVAL_OK) {
+                        LOG_DEBUG("Task %d exited before reset; skipping "
+                                  "(benign race with short-lived process)\n",
+                                  pid);
+                        continue;
+                }
                 alloc_result = os_alloc_assoc_set_pid(pid, cos0);
                 if (alloc_result == PQOS_RETVAL_PARAM) {
                         LOG_DEBUG("Task %d no longer exists\n", pid);
@@ -2231,7 +2245,11 @@ os_alloc_assoc_set_pid(const pid_t task, const unsigned class_id)
          * groups. Obtain monitoring group name
          */
         ret_mon = resctrl_mon_assoc_get_pid(task, mon_group, sizeof(mon_group));
-        if (ret_mon != PQOS_RETVAL_OK && ret_mon != PQOS_RETVAL_RESOURCE)
+        if (ret_mon == PQOS_RETVAL_PARAM)
+                LOG_DEBUG("Skipping monitoring group lookup for task %d: "
+                          "task no longer exists (benign race during reset).\n",
+                          task);
+        else if (ret_mon != PQOS_RETVAL_OK && ret_mon != PQOS_RETVAL_RESOURCE)
                 LOG_WARN("Failed to obtain monitoring group assignment for "
                          "task %d\n",
                          task);

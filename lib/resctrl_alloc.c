@@ -407,7 +407,11 @@ resctrl_alloc_task_write(const unsigned class_id, const pid_t task)
         /* Check if task exists */
         ret = resctrl_alloc_task_validate(task);
         if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("Task %d does not exist!\n", (int)task);
+                LOG_DEBUG("Task %d not found before resctrl tasks-file write "
+                          "(task likely exited concurrently); skipping. This "
+                          "is a benign race and is expected during a global "
+                          "allocation reset.\n",
+                          (int)task);
                 return PQOS_RETVAL_PARAM;
         }
 
@@ -426,7 +430,12 @@ resctrl_alloc_task_write(const unsigned class_id, const pid_t task)
         errno = 0;
         ret = resctrl_alloc_fclose(fd);
         if (ret != PQOS_RETVAL_OK && errno == ESRCH) {
-                LOG_ERROR("Task %d does not exist! fclose\n", (int)task);
+                LOG_DEBUG("Task %d exited between validation and resctrl "
+                          "tasks-file write (kernel returned ESRCH). This is "
+                          "a benign race: the task is already removed from its "
+                          "resctrl group by the kernel, and the allocation "
+                          "reset is not affected.\n",
+                          (int)task);
                 ret = PQOS_RETVAL_PARAM;
         }
 
@@ -510,7 +519,11 @@ resctrl_alloc_task_search(unsigned *class_id,
         /* Check if task exists */
         ret = resctrl_alloc_task_validate(task);
         if (ret != PQOS_RETVAL_OK) {
-                LOG_ERROR("Task %d does not exist!\n", (int)task);
+                LOG_DEBUG("Task %d not found while searching resctrl COS "
+                          "tasks files (task may have exited concurrently). "
+                          "Returning PQOS_RETVAL_PARAM; callers treat this "
+                          "as a benign racing exit.\n",
+                          (int)task);
                 return PQOS_RETVAL_PARAM;
         }
 
