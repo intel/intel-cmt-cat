@@ -126,6 +126,10 @@ $(BIN_DIR)/test_profiles: ./test_profiles.c $(PQOS_OBJS) $(APP_MOCK_OBJS)
 $(BIN_DIR)/test_main: ./test_main.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 

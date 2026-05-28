@@ -254,12 +254,16 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
 {
         unsigned index = 0;
         char *saveptr = NULL;
-        char tmp[BUF_SIZE] = {0};
+        char *tmp = NULL;
 
         if (s == NULL || tab == NULL || max == 0)
                 return index;
 
-        snprintf(tmp, BUF_SIZE, "%s", s);
+        tmp = strdup(s);
+        if (tmp == NULL) {
+                printf("Failed to allocate memory for argument copy!\n");
+                exit(EXIT_FAILURE);
+        }
 
         for (;;) {
                 char *p = NULL;
@@ -320,14 +324,20 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                         uint64_t val = strtouint64(token);
 
                         if (!(isdup(tab, index, val))) {
+                                if (index >= max) {
+                                        printf("Maximum available value is "
+                                               "%d\n",
+                                               (max - 1));
+                                        parse_error(
+                                            tmp, "Too many groups selected.\n");
+                                }
                                 tab[index] = val;
                                 index++;
                         }
-                        if (index >= max)
-                                parse_error(s, "Too many groups selected.\n");
                 }
         }
 
+        free(tmp);
         return index;
 }
 
