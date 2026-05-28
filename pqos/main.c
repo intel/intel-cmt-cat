@@ -305,9 +305,9 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
                         }
                         for (n = start; n <= end; n++) {
                                 if (index >= max) {
-                                        printf("Maximum available value is "
-                                               "%d\n",
-                                               (max - 1));
+                                        printf("Exceeded parser capacity of "
+                                               "%u entries\n",
+                                               max);
                                         parse_error(
                                             tmp, "Too many groups selected.\n");
                                 }
@@ -325,9 +325,9 @@ strlisttotab(char *s, uint64_t *tab, const unsigned max)
 
                         if (!(isdup(tab, index, val))) {
                                 if (index >= max) {
-                                        printf("Maximum available value is "
-                                               "%d\n",
-                                               (max - 1));
+                                        printf("Exceeded parser capacity of "
+                                               "%u entries\n",
+                                               max);
                                         parse_error(
                                             tmp, "Too many groups selected.\n");
                                 }

@@ -1083,9 +1083,9 @@ parse_monitor_group(char *str, enum mon_group_type type)
 {
         enum pqos_mon_event evt = (enum pqos_mon_event)0;
         unsigned group_count = 0;
+        unsigned cbuf_len = (unsigned)get_cpu_count();
         unsigned i;
         uint64_t *cbuf = NULL;
-        const int cbuf_len = get_cpu_count();
         char *non_grp = NULL;
 
         cbuf = malloc(sizeof(*cbuf) * cbuf_len);
@@ -1106,8 +1106,14 @@ parse_monitor_group(char *str, enum mon_group_type type)
                          * group so strlisttotab result is treated as the
                          * number of new groups
                          */
-                        unsigned new_groups_count =
-                            strlisttotab(non_grp, cbuf, cbuf_len);
+                        unsigned new_groups_count;
+
+                        if (type == MON_GROUP_TYPE_PID)
+                                new_groups_count = strlisttotabrealloc(
+                                    non_grp, &cbuf, &cbuf_len);
+                        else
+                                new_groups_count =
+                                    strlisttotab(non_grp, cbuf, cbuf_len);
 
                         /* set group info */
                         for (i = 0; i < new_groups_count; i++) {
@@ -1144,7 +1150,12 @@ parse_monitor_group(char *str, enum mon_group_type type)
                          * one group so strlisttotab result is the number
                          * of elements in that one group
                          */
-                        element_count = strlisttotab(grp, cbuf, cbuf_len);
+                        if (type == MON_GROUP_TYPE_PID)
+                                element_count =
+                                    strlisttotabrealloc(grp, &cbuf, &cbuf_len);
+                        else
+                                element_count =
+                                    strlisttotab(grp, cbuf, cbuf_len);
 
                         /* set group info */
                         group = grp_add(type, evt, desc, cbuf, element_count);

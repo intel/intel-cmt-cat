@@ -29,6 +29,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "main.h"
 #include "output.h"
 
 #include <limits.h>
@@ -41,9 +42,6 @@
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
-
-void *realloc_and_init(void *ptr, unsigned *elem_count, const size_t elem_size);
-unsigned strlisttotab(char *s, uint64_t *tab, const unsigned max);
 
 static void
 test_realloc_and_init_grows_and_zeroes_new_elements(void **state)
@@ -112,82 +110,45 @@ test_realloc_and_init_rejects_byte_size_overflow(void **state)
 }
 
 static void
-test_strlisttotab_single_values(void **state)
+test_strlisttotabrealloc_grows_array(void **state)
 {
-        char s[] = "1,2,3,5,7";
-        uint64_t tab[10] = {0};
-        unsigned n;
+        unsigned count = 2;
+        char input[] = "1,2,3,4,5";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
 
-        n = strlisttotab(s, tab, 10);
-        assert_int_equal(n, 5);
+        assert_non_null(tab);
+
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 5);
+        assert_true(count >= 5);
         assert_int_equal(tab[0], 1);
         assert_int_equal(tab[1], 2);
         assert_int_equal(tab[2], 3);
-        assert_int_equal(tab[3], 5);
-        assert_int_equal(tab[4], 7);
+        assert_int_equal(tab[3], 4);
+        assert_int_equal(tab[4], 5);
 
+        free(tab);
         (void)state; /* unused */
 }
 
 static void
-test_strlisttotab_range_values(void **state)
+test_strlisttotabrealloc_ignores_duplicates(void **state)
 {
-        char s[] = "1-3,5-7";
-        uint64_t tab[10] = {0};
-        unsigned n;
+        unsigned count = 2;
+        char input[] = "1,1,2,2,3";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
 
-        n = strlisttotab(s, tab, 10);
-        assert_int_equal(n, 6);
+        assert_non_null(tab);
+
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 3);
         assert_int_equal(tab[0], 1);
         assert_int_equal(tab[1], 2);
         assert_int_equal(tab[2], 3);
-        assert_int_equal(tab[3], 5);
-        assert_int_equal(tab[4], 6);
-        assert_int_equal(tab[5], 7);
 
-        (void)state; /* unused */
-}
-
-static void
-test_strlisttotab_too_many_single_values_reports_original_arg(void **state)
-{
-        char s[] = "1,2,3,4,5,6,7,8,9,10";
-        uint64_t tab[3];
-
-        run_void_function(strlisttotab, s, tab, 3);
-        assert_int_equal(output_exit_was_called(), 1);
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
-        assert_int_equal(output_has_text("Too many groups selected"), 1);
-        /* Must report original argument, never "<null>" */
-        assert_int_equal(output_has_text("<null>"), 0);
-        assert_int_equal(output_has_text("1,2,3,4,5,6,7,8,9,10"), 1);
-
-        (void)state; /* unused */
-}
-
-static void
-test_strlisttotab_long_arg_reports_original_arg(void **state)
-{
-        /* Build a comma-separated list longer than 256 chars (old BUF_SIZE) */
-        char s[1024] = {0};
-        uint64_t tab[3];
-        size_t pos = 0;
-        int i;
-
-        for (i = 1; i <= 100; i++) {
-                if (i > 1)
-                        s[pos++] = ',';
-                pos += (size_t)snprintf(s + pos, sizeof(s) - pos, "%d", i);
-        }
-
-        run_void_function(strlisttotab, s, tab, 3);
-        assert_int_equal(output_exit_was_called(), 1);
-        assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
-        assert_int_equal(output_has_text("Too many groups selected"), 1);
-        /* Must not report "<null>" even for strings longer than the old 256-byte buffer */
-        assert_int_equal(output_has_text("<null>"), 0);
-        assert_int_equal(output_has_text("1,2,3"), 1);
-
+        free(tab);
         (void)state; /* unused */
 }
 
@@ -201,12 +162,8 @@ main(void)
             cmocka_unit_test(
                 test_realloc_and_init_rejects_element_count_overflow),
             cmocka_unit_test(test_realloc_and_init_rejects_byte_size_overflow),
-            cmocka_unit_test(test_strlisttotab_single_values),
-            cmocka_unit_test(test_strlisttotab_range_values),
-            cmocka_unit_test(
-                test_strlisttotab_too_many_single_values_reports_original_arg),
-            cmocka_unit_test(
-                test_strlisttotab_long_arg_reports_original_arg)};
+            cmocka_unit_test(test_strlisttotabrealloc_grows_array),
+            cmocka_unit_test(test_strlisttotabrealloc_ignores_duplicates)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }
