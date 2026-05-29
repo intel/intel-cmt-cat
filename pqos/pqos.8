@@ -349,7 +349,7 @@ conflicting options.
 .br
 The auto\-detection rules are:
 .br
-1) Options that only work under MMIO (e.g. \fB\-\-print\-mem\-regions\fP, \fB\-\-print\-topology\fP, \fB\-\-dump\fP, \fB\-\-alloc\-domain\-id\fP, \fB\-\-alloc\-mem\-region\fP, ...) force the MMIO interface.
+1) Options that only work under MMIO (e.g. \fB\-\-print\-mem\-regions\fP, \fB\-\-print\-topology\fP, \fB\-\-dump\fP, \fB\-\-alloc\-domain\-id\fP, \fB\-\-alloc\-mem\-regions\fP, ...) force the MMIO interface.
 .br
 2) \fB\-p\fP / \fB\-\-mon\-pid\fP (and PID\-based \fB\-\-alloc\-assoc\fP) force the OS interface.
 .br
@@ -357,7 +357,7 @@ The auto\-detection rules are:
 .br
 4) \fB\-\-print\-io\-devs\fP and \fB\-\-print\-io\-dev\fP restrict the choice to MSR or MMIO.
 .br
-5) \fB\-m\fP/\fB\-\-mon\-uncore\fP events cr_en, act, pow and aet restrict the choice to MSR or MMIO.
+5) \fB\-m\fP/\fB\-\-mon\-uncore\fP events cr_en, act, pow and aet restrict the choice to OS.
 .br
 6) \fB\-R\fP / \fB\-\-alloc\-reset\fP values cdp\-on/off and l2cdp\-on/off / l3cdp\-on/off restrict the choice to MSR or OS.
 .br

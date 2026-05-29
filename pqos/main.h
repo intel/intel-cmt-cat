@@ -65,6 +65,8 @@ extern "C" {
 
 #define DEV_ALL_VCS ((uint32_t)(-1))
 
+#include "pqos.h"
+
 /**
  * Maintains alloc option - allocate cores or task id's
  */
@@ -85,8 +87,6 @@ extern enum pqos_interface sel_interface;
 #define IFACE_OS   (1U << 1)
 #define IFACE_MMIO (1U << 2)
 #define IFACE_ANY  (IFACE_MSR | IFACE_OS | IFACE_MMIO)
-
-#include "pqos.h"
 
 /**
  * @brief Pure helper: AND-narrow @a current with @a add.
@@ -115,6 +115,26 @@ unsigned iface_narrow(unsigned current, unsigned add);
  */
 int iface_resolve(unsigned mask, int user_set, enum pqos_interface user,
                   enum pqos_interface *out);
+
+/**
+ * @brief AND-narrow the global interface constraint mask.
+ *
+ * Applies @a mask to the accumulated constraint, exiting with an error
+ * message when the result would be an empty (conflicting) set.
+ *
+ * @param [in] mask interface compatibility mask of the option being parsed
+ * @param [in] opt_descr human-readable option name used in error messages
+ */
+void narrow_iface(unsigned mask, const char *opt_descr);
+
+/**
+ * @brief Examine a monitoring argument string and narrow the interface
+ *        constraint when OS-only AET events are requested.
+ *
+ * @param [in] arg raw argument string (may be NULL)
+ * @param [in] opt_descr description used in conflict error messages
+ */
+void narrow_iface_for_mon_events(const char *arg, const char *opt_descr);
 
 /**
  * @brief Converts string into 64-bit unsigned number.

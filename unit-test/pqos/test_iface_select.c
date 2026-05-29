@@ -320,15 +320,30 @@ test_scenario_pid_plus_print_mem_regions_conflict(void **state)
 }
 
 static void
-test_scenario_uncore_aet_plus_explicit_os_conflict(void **state)
+test_scenario_uncore_aet_os_compatible(void **state)
 {
         enum pqos_interface out = PQOS_INTER_AUTO;
         unsigned m = IFACE_ANY;
 
         (void)state;
-        m = iface_narrow(m, IFACE_MSR | IFACE_MMIO); /* aet event */
-        assert_int_equal(
-            iface_resolve(m, 1, PQOS_INTER_OS, &out), -2);
+        /* aet/cr_en/act/pow events are OS-only; OS interface is compatible. */
+        m = iface_narrow(m, IFACE_OS); /* aet event */
+        assert_int_equal(m, IFACE_OS);
+        assert_int_equal(iface_resolve(m, 1, PQOS_INTER_OS, &out), 0);
+        assert_int_equal(out, PQOS_INTER_OS);
+}
+
+static void
+test_scenario_uncore_aet_plus_mmio_conflict(void **state)
+{
+        unsigned m = IFACE_ANY;
+
+        (void)state;
+        /* aet event (OS only) conflicts with an MMIO-only option. */
+        m = iface_narrow(m, IFACE_OS);   /* aet event */
+        assert_int_equal(m, IFACE_OS);
+        m = iface_narrow(m, IFACE_MMIO); /* --print-mem-regions */
+        assert_int_equal(m, 0); /* irreconcilable */
 }
 
 static void
@@ -370,8 +385,8 @@ main(void)
                 test_scenario_mon_reset_l3iordt_prefers_msr_on_msr_os_machine),
             cmocka_unit_test(test_scenario_print_io_devs_picks_mmio),
             cmocka_unit_test(test_scenario_pid_plus_print_mem_regions_conflict),
-            cmocka_unit_test(
-                test_scenario_uncore_aet_plus_explicit_os_conflict),
+            cmocka_unit_test(test_scenario_uncore_aet_os_compatible),
+            cmocka_unit_test(test_scenario_uncore_aet_plus_mmio_conflict),
             cmocka_unit_test(test_scenario_no_constraint_keeps_auto),
         };
 

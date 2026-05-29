@@ -1230,6 +1230,7 @@ selfn_monitor_cores(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
+        narrow_iface_for_mon_events(arg, "-m/--mon-core");
         selfn_strdup(&cp, arg);
 
         for (str = cp;; str = NULL) {
@@ -1260,6 +1261,7 @@ selfn_monitor_rmid_cores(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
+        narrow_iface(IFACE_MSR | IFACE_MMIO, "--rmid");
         selfn_strdup(&cp, arg);
 
         for (str = cp;; str = NULL) {
@@ -1862,6 +1864,7 @@ selfn_monitor_pids(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
+        narrow_iface(IFACE_OS, "-p/--mon-pid");
         selfn_strdup(&cp, arg);
 
         for (str = cp;; str = NULL) {
@@ -1910,6 +1913,7 @@ selfn_monitor_channels(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
+        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-channel");
         selfn_strdup(&cp, arg);
 
         for (str = cp;; str = NULL) {
@@ -1941,6 +1945,7 @@ selfn_monitor_rmid_channels(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
+        narrow_iface(IFACE_MSR | IFACE_MMIO, "--rmid-channels");
         selfn_strdup(&cp, arg);
 
         for (str = cp;; str = NULL) {
@@ -2199,6 +2204,7 @@ selfn_monitor_devs(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
+        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-devs");
         selfn_strdup(&cp, arg);
 
         for (str = cp;; str = NULL) {
@@ -2833,6 +2839,7 @@ selfn_monitor_top_pids(void)
         int res = 0;
         struct slist *pslist = NULL, *it = NULL;
 
+        narrow_iface(IFACE_OS, "-p/--mon-pid");
         printf("Monitoring top-pids enabled\n");
         sel_mon_top_like = 1;
 

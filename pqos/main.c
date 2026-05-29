@@ -137,20 +137,6 @@ enum pqos_interface sel_interface = PQOS_INTER_AUTO;
 static int sel_interface_selected = 0;
 
 /**
- * Interface compatibility bitmask used by the auto-selection logic.
- *
- * Each command-line option contributes a mask describing which interfaces
- * can satisfy it. The accumulated AND across all parsed options yields the
- * set of interfaces that are still compatible with the request. If the user
- * also supplies --iface / -I explicitly, the resolver verifies that the
- * explicit choice is in the accumulated set.
- */
-#define IFACE_MSR  (1U << 0)
-#define IFACE_OS   (1U << 1)
-#define IFACE_MMIO (1U << 2)
-#define IFACE_ANY  (IFACE_MSR | IFACE_OS | IFACE_MMIO)
-
-/**
  * Accumulated interface constraint mask. Starts at IFACE_ANY (no constraint)
  * and is AND-narrowed as options are parsed.
  */
@@ -217,6 +203,7 @@ static int sel_print_io_dev = 0;
 
 static uint64_t strtouint64_base(const char *s, int default_base);
 static void narrow_iface_for_reset_mon(const char *arg);
+static void narrow_iface_for_reset_alloc(const char *arg);
 
 /**
  * @brief Function to check if a value is already contained in a table
@@ -584,9 +571,8 @@ selfn_reset_alloc(const char *arg)
                 char *s = NULL;
                 struct pqos_alloc_config *cfg = &sel_alloc_config;
 
+                narrow_iface_for_reset_alloc(arg);
                 selfn_strdup(&s, arg);
-
-                /* L3 CDP reset options */
                 const struct {
                         const char *name;
                         enum pqos_cdp_config cdp;
@@ -837,7 +823,7 @@ strcasestr_local(const char *haystack, const char *needle)
 }
 
 /**
- * @brief Convert an interface mask to a printable "msr|os|mmio" string.
+ * @brief Convert an interface mask to a printable "mmio|msr|os" string.
  *
  * @param [in] mask interface bitmask (combination of IFACE_MSR/OS/MMIO)
  * @param [out] buf destination buffer
@@ -850,6 +836,7 @@ iface_mask_to_str(unsigned mask, char *buf, size_t buf_size)
 {
         size_t pos = 0;
         const char *sep = "";
+        int n;
 
         if (buf == NULL || buf_size == 0)
                 return "";
@@ -860,17 +847,27 @@ iface_mask_to_str(unsigned mask, char *buf, size_t buf_size)
                 return buf;
         }
         if (mask & IFACE_MMIO) {
-                pos += snprintf(buf + pos, buf_size - pos, "%smmio", sep);
+                n = snprintf(buf + pos, buf_size - pos, "%smmio", sep);
+                if (n > 0)
+                        pos += (size_t)n < buf_size - pos ? (size_t)n
+                                                          : buf_size - pos - 1;
                 sep = "|";
         }
         if (mask & IFACE_MSR) {
-                pos += snprintf(buf + pos, buf_size - pos, "%smsr", sep);
+                n = snprintf(buf + pos, buf_size - pos, "%smsr", sep);
+                if (n > 0)
+                        pos += (size_t)n < buf_size - pos ? (size_t)n
+                                                          : buf_size - pos - 1;
                 sep = "|";
         }
         if (mask & IFACE_OS) {
-                pos += snprintf(buf + pos, buf_size - pos, "%sos", sep);
+                n = snprintf(buf + pos, buf_size - pos, "%sos", sep);
+                if (n > 0)
+                        pos += (size_t)n < buf_size - pos ? (size_t)n
+                                                          : buf_size - pos - 1;
                 sep = "|";
         }
+        (void)sep;
         return buf;
 }
 
@@ -1007,7 +1004,7 @@ iface_resolve(unsigned mask,
  * @param [in] opt_descr human-readable name of the option (e.g. "-p" or
  *                       "--print-mem-regions"); used in error messages
  */
-static void
+void
 narrow_iface(unsigned mask, const char *opt_descr)
 {
         unsigned next;
@@ -1097,14 +1094,14 @@ narrow_iface_for_reset_mon(const char *arg)
  *        narrow the interface constraint when AET/uncore-energy events are
  *        requested.
  *
- * Per project requirements, cr_en, act, pow and aet event types are only
- * available through the MSR or MMIO interfaces, so the mask is narrowed
- * accordingly when any of these tokens is detected.
+ * cr_en, act, pow and aet event types are only available through the OS
+ * interface (via resctrl PERF_PKG_MON), so the mask is narrowed to
+ * IFACE_OS when any of these tokens is detected.
  *
  * @param [in] arg raw argument string (may be NULL)
  * @param [in] opt_descr description used in conflict error messages
  */
-static void
+void
 narrow_iface_for_mon_events(const char *arg, const char *opt_descr)
 {
         static const char *const tokens[] = {"cr_en:", "act:", "pow:", "aet:"};
@@ -1120,7 +1117,7 @@ narrow_iface_for_mon_events(const char *arg, const char *opt_descr)
                 while ((p = strcasestr_local(p, tokens[i])) != NULL) {
                         if (p == arg || p[-1] == ',' || p[-1] == ';' ||
                             p[-1] == ' ') {
-                                narrow_iface(IFACE_MSR | IFACE_MMIO, opt_descr);
+                                narrow_iface(IFACE_OS, opt_descr);
                                 return;
                         }
                         p += tlen;
@@ -1646,7 +1643,7 @@ static const char help_printf_long[] =
     "          The auto-detection rules are:\n"
     "                  1) Options that only work under MMIO (e.g.\n"
     "                     --print-mem-regions, --print-topology, --dump,\n"
-    "                     --alloc-domain-id, --alloc-mem-region, ...)\n"
+    "                     --alloc-domain-id, --alloc-mem-regions, ...)\n"
     "                     force the MMIO interface.\n"
     "                  2) -p / --mon-pid (and PID-based --alloc-assoc)\n"
     "                     force the OS interface.\n"
@@ -1656,7 +1653,7 @@ static const char help_printf_long[] =
     "                  4) --print-io-devs and --print-io-dev restrict\n"
     "                     the choice to MSR or MMIO.\n"
     "                  5) -m/--mon-uncore events cr_en, act, pow and aet\n"
-    "                     restrict the choice to MSR or MMIO.\n"
+    "                     restrict the choice to OS.\n"
     "                  6) -R / --alloc-reset values cdp-on/off and\n"
     "                     l2cdp-on/off / l3cdp-on/off restrict the\n"
     "                     choice to MSR or OS.\n"
@@ -2013,7 +2010,6 @@ main(int argc, char **argv)
                         break;
                 case 'p':
                         pid_flag = 1;
-                        narrow_iface(IFACE_OS, "-p/--mon-pid");
                         if (optarg != NULL && *optarg == '-') {
                                 /**
                                  * Next switch option wrongly assumed to be
@@ -2033,7 +2029,6 @@ main(int argc, char **argv)
                         selfn_monitor_set_llc_percent();
                         break;
                 case 'm':
-                        narrow_iface_for_mon_events(optarg, "-m/--mon-core");
                         selfn_monitor_cores(optarg);
                         break;
                 case OPTION_MON_UNCORE:
@@ -2084,7 +2079,6 @@ main(int argc, char **argv)
                                         selfn_reset_alloc(NULL);
                                         optind--;
                                 } else {
-                                        narrow_iface_for_reset_alloc(optarg);
                                         selfn_reset_alloc(optarg);
                                 }
                         } else
@@ -2109,7 +2103,6 @@ main(int argc, char **argv)
                                  */
                                 selfn_monitor_top_pids();
                                 pid_flag = 1;
-                                narrow_iface(IFACE_OS, "-p/--mon-pid");
                         } else {
                                 printf("Option -%c is missing required "
                                        "argument\n",
@@ -2120,9 +2113,6 @@ main(int argc, char **argv)
                 case 'a':
                         selfn_allocation_assoc(optarg);
                         pid_flag |= alloc_pid_flag;
-                        if (alloc_pid_flag)
-                                narrow_iface(IFACE_OS,
-                                             "-a/--alloc-assoc (pid)");
                         break;
                 case 'c':
                         selfn_allocation_select(optarg);
@@ -2167,11 +2157,9 @@ main(int argc, char **argv)
                         selfn_monitor_disable_llc_miss(NULL);
                         break;
                 case OPTION_MON_DEVS:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-dev");
                         selfn_monitor_devs(optarg);
                         break;
                 case OPTION_MON_CHANNELS:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-channel");
                         selfn_monitor_channels(optarg);
                         break;
                 case OPTION_MON_MEM_REGIONS:
@@ -2180,11 +2168,9 @@ main(int argc, char **argv)
                         break;
 #ifdef PQOS_RMID_CUSTOM
                 case OPTION_RMID:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--rmid");
                         selfn_monitor_rmid_cores(optarg);
                         break;
                 case OPTION_RMID_CHANNELS:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--rmid-channels");
                         selfn_monitor_rmid_channels(optarg);
                         break;
 #endif

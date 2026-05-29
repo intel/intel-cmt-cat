@@ -1654,6 +1654,9 @@ selfn_allocation_assoc(const char *arg)
         }
 
         free(cp);
+
+        if (alloc_pid_flag)
+                narrow_iface(IFACE_OS, "-a/--alloc-assoc (pid)");
 }
 
 /**
