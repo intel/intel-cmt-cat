@@ -216,6 +216,7 @@ static int sel_print_io_devs = 0;
 static int sel_print_io_dev = 0;
 
 static uint64_t strtouint64_base(const char *s, int default_base);
+static void narrow_iface_for_reset_mon(const char *arg);
 
 /**
  * @brief Function to check if a value is already contained in a table
@@ -697,6 +698,7 @@ selfn_reset_alloc(const char *arg)
 static void
 selfn_reset_mon(const char *arg)
 {
+        narrow_iface_for_reset_mon(arg);
         if (arg != NULL && *arg != '\0') {
                 unsigned i;
                 char *tok = NULL;
@@ -953,7 +955,9 @@ iface_narrow(unsigned current, unsigned add)
  *            @a mask
  */
 int
-iface_resolve(unsigned mask, int user_set, enum pqos_interface user,
+iface_resolve(unsigned mask,
+              int user_set,
+              enum pqos_interface user,
               enum pqos_interface *out)
 {
         unsigned bit;
@@ -974,8 +978,7 @@ iface_resolve(unsigned mask, int user_set, enum pqos_interface user,
         }
 
         if (mask == IFACE_ANY) {
-                /* No option narrowed the mask; keep AUTO so the library
-                 * performs its own auto-detection. */
+                /* Keep AUTO when no option narrowed the mask. */
                 *out = PQOS_INTER_AUTO;
                 return 0;
         }
@@ -1050,6 +1053,8 @@ narrow_iface(unsigned mask, const char *opt_descr)
  * CDP (l3cdp-on/off, l2cdp-on/off, l3cdp-any, l2cdp-any) configuration
  * is only available through the MSR or OS interfaces today, so the mask
  * is narrowed to IFACE_MSR | IFACE_OS when any such token is detected.
+ * L3 I/O RDT reset values additionally narrow the choice to hardware
+ * interfaces (MSR or MMIO).
  *
  * @param [in] arg raw argument string (may be NULL)
  */
@@ -1058,10 +1063,33 @@ narrow_iface_for_reset_alloc(const char *arg)
 {
         if (arg == NULL || *arg == '\0')
                 return;
-        /* Tokens of interest: l3cdp-*, l2cdp-*. The substring "cdp" uniquely
-         * identifies them inside the comma-separated list. */
+        /* "cdp" uniquely identifies l3cdp-* and l2cdp-* tokens. */
         if (strcasestr_local(arg, "cdp") != NULL)
                 narrow_iface(IFACE_MSR | IFACE_OS, "-R/--alloc-reset (cdp)");
+        if (strcasestr_local(arg, "l3iordt-on") != NULL ||
+            strcasestr_local(arg, "l3iordt-off") != NULL)
+                narrow_iface(IFACE_MSR | IFACE_MMIO,
+                             "-R/--alloc-reset (l3iordt)");
+}
+
+/**
+ * @brief Examine a -r / --mon-reset argument string and narrow the interface
+ *        constraint when L3 I/O RDT tokens are present.
+ *
+ * I/O RDT reset is available through the hardware interfaces only, so the
+ * mask is narrowed to IFACE_MSR | IFACE_MMIO when an l3iordt-* token is
+ * detected.
+ *
+ * @param [in] arg raw argument string (may be NULL)
+ */
+static void
+narrow_iface_for_reset_mon(const char *arg)
+{
+        if (arg == NULL || *arg == '\0')
+                return;
+        if (strcasestr_local(arg, "l3iordt-on") != NULL ||
+            strcasestr_local(arg, "l3iordt-off") != NULL)
+                narrow_iface(IFACE_MSR | IFACE_MMIO, "-r/--mon-reset");
 }
 
 /**
@@ -1085,9 +1113,7 @@ narrow_iface_for_mon_events(const char *arg, const char *opt_descr)
         if (arg == NULL || *arg == '\0')
                 return;
         for (i = 0; i < DIM(tokens); i++) {
-                /* Match either as the very first token or after a separator
-                 * (',' or ';') so that, for example, "all:0;aet:0" matches
-                 * but a substring inside a list of cores does not. */
+                /* Avoid false positives when matching after separators. */
                 const char *p = arg;
                 size_t tlen = strlen(tokens[i]);
 
@@ -1126,19 +1152,16 @@ resolve_interface(void)
         int ret;
         unsigned mask = iface_constraint_mask;
 
-        /* When no explicit interface is requested and the constraint mask is
-         * not IFACE_ANY, narrow the working mask to only interfaces actually
-         * available on this machine.  This prevents blindly selecting MMIO
-         * when the required ACPI tables are absent, allowing graceful fallback
-         * to MSR or OS. */
+        /* Narrow to available interfaces so MMIO isn't chosen blindly. */
         if (!user_interface_set && mask != IFACE_ANY) {
                 enum pqos_interface avail[4];
                 unsigned n = (unsigned)(sizeof(avail) / sizeof(avail[0]));
                 unsigned avail_mask = 0;
                 unsigned i;
 
-                if (pqos_get_available_interfaces(avail, &n) == PQOS_RETVAL_OK
-                    && n > 0) {
+                if (pqos_get_available_interfaces(avail, &n) ==
+                        PQOS_RETVAL_OK &&
+                    n > 0) {
                         for (i = 0; i < n; i++)
                                 avail_mask |= iface_enum_to_bit(avail[i]);
                         /* Only narrow if the result is non-empty. */
@@ -1147,8 +1170,8 @@ resolve_interface(void)
                 }
         }
 
-        ret = iface_resolve(mask, user_interface_set,
-                            user_interface, &resolved);
+        ret =
+            iface_resolve(mask, user_interface_set, user_interface, &resolved);
         if (ret == -2) {
                 iface_mask_to_str(iface_constraint_mask, mask_str,
                                   sizeof(mask_str));
@@ -1164,11 +1187,9 @@ resolve_interface(void)
                 exit(EXIT_FAILURE);
         }
         if (ret != 0) {
-                /* Should be unreachable: the constraint mask is non-empty
-                 * by construction (narrow_iface() exits on conflict). */
-                fprintf(stderr,
-                        "Error: failed to resolve PQoS interface from "
-                        "command-line options.\n");
+                /* Unreachable: narrow_iface() exits on conflict. */
+                fprintf(stderr, "Error: failed to resolve PQoS interface from "
+                                "command-line options.\n");
                 exit(EXIT_FAILURE);
         }
         sel_interface = resolved;
@@ -1220,9 +1241,8 @@ selfn_iface(const char *arg)
                 user_interface = PQOS_INTER_MMIO;
                 user_interface_set = 1;
         } else {
-                parse_error(arg,
-                            "Unknown interface! Available options: auto, "
-                            "msr, os, mmio\n");
+                parse_error(arg, "Unknown interface! Available options: auto, "
+                                 "msr, os, mmio\n");
                 return;
         }
 
@@ -1640,9 +1660,12 @@ static const char help_printf_long[] =
     "                  6) -R / --alloc-reset values cdp-on/off and\n"
     "                     l2cdp-on/off / l3cdp-on/off restrict the\n"
     "                     choice to MSR or OS.\n"
-    "                  7) When several interfaces remain valid the\n"
+    "                  7) -r / --mon-reset values l3iordt-on/off and\n"
+    "                     -R / --alloc-reset values l3iordt-on/off\n"
+    "                     restrict the choice to MSR or MMIO.\n"
+    "                  8) When several interfaces remain valid the\n"
     "                     preference order is mmio > msr > os.\n"
-    "                  8) When no option constrains the interface the\n"
+    "                  9) When no option constrains the interface the\n"
     "                     library's own auto-detection is used:\n"
     "                       a) Takes RDT_IFACE environment variable\n"
     "                          into account if it is set\n"
@@ -2161,8 +2184,7 @@ main(int argc, char **argv)
                         selfn_monitor_rmid_cores(optarg);
                         break;
                 case OPTION_RMID_CHANNELS:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO,
-                                     "--rmid-channels");
+                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--rmid-channels");
                         selfn_monitor_rmid_channels(optarg);
                         break;
 #endif
@@ -2263,8 +2285,7 @@ main(int argc, char **argv)
                         selfn_dump_rmid_upscaling(NULL);
                         break;
                 case OPTION_PRINT_IO_DEVS:
-                        narrow_iface(IFACE_MSR | IFACE_MMIO,
-                                     "--print-io-devs");
+                        narrow_iface(IFACE_MSR | IFACE_MMIO, "--print-io-devs");
                         selfn_print_io_devs(NULL);
                         break;
                 case OPTION_PRINT_IO_DEV:

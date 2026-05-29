@@ -888,7 +888,8 @@ int pqos_sysconfig_get(const struct pqos_sysconfig **sysconf);
 int pqos_inter_get(enum pqos_interface *interface);
 
 /**
- * @brief Returns interfaces available on the current machine, in priority order.
+ * @brief Returns interfaces available on the current machine in priority
+ *        order.
  *
  * Can be called before pqos_init(). Returns available interfaces in
  * priority order: MMIO first (if ACPI ERDT and MRRM tables are present),

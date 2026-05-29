@@ -361,9 +361,11 @@ The auto\-detection rules are:
 .br
 6) \fB\-R\fP / \fB\-\-alloc\-reset\fP values cdp\-on/off and l2cdp\-on/off / l3cdp\-on/off restrict the choice to MSR or OS.
 .br
-7) When several interfaces remain valid the preference order is mmio > msr > os.
+7) \fB\-r\fP / \fB\-\-mon\-reset\fP values l3iordt\-on/off and \fB\-R\fP / \fB\-\-alloc\-reset\fP values l3iordt\-on/off restrict the choice to MSR or MMIO.
 .br
-8) When no option constrains the interface the library's own auto\-detection is used:
+8) When several interfaces remain valid the preference order is mmio > msr > os.
+.br
+9) When no option constrains the interface the library's own auto\-detection is used:
 .br
 \ \ a) Takes RDT_IFACE environment variable into account if it is set
 .br
