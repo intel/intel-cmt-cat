@@ -848,26 +848,22 @@ iface_mask_to_str(unsigned mask, char *buf, size_t buf_size)
         }
         if (mask & IFACE_MMIO) {
                 n = snprintf(buf + pos, buf_size - pos, "%smmio", sep);
-                if (n > 0)
-                        pos += (size_t)n < buf_size - pos ? (size_t)n
-                                                          : buf_size - pos - 1;
+                pos = (n > 0 && (size_t)n < buf_size - pos) ? pos + (size_t)n
+                                                            : buf_size - 1;
                 sep = "|";
         }
         if (mask & IFACE_MSR) {
                 n = snprintf(buf + pos, buf_size - pos, "%smsr", sep);
-                if (n > 0)
-                        pos += (size_t)n < buf_size - pos ? (size_t)n
-                                                          : buf_size - pos - 1;
+                pos = (n > 0 && (size_t)n < buf_size - pos) ? pos + (size_t)n
+                                                            : buf_size - 1;
                 sep = "|";
         }
         if (mask & IFACE_OS) {
                 n = snprintf(buf + pos, buf_size - pos, "%sos", sep);
-                if (n > 0)
-                        pos += (size_t)n < buf_size - pos ? (size_t)n
-                                                          : buf_size - pos - 1;
-                sep = "|";
+                pos = (n > 0 && (size_t)n < buf_size - pos) ? pos + (size_t)n
+                                                            : buf_size - 1;
         }
-        (void)sep;
+        (void)pos;
         return buf;
 }
 
