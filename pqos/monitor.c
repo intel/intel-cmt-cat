@@ -2146,7 +2146,7 @@ parse_monitor_dev(char *str)
         bdf |= function & 0x7;
 
         if (vc_count == 0)
-                printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x@ALL",
+                printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x@ALL\n",
                        segment, BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
         else
                 for (idx = 0; idx < vc_count; idx++)
@@ -2204,7 +2204,7 @@ selfn_monitor_devs(const char *arg)
         if (*arg == '\0')
                 parse_error(arg, "Empty string!");
 
-        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-devs");
+        narrow_iface(IFACE_MSR | IFACE_MMIO, "--mon-dev");
         selfn_strdup(&cp, arg);
 
         for (str = cp;; str = NULL) {
