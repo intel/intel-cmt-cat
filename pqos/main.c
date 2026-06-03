@@ -1969,7 +1969,7 @@ main(int argc, char **argv)
         const struct pqos_capability *cap_smba = NULL;
         unsigned l3cat_id_count, *l3cat_ids = NULL;
         int cmd, ret, exit_val = EXIT_SUCCESS;
-        int opt_index = 0, pid_flag = 0;
+        int opt_index = 0;
 
         m_cmd_name = argv[0];
 
@@ -2005,7 +2005,6 @@ main(int argc, char **argv)
                         selfn_monitor_interval(optarg);
                         break;
                 case 'p':
-                        pid_flag = 1;
                         if (optarg != NULL && *optarg == '-') {
                                 /**
                                  * Next switch option wrongly assumed to be
@@ -2098,7 +2097,6 @@ main(int argc, char **argv)
                                  * monitored for cache/mbm/misses
                                  */
                                 selfn_monitor_top_pids();
-                                pid_flag = 1;
                         } else {
                                 printf("Option -%c is missing required "
                                        "argument\n",
@@ -2108,7 +2106,6 @@ main(int argc, char **argv)
                         break;
                 case 'a':
                         selfn_allocation_assoc(optarg);
-                        pid_flag |= alloc_pid_flag;
                         break;
                 case 'c':
                         selfn_allocation_select(optarg);
@@ -2295,7 +2292,6 @@ main(int argc, char **argv)
          * resolve_interface() with a unified error message.
          */
         resolve_interface();
-        (void)pid_flag;
         cfg.verbose = sel_verbose_mode;
         cfg.interface = sel_interface;
         /**
