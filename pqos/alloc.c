@@ -1616,15 +1616,20 @@ parse_allocation_assoc(char *str)
             (strncasecmp(str, "llc:", 4) == 0) ||
             (strncasecmp(str, "core:", 5) == 0)) {
                 alloc_pid_flag = 0;
+                narrow_iface(IFACE_MSR | IFACE_OS, "-a/--alloc-assoc (core)");
                 fill_core_tab(str);
         } else if (strncasecmp(str, "pid:", 4) == 0) {
                 alloc_pid_flag = 1;
+                narrow_iface(IFACE_OS, "-a/--alloc-assoc (pid)");
                 fill_pid_tab(str);
         } else if (strncasecmp(str, "dev:", 4) == 0) {
                 alloc_pid_flag = 0;
+                narrow_iface(IFACE_MSR | IFACE_MMIO, "-a/--alloc-assoc (dev)");
                 fill_dev_tab(str);
         } else if (strncasecmp(str, "channel:", 8) == 0) {
                 alloc_pid_flag = 0;
+                narrow_iface(IFACE_MSR | IFACE_MMIO,
+                             "-a/--alloc-assoc (channel)");
                 fill_channel_tab(str);
         } else
                 parse_error(str, "Unrecognized allocation type");
@@ -1654,9 +1659,6 @@ selfn_allocation_assoc(const char *arg)
         }
 
         free(cp);
-
-        if (alloc_pid_flag)
-                narrow_iface(IFACE_OS, "-a/--alloc-assoc (pid)");
 }
 
 /**

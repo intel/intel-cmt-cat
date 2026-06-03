@@ -359,6 +359,50 @@ test_scenario_no_constraint_keeps_auto(void **state)
         assert_int_equal(out, PQOS_INTER_AUTO);
 }
 
+static void
+test_scenario_alloc_assoc_core_picks_msr(void **state)
+{
+        enum pqos_interface out = PQOS_INTER_AUTO;
+        unsigned m = IFACE_ANY;
+
+        (void)state;
+        /* -a core:/cos:/llc: works over MSR or OS; MSR preferred. */
+        m = iface_narrow(m, IFACE_MSR | IFACE_OS);
+        assert_int_equal(m, IFACE_MSR | IFACE_OS);
+        assert_int_equal(iface_resolve(m, 0, PQOS_INTER_AUTO, &out), 0);
+        assert_int_equal(out, PQOS_INTER_MSR);
+}
+
+static void
+test_scenario_alloc_assoc_core_plus_dev_picks_msr(void **state)
+{
+        enum pqos_interface out = PQOS_INTER_AUTO;
+        unsigned m = IFACE_ANY;
+
+        (void)state;
+        /* -a "core:...;dev:..." : core->MSR|OS, dev->MSR|MMIO; only MSR
+         * survives the intersection of both tokens. */
+        m = iface_narrow(m, IFACE_MSR | IFACE_OS);   /* core: */
+        m = iface_narrow(m, IFACE_MSR | IFACE_MMIO); /* dev: */
+        assert_int_equal(m, IFACE_MSR);
+        assert_int_equal(iface_resolve(m, 0, PQOS_INTER_AUTO, &out), 0);
+        assert_int_equal(out, PQOS_INTER_MSR);
+}
+
+static void
+test_scenario_alloc_assoc_pid_plus_channel_conflict(void **state)
+{
+        unsigned m = IFACE_ANY;
+
+        (void)state;
+        /* -a "pid:...;channel:..." : pid->OS, channel->MSR|MMIO leaves no
+         * common interface, so the mask collapses to zero (conflict). */
+        m = iface_narrow(m, IFACE_OS); /* pid: */
+        assert_int_equal(m, IFACE_OS);
+        m = iface_narrow(m, IFACE_MSR | IFACE_MMIO); /* channel: */
+        assert_int_equal(m, 0);                      /* irreconcilable */
+}
+
 int
 main(void)
 {
@@ -388,6 +432,10 @@ main(void)
             cmocka_unit_test(test_scenario_uncore_aet_os_compatible),
             cmocka_unit_test(test_scenario_uncore_aet_plus_mmio_conflict),
             cmocka_unit_test(test_scenario_no_constraint_keeps_auto),
+            cmocka_unit_test(test_scenario_alloc_assoc_core_picks_msr),
+            cmocka_unit_test(test_scenario_alloc_assoc_core_plus_dev_picks_msr),
+            cmocka_unit_test(
+                test_scenario_alloc_assoc_pid_plus_channel_conflict),
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);
