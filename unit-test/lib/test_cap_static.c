@@ -1237,8 +1237,8 @@ test_get_available_interfaces_msr_only(void **state __attribute__((unused)))
 }
 
 static void
-test_get_available_interfaces_respects_capacity(
-    void **state __attribute__((unused)))
+test_get_available_interfaces_respects_capacity(void **state
+                                                __attribute__((unused)))
 {
         enum pqos_interface ifaces[1];
         unsigned count = 1;

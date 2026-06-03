@@ -289,7 +289,7 @@ test_scenario_mon_reset_l3iordt_prefers_msr_on_msr_os_machine(void **state)
 
         (void)state;
         m = iface_narrow(m, IFACE_MSR | IFACE_MMIO); /* -r l3iordt-on */
-        m = iface_narrow(m, IFACE_MSR | IFACE_OS);   /* machine supports MSR, OS */
+        m = iface_narrow(m, IFACE_MSR | IFACE_OS);   /* machine: MSR, OS */
         assert_int_equal(m, IFACE_MSR);
         assert_int_equal(iface_resolve(m, 0, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_MSR);
