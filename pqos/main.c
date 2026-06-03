@@ -1157,9 +1157,32 @@ resolve_interface(void)
                     n > 0) {
                         for (i = 0; i < n; i++)
                                 avail_mask |= iface_enum_to_bit(avail[i]);
-                        /* Only narrow if the result is non-empty. */
-                        if ((mask & avail_mask) != 0)
+                        if ((mask & avail_mask) != 0) {
                                 mask &= avail_mask;
+                        } else {
+                                /*
+                                 * The interface(s) required by the selected
+                                 * options are not available on this platform.
+                                 * Fail early with a clear message instead of
+                                 * letting the library report a generic error.
+                                 */
+                                char need_str[32];
+                                char have_str[32];
+
+                                iface_mask_to_str(mask, need_str,
+                                                  sizeof(need_str));
+                                iface_mask_to_str(avail_mask, have_str,
+                                                  sizeof(have_str));
+                                fprintf(stderr,
+                                        "Error: option '%s' requires interface "
+                                        "'%s' but only '%s' is available on "
+                                        "this platform.\n",
+                                        iface_constraint_origin != NULL
+                                            ? iface_constraint_origin
+                                            : "<earlier option>",
+                                        need_str, have_str);
+                                exit(EXIT_FAILURE);
+                        }
                 }
         }
 
