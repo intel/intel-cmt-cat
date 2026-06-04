@@ -539,8 +539,6 @@ mmio_io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
         unsigned int ret = 0;
         const struct pqos_devinfo *devinfo = _pqos_get_dev();
 
-        memset(pci_info, 0, sizeof(struct pqos_pci_info));
-
         ret = pqos_devinfo_get_domain_id(devinfo, segment, bdf,
                                          &pci_info->domain_id);
         if (ret != PQOS_RETVAL_OK)

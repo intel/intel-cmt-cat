@@ -657,14 +657,13 @@ cap_print_mrrm_info_regions(const struct pqos_mrrm_info *mrrm)
         uint64_t base_addr = 0;
         uint64_t length = 0;
 
-        printf("Total Memory Regions:  %d\n",
+        printf("\nTotal Memory Regions:  %d\n",
                mrrm->max_memory_regions_supported);
         if (mrrm->flags == 0)
                 printf("Region ID Type:        Static\n");
         else
                 printf("Region ID Type:        Dynamic\n");
 
-        printf("\n\n");
         for (idx = 0; idx < mrrm->num_mres; idx++) {
 
                 /* Log Region's Base Address */
@@ -1031,20 +1030,25 @@ print_io_dev(const struct pqos_sysconfig *sys,
         unsigned int j;
         struct pqos_pci_info pci_info;
 
+        memset(&pci_info, 0, sizeof(pci_info));
+
         printf("\n%.4x:%.2x:%.2x.%x ", segment, BDF_BUS(bdf), BDF_DEV(bdf),
                BDF_FUNC(bdf));
 
         ret = pqos_io_devs_get(&pci_info, segment, bdf);
-        if (ret != PQOS_RETVAL_OK)
+        if (ret != PQOS_RETVAL_OK) {
                 printf("Unable to get I/O device %.4x:%.2x:%.2x.%x PCI "
                        "information\n",
                        segment, BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
+                return;
+        }
 
-        printf("%s: %s %s",
-               pci_info.subclass_name[0] ? pci_info.subclass_name
-                                         : "PCI device",
-               pci_info.vendor_name[0] ? pci_info.vendor_name : "",
-               pci_info.device_name[0] ? pci_info.device_name : "");
+        printf("%s:", pci_info.subclass_name[0] ? pci_info.subclass_name
+                                                : "PCI device");
+        if (pci_info.vendor_name[0])
+                printf(" %s", pci_info.vendor_name);
+        if (pci_info.device_name[0])
+                printf(" %s", pci_info.device_name);
 
         if (pci_info.revision != 0)
                 printf(" (rev %02x)", pci_info.revision);
@@ -1285,10 +1289,12 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
                         break;
                 }
 
-        printf("Enable I/O RDT            : pqos l3iordt-on\n");
-        printf("Disable I/O RDT           : pqos l3iordt-off\n");
-        printf("Reset I/O RDT Allocation  : pqos --alloc-reset or pqos -R\n");
-        printf("Reset I/O RDT Monitoring  : pqos --mon-reset or pqos -r -d\n");
+        printf("\nEnable I/O RDT Allocation  : pqos -R l3iordt-on -d\n");
+        printf("Enable I/O RDT Monitoring  : pqos -r l3iordt-on -d\n\n");
+        printf("Disable I/O RDT Allocation : pqos -R l3iordt-off -d\n");
+        printf("Disable I/O RDT Monitoring : pqos -r l3iordt-off -d\n\n");
+        printf("Reset I/O RDT Allocation   : pqos -R -d\n");
+        printf("Reset I/O RDT Monitoring   : pqos -r -d\n");
 
         for (idx = 0; idx < sel_pci_dev_count; idx++)
                 print_io_dev(sys, cap_l3ca, interface, sel_pci_dev[idx].segment,
@@ -1338,10 +1344,12 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
                         break;
                 }
 
-        printf("Enable I/O RDT            : pqos l3iordt-on\n");
-        printf("Disable I/O RDT           : pqos l3iordt-off\n");
-        printf("Reset I/O RDT Allocation  : pqos --alloc-reset or pqos -R\n");
-        printf("Reset I/O RDT Monitoring  : pqos --mon-reset or pqos -r -d\n");
+        printf("\nEnable I/O RDT Allocation  : pqos -R l3iordt-on -d\n");
+        printf("Enable I/O RDT Monitoring  : pqos -r l3iordt-on -d\n\n");
+        printf("Disable I/O RDT Allocation : pqos -R l3iordt-off -d\n");
+        printf("Disable I/O RDT Monitoring : pqos -r l3iordt-off -d\n\n");
+        printf("Reset I/O RDT Allocation   : pqos -R -d\n");
+        printf("Reset I/O RDT Monitoring   : pqos -r -d\n");
 
         dev = sys->dev;
         for (i = 0; i < dev->num_devs; i++)
