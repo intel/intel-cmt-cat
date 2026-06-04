@@ -62,9 +62,6 @@
 #define MBA_MINIMUM_CONTROL_WINDOW 2
 #define MBA_MAXIMUM_CONTROL_WINDOW 4
 
-#define MSR_STR  "msr"
-#define MMIO_STR "mmio"
-
 struct pci_dev {
         uint16_t segment; /**< PCI segment */
         uint16_t bdf;     /**< Bus Device Function */
@@ -1027,7 +1024,6 @@ static void
 print_io_dev(const struct pqos_sysconfig *sys,
              const struct pqos_capability *cap_l3ca,
              enum pqos_interface interface,
-             const char *interface_str,
              uint16_t segment,
              uint16_t bdf)
 {
@@ -1086,12 +1082,12 @@ print_io_dev(const struct pqos_sysconfig *sys,
         printf("\n\tMonitoring Commands:\n");
         for (j = 0; j < pci_info.num_channels; j++) {
                 if (pci_info.channels[j] > 0) {
-                        printf("\t\tpqos --iface=%s --mon-dev=all:"
+                        printf("\t\tpqos --mon-dev=all:"
                                "%.4x:%.2x:%.2x.%x@%d\n",
-                               interface_str, segment, BDF_BUS(bdf),
-                               BDF_DEV(bdf), BDF_FUNC(bdf), j);
-                        printf("\t\tpqos --iface=%s --mon-channel=all:0x%lx\n",
-                               interface_str, pci_info.channels[j]);
+                               segment, BDF_BUS(bdf), BDF_DEV(bdf),
+                               BDF_FUNC(bdf), j);
+                        printf("\t\tpqos --mon-channel=all:0x%lx\n",
+                               pci_info.channels[j]);
                 }
 
                 if (((j + 1) < pci_info.num_channels) &&
@@ -1109,12 +1105,12 @@ print_io_dev(const struct pqos_sysconfig *sys,
         printf("\tAllocation Commands:\n");
         for (j = 0; j < pci_info.num_channels; j++) {
                 if (pci_info.channels[j] > 0) {
-                        printf("\t\tpqos --iface=%s -a dev:<CLOS>="
+                        printf("\t\tpqos -a dev:<CLOS>="
                                "%.4x:%.2x:%.2x.%x@%d\n",
-                               interface_str, segment, BDF_BUS(bdf),
-                               BDF_DEV(bdf), BDF_FUNC(bdf), j);
-                        printf("\t\tpqos --iface=%s -a channel:<CLOS>=0x%lx\n",
-                               interface_str, pci_info.channels[j]);
+                               segment, BDF_BUS(bdf), BDF_DEV(bdf),
+                               BDF_FUNC(bdf), j);
+                        printf("\t\tpqos -a channel:<CLOS>=0x%lx\n",
+                               pci_info.channels[j]);
                 }
 
                 if (((j + 1) < pci_info.num_channels) &&
@@ -1130,9 +1126,8 @@ print_io_dev(const struct pqos_sysconfig *sys,
                 printf("\tFor example, set COS 14 to the first 4 "
                        "L3 cache ways and COS 10 to the next 8 "
                        "L3 cache ways\n");
-                printf("\tpqos --iface=%s -e \"llc:14=0x000f;"
-                       "llc:10=0x0ff0;\"\n",
-                       interface_str);
+                printf("\tpqos -e \"llc:14=0x000f;"
+                       "llc:10=0x0ff0;\"\n");
         } else if (interface == PQOS_INTER_MMIO) {
                 for (j = 0; j < sys->erdt->num_dev_agents; j++) {
                         if (pci_info.domain_id ==
@@ -1146,9 +1141,9 @@ print_io_dev(const struct pqos_sysconfig *sys,
                        "L3 cache ways and COS 10 to the next 8 "
                        "L3 cache ways in Device Domain 0x%x\n",
                        pci_info.domain_id);
-                printf("\tpqos --iface=%s --alloc-domain-id=0x%x -e "
+                printf("\tpqos --alloc-domain-id=0x%x -e "
                        "\"llc:14=0x000f;llc:10=0x0ff0;\"\n",
-                       interface_str, pci_info.domain_id);
+                       pci_info.domain_id);
         }
 }
 
@@ -1250,7 +1245,6 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
         int ret;
         uint32_t idx;
         enum pqos_interface interface;
-        const char *interface_str = NULL;
         const struct pqos_capability *cap_l3ca = NULL;
 
         if (sel_pci_dev_count == 0) {
@@ -1271,15 +1265,12 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
                 return;
         }
 
-        if (interface == PQOS_INTER_MSR)
-                interface_str = MSR_STR;
-        else if (interface == PQOS_INTER_MMIO) {
+        if (interface == PQOS_INTER_MMIO) {
                 if (!sys->erdt) {
                         printf("ERDT info not available!\n");
                         return;
                 }
-                interface_str = MMIO_STR;
-        } else {
+        } else if (interface != PQOS_INTER_MSR) {
                 printf("--print-io-dev command is supported in msr and mmio "
                        "interfaces only\n");
                 return;
@@ -1294,20 +1285,14 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
                         break;
                 }
 
-        printf("Enable I/O RDT            : pqos --iface=%s l3iordt-on\n",
-               interface_str);
-        printf("Disable I/O RDT           : pqos --iface=%s l3iordt-off\n",
-               interface_str);
-        printf("Reset I/O RDT Allocation  : pqos --iface=%s --alloc-reset or "
-               "pqos --iface=%s -R\n",
-               interface_str, interface_str);
-        printf("Reset I/O RDT Monitoring  : pqos --iface=%s --mon-reset or "
-               "pqos --iface=%s -r -d\n",
-               interface_str, interface_str);
+        printf("Enable I/O RDT            : pqos l3iordt-on\n");
+        printf("Disable I/O RDT           : pqos l3iordt-off\n");
+        printf("Reset I/O RDT Allocation  : pqos --alloc-reset or pqos -R\n");
+        printf("Reset I/O RDT Monitoring  : pqos --mon-reset or pqos -r -d\n");
 
         for (idx = 0; idx < sel_pci_dev_count; idx++)
-                print_io_dev(sys, cap_l3ca, interface, interface_str,
-                             sel_pci_dev[idx].segment, sel_pci_dev[idx].bdf);
+                print_io_dev(sys, cap_l3ca, interface, sel_pci_dev[idx].segment,
+                             sel_pci_dev[idx].bdf);
 
         printf("\n");
         free(sel_pci_dev);
@@ -1320,7 +1305,6 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
         uint32_t i;
         enum pqos_interface interface;
         struct pqos_devinfo *dev = NULL;
-        const char *interface_str = NULL;
         const struct pqos_capability *cap_l3ca = NULL;
 
         if (!sys || !sys->dev) {
@@ -1334,15 +1318,12 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
                 return;
         }
 
-        if (interface == PQOS_INTER_MSR)
-                interface_str = MSR_STR;
-        else if (interface == PQOS_INTER_MMIO) {
+        if (interface == PQOS_INTER_MMIO) {
                 if (!sys->erdt) {
                         printf("ERDT info not available!\n");
                         return;
                 }
-                interface_str = MMIO_STR;
-        } else {
+        } else if (interface != PQOS_INTER_MSR) {
                 printf("--print-io-devs command is supported in msr and mmio "
                        "interfaces only\n");
                 return;
@@ -1357,21 +1338,15 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
                         break;
                 }
 
-        printf("Enable I/O RDT            : pqos --iface=%s l3iordt-on\n",
-               interface_str);
-        printf("Disable I/O RDT           : pqos --iface=%s l3iordt-off\n",
-               interface_str);
-        printf("Reset I/O RDT Allocation  : pqos --iface=%s --alloc-reset or "
-               "pqos --iface=%s -R\n",
-               interface_str, interface_str);
-        printf("Reset I/O RDT Monitoring  : pqos --iface=%s --mon-reset or "
-               "pqos --iface=%s -r -d\n",
-               interface_str, interface_str);
+        printf("Enable I/O RDT            : pqos l3iordt-on\n");
+        printf("Disable I/O RDT           : pqos l3iordt-off\n");
+        printf("Reset I/O RDT Allocation  : pqos --alloc-reset or pqos -R\n");
+        printf("Reset I/O RDT Monitoring  : pqos --mon-reset or pqos -r -d\n");
 
         dev = sys->dev;
         for (i = 0; i < dev->num_devs; i++)
-                print_io_dev(sys, cap_l3ca, interface, interface_str,
-                             dev->devs[i].segment, dev->devs[i].bdf);
+                print_io_dev(sys, cap_l3ca, interface, dev->devs[i].segment,
+                             dev->devs[i].bdf);
 
         printf("\n");
 }
