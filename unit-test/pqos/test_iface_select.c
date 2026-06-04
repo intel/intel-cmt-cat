@@ -117,8 +117,7 @@ test_resolve_any_keeps_auto(void **state)
         enum pqos_interface out = PQOS_INTER_MSR;
 
         (void)state;
-        assert_int_equal(
-            iface_resolve(IFACE_ANY, 0, PQOS_INTER_AUTO, &out), 0);
+        assert_int_equal(iface_resolve(IFACE_ANY, 0, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_AUTO);
 }
 
@@ -128,16 +127,14 @@ test_resolve_single_bit(void **state)
         enum pqos_interface out = PQOS_INTER_AUTO;
 
         (void)state;
-        assert_int_equal(
-            iface_resolve(IFACE_MMIO, 0, PQOS_INTER_AUTO, &out), 0);
+        assert_int_equal(iface_resolve(IFACE_MMIO, 0, PQOS_INTER_AUTO, &out),
+                         0);
         assert_int_equal(out, PQOS_INTER_MMIO);
 
-        assert_int_equal(
-            iface_resolve(IFACE_OS, 0, PQOS_INTER_AUTO, &out), 0);
+        assert_int_equal(iface_resolve(IFACE_OS, 0, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_OS);
 
-        assert_int_equal(
-            iface_resolve(IFACE_MSR, 0, PQOS_INTER_AUTO, &out), 0);
+        assert_int_equal(iface_resolve(IFACE_MSR, 0, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_MSR);
 }
 
@@ -148,14 +145,12 @@ test_resolve_prefers_mmio(void **state)
 
         (void)state;
         /* Preference order is MMIO > MSR > OS. */
-        assert_int_equal(iface_resolve(IFACE_MSR | IFACE_MMIO, 0,
-                                       PQOS_INTER_AUTO, &out),
-                         0);
+        assert_int_equal(
+            iface_resolve(IFACE_MSR | IFACE_MMIO, 0, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_MMIO);
 
-        assert_int_equal(iface_resolve(IFACE_MMIO | IFACE_OS, 0,
-                                       PQOS_INTER_AUTO, &out),
-                         0);
+        assert_int_equal(
+            iface_resolve(IFACE_MMIO | IFACE_OS, 0, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_MMIO);
 }
 
@@ -166,9 +161,8 @@ test_resolve_msr_or_os_picks_msr(void **state)
 
         (void)state;
         /* When MMIO is excluded but both MSR and OS remain, MSR wins. */
-        assert_int_equal(iface_resolve(IFACE_MSR | IFACE_OS, 0,
-                                       PQOS_INTER_AUTO, &out),
-                         0);
+        assert_int_equal(
+            iface_resolve(IFACE_MSR | IFACE_OS, 0, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_MSR);
 }
 
@@ -179,14 +173,12 @@ test_resolve_explicit_user_compatible(void **state)
 
         (void)state;
         /* User asks for OS and option mask still contains OS -> use OS. */
-        assert_int_equal(
-            iface_resolve(IFACE_OS, 1, PQOS_INTER_OS, &out), 0);
+        assert_int_equal(iface_resolve(IFACE_OS, 1, PQOS_INTER_OS, &out), 0);
         assert_int_equal(out, PQOS_INTER_OS);
 
         /* User asks for MMIO and constraint allows MMIO/MSR. */
-        assert_int_equal(iface_resolve(IFACE_MMIO | IFACE_MSR, 1,
-                                       PQOS_INTER_MMIO, &out),
-                         0);
+        assert_int_equal(
+            iface_resolve(IFACE_MMIO | IFACE_MSR, 1, PQOS_INTER_MMIO, &out), 0);
         assert_int_equal(out, PQOS_INTER_MMIO);
 }
 
@@ -197,12 +189,10 @@ test_resolve_explicit_user_conflict(void **state)
 
         (void)state;
         /* User asks for OS but options force MMIO -> conflict. */
-        assert_int_equal(
-            iface_resolve(IFACE_MMIO, 1, PQOS_INTER_OS, &out), -2);
+        assert_int_equal(iface_resolve(IFACE_MMIO, 1, PQOS_INTER_OS, &out), -2);
 
         /* User asks for MMIO but options force OS (e.g. -p). */
-        assert_int_equal(
-            iface_resolve(IFACE_OS, 1, PQOS_INTER_MMIO, &out), -2);
+        assert_int_equal(iface_resolve(IFACE_OS, 1, PQOS_INTER_MMIO, &out), -2);
 }
 
 static void
@@ -222,9 +212,8 @@ test_resolve_user_auto_treated_as_no_override(void **state)
         (void)state;
         /* --iface=auto should NOT be treated as an explicit override:
          * fall through to mask-based selection (MMIO > MSR > OS). */
-        assert_int_equal(iface_resolve(IFACE_MSR | IFACE_MMIO, 1,
-                                       PQOS_INTER_AUTO, &out),
-                         0);
+        assert_int_equal(
+            iface_resolve(IFACE_MSR | IFACE_MMIO, 1, PQOS_INTER_AUTO, &out), 0);
         assert_int_equal(out, PQOS_INTER_MMIO);
 }
 
@@ -316,7 +305,7 @@ test_scenario_pid_plus_print_mem_regions_conflict(void **state)
         m = iface_narrow(m, IFACE_OS); /* -p */
         assert_int_equal(m, IFACE_OS);
         m = iface_narrow(m, IFACE_MMIO); /* --print-mem-regions */
-        assert_int_equal(m, 0); /* irreconcilable */
+        assert_int_equal(m, 0);          /* irreconcilable */
 }
 
 static void
@@ -340,10 +329,10 @@ test_scenario_uncore_aet_plus_mmio_conflict(void **state)
 
         (void)state;
         /* aet event (OS only) conflicts with an MMIO-only option. */
-        m = iface_narrow(m, IFACE_OS);   /* aet event */
+        m = iface_narrow(m, IFACE_OS); /* aet event */
         assert_int_equal(m, IFACE_OS);
         m = iface_narrow(m, IFACE_MMIO); /* --print-mem-regions */
-        assert_int_equal(m, 0); /* irreconcilable */
+        assert_int_equal(m, 0);          /* irreconcilable */
 }
 
 static void
