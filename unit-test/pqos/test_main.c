@@ -152,6 +152,26 @@ test_strlisttotabrealloc_ignores_duplicates(void **state)
         (void)state; /* unused */
 }
 
+static void
+test_strlisttotabrealloc_large_range(void **state)
+{
+        unsigned count = 4;
+        char input[] = "1-65535";
+        uint64_t *tab = calloc(count, sizeof(*tab));
+        unsigned parsed;
+
+        assert_non_null(tab);
+
+        parsed = strlisttotabrealloc(input, &tab, &count);
+        assert_int_equal(parsed, 65535);
+        assert_true(count >= 65535);
+        assert_int_equal(tab[0], 1);
+        assert_int_equal(tab[65534], 65535);
+
+        free(tab);
+        (void)state; /* unused */
+}
+
 int
 main(void)
 {
@@ -163,7 +183,8 @@ main(void)
                 test_realloc_and_init_rejects_element_count_overflow),
             cmocka_unit_test(test_realloc_and_init_rejects_byte_size_overflow),
             cmocka_unit_test(test_strlisttotabrealloc_grows_array),
-            cmocka_unit_test(test_strlisttotabrealloc_ignores_duplicates)};
+            cmocka_unit_test(test_strlisttotabrealloc_ignores_duplicates),
+            cmocka_unit_test(test_strlisttotabrealloc_large_range)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

@@ -424,6 +424,41 @@ strlisttotabrealloc(char *s, uint64_t **tab, unsigned *max)
                                 printf("Too large group items.\n");
                                 exit(EXIT_FAILURE);
                         }
+                        if (index == 0) {
+                                /*
+                                 * Fast path for the first range.
+                                 * There are no prior values, so duplicate
+                                 * checks can be skipped.
+                                 */
+                                uint64_t range_len;
+
+                                if (start == 0 && end == UINT64_MAX) {
+                                        printf("Too large group items.\n");
+                                        exit(EXIT_FAILURE);
+                                }
+
+                                range_len = end - start + 1;
+
+                                if (range_len > UINT_MAX) {
+                                        printf("Too large group items.\n");
+                                        exit(EXIT_FAILURE);
+                                }
+
+                                while (*max < (unsigned)range_len) {
+                                        (*tab) = realloc_and_init(
+                                            *tab, max, sizeof(**tab));
+                                        if ((*tab) == NULL) {
+                                                printf("Reallocation error!\n");
+                                                exit(EXIT_FAILURE);
+                                        }
+                                }
+
+                                for (n = start; n <= end; n++) {
+                                        (*tab)[index] = n;
+                                        index++;
+                                }
+                                continue;
+                        }
                         for (n = start; n <= end; n++) {
                                 if (!(isdup(*tab, index, n))) {
                                         (*tab)[index] = n;

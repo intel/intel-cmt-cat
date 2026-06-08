@@ -47,9 +47,11 @@
 #include "pqos_internal.h"
 #endif
 
+#include <ctype.h>
 #include <dirent.h> /**< for dir list*/
 #include <fcntl.h>
 #include <inttypes.h>
+#include <limits.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1045,6 +1047,7 @@ parse_event(const char *str, enum pqos_mon_event *evt)
 }
 
 #define PARSE_MON_GRP_BUFF_SIZE 2048
+#define MAX_PID_LIST_SIZE       262144U
 
 static int
 get_cpu_count(void)
@@ -1067,6 +1070,111 @@ get_cpu_count(void)
         free(namelist);
 
         return num_cpus;
+}
+
+static int
+pid_exists(const uint64_t pid)
+{
+        struct stat st;
+        char path[48];
+
+        if (pid == 0)
+                return 0;
+
+        snprintf(path, sizeof(path), "%s/%" PRIu64, proc_pids_dir, pid);
+
+        return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+static void
+print_invalid_pid_message(const uint64_t pid)
+{
+        printf("Requested PID set contains nonexistent processes "
+               "(first invalid PID: %" PRIu64 ")\n",
+               pid);
+}
+
+static int
+pid_list_size_exceeded(const char *pid_list)
+{
+        char *copy, *token, *saveptr = NULL;
+        uint64_t pid_count = 0;
+
+        copy = strdup(pid_list);
+        if (copy == NULL) {
+                printf("Failed to allocate memory for argument copy!\n");
+                exit(EXIT_FAILURE);
+        }
+
+        for (token = strtok_r(copy, ",", &saveptr); token != NULL;
+             token = strtok_r(NULL, ",", &saveptr)) {
+                char *sep;
+
+                while (isspace((unsigned char)*token))
+                        token++;
+                if (*token == '\0')
+                        continue;
+
+                sep = strchr(token, '-');
+                if (sep != NULL) {
+                        uint64_t start, end, range_len;
+
+                        if (*(sep + 1) == '\0')
+                                parse_error(token,
+                                            "Incomplete PID range format");
+                        *sep = '\0';
+                        start = strtouint64(token);
+
+                        if (!(*(sep + 1) >= '0' && *(sep + 1) <= '9'))
+                                parse_error(sep + 1,
+                                            "Invalid PID range format");
+
+                        end = strtouint64(sep + 1);
+                        if (start > end) {
+                                uint64_t n = start;
+
+                                start = end;
+                                end = n;
+                        }
+                        if (start == 0 && end == UINT64_MAX) {
+                                free(copy);
+                                return 1;
+                        }
+
+                        range_len = end - start + 1;
+                        if (pid_count > UINT64_MAX - range_len ||
+                            pid_count + range_len > MAX_PID_LIST_SIZE) {
+                                free(copy);
+                                return 1;
+                        }
+                        pid_count += range_len;
+                } else {
+                        if (pid_count + 1 > MAX_PID_LIST_SIZE) {
+                                free(copy);
+                                return 1;
+                        }
+                        pid_count++;
+                }
+        }
+
+        free(copy);
+        return 0;
+}
+
+static int
+find_first_invalid_pid(const uint64_t *pid_list,
+                       const unsigned count,
+                       uint64_t *invalid_pid)
+{
+        unsigned i;
+
+        for (i = 0; i < count; i++)
+                if (!pid_exists(pid_list[i])) {
+                        *invalid_pid = pid_list[i];
+                        return 1;
+                }
+
+        return 0;
 }
 
 /**
@@ -1107,6 +1215,14 @@ parse_monitor_group(char *str, enum mon_group_type type)
                          * number of new groups
                          */
                         unsigned new_groups_count;
+                        uint64_t invalid_pid;
+
+                        if (type == MON_GROUP_TYPE_PID &&
+                            pid_list_size_exceeded(non_grp))
+                                parse_error(non_grp,
+                                            "Requested PID range expansion is "
+                                            "too large. "
+                                            "Please reduce the PID range.");
 
                         if (type == MON_GROUP_TYPE_PID)
                                 new_groups_count = strlisttotabrealloc(
@@ -1114,6 +1230,14 @@ parse_monitor_group(char *str, enum mon_group_type type)
                         else
                                 new_groups_count =
                                     strlisttotab(non_grp, cbuf, cbuf_len);
+
+                        if (type == MON_GROUP_TYPE_PID &&
+                            find_first_invalid_pid(cbuf, new_groups_count,
+                                                   &invalid_pid)) {
+                                print_invalid_pid_message(invalid_pid);
+                                free(cbuf);
+                                return -1;
+                        }
 
                         /* set group info */
                         for (i = 0; i < new_groups_count; i++) {
@@ -1142,6 +1266,7 @@ parse_monitor_group(char *str, enum mon_group_type type)
                 if (grp != NULL) {
                         char *desc = NULL;
                         unsigned element_count;
+                        uint64_t invalid_pid;
                         const struct mon_group *group;
 
                         selfn_strdup(&desc, grp);
@@ -1150,12 +1275,28 @@ parse_monitor_group(char *str, enum mon_group_type type)
                          * one group so strlisttotab result is the number
                          * of elements in that one group
                          */
+                        if (type == MON_GROUP_TYPE_PID &&
+                            pid_list_size_exceeded(grp))
+                                parse_error(grp,
+                                            "Requested PID range expansion is "
+                                            "too large. "
+                                            "Please reduce the PID range.");
+
                         if (type == MON_GROUP_TYPE_PID)
                                 element_count =
                                     strlisttotabrealloc(grp, &cbuf, &cbuf_len);
                         else
                                 element_count =
                                     strlisttotab(grp, cbuf, cbuf_len);
+
+                        if (type == MON_GROUP_TYPE_PID &&
+                            find_first_invalid_pid(cbuf, element_count,
+                                                   &invalid_pid)) {
+                                print_invalid_pid_message(invalid_pid);
+                                free(desc);
+                                free(cbuf);
+                                return -1;
+                        }
 
                         /* set group info */
                         group = grp_add(type, evt, desc, cbuf, element_count);
