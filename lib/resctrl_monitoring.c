@@ -1426,10 +1426,31 @@ resctrl_mon_start(struct pqos_mon_data *group)
 
 resctrl_mon_start_exit:
         if (ret != PQOS_RETVAL_OK) {
+                if (group->num_pids > 0 &&
+                    group->intl->resctrl.mon_group != NULL) {
+                        const struct pqos_cap *cap = _pqos_get_cap();
+                        unsigned max_cos;
+
+                        if (resctrl_alloc_get_grps_num(cap, &max_cos) ==
+                            PQOS_RETVAL_OK) {
+                                unsigned cos = 0;
+
+                                do {
+                                        (void)resctrl_mon_rmdir(
+                                            cos,
+                                            group->intl->resctrl.mon_group);
+                                } while (++cos < max_cos);
+                                (void)resctrl_mon_rmdir(
+                                    0, group->intl->resctrl.mon_group);
+                        free(group->intl->resctrl.mon_group);
+                        group->intl->resctrl.mon_group = NULL;
+                        resctrl_group = NULL;
+                }
                 if (group->intl->resctrl.l3id != NULL)
                         free(group->intl->resctrl.l3id);
                 if (group->intl->resctrl.mon_group != resctrl_group)
                         free(resctrl_group);
+                }
         }
 
         return ret;
