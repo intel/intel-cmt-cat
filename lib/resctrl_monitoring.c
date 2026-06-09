@@ -766,6 +766,7 @@ PQOS_STATIC int
 resctrl_mon_mkdir(const unsigned class_id, const char *name)
 {
         char path[128];
+        int mkdir_ret;
 
         ASSERT(name != NULL);
 
@@ -773,8 +774,15 @@ resctrl_mon_mkdir(const unsigned class_id, const char *name)
             PQOS_RETVAL_OK)
                 return PQOS_RETVAL_ERROR;
 
-        if (mkdir(path, 0755) == -1 && errno != EEXIST)
+        mkdir_ret = mkdir(path, 0755);
+        if (mkdir_ret == -1 && errno != EEXIST) {
+                const int err = errno;
+
+                LOG_ERROR("Failed to create resctrl monitoring group %s: "
+                          "errno %d (%s)\n",
+                          path, err, strerror(err));
                 return PQOS_RETVAL_BUSY;
+        }
 
         return PQOS_RETVAL_OK;
 }
@@ -1440,17 +1448,17 @@ resctrl_mon_start_exit:
                                             cos,
                                             group->intl->resctrl.mon_group);
                                 } while (++cos < max_cos);
-                                (void)resctrl_mon_rmdir(
-                                    0, group->intl->resctrl.mon_group);
+                        }
+
                         free(group->intl->resctrl.mon_group);
                         group->intl->resctrl.mon_group = NULL;
                         resctrl_group = NULL;
                 }
+
                 if (group->intl->resctrl.l3id != NULL)
                         free(group->intl->resctrl.l3id);
                 if (group->intl->resctrl.mon_group != resctrl_group)
                         free(resctrl_group);
-                }
         }
 
         return ret;

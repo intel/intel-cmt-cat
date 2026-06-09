@@ -1177,6 +1177,49 @@ find_first_invalid_pid(const uint64_t *pid_list,
         return 0;
 }
 
+static int
+monitor_get_available_group_capacity(
+    const struct pqos_capability *const cap_mon,
+    unsigned *available_groups)
+{
+        ASSERT(available_groups != NULL);
+
+        if (available_groups == NULL || cap_mon == NULL ||
+            cap_mon->u.mon == NULL)
+                return -1;
+
+        if (cap_mon->u.mon->max_rmid == 0)
+                return -1;
+
+        *available_groups = (unsigned)(cap_mon->u.mon->max_rmid - 1);
+
+        return 0;
+}
+
+static int
+monitor_validate_group_capacity(const struct pqos_capability *const cap_mon,
+                                const enum pqos_interface interface)
+{
+        unsigned available_groups = 0;
+
+        if (interface != PQOS_INTER_OS &&
+            interface != PQOS_INTER_OS_RESCTRL_MON)
+                return 0;
+
+        if (monitor_get_available_group_capacity(cap_mon, &available_groups) !=
+            0)
+                return 0;
+
+        if (sel_monitor_num <= available_groups)
+                return 0;
+
+        printf("Too many monitoring groups selected. Requested %u groups, but "
+               "only %u are available.\n",
+               sel_monitor_num, available_groups);
+
+        return -1;
+}
+
 /**
  * @brief Function to set the descriptions and cores/pids for each monitoring
  * group
@@ -1756,6 +1799,9 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                 return -1;
         }
 
+        if (monitor_validate_group_capacity(cap_mon, interface) != 0)
+                return -1;
+
         if (interface == PQOS_INTER_MMIO) {
                 int j;
                 /* All memory regions are selected, if none is specified
@@ -1835,9 +1881,10 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                          * attempt to use the same core id.
                          */
                         if (ret != PQOS_RETVAL_OK) {
-                                printf("Monitoring start error on core(s) "
-                                       "%s, status %d\n",
-                                       grp->desc, ret);
+                                printf("Monitoring start error on core(s) %s: "
+                                       "%s (status %d)\n",
+                                       grp->desc, pqos_retval_to_string(ret),
+                                       ret);
                                 break;
                         } else
                                 grp->started = 1;
@@ -1853,9 +1900,20 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                          * Any problem with monitoring the process?
                          */
                         if (ret != PQOS_RETVAL_OK) {
-                                printf("PID %s monitoring start error,"
-                                       "status %d\n",
-                                       grp->desc, ret);
+                                if (ret == PQOS_RETVAL_BUSY)
+                                        printf("PID %s monitoring start error: "
+                                               "resource busy while creating "
+                                               "resctrl monitoring group. Too "
+                                               "many monitoring groups may be "
+                                               "selected, or stale/busy "
+                                               "resctrl groups may exist. "
+                                               "(status %d)\n",
+                                               grp->desc, ret);
+                                else
+                                        printf("PID %s monitoring start error: "
+                                               "%s (status %d)\n",
+                                               grp->desc,
+                                               pqos_retval_to_string(ret), ret);
                                 break;
                         } else
                                 grp->started = 1;
@@ -1879,9 +1937,10 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                          * Any problem with monitoring channels?
                          */
                         if (ret != PQOS_RETVAL_OK) {
-                                printf("Channel %s monitoring start error,"
-                                       "status %d\n",
-                                       grp->desc, ret);
+                                printf("Channel %s monitoring start error: %s "
+                                       "(status %d)\n",
+                                       grp->desc, pqos_retval_to_string(ret),
+                                       ret);
                                 break;
                         } else
                                 grp->started = 1;
@@ -1892,8 +1951,9 @@ monitor_setup(const struct pqos_cpuinfo *cpu_info,
                             (void *)grp->desc, &grp->data);
                         if (ret != PQOS_RETVAL_OK) {
                                 printf("Uncore monitoring start error on socket"
-                                       " %s, status %d\n",
-                                       grp->desc, ret);
+                                       " %s: %s (status %d)\n",
+                                       grp->desc, pqos_retval_to_string(ret),
+                                       ret);
                                 break;
                         } else
                                 grp->started = 1;

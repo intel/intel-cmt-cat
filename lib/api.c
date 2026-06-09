@@ -72,6 +72,37 @@
 
 #define PQOS_MON_EVENTS_ALLOWED (PQOS_MON_EVENTS_NON_PMU | PQOS_MON_EVENTS_PMU)
 
+const char *
+pqos_retval_to_string(const int retval)
+{
+        switch (retval) {
+        case PQOS_RETVAL_OK:
+                return "success";
+        case PQOS_RETVAL_ERROR:
+                return "generic error";
+        case PQOS_RETVAL_PARAM:
+                return "invalid parameter";
+        case PQOS_RETVAL_RESOURCE:
+                return "resource error";
+        case PQOS_RETVAL_INIT:
+                return "initialization error";
+        case PQOS_RETVAL_TRANSPORT:
+                return "transport error";
+        case PQOS_RETVAL_PERF_CTR:
+                return "performance counter error";
+        case PQOS_RETVAL_BUSY:
+                return "resource busy";
+        case PQOS_RETVAL_INTER:
+                return "interface not supported";
+        case PQOS_RETVAL_OVERFLOW:
+                return "data overflow";
+        case PQOS_RETVAL_UNAVAILABLE:
+                return "data unavailable";
+        default:
+                return "unknown return code";
+        }
+}
+
 /**
  * PQoS API functions
  */

@@ -34,6 +34,7 @@
 #include "resctrl_monitoring.h"
 #include "test.h"
 
+#include <errno.h>
 #include <sys/stat.h>
 
 /* ======== mock ======== */
@@ -74,6 +75,14 @@ test_resctrl_mon_mkdir(void **state __attribute__((unused)))
 
         ret = resctrl_mon_mkdir(1, "test");
         assert_int_equal(ret, PQOS_RETVAL_OK);
+
+        expect_string(__wrap_mkdir, path, RESCTRL_PATH "/COS2/mon_groups/test");
+        expect_value(__wrap_mkdir, mode, 0755);
+        will_return(__wrap_mkdir, -1);
+        errno = ENOSPC;
+
+        ret = resctrl_mon_mkdir(2, "test");
+        assert_int_equal(ret, PQOS_RETVAL_BUSY);
 }
 
 /* ======== resctrl_mon_rmdir ======== */

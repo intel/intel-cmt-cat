@@ -3381,6 +3381,33 @@ test_pqos_mon_get_ipc(void **state __attribute__((unused)))
         assert_int_equal(value, group.values.ipc);
 }
 
+static void
+test_pqos_retval_to_string(void **state __attribute__((unused)))
+{
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_OK), "success");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_ERROR),
+                            "generic error");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_PARAM),
+                            "invalid parameter");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_RESOURCE),
+                            "resource error");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_INIT),
+                            "initialization error");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_TRANSPORT),
+                            "transport error");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_PERF_CTR),
+                            "performance counter error");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_BUSY),
+                            "resource busy");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_INTER),
+                            "interface not supported");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_OVERFLOW),
+                            "data overflow");
+        assert_string_equal(pqos_retval_to_string(PQOS_RETVAL_UNAVAILABLE),
+                            "data unavailable");
+        assert_string_equal(pqos_retval_to_string(-1), "unknown return code");
+}
+
 int
 main(void)
 {
@@ -3469,6 +3496,7 @@ main(void)
             cmocka_unit_test(test_pqos_mon_start_uncore_param),
             cmocka_unit_test(test_pqos_mon_get_value_param),
             cmocka_unit_test(test_pqos_mon_get_ipc_param),
+            cmocka_unit_test(test_pqos_retval_to_string),
         };
 
         const struct CMUnitTest tests_hw[] = {

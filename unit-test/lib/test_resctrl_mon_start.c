@@ -278,6 +278,43 @@ test_resctrl_mon_start_pid(void **state)
         assert_int_equal(ret, PQOS_RETVAL_OK);
 }
 
+static void
+test_resctrl_mon_start_pid_cleanup_on_error(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_mon_data group;
+        struct pqos_mon_data_internal intl;
+        pid_t pids[] = {1};
+        int ret;
+
+        memset(&group, 0, sizeof(struct pqos_mon_data));
+        group.intl = &intl;
+        group.num_pids = 1;
+        group.pids = pids;
+        group.tid_map = pids;
+        group.tid_nr = 1;
+        group.event = PQOS_MON_EVENT_TMEM_BW;
+        memset(&intl, 0, sizeof(struct pqos_mon_data_internal));
+
+        will_return_maybe(__wrap__pqos_get_cap, data->cap);
+        will_return_maybe(__wrap__pqos_get_cpu, data->cpu);
+        will_return_maybe(resctrl_mon_is_supported, 1);
+        will_return_maybe(resctrl_mon_is_event_supported, 1);
+
+        will_return(resctrl_mon_new_group, "test");
+        will_return(__wrap_resctrl_alloc_get_grps_num, PQOS_RETVAL_ERROR);
+        expect_value(__wrap_resctrl_mon_assoc_set_pid, task, pids[0]);
+        expect_string(__wrap_resctrl_mon_assoc_set_pid, name, "test");
+        will_return(__wrap_resctrl_mon_assoc_set_pid, PQOS_RETVAL_BUSY);
+        expect_value(__wrap_resctrl_mon_rmdir, class_id, 0);
+        expect_string(__wrap_resctrl_mon_rmdir, name, "test");
+        will_return(__wrap_resctrl_mon_rmdir, 0);
+
+        ret = resctrl_mon_start(&group);
+        assert_int_equal(ret, PQOS_RETVAL_BUSY);
+        assert_null(intl.resctrl.mon_group);
+}
+
 int
 main(void)
 {
@@ -286,6 +323,7 @@ main(void)
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_resctrl_mon_start_core),
             cmocka_unit_test(test_resctrl_mon_start_pid),
+            cmocka_unit_test(test_resctrl_mon_start_pid_cleanup_on_error),
         };
 
         result += cmocka_run_group_tests(tests, test_init_mon, test_fini);

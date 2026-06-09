@@ -88,6 +88,15 @@ extern "C" {
 #define PQOS_RETVAL_OVERFLOW    9  /**< Data overflow */
 #define PQOS_RETVAL_UNAVAILABLE 10 /**< Data not available */
 
+/**
+ * @brief Converts PQoS return code to a user-friendly string
+ *
+ * @param [in] retval PQoS return code
+ *
+ * @return Return code description
+ */
+const char *pqos_retval_to_string(int retval);
+
 /*
  * =======================================
  * MBA
