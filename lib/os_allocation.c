@@ -576,12 +576,14 @@ static int
 filter_pids(const struct dirent *dir)
 {
         size_t char_idx;
+        size_t name_len;
 
         if (dir->d_name[0] == '.')
                 return 0;
 
-        for (char_idx = 0; char_idx < strlen(dir->d_name); ++char_idx) {
-                if (!isdigit(dir->d_name[char_idx]))
+        name_len = strlen(dir->d_name);
+        for (char_idx = 0; char_idx < name_len; ++char_idx) {
+                if (!isdigit((unsigned char)dir->d_name[char_idx]))
                         return 0;
         }
 
