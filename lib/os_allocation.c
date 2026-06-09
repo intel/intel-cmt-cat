@@ -601,6 +601,12 @@ os_alloc_reset_tasks(void)
         LOG_INFO("OS alloc reset - tasks\n");
 
         pid_count = scandir("/proc", &pids_list, filter_pids, NULL);
+        if (pid_count < 0) {
+                LOG_ERROR("Failed to scan /proc for tasks\n");
+                if (pids_list != NULL)
+                        free(pids_list);
+                return PQOS_RETVAL_ERROR;
+        }
 
         for (pid_idx = 0; pid_idx < pid_count; ++pid_idx) {
                 pid = atoi(pids_list[pid_idx]->d_name);
