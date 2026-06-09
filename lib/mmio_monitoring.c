@@ -1004,11 +1004,13 @@ mmio_mon_stop(struct pqos_mon_data *group)
 
         ASSERT(group != NULL);
 
-        if (group->num_cores == 0)
+        if (group->num_cores == 0 && group->num_channels == 0)
                 return PQOS_RETVAL_PARAM;
         if (group->num_cores != 0 && group->cores == NULL)
                 return PQOS_RETVAL_PARAM;
-        if ((group->num_cores > 0) &&
+        if (group->num_channels != 0 && group->channels == NULL)
+                return PQOS_RETVAL_PARAM;
+        if ((group->num_cores > 0 || group->num_channels > 0) &&
             (group->intl->hw.num_ctx == 0 || group->intl->hw.ctx == NULL))
                 return PQOS_RETVAL_PARAM;
 
@@ -1043,6 +1045,14 @@ mmio_mon_stop(struct pqos_mon_data *group)
                                 retval = PQOS_RETVAL_RESOURCE;
                 }
 
+        /* Associate channels from the group back with RMID0 */
+        if (group->channels != NULL)
+                for (i = 0; i < group->num_channels; ++i) {
+                        ret = iordt_mon_assoc_write(group->channels[i], RMID0);
+                        if (ret != PQOS_RETVAL_OK)
+                                retval = PQOS_RETVAL_RESOURCE;
+                }
+
         /* stop perf counters */
         ret = mmio_mon_stop_perf(group);
         if (ret != PQOS_RETVAL_OK)
@@ -1053,6 +1063,8 @@ mmio_mon_stop(struct pqos_mon_data *group)
          */
         if (group->cores != NULL)
                 free(group->cores);
+        if (group->channels != NULL)
+                free(group->channels);
 
         free(group->intl->hw.ctx);
 
