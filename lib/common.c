@@ -305,7 +305,7 @@ pqos_file_contains(const char *fname, const char *str, int *found)
 uint8_t *
 pqos_mmap_read(uint64_t address, const uint64_t size)
 {
-        uint32_t offset;
+        uint64_t offset;
         uint64_t page_size;
         uint8_t *mem;
         int fd;
@@ -336,7 +336,7 @@ pqos_mmap_read(uint64_t address, const uint64_t size)
 uint8_t *
 pqos_mmap_write(uint64_t address, const uint64_t size)
 {
-        uint32_t offset;
+        uint64_t offset;
         uint64_t page_size;
         uint8_t *mem;
         int fd;
