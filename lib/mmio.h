@@ -169,7 +169,7 @@ int get_l3_cmt_rmid_range_v1(const struct pqos_erdt_cmrc *cmrc,
  *
  * @param[in] mmrc structure under given RMDD containing MMIO
  * description for MBM_Region_m_RMID_n register set
- * @param[in] region_number region number to which RMID sub-range belongs to.
+ * @param[in] region_num region number to which RMID sub-range belongs to.
  * @param[in] n_first first RMID to extract
  * @param[in] n_last last RMID to extract
  *            0 <=  n_first <= n_last < RMDD.MAX_RMID
@@ -182,7 +182,7 @@ int get_l3_cmt_rmid_range_v1(const struct pqos_erdt_cmrc *cmrc,
  */
 
 int get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
-                                    unsigned int region_number,
+                                    int region_num,
                                     unsigned int rmid_first,
                                     unsigned int rmid_last,
                                     l3_mbm_rmid_t *rmids_val);
@@ -193,7 +193,7 @@ int get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
  *
  * @param[in] marc structure under given RMDD containing MMIO
  *            description for MBA_OPTIMAL_BW_n register set
- * @param[in] region_number region number to which RMID sub-range belongs to.
+ * @param[in] region_num region number to which RMID sub-range belongs to.
  * @param[in] clos_number region number to which RMID sub-range belongs to.
  * @param[out] value CLOS value. Allocated on the caller's side.
  *
@@ -202,7 +202,7 @@ int get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
 int get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                      unsigned int region_number,
+                                      int region_num,
                                       unsigned int clos_number,
                                       unsigned int *value);
 
@@ -212,7 +212,7 @@ int get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  *
  * @param[in] marc structure under given RMDD containing MMIO
  *            description for MBA_OPTIMAL_BW_n register set
- * @param[in] region_number region number to which RMID sub-range belongs to.
+ * @param[in] region_num region number to which RMID sub-range belongs to.
  * @param[in] clos_number region number to which RMID sub-range belongs to.
  * @param[in] value CLOS value
  *
@@ -221,7 +221,7 @@ int get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
 int set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                      unsigned int region_number,
+                                      int region_num,
                                       unsigned int clos_number,
                                       unsigned int value);
 
@@ -231,7 +231,7 @@ int set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  *
  * @param[in] marc structure under given RMDD containing MMIO
  *            description for MBA_OPTIMAL_BW_n register set
- * @param[in] region_number region number to which RMID sub-range belongs to.
+ * @param[in] region_num region number to which RMID sub-range belongs to.
  * @param[in] clos_number region number to which RMID sub-range belongs to.
  * @param[out] value CLOS value. Allocates on the caller side.
  *
@@ -240,7 +240,7 @@ int set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
 int get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                  unsigned int region_number,
+                                  int region_num,
                                   unsigned int clos_number,
                                   unsigned int *value);
 
@@ -250,7 +250,7 @@ int get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  *
  * @param[in] marc structure under given RMDD containing MMIO
  *            description for MBA_OPTIMAL_BW_n register set
- * @param[in] region_number region number to which RMID sub-range belongs to.
+ * @param[in] region_num region number to which RMID sub-range belongs to.
  * @param[in] clos_number region number to which RMID sub-range belongs to.
  * @param[in] value CLOS value
  *
@@ -259,7 +259,7 @@ int get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
 int set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                  unsigned int region_number,
+                                  int region_num,
                                   unsigned int clos_number,
                                   unsigned int value);
 
@@ -269,7 +269,7 @@ int set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  *
  * @param[in] marc structure under given RMDD containing MMIO
  *            description for MBA_OPTIMAL_BW_n register set
- * @param[in] region_number region number to which RMID sub-range belongs to.
+ * @param[in] region_num region number to which RMID sub-range belongs to.
  * @param[in] clos_number clos number to which RMID sub-range belongs to.
  * @param[out] value CLOS value. Allocates on the caller side.
  *
@@ -277,7 +277,7 @@ int set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  * @retval PQOS_RETVAL_OK on success
  */
 int get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                  unsigned int region_number,
+                                  int region_num,
                                   unsigned int clos_number,
                                   unsigned int *value);
 
@@ -287,7 +287,7 @@ int get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  *
  * @param[in] marc structure under given RMDD containing MMIO
  *            description for MBA_OPTIMAL_BW_n register set
- * @param[in] region_number region number to which RMID sub-range belongs to.
+ * @param[in] region_num region number to which RMID sub-range belongs to.
  * @param[in] clos_number region number to which RMID sub-range belongs to.
  * @param[in] value CLOS value
  *
@@ -296,7 +296,7 @@ int get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
  * @retval PQOS_RETVAL_ERROR if error occurs
  */
 int set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                  unsigned int region_number,
+                                  int region_num,
                                   unsigned int clos_number,
                                   unsigned int value);
 

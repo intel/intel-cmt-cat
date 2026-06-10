@@ -47,25 +47,23 @@
 
 static uint64_t *
 _get_clos_addr_by_region(uint64_t *mem,
-                         unsigned int region_number,
+                         int region_num,
                          unsigned int clos_number)
 {
-        LOG_INFO("%s(): mem: %p, region_number: %u, clos_number: %u\n",
-                 __func__, (const void *)mem, region_number, clos_number);
+        LOG_INFO("%s(): mem: %p, region_num: %d, clos_number: %u\n", __func__,
+                 (const void *)mem, region_num, clos_number);
         return (uint64_t *)((uint8_t *)mem +
-                            (region_number / 4) * BYTES_PER_REGION_SET +
+                            (region_num / 4) * BYTES_PER_REGION_SET +
                             clos_number * BYTES_PER_CLOS_ENTRY);
 }
 
 static int
-_get_clos_region_value(uint64_t clos_value,
-                       unsigned int region_number,
-                       unsigned int *value)
+_get_clos_region_value(uint64_t clos_value, int region_num, unsigned int *value)
 {
-        LOG_INFO("%s(): clos_value: %#" PRIx64 ", region_number: %u\n",
-                 __func__, clos_value, region_number);
+        LOG_INFO("%s(): clos_value: %#" PRIx64 ", region_num: %d\n", __func__,
+                 clos_value, region_num);
 
-        switch (region_number) {
+        switch (region_num) {
         case 0:
                 *value = (unsigned int)(clos_value & MBA_BW_ALL_BR0_MASK);
                 break;
@@ -82,9 +80,9 @@ _get_clos_region_value(uint64_t clos_value,
                                         MBA_BW_ALL_BR3_SHIFT);
                 break;
         default:
-                LOG_ERROR("%s: wrong region number provided: %u. "
+                LOG_ERROR("%s: wrong region number provided: %d. "
                           "Available region numbers are 0 to %d\n",
-                          __func__, region_number, PQOS_MAX_MEM_REGIONS - 1);
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -94,16 +92,14 @@ _get_clos_region_value(uint64_t clos_value,
 }
 
 static int
-_set_clos_region_value(uint64_t *clos_addr,
-                       unsigned int region_number,
-                       uint64_t value)
+_set_clos_region_value(uint64_t *clos_addr, int region_num, uint64_t value)
 {
         uint64_t clos_value = *clos_addr;
 
-        LOG_INFO("%s(): clos addr %p , region_number: %u, value %#" PRIx64 "\n",
-                 __func__, (void *)clos_addr, region_number, value);
+        LOG_INFO("%s(): clos addr %p , region_num: %d, value %#" PRIx64 "\n",
+                 __func__, (void *)clos_addr, region_num, value);
 
-        switch (region_number) {
+        switch (region_num) {
         case 0:
                 *clos_addr =
                     (uint64_t)((clos_value & MBA_BW_ALL_BR0_RESET_MASK) |
@@ -125,8 +121,8 @@ _set_clos_region_value(uint64_t *clos_addr,
                                value << MBA_BW_ALL_BR3_SHIFT);
                 break;
         default:
-                LOG_ERROR("%s: wrong region number provided: %u\n", __func__,
-                          region_number);
+                LOG_ERROR("%s: wrong region number provided: %d\n", __func__,
+                          region_num);
                 return PQOS_RETVAL_ERROR;
         }
 
@@ -270,7 +266,7 @@ get_l3_cmt_rmid_range_v1(const struct pqos_erdt_cmrc *cmrc,
 
 int
 get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
-                                unsigned int region_number,
+                                int region_num,
                                 unsigned int rmid_first,
                                 unsigned int rmid_last,
                                 l3_mbm_rmid_t *rmids_val)
@@ -281,13 +277,20 @@ get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
         uint64_t *mem;
         uint64_t size = (uint64_t)mmrc->reg_block_size * PAGE_SIZE;
 
+        if (region_num < 0 || region_num >= PQOS_MAX_MEM_REGIONS) {
+                LOG_ERROR("%s: wrong region number provided: %d. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
         mem = (uint64_t *)pqos_mmap_read(mmrc->reg_block_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
         LOG_INFO("%s(): rmid_first: %u, rmid_last: %u,"
-                 " region_number: %u, rmids_val ptr: %x\n",
-                 __func__, rmid_first, rmid_last, region_number,
+                 " region_num: %d, rmids_val ptr: %p\n",
+                 __func__, rmid_first, rmid_last, region_num,
                  (void *)rmids_val);
 
         LOG_INFO("%s(): mmrc->reg_block_base_addr:\n"
@@ -301,7 +304,7 @@ get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
         rmid_offset =
             ((((rmid_first / 32) * BYTES_PER_RMID_ENTRY) + rmid_first % 8) *
              BYTES_PER_RMID_ENTRY) +
-            (uint64_t)region_number * MBM_REGION_SIZE;
+            region_num * MBM_REGION_SIZE;
 
         LOG_INFO("%s(): rmid_block_addr: %#" PRIx64 ", "
                  "rmid_offset: %#" PRIx64 "\n"
@@ -323,7 +326,7 @@ get_l3_mbm_region_rmid_range_v1(const struct pqos_erdt_mmrc *mmrc,
 
 int
 get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                  unsigned int region_number,
+                                  int region_num,
                                   unsigned int clos_number,
                                   unsigned int *value)
 {
@@ -331,15 +334,22 @@ get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
+        if (region_num < 0 || region_num >= PQOS_MAX_MEM_REGIONS) {
+                LOG_ERROR("%s: wrong region number provided: %d. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
         mem =
             (uint64_t *)pqos_mmap_read(marc->opt_bw_reg_block_base_addr, size);
 
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        LOG_INFO("%s(): marc: %p, region_number: %u, clos_number: %u "
+        LOG_INFO("%s(): marc: %p, region_num: %d, clos_number: %u "
                  "value addr: %p\n",
-                 __func__, (const void *)marc, region_number, clos_number,
+                 __func__, (const void *)marc, region_num, clos_number,
                  (void *)value);
 
         LOG_INFO("Optimal Base Addr: %#" PRIx64
@@ -347,8 +357,8 @@ get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
                  marc->opt_bw_reg_block_base_addr, marc->reg_block_size);
 
         ret = _get_clos_region_value(
-            *_get_clos_addr_by_region(mem, region_number, clos_number),
-            region_number, value);
+            *_get_clos_addr_by_region(mem, region_num, clos_number), region_num,
+            value);
         pqos_munmap(mem, size);
 
         return ret;
@@ -356,7 +366,7 @@ get_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 
 int
 set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                                  unsigned int region_number,
+                                  int region_num,
                                   unsigned int clos_number,
                                   unsigned int value)
 {
@@ -364,24 +374,30 @@ set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
+        if (region_num < 0 || region_num >= PQOS_MAX_MEM_REGIONS) {
+                LOG_ERROR("%s: wrong region number provided: %d. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
         mem =
             (uint64_t *)pqos_mmap_write(marc->opt_bw_reg_block_base_addr, size);
 
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        LOG_INFO("%s(): marc: %p, region_number: %u, clos_number: %u "
+        LOG_INFO("%s(): marc: %p, region_num: %d, clos_number: %u "
                  "value: %u\n",
-                 __func__, (const void *)marc, region_number, clos_number,
-                 value);
+                 __func__, (const void *)marc, region_num, clos_number, value);
 
         LOG_INFO("Optimal Base Addr: %#" PRIx64
                  ", Block size in 4k pages: %u\n",
                  marc->opt_bw_reg_block_base_addr, marc->reg_block_size);
 
         ret = _set_clos_region_value(
-            _get_clos_addr_by_region(mem, region_number, clos_number),
-            region_number, value);
+            _get_clos_addr_by_region(mem, region_num, clos_number), region_num,
+            value);
 
         pqos_munmap(mem, size);
 
@@ -390,7 +406,7 @@ set_mba_optimal_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 
 int
 get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                              unsigned int region_number,
+                              int region_num,
                               unsigned int clos_number,
                               unsigned int *value)
 {
@@ -398,23 +414,30 @@ get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
+        if (region_num < 0 || region_num >= PQOS_MAX_MEM_REGIONS) {
+                LOG_ERROR("%s: wrong region number provided: %d. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
         mem =
             (uint64_t *)pqos_mmap_read(marc->min_bw_reg_block_base_addr, size);
 
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        LOG_INFO("%s(): marc: %p, region_number: %u, clos_number: %u "
+        LOG_INFO("%s(): marc: %p, region_num: %d, clos_number: %u "
                  "value addr: %p\n",
-                 __func__, (const void *)marc, region_number, clos_number,
+                 __func__, (const void *)marc, region_num, clos_number,
                  (void *)value);
 
         LOG_INFO("Min Base Addr: %#" PRIx64 ", Block size in 4k pages: %u\n",
                  marc->min_bw_reg_block_base_addr, marc->reg_block_size);
 
         ret = _get_clos_region_value(
-            *_get_clos_addr_by_region(mem, region_number, clos_number),
-            region_number, value);
+            *_get_clos_addr_by_region(mem, region_num, clos_number), region_num,
+            value);
 
         pqos_munmap(mem, size);
 
@@ -423,7 +446,7 @@ get_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 
 int
 set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                              unsigned int region_number,
+                              int region_num,
                               unsigned int clos_number,
                               unsigned int value)
 {
@@ -431,23 +454,29 @@ set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
+        if (region_num < 0 || region_num >= PQOS_MAX_MEM_REGIONS) {
+                LOG_ERROR("%s: wrong region number provided: %d. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
         mem =
             (uint64_t *)pqos_mmap_write(marc->min_bw_reg_block_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        LOG_INFO("%s(): marc: %p, region_number: %u, clos_number: %u "
+        LOG_INFO("%s(): marc: %p, region_num: %d, clos_number: %u "
                  "value: %u\n",
-                 __func__, (const void *)marc, region_number, clos_number,
-                 value);
+                 __func__, (const void *)marc, region_num, clos_number, value);
 
         LOG_INFO("Minimal Base Addr: %#" PRIx64
                  ", Block size in 4k pages: %u\n",
                  marc->min_bw_reg_block_base_addr, marc->reg_block_size);
 
         ret = _set_clos_region_value(
-            _get_clos_addr_by_region(mem, region_number, clos_number),
-            region_number, value);
+            _get_clos_addr_by_region(mem, region_num, clos_number), region_num,
+            value);
 
         pqos_munmap(mem, size);
 
@@ -456,7 +485,7 @@ set_mba_min_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 
 int
 get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                              unsigned int region_number,
+                              int region_num,
                               unsigned int clos_number,
                               unsigned int *value)
 {
@@ -464,22 +493,29 @@ get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
+        if (region_num < 0 || region_num >= PQOS_MAX_MEM_REGIONS) {
+                LOG_ERROR("%s: wrong region number provided: %d. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
         mem =
             (uint64_t *)pqos_mmap_read(marc->max_bw_reg_block_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        LOG_INFO("%s(): marc: %p, region_number: %u, clos_number: %u "
+        LOG_INFO("%s(): marc: %p, region_num: %d, clos_number: %u "
                  "value: %p\n",
-                 __func__, (const void *)marc, region_number, clos_number,
+                 __func__, (const void *)marc, region_num, clos_number,
                  (void *)value);
 
         LOG_INFO("Max Base Addr: %#" PRIx64 ", Block size in 4k pages: %u\n",
                  marc->max_bw_reg_block_base_addr, marc->reg_block_size);
 
         ret = _get_clos_region_value(
-            *_get_clos_addr_by_region(mem, region_number, clos_number),
-            region_number, value);
+            *_get_clos_addr_by_region(mem, region_num, clos_number), region_num,
+            value);
         pqos_munmap(mem, size);
 
         return ret;
@@ -487,7 +523,7 @@ get_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 
 int
 set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
-                              unsigned int region_number,
+                              int region_num,
                               unsigned int clos_number,
                               unsigned int value)
 {
@@ -495,23 +531,29 @@ set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
         uint64_t *mem;
         uint64_t size = (uint64_t)marc->reg_block_size * PAGE_SIZE;
 
+        if (region_num < 0 || region_num >= PQOS_MAX_MEM_REGIONS) {
+                LOG_ERROR("%s: wrong region number provided: %d. "
+                          "Available region numbers are 0 to %d\n",
+                          __func__, region_num, PQOS_MAX_MEM_REGIONS - 1);
+                return PQOS_RETVAL_ERROR;
+        }
+
         mem =
             (uint64_t *)pqos_mmap_write(marc->max_bw_reg_block_base_addr, size);
         if (mem == NULL)
                 return PQOS_RETVAL_ERROR;
 
-        LOG_INFO("%s(): marc: %p, region_number: %u, clos_number: %u "
+        LOG_INFO("%s(): marc: %p, region_num: %d, clos_number: %u "
                  "value: %u\n",
-                 __func__, (const void *)marc, region_number, clos_number,
-                 value);
+                 __func__, (const void *)marc, region_num, clos_number, value);
 
         LOG_INFO("Maximal Base Addr: %#" PRIx64
                  ", Block size in 4k pages: %u\n",
                  marc->max_bw_reg_block_base_addr, marc->reg_block_size);
 
         ret = _set_clos_region_value(
-            _get_clos_addr_by_region(mem, region_number, clos_number),
-            region_number, value);
+            _get_clos_addr_by_region(mem, region_num, clos_number), region_num,
+            value);
 
         pqos_munmap(mem, size);
 
