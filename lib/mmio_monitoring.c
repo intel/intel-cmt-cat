@@ -1134,11 +1134,13 @@ mmio_mon_read_counter(struct pqos_mon_data *group,
                                  .mmrc;
 
                         for (j = 0; j < group->regions.num_mem_regions; j++) {
-                                unsigned region_number =
-                                    group->regions.region_num[j];
-                                get_l3_mbm_region_rmid_range_v1(
-                                    mmrc, region_number, rmid, rmid,
+                                int region_num = group->regions.region_num[j];
+
+                                ret = get_l3_mbm_region_rmid_range_v1(
+                                    mmrc, region_num, rmid, rmid,
                                     &tmp_values[j]);
+                                if (ret != PQOS_RETVAL_OK)
+                                        return ret;
 
                                 if (!is_available_l3_mbm_rmid(tmp_values[j])) {
                                         LOG_ERROR(
