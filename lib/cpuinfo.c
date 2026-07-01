@@ -489,8 +489,25 @@ cpuinfo_build_topo(struct apic_info *apic)
 
         for (i = 0; i < max_core_count; ++i)
                 if (detect_cpu(i, apic, &l_cpu->cores[core_count],
-                               max_core_count) == 0)
+                               max_core_count) == 0) {
+#ifdef __linux__
+                        /*
+                         * The APIC-derived topology does not give the
+                         * physical core id, so read it from sysfs (same
+                         * source as the OS interface). SMT siblings share
+                         * (socket, core_id). Left at 0 if unavailable.
+                         */
+                        char core_path[256];
+
+                        snprintf(core_path, sizeof(core_path) - 1,
+                                 "/sys/devices/system/cpu/cpu%u/topology/"
+                                 "core_id",
+                                 l_cpu->cores[core_count].lcore);
+                        pqos_fread_uint(core_path,
+                                        &l_cpu->cores[core_count].core_id);
+#endif
                         core_count++;
+                }
 
         if (set_affinity_mask(current_mask, max_core_count) != 0) {
                 LOG_ERROR("Couldn't restore original CPU affinity mask!");

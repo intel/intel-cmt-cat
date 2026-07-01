@@ -424,6 +424,7 @@ struct pqos_cap {
 struct pqos_coreinfo {
         unsigned lcore;    /**< logical core id */
         unsigned socket;   /**< socket id in the system */
+        unsigned core_id;  /**< physical core id within socket */
         unsigned l3_id;    /**< L3/LLC cluster id */
         unsigned l2_id;    /**< L2 cluster id */
         unsigned l3cat_id; /**< L3 CAT classes id */

@@ -192,6 +192,28 @@ os_cpuinfo_cpu_socket(unsigned lcore, unsigned *socket)
 }
 
 /**
+ * @brief Detects physical core id of \a lcore
+ *
+ * Reads topology/core_id which identifies the physical core within the
+ * package. SMT siblings share the same (socket, core_id) pair.
+ *
+ * @param [in] lcore Logical core id
+ * @param [out] core_id physical core id within the socket
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ */
+PQOS_STATIC int
+os_cpuinfo_cpu_core(unsigned lcore, unsigned *core_id)
+{
+        char buf[256];
+
+        snprintf(buf, sizeof(buf) - 1, SYSTEM_CPU "/cpu%u/topology/core_id",
+                 lcore);
+        return pqos_fread_uint(buf, core_id);
+}
+
+/**
  * @brief Detects cache topology of \a lcore
  *
  * @param [in] lcore Logical core id
@@ -309,6 +331,13 @@ os_cpuinfo_topology(void)
                         break;
                 }
 
+                retval = os_cpuinfo_cpu_core(lcore, &info->core_id);
+                if (retval != PQOS_RETVAL_OK) {
+                        LOG_ERROR("Failed to get core id for lcore %u\n",
+                                  lcore);
+                        break;
+                }
+
                 retval = os_cpuinfo_cpu_node(lcore, &info->numa);
                 if (retval != PQOS_RETVAL_OK) {
                         LOG_ERROR("Failed to get NUMA node for lcore %u\n",
@@ -326,11 +355,11 @@ os_cpuinfo_topology(void)
 
                 info->lcore = lcore;
 
-                LOG_DEBUG("Detected core %u, socket %u, "
+                LOG_DEBUG("Detected core %u, socket %u, core id %u, "
                           "NUMAnode %u, "
                           "L2 ID %u, L3 ID %u\n",
-                          info->lcore, info->socket, info->numa, info->l2_id,
-                          info->l3_id);
+                          info->lcore, info->socket, info->core_id, info->numa,
+                          info->l2_id, info->l3_id);
 
                 cpu->num_cores++;
         }
