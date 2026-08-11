@@ -121,6 +121,7 @@ struct test_data {
         struct pqos_cap_mba cap_mba;
         struct pqos_cap_mba cap_smba;
         struct pqos_cap_mon *cap_mon;
+        struct hybrid_capabilities cap_hybrid;
         struct pqos_devinfo *dev;
         struct pqos_sysconfig *sys;
         enum pqos_interface interface;
@@ -260,6 +261,15 @@ test_cap_init(struct test_data *data, unsigned technology)
 
                 cap->capabilities[cap_num].type = PQOS_CAP_TYPE_MON;
                 cap->capabilities[cap_num].u.mon = mon;
+                ++cap_num;
+        }
+        if (technology & (1 << PQOS_CAP_TYPE_HYBRID)) {
+                data->cap_hybrid.mem_size = sizeof(data->cap_hybrid);
+                data->cap_hybrid.status = HYBRID_STATUS_NO;
+                data->cap_hybrid.num_cores = 0;
+
+                cap->capabilities[cap_num].type = PQOS_CAP_TYPE_HYBRID;
+                cap->capabilities[cap_num].u.hybrid = &data->cap_hybrid;
                 ++cap_num;
         }
 
@@ -433,6 +443,7 @@ test_init_all(void **state)
         technology |= 1 << PQOS_CAP_TYPE_L3CA;
         technology |= 1 << PQOS_CAP_TYPE_L2CA;
         technology |= 1 << PQOS_CAP_TYPE_MON;
+        technology |= 1 << PQOS_CAP_TYPE_HYBRID;
 
         return test_init(state, technology);
 }

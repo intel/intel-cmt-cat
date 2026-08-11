@@ -134,6 +134,17 @@ const char *pqos_retval_to_string(int retval);
 
 /*
  * =======================================
+ * Hybrid
+ * =======================================
+ */
+/** Highest supported asymmetric RDT CPUID resource subleaf identifier */
+#define PQOS_HYBRID_MAX_RESOURCE_ID 6
+
+/** Maximum capability differences stored for one logical processor */
+#define PQOS_HYBRID_MAX_DIFFERENCES 64
+
+/*
+ * =======================================
  * Interface values
  * =======================================
  */
@@ -274,6 +285,7 @@ int pqos_fini(void);
  * - L2 cache allocation capability
  * - Memory Bandwidth Allocation
  * - Slow Memory Bandwidth Allocation
+ * - Hybrid processor capabilities
  */
 enum pqos_cap_type {
         PQOS_CAP_TYPE_MON = 0, /**< QoS monitoring */
@@ -281,7 +293,124 @@ enum pqos_cap_type {
         PQOS_CAP_TYPE_L2CA,    /**< L2 cache allocation */
         PQOS_CAP_TYPE_MBA,     /**< Memory Bandwidth Allocation */
         PQOS_CAP_TYPE_SMBA,    /**< Slow Memory Bandwidth Allocation */
+        PQOS_CAP_TYPE_HYBRID,  /**< Hybrid processor capabilities */
         PQOS_CAP_TYPE_NUMOF
+};
+
+/**
+ * Hybrid processor status
+ */
+enum hybrid_status {
+        HYBRID_STATUS_UNKNOWN = -1, /**< Hybrid status is unavailable */
+        HYBRID_STATUS_NO = 0,       /**< Processor is not hybrid */
+        HYBRID_STATUS_YES = 1       /**< Processor is hybrid */
+};
+
+/**
+ * Hybrid capability resource
+ */
+enum hybrid_resource {
+        HYBRID_RESOURCE_MONITORING, /**< Monitoring enumeration */
+        HYBRID_RESOURCE_L3_MON,     /**< L3 monitoring */
+        HYBRID_RESOURCE_ALLOCATION, /**< Allocation enumeration */
+        HYBRID_RESOURCE_L3_CAT,     /**< L3 Cache Allocation Technology */
+        HYBRID_RESOURCE_L2_CAT,     /**< L2 Cache Allocation Technology */
+        HYBRID_RESOURCE_MBA,        /**< Memory Bandwidth Allocation */
+        HYBRID_RESOURCE_CBA,        /**< Cache Bandwidth Allocation */
+        HYBRID_RESOURCE_PRIORITY    /**< Resource Priority */
+};
+
+/**
+ * Hybrid capability field
+ */
+enum hybrid_field {
+        HYBRID_FIELD_SUPPORT,             /**< Resource support */
+        HYBRID_FIELD_ENUMERATION_SUPPORT, /**< CPUID leaf support */
+        HYBRID_FIELD_MAX_RMID,            /**< Maximum RMID */
+        HYBRID_FIELD_COUNTER_WIDTH,       /**< Monitoring counter width */
+        HYBRID_FIELD_OVERFLOW,            /**< Counter overflow support */
+        HYBRID_FIELD_IO_CMT,              /**< I/O RDT CMT support */
+        HYBRID_FIELD_IO_MBM,              /**< I/O RDT MBM support */
+        HYBRID_FIELD_CONVERSION_FACTOR,   /**< Monitoring conversion factor */
+        HYBRID_FIELD_L3_OCCUP,            /**< L3 occupancy support */
+        HYBRID_FIELD_L3_TOTAL_BW,         /**< L3 total bandwidth support */
+        HYBRID_FIELD_L3_LOCAL_BW,         /**< L3 local bandwidth support */
+        HYBRID_FIELD_CBM_LENGTH,          /**< Capacity bitmask length */
+        HYBRID_FIELD_CONTENTION_MASK,     /**< Cache contention mask */
+        HYBRID_FIELD_NON_CPU_AGENT,       /**< Non-CPU agent support */
+        HYBRID_FIELD_CDP,                 /**< Code/Data Prioritization */
+        HYBRID_FIELD_NON_CONTIGUOUS_CBM,  /**< Non-contiguous CBM support */
+        HYBRID_FIELD_MAX_CLOS,            /**< Maximum class of service */
+        HYBRID_FIELD_MAX_THROTTLE,        /**< Maximum throttling value */
+        HYBRID_FIELD_PER_THREAD_CONTROL,  /**< Per-thread control */
+        HYBRID_FIELD_LINEAR_RESPONSE,     /**< Linear response support */
+        HYBRID_FIELD_MAX_LEVELS,          /**< Maximum bandwidth levels */
+        HYBRID_FIELD_BANDWIDTH_SCOPE,     /**< Bandwidth control scope */
+        HYBRID_FIELD_PER_THREAD_ENABLE,   /**< Per-thread enable */
+        HYBRID_FIELD_PER_PACKAGE_ENABLE   /**< Per-package enable */
+};
+
+/**
+ * CPUID register values used for hybrid capability enumeration
+ */
+struct hybrid_cpuid_out {
+        uint32_t eax; /**< EAX value */
+        uint32_t ebx; /**< EBX value */
+        uint32_t ecx; /**< ECX value */
+        uint32_t edx; /**< EDX value */
+};
+
+/**
+ * Difference between regular and asymmetric capability enumeration
+ */
+struct hybrid_difference {
+        enum hybrid_resource resource; /**< Resource containing the field */
+        enum hybrid_field field;       /**< Capability field */
+        uint32_t regular;              /**< Regular CPUID value */
+        uint32_t asymmetric;           /**< Asymmetric CPUID value */
+};
+
+/**
+ * Hybrid capabilities of one logical processor
+ */
+struct hybrid_core_capability {
+        unsigned mem_size;           /**< Byte size of the structure */
+        unsigned lcore;              /**< Logical processor identifier */
+        unsigned socket;             /**< Socket identifier */
+        uint32_t max_leaf;           /**< Maximum basic CPUID leaf */
+        int core_type_valid;         /**< Core type information is valid */
+        uint8_t core_type;           /**< Native core type */
+        uint32_t native_model_id;    /**< Native model identifier */
+        int mon_supported;           /**< Asymmetric monitoring is supported */
+        int alloc_supported;         /**< Asymmetric allocation is supported */
+        int regular_mon_supported;   /**< Regular monitoring is supported */
+        int regular_alloc_supported; /**< Regular allocation is supported */
+        uint32_t mon_resources;      /**< Asymmetric monitoring resources */
+        uint32_t alloc_resources;    /**< Asymmetric allocation resources */
+        uint32_t regular_mon_resources;   /**< Regular monitoring resources */
+        uint32_t regular_alloc_resources; /**< Regular allocation resources */
+        struct hybrid_cpuid_out
+            mon[PQOS_HYBRID_MAX_RESOURCE_ID + 1]; /**< Asymmetric monitoring */
+        struct hybrid_cpuid_out alloc[PQOS_HYBRID_MAX_RESOURCE_ID +
+                                      1]; /**< Asymmetric allocation */
+        struct hybrid_cpuid_out regular_mon[PQOS_HYBRID_MAX_RESOURCE_ID + 1];
+        /**< Regular monitoring enumeration */
+        struct hybrid_cpuid_out regular_alloc[PQOS_HYBRID_MAX_RESOURCE_ID + 1];
+        /**< Regular allocation enumeration */
+        unsigned num_differences; /**< Number of capability differences */
+        struct hybrid_difference differences[PQOS_HYBRID_MAX_DIFFERENCES];
+        /**< Regular and asymmetric enumeration differences */
+};
+
+/**
+ * Platform hybrid capability structure
+ */
+struct hybrid_capabilities {
+        unsigned mem_size;         /**< Byte size of the structure */
+        enum hybrid_status status; /**< Platform hybrid status */
+        unsigned num_cores;        /**< Number of logical processors */
+        struct hybrid_core_capability
+            cores[0]; /**< Per-processor capabilities */
 };
 
 /**
@@ -412,6 +541,7 @@ struct pqos_capability {
                 struct pqos_cap_l2ca *l2ca;
                 struct pqos_cap_mba *mba;
                 struct pqos_cap_mba *smba;
+                struct hybrid_capabilities *hybrid;
                 void *generic_ptr;
         } u;
 };
