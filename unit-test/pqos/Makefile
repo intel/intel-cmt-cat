@@ -195,6 +195,11 @@ $(BIN_DIR)/test_iface_select: ./test_iface_select.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_hybrid: ./test_hybrid.c $(OBJ_DIR)/hybrid.o
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) -Wl,--start-group -L$(LIB_DIR) -lpqos -lcmocka \
+		$(OBJ_DIR)/hybrid.o $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_monitor_utils: ./test_monitor_utils.c
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \

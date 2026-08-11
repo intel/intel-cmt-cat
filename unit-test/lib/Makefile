@@ -476,6 +476,12 @@ $(BIN_DIR)/test_hw_cap: test_hw_cap.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_hybrid: test_hybrid.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_hw_cap_l3ca_cdp: test_hw_cap_l3ca_cdp.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
@@ -863,6 +869,7 @@ $(BIN_DIR)/test_cap: test_cap.c $(LIB_OBJS)
 		-Wl,--wrap=iordt_fini \
 		-Wl,--wrap=hw_cap_mon_discover \
 		-Wl,--wrap=os_cap_mon_discover \
+		-Wl,--wrap=hybrid_cap_discover \
 		-Wl,--wrap=hw_cap_l3ca_discover \
 		-Wl,--wrap=os_cap_l3ca_discover \
 		-Wl,--wrap=hw_cap_l2ca_discover \
@@ -895,6 +902,7 @@ $(BIN_DIR)/test_cap_static: ./test_cap_static.c $(LIB_OBJS)
 		-Wl,--wrap=os_cap_mba_discover \
 		-Wl,--wrap=hw_cap_mon_discover \
 		-Wl,--wrap=os_cap_mon_discover \
+		-Wl,--wrap=hybrid_cap_discover \
 		-Wl,--wrap=os_cap_get_mba_ctrl \
 		-Wl,--wrap=pqos_cap_get_type \
 		-Wl,--wrap=api_init \
