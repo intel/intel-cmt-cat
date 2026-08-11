@@ -41,6 +41,7 @@
 #include "common.h"
 #include "dump.h"
 #include "dump_rmids.h"
+#include "hybrid.h"
 #include "monitor.h"
 #include "pqos.h"
 #include "profiles.h"
@@ -205,6 +206,10 @@ static int sel_print_io_devs = 0;
  * Enable displaying specific I/O device
  */
 static int sel_print_io_dev = 0;
+
+static int sel_enum_hybrid_cores = 0;
+
+static const char *sel_hybrid_core_list = NULL;
 
 static uint64_t strtouint64_base(const char *s, int default_base);
 static void narrow_iface_for_reset_mon(const char *arg);
@@ -1564,6 +1569,7 @@ static const char help_printf_short[] =
     "          [--iface=INTERFACE]\n"
     "       %s [-s] [--show]\n"
     "       %s [-d] [--display] [-D] [--display-verbose]\n"
+    "       %s [--enum-hybrid-cores[=CORE_LIST]]\n"
     "       %s [-m EVTCORES] [--mon-core=EVTCORES] |\n"
     "          [-p [EVTPIDS]] [--mon-pid[=EVTPIDS]] |\n"
     "          [--mon-uncore[=EVTUNCORE]]\n"
@@ -1597,6 +1603,9 @@ static const char help_printf_long[] =
     "  -d, --display               display supported capabilities\n"
     "  -D, --display-verbose       display supported capabilities in verbose "
     "mode\n"
+    "  --enum-hybrid-cores[=CORE_LIST]\n"
+    "          display asymmetric RDT capabilities for all online or selected\n"
+    "          logical processors (for example 0-3,8,10-12)\n"
     "  -f FILE, --config-file=FILE load commands from selected file\n"
     "  -l FILE, --log-file=FILE    log messages into selected file\n"
     "  -e CLASSDEF, --alloc-class=CLASSDEF\n"
@@ -1919,7 +1928,7 @@ print_help(const int is_long)
 {
         printf(help_printf_short, m_cmd_name, m_cmd_name, m_cmd_name,
                m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name, m_cmd_name,
-               m_cmd_name, m_cmd_name);
+               m_cmd_name, m_cmd_name, m_cmd_name);
         if (is_long)
                 printf("%s", help_printf_long);
 }
@@ -1990,6 +1999,7 @@ print_lib_version(const struct pqos_cap *p_cap)
 #define OPTION_DUMP_RMID_UPSCALING   1033
 #define OPTION_PRINT_IO_DEVS         1034
 #define OPTION_PRINT_IO_DEV          1035
+#define OPTION_ENUM_HYBRID_CORES     1036
 
 static struct option long_cmd_opts[] = {
     /* clang-format off */
@@ -2057,6 +2067,8 @@ static struct option long_cmd_opts[] = {
     {"dump-rmid-upscaling",   no_argument,       0, OPTION_DUMP_RMID_UPSCALING},
     {"print-io-devs",         no_argument,       0, OPTION_PRINT_IO_DEVS},
     {"print-io-dev",          required_argument, 0, OPTION_PRINT_IO_DEV},
+    {"enum-hybrid-cores",     optional_argument, 0,
+                                              OPTION_ENUM_HYBRID_CORES},
     {0, 0, 0, 0} /* end */
     /* clang-format on */
 };
@@ -2444,6 +2456,13 @@ main(int argc, char **argv)
                         narrow_iface(IFACE_MSR | IFACE_MMIO, "--print-io-dev");
                         selfn_print_io_dev(optarg);
                         break;
+                case OPTION_ENUM_HYBRID_CORES:
+                        sel_enum_hybrid_cores = 1;
+                        sel_hybrid_core_list = optarg;
+                        if (sel_hybrid_core_list == NULL && optind < argc &&
+                            argv[optind][0] != '-')
+                                sel_hybrid_core_list = argv[optind++];
+                        break;
                 default:
                         fprintf(stderr,
                                 "Internal error: unsupported option code %d\n",
@@ -2539,6 +2558,13 @@ main(int argc, char **argv)
                 goto error_exit_2;
         }
 
+        if (sel_enum_hybrid_cores) {
+                if (hybrid_enum_cores(p_sys, sel_hybrid_core_list) != 0)
+                        exit_val = EXIT_FAILURE;
+                else
+                        exit_val = EXIT_SUCCESS;
+                goto error_exit_2;
+        }
         l3cat_ids = pqos_cpu_get_l3cat_ids(p_sys->cpu, &l3cat_id_count);
         if (l3cat_ids == NULL) {
                 printf("Error retrieving CPU socket information!\n");

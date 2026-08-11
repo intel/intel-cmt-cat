@@ -37,6 +37,7 @@
 #include "cap.h"
 
 #include "common.h"
+#include "hybrid.h"
 #include "main.h"
 #include "pqos.h"
 
@@ -547,6 +548,8 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
 
         if (!sys || !sys->cap || !sys->cpu)
                 return;
+
+        hybrid_print_status(sys);
 
         for (i = 0; i < sys->cap->num_cap; i++)
                 switch (sys->cap->capabilities[i].type) {

@@ -2,7 +2,7 @@
 .\" First parameter, NAME, should be all caps
 .\" Second parameter, SECTION, should be 1-8, maybe w/ subsection
 .\" other parameters are allowed: see man(7), man(1)
-.TH PQOS 8 "Apr 19, 2022"
+.TH PQOS 8 "Aug 11, 2026"
 .\" Please adjust this date whenever revising the manpage.
 .\"
 .\" Some roff macros, for reference:
@@ -65,6 +65,18 @@ display supported Intel(R) Resource Director Technology/AMD PQoS capabilities
 .TP
 .B -D, \-\-display\-verbose
 display supported Intel(R) Resource Director Technology/AMD PQoS capabilities in verbose mode
+.TP
+.B \-\-enum\-hybrid\-cores[=CORE_LIST]
+display Intel(R) RDT Asymmetric Monitoring (CPUID leaf 27H) and Asymmetric
+Allocation (CPUID leaf 28H) capabilities for each selected logical processor.
+If CORE_LIST is omitted, all logical processors represented by the library are
+selected. CORE_LIST accepts comma-separated processor numbers, inclusive
+ranges, or both, for example "0-3,8,10-12". Duplicate entries are removed and
+processors are shown in ascending order. Malformed lists, reversed ranges, and
+processors unavailable in the system configuration are rejected. The library
+enumerates each processor during initialization and returns the capabilities
+through the pqos_sysconfig structure; the command only selects and displays
+that data.
 .TP
 .B \-f FILE, \-\-config\-file=FILE
 load commands from selected configuration FILE
