@@ -59,6 +59,7 @@
 #include "cpuinfo.h"
 #include "erdt.h"
 #include "hw_cap.h"
+#include "hybrid.h"
 #include "iordt.h"
 #include "lock.h"
 #include "log.h"
@@ -398,6 +399,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         struct pqos_cap_l2ca *det_l2ca = NULL;
         struct pqos_cap_mba *det_mba = NULL;
         struct pqos_cap_mba *det_smba = NULL;
+        struct hybrid_capabilities *det_hybrid = NULL;
         struct pqos_cap *_cap = NULL;
         unsigned sz = 0;
         int ret = PQOS_RETVAL_RESOURCE;
@@ -528,6 +530,26 @@ discover_capabilities(struct pqos_cap **p_cap,
                 goto error_exit;
         }
 
+        /**
+         * Hybrid processor capability init
+         */
+        ret = hybrid_cap_discover(&det_hybrid, cpu);
+        switch (ret) {
+        case PQOS_RETVAL_OK:
+                LOG_INFO("Hybrid processor capability detected: %s\n",
+                         det_hybrid->status == HYBRID_STATUS_YES ? "yes"
+                                                                 : "no");
+                sz += sizeof(struct pqos_capability);
+                break;
+        case PQOS_RETVAL_RESOURCE:
+                LOG_INFO("Hybrid processor capability not detected\n");
+                break;
+        default:
+                LOG_ERROR("Hybrid processor capability discovery failed\n");
+                ret = PQOS_RETVAL_ERROR;
+                goto error_exit;
+        }
+
         if (sz == 0) {
                 LOG_ERROR("No Platform QoS capability discovered\n");
                 ret = PQOS_RETVAL_ERROR;
@@ -593,6 +615,13 @@ discover_capabilities(struct pqos_cap **p_cap,
                 ret = PQOS_RETVAL_OK;
         }
 
+        if (det_hybrid != NULL) {
+                _cap->capabilities[_cap->num_cap].type = PQOS_CAP_TYPE_HYBRID;
+                _cap->capabilities[_cap->num_cap].u.hybrid = det_hybrid;
+                _cap->num_cap++;
+                ret = PQOS_RETVAL_OK;
+        }
+
         (*p_cap) = _cap;
 
 error_exit:
@@ -605,6 +634,10 @@ error_exit:
                         free(det_l2ca);
                 if (det_mba != NULL)
                         free(det_mba);
+                if (det_smba != NULL)
+                        free(det_smba);
+                if (det_hybrid != NULL)
+                        free(det_hybrid);
                 if (_cap != NULL)
                         free(_cap);
         }

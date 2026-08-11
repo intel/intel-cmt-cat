@@ -250,6 +250,7 @@ cppcheck:
 	utils.c utils.h \
 	cpuinfo.c cpuinfo.h os_allocation.h os_allocation.c \
 	hw_cap.h hw_cap.c \
+	hybrid.h hybrid.c \
 	hw_monitoring.h hw_monitoring.c \
 	lock.h lock.c \
 	os_cap.h os_cap.c \

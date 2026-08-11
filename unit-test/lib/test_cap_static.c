@@ -99,6 +99,14 @@ check_malloc_force_fail(void)
 
 /* ======== mock ======== */
 
+int
+__wrap_hybrid_cap_discover(struct hybrid_capabilities **cap,
+                           const struct pqos_cpuinfo *cpu)
+{
+        assert_non_null(cap);
+        assert_non_null(cpu);
+        return PQOS_RETVAL_RESOURCE;
+}
 void *
 __wrap_malloc(size_t size)
 {

@@ -41,6 +41,14 @@
 /* ======== mock ========*/
 
 int
+__wrap_hybrid_cap_discover(struct hybrid_capabilities **cap,
+                           const struct pqos_cpuinfo *cpu)
+{
+        assert_non_null(cap);
+        assert_non_null(cpu);
+        return PQOS_RETVAL_RESOURCE;
+}
+int
 __wrap_cpuinfo_init(enum pqos_interface interface __attribute__((unused)),
                     const struct pqos_cpuinfo **topology)
 {
