@@ -81,6 +81,15 @@ PQOS_LOCAL int hybrid_cap_read(hybrid_cpuid_fn cpuid,
 PQOS_LOCAL int hybrid_cap_compare(struct hybrid_core_capability *cap);
 
 /**
+ * @brief Checks whether Resource Priority is enumerated
+ *
+ * @param [in] cap Platform hybrid capabilities
+ *
+ * @return 1 if CPUID leaf 28H sub-leaf 6 is enumerated, 0 otherwise
+ */
+PQOS_LOCAL int hybrid_cap_rp_supported(const struct hybrid_capabilities *cap);
+
+/**
  * @brief Discovers hybrid capabilities for all logical processors
  *
  * The returned structure is allocated by this function and must be freed by

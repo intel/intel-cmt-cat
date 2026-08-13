@@ -539,6 +539,10 @@ discover_capabilities(struct pqos_cap **p_cap,
                 LOG_INFO("Hybrid processor capability detected: %s\n",
                          det_hybrid->status == HYBRID_STATUS_YES ? "yes"
                                                                  : "no");
+                if (hybrid_cap_rp_supported(det_hybrid))
+                        LOG_WARN("Resource Priority capability detected.\n"
+                                 "      Disable Resource Priority in BIOS "
+                                 "before using PQoS allocation features.\n");
                 sz += sizeof(struct pqos_capability);
                 break;
         case PQOS_RETVAL_RESOURCE:

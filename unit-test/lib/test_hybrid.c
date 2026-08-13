@@ -184,6 +184,25 @@ test_compare_ignores_reserved_and_reports_cbm(void **state)
         (void)state;
 }
 
+static void
+test_resource_priority_support(void **state)
+{
+        const size_t size = sizeof(struct hybrid_capabilities) +
+                            sizeof(struct hybrid_core_capability);
+        struct hybrid_capabilities *cap = calloc(1, size);
+
+        assert_non_null(cap);
+        cap->status = HYBRID_STATUS_YES;
+        cap->num_cores = 1;
+        assert_false(hybrid_cap_rp_supported(cap));
+        cap->cores[0].alloc_supported = 1;
+        assert_false(hybrid_cap_rp_supported(cap));
+        cap->cores[0].alloc_resources = 1U << 6;
+        assert_true(hybrid_cap_rp_supported(cap));
+        free(cap);
+        (void)state;
+}
+
 #ifdef __linux__
 static void
 test_discover_skips_inaccessible_topology_cpus(void **state)
@@ -224,6 +243,7 @@ main(void)
             cmocka_unit_test(test_cap_read_checks_max_leaf),
             cmocka_unit_test(test_cap_read_decodes_asymmetric_leaves),
             cmocka_unit_test(test_compare_ignores_reserved_and_reports_cbm),
+            cmocka_unit_test(test_resource_priority_support),
 #ifdef __linux__
             cmocka_unit_test(test_discover_skips_inaccessible_topology_cpus),
 #endif

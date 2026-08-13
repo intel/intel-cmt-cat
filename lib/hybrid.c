@@ -62,6 +62,7 @@ typedef cpuset_t cpu_set_t;
 #define ASYM_MONITORING_BIT (1U << 0)
 #define ASYM_ALLOCATION_BIT (1U << 1)
 #define MON_RESOURCE_MASK   (1U << 1)
+#define RP_RESOURCE_MASK    (1U << 6)
 #define ALLOC_RESOURCE_MASK                                                    \
         ((1U << 1) | (1U << 2) | (1U << 3) | (1U << 5) | (1U << 6))
 
@@ -435,6 +436,20 @@ hybrid_cap_compare(struct hybrid_core_capability *cap)
             cap, 6, HYBRID_RESOURCE_PRIORITY, priority_fields,
             sizeof(priority_fields) / sizeof(priority_fields[0]));
         return PQOS_RETVAL_OK;
+}
+
+int
+hybrid_cap_rp_supported(const struct hybrid_capabilities *cap)
+{
+        unsigned i;
+
+        if (cap == NULL || cap->status != HYBRID_STATUS_YES)
+                return 0;
+        for (i = 0; i < cap->num_cores; i++)
+                if (cap->cores[i].alloc_supported &&
+                    (cap->cores[i].alloc_resources & RP_RESOURCE_MASK) != 0)
+                        return 1;
+        return 0;
 }
 
 /**
