@@ -30,8 +30,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _HYBRID_H_
-#define _HYBRID_H_
+#ifndef __HYBRID_H__
+#define __HYBRID_H__
 
 #include "pqos.h"
 
@@ -73,4 +73,4 @@ void hybrid_print_status(const struct pqos_sysconfig *sys);
  */
 int hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection);
 
-#endif /* _HYBRID_H_ */
+#endif /* __HYBRID_H__ */
