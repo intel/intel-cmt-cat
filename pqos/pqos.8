@@ -73,8 +73,9 @@ If CORE_LIST is omitted, all logical processors represented by the library are
 selected. CORE_LIST accepts comma-separated processor numbers, inclusive
 ranges, or both, for example "0-3,8,10-12". Duplicate entries are removed and
 processors are shown in ascending order. Malformed lists, reversed ranges, and
-processors unavailable in the system configuration are rejected. The library
-enumerates each processor during initialization and returns the capabilities
+processors unavailable in the system configuration or inaccessible during
+initialization are rejected. The library enumerates each processor during
+initialization and returns the capabilities
 through the pqos_sysconfig structure; the command only selects and displays
 that data.
 .TP
