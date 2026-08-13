@@ -57,11 +57,10 @@ test_parse_core_list(void **state)
         free(cores);
 
         for (i = 0; i < sizeof(invalid) / sizeof(invalid[0]); i++) {
-                cores = NULL;
-                count = 0;
                 assert_int_equal(
                     hybrid_parse_core_list(invalid[i], &cores, &count), -1);
                 assert_null(cores);
+                assert_int_equal(count, 0);
         }
         (void)state;
 }

@@ -175,7 +175,11 @@ hybrid_parse_core_list(const char *text, unsigned **cores, unsigned *count)
         unsigned *parsed = NULL;
         unsigned parsed_count = 0;
 
-        if (text == NULL || *text == '\0' || cores == NULL || count == NULL)
+        if (cores == NULL || count == NULL)
+                return -1;
+        *cores = NULL;
+        *count = 0;
+        if (text == NULL || *text == '\0')
                 return -1;
         token = text;
         while (*token != '\0') {
