@@ -399,7 +399,7 @@ discover_capabilities(struct pqos_cap **p_cap,
         struct pqos_cap_l2ca *det_l2ca = NULL;
         struct pqos_cap_mba *det_mba = NULL;
         struct pqos_cap_mba *det_smba = NULL;
-        struct hybrid_capabilities *det_hybrid = NULL;
+        struct pqos_hybrid_capabilities *det_hybrid = NULL;
         struct pqos_cap *_cap = NULL;
         unsigned sz = 0;
         int ret = PQOS_RETVAL_RESOURCE;
@@ -537,8 +537,8 @@ discover_capabilities(struct pqos_cap **p_cap,
         switch (ret) {
         case PQOS_RETVAL_OK:
                 LOG_INFO("Hybrid processor capability detected: %s\n",
-                         det_hybrid->status == HYBRID_STATUS_YES ? "yes"
-                                                                 : "no");
+                         det_hybrid->status == PQOS_HYBRID_STATUS_YES ? "yes"
+                                                                      : "no");
                 if (hybrid_cap_rp_supported(det_hybrid))
                         LOG_WARN("Resource Priority capability detected.\n"
                                  "      Disable Resource Priority in BIOS "

@@ -49,7 +49,7 @@
  */
 typedef int (*hybrid_cpuid_fn)(unsigned leaf,
                                unsigned subleaf,
-                               struct hybrid_cpuid_out *out,
+                               struct pqos_hybrid_cpuid_out *out,
                                void *context);
 
 /**
@@ -67,7 +67,7 @@ typedef int (*hybrid_cpuid_fn)(unsigned leaf,
  */
 PQOS_LOCAL int hybrid_cap_read(hybrid_cpuid_fn cpuid,
                                void *context,
-                               struct hybrid_core_capability *cap);
+                               struct pqos_hybrid_core_capability *cap);
 
 /**
  * @brief Compares regular and asymmetric capability enumeration
@@ -78,7 +78,7 @@ PQOS_LOCAL int hybrid_cap_read(hybrid_cpuid_fn cpuid,
  * @retval PQOS_RETVAL_OK Capabilities compared successfully
  * @retval PQOS_RETVAL_PARAM Invalid parameter
  */
-PQOS_LOCAL int hybrid_cap_compare(struct hybrid_core_capability *cap);
+PQOS_LOCAL int hybrid_cap_compare(struct pqos_hybrid_core_capability *cap);
 
 /**
  * @brief Checks whether Resource Priority is enumerated
@@ -87,7 +87,8 @@ PQOS_LOCAL int hybrid_cap_compare(struct hybrid_core_capability *cap);
  *
  * @return 1 if CPUID leaf 28H sub-leaf 6 is enumerated, 0 otherwise
  */
-PQOS_LOCAL int hybrid_cap_rp_supported(const struct hybrid_capabilities *cap);
+PQOS_LOCAL int
+hybrid_cap_rp_supported(const struct pqos_hybrid_capabilities *cap);
 
 /**
  * @brief Discovers hybrid capabilities for all logical processors
@@ -105,7 +106,7 @@ PQOS_LOCAL int hybrid_cap_rp_supported(const struct hybrid_capabilities *cap);
  * @retval PQOS_RETVAL_ERROR Affinity restoration or CPUID enumeration failed
  * @retval PQOS_RETVAL_UNAVAILABLE No topology CPUs are accessible
  */
-PQOS_LOCAL int hybrid_cap_discover(struct hybrid_capabilities **cap,
+PQOS_LOCAL int hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                                    const struct pqos_cpuinfo *cpu);
 
 #endif /* __PQOS_HYBRID_H__ */

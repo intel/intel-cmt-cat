@@ -249,7 +249,7 @@ error:
  * @return Hybrid capability on success
  * @retval NULL Hybrid capability is unavailable
  */
-static const struct hybrid_capabilities *
+static const struct pqos_hybrid_capabilities *
 get_hybrid_cap(const struct pqos_sysconfig *sys)
 {
         const struct pqos_capability *item = NULL;
@@ -266,12 +266,12 @@ get_hybrid_cap(const struct pqos_sysconfig *sys)
 void
 hybrid_print_status(const struct pqos_sysconfig *sys)
 {
-        const struct hybrid_capabilities *cap = get_hybrid_cap(sys);
+        const struct pqos_hybrid_capabilities *cap = get_hybrid_cap(sys);
 
         printf("Hybrid Processor: %s\n",
-               cap == NULL || cap->status == HYBRID_STATUS_UNKNOWN
+               cap == NULL || cap->status == PQOS_HYBRID_STATUS_UNKNOWN
                    ? "Unknown"
-                   : (cap->status == HYBRID_STATUS_YES ? "Yes" : "No"));
+                   : (cap->status == PQOS_HYBRID_STATUS_YES ? "Yes" : "No"));
 }
 
 /**
@@ -283,7 +283,7 @@ hybrid_print_status(const struct pqos_sysconfig *sys)
  * @return Selected register value
  */
 static uint32_t
-register_value(const struct hybrid_cpuid_out *out, unsigned reg)
+register_value(const struct pqos_hybrid_cpuid_out *out, unsigned reg)
 {
         if (reg == 0)
                 return out->eax;
@@ -302,7 +302,7 @@ register_value(const struct hybrid_cpuid_out *out, unsigned reg)
  * @param [in] count Number of field definitions
  */
 static void
-print_fields(const struct hybrid_cpuid_out *out,
+print_fields(const struct pqos_hybrid_cpuid_out *out,
              const struct field_definition *fields,
              unsigned count)
 {
@@ -324,7 +324,7 @@ print_fields(const struct hybrid_cpuid_out *out,
  * @param [in] cap Logical processor hybrid capability
  */
 static void
-print_monitoring(const struct hybrid_core_capability *cap)
+print_monitoring(const struct pqos_hybrid_core_capability *cap)
 {
         printf("Asymmetric Monitoring:\n  CPUID Leaf 0x27: %s\n",
                cap->mon_supported ? "Supported" : "Not supported");
@@ -348,7 +348,7 @@ print_monitoring(const struct hybrid_core_capability *cap)
  * @param [in] field_count Number of field definitions
  */
 static void
-print_alloc_resource(const struct hybrid_core_capability *cap,
+print_alloc_resource(const struct pqos_hybrid_core_capability *cap,
                      unsigned id,
                      const char *name,
                      const struct field_definition *fields,
@@ -367,7 +367,7 @@ print_alloc_resource(const struct hybrid_core_capability *cap,
  * @param [in] cap Logical processor hybrid capability
  */
 static void
-print_allocation(const struct hybrid_core_capability *cap)
+print_allocation(const struct pqos_hybrid_core_capability *cap)
 {
         printf("Asymmetric Allocation:\n  CPUID Leaf 0x28: %s\n",
                cap->alloc_supported ? "Supported" : "Not supported");
@@ -411,7 +411,7 @@ core_type_name(uint8_t type)
  * @return Resource display name
  */
 static const char *
-resource_name(enum hybrid_resource resource)
+resource_name(enum pqos_hybrid_resource resource)
 {
         static const char *const names[] = {
             "Monitoring", "L3 Monitoring", "Allocation", "L3 CAT",
@@ -430,7 +430,7 @@ resource_name(enum hybrid_resource resource)
  * @return Field display name
  */
 static const char *
-field_name(enum hybrid_field field)
+field_name(enum pqos_hybrid_field field)
 {
         static const char *const names[] = {"Support",
                                             "Regular enumeration support",
@@ -468,7 +468,7 @@ field_name(enum hybrid_field field)
  * @param [in] cap Logical processor hybrid capability
  */
 static void
-print_capabilities(const struct hybrid_core_capability *cap)
+print_capabilities(const struct pqos_hybrid_core_capability *cap)
 {
         unsigned i;
 
@@ -504,8 +504,8 @@ print_capabilities(const struct hybrid_core_capability *cap)
  * @return Logical processor capability on success
  * @retval NULL Logical processor is not represented
  */
-static const struct hybrid_core_capability *
-find_core(const struct hybrid_capabilities *cap, unsigned lcore)
+static const struct pqos_hybrid_core_capability *
+find_core(const struct pqos_hybrid_capabilities *cap, unsigned lcore)
 {
         unsigned i;
 
@@ -518,7 +518,7 @@ find_core(const struct hybrid_capabilities *cap, unsigned lcore)
 int
 hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection)
 {
-        const struct hybrid_capabilities *cap = get_hybrid_cap(sys);
+        const struct pqos_hybrid_capabilities *cap = get_hybrid_cap(sys);
         unsigned *selected = NULL;
         unsigned selected_count = 0, i;
         int ret = 0;
@@ -529,7 +529,7 @@ hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection)
                 return -1;
         }
         hybrid_print_status(sys);
-        if (cap->status != HYBRID_STATUS_YES) {
+        if (cap->status != PQOS_HYBRID_STATUS_YES) {
                 printf("Asymmetric RDT capability enumeration is not "
                        "available on this processor.\n");
                 return 0;
@@ -547,7 +547,7 @@ hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection)
                 return 0;
         }
         for (i = 0; i < selected_count; i++) {
-                const struct hybrid_core_capability *core =
+                const struct pqos_hybrid_core_capability *core =
                     find_core(cap, selected[i]);
 
                 if (core == NULL) {

@@ -42,7 +42,7 @@
 struct result {
         unsigned leaf;
         unsigned subleaf;
-        struct hybrid_cpuid_out out;
+        struct pqos_hybrid_cpuid_out out;
 };
 
 struct cpuid_data {
@@ -84,7 +84,7 @@ add(struct cpuid_data *data,
 static int
 read_cpuid(unsigned leaf,
            unsigned subleaf,
-           struct hybrid_cpuid_out *out,
+           struct pqos_hybrid_cpuid_out *out,
            void *context)
 {
         const struct cpuid_data *data = context;
@@ -103,7 +103,7 @@ static void
 test_cap_read_checks_max_leaf(void **state)
 {
         struct cpuid_data data = {0};
-        struct hybrid_core_capability cap;
+        struct pqos_hybrid_core_capability cap;
 
         add(&data, 0, 0, 0x10, 0, 0, 0);
         add(&data, 7, 0, 1, 0, 0, 1U << 15);
@@ -119,7 +119,7 @@ static void
 test_cap_read_decodes_asymmetric_leaves(void **state)
 {
         struct cpuid_data data = {0};
-        struct hybrid_core_capability cap;
+        struct pqos_hybrid_core_capability cap;
 
         add(&data, 0, 0, 0x28, 0, 0, 0);
         add(&data, 7, 0, 1, 0, 0, 1U << 15);
@@ -164,7 +164,7 @@ static void
 test_compare_ignores_reserved_and_reports_cbm(void **state)
 {
         struct cpuid_data data = {0};
-        struct hybrid_core_capability cap;
+        struct pqos_hybrid_core_capability cap;
 
         add_matching_data(&data);
         assert_int_equal(hybrid_cap_read(read_cpuid, &data, &cap),
@@ -177,8 +177,10 @@ test_compare_ignores_reserved_and_reports_cbm(void **state)
                          PQOS_RETVAL_OK);
         assert_int_equal(hybrid_cap_compare(&cap), PQOS_RETVAL_OK);
         assert_int_equal(cap.num_differences, 1);
-        assert_int_equal(cap.differences[0].resource, HYBRID_RESOURCE_L2_CAT);
-        assert_int_equal(cap.differences[0].field, HYBRID_FIELD_CBM_LENGTH);
+        assert_int_equal(cap.differences[0].resource,
+                         PQOS_HYBRID_RESOURCE_L2_CAT);
+        assert_int_equal(cap.differences[0].field,
+                         PQOS_HYBRID_FIELD_CBM_LENGTH);
         assert_int_equal(cap.differences[0].regular, 16);
         assert_int_equal(cap.differences[0].asymmetric, 8);
         (void)state;
@@ -187,12 +189,12 @@ test_compare_ignores_reserved_and_reports_cbm(void **state)
 static void
 test_resource_priority_support(void **state)
 {
-        const size_t size = sizeof(struct hybrid_capabilities) +
-                            sizeof(struct hybrid_core_capability);
-        struct hybrid_capabilities *cap = calloc(1, size);
+        const size_t size = sizeof(struct pqos_hybrid_capabilities) +
+                            sizeof(struct pqos_hybrid_core_capability);
+        struct pqos_hybrid_capabilities *cap = calloc(1, size);
 
         assert_non_null(cap);
-        cap->status = HYBRID_STATUS_YES;
+        cap->status = PQOS_HYBRID_STATUS_YES;
         cap->num_cores = 1;
         assert_false(hybrid_cap_rp_supported(cap));
         cap->cores[0].alloc_supported = 1;
@@ -210,7 +212,7 @@ test_discover_skips_inaccessible_topology_cpus(void **state)
         const size_t size =
             sizeof(struct pqos_cpuinfo) + sizeof(struct pqos_coreinfo);
         struct pqos_cpuinfo *cpu = calloc(1, size);
-        struct hybrid_capabilities *cap = NULL;
+        struct pqos_hybrid_capabilities *cap = NULL;
 
         assert_non_null(cpu);
         cpu->num_cores = 1;
@@ -227,7 +229,7 @@ static void
 test_non_hybrid_is_not_a_hybrid_capability(void **state)
 {
         struct cpuid_data data = {0};
-        struct hybrid_core_capability cap;
+        struct pqos_hybrid_core_capability cap;
 
         add(&data, 0, 0, 7, 0, 0, 0);
         add(&data, 7, 0, 0, 0, 0, 0);

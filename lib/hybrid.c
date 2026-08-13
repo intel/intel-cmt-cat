@@ -67,7 +67,7 @@ typedef cpuset_t cpu_set_t;
         ((1U << 1) | (1U << 2) | (1U << 3) | (1U << 5) | (1U << 6))
 
 struct field_definition {
-        enum hybrid_field field;
+        enum pqos_hybrid_field field;
         unsigned reg;
         uint32_t mask;
         unsigned shift;
@@ -75,46 +75,46 @@ struct field_definition {
 };
 
 static const struct field_definition mon_l3_fields[] = {
-    {HYBRID_FIELD_COUNTER_WIDTH, 0, 0xffU, 0, 24},
-    {HYBRID_FIELD_OVERFLOW, 0, 1U << 8, 8, 0},
-    {HYBRID_FIELD_IO_CMT, 0, 1U << 9, 9, 0},
-    {HYBRID_FIELD_IO_MBM, 0, 1U << 10, 10, 0},
-    {HYBRID_FIELD_CONVERSION_FACTOR, 1, UINT32_MAX, 0, 0},
-    {HYBRID_FIELD_MAX_RMID, 2, UINT32_MAX, 0, 0},
-    {HYBRID_FIELD_L3_OCCUP, 3, 1U, 0, 0},
-    {HYBRID_FIELD_L3_TOTAL_BW, 3, 1U << 1, 1, 0},
-    {HYBRID_FIELD_L3_LOCAL_BW, 3, 1U << 2, 2, 0}};
+    {PQOS_HYBRID_FIELD_COUNTER_WIDTH, 0, 0xffU, 0, 24},
+    {PQOS_HYBRID_FIELD_OVERFLOW, 0, 1U << 8, 8, 0},
+    {PQOS_HYBRID_FIELD_IO_CMT, 0, 1U << 9, 9, 0},
+    {PQOS_HYBRID_FIELD_IO_MBM, 0, 1U << 10, 10, 0},
+    {PQOS_HYBRID_FIELD_CONVERSION_FACTOR, 1, UINT32_MAX, 0, 0},
+    {PQOS_HYBRID_FIELD_MAX_RMID, 2, UINT32_MAX, 0, 0},
+    {PQOS_HYBRID_FIELD_L3_OCCUP, 3, 1U, 0, 0},
+    {PQOS_HYBRID_FIELD_L3_TOTAL_BW, 3, 1U << 1, 1, 0},
+    {PQOS_HYBRID_FIELD_L3_LOCAL_BW, 3, 1U << 2, 2, 0}};
 
 static const struct field_definition cat_l3_fields[] = {
-    {HYBRID_FIELD_CBM_LENGTH, 0, 0x1fU, 0, 1},
-    {HYBRID_FIELD_CONTENTION_MASK, 1, UINT32_MAX, 0, 0},
-    {HYBRID_FIELD_NON_CPU_AGENT, 2, 1U << 1, 1, 0},
-    {HYBRID_FIELD_CDP, 2, 1U << 2, 2, 0},
-    {HYBRID_FIELD_NON_CONTIGUOUS_CBM, 2, 1U << 3, 3, 0},
-    {HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
+    {PQOS_HYBRID_FIELD_CBM_LENGTH, 0, 0x1fU, 0, 1},
+    {PQOS_HYBRID_FIELD_CONTENTION_MASK, 1, UINT32_MAX, 0, 0},
+    {PQOS_HYBRID_FIELD_NON_CPU_AGENT, 2, 1U << 1, 1, 0},
+    {PQOS_HYBRID_FIELD_CDP, 2, 1U << 2, 2, 0},
+    {PQOS_HYBRID_FIELD_NON_CONTIGUOUS_CBM, 2, 1U << 3, 3, 0},
+    {PQOS_HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
 
 static const struct field_definition cat_l2_fields[] = {
-    {HYBRID_FIELD_CBM_LENGTH, 0, 0x1fU, 0, 1},
-    {HYBRID_FIELD_CONTENTION_MASK, 1, UINT32_MAX, 0, 0},
-    {HYBRID_FIELD_CDP, 2, 1U << 2, 2, 0},
-    {HYBRID_FIELD_NON_CONTIGUOUS_CBM, 2, 1U << 3, 3, 0},
-    {HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
+    {PQOS_HYBRID_FIELD_CBM_LENGTH, 0, 0x1fU, 0, 1},
+    {PQOS_HYBRID_FIELD_CONTENTION_MASK, 1, UINT32_MAX, 0, 0},
+    {PQOS_HYBRID_FIELD_CDP, 2, 1U << 2, 2, 0},
+    {PQOS_HYBRID_FIELD_NON_CONTIGUOUS_CBM, 2, 1U << 3, 3, 0},
+    {PQOS_HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
 
 static const struct field_definition mba_fields[] = {
-    {HYBRID_FIELD_MAX_THROTTLE, 0, 0xfffU, 0, 1},
-    {HYBRID_FIELD_PER_THREAD_CONTROL, 2, 1U, 0, 0},
-    {HYBRID_FIELD_LINEAR_RESPONSE, 2, 1U << 2, 2, 0},
-    {HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
+    {PQOS_HYBRID_FIELD_MAX_THROTTLE, 0, 0xfffU, 0, 1},
+    {PQOS_HYBRID_FIELD_PER_THREAD_CONTROL, 2, 1U, 0, 0},
+    {PQOS_HYBRID_FIELD_LINEAR_RESPONSE, 2, 1U << 2, 2, 0},
+    {PQOS_HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
 
 static const struct field_definition cba_fields[] = {
-    {HYBRID_FIELD_MAX_LEVELS, 0, 0xffU, 0, 1},
-    {HYBRID_FIELD_BANDWIDTH_SCOPE, 0, 0xfU << 8, 8, 0},
-    {HYBRID_FIELD_LINEAR_RESPONSE, 2, 1U << 3, 3, 0},
-    {HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
+    {PQOS_HYBRID_FIELD_MAX_LEVELS, 0, 0xffU, 0, 1},
+    {PQOS_HYBRID_FIELD_BANDWIDTH_SCOPE, 0, 0xfU << 8, 8, 0},
+    {PQOS_HYBRID_FIELD_LINEAR_RESPONSE, 2, 1U << 3, 3, 0},
+    {PQOS_HYBRID_FIELD_MAX_CLOS, 3, 0xffffU, 0, 0}};
 
 static const struct field_definition priority_fields[] = {
-    {HYBRID_FIELD_PER_THREAD_ENABLE, 0, 1U, 0, 0},
-    {HYBRID_FIELD_PER_PACKAGE_ENABLE, 0, 1U << 1, 1, 0}};
+    {PQOS_HYBRID_FIELD_PER_THREAD_ENABLE, 0, 1U, 0, 0},
+    {PQOS_HYBRID_FIELD_PER_PACKAGE_ENABLE, 0, 1U << 1, 1, 0}};
 
 /**
  * @brief Executes CPUID on the current logical processor
@@ -130,7 +130,7 @@ static const struct field_definition priority_fields[] = {
 static int
 native_cpuid(unsigned leaf,
              unsigned subleaf,
-             struct hybrid_cpuid_out *out,
+             struct pqos_hybrid_cpuid_out *out,
              void *context)
 {
         struct cpuid_out result;
@@ -162,7 +162,7 @@ read_subleaves(hybrid_cpuid_fn cpuid,
                void *context,
                unsigned leaf,
                uint32_t resources,
-               struct hybrid_cpuid_out *out)
+               struct pqos_hybrid_cpuid_out *out)
 {
         unsigned id;
 
@@ -197,7 +197,7 @@ read_capability(hybrid_cpuid_fn cpuid,
                 int resources_in_ebx,
                 uint32_t resource_mask,
                 uint32_t *resources,
-                struct hybrid_cpuid_out *out)
+                struct pqos_hybrid_cpuid_out *out)
 {
         if (!enabled)
                 return PQOS_RETVAL_OK;
@@ -211,9 +211,9 @@ read_capability(hybrid_cpuid_fn cpuid,
 int
 hybrid_cap_read(hybrid_cpuid_fn cpuid,
                 void *context,
-                struct hybrid_core_capability *cap)
+                struct pqos_hybrid_core_capability *cap)
 {
-        struct hybrid_cpuid_out leaf0, leaf7 = {0}, leaf7_1 = {0};
+        struct pqos_hybrid_cpuid_out leaf0, leaf7 = {0}, leaf7_1 = {0};
 
         if (cpuid == NULL || cap == NULL)
                 return PQOS_RETVAL_PARAM;
@@ -230,7 +230,7 @@ hybrid_cap_read(hybrid_cpuid_fn cpuid,
         if ((leaf7.edx & HYBRID_BIT) == 0)
                 return PQOS_RETVAL_RESOURCE;
         if (cap->max_leaf >= CPUID_NATIVE_MODEL) {
-                struct hybrid_cpuid_out model;
+                struct pqos_hybrid_cpuid_out model;
 
                 if (cpuid(CPUID_NATIVE_MODEL, 0, &model, context) != 0)
                         return PQOS_RETVAL_ERROR;
@@ -280,7 +280,7 @@ hybrid_cap_read(hybrid_cpuid_fn cpuid,
  * @return Selected register value
  */
 static uint32_t
-register_value(const struct hybrid_cpuid_out *out, unsigned reg)
+register_value(const struct pqos_hybrid_cpuid_out *out, unsigned reg)
 {
         if (reg == 0)
                 return out->eax;
@@ -300,7 +300,7 @@ register_value(const struct hybrid_cpuid_out *out, unsigned reg)
  * @return Decoded field value
  */
 static uint32_t
-field_value(const struct hybrid_cpuid_out *out,
+field_value(const struct pqos_hybrid_cpuid_out *out,
             const struct field_definition *field)
 {
         return ((register_value(out, field->reg) & field->mask) >>
@@ -318,13 +318,13 @@ field_value(const struct hybrid_cpuid_out *out,
  * @param [in] asymmetric Asymmetric CPUID value
  */
 static void
-add_difference(struct hybrid_core_capability *cap,
-               enum hybrid_resource resource,
-               enum hybrid_field field,
+add_difference(struct pqos_hybrid_core_capability *cap,
+               enum pqos_hybrid_resource resource,
+               enum pqos_hybrid_field field,
                uint32_t regular,
                uint32_t asymmetric)
 {
-        struct hybrid_difference *difference;
+        struct pqos_hybrid_difference *difference;
 
         if (regular == asymmetric)
                 return;
@@ -352,12 +352,12 @@ add_difference(struct hybrid_core_capability *cap,
  * @param [in] resource Compared resource
  */
 static void
-compare_fields(struct hybrid_core_capability *cap,
-               const struct hybrid_cpuid_out *regular,
-               const struct hybrid_cpuid_out *asymmetric,
+compare_fields(struct pqos_hybrid_core_capability *cap,
+               const struct pqos_hybrid_cpuid_out *regular,
+               const struct pqos_hybrid_cpuid_out *asymmetric,
                const struct field_definition *fields,
                unsigned num_fields,
-               enum hybrid_resource resource)
+               enum pqos_hybrid_resource resource)
 {
         unsigned i;
 
@@ -377,16 +377,16 @@ compare_fields(struct hybrid_core_capability *cap,
  * @param [in] num_fields Number of field definitions
  */
 static void
-compare_alloc_resource(struct hybrid_core_capability *cap,
+compare_alloc_resource(struct pqos_hybrid_core_capability *cap,
                        unsigned id,
-                       enum hybrid_resource resource,
+                       enum pqos_hybrid_resource resource,
                        const struct field_definition *fields,
                        unsigned num_fields)
 {
         const int regular = (cap->regular_alloc_resources & (1U << id)) != 0;
         const int asymmetric = (cap->alloc_resources & (1U << id)) != 0;
 
-        add_difference(cap, resource, HYBRID_FIELD_SUPPORT, regular,
+        add_difference(cap, resource, PQOS_HYBRID_FIELD_SUPPORT, regular,
                        asymmetric);
         if (regular && asymmetric)
                 compare_fields(cap, &cap->regular_alloc[id], &cap->alloc[id],
@@ -394,56 +394,56 @@ compare_alloc_resource(struct hybrid_core_capability *cap,
 }
 
 int
-hybrid_cap_compare(struct hybrid_core_capability *cap)
+hybrid_cap_compare(struct pqos_hybrid_core_capability *cap)
 {
         int regular, asymmetric;
 
         if (cap == NULL)
                 return PQOS_RETVAL_PARAM;
         cap->num_differences = 0;
-        add_difference(cap, HYBRID_RESOURCE_MONITORING,
-                       HYBRID_FIELD_ENUMERATION_SUPPORT,
+        add_difference(cap, PQOS_HYBRID_RESOURCE_MONITORING,
+                       PQOS_HYBRID_FIELD_ENUMERATION_SUPPORT,
                        cap->regular_mon_supported, cap->mon_supported);
         if (cap->mon_supported && cap->regular_mon_supported)
-                add_difference(cap, HYBRID_RESOURCE_MONITORING,
-                               HYBRID_FIELD_MAX_RMID, cap->regular_mon[0].ebx,
-                               cap->mon[0].ebx);
+                add_difference(cap, PQOS_HYBRID_RESOURCE_MONITORING,
+                               PQOS_HYBRID_FIELD_MAX_RMID,
+                               cap->regular_mon[0].ebx, cap->mon[0].ebx);
 
         regular = (cap->regular_mon_resources & MON_RESOURCE_MASK) != 0;
         asymmetric = (cap->mon_resources & MON_RESOURCE_MASK) != 0;
-        add_difference(cap, HYBRID_RESOURCE_L3_MON, HYBRID_FIELD_SUPPORT,
-                       regular, asymmetric);
+        add_difference(cap, PQOS_HYBRID_RESOURCE_L3_MON,
+                       PQOS_HYBRID_FIELD_SUPPORT, regular, asymmetric);
         if (regular && asymmetric)
                 compare_fields(cap, &cap->regular_mon[1], &cap->mon[1],
                                mon_l3_fields,
                                sizeof(mon_l3_fields) / sizeof(mon_l3_fields[0]),
-                               HYBRID_RESOURCE_L3_MON);
+                               PQOS_HYBRID_RESOURCE_L3_MON);
 
-        add_difference(cap, HYBRID_RESOURCE_ALLOCATION,
-                       HYBRID_FIELD_ENUMERATION_SUPPORT,
+        add_difference(cap, PQOS_HYBRID_RESOURCE_ALLOCATION,
+                       PQOS_HYBRID_FIELD_ENUMERATION_SUPPORT,
                        cap->regular_alloc_supported, cap->alloc_supported);
-        compare_alloc_resource(cap, 1, HYBRID_RESOURCE_L3_CAT, cat_l3_fields,
-                               sizeof(cat_l3_fields) /
-                                   sizeof(cat_l3_fields[0]));
-        compare_alloc_resource(cap, 2, HYBRID_RESOURCE_L2_CAT, cat_l2_fields,
-                               sizeof(cat_l2_fields) /
-                                   sizeof(cat_l2_fields[0]));
-        compare_alloc_resource(cap, 3, HYBRID_RESOURCE_MBA, mba_fields,
+        compare_alloc_resource(
+            cap, 1, PQOS_HYBRID_RESOURCE_L3_CAT, cat_l3_fields,
+            sizeof(cat_l3_fields) / sizeof(cat_l3_fields[0]));
+        compare_alloc_resource(
+            cap, 2, PQOS_HYBRID_RESOURCE_L2_CAT, cat_l2_fields,
+            sizeof(cat_l2_fields) / sizeof(cat_l2_fields[0]));
+        compare_alloc_resource(cap, 3, PQOS_HYBRID_RESOURCE_MBA, mba_fields,
                                sizeof(mba_fields) / sizeof(mba_fields[0]));
-        compare_alloc_resource(cap, 5, HYBRID_RESOURCE_CBA, cba_fields,
+        compare_alloc_resource(cap, 5, PQOS_HYBRID_RESOURCE_CBA, cba_fields,
                                sizeof(cba_fields) / sizeof(cba_fields[0]));
         compare_alloc_resource(
-            cap, 6, HYBRID_RESOURCE_PRIORITY, priority_fields,
+            cap, 6, PQOS_HYBRID_RESOURCE_PRIORITY, priority_fields,
             sizeof(priority_fields) / sizeof(priority_fields[0]));
         return PQOS_RETVAL_OK;
 }
 
 int
-hybrid_cap_rp_supported(const struct hybrid_capabilities *cap)
+hybrid_cap_rp_supported(const struct pqos_hybrid_capabilities *cap)
 {
         unsigned i;
 
-        if (cap == NULL || cap->status != HYBRID_STATUS_YES)
+        if (cap == NULL || cap->status != PQOS_HYBRID_STATUS_YES)
                 return 0;
         for (i = 0; i < cap->num_cores; i++)
                 if (cap->cores[i].alloc_supported &&
@@ -520,7 +520,7 @@ static int
 read_core(unsigned lcore,
           unsigned max_cores,
           const cpu_set_t *original,
-          struct hybrid_core_capability *cap)
+          struct pqos_hybrid_core_capability *cap)
 {
         const size_t set_size = CPU_ALLOC_SIZE(max_cores);
         cpu_set_t *target = CPU_ALLOC(max_cores);
@@ -552,10 +552,10 @@ read_core(unsigned lcore,
 }
 
 int
-hybrid_cap_discover(struct hybrid_capabilities **cap,
+hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                     const struct pqos_cpuinfo *cpu)
 {
-        struct hybrid_capabilities *hybrid = NULL;
+        struct pqos_hybrid_capabilities *hybrid = NULL;
         cpu_set_t *original = NULL;
         unsigned max_cores = 0, i;
         size_t size;
@@ -592,10 +592,10 @@ hybrid_cap_discover(struct hybrid_capabilities **cap,
         }
 
         hybrid->mem_size = size;
-        hybrid->status = HYBRID_STATUS_YES;
+        hybrid->status = PQOS_HYBRID_STATUS_YES;
         hybrid->num_cores = 0;
         for (i = 0; i < cpu->num_cores; i++) {
-                struct hybrid_core_capability *core;
+                struct pqos_hybrid_core_capability *core;
 
                 if (!CPU_ISSET_S(cpu->cores[i].lcore, CPU_ALLOC_SIZE(max_cores),
                                  original)) {
@@ -611,7 +611,7 @@ hybrid_cap_discover(struct hybrid_capabilities **cap,
                 if (ret != PQOS_RETVAL_OK) {
                         if (ret == PQOS_RETVAL_RESOURCE &&
                             hybrid->num_cores == 0) {
-                                hybrid->status = HYBRID_STATUS_NO;
+                                hybrid->status = PQOS_HYBRID_STATUS_NO;
                                 hybrid->num_cores = 0;
                                 break;
                         }
@@ -627,7 +627,8 @@ hybrid_cap_discover(struct hybrid_capabilities **cap,
                         goto error;
                 hybrid->num_cores++;
         }
-        if (hybrid->status == HYBRID_STATUS_YES && hybrid->num_cores == 0) {
+        if (hybrid->status == PQOS_HYBRID_STATUS_YES &&
+            hybrid->num_cores == 0) {
                 LOG_INFO("No topology CPUs are available to this process\n");
                 ret = PQOS_RETVAL_UNAVAILABLE;
                 goto error;

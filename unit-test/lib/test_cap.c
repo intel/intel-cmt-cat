@@ -41,7 +41,7 @@
 /* ======== mock ========*/
 
 int
-__wrap_hybrid_cap_discover(struct hybrid_capabilities **cap,
+__wrap_hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
                            const struct pqos_cpuinfo *cpu)
 {
         assert_non_null(cap);

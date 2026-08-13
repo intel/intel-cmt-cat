@@ -70,17 +70,17 @@ test_enum_cores_uses_sysconfig_capability(void **state)
 {
         const size_t cap_size =
             sizeof(struct pqos_cap) + sizeof(struct pqos_capability);
-        const size_t hybrid_size = sizeof(struct hybrid_capabilities) +
-                                   sizeof(struct hybrid_core_capability);
-        struct hybrid_capabilities *hybrid = calloc(1, hybrid_size);
+        const size_t hybrid_size = sizeof(struct pqos_hybrid_capabilities) +
+                                   sizeof(struct pqos_hybrid_core_capability);
+        struct pqos_hybrid_capabilities *hybrid = calloc(1, hybrid_size);
         struct pqos_cap *cap = calloc(1, cap_size);
         struct pqos_sysconfig sys = {0};
-        struct hybrid_core_capability *core;
+        struct pqos_hybrid_core_capability *core;
 
         assert_non_null(hybrid);
         assert_non_null(cap);
         hybrid->mem_size = hybrid_size;
-        hybrid->status = HYBRID_STATUS_YES;
+        hybrid->status = PQOS_HYBRID_STATUS_YES;
         hybrid->num_cores = 1;
         core = &hybrid->cores[0];
         core->mem_size = sizeof(*core);
