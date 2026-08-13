@@ -115,6 +115,7 @@ compare_unsigned(const void *a, const void *b)
  *
  * @param [in,out] cores Logical processor identifier array
  * @param [in,out] count Number of array elements
+ * @param [in,out] capacity Number of allocated array elements
  * @param [in] value Logical processor identifier to append
  *
  * @return Operation status
@@ -122,17 +123,27 @@ compare_unsigned(const void *a, const void *b)
  * @retval -1 Invalid value, capacity exceeded or allocation failure
  */
 static int
-append_core(unsigned **cores, unsigned *count, unsigned value)
+append_core(unsigned **cores,
+            unsigned *count,
+            unsigned *capacity,
+            unsigned value)
 {
-        unsigned *resized;
-
         if (value > INT_MAX || *count >= MAX_SELECTED_CORES)
                 return -1;
-        resized = realloc(*cores, ((size_t)*count + 1) * sizeof(**cores));
-        if (resized == NULL)
-                return -1;
-        resized[*count] = value;
-        *cores = resized;
+        if (*count == *capacity) {
+                unsigned new_capacity = *capacity == 0 ? 16U : *capacity * 2U;
+                unsigned *resized;
+
+                if (new_capacity > MAX_SELECTED_CORES)
+                        new_capacity = MAX_SELECTED_CORES;
+                resized =
+                    realloc(*cores, (size_t)new_capacity * sizeof(**cores));
+                if (resized == NULL)
+                        return -1;
+                *cores = resized;
+                *capacity = new_capacity;
+        }
+        (*cores)[*count] = value;
         (*count)++;
         return 0;
 }
@@ -173,7 +184,7 @@ hybrid_parse_core_list(const char *text, unsigned **cores, unsigned *count)
 {
         const char *token;
         unsigned *parsed = NULL;
-        unsigned parsed_count = 0;
+        unsigned parsed_count = 0, parsed_capacity = 0;
 
         if (cores == NULL || count == NULL)
                 return -1;
@@ -198,7 +209,8 @@ hybrid_parse_core_list(const char *text, unsigned **cores, unsigned *count)
 
                 if (dash == NULL) {
                         if (parse_core_number(token, end, &first) != 0 ||
-                            append_core(&parsed, &parsed_count, first) != 0)
+                            append_core(&parsed, &parsed_count,
+                                        &parsed_capacity, first) != 0)
                                 goto error;
                 } else {
                         if (parse_core_number(token, dash, &first) != 0 ||
@@ -210,7 +222,7 @@ hybrid_parse_core_list(const char *text, unsigned **cores, unsigned *count)
                                 goto error;
                         for (value = first;; value++) {
                                 if (append_core(&parsed, &parsed_count,
-                                                value) != 0)
+                                                &parsed_capacity, value) != 0)
                                         goto error;
                                 if (value == last)
                                         break;
