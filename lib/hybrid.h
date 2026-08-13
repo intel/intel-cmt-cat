@@ -93,7 +93,8 @@ PQOS_LOCAL int hybrid_cap_compare(struct hybrid_core_capability *cap);
  * @retval PQOS_RETVAL_OK Discovery completed successfully
  * @retval PQOS_RETVAL_PARAM Invalid parameter
  * @retval PQOS_RETVAL_RESOURCE Allocation failed
- * @retval PQOS_RETVAL_ERROR Affinity or CPUID enumeration failed
+ * @retval PQOS_RETVAL_ERROR Affinity restoration or CPUID enumeration failed
+ * @retval PQOS_RETVAL_UNAVAILABLE No topology CPUs are accessible
  */
 PQOS_LOCAL int hybrid_cap_discover(struct hybrid_capabilities **cap,
                                    const struct pqos_cpuinfo *cpu);

@@ -518,10 +518,11 @@ read_core(unsigned lcore,
         CPU_ZERO_S(set_size, target);
         CPU_SET_S(lcore, set_size, target);
         if (set_affinity_mask(target, max_cores) != 0) {
-                LOG_ERROR("Unable to set affinity to logical core %u: %s\n",
-                          lcore, strerror(errno));
+                LOG_INFO("Logical core %u is unavailable to this process: "
+                         "%s\n",
+                         lcore, strerror(errno));
                 CPU_FREE(target);
-                return PQOS_RETVAL_ERROR;
+                return PQOS_RETVAL_UNAVAILABLE;
         }
 
         ret = hybrid_cap_read(native_cpuid, NULL, cap);
@@ -547,6 +548,7 @@ hybrid_cap_discover(struct hybrid_capabilities **cap,
 
         if (cap == NULL || cpu == NULL || cpu->num_cores == 0)
                 return PQOS_RETVAL_PARAM;
+        *cap = NULL;
         for (i = 0; i < cpu->num_cores; i++) {
                 if (cpu->cores[i].lcore == UINT_MAX) {
                         LOG_ERROR("Logical core identifier is too large\n");
@@ -570,19 +572,30 @@ hybrid_cap_discover(struct hybrid_capabilities **cap,
         if (get_affinity_mask(original, max_cores) != 0) {
                 LOG_ERROR("Unable to retrieve CPU affinity: %s\n",
                           strerror(errno));
-                ret = PQOS_RETVAL_ERROR;
+                ret = PQOS_RETVAL_UNAVAILABLE;
                 goto error;
         }
 
         hybrid->mem_size = size;
         hybrid->status = HYBRID_STATUS_YES;
-        hybrid->num_cores = cpu->num_cores;
+        hybrid->num_cores = 0;
         for (i = 0; i < cpu->num_cores; i++) {
-                struct hybrid_core_capability *core = &hybrid->cores[i];
+                struct hybrid_core_capability *core;
 
+                if (!CPU_ISSET_S(cpu->cores[i].lcore, CPU_ALLOC_SIZE(max_cores),
+                                 original)) {
+                        LOG_INFO("Logical core %u is unavailable to this "
+                                 "process\n",
+                                 cpu->cores[i].lcore);
+                        continue;
+                }
+                core = &hybrid->cores[hybrid->num_cores];
                 ret = read_core(cpu->cores[i].lcore, max_cores, original, core);
+                if (ret == PQOS_RETVAL_UNAVAILABLE)
+                        continue;
                 if (ret != PQOS_RETVAL_OK) {
-                        if (ret == PQOS_RETVAL_RESOURCE && i == 0) {
+                        if (ret == PQOS_RETVAL_RESOURCE &&
+                            hybrid->num_cores == 0) {
                                 hybrid->status = HYBRID_STATUS_NO;
                                 hybrid->num_cores = 0;
                                 break;
@@ -597,6 +610,12 @@ hybrid_cap_discover(struct hybrid_capabilities **cap,
                 ret = hybrid_cap_compare(core);
                 if (ret != PQOS_RETVAL_OK)
                         goto error;
+                hybrid->num_cores++;
+        }
+        if (hybrid->status == HYBRID_STATUS_YES && hybrid->num_cores == 0) {
+                LOG_INFO("No topology CPUs are available to this process\n");
+                ret = PQOS_RETVAL_UNAVAILABLE;
+                goto error;
         }
 
         CPU_FREE(original);

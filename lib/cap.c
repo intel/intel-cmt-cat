@@ -544,6 +544,9 @@ discover_capabilities(struct pqos_cap **p_cap,
         case PQOS_RETVAL_RESOURCE:
                 LOG_INFO("Hybrid processor capability not detected\n");
                 break;
+        case PQOS_RETVAL_UNAVAILABLE:
+                LOG_INFO("Hybrid processor capability unavailable\n");
+                break;
         default:
                 LOG_ERROR("Hybrid processor capability discovery failed\n");
                 ret = PQOS_RETVAL_ERROR;

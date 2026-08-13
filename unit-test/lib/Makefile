@@ -479,6 +479,7 @@ $(BIN_DIR)/test_hw_cap: test_hw_cap.c $(LIB_OBJS)
 $(BIN_DIR)/test_hybrid: test_hybrid.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
+		-Wl,--wrap=sched_getaffinity \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

@@ -33,6 +33,10 @@
 #include "hybrid.h"
 #include "test.h"
 
+#ifdef __linux__
+#include <sched.h>
+#endif
+
 #define MAX_RESULTS 24
 
 struct result {
@@ -45,6 +49,17 @@ struct cpuid_data {
         struct result results[MAX_RESULTS];
         unsigned count;
 };
+
+#ifdef __linux__
+int
+__wrap_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask)
+{
+        (void)pid;
+        CPU_ZERO_S(cpusetsize, mask);
+        CPU_SET_S(0, cpusetsize, mask);
+        return 0;
+}
+#endif
 
 static void
 add(struct cpuid_data *data,
@@ -169,6 +184,26 @@ test_compare_ignores_reserved_and_reports_cbm(void **state)
         (void)state;
 }
 
+#ifdef __linux__
+static void
+test_discover_skips_inaccessible_topology_cpus(void **state)
+{
+        const size_t size =
+            sizeof(struct pqos_cpuinfo) + sizeof(struct pqos_coreinfo);
+        struct pqos_cpuinfo *cpu = calloc(1, size);
+        struct hybrid_capabilities *cap = NULL;
+
+        assert_non_null(cpu);
+        cpu->num_cores = 1;
+        cpu->cores[0].lcore = 1;
+        assert_int_equal(hybrid_cap_discover(&cap, cpu),
+                         PQOS_RETVAL_UNAVAILABLE);
+        assert_null(cap);
+        free(cpu);
+        (void)state;
+}
+#endif
+
 static void
 test_non_hybrid_is_not_a_hybrid_capability(void **state)
 {
@@ -189,6 +224,9 @@ main(void)
             cmocka_unit_test(test_cap_read_checks_max_leaf),
             cmocka_unit_test(test_cap_read_decodes_asymmetric_leaves),
             cmocka_unit_test(test_compare_ignores_reserved_and_reports_cbm),
+#ifdef __linux__
+            cmocka_unit_test(test_discover_skips_inaccessible_topology_cpus),
+#endif
             cmocka_unit_test(test_non_hybrid_is_not_a_hybrid_capability)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
