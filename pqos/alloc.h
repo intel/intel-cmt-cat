@@ -161,6 +161,34 @@ int alloc_apply(const struct pqos_capability *cap_l3ca,
                 const struct pqos_cpuinfo *cpu,
                 const struct pqos_devinfo *dev);
 
+/**
+ * @brief Checks the allocation options selected via selfn_xxxx() functions
+ *
+ * The --alloc-domain-id, --alloc-mem-regions, --alloc-opt-bw, --alloc-min-bw
+ * and --alloc-max-bw options only say where and how a class definition given
+ * with -e applies. Without -e nothing reads them, and the utility fell through
+ * to monitoring, so a forgotten or mistyped -e turned an allocation command
+ * into a monitoring session that runs until it is interrupted.
+ *
+ * Called once the command line is known and before the utility does anything
+ * with it: nothing is reset, printed or applied, and the library is not yet up,
+ * so every such command line is rejected without a side effect. Only the option
+ * conflicts that resolve_interface() reports can be printed before this, and
+ * those exit where they are found. alloc_apply(), where the options are read,
+ * is reached far later: -R has reset the configuration by then, and -s, -d,
+ * --print-mem-regions and the dump options have printed and exited without ever
+ * getting there.
+ *
+ * @param [in] class_pending whether a class definition is still to be added,
+ *             which -c/--profile does through profile_l3ca_apply() after this
+ *             check has run
+ *
+ * @return Operation status
+ * @retval 0 the selected options are usable
+ * @retval -1 allocation options were selected without a class
+ */
+int alloc_check_options(const int class_pending);
+
 #ifdef __cplusplus
 }
 #endif

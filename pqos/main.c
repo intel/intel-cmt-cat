@@ -2369,6 +2369,18 @@ main(int argc, char **argv)
          * resolve_interface() with a unified error message.
          */
         resolve_interface();
+
+        /*
+         * The allocation options are checked here, with the interface, rather
+         * than where they are applied: everything below this point either
+         * resets the configuration, prints it and exits, or opens the library,
+         * so a command line missing its -e has to be rejected first. A profile
+         * counts as the class it will become: profile_l3ca_apply() turns it
+         * into -e definitions, but only once the library is up.
+         */
+        if (alloc_check_options(sel_allocation_profile != NULL) != 0)
+                return EXIT_FAILURE;
+
         cfg.verbose = sel_verbose_mode;
         cfg.interface = sel_interface;
         /**

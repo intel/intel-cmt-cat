@@ -1022,6 +1022,82 @@ set_allocation_class(char *str,
 }
 
 /**
+ * The options that only say where and how a class definition given with -e
+ * applies, each next to where the parser records that it was given. Naming them
+ * once keeps what is detected and what is reported from drifting apart, and
+ * lets the report name the options that were actually on the command line.
+ */
+static const struct {
+        const char *name;    /**< as it is written on the command line */
+        const int *selected; /**< non-zero once the option has been parsed */
+} alloc_class_options[] = {
+    {"--alloc-domain-id", &sel_alloc_domain_id.num_domain_ids},
+    {"--alloc-mem-regions", &sel_alloc_mem_regions.num_mem_regions},
+    {"--alloc-opt-bw", &sel_alloc_mem_regions.opt_bw_limit_flag},
+    {"--alloc-min-bw", &sel_alloc_mem_regions.min_bw_limit_flag},
+    {"--alloc-max-bw", &sel_alloc_mem_regions.max_bw_limit_flag}};
+
+/**
+ * Room for every name in alloc_class_options with ", " between them. The five
+ * of them take 90 bytes, and a name added to the table that no longer fits
+ * shortens the list rather than running past its end.
+ */
+#define ALLOC_CLASS_OPTIONS_SIZE 128
+
+/**
+ * @brief Whether any of the class-dependent allocation options was given
+ *
+ * @return whether one of them selects anything
+ */
+static int
+alloc_options_selected(void)
+{
+        unsigned i;
+
+        for (i = 0; i < DIM(alloc_class_options); i++)
+                if (*alloc_class_options[i].selected != 0)
+                        return 1;
+
+        return 0;
+}
+
+int
+alloc_check_options(const int class_pending)
+{
+        char given[ALLOC_CLASS_OPTIONS_SIZE] = {0};
+        size_t used = 0;
+        unsigned i;
+
+        if (class_pending || sel_alloc_opt_num > 0)
+                return 0;
+
+        for (i = 0; i < DIM(alloc_class_options); i++) {
+                int len;
+
+                if (*alloc_class_options[i].selected == 0)
+                        continue;
+
+                len =
+                    snprintf(given + used, sizeof(given) - used, "%s%s",
+                             used > 0 ? ", " : "", alloc_class_options[i].name);
+                if (len < 0 || (size_t)len >= sizeof(given) - used)
+                        break;
+
+                used += (size_t)len;
+        }
+
+        if (used == 0)
+                return 0;
+
+        printf("-e/--alloc-class option is missing in command line. Nothing "
+               "reads %s without it: an allocation option only says where and "
+               "how a class definition applies!\n",
+               given);
+
+        return -1;
+}
+
+/**
  * @brief Parse and apply selected allocation options
  *
  * @param cpu CPU topology structure
@@ -2762,7 +2838,8 @@ alloc_apply(const struct pqos_capability *cap_l3ca,
                 }
         } else {
                 if (sel_assoc_core_num > 0 || sel_alloc_opt_num > 0 ||
-                    sel_assoc_pid_num > 0 || sel_assoc_channel_num > 0) {
+                    sel_assoc_pid_num > 0 || sel_assoc_channel_num > 0 ||
+                    alloc_options_selected()) {
                         printf("Allocation capability not detected!\n");
                         return -1;
                 }

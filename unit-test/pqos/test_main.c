@@ -326,6 +326,46 @@ test_unknown_option_returns_failure(void **state)
         (void)state;
 }
 
+/**
+ * Where the missing class is caught is the guarantee, so this drives the
+ * whole utility rather than the check on its own: the interface is named
+ * explicitly, which is what lets resolve_interface() take the override path
+ * and settle on MMIO without asking the platform, so a machine with no MMIO
+ * runs this too. That the library was never opened is asserted through the
+ * initialization error it would otherwise report here, since the check would
+ * still reject this command line from further down - only by then -R has
+ * reset the configuration and the print-and-exit options have printed.
+ */
+static void
+test_alloc_option_without_class_returns_failure(void **state)
+{
+        char *argv[4] = {NULL};
+        int ret = 0;
+
+        /* strdup() because getopt_long() and the parsers write to argv */
+        argv[0] = strdup("pqos");
+        argv[1] = strdup("--iface=mmio");
+        argv[2] = strdup("--alloc-domain-id=0");
+        assert_non_null(argv[0]);
+        assert_non_null(argv[1]);
+        assert_non_null(argv[2]);
+
+        optind = 1;
+        opterr = 0;
+        run_function(appmain, ret, 3, argv);
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_has_text(
+            "-e/--alloc-class option is missing in command line"));
+        assert_true(output_has_text("--alloc-domain-id"));
+        assert_false(output_has_text("Error initializing PQoS library"));
+
+        free(argv[0]);
+        free(argv[1]);
+        free(argv[2]);
+        (void)state;
+}
+
 int
 main(void)
 {
@@ -346,7 +386,9 @@ main(void)
                 test_parse_mem_regions_separates_id_range_from_capacity),
             cmocka_unit_test(test_parse_pci_id_accepts_valid_fields),
             cmocka_unit_test(test_parse_pci_id_rejects_invalid_fields),
-            cmocka_unit_test(test_unknown_option_returns_failure)};
+            cmocka_unit_test(test_unknown_option_returns_failure),
+            /* last: its command line stays in the selection globals */
+            cmocka_unit_test(test_alloc_option_without_class_returns_failure)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

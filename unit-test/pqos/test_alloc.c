@@ -566,6 +566,25 @@ test_alloc_apply_cap_not_detected(void **state)
 }
 
 static void
+test_alloc_apply_cap_not_detected_alloc_option(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret = 0;
+
+        /* an --alloc-* option with no -e and no allocation capability at all.
+         * Without the check this reported nothing and the options were ignored.
+         */
+        sel_alloc_domain_id.num_domain_ids = 1;
+
+        run_function(alloc_apply, ret, NULL, NULL, NULL, NULL, data->cpu_info,
+                     NULL);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("Allocation capability not detected!"));
+
+        sel_alloc_domain_id.num_domain_ids = 0;
+}
+
+static void
 test_alloc_apply_mba(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
@@ -1489,12 +1508,144 @@ fini_sel_assoc_tab(void **state)
         return 0;
 }
 
+/* ======== alloc_check_options ======== */
+
+static void
+test_alloc_check_options_without_options(void **state)
+{
+        int ret = -1;
+
+        UNUSED_ARG(state);
+
+        /* neither -e nor an --alloc-* option: nothing to report, so a plain
+         * monitoring command line is not disturbed
+         */
+        run_function(alloc_check_options, ret, 0);
+        assert_int_equal(ret, 0);
+        assert_false(output_has_text("-e/--alloc-class"));
+}
+
+static void
+test_alloc_check_options_with_class(void **state)
+{
+        int ret = -1;
+
+        UNUSED_ARG(state);
+
+        /* set static data, as -e llc:1=0xf --alloc-domain-id=0 would */
+        sel_alloc_opt_num = 1;
+        sel_alloc_domain_id.num_domain_ids = 1;
+
+        run_function(alloc_check_options, ret, 0);
+        assert_int_equal(ret, 0);
+        assert_false(output_has_text("-e/--alloc-class"));
+
+        sel_alloc_opt_num = 0;
+        sel_alloc_domain_id.num_domain_ids = 0;
+}
+
+static void
+test_alloc_check_options_with_profile(void **state)
+{
+        int ret = -1;
+
+        UNUSED_ARG(state);
+
+        /* set static data, as -c CFG0 --alloc-domain-id=0 would: the profile
+         * becomes -e definitions in profile_l3ca_apply(), which runs after the
+         * check, so the options do have a class to describe
+         */
+        sel_alloc_domain_id.num_domain_ids = 1;
+
+        run_function(alloc_check_options, ret, 1);
+        assert_int_equal(ret, 0);
+        assert_false(output_has_text("-e/--alloc-class"));
+
+        sel_alloc_domain_id.num_domain_ids = 0;
+}
+
+static void
+test_alloc_check_options_rejects_domain_without_class(void **state)
+{
+        int ret = 0;
+
+        UNUSED_ARG(state);
+
+        /* set static data, as --alloc-domain-id=0 would */
+        sel_alloc_domain_id.num_domain_ids = 1;
+
+        run_function(alloc_check_options, ret, 0);
+        assert_int_equal(ret, -1);
+        assert_true(
+            output_has_text("-e/--alloc-class option is missing in command"));
+
+        sel_alloc_domain_id.num_domain_ids = 0;
+}
+
+static void
+test_alloc_check_options_rejects_regions_without_class(void **state)
+{
+        int ret = 0;
+
+        UNUSED_ARG(state);
+
+        /* set static data, as --alloc-mem-regions=0 would */
+        sel_alloc_mem_regions.num_mem_regions = 1;
+
+        run_function(alloc_check_options, ret, 0);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("--alloc-mem-regions"));
+        /* the report names the option that was given, and only that one */
+        assert_false(output_has_text("--alloc-domain-id"));
+
+        sel_alloc_mem_regions.num_mem_regions = 0;
+}
+
+static void
+test_alloc_check_options_rejects_bandwidth_flag_without_class(void **state)
+{
+        /* each bandwidth limit flag on its own, as --alloc-opt-bw,
+         * --alloc-min-bw and --alloc-max-bw would set them
+         */
+        int *flags[] = {&sel_alloc_mem_regions.opt_bw_limit_flag,
+                        &sel_alloc_mem_regions.min_bw_limit_flag,
+                        &sel_alloc_mem_regions.max_bw_limit_flag};
+        /* what each of them is called in the report */
+        static const char *const names[] = {"--alloc-opt-bw", "--alloc-min-bw",
+                                            "--alloc-max-bw"};
+        int ret = 0;
+        unsigned i;
+
+        UNUSED_ARG(state);
+
+        for (i = 0; i < DIM(flags); i++) {
+                *flags[i] = 1;
+
+                run_function(alloc_check_options, ret, 0);
+                assert_int_equal(ret, -1);
+                assert_true(output_has_text(names[i]));
+                assert_true(output_has_text("-e/--alloc-class option is "
+                                            "missing in command line"));
+
+                *flags[i] = 0;
+        }
+}
+
 int
 main(void)
 {
         int result = 0;
 
         const struct CMUnitTest tests[] = {
+            cmocka_unit_test(test_alloc_check_options_without_options),
+            cmocka_unit_test(test_alloc_check_options_with_class),
+            cmocka_unit_test(test_alloc_check_options_with_profile),
+            cmocka_unit_test(
+                test_alloc_check_options_rejects_domain_without_class),
+            cmocka_unit_test(
+                test_alloc_check_options_rejects_regions_without_class),
+            cmocka_unit_test(
+                test_alloc_check_options_rejects_bandwidth_flag_without_class),
             cmocka_unit_test(test_selfn_allocation_assoc_negative),
             cmocka_unit_test_teardown(test_selfn_allocation_assoc_llc,
                                       cleanup_assoc_core_and_pid_tabs),
@@ -1531,7 +1682,8 @@ main(void)
             cmocka_unit_test(test_alloc_apply_set_pid_to_class_id_neg)};
 
         const struct CMUnitTest tests_need_cpu_info[] = {
-            cmocka_unit_test(test_alloc_apply_cap_not_detected)};
+            cmocka_unit_test(test_alloc_apply_cap_not_detected),
+            cmocka_unit_test(test_alloc_apply_cap_not_detected_alloc_option)};
 
         result += cmocka_run_group_tests(tests, NULL, NULL);
         result += cmocka_run_group_tests(tests_need_all_caps, init_all_caps,
