@@ -73,7 +73,7 @@ extern "C" {
 #define MAX_DOMAIN_IDS 128
 #define MAX_RMIDS      1024
 
-#define PQOS_SYSTEM_CPU  "/sys/devices/system/cpu"
+#define PQOS_SYSTEM_CPU "/sys/devices/system/cpu"
 
 /**
  * @brief Wrapper around fopen() that additionally checks if a given path
@@ -128,7 +128,11 @@ void parse_error(const char *arg, const char *note) __attribute__((noreturn));
 int pqos_parse_uint64(const char *text, uint64_t *value);
 
 /**
- * @brief Parse a comma-separated list of memory regions
+ * @brief Parse a list of memory regions
+ *
+ * An entry of the list is a single region or a first-last range, so "0",
+ * "0,2" and "0-2" are all accepted, as they are by the allocation and the
+ * domain options of the same commands.
  *
  * @param [in] arg memory region list
  * @param [out] regions parsed memory regions
@@ -193,8 +197,7 @@ int pqos_filter_cpu(const struct dirent *dir);
  *
  * @return directory names comparison result
  */
-int
-pqos_cpu_sort(const struct dirent **dir1, const struct dirent **dir2);
+int pqos_cpu_sort(const struct dirent **dir1, const struct dirent **dir2);
 
 #ifdef __cplusplus
 }

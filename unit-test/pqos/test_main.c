@@ -366,6 +366,63 @@ test_alloc_option_without_class_returns_failure(void **state)
         (void)state;
 }
 
+static void
+test_parse_mem_regions_accepts_ranges(void **state)
+{
+        int regions[PQOS_MAX_MEM_REGIONS];
+
+        /* a range covers every region it spans, in order */
+        assert_int_equal(pqos_parse_mem_regions("0-2", regions, DIM(regions)),
+                         3);
+        assert_int_equal(regions[0], 0);
+        assert_int_equal(regions[1], 1);
+        assert_int_equal(regions[2], 2);
+
+        /* a range of one region is the region */
+        assert_int_equal(pqos_parse_mem_regions("1-1", regions, DIM(regions)),
+                         1);
+        assert_int_equal(regions[0], 1);
+
+        /* ranges and single values mix in one list */
+        assert_int_equal(pqos_parse_mem_regions("0,2-3", regions, DIM(regions)),
+                         3);
+        assert_int_equal(regions[0], 0);
+        assert_int_equal(regions[1], 2);
+        assert_int_equal(regions[2], 3);
+
+        (void)state;
+}
+
+static void
+test_parse_mem_regions_rejects_invalid_ranges(void **state)
+{
+        int regions[PQOS_MAX_MEM_REGIONS];
+        int short_regions[2];
+
+        /* a range that ends before it starts */
+        assert_int_equal(pqos_parse_mem_regions("2-1", regions, DIM(regions)),
+                         -1);
+        /* a range that leaves the region space */
+        assert_int_equal(pqos_parse_mem_regions("0-4", regions, DIM(regions)),
+                         -1);
+        /* an overlap between a range and a value repeats a region */
+        assert_int_equal(pqos_parse_mem_regions("0-1,1", regions, DIM(regions)),
+                         -1);
+        /* neither end may be missing or unparsable */
+        assert_int_equal(pqos_parse_mem_regions("0-", regions, DIM(regions)),
+                         -1);
+        assert_int_equal(pqos_parse_mem_regions("-1", regions, DIM(regions)),
+                         -1);
+        assert_int_equal(
+            pqos_parse_mem_regions("0-invalid", regions, DIM(regions)), -1);
+        /* a range that does not fit the caller's array */
+        assert_int_equal(
+            pqos_parse_mem_regions("0-2", short_regions, DIM(short_regions)),
+            -1);
+
+        (void)state;
+}
+
 int
 main(void)
 {
@@ -382,6 +439,8 @@ main(void)
             cmocka_unit_test(test_parse_uint64_formats_and_errors),
             cmocka_unit_test(test_parse_mem_regions_replaces_previous_values),
             cmocka_unit_test(test_parse_mem_regions_rejects_invalid_lists),
+            cmocka_unit_test(test_parse_mem_regions_accepts_ranges),
+            cmocka_unit_test(test_parse_mem_regions_rejects_invalid_ranges),
             cmocka_unit_test(
                 test_parse_mem_regions_separates_id_range_from_capacity),
             cmocka_unit_test(test_parse_pci_id_accepts_valid_fields),

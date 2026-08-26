@@ -176,42 +176,78 @@ pqos_parse_mem_regions(const char *arg,
         for (token = strsep(&next, ","); token != NULL;
              token = strsep(&next, ",")) {
                 uint64_t value;
+                uint64_t first;
+                uint64_t last;
+                char *dash;
 
-                if (count >= max_regions) {
-                        fprintf(stderr,
-                                "Too many memory regions in '%s'; maximum is "
-                                "%u\n",
-                                arg, max_regions);
-                        free(copy);
-                        return -1;
-                }
-
-                if (pqos_parse_uint64(token, &value) != 0) {
-                        fprintf(stderr, "Invalid memory region '%s' in '%s'\n",
-                                token, arg);
-                        free(copy);
-                        return -1;
-                }
-                if (value >= PQOS_MAX_MEM_REGIONS) {
-                        fprintf(stderr,
-                                "Memory region %" PRIu64
-                                " is out of range [0, %u]\n",
-                                value, PQOS_MAX_MEM_REGIONS - 1);
-                        free(copy);
-                        return -1;
-                }
-
-                for (i = 0; i < count; i++)
-                        if ((uint64_t)regions[i] == value) {
+                /* a token is a single region or a first-last range, the forms
+                 * the allocation and the domain options of the same command
+                 * lines already take. A leading dash is not a range, so it is
+                 * left to the single value path to reject.
+                 */
+                dash = strchr(token, '-');
+                if (dash != NULL && dash != token) {
+                        *dash = '\0';
+                        if (pqos_parse_uint64(token, &first) != 0 ||
+                            pqos_parse_uint64(dash + 1, &last) != 0) {
                                 fprintf(stderr,
-                                        "Memory region %" PRIu64
-                                        " is selected more than once\n",
-                                        value);
+                                        "Invalid memory region range '%s-%s' "
+                                        "in '%s'\n",
+                                        token, dash + 1, arg);
+                                free(copy);
+                                return -1;
+                        }
+                        if (last < first) {
+                                fprintf(stderr,
+                                        "Memory region range '%" PRIu64
+                                        "-%" PRIu64 "' ends before it starts\n",
+                                        first, last);
+                                free(copy);
+                                return -1;
+                        }
+                } else {
+                        if (pqos_parse_uint64(token, &first) != 0) {
+                                fprintf(stderr,
+                                        "Invalid memory region '%s' in '%s'\n",
+                                        token, arg);
+                                free(copy);
+                                return -1;
+                        }
+                        last = first;
+                }
+
+                for (value = first; value <= last; value++) {
+                        if (count >= max_regions) {
+                                fprintf(stderr,
+                                        "Too many memory regions in '%s'; "
+                                        "maximum is %u\n",
+                                        arg, max_regions);
                                 free(copy);
                                 return -1;
                         }
 
-                regions[count++] = (int)value;
+                        if (value >= PQOS_MAX_MEM_REGIONS) {
+                                fprintf(stderr,
+                                        "Memory region %" PRIu64
+                                        " is out of range [0, %u]\n",
+                                        value, PQOS_MAX_MEM_REGIONS - 1);
+                                free(copy);
+                                return -1;
+                        }
+
+                        for (i = 0; i < count; i++)
+                                if ((uint64_t)regions[i] == value) {
+                                        fprintf(stderr,
+                                                "Memory region %" PRIu64
+                                                " is selected more than "
+                                                "once\n",
+                                                value);
+                                        free(copy);
+                                        return -1;
+                                }
+
+                        regions[count++] = (int)value;
+                }
         }
 
         free(copy);
