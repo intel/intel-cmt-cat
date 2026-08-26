@@ -62,6 +62,12 @@
 #define MBA_MINIMUM_CONTROL_WINDOW 2
 #define MBA_MAXIMUM_CONTROL_WINDOW 4
 
+/* the suggested allocation example shows one mask next to another, so it needs
+ * two classes and enough cache ways to give each of them a mask the hardware
+ * accepts
+ */
+#define EXAMPLE_NUM_CLASSES 2
+
 struct pci_dev {
         uint16_t segment; /**< PCI segment */
         uint16_t bdf;     /**< Bus Device Function */
@@ -1030,10 +1036,120 @@ release_io_dev_selection(void)
 }
 
 /**
+ * @brief Print an allocation example the platform can run
+ *
+ * The classes and the ways are taken from the counts printed above the example,
+ * so the command can be run as it stands. The example this replaced was fixed
+ * at CLOS 14 and 10 with the masks 0x000f and 0x0ff0, which needs twelve cache
+ * ways: on a device that has eight the second allocation failed and left the
+ * first one applied.
+ *
+ * @param [in] num_classes number of classes of service the domain reports
+ * @param [in] num_ways number of L3 cache ways the domain reports
+ * @param [in] min_cbm_bits fewest bits a mask may have, or 0 where no minimum
+ *             could be established, in which case nothing is suggested
+ * @param [in] domain_id device domain of the example, or -1 for an interface
+ *             whose allocation command does not name one
+ */
+static void
+print_alloc_ways_example(unsigned num_classes,
+                         unsigned num_ways,
+                         unsigned min_cbm_bits,
+                         int domain_id)
+{
+        unsigned first_ways;
+        unsigned second_ways;
+        unsigned first_clos;
+        unsigned second_clos;
+        unsigned long long first_mask;
+        unsigned long long second_mask;
+
+        /* nothing is suggested where the narrowest usable mask is unknown,
+         * since a suggestion built on a guess is what this replaced
+         */
+        if (min_cbm_bits == 0)
+                return;
+
+        /* a class for each half, and enough ways that the smaller half still
+         * holds the fewest bits a mask may have
+         */
+        if (num_classes < EXAMPLE_NUM_CLASSES ||
+            num_ways < EXAMPLE_NUM_CLASSES * min_cbm_bits)
+                return;
+
+        first_ways = num_ways / EXAMPLE_NUM_CLASSES;
+        second_ways = num_ways - first_ways;
+
+        /* the highest classes, to leave CLOS 0 alone where there are more
+         * than two of them
+         */
+        first_clos = num_classes - 1;
+        second_clos = num_classes - 2;
+        first_mask = (1ULL << first_ways) - 1;
+        second_mask = ((1ULL << second_ways) - 1) << first_ways;
+
+        printf("\tFor example, set CLOS %u to the first %u L3 cache ways and "
+               "CLOS %u to the next %u L3 cache ways",
+               first_clos, first_ways, second_clos, second_ways);
+        if (domain_id >= 0)
+                printf(" in Device Domain 0x%x", (unsigned)domain_id);
+        printf("\n");
+
+        printf("\tpqos ");
+        if (domain_id >= 0)
+                printf("--alloc-domain-id=0x%x ", (unsigned)domain_id);
+        printf("-e \"llc:%u=%#llx;llc:%u=%#llx;\"\n", first_clos, first_mask,
+               second_clos, second_mask);
+}
+
+/**
+ * @brief Determine the fewest bits an L3 CAT mask may have
+ *
+ * On the MSR interface pqos_l3ca_get_min_cbm_bits() is not a passive query: it
+ * finds a free class of service, writes masks of growing width, reads them back
+ * and restores the original. It is therefore resolved once per command rather
+ * than once per device, so that a report over every device does not repeat
+ * those transient allocation changes. A failure of that probe leaves the
+ * minimum unknown, which is not the same as there being none, so the two are
+ * told apart by the interface: only MMIO is known to have no minimum, and both
+ * cases otherwise come back as PQOS_RETVAL_RESOURCE.
+ *
+ * @param [in] interface the interface in use
+ *
+ * @return fewest bits a mask may have, or 0 where no minimum could be
+ *         established, in which case nothing should be suggested
+ */
+static unsigned
+get_min_cbm_bits(enum pqos_interface interface)
+{
+        unsigned min_cbm_bits;
+
+        /* the CARD block of a device agent has no such minimum, and the MMIO
+         * interface installs no operation to ask for one, so one way per mask
+         * is acceptable there
+         */
+        if (interface == PQOS_INTER_MMIO)
+                return 1;
+
+        /* everywhere else this is an active probe, and a failure means the
+         * minimum is unknown rather than absent
+         */
+        if (pqos_l3ca_get_min_cbm_bits(&min_cbm_bits) != PQOS_RETVAL_OK)
+                return 0;
+
+        return min_cbm_bits;
+}
+
+/**
  * @brief Print information about I/O device from ERDT & IRDT ACPI tables
  *
  * @param [in] segment PCI Device's segment
  * @param [in] bdf PCI Device's Bus, Device and Function
+ * @param [in] min_cbm_bits fewest bits an L3 CAT mask may have, as returned by
+ *             get_min_cbm_bits(), so 0 means it could not be established rather
+ *             than that there is none. Passed in rather than queried here,
+ *             because on the MSR interface the query writes and restores a mask
+ *             and this runs once per device
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
@@ -1045,7 +1161,8 @@ print_io_dev(const struct pqos_sysconfig *sys,
              const struct pqos_capability *cap_l3ca,
              enum pqos_interface interface,
              uint16_t segment,
-             uint16_t bdf)
+             uint16_t bdf,
+             unsigned min_cbm_bits)
 {
         int ret;
         unsigned int j;
@@ -1144,31 +1261,25 @@ print_io_dev(const struct pqos_sysconfig *sys,
         }
         printf("\n\tAfter/Before allocation commands, assign required "
                "Cache Ways to CLOS\n");
-        if (interface == PQOS_INTER_MSR && cap_l3ca != NULL)
+        if (interface == PQOS_INTER_MSR && cap_l3ca != NULL) {
                 printf("\tAvailable Cache Ways: %d\n",
                        cap_l3ca->u.l3ca->num_ways);
-        if (interface == PQOS_INTER_MSR) {
-                printf("\tFor example, set CLOS 14 to the first 4 "
-                       "L3 cache ways and CLOS 10 to the next 8 "
-                       "L3 cache ways\n");
-                printf("\tpqos -e \"llc:14=0x000f;"
-                       "llc:10=0x0ff0;\"\n");
+                print_alloc_ways_example(cap_l3ca->u.l3ca->num_classes,
+                                         cap_l3ca->u.l3ca->num_ways,
+                                         min_cbm_bits, -1);
         } else if (interface == PQOS_INTER_MMIO) {
                 for (j = 0; j < sys->erdt->num_dev_agents; j++) {
-                        if (pci_info.domain_id ==
+                        if (pci_info.domain_id !=
                             sys->erdt->dev_agents[j].rmdd.domain_id)
-                                printf("\tAvailable Cache Ways: %d\n",
-                                       sys->erdt->dev_agents[j]
-                                           .rmdd.num_io_l3_ways);
-                }
+                                continue;
 
-                printf("\tFor example, set CLOS 14 to the first 4 "
-                       "L3 cache ways and CLOS 10 to the next 8 "
-                       "L3 cache ways in Device Domain 0x%x\n",
-                       pci_info.domain_id);
-                printf("\tpqos --alloc-domain-id=0x%x -e "
-                       "\"llc:14=0x000f;llc:10=0x0ff0;\"\n",
-                       pci_info.domain_id);
+                        printf("\tAvailable Cache Ways: %d\n",
+                               sys->erdt->dev_agents[j].rmdd.num_io_l3_ways);
+                        print_alloc_ways_example(
+                            sys->erdt->max_clos,
+                            sys->erdt->dev_agents[j].rmdd.num_io_l3_ways,
+                            min_cbm_bits, pci_info.domain_id);
+                }
         }
 
         return PQOS_RETVAL_OK;
@@ -1207,6 +1318,7 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
         int ret;
         int result = PQOS_RETVAL_OK;
         uint32_t idx;
+        unsigned min_cbm_bits;
         enum pqos_interface interface;
         const struct pqos_capability *cap_l3ca = NULL;
 
@@ -1259,6 +1371,8 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
         printf("Reset I/O RDT Allocation   : pqos -R -d\n");
         printf("Reset I/O RDT Monitoring   : pqos -r -d\n");
 
+        min_cbm_bits = get_min_cbm_bits(interface);
+
         /*
          * every requested device is reported, and the first failure is
          * returned, so a list is not cut short by one absent device
@@ -1266,7 +1380,7 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
         for (idx = 0; idx < sel_pci_dev_count; idx++) {
                 ret = print_io_dev(sys, cap_l3ca, interface,
                                    sel_pci_dev[idx].segment,
-                                   sel_pci_dev[idx].bdf);
+                                   sel_pci_dev[idx].bdf, min_cbm_bits);
                 if (ret != PQOS_RETVAL_OK && result == PQOS_RETVAL_OK)
                         result = ret;
         }
@@ -1283,6 +1397,7 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
         int ret;
         int result = PQOS_RETVAL_OK;
         uint32_t i;
+        unsigned min_cbm_bits;
         enum pqos_interface interface;
         struct pqos_devinfo *dev = NULL;
         const struct pqos_capability *cap_l3ca = NULL;
@@ -1325,10 +1440,13 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
         printf("Reset I/O RDT Allocation   : pqos -R -d\n");
         printf("Reset I/O RDT Monitoring   : pqos -r -d\n");
 
+        min_cbm_bits = get_min_cbm_bits(interface);
+
         dev = sys->dev;
         for (i = 0; i < dev->num_devs; i++) {
-                ret = print_io_dev(sys, cap_l3ca, interface,
-                                   dev->devs[i].segment, dev->devs[i].bdf);
+                ret =
+                    print_io_dev(sys, cap_l3ca, interface, dev->devs[i].segment,
+                                 dev->devs[i].bdf, min_cbm_bits);
                 if (ret != PQOS_RETVAL_OK && result == PQOS_RETVAL_OK)
                         result = ret;
         }
