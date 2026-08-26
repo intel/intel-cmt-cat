@@ -94,6 +94,8 @@ struct pci_dev *pci_dev_get(uint16_t domain, uint16_t bdf);
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the PCI information of the device cannot be
+ *         read, e.g. when no such device is present
  */
 PQOS_LOCAL int
 io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf);
@@ -107,6 +109,8 @@ io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf);
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the PCI information of the device cannot be
+ *         read, e.g. when no such device is present
  */
 PQOS_LOCAL int
 hw_io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf);
@@ -120,6 +124,8 @@ hw_io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf);
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the PCI information of the device cannot be
+ *         read, e.g. when no such device is present
  */
 PQOS_LOCAL int mmio_io_devs_get(struct pqos_pci_info *pci_info,
                                 uint16_t segment,

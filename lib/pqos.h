@@ -2410,6 +2410,8 @@ int pqos_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg);
  *
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the PCI information of the device cannot be
+ *         read, e.g. when no such device is present
  */
 int pqos_io_devs_get(struct pqos_pci_info *pci_info,
                      uint16_t segment,

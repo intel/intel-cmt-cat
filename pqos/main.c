@@ -2536,12 +2536,14 @@ main(int argc, char **argv)
         }
 
         if (sel_print_io_devs) {
-                cap_print_io_devs(p_sys);
+                if (cap_print_io_devs(p_sys) != PQOS_RETVAL_OK)
+                        exit_val = EXIT_FAILURE;
                 goto allocation_exit;
         }
 
         if (sel_print_io_dev) {
-                cap_print_io_dev(p_sys);
+                if (cap_print_io_dev(p_sys) != PQOS_RETVAL_OK)
+                        exit_val = EXIT_FAILURE;
                 goto allocation_exit;
         }
 

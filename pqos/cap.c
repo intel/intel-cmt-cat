@@ -1014,12 +1014,33 @@ cap_print_topology(const struct pqos_sysconfig *sys)
 }
 
 /**
+ * @brief Release the device selection of the --print-io-dev option
+ *
+ * parse_io_dev() grows the selection once per option, so it is freed and the
+ * count reset on every path out of cap_print_io_dev(), which is the only
+ * consumer. Leaving it behind would leak it and would show the devices of the
+ * previous call again if the function ran twice in one process.
+ */
+static void
+release_io_dev_selection(void)
+{
+        free(sel_pci_dev);
+        sel_pci_dev = NULL;
+        sel_pci_dev_count = 0;
+}
+
+/**
  * @brief Print information about I/O device from ERDT & IRDT ACPI tables
  *
  * @param [in] segment PCI Device's segment
  * @param [in] bdf PCI Device's Bus, Device and Function
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE if the device information cannot be read, e.g.
+ *         when no such PCI device is present
  */
-static void
+static int
 print_io_dev(const struct pqos_sysconfig *sys,
              const struct pqos_capability *cap_l3ca,
              enum pqos_interface interface,
@@ -1040,7 +1061,7 @@ print_io_dev(const struct pqos_sysconfig *sys,
                 printf("Unable to get I/O device %.4x:%.2x:%.2x.%x PCI "
                        "information\n",
                        segment, BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
-                return;
+                return ret;
         }
 
         printf("%s:", pci_info.subclass_name[0] ? pci_info.subclass_name
@@ -1149,6 +1170,8 @@ print_io_dev(const struct pqos_sysconfig *sys,
                        "\"llc:14=0x000f;llc:10=0x0ff0;\"\n",
                        pci_info.domain_id);
         }
+
+        return PQOS_RETVAL_OK;
 }
 
 void
@@ -1178,10 +1201,11 @@ parse_io_dev(char *str)
         sel_pci_dev_count++;
 }
 
-void
+int
 cap_print_io_dev(const struct pqos_sysconfig *sys)
 {
         int ret;
+        int result = PQOS_RETVAL_OK;
         uint32_t idx;
         enum pqos_interface interface;
         const struct pqos_capability *cap_l3ca = NULL;
@@ -1189,30 +1213,34 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
         if (sel_pci_dev_count == 0) {
                 printf("Segment and BDF information are missing. "
                        "--print-io-dev=<segment>:<bus>:<device>.<function>\n");
-                free(sel_pci_dev);
-                return;
+                release_io_dev_selection();
+                return PQOS_RETVAL_OK;
         }
 
         if (!sys || !sys->dev) {
                 printf("IRDT info not available!\n");
-                return;
+                release_io_dev_selection();
+                return PQOS_RETVAL_OK;
         }
 
         ret = pqos_inter_get(&interface);
         if (ret != PQOS_RETVAL_OK) {
                 printf("unable to get interface\n");
-                return;
+                release_io_dev_selection();
+                return PQOS_RETVAL_OK;
         }
 
         if (interface == PQOS_INTER_MMIO) {
                 if (!sys->erdt) {
                         printf("ERDT info not available!\n");
-                        return;
+                        release_io_dev_selection();
+                        return PQOS_RETVAL_OK;
                 }
         } else if (interface != PQOS_INTER_MSR) {
                 printf("--print-io-dev command is supported in msr and mmio "
                        "interfaces only\n");
-                return;
+                release_io_dev_selection();
+                return PQOS_RETVAL_OK;
         }
 
         for (idx = 0; sys->cap && (idx < sys->cap->num_cap); idx++)
@@ -1231,18 +1259,29 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
         printf("Reset I/O RDT Allocation   : pqos -R -d\n");
         printf("Reset I/O RDT Monitoring   : pqos -r -d\n");
 
-        for (idx = 0; idx < sel_pci_dev_count; idx++)
-                print_io_dev(sys, cap_l3ca, interface, sel_pci_dev[idx].segment,
-                             sel_pci_dev[idx].bdf);
+        /*
+         * every requested device is reported, and the first failure is
+         * returned, so a list is not cut short by one absent device
+         */
+        for (idx = 0; idx < sel_pci_dev_count; idx++) {
+                ret = print_io_dev(sys, cap_l3ca, interface,
+                                   sel_pci_dev[idx].segment,
+                                   sel_pci_dev[idx].bdf);
+                if (ret != PQOS_RETVAL_OK && result == PQOS_RETVAL_OK)
+                        result = ret;
+        }
 
         printf("\n");
-        free(sel_pci_dev);
+        release_io_dev_selection();
+
+        return result;
 }
 
-void
+int
 cap_print_io_devs(const struct pqos_sysconfig *sys)
 {
         int ret;
+        int result = PQOS_RETVAL_OK;
         uint32_t i;
         enum pqos_interface interface;
         struct pqos_devinfo *dev = NULL;
@@ -1250,24 +1289,24 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
 
         if (!sys || !sys->dev) {
                 printf("IRDT info not available!\n");
-                return;
+                return PQOS_RETVAL_OK;
         }
 
         ret = pqos_inter_get(&interface);
         if (ret != PQOS_RETVAL_OK) {
                 printf("unable to get interface\n");
-                return;
+                return PQOS_RETVAL_OK;
         }
 
         if (interface == PQOS_INTER_MMIO) {
                 if (!sys->erdt) {
                         printf("ERDT info not available!\n");
-                        return;
+                        return PQOS_RETVAL_OK;
                 }
         } else if (interface != PQOS_INTER_MSR) {
                 printf("--print-io-devs command is supported in msr and mmio "
                        "interfaces only\n");
-                return;
+                return PQOS_RETVAL_OK;
         }
 
         for (i = 0; sys->cap && (i < sys->cap->num_cap); i++)
@@ -1287,9 +1326,14 @@ cap_print_io_devs(const struct pqos_sysconfig *sys)
         printf("Reset I/O RDT Monitoring   : pqos -r -d\n");
 
         dev = sys->dev;
-        for (i = 0; i < dev->num_devs; i++)
-                print_io_dev(sys, cap_l3ca, interface, dev->devs[i].segment,
-                             dev->devs[i].bdf);
+        for (i = 0; i < dev->num_devs; i++) {
+                ret = print_io_dev(sys, cap_l3ca, interface,
+                                   dev->devs[i].segment, dev->devs[i].bdf);
+                if (ret != PQOS_RETVAL_OK && result == PQOS_RETVAL_OK)
+                        result = ret;
+        }
 
         printf("\n");
+
+        return result;
 }

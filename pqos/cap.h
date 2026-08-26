@@ -83,16 +83,34 @@ void parse_io_dev(char *str);
  *
  * @param [in] sys PQoS system configuration struct
  *                 returned by a pqos_sysconfig_get
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK when every device was reported, and also when there
+ *         is nothing to report, i.e. no I/O RDT or ERDT information and an
+ *         interface that does not provide the report. Those cases print a
+ *         message and keep the exit code they had before this returned a
+ *         status, so PQOS_RETVAL_OK does not mean a report was printed
+ * @retval PQOS_RETVAL_RESOURCE if the information of a device could not be read
  */
-void cap_print_io_devs(const struct pqos_sysconfig *sys);
+int cap_print_io_devs(const struct pqos_sysconfig *sys);
 
 /**
  * @brief Print information about I/O device from ERDT & IRDT ACPI tables
  *
  * @param [in] sys PQoS system configuration struct
  *                 returned by a pqos_sysconfig_get
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK when every requested device was reported, and also
+ *         when there is nothing to report, i.e. no selection was made, no I/O
+ *         RDT or ERDT information is available and an interface that does not
+ *         provide the report. Those cases print a message and keep the exit
+ *         code they had before this returned a status, so PQOS_RETVAL_OK does
+ *         not mean a report was printed
+ * @retval PQOS_RETVAL_RESOURCE if the information of a requested device could
+ *         not be read, e.g. when no such PCI device is present
  */
-void cap_print_io_dev(const struct pqos_sysconfig *sys);
+int cap_print_io_dev(const struct pqos_sysconfig *sys);
 
 #ifdef __cplusplus
 }

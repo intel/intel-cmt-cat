@@ -472,6 +472,20 @@ io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
         const struct pqos_devinfo *devinfo = _pqos_get_dev();
 
         dev = pci_dev_get(segment, bdf);
+        if (dev == NULL) {
+                /*
+                 * pci_dev_get() logs a reason only when it has one, the
+                 * NUMA node it could not read. It is silent for a device
+                 * that is not present and for a PCI header type it does
+                 * not know, which are the cases this message is here for,
+                 * so it names the operation rather than a reason
+                 */
+                LOG_ERROR("Unable to read the I/O device information of "
+                          "%04x:%02x:%02x.%x\n",
+                          segment, (bdf >> 8), ((bdf >> 3) & 0x1F),
+                          (bdf & 0x7));
+                return PQOS_RETVAL_RESOURCE;
+        }
 
         pci_read_driver(pci_info, dev);
         pci_info->numa = dev->numa;
