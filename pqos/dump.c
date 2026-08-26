@@ -66,7 +66,9 @@ static struct sel_dump_info {
         uint64_t sockets[MAX_DOMAIN_IDS];    /**< List of sockets */
         uint32_t num_domain_ids;             /**< Number of domain ids */
         uint64_t domain_ids[MAX_DOMAIN_IDS]; /**< List of domain ids */
-        enum pqos_mmio_dump_space space;     /**< ERDT Sub-structure types */
+        enum pqos_mmio_dump_space space;     /**< ERDT Sub-structure type.
+                                                MMIO_DUMP_SPACE_ERROR means
+                                                --space was not given */
         enum pqos_mmio_dump_width width;     /**< Width of MMIO access */
         unsigned int le_flag;                /**< Little endian flag.
                                                 default: 0, means big endian */
@@ -79,7 +81,7 @@ static struct sel_dump_info {
                                                 Default 0, means from the
                                                 offset to end of
                                                 the MMIO space */
-} sel_dump;
+} sel_dump = {.space = MMIO_DUMP_SPACE_ERROR};
 
 /* Map between ACPI structures and appropriate MMIO spaces */
 static const struct pqos_mmio_dump_space_map_entry sel_mmio_dump_space_map[] = {
@@ -508,6 +510,13 @@ dump_mmio_regs(const struct pqos_sysconfig *sys)
 
         if (sel_dump.num_sockets == 0 && sel_dump.num_domain_ids == 0) {
                 printf("Provide either --socket or --dump-domain-id\n");
+                exit(EXIT_FAILURE);
+        }
+
+        if (sel_dump.space == MMIO_DUMP_SPACE_ERROR) {
+                printf("Provide --space\n");
+                printf("Available inputs in --space=: cmrc mmrc marc-opt "
+                       "marc-min marc-max cmrd ibrd card\n");
                 exit(EXIT_FAILURE);
         }
 

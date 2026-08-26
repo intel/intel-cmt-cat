@@ -63,8 +63,12 @@ static struct sel_dump_rmids_info {
         int region_num[PQOS_MAX_MEM_REGIONS]; /**< List of memory regions */
         unsigned int num_rmids;               /**< Number of RMIDs */
         uint64_t rmids[MAX_RMIDS];            /**< List of RMIDs */
-        enum pqos_mmio_dump_rmid_type rmid_type; /**< RMIDs type. Default: 0,
-                                                    means MBM */
+        enum pqos_mmio_dump_rmid_type rmid_type; /**< RMIDs type */
+        unsigned int type_selected;              /**< Whether
+                                                    --dump-rmid-type was given.
+                                                    The type enum has no value
+                                                    for "not selected", so the
+                                                    flag carries it */
         unsigned int bin;                        /**< Binary flag. Default: 0,
                                                     means hexadecimal */
         unsigned int upscale;                    /**< Upscale raw value.
@@ -215,6 +219,8 @@ selfn_dump_rmid_type(const char *arg)
                        "io-total io-miss\n");
                 exit(EXIT_FAILURE);
         }
+
+        sel_dump_rmids.type_selected = 1;
 }
 
 void
@@ -252,6 +258,13 @@ dump_rmid_regs(const struct pqos_sysconfig *sys)
 
         if (sel_dump_rmids.num_rmids == 0) {
                 printf("Missing --dump-rmids option\n");
+                exit(EXIT_FAILURE);
+        }
+
+        if (!sel_dump_rmids.type_selected) {
+                printf("Missing --dump-rmid-type option\n");
+                printf("Available inputs in --dump-rmid-type: mbm l3 io-l3 "
+                       "io-total io-miss\n");
                 exit(EXIT_FAILURE);
         }
 
