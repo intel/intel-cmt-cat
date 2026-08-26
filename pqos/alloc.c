@@ -306,13 +306,21 @@ set_l3_clos(const unsigned class_id,
                         }
                 }
 
-                /* get current L3 definitions for this socket */
+                /* get the current L3 definitions of this socket, or of this
+                 * domain on the MMIO interface, where a socket does not select
+                 * the L3 CAT registers
+                 */
                 ret = pqos_l3ca_get(sock_ids[i], DIM(sock_l3ca), &num_ca,
                                     sock_l3ca);
                 if (ret != PQOS_RETVAL_OK) {
-                        printf("Failed to retrieve socket %u "
-                               "L3 classes!\n",
-                               sock_ids[i]);
+                        if (interface == PQOS_INTER_MMIO)
+                                printf("Failed to retrieve L3 classes of "
+                                       "domain 0x%" PRIx64 "!\n",
+                                       sel_alloc_domain_id.domain_ids[i]);
+                        else
+                                printf("Failed to retrieve socket %u "
+                                       "L3 classes!\n",
+                                       sock_ids[i]);
                         break;
                 }
                 /* find selected class in array */

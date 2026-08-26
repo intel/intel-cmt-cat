@@ -51,6 +51,18 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* The device domain list of log_domain_without_l3ca(). One log line carries at
+ * most AP_BUFFER_SIZE - 1 bytes, 319, and the text around the list takes about
+ * 150 of them, so the list is kept well inside what is left. log_printf() hands
+ * the length the message needed, rather than the length it wrote, to its
+ * callback and to write(), so a message that did not fit would be read past the
+ * end of its buffer.
+ */
+#define DOMAIN_LIST_SIZE 128
+
+/* What ends the list where the domains did not all fit in DOMAIN_LIST_SIZE */
+#define DOMAIN_LIST_MORE " and more"
+
 /**
  * @brief Populate a single mem_region data structure for a given CLOS
  *        using the region_num already stored in the mem_region.
@@ -467,6 +479,81 @@ mmio_mba_get(const unsigned mba_id,
  * I/O L3 cache allocation
  * =======================================
  */
+/**
+ * @brief Whether a device agent carries L3 CAT registers
+ *
+ * A device RMDD is valid without a CARD sub-structure: erdt_populate_rmdd_
+ * device_agent() requires only DACD, so a device agent that is enumerated for
+ * monitoring alone leaves the CARD block zeroed. The registers L3 CAT programs
+ * are in that block, so such a domain cannot be allocated in, and its zeroed
+ * register base and block size are what tell it apart.
+ *
+ * @param [in] dev_agent device agent to examine
+ *
+ * @return whether the agent's CARD block was populated
+ */
+static int
+dev_agent_has_l3ca(const struct pqos_device_agent_info *dev_agent)
+{
+        return dev_agent->card.reg_base_addr != 0 &&
+               dev_agent->card.reg_block_size != 0;
+}
+
+/**
+ * @brief Report a domain that carries no L3 CAT registers
+ *
+ * On the MMIO interface the L3 CAT registers live in the CARD block of an I/O
+ * device agent, so a CPU domain, a domain the platform does not have, and a
+ * device agent enumerated for monitoring alone cannot carry them. A CPU domain
+ * ID and a device domain ID look alike on a command line, which is why the
+ * message names the domains that do carry L3 CAT.
+ *
+ * @param [in] erdt ERDT information
+ * @param [in] domain_id domain that was asked for
+ */
+static void
+log_domain_without_l3ca(const struct pqos_erdt_info *erdt, uint16_t domain_id)
+{
+        char domains[DOMAIN_LIST_SIZE] = {0};
+        /* room an entry may take, leaving DOMAIN_LIST_MORE always able to
+         * follow the last one that fitted
+         */
+        const size_t entry_limit = sizeof(domains) - sizeof(DOMAIN_LIST_MORE);
+        size_t used = 0;
+        unsigned i;
+
+        for (i = 0; i < erdt->num_dev_agents; i++) {
+                int len;
+
+                if (!dev_agent_has_l3ca(&erdt->dev_agents[i]))
+                        continue;
+
+                len = snprintf(domains + used, entry_limit - used, "%s0x%x",
+                               used > 0 ? ", " : "",
+                               erdt->dev_agents[i].rmdd.domain_id);
+
+                if (len < 0 || (size_t)len >= entry_limit - used) {
+                        /* the list did not fit, so say so rather than end it
+                         * as though the platform had no more domains. used is
+                         * below entry_limit, so the reserved room is there
+                         */
+                        memcpy(domains + used, DOMAIN_LIST_MORE,
+                               sizeof(DOMAIN_LIST_MORE));
+                        used += sizeof(DOMAIN_LIST_MORE) - 1;
+                        break;
+                }
+                used += (size_t)len;
+        }
+
+        LOG_ERROR("Domain ID 0x%x carries no L3 CAT registers. On the MMIO "
+                  "interface L3 CAT applies to the I/O device domains, %s. "
+                  "Use --print-io-devs to list them\n",
+                  domain_id,
+                  used > 0 ? domains
+                           : "of which this platform "
+                             "reports none");
+}
+
 int
 mmio_l3ca_set(const unsigned l3cat_id,
               const unsigned num_ca,
@@ -487,9 +574,11 @@ mmio_l3ca_set(const unsigned l3cat_id,
 
         // Check if all domains are valid
         for (unsigned i = 0; i < num_ca; i++) {
-                if (!get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id)) {
-                        LOG_ERROR("Domain id %u is unavailable\n",
-                                  ca[i].domain_id);
+                const struct pqos_device_agent_info *dev_agent =
+                    get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id);
+
+                if (dev_agent == NULL || !dev_agent_has_l3ca(dev_agent)) {
+                        log_domain_without_l3ca(erdt, ca[i].domain_id);
                         return PQOS_RETVAL_PARAM;
                 }
 
@@ -560,9 +649,11 @@ mmio_l3ca_get(const unsigned l3cat_id,
 
         // Check if all domains are valid
         for (unsigned i = 0; i < erdt->max_clos; i++) {
-                if (!get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id)) {
-                        LOG_ERROR("Domain ID 0x%x is unavailable\n",
-                                  ca[i].domain_id);
+                const struct pqos_device_agent_info *dev_agent =
+                    get_mmio_dev_agent_by_domain(erdt, ca[i].domain_id);
+
+                if (dev_agent == NULL || !dev_agent_has_l3ca(dev_agent)) {
+                        log_domain_without_l3ca(erdt, ca[i].domain_id);
                         return PQOS_RETVAL_PARAM;
                 }
         }
@@ -593,6 +684,14 @@ mmio_alloc_reset_cat(void)
         ASSERT(erdt != NULL);
 
         for (unsigned domain = 0; domain < erdt->num_dev_agents; domain++) {
+                /* An agent enumerated for monitoring alone has no CARD block,
+                 * so it holds no L3 CAT register to reset. Writing one anyway
+                 * would map its zeroed register base, which fails, and take the
+                 * whole allocation reset down with it.
+                 */
+                if (!dev_agent_has_l3ca(&erdt->dev_agents[domain]))
+                        continue;
+
                 for (unsigned i = 0; i < erdt->max_clos; i++) {
                         /* Reset I/ORDT L3 CAT */
                         ret = set_iol3_cbm_clos_v1(

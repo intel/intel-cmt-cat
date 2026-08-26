@@ -52,6 +52,39 @@ mock_inter_get(const enum pqos_interface inter, unsigned count)
         }
 }
 
+/* ======== set_l3_clos on the MMIO interface ======== */
+
+static void
+test_set_l3_clos_mmio_reports_the_domain(void **state)
+{
+        unsigned sock_ids[1] = {0};
+        int ret = 0;
+
+        UNUSED_ARG(state);
+
+        /* a class definition for a CPU domain on the MMIO interface. The
+         * library cannot serve it, and the message used to name a socket, which
+         * this interface does not use to select the L3 CAT registers.
+         */
+        mock_inter_get(PQOS_INTER_MMIO, 1);
+        sel_alloc_domain_id.num_domain_ids = 1;
+        sel_alloc_domain_id.domain_ids[0] = 0;
+
+        expect_value(__wrap_pqos_l3ca_get, l3cat_id, 0);
+        expect_value(__wrap_pqos_l3ca_get, max_num_ca, PQOS_MAX_L3CA_CLOS);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_ERROR);
+
+        run_function(set_l3_clos, ret, 1, 0xf, sock_ids, 1,
+                     CAT_UPDATE_SCOPE_BOTH, NULL);
+
+        assert_int_equal(ret, -1);
+        assert_true(
+            output_has_text("Failed to retrieve L3 classes of domain 0x0!"));
+        assert_false(output_has_text("socket"));
+
+        sel_alloc_domain_id.num_domain_ids = 0;
+}
+
 static void
 test_selfn_allocation_assoc_negative(void **state)
 {
@@ -1646,6 +1679,7 @@ main(void)
                 test_alloc_check_options_rejects_regions_without_class),
             cmocka_unit_test(
                 test_alloc_check_options_rejects_bandwidth_flag_without_class),
+            cmocka_unit_test(test_set_l3_clos_mmio_reports_the_domain),
             cmocka_unit_test(test_selfn_allocation_assoc_negative),
             cmocka_unit_test_teardown(test_selfn_allocation_assoc_llc,
                                       cleanup_assoc_core_and_pid_tabs),

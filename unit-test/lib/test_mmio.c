@@ -37,8 +37,25 @@
 #include "test.h"
 
 #include <limits.h>
+#include <stdarg.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <string.h>
+
+/* the last line the library logged, so a test can assert the message and not
+ * only the return value
+ */
+static char test_log[512];
+
+void
+__wrap_log_printf(int type __attribute__((unused)), const char *str, ...)
+{
+        va_list ap;
+
+        va_start(ap, str);
+        vsnprintf(test_log, sizeof(test_log), str, ap);
+        va_end(ap);
+}
 
 uint8_t *
 __wrap_pqos_mmap_read(uint64_t address, const uint64_t size)
@@ -180,6 +197,18 @@ __wrap_set_mba_max_bw_region_clos_v1(const struct pqos_erdt_marc *marc,
 {
         check_expected_ptr(marc);
         check_expected(region_num);
+        check_expected(clos_number);
+        check_expected(value);
+
+        return mock_type(int);
+}
+
+int
+__wrap_set_iol3_cbm_clos_v1(const struct pqos_erdt_card *card,
+                            unsigned int clos_number,
+                            uint64_t value)
+{
+        check_expected_ptr(card);
         check_expected(clos_number);
         check_expected(value);
 
@@ -773,6 +802,194 @@ test_io_overflow_invalidates_baseline(void **state __attribute__((unused)))
         assert_io_overflow_invalidates_baseline(PQOS_MON_EVENT_IO_MISS_MEM_BW);
 }
 
+/* ======== mmio_l3ca_get / mmio_l3ca_set domain selection ======== */
+
+static void
+test_mmio_l3ca_get_rejects_domain_without_l3ca(void **state
+                                               __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca[2] = {{0}};
+        unsigned num_ca = 0;
+        int ret;
+
+        /* the platform has one I/O device domain, 0x10, whose CARD block gives
+         * it the registers L3 CAT programs
+         */
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        /* a CPU domain has no CARD block, so it carries no L3 CAT */
+        ca[0].domain_id = 0;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_get(0, DIM(ca), &num_ca, ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(num_ca, 0);
+        /* the message says what the domain lacks, which domains have it, and
+         * where to look them up
+         */
+        assert_non_null(strstr(test_log, "carries no L3 CAT registers"));
+        assert_non_null(strstr(test_log, "0x10"));
+        assert_non_null(strstr(test_log, "--print-io-devs"));
+}
+
+static void
+test_mmio_l3ca_set_rejects_domain_without_l3ca(void **state
+                                               __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca = {0};
+        int ret;
+
+        dev_agent.rmdd.domain_id = 0x10;
+        dev_agent.card.reg_base_addr = 0xf0000000;
+        dev_agent.card.reg_block_size = 1;
+        erdt.num_dev_agents = 1;
+        erdt.dev_agents = &dev_agent;
+        erdt.max_clos = 1;
+
+        ca.domain_id = 0;
+        ca.class_id = 0;
+        ca.u.ways_mask = 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        /* the same message as the read path, which used to differ from it */
+        assert_non_null(strstr(test_log, "carries no L3 CAT registers"));
+        assert_non_null(strstr(test_log, "0x10"));
+}
+
+static void
+test_mmio_l3ca_set_rejects_monitoring_only_domain(void **state
+                                                  __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca = {0};
+        int ret;
+
+        /* 0x10 is enumerated for monitoring alone, so its CARD block was never
+         * populated, while 0x11 has one
+         */
+        dev_agents[0].rmdd.domain_id = 0x10;
+        dev_agents[1].rmdd.domain_id = 0x11;
+        dev_agents[1].card.reg_base_addr = 0xf0000000;
+        dev_agents[1].card.reg_block_size = 1;
+        erdt.num_dev_agents = DIM(dev_agents);
+        erdt.dev_agents = dev_agents;
+        erdt.max_clos = 1;
+
+        ca.domain_id = 0x10;
+        ca.class_id = 0;
+        ca.u.ways_mask = 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        /* a device domain, and still no registers to program, so it is rejected
+         * rather than left to fail on a zeroed register base
+         */
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "carries no L3 CAT registers"));
+        /* and it is not itself offered as somewhere L3 CAT applies */
+        assert_non_null(strstr(test_log, "0x11"));
+        assert_null(strstr(test_log, "0x10,"));
+}
+
+static void
+test_mmio_l3ca_set_domain_list_says_when_truncated(void **state
+                                                   __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agents[64] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_l3ca ca = {0};
+        unsigned i;
+        int ret;
+
+        /* more device domains than the list can hold */
+        for (i = 0; i < DIM(dev_agents); i++) {
+                dev_agents[i].rmdd.domain_id = (uint16_t)(0x1000 + i);
+                dev_agents[i].card.reg_base_addr = 0xf0000000;
+                dev_agents[i].card.reg_block_size = 1;
+        }
+        erdt.num_dev_agents = DIM(dev_agents);
+        erdt.dev_agents = dev_agents;
+        erdt.max_clos = 1;
+
+        ca.domain_id = 0;
+        ca.class_id = 0;
+        ca.u.ways_mask = 1;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        test_log[0] = '\0';
+
+        ret = mmio_l3ca_set(0, 1, &ca);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        /* the list is not passed off as complete, and the message itself stays
+         * inside the 319 bytes one log line carries, rather than being handed
+         * to write() as a length past the end of log_printf()'s buffer
+         */
+        assert_non_null(strstr(test_log, " and more"));
+        assert_true(strlen(test_log) < 319);
+}
+
+static void
+test_alloc_reset_cat_skips_monitoring_only_domain(void **state
+                                                  __attribute__((unused)))
+{
+        struct pqos_device_agent_info dev_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        const unsigned num_writes = 2; /* max_clos, for the one domain left */
+        unsigned i;
+        int ret;
+
+        /* 0x10 is enumerated for monitoring alone, so its CARD block was never
+         * populated, while 0x11 has one
+         */
+        dev_agents[0].rmdd.domain_id = 0x10;
+        dev_agents[1].rmdd.domain_id = 0x11;
+        dev_agents[1].rmdd.num_io_l3_ways = 4;
+        dev_agents[1].card.reg_base_addr = 0xf0000000;
+        dev_agents[1].card.reg_block_size = 1;
+        erdt.num_dev_agents = DIM(dev_agents);
+        erdt.dev_agents = dev_agents;
+        erdt.max_clos = num_writes;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+
+        /* the reset reaches the CARD block that exists, and only that one: a
+         * write against the zeroed base of 0x10 would fail the whole reset
+         */
+        expect_value_count(__wrap_set_iol3_cbm_clos_v1, card,
+                           &dev_agents[1].card, num_writes);
+        expect_any_count(__wrap_set_iol3_cbm_clos_v1, clos_number, num_writes);
+        expect_value_count(__wrap_set_iol3_cbm_clos_v1, value, 0xf, num_writes);
+
+        for (i = 0; i < num_writes; i++)
+                will_return(__wrap_set_iol3_cbm_clos_v1, PQOS_RETVAL_OK);
+
+        ret = mmio_alloc_reset_cat();
+
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
 int
 main(void)
 {
@@ -790,7 +1007,14 @@ main(void)
             cmocka_unit_test(test_mba_get_uses_mrrm_count),
             cmocka_unit_test(test_mba_get_rejects_unsupported_num_regions),
             cmocka_unit_test(test_mba_reset_uses_mrrm_count),
-            cmocka_unit_test(test_io_overflow_invalidates_baseline)};
+            cmocka_unit_test(test_io_overflow_invalidates_baseline),
+            cmocka_unit_test(test_mmio_l3ca_get_rejects_domain_without_l3ca),
+            cmocka_unit_test(test_mmio_l3ca_set_rejects_domain_without_l3ca),
+            cmocka_unit_test(test_mmio_l3ca_set_rejects_monitoring_only_domain),
+            cmocka_unit_test(
+                test_mmio_l3ca_set_domain_list_says_when_truncated),
+            cmocka_unit_test(
+                test_alloc_reset_cat_skips_monitoring_only_domain)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }
