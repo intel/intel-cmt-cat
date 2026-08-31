@@ -260,7 +260,8 @@ lock_init(void)
         }
 
         /* Open lock file atomically (create if not exists) */
-        m_apilock = open(LOCKFILE, O_RDWR | O_CREAT | O_EXCL, LOCKFILE_PERMS);
+        m_apilock =
+            open(LOCKFILE, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, LOCKFILE_PERMS);
         if (m_apilock == -1) {
                 if (errno == EEXIST) {
                         /* Lock file exists, check if it is stale */
@@ -280,9 +281,10 @@ lock_init(void)
                                 }
                                 /* Creating the lock file after removing the
                                  * stale one */
-                                m_apilock =
-                                    open(LOCKFILE, O_RDWR | O_CREAT | O_EXCL,
-                                         LOCKFILE_PERMS);
+                                m_apilock = open(
+                                    LOCKFILE,
+                                    O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC,
+                                    LOCKFILE_PERMS);
                                 if (m_apilock == -1) {
                                         fprintf(stderr,
                                                 "Couldn't create lock file: "
