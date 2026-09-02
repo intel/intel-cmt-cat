@@ -370,6 +370,26 @@ mrrm_will_return(struct pqos_mrrm_info *mrrm, const uint8_t num_mem_regions)
         will_return(__wrap__pqos_get_mrrm, mrrm);
 }
 
+/**
+ * @brief Gives a CPU agent a domain ID and the MARC block MBA needs
+ *
+ * A CPU agent with a zeroed MARC block carries no MBA registers, which the
+ * cases below about such an agent rely on, so every other case has to populate
+ * it or it would be testing that instead of what it names.
+ *
+ * @param [out] cpu_agent CPU agent to fill
+ * @param [in] domain_id domain the agent covers
+ */
+static void
+cpu_agent_init(struct pqos_cpu_agent_info *cpu_agent, uint16_t domain_id)
+{
+        cpu_agent->rmdd.domain_id = domain_id;
+        cpu_agent->marc.opt_bw_reg_block_base_addr = 0xf0000000;
+        cpu_agent->marc.min_bw_reg_block_base_addr = 0xf0001000;
+        cpu_agent->marc.max_bw_reg_block_base_addr = 0xf0002000;
+        cpu_agent->marc.reg_block_size = 1;
+}
+
 static void
 test_mba_set_resolves_domain_id(void **state __attribute__((unused)))
 {
@@ -382,8 +402,8 @@ test_mba_set_resolves_domain_id(void **state __attribute__((unused)))
         erdt.max_clos = 4;
         erdt.num_cpu_agents = 2;
         erdt.cpu_agents = cpu_agents;
-        cpu_agents[0].rmdd.domain_id = 10;
-        cpu_agents[1].rmdd.domain_id = 20;
+        cpu_agent_init(&cpu_agents[0], 10);
+        cpu_agent_init(&cpu_agents[1], 20);
 
         requested.class_id = 1;
         requested.domain_id = 20;
@@ -419,7 +439,7 @@ test_mba_set_accepts_max_bw(void **state __attribute__((unused)))
         erdt.max_clos = 4;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
 
         mba_request_init(&requested, cpu_agent.rmdd.domain_id, 0, MBA_MAX_BW);
 
@@ -462,7 +482,7 @@ assert_mba_set_rejects(const uint8_t num_mem_regions,
         erdt.max_clos = 4;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
 
         mba_request_init(&requested, cpu_agent.rmdd.domain_id, region_num, bw);
 
@@ -503,7 +523,7 @@ test_mba_set_rejects_unsupported_region(void **state __attribute__((unused)))
         erdt.max_clos = 4;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
 
         mba_request_init(&requested, cpu_agent.rmdd.domain_id, 1, MBA_MAX_BW);
 
@@ -534,7 +554,7 @@ test_mba_set_validates_before_write(void **state __attribute__((unused)))
         erdt.max_clos = 4;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
 
         /* the first request is valid, the second one is not */
         mba_request_init(&requested[0], cpu_agent.rmdd.domain_id, 0,
@@ -568,7 +588,7 @@ test_mba_get_ignores_num_clos_input(void **state __attribute__((unused)))
         erdt.max_clos = 2;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
         mrrm.max_memory_regions_supported = PQOS_MAX_MEM_REGIONS + 1;
         mba_tab[0].domain_id = cpu_agent.rmdd.domain_id;
 
@@ -619,7 +639,7 @@ test_mba_get_uses_mrrm_count(void **state __attribute__((unused)))
         erdt.max_clos = 1;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
         mba_tab[0].domain_id = cpu_agent.rmdd.domain_id;
 
         will_return(__wrap__pqos_get_erdt, &erdt);
@@ -664,7 +684,7 @@ test_mba_get_rejects_unsupported_num_regions(void **state
         erdt.max_clos = 1;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
         mba_tab[0].domain_id = cpu_agent.rmdd.domain_id;
         /* more regions than the platform advertises */
         mba_tab[0].num_mem_regions = PQOS_MAX_MEM_REGIONS;
@@ -690,7 +710,7 @@ test_mba_reset_uses_mrrm_count(void **state __attribute__((unused)))
         erdt.max_clos = 2;
         erdt.num_cpu_agents = 1;
         erdt.cpu_agents = &cpu_agent;
-        cpu_agent.rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agent, 10);
 
         will_return(__wrap__pqos_get_erdt, &erdt);
         mrrm_will_return(&mrrm, supported);
