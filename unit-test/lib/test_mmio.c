@@ -755,6 +755,174 @@ test_mba_reset_uses_mrrm_count(void **state __attribute__((unused)))
 }
 
 static void
+test_mba_reset_skips_domain_without_marc(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        const uint8_t supported = 1;
+        const int num_writes =
+            1 * supported; /* max_clos * regions, one agent */
+        int ret;
+
+        /* domain 10 was enumerated without a MARC block, so it holds no MBA
+         * register; domain 20 has one
+         */
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = DIM(cpu_agents);
+        erdt.cpu_agents = cpu_agents;
+        cpu_agents[0].rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agents[1], 20);
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, supported);
+
+        /* the writes are expected against the second agent's MARC only, so a
+         * write through the zeroed one would fail the case
+         */
+        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, marc,
+                           &cpu_agents[1].marc, num_writes);
+        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, region_num,
+                         num_writes);
+        expect_any_count(__wrap_set_mba_optimal_bw_region_clos_v1, clos_number,
+                         num_writes);
+        expect_value_count(__wrap_set_mba_optimal_bw_region_clos_v1, value,
+                           MBA_MAX_BW, num_writes);
+        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, marc,
+                           &cpu_agents[1].marc, num_writes);
+        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, region_num,
+                         num_writes);
+        expect_any_count(__wrap_set_mba_min_bw_region_clos_v1, clos_number,
+                         num_writes);
+        expect_value_count(__wrap_set_mba_min_bw_region_clos_v1, value,
+                           MBA_MAX_BW, num_writes);
+        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, marc,
+                           &cpu_agents[1].marc, num_writes);
+        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, region_num,
+                         num_writes);
+        expect_any_count(__wrap_set_mba_max_bw_region_clos_v1, clos_number,
+                         num_writes);
+        expect_value_count(__wrap_set_mba_max_bw_region_clos_v1, value,
+                           MBA_MAX_BW, num_writes);
+
+        for (int i = 0; i < num_writes; i++) {
+                will_return(__wrap_set_mba_optimal_bw_region_clos_v1,
+                            PQOS_RETVAL_OK);
+                will_return(__wrap_set_mba_min_bw_region_clos_v1,
+                            PQOS_RETVAL_OK);
+                will_return(__wrap_set_mba_max_bw_region_clos_v1,
+                            PQOS_RETVAL_OK);
+        }
+
+        ret = mmio_alloc_reset_mba();
+
+        /* the domain that cannot be reset does not take the reset of the whole
+         * platform down with it
+         */
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+}
+
+static void
+test_mba_set_rejects_domain_without_marc(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba requested = {0};
+        int ret;
+
+        erdt.max_clos = 2;
+        erdt.num_cpu_agents = DIM(cpu_agents);
+        erdt.cpu_agents = cpu_agents;
+        cpu_agents[0].rmdd.domain_id = 10;
+        cpu_agent_init(&cpu_agents[1], 20);
+
+        mba_request_init(&requested, cpu_agents[0].rmdd.domain_id, 0,
+                         MBA_MAX_BW);
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+        test_log[0] = '\0';
+
+        ret = mmio_mba_set(0, 1, &requested, NULL);
+
+        /* no write is queued, so the request is refused before the registers
+         * are reached rather than by a mapping of the zeroed block
+         */
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "carries no MBA registers"));
+        assert_non_null(strstr(test_log, "--print-topology"));
+        /* the domain that does carry MBA is named, and the one that does not
+         * is not offered as somewhere MBA applies: it appears as the domain
+         * that was asked for, "Domain ID 0xa", and never as a list entry
+         */
+        assert_non_null(strstr(test_log, "0x14"));
+        assert_null(strstr(test_log, "0xa, "));
+}
+
+static void
+test_mba_get_rejects_domain_without_marc(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba mba_tab[1] = {0};
+        unsigned num_clos = 0;
+        int ret;
+
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent.rmdd.domain_id = 10;
+        mba_tab[0].domain_id = cpu_agent.rmdd.domain_id;
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, 1);
+        test_log[0] = '\0';
+
+        ret = mmio_mba_get(0, 1, &num_clos, mba_tab);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_int_equal(num_clos, 0);
+        assert_non_null(strstr(test_log, "carries no MBA registers"));
+        /* the platform has no domain that carries MBA, which the message says
+         * rather than offering an empty list
+         */
+        assert_non_null(strstr(test_log, "reports none"));
+}
+
+static void
+test_mba_set_rejects_partly_populated_marc(void **state __attribute__((unused)))
+{
+        struct pqos_cpu_agent_info cpu_agent = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm;
+        struct pqos_mba requested = {0};
+        int ret;
+
+        erdt.max_clos = 2;
+        erdt.num_cpu_agents = 1;
+        erdt.cpu_agents = &cpu_agent;
+        cpu_agent_init(&cpu_agent, 10);
+        /* the three bandwidth control types have a base address each, and a
+         * request programs all three, so one missing address is as unusable as
+         * a block that is missing altogether
+         */
+        cpu_agent.marc.max_bw_reg_block_base_addr = 0;
+
+        mba_request_init(&requested, cpu_agent.rmdd.domain_id, 0, MBA_MAX_BW);
+
+        will_return(__wrap__pqos_get_erdt, &erdt);
+        mrrm_will_return(&mrrm, PQOS_MAX_MEM_REGIONS);
+        test_log[0] = '\0';
+
+        ret = mmio_mba_set(0, 1, &requested, NULL);
+
+        assert_int_equal(ret, PQOS_RETVAL_PARAM);
+        assert_non_null(strstr(test_log, "carries no MBA registers"));
+}
+
+static void
 assert_io_overflow_invalidates_baseline(const enum pqos_mon_event event)
 {
         struct pqos_device_agent_info dev_agent = {0};
@@ -1027,6 +1195,10 @@ main(void)
             cmocka_unit_test(test_mba_get_uses_mrrm_count),
             cmocka_unit_test(test_mba_get_rejects_unsupported_num_regions),
             cmocka_unit_test(test_mba_reset_uses_mrrm_count),
+            cmocka_unit_test(test_mba_reset_skips_domain_without_marc),
+            cmocka_unit_test(test_mba_set_rejects_domain_without_marc),
+            cmocka_unit_test(test_mba_get_rejects_domain_without_marc),
+            cmocka_unit_test(test_mba_set_rejects_partly_populated_marc),
             cmocka_unit_test(test_io_overflow_invalidates_baseline),
             cmocka_unit_test(test_mmio_l3ca_get_rejects_domain_without_l3ca),
             cmocka_unit_test(test_mmio_l3ca_set_rejects_domain_without_l3ca),

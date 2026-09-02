@@ -237,6 +237,66 @@ cap_get_mmio_l3ca_zero_length(const struct pqos_erdt_info *erdt,
         return dev_agent->card.zero_length_bitmask;
 }
 
+/**
+ * @brief Whether a CPU agent carries MBA registers
+ *
+ * A CPU RMDD is valid without a MARC sub-structure: erdt_populate_rmdd_cpu_
+ * agent() requires only CACD, so an agent enumerated without one leaves the
+ * MARC block zeroed, the way a device agent enumerated for monitoring alone
+ * leaves CARD zeroed. The registers MBA programs are in that block, and the
+ * three bandwidth control types each have a base address of their own, so all
+ * three are needed before any of them can be reached.
+ *
+ * @param [in] cpu_agent CPU agent to examine
+ *
+ * @return whether the agent's MARC block was populated
+ */
+static int
+cpu_agent_has_mba(const struct pqos_cpu_agent_info *cpu_agent)
+{
+        return cpu_agent->marc.reg_block_size != 0 &&
+               cpu_agent->marc.opt_bw_reg_block_base_addr != 0 &&
+               cpu_agent->marc.min_bw_reg_block_base_addr != 0 &&
+               cpu_agent->marc.max_bw_reg_block_base_addr != 0;
+}
+
+/**
+ * @brief Report a domain that carries no MBA registers
+ *
+ * On the MMIO interface the MBA registers live in the MARC block of a CPU
+ * agent, so a device domain, a domain the platform does not have, and a CPU
+ * agent enumerated without MARC cannot carry them. A CPU domain ID and a
+ * device domain ID look alike on a command line, which is why the message
+ * names the domains that do carry MBA.
+ *
+ * @param [in] erdt ERDT information
+ * @param [in] domain_id domain that was asked for
+ */
+static void
+log_domain_without_mba(const struct pqos_erdt_info *erdt, uint16_t domain_id)
+{
+        char domains[DOMAIN_LIST_SIZE] = {0};
+        size_t used = 0;
+        unsigned i;
+
+        for (i = 0; i < erdt->num_cpu_agents; i++) {
+                if (!cpu_agent_has_mba(&erdt->cpu_agents[i]))
+                        continue;
+
+                if (!append_domain(domains, &used,
+                                   erdt->cpu_agents[i].rmdd.domain_id))
+                        break;
+        }
+
+        LOG_ERROR("Domain ID 0x%x carries no MBA registers. On the MMIO "
+                  "interface MBA applies to the CPU domains, %s. Use "
+                  "--print-topology to list them\n",
+                  domain_id,
+                  used > 0 ? domains
+                           : "of which this platform "
+                             "reports none");
+}
+
 int
 mmio_alloc_reset_mba(void)
 {
@@ -251,6 +311,14 @@ mmio_alloc_reset_mba(void)
                 return ret;
 
         for (unsigned domain = 0; domain < erdt->num_cpu_agents; domain++) {
+                /* An agent enumerated without a MARC block holds no MBA
+                 * register to reset. Writing one anyway would map its zeroed
+                 * register base, which fails, and take the whole allocation
+                 * reset down with it, leaving every other domain unreset.
+                 */
+                if (!cpu_agent_has_mba(&erdt->cpu_agents[domain]))
+                        continue;
+
                 for (unsigned i = 0; i < erdt->max_clos; i++) {
                         for (int j = 0; j < (int)num_mem_regions; j++) {
                                 ret = set_mba_optimal_bw_region_clos_v1(
@@ -307,8 +375,19 @@ mmio_mba_check_request(const struct pqos_mba *mba,
                        const struct pqos_erdt_info *erdt,
                        const unsigned num_mem_regions)
 {
-        if (get_mmio_cpu_agent_by_domain(erdt, mba->domain_id) == NULL ||
-            mba->class_id >= erdt->max_clos || mba->num_mem_regions < 0 ||
+        const struct pqos_cpu_agent_info *cpu_agent =
+            get_mmio_cpu_agent_by_domain(erdt, mba->domain_id);
+
+        /* the registers are named before the values are, so that a domain that
+         * cannot be programmed at all is reported as such rather than through
+         * the failure of a write to a zeroed register base
+         */
+        if (cpu_agent == NULL || !cpu_agent_has_mba(cpu_agent)) {
+                log_domain_without_mba(erdt, mba->domain_id);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (mba->class_id >= erdt->max_clos || mba->num_mem_regions < 0 ||
             (unsigned)mba->num_mem_regions > num_mem_regions)
                 return PQOS_RETVAL_PARAM;
 
@@ -488,8 +567,12 @@ mmio_mba_get(const unsigned mba_id,
                 return PQOS_RETVAL_ERROR;
 
         cpu_agent = get_mmio_cpu_agent_by_domain(erdt, mba_tab[0].domain_id);
-        if (cpu_agent == NULL || num_mem_regions < 0 ||
-            (unsigned)num_mem_regions > supported)
+        if (cpu_agent == NULL || !cpu_agent_has_mba(cpu_agent)) {
+                log_domain_without_mba(erdt, mba_tab[0].domain_id);
+                return PQOS_RETVAL_PARAM;
+        }
+
+        if (num_mem_regions < 0 || (unsigned)num_mem_regions > supported)
                 return PQOS_RETVAL_PARAM;
 
         for (unsigned i = 0; i < erdt->max_clos; i++) {
