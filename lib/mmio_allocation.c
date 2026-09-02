@@ -64,6 +64,42 @@
 #define DOMAIN_LIST_MORE " and more"
 
 /**
+ * @brief Add one domain ID to a list built for a diagnostic
+ *
+ * The buffer always keeps room for DOMAIN_LIST_MORE behind the last entry that
+ * fitted, so a list that ran out of room says so rather than ending as though
+ * the platform had no further domains.
+ *
+ * @param [out]    domains buffer of DOMAIN_LIST_SIZE bytes to build the list in
+ * @param [in,out] used how much of the buffer the list occupies
+ * @param [in]     domain_id domain to add
+ *
+ * @return whether another domain can still be added
+ */
+static int
+append_domain(char *domains, size_t *used, uint16_t domain_id)
+{
+        /* room an entry may take, leaving DOMAIN_LIST_MORE always able to
+         * follow the last one that fitted
+         */
+        const size_t entry_limit = DOMAIN_LIST_SIZE - sizeof(DOMAIN_LIST_MORE);
+        int len = snprintf(domains + *used, entry_limit - *used, "%s0x%x",
+                           *used > 0 ? ", " : "", domain_id);
+
+        if (len < 0 || (size_t)len >= entry_limit - *used) {
+                /* *used is below entry_limit, so the reserved room is there */
+                memcpy(domains + *used, DOMAIN_LIST_MORE,
+                       sizeof(DOMAIN_LIST_MORE));
+                *used += sizeof(DOMAIN_LIST_MORE) - 1;
+                return 0;
+        }
+
+        *used += (size_t)len;
+
+        return 1;
+}
+
+/**
  * @brief Populate a single mem_region data structure for a given CLOS
  *        using the region_num already stored in the mem_region.
  *
@@ -515,34 +551,16 @@ static void
 log_domain_without_l3ca(const struct pqos_erdt_info *erdt, uint16_t domain_id)
 {
         char domains[DOMAIN_LIST_SIZE] = {0};
-        /* room an entry may take, leaving DOMAIN_LIST_MORE always able to
-         * follow the last one that fitted
-         */
-        const size_t entry_limit = sizeof(domains) - sizeof(DOMAIN_LIST_MORE);
         size_t used = 0;
         unsigned i;
 
         for (i = 0; i < erdt->num_dev_agents; i++) {
-                int len;
-
                 if (!dev_agent_has_l3ca(&erdt->dev_agents[i]))
                         continue;
 
-                len = snprintf(domains + used, entry_limit - used, "%s0x%x",
-                               used > 0 ? ", " : "",
-                               erdt->dev_agents[i].rmdd.domain_id);
-
-                if (len < 0 || (size_t)len >= entry_limit - used) {
-                        /* the list did not fit, so say so rather than end it
-                         * as though the platform had no more domains. used is
-                         * below entry_limit, so the reserved room is there
-                         */
-                        memcpy(domains + used, DOMAIN_LIST_MORE,
-                               sizeof(DOMAIN_LIST_MORE));
-                        used += sizeof(DOMAIN_LIST_MORE) - 1;
+                if (!append_domain(domains, &used,
+                                   erdt->dev_agents[i].rmdd.domain_id))
                         break;
-                }
-                used += (size_t)len;
         }
 
         LOG_ERROR("Domain ID 0x%x carries no L3 CAT registers. On the MMIO "
