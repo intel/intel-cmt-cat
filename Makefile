@@ -48,7 +48,7 @@ ifdef SHARED
 export SHARED
 endif
 
-.PHONY: all clean TAGS install uninstall style cppcheck setup-dev
+.PHONY: all clean TAGS install uninstall style style-modes cppcheck setup-dev
 
 all:
 	$(MAKE) -C lib
@@ -71,7 +71,31 @@ clean:
 	$(MAKE) -C tests clean
 	$(MAKE) -C unit-test clean
 
-style:
+# Directories that hold C source, for the mode check below
+STYLE_MODE_DIRS = lib pqos tools examples unit-test tests
+
+# A C file is not a program, so the executable bit on one is a mistake rather
+# than a build requirement. The bit is on the file itself, in a clone and in a
+# tree unpacked from a release archive alike, so the filesystem is what to ask.
+# The index is the wrong thing to ask: it does not see a chmod until it is
+# staged, which is the moment the mistake is made, and a check that begins by
+# asking git turns itself off wherever git is not installed, refuses the
+# directory as dubiously owned, or has no .git to look at - this repository's own
+# .dockerignore drops .git, so a container build would land there. Only the user
+# bit is looked at, which is the one git itself records. Hidden directories are
+# skipped, so the C sources of a virtual environment under tests/ are not
+# reported.
+style-modes:
+	@files=$$(find $(STYLE_MODE_DIRS) -name '.*' -prune -o \
+		-type f -name '*.[ch]' -perm -u+x -print | \
+		sort | sed 's/^/  /'); \
+	if [ -n "$$files" ]; then \
+		echo "style-modes: the executable bit is set on:"; \
+		echo "$$files"; \
+		exit 1; \
+	fi
+
+style: style-modes
 	$(MAKE) -C lib style
 	$(MAKE) -C pqos style
 	$(MAKE) -C tools/membw style
