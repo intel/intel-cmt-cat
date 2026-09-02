@@ -55,7 +55,7 @@ __wrap_resctrl_mon_stop(struct pqos_mon_data *group)
 int
 __wrap_resctrl_mon_is_event_supported(const enum pqos_mon_event event)
 {
-        check_expected_ptr(event);
+        check_expected(event);
 
         return mock_type(int);
 }
