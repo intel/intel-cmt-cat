@@ -100,6 +100,7 @@ $(BIN_DIR)/test_alloc: ./test_alloc.c $(PQOS_OBJS)
 		-Wl,--wrap=pqos_l3ca_get \
 		-Wl,--wrap=pqos_l2ca_get \
 		-Wl,--wrap=pqos_mba_get \
+		-Wl,--wrap=pqos_get_num_mem_regions \
 		-Wl,--wrap=pqos_pid_get_pid_assoc \
 		-Wl,--wrap=pqos_alloc_assoc_get \
 		-Wl,--wrap=pqos_mon_assoc_get \

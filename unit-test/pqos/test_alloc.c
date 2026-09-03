@@ -582,6 +582,80 @@ test_alloc_print_config_os(void **state)
 }
 
 static void
+test_print_domain_alloc_config_skips_domain_without_marc(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cpu_agent_info cpu_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm = {0};
+        struct pqos_erdt_info *saved_erdt = data->sys->erdt;
+        struct pqos_mrrm_info *saved_mrrm = data->sys->mrrm;
+        struct pqos_mba mba = {0};
+        unsigned i;
+
+        /* domain 0x10 was enumerated without a MARC block, so it has no MBA
+         * register and pqos_mba_get() refuses it; domain 0x11 has one
+         */
+        erdt.max_clos = 1;
+        erdt.num_cpu_agents = DIM(cpu_agents);
+        erdt.cpu_agents = cpu_agents;
+        cpu_agents[0].rmdd.domain_id = 0x10;
+        cpu_agents[1].rmdd.domain_id = 0x11;
+        /* a usable MARC block: pqos_mba_get() reads all three bandwidth
+         * control windows, so all three base addresses have to be there
+         */
+        cpu_agents[1].marc.opt_bw_reg_block_base_addr = 0xf0000000;
+        cpu_agents[1].marc.min_bw_reg_block_base_addr = 0xf0001000;
+        cpu_agents[1].marc.max_bw_reg_block_base_addr = 0xf0002000;
+        cpu_agents[1].marc.reg_block_size = 1;
+
+        data->sys->erdt = &erdt;
+        data->sys->mrrm = &mrrm;
+
+        mba.class_id = 0;
+        mba.domain_id = cpu_agents[1].rmdd.domain_id;
+        mba.num_mem_regions = 1;
+        mba.mem_regions[0].region_num = 0;
+        mba.mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_OPT_IDX] = 0x1ff;
+        mba.mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_MIN_IDX] = -1;
+        mba.mem_regions[0].bw_ctrl_val[PQOS_BW_CTRL_TYPE_MAX_IDX] = -1;
+
+        /* the region count and the MBA read are expected once, for the domain
+         * that has a MARC block; a call for the other one would fail the case
+         */
+        will_return(__wrap_pqos_get_num_mem_regions, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_get_num_mem_regions, 1);
+        expect_value(__wrap_pqos_mba_get, mba_id, cpu_agents[1].rmdd.domain_id);
+        expect_value(__wrap_pqos_mba_get, max_num_clos, erdt.max_clos);
+        will_return(__wrap_pqos_mba_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_mba_get, 1);
+        will_return(__wrap_pqos_mba_get, &mba);
+
+        /* print_core_assoc() per core, plus one for print_iordt_alloc() */
+        mock_inter_get(PQOS_INTER_MMIO, data->cpu_info->num_cores + 1);
+        for (i = 0; i < data->cpu_info->num_cores; i++) {
+                expect_value(__wrap_pqos_alloc_assoc_get, lcore, i);
+                will_return(__wrap_pqos_alloc_assoc_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_alloc_assoc_get, 0);
+        }
+
+        run_void_function(print_domain_alloc_config, NULL, NULL, NULL,
+                          data->cap_mba, data->sys);
+
+        /* the domain that cannot be read does not end the display: the MBA of
+         * the domain that can is shown, and so are the core associations
+         * printed after the loop
+         */
+        assert_true(output_has_text("Domain ID 17 MBA CLOS0 Memory Region 0 "
+                                    "Optimal Bandwidth=> 0x1ff\n"));
+        assert_true(output_has_text("Core information for socket 0:\n"));
+        assert_false(output_has_text("Error retrieving MMIO registers"));
+
+        data->sys->erdt = saved_erdt;
+        data->sys->mrrm = saved_mrrm;
+}
+
+static void
 test_alloc_apply_cap_not_detected(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
@@ -1699,6 +1773,8 @@ main(void)
         const struct CMUnitTest tests_need_all_caps[] = {
             cmocka_unit_test(test_alloc_print_config_msr),
             cmocka_unit_test(test_alloc_print_config_os),
+            cmocka_unit_test(
+                test_print_domain_alloc_config_skips_domain_without_marc),
             cmocka_unit_test(test_alloc_apply_mba),
             cmocka_unit_test(test_alloc_apply_mba_max),
             cmocka_unit_test(test_alloc_apply_l3ca),

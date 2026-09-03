@@ -2524,6 +2524,28 @@ print_mba(const struct pqos_mba *mba)
                 }
 }
 
+/**
+ * @brief Whether a CPU domain has MBA registers to display
+ *
+ * The MBA registers of a domain are in the MARC block of its CPU agent, and a
+ * CPU agent is valid without one. The test is the library's: all three
+ * bandwidth control windows, because pqos_mba_get() reads all three and refuses
+ * a domain that cannot serve them. Admitting a domain the library will refuse
+ * would put the abort below back, which is what this predicate exists to avoid.
+ *
+ * @param [in] cpu_agent CPU agent to examine
+ *
+ * @return whether the domain has MBA registers
+ */
+static int
+domain_has_mba(const struct pqos_cpu_agent_info *cpu_agent)
+{
+        return cpu_agent->marc.reg_block_size != 0 &&
+               cpu_agent->marc.opt_bw_reg_block_base_addr != 0 &&
+               cpu_agent->marc.min_bw_reg_block_base_addr != 0 &&
+               cpu_agent->marc.max_bw_reg_block_base_addr != 0;
+}
+
 void
 print_domain_alloc_config(const struct pqos_capability *cap_mon,
                           const struct pqos_capability *cap_l3ca,
@@ -2594,6 +2616,16 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
         for (idx = 0; idx < sys->erdt->num_cpu_agents; idx++) {
                 unsigned supported;
                 unsigned num_mba = 0;
+
+                /* A CPU agent enumerated without a MARC block has no MBA
+                 * register to show, and pqos_mba_get() refuses such a domain.
+                 * That is right for a domain the user named, but here the
+                 * domains come from the platform, so skip it: failing would
+                 * hide the MBA of every domain enumerated after it, and the
+                 * core associations printed below.
+                 */
+                if (!domain_has_mba(&sys->erdt->cpu_agents[idx]))
+                        continue;
 
                 if (pqos_platform_mem_regions(&supported) != 0)
                         goto free_and_return;

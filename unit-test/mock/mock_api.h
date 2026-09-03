@@ -107,6 +107,7 @@ int __wrap_pqos_mba_get(const unsigned mba_id,
                         const unsigned max_num_clos,
                         unsigned *num_clos,
                         struct pqos_mba *mba_tab);
+int __wrap_pqos_get_num_mem_regions(unsigned *num_mem_regions);
 unsigned *__wrap_pqos_cpu_get_cores_l3cat_id(const struct pqos_cpuinfo *cpu,
                                              const unsigned l3cat_id,
                                              unsigned *count);

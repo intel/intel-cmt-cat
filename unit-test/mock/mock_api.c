@@ -412,6 +412,20 @@ __wrap_pqos_mba_get(const unsigned mba_id,
         return ret;
 }
 
+int
+__wrap_pqos_get_num_mem_regions(unsigned *num_mem_regions)
+{
+        int ret;
+
+        ret = mock_type(int);
+        if (ret == PQOS_RETVAL_OK) {
+                assert_non_null(num_mem_regions);
+                *num_mem_regions = mock_type(unsigned);
+        }
+
+        return ret;
+}
+
 unsigned *
 __wrap_pqos_cpu_get_cores_l3cat_id(const struct pqos_cpuinfo *cpu,
                                    const unsigned l3cat_id,
