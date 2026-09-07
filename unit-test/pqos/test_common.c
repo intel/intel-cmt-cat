@@ -29,6 +29,8 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include "test_common.h"
+
 #include "common.h"
 #include "output.h"
 
@@ -86,6 +88,35 @@ group_teardown(void **state)
                 rmdir(work_dir);
 
         return 0;
+}
+
+/* The window between safe_open()'s lstat() and its open() cannot be hit by a
+ * caller, so lstat() is wrapped: the first call on the armed name answers
+ * truthfully and then puts a symlink there, which is exactly the race the
+ * O_NOFOLLOW is for. A C library that does not route lstat() through the
+ * wrapper - the symbol is only exported from glibc 2.33 - leaves
+ * race_wrapper_ran clear, and the cases below skip rather than pretend.
+ */
+static const char *race_link = NULL;
+static const char *race_target = NULL;
+static int race_wrapper_ran;
+
+int
+__wrap_lstat(const char *pathname, struct stat *buf)
+{
+        int ret = __real_lstat(pathname, buf);
+        int error = errno;
+
+        if (race_link != NULL && strcmp(pathname, race_link) == 0) {
+                race_wrapper_ran = 1;
+                if (symlink(race_target, race_link) != 0)
+                        race_wrapper_ran = -1;
+                race_link = NULL;
+        }
+
+        errno = error;
+
+        return ret;
 }
 
 /* A file the caller offered to create does not exist yet, which is the whole
@@ -265,6 +296,88 @@ test_safe_open_refuses_a_dangling_symlink(void **state)
         unlink(target);
 }
 
+/* The link appears after the lstat() has already said the name is free, so the
+ * check before the open cannot see it and the open() is the only thing left
+ * between the caller and a file it never named.
+ */
+static void
+test_safe_open_refuses_a_symlink_that_appears_in_the_window(void **state)
+{
+        char target_buffer[PATH_MAX];
+        char link_buffer[PATH_MAX];
+        const char *target =
+            work_path(target_buffer, sizeof(target_buffer), "race_target.txt");
+        const char *link =
+            work_path(link_buffer, sizeof(link_buffer), "race_link.txt");
+        int fd = 0;
+
+        UNUSED_ARG(state);
+
+        unlink(link);
+        unlink(target);
+        race_target = target;
+        race_link = link;
+        race_wrapper_ran = 0;
+        errno = 0;
+
+        run_function(safe_open, fd, link, O_WRONLY | O_CREAT, FILE_MODE);
+
+        race_link = NULL;
+        if (race_wrapper_ran != 1) {
+                unlink(link);
+                unlink(target);
+                skip();
+        }
+
+        assert_int_equal(fd, -1);
+        assert_int_equal(errno, ELOOP);
+        assert_int_equal(output_has_text("is a symlink"), 1);
+        assert_int_equal(access(target, F_OK), -1);
+
+        assert_int_equal(unlink(link), 0);
+}
+
+/* The same race with O_EXCL, where the refusal arrives as EEXIST rather than
+ * ELOOP and would otherwise be reported as "the file exists".
+ */
+static void
+test_safe_open_names_the_symlink_that_appears_under_o_excl(void **state)
+{
+        char target_buffer[PATH_MAX];
+        char link_buffer[PATH_MAX];
+        const char *target =
+            work_path(target_buffer, sizeof(target_buffer), "excl_race.txt");
+        const char *link =
+            work_path(link_buffer, sizeof(link_buffer), "excl_race_link.txt");
+        int fd = 0;
+
+        UNUSED_ARG(state);
+
+        unlink(link);
+        unlink(target);
+        race_target = target;
+        race_link = link;
+        race_wrapper_ran = 0;
+        errno = 0;
+
+        run_function(safe_open, fd, link, O_WRONLY | O_CREAT | O_EXCL,
+                     FILE_MODE);
+
+        race_link = NULL;
+        if (race_wrapper_ran != 1) {
+                unlink(link);
+                unlink(target);
+                skip();
+        }
+
+        assert_int_equal(fd, -1);
+        assert_int_equal(errno, ELOOP);
+        assert_int_equal(output_has_text("is a symlink"), 1);
+        assert_int_equal(access(target, F_OK), -1);
+
+        assert_int_equal(unlink(link), 0);
+}
+
 int
 main(void)
 {
@@ -277,6 +390,10 @@ main(void)
             cmocka_unit_test(
                 test_safe_open_refuses_a_symlink_whatever_the_flags),
             cmocka_unit_test(test_safe_open_refuses_a_dangling_symlink),
+            cmocka_unit_test(
+                test_safe_open_refuses_a_symlink_that_appears_in_the_window),
+            cmocka_unit_test(
+                test_safe_open_names_the_symlink_that_appears_under_o_excl),
         };
 
         return cmocka_run_group_tests(tests, group_setup, group_teardown);

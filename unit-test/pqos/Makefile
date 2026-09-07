@@ -141,6 +141,7 @@ $(BIN_DIR)/test_common: ./test_common.c $(PQOS_OBJS)
 		-Wl,--wrap=printf \
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
+		-Wl,--wrap=lstat \
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
@@ -204,6 +205,7 @@ checkpatch:
 	SYMBOLIC_PERMS,CONST_STRUCT,SPACING \
 	-f test_alloc.c \
 	-f test_common.c \
+	-f test_common.h \
 	-f test_dump.c \
 	-f test_main.c \
 	-f test_iface_select.c \
