@@ -103,8 +103,10 @@ FILE *safe_fopen(const char *name, const char *mode);
  * @param [in] mode file mode bits
  *
  * @return A file descriptor
- * @retval A valid file descriptor or -1 on error, with errno ELOOP when the
- * name is a symbolic link
+ * @retval A valid file descriptor, or -1 with errno ELOOP when the name it was
+ * given is a symbolic link, EAGAIN when the name still exists but no longer
+ * refers to the file that was opened, and otherwise the errno of whichever
+ * call failed - the open, or one of the stats that check what it opened
  */
 int safe_open(const char *pathname, int flags, mode_t mode);
 
