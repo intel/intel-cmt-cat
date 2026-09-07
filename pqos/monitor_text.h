@@ -41,9 +41,8 @@
  *
  * @param fp file descriptor
  */
-void monitor_text_begin(FILE * fp,
-                        const int num_mem_regions,
-                        const int *region_num);
+void
+monitor_text_begin(FILE *fp, const int num_mem_regions, const int *region_num);
 
 /**
  * @brief Print text header

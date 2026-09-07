@@ -41,9 +41,8 @@
  *
  * @param fp file descriptor
  */
-void monitor_csv_begin(FILE * fp,
-                       const int num_mem_regions,
-                       const int *region_num);
+void
+monitor_csv_begin(FILE *fp, const int num_mem_regions, const int *region_num);
 
 /**
  * @brief Print CSV header

@@ -74,32 +74,28 @@ void selfn_alloc_mem_regions(const char *arg);
  *
  * @param arg not used
  */
-void
-selfn_alloc_opt_bw(const char *arg);
+void selfn_alloc_opt_bw(const char *arg);
 
 /**
  * @brief Selects minimum bandwidth in memory regions for allocation
  *
  * @param arg not used
  */
-void
-selfn_alloc_min_bw(const char *arg);
+void selfn_alloc_min_bw(const char *arg);
 
 /**
  * @brief Selects maximum bandwidth in memory regions for allocation
  *
  * @param arg not used
  */
-void
-selfn_alloc_max_bw(const char *arg);
+void selfn_alloc_max_bw(const char *arg);
 
 /**
  * @brief Selects domain id for allocation
  *
  * @param arg not used
  */
-void
-selfn_alloc_domain_id(const char *arg);
+void selfn_alloc_domain_id(const char *arg);
 
 /**
  * @brief Prints information about cache allocation settings in the system
@@ -131,12 +127,11 @@ void alloc_print_config(const struct pqos_capability *cap_mon,
  * @param [in] sys PQoS system configuration structure
  * @param [in] verbose enable verbose mode
  */
-void
-print_domain_alloc_config(const struct pqos_capability *cap_mon,
-                          const struct pqos_capability *cap_l3ca,
-                          const struct pqos_capability *cap_l2ca,
-                          const struct pqos_capability *cap_mba,
-                          const struct pqos_sysconfig *sys);
+void print_domain_alloc_config(const struct pqos_capability *cap_mon,
+                               const struct pqos_capability *cap_l3ca,
+                               const struct pqos_capability *cap_l2ca,
+                               const struct pqos_capability *cap_mba,
+                               const struct pqos_sysconfig *sys);
 
 /**
  * @brief Applies allocation settings previously selected via

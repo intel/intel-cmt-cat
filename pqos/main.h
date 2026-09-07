@@ -113,7 +113,9 @@ unsigned iface_narrow(unsigned current, unsigned add);
  * @retval -1 when @a mask is empty / invalid
  * @retval -2 when the user override conflicts with @a mask
  */
-int iface_resolve(unsigned mask, int user_set, enum pqos_interface user,
+int iface_resolve(unsigned mask,
+                  int user_set,
+                  enum pqos_interface user,
                   enum pqos_interface *out);
 
 /**

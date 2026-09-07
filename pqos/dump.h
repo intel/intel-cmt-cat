@@ -49,73 +49,63 @@ extern "C" {
  * @param [in] sys PQoS system configuration struct
  *                 returned by a pqos_sysconfig_get
  */
-int
-pqos_print_dump_info(const struct pqos_sysconfig *sys);
+int pqos_print_dump_info(const struct pqos_sysconfig *sys);
 
 /**
  * @brief Selects domain id option in dump command
  *
  * @param [in] arg string passed from --dump-domain-id command line option
  */
-void
-selfn_dump_domain_id(const char *arg);
+void selfn_dump_domain_id(const char *arg);
 
 /**
  * @brief Selects socket option in dump command
  *
  * @param [in] arg string passed from --socket command line option
  */
-void
-selfn_dump_socket(const char *arg);
+void selfn_dump_socket(const char *arg);
 
 /**
  * @brief Selects space option in dump command
  *
  * @param [in] arg string passed from --space command line option
  */
-void
-selfn_dump_space(const char *arg);
+void selfn_dump_space(const char *arg);
 
 /**
  * @brief Selects width option in dump command
  *
  * @param [in] arg string passed from --width command line option
  */
-void
-selfn_dump_width(const char *arg);
+void selfn_dump_width(const char *arg);
 
 /**
  * @brief Selects little-endian option in dump command
  *
  * @param arg not used
  */
-void
-selfn_dump_le(const char *arg);
-
+void selfn_dump_le(const char *arg);
 
 /**
  * @brief Selects binary option in dump command
  *
  * @param arg not used
  */
-void
-selfn_dump_binary(const char *arg);
+void selfn_dump_binary(const char *arg);
 
 /**
  * @brief Selects offset option in dump command
  *
  * @param [in] arg string passed from --offset command line option
  */
-void
-selfn_dump_offset(const char *arg);
+void selfn_dump_offset(const char *arg);
 
 /**
  * @brief Selects length option in dump command
  *
  * @param [in] arg string passed from --length command line option
  */
-void
-selfn_dump_length(const char *arg);
+void selfn_dump_length(const char *arg);
 
 /**
  *  @brief Prints the values of MMIO registers provided in --dump command
@@ -126,8 +116,7 @@ selfn_dump_length(const char *arg);
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  */
-int
-dump_mmio_regs(const struct pqos_sysconfig *sys);
+int dump_mmio_regs(const struct pqos_sysconfig *sys);
 
 #ifdef __cplusplus
 }
