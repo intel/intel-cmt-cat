@@ -89,6 +89,7 @@ init_cpuinfo(struct test_data *data, unsigned num_cores, unsigned num_socket)
         cpu_info->l3.way_size = 3670016;
 
         unsigned i = 0;
+
         for (i = 0; i < num_cores; i++) {
                 if ((i != 0) && (i % (num_cores / data->num_socket) == 0))
                         socket++;
@@ -128,6 +129,7 @@ init_cap_mon(struct test_data *data)
         cap_mon->u.mon->num_events = num_events;
 
         unsigned i;
+
         for (i = 0; i < num_events; i++) {
                 if (i < 4)
                         cap_mon->u.mon->events[i].max_rmid = 224;
