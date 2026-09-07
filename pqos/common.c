@@ -509,11 +509,23 @@ safe_open(const char *pathname, int flags, mode_t mode)
                 goto safe_open_error;
 
         /**
-         * The descriptor cannot be a symlink, O_NOFOLLOW saw to that, so what
-         * is left for this to catch is the name having been replaced between
-         * the lstat() and the open() - which is not the same thing, and is not
-         * reported as one. What identifies a file and what kind of file it is
-         * are what get compared; a chmod in between changes neither.
+         * A descriptor on the symlink itself is what O_PATH | O_NOFOLLOW
+         * gives, and a link that appeared after the lstat() above would then
+         * be described identically by both stats, so the refusal cannot rest
+         * on the flags the caller happened to choose.
+         */
+        if (S_ISLNK(fstat_val.st_mode)) {
+                printf("File %s is a symlink\n", pathname);
+                errno = ELOOP;
+                goto safe_open_error;
+        }
+
+        /**
+         * What is left for the comparison to catch is the name having been
+         * replaced between the lstat() and the open() - which is not the same
+         * thing as a symlink, and is not reported as one. What identifies a
+         * file and what kind of file it is are what get compared; a chmod in
+         * between changes neither.
          *
          * A directory in the path that is a symlink is invisible to this: the
          * lstat() and the open() resolve it the same way, so they agree about
