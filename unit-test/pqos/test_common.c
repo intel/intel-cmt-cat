@@ -554,12 +554,41 @@ test_filter_cpu_rejects_everything_else(void **state)
         assert_int_equal(filter_name("cpu0abc"), 0);
         assert_int_equal(filter_name("cpu1_2"), 0);
 
+        /* the two scandir() calls the filter with first */
+        assert_int_equal(filter_name("."), 0);
+        assert_int_equal(filter_name(".."), 0);
+
         assert_int_equal(filter_name("cpu"), 0);
         assert_int_equal(filter_name("cpufreq"), 0);
         assert_int_equal(filter_name("cpuidle"), 0);
         assert_int_equal(filter_name("possible"), 0);
         assert_int_equal(filter_name("cpu-1"), 0);
         assert_int_equal(filter_name("cpu4294967296"), 0);
+        assert_int_equal(filter_name("cpu99999999999999999999"), 0);
+
+        /* the forms strtoul() would take for a number the kernel never writes
+         * that way, each of which would be a second entry for a CPU that
+         * already has one
+         */
+        assert_int_equal(filter_name("cpu+7"), 0);
+        assert_int_equal(filter_name("cpu 7"), 0);
+        assert_int_equal(filter_name("cpu7\n"), 0);
+        assert_int_equal(filter_name("cpu0x10"), 0);
+        assert_int_equal(filter_name("cpu0X10"), 0);
+}
+
+/* A leading zero is still a decimal number: base 0 would read cpu010 as octal
+ * 8 and order it in front of cpu9.
+ */
+static void
+test_cpu_names_are_read_as_decimal(void **state)
+{
+        UNUSED_ARG(state);
+
+        assert_int_equal(filter_name("cpu010"), 1);
+        assert_true(sort_names("cpu010", "cpu9") > 0);
+        assert_true(sort_names("cpu9", "cpu010") < 0);
+        assert_int_equal(sort_names("cpu010", "cpu10"), 0);
 }
 
 static void
@@ -629,6 +658,7 @@ main(void)
                 test_safe_open_does_not_adopt_a_file_that_appeared),
             cmocka_unit_test(test_filter_cpu_accepts_a_cpu_number),
             cmocka_unit_test(test_filter_cpu_rejects_everything_else),
+            cmocka_unit_test(test_cpu_names_are_read_as_decimal),
             cmocka_unit_test(test_cpu_sort_orders_by_number),
             cmocka_unit_test(test_cpu_sort_orders_numbers_beyond_int_range),
             cmocka_unit_test(test_cpu_sort_puts_unreadable_names_last),

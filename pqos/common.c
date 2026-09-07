@@ -57,7 +57,10 @@ pqos_platform_mem_regions(unsigned *num_mem_regions)
 }
 
 /**
- * @brief Converts string into unsigned number.
+ * @brief Converts a decimal string into an unsigned number.
+ *
+ * Base 10, so a number a caller read out of a name means the same thing
+ * whether or not it was written with a leading zero.
  *
  * @param [in] str string to be converted into unsigned number
  * @param [out] value Numeric value of the string representing the number
@@ -75,11 +78,11 @@ pqos_parse_uint(const char *str, unsigned *value)
         ASSERT(value != NULL);
 
         errno = 0;
-        val = strtoul(str, &endptr, 0);
+        val = strtoul(str, &endptr, 10);
         if (!(*str != '\0' && (*endptr == '\0' || *endptr == '\n')))
                 return PQOS_RETVAL_ERROR;
 
-        if (val <= UINT_MAX) {
+        if (errno == 0 && val <= UINT_MAX) {
                 *value = val;
                 return PQOS_RETVAL_OK;
         }
@@ -560,10 +563,30 @@ safe_open_error:
 static int
 cpu_from_name(const char *name, unsigned *cpu)
 {
+        const char *digits;
+        size_t i;
+
+        /* the prefix decides whether there is anything behind it to look at:
+         * scandir() calls the filter for "." and ".." as well
+         */
         if (strncmp(name, "cpu", 3) != 0)
                 return PQOS_RETVAL_ERROR;
 
-        return pqos_parse_uint(name + 3, cpu);
+        digits = name + 3;
+        if (digits[0] == '\0')
+                return PQOS_RETVAL_ERROR;
+
+        /* The kernel names these directories "cpu" and a decimal number, and
+         * nothing else. strtoul() alone would also take a sign, a leading
+         * space and a trailing newline, so "cpu+7", "cpu 7" and "cpu7\n" would
+         * all be a seventh CPU beside cpu7 - more entries than the machine has
+         * and two of them comparing equal.
+         */
+        for (i = 0; digits[i] != '\0'; i++)
+                if (!isdigit((unsigned char)digits[i]))
+                        return PQOS_RETVAL_ERROR;
+
+        return pqos_parse_uint(digits, cpu);
 }
 
 /**
