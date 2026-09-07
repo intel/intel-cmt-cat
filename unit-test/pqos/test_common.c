@@ -101,6 +101,7 @@ group_teardown(void **state)
  */
 static const char *race_link = NULL;
 static const char *race_target = NULL;
+static int race_regular;
 static int race_wrapper_ran;
 
 int
@@ -116,8 +117,16 @@ __wrap_lstat(const char *pathname, struct stat *buf)
                  * for a name that is not one this fails and changes nothing
                  */
                 rmdir(race_link);
-                if (symlink(race_target, race_link) != 0)
+                if (race_regular) {
+                        int raced = creat(race_link, S_IRUSR | S_IWUSR);
+
+                        if (raced == -1)
+                                race_wrapper_ran = -1;
+                        else
+                                close(raced);
+                } else if (symlink(race_target, race_link) != 0) {
                         race_wrapper_ran = -1;
+                }
                 race_link = NULL;
         }
 
@@ -454,6 +463,45 @@ test_safe_open_names_a_link_the_open_called_something_else(void **state)
         assert_int_equal(unlink(dir), 0);
 }
 
+/* Not every name that appears in the window is a link. A file somebody else
+ * created there - or a FIFO, which O_NOFOLLOW has no opinion about - would be
+ * adopted as the caller's new log, so the create has to be the one that made
+ * the file it goes on to write to.
+ */
+static void
+test_safe_open_does_not_adopt_a_file_that_appeared(void **state)
+{
+        char path_buffer[PATH_MAX];
+        const char *path =
+            work_path(path_buffer, sizeof(path_buffer), "raced_in.txt");
+        int fd = 0;
+
+        UNUSED_ARG(state);
+
+        unlink(path);
+        race_target = NULL;
+        race_regular = 1;
+        race_link = path;
+        race_wrapper_ran = 0;
+        errno = 0;
+
+        run_function(safe_open, fd, path, O_WRONLY | O_CREAT, FILE_MODE);
+
+        race_link = NULL;
+        race_regular = 0;
+        if (race_wrapper_ran != 1) {
+                unlink(path);
+                skip();
+        }
+
+        assert_int_equal(fd, -1);
+        assert_int_equal(errno, EEXIST);
+        /* it is not a link, and is not described as one */
+        assert_int_equal(output_has_text("is a symlink"), 0);
+
+        assert_int_equal(unlink(path), 0);
+}
+
 int
 main(void)
 {
@@ -474,6 +522,8 @@ main(void)
                 test_safe_open_names_the_symlink_that_appears_under_o_excl),
             cmocka_unit_test(
                 test_safe_open_names_a_link_the_open_called_something_else),
+            cmocka_unit_test(
+                test_safe_open_does_not_adopt_a_file_that_appeared),
         };
 
         return cmocka_run_group_tests(tests, group_setup, group_teardown);

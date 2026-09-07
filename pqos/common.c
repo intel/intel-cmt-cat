@@ -481,8 +481,14 @@ safe_open(const char *pathname, int flags, mode_t mode)
          * would otherwise be followed here, creating or truncating whatever it
          * points at, and the comparison below could then only refuse the
          * descriptor - with the side effect already done.
+         *
+         * O_EXCL where the lstat() found nothing, so that the file this then
+         * opens is the file it created. Without it, anything that appeared in
+         * between - a file somebody else wrote, or a FIFO, which O_NOFOLLOW has
+         * no opinion about - would be adopted as though the caller had named
+         * it.
          */
-        fd = open(pathname, flags | O_NOFOLLOW, mode);
+        fd = open(pathname, flags | O_NOFOLLOW | (new_file ? O_EXCL : 0), mode);
         if (fd == -1) {
                 /**
                  * What a refused symlink is called here depends on the flags
