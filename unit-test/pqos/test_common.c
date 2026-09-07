@@ -32,6 +32,7 @@
 #include "common.h"
 #include "output.h"
 
+#include <errno.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <setjmp.h>
@@ -186,10 +187,12 @@ test_safe_open_refuses_a_symlink(void **state)
         assert_non_null(stream);
         assert_int_equal(fclose(stream), 0);
         assert_int_equal(symlink(target, link), 0);
+        errno = 0;
 
         run_function(safe_open, fd, link, O_WRONLY | O_CREAT, FILE_MODE);
 
         assert_int_equal(fd, -1);
+        assert_int_equal(errno, ELOOP);
         assert_int_equal(output_has_text("is a symlink"), 1);
 
         assert_int_equal(unlink(link), 0);
@@ -212,11 +215,15 @@ test_safe_open_refuses_a_dangling_symlink(void **state)
         unlink(link);
         unlink(target);
         assert_int_equal(symlink(target, link), 0);
+        errno = 0;
 
         run_function(safe_open, fd, link, O_WRONLY | O_CREAT, FILE_MODE);
 
         assert_int_equal(fd, -1);
+        assert_int_equal(errno, ELOOP);
         assert_int_equal(output_has_text("is a symlink"), 1);
+        /* refused before the open could create what the link pointed at */
+        assert_int_equal(access(target, F_OK), -1);
 
         assert_int_equal(unlink(link), 0);
         unlink(target);

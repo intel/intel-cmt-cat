@@ -465,10 +465,19 @@ safe_open(const char *pathname, int flags, mode_t mode)
                 new_file = 1;
         }
 
-        /* open the file */
-        fd = open(pathname, flags, mode);
-        if (fd == -1)
+        /**
+         * O_NOFOLLOW, because between the lstat() above and here another
+         * process can put a symlink in the way: the check below would refuse
+         * the descriptor, but only after open() had already created or
+         * truncated whatever the link pointed at. Refused this way there is
+         * nothing to undo, and the link is still named in the message.
+         */
+        fd = open(pathname, flags | O_NOFOLLOW, mode);
+        if (fd == -1) {
+                if (errno == ELOOP)
+                        printf("File %s is a symlink\n", pathname);
                 return -1;
+        }
 
         /* the file created above is the one to compare against */
         if (new_file && lstat(pathname, &lstat_val) == -1)
@@ -478,7 +487,11 @@ safe_open(const char *pathname, int flags, mode_t mode)
         if (fstat(fd, &fstat_val) == -1)
                 goto safe_open_error;
 
-        /* we should not have followed a symbolic link */
+        /**
+         * O_NOFOLLOW covers the last component of the name only, so this stays
+         * as the check on everything it cannot see - a directory in the path
+         * that is a symlink, or the file changing underneath the open.
+         */
         if (lstat_val.st_mode != fstat_val.st_mode ||
             lstat_val.st_ino != fstat_val.st_ino ||
             lstat_val.st_dev != fstat_val.st_dev) {
