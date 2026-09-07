@@ -35,10 +35,12 @@
 
 #include <sys/stat.h>
 
-/* lstat() is linked with --wrap=lstat, so __real_lstat exists and the wrapper
- * can pass a call through after it has done its part
+/* lstat() is linked with --wrap=lstat. The wrapper does not ask for
+ * __real_lstat: that reference is rewritten back to lstat, which is only an
+ * exported symbol from glibc 2.33, so a build against an older one would fail
+ * to link rather than reach the skip the cases arrange. fstatat() with
+ * AT_SYMLINK_NOFOLLOW is the same operation and has been exported all along.
  */
-int __real_lstat(const char *pathname, struct stat *buf);
 int __wrap_lstat(const char *pathname, struct stat *buf);
 
 #endif /* __TEST_COMMON_H */

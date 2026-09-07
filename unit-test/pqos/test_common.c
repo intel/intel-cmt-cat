@@ -93,9 +93,11 @@ group_teardown(void **state)
 /* The window between safe_open()'s lstat() and its open() cannot be hit by a
  * caller, so lstat() is wrapped: the first call on the armed name answers
  * truthfully and then puts a symlink there, which is exactly the race the
- * O_NOFOLLOW is for. A C library that does not route lstat() through the
- * wrapper - the symbol is only exported from glibc 2.33 - leaves
- * race_wrapper_ran clear, and the cases below skip rather than pretend.
+ * O_NOFOLLOW is for. The pass-through is fstatat() rather than __real_lstat,
+ * which would not link where lstat is not an exported symbol; a C library that
+ * does not route lstat() through the wrapper at all - it is exported from
+ * glibc 2.33 - leaves race_wrapper_ran clear, and the cases below skip rather
+ * than pretend.
  */
 static const char *race_link = NULL;
 static const char *race_target = NULL;
@@ -104,7 +106,7 @@ static int race_wrapper_ran;
 int
 __wrap_lstat(const char *pathname, struct stat *buf)
 {
-        int ret = __real_lstat(pathname, buf);
+        int ret = fstatat(AT_FDCWD, pathname, buf, AT_SYMLINK_NOFOLLOW);
         int error = errno;
 
         if (race_link != NULL && strcmp(pathname, race_link) == 0) {
