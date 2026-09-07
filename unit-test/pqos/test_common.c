@@ -109,6 +109,11 @@ __wrap_lstat(const char *pathname, struct stat *buf)
 
         if (race_link != NULL && strcmp(pathname, race_link) == 0) {
                 race_wrapper_ran = 1;
+                /* the armed name may be a directory the case created, so that
+                 * it can be replaced the way a directory of a path could be;
+                 * for a name that is not one this fails and changes nothing
+                 */
+                rmdir(race_link);
                 if (symlink(race_target, race_link) != 0)
                         race_wrapper_ran = -1;
                 race_link = NULL;
@@ -410,6 +415,43 @@ test_safe_open_names_the_symlink_that_appears_under_o_excl(void **state)
         assert_int_equal(unlink(link), 0);
 }
 
+/* O_DIRECTORY turns the refusal into ENOTDIR, so an errno is not what decides
+ * whether a name is a link - the name is. Here a directory is replaced by a
+ * link to one inside the window, which is the shape a path component takes.
+ */
+static void
+test_safe_open_names_a_link_the_open_called_something_else(void **state)
+{
+        char dir_buffer[PATH_MAX];
+        const char *dir = work_path(dir_buffer, sizeof(dir_buffer), "race_dir");
+        int fd = 0;
+
+        UNUSED_ARG(state);
+
+        rmdir(dir);
+        unlink(dir);
+        assert_int_equal(mkdir(dir, S_IRWXU), 0);
+        race_target = work_dir;
+        race_link = dir;
+        race_wrapper_ran = 0;
+        errno = 0;
+
+        run_function(safe_open, fd, dir, O_RDONLY | O_DIRECTORY, FILE_MODE);
+
+        race_link = NULL;
+        if (race_wrapper_ran != 1) {
+                unlink(dir);
+                rmdir(dir);
+                skip();
+        }
+
+        assert_int_equal(fd, -1);
+        assert_int_equal(errno, ELOOP);
+        assert_int_equal(output_has_text("is a symlink"), 1);
+
+        assert_int_equal(unlink(dir), 0);
+}
+
 int
 main(void)
 {
@@ -428,6 +470,8 @@ main(void)
                 test_safe_open_refuses_a_symlink_that_appears_in_the_window),
             cmocka_unit_test(
                 test_safe_open_names_the_symlink_that_appears_under_o_excl),
+            cmocka_unit_test(
+                test_safe_open_names_a_link_the_open_called_something_else),
         };
 
         return cmocka_run_group_tests(tests, group_setup, group_teardown);
