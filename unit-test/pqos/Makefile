@@ -134,6 +134,16 @@ $(BIN_DIR)/test_main: ./test_main.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_common: ./test_common.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--start-group \
+		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_dump: ./test_dump.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \
@@ -193,6 +203,7 @@ checkpatch:
 	SPDX_LICENSE_TAG,ARRAY_SIZE,EMBEDDED_FUNCTION_NAME,\
 	SYMBOLIC_PERMS,CONST_STRUCT,SPACING \
 	-f test_alloc.c \
+	-f test_common.c \
 	-f test_dump.c \
 	-f test_main.c \
 	-f test_iface_select.c \

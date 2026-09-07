@@ -2392,7 +2392,8 @@ main(int argc, char **argv)
                 cfg.fd_log = safe_open(sel_log_file, O_WRONLY | O_CREAT,
                                        FILE_READ_WRITE);
                 if (cfg.fd_log == -1) {
-                        printf("Error opening %s log file!\n", sel_log_file);
+                        printf("Error opening %s log file: %s!\n", sel_log_file,
+                               strerror(errno));
                         exit_val = EXIT_FAILURE;
                         goto error_exit_1;
                 }

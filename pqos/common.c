@@ -446,35 +446,59 @@ int
 safe_open(const char *pathname, int flags, mode_t mode)
 {
         int fd;
+        int error;
         struct stat lstat_val;
         struct stat fstat_val;
+        int new_file = 0;
 
         /* collect any link info about the file */
         /* coverity[fs_check_call] */
-        if (lstat(pathname, &lstat_val) == -1)
-                return -1;
+        if (lstat(pathname, &lstat_val) == -1) {
+                /**
+                 * A caller that asked for the file to be created is entitled
+                 * to a name that does not exist yet. Any other reason for
+                 * lstat() to fail, and any missing file the caller did not
+                 * offer to create, still ends the call.
+                 */
+                if (errno != ENOENT || (flags & O_CREAT) == 0)
+                        return -1;
+                new_file = 1;
+        }
 
         /* open the file */
         fd = open(pathname, flags, mode);
         if (fd == -1)
                 return -1;
 
+        /* the file created above is the one to compare against */
+        if (new_file && lstat(pathname, &lstat_val) == -1)
+                goto safe_open_error;
+
         /* collect info about the opened file */
-        if (fstat(fd, &fstat_val) == -1) {
-                close(fd);
-                return -1;
-        }
+        if (fstat(fd, &fstat_val) == -1)
+                goto safe_open_error;
 
         /* we should not have followed a symbolic link */
         if (lstat_val.st_mode != fstat_val.st_mode ||
             lstat_val.st_ino != fstat_val.st_ino ||
             lstat_val.st_dev != fstat_val.st_dev) {
                 printf("File %s is a symlink\n", pathname);
-                close(fd);
-                return -1;
+                errno = ELOOP;
+                goto safe_open_error;
         }
 
         return fd;
+
+safe_open_error:
+        /**
+         * The caller reports errno, so the reason the call failed has to
+         * survive the close() that tidies up after it.
+         */
+        error = errno;
+        close(fd);
+        errno = error;
+
+        return -1;
 }
 
 int
