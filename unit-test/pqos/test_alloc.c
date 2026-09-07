@@ -656,6 +656,70 @@ test_print_domain_alloc_config_skips_domain_without_marc(void **state)
 }
 
 static void
+test_print_domain_alloc_config_skips_domain_without_card(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_device_agent_info dev_agents[2] = {0};
+        struct pqos_erdt_info erdt = {0};
+        struct pqos_mrrm_info mrrm = {0};
+        struct pqos_erdt_info *saved_erdt = data->sys->erdt;
+        struct pqos_mrrm_info *saved_mrrm = data->sys->mrrm;
+        struct pqos_l3ca l3ca = {0};
+        unsigned i;
+
+        /* device domain 0x20 was enumerated for monitoring alone, so its CARD
+         * block is zeroed and pqos_l3ca_get() refuses it; 0x21 carries L3 CAT
+         */
+        erdt.max_clos = 1;
+        erdt.num_dev_agents = DIM(dev_agents);
+        erdt.dev_agents = dev_agents;
+        dev_agents[0].rmdd.domain_id = 0x20;
+        dev_agents[1].rmdd.domain_id = 0x21;
+        dev_agents[1].card.reg_base_addr = 0xf0000000;
+        dev_agents[1].card.reg_block_size = 1;
+
+        data->sys->erdt = &erdt;
+        data->sys->mrrm = &mrrm;
+
+        l3ca.class_id = 0;
+        l3ca.domain_id = dev_agents[1].rmdd.domain_id;
+        l3ca.u.ways_mask = 0xf;
+
+        /* the read is expected once, for the domain that has a CARD block; a
+         * call for the other one would fail the case
+         */
+        expect_value(__wrap_pqos_l3ca_get, l3cat_id,
+                     dev_agents[1].rmdd.domain_id);
+        expect_value(__wrap_pqos_l3ca_get, max_num_ca, PQOS_MAX_L3CA_CLOS);
+        will_return(__wrap_pqos_l3ca_get, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_l3ca_get, 1);
+        will_return(__wrap_pqos_l3ca_get, &l3ca);
+
+        /* print_core_assoc() per core, plus one for print_iordt_alloc() */
+        mock_inter_get(PQOS_INTER_MMIO, data->cpu_info->num_cores + 1);
+        for (i = 0; i < data->cpu_info->num_cores; i++) {
+                expect_value(__wrap_pqos_alloc_assoc_get, lcore, i);
+                will_return(__wrap_pqos_alloc_assoc_get, PQOS_RETVAL_OK);
+                will_return(__wrap_pqos_alloc_assoc_get, 0);
+        }
+
+        run_void_function(print_domain_alloc_config, NULL, NULL, NULL,
+                          data->cap_mba, data->sys);
+
+        /* the domain that cannot be read does not end the display: the L3 CAT
+         * of the domain that can is shown, and so are the core associations
+         * printed after both loops
+         */
+        assert_true(output_has_text("Domain ID 0x21 I/O L3CA CLOS0 => "
+                                    "MASK 0xf\n"));
+        assert_true(output_has_text("Core information for socket 0:\n"));
+        assert_false(output_has_text("Error retrieving I/O L3CA"));
+
+        data->sys->erdt = saved_erdt;
+        data->sys->mrrm = saved_mrrm;
+}
+
+static void
 test_alloc_apply_cap_not_detected(void **state)
 {
         struct test_data *data = (struct test_data *)*state;
@@ -1775,6 +1839,8 @@ main(void)
             cmocka_unit_test(test_alloc_print_config_os),
             cmocka_unit_test(
                 test_print_domain_alloc_config_skips_domain_without_marc),
+            cmocka_unit_test(
+                test_print_domain_alloc_config_skips_domain_without_card),
             cmocka_unit_test(test_alloc_apply_mba),
             cmocka_unit_test(test_alloc_apply_mba_max),
             cmocka_unit_test(test_alloc_apply_l3ca),

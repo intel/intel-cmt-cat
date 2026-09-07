@@ -2546,6 +2546,26 @@ domain_has_mba(const struct pqos_cpu_agent_info *cpu_agent)
                cpu_agent->marc.max_bw_reg_block_base_addr != 0;
 }
 
+/**
+ * @brief Whether a device domain has I/O L3 CAT registers to display
+ *
+ * The I/O L3 CAT registers of a domain are in the CARD block of its device
+ * agent, and a device agent enumerated for monitoring alone leaves that block
+ * zeroed. The test is the library's - dev_agent_has_l3ca() in
+ * lib/mmio_allocation.c - because pqos_l3ca_get() refuses a domain that fails
+ * it, and admitting one here would put the abort below back.
+ *
+ * @param [in] dev_agent device agent to examine
+ *
+ * @return whether the domain has I/O L3 CAT registers
+ */
+static int
+domain_has_l3ca(const struct pqos_device_agent_info *dev_agent)
+{
+        return dev_agent->card.reg_base_addr != 0 &&
+               dev_agent->card.reg_block_size != 0;
+}
+
 void
 print_domain_alloc_config(const struct pqos_capability *cap_mon,
                           const struct pqos_capability *cap_l3ca,
@@ -2589,6 +2609,17 @@ print_domain_alloc_config(const struct pqos_capability *cap_mon,
                 for (clos_idx = 0; clos_idx < sys->erdt->max_clos; clos_idx++)
                         l3ca[clos_idx].domain_id =
                             sys->erdt->dev_agents[idx].rmdd.domain_id;
+
+                /* A device agent enumerated for monitoring alone has no
+                 * I/O L3 CAT register to show, and pqos_l3ca_get() refuses
+                 * such a domain. That is right for a domain the user named,
+                 * but here the domains come from the platform, so skip it:
+                 * failing would hide the configuration of every domain
+                 * enumerated after it, the MBA of every CPU domain, and the
+                 * core associations printed below.
+                 */
+                if (!domain_has_l3ca(&sys->erdt->dev_agents[idx]))
+                        continue;
 
                 ret = pqos_l3ca_get(sys->erdt->dev_agents[idx].rmdd.domain_id,
                                     DIM(l3ca), &num_ca, l3ca);
