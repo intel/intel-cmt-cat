@@ -296,6 +296,38 @@ test_safe_open_refuses_a_dangling_symlink(void **state)
         unlink(target);
 }
 
+/* An ELOOP is not proof that the name is a link: a loop in a directory of the
+ * path answers the same way, and calling that a symlink names the wrong file.
+ * Here the leaf's own lstat() is what fails, so the refusal comes before the
+ * open; the promise the case pins is the one a caller sees either way - ELOOP,
+ * and no claim about the leaf.
+ */
+static void
+test_safe_open_does_not_call_a_looping_parent_a_symlink(void **state)
+{
+        char loop_buffer[PATH_MAX];
+        char path_buffer[PATH_MAX];
+        const char *loop = work_path(loop_buffer, sizeof(loop_buffer), "loop");
+        const char *path =
+            work_path(path_buffer, sizeof(path_buffer), "loop/leaf.txt");
+        int fd = 0;
+
+        UNUSED_ARG(state);
+
+        unlink(loop);
+        assert_int_equal(symlink(loop, loop), 0);
+        errno = 0;
+
+        run_function(safe_open, fd, path, O_WRONLY | O_CREAT, FILE_MODE);
+
+        assert_int_equal(fd, -1);
+        assert_int_equal(errno, ELOOP);
+        /* the refusal is right, the explanation would not have been */
+        assert_int_equal(output_has_text("is a symlink"), 0);
+
+        assert_int_equal(unlink(loop), 0);
+}
+
 /* The link appears after the lstat() has already said the name is free, so the
  * check before the open cannot see it and the open() is the only thing left
  * between the caller and a file it never named.
@@ -390,6 +422,8 @@ main(void)
             cmocka_unit_test(
                 test_safe_open_refuses_a_symlink_whatever_the_flags),
             cmocka_unit_test(test_safe_open_refuses_a_dangling_symlink),
+            cmocka_unit_test(
+                test_safe_open_does_not_call_a_looping_parent_a_symlink),
             cmocka_unit_test(
                 test_safe_open_refuses_a_symlink_that_appears_in_the_window),
             cmocka_unit_test(

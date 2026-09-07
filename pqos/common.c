@@ -487,16 +487,18 @@ safe_open(const char *pathname, int flags, mode_t mode)
                 /**
                  * What the refusal is called depends on the flags and the
                  * platform: O_NOFOLLOW meeting a symlink is ELOOP on Linux and
-                 * EMLINK on FreeBSD, and O_EXCL turns it into EEXIST. So the
-                 * name is asked what it is rather than the errno being trusted
-                 * to say, and the caller is told ELOOP however it was reported.
-                 * printf() can fail and leave an errno of its own behind, so
-                 * the reason this returns is put back after the message.
+                 * EMLINK on FreeBSD, and O_EXCL turns it into EEXIST. None of
+                 * the three is proof on its own either - an ELOOP can come from
+                 * a loop in a directory of the path, and an EEXIST from a
+                 * regular file that appeared - so the name is asked what it is,
+                 * and only a link it confirms is reported as one. printf() can
+                 * fail and leave an errno of its own behind, so the reason this
+                 * returns is put back after the message.
                  */
                 error = errno;
-                if (error == ELOOP || error == EMLINK ||
-                    (error == EEXIST && lstat(pathname, &lstat_val) == 0 &&
-                     S_ISLNK(lstat_val.st_mode))) {
+                if ((error == ELOOP || error == EMLINK || error == EEXIST) &&
+                    lstat(pathname, &lstat_val) == 0 &&
+                    S_ISLNK(lstat_val.st_mode)) {
                         printf("File %s is a symlink\n", pathname);
                         error = ELOOP;
                 }
