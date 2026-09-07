@@ -240,12 +240,14 @@ cap_get_mmio_l3ca_zero_length(const struct pqos_erdt_info *erdt,
 /**
  * @brief Whether a CPU agent carries MBA registers
  *
- * A CPU RMDD is valid without a MARC sub-structure: erdt_populate_rmdd_cpu_
- * agent() requires only CACD, so an agent enumerated without one leaves the
- * MARC block zeroed, the way a device agent enumerated for monitoring alone
- * leaves CARD zeroed. The registers MBA programs are in that block, and the
- * three bandwidth control types each have a base address of their own, so all
- * three are needed before any of them can be reached.
+ * The Intel RDT architecture specification requires a MARC sub-structure for
+ * every RDT domain that supports Memory Bandwidth Allocation, so a domain
+ * without one does not support MBA. A CPU RMDD is valid that way:
+ * erdt_populate_rmdd_cpu_agent() requires only CACD, so an agent enumerated
+ * without MARC leaves the block zeroed, the way a device agent enumerated for
+ * monitoring alone leaves CARD zeroed. The registers MBA programs are in that
+ * block, and the three bandwidth control types each have a base address of
+ * their own, so all three are needed before any of them can be reached.
  *
  * @param [in] cpu_agent CPU agent to examine
  *
