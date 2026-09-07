@@ -2528,10 +2528,11 @@ print_mba(const struct pqos_mba *mba)
  * @brief Whether a CPU domain has MBA registers to display
  *
  * The MBA registers of a domain are in the MARC block of its CPU agent, and a
- * CPU agent is valid without one. The test is the library's: all three
- * bandwidth control windows, because pqos_mba_get() reads all three and refuses
- * a domain that cannot serve them. Admitting a domain the library will refuse
- * would put the abort below back, which is what this predicate exists to avoid.
+ * CPU agent is valid without one. This mirrors the library's own rule - a copy
+ * of it, not a call, so the two have to agree - all three bandwidth control
+ * windows, because pqos_mba_get() reads all three and refuses a domain that
+ * cannot serve them. Admitting a domain the library will refuse would put the
+ * abort below back, which is what this predicate exists to avoid.
  *
  * @param [in] cpu_agent CPU agent to examine
  *
@@ -2551,9 +2552,10 @@ domain_has_mba(const struct pqos_cpu_agent_info *cpu_agent)
  *
  * The I/O L3 CAT registers of a domain are in the CARD block of its device
  * agent, and a device agent enumerated for monitoring alone leaves that block
- * zeroed. The test is the library's - dev_agent_has_l3ca() in
- * lib/mmio_allocation.c - because pqos_l3ca_get() refuses a domain that fails
- * it, and admitting one here would put the abort below back.
+ * zeroed. This mirrors the library's own predicate, dev_agent_has_l3ca() in
+ * lib/mmio_allocation.c - it is a copy, not a call, and the two have to agree -
+ * because pqos_l3ca_get() refuses a domain that fails it, and admitting one
+ * here would put the abort below back.
  *
  * @param [in] dev_agent device agent to examine
  *
