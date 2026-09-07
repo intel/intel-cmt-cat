@@ -463,14 +463,24 @@ safe_open(const char *pathname, int flags, mode_t mode)
                 if (errno != ENOENT || (flags & O_CREAT) == 0)
                         return -1;
                 new_file = 1;
+        } else if (S_ISLNK(lstat_val.st_mode)) {
+                /**
+                 * Refused here rather than left to the O_NOFOLLOW below,
+                 * because what open() reports for a symlink depends on the
+                 * flags it is given - O_CREAT | O_EXCL answers EEXIST, O_PATH
+                 * opens the link itself - while the caller is promised ELOOP.
+                 */
+                printf("File %s is a symlink\n", pathname);
+                errno = ELOOP;
+
+                return -1;
         }
 
         /**
-         * O_NOFOLLOW, because between the lstat() above and here another
-         * process can put a symlink in the way: the check below would refuse
-         * the descriptor, but only after open() had already created or
-         * truncated whatever the link pointed at. Refused this way there is
-         * nothing to undo, and the link is still named in the message.
+         * O_NOFOLLOW for the symlink that appears after the lstat() above: it
+         * would otherwise be followed here, creating or truncating whatever it
+         * points at, and the comparison below could then only refuse the
+         * descriptor - with the side effect already done.
          */
         fd = open(pathname, flags | O_NOFOLLOW, mode);
         if (fd == -1) {
@@ -499,16 +509,21 @@ safe_open(const char *pathname, int flags, mode_t mode)
                 goto safe_open_error;
 
         /**
-         * What is left for this to catch is the name being replaced between
-         * the lstat() above and the open(). A directory in the path that is a
-         * symlink is not one of them: the lstat() and the open() resolve it
-         * the same way, so they agree about the file at the end of it.
+         * The descriptor cannot be a symlink, O_NOFOLLOW saw to that, so what
+         * is left for this to catch is the name having been replaced between
+         * the lstat() and the open() - which is not the same thing, and is not
+         * reported as one. What identifies a file and what kind of file it is
+         * are what get compared; a chmod in between changes neither.
+         *
+         * A directory in the path that is a symlink is invisible to this: the
+         * lstat() and the open() resolve it the same way, so they agree about
+         * the file at the end of it.
          */
-        if (lstat_val.st_mode != fstat_val.st_mode ||
+        if ((lstat_val.st_mode & S_IFMT) != (fstat_val.st_mode & S_IFMT) ||
             lstat_val.st_ino != fstat_val.st_ino ||
             lstat_val.st_dev != fstat_val.st_dev) {
-                printf("File %s is a symlink\n", pathname);
-                errno = ELOOP;
+                printf("File %s changed while it was being opened\n", pathname);
+                errno = EAGAIN;
                 goto safe_open_error;
         }
 

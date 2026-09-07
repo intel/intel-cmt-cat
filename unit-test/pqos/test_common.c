@@ -167,9 +167,9 @@ test_safe_open_opens_an_existing_file(void **state)
 }
 
 /* The symlink check is what safe_open() is for, so it has to survive the
- * missing file being allowed through: a name that resolves to a file the
- * caller did not name is refused, whether the link already pointed at
- * something or the open created its target.
+ * missing file being allowed through: a name that is a link is refused whether
+ * the link has a target or not, and the one without a target is refused
+ * without its target being created.
  */
 static void
 test_safe_open_refuses_a_symlink(void **state)
@@ -200,6 +200,39 @@ test_safe_open_refuses_a_symlink(void **state)
 
         assert_int_equal(unlink(link), 0);
         assert_int_equal(unlink(target), 0);
+}
+
+/* What open() reports for a symlink depends on the flags: O_CREAT | O_EXCL
+ * answers EEXIST rather than ELOOP, so a caller passing them would have been
+ * told the file exists instead of that its name is a link.
+ */
+static void
+test_safe_open_refuses_a_symlink_whatever_the_flags(void **state)
+{
+        char target_buffer[PATH_MAX];
+        char link_buffer[PATH_MAX];
+        const char *target =
+            work_path(target_buffer, sizeof(target_buffer), "excl_target.txt");
+        const char *link =
+            work_path(link_buffer, sizeof(link_buffer), "excl_link.txt");
+        int fd = 0;
+
+        UNUSED_ARG(state);
+
+        unlink(link);
+        unlink(target);
+        assert_int_equal(symlink(target, link), 0);
+        errno = 0;
+
+        run_function(safe_open, fd, link, O_WRONLY | O_CREAT | O_EXCL,
+                     FILE_MODE);
+
+        assert_int_equal(fd, -1);
+        assert_int_equal(errno, ELOOP);
+        assert_int_equal(output_has_text("is a symlink"), 1);
+        assert_int_equal(access(target, F_OK), -1);
+
+        assert_int_equal(unlink(link), 0);
 }
 
 static void
@@ -241,6 +274,8 @@ main(void)
                 test_safe_open_refuses_a_missing_file_it_may_not_create),
             cmocka_unit_test(test_safe_open_opens_an_existing_file),
             cmocka_unit_test(test_safe_open_refuses_a_symlink),
+            cmocka_unit_test(
+                test_safe_open_refuses_a_symlink_whatever_the_flags),
             cmocka_unit_test(test_safe_open_refuses_a_dangling_symlink),
         };
 
