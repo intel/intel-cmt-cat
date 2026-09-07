@@ -57,23 +57,6 @@ pqos_platform_mem_regions(unsigned *num_mem_regions)
 }
 
 /**
- * @brief Filter directory filenames
- *
- * This function is used by the scandir function to filter directories
- *
- * @param dir dirent structure containing directory info
- *
- * @return if directory entry should be included in scandir() output list
- * @retval 0 means don't include the entry
- * @retval 1 means include the entry
- */
-int
-pqos_filter_cpu(const struct dirent *dir)
-{
-        return fnmatch("cpu[0-9]*", dir->d_name, 0) == 0;
-}
-
-/**
  * @brief Converts string into unsigned number.
  *
  * @param [in] str string to be converted into unsigned number
@@ -564,14 +547,76 @@ safe_open_error:
         return -1;
 }
 
+/**
+ * @brief Reads the CPU number out of a directory entry name
+ *
+ * @param [in] name directory entry name, expected to be "cpu" and a number
+ * @param [out] cpu number the name carries
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK when the whole name is "cpu" followed by a number
+ * @retval PQOS_RETVAL_ERROR otherwise, *cpu untouched
+ */
+static int
+cpu_from_name(const char *name, unsigned *cpu)
+{
+        if (strncmp(name, "cpu", 3) != 0)
+                return PQOS_RETVAL_ERROR;
+
+        return pqos_parse_uint(name + 3, cpu);
+}
+
+/**
+ * @brief Filter directory filenames
+ *
+ * This function is used by the scandir function to filter directories
+ *
+ * @param dir dirent structure containing directory info
+ *
+ * @return if directory entry should be included in scandir() output list
+ * @retval 0 means don't include the entry
+ * @retval 1 means include the entry
+ */
+int
+pqos_filter_cpu(const struct dirent *dir)
+{
+        unsigned cpu;
+
+        /* the entries this is asked about are the ones pqos_cpu_sort() has to
+         * order, so a name that does not carry a CPU number - "cpu0abc" passes
+         * a "cpu[0-9]*" glob - is left out here rather than counted as a CPU
+         * and ordered on a number nobody could read out of it.
+         */
+        return cpu_from_name(dir->d_name, &cpu) == PQOS_RETVAL_OK;
+}
+
 int
 pqos_cpu_sort(const struct dirent **dir1, const struct dirent **dir2)
 {
         unsigned cpu1 = 0;
         unsigned cpu2 = 0;
+        const int parsed1 = cpu_from_name((*dir1)->d_name, &cpu1);
+        const int parsed2 = cpu_from_name((*dir2)->d_name, &cpu2);
 
-        pqos_parse_uint((*dir1)->d_name + 3, &cpu1);
-        pqos_parse_uint((*dir2)->d_name + 3, &cpu2);
+        /* an entry whose name holds no CPU number cannot be placed by one, so
+         * it goes after everything that can and is ordered against its own
+         * kind by name. Nothing reaches here through pqos_filter_cpu(), which
+         * keeps the comparator whole for any other caller.
+         */
+        if (parsed1 != PQOS_RETVAL_OK || parsed2 != PQOS_RETVAL_OK) {
+                if (parsed1 == parsed2)
+                        return strcmp((*dir1)->d_name, (*dir2)->d_name);
 
-        return cpu1 - cpu2;
+                return parsed1 == PQOS_RETVAL_OK ? -1 : 1;
+        }
+
+        /* subtracting the two would be an unsigned difference converted to
+         * int, which is only the answer for values far below INT_MAX
+         */
+        if (cpu1 < cpu2)
+                return -1;
+        if (cpu1 > cpu2)
+                return 1;
+
+        return 0;
 }

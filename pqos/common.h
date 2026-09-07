@@ -49,7 +49,6 @@ extern "C" {
 #include "pqos.h"
 
 #include <dirent.h> /**< scandir() */
-#include <fnmatch.h>
 #include <stdio.h>
 #include <sys/stat.h>
 
