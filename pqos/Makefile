@@ -160,20 +160,14 @@ CHECKPATCH?=checkpatch.pl
 .PHONY: checkpatch
 checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
-	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,UNSPECIFIED_INT,ARRAY_SIZE,\
-	SPDX_LICENSE_TAG,CONST_STRUCT,SPACING,\
-	PREFER_DEFINED_ATTRIBUTE_MACRO\
-	 -f main.c -f main.h -f monitor.c -f monitor.h -f alloc.c -f alloc.h -f profiles.c -f profiles.h \
-	 -f cap.h -f cap.c -f common.h -f common.c \
-	 -f monitor_csv.c -f monitor_csv.h \
-	 -f monitor_text.c -f monitor_text.h \
-	 -f monitor_utils.c -f monitor_utils.h \
-	 -f monitor_xml.c -f monitor_xml.h
+	--ignore $(CHECKPATCH_IGNORE) \
+	--typedefsfile ../.checkpatch.types \
+	--file *.[ch]
 
 CLANGFORMAT?=clang-format
 .PHONY: clang-format
 clang-format:
-	@for file in $(SRCS); do \
+	@for file in $(wildcard *.[ch]); do \
 		echo "Checking style $$file"; \
 		$(CLANGFORMAT) -style=file "$$file" | diff "$$file" - | tee /dev/stderr | [ $$(wc -c) -eq 0 ] || \
 		{ echo "ERROR: $$file has style problems"; exit 1; } \

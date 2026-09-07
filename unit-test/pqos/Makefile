@@ -199,21 +199,9 @@ CHECKPATCH?=checkpatch.pl
 .PHONY: checkpatch
 checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --emacs \
-	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
-	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE,\
-	SPDX_LICENSE_TAG,ARRAY_SIZE,EMBEDDED_FUNCTION_NAME,\
-	SYMBOLIC_PERMS,CONST_STRUCT,SPACING \
-	-f test_alloc.c \
-	-f test_common.c \
-	-f test_common.h \
-	-f test_dump.c \
-	-f test_main.c \
-	-f test_iface_select.c \
-	-f test_monitor_utils.c \
-	-f test_monitor_xml.c \
-	-f test_profiles.c \
-	-f mock/mock_alloc.c \
-	-f mock/mock_alloc.h \
+	--ignore $(CHECKPATCH_IGNORE) \
+	--typedefsfile ../../.checkpatch.types \
+	--file *.[ch] $(APP_MOCK_DIR)/*.[ch]
 
 .PHONY: style
 style:

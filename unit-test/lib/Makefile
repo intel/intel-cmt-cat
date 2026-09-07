@@ -1085,12 +1085,9 @@ CHECKPATCH?=checkpatch.pl
 .PHONY: checkpatch
 checkpatch:
 	$(CHECKPATCH) --no-tree --no-signoff --terse \
-	--ignore CODE_INDENT,INITIALISED_STATIC,LEADING_SPACE,SPLIT_STRING,\
-	NEW_TYPEDEFS,UNSPECIFIED_INT,BLOCK_COMMENT_STYLE,\
-	SPDX_LICENSE_TAG,ARRAY_SIZE,EMBEDDED_FUNCTION_NAME,\
-	SYMBOLIC_PERMS,CONST_STRUCT,PREFER_DEFINED_ATTRIBUTE_MACRO,SPACING \
+	--ignore $(CHECKPATCH_IGNORE) \
 	--typedefsfile ../../.checkpatch.types \
-	--file *.[ch] \
+	--file *.[ch]
 
 CLANGFORMAT?=clang-format
 .PHONY: clang-format

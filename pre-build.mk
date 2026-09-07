@@ -25,3 +25,29 @@ endif
 endif
 
 endif
+
+# One checkpatch ignore list for every directory that runs the style gate, so
+# the same code is accepted or reported the same way wherever the file sits.
+# Outside the check above, which runs once per build session, so a recursive
+# make still sees it.
+CHECKPATCH_IGNORE_TYPES = \
+	ARRAY_SIZE \
+	BLOCK_COMMENT_STYLE \
+	CODE_INDENT \
+	CONST_STRUCT \
+	EMBEDDED_FUNCTION_NAME \
+	INITIALISED_STATIC \
+	LEADING_SPACE \
+	NEW_TYPEDEFS \
+	PREFER_DEFINED_ATTRIBUTE_MACRO \
+	SPACING \
+	SPDX_LICENSE_TAG \
+	SPLIT_STRING \
+	SYMBOLIC_PERMS \
+	UNSPECIFIED_INT
+
+# checkpatch takes them as one comma separated word
+CHECKPATCH_COMMA := ,
+CHECKPATCH_EMPTY :=
+CHECKPATCH_SPACE := $(CHECKPATCH_EMPTY) $(CHECKPATCH_EMPTY)
+CHECKPATCH_IGNORE = $(subst $(CHECKPATCH_SPACE),$(CHECKPATCH_COMMA),$(strip $(CHECKPATCH_IGNORE_TYPES)))
