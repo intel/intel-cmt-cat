@@ -46,13 +46,6 @@
 
 /**
  * ---------------------------------------
- * Local data types
- * ---------------------------------------
- */
-#define AP_BUFFER_SIZE 320
-
-/**
- * ---------------------------------------
  * Local data structures
  * ---------------------------------------
  */
@@ -165,6 +158,16 @@ log_printf(int type, const char *str, ...)
         ASSERT(size >= 0);
         if (size < 0)
                 return;
+
+        /**
+         * vsnprintf() returns the length the message needed, not the length it
+         * wrote: given AP_BUFFER_SIZE - 1 it writes at most AP_BUFFER_SIZE - 2
+         * characters and a NUL. Reporting the needed length would send the
+         * callback and the write() below past the end of ap_buffer, and would
+         * describe the truncated text by the size of the message it came from.
+         */
+        if (size > AP_BUFFER_SIZE - 2)
+                size = AP_BUFFER_SIZE - 2;
 
         if (m_callback_log != NULL)
                 m_callback_log(m_context_log, size, ap_buffer);

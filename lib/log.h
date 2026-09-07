@@ -55,6 +55,13 @@ extern "C" {
 #define LOG_RETVAL_OK    0 /**< everything OK */
 #define LOG_RETVAL_ERROR 1 /**< generic error */
 
+/**
+ * The payload buffer of log_printf(). vsnprintf() is given AP_BUFFER_SIZE - 1
+ * of it and spends one byte of that on the NUL, so a message reaches the log
+ * callback and the log file as at most AP_BUFFER_SIZE - 2 characters.
+ */
+#define AP_BUFFER_SIZE 320
+
 #define LOG_OPT_INFO  (1 << 0)
 #define LOG_OPT_WARN  (1 << 1)
 #define LOG_OPT_ERROR (1 << 2)

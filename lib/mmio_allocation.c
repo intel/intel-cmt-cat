@@ -52,11 +52,9 @@
 #include <string.h>
 
 /* The device domain list of log_domain_without_l3ca(). One log line carries at
- * most AP_BUFFER_SIZE - 1 bytes, 319, and the text around the list takes about
- * 150 of them, so the list is kept well inside what is left. log_printf() hands
- * the length the message needed, rather than the length it wrote, to its
- * callback and to write(), so a message that did not fit would be read past the
- * end of its buffer.
+ * most AP_BUFFER_SIZE - 2 characters, and the text around the list takes about
+ * 150 of them, so the list is kept well inside what is left rather than leaving
+ * the line to be truncated.
  */
 #define DOMAIN_LIST_SIZE 128
 
