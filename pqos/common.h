@@ -91,16 +91,20 @@ FILE *safe_fopen(const char *name, const char *mode);
 /* clang-format on */
 
 /**
- * @brief Wrapper around open() that additionally checks if a given path
- * contains any symbolic links and fails if it does.
+ * @brief Wrapper around open() that fails if the file it names is a symbolic
+ * link.
+ *
+ * The name itself, that is: a directory in the path leading to it is
+ * resolved as open() would resolve it, links included, so this is not a
+ * check on the whole path.
  *
  * @param [in] pathname a path to a file
  * @param [in] flags file access flags
  * @param [in] mode file mode bits
  *
  * @return A file descriptor
- * @retval A valid file descriptor or -1 on error (e.g. when the path
- * contains any symbolic links).
+ * @retval A valid file descriptor or -1 on error, with errno ELOOP when the
+ * name is a symbolic link
  */
 int safe_open(const char *pathname, int flags, mode_t mode);
 

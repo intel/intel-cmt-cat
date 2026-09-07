@@ -130,10 +130,13 @@ test_safe_open_refuses_a_missing_file_it_may_not_create(void **state)
         UNUSED_ARG(state);
 
         unlink(path);
+        errno = 0;
 
         run_function(safe_open, fd, path, O_RDONLY, FILE_MODE);
 
         assert_int_equal(fd, -1);
+        /* the reason reaches the caller, which is what prints it */
+        assert_int_equal(errno, ENOENT);
         assert_int_equal(access(path, F_OK), -1);
 }
 

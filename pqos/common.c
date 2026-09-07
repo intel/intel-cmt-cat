@@ -474,8 +474,19 @@ safe_open(const char *pathname, int flags, mode_t mode)
          */
         fd = open(pathname, flags | O_NOFOLLOW, mode);
         if (fd == -1) {
-                if (errno == ELOOP)
+                /**
+                 * O_NOFOLLOW meeting a symlink is ELOOP on Linux and EMLINK on
+                 * FreeBSD, and the caller is told ELOOP either way. printf()
+                 * can fail and leave an errno of its own behind, so the reason
+                 * this returns is put back after it.
+                 */
+                error = errno;
+                if (error == ELOOP || error == EMLINK) {
                         printf("File %s is a symlink\n", pathname);
+                        error = ELOOP;
+                }
+                errno = error;
+
                 return -1;
         }
 
@@ -488,9 +499,10 @@ safe_open(const char *pathname, int flags, mode_t mode)
                 goto safe_open_error;
 
         /**
-         * O_NOFOLLOW covers the last component of the name only, so this stays
-         * as the check on everything it cannot see - a directory in the path
-         * that is a symlink, or the file changing underneath the open.
+         * What is left for this to catch is the name being replaced between
+         * the lstat() above and the open(). A directory in the path that is a
+         * symlink is not one of them: the lstat() and the open() resolve it
+         * the same way, so they agree about the file at the end of it.
          */
         if (lstat_val.st_mode != fstat_val.st_mode ||
             lstat_val.st_ino != fstat_val.st_ino ||
