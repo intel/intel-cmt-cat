@@ -502,6 +502,415 @@ test_safe_open_does_not_adopt_a_file_that_appeared(void **state)
         assert_int_equal(unlink(path), 0);
 }
 
+/* ======== safe_fopen ======== */
+
+/* The mode string decides the flags, so the stream a caller gets has to behave
+ * the way fopen() would have behaved: read what is there, create what is not,
+ * and add to what is there rather than replacing it.
+ */
+static void
+test_safe_fopen_reads_an_existing_file(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "readable.txt");
+        char content[8] = {0};
+        FILE *stream;
+
+        UNUSED_ARG(state);
+
+        stream = fopen(path, "w");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("logged\n", 1, 7, stream), 7);
+        assert_int_equal(fclose(stream), 0);
+
+        run_function(safe_fopen, stream, path, "r");
+
+        assert_non_null(stream);
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "logged\n");
+        assert_int_equal(fclose(stream), 0);
+
+        assert_int_equal(unlink(path), 0);
+}
+
+static void
+test_safe_fopen_creates_and_appends(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "created.txt");
+        char content[16] = {0};
+        FILE *stream;
+
+        UNUSED_ARG(state);
+
+        unlink(path);
+
+        run_function(safe_fopen, stream, path, "w+");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("first\n", 1, 6, stream), 6);
+        assert_int_equal(fclose(stream), 0);
+
+        run_function(safe_fopen, stream, path, "a");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("second\n", 1, 7, stream), 7);
+        assert_int_equal(fclose(stream), 0);
+
+        stream = fopen(path, "r");
+        assert_non_null(stream);
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "first\n");
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "second\n");
+        assert_int_equal(fclose(stream), 0);
+
+        assert_int_equal(unlink(path), 0);
+}
+
+/* The defect this closes: a link already sitting at the name was followed by
+ * fopen() and the file it pointed at was truncated by the "w+" the monitoring
+ * output file uses, before anything looked at the descriptor. No race is
+ * needed to reach it, so the case does not need one either - and what it
+ * asserts is the target, not only the refusal.
+ */
+static void
+test_safe_fopen_keeps_a_symlink_target_intact(void **state)
+{
+        char target_buffer[PATH_MAX];
+        char link_buffer[PATH_MAX];
+        const char *target =
+            work_path(target_buffer, sizeof(target_buffer), "precious.txt");
+        const char *link =
+            work_path(link_buffer, sizeof(link_buffer), "output.csv");
+        char content[16] = {0};
+        FILE *stream;
+        int error;
+
+        UNUSED_ARG(state);
+
+        unlink(link);
+        stream = fopen(target, "w");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("keep me\n", 1, 8, stream), 8);
+        assert_int_equal(fclose(stream), 0);
+        assert_int_equal(symlink(target, link), 0);
+        errno = 0;
+
+        run_function(safe_fopen, stream, link, "w+");
+        /* kept before the assertions below, since every one of them is a call
+         * that may set errno itself
+         */
+        error = errno;
+
+        /* the state is asserted before the refusal, because the file surviving
+         * is the point: what this replaced also returned NULL, after the target
+         * had already been emptied
+         */
+        assert_null(stream);
+        stream = fopen(target, "r");
+        assert_non_null(stream);
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "keep me\n");
+        assert_int_equal(fclose(stream), 0);
+
+        assert_int_equal(error, ELOOP);
+        assert_int_equal(output_has_text("is a symlink"), 1);
+
+        assert_int_equal(unlink(link), 0);
+        assert_int_equal(unlink(target), 0);
+}
+
+/* A link with no target is refused as a link rather than created through */
+static void
+test_safe_fopen_refuses_a_dangling_symlink(void **state)
+{
+        char target_buffer[PATH_MAX];
+        char link_buffer[PATH_MAX];
+        const char *target =
+            work_path(target_buffer, sizeof(target_buffer), "nowhere.txt");
+        const char *link =
+            work_path(link_buffer, sizeof(link_buffer), "dangling.csv");
+        FILE *stream;
+        int error;
+
+        UNUSED_ARG(state);
+
+        unlink(target);
+        unlink(link);
+        assert_int_equal(symlink(target, link), 0);
+        errno = 0;
+
+        run_function(safe_fopen, stream, link, "w+");
+        error = errno;
+
+        /* the target is checked first: what this replaced created it through
+         * the link before refusing the stream. access() sets errno of its own,
+         * which is why the reason was kept above
+         */
+        assert_null(stream);
+        assert_int_equal(access(target, F_OK), -1);
+        assert_int_equal(error, ELOOP);
+        assert_int_equal(output_has_text("is a symlink"), 1);
+
+        assert_int_equal(unlink(link), 0);
+}
+
+/* A mode this cannot translate must fail rather than open the file in some
+ * other way, and the caller is told which kind of failure it was
+ */
+static void
+test_safe_fopen_refuses_a_mode_it_cannot_translate(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "unwritten.txt");
+        /* "bw" and "rbb" are the ones that matter: a 'b' accepted wherever it
+         * appeared would translate them as "w" and "r", and the first of those
+         * truncates. The rest are the shapes C does not give the exclusive
+         * modifier: it goes after a 'w', once, and last of all, so "wxb",
+         * "wx+" and "w+xb" are no more C modes than "rx" or "xw" are
+         */
+        static const char *const modes[] = {
+            "",     "rw", "w+e", "z",  "bw",  "b",   "rbb", "+r",  "r++",
+            "ab+b", "rx", "ax",  "xw", "wxx", "wxb", "wx+", "w+xb"};
+        static const char *const accepted[] = {"wb", "w+b", "wb+"};
+        FILE *stream;
+        unsigned i;
+
+        UNUSED_ARG(state);
+
+        unlink(path);
+
+        for (i = 0; i < DIM(modes); i++) {
+                errno = 0;
+                run_function(safe_fopen, stream, path, modes[i]);
+
+                assert_null(stream);
+                assert_int_equal(errno, EINVAL);
+                /* and nothing was created on the way */
+                assert_int_equal(access(path, F_OK), -1);
+        }
+
+        /* a 'b' where C puts it is accepted, since it asks for nothing */
+        for (i = 0; i < DIM(accepted); i++) {
+                run_function(safe_fopen, stream, path, accepted[i]);
+                assert_non_null(stream);
+                assert_int_equal(fclose(stream), 0);
+                assert_int_equal(unlink(path), 0);
+        }
+}
+
+/* The mode is refused before the file is opened, so a malformed one cannot
+ * empty a file on its way to being rejected: "bw" translated as "w" would open
+ * with O_TRUNC and only then be refused by fdopen()
+ */
+static void
+test_safe_fopen_refuses_a_malformed_mode_without_truncating(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "not_emptied.txt");
+        char content[16] = {0};
+        FILE *stream;
+        int error;
+
+        UNUSED_ARG(state);
+
+        stream = fopen(path, "w");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("keep me\n", 1, 8, stream), 8);
+        assert_int_equal(fclose(stream), 0);
+        errno = 0;
+
+        run_function(safe_fopen, stream, path, "bw");
+        error = errno;
+
+        assert_null(stream);
+        stream = fopen(path, "r");
+        assert_non_null(stream);
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "keep me\n");
+        assert_int_equal(fclose(stream), 0);
+        assert_int_equal(error, EINVAL);
+
+        assert_int_equal(unlink(path), 0);
+}
+
+/* The stream outlives the call, so it is not handed to whatever the process
+ * executes next
+ */
+static void
+test_safe_fopen_closes_the_stream_on_exec(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "cloexec.txt");
+        FILE *stream;
+
+        UNUSED_ARG(state);
+
+        unlink(path);
+
+        run_function(safe_fopen, stream, path, "w");
+
+        assert_non_null(stream);
+        assert_true(fcntl(fileno(stream), F_GETFD) & FD_CLOEXEC);
+        assert_int_equal(fclose(stream), 0);
+
+        assert_int_equal(unlink(path), 0);
+}
+
+/* 'x' is C11, not a glibc extension: it asks for the file to be created and for
+ * the call to fail if it is already there. What must not happen is the failure
+ * arriving after the file has been touched, so this asserts the file as well as
+ * the errno.
+ */
+static void
+test_safe_fopen_creates_exclusively(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "exclusive.txt");
+        char content[16] = {0};
+        FILE *stream;
+        int error;
+
+        UNUSED_ARG(state);
+
+        unlink(path);
+
+        run_function(safe_fopen, stream, path, "wx");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("first\n", 1, 6, stream), 6);
+        assert_int_equal(fclose(stream), 0);
+
+        errno = 0;
+        run_function(safe_fopen, stream, path, "wx");
+        error = errno;
+
+        assert_null(stream);
+        stream = fopen(path, "r");
+        assert_non_null(stream);
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "first\n");
+        assert_int_equal(fclose(stream), 0);
+        assert_int_equal(error, EEXIST);
+
+        assert_int_equal(unlink(path), 0);
+}
+
+/* The variants C allows, which also cover why 'x' is left out of the mode the
+ * stream is made with: glibc's fdopen() refuses "w+x" outright, so a stream
+ * asked for that way is only possible because the modifier is dropped once the
+ * exclusion has happened
+ */
+static void
+test_safe_fopen_accepts_the_exclusive_variants(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "variants.txt");
+        /* exactly the five C11 gives, with 'x' last in each */
+        static const char *const modes[] = {"wx", "wbx", "w+x", "w+bx", "wb+x"};
+        FILE *stream;
+        unsigned i;
+
+        UNUSED_ARG(state);
+
+        for (i = 0; i < DIM(modes); i++) {
+                unlink(path);
+                errno = 0;
+
+                run_function(safe_fopen, stream, path, modes[i]);
+
+                assert_non_null(stream);
+                assert_int_equal(fclose(stream), 0);
+                assert_int_equal(access(path, F_OK), 0);
+        }
+
+        assert_int_equal(unlink(path), 0);
+}
+
+/* An exclusive mode does not weaken the symlink refusal, which is worth a case
+ * because O_CREAT | O_EXCL is what makes the kernel answer EEXIST for a link
+ * rather than ELOOP: the name is asked about after the failure, so the caller
+ * is told it is a link either way
+ */
+static void
+test_safe_fopen_refuses_a_symlink_under_an_exclusive_mode(void **state)
+{
+        char target_buffer[PATH_MAX];
+        char link_buffer[PATH_MAX];
+        const char *target =
+            work_path(target_buffer, sizeof(target_buffer), "excl_target.txt");
+        const char *link =
+            work_path(link_buffer, sizeof(link_buffer), "excl_link.txt");
+        char content[16] = {0};
+        FILE *stream;
+        int error;
+
+        UNUSED_ARG(state);
+
+        unlink(link);
+        stream = fopen(target, "w");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("keep me\n", 1, 8, stream), 8);
+        assert_int_equal(fclose(stream), 0);
+        assert_int_equal(symlink(target, link), 0);
+        errno = 0;
+
+        run_function(safe_fopen, stream, link, "wx");
+        error = errno;
+
+        assert_null(stream);
+        stream = fopen(target, "r");
+        assert_non_null(stream);
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "keep me\n");
+        assert_int_equal(fclose(stream), 0);
+
+        assert_int_equal(error, ELOOP);
+        assert_int_equal(output_has_text("is a symlink"), 1);
+
+        assert_int_equal(unlink(link), 0);
+        assert_int_equal(unlink(target), 0);
+}
+
+/* fopen() puts a plain append stream at the end of the file and fdopen() does
+ * not, so the wrapper has to. "a+" is the deliberate exception: fopen() leaves
+ * that one at the start for reading, and this matches it.
+ */
+static void
+test_safe_fopen_positions_an_append_stream_at_the_end(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "appended.txt");
+        char content[32] = {0};
+        FILE *stream;
+
+        UNUSED_ARG(state);
+
+        stream = fopen(path, "w");
+        assert_non_null(stream);
+        assert_int_equal(fwrite("0123456789", 1, 10, stream), 10);
+        assert_int_equal(fclose(stream), 0);
+
+        run_function(safe_fopen, stream, path, "a");
+        assert_non_null(stream);
+        assert_int_equal(ftell(stream), 10);
+        assert_int_equal(fwrite("XY", 1, 2, stream), 2);
+        assert_int_equal(fclose(stream), 0);
+
+        /* and the write went where O_APPEND puts it */
+        stream = fopen(path, "r");
+        assert_non_null(stream);
+        assert_non_null(fgets(content, sizeof(content), stream));
+        assert_string_equal(content, "0123456789XY");
+        assert_int_equal(fclose(stream), 0);
+
+        /* the update form keeps fopen()'s position, which is the start */
+        run_function(safe_fopen, stream, path, "a+");
+        assert_non_null(stream);
+        assert_int_equal(ftell(stream), 0);
+        assert_int_equal(fclose(stream), 0);
+
+        assert_int_equal(unlink(path), 0);
+}
+
 /* ======== pqos_filter_cpu / pqos_cpu_sort ======== */
 
 /* The two are the scandir() callbacks for /sys/devices/system/cpu, so a
@@ -656,6 +1065,21 @@ main(void)
                 test_safe_open_names_a_link_the_open_called_something_else),
             cmocka_unit_test(
                 test_safe_open_does_not_adopt_a_file_that_appeared),
+            cmocka_unit_test(test_safe_fopen_reads_an_existing_file),
+            cmocka_unit_test(test_safe_fopen_creates_and_appends),
+            cmocka_unit_test(test_safe_fopen_keeps_a_symlink_target_intact),
+            cmocka_unit_test(test_safe_fopen_refuses_a_dangling_symlink),
+            cmocka_unit_test(
+                test_safe_fopen_refuses_a_mode_it_cannot_translate),
+            cmocka_unit_test(
+                test_safe_fopen_refuses_a_malformed_mode_without_truncating),
+            cmocka_unit_test(test_safe_fopen_creates_exclusively),
+            cmocka_unit_test(test_safe_fopen_accepts_the_exclusive_variants),
+            cmocka_unit_test(
+                test_safe_fopen_refuses_a_symlink_under_an_exclusive_mode),
+            cmocka_unit_test(
+                test_safe_fopen_positions_an_append_stream_at_the_end),
+            cmocka_unit_test(test_safe_fopen_closes_the_stream_on_exec),
             cmocka_unit_test(test_filter_cpu_accepts_a_cpu_number),
             cmocka_unit_test(test_filter_cpu_rejects_everything_else),
             cmocka_unit_test(test_cpu_names_are_read_as_decimal),

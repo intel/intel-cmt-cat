@@ -75,15 +75,34 @@ extern "C" {
 #define PQOS_SYSTEM_CPU "/sys/devices/system/cpu"
 
 /**
- * @brief Wrapper around fopen() that additionally checks if a given path
- * contains any symbolic links and fails if it does.
+ * @brief Wrapper around fopen() that fails if the file it names is a symbolic
+ * link, refusing it before anything is opened, created or truncated
+ *
+ * The file is opened with O_NOFOLLOW and the stream is made from the
+ * descriptor, so the name is resolved once and the kernel is what refuses a
+ * link. A directory in the path leading to the file is resolved as open() would
+ * resolve it, symbolic links included, which is the same promise safe_open()
+ * makes.
+ *
+ * Every mode C defines is accepted - a first character of 'r', 'w' or 'a', then
+ * '+' and 'b' in either order, and last of all the exclusive 'x' that C11 adds
+ * for a 'w', making those modes "wx", "wbx", "w+x", "w+bx" and "wb+x". 'x' does
+ * what it says: the file is created and the call fails with EEXIST if it was
+ * already there. Any other mode fails before the file is opened, so a caller
+ * asking for one of the glibc extensions ('e', 'm', 'c') is told no, as is one
+ * writing 'b' or 'x' where C does not put it, which cannot then turn into a
+ * mode that truncates.
  *
  * @param [in] name a path to a file
  * @param [in] mode a file access mode
  *
  * @return Pointer to a file
- * @retval A valid pointer to a file or NULL on error (e.g. when the path
- * contains any symbolic links).
+ * @retval A valid pointer to a file, or NULL with errno set to the reason:
+ * ELOOP where the file is a symbolic link - on every platform, since what the
+ * kernel reported for it (EMLINK on FreeBSD, EEXIST, ENOENT for a link with no
+ * target) is replaced so that a caller does not have to know them - EINVAL
+ * where the mode is not one C defines, EEXIST where an 'x' mode names a file
+ * that is there, and otherwise the errno of open() or fdopen()
  */
 /* clang-format off */
 FILE *safe_fopen(const char *name, const char *mode);

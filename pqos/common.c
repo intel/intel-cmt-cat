@@ -378,54 +378,190 @@ pqos_parse_pci_id(char *arg,
         return 0;
 }
 
+/**
+ * The permissions a created file is given, which is what fopen() gives one and
+ * is narrowed by the umask exactly as it is there, so a file this makes is the
+ * file it has always made.
+ */
+#define FOPEN_CREATE_PERMS                                                     \
+        (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+
+/** Room for a mode string with the exclusive modifier taken out of it */
+#define FOPEN_MODE_SIZE 8
+
+/**
+ * @brief Translate a mode string of fopen() into flags for open()
+ *
+ * Every mode C defines is translated, and the position of each character
+ * matters. The first one carries the access, then '+' and 'b' in either order,
+ * and last of all the exclusive 'x' that C11 adds for a 'w' - which makes the
+ * exclusive modes exactly "wx", "wbx", "w+x", "w+bx" and "wb+x". Nothing else
+ * is a mode C defines, so "wxb" and "wx+" are refused along with the glibc
+ * extensions 'e', 'm' and 'c'; a 'b' or an 'x' accepted wherever it appeared
+ * would turn "bw" into a translation of "w", and the file would be opened and
+ * truncated before fdopen() refused the mode, which is the very thing this
+ * function exists to prevent.
+ *
+ * 'x' asks for the file to be created and to fail if it is already there, which
+ * is what O_EXCL does, and it takes O_TRUNC out of the flags because a file
+ * that cannot exist has nothing to truncate. It is also the one modifier that
+ * has no meaning for a descriptor that is already open, and glibc's fdopen()
+ * refuses "w+x" outright, so it is left out of the mode the stream is made with
+ * - the exclusion has already happened by then.
+ *
+ * @param [in] mode the mode string as safe_fopen() received it
+ * @param [out] flags the flags to open() the file with
+ * @param [out] stream_mode the mode fdopen() is given, the same string without
+ *              an 'x'; at least FOPEN_MODE_SIZE bytes
+ *
+ * @return Operation status
+ * @retval 0 the mode was translated
+ * @retval -1 the mode is not one C defines
+ */
+static int
+fopen_mode_flags(const char *mode, int *flags, char *stream_mode)
+{
+        int plus = 0;
+        int binary = 0;
+        int exclusive = 0;
+        size_t used = 0;
+        size_t i;
+
+        /* refused before the walk below, which starts past the access character
+         * and would read past the end of an empty mode
+         */
+        if (mode[0] == '\0')
+                return -1;
+
+        stream_mode[used++] = mode[0];
+
+        for (i = 1; mode[i] != '\0'; i++) {
+                if (mode[i] == '+' && !plus)
+                        plus = 1;
+                else if (mode[i] == 'b' && !binary)
+                        binary = 1;
+                else if (mode[i] == 'x' && !exclusive && mode[0] == 'w' &&
+                         mode[i + 1] == '\0')
+                        exclusive = 1;
+                else
+                        return -1;
+
+                if (mode[i] == 'x')
+                        continue;
+
+                if (used >= FOPEN_MODE_SIZE - 1)
+                        return -1;
+                stream_mode[used++] = mode[i];
+        }
+        stream_mode[used] = '\0';
+
+        switch (mode[0]) {
+        case 'r':
+                *flags = plus ? O_RDWR : O_RDONLY;
+                break;
+        case 'w':
+                *flags = (plus ? O_RDWR : O_WRONLY) | O_CREAT;
+                *flags |= exclusive ? O_EXCL : O_TRUNC;
+                break;
+        case 'a':
+                *flags = (plus ? O_RDWR : O_WRONLY) | O_CREAT | O_APPEND;
+                break;
+        default:
+                return -1;
+        }
+
+        return 0;
+}
+
 FILE *
 safe_fopen(const char *name, const char *mode)
 {
         int fd;
-        FILE *stream = NULL;
-        struct stat lstat_val;
-        struct stat fstat_val;
-        int new_file = 0;
+        int flags = 0;
+        int error;
+        char stream_mode[FOPEN_MODE_SIZE] = {0};
+        FILE *stream;
 
-        /* collect any link info about the file */
-        /* coverity[fs_check_call] */
-        if (lstat(name, &lstat_val) == -1) {
-                if (errno != ENOENT)
-                        return NULL;
-                else
-                        new_file = 1;
+        if (name == NULL || mode == NULL ||
+            fopen_mode_flags(mode, &flags, stream_mode) != 0) {
+                /* the caller asked for something this cannot do, and is told
+                 * which kind of failure it was rather than left to guess
+                 */
+                errno = EINVAL;
+
+                return NULL;
         }
 
-        stream = fopen(name, mode);
-        if (stream == NULL)
-                return stream;
+        /*
+         * The kernel refuses a symbolic link here, before anything is opened,
+         * created or truncated. What this replaced asked lstat() whether the
+         * name was a link and then handed the name to fopen(), which resolved
+         * it a second time: a link already sitting at the name was followed and
+         * the file it pointed at was truncated by a "w" or "w+" mode, and the
+         * comparison that came afterwards could only refuse the stream, not put
+         * the file back. No race was needed for that, only a link.
+         *
+         * O_CLOEXEC because the stream outlives the call - the monitoring
+         * output file is held for the whole run - and nothing that inherits it
+         * has a use for it.
+         */
+        fd = open(name, flags | O_NOFOLLOW | O_CLOEXEC, FOPEN_CREATE_PERMS);
+        if (fd == -1) {
+                struct stat lstat_val;
 
-        if (new_file && lstat(name, &lstat_val) == -1)
-                goto safe_fopen_error;
+                /*
+                 * What open() reports for a link it refused is not one thing:
+                 * ELOOP on Linux, EMLINK on FreeBSD, EEXIST under O_EXCL, and
+                 * ENOENT for a link whose target is not there, which is what
+                 * "w+" on a dangling link answers. So the name is asked about
+                 * instead of the errno - after the failure, where the answer
+                 * only explains it and cannot affect what was opened - and the
+                 * caller is told the same thing safe_open() tells it.
+                 *
+                 * errno is put back around that, because lstat() and printf()
+                 * are both allowed to change it and the caller is entitled to
+                 * the reason the call failed.
+                 */
+                error = errno;
+                if (lstat(name, &lstat_val) == 0 &&
+                    S_ISLNK(lstat_val.st_mode)) {
+                        printf("File %s is a symlink\n", name);
+                        error = ELOOP;
+                }
+                errno = error;
 
-        fd = fileno(stream);
-        if (fd == -1)
-                goto safe_fopen_error;
+                return NULL;
+        }
 
-        /* collect info about the opened file */
-        if (fstat(fd, &fstat_val) == -1)
-                goto safe_fopen_error;
+        stream = fdopen(fd, stream_mode);
+        if (stream == NULL) {
+                error = errno;
+                close(fd);
+                errno = error;
 
-        /* we should not have followed a symbolic link */
-        if (lstat_val.st_mode != fstat_val.st_mode ||
-            lstat_val.st_ino != fstat_val.st_ino ||
-            lstat_val.st_dev != fstat_val.st_dev) {
-                printf("File %s is a symlink\n", name);
-                goto safe_fopen_error;
+                return NULL;
+        }
+
+        /*
+         * fdopen() takes the offset the descriptor has, which open() leaves at
+         * the start of the file, while fopen() puts a plain append stream at
+         * the end of it. Writes land at the end either way - that is what
+         * O_APPEND is for - but a caller that asks ftell() before writing gets
+         * what fopen() would have given it. A target that cannot seek keeps the
+         * offset it has, its refusal being an answer rather than a problem, and
+         * errno is put back so that a stream returned successfully does not
+         * carry one.
+         *
+         * "a+" is left where it is: fopen() positions that one at the start of
+         * the file for reading, which is what this already matches.
+         */
+        if (mode[0] == 'a' && strchr(mode, '+') == NULL) {
+                error = errno;
+                (void)fseek(stream, 0, SEEK_END);
+                errno = error;
         }
 
         return stream;
-
-safe_fopen_error:
-        if (stream != NULL)
-                fclose(stream);
-
-        return NULL;
 }
 
 int
