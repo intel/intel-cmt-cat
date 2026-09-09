@@ -70,6 +70,28 @@ Linux kernel
 (https://github.com/torvalds/linux/blob/master/scripts/checkpatch.pl).
 
 
+Formatting using clang-format
+=============================
+
+The .clang-format file in the root of the tree describes the formatting, and
+the version of clang-format decides how it is applied: the same file gives
+different answers under different versions, so one version is named. The
+required version is clang-format 18 - the gate installs the clang-format-18
+package and runs it, which is 18.1.3 on Ubuntu 24.04 and 18.1.8 on 26.04, and
+the two format this tree identically:
+
+make style CLANGFORMAT=clang-format-18 CHECKPATCH=<path to checkpatch.pl>
+
+To check a single file, which is what the target does for each file in turn:
+
+clang-format-18 -style=file <file> | diff <file> -
+
+The output has to be empty. A different version reports files the gate accepts:
+version 11 reformats lib/mmio.c, versions 19 and 20 reformat one macro line in
+lib/pqos.h, and versions 21 and 22 reformat that line and two declarations in
+lib/pqos_internal.h.
+
+
 Indentation
 ===========
 
