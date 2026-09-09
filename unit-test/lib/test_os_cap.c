@@ -416,6 +416,182 @@ test_os_cap_mba_discover_unsupported(void **state)
         assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
 }
 
+/* An MB resource in a mode this library does not describe is MBA it cannot
+ * report, and nothing more: the caller keeps every other capability of the
+ * interface. A kernel with ERDT support answers "legacy [native]" here.
+ */
+static void
+test_os_cap_mba_discover_native_control_mode(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap;
+        int ret;
+
+        expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        expect_string(__wrap_pqos_file_exists, path,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        will_return(__wrap_pqos_file_exists, 1);
+
+        expect_string(__wrap_pqos_file_contains, fname,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        expect_string(__wrap_pqos_file_contains, str, "[legacy]");
+        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_file_contains, 0);
+
+        ret = os_cap_mba_discover(&cap, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+/* A kernel that has the file and is in the legacy mode is the one this
+ * describes, and it has to be accepted: reading the mode wrongly would refuse
+ * MBA on every modern kernel that is running the mode this library knows.
+ */
+static void
+test_os_cap_mba_discover_legacy_control_mode(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap;
+        unsigned num_grps = 5;
+        int ret;
+
+        expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        expect_string(__wrap_pqos_file_exists, path,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        will_return(__wrap_pqos_file_exists, 1);
+
+        expect_string(__wrap_pqos_file_contains, fname,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        expect_string(__wrap_pqos_file_contains, str, "[legacy]");
+        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_file_contains, 1);
+
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
+
+        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
+        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
+        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_file_contains, 0);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/MB/min_bandwidth");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_fread_uint64, 100 - data->cap_mba.throttle_max);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/MB/bandwidth_gran");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_fread_uint64, data->cap_mba.throttle_step);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/MB/delay_linear");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_fread_uint64, 1);
+
+        ret = os_cap_mba_discover(&cap, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_OK);
+        assert_int_equal(cap.num_classes, num_grps);
+        assert_int_equal(cap.throttle_max, data->cap_mba.throttle_max);
+        assert_int_equal(cap.throttle_step, data->cap_mba.throttle_step);
+        assert_int_equal(cap.is_linear, 1);
+}
+
+/* A throttling value that cannot be read has to be answered the same way as a
+ * mode this does not describe. Reported as an error instead, it ends
+ * discover_capabilities() and costs the caller L3 CAT, L2 CAT and monitoring as
+ * well. The kernel modelled here is one with no control_mode file - legacy by
+ * definition - so the value is what the case is about and nothing else.
+ */
+static void
+test_os_cap_mba_discover_empty_throttle_value(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap;
+        unsigned num_grps = 5;
+        int ret;
+
+        expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        expect_string(__wrap_pqos_file_exists, path,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        will_return(__wrap_pqos_file_exists, 0);
+
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
+
+        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
+        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
+        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_file_contains, 0);
+
+        /* min_bandwidth holds nothing */
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/MB/min_bandwidth");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        /* the wrapper pops a value only for OK, so none is queued here */
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_ERROR);
+
+        ret = os_cap_mba_discover(&cap, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
+/* and the same for a value further down, so every one of them is answered the
+ * same way rather than only the first. This kernel has no control_mode file
+ * either, so again only the unreadable value decides the answer.
+ */
+static void
+test_os_cap_mba_discover_empty_delay_linear(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        struct pqos_cap_mba cap;
+        unsigned num_grps = 5;
+        int ret;
+
+        expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
+        will_return(__wrap_pqos_dir_exists, 1);
+
+        expect_string(__wrap_pqos_file_exists, path,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        will_return(__wrap_pqos_file_exists, 0);
+
+        will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
+        will_return(__wrap_resctrl_alloc_get_num_closids, num_grps);
+
+        expect_string(__wrap_pqos_file_contains, fname, "/proc/mounts");
+        expect_string(__wrap_pqos_file_contains, str, "mba_MBps");
+        will_return(__wrap_pqos_file_contains, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_file_contains, 0);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/MB/min_bandwidth");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_fread_uint64, 10);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/MB/bandwidth_gran");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_OK);
+        will_return(__wrap_pqos_fread_uint64, 10);
+
+        expect_string(__wrap_pqos_fread_uint64, fname,
+                      "/sys/fs/resctrl/info/MB/delay_linear");
+        expect_value(__wrap_pqos_fread_uint64, base, 10);
+        /* the wrapper pops a value only for OK, so none is queued here */
+        will_return(__wrap_pqos_fread_uint64, PQOS_RETVAL_ERROR);
+
+        ret = os_cap_mba_discover(&cap, data->cpu);
+        assert_int_equal(ret, PQOS_RETVAL_RESOURCE);
+}
+
 static void
 test_os_cap_mba_discover_default(void **state)
 {
@@ -426,6 +602,11 @@ test_os_cap_mba_discover_default(void **state)
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
         will_return(__wrap_pqos_dir_exists, 1);
+
+        /* a kernel with no control_mode file, so legacy by definition */
+        expect_string(__wrap_pqos_file_exists, path,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        will_return(__wrap_pqos_file_exists, 0);
 
         /* read number of classes */
         will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
@@ -476,6 +657,11 @@ test_os_cap_mba_discover_ctrl(void **state)
 
         expect_string(__wrap_pqos_dir_exists, path, "/sys/fs/resctrl/info/MB");
         will_return(__wrap_pqos_dir_exists, 1);
+
+        /* a kernel with no control_mode file, so legacy by definition */
+        expect_string(__wrap_pqos_file_exists, path,
+                      "/sys/fs/resctrl/info/MB/control_mode");
+        will_return(__wrap_pqos_file_exists, 0);
 
         /* read number of classes */
         will_return(__wrap_resctrl_alloc_get_num_closids, PQOS_RETVAL_OK);
@@ -829,7 +1015,11 @@ main(void)
 
         const struct CMUnitTest tests_mba[] = {
             cmocka_unit_test(test_os_cap_mba_discover_default),
-            cmocka_unit_test(test_os_cap_mba_discover_ctrl)};
+            cmocka_unit_test(test_os_cap_mba_discover_ctrl),
+            cmocka_unit_test(test_os_cap_mba_discover_native_control_mode),
+            cmocka_unit_test(test_os_cap_mba_discover_legacy_control_mode),
+            cmocka_unit_test(test_os_cap_mba_discover_empty_throttle_value),
+            cmocka_unit_test(test_os_cap_mba_discover_empty_delay_linear)};
 
         const struct CMUnitTest tests_mon[] = {
             cmocka_unit_test(test_os_cap_mon_discover_resctrl_llc),

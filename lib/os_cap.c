@@ -819,6 +819,51 @@ ctrl_exit:
         return PQOS_RETVAL_OK;
 }
 
+/**
+ * @brief Reads one of the legacy MBA throttling values out of resctrl
+ *
+ * @param [in] path file holding the value
+ * @param [out] value value read
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_RESOURCE for every reason the value could not be read: a
+ *         file that is absent, one that cannot be opened, one that holds
+ *         nothing, and one that holds something other than a number. The caller
+ *         cannot tell them apart, and does not need to - any of them is MBA
+ *         this library cannot describe, and answering with the read error
+ *         instead would end the whole capability discovery. Which reason it was
+ *         goes to the log.
+ */
+static int
+os_cap_mba_throttle_value(const char *path, uint64_t *value)
+{
+        int ret = pqos_fread_uint64(path, 10, value);
+
+        if (ret != PQOS_RETVAL_OK) {
+                /*
+                 * The message says what happened rather than why, because
+                 * pqos_fread_uint64() answers the same way for a file that
+                 * holds nothing, one that cannot be opened and one that holds
+                 * something other than a number.
+                 *
+                 * RESOURCE rather than the status either way: a throttling
+                 * value this cannot read is MBA it cannot describe, and
+                 * reporting anything else costs the caller every other
+                 * capability of the interface, which is what this function
+                 * exists to stop. The line above is what tells an operator
+                 * that something other than the mode was the reason.
+                 */
+                LOG_INFO("MBA: could not read a throttling value from %s "
+                         "(status %d), so the legacy throttling parameters "
+                         "are not available\n",
+                         path, ret);
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        return PQOS_RETVAL_OK;
+}
+
 int
 os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 {
@@ -830,6 +875,30 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
 
         if (!pqos_dir_exists(RESCTRL_PATH_INFO_MB))
                 return PQOS_RETVAL_RESOURCE;
+
+        /**
+         * The MB resource can be in a mode other than the legacy one described
+         * here. A kernel with ERDT support reports "legacy [native]" and leaves
+         * the throttling values below empty, because that mode does not have
+         * them. Older kernels have no control_mode file at all, and those are
+         * legacy by definition - pqos_file_contains() answers OK with found
+         * clear for a file that is not there, so the two cases have to be told
+         * apart before the answer is read.
+         */
+        if (pqos_file_exists(RESCTRL_PATH_INFO_MB "/control_mode")) {
+                int legacy = 0;
+
+                ret = pqos_file_contains(RESCTRL_PATH_INFO_MB "/control_mode",
+                                         "[legacy]", &legacy);
+                if (ret != PQOS_RETVAL_OK)
+                        return ret;
+
+                if (!legacy) {
+                        LOG_INFO("MBA: the MB resource is not in the legacy "
+                                 "control mode\n");
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        }
 
         memset(cap, 0, sizeof(*cap));
         cap->mem_size = sizeof(*cap);
@@ -849,25 +918,23 @@ os_cap_mba_discover(struct pqos_cap_mba *cap, const struct pqos_cpuinfo *cpu)
         else
                 cap->ctrl = mba_ctrl;
 
-        ret =
-            pqos_fread_uint64(RESCTRL_PATH_INFO_MB "/min_bandwidth", 10, &val);
+        ret = os_cap_mba_throttle_value(RESCTRL_PATH_INFO_MB "/min_bandwidth",
+                                        &val);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-        else
-                cap->throttle_max = 100 - val;
+        cap->throttle_max = 100 - val;
 
-        ret =
-            pqos_fread_uint64(RESCTRL_PATH_INFO_MB "/bandwidth_gran", 10, &val);
+        ret = os_cap_mba_throttle_value(RESCTRL_PATH_INFO_MB "/bandwidth_gran",
+                                        &val);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-        else
-                cap->throttle_step = val;
+        cap->throttle_step = val;
 
-        ret = pqos_fread_uint64(RESCTRL_PATH_INFO_MB "/delay_linear", 10, &val);
+        ret = os_cap_mba_throttle_value(RESCTRL_PATH_INFO_MB "/delay_linear",
+                                        &val);
         if (ret != PQOS_RETVAL_OK)
                 return ret;
-        else
-                cap->is_linear = (val == 1);
+        cap->is_linear = (val == 1);
 
         return ret;
 }
