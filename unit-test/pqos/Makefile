@@ -134,6 +134,19 @@ $(BIN_DIR)/test_main: ./test_main.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_cap: ./test_cap.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=pqos_inter_get \
+		-Wl,--wrap=pqos_io_devs_get \
+		-Wl,--wrap=pqos_l3ca_get_min_cbm_bits \
+		-Wl,--start-group \
+		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_common: ./test_common.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \

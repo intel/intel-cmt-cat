@@ -467,7 +467,7 @@ io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
         unsigned int revision = 0;
         unsigned int ret = 0;
         unsigned int idx = 0;
-        pqos_channel_t *channels = NULL;
+        pqos_channel_t channel_id = 0;
         const struct pqos_channel *channel = NULL;
         const struct pqos_devinfo *devinfo = _pqos_get_dev();
 
@@ -515,16 +515,33 @@ io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
                           PCI_SYSFS_FILE_STR_REVISION);
         pci_info->revision = revision;
 
-        channels = pqos_devinfo_get_channel_ids(devinfo, segment, bdf,
-                                                &pci_info->num_channels);
-        if (channels == NULL)
-                LOG_ERROR("Unable to get channels of %04x:%02x:%02x.%x\n",
-                          segment, (bdf >> 8), ((bdf >> 3) & 0x1F),
-                          (bdf & 0x7));
+        /*
+         * The channels of the device, taken from the platform's I/O RDT device
+         * list one virtual channel at a time. pqos_devinfo_get_channel_ids()
+         * answers the same question in one call, but it builds its answer with
+         * an allocation, and a failure of that allocation is reported as a NULL
+         * list - which is what a device with no channel looks like as well.
+         * Read this way the two cannot be confused, and nothing has to be
+         * freed.
+         *
+         * A device that is not on the list, or is on it with no channel, leaves
+         * the count at zero. That describes the device rather than a failure of
+         * this call, which keeps returning the PCI information it did read, so
+         * it is logged as information and left for the caller to report.
+         */
+        pci_info->num_channels = 0;
+        for (idx = 0; idx < PQOS_DEV_MAX_CHANNELS; idx++) {
+                channel_id =
+                    pqos_devinfo_get_channel_id(devinfo, segment, bdf, idx);
 
-        for (idx = 0; idx < pci_info->num_channels && channels; idx++)
-                pci_info->channels[idx] = channels[idx];
-        free(channels);
+                if (channel_id > 0)
+                        pci_info->channels[pci_info->num_channels++] =
+                            channel_id;
+        }
+
+        if (pci_info->num_channels == 0)
+                LOG_INFO("No I/O RDT channel of %04x:%02x:%02x.%x\n", segment,
+                         (bdf >> 8), ((bdf >> 3) & 0x1F), (bdf & 0x7));
 
         for (idx = 0; idx < pci_info->num_channels; idx++) {
                 channel =
@@ -549,17 +566,31 @@ hw_io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
 int
 mmio_io_devs_get(struct pqos_pci_info *pci_info, uint16_t segment, uint16_t bdf)
 {
-        unsigned int ret = 0;
+        int ret;
         const struct pqos_devinfo *devinfo = _pqos_get_dev();
 
-        ret = pqos_devinfo_get_domain_id(devinfo, segment, bdf,
-                                         &pci_info->domain_id);
+        ret = io_devs_get(pci_info, segment, bdf);
         if (ret != PQOS_RETVAL_OK)
+                return ret;
+
+        /*
+         * The device domain is found through the first channel of the device,
+         * so a device the platform reports no channel for has none to be found.
+         * That is not a failure of the lookup and the caller reports the device
+         * itself, so it is not asked for: the domain is only missing for a
+         * device that has channels, which is an I/O RDT device the ERDT table
+         * does not describe
+         */
+        if (pci_info->num_channels == 0)
+                return ret;
+
+        if (pqos_devinfo_get_domain_id(devinfo, segment, bdf,
+                                       &pci_info->domain_id) != PQOS_RETVAL_OK)
                 LOG_ERROR("Unable to get domain ID of %04x:%02x:%02x.%x\n",
                           segment, (bdf >> 8), ((bdf >> 3) & 0x1F),
                           (bdf & 0x7));
 
-        return io_devs_get(pci_info, segment, bdf);
+        return ret;
 }
 
 void

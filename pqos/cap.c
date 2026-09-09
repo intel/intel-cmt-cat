@@ -1154,7 +1154,8 @@ get_min_cbm_bits(enum pqos_interface interface)
  * @return Operation status
  * @retval PQOS_RETVAL_OK on success
  * @retval PQOS_RETVAL_RESOURCE if the device information cannot be read, e.g.
- *         when no such PCI device is present
+ *         when no such PCI device is present, and when the device is present
+ *         but is not an I/O RDT device
  */
 static int
 print_io_dev(const struct pqos_sysconfig *sys,
@@ -1191,6 +1192,27 @@ print_io_dev(const struct pqos_sysconfig *sys,
         if (pci_info.revision != 0)
                 printf(" (rev %02x)", pci_info.revision);
         printf("\n");
+
+        /* An I/O RDT device is one the platform reports a channel for, since a
+         * channel is what monitoring counts and what allocation assigns. With
+         * none of them the fields, the commands and the class of service and
+         * cache way counts below would describe operations that cannot be run
+         * on this device, so it is reported the way an absent device is, with a
+         * status the caller turns into a non-zero exit code. Which of the two
+         * reasons it is gets named, because the commands printed above resolve
+         * one of them and cannot do anything about the other
+         */
+        if (pci_info.num_channels == 0) {
+                if (sys->dev->num_devs == 0)
+                        printf("\tNo I/O RDT channels. The platform reports no "
+                               "I/O RDT device, so I/O RDT is either not "
+                               "supported or not enabled\n");
+                else
+                        printf("\tNo I/O RDT channels, so this is not an I/O "
+                               "RDT device\n");
+
+                return PQOS_RETVAL_RESOURCE;
+        }
 
         if (pci_info.is_pcie)
                 printf("\tPCIe                 : %s\n", pci_info.pcie_type);
@@ -1322,37 +1344,42 @@ cap_print_io_dev(const struct pqos_sysconfig *sys)
         enum pqos_interface interface;
         const struct pqos_capability *cap_l3ca = NULL;
 
+        /* None of the reasons below leaves anything to report, so each of them
+         * returns a status rather than PQOS_RETVAL_OK: the caller turns it into
+         * a non-zero exit code, which is what tells a script that the report it
+         * asked for was not produced
+         */
         if (sel_pci_dev_count == 0) {
                 printf("Segment and BDF information are missing. "
                        "--print-io-dev=<segment>:<bus>:<device>.<function>\n");
                 release_io_dev_selection();
-                return PQOS_RETVAL_OK;
+                return PQOS_RETVAL_PARAM;
         }
 
         if (!sys || !sys->dev) {
                 printf("IRDT info not available!\n");
                 release_io_dev_selection();
-                return PQOS_RETVAL_OK;
+                return PQOS_RETVAL_RESOURCE;
         }
 
         ret = pqos_inter_get(&interface);
         if (ret != PQOS_RETVAL_OK) {
                 printf("unable to get interface\n");
                 release_io_dev_selection();
-                return PQOS_RETVAL_OK;
+                return ret;
         }
 
         if (interface == PQOS_INTER_MMIO) {
                 if (!sys->erdt) {
                         printf("ERDT info not available!\n");
                         release_io_dev_selection();
-                        return PQOS_RETVAL_OK;
+                        return PQOS_RETVAL_RESOURCE;
                 }
         } else if (interface != PQOS_INTER_MSR) {
                 printf("--print-io-dev command is supported in msr and mmio "
                        "interfaces only\n");
                 release_io_dev_selection();
-                return PQOS_RETVAL_OK;
+                return PQOS_RETVAL_PARAM;
         }
 
         for (idx = 0; sys->cap && (idx < sys->cap->num_cap); idx++)
