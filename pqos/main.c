@@ -167,6 +167,11 @@ static int user_interface_set = 0;
 static int sel_print_version = 0;
 
 /**
+ * Enable displaying the list of allocation profiles
+ */
+static int sel_profile_list = 0;
+
+/**
  * Enable displaying memory regions
  */
 static int sel_print_mem_regions = 0;
@@ -1313,6 +1318,24 @@ selfn_print_version(const char *arg)
 }
 
 /**
+ * @brief Selects printing the list of allocation profiles
+ *
+ * The list itself is printed once the command line has been read rather than
+ * here, so that a command line which also asks for an allocation is reported:
+ * the profiles are printed and the utility exits, and an allocation given with
+ * them would be dropped. -h/--help stays where it is, since help has to be
+ * available for a command line that cannot be read at all.
+ *
+ * @param arg not used
+ */
+static void
+selfn_profile_list(const char *arg)
+{
+        UNUSED_ARG(arg);
+        sel_profile_list = 1;
+}
+
+/**
  * @brief Selects displaying supported capabilities
  *
  * @param arg not used
@@ -2024,6 +2047,74 @@ static struct option long_cmd_opts[] = {
     /* clang-format on */
 };
 
+/**
+ * The command modes that print what they were asked for and exit, each next to
+ * the flag the parser sets for it. Every one of them returns, or jumps to
+ * allocation_exit, from above the point where an allocation is applied, so
+ * naming them once here is what lets a command line that asks for both be
+ * reported, and is the one place a print option added later has to be listed.
+ */
+static const struct {
+        const char *name;    /**< as it is written on the command line */
+        const int *selected; /**< non-zero once the option has been parsed */
+} print_and_exit_options[] = {{"-H/--profile-list", &sel_profile_list},
+                              {"-s/--show", &sel_show_allocation_config},
+                              {"-d/--display", &sel_display},
+                              {"-D/--display-verbose", &sel_display_verbose},
+                              {"--version", &sel_print_version},
+                              {"--print-mem-regions", &sel_print_mem_regions},
+                              {"--print-topology", &sel_print_topology},
+                              {"--print-dump-info", &sel_print_dump_info},
+                              {"--dump", &sel_dump},
+                              {"--dump-rmid-regs", &sel_dump_rmid_regs},
+                              {"--print-io-devs", &sel_print_io_devs},
+                              {"--print-io-dev", &sel_print_io_dev}};
+
+/**
+ * @brief Refuse a command line that both prints and allocates
+ *
+ * A mode that prints and exits does so before alloc_apply() and
+ * profile_l3ca_apply() are reached, so the allocation on the same command line
+ * was carried all the way to a return that never reads it: the tool printed the
+ * configuration it was asked for, exited 0, and left the class definitions,
+ * the associations or the profile unapplied without a word about it.
+ *
+ * Called with the other command line checks, before anything is reset, printed
+ * or applied and before the library is up, so such a command line is refused
+ * without a side effect. Both sides are named, since the command line has to be
+ * split in two to do what it was asking for.
+ *
+ * @return Operation status
+ * @retval 0 the command line does not ask for both
+ * @retval -1 it does, and it was reported
+ */
+static int
+check_print_and_exit_options(void)
+{
+        const char *printing = NULL;
+        const char *allocating = alloc_requested_option();
+        unsigned i;
+
+        for (i = 0; i < DIM(print_and_exit_options); i++)
+                if (*print_and_exit_options[i].selected != 0) {
+                        printing = print_and_exit_options[i].name;
+                        break;
+                }
+
+        if (allocating == NULL && sel_allocation_profile != NULL)
+                allocating = "-c/--profile-set";
+
+        if (printing == NULL || allocating == NULL)
+                return 0;
+
+        printf("%s prints and exits before an allocation is applied, so the "
+               "%s given with it would be dropped. Apply the allocation with a "
+               "command of its own, then print!\n",
+               printing, allocating);
+
+        return -1;
+}
+
 int
 main(int argc, char **argv)
 {
@@ -2050,8 +2141,8 @@ main(int argc, char **argv)
                         print_help(1);
                         return EXIT_SUCCESS;
                 case 'H':
-                        profile_l3ca_list();
-                        return EXIT_SUCCESS;
+                        selfn_profile_list(NULL);
+                        break;
                 case OPTION_VERSION:
                         selfn_print_version(NULL);
                         break;
@@ -2380,6 +2471,17 @@ main(int argc, char **argv)
          */
         if (alloc_check_options(sel_allocation_profile != NULL) != 0)
                 return EXIT_FAILURE;
+
+        if (check_print_and_exit_options() != 0)
+                return EXIT_FAILURE;
+
+        /* the profiles are the utility's own, so they are listed without the
+         * library and before anything is reset, printed or applied
+         */
+        if (sel_profile_list) {
+                profile_l3ca_list();
+                return EXIT_SUCCESS;
+        }
 
         cfg.verbose = sel_verbose_mode;
         cfg.interface = sel_interface;

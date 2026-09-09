@@ -147,6 +147,28 @@ $(BIN_DIR)/test_cap: ./test_cap.c $(PQOS_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_cmdline: ./test_cmdline.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--start-group \
+		$(LDFLAGS) $(PQOS_OBJS) $< -Wl,--end-group -o $@
+
+# main.c is included by the test rather than linked, so its object is left out
+$(BIN_DIR)/test_print_modes: ./test_print_modes.c $(PQOS_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=puts \
+		-Wl,--wrap=printf \
+		-Wl,--wrap=putchar \
+		-Wl,--wrap=exit \
+		-Wl,--wrap=alloc_requested_option \
+		-Wl,--start-group \
+		$(LDFLAGS) $(filter-out ./obj/main.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_common: ./test_common.c $(PQOS_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \

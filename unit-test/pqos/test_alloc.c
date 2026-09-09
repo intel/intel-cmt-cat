@@ -755,6 +755,27 @@ test_alloc_apply_cap_not_detected_alloc_option(void **state)
         sel_alloc_domain_id.num_domain_ids = 0;
 }
 
+/* A device association with no allocation capability at all. It is the one
+ * selection alloc_apply() did not look at, so "-a dev:" reported nothing and
+ * the utility fell through to monitoring, which is what asking one question of
+ * the command line in one place fixes.
+ */
+static void
+test_alloc_apply_cap_not_detected_dev_assoc(void **state)
+{
+        struct test_data *data = (struct test_data *)*state;
+        int ret = 0;
+
+        sel_assoc_dev_num = 1;
+
+        run_function(alloc_apply, ret, NULL, NULL, NULL, NULL, data->cpu_info,
+                     NULL);
+        assert_int_equal(ret, -1);
+        assert_true(output_has_text("Allocation capability not detected!"));
+
+        sel_assoc_dev_num = 0;
+}
+
 static void
 test_alloc_apply_mba(void **state)
 {
@@ -1859,7 +1880,8 @@ main(void)
 
         const struct CMUnitTest tests_need_cpu_info[] = {
             cmocka_unit_test(test_alloc_apply_cap_not_detected),
-            cmocka_unit_test(test_alloc_apply_cap_not_detected_alloc_option)};
+            cmocka_unit_test(test_alloc_apply_cap_not_detected_alloc_option),
+            cmocka_unit_test(test_alloc_apply_cap_not_detected_dev_assoc)};
 
         result += cmocka_run_group_tests(tests, NULL, NULL);
         result += cmocka_run_group_tests(tests_need_all_caps, init_all_caps,

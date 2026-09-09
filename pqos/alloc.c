@@ -1069,6 +1069,27 @@ alloc_options_selected(void)
         return 0;
 }
 
+const char *
+alloc_requested_option(void)
+{
+        if (sel_alloc_opt_num > 0)
+                return "-e/--alloc-class";
+
+        if (sel_assoc_core_num > 0 || sel_assoc_pid_num > 0 ||
+            sel_assoc_dev_num > 0 || sel_assoc_channel_num > 0)
+                return "-a/--alloc-assoc";
+
+        /* On its own this is rejected by alloc_check_options() before anyone
+         * asks, so it is reached with a class definition beside it, and it
+         * names the group rather than the option. Without an article, like the
+         * names above it, so that it reads as written wherever a caller puts it
+         */
+        if (alloc_options_selected())
+                return "--alloc-* option";
+
+        return NULL;
+}
+
 int
 alloc_check_options(const int class_pending)
 {
@@ -2910,9 +2931,11 @@ alloc_apply(const struct pqos_capability *cap_l3ca,
                         return 1;
                 }
         } else {
-                if (sel_assoc_core_num > 0 || sel_alloc_opt_num > 0 ||
-                    sel_assoc_pid_num > 0 || sel_assoc_channel_num > 0 ||
-                    alloc_options_selected()) {
+                /* the same question as the one asked of the command line
+                 * before anything ran, so that an allocation option added to
+                 * one of them is reported by both
+                 */
+                if (alloc_requested_option() != NULL) {
                         printf("Allocation capability not detected!\n");
                         return -1;
                 }

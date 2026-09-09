@@ -184,6 +184,23 @@ int alloc_apply(const struct pqos_capability *cap_l3ca,
  */
 int alloc_check_options(const int class_pending);
 
+/**
+ * @brief Names an option through which the command line asks for an allocation
+ *
+ * Asked before anything is printed or applied, so that a command mode which
+ * prints and exits can be refused the allocation it would drop. The name is
+ * returned rather than a flag, because the report is about the command line and
+ * naming the option that was given is what makes it actionable.
+ *
+ * -c/--profile-set is not one of them: the profile is turned into class
+ * definitions by profile_l3ca_apply(), which runs later, so main.c holds that
+ * one and asks about it separately.
+ *
+ * @return the option as it is written on the command line, or NULL when no
+ *         allocation was asked for
+ */
+const char *alloc_requested_option(void);
+
 #ifdef __cplusplus
 }
 #endif
