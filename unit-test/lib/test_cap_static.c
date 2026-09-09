@@ -749,6 +749,15 @@ test_cap_l2ca_discover(void **state __attribute__((unused)))
         will_return(__wrap_hw_cap_l2ca_discover, PQOS_RETVAL_RESOURCE);
         assert_int_not_equal(cap_l2ca_discover(&r_cap, &cpu, PQOS_INTER_MSR),
                              PQOS_RETVAL_OK);
+        /*
+         * The MMIO interface has no L2 CAT operation, so the capability is not
+         * reported there and no discovery function is asked for it: an
+         * unexpected call to either wrapper fails this case.
+         */
+        r_cap = NULL;
+        assert_int_equal(cap_l2ca_discover(&r_cap, &cpu, PQOS_INTER_MMIO),
+                         PQOS_RETVAL_RESOURCE);
+        assert_null(r_cap);
 #ifdef __linux__
         expect_function_call(__wrap_os_cap_l2ca_discover);
         r_cap = NULL;

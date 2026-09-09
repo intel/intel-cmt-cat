@@ -241,10 +241,19 @@ cap_l2ca_discover(struct pqos_cap_l2ca **r_cap,
 
         switch (iface) {
         case PQOS_INTER_MSR:
-        /* MMIO interface shares same L2 CAT functionality with MSR interface,
-         * so it uses the same l2ca discovery function. */
-        case PQOS_INTER_MMIO:
                 ret = hw_cap_l2ca_discover(cap, cpu);
+                break;
+        /**
+         * The MMIO interface has no L2 CAT operation at all: api.c installs
+         * l2ca_set, l2ca_get and l2ca_get_min_cbm_bits for the MSR and the OS
+         * interface only, so every L2 CAT call on this one is answered with
+         * PQOS_RETVAL_RESOURCE. Reporting the capability advertised a
+         * technology whose every operation is refused, and put a class count
+         * taken from CPUID beside the ERDT limited counts of L3 CAT and MBA in
+         * one display. L2 CAT is reached through MSR or OS on such a platform.
+         */
+        case PQOS_INTER_MMIO:
+                ret = PQOS_RETVAL_RESOURCE;
                 break;
 #ifdef __linux__
         case PQOS_INTER_OS:
