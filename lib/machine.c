@@ -176,7 +176,7 @@ msr_file_open(const unsigned lcore)
 #ifdef __FreeBSD__
                 snprintf(fname, sizeof(fname) - 1, "/dev/cpuctl%u", lcore);
 #endif
-                fd = open(fname, O_RDWR);
+                fd = open(fname, O_RDWR | O_CLOEXEC);
                 if (fd < 0)
                         LOG_WARN("Error opening file '%s'!\n", fname);
                 else

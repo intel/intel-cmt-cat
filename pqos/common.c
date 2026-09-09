@@ -395,51 +395,42 @@ pqos_parse_pci_id(char *arg,
 FILE *
 safe_fopen(const char *name, const char *mode)
 {
-        int fd;
+        int fd = -1, flags = 0;
         FILE *stream = NULL;
-        struct stat lstat_val;
-        struct stat fstat_val;
-        int new_file = 0;
+        mode_t perms = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH; /* 0644 */
 
-        /* collect any link info about the file */
-        /* coverity[fs_check_call] */
-        if (lstat(name, &lstat_val) == -1) {
-                if (errno != ENOENT)
-                        return NULL;
-                else
-                        new_file = 1;
+        if (name == NULL || mode == NULL)
+                return NULL;
+
+        if (strcmp(mode, "r") == 0)
+                flags = O_RDONLY;
+        else if (strcmp(mode, "r+") == 0)
+                flags = O_RDWR;
+        else if (strcmp(mode, "w") == 0)
+                flags = O_WRONLY | O_CREAT | O_TRUNC;
+        else if (strcmp(mode, "w+") == 0)
+                flags = O_RDWR | O_CREAT | O_TRUNC;
+        else if (strcmp(mode, "a") == 0)
+                flags = O_WRONLY | O_CREAT | O_APPEND;
+        else if (strcmp(mode, "a+") == 0)
+                flags = O_RDWR | O_CREAT | O_APPEND;
+        else
+                return NULL;
+
+        fd = open(name, flags | O_NOFOLLOW, perms);
+        if (fd == -1) {
+                if (errno == ELOOP)
+                        printf("File %s is a symlink\n", name);
+                return NULL;
         }
 
-        stream = fopen(name, mode);
-        if (stream == NULL)
-                return stream;
-
-        if (new_file && lstat(name, &lstat_val) == -1)
-                goto safe_fopen_error;
-
-        fd = fileno(stream);
-        if (fd == -1)
-                goto safe_fopen_error;
-
-        /* collect info about the opened file */
-        if (fstat(fd, &fstat_val) == -1)
-                goto safe_fopen_error;
-
-        /* we should not have followed a symbolic link */
-        if (lstat_val.st_mode != fstat_val.st_mode ||
-            lstat_val.st_ino != fstat_val.st_ino ||
-            lstat_val.st_dev != fstat_val.st_dev) {
-                printf("File %s is a symlink\n", name);
-                goto safe_fopen_error;
+        stream = fdopen(fd, mode);
+        if (stream == NULL) {
+                close(fd);
+                return NULL;
         }
 
         return stream;
-
-safe_fopen_error:
-        if (stream != NULL)
-                fclose(stream);
-
-        return NULL;
 }
 
 int
