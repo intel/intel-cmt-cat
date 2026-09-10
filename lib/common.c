@@ -51,46 +51,213 @@
 /* pqos tool opens some file descriptors while using msr interface */
 #define MAX_PQOS_FD 100
 
+/**
+ * The permissions a created file is given: 0666, which is what fopen() asks
+ * for, narrowed by the umask exactly as it is there. Octal rather than the six
+ * S_I* macros, which is the form the rest of this tree uses - lock.c spells the
+ * same value LOCKFILE_PERMS 0666 - and the one checkpatch asks for.
+ */
+#define FOPEN_CREATE_PERMS 0666
+
+/** Room for a mode string with the exclusive modifier taken out of it */
+#define FOPEN_MODE_SIZE 8
+
+/**
+ * @brief Translate a mode string of fopen() into flags for open()
+ *
+ * Every mode C defines is translated, and the position of each character
+ * matters. The first one carries the access, then '+' and 'b' in either order,
+ * and last of all the exclusive 'x' that C11 adds for a 'w' - which makes the
+ * exclusive modes exactly "wx", "wbx", "w+x", "w+bx" and "wb+x". Nothing else
+ * is a mode C defines, so "wxb" and "wx+" are refused along with the glibc
+ * extensions 'e', 'm' and 'c'; a 'b' or an 'x' accepted wherever it appeared
+ * would turn "bw" into a translation of "w", and the file would be opened and
+ * truncated before fdopen() refused the mode.
+ *
+ * 'x' asks for the file to be created and to fail if it is already there,
+ * which is what O_EXCL does, and takes O_TRUNC out of the flags because a file
+ * that cannot exist has nothing to truncate. It is also the one modifier with
+ * no meaning for a descriptor that is already open, and glibc's fdopen()
+ * refuses "w+x" outright, so it is left out of the mode the stream is made
+ * with.
+ *
+ * This is the counterpart of the same function in the utility's pqos/common.c,
+ * which safe_fopen() uses, and for now a change to the mode grammar has to be
+ * made in both: pqos_fopen() is PQOS_LOCAL, so the utility cannot call it. The
+ * duplication is deliberate and meant to be short-lived - the two wrappers are
+ * to become one, the library's pair declared in the public header and the
+ * utility's deleted - which is tracked apart from this.
+ *
+ * @param [in] mode the mode string as pqos_fopen() received it
+ * @param [out] flags the flags to open() the file with
+ * @param [out] stream_mode the mode fdopen() is given, the same string without
+ *              an 'x'; at least FOPEN_MODE_SIZE bytes
+ *
+ * @return Operation status
+ * @retval 0 the mode was translated
+ * @retval -1 the mode is not one C defines
+ */
+static int
+fopen_mode_flags(const char *mode, int *flags, char *stream_mode)
+{
+        int plus = 0;
+        int binary = 0;
+        int exclusive = 0;
+        size_t used = 0;
+        size_t i;
+
+        /* refused before the walk below, which starts past the access character
+         * and would read past the end of an empty mode
+         */
+        if (mode[0] == '\0')
+                return -1;
+
+        stream_mode[used++] = mode[0];
+
+        for (i = 1; mode[i] != '\0'; i++) {
+                if (mode[i] == '+' && !plus)
+                        plus = 1;
+                else if (mode[i] == 'b' && !binary)
+                        binary = 1;
+                else if (mode[i] == 'x' && !exclusive && mode[0] == 'w' &&
+                         mode[i + 1] == '\0')
+                        exclusive = 1;
+                else
+                        return -1;
+
+                if (mode[i] == 'x')
+                        continue;
+
+                if (used >= FOPEN_MODE_SIZE - 1)
+                        return -1;
+                stream_mode[used++] = mode[i];
+        }
+        stream_mode[used] = '\0';
+
+        switch (mode[0]) {
+        case 'r':
+                *flags = plus ? O_RDWR : O_RDONLY;
+                break;
+        case 'w':
+                *flags = (plus ? O_RDWR : O_WRONLY) | O_CREAT;
+                *flags |= exclusive ? O_EXCL : O_TRUNC;
+                break;
+        case 'a':
+                *flags = (plus ? O_RDWR : O_WRONLY) | O_CREAT | O_APPEND;
+                break;
+        default:
+                return -1;
+        }
+
+        return 0;
+}
+
+/**
+ * @brief Tell whether fopen() would leave a stream opened with this mode at the
+ *        end of the file
+ *
+ * The C libraries this is built for do not agree: FreeBSD seeks whenever
+ * O_APPEND was asked for, "a+" included; glibc positions only a stream that
+ * cannot be read, so "a" ends up at the end of the file and "a+" at the start;
+ * musl positions none of them. A library this was not built against is taken to
+ * behave as musl does and leave the offset alone. Same reasoning, and the same
+ * duplication, as the copy in pqos/common.c.
+ *
+ * __GLIBC__ comes from <features.h> rather than the compiler, and any glibc
+ * header pulls that in, so the test below only means anything underneath one;
+ * <stdio.h> is included at the top of this file.
+ *
+ * @param [in] mode the mode string as pqos_fopen() received it
+ *
+ * @return Whether the stream belongs at the end of the file
+ * @retval 1 fopen() would have positioned it there
+ * @retval 0 fopen() would have left it where the descriptor is
+ */
+static int
+fopen_positions_at_end(const char *mode)
+{
+        if (mode[0] != 'a')
+                return 0;
+
+#ifdef __FreeBSD__
+        return 1;
+#elif defined(__GLIBC__)
+        return strchr(mode, '+') == NULL;
+#else
+        return 0;
+#endif
+}
+
 FILE *
 pqos_fopen(const char *name, const char *mode)
 {
         int fd;
-        FILE *stream = NULL;
-        struct stat lstat_val;
-        struct stat fstat_val;
+        int flags = 0;
+        int error;
+        char stream_mode[FOPEN_MODE_SIZE] = {0};
+        FILE *stream;
 
-        /* collect any link info about the file */
-        /* coverity[fs_check_call] */
-        if (lstat(name, &lstat_val) == -1)
+        if (name == NULL || mode == NULL ||
+            fopen_mode_flags(mode, &flags, stream_mode) != 0) {
+                errno = EINVAL;
+
                 return NULL;
+        }
 
-        stream = fopen(name, mode);
-        if (stream == NULL)
-                return stream;
+        /*
+         * The kernel refuses a symbolic link here, before anything is opened,
+         * created or truncated. What this replaced asked lstat() whether the
+         * name was a link and then handed the name to fopen(), which resolved
+         * it a second time: a link planted in between was followed, and a
+         * writing mode - which lib/resctrl_monitoring.c uses - truncated the
+         * file it pointed at before the comparison that came afterwards could
+         * refuse the stream. No race was needed for a link already sitting at
+         * the name.
+         */
+        fd = open(name, flags | O_NOFOLLOW, FOPEN_CREATE_PERMS);
+        if (fd == -1) {
+                struct stat lstat_val;
 
-        fd = fileno(stream);
-        if (fd == -1)
-                goto pqos_fopen_error;
+                /*
+                 * What open() reports for a link it refused depends on the
+                 * platform and on the flags - ELOOP on Linux, EMLINK on
+                 * FreeBSD, EEXIST under O_EXCL - so the name is asked about
+                 * instead, after the failure, where the answer only explains
+                 * it. errno is put back around that, because lstat() and the
+                 * logging are both allowed to change it and the caller is
+                 * entitled to the reason the call failed.
+                 */
+                error = errno;
+                if (lstat(name, &lstat_val) == 0 && S_ISLNK(lstat_val.st_mode))
+                        LOG_ERROR("File %s is a symlink\n", name);
+                errno = error;
 
-        /* collect info about the opened file */
-        if (fstat(fd, &fstat_val) == -1)
-                goto pqos_fopen_error;
+                return NULL;
+        }
 
-        /* we should not have followed a symbolic link */
-        if (lstat_val.st_mode != fstat_val.st_mode ||
-            lstat_val.st_ino != fstat_val.st_ino ||
-            lstat_val.st_dev != fstat_val.st_dev) {
-                LOG_ERROR("File %s is a symlink\n", name);
-                goto pqos_fopen_error;
+        stream = fdopen(fd, stream_mode);
+        if (stream == NULL) {
+                error = errno;
+                close(fd);
+                errno = error;
+
+                return NULL;
+        }
+
+        /*
+         * fdopen() takes the offset the descriptor has, which open() leaves at
+         * the start of the file, while fopen() may put an append stream at the
+         * end of it. Writes land at the end either way - that is what O_APPEND
+         * is for - but a caller that asks ftell() before writing gets what the
+         * fopen() of this platform would have given it.
+         */
+        if (fopen_positions_at_end(mode)) {
+                error = errno;
+                (void)fseek(stream, 0, SEEK_END);
+                errno = error;
         }
 
         return stream;
-
-pqos_fopen_error:
-        if (stream != NULL)
-                fclose(stream);
-
-        return NULL;
 }
 
 int
@@ -103,33 +270,87 @@ int
 pqos_open(const char *pathname, int flags)
 {
         int fd;
-        struct stat lstat_val;
-        struct stat fstat_val;
+        int error;
+        int creating = 0;
 
-        /* collect any link info about the file */
-        /* coverity[fs_check_call] */
-        if (lstat(pathname, &lstat_val) == -1)
-                return -1;
+        if (pathname == NULL) {
+                errno = EINVAL;
 
-        /* open the file */
-        fd = open(pathname, flags);
-        if (fd == -1)
-                return -1;
-
-        /* collect info about the opened file */
-        if (fstat(fd, &fstat_val) == -1) {
-                close(fd);
                 return -1;
         }
 
-        /* we should not have followed a symbolic link */
-        if (lstat_val.st_mode != fstat_val.st_mode ||
-            lstat_val.st_ino != fstat_val.st_ino ||
-            lstat_val.st_dev != fstat_val.st_dev) {
-                printf("File %s is a symlink\n", pathname);
-                close(fd);
+        /*
+         * O_NOFOLLOW, so the kernel refuses a link at the name and the name
+         * is resolved once. What this replaced lstat()ed the name, opened it
+         * and compared the two answers, which meant a link planted in between
+         * had already been followed by the time it was refused.
+         *
+         * The mode is passed whenever open() will read one as its variadic
+         * argument, which the call this replaced never supplied. That is
+         * O_CREAT, and also O_TMPFILE, which this library is in reach of
+         * because it is built with _GNU_SOURCE and which does not carry
+         * O_CREAT in its bit pattern, so a caller asking for O_TMPFILE alone
+         * would otherwise land in the branch with no mode. O_TMPFILE is more
+         * than one bit, so the whole pattern is compared, and it exists only
+         * on Linux.
+         *
+         * No caller in the tree asks for either today - both use /dev/mem -
+         * so this closes the gap for the next one.
+         */
+        if (flags & O_CREAT)
+                creating = 1;
+#ifdef O_TMPFILE
+        if ((flags & O_TMPFILE) == O_TMPFILE)
+                creating = 1;
+#endif
+
+        if (creating)
+                fd = open(pathname, flags | O_NOFOLLOW, FOPEN_CREATE_PERMS);
+        else
+                fd = open(pathname, flags | O_NOFOLLOW);
+        if (fd == -1) {
+                struct stat lstat_val;
+
+                /* the errno of a refused link is not one thing, so the name is
+                 * asked about instead, and errno is kept for the caller
+                 */
+                error = errno;
+                if (lstat(pathname, &lstat_val) == 0 &&
+                    S_ISLNK(lstat_val.st_mode))
+                        LOG_ERROR("File %s is a symlink\n", pathname);
+                errno = error;
+
                 return -1;
         }
+
+#ifdef O_PATH
+        /*
+         * O_PATH is the one flag that makes O_NOFOLLOW stop refusing a link:
+         * the pair opens the *link* rather than what it points at, and every
+         * other check here would agree with it. So a descriptor opened that way
+         * is asked what it describes, and a link is refused with the answer the
+         * rest of this function promises. Only reachable where O_PATH exists,
+         * which is Linux, and only paid for when a caller asks for it.
+         */
+        if (flags & O_PATH) {
+                struct stat fstat_val;
+
+                if (fstat(fd, &fstat_val) == -1) {
+                        error = errno;
+                        close(fd);
+                        errno = error;
+
+                        return -1;
+                }
+                if (S_ISLNK(fstat_val.st_mode)) {
+                        LOG_ERROR("File %s is a symlink\n", pathname);
+                        close(fd);
+                        errno = ELOOP;
+
+                        return -1;
+                }
+        }
+#endif
 
         return fd;
 }

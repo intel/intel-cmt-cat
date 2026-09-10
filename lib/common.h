@@ -49,15 +49,32 @@ extern "C" {
 #include <sys/stat.h>
 
 /**
- * @brief Wrapper around fopen() that additionally checks if a given path
- * contains any symbolic links and fails if it does.
+ * @brief Wrapper around fopen() that fails if the file it names is a symbolic
+ * link, refusing it before anything is opened, created or truncated
+ *
+ * The file is opened with O_NOFOLLOW and the stream is made from the
+ * descriptor, so the name is resolved once and the kernel refuses a link. A
+ * directory in the path leading to the file is resolved as open() would resolve
+ * it, symbolic links included, which is the same promise pqos_open() makes.
+ *
+ * Every mode C defines is accepted - a first character of 'r', 'w' or 'a', then
+ * '+' and 'b' in either order, and last of all the exclusive 'x' that C11 adds
+ * for a 'w', making those modes "wx", "wbx", "w+x", "w+bx" and "wb+x". Any
+ * other mode fails before the file is opened, so a caller asking for one of
+ * the glibc extensions ('e', 'm', 'c') is told no, as is one writing 'b' or
+ * 'x' where C does not put it, which cannot then turn into a mode that
+ * truncates. An append stream is left where the fopen() of the platform would
+ * have left it.
  *
  * @param [in] name a path to a file
  * @param [in] mode a file access mode
  *
  * @return Pointer to a file
- * @retval A valid pointer to a file or NULL on error (e.g. when the path
- * contains any symbolic links).
+ * @retval A valid pointer to a file, or NULL with errno set to the reason: the
+ * errno of open() or fdopen(), which for a link is ELOOP on Linux, EMLINK on
+ * FreeBSD and EEXIST under an 'x' mode - the flags come from the mode string
+ * alone here, so those are all of them - and EINVAL where the mode is not one C
+ * defines. A refused link is also reported through LOG_ERROR.
  */
 PQOS_LOCAL FILE *pqos_fopen(const char *name, const char *mode);
 
@@ -72,15 +89,26 @@ PQOS_LOCAL FILE *pqos_fopen(const char *name, const char *mode);
 PQOS_LOCAL int pqos_fclose(FILE *stream);
 
 /**
- * @brief Wrapper around open() that additionally checks if a given path
- * contains any symbolic links and fails if it does.
+ * @brief Wrapper around open() that fails if the file it names is a symbolic
+ * link
+ *
+ * The name itself, that is: O_NOFOLLOW is added to the flags, so the kernel
+ * refuses a link at the name and resolves it once, while a directory in the
+ * path leading to it is resolved as open() would resolve it, links included.
+ * This is not a check on the whole path.
  *
  * @param [in] pathname a path to a file
  * @param [in] flags file access flags
  *
  * @return A file descriptor
- * @retval A valid file descriptor or -1 on error (e.g. when the path
- * contains any symbolic links).
+ * @retval A valid file descriptor, or -1. errno is whatever open() reported,
+ * and for a link at the name that is not one value but a function of the flags:
+ * on Linux ELOOP for a plain open, ENOTDIR with O_DIRECTORY, EEXIST with
+ * O_CREAT | O_EXCL, and on FreeBSD EMLINK. That is why nothing here decides
+ * anything by reading it - a refused link is recognised by lstat()ing the name
+ * after the failure and reported through LOG_ERROR. Two errnos this function
+ * does set itself: EINVAL where no name was given, and ELOOP where O_PATH made
+ * open() succeed on the link rather than refuse it.
  */
 PQOS_LOCAL int pqos_open(const char *pathname, int flags);
 

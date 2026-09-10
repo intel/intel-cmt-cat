@@ -379,12 +379,13 @@ pqos_parse_pci_id(char *arg,
 }
 
 /**
- * The permissions a created file is given, which is what fopen() gives one and
- * is narrowed by the umask exactly as it is there, so a file this makes is the
- * file it has always made.
+ * The permissions a created file is given: 0666, which is what fopen() asks
+ * for, narrowed by the umask exactly as it is there, so a file this makes is
+ * the file it has always made. Octal rather than the six S_I* macros, which is
+ * the form the rest of this tree uses - lib/lock.c spells the same value
+ * LOCKFILE_PERMS 0666 - and the one checkpatch asks for.
  */
-#define FOPEN_CREATE_PERMS                                                     \
-        (S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH)
+#define FOPEN_CREATE_PERMS 0666
 
 /** Room for a mode string with the exclusive modifier taken out of it */
 #define FOPEN_MODE_SIZE 8

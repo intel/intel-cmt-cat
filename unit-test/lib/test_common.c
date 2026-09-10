@@ -36,9 +36,14 @@
 #include "test.h"
 
 #include <ctype.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #define FILE_DEAD ((FILE *)0xDEAD)
@@ -223,61 +228,373 @@ test_common_pqos_file_contains(void **state __attribute__((unused)))
         assert_int_equal(found_param, 0);
 }
 
+/* pqos_fopen() and pqos_open() open the file themselves now - with O_NOFOLLOW,
+ * so that the kernel is what refuses a link - and no longer reach fopen(),
+ * which is why these cases work on real files instead of on the fopen() wrapper
+ * above. A file is written with __real_fopen() so that the wrapper's
+ * expectations stay out of the fixture.
+ */
+/* Every fixture lives in a directory of this process's own, so a concurrent run
+ * cannot unlink or replace what this one is asserting about, and a name planted
+ * beforehand cannot make ut_write() truncate somebody else's file. Same reason,
+ * and the same shape, as unit-test/pqos/test_common.c.
+ */
+static char work_dir[PATH_MAX];
+static char ut_file[PATH_MAX];
+static char ut_link[PATH_MAX];
+static char ut_target[PATH_MAX];
+static char ut_absent[PATH_MAX];
+
+static void
+ut_path(char *buffer, size_t size, const char *name)
+{
+        snprintf(buffer, size, "%s/%s", work_dir, name);
+        buffer[size - 1] = '\0';
+}
+
+static int
+group_setup(void **state __attribute__((unused)))
+{
+        snprintf(work_dir, sizeof(work_dir), "/tmp/pqos_ut_lib_common_XXXXXX");
+        if (mkdtemp(work_dir) == NULL)
+                return -1;
+
+        ut_path(ut_file, sizeof(ut_file), "file");
+        ut_path(ut_link, sizeof(ut_link), "link");
+        ut_path(ut_target, sizeof(ut_target), "target");
+        ut_path(ut_absent, sizeof(ut_absent), "absent");
+
+        return 0;
+}
+
+static int
+group_teardown(void **state __attribute__((unused)))
+{
+        if (work_dir[0] != '\0')
+                rmdir(work_dir);
+
+        return 0;
+}
+
+char *__real_fgets(char *s, int n, FILE *stream);
+
+static void
+ut_write(const char *path, const char *text)
+{
+        FILE *stream = __real_fopen(path, "w");
+
+        assert_non_null(stream);
+        assert_int_equal(fwrite(text, 1, strlen(text), stream), strlen(text));
+        assert_int_equal(__real_fclose(stream), 0);
+}
+
+static void
+ut_assert_contents(const char *path, const char *text)
+{
+        FILE *stream = __real_fopen(path, "r");
+        char buffer[64] = {0};
+
+        assert_non_null(stream);
+        assert_non_null(__real_fgets(buffer, sizeof(buffer), stream));
+        assert_string_equal(buffer, text);
+        assert_int_equal(__real_fclose(stream), 0);
+}
+
+static void
+ut_cleanup(void)
+{
+        unlink(ut_link);
+        unlink(ut_target);
+        unlink(ut_file);
+}
+
 static void
 test_common_pqos_fopen(void **state __attribute__((unused)))
 {
         FILE *fd;
+        int error;
 
-        /* file does not exists */
+        ut_cleanup();
+
+        /* an existing file is read */
         {
-                const char *path = "/proc/file_that_doesnt_exist";
+                char buffer[64] = {0};
 
-                fd = pqos_fopen(path, "r");
-                assert_null(fd);
-        }
+                ut_write(ut_file, "contents\n");
 
-        /* directory */
-        {
-                const char *path = "/proc";
-
-                expect_string(__wrap_fopen, name, path);
-                expect_string(__wrap_fopen, mode, "r");
-                will_return(__wrap_fopen, NULL);
-
-                fd = pqos_fopen(path, "r");
-                assert_null(fd);
-        }
-
-        /* symlink */
-        {
-                const char *path = "/tmp/pqos_ut_symlink";
-
-                unlink(path);
-                assert_return_code(symlink("/proc/cpuinfo", path), 0);
-
-                expect_string(__wrap_fopen, name, path);
-                expect_string(__wrap_fopen, mode, "r");
-                will_return(__wrap_fopen, (FILE *)1);
-
-                fd = pqos_fopen(path, "r");
-                assert_null(fd);
-
-                unlink(path);
-        }
-
-        /* normal file */
-        {
-                const char *path = "/proc/cpuinfo";
-
-                expect_string(__wrap_fopen, name, path);
-                expect_string(__wrap_fopen, mode, "r");
-                will_return(__wrap_fopen, (FILE *)1);
-
-                fd = pqos_fopen(path, "r");
+                fd = pqos_fopen(ut_file, "r");
                 assert_non_null(fd);
-
-                pqos_fclose(fd);
+                assert_non_null(__real_fgets(buffer, sizeof(buffer), fd));
+                assert_string_equal(buffer, "contents\n");
+                assert_int_equal(pqos_fclose(fd), 0);
         }
+
+        /* file does not exist, and errno says which */
+        {
+                fd = pqos_fopen(ut_absent, "r");
+                error = errno;
+                assert_null(fd);
+                assert_int_equal(error, ENOENT);
+        }
+
+        /* a writing mode creates the file */
+        {
+                unlink(ut_file);
+                fd = pqos_fopen(ut_file, "w");
+                assert_non_null(fd);
+                assert_int_equal(fwrite("written\n", 1, 8, fd), 8);
+                assert_int_equal(pqos_fclose(fd), 0);
+                ut_assert_contents(ut_file, "written\n");
+        }
+
+        /* a symlink is refused, and its target is left as it was - the
+         * implementation this replaced truncated it through a "w" mode before
+         * refusing the stream, so this case fails against that one
+         */
+        {
+                ut_write(ut_target, "keep me\n");
+                assert_return_code(symlink(ut_target, ut_link), 0);
+
+                fd = pqos_fopen(ut_link, "w");
+                assert_null(fd);
+                ut_assert_contents(ut_target, "keep me\n");
+
+                unlink(ut_link);
+                unlink(ut_target);
+        }
+
+        /* a symlink is refused for a reading mode too */
+        {
+                ut_write(ut_target, "keep me\n");
+                assert_return_code(symlink(ut_target, ut_link), 0);
+
+                fd = pqos_fopen(ut_link, "r");
+                assert_null(fd);
+
+                unlink(ut_link);
+                unlink(ut_target);
+        }
+
+        /* a link with no target does not become one */
+        {
+                assert_return_code(symlink(ut_target, ut_link), 0);
+
+                fd = pqos_fopen(ut_link, "w+");
+                assert_null(fd);
+                assert_int_equal(access(ut_target, F_OK), -1);
+
+                unlink(ut_link);
+        }
+
+        /* a mode that is not one C defines is refused, before the file it names
+         * can be truncated by the part of it that is a mode
+         */
+        {
+                static const char *const refused[] = {
+                    "", "rw", "w+e", "z", "bw", "rbb", "+r", "wxb"};
+                unsigned i;
+
+                ut_write(ut_file, "untouched\n");
+
+                for (i = 0; i < DIM(refused); i++) {
+                        fd = pqos_fopen(ut_file, refused[i]);
+                        error = errno;
+                        assert_null(fd);
+                        assert_int_equal(error, EINVAL);
+                        ut_assert_contents(ut_file, "untouched\n");
+                }
+        }
+
+        /* the binary and exclusive forms C does define are accepted */
+        {
+                static const char *const accepted[] = {"wb", "w+b", "wb+", "wx",
+                                                       "w+bx"};
+                unsigned i;
+
+                for (i = 0; i < DIM(accepted); i++) {
+                        unlink(ut_file);
+                        fd = pqos_fopen(ut_file, accepted[i]);
+                        assert_non_null(fd);
+                        assert_int_equal(pqos_fclose(fd), 0);
+                }
+        }
+
+        /* an exclusive mode fails on a file that is there, and leaves it alone
+         */
+        {
+                ut_write(ut_file, "already\n");
+
+                fd = pqos_fopen(ut_file, "wx");
+                error = errno;
+                assert_null(fd);
+                assert_int_equal(error, EEXIST);
+                ut_assert_contents(ut_file, "already\n");
+        }
+
+        /* NULL arguments are refused rather than dereferenced */
+        {
+                fd = pqos_fopen(NULL, "r");
+                assert_null(fd);
+                assert_int_equal(errno, EINVAL);
+
+                fd = pqos_fopen(ut_file, NULL);
+                assert_null(fd);
+                assert_int_equal(errno, EINVAL);
+        }
+
+        /* an append stream is where the fopen() of this platform puts one, and
+         * a write goes to the end of the file whatever that is
+         */
+        {
+                static const char *const modes[] = {"a", "ab", "a+", "a+b",
+                                                    "ab+"};
+                unsigned i;
+
+                for (i = 0; i < DIM(modes); i++) {
+                        FILE *reference;
+                        long position;
+
+                        ut_write(ut_file, "0123456789");
+
+                        reference = __real_fopen(ut_file, modes[i]);
+                        assert_non_null(reference);
+                        position = ftell(reference);
+                        assert_int_equal(__real_fclose(reference), 0);
+
+                        fd = pqos_fopen(ut_file, modes[i]);
+                        assert_non_null(fd);
+                        assert_int_equal(ftell(fd), position);
+                        assert_int_equal(fwrite("XY", 1, 2, fd), 2);
+                        assert_int_equal(pqos_fclose(fd), 0);
+                        ut_assert_contents(ut_file, "0123456789XY");
+                }
+        }
+
+        ut_cleanup();
+}
+
+static void
+test_common_pqos_open(void **state __attribute__((unused)))
+{
+        int fd;
+        int error;
+
+        ut_cleanup();
+
+        /* an existing file is opened */
+        {
+                ut_write(ut_file, "contents\n");
+
+                fd = pqos_open(ut_file, O_RDONLY);
+                assert_true(fd >= 0);
+                assert_int_equal(close(fd), 0);
+        }
+
+        /* a symlink is refused, and what it points at is not truncated - the
+         * implementation this replaced opened it first
+         */
+        {
+                ut_write(ut_target, "keep me\n");
+                assert_return_code(symlink(ut_target, ut_link), 0);
+
+                fd = pqos_open(ut_link, O_WRONLY | O_TRUNC);
+                assert_int_equal(fd, -1);
+                ut_assert_contents(ut_target, "keep me\n");
+
+                unlink(ut_link);
+                unlink(ut_target);
+        }
+
+        /* a missing file leaves the caller its errno */
+        {
+                fd = pqos_open(ut_absent, O_RDONLY);
+                error = errno;
+                assert_int_equal(fd, -1);
+                assert_int_equal(error, ENOENT);
+        }
+
+        /* O_CREAT is given a mode, so the file it creates is readable rather
+         * than opened with whatever the stack held
+         */
+        {
+                struct stat st;
+                mode_t saved;
+
+                unlink(ut_file);
+                /* nothing masked out, so what is asserted is the mode the
+                 * helper supplies rather than what this process's umask
+                 * happens to leave of it
+                 */
+                saved = umask(0);
+                fd = pqos_open(ut_file, O_WRONLY | O_CREAT);
+                (void)umask(saved);
+
+                assert_true(fd >= 0);
+                assert_int_equal(close(fd), 0);
+                assert_int_equal(stat(ut_file, &st), 0);
+                assert_int_equal(st.st_mode & 07777, 0666);
+        }
+
+#ifdef O_TMPFILE
+        /* O_TMPFILE asks open() for a mode as O_CREAT does, without carrying
+         * O_CREAT in its bit pattern, so it has a branch of its own in the
+         * helper and needs a case of its own here. The name it takes is the
+         * directory to create the unnamed file in. A filesystem that will not
+         * do it says so rather than failing the case.
+         */
+        {
+                struct stat st;
+                mode_t saved = umask(0);
+
+                fd = pqos_open(work_dir, O_TMPFILE | O_RDWR);
+                error = errno;
+                (void)umask(saved);
+
+                if (fd == -1 && (error == EOPNOTSUPP || error == EINVAL ||
+                                 error == EISDIR)) {
+                        print_message("O_TMPFILE unsupported here (%s), "
+                                      "mode not checked\n",
+                                      strerror(error));
+                } else {
+                        assert_true(fd >= 0);
+                        assert_int_equal(fstat(fd, &st), 0);
+                        assert_int_equal(st.st_mode & 07777, 0666);
+                        assert_int_equal(close(fd), 0);
+                }
+        }
+#endif
+
+#ifdef O_PATH
+        /* O_PATH is the flag O_NOFOLLOW does not refuse a link for - the pair
+         * opens the link itself - so the descriptor is asked what it describes
+         */
+        {
+                ut_write(ut_target, "keep me\n");
+                assert_return_code(symlink(ut_target, ut_link), 0);
+
+                fd = pqos_open(ut_link, O_PATH);
+                error = errno;
+                assert_int_equal(fd, -1);
+                assert_int_equal(error, ELOOP);
+
+                /* and a regular file is still opened that way */
+                fd = pqos_open(ut_target, O_PATH);
+                assert_true(fd >= 0);
+                assert_int_equal(close(fd), 0);
+
+                unlink(ut_link);
+                unlink(ut_target);
+        }
+#endif
+
+        /* no name is refused rather than handed to open() */
+        {
+                fd = pqos_open(NULL, O_RDONLY);
+                assert_int_equal(fd, -1);
+                assert_int_equal(errno, EINVAL);
+        }
+
+        ut_cleanup();
 }
 
 int
@@ -292,9 +609,11 @@ main(void)
             cmocka_unit_test(test_common_pqos_fgets),
             cmocka_unit_test(test_common_pqos_file_contains),
             cmocka_unit_test(test_common_pqos_fopen),
+            cmocka_unit_test(test_common_pqos_open),
         };
 
-        result += cmocka_run_group_tests(tests_common, NULL, NULL);
+        result +=
+            cmocka_run_group_tests(tests_common, group_setup, group_teardown);
 
         return result;
 }
