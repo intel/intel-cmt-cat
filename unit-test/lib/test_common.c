@@ -442,6 +442,17 @@ test_common_pqos_fopen(void **state __attribute__((unused)))
                 assert_int_equal(errno, EINVAL);
         }
 
+        /* the descriptor the stream carries is closed on exec: it can live for
+         * the whole session, and nothing a child of this process does needs it
+         */
+        {
+                unlink(ut_file);
+                fd = pqos_fopen(ut_file, "w");
+                assert_non_null(fd);
+                assert_true(fcntl(fileno(fd), F_GETFD) & FD_CLOEXEC);
+                assert_int_equal(pqos_fclose(fd), 0);
+        }
+
         /* an append stream is where the fopen() of this platform puts one, and
          * a write goes to the end of the file whatever that is
          */
@@ -586,6 +597,17 @@ test_common_pqos_open(void **state __attribute__((unused)))
                 unlink(ut_target);
         }
 #endif
+        /* and it is closed on exec - pqos_open() opens /dev/mem, which a child
+         * of this process has no business inheriting
+         */
+        {
+                ut_write(ut_file, "contents\n");
+
+                fd = pqos_open(ut_file, O_RDONLY);
+                assert_true(fd >= 0);
+                assert_true(fcntl(fd, F_GETFD) & FD_CLOEXEC);
+                assert_int_equal(close(fd), 0);
+        }
 
         /* no name is refused rather than handed to open() */
         {

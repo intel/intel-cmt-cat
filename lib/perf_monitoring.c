@@ -545,7 +545,11 @@ perf_mon_start(struct pqos_mon_data *group, enum pqos_mon_event event)
                  * If monitoring cores, pass core list
                  * Otherwise, pass list of TID's
                  */
-                ret = perf_setup_counter(&se->attrs, tid, core, -1, 0, fd);
+                /* PERF_FLAG_FD_CLOEXEC is what O_CLOEXEC is for a counter,
+                 * which lives for as long as the monitoring session does
+                 */
+                ret = perf_setup_counter(&se->attrs, tid, core, -1,
+                                         PERF_FLAG_FD_CLOEXEC, fd);
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("Failed to start perf "
                                   "counters for %s\n",

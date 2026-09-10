@@ -244,7 +244,7 @@ pci_read_config(struct pqos_pci_info *info, struct pci_dev *dev)
                  PCI_DEVICES_DIR "/%04x:%02x:%02x.%x/config", dev->domain,
                  dev->bus, dev->dev, dev->func);
 
-        fd = open(path, O_RDONLY);
+        fd = open(path, O_RDONLY | O_CLOEXEC);
         if (fd < 0) {
                 LOG_ERROR("PCI %04x:%02x:%02x.%x failed to open config file\n",
                           (unsigned)dev->domain, (unsigned)dev->bus,

@@ -162,8 +162,8 @@ check_lockdir_access(void)
                 return -1;
 
         /* Try to create and delete a temp file */
-        int fd =
-            open(LOCKFILE_TMP, O_WRONLY | O_CREAT | O_EXCL, LOCKFILE_PERMS);
+        int fd = open(LOCKFILE_TMP, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC,
+                      LOCKFILE_PERMS);
         if (fd == -1)
                 return -1;
         close(fd);
@@ -259,8 +259,13 @@ lock_init(void)
                 return -1;
         }
 
-        /* Open lock file atomically (create if not exists) */
-        m_apilock = open(LOCKFILE, O_RDWR | O_CREAT | O_EXCL, LOCKFILE_PERMS);
+        /* Open lock file atomically (create if not exists).
+         *
+         * O_CLOEXEC: the descriptor is held for the whole session, and a child
+         * that inherited it could release a lock it does not hold.
+         */
+        m_apilock = open(LOCKFILE, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC,
+                         LOCKFILE_PERMS);
         if (m_apilock == -1) {
                 if (errno == EEXIST) {
                         /* Lock file exists, check if it is stale */
@@ -281,7 +286,8 @@ lock_init(void)
                                 /* Creating the lock file after removing the
                                  * stale one */
                                 m_apilock =
-                                    open(LOCKFILE, O_RDWR | O_CREAT | O_EXCL,
+                                    open(LOCKFILE,
+                                         O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC,
                                          LOCKFILE_PERMS);
                                 if (m_apilock == -1) {
                                         fprintf(stderr,

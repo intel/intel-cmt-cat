@@ -214,7 +214,7 @@ pqos_fopen(const char *name, const char *mode)
          * refuse the stream. No race was needed for a link already sitting at
          * the name.
          */
-        fd = open(name, flags | O_NOFOLLOW, FOPEN_CREATE_PERMS);
+        fd = open(name, flags | O_NOFOLLOW | O_CLOEXEC, FOPEN_CREATE_PERMS);
         if (fd == -1) {
                 struct stat lstat_val;
 
@@ -305,9 +305,10 @@ pqos_open(const char *pathname, int flags)
 #endif
 
         if (creating)
-                fd = open(pathname, flags | O_NOFOLLOW, FOPEN_CREATE_PERMS);
+                fd = open(pathname, flags | O_NOFOLLOW | O_CLOEXEC,
+                          FOPEN_CREATE_PERMS);
         else
-                fd = open(pathname, flags | O_NOFOLLOW);
+                fd = open(pathname, flags | O_NOFOLLOW | O_CLOEXEC);
         if (fd == -1) {
                 struct stat lstat_val;
 

@@ -172,7 +172,8 @@ expect_check_lockdir_access_ok(void)
 
         expect_function_call(__wrap_open);
         expect_string(__wrap_open, path, TEST_LOCKFILE_TMP);
-        expect_value(__wrap_open, oflags, O_WRONLY | O_CREAT | O_EXCL);
+        expect_value(__wrap_open, oflags,
+                     O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC);
         expect_value(__wrap_open, mode, 0666);
         will_return(__wrap_open, 0);
         will_return(__wrap_open, TEST_TMP_FD);
@@ -191,7 +192,8 @@ expect_lockfile_open(int err, int fd)
 {
         expect_function_call(__wrap_open);
         expect_string(__wrap_open, path, LOCKFILE);
-        expect_value(__wrap_open, oflags, O_RDWR | O_CREAT | O_EXCL);
+        expect_value(__wrap_open, oflags,
+                     O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC);
         expect_value(__wrap_open, mode, 0666);
         will_return(__wrap_open, err);
         will_return(__wrap_open, fd);

@@ -304,7 +304,7 @@ acpi_read_fs(const char *path)
         if (tbl_internal->table.header == NULL)
                 goto acpi_read_fs_clean_table;
 
-        fd = open(path, O_RDONLY);
+        fd = open(path, O_RDONLY | O_CLOEXEC);
         if (fd < 0)
                 goto acpi_read_fs_clean_table;
 

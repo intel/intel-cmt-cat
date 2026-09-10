@@ -657,7 +657,9 @@ safe_open(const char *pathname, int flags, mode_t mode)
          * no opinion about - would be adopted as though the caller had named
          * it.
          */
-        fd = open(pathname, flags | O_NOFOLLOW | (new_file ? O_EXCL : 0), mode);
+        fd = open(pathname,
+                  flags | O_NOFOLLOW | O_CLOEXEC | (new_file ? O_EXCL : 0),
+                  mode);
         if (fd == -1) {
                 /**
                  * What a refused symlink is called here depends on the flags

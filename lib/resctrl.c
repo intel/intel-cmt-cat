@@ -74,7 +74,8 @@ resctrl_lock(const int type)
 
         ASSERT(type == LOCK_SH || type == LOCK_EX);
 
-        resctrl_lock_fd = open(RESCTRL_PATH, O_DIRECTORY);
+        /* O_CLOEXEC: held for as long as the resctrl lock is */
+        resctrl_lock_fd = open(RESCTRL_PATH, O_DIRECTORY | O_CLOEXEC);
         if (resctrl_lock_fd < 0) {
                 LOG_ERROR("Could not open %s directory\n", RESCTRL_PATH);
                 return PQOS_RETVAL_ERROR;

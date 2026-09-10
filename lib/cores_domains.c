@@ -33,6 +33,8 @@
 
 #include "cores_domains.h"
 
+#include "common.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -51,7 +53,10 @@ uint32_t *cpu2apic;
 static int
 build_apic_to_cpu_map(uint32_t *cpu2apic, size_t num_cpus)
 {
-        FILE *f = fopen("/proc/cpuinfo", "r");
+        /* pqos_fopen() rather than fopen(): the descriptor is closed on exec,
+         * and the name is opened with O_NOFOLLOW
+         */
+        FILE *f = pqos_fopen("/proc/cpuinfo", "r");
 
         if (!f)
                 return PQOS_RETVAL_ERROR;
@@ -82,7 +87,7 @@ build_apic_to_cpu_map(uint32_t *cpu2apic, size_t num_cpus)
                         }
                 }
         }
-        fclose(f);
+        pqos_fclose(f);
 
         return PQOS_RETVAL_OK;
 }

@@ -438,7 +438,7 @@ test_perf_mon_start_core_event(enum pqos_mon_event event)
         expect_value(__wrap_perf_setup_counter, pid, -1);
         expect_value(__wrap_perf_setup_counter, cpu, cores[0]);
         expect_value(__wrap_perf_setup_counter, group_fd, -1);
-        expect_value(__wrap_perf_setup_counter, flags, 0);
+        expect_value(__wrap_perf_setup_counter, flags, PERF_FLAG_FD_CLOEXEC);
         will_return(__wrap_perf_setup_counter, PQOS_RETVAL_OK);
         will_return(__wrap_perf_setup_counter, 0xDEAD);
 
@@ -527,7 +527,7 @@ test_perf_mon_start_pid_event(enum pqos_mon_event event)
         expect_value(__wrap_perf_setup_counter, pid, pids[0]);
         expect_value(__wrap_perf_setup_counter, cpu, -1);
         expect_value(__wrap_perf_setup_counter, group_fd, -1);
-        expect_value(__wrap_perf_setup_counter, flags, 0);
+        expect_value(__wrap_perf_setup_counter, flags, PERF_FLAG_FD_CLOEXEC);
         will_return(__wrap_perf_setup_counter, PQOS_RETVAL_OK);
         will_return(__wrap_perf_setup_counter, 0xDEAD);
 

@@ -176,7 +176,11 @@ msr_file_open(const unsigned lcore)
 #ifdef __FreeBSD__
                 snprintf(fname, sizeof(fname) - 1, "/dev/cpuctl%u", lcore);
 #endif
-                fd = open(fname, O_RDWR);
+                /* O_CLOEXEC: this descriptor is cached per core for the
+                 * lifetime of the library, and a child that inherited it could
+                 * read and write every MSR whatever its own privileges are
+                 */
+                fd = open(fname, O_RDWR | O_CLOEXEC);
                 if (fd < 0)
                         LOG_WARN("Error opening file '%s'!\n", fname);
                 else

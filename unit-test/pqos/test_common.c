@@ -502,6 +502,29 @@ test_safe_open_does_not_adopt_a_file_that_appeared(void **state)
         assert_int_equal(unlink(path), 0);
 }
 
+/* the descriptor outlives the call - the log file and the monitoring output are
+ * held for the whole run - and nothing a child of this process does needs it
+ */
+static void
+test_safe_open_closes_the_descriptor_on_exec(void **state)
+{
+        char buffer[PATH_MAX];
+        const char *path = work_path(buffer, sizeof(buffer), "cloexec_fd.txt");
+        int fd = 0;
+
+        UNUSED_ARG(state);
+
+        unlink(path);
+
+        run_function(safe_open, fd, path, O_WRONLY | O_CREAT, FILE_MODE);
+
+        assert_true(fd >= 0);
+        assert_true(fcntl(fd, F_GETFD) & FD_CLOEXEC);
+        assert_int_equal(close(fd), 0);
+
+        assert_int_equal(unlink(path), 0);
+}
+
 /* ======== safe_fopen ======== */
 
 /* The mode string decides the flags, so the stream a caller gets has to behave
@@ -1092,6 +1115,7 @@ main(void)
                 test_safe_fopen_refuses_a_symlink_under_an_exclusive_mode),
             cmocka_unit_test(
                 test_safe_fopen_positions_an_append_stream_at_the_end),
+            cmocka_unit_test(test_safe_open_closes_the_descriptor_on_exec),
             cmocka_unit_test(test_safe_fopen_closes_the_stream_on_exec),
             cmocka_unit_test(test_filter_cpu_accepts_a_cpu_number),
             cmocka_unit_test(test_filter_cpu_rejects_everything_else),
