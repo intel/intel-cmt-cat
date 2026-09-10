@@ -106,11 +106,13 @@ extern "C" {
  *
  * @return Pointer to a file
  * @retval A valid pointer to a file, or NULL with errno set to the reason:
- * ELOOP where the file is a symbolic link - on every platform, since what the
- * kernel reported for it (EMLINK on FreeBSD, EEXIST, ENOENT for a link with no
- * target) is replaced so that a caller does not have to know them - EINVAL
- * where the mode is not one C defines, EEXIST where an 'x' mode names a file
- * that is there, and otherwise the errno of open() or fdopen()
+ * ELOOP where the file is a symbolic link - on every platform, and whether the
+ * link resolves or dangles, since what the kernel reported for it (EMLINK on
+ * FreeBSD, EEXIST for the O_CREAT | O_EXCL pair an 'x' mode asks for) is
+ * replaced so that a caller does
+ * not have to know them - EINVAL where the mode is not one C defines, EEXIST
+ * where an 'x' mode names a file that is there, and otherwise the errno of
+ * open() or fdopen()
  */
 /* clang-format off */
 FILE *safe_fopen(const char *name, const char *mode);

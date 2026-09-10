@@ -559,12 +559,13 @@ safe_fopen(const char *name, const char *mode)
 
                 /*
                  * What open() reports for a link it refused is not one thing:
-                 * ELOOP on Linux, EMLINK on FreeBSD, EEXIST under O_EXCL, and
-                 * ENOENT for a link whose target is not there, which is what
-                 * "w+" on a dangling link answers. So the name is asked about
-                 * instead of the errno - after the failure, where the answer
-                 * only explains it and cannot affect what was opened - and the
-                 * caller is told the same thing safe_open() tells it.
+                 * ELOOP on Linux - whether the link resolves or dangles, since
+                 * O_NOFOLLOW refuses it before its target is looked at - EMLINK
+                 * on FreeBSD, and EEXIST for the O_CREAT | O_EXCL pair. So
+                 * the name is asked about instead of the errno - after the
+                 * failure, where the answer only explains it and cannot affect
+                 * what was opened - and the caller is told the same thing
+                 * safe_open() tells it.
                  *
                  * errno is put back around that, because lstat() and printf()
                  * are both allowed to change it and the caller is entitled to
