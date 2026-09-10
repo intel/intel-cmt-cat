@@ -93,6 +93,14 @@ extern "C" {
  * writing 'b' or 'x' where C does not put it, which cannot then turn into a
  * mode that truncates.
  *
+ * An append stream is left where the fopen() of the platform would have left
+ * it, since the descriptor fdopen() is handed sits at the start of the file.
+ * Which position that is depends on the C library and all three answers are
+ * given: the end of the file for every append mode (FreeBSD), the end for a
+ * stream that cannot be read and the start for "a+" (glibc), or the start for
+ * all of them (musl, and any library this was not built against). Writes go to
+ * the end of the file whatever the position is, which is what O_APPEND does.
+ *
  * @param [in] name a path to a file
  * @param [in] mode a file access mode
  *

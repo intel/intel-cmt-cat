@@ -870,17 +870,22 @@ test_safe_fopen_refuses_a_symlink_under_an_exclusive_mode(void **state)
         assert_int_equal(unlink(target), 0);
 }
 
-/* fopen() puts a plain append stream at the end of the file and fdopen() does
- * not, so the wrapper has to. "a+" is the deliberate exception: fopen() leaves
- * that one at the start for reading, and this matches it.
+/* fopen() puts an append stream at the end of the file and the descriptor
+ * fdopen() is handed sits at the start, so the wrapper has to put it back.
+ * Where "a+" belongs is the platform's to say - glibc leaves it at the start
+ * for reading, FreeBSD seeks every stream it opened with O_APPEND - so each
+ * mode is asked of the fopen() on this machine and the wrapper is held to that
+ * answer, rather than one platform's being written down here.
  */
 static void
 test_safe_fopen_positions_an_append_stream_at_the_end(void **state)
 {
+        static const char *const modes[] = {"a", "ab", "a+", "a+b", "ab+"};
         char buffer[PATH_MAX];
         const char *path = work_path(buffer, sizeof(buffer), "appended.txt");
         char content[32] = {0};
         FILE *stream;
+        size_t i;
 
         UNUSED_ARG(state);
 
@@ -889,23 +894,31 @@ test_safe_fopen_positions_an_append_stream_at_the_end(void **state)
         assert_int_equal(fwrite("0123456789", 1, 10, stream), 10);
         assert_int_equal(fclose(stream), 0);
 
+        for (i = 0; i < DIM(modes); i++) {
+                long position;
+
+                /* none of these writes, so the size is the same for each */
+                stream = fopen(path, modes[i]);
+                assert_non_null(stream);
+                position = ftell(stream);
+                assert_int_equal(fclose(stream), 0);
+
+                run_function(safe_fopen, stream, path, modes[i]);
+                assert_non_null(stream);
+                assert_int_equal(ftell(stream), position);
+                assert_int_equal(fclose(stream), 0);
+        }
+
+        /* and a write lands at the end wherever the stream started */
         run_function(safe_fopen, stream, path, "a");
         assert_non_null(stream);
-        assert_int_equal(ftell(stream), 10);
         assert_int_equal(fwrite("XY", 1, 2, stream), 2);
         assert_int_equal(fclose(stream), 0);
 
-        /* and the write went where O_APPEND puts it */
         stream = fopen(path, "r");
         assert_non_null(stream);
         assert_non_null(fgets(content, sizeof(content), stream));
         assert_string_equal(content, "0123456789XY");
-        assert_int_equal(fclose(stream), 0);
-
-        /* the update form keeps fopen()'s position, which is the start */
-        run_function(safe_fopen, stream, path, "a+");
-        assert_non_null(stream);
-        assert_int_equal(ftell(stream), 0);
         assert_int_equal(fclose(stream), 0);
 
         assert_int_equal(unlink(path), 0);

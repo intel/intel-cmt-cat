@@ -473,6 +473,53 @@ fopen_mode_flags(const char *mode, int *flags, char *stream_mode)
         return 0;
 }
 
+/**
+ * @brief Tell whether fopen() would leave a stream opened with this mode at the
+ *        end of the file
+ *
+ * There is no one answer to that, and not even a first character of 'a' settles
+ * it. All three of these were measured rather than assumed:
+ *
+ * - FreeBSD seeks whenever the file was opened with O_APPEND, "a+" included
+ *   (lib/libc/stdio/fopen.c), and its fdopen() seeks nothing;
+ * - glibc positions only a stream that cannot be read, so "a" ends up at the
+ *   end of the file and "a+" at the start of it;
+ * - musl positions none of them, so every append mode starts where the
+ *   descriptor is, which is where fdopen() would have left it anyway.
+ *
+ * A library this was not built against is taken to behave as musl does, leaving
+ * the offset alone - what this wrapper did before it seeked at all, so an
+ * unknown library is no worse off than it was. The unit case compares this with
+ * the fopen() on the machine rather than with a number, so it is what would
+ * report a library that positions a stream some other way.
+ *
+ * __GLIBC__ is not a compiler macro: <features.h> defines it and any glibc
+ * header pulls that in, so the test below only means anything underneath one.
+ * <stdio.h> arrives with common.h at the top of this file, which is what makes
+ * it safe here - a mode that seeks nothing is what an include order that hid
+ * the macro would fall back to.
+ *
+ * @param [in] mode the mode string as safe_fopen() received it
+ *
+ * @return Whether the stream belongs at the end of the file
+ * @retval 1 fopen() would have positioned it there
+ * @retval 0 fopen() would have left it where the descriptor is
+ */
+static int
+fopen_positions_at_end(const char *mode)
+{
+        if (mode[0] != 'a')
+                return 0;
+
+#ifdef __FreeBSD__
+        return 1;
+#elif defined(__GLIBC__)
+        return strchr(mode, '+') == NULL;
+#else
+        return 0;
+#endif
+}
+
 FILE *
 safe_fopen(const char *name, const char *mode)
 {
@@ -544,18 +591,16 @@ safe_fopen(const char *name, const char *mode)
 
         /*
          * fdopen() takes the offset the descriptor has, which open() leaves at
-         * the start of the file, while fopen() puts a plain append stream at
-         * the end of it. Writes land at the end either way - that is what
-         * O_APPEND is for - but a caller that asks ftell() before writing gets
-         * what fopen() would have given it. A target that cannot seek keeps the
+         * the start of the file, while fopen() puts an append stream at the end
+         * of it. Writes land at the end either way - that is what O_APPEND is
+         * for - but a caller that asks ftell() before writing gets what the
+         * fopen() of this platform would have given it, which for "a+" is not
+         * the same answer everywhere. A target that cannot seek keeps the
          * offset it has, its refusal being an answer rather than a problem, and
          * errno is put back so that a stream returned successfully does not
          * carry one.
-         *
-         * "a+" is left where it is: fopen() positions that one at the start of
-         * the file for reading, which is what this already matches.
          */
-        if (mode[0] == 'a' && strchr(mode, '+') == NULL) {
+        if (fopen_positions_at_end(mode)) {
                 error = errno;
                 (void)fseek(stream, 0, SEEK_END);
                 errno = error;
