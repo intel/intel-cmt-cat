@@ -44,6 +44,7 @@
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/types.h>
 #include <unistd.h>
 
 #ifdef __cplusplus
@@ -2416,6 +2417,189 @@ int pqos_dump_rmids(const struct pqos_mmio_dump_rmids *dump_cfg);
 int pqos_io_devs_get(struct pqos_pci_info *pci_info,
                      uint16_t segment,
                      uint16_t bdf);
+
+/**
+ * @brief Wrapper around fopen() that fails if the file it names is a symbolic
+ *        link, refusing it before anything is opened, created or truncated
+ *
+ * The file is opened with O_NOFOLLOW and the stream is made from the
+ * descriptor, so the name is resolved once and the kernel is what refuses a
+ * link. A directory in the path leading to the file is resolved as open() would
+ * resolve it, symbolic links included, which is the same promise pqos_open()
+ * makes: this is a check on the name, not on the whole path.
+ *
+ *
+ * A trailing slash does not withdraw that: the kernel would resolve the last
+ * component of "link/" as a directory, which stops the link being the final
+ * component and takes O_NOFOLLOW out of the picture. So the slashes are taken
+ * off and the component the caller named is the one opened - checking the leaf
+ * and then opening the name as written would only be advisory, since a link put
+ * there in between would still be followed. A name that really is a directory
+ * still opens, written with a slash or without one, and a name that is nothing
+ * but slashes is the root.
+ *
+ * Every mode C defines is accepted - a first character of 'r', 'w' or 'a', then
+ * '+' and 'b' in either order, and last of all the exclusive 'x' that C11 adds
+ * for a 'w', making those modes "wx", "wbx", "w+x", "w+bx" and "wb+x". 'x' does
+ * what it says: the file is created and the call fails with EEXIST if it was
+ * already there. Any other mode fails before the file is opened, so a caller
+ * asking for one of the glibc extensions ('e', 'm', 'c') is told no, as is one
+ * writing 'b' or 'x' where C does not put it, which cannot then turn into a
+ * mode that truncates. The descriptor behind the stream is closed on exec.
+ *
+ * An append stream is left where the fopen() of the platform would have left
+ * it, since the descriptor fdopen() is handed sits at the start of the file.
+ * Which position that is depends on the C library, and all three answers are
+ * given: the end of the file for every append mode (FreeBSD), the end for a
+ * stream that cannot be read and the start for "a+" (glibc), or the start for
+ * all of them (musl, and any library this was not built against). Writes go to
+ * the end of the file whatever the position is, which is what O_APPEND does.
+ *
+ * A refused link is reported through the library log, and only once there is
+ * one: this may be called before pqos_init(), which is how the utility opens
+ * its own configuration file, and a message raised before the log exists is
+ * dropped rather than written anywhere. errno carries the reason either way.
+ *
+ * The stream is closed with pqos_fclose(), which is this function's pair and
+ * closes the descriptor underneath the stream with it.
+ *
+ * The mode is read before the file is, and has to be: it is what the flags to
+ * open() are made of. So a mode this does not accept is EINVAL whatever the
+ * name refers to - a symbolic link named with a mode C does not define is
+ * reported as the mode error, there being nothing opened to say anything about
+ * the name.
+ *
+ * @param [in] name a path to a file
+ * @param [in] mode a file access mode
+ *
+ * @return Pointer to a file
+ * @retval A valid pointer to a file, or NULL with errno ELOOP when the name is
+ *         a symbolic link and the mode is one C defines - on every platform,
+ *         whichever writing or reading mode it is, since the
+ *         name is asked rather than the errno read, where open() itself would
+ *         say ELOOP on Linux, EMLINK on FreeBSD and EEXIST for the
+ *         O_CREAT | O_EXCL pair an 'x' mode asks for - EINVAL where the mode is
+ *         not one C defines, and otherwise the errno of open() or fdopen()
+ */
+/* clang-format off */
+FILE *pqos_fopen(const char *name, const char *mode);
+/* clang-format on */
+
+/**
+ * @brief Wrapper around open() that fails if the file it names is a symbolic
+ *        link
+ *
+ * The name itself, that is: a directory in the path leading to it is resolved
+ * as open() would resolve it, links included, so this is not a check on the
+ * whole path.
+ *
+ * A name that is already a link is refused before anything is opened, and
+ * O_NOFOLLOW refuses one that appears afterwards. O_EXCL is added where the
+ * name did not exist, so that the file opened is the file created rather than
+ * whatever appeared in between; a caller that did not ask for O_CREAT still
+ * gets an error for a name that is not there. What was opened is compared with
+ * what the name described, so a replacement this can tell apart is refused
+ * too - see what that comparison can and cannot see, below. The descriptor is
+ * closed on exec.
+ *
+ * A trailing slash does not withdraw the refusal of a link at the name: the
+ * kernel would resolve the last component of "link/" as a directory, which
+ * stops the link being the final component and takes O_NOFOLLOW out of the
+ * picture. So the slashes are taken off and the component the caller named is
+ * the one opened, with O_DIRECTORY added to carry what the slash asked for -
+ * checking the leaf and then opening the name as written would only be
+ * advisory, since a link put there in between would still be followed. A name
+ * that really is a directory still opens, written with a slash or without one;
+ * a name that is nothing but slashes is the root; and a file named with a slash
+ * still gets the ENOTDIR the kernel gives it.
+ *
+ * O_TRUNC is applied to the file this identified rather than by the open, so a
+ * name whose replacement this can see is refused before anything is emptied:
+ * open() would have truncated whatever took the name's place, and no refusal
+ * after that could put it back. It is applied where open() would have applied
+ * it and nowhere else - to a regular file, that is; a FIFO is opened and left
+ * alone,
+ * as open() leaves it alone, and an O_PATH descriptor, which cannot be written
+ * through, is returned untruncated for the same reason. A truncating open must
+ * otherwise be writable, and O_RDONLY | O_TRUNC - which POSIX leaves
+ * unspecified - is refused with EINVAL rather than quietly not truncating.
+ *
+ * That comparison is what the platform can tell about a file, and it is best
+ * effort rather than proof of identity. Two things escape it, and a caller
+ * relying on the truncation should know both.
+ *
+ * A hard link that was already there when this was called is not a second
+ * file: both stats describe the one inode, and truncating or writing through
+ * either name reaches it. The check is on the name having changed during the
+ * call, not on how many names the file has.
+ *
+ * And what identifies a file to this - its device and inode number, and the
+ * kind of file it is - is recycled. A name unlinked and created again on the
+ * same filesystem can carry the number it had, so a replacement made between
+ * the moment the name was looked at and the moment it was opened is
+ * indistinguishable from the file that was there before, and a truncating call
+ * then empties the replacement. What that costs is bounded: the file emptied is
+ * the file the name referred to when the open resolved it, so it is the file
+ * open() itself would have truncated, and it is not a symbolic link - which is
+ * what O_NOFOLLOW guarantees whatever else changed. What the deferred
+ * truncation does buy is that nothing is emptied through a descriptor this call
+ * then refuses to return, and that the flag is honoured only where open() would
+ * have honoured it.
+ *
+ * The three answers have an order, since a caller may earn more than one of
+ * them: a symbolic link is ELOOP whatever the flags, then a flag combination
+ * this cannot honour is EINVAL whether or not the file exists, and then a name
+ * that is not there is ENOENT.
+ *
+ * The descriptor is closed with close().
+ *
+ * O_TMPFILE is the one exception to that comparison, and it has to be: the
+ * descriptor is an unnamed inode created inside the directory the name refers
+ * to, so it is not the file the name described and never could be. The name is
+ * still refused if it is a symbolic link, which is what this function is for,
+ * but a caller passing O_TMPFILE gets no EAGAIN and should not test for one -
+ * the directory it named may have been replaced by another directory.
+ *
+ * A refused link, and a name that changed while it was being opened, are
+ * reported through the library log, and only once there is one: this may be
+ * called before pqos_init(), which is how the utility opens the log file it
+ * then hands to it, and a message raised before the log exists is dropped
+ * rather than written anywhere. errno carries the reason either way.
+ *
+ * @param [in] pathname a path to a file
+ * @param [in] flags file access flags
+ * @param [in] mode file mode bits, used where the flags create a file
+ *
+ * @return A file descriptor
+ * @retval A valid file descriptor, or -1 with errno ELOOP when the name is a
+ *         symbolic link - on every platform and whatever the flags, since the
+ *         name is asked rather than the errno read - EAGAIN when the name still
+ *         exists but no longer refers to the file that was opened, EINVAL where
+ *         no name was given or where O_TRUNC was asked for without a writable
+ *         mode, and otherwise the errno of whichever call failed: the open, one
+ *         of the stats that check what it opened, or the truncation
+ */
+int pqos_open(const char *pathname, int flags, mode_t mode);
+
+/**
+ * @brief Closes a stream that pqos_fopen() returned
+ *
+ * fclose() would do as well - the stream is an ordinary one, made from a
+ * descriptor - and this is that call. It is here so that a caller of
+ * pqos_fopen() has the matching function to close with rather than having to
+ * know how the stream was made, and so that the pair can grow a stream that
+ * needs more than fclose() without every caller changing.
+ *
+ * The descriptor underneath the stream goes with it. A descriptor from
+ * pqos_open() is not a stream and is closed with close().
+ *
+ * @param [in] stream a stream pqos_fopen() returned
+ *
+ * @return Operation status
+ * @retval 0 on success
+ * @retval EOF on error, with errno set by fclose()
+ */
+int pqos_fclose(FILE *stream);
 
 #ifdef __cplusplus
 }

@@ -74,69 +74,10 @@ extern "C" {
 
 #define PQOS_SYSTEM_CPU "/sys/devices/system/cpu"
 
-/**
- * @brief Wrapper around fopen() that fails if the file it names is a symbolic
- * link, refusing it before anything is opened, created or truncated
- *
- * The file is opened with O_NOFOLLOW and the stream is made from the
- * descriptor, so the name is resolved once and the kernel is what refuses a
- * link. A directory in the path leading to the file is resolved as open() would
- * resolve it, symbolic links included, which is the same promise safe_open()
- * makes.
- *
- * Every mode C defines is accepted - a first character of 'r', 'w' or 'a', then
- * '+' and 'b' in either order, and last of all the exclusive 'x' that C11 adds
- * for a 'w', making those modes "wx", "wbx", "w+x", "w+bx" and "wb+x". 'x' does
- * what it says: the file is created and the call fails with EEXIST if it was
- * already there. Any other mode fails before the file is opened, so a caller
- * asking for one of the glibc extensions ('e', 'm', 'c') is told no, as is one
- * writing 'b' or 'x' where C does not put it, which cannot then turn into a
- * mode that truncates.
- *
- * An append stream is left where the fopen() of the platform would have left
- * it, since the descriptor fdopen() is handed sits at the start of the file.
- * Which position that is depends on the C library and all three answers are
- * given: the end of the file for every append mode (FreeBSD), the end for a
- * stream that cannot be read and the start for "a+" (glibc), or the start for
- * all of them (musl, and any library this was not built against). Writes go to
- * the end of the file whatever the position is, which is what O_APPEND does.
- *
- * @param [in] name a path to a file
- * @param [in] mode a file access mode
- *
- * @return Pointer to a file
- * @retval A valid pointer to a file, or NULL with errno set to the reason:
- * ELOOP where the file is a symbolic link - on every platform, and whether the
- * link resolves or dangles, since what the kernel reported for it (EMLINK on
- * FreeBSD, EEXIST for the O_CREAT | O_EXCL pair an 'x' mode asks for) is
- * replaced so that a caller does
- * not have to know them - EINVAL where the mode is not one C defines, EEXIST
- * where an 'x' mode names a file that is there, and otherwise the errno of
- * open() or fdopen()
+/* The symlink-safe open and fopen the tool uses are the library's own,
+ * pqos_open() and pqos_fopen(), declared in pqos.h. It kept copies of them
+ * until the two behaved alike, which they now do.
  */
-/* clang-format off */
-FILE *safe_fopen(const char *name, const char *mode);
-/* clang-format on */
-
-/**
- * @brief Wrapper around open() that fails if the file it names is a symbolic
- * link.
- *
- * The name itself, that is: a directory in the path leading to it is
- * resolved as open() would resolve it, links included, so this is not a
- * check on the whole path.
- *
- * @param [in] pathname a path to a file
- * @param [in] flags file access flags
- * @param [in] mode file mode bits
- *
- * @return A file descriptor
- * @retval A valid file descriptor, or -1 with errno ELOOP when the name it was
- * given is a symbolic link, EAGAIN when the name still exists but no longer
- * refers to the file that was opened, and otherwise the errno of whichever
- * call failed - the open, or one of the stats that check what it opened
- */
-int safe_open(const char *pathname, int flags, mode_t mode);
 
 /**
  * @brief Common function to handle string parsing errors

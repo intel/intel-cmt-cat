@@ -134,6 +134,38 @@ PQOS_LOCAL int log_fini(void);
  */
 PQOS_LOCAL void log_printf(int type, const char *str, ...);
 
+/**
+ * @brief Whether the log has been initialized
+ *
+ * What state the log is in, which is not the same as what a message would do
+ * with it: a log initialized to write nowhere is initialized all the same.
+ * What this answers is whether log_printf() may be called at all - see
+ * LOG_ERROR_IF_INIT() below, which is the only reason it exists.
+ *
+ * @retval 1 when log_init() has succeeded and log_fini() has not run since
+ * @retval 0 otherwise
+ */
+PQOS_LOCAL int log_is_initialized(void);
+
+/**
+ * @brief Logs an error from a function that may run before the log exists
+ *
+ * log_printf() holds library code to the rule that nothing logs before
+ * pqos_init(): it returns without writing, and a DEBUG build asserts. The rule
+ * has two exceptions, and they are public - pqos_open() and pqos_fopen() are
+ * how the utility opens its own log file and its configuration file, which it
+ * must do before it can initialize the library. Those two ask whether there is
+ * anywhere to write instead of assuming it, and say nothing when there is not.
+ *
+ * @param [in] str format string compatible with printf().
+ *             Variadic arguments to follow depending on \a str.
+ */
+#define LOG_ERROR_IF_INIT(str...)                                              \
+        do {                                                                   \
+                if (log_is_initialized())                                      \
+                        LOG_ERROR(str);                                        \
+        } while (0)
+
 #ifdef __cplusplus
 }
 #endif

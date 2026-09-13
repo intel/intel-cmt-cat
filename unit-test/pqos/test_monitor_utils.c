@@ -36,15 +36,18 @@
 #include <string.h>
 
 void *mock_calloc(size_t nmemb, size_t size);
-FILE *mock_safe_fopen(const char *name, const char *mode);
+FILE *mock_pqos_fopen(const char *name, const char *mode);
+static int mock_pqos_fclose(FILE *stream);
 
-#define calloc     mock_calloc
-#define safe_fopen mock_safe_fopen
+#define calloc      mock_calloc
+#define pqos_fopen  mock_pqos_fopen
+#define pqos_fclose mock_pqos_fclose
 /* clang-format off */
 #include "monitor_utils.c"
 /* clang-format on */
 #undef calloc
-#undef safe_fopen
+#undef pqos_fopen
+#undef pqos_fclose
 
 struct pid_stat_fixture {
         pid_t pid;
@@ -202,8 +205,20 @@ mock_calloc(const size_t nmemb, const size_t size)
         return ptr;
 }
 
+/* The stream the opener below hands out comes from fmemopen(), and fclose() is
+ * what closes one. pqos_fclose() is the library's name for that call, and the
+ * library is not linked into this test.
+ */
+static int
+mock_pqos_fclose(FILE *stream)
+{
+        assert_non_null(stream);
+
+        return fclose(stream);
+}
+
 FILE *
-mock_safe_fopen(const char *name, const char *mode)
+mock_pqos_fopen(const char *name, const char *mode)
 {
         struct pid_stat_fixture *fixture;
         pid_t pid = -1;

@@ -1487,7 +1487,7 @@ parse_config_file(const char *fname)
         FILE *fp = NULL;
         char cb[256];
 
-        fp = safe_fopen(fname, "r");
+        fp = pqos_fopen(fname, "r");
         if (fp == NULL)
                 parse_error(fname, "cannot open configuration file!");
 
@@ -1538,12 +1538,22 @@ parse_config_file(const char *fname)
                         break;
                 }
 
-                if (i >= (int)DIM(optab))
+                if (i >= (int)DIM(optab)) {
+                        /* closed before the exit that follows, since
+                         * parse_error() does not return: a configuration file
+                         * the tool rejects is an ordinary user error and not a
+                         * reason to leave a stream to the process teardown.
+                         * What is still left to it is an allocation failure
+                         * inside one of the handlers above, which exits from a
+                         * place this function cannot reach.
+                         */
+                        pqos_fclose(fp);
                         parse_error(cp,
                                     "Unrecognized configuration file command");
+                }
         }
 
-        fclose(fp);
+        pqos_fclose(fp);
 }
 
 static const char *m_cmd_name = "pqos"; /**< command name */
@@ -2491,7 +2501,7 @@ main(int argc, char **argv)
         if (sel_log_file == NULL) {
                 cfg.fd_log = STDOUT_FILENO;
         } else {
-                cfg.fd_log = safe_open(sel_log_file, O_WRONLY | O_CREAT,
+                cfg.fd_log = pqos_open(sel_log_file, O_WRONLY | O_CREAT,
                                        FILE_READ_WRITE);
                 if (cfg.fd_log == -1) {
                         printf("Error opening %s log file: %s!\n", sel_log_file,

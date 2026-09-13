@@ -444,7 +444,7 @@ open_proc_stat_file(const char *proc_pid_dir_name)
         snprintf(path_buf, sizeof(path_buf) - 1, proc_stat_path_fmt, PROC_DIR,
                  proc_pid_dir_name);
 
-        return safe_fopen(path_buf, "r");
+        return pqos_fopen(path_buf, "r");
 }
 
 /**
@@ -485,10 +485,10 @@ monitor_utils_get_pid_stat(const char *proc_pid_dir_name,
 
         n_read = fread(buf, sizeof(char), sizeof(buf) - 1, fproc_pid_stats);
         if (ferror(fproc_pid_stats)) {
-                fclose(fproc_pid_stats);
+                pqos_fclose(fproc_pid_stats);
                 return -1;
         }
-        fclose(fproc_pid_stats);
+        pqos_fclose(fproc_pid_stats);
 
         if (n_read == 0)
                 return -1;

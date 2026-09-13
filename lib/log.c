@@ -128,6 +128,12 @@ log_fini(void)
         return LOG_RETVAL_OK;
 }
 
+int
+log_is_initialized(void)
+{
+        return log_init_successful == 1;
+}
+
 void
 log_printf(int type, const char *str, ...)
 {

@@ -48,6 +48,15 @@ WRAP = \
 
 CFLAGS += -g -ggdb -O0
 
+# DEBUG=y turns the library's ASSERT into assert(), which is how the cases that
+# are about a debug build's behaviour reach it: log_printf() asserts that nothing
+# logs before log_init(), and test_common_refuses_a_symlink_before_the_log_exists
+# only catches a regression of that when the assertion is compiled in.
+DEBUG ?= n
+ifeq ($(DEBUG),y)
+CFLAGS += -DDEBUG
+endif
+
 all: $(TESTS)
 
 $(OBJ_DIR)/%.o: $(LIB_DIR)/%.c $(OBJ_DIR)/%.d
@@ -901,6 +910,8 @@ $(BIN_DIR)/test_common: ./test_common.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=getline \
+		-Wl,--wrap=log_printf \
+		-Wl,--wrap=lstat \
 		-Wl,--wrap=fopen \
 		-Wl,--wrap=fgets \
 		-Wl,--wrap=fread \
