@@ -1088,9 +1088,24 @@ $(BIN_DIR)/test_os_monitoring_events: ./test_os_monitoring_events.c $(LIB_OBJS)
 .PHONY: run
 run: $(TESTS)
 	@echo "Running Library Unit Tests"
-	@for test in $(TESTS); do \
-		bash -c "LD_LIBRARY_PATH=$(MOCK_DIR) ./$$test" || true; \
-	done;
+# every binary is run before the result is reported, so one failure
+# does not hide the ones after it, and the target fails if any of
+# them did: a test suite whose failures cannot fail the build is a
+# suite nothing is gated on.
+#
+# each binary is run directly rather than through a command string
+# given to another shell, so that whatever its name contains is a
+# path and not something for a shell to read, and the summary is
+# printed with printf, whose handling of a leading dash or a
+# backslash in what it is given does not vary between shells
+	@failed=""; \
+	for test in $(TESTS); do \
+		LD_LIBRARY_PATH=$(MOCK_DIR) "$$test" || failed="$$failed $$test"; \
+	done; \
+	if [ -n "$$failed" ]; then \
+		printf 'FAILED:%s\n' "$$failed"; \
+		exit 1; \
+	fi
 
 CHECKPATCH?=checkpatch.pl
 .PHONY: checkpatch

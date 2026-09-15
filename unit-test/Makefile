@@ -11,9 +11,18 @@ all:
 	$(MAKE) -C output
 	$(MAKE) -C pqos
 
+# both directories are run before the result is reported, for the reason each
+# of them runs all of its own binaries: a failure in one is not a reason to
+# stop learning what the other would have said. The target still fails if
+# either did
 run:
-	$(MAKE) -C lib run
-	$(MAKE) -C pqos run
+	@failed=""; \
+	$(MAKE) -C lib run || failed="$$failed lib"; \
+	$(MAKE) -C pqos run || failed="$$failed pqos"; \
+	if [ -n "$$failed" ]; then \
+		printf 'FAILED in:%s\n' "$$failed"; \
+		exit 1; \
+	fi
 
 run.lib:
 	$(MAKE) -C lib run
