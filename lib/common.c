@@ -847,10 +847,24 @@ pqos_file_contains(const char *fname, const char *str, int *found)
         if (strncmp(fname, "/proc/", 6) == 0)
                 check_symlink = 0;
 
-        if (check_symlink)
+        if (check_symlink) {
                 fd = pqos_fopen(fname, "r");
-        else
-                fd = fopen(fname, "r");
+        } else {
+                /* the kernel's own names are exempt from the symlink refusal,
+                 * but the descriptor still closes on exec, which fopen() alone
+                 * does not do: it would otherwise be inherited by anything the
+                 * caller starts
+                 */
+                int handle = open(fname, O_RDONLY | O_CLOEXEC);
+
+                fd = handle == -1 ? NULL : fdopen(handle, "r");
+                if (fd == NULL && handle != -1) {
+                        int error = errno;
+
+                        close(handle);
+                        errno = error;
+                }
+        }
 
         if (fd == NULL) {
                 LOG_DEBUG("%s not found.\n", fname);

@@ -912,6 +912,8 @@ $(BIN_DIR)/test_common: ./test_common.c $(LIB_OBJS)
 		-Wl,--wrap=getline \
 		-Wl,--wrap=log_printf \
 		-Wl,--wrap=lstat \
+		-Wl,--wrap=open \
+		-Wl,--wrap=fdopen \
 		-Wl,--wrap=fopen \
 		-Wl,--wrap=fgets \
 		-Wl,--wrap=fread \

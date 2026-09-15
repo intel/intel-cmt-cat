@@ -86,6 +86,82 @@ __wrap_getline(char **string, size_t *n, FILE *stream)
         return ret;
 }
 
+/* The descriptor the /proc case hands back from its mocked open(), which
+ * nothing may read: the stream on top of it is FILE_DEAD.
+ */
+#define FD_DEAD 0x0DEAD
+
+/* The name that case opens. Only this one is mocked below - every other case
+ * here opens a real file, and pqos_open() itself is what several of them are
+ * about, so the wrappers pass anything else straight through.
+ */
+#define PROC_DEAD_NAME "/proc/my_file_to_open"
+
+/* named through a typedef, as log_printf's is: a prototype written out in a
+ * .c file reads to checkpatch as an extern declaration
+ */
+/* Whether open() is being handed a mode, by the rule the C library uses
+ *
+ * The third argument of open() is there only when the flags ask for it, so a
+ * wrapper may only read one then. O_TMPFILE asks for a mode without carrying
+ * O_CREAT in its bit pattern, which is why it is tested for on its own.
+ */
+static int
+open_takes_a_mode(int oflags)
+{
+#ifdef O_TMPFILE
+        if ((oflags & O_TMPFILE) == O_TMPFILE)
+                return 1;
+#endif
+
+        return (oflags & O_CREAT) != 0;
+}
+
+typedef int open_fn(const char *path, int oflags, ...);
+open_fn __real_open;
+
+/* Variadic, as open() is
+ *
+ * A wrapper with a fixed mode parameter reads a third argument that a two
+ * argument call never passed, and the library makes such a call: the /proc
+ * names it reads are opened O_RDONLY | O_CLOEXEC with no mode at all. What the
+ * flags do not ask for is not read here either.
+ */
+int
+__wrap_open(const char *path, int oflags, ...)
+{
+        int mode = 0;
+
+        if (open_takes_a_mode(oflags)) {
+                va_list args;
+
+                va_start(args, oflags);
+                mode = va_arg(args, int);
+                va_end(args);
+        }
+
+        if (strcmp(path, PROC_DEAD_NAME) != 0)
+                return __real_open(path, oflags, mode);
+
+        check_expected(oflags);
+
+        return mock_type(int);
+}
+
+typedef FILE *fdopen_fn(int fd, const char *mode);
+fdopen_fn __real_fdopen;
+
+FILE *
+__wrap_fdopen(int fd, const char *mode)
+{
+        if (fd != FD_DEAD)
+                return __real_fdopen(fd, mode);
+
+        check_expected_ptr(mode);
+
+        return mock_type(FILE *);
+}
+
 FILE *__real_fopen(const char *name, const char *mode);
 
 FILE *
@@ -209,18 +285,25 @@ test_common_pqos_file_contains(void **state __attribute__((unused)))
         int found_param;
         const char *path = "/proc/my_file_to_open";
 
-        expect_string(__wrap_fopen, name, path);
-        expect_string(__wrap_fopen, mode, "r");
-        will_return(__wrap_fopen, FILE_DEAD);
+        /* a name under /proc is exempt from the symlink refusal, so it is
+         * opened here rather than through pqos_fopen() - and the flags are
+         * required to carry O_CLOEXEC, since a descriptor the library keeps
+         * must not be inherited by anything the caller starts
+         */
+        expect_value(__wrap_open, oflags, O_RDONLY | O_CLOEXEC);
+        will_return(__wrap_open, FD_DEAD);
+        expect_string(__wrap_fdopen, mode, "r");
+        will_return(__wrap_fdopen, FILE_DEAD);
         will_return(__wrap_fgets, "Test string");
         will_return(__wrap_fclose, 0);
         ret_value = pqos_file_contains(path, search_str1, &found_param);
         assert_int_equal(ret_value, PQOS_RETVAL_OK);
         assert_int_equal(found_param, 1);
 
-        expect_string(__wrap_fopen, name, path);
-        expect_string(__wrap_fopen, mode, "r");
-        will_return(__wrap_fopen, FILE_DEAD);
+        expect_value(__wrap_open, oflags, O_RDONLY | O_CLOEXEC);
+        will_return(__wrap_open, FD_DEAD);
+        expect_string(__wrap_fdopen, mode, "r");
+        will_return(__wrap_fdopen, FILE_DEAD);
         will_return(__wrap_fgets, "test string");
         will_return(__wrap_fgets, "");
         will_return(__wrap_fclose, 0);
@@ -228,9 +311,9 @@ test_common_pqos_file_contains(void **state __attribute__((unused)))
         assert_int_equal(ret_value, PQOS_RETVAL_OK);
         assert_int_equal(found_param, 0);
 
-        expect_string(__wrap_fopen, name, path);
-        expect_string(__wrap_fopen, mode, "r");
-        will_return(__wrap_fopen, NULL);
+        /* the open failing is the file not being there */
+        expect_value(__wrap_open, oflags, O_RDONLY | O_CLOEXEC);
+        will_return(__wrap_open, -1);
         ret_value = pqos_file_contains(path, search_str1, &found_param);
         assert_int_equal(ret_value, PQOS_RETVAL_OK);
         assert_int_equal(found_param, 0);

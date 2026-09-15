@@ -42,6 +42,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -107,15 +108,105 @@ __wrap_unlink(const char *pathname)
         return mock_type(int);
 }
 
+/* The flags of every open lock.c performed, so that a case can require what
+ * they all have to carry. The mock below asserts on the two opens the cases
+ * arm; this is about the property every one of them shares, and the opens that
+ * pass through - the lock file read back, the /proc entry behind the liveness
+ * check - are exactly the ones a change is most likely to leave inheritable.
+ */
+#define OPENS_MAX      32
+#define OPENS_PATH_MAX 256
+static char opens_path[OPENS_MAX][OPENS_PATH_MAX];
+static int opens_flags[OPENS_MAX];
+static int opens_seen;
+
+static void
+opens_clear(void)
+{
+        opens_seen = 0;
+}
+
+static void
+opens_record(const char *path, int oflags)
+{
+        if (opens_seen >= OPENS_MAX)
+                return;
+
+        strncpy(opens_path[opens_seen], path, OPENS_PATH_MAX - 1);
+        opens_path[opens_seen][OPENS_PATH_MAX - 1] = '\0';
+        opens_flags[opens_seen++] = oflags;
+}
+
+/* Whether the run opened a name carrying this text, with exactly these flags
+ *
+ * The name matters as much as the flags: a call site put back to fopen()
+ * performs no open() at all, so a case that only asked whether every open
+ * carried O_CLOEXEC would pass with the descriptor inheritable again. Each
+ * expected open is therefore named.
+ */
+static int
+opens_include(const char *what, int oflags)
+{
+        int i;
+
+        for (i = 0; i < opens_seen; i++)
+                if (strstr(opens_path[i], what) != NULL &&
+                    opens_flags[i] == oflags)
+                        return 1;
+
+        return 0;
+}
+
 /*
  * NOTE: open/close are linked with --wrap=open/close, so
  * __real_open/__real_close exist and can be used for passthrough.
  */
-int
-__wrap_open(const char *path, int oflags, int mode)
+/* Whether open() is being handed a mode, by the rule the C library uses
+ *
+ * The third argument of open() is there only when the flags ask for it, so a
+ * wrapper may only read one then. O_TMPFILE asks for a mode without carrying
+ * O_CREAT in its bit pattern, which is why it is tested for on its own.
+ */
+static int
+open_takes_a_mode(int oflags)
 {
-        /* Only mock our two lock-related paths */
-        if (strcmp(path, LOCKFILE) != 0 && strcmp(path, TEST_LOCKFILE_TMP) != 0)
+#ifdef O_TMPFILE
+        if ((oflags & O_TMPFILE) == O_TMPFILE)
+                return 1;
+#endif
+
+        return (oflags & O_CREAT) != 0;
+}
+
+int
+__wrap_open(const char *path, int oflags, ...)
+{
+        int mode = 0;
+
+        if (open_takes_a_mode(oflags)) {
+                va_list args;
+
+                va_start(args, oflags);
+                mode = va_arg(args, int);
+                va_end(args);
+        }
+
+        opens_record(path, oflags);
+
+        /* Only the two opens the cases arm are mocked: the lock file taken
+         * exclusively, and the temporary file the directory check makes. Every
+         * other open goes through, which includes the read-only open of the
+         * lock file that read_lockfile() does and the /proc read behind
+         * is_pid_alive() - neither is what a case here arms, and asserting on
+         * them made the mock a description of lock.c's internals rather than
+         * of what these cases are about.
+         */
+        int mocked = (strcmp(path, TEST_LOCKFILE_TMP) == 0) ||
+                     (strcmp(path, LOCKFILE) == 0 &&
+                      (oflags & (O_RDWR | O_CREAT | O_EXCL)) ==
+                          (O_RDWR | O_CREAT | O_EXCL));
+
+        if (!mocked)
                 return __real_open(path, oflags, mode);
 
         function_called();
@@ -349,6 +440,102 @@ test_lock_get(void **state __attribute__((unused)))
         assert_int_equal(lock_fini(), 0);
 }
 
+/* Every descriptor this file opens closes on exec
+ *
+ * fopen() does not do that, and three of these opens replaced a fopen(): the
+ * lock file read, the lock file written and the /proc entry read for a process
+ * start time. The flags are collected for every open the run performs rather
+ * than arming each one, because what is being required is the property they
+ * share - a fopen() put back anywhere here, or the flag dropped from one
+ * open(), fails this case wherever it happens.
+ */
+static void
+test_lock_opens_close_on_exec(void **state __attribute__((unused)))
+{
+        int i;
+
+        opens_clear();
+
+        /* a successful init, which is what performs them: the directory
+         * check's temporary file, the lock file created exclusively, the /proc
+         * entry read for this process's start time, and the lock file written
+         * with the pid and that time. It is not read on this path - the read
+         * happens when the file is already there, which is the second half of
+         * this case
+         */
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(0, TEST_LOCK_FD3);
+
+        expect_function_call(__wrap_pthread_mutex_init);
+        will_return(__wrap_pthread_mutex_init, 0);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
+        assert_int_equal(lock_init(), 0);
+
+        /* each open this path performs, by name and by flags: the /proc entry
+         * read for the process start time and the lock file written with the
+         * pid. Naming them is what makes a call site put back to fopen() fail
+         * here, since that performs no open() to inspect
+         */
+        assert_true(opens_include("/proc/", O_RDONLY | O_CLOEXEC));
+        assert_true(
+            opens_include(LOCKFILE, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC));
+
+        /* and nothing else this path opened is inheritable either */
+        for (i = 0; i < opens_seen; i++)
+                assert_int_not_equal(opens_flags[i] & O_CLOEXEC, 0);
+
+        expect_function_call(__wrap_close);
+        expect_value(__wrap_close, fildes, TEST_LOCK_FD3);
+        will_return(__wrap_close, 0);
+
+        expect_function_call(__wrap_pthread_mutex_destroy);
+        will_return(__wrap_pthread_mutex_destroy, 0);
+
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, 0);
+
+        assert_int_equal(lock_fini(), 0);
+
+        /* the lock file is also read, and that open is on another path: it
+         * happens when the file is already there, which is the init above
+         * finding EEXIST rather than creating it. Doctoring read_lockfile()
+         * back to fopen() passes the case above and fails this half, which is
+         * why both are here
+         */
+        opens_clear();
+
+        expect_function_call(__wrap_pthread_mutex_lock);
+        will_return(__wrap_pthread_mutex_lock, 0);
+
+        expect_check_lockdir_access_ok();
+        expect_lockfile_open(EEXIST, -1);
+
+        /* whatever the stale check decides, the read has happened by then, and
+         * the init fails because the unlink of a file this test does not own
+         * is not mocked to succeed
+         */
+        expect_function_call(__wrap_unlink);
+        expect_string(__wrap_unlink, pathname, LOCKFILE);
+        will_return(__wrap_unlink, -1);
+
+        expect_function_call(__wrap_pthread_mutex_unlock);
+        will_return(__wrap_pthread_mutex_unlock, 0);
+
+        assert_int_equal(lock_init(), -1);
+
+        assert_true(opens_include(LOCKFILE, O_RDONLY | O_CLOEXEC));
+
+        for (i = 0; i < opens_seen; i++)
+                assert_int_not_equal(opens_flags[i] & O_CLOEXEC, 0);
+}
+
 int
 main(void)
 {
@@ -356,6 +543,7 @@ main(void)
             cmocka_unit_test(test_lock_init_error),
             cmocka_unit_test(test_lock_init_exit),
             cmocka_unit_test(test_lock_get),
+            cmocka_unit_test(test_lock_opens_close_on_exec),
         };
 
         return cmocka_run_group_tests(tests, NULL, NULL);

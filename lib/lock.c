@@ -108,6 +108,45 @@ lock_release(void)
 static int m_apilock = -1;
 static pthread_mutex_t m_apilock_mutex;
 static pid_t m_pid = 0;
+/**
+ * @brief Opens a file as a stream whose descriptor closes on exec
+ *
+ * fopen() leaves the descriptor open across an exec, so anything this process
+ * starts inherits it. What that costs here is not the lock itself - the lock is
+ * the file existing and the pid written in it, and these streams neither hold
+ * nor release it - but a descriptor handed to a program that has no business
+ * with it, on a file this library owns, for as long as that program runs. The
+ * descriptor is made with open(), which is where O_CLOEXEC can be asked for,
+ * and the stream is put on top of it. The descriptor the lock is taken with is
+ * kept in m_apilock and has always been opened this way.
+ *
+ * @param [in] path file to open
+ * @param [in] oflags flags for open(), without O_CLOEXEC
+ * @param [in] fmode mode string for fdopen()
+ * @param [in] perms permission bits, used where the flags create the file
+ *
+ * @return A stream, or NULL with errno set
+ */
+static FILE *
+fopen_cloexec(const char *path, int oflags, const char *fmode, mode_t perms)
+{
+        int fd = open(path, oflags | O_CLOEXEC, perms);
+        FILE *fp;
+
+        if (fd == -1)
+                return NULL;
+
+        fp = fdopen(fd, fmode);
+        if (fp == NULL) {
+                int error = errno;
+
+                close(fd);
+                errno = error;
+        }
+
+        return fp;
+}
+
 static unsigned long m_start_time = 0;
 
 /**
@@ -127,7 +166,7 @@ get_process_start_time(pid_t pid)
         unsigned long start_time = 0;
 
         snprintf(stat_path, sizeof(stat_path), "/proc/%d/stat", pid);
-        FILE *fp = fopen(stat_path, "r");
+        FILE *fp = fopen_cloexec(stat_path, O_RDONLY, "r", 0);
 
         if (!fp)
                 return 0;
@@ -203,7 +242,7 @@ is_pid_alive(pid_t pid, unsigned long start_time)
 static int
 read_lockfile(pid_t *pid, unsigned long *start_time)
 {
-        FILE *fp = fopen(LOCKFILE, "r");
+        FILE *fp = fopen_cloexec(LOCKFILE, O_RDONLY, "r", 0);
         char line[MAX_LINE];
 
         if (!fp)
@@ -231,8 +270,16 @@ read_lockfile(pid_t *pid, unsigned long *start_time)
 static int
 write_lockfile(pid_t pid, unsigned long start_time)
 {
-        FILE *fp = fopen(LOCKFILE, "w");
+        FILE *fp = fopen_cloexec(LOCKFILE, O_WRONLY | O_CREAT | O_TRUNC, "w",
+                                 LOCKFILE_PERMS);
 
+        /* a stream of its own, on a file this process already holds a
+         * descriptor for. Writing through m_apilock would need no second
+         * descriptor at all, which is better than making a second one close on
+         * exec - but that descriptor is a number the lock unit tests invent,
+         * not one they can be written through, so the change belongs with a
+         * change to them and not here.
+         */
         if (!fp)
                 return -1;
         fprintf(fp, "%d %lu\n", pid, start_time);
