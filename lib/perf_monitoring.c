@@ -178,7 +178,12 @@ get_supported_event(const enum pqos_mon_event event)
         case PQOS_PERF_EVENT_LLC_REF:
                 return &events_tab[OS_MON_EVT_IDX_LLC_REF];
         default:
-                ASSERT(0);
+                /* an event this does not handle is the answer the caller is
+                 * documented to get: *_mon_is_event_supported() promises
+                 * "@retval 0 if not supported", and it reads that from the NULL
+                 * below. Asserting here made asking the question fatal in a
+                 * debug build, which is the opposite of the contract.
+                 */
                 return NULL;
         }
 }

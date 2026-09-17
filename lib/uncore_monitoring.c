@@ -156,7 +156,12 @@ get_event(const enum pqos_mon_event event)
         case PQOS_PERF_EVENT_LLC_REF_PCIE_WRITE:
                 return &uncore_events[UNCORE_EVENT_LLC_REF_PCIE_WRITE];
         default:
-                ASSERT(0);
+                /* an event this does not handle is the answer the caller is
+                 * documented to get: *_mon_is_event_supported() promises
+                 * "@retval 0 if not supported", and it reads that from the NULL
+                 * below. Asserting here made asking the question fatal in a
+                 * debug build, which is the opposite of the contract.
+                 */
                 return NULL;
         }
 }
