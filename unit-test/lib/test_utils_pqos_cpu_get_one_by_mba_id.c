@@ -110,6 +110,8 @@ static void
 test_utils_pqos_cpu_get_one_by_mba_id_cpu_null(void **state
                                                __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         unsigned lcore_param = 1;
         int return_value;
         unsigned mba_id_param = 1;
@@ -125,6 +127,8 @@ static void
 test_utils_pqos_cpu_get_one_by_mba_id_mba_id_param_null(void **state
                                                         __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         unsigned lcore_param = 1;
         struct pqos_cpuinfo cpu_param;
         int return_value;

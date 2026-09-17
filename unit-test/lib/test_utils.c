@@ -315,6 +315,8 @@ test_pqos_l3ca_get_clos_num(void **state)
 static void
 test_pqos_l3ca_get_clos_num_param(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         unsigned clos_num;
         int ret;
@@ -400,6 +402,8 @@ test_pqos_l2ca_get_clos_num(void **state)
 static void
 test_pqos_l2ca_get_clos_num_param(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         unsigned clos_num;
         int ret;
@@ -439,6 +443,8 @@ test_pqos_mba_get_clos_num(void **state)
 static void
 test_pqos_mba_get_clos_num_param(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         unsigned clos_num;
         int ret;
@@ -492,6 +498,8 @@ test_pqos_l3ca_cdp_enabled(void **state)
 static void
 test_pqos_l3ca_cdp_enabled_param(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int cdp_supported;
         int cdp_enabled;
@@ -547,6 +555,8 @@ test_pqos_l2ca_cdp_enabled(void **state)
 static void
 test_pqos_l2ca_cdp_enabled_param(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int cdp_supported;
         int cdp_enabled;
@@ -602,6 +612,8 @@ test_pqos_mba_ctrl_enabled(void **state)
 static void
 test_pqos_mba_ctrl_enabled_param(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ctrl_supported;
         int ctrl_enabled;
@@ -827,6 +839,8 @@ test_pqos_cpu_get_one_by_numaid(void **state __attribute__((unused)))
 static void
 test_pqos_cpu_get_one_by_numaid_param(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct pqos_cpuinfo cpu;
         int ret;
         unsigned numaid = 1;

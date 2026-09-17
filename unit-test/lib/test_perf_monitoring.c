@@ -486,6 +486,8 @@ test_perf_mon_start_core(void **state __attribute__((unused)))
 static void
 test_perf_mon_start_core_param(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         int ret;
         struct pqos_mon_data grp;
         struct pqos_mon_data_internal intl;
@@ -575,6 +577,8 @@ test_perf_mon_start_pid(void **state __attribute__((unused)))
 static void
 test_perf_mon_start_pid_param(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         int ret;
         struct pqos_mon_data grp;
         struct pqos_mon_data_internal intl;

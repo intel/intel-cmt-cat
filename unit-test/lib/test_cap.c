@@ -250,6 +250,8 @@ test__pqos_check_init_after_init(void **state __attribute__((unused)))
 static void
 test__pqos_get_cap_before_init(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         const struct pqos_cap *ret;
 
         ret = __real__pqos_get_cap();
@@ -270,6 +272,8 @@ test__pqos_get_cap_after_init(void **state __attribute__((unused)))
 static void
 test__pqos_get_cpu_before_init(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         const struct pqos_cpuinfo *ret;
 
         ret = __real__pqos_get_cpu();
@@ -453,6 +457,8 @@ test_pqos_cap_get_after_init(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l3cdp_change_msr(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -473,6 +479,8 @@ test__pqos_cap_l3cdp_change_msr(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l3cdp_change_os(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -492,6 +500,8 @@ test__pqos_cap_l3cdp_change_os(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l3cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -514,6 +524,8 @@ test__pqos_cap_l3cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l2cdp_change_msr(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -534,6 +546,8 @@ test__pqos_cap_l2cdp_change_msr(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l2cdp_change_os(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -553,6 +567,8 @@ test__pqos_cap_l2cdp_change_os(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l2cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -575,6 +591,8 @@ test__pqos_cap_l2cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
 static void
 test__pqos_cap_mba_change(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         _pqos_cap_mba_change(-1);
         _pqos_cap_mba_change(PQOS_MBA_ANY);
         _pqos_cap_mba_change(PQOS_MBA_DEFAULT);

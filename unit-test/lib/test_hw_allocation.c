@@ -462,6 +462,8 @@ test_hw_l3ca_get_cdp(void **state)
 static void
 test_hw_l3ca_get_unsupported(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         unsigned l3cat_id = 0;
@@ -825,6 +827,8 @@ test_hw_l2ca_get_cdp(void **state)
 static void
 test_hw_l2ca_get_unsupported(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         unsigned l2cat_id = 0;
@@ -1164,6 +1168,8 @@ test_hw_alloc_release(void **state __attribute__((unused)))
 static void
 test_hw_alloc_reset_unsupported_all(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
@@ -1344,6 +1350,8 @@ test_hw_alloc_reset_unsupported_mba_ctrl(void **state)
 static void
 test_hw_alloc_reset_l3ca(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         unsigned *l3cat_ids = NULL;
@@ -1388,6 +1396,8 @@ test_hw_alloc_reset_l3ca(void **state)
 static void
 test_hw_alloc_reset_l3cdp_enable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         unsigned *l3cat_ids = NULL;
@@ -1441,6 +1451,8 @@ test_hw_alloc_reset_l3cdp_enable(void **state)
 static void
 test_hw_alloc_reset_l3cdp_disable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         unsigned *l3cat_ids = NULL;

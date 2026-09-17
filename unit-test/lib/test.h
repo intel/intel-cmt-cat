@@ -87,6 +87,31 @@ test_log_init_at_start(void)
 }
 #endif
 
+/* A case that hands the library a parameter its own ASSERT rejects
+ *
+ * The library validates parameters with ASSERT, which lib/types.h maps to
+ * assert() under DEBUG and to nothing otherwise. So a case that calls a
+ * function with NULL to prove it returns PQOS_RETVAL_PARAM tests the release
+ * build's behaviour, and in a debug build the process dies on the assertion
+ * instead - before the case can report anything, and taking the rest of the
+ * binary with it.
+ *
+ * Such a case says so with this, as its first statement. It is a skip rather
+ * than a compile-time exclusion so that the case stays listed and a debug run
+ * says what it did not run, and the reason.
+ *
+ * The other reading of this - that the library should return an error rather
+ * than assert, so that one build's behaviour is not untested - is a change to
+ * the library and its own argument.
+ */
+#ifdef DEBUG
+#define SKIP_IF_ASSERTS_ARE_LIVE() skip()
+#else
+#define SKIP_IF_ASSERTS_ARE_LIVE()                                             \
+        do {                                                                   \
+        } while (0)
+#endif
+
 struct test_data {
         struct pqos_cpuinfo *cpu;
         struct pqos_cap *cap;

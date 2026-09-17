@@ -93,6 +93,8 @@ test_utils_pqos_cpu_get_core_info_multiple_cores_on_the_list(
 static void
 test_utils_pqos_cpu_get_core_info_cpu_null(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         unsigned lcore_param = 1;
         const struct pqos_coreinfo *return_value;
 

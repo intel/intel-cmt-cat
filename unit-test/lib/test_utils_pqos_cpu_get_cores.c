@@ -117,6 +117,8 @@ test_utils_pqos_cpu_get_cores_multiple_cores_on_the_list(
 static void
 test_utils_pqos_cpu_get_cores_cpu_null(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         unsigned count_param = 1;
         unsigned *return_value;
         unsigned socket = 1;
@@ -133,6 +135,8 @@ test_utils_pqos_cpu_get_cores_cpu_null(void **state __attribute__((unused)))
 static void
 test_utils_pqos_cpu_get_cores_count_null(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         unsigned count_param = 1;
         struct pqos_cpuinfo cpu_param;
         unsigned *return_value;

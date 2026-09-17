@@ -178,6 +178,8 @@ test_os_mon_init_unsupported(void **state)
 static void
 test_os_mon_init_param(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
 

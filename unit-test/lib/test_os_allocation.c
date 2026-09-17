@@ -1209,6 +1209,8 @@ test_os_alloc_reset_full(struct test_data *data,
 static void
 test_os_alloc_reset_l3cdp_enable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_alloc_config cfg;
@@ -1233,6 +1235,8 @@ test_os_alloc_reset_l3cdp_enable(void **state)
 static void
 test_os_alloc_reset_l3cdp_disable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_alloc_config cfg;
@@ -1284,6 +1288,8 @@ test_os_alloc_reset_l3cdp_mon(void **state)
 static void
 test_os_alloc_reset_l2cdp_enable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_alloc_config cfg;
@@ -1308,6 +1314,8 @@ test_os_alloc_reset_l2cdp_enable(void **state)
 static void
 test_os_alloc_reset_l2cdp_disable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_alloc_config cfg;
@@ -1360,6 +1368,8 @@ test_os_alloc_reset_l2cdp_mon(void **state)
 static void
 test_os_alloc_reset_mba_ctrl_enable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_alloc_config cfg;
@@ -1384,6 +1394,8 @@ test_os_alloc_reset_mba_ctrl_enable(void **state)
 static void
 test_os_alloc_reset_mba_ctrl_disable(void **state)
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         struct test_data *data = (struct test_data *)*state;
         int ret;
         struct pqos_alloc_config cfg;

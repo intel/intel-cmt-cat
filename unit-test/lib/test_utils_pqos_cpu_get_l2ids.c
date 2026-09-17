@@ -92,6 +92,8 @@ test_utils_pqos_cpu_get_l2ids_multiple_cores_on_the_list(
 static void
 test_utils_pqos_cpu_get_l2ids_cpu_null(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         unsigned count_param = 1;
         unsigned *return_value;
 
@@ -107,6 +109,8 @@ test_utils_pqos_cpu_get_l2ids_cpu_null(void **state __attribute__((unused)))
 static void
 test_utils_pqos_cpu_get_l2ids_count_null(void **state __attribute__((unused)))
 {
+        SKIP_IF_ASSERTS_ARE_LIVE();
+
         unsigned count_param = 1;
         struct pqos_cpuinfo cpu_param;
         unsigned *return_value;
