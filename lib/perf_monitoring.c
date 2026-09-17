@@ -417,8 +417,14 @@ perf_mon_init(const struct pqos_cpuinfo *cpu, const struct pqos_cap *cap)
         int ret;
         unsigned i;
 
-        ASSERT(cpu != NULL);
-
+        /* neither is read: this function asks the kernel what perf supports
+         * and does not consult the platform. The assertion that cpu is not NULL
+         * was here beside the two UNUSED_PARAM lines that say so, and it
+         * rejected a call this function serves - perf monitoring is initialized
+         * with (NULL, NULL) by design, which the unit test asserts returns
+         * PQOS_RETVAL_OK. In a release build the assertion compiles away and
+         * the call works; in a debug build it aborted.
+         */
         UNUSED_PARAM(cpu);
         UNUSED_PARAM(cap);
 
