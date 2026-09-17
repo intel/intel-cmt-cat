@@ -169,8 +169,6 @@ test_uncore_mon_discover_unsupported(void **state __attribute__((unused)))
 static void
 test_uncore_mon_is_event_supported_skx(void **state __attribute__((unused)))
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         int ret;
 
         ret = uncore_mon_is_event_supported(PQOS_PERF_EVENT_LLC_MISS_PCIE_READ);

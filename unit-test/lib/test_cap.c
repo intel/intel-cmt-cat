@@ -457,8 +457,6 @@ test_pqos_cap_get_after_init(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l3cdp_change_msr(void **state __attribute__((unused)))
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -470,6 +468,15 @@ test__pqos_cap_l3cdp_change_msr(void **state __attribute__((unused)))
                 _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ON);
                 will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
                 _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+                /* the three changes above are valid and run in either
+                 * build; what a debug build cannot do is the call below,
+                 * which the library asserts against. The guard sits here
+                 * rather than at the top of the case so that the valid
+                 * coverage is not lost, and before the will_return so that
+                 * no expectation is left armed.
+                 */
+                SKIP_IF_ASSERTS_ARE_LIVE();
+
                 will_return(__wrap_hw_cap_l3ca_discover, &(data->cap_l3ca));
                 _pqos_cap_l3cdp_change(-1);
         }
@@ -479,8 +486,6 @@ test__pqos_cap_l3cdp_change_msr(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l3cdp_change_os(void **state __attribute__((unused)))
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -492,6 +497,13 @@ test__pqos_cap_l3cdp_change_os(void **state __attribute__((unused)))
                 _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ON);
                 will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
                 _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+                /* the changes above are valid and run in either build; the
+                 * call below is the one a debug build asserts against, so the
+                 * guard sits here rather than at the top of the case, and
+                 * before the will_return so no expectation is left armed
+                 */
+                SKIP_IF_ASSERTS_ARE_LIVE();
+
                 will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
                 _pqos_cap_l3cdp_change(-1);
         }
@@ -500,8 +512,6 @@ test__pqos_cap_l3cdp_change_os(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l3cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -513,6 +523,13 @@ test__pqos_cap_l3cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
                 _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ON);
                 will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
                 _pqos_cap_l3cdp_change(PQOS_REQUIRE_CDP_ANY);
+                /* the changes above are valid and run in either build; the
+                 * call below is the one a debug build asserts against, so the
+                 * guard sits here rather than at the top of the case, and
+                 * before the will_return so no expectation is left armed
+                 */
+                SKIP_IF_ASSERTS_ARE_LIVE();
+
                 will_return(__wrap_os_cap_l3ca_discover, &(data->cap_l3ca));
                 _pqos_cap_l3cdp_change(-1);
         }
@@ -524,8 +541,6 @@ test__pqos_cap_l3cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l2cdp_change_msr(void **state __attribute__((unused)))
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -537,6 +552,13 @@ test__pqos_cap_l2cdp_change_msr(void **state __attribute__((unused)))
                 _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ON);
                 will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
                 _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ANY);
+                /* the changes above are valid and run in either build; the
+                 * call below is the one a debug build asserts against, so the
+                 * guard sits here rather than at the top of the case, and
+                 * before the will_return so no expectation is left armed
+                 */
+                SKIP_IF_ASSERTS_ARE_LIVE();
+
                 will_return(__wrap_hw_cap_l2ca_discover, &(data->cap_l2ca));
                 _pqos_cap_l2cdp_change(-1);
         }
@@ -546,8 +568,6 @@ test__pqos_cap_l2cdp_change_msr(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l2cdp_change_os(void **state __attribute__((unused)))
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -559,6 +579,13 @@ test__pqos_cap_l2cdp_change_os(void **state __attribute__((unused)))
                 _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ON);
                 will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
                 _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ANY);
+                /* the changes above are valid and run in either build; the
+                 * call below is the one a debug build asserts against, so the
+                 * guard sits here rather than at the top of the case, and
+                 * before the will_return so no expectation is left armed
+                 */
+                SKIP_IF_ASSERTS_ARE_LIVE();
+
                 will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
                 _pqos_cap_l2cdp_change(-1);
         }
@@ -567,8 +594,6 @@ test__pqos_cap_l2cdp_change_os(void **state __attribute__((unused)))
 static void
 test__pqos_cap_l2cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         struct test_data *data;
 
         data = (struct test_data *)*state;
@@ -580,6 +605,13 @@ test__pqos_cap_l2cdp_change_os_resctrl_mon(void **state __attribute__((unused)))
                 _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ON);
                 will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
                 _pqos_cap_l2cdp_change(PQOS_REQUIRE_CDP_ANY);
+                /* the changes above are valid and run in either build; the
+                 * call below is the one a debug build asserts against, so the
+                 * guard sits here rather than at the top of the case, and
+                 * before the will_return so no expectation is left armed
+                 */
+                SKIP_IF_ASSERTS_ARE_LIVE();
+
                 will_return(__wrap_os_cap_l2ca_discover, &(data->cap_l2ca));
                 _pqos_cap_l2cdp_change(-1);
         }

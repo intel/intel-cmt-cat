@@ -1168,8 +1168,6 @@ test_hw_alloc_release(void **state __attribute__((unused)))
 static void
 test_hw_alloc_reset_unsupported_all(void **state)
 {
-        SKIP_IF_ASSERTS_ARE_LIVE();
-
         struct test_data *data = (struct test_data *)*state;
         int ret;
 
