@@ -1478,6 +1478,82 @@ test_alloc_apply_l2_cdp(void **state)
         sel_alloc_opt_num = 2;
 }
 
+/* What a class definition's id takes, and what it says when it is given
+ * something else
+ *
+ * The options beside it on the same command line take a list or a range -
+ * "--alloc-domain-id=0-3" - so reaching for one in the id is an easy mistake,
+ * and it used to be answered by the string-to-number helper, whose message
+ * named neither the option nor what it wanted.
+ *
+ * Called directly: this file includes alloc.c, so the parser is reachable
+ * without arming the mocks of a path that has nothing to do with reading an id.
+ * The string is copied into a buffer first because the parser writes to it - it
+ * takes the scope suffix off in place.
+ */
+static void
+test_parse_clos_mask_type_takes_one_number(void **state __attribute__((unused)))
+{
+        static const char *const refused[] = {"0-14", "abc", "", "1 2", "0x"};
+        /* what the message quotes: "abc" and not the "ab" that is left once the
+         * trailing "c" has been read as the code scope
+         */
+        static const char *const quoted[] = {"0-14", "abc", "", "1 2", "0x"};
+        char buffer[MAX_CLOS_MASK_STR_LEN];
+        unsigned i;
+        int scope = CAT_UPDATE_SCOPE_BOTH;
+        unsigned id = 0;
+
+        for (i = 0; i < DIM(refused); ++i) {
+                strncpy(buffer, refused[i], sizeof(buffer) - 1);
+                buffer[sizeof(buffer) - 1] = '\0';
+
+                run_void_function(parse_clos_mask_type, buffer, &scope, &id);
+
+                assert_int_equal(output_exit_was_called(), 1);
+                assert_int_equal(output_get_exit_status(), EXIT_FAILURE);
+                assert_true(output_has_text(
+                    "a class definition takes a single number"));
+                assert_true(output_has_text(
+                    "Invalid class of service id \"%s\"", quoted[i]));
+        }
+}
+
+/* The spellings the id does take
+ *
+ * A decimal number, a hexadecimal one, and either scope suffix - which is read
+ * and taken off, leaving the number behind it.
+ */
+static void
+test_parse_clos_mask_type_accepts_a_number(void **state __attribute__((unused)))
+{
+        struct {
+                const char *given;
+                unsigned id;
+                int scope;
+        } accepted[] = {{"1", 1, CAT_UPDATE_SCOPE_BOTH},
+                        {"0x1f", 31, CAT_UPDATE_SCOPE_BOTH},
+                        {"2c", 2, CAT_UPDATE_SCOPE_CODE},
+                        {"3D", 3, CAT_UPDATE_SCOPE_DATA},
+                        {"0", 0, CAT_UPDATE_SCOPE_BOTH}};
+        char buffer[MAX_CLOS_MASK_STR_LEN];
+        unsigned i;
+
+        for (i = 0; i < DIM(accepted); ++i) {
+                int scope = CAT_UPDATE_SCOPE_BOTH;
+                unsigned id = 0xffff;
+
+                strncpy(buffer, accepted[i].given, sizeof(buffer) - 1);
+                buffer[sizeof(buffer) - 1] = '\0';
+
+                run_void_function(parse_clos_mask_type, buffer, &scope, &id);
+
+                assert_int_equal(output_exit_was_called(), 0);
+                assert_int_equal(id, accepted[i].id);
+                assert_int_equal(scope, accepted[i].scope);
+        }
+}
+
 static void
 test_alloc_apply_unrecognized_alloc_type(void **state)
 {
@@ -1869,6 +1945,8 @@ main(void)
             cmocka_unit_test(test_alloc_apply_l2),
             cmocka_unit_test(test_alloc_apply_l2_cdp),
             cmocka_unit_test(test_alloc_apply_unrecognized_alloc_type),
+            cmocka_unit_test(test_parse_clos_mask_type_takes_one_number),
+            cmocka_unit_test(test_parse_clos_mask_type_accepts_a_number),
             cmocka_unit_test_setup_teardown(
                 test_alloc_apply_set_core_to_class_id, init_sel_assoc_tab,
                 fini_sel_assoc_tab),
