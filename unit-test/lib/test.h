@@ -32,6 +32,7 @@
 
 #include "cpu_registers.h"
 #include "cpuinfo.h"
+#include "log.h"
 #include "pqos.h"
 
 #include <setjmp.h>
@@ -43,6 +44,48 @@
 /* clang-format off */
 #include <cmocka.h>
 /* clang-format on */
+
+/* Stand in for pqos_init() where the log is concerned
+ *
+ * The library asserts that nothing logs before the log has been initialized,
+ * and under DEBUG that assertion is live - lib/types.h maps ASSERT to assert()
+ * - so a case reaching library code that logs dies on
+ * "log_printf: Assertion `log_init_successful == 1' failed" before it can
+ * report anything, and most of the binaries here did. The counts are in the
+ * ticket rather than here, where they would age.
+ *
+ * A real run initializes the log in pqos_init(); a unit test calls the
+ * internals directly, so the harness has to do it. Three files already did it
+ * by hand, which is what kept them passing.
+ *
+ * Silent, so that a test's output stays its own. Done as a constructor because
+ * every binary here includes this header exactly once, while a group setup
+ * would have to be passed by each of them - eleven pass NULL, and the rest run
+ * several groups each, so it would be dozens of call sites rather than one
+ * place.
+ *
+ * A file that manages the log itself calls log_init() again in its own setup
+ * and overrides this - test_log.c does, and so do the cases that capture
+ * messages through a callback.
+ *
+ * A file that *mocks* log_init cannot have this: the call would reach its
+ * __wrap_log_init before cmocka has started, and function_called() there
+ * crashes. Such a file defines TEST_MOCKS_LOG_INIT before including this
+ * header, and arms the log itself if it needs one.
+ */
+static inline void
+test_log_init_silent(void)
+{
+        (void)log_init(-1, NULL, NULL, LOG_VER_SILENT);
+}
+
+#ifndef TEST_MOCKS_LOG_INIT
+static void __attribute__((constructor))
+test_log_init_at_start(void)
+{
+        test_log_init_silent();
+}
+#endif
 
 struct test_data {
         struct pqos_cpuinfo *cpu;
@@ -285,6 +328,14 @@ test_init(void **state, unsigned technology)
 {
         int ret;
         struct test_data *data;
+
+        /* again here, not only at process start: a case that finalizes the
+         * library takes the log down with it - pqos_fini() calls log_fini() -
+         * and the group after it would start with logging off. test_cap runs
+         * one group three times and ends each with pqos_fini(), which is the
+         * shape this covers.
+         */
+        test_log_init_silent();
 
         data = calloc(1, sizeof(struct test_data));
         if (data == NULL)
