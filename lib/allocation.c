@@ -1755,8 +1755,12 @@ hw_alloc_reset(const struct pqos_alloc_config *cfg)
 
         int ret = PQOS_RETVAL_OK;
 
-        ASSERT(cfg != NULL);
-
+        /* cfg may be NULL: pqos_alloc_reset_config() takes it, and
+         * alloc_reset() reads it as "every setting at its ANY default" - its
+         * own assertion says so, "cfg == NULL || cfg->l3_cdp == ...". Asserting
+         * against NULL here contradicted both, and refused that call in a debug
+         * build while a release build served it.
+         */
         ret = alloc_reset(cfg);
         if (ret != PQOS_RETVAL_OK) {
                 LOG_ERROR("Failed to reset allocation configuration\n");
