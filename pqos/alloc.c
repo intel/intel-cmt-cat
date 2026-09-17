@@ -179,10 +179,43 @@ int alloc_pid_flag;
  *              or just one of them
  * @param [out] id class ID referred to in the string \a str
  */
+/**
+ * @brief Whether a string is a single number, decimal or hexadecimal
+ *
+ * The class id of a class definition takes one number. The two options beside
+ * it on the same command line - --alloc-domain-id and --alloc-mem-regions -
+ * take a list or a range, so reaching for one here is an easy mistake, and the
+ * number helper's own message names neither the option nor what it wanted.
+ *
+ * @param [in] str string to check
+ *
+ * @retval 1 the whole string is one number
+ * @retval 0 it is not
+ */
+static int
+is_a_single_number(const char *str)
+{
+        size_t digits;
+
+        if (str == NULL || *str == '\0')
+                return 0;
+
+        if (strncmp(str, "0x", 2) == 0 || strncmp(str, "0X", 2) == 0) {
+                digits = strspn(str + 2, "0123456789abcdefABCDEF");
+
+                return digits > 0 && str[2 + digits] == '\0';
+        }
+
+        digits = strspn(str, "0123456789");
+
+        return str[digits] == '\0';
+}
+
 static void
 parse_clos_mask_type(char *str, int *scope, unsigned *id)
 {
         size_t len = 0;
+        char given[MAX_CLOS_MASK_STR_LEN];
 
         ASSERT(str != NULL);
         ASSERT(scope != NULL);
@@ -194,6 +227,14 @@ parse_clos_mask_type(char *str, int *scope, unsigned *id)
                 exit(EXIT_FAILURE);
         }
 
+        /* kept for the message below, which quotes what was typed rather than
+         * what is left of it once a scope suffix has been taken off: "abc"
+         * reaches the check as "ab", and a reader shown "ab" would look for a
+         * mistake they did not make
+         */
+        strncpy(given, str, sizeof(given) - 1);
+        given[sizeof(given) - 1] = '\0';
+
         if (len > 1 && (str[len - 1] == 'c' || str[len - 1] == 'C')) {
                 *scope = CAT_UPDATE_SCOPE_CODE;
                 str[len - 1] = '\0';
@@ -203,6 +244,15 @@ parse_clos_mask_type(char *str, int *scope, unsigned *id)
         } else {
                 *scope = CAT_UPDATE_SCOPE_BOTH;
         }
+        if (!is_a_single_number(str)) {
+                printf("Invalid class of service id \"%s\": a class "
+                       "definition takes a single number, as in \"mba:1=50\". "
+                       "A list or a range is accepted by --alloc-domain-id and "
+                       "--alloc-mem-regions, not here.\n",
+                       given);
+                exit(EXIT_FAILURE);
+        }
+
         *id = (unsigned)strtouint64(str);
 }
 
