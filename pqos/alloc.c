@@ -164,22 +164,6 @@ static struct {
 int alloc_pid_flag;
 
 /**
- * @brief Converts string describing allocation CLOS into ID and mask scope
- *
- * Current string format is: <ID>[CcDd]
- *
- * Some examples:
- *  1d  - class 1, data mask
- *  5C  - class 5, code mask
- *  0   - class 0, common mask for code & data
- *
- * @param [in] str string describing allocation CLOS. Function may modify
- *             the last character of the string in some conditions.
- * @param [out] scope indicates if string \a str refers to both CLOS masks
- *              or just one of them
- * @param [out] id class ID referred to in the string \a str
- */
-/**
  * @brief Whether a string is a single number, decimal or hexadecimal
  *
  * The class id of a class definition takes one number. The two options beside
@@ -211,6 +195,22 @@ is_a_single_number(const char *str)
         return str[digits] == '\0';
 }
 
+/**
+ * @brief Converts string describing allocation CLOS into ID and mask scope
+ *
+ * Current string format is: <ID>[CcDd]
+ *
+ * Some examples:
+ *  1d  - class 1, data mask
+ *  5C  - class 5, code mask
+ *  0   - class 0, common mask for code & data
+ *
+ * @param [in] str string describing allocation CLOS. Function may modify
+ *             the last character of the string in some conditions.
+ * @param [out] scope indicates if string \a str refers to both CLOS masks
+ *              or just one of them
+ * @param [out] id class ID referred to in the string \a str
+ */
 static void
 parse_clos_mask_type(char *str, int *scope, unsigned *id)
 {
