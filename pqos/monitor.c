@@ -2409,11 +2409,11 @@ parse_monitor_dev(char *str)
         }
 
         if (vc_count == 0)
-                printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x@ALL\n",
+                printf("Setting up monitoring for dev %.4x:%.2x:%.2x.%x@ALL\n",
                        segment, BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
         else
                 for (idx = 0; idx < vc_count; idx++)
-                        printf("Setting up monitoring for dev %.4x:%.4x:%.2x.%x"
+                        printf("Setting up monitoring for dev %.4x:%.2x:%.2x.%x"
                                "@%u\n",
                                segment, BDF_BUS(bdf), BDF_DEV(bdf),
                                BDF_FUNC(bdf), vc[idx]);

@@ -154,6 +154,46 @@ test_fill_dev_tab_rejects_invalid_vc(void **state)
         (void)state;
 }
 
+/* A device is printed the way sysfs and lspci write it, and the way the rest of
+ * the tool prints it: the bus is two hex digits.
+ *
+ * This line used to print the bus with four - "0000:000d:00.0" - which no other
+ * report in the tool does, so one tool named the same device two ways and a
+ * reader comparing two of its outputs had to know which spelling to expect.
+ * Input is not the problem: pqos_parse_pci_id() reads the bus as a number
+ * rather than a fixed width, so both spellings parse and both reach the same
+ * device - checked on hardware, where "-a dev:1=0000:000d:00.0@0 -a
+ * dev:2=0000:0d:00.0@0" warns about updating the CLOS of one device. What was
+ * wrong was the output being noncanonical. The case is here because a format
+ * string is exactly the kind of thing that drifts back.
+ */
+static void
+test_fill_dev_tab_prints_the_standard_device_id(void **state)
+{
+        char first[] = "dev:1=0000:0d:00.0@0";
+        char again[] = "dev:2=0000:0d:00.0@0";
+
+        sel_assoc_dev_num = 0;
+
+        run_void_function(fill_dev_tab, first);
+        assert_int_equal(output_exit_was_called(), 0);
+
+        /* the same device a second time: the table is updated and the warning
+         * names the device, which is the line under test
+         */
+        run_void_function(fill_dev_tab, again);
+        assert_int_equal(output_exit_was_called(), 0);
+        assert_string_equal(output_get(),
+                            "warn: updating CLOS for dev 0000:0d:00.0@0 from 1 "
+                            "to 2.\n");
+        /* and not the spelling this replaced */
+        assert_null(strstr(output_get(), "0000:000d"));
+
+        sel_assoc_dev_num = 0;
+
+        (void)state;
+}
+
 static void
 test_selfn_allocation_assoc_llc(void **state)
 {
@@ -1929,7 +1969,8 @@ main(void)
             cmocka_unit_test_teardown(test_selfn_allocation_class,
                                       cleanup_alloc_opts),
             cmocka_unit_test(test_alloc_print_config_negative),
-            cmocka_unit_test(test_fill_dev_tab_rejects_invalid_vc)};
+            cmocka_unit_test(test_fill_dev_tab_rejects_invalid_vc),
+            cmocka_unit_test(test_fill_dev_tab_prints_the_standard_device_id)};
 
         const struct CMUnitTest tests_need_all_caps[] = {
             cmocka_unit_test(test_alloc_print_config_msr),

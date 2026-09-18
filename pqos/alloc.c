@@ -1711,7 +1711,7 @@ fill_dev_tab(char *str)
                  * this dev is already on the list
                  * - update CLOS but warn about it
                  */
-                printf("warn: updating CLOS for dev %.4x:%.4x:%.2x.%x", segment,
+                printf("warn: updating CLOS for dev %.4x:%.2x:%.2x.%x", segment,
                        BDF_BUS(bdf), BDF_DEV(bdf), BDF_FUNC(bdf));
                 if (vc != DEV_ALL_VCS)
                         printf("@%u", vc);
@@ -2244,7 +2244,7 @@ print_dev_assoc(const int is_alloc,
                                             "    Domain ID  0x%x => ",
                                             channels_domains->domain_ids[idx]);
 
-                printf("    Device %.4x:%.4x:%.2x.%x@%u, Channel 0x%" PRIx64
+                printf("    Device %.4x:%.2x:%.2x.%x@%u, Channel 0x%" PRIx64
                        " => ",
                        dev->segment, BDF_BUS(dev->bdf), BDF_DEV(dev->bdf),
                        BDF_FUNC(dev->bdf), vc, dev->channel[vc]);
