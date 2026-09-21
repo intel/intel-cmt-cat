@@ -715,6 +715,188 @@ struct pqos_mrrm_info {
 };
 
 /**
+ * One physical range of a memory region, as MRRM reported it
+ */
+struct pqos_mem_range {
+        uint64_t base_address;
+        uint64_t length;
+        /** MRRM said the local region ID is meaningful */
+        int local_region_id_valid;
+        uint8_t local_region_id;
+        /** MRRM said the remote region ID is meaningful */
+        int remote_region_id_valid;
+        uint8_t remote_region_id;
+};
+
+/**
+ * Latency and bandwidth HMAT reports for one initiator-target pair
+ *
+ * Absent rather than zero where HMAT does not describe the pair: valid is what
+ * tells a caller whether the numbers mean anything.
+ */
+struct pqos_mem_locality {
+        /** any of the four numbers below is known */
+        int valid;
+        unsigned initiator_domain;
+        unsigned target_domain;
+        /** HMAT describes the four independently, so each says whether it was
+         *  found: a metric no structure carried is not a zero measurement
+         */
+        int read_latency_valid;
+        uint64_t read_latency_ns;
+        int write_latency_valid;
+        uint64_t write_latency_ns;
+        int read_bandwidth_valid;
+        uint64_t read_bandwidth_mbs;
+        int write_bandwidth_valid;
+        uint64_t write_bandwidth_mbs;
+        /** A figure may carry a condition rather than holding generally: that
+         *  it applies to transfers of at least a size the platform names, or
+         *  that it describes non-sequential transfers. Where either flag beside
+         *  a figure is set, that figure is not an unconditional one.
+         *
+         *  The minimum is passed on as the byte ACPI carries, not converted:
+         *  what that byte counts is the table's business, and inventing a unit
+         *  for it would state more than the platform did
+         */
+        int read_latency_min_transfer_qualified;
+        uint8_t read_latency_min_transfer;
+        int read_latency_non_sequential;
+        int write_latency_min_transfer_qualified;
+        uint8_t write_latency_min_transfer;
+        int write_latency_non_sequential;
+        int read_bandwidth_min_transfer_qualified;
+        uint8_t read_bandwidth_min_transfer;
+        int read_bandwidth_non_sequential;
+        int write_bandwidth_min_transfer_qualified;
+        uint8_t write_bandwidth_min_transfer;
+        int write_bandwidth_non_sequential;
+        /** HMAT listed this pair and marked a value unavailable, which is the
+         *  platform stating it has no number rather than describing nothing
+         */
+        int values_unavailable;
+        /** HMAT listed this pair and gave a value that does not survive being
+         *  scaled by its base unit, so there is a number and it cannot be
+         *  reported. Distinct from the two absences above it
+         */
+        int values_unrepresentable;
+};
+
+/**
+ * What a memory region is
+ */
+enum pqos_mem_region_type {
+        /** no table describes these ranges well enough to say what they are */
+        PQOS_MEM_REGION_UNKNOWN = 0,
+        PQOS_MEM_REGION_LOCAL, /**< attached memory, DDR */
+        PQOS_MEM_REGION_CXL,   /**< a window CXL memory is mapped into */
+};
+
+/**
+ * One memory region: the ranges sharing a local region ID, and what the ACPI
+ * tables say about them
+ *
+ * Each of the three match flags answers "did that table describe these
+ * ranges", so a field left unknown by an absent table cannot be mistaken for
+ * a measurement.
+ */
+struct pqos_mem_region {
+        uint8_t local_region_id;
+        enum pqos_mem_region_type type;
+        unsigned num_ranges;
+        unsigned *range_index; /**< indices into pqos_mem_regions::range */
+        /** the lengths of the ranges add up to an address space size. Ranges
+         *  that overlap, or that do not end at a representable address, or
+         *  whose lengths leave the type when added, make them not - and a
+         *  total computed from any of those is a plausible wrong figure
+         */
+        int total_size_valid;
+        uint64_t total_size;
+
+        /** SRAT places these ranges in a proximity domain */
+        int srat_match;
+        /** HMAT describes the target domain */
+        int hmat_match;
+        /** CEDT has a window overlapping these ranges, which is what places the
+         *  region in CXL space. Overlap and not coverage: a window reaching any
+         *  part of any range sets this, and whether the windows account for
+         *  every address is the separate, stronger cxl_range_match below
+         */
+        int cedt_match;
+
+        /** the mapping is a pair: HMAT names an initiator for the target
+         *  below. Clear where it names none, which leaves initiator_domain
+         *  holding nothing and says nothing about target_domain
+         */
+        int proximity_valid;
+        /** meaningful where proximity_valid is set */
+        unsigned initiator_domain;
+        /** the proximity domain SRAT placed this region's memory in, so
+         *  meaningful wherever srat_match is set - with proximity_valid clear
+         *  as well, where SRAT knows the target and HMAT pairs no initiator
+         *  with it
+         */
+        unsigned target_domain;
+
+        /* CEDT detail, meaningful where cedt_match is set */
+        /** a CFMWS window overlaps at least one range - the same statement as
+         *  cedt_match, reported beside the stronger one below because the two
+         *  answers are what the platform's tables offer
+         */
+        int cfmws_match;
+        /** the windows account for every address of every range. Collectively:
+         *  a range may be spanned by several adjacent windows with no single
+         *  window containing it, and that counts. Clear where any address of
+         *  any range falls outside every window
+         */
+        int cxl_range_match;
+        /** ranges in a window that one proximity domain's SRAT entries account
+         *  for entirely, with none of those entries enabled.
+         *
+         *  ACPI tells an operating system to ignore the contents of a disabled
+         *  entry, and this count is the one place anything disabled is read: it
+         *  is a statement about the table, not about memory. Nothing else here
+         *  comes from a disabled entry - not the type, not the proximity
+         *  domains, not the locality numbers - so a platform that populates
+         *  SRAT with placeholders it has not enabled is described as having
+         *  window space its firmware has not brought up, and nothing stronger
+         */
+        unsigned reserved_mres;
+        /** ranges in a window that one proximity domain's enabled SRAT entries
+         *  account for entirely. Counted per range, not per device: these
+         *  tables carry no device enumeration, so one device spanning several
+         *  ranges cannot be told from several devices
+         */
+        unsigned active_mres;
+        /** ranges in a window that neither of the above accounts for: SRAT says
+         *  nothing about them, or describes part of them, or two domains
+         *  describe them between them. Distinct from reserved_mres, where the
+         *  reservation is firmware's own statement about the whole range; here
+         *  there is no such statement to report
+         */
+        unsigned unclassified_mres;
+
+        struct pqos_mem_locality locality;
+};
+
+/**
+ * The memory regions of the platform
+ */
+struct pqos_mem_regions {
+        /** MRRM assigns region IDs dynamically rather than statically */
+        int dynamic_region_ids;
+        /** how many regions MRRM says the platform supports, which is a
+         *  different number from how many its range entries describe: the
+         *  header's figure is a capability, num_regions below is what is there
+         */
+        unsigned max_regions_supported;
+        unsigned num_range_entries;
+        struct pqos_mem_range *range; /**< every MRRM range, in table order */
+        unsigned num_regions;
+        struct pqos_mem_region *region;
+};
+
+/**
  * Cores to Domains Mapping Structure
  */
 struct pqos_cores_domains {
@@ -744,6 +926,8 @@ struct pqos_sysconfig {
         struct pqos_cores_domains *cores_domains; /**< Cores to domains info */
         struct pqos_channels_domains *channels_domains; /**< Channels to domains
                                                            info */
+        /** Memory regions, with what SRAT, HMAT and CEDT say about them */
+        struct pqos_mem_regions *mem_regions;
 };
 
 /**

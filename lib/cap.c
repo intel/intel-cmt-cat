@@ -63,6 +63,7 @@
 #include "lock.h"
 #include "log.h"
 #include "machine.h"
+#include "mem_regions.h"
 #include "mmio_common.h"
 #include "monitoring.h"
 #include "mrrm.h"
@@ -813,6 +814,7 @@ pqos_init(const struct pqos_config *config)
         struct pqos_devinfo *dev = NULL;
         struct pqos_erdt_info *erdt = NULL;
         struct pqos_mrrm_info *mrrm = NULL;
+        struct pqos_mem_regions *mem_regions = NULL;
         struct pqos_cores_domains *cores_domains = NULL;
         struct pqos_channels_domains *channels_domains = NULL;
         enum pqos_interface interface;
@@ -1024,6 +1026,20 @@ pqos_init(const struct pqos_config *config)
                         break;
                 }
 
+                /* What the ranges are, and how fast, comes from three other
+                 * ACPI tables. None of them is required: a platform without
+                 * them still has its regions reported, with the fields those
+                 * tables would have filled marked unknown.
+                 */
+                if (ret == PQOS_RETVAL_OK) {
+                        int mem_ret = mem_regions_init(mrrm, &mem_regions);
+
+                        if (mem_ret != PQOS_RETVAL_OK)
+                                LOG_DEBUG("Memory region description "
+                                          "unavailable: %d\n",
+                                          mem_ret);
+                }
+
                 /* MRRM is required for MMIO interface */
                 if (ret != PQOS_RETVAL_OK) {
                         LOG_ERROR("MRRM table is required for MMIO "
@@ -1060,6 +1076,7 @@ pqos_init(const struct pqos_config *config)
 
         if (ret != PQOS_RETVAL_OK && interface == PQOS_INTER_MMIO) {
                 cores_domains_fini();
+                mem_regions_fini();
                 mrrm_fini();
                 channels_domains_fini();
         }
@@ -1089,6 +1106,7 @@ init_error:
                 m_sysconf.dev = dev;
                 m_sysconf.erdt = erdt;
                 m_sysconf.mrrm = mrrm;
+                m_sysconf.mem_regions = mem_regions;
                 m_sysconf.cores_domains = cores_domains;
                 m_sysconf.channels_domains = channels_domains;
         }
@@ -1127,6 +1145,7 @@ pqos_fini(void)
         if (interface == PQOS_INTER_MMIO) {
                 cores_domains_fini();
                 channels_domains_fini();
+                mem_regions_fini();
                 mrrm_fini();
         }
 

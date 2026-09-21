@@ -50,10 +50,8 @@
 #include <sys/utsname.h>
 #endif
 
-#define BUFFER_SIZE            1024
-#define NON_VERBOSE            0
-#define VALID_LOCAL_REGION_ID  1
-#define VALID_REMOTE_REGION_ID 2
+#define BUFFER_SIZE 1024
+#define NON_VERBOSE 0
 
 #define UNAVAILABLE_BIT_SUPPORT 1
 #define OVERFLOW_BIT_SUPPORT    2
@@ -654,54 +652,368 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
         }
 }
 
-static void
-cap_print_mrrm_info_regions(const struct pqos_mrrm_info *mrrm)
+/**
+ * @brief The last address of a range, where the range has one
+ *
+ * A nonzero length is not enough: MRRM can declare a base and length whose sum
+ * leaves the address space, and adding them would print an end address below
+ * the start. Such a range is reported as having no valid end rather than a
+ * fabricated one.
+ *
+ * @param [in] range the range
+ * @param [out] last its last address
+ *
+ * @retval 1 the range has a representable last address
+ * @retval 0 it does not
+ */
+static int
+cap_range_last(const struct pqos_mem_range *range, uint64_t *last)
 {
-        uint32_t idx = 0;
-        uint32_t low = 0;
-        uint32_t high = 0;
-        uint64_t base_addr = 0;
-        uint64_t length = 0;
+        if (range->length == 0 ||
+            range->base_address > UINT64_MAX - (range->length - 1))
+                return 0;
 
-        printf("\nTotal Memory Regions:  %d\n",
-               mrrm->max_memory_regions_supported);
-        if (mrrm->flags == 0)
-                printf("Region ID Type:        Static\n");
-        else
-                printf("Region ID Type:        Dynamic\n");
+        *last = range->base_address + (range->length - 1);
 
-        for (idx = 0; idx < mrrm->num_mres; idx++) {
+        return 1;
+}
 
-                /* Log Region's Base Address */
-                low = mrrm->mre[idx].base_address_low;
-                high = mrrm->mre[idx].base_address_high;
-                base_addr =
-                    ((uint64_t)high << (sizeof(uint32_t) * CHAR_BIT)) | low;
-                printf("\n\n\nBase Address     : 0x%lx\n", base_addr);
+/**
+ * @brief Prints the ranges MRRM reported, in the order the table lists them
+ *
+ * The indices printed here are what the per-region listing refers to, so a
+ * reader can follow a range from the raw table into the region carrying it.
+ *
+ * @param [in] regions the memory regions
+ */
+static void
+cap_print_raw_ranges(const struct pqos_mem_regions *regions)
+{
+        unsigned idx;
 
-                /* Log Region's  Length */
-                low = mrrm->mre[idx].length_low;
-                high = mrrm->mre[idx].length_high;
-                length =
-                    ((uint64_t)high << (sizeof(uint32_t) * CHAR_BIT)) | low;
-                printf("Length           : 0x%lx\n", length);
+        printf("Raw Memory Range Entries:\n");
 
-                /* Local Region ID Info */
-                if (mrrm->mre[idx].region_id_flags & VALID_LOCAL_REGION_ID) {
-                        printf("Local Region ID  : 0x%x\n",
-                               mrrm->mre[idx].local_region_id);
-                } else
-                        printf("Local Region ID  : Not Valid\n");
+        for (idx = 0; idx < regions->num_range_entries; idx++) {
+                const struct pqos_mem_range *r = &regions->range[idx];
+                uint64_t last;
 
-                /* Remote Region ID Info */
-                if (mrrm->mre[idx].region_id_flags & VALID_REMOTE_REGION_ID)
-                        printf("Remote Region ID: 0x%x\n",
-                               mrrm->mre[idx].remote_region_id);
+                printf("  [%u]\n", idx);
+                printf("    Base Address     : 0x%016" PRIx64 "\n",
+                       r->base_address);
+                printf("    Length           : 0x%016" PRIx64 "\n", r->length);
+                if (cap_range_last(r, &last))
+                        printf("    End Address      : 0x%016" PRIx64 "\n",
+                               last);
                 else
-                        printf("Remote Region ID : Not Valid\n");
+                        printf("    End Address      : Not Valid\n");
+
+                if (r->local_region_id_valid)
+                        printf("    Local Region ID  : 0x%x\n",
+                               r->local_region_id);
+                else
+                        printf("    Local Region ID  : Not Valid\n");
+
+                if (r->remote_region_id_valid)
+                        printf("    Remote Region ID : 0x%x\n",
+                               r->remote_region_id);
+                else
+                        printf("    Remote Region ID : Not Valid\n");
+
+                printf("\n");
+        }
+}
+
+/**
+ * @brief Prints what the ACPI tables say about one region
+ *
+ * A field no table described is named as such rather than printed as a zero.
+ * SRAT is three-valued for that reason: whether it describes a CXL window is up
+ * to the platform, so no entry there is not the same answer as "no".
+ *
+ * @param [in] region the region
+ */
+static void
+cap_print_region_acpi(const struct pqos_mem_region *region)
+{
+        printf("  ACPI:\n");
+        printf("    SRAT Match        : ");
+        if (region->srat_match)
+                printf("Yes\n");
+        else if (region->type == PQOS_MEM_REGION_CXL)
+                printf("Optional / Platform dependent\n");
+        else
+                printf("No\n");
+
+        printf("    HMAT Match        : %s\n",
+               region->hmat_match ? "Yes" : "No");
+        printf("    CEDT Match        : %s\n",
+               region->cedt_match ? "Yes" : "No");
+
+        printf("\n  Proximity:\n");
+        if (region->proximity_valid) {
+                printf("    Initiator Domain  : %u\n",
+                       region->initiator_domain);
+                printf("    Target Domain     : %u\n", region->target_domain);
+                printf("    Mapping           : Initiator%u -> Target%u\n",
+                       region->initiator_domain, region->target_domain);
+        } else if (region->srat_match) {
+                /* SRAT placed this memory in a domain, but no HMAT entry pairs
+                 * an initiator with that target, so half the mapping is unknown
+                 */
+                printf("    Initiator Domain  : Not Available\n");
+                printf("    Target Domain     : %u\n", region->target_domain);
+                printf("    Mapping           : Not Available\n");
+        } else {
+                printf("    Initiator Domain  : Not Available\n");
+                printf("    Target Domain     : Not Available\n");
+                printf("    Mapping           : Not Available\n");
+        }
+
+        if (region->cedt_match) {
+                printf("\n  CXL Windows:\n");
+                printf("    CFMWS Match       : %s\n",
+                       region->cfmws_match ? "Yes" : "No");
+                printf("    CXL Range Match   : %s\n",
+                       region->cxl_range_match ? "Yes" : "No");
+                /* Three counts, one line each, and all three wherever this
+                 * block appears - which is wherever CEDT describes the region.
+                 * A platform with no CXL window has no such block at all,
+                 * and printing three zeroes under a heading about windows that
+                 * do not exist would be a statement about nothing: the counts
+                 * are counts of ranges in windows.
+                 *
+                 * What the three of them are is memory range entries, labelled
+                 * as such: these tables enumerate no devices, so a count of
+                 * ranges cannot be called a count of devices without claiming
+                 * what ACPI does not say.
+                 *
+                 * What separates them is who said what. SRAT enabling the
+                 * memory is firmware saying it is there; SRAT describing it and
+                 * leaving it disabled is firmware reserving the window; SRAT
+                 * saying nothing is neither, and folding that into either of
+                 * the others would attribute to firmware a statement it never
+                 * made.
+                 *
+                 * None of the three is qualified in parentheses, and none is
+                 * omitted for being zero, because the functional tests parse
+                 * these lines: within a block that is there, a field that comes
+                 * and goes is a field a test has to guess at.
+                 */
+                printf("    Active MREs       : %u\n", region->active_mres);
+                printf("    Reserved MREs     : %u\n", region->reserved_mres);
+                printf("    Unclassified MREs : %u\n",
+                       region->unclassified_mres);
+        }
+}
+
+/**
+ * @brief Prints one of the four locality numbers
+ *
+ * A figure HMAT qualifies by a minimum transfer size is not an unconditional
+ * one, so the line says so where the platform said so. The minimum is printed
+ * as the byte the table carries rather than converted to a size: what that byte
+ * counts is the table's business, and naming a unit for it here would state
+ * more than the platform did.
+ *
+ * @param [in] loc the locality the number came from
+ * @param [in] label the name of the number, padded by the caller
+ * @param [in] unit what the number is counted in
+ * @param [in] valid whether it is known
+ * @param [in] value the number
+ * @param [in] sized whether it holds only above a minimum transfer size
+ * @param [in] min_transfer that minimum, as ACPI encodes it
+ * @param [in] non_sequential whether it describes non-sequential transfers
+ */
+static void
+cap_print_locality_value(const struct pqos_mem_locality *loc,
+                         const char *label,
+                         const char *unit,
+                         const int valid,
+                         const uint64_t value,
+                         const int sized,
+                         const uint8_t min_transfer,
+                         const int non_sequential)
+{
+        printf("    %-18s: ", label);
+
+        if (!valid) {
+                printf("Not Available\n");
+                return;
+        }
+
+        printf("Initiator-Target[%u-%u]: %" PRIu64 " %s", loc->initiator_domain,
+               loc->target_domain, value, unit);
+
+        if (sized)
+                printf(", for transfers of encoded size %u and above",
+                       min_transfer);
+        if (non_sequential)
+                printf(", for non-sequential transfers");
+
+        printf("\n");
+}
+
+/**
+ * @brief Prints the HMAT numbers of one region
+ *
+ * @param [in] region the region
+ */
+static void
+cap_print_region_locality(const struct pqos_mem_region *region)
+{
+        const struct pqos_mem_locality *loc = &region->locality;
+
+        printf("\n  HMAT Locality:\n");
+
+        /* each number says whether it was found, because HMAT describes the
+         * four independently: a platform can carry read latency and no write
+         * bandwidth, and printing the one it does not carry as zero would read
+         * as a measurement
+         */
+        cap_print_locality_value(
+            loc, "Read  Latency", "nsec", loc->read_latency_valid,
+            loc->read_latency_ns, loc->read_latency_min_transfer_qualified,
+            loc->read_latency_min_transfer, loc->read_latency_non_sequential);
+        cap_print_locality_value(
+            loc, "Write Latency", "nsec", loc->write_latency_valid,
+            loc->write_latency_ns, loc->write_latency_min_transfer_qualified,
+            loc->write_latency_min_transfer, loc->write_latency_non_sequential);
+        cap_print_locality_value(
+            loc, "Read  Bandwidth", "MB/s", loc->read_bandwidth_valid,
+            loc->read_bandwidth_mbs, loc->read_bandwidth_min_transfer_qualified,
+            loc->read_bandwidth_min_transfer,
+            loc->read_bandwidth_non_sequential);
+        cap_print_locality_value(loc, "Write Bandwidth", "MB/s",
+                                 loc->write_bandwidth_valid,
+                                 loc->write_bandwidth_mbs,
+                                 loc->write_bandwidth_min_transfer_qualified,
+                                 loc->write_bandwidth_min_transfer,
+                                 loc->write_bandwidth_non_sequential);
+
+        /* the reason belongs with an answer that is entirely missing; where
+         * some of the numbers are there, the missing ones say so themselves
+         */
+        if (!loc->valid) {
+                printf("    Reason            : ");
+                /* Five ways to have no number, told apart, and none of them
+                 * mentions a device - whether one is present is not something
+                 * these tables answer.
+                 *
+                 * The order is the order the lookup happens in, so that each
+                 * line reports the step that actually stopped. Without an SRAT
+                 * target domain nothing was asked of HMAT at all, and saying
+                 * "no HMAT entry" there would assert an absence that was never
+                 * checked. With a target and no initiator paired with it, the
+                 * pair does not exist to be looked up. And where the pair is
+                 * described, a value marked unavailable is the platform saying
+                 * it has no number, a value that will not scale is a number
+                 * this report cannot state, and neither is the same as no
+                 * matrix carrying the pair.
+                 */
+                if (!region->srat_match)
+                        printf("SRAT gives these ranges no proximity domain to "
+                               "look up\n");
+                else if (!region->hmat_match)
+                        printf("No HMAT entry pairs an initiator with target "
+                               "domain %u\n",
+                               region->target_domain);
+                else if (loc->values_unrepresentable)
+                        printf("HMAT value for this pair does not fit once "
+                               "scaled by its base unit\n");
+                else if (loc->values_unavailable)
+                        printf("HMAT marks the values for this pair "
+                               "unavailable\n");
+                else
+                        printf("HMAT describes this pair but no locality "
+                               "matrix carries it\n");
+        }
+}
+
+/**
+ * @brief Prints one region: its ranges, and what the tables say about them
+ *
+ * @param [in] regions all the regions, for the range array
+ * @param [in] index which region to print
+ */
+static void
+cap_print_region(const struct pqos_mem_regions *regions, const unsigned index)
+{
+        const struct pqos_mem_region *region = &regions->region[index];
+        unsigned i;
+
+        printf("\nREGION %u:\n", index);
+        printf("  Type               : ");
+        switch (region->type) {
+        case PQOS_MEM_REGION_CXL:
+                printf("CXL Reserved\n");
+                break;
+        case PQOS_MEM_REGION_LOCAL:
+                printf("DDR / Local Memory\n");
+                break;
+        default:
+                /* no table described these ranges well enough to say. Printing
+                 * one of the two above would be a guess dressed as a finding
+                 */
+                printf("Unknown - not described by SRAT or CEDT\n");
+                break;
+        }
+        printf("  Local Region ID    : 0x%x\n", region->local_region_id);
+        printf("  Range Count        : %u\n", region->num_ranges);
+        if (region->total_size_valid)
+                printf("  Total Size         : 0x%016" PRIx64 "\n",
+                       region->total_size);
+        else
+                printf("  Total Size         : Not Valid\n");
+
+        printf("\n  Ranges:\n");
+        for (i = 0; i < region->num_ranges; i++) {
+                const unsigned idx = region->range_index[i];
+                const struct pqos_mem_range *r = &regions->range[idx];
+                uint64_t last;
+
+                if (cap_range_last(r, &last))
+                        printf("    [%u] 0x%016" PRIx64 " - 0x%016" PRIx64
+                               ", Size: 0x%016" PRIx64 "\n",
+                               idx, r->base_address, last, r->length);
+                else
+                        printf("    [%u] 0x%016" PRIx64
+                               " - Not Valid, Size: 0x%016" PRIx64 "\n",
+                               idx, r->base_address, r->length);
         }
 
         printf("\n");
+        cap_print_region_acpi(region);
+        cap_print_region_locality(region);
+        printf("\n");
+}
+
+/**
+ * @brief Prints the memory region report
+ *
+ * @param [in] regions the memory regions
+ */
+static void
+cap_print_mem_region_info(const struct pqos_mem_regions *regions)
+{
+        unsigned idx;
+
+        printf("\nMemory Region Discovery\n");
+        printf("-----------------------\n");
+        printf("Region ID Type       : %s\n",
+               regions->dynamic_region_ids ? "Dynamic" : "Static");
+        /* what the platform says it supports, and what its table describes.
+         * Both, because they are different questions and a report that answered
+         * only the second would drop the MRRM header's own figure
+         */
+        printf("Regions Supported    : %u\n", regions->max_regions_supported);
+        printf("Total Local Regions  : %u\n", regions->num_regions);
+        printf("Total Range Entries  : %u\n", regions->num_range_entries);
+        printf("\n");
+
+        cap_print_raw_ranges(regions);
+
+        for (idx = 0; idx < regions->num_regions; idx++)
+                cap_print_region(regions, idx);
 }
 
 /**
@@ -730,8 +1042,14 @@ cap_print_mem_regions(const struct pqos_sysconfig *sys)
                 return;
         }
 
-        if (sys->mrrm)
-                cap_print_mrrm_info_regions(sys->mrrm);
+        /* the regions, with what the ACPI tables say about them. Where those
+         * tables could not be read the ranges MRRM reported are still listed,
+         * with the fields they would have filled marked unavailable
+         */
+        if (sys->mem_regions != NULL)
+                cap_print_mem_region_info(sys->mem_regions);
+        else
+                printf("Memory region information is not available\n");
 }
 
 static void

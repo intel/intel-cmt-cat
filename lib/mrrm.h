@@ -51,6 +51,12 @@ extern "C" {
 
 #define REGION_ASSIGNMENT_TYPE_BIT 1
 #define REGION_ID_FLAGS_MASK       3
+/* Which of the two region IDs an MRE carries. Decoded here and published as the
+ * two booleans on struct pqos_mem_range, so that nothing outside the library
+ * needs the bits or a second definition of them
+ */
+#define MRRM_VALID_LOCAL_REGION_ID  0x1
+#define MRRM_VALID_REMOTE_REGION_ID 0x2
 /* MRE structure size without Region-ID Programming Registers[] */
 #define ACPI_MRRM_MRE_SIZE                  32
 #define ACPI_MRRM_MRE_TYPE                  0
