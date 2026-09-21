@@ -2493,14 +2493,56 @@ FILE *pqos_fopen(const char *name, const char *mode);
  * as open() would resolve it, links included, so this is not a check on the
  * whole path.
  *
- * A name that is already a link is refused before anything is opened, and
- * O_NOFOLLOW refuses one that appears afterwards. O_EXCL is added where the
- * name did not exist, so that the file opened is the file created rather than
- * whatever appeared in between; a caller that did not ask for O_CREAT still
- * gets an error for a name that is not there. What was opened is compared with
- * what the name described, so a replacement this can tell apart is refused
- * too - see what that comparison can and cannot see, below. The descriptor is
- * closed on exec.
+ * One open() decides what the descriptor refers to, and nothing looks at the
+ * name beforehand to be overtaken. O_NOFOLLOW means the file opened is not a
+ * symbolic link: a link is refused if it is there when the final component is
+ * resolved, however long it has been there. One installed at the name after
+ * that - after this call already holds a descriptor on the file it opened or
+ * created - changes nothing about the descriptor and is not refused, because
+ * it is not what was opened. A caller that did not ask for O_CREAT gets an
+ * error for a name that is not there. The descriptor is closed on exec.
+ *
+ * Which errno a refused link arrives as is normalised to ELOOP, because what
+ * open() answers for one depends on the platform and the flags - ELOOP on
+ * Linux, EMLINK on FreeBSD, EEXIST under O_EXCL, ENOTDIR under O_DIRECTORY -
+ * and none of those means a symbolic link on its own. So the name is asked
+ * rather than the errno read, and asked only once this call has decided to
+ * fail - which covers both paths that can decide it: a flag combination
+ * refused before anything is opened, and an open that came back with an
+ * error.
+ *
+ * What no report from it can change: no symbolic link is followed, none is
+ * truncated, and no descriptor on one is returned. O_PATH is where that
+ * distinction earns its keep - with O_PATH | O_NOFOLLOW the kernel hands back
+ * a descriptor on the link itself rather than refusing it, so this inspects
+ * what it was given and closes it again rather than trusting the open.
+ *
+ * The normalisation itself is best effort, being a second look at a name that
+ * anything may have changed in between, and it can be wrong in either
+ * direction. A link that has gone by the time it is asked about leaves the
+ * errno open() gave, so a caller can see EEXIST from an O_EXCL create that a
+ * link refused; and a link installed at a name whose open failed for another
+ * reason - a directory, a permission - is reported as ELOOP in place of that
+ * reason. Identifying the entry open() rejected without reading the name again
+ * is not something portable userspace can do, and the alternative to asking
+ * would be an errno that does not mean what the caller would take it to mean.
+ *
+ * The flags reach open() as given. O_CREAT therefore means what open() means
+ * by it - create the file, or open what the name refers to - and a caller that
+ * needs the file to be new asks for O_EXCL, which is passed through and does
+ * exactly that. A combination open() refuses is refused here for the same
+ * reason, and with the errno open() gave: on a platform where O_CREAT with
+ * O_DIRECTORY is EINVAL - Linux is one - it is EINVAL from this function too,
+ * and on one that allows the pair the call is served. What this function is
+ * saying is that the flags arrive as the caller wrote them, not what any one
+ * kernel makes of them.
+ *
+ * O_NOFOLLOW and O_CLOEXEC are always added. One flag is taken away: O_TRUNC,
+ * where O_PATH is set with it - open() ignores O_TRUNC for such a descriptor
+ * and the truncation paragraph below says so, but the flag does not reach
+ * open() either way. And one more is added for a name written with trailing
+ * slashes: O_DIRECTORY, so that the component the caller named is what gets
+ * opened, which the paragraph after next explains.
  *
  * A trailing slash does not withdraw the refusal of a link at the name: the
  * kernel would resolve the last component of "link/" as a directory, which
@@ -2513,58 +2555,43 @@ FILE *pqos_fopen(const char *name, const char *mode);
  * a name that is nothing but slashes is the root; and a file named with a slash
  * still gets the ENOTDIR the kernel gives it.
  *
- * O_TRUNC is applied to the file this identified rather than by the open, so a
- * name whose replacement this can see is refused before anything is emptied:
- * open() would have truncated whatever took the name's place, and no refusal
- * after that could put it back. It is applied where open() would have applied
- * it and nowhere else - to a regular file, that is; a FIFO is opened and left
- * alone,
- * as open() leaves it alone, and an O_PATH descriptor, which cannot be written
- * through, is returned untruncated for the same reason. A truncating open must
- * otherwise be writable, and O_RDONLY | O_TRUNC - which POSIX leaves
- * unspecified - is refused with EINVAL rather than quietly not truncating.
+ * O_TRUNC is applied by the open itself, so the file emptied is the file the
+ * name resolved to at that moment - the file open() would have truncated - and
+ * no other. There is no window between deciding and doing, and nothing that
+ * empties a file after the name it was reached through has become visible: a
+ * file this creates is created empty in the same call.
  *
- * That comparison is what the platform can tell about a file, and it is best
- * effort rather than proof of identity. Two things escape it, and a caller
- * relying on the truncation should know both.
- *
- * A hard link that was already there when this was called is not a second
- * file: both stats describe the one inode, and truncating or writing through
- * either name reaches it. The check is on the name having changed during the
- * call, not on how many names the file has.
- *
- * And what identifies a file to this - its device and inode number, and the
- * kind of file it is - is recycled. A name unlinked and created again on the
- * same filesystem can carry the number it had, so a replacement made between
- * the moment the name was looked at and the moment it was opened is
- * indistinguishable from the file that was there before, and a truncating call
- * then empties the replacement. What that costs is bounded: the file emptied is
- * the file the name referred to when the open resolved it, so it is the file
- * open() itself would have truncated, and it is not a symbolic link - which is
- * what O_NOFOLLOW guarantees whatever else changed. What the deferred
- * truncation does buy is that nothing is emptied through a descriptor this call
- * then refuses to return, and that the flag is honoured only where open() would
- * have honoured it.
+ * A truncating open must be writable. O_RDONLY | O_TRUNC, which POSIX leaves
+ * unspecified, is refused with EINVAL rather than quietly not truncating, and
+ * an O_PATH descriptor - which cannot be written through, and for which open()
+ * ignores O_TRUNC - is returned untruncated for the same reason. A FIFO is
+ * opened and left alone, as open() leaves it alone.
  *
  * The three answers have an order, since a caller may earn more than one of
  * them: a symbolic link is ELOOP whatever the flags, then a flag combination
  * this cannot honour is EINVAL whether or not the file exists, and then a name
- * that is not there is ENOENT.
+ * that is not there is ENOENT. The flags are judged before anything is opened,
+ * which is what keeps a name that cannot be honoured from being opened at
+ * all - a FIFO opened O_RDONLY would block - and the name is consulted on that
+ * path
+ * only to say which of the two reasons applies.
+ *
+ * What this does not promise: a hard link that was already there is not a
+ * second file, and truncating or writing through either name reaches the one
+ * inode. Nothing here counts how many names a file has.
  *
  * The descriptor is closed with close().
  *
- * O_TMPFILE is the one exception to that comparison, and it has to be: the
- * descriptor is an unnamed inode created inside the directory the name refers
- * to, so it is not the file the name described and never could be. The name is
- * still refused if it is a symbolic link, which is what this function is for,
- * but a caller passing O_TMPFILE gets no EAGAIN and should not test for one -
- * the directory it named may have been replaced by another directory.
+ * O_TMPFILE hands back an unnamed inode created inside the directory the name
+ * refers to, so the descriptor is not the file the name described and never
+ * could be. It is opened in one step like any other, and the name is refused
+ * if it is a symbolic link, which is what this function is for.
  *
- * A refused link, and a name that changed while it was being opened, are
- * reported through the library log, and only once there is one: this may be
- * called before pqos_init(), which is how the utility opens the log file it
- * then hands to it, and a message raised before the log exists is dropped
- * rather than written anywhere. errno carries the reason either way.
+ * A refused link is reported through the library log, and only once there is
+ * one: this may be called before pqos_init(), which is how the utility opens
+ * the log file it then hands to it, and a message raised before the log exists
+ * is dropped rather than written anywhere. errno carries the reason either
+ * way.
  *
  * @param [in] pathname a path to a file
  * @param [in] flags file access flags
@@ -2573,11 +2600,15 @@ FILE *pqos_fopen(const char *name, const char *mode);
  * @return A file descriptor
  * @retval A valid file descriptor, or -1 with errno ELOOP when the name is a
  *         symbolic link - on every platform and whatever the flags, since the
- *         name is asked rather than the errno read - EAGAIN when the name still
- *         exists but no longer refers to the file that was opened, EINVAL where
- *         no name was given or where O_TRUNC was asked for without a writable
- *         mode, and otherwise the errno of whichever call failed: the open, one
- *         of the stats that check what it opened, or the truncation
+ *         name is asked rather than the errno read, unless the name stopped
+ *         being a link before it could be asked, when the errno of the refused
+ *         open stands - EINVAL where no name was
+ *         given or where O_TRUNC was asked for without a writable mode, and
+ *         ENOMEM where a name written with trailing slashes could not be
+ *         copied in order to open the component it names, and otherwise the
+ *         errno of whichever call failed - the open, or the fstat that checks
+ *         an O_PATH descriptor. That includes every refusal open() itself
+ *         makes of the flags it was handed
  */
 int pqos_open(const char *pathname, int flags, mode_t mode);
 

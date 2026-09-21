@@ -315,16 +315,47 @@ pqos_fclose(FILE *stream)
         return fclose(stream);
 }
 
+/**
+ * @brief Whether a name refers to a symbolic link
+ *
+ * Asked only where a call has already decided to fail, so that a link is
+ * reported as one however the failure arrived. What open() answers for a link
+ * it would not follow depends on the platform and on the flags - ELOOP on
+ * Linux, EMLINK on FreeBSD, EEXIST under O_EXCL, ENOTDIR under O_DIRECTORY -
+ * and none of those means a symbolic link on its own, so the errno is not read
+ * for an answer: the name is asked instead.
+ *
+ * Nothing is opened on the strength of this. It explains a refusal rather than
+ * deciding one, which is why looking at the name here carries none of the
+ * hazard that looking at it before an open would.
+ *
+ * It is a second look at a mutable name, though, so it can disagree with the
+ * open that just failed: a link unlinked or replaced in between is not found
+ * here, and the caller keeps whatever errno open() gave - EEXIST from an O_EXCL
+ * create, say. What that costs is the specificity of the message, never the
+ * safety of the call: the link was not followed, nothing was opened, and
+ * pqos.h says the normalisation is best effort for exactly this reason.
+ * Identifying the entry open() rejected without naming it again is not
+ * something portable userspace can do.
+ *
+ * @param [in] pathname the name to ask about
+ *
+ * @retval 1 the name is a symbolic link
+ * @retval 0 it is not, or could not be looked at
+ */
+static int
+name_is_a_symlink(const char *pathname)
+{
+        struct stat lstat_val;
+
+        return lstat(pathname, &lstat_val) == 0 && S_ISLNK(lstat_val.st_mode);
+}
+
 static int
 open_leaf(const char *pathname, int flags, mode_t mode)
 {
         int fd;
         int error;
-        struct stat lstat_val;
-        struct stat fstat_val;
-        int new_file = 0;
-        int missing = 0;
-        int truncate_it = 0;
 
         if (pathname == NULL) {
                 errno = EINVAL;
@@ -332,48 +363,16 @@ open_leaf(const char *pathname, int flags, mode_t mode)
                 return -1;
         }
 
-        /* collect any link info about the file */
-        /* coverity[fs_check_call] */
-        if (lstat(pathname, &lstat_val) == -1) {
-                /**
-                 * A caller that asked for the file to be created is entitled to
-                 * a name that does not exist yet - "pqos --log-file=<new path>"
-                 * names a log the tool is meant to open for the first time. Any
-                 * other reason for lstat() to fail ends the call here; a name
-                 * that is simply not there is answered below, after the flags
-                 * have been judged, since a request this cannot honour is worth
-                 * saying so about whether or not the file exists.
-                 */
-                if (errno != ENOENT)
-                        return -1;
-                missing = 1;
-        } else if (S_ISLNK(lstat_val.st_mode)) {
-                /**
-                 * Refused here rather than left to the O_NOFOLLOW below,
-                 * because what open() reports for a symlink depends on the
-                 * flags it is given - O_CREAT | O_EXCL answers EEXIST, O_PATH
-                 * opens the link itself, O_DIRECTORY answers ENOTDIR - while
-                 * the caller is promised ELOOP.
-                 */
-                LOG_ERROR_IF_INIT("File %s is a symlink\n", pathname);
-                errno = ELOOP;
-
-                return -1;
-        }
-
         /**
-         * O_TRUNC is applied after the checks below rather than by the open()
-         * itself, because open() applies it to whatever the name refers to at
-         * that moment. A name replaced between the lstat() above and the open()
-         * is another file, and emptying it is a side effect the comparison
-         * further down cannot undo - it could only refuse the descriptor, with
-         * the damage done. ftruncate() acts on the file this call has
-         * identified and on nothing else.
+         * The flags are judged before anything is opened, and they have to be:
+         * an access mode that cannot truncate is refused, and
+         * a call that opened the file first to find that out would block for
+         * ever on a FIFO opened O_RDONLY, having been asked for something it
+         * was always going to refuse.
          *
-         * A truncating open has to be writable for that to be possible: POSIX
-         * leaves O_RDONLY | O_TRUNC unspecified, ftruncate() refuses a
-         * descriptor that cannot write, and turning the request into an open
-         * that quietly does not truncate would be worse than refusing it.
+         * A truncating open must be writable. POSIX leaves O_RDONLY | O_TRUNC
+         * unspecified, and turning the request into an open that quietly does
+         * not truncate would be worse than refusing it.
          *
          * O_PATH is the exception that is not an error: it carries an access
          * mode and forbids reading or writing through the descriptor, and
@@ -381,13 +380,13 @@ open_leaf(const char *pathname, int flags, mode_t mode)
          * open() would honour it - the flag is dropped and nothing is truncated
          * - rather than refused for a mode it does not really have.
          *
-         * Asked after the name has been looked at, not before: a symbolic link
-         * is promised as ELOOP whatever the flags, and a caller that passed a
-         * link and a nonsense access mode is told about the link - which is the
-         * answer that matters, and the one a caller guarding against a planted
-         * link tests for. And asked before the name's existence is answered, so
-         * that a request this cannot honour is named as such rather than
-         * reported as a missing file.
+         * A symbolic link is still ELOOP here, ahead of the flags, which is the
+         * order the caller is promised. That does look at the name - an lstat()
+         * through name_is_a_symlink() - so this path is not free of the
+         * filesystem; what it is free of is any consequence. The call is
+         * refusing either way, nothing is opened on the strength of the answer,
+         * and what the name says only decides which of the two reasons it
+         * gives.
          */
         if ((flags & O_TRUNC) != 0) {
                 int no_io = 0;
@@ -395,62 +394,70 @@ open_leaf(const char *pathname, int flags, mode_t mode)
 #ifdef O_PATH
                 no_io = (flags & O_PATH) != 0;
 #endif
-                if (!no_io && (flags & O_ACCMODE) == O_RDONLY) {
-                        errno = EINVAL;
+                if (no_io) {
+                        flags &= ~O_TRUNC;
+                } else if ((flags & O_ACCMODE) == O_RDONLY) {
+                        if (name_is_a_symlink(pathname)) {
+                                LOG_ERROR_IF_INIT("File %s is a symlink\n",
+                                                  pathname);
+                                errno = ELOOP;
+                        } else {
+                                errno = EINVAL;
+                        }
 
                         return -1;
                 }
-
-                flags &= ~O_TRUNC;
-                truncate_it = !no_io;
         }
 
         /**
-         * The name is not there, and the caller did not offer to create it.
-         */
-        if (missing) {
-                if ((flags & O_CREAT) == 0) {
-                        errno = ENOENT;
-
-                        return -1;
-                }
-                new_file = 1;
-        }
-
-        /**
-         * O_NOFOLLOW for the symlink that appears after the lstat() above: it
-         * would otherwise be followed here, creating or truncating whatever it
-         * points at, and the comparison below could then only refuse the
-         * descriptor - with the side effect already done.
+         * One open decides everything, which is what this function is built
+         * around. There is no look at the name beforehand to be overtaken: the
+         * descriptor is the file the name resolved to at the moment open()
+         * resolved it, O_NOFOLLOW means that file is not a symbolic link, and
+         * O_TRUNC - where it survived the judgment above - was applied by the
+         * same call, to that same file, with nothing in between to replace it.
          *
-         * O_EXCL where the lstat() found nothing, so that the file this then
-         * opens is the file it created. Without it, anything that appeared in
-         * between - a file somebody else wrote, or a FIFO, which O_NOFOLLOW has
-         * no opinion about - would be adopted as though the caller had named
-         * it.
+         * What this replaced looked the name up with lstat(), opened it, and
+         * then compared the two: a name swapped in the window could be noticed
+         * only after the fact, and only where the platform gave it away, since
+         * device and inode numbers are recycled - a name unlinked and created
+         * again can carry the number it had. The window is gone rather than
+         * narrowed, so nothing rests on that comparison any more.
          *
-         * The mode is passed whatever the flags are. open() reads it only
-         * where they create a file, and a flag combination that does - O_CREAT,
-         * or the O_TMPFILE that does not carry O_CREAT in its bit pattern -
-         * therefore needs no test of its own here.
+         * The caller's flags reach open() as they were given, O_CREAT
+         * included, and that is deliberate. Looking at the name before
+         * creating it - one open without O_CREAT to see whether anything is
+         * there, then O_CREAT | O_EXCL to make it - would refuse a file that
+         * appeared in between, but it cannot be done without taking O_CREAT
+         * off that first open, and that changes what the kernel makes of the
+         * rest: O_RDONLY | O_CREAT | O_DIRECTORY is EINVAL from open(), while
+         * without the O_CREAT it opens the directory. A caller handed that
+         * pair would be given a descriptor where open() refuses one. What the
+         * refusal would buy is narrow as well, since a file already at the
+         * name when the call starts is opened either way, so only one
+         * appearing during the call was ever caught.
+         *
+         * So O_CREAT here means what open() means by it: create the file, or
+         * open what the name refers to. A caller that needs the file to be new
+         * asks for O_EXCL, which is passed through and does exactly that.
+         *
+         * O_TRUNC is the one flag this function ever takes away, and only
+         * where O_PATH is set with it, for the reason the judgment above
+         * gives.
+         *
+         * The mode is passed whatever the flags are. open() reads it only where
+         * they create a file, so a flag combination that does - O_CREAT, or the
+         * O_TMPFILE that does not carry O_CREAT in its bit pattern - needs no
+         * test of its own here.
          */
-        fd = open(pathname,
-                  flags | O_NOFOLLOW | O_CLOEXEC | (new_file ? O_EXCL : 0),
-                  mode);
+        fd = open(pathname, flags | O_NOFOLLOW | O_CLOEXEC, mode);
+
         if (fd == -1) {
-                /**
-                 * What a refused symlink is called here depends on the flags
-                 * and on the platform - ELOOP on Linux, EMLINK on FreeBSD,
-                 * EEXIST under O_EXCL, ENOTDIR under O_DIRECTORY - and none of
-                 * them means a symlink on its own either. So the errno is not
-                 * read for an answer at all: the name is asked what it is, and
-                 * a link is reported as one however the open came back. The
-                 * logging can leave an errno of its own behind, so the reason
-                 * this returns is put back after the message.
+                /* the logging can leave an errno of its own behind, so the
+                 * reason this returns is put back after the message
                  */
                 error = errno;
-                if (lstat(pathname, &lstat_val) == 0 &&
-                    S_ISLNK(lstat_val.st_mode)) {
+                if (name_is_a_symlink(pathname)) {
                         LOG_ERROR_IF_INIT("File %s is a symlink\n", pathname);
                         error = ELOOP;
                 }
@@ -460,114 +467,50 @@ open_leaf(const char *pathname, int flags, mode_t mode)
         }
 
         /**
-         * O_TMPFILE hands back an unnamed inode created inside the directory
-         * the name refers to, so the descriptor is not the file the name
-         * described: the comparison below would find a regular file where the
-         * name is a directory and refuse every such call. The name was still
-         * lstat()ed and refused if it was a link, which is the check this
-         * function is for.
+         * A descriptor on the symbolic link itself is what O_PATH | O_NOFOLLOW
+         * gives, rather than a refusal, so the one thing the open cannot rule
+         * out is asked of the descriptor - not of the name, which is no longer
+         * consulted about what was opened.
+         *
+         * Asked only where it can be true. Without O_PATH, O_NOFOLLOW is what
+         * refuses a link and the open would not have returned a descriptor on
+         * one, so there is nothing for this to find; and asking anyway gives an
+         * ordinary call a way to fail after open() has already done its work.
+         * fstat() on a descriptor this call holds should not fail, but
+         * EOVERFLOW and EIO are answers it is allowed to give, and a
+         * truncating open has emptied the file by the time this runs -
+         * reporting failure then hands the caller an error for a file that has
+         * already been emptied.
+         * O_PATH is the case where that trade does not arise: open() ignores
+         * O_TRUNC for such a descriptor, so nothing has been changed yet.
          */
-#ifdef O_TMPFILE
-        if ((flags & O_TMPFILE) == O_TMPFILE)
-                return fd;
+#ifdef O_PATH
+        if ((flags & O_PATH) != 0) {
+                struct stat fstat_val;
+                int refuse = 0;
+
+                if (fstat(fd, &fstat_val) == -1) {
+                        refuse = 1;
+                } else if (S_ISLNK(fstat_val.st_mode)) {
+                        LOG_ERROR_IF_INIT("File %s is a symlink\n", pathname);
+                        errno = ELOOP;
+                        refuse = 1;
+                }
+
+                if (refuse) {
+                        /* the caller reports errno, so the reason this failed
+                         * has to survive the close() that tidies up after it
+                         */
+                        error = errno;
+                        close(fd);
+                        errno = error;
+
+                        return -1;
+                }
+        }
 #endif
 
-        /* the file created above is the one to compare against */
-        if (new_file && lstat(pathname, &lstat_val) == -1)
-                goto pqos_open_error;
-
-        /* collect info about the opened file */
-        if (fstat(fd, &fstat_val) == -1)
-                goto pqos_open_error;
-
-        /**
-         * A descriptor on the symlink itself is what O_PATH | O_NOFOLLOW gives,
-         * and a link that appeared after the lstat() above would then be
-         * described identically by both stats, so the refusal cannot rest on
-         * the flags the caller happened to choose.
-         */
-        if (S_ISLNK(fstat_val.st_mode)) {
-                LOG_ERROR_IF_INIT("File %s is a symlink\n", pathname);
-                errno = ELOOP;
-                goto pqos_open_error;
-        }
-
-        /**
-         * A symlink planted at the name after this created the file: the
-         * descriptor is the regular file it made, while the name now refers to
-         * a link. The identity comparison below would call that "changed",
-         * which is true but less than the caller is promised - a name found to
-         * be a symbolic link is ELOOP however this arrived at it, and a caller
-         * watching for a planted link tests for that.
-         */
-        if (S_ISLNK(lstat_val.st_mode)) {
-                LOG_ERROR_IF_INIT("File %s is a symlink\n", pathname);
-                errno = ELOOP;
-                goto pqos_open_error;
-        }
-
-        /**
-         * What is left for the comparison to catch is the name having been
-         * replaced by another file of some other kind - not by a link, which is
-         * answered above and is not reported as a change. What identifies a
-         * file and what kind of file it is are what get compared; a chmod in
-         * between changes neither.
-         *
-         * A directory in the path that is a symlink is invisible to this: the
-         * lstat() and the open() resolve it the same way, so they agree about
-         * the file at the end of it.
-         *
-         * And this identifies a file by what the platform can say about it,
-         * which is recycled: for a name that already existed, the tuple
-         * compared was read before the open, and a name unlinked and created
-         * again in that window can carry the inode number it had. So the
-         * comparison is best effort, as pqos.h says - what it rests on is that
-         * a file recycling the number is still the file the name referred to
-         * when open() resolved it, and still not a symbolic link.
-         */
-        if ((lstat_val.st_mode & S_IFMT) != (fstat_val.st_mode & S_IFMT) ||
-            lstat_val.st_ino != fstat_val.st_ino ||
-            lstat_val.st_dev != fstat_val.st_dev) {
-                LOG_ERROR_IF_INIT("File %s changed while it was being "
-                                  "opened\n",
-                                  pathname);
-                errno = EAGAIN;
-                goto pqos_open_error;
-        }
-
-        /**
-         * The file the checks above identified is the one emptied, once they
-         * have all passed - and only where open() itself would have emptied it.
-         * O_TRUNC applies to a regular file: open() ignores it for a FIFO, so
-         * "pqos -o <fifo>" is a command line that works and has to keep
-         * working, and ftruncate() would answer EINVAL for one. A directory or
-         * a device never reaches here with a writable open. So the file type
-         * this call verified is what decides, which is the same thing open()
-         * decides on.
-         *
-         * A file this call created is left alone: O_EXCL made it, so it was
-         * empty, and there is nothing for a truncation to do. Doing it anyway
-         * would not be harmless - the name is visible from the moment open()
-         * returns, and emptying the file afterwards would erase whatever
-         * another process had written to it in between, which the create that
-         * open() performs in one step cannot do.
-         */
-        if (truncate_it && !new_file && S_ISREG(fstat_val.st_mode) &&
-            ftruncate(fd, 0) == -1)
-                goto pqos_open_error;
-
         return fd;
-
-pqos_open_error:
-        /**
-         * The caller reports errno, so the reason the call failed has to
-         * survive the close() that tidies up after it.
-         */
-        error = errno;
-        close(fd);
-        errno = error;
-
-        return -1;
 }
 
 /**

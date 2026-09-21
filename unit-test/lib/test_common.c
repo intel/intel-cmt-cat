@@ -120,6 +120,14 @@ open_takes_a_mode(int oflags)
 typedef int open_fn(const char *path, int oflags, ...);
 open_fn __real_open;
 
+/* Armed by a case that wants something put at a name while a call is running.
+ * They are set, and race_plant() is defined, in the race section further down;
+ * they appear here because the open() wrapper below is what acts on them.
+ */
+static const char *race_link;
+static const char *race_open_link;
+static void race_plant(void);
+
 /* Variadic, as open() is
  *
  * A wrapper with a fixed mode parameter reads a third argument that a two
@@ -131,6 +139,8 @@ int
 __wrap_open(const char *path, int oflags, ...)
 {
         int mode = 0;
+        int armed;
+        int fd;
 
         if (open_takes_a_mode(oflags)) {
                 va_list args;
@@ -140,12 +150,38 @@ __wrap_open(const char *path, int oflags, ...)
                 va_end(args);
         }
 
-        if (strcmp(path, PROC_DEAD_NAME) != 0)
-                return __real_open(path, oflags, mode);
+        if (strcmp(path, PROC_DEAD_NAME) == 0) {
+                check_expected(oflags);
 
-        check_expected(oflags);
+                return mock_type(int);
+        }
 
-        return mock_type(int);
+        /* pqos_open() opens once, so there is no window inside it to plant
+         * in: a case arms a name here to have something put at it immediately
+         * after that open returns, while the descriptor is held. That is what
+         * the cases below are about - what happens to the name afterwards,
+         * rather than what the open resolved.
+         */
+        armed = race_open_link != NULL && strcmp(path, race_open_link) == 0;
+
+        fd = __real_open(path, oflags, mode);
+
+        /* only after an open that succeeded: what these cases are about is a
+         * name changing under a descriptor that is being held, and a failed
+         * open holds nothing. Planting anyway would touch the filesystem on a
+         * path no case describes, and could turn an errno a case is asserting
+         * on into a different one.
+         */
+        if (armed && fd >= 0) {
+                int error = errno;
+
+                race_link = race_open_link;
+                race_open_link = NULL;
+                race_plant();
+                errno = error;
+        }
+
+        return fd;
 }
 
 typedef FILE *fdopen_fn(int fd, const char *mode);
@@ -425,22 +461,25 @@ logged_clear(void)
         memset(logged, 0, sizeof(logged));
 }
 
-/* The window between pqos_open()'s lstat() and its open() cannot be hit by a
- * caller, so lstat() is wrapped: the first call on the armed name answers
- * truthfully and then puts a symlink there, which is exactly the race the
- * O_NOFOLLOW is for. The pass-through is fstatat() rather than __real_lstat,
- * which would not link where lstat is not an exported symbol; a C library that
- * does not route lstat() through the wrapper at all - it is exported from glibc
- * 2.33 - leaves race_wrapper_ran clear, and the cases below skip rather than
- * pretend.
+/* Something put at a name while a call is running cannot be arranged by a
+ * caller, so open() is wrapped and a case arms the name it is interested in:
+ * race_open_link fires the plant immediately after the real open() returns.
+ *
+ * pqos_open() has no window inside it - it opens once, and the descriptor is
+ * what the name resolved to at that moment - so what these cases are about is
+ * what happens to the *name* afterwards, while the descriptor is held. The
+ * cases about a link or a file already at the name put it there beforehand and
+ * assert the answer, which needs no wrapper and cannot be skipped.
+ *
+ * race_wrapper_ran carries three answers, and a case that arms the hook has to
+ * tell them apart: 1 is the plant done, 0 is the wrapper never reached - a C
+ * library that does not route open() through it - which is a skip, and -1 is
+ * the plant having run and failed, which is a broken setup and a failure. Only
+ * 0 may skip; reading it as "not 1" turns a case that could not be set up into
+ * a case that passed.
  */
-static const char *race_link = NULL;
 static const char *race_target = NULL;
-static const char *race_replacement = NULL;
 static const char *race_written = NULL;
-static int race_regular;
-static int race_skip;
-static int race_early;
 static int race_wrapper_ran;
 
 /* Puts at the armed name whatever the case armed it with */
@@ -467,22 +506,6 @@ race_plant(void)
                         strlen(race_written) ||
                     __real_fclose(stream) != 0)
                         race_wrapper_ran = -1;
-        } else if (race_replacement != NULL) {
-                /* an atomic swap by a file that already exists, so the name
-                 * comes to refer to another inode. Unlinking the name and
-                 * creating it again would not do: the inode number is free by
-                 * then and the filesystem hands it straight back, leaving the
-                 * identity comparison looking at what it expected
-                 */
-                if (rename(race_replacement, race_link) != 0)
-                        race_wrapper_ran = -1;
-        } else if (race_regular) {
-                int raced = creat(race_link, S_IRUSR | S_IWUSR);
-
-                if (raced == -1)
-                        race_wrapper_ran = -1;
-                else
-                        close(raced);
         } else {
                 /* the name may hold a file this call has just created, which a
                  * link cannot be planted over
@@ -495,38 +518,16 @@ race_plant(void)
         race_link = NULL;
 }
 
+/* lstat() is wrapped because the link flags say so, and passes everything
+ * through. Nothing arms it any more: pqos_open() consults the name only to
+ * explain a failure it has already decided on, so there is no answer a case
+ * would want to race. fstatat() rather than __real_lstat, which would not link
+ * where lstat is not an exported symbol.
+ */
 int
 __wrap_lstat(const char *pathname, struct stat *buf)
 {
-        int armed = race_link != NULL && strcmp(pathname, race_link) == 0;
-        int ret;
-        int error;
-
-        /* a case interested in a later window says how many calls on the name
-         * to let past untouched: pqos_open() lstat()s a name it creates a
-         * second time, after the open, and that window is a different one
-         */
-        if (armed && race_skip > 0) {
-                race_skip--;
-                armed = 0;
-        }
-
-        /* planted before the answer where the case is about what this call
-         * reports, and after it where the case is about what the open() that
-         * follows finds - which is the window O_NOFOLLOW is for
-         */
-        if (armed && race_early)
-                race_plant();
-
-        ret = fstatat(AT_FDCWD, pathname, buf, AT_SYMLINK_NOFOLLOW);
-        error = errno;
-
-        if (armed && !race_early)
-                race_plant();
-
-        errno = error;
-
-        return ret;
+        return fstatat(AT_FDCWD, pathname, buf, AT_SYMLINK_NOFOLLOW);
 }
 
 char *__real_fgets(char *s, int n, FILE *stream);
@@ -1018,46 +1019,10 @@ test_common_pqos_open_looping_parent_is_not_a_link(void **state
         assert_int_equal(unlink(loop), 0);
 }
 
-/* The window the O_NOFOLLOW is for: a link planted after the lstat() has to be
- * refused by the open rather than followed, and the file it points at must be
- * left alone.
- */
-static void
-test_common_pqos_open_refuses_a_late_symlink(void **state
-                                             __attribute__((unused)))
-{
-        int fd;
-        int error;
-
-        unlink(ut_link);
-        unlink(ut_target);
-        race_target = ut_target;
-        race_link = ut_link;
-        race_regular = 0;
-        race_wrapper_ran = 0;
-        logged_clear();
-        errno = 0;
-
-        fd = pqos_open(ut_link, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-        error = errno;
-
-        race_link = NULL;
-        if (race_wrapper_ran != 1) {
-                unlink(ut_link);
-                unlink(ut_target);
-                skip();
-        }
-
-        assert_int_equal(fd, -1);
-        assert_int_equal(error, ELOOP);
-        assert_non_null(strstr(logged, "is a symlink"));
-        assert_int_equal(access(ut_target, F_OK), -1);
-
-        assert_int_equal(unlink(ut_link), 0);
-}
-
-/* The same race under O_EXCL, where the refusal arrives as EEXIST rather than
- * ELOOP and would otherwise be reported as "the file exists".
+/* A link at the name under O_EXCL, where the refusal arrives as EEXIST rather
+ * than ELOOP and would otherwise be reported as "the file exists". Nothing is
+ * raced here: an exclusive create is one open, so the link is put there first
+ * and what is being checked is which errno the caller is given.
  */
 static void
 test_common_pqos_open_names_a_late_symlink_under_o_excl(void **state
@@ -1068,33 +1033,26 @@ test_common_pqos_open_names_a_late_symlink_under_o_excl(void **state
 
         unlink(ut_link);
         unlink(ut_target);
-        race_target = ut_target;
-        race_link = ut_link;
-        race_regular = 0;
-        race_wrapper_ran = 0;
+        assert_return_code(symlink(ut_target, ut_link), 0);
         logged_clear();
         errno = 0;
 
         fd = pqos_open(ut_link, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
         error = errno;
 
-        race_link = NULL;
-        if (race_wrapper_ran != 1) {
-                unlink(ut_link);
-                unlink(ut_target);
-                skip();
-        }
-
         assert_int_equal(fd, -1);
         assert_int_equal(error, ELOOP);
         assert_non_null(strstr(logged, "is a symlink"));
+        /* and the name the link pointed at was not created */
+        assert_int_equal(access(ut_target, F_OK), -1);
 
         assert_int_equal(unlink(ut_link), 0);
 }
 
 /* O_DIRECTORY turns the refusal into ENOTDIR, so an errno is not what decides
- * whether a name is a link - the name is. Here a directory is replaced by a
- * link to one inside the window, which is the shape a path component takes.
+ * whether a name is a link - the name is. A link to a directory is what a
+ * caller passing O_DIRECTORY runs into, and it has to arrive as ELOOP like any
+ * other link.
  */
 static void
 test_common_pqos_open_names_a_link_under_o_directory(void **state
@@ -1108,23 +1066,12 @@ test_common_pqos_open_names_a_link_under_o_directory(void **state
         ut_path(dir, sizeof(dir), "race_dir");
         rmdir(dir);
         unlink(dir);
-        assert_int_equal(mkdir(dir, S_IRWXU), 0);
-        race_target = work_dir;
-        race_link = dir;
-        race_regular = 0;
-        race_wrapper_ran = 0;
+        assert_return_code(symlink(work_dir, dir), 0);
         logged_clear();
         errno = 0;
 
         fd = pqos_open(dir, O_RDONLY | O_DIRECTORY, 0);
         error = errno;
-
-        race_link = NULL;
-        if (race_wrapper_ran != 1) {
-                rmdir(dir);
-                unlink(dir);
-                skip();
-        }
 
         assert_int_equal(fd, -1);
         /* the open said ENOTDIR; what is reported is what the name is */
@@ -1137,40 +1084,114 @@ test_common_pqos_open_names_a_link_under_o_directory(void **state
 #endif
 }
 
-/* A regular file appearing in the window is not a link, and adopting it would
- * hand the caller a file it never named. It is reported as the name having
- * changed, which is what happened.
+/* What O_CREAT means here is what open() means by it: create the file, or open
+ * what the name refers to.
+ *
+ * An earlier version of this function opened twice for a create that is not
+ * exclusive - once without O_CREAT to see whether anything was there, then with
+ * O_CREAT | O_EXCL - so that a file appearing in between was refused with
+ * EEXIST rather than opened. It was taken out for two reasons, and this case
+ * pins what replaced it. Removing O_CREAT for the first open changes what the
+ * kernel makes of the rest, measured: O_RDONLY | O_CREAT | O_DIRECTORY is
+ * EINVAL from open() and opens the directory without it. And the protection was
+ * narrower than it appeared, since a file already at the name when the call
+ * started was opened either way.
+ *
+ * A caller that needs the file to be new asks for O_EXCL, which is passed
+ * through and refuses an existing name - the case below this one.
  */
 static void
-test_common_pqos_open_does_not_adopt_a_late_file(void **state
+test_common_pqos_open_opens_a_file_that_is_there(void **state
                                                  __attribute__((unused)))
 {
+        static const char *const theirs = "already at the name\n";
         int fd;
-        int error;
 
-        unlink(ut_link);
-        race_target = NULL;
-        race_link = ut_link;
-        race_regular = 1;
-        race_wrapper_ran = 0;
+        unlink(ut_file);
+        ut_write(ut_file, theirs);
         logged_clear();
         errno = 0;
 
-        fd = pqos_open(ut_link, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-        error = errno;
+        fd = pqos_open(ut_file, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
 
-        race_link = NULL;
-        race_regular = 0;
-        if (race_wrapper_ran != 1) {
-                unlink(ut_link);
+        assert_true(fd >= 0);
+        assert_int_equal(close(fd), 0);
+        /* opened, not refused, and not emptied either - O_TRUNC was not asked
+         * for
+         */
+        ut_assert_contents(ut_file, theirs);
+        assert_null(strstr(logged, "is a symlink"));
+
+        /* and O_EXCL is how a caller says the file has to be new */
+        errno = 0;
+        fd = pqos_open(ut_file, O_WRONLY | O_CREAT | O_EXCL, S_IRUSR | S_IWUSR);
+        assert_int_equal(fd, -1);
+        assert_int_equal(errno, EEXIST);
+
+        assert_int_equal(unlink(ut_file), 0);
+}
+
+/* The caller's flags reach the kernel as given, so a combination open() refuses
+ * is refused here too.
+ *
+ * O_RDONLY | O_CREAT | O_DIRECTORY is the one that caught this: open() answers
+ * EINVAL for it, measured, and an earlier version of pqos_open() took O_CREAT
+ * off in order to look before it created - which turned that refusal into an
+ * open directory and a descriptor the caller was never meant to get. O_NOFOLLOW
+ * and O_CLOEXEC are added now, and the only flag removed is O_TRUNC where
+ * O_PATH is set with it, which open() ignores there anyway; O_CREAT in
+ * particular travels untouched, which is why this case asks for a combination
+ * whose meaning depends on it.
+ *
+ * What is compared is the platform's own answer rather than a fixed errno: the
+ * case asks open() first and requires pqos_open() to agree, and skips where a
+ * platform allows the pair. pqos.h documents the same example the same way.
+ */
+static void
+test_common_pqos_open_passes_the_flags_as_given(void **state
+                                                __attribute__((unused)))
+{
+#ifdef O_DIRECTORY
+        char dir[PATH_MAX];
+        int fd;
+        int error;
+
+        ut_path(dir, sizeof(dir), "flags_dir");
+        rmdir(dir);
+        unlink(dir);
+        assert_int_equal(mkdir(dir, S_IRWXU), 0);
+        logged_clear();
+
+        /* what a direct open() says about these flags, on this platform */
+        fd = open(dir, O_RDONLY | O_CREAT | O_DIRECTORY, S_IRUSR | S_IWUSR);
+        error = errno;
+        if (fd >= 0) {
+                /* a platform that allows the pair has nothing to check here */
+                assert_int_equal(close(fd), 0);
+                assert_int_equal(rmdir(dir), 0);
                 skip();
         }
 
+        errno = 0;
+        fd =
+            pqos_open(dir, O_RDONLY | O_CREAT | O_DIRECTORY, S_IRUSR | S_IWUSR);
+
+        /* the same refusal, for the same reason */
         assert_int_equal(fd, -1);
-        assert_int_equal(error, EEXIST);
+        assert_int_equal(errno, error);
         assert_null(strstr(logged, "is a symlink"));
 
-        assert_int_equal(unlink(ut_link), 0);
+        /* and without the flag the kernel objects to, the directory opens -
+         * so what was refused above is the combination, not the directory
+         */
+        fd = pqos_open(dir, O_RDONLY | O_DIRECTORY, 0);
+        assert_true(fd >= 0);
+        assert_int_equal(close(fd), 0);
+
+        assert_int_equal(rmdir(dir), 0);
+#else
+        skip();
+#endif
 }
 
 /* Both of these run before pqos_init() in the utility - the log file and the
@@ -1282,49 +1303,54 @@ test_common_names_a_symlink_the_same_way_in_both(void **state
         assert_int_equal(unlink(ut_target), 0);
 }
 
-/* A name replaced under the call is refused - and where the caller asked for
- * O_TRUNC that has to mean refused before anything is emptied. open() applies
- * O_TRUNC to whatever the name refers to by then, so the file that took the
- * name's place would come back empty and the refusal would arrive too late to
- * matter. The truncation is done through the descriptor this call identified.
+/* What O_TRUNC empties, and what it leaves alone. The truncation is part of the
+ * open now, so the file emptied is the file the name resolved to at the moment
+ * it was opened - the file open() itself would have truncated - and no other.
+ *
+ * A name replaced before the call is therefore served as the replacement rather
+ * than refused: there is no window to notice, no comparison, and no EAGAIN. The
+ * comparison this replaced could only see a replacement when the platform gave
+ * it away, since a name unlinked and created again can carry the inode number
+ * it had, so what it protected was never what it appeared to protect.
+ *
+ * The file the name used to refer to is kept reachable through a second name,
+ * so that "and no other" is asserted rather than assumed.
  */
 static void
-test_common_pqos_open_does_not_empty_a_late_file(void **state
-                                                 __attribute__((unused)))
+test_common_pqos_open_truncates_what_it_opened(void **state
+                                               __attribute__((unused)))
 {
+        static const char *const kept = "the file the name used to name\n";
         static const char *const raced = "the file that took the name\n";
+        char hard[PATH_MAX];
         int fd;
-        int error;
 
-        ut_write(ut_link, "the file the caller named\n");
+        ut_path(hard, sizeof(hard), "hard_name");
+        unlink(hard);
+        ut_write(ut_link, kept);
+        /* one inode, two names: the second outlives the rename below */
+        assert_return_code(link(ut_link, hard), 0);
         ut_write(ut_target, raced);
-
-        race_target = NULL;
-        race_link = ut_link;
-        race_replacement = ut_target;
-        race_wrapper_ran = 0;
+        /* the replacement takes the name atomically, as another process
+         * could
+         */
+        assert_return_code(rename(ut_target, ut_link), 0);
         logged_clear();
         errno = 0;
 
         fd = pqos_open(ut_link, O_WRONLY | O_TRUNC, 0);
-        error = errno;
 
-        race_link = NULL;
-        race_replacement = NULL;
-        if (race_wrapper_ran != 1) {
-                unlink(ut_link);
-                skip();
-        }
+        assert_true(fd >= 0);
+        assert_int_equal(close(fd), 0);
 
-        assert_int_equal(fd, -1);
-        assert_int_equal(error, EAGAIN);
-
-        /* what the refusal is worth: the file that took the name still has
-         * what it had
-         */
-        ut_assert_contents(ut_link, raced);
+        /* the file the name refers to is the one that was emptied */
+        assert_int_equal(ut_size(ut_link), 0);
+        /* and the one it used to refer to still has what it had */
+        ut_assert_contents(hard, kept);
+        assert_null(strstr(logged, "changed while"));
 
         assert_int_equal(unlink(ut_link), 0);
+        assert_int_equal(unlink(hard), 0);
 }
 
 /* Truncating needs a descriptor that can write, since the truncation is done
@@ -1463,61 +1489,83 @@ test_common_pqos_open_truncates_through_a_hard_link(void **state
         assert_int_equal(unlink(ut_target), 0);
 }
 
-/* A link planted at the name after this created the file. The descriptor is the
- * regular file it made, so the identity comparison would find a mismatch and
- * call it a change - true, but less than the caller is promised: a name found
- * to be a symbolic link is ELOOP however the call arrived at it. The window is
- * the second lstat() of the name, the one that follows the open, and what
- * matters here is the answer that lstat() gives rather than what the open
- * finds, so the harness plants the link before answering.
+/* A link planted at the name after this created the file, which is served
+ * rather than refused: the descriptor is the file that was created, the link
+ * cannot reach through a descriptor, and what it points at stays untouched by a
+ * write through one.
+ *
+ * This is where the redesign shows. What this replaced looked at the name again
+ * after the open, found a link and answered ELOOP - refusing a descriptor that
+ * was never in doubt, and telling a caller that the file it had just created
+ * was a symbolic link. The name is not asked about what was opened any more.
+ *
+ * The plant lands immediately after the open that created the file, which is
+ * the only open on the name: the harness fires it as that call returns.
  */
 static void
 test_common_pqos_open_names_a_planted_link(void **state __attribute__((unused)))
 {
+        static const char *const written = "into the file that was created\n";
         int fd;
-        int error;
 
         unlink(ut_link);
         ut_write(ut_target, "keep me\n");
 
         race_target = ut_target;
-        race_link = ut_link;
-        race_skip = 1;
-        race_early = 1;
+        race_open_link = ut_link;
         race_wrapper_ran = 0;
         logged_clear();
         errno = 0;
 
         fd = pqos_open(ut_link, O_WRONLY | O_CREAT, S_IRUSR | S_IWUSR);
-        error = errno;
 
-        race_link = NULL;
-        race_skip = 0;
-        race_early = 0;
-        if (race_wrapper_ran != 1) {
+        race_open_link = NULL;
+
+        /* a call that failed is a failure here, not an unsupported harness. The
+         * plant fires only after an open that succeeded, so a regression that
+         * makes pqos_open() fail leaves race_wrapper_ran clear, and judging the
+         * plant first would report that as "this C library does not route
+         * open() through the wrapper" and skip. The open is asserted first, and
+         * the descriptor is closed on the path that really is unsupported.
+         */
+        assert_true(fd >= 0);
+
+        /* -1 is the plant itself having failed - a symlink, unlink or write
+         * that did not happen - which is a broken setup rather than an
+         * unsupported harness. Skipping on it would turn a case that could not
+         * be set up into a case that passed.
+         */
+        assert_int_not_equal(race_wrapper_ran, -1);
+
+        if (race_wrapper_ran == 0) {
+                assert_int_equal(close(fd), 0);
                 unlink(ut_link);
                 unlink(ut_target);
                 skip();
         }
 
-        assert_int_equal(fd, -1);
-        assert_int_equal(error, ELOOP);
-        assert_non_null(strstr(logged, "is a symlink"));
-        assert_null(strstr(logged, "changed while"));
+        assert_int_equal(write(fd, written, strlen(written)),
+                         (int)strlen(written));
+        assert_int_equal(close(fd), 0);
 
-        /* and what the link points at was not touched */
+        /* nothing was said about a symlink, and the write reached the file this
+         * created rather than the one the link names
+         */
+        assert_null(strstr(logged, "is a symlink"));
+        assert_null(strstr(logged, "changed while"));
         ut_assert_contents(ut_target, "keep me\n");
 
         unlink(ut_link);
         assert_int_equal(unlink(ut_target), 0);
 }
 
-/* The window a deferred truncation opens after a create, which open() does not
- * have: O_EXCL made the file, so it was empty and there is nothing to truncate,
- * but the name is visible from the moment open() returns. Emptying it after
- * that would erase what another process wrote in between - data the create
- * open() performs in one step would have kept. The write lands on the second
- * lstat() of the name, the one that follows the open.
+/* A write that lands the moment after this created the file is kept. The
+ * truncation the caller asked for was part of the create - one open, on a file
+ * that did not exist yet - so there is nothing left to apply afterwards, and
+ * nothing that could erase what another process wrote once the name appeared.
+ *
+ * A deferred truncation is what would have that window, which is why this case
+ * exists: the write lands immediately after the open that created the file.
  */
 static void
 test_common_pqos_open_keeps_an_early_write(void **state __attribute__((unused)))
@@ -1527,25 +1575,38 @@ test_common_pqos_open_keeps_an_early_write(void **state __attribute__((unused)))
 
         unlink(ut_file);
 
-        race_link = ut_file;
+        race_open_link = ut_file;
         race_written = theirs;
-        race_skip = 1;
-        race_early = 1;
         race_wrapper_ran = 0;
         logged_clear();
 
         fd = pqos_open(ut_file, O_WRONLY | O_CREAT | O_TRUNC, 0600);
 
-        race_link = NULL;
+        race_open_link = NULL;
         race_written = NULL;
-        race_skip = 0;
-        race_early = 0;
-        if (race_wrapper_ran != 1) {
+
+        /* a call that failed is a failure here, not an unsupported harness. The
+         * plant fires only after an open that succeeded, so a regression that
+         * makes pqos_open() fail leaves race_wrapper_ran clear, and judging the
+         * plant first would report that as "this C library does not route
+         * open() through the wrapper" and skip. The open is asserted first, and
+         * the descriptor is closed on the path that really is unsupported.
+         */
+        assert_true(fd >= 0);
+
+        /* -1 is the plant itself having failed - a symlink, unlink or write
+         * that did not happen - which is a broken setup rather than an
+         * unsupported harness. Skipping on it would turn a case that could not
+         * be set up into a case that passed.
+         */
+        assert_int_not_equal(race_wrapper_ran, -1);
+
+        if (race_wrapper_ran == 0) {
+                assert_int_equal(close(fd), 0);
                 unlink(ut_file);
                 skip();
         }
 
-        assert_true(fd >= 0);
         assert_int_equal(close(fd), 0);
 
         /* what they wrote is still there: this call created the file, so it had
@@ -1619,35 +1680,14 @@ test_common_pqos_open_refuses_a_link_behind_a_slash(void **state
         assert_true(fd >= 0);
         assert_int_equal(close(fd), 0);
 
-        /* and the window the check used to leave open: the leaf is what gets
-         * opened now, so a link put there after the lstat() is refused by the
-         * O_NOFOLLOW on that open - a check of the leaf followed by an open of
-         * the name as written could only have been advisory
+        /* The window the leaf check used to leave open is gone rather than
+         * covered: pqos_open() takes the slashes off and opens the component
+         * that was named, once, so between deciding what to open and opening it
+         * there is nothing left to overtake. A case arming a plant here would
+         * have no call to fire on - the harness watches open(), and there is
+         * only the one - so what used to be raced is asserted above instead,
+         * with the link already at the name.
          */
-        assert_int_equal(rmdir(dir), 0);
-        assert_int_equal(mkdir(dir, S_IRWXU), 0);
-        race_target = work_dir;
-        race_link = dir;
-        race_regular = 0;
-        race_wrapper_ran = 0;
-        logged_clear();
-        errno = 0;
-
-        fd = pqos_open(dir_slashed, O_RDONLY | O_DIRECTORY, 0);
-        error = errno;
-
-        race_link = NULL;
-        if (race_wrapper_ran == 1) {
-                assert_int_equal(fd, -1);
-                assert_int_equal(error, ELOOP);
-                assert_non_null(strstr(logged, "is a symlink"));
-                unlink(dir);
-        } else {
-                if (fd >= 0)
-                        assert_int_equal(close(fd), 0);
-                rmdir(dir);
-        }
-
         assert_int_equal(unlink(ut_link), 0);
 #else
         skip();
@@ -1739,16 +1779,16 @@ main(void)
             cmocka_unit_test(test_common_pqos_open_refuses_a_dangling_symlink),
             cmocka_unit_test(
                 test_common_pqos_open_looping_parent_is_not_a_link),
-            cmocka_unit_test(test_common_pqos_open_refuses_a_late_symlink),
             cmocka_unit_test(
                 test_common_pqos_open_names_a_late_symlink_under_o_excl),
             cmocka_unit_test(
                 test_common_pqos_open_names_a_link_under_o_directory),
-            cmocka_unit_test(test_common_pqos_open_does_not_adopt_a_late_file),
+            cmocka_unit_test(test_common_pqos_open_opens_a_file_that_is_there),
+            cmocka_unit_test(test_common_pqos_open_passes_the_flags_as_given),
             cmocka_unit_test(
                 test_common_refuses_a_symlink_before_the_log_exists),
             cmocka_unit_test(test_common_names_a_symlink_the_same_way_in_both),
-            cmocka_unit_test(test_common_pqos_open_does_not_empty_a_late_file),
+            cmocka_unit_test(test_common_pqos_open_truncates_what_it_opened),
             cmocka_unit_test(
                 test_common_pqos_open_refuses_a_read_only_truncate),
             cmocka_unit_test(test_common_pqos_open_leaves_a_fifo_alone),
