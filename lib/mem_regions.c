@@ -66,9 +66,10 @@ struct cedt_window {
 /** One HMAT locality matrix, as parsed */
 struct hmat_matrix {
         uint8_t data_type;
-        /** how broadly the numbers apply: zero where they hold for any
-         *  transfer, otherwise one more than the minimum transfer size the
-         *  structure names, so that the broader statement sorts first
+        /** how broadly the numbers apply, as hmat_generality() computes it:
+         *  zero where they hold for any transfer, and otherwise larger the more
+         *  conditions the structure attaches, so that the broader statement
+         *  sorts first
          */
         unsigned qualifier;
         /** the structure attaches a condition to its numbers - a minimum
@@ -174,6 +175,10 @@ hmat_locality_usable(const struct acpi_hmat_entry *e)
  * which conditions the figure it printed came with.
  *
  * @param [in] m the structure
+ *
+ * The key is the number of conditions, in the high part, and the minimum
+ * transfer size in the low part - so any structure carrying fewer conditions
+ * sorts ahead of one carrying more, whatever sizes they name.
  *
  * @return its key, zero for a structure that qualifies nothing
  */
@@ -1812,10 +1817,12 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
                     ((uint64_t)mre->length_high << 32) | mre->length_low;
                 out->range[i].local_region_id = mre->local_region_id;
                 out->range[i].local_region_id_valid =
-                    (mre->region_id_flags & MRRM_VALID_LOCAL_REGION_ID) != 0;
+                    (mre->region_id_flags & PQOS_MRE_VALID_LOCAL_REGION_ID) !=
+                    0;
                 out->range[i].remote_region_id = mre->remote_region_id;
                 out->range[i].remote_region_id_valid =
-                    (mre->region_id_flags & MRRM_VALID_REMOTE_REGION_ID) != 0;
+                    (mre->region_id_flags & PQOS_MRE_VALID_REMOTE_REGION_ID) !=
+                    0;
         }
 
         /* then the regions, one per distinct local region ID. A range whose

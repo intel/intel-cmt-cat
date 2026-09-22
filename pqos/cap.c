@@ -660,22 +660,71 @@ cap_print_features(const struct pqos_sysconfig *sys, const int verbose)
  * the start. Such a range is reported as having no valid end rather than a
  * fabricated one.
  *
- * @param [in] range the range
+ * The library applies the same rule to the same table in range_last(), and the
+ * two are separate on purpose: this is the utility, which reads the library's
+ * public structures and does not share its internals, and exporting six lines
+ * of arithmetic as API to save repeating them would be the worse trade.
+ *
+ * @param [in] base start of the range
+ * @param [in] length its length
  * @param [out] last its last address
  *
  * @retval 1 the range has a representable last address
  * @retval 0 it does not
  */
 static int
-cap_range_last(const struct pqos_mem_range *range, uint64_t *last)
+cap_range_last(const uint64_t base, const uint64_t length, uint64_t *last)
 {
-        if (range->length == 0 ||
-            range->base_address > UINT64_MAX - (range->length - 1))
+        if (length == 0 || base > UINT64_MAX - (length - 1))
                 return 0;
 
-        *last = range->base_address + (range->length - 1);
+        *last = base + (length - 1);
 
         return 1;
+}
+
+/**
+ * @brief Prints one memory range entry
+ *
+ * Shared by the description the library builds and the fallback below it, so
+ * that a range reads the same either way.
+ *
+ * @param [in] index which entry it is, in table order
+ * @param [in] base start of the range
+ * @param [in] length its length
+ * @param [in] local_valid the platform marked the local region ID valid
+ * @param [in] local_id that ID
+ * @param [in] remote_valid the platform marked the remote region ID valid
+ * @param [in] remote_id that ID
+ */
+static void
+cap_print_range(const unsigned index,
+                const uint64_t base,
+                const uint64_t length,
+                const int local_valid,
+                const uint8_t local_id,
+                const int remote_valid,
+                const uint8_t remote_id)
+{
+        uint64_t last;
+
+        printf("  [%u]\n", index);
+        printf("    Base Address     : 0x%016" PRIx64 "\n", base);
+        printf("    Length           : 0x%016" PRIx64 "\n", length);
+        if (cap_range_last(base, length, &last))
+                printf("    End Address      : 0x%016" PRIx64 "\n", last);
+        else
+                printf("    End Address      : Not Valid\n");
+
+        if (local_valid)
+                printf("    Local Region ID  : 0x%x\n", local_id);
+        else
+                printf("    Local Region ID  : Not Valid\n");
+
+        if (remote_valid)
+                printf("    Remote Region ID : 0x%x\n", remote_id);
+        else
+                printf("    Remote Region ID : Not Valid\n");
 }
 
 /**
@@ -695,29 +744,10 @@ cap_print_raw_ranges(const struct pqos_mem_regions *regions)
 
         for (idx = 0; idx < regions->num_range_entries; idx++) {
                 const struct pqos_mem_range *r = &regions->range[idx];
-                uint64_t last;
 
-                printf("  [%u]\n", idx);
-                printf("    Base Address     : 0x%016" PRIx64 "\n",
-                       r->base_address);
-                printf("    Length           : 0x%016" PRIx64 "\n", r->length);
-                if (cap_range_last(r, &last))
-                        printf("    End Address      : 0x%016" PRIx64 "\n",
-                               last);
-                else
-                        printf("    End Address      : Not Valid\n");
-
-                if (r->local_region_id_valid)
-                        printf("    Local Region ID  : 0x%x\n",
-                               r->local_region_id);
-                else
-                        printf("    Local Region ID  : Not Valid\n");
-
-                if (r->remote_region_id_valid)
-                        printf("    Remote Region ID : 0x%x\n",
-                               r->remote_region_id);
-                else
-                        printf("    Remote Region ID : Not Valid\n");
+                cap_print_range(idx, r->base_address, r->length,
+                                r->local_region_id_valid, r->local_region_id,
+                                r->remote_region_id_valid, r->remote_region_id);
 
                 printf("\n");
         }
@@ -1000,7 +1030,7 @@ cap_print_region(const struct pqos_mem_regions *regions, const unsigned index)
                 const struct pqos_mem_range *r = &regions->range[idx];
                 uint64_t last;
 
-                if (cap_range_last(r, &last))
+                if (cap_range_last(r->base_address, r->length, &last))
                         printf("    [%u] 0x%016" PRIx64 " - 0x%016" PRIx64
                                ", Size: 0x%016" PRIx64 "\n",
                                idx, r->base_address, last, r->length);
@@ -1046,6 +1076,55 @@ cap_print_mem_region_info(const struct pqos_mem_regions *regions)
 }
 
 /**
+ * @brief Prints the ranges MRRM reported, where nothing else could be built
+ *
+ * The description the library builds from MRRM can fail to be built at all -
+ * there is memory to allocate for it - and MRRM itself is parsed by then, so
+ * its ranges are known. Printing them is better than printing nothing: the
+ * header's two answers and every range entry are exactly as available as they
+ * were, and what is missing - the grouping into regions, and everything the
+ * other tables would have said - is marked unavailable in the same words the
+ * described report uses, so the two have the same fields either way.
+ *
+ * @param [in] mrrm the ranges, as MRRM reported them
+ */
+static void
+cap_print_mrrm_ranges(const struct pqos_mrrm_info *mrrm)
+{
+        unsigned idx;
+
+        printf("\nMemory Region Discovery\n");
+        printf("-----------------------\n");
+        printf("Region ID Type       : %s\n",
+               mrrm->flags != 0 ? "Dynamic" : "Static");
+        printf("Regions Supported    : %u\n",
+               (unsigned)mrrm->max_memory_regions_supported);
+        printf("Total Local Regions  : Not Available\n");
+        printf("Total Range Entries  : %u\n", (unsigned)mrrm->num_mres);
+        printf("\n");
+
+        printf("Raw Memory Range Entries:\n");
+
+        for (idx = 0; idx < mrrm->num_mres; idx++) {
+                const struct pqos_mre_info *mre = &mrrm->mre[idx];
+                const uint64_t base = ((uint64_t)mre->base_address_high << 32) |
+                                      mre->base_address_low;
+                const uint64_t length =
+                    ((uint64_t)mre->length_high << 32) | mre->length_low;
+
+                cap_print_range(idx, base, length,
+                                (mre->region_id_flags &
+                                 PQOS_MRE_VALID_LOCAL_REGION_ID) != 0,
+                                mre->local_region_id,
+                                (mre->region_id_flags &
+                                 PQOS_MRE_VALID_REMOTE_REGION_ID) != 0,
+                                mre->remote_region_id);
+
+                printf("\n");
+        }
+}
+
+/**
  * @brief Print capabilities
  *
  * @param [in] cap system capability structure
@@ -1073,12 +1152,15 @@ cap_print_mem_regions(const struct pqos_sysconfig *sys)
 
         /* the regions, with what the ACPI tables say about them. Where those
          * tables could not be read the ranges MRRM reported are still listed,
-         * with the fields they would have filled marked unavailable
+         * with the fields they would have filled marked unavailable - and where
+         * even the description could not be allocated, the ranges are listed
+         * from MRRM directly, since a report of nothing at all would hide facts
+         * the library holds
          */
         if (sys->mem_regions != NULL)
                 cap_print_mem_region_info(sys->mem_regions);
         else
-                printf("Memory region information is not available\n");
+                cap_print_mrrm_ranges(sys->mrrm);
 }
 
 static void

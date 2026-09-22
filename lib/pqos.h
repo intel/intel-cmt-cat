@@ -692,6 +692,14 @@ struct pqos_erdt_info {
 /**
  * Memory Range Entry (MRE) Structure
  */
+/* Which of an MRE's two region IDs the platform has marked valid, for reading
+ * pqos_mre_info::region_id_flags below. Public because the field is: a caller
+ * given the raw flags and no way to interpret them has been given nothing, and
+ * one definition beside the field it decodes is one fewer to keep in step
+ */
+#define PQOS_MRE_VALID_LOCAL_REGION_ID  0x1
+#define PQOS_MRE_VALID_REMOTE_REGION_ID 0x2
+
 struct pqos_mre_info {
         uint32_t base_address_low;
         uint32_t base_address_high;
@@ -804,7 +812,12 @@ struct pqos_mem_region {
         uint8_t local_region_id;
         enum pqos_mem_region_type type;
         unsigned num_ranges;
-        unsigned *range_index; /**< indices into pqos_mem_regions::range */
+        /** indices into pqos_mem_regions::range. Allocated and released by the
+         *  library, valid until pqos_fini(), and to be read and not written:
+         *  the description is the library's copy of what the tables said, not a
+         *  buffer handed to the caller
+         */
+        unsigned *range_index;
         /** the lengths of the ranges add up to an address space size. Ranges
          *  that overlap, or that do not end at a representable address, or
          *  whose lengths leave the type when added, make them not - and a
@@ -881,6 +894,15 @@ struct pqos_mem_region {
 
 /**
  * The memory regions of the platform
+ *
+ * Owned by the library from end to end. The structure and the three arrays
+ * reachable through it - the ranges, the regions, and each region's list of
+ * range indices - are allocated while the library initialises, released by
+ * pqos_fini(), and replaced wholesale by a later pqos_init(). A caller reads
+ * them through the const pointer pqos_sysconfig_get() hands out and must not
+ * free them, keep them past pqos_fini(), or write through them: nothing here is
+ * a buffer provided for the caller's use, and the library reads these fields
+ * back when it prints or correlates.
  */
 struct pqos_mem_regions {
         /** Which of the correlating tables the platform had, and the library
@@ -906,8 +928,10 @@ struct pqos_mem_regions {
          */
         unsigned max_regions_supported;
         unsigned num_range_entries;
-        struct pqos_mem_range *range; /**< every MRRM range, in table order */
+        /** every MRRM range, in table order. Library-owned, as above */
+        struct pqos_mem_range *range;
         unsigned num_regions;
+        /** one per distinct local region ID. Library-owned, as above */
         struct pqos_mem_region *region;
 };
 
