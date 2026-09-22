@@ -730,6 +730,14 @@ $(BIN_DIR)/test_mrrm: test_mrrm.c $(LIB_OBJS)
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 
+$(BIN_DIR)/test_mem_regions: test_mem_regions.c $(LIB_OBJS)
+	mkdir -p $(BIN_DIR)
+	$(CC) $(CFLAGS) \
+		-Wl,--wrap=acpi_free -Wl,--wrap=acpi_get_sig \
+		-Wl,--wrap=pqos_file_exists -Wl,--wrap=pqos_dir_exists \
+		-Wl,--start-group \
+		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
+
 $(BIN_DIR)/test_erdt: test_erdt.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) \

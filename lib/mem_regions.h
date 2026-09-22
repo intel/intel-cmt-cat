@@ -281,18 +281,17 @@ struct __attribute__((__packed__)) acpi_cedt_cfmws {
  * Reads SRAT, HMAT and CEDT where they are present and correlates them with the
  * ranges in @a mrrm, grouping those ranges by local region ID.
  *
- * @param [in] mrrm the ranges to describe, as MRRM reported them
- * @param [out] regions structure to allocate and fill
- *
  * A table carrying no ranges is described successfully, as a structure with no
  * regions and no ranges: how region IDs are assigned and how many regions the
  * platform supports are still known, and they are what the report can state.
+ * A correlating table that is absent, or too damaged to walk, is not a failure
+ * either: it contributes nothing, and the regions are described without what it
+ * would have said - which is what the per-field match flags are for.
+ *
+ * @param [in] mrrm the ranges to describe, as MRRM reported them
+ * @param [out] regions structure to allocate and fill
  *
  * @return Operational status
- * A table that is absent, or too damaged to walk, is not a failure either: it
- * contributes nothing and the regions are described without what it would have
- * said, which is what the per-field match flags are for.
- *
  * @retval PQOS_RETVAL_OK success, including a table with no ranges in it and a
  *         correlating table that could not be read
  * @retval PQOS_RETVAL_RESOURCE out of memory
