@@ -1385,7 +1385,12 @@ locality_offer(struct locality_pick *pick,
         pick->min_transfer_qualified = m->min_transfer_qualified;
         pick->min_transfer_size = m->min_transfer_size;
         pick->non_sequential = m->non_sequential;
-        pick->value = value;
+        /* an answer that is not a number carries no number. The caller passes
+         * zero for one, so this is what it already held - written explicitly
+         * because the guarantee below, that a figure never outlives the flag
+         * that says it is one, should not rest on that
+         */
+        pick->value = has_value ? value : 0;
 }
 
 /**
@@ -1428,7 +1433,11 @@ locality_store(struct pqos_mem_locality *loc,
                const int valid,
                const struct locality_pick *pick)
 {
-        const uint64_t value = pick->value;
+        /* nothing of a figure survives the flag that says there is one: a
+         * caller reading a value without its valid flag gets a zero, not the
+         * last number some other structure happened to publish
+         */
+        const uint64_t value = valid ? pick->value : 0;
         const int sized = valid && pick->min_transfer_qualified;
         const uint8_t minimum = sized ? pick->min_transfer_size : 0;
         const int non_sequential = valid && pick->non_sequential;
