@@ -38,6 +38,7 @@
 #include "mem_regions.h"
 
 #include "acpi.h"
+#include "common.h"
 #include "log.h"
 #include "mrrm.h"
 #include "types.h"
@@ -96,9 +97,19 @@ struct acpi_facts {
 
         struct cedt_window *cedt;
         unsigned num_cedt;
+        /** every CXL window this platform has is in the array above: either the
+         *  table was walked from end to end, or there is no table to walk and
+         *  so no host bridge publishing windows. Clear where CEDT exists and
+         *  could not be read in full, which leaves windows unaccounted for
+         */
+        int cedt_known;
 
         struct hmat_matrix *hmat;
         unsigned num_hmat;
+        /** which revision of HMAT the matrices came from, since that decides
+         *  what their entries count
+         */
+        unsigned hmat_revision;
 
         /** HMAT proximity domain attributes, as initiator-target pairs */
         unsigned *hmat_initiator;
@@ -288,7 +299,7 @@ cedt_covers(const struct acpi_facts *facts,
  * @param [in] base start of the range
  * @param [in] length its length
  * @param [in] domain the proximity domain to ask about
- * @param [in] want_enabled 1 to rest the answer on entries firmware has
+ * @param [in] want_enabled 1 to base the answer on entries firmware has
  *             enabled, 0 on entries it has described and left disabled. Never
  *             both: memory that is there and memory that is not are different
  *             answers, and a range half of each is neither of them
@@ -341,25 +352,31 @@ srat_covers(const struct acpi_facts *facts,
 }
 
 /**
- * @brief The one proximity domain whose SRAT entries cover a range
+ * @brief The one proximity domain whose SRAT entries account for a range
  *
- * Coverage is asked of each domain that has an entry overlapping the range -
- * there are only as many candidates as there are overlapping entries - and the
- * search does not stop at the first that covers it. Two domains each covering
- * the whole range is a table contradicting itself, and answering with the one
- * that happens to come first would attach one domain's latency to the other's
- * memory on no better grounds than table order. So a second covering domain
- * withdraws the answer rather than losing to the first.
+ * Two questions, and both have to answer yes. One domain's entries must cover
+ * every address of the range, collectively, which is what srat_covers() asks.
+ * And no other domain may reach into it at all - not merely fail to cover it:
+ * an entry of a second domain over half the range makes those addresses belong
+ * to two domains at once, and reporting the covering domain's latency for the
+ * whole range would state a figure for memory the table says is somewhere else.
+ * Partial contradiction is still contradiction, so it withdraws the answer the
+ * same way a second covering domain does.
+ *
+ * Entries of the other status are not consulted for either question. A disabled
+ * placeholder overlapping enabled memory is firmware describing space it has
+ * not brought up, not two domains disagreeing, and it must not take the answer
+ * away.
  *
  * @param [in] facts the parsed tables
  * @param [in] base start of the range
  * @param [in] length its length
- * @param [in] want_enabled which entries the answer may rest on, as for
- *             srat_covers()
- * @param [out] domain the domain that covers it, where exactly one does
+ * @param [in] want_enabled which entries the answer may be based on, as
+ *             for srat_covers()
+ * @param [out] domain the domain that accounts for it, where one does
  *
- * @retval 1 one domain covers the range, and it is in domain
- * @retval 0 none does, or more than one does
+ * @retval 1 one domain accounts for the range alone, and it is in domain
+ * @retval 0 none does, or another domain reaches into it
  */
 static int
 srat_domain_of(const struct acpi_facts *facts,
@@ -372,12 +389,10 @@ srat_domain_of(const struct acpi_facts *facts,
         unsigned found = 0;
         int have = 0;
 
-        for (i = 0; i < facts->num_srat; i++) {
+        for (i = 0; i < facts->num_srat && !have; i++) {
                 const struct srat_range *e = &facts->srat[i];
 
                 if (e->enabled != want_enabled)
-                        continue;
-                if (have && e->proximity_domain == found)
                         continue;
                 if (!ranges_overlap(base, length, e->base, e->length))
                         continue;
@@ -385,21 +400,29 @@ srat_domain_of(const struct acpi_facts *facts,
                                  want_enabled))
                         continue;
 
-                if (have) {
-                        LOG_DEBUG("SRAT range 0x%llx covered by proximity "
-                                  "domains %u and %u both\n",
-                                  (unsigned long long)base, found,
-                                  e->proximity_domain);
-
-                        return 0;
-                }
-
                 found = e->proximity_domain;
                 have = 1;
         }
 
         if (!have)
                 return 0;
+
+        for (i = 0; i < facts->num_srat; i++) {
+                const struct srat_range *e = &facts->srat[i];
+
+                if (e->enabled != want_enabled)
+                        continue;
+                if (e->proximity_domain == found)
+                        continue;
+                if (!ranges_overlap(base, length, e->base, e->length))
+                        continue;
+
+                LOG_DEBUG("SRAT range 0x%llx is in proximity domain %u and "
+                          "domain %u reaches into it\n",
+                          (unsigned long long)base, found, e->proximity_domain);
+
+                return 0;
+        }
 
         *domain = found;
 
@@ -472,10 +495,40 @@ srat_parse(struct acpi_facts *facts)
 
                         return PQOS_RETVAL_OK;
                 }
-                if (e->type == ACPI_SRAT_TYPE_MEMORY_AFFINITY &&
-                    e->length >= sizeof(struct acpi_srat_memory))
+                /* a memory affinity entry shorter than a memory affinity
+                 * entry is the same malformation as one that overruns the
+                 * table: the bytes that should hold its addresses hold
+                 * something else, and skipping it would leave the answers drawn
+                 * from its neighbours standing. Other entry types are left
+                 * alone - their payloads are not read here, so their lengths
+                 * are not this module's business
+                 */
+                if (e->type == ACPI_SRAT_TYPE_MEMORY_AFFINITY) {
+                        if (e->length < sizeof(struct acpi_srat_memory)) {
+                                LOG_DEBUG("SRAT memory affinity entry of "
+                                          "length %u at offset %zd is too "
+                                          "short; ignoring SRAT\n",
+                                          e->length,
+                                          pos - facts->srat_tbl->generic);
+
+                                return PQOS_RETVAL_OK;
+                        }
+
                         count++;
+                }
                 pos += e->length;
+        }
+
+        /* and the walk has to end where the table does. Bytes left over are a
+         * structure the table declared room for and did not finish, so they are
+         * as unreadable as an overrunning one and the same answer applies
+         */
+        if (pos != end) {
+                LOG_DEBUG("SRAT has %zd byte(s) after its last entry; "
+                          "ignoring SRAT\n",
+                          end - pos);
+
+                return PQOS_RETVAL_OK;
         }
 
         if (count == 0)
@@ -609,10 +662,23 @@ cedt_parse(struct acpi_facts *facts)
         const uint8_t *pos;
         const uint8_t *end;
         unsigned count = 0;
+        int refused = 0;
 
         facts->cedt_tbl = acpi_get_sig(ACPI_TABLE_SIG_CEDT);
         if (facts->cedt_tbl == NULL) {
-                LOG_DEBUG("CEDT table not found\n");
+                /* No windows to correlate, and two different reasons for it. A
+                 * platform with no CEDT has no CXL host bridge to publish one,
+                 * so it has no CXL windows and a region without one is what
+                 * SRAT says it is. A CEDT that is there and cannot be read is
+                 * the other thing entirely: the platform has CXL, and which of
+                 * its ranges sit in windows is now unknown. Only the first lets
+                 * a region be called local memory, so the two are told apart by
+                 * whether the table exists to be read at all
+                 */
+                facts->cedt_known = !pqos_file_exists(ACPI_CEDT_TABLE);
+                LOG_DEBUG("CEDT table not %s\n",
+                          facts->cedt_known ? "present" : "readable");
+
                 return PQOS_RETVAL_OK;
         }
 
@@ -650,17 +716,33 @@ cedt_parse(struct acpi_facts *facts)
                         break;
                 }
                 if (e->type == ACPI_CEDT_TYPE_CFMWS) {
-                        if (cfmws_complete(e))
+                        if (cfmws_complete(e)) {
                                 count++;
-                        else
+                        } else {
+                                /* a window that cannot be read is a window
+                                 * whose addresses are unknown, so the windows
+                                 * are no longer all accounted for even though
+                                 * the walk will reach the end of the table
+                                 */
+                                refused = 1;
                                 LOG_DEBUG("CEDT: CXL window of length %u at "
                                           "offset %zd does not carry the "
                                           "interleave targets it declares\n",
                                           e->length,
                                           pos - facts->cedt_tbl->generic);
+                        }
                 }
                 pos += e->length;
         }
+
+        /* the walk reached the end of the table and read every window in it, so
+         * the windows counted are all the windows there are. A region no window
+         * covers can be called local memory on that basis; where this is clear
+         * - a structure that ended the walk, or a window whose own contents
+         * could not be read - it cannot, because the addresses of what was
+         * skipped are exactly what would have answered the question
+         */
+        facts->cedt_known = pos == end && !refused;
 
         if (count == 0)
                 return PQOS_RETVAL_OK;
@@ -692,7 +774,8 @@ cedt_parse(struct acpi_facts *facts)
                 pos += e->length;
         }
 
-        LOG_DEBUG("CEDT: %u CXL fixed memory window(s)\n", facts->num_cedt);
+        LOG_DEBUG("CEDT: %u CXL fixed memory window(s)%s\n", facts->num_cedt,
+                  facts->cedt_known ? "" : ", and more that could not be read");
 
         return PQOS_RETVAL_OK;
 }
@@ -732,6 +815,23 @@ hmat_parse(struct acpi_facts *facts)
                 return PQOS_RETVAL_OK;
         }
 
+        /* the one place a revision decides anything here, and it decides what
+         * the numbers mean rather than where they are. A revision whose units
+         * are not known contributes nothing: scaling its entries by another
+         * revision's rule would publish figures that are wrong by a factor
+         * rather than missing, and nothing in the table would show it
+         */
+        if (hmat->header.revision != ACPI_HMAT_REVISION_TENTHS &&
+            hmat->header.revision != ACPI_HMAT_REVISION_PICOSECONDS) {
+                LOG_DEBUG(
+                    "HMAT revision %u has no known units; ignoring HMAT\n",
+                    hmat->header.revision);
+
+                return PQOS_RETVAL_OK;
+        }
+
+        facts->hmat_revision = hmat->header.revision;
+
         end = facts->hmat_tbl->generic + hmat->header.length;
 
         /* A structure has to declare at least its own header. A length below
@@ -759,12 +859,47 @@ hmat_parse(struct acpi_facts *facts)
 
                         return PQOS_RETVAL_OK;
                 }
+                /* a structure of a type this module reads, declaring less
+                 * than that type needs, is malformed rather than skippable -
+                 * the same argument as the overrunning one above. A zero base
+                 * unit is different and is only the structure's own loss: the
+                 * structure is readable, it simply has no number in it, and the
+                 * matrices beside it are unaffected by dropping it
+                 */
                 if (e->type == ACPI_HMAT_TYPE_LOCALITY) {
+                        if (e->length < sizeof(struct acpi_hmat_locality)) {
+                                LOG_DEBUG("HMAT locality structure of length "
+                                          "%u at offset %zd is too short; "
+                                          "ignoring HMAT\n",
+                                          e->length,
+                                          pos - facts->hmat_tbl->generic);
+
+                                return PQOS_RETVAL_OK;
+                        }
                         if (hmat_locality_usable(e))
                                 matrices++;
-                } else if (e->type == ACPI_HMAT_TYPE_PROXIMITY_DOMAIN)
+                } else if (e->type == ACPI_HMAT_TYPE_PROXIMITY_DOMAIN) {
+                        if (e->length < ACPI_HMAT_PROXIMITY_MIN_LENGTH) {
+                                LOG_DEBUG("HMAT proximity structure of length "
+                                          "%u at offset %zd is too short; "
+                                          "ignoring HMAT\n",
+                                          e->length,
+                                          pos - facts->hmat_tbl->generic);
+
+                                return PQOS_RETVAL_OK;
+                        }
+
                         domains++;
+                }
                 pos += e->length;
+        }
+
+        if (pos != end) {
+                LOG_DEBUG("HMAT has %zd byte(s) after its last structure; "
+                          "ignoring HMAT\n",
+                          end - pos);
+
+                return PQOS_RETVAL_OK;
         }
 
         if (matrices > 0) {
@@ -936,6 +1071,12 @@ enum hmat_lookup {
  * The remainder term cannot overflow on its own: it is below the divisor, which
  * is a thousand at most, and the entry is a 16-bit number.
  *
+ * Rounded up, not truncated. A latency of a few hundred picoseconds is a real
+ * measurement and a nanosecond is the coarsest the report can state it in, so
+ * truncating would publish it as zero - and zero is what this module uses to
+ * mean "the platform has no number". Rounding up keeps every nonzero
+ * measurement nonzero, which is also what Linux publishes for these entries.
+ *
  * @param [in] raw the matrix entry
  * @param [in] base_unit the structure's base unit
  * @param [in] divisor what to divide by to reach the report's unit
@@ -964,7 +1105,7 @@ hmat_scale(const uint16_t raw,
                 return 0;
 
         scaled = whole * raw;
-        rest = (part * raw) / divisor;
+        rest = (part * raw + divisor - 1) / divisor;
         if (scaled > UINT64_MAX - rest)
                 return 0;
 
@@ -1066,7 +1207,7 @@ struct locality_pick {
 };
 
 /**
- * @brief Which of the four numbers a data type describes, and in what unit
+ * @brief Which of the four numbers a data type describes, and of what kind
  *
  * A generic access structure describes both directions of its kind, which is
  * what makes it the fallback: anything naming a direction is a more particular
@@ -1075,8 +1216,8 @@ struct locality_pick {
  * @param [in] data_type the structure's data type
  * @param [out] metrics the numbers it describes, at most two
  * @param [out] specific whether it names a direction
- * @param [out] divisor what an entry has to be divided by to reach the unit the
- *              report states
+ * @param [out] latency whether they are latencies rather than bandwidths, which
+ *              with the table's revision decides the unit
  *
  * @return how many of the four it describes, zero where it describes none
  */
@@ -1084,24 +1225,24 @@ static unsigned
 locality_metrics_of(const uint8_t data_type,
                     enum locality_metric metrics[2],
                     int *specific,
-                    uint64_t *divisor)
+                    int *latency)
 {
         *specific = 1;
-        *divisor = 1;
+        *latency = 0;
 
         switch (data_type) {
         case ACPI_HMAT_ACCESS_LATENCY:
                 *specific = 0;
-                *divisor = ACPI_HMAT_PS_PER_NS;
+                *latency = 1;
                 metrics[0] = LOCALITY_READ_LATENCY;
                 metrics[1] = LOCALITY_WRITE_LATENCY;
                 return 2;
         case ACPI_HMAT_READ_LATENCY:
-                *divisor = ACPI_HMAT_PS_PER_NS;
+                *latency = 1;
                 metrics[0] = LOCALITY_READ_LATENCY;
                 return 1;
         case ACPI_HMAT_WRITE_LATENCY:
-                *divisor = ACPI_HMAT_PS_PER_NS;
+                *latency = 1;
                 metrics[0] = LOCALITY_WRITE_LATENCY;
                 return 1;
         case ACPI_HMAT_ACCESS_BANDWIDTH:
@@ -1118,6 +1259,30 @@ locality_metrics_of(const uint8_t data_type,
         default:
                 return 0;
         }
+}
+
+/**
+ * @brief What an entry has to be divided by to reach the unit the report states
+ *
+ * Revision 1 published every metric in tenths of the structure's base unit, so
+ * both kinds are divided by ten. Revision 2 kept bandwidth in MB/s, which is
+ * the unit the report states, and moved latency to picoseconds, which is a
+ * thousand to the nanosecond. Nothing else in the module needs the revision,
+ * and a revision with no entry here never reaches this point - hmat_parse()
+ * drops the table instead.
+ *
+ * @param [in] revision the revision of the table the entry came from
+ * @param [in] latency whether the entry is a latency rather than a bandwidth
+ *
+ * @return the divisor
+ */
+static uint64_t
+hmat_divisor(const unsigned revision, const int latency)
+{
+        if (revision == ACPI_HMAT_REVISION_TENTHS)
+                return ACPI_HMAT_TENTHS_PER_UNIT;
+
+        return latency ? ACPI_HMAT_PS_PER_NS : 1;
 }
 
 /**
@@ -1323,16 +1488,18 @@ locality_fill(const struct acpi_facts *facts,
                 unsigned count;
                 unsigned k;
                 int specific = 0;
-                uint64_t divisor = 1;
+                int latency = 0;
                 uint64_t value = 0;
                 enum hmat_lookup answer;
 
                 count = locality_metrics_of(m->data_type, metrics, &specific,
-                                            &divisor);
+                                            &latency);
                 if (count == 0)
                         continue;
 
-                answer = hmat_value(m, initiator, target, divisor, &value);
+                answer = hmat_value(m, initiator, target,
+                                    hmat_divisor(facts->hmat_revision, latency),
+                                    &value);
                 if (answer == HMAT_LOOKUP_ABSENT)
                         continue;
 
@@ -1468,16 +1635,21 @@ region_describe(const struct acpi_facts *facts,
         region->cxl_range_match =
             covered == region->num_ranges && covered > 0 && !partly_covered;
 
-        /* a window covering the ranges makes the region CXL space. Calling it
-         * attached memory otherwise would be an inference from absence - CEDT
-         * may be missing, unreadable or describe only part of the platform - so
-         * that answer needs its own evidence, which is SRAT having the memory
-         * and having it enabled. With neither table saying anything, the type
-         * is unknown and the report says so.
+        /* A window covering the ranges makes the region CXL space. The other
+         * answer takes two things, because SRAT does not carry one of them:
+         * SRAT says the memory is there and which domain it is in, not what
+         * kind of memory it is - the CXL memory on a platform like this one is
+         * an enabled SRAT entry like any other. So calling a region local
+         * memory needs the knowledge that no CXL window covers it, and that is
+         * only knowledge where every window is accounted for: a CEDT walked to
+         * its end, or no CEDT at all, which is a platform with no host bridge
+         * to publish one. A CEDT that exists and could not be read in full
+         * leaves the question open, and the type is unknown rather than a guess
+         * in the direction of ordinary memory.
          */
         if (region->cedt_match)
                 region->type = PQOS_MEM_REGION_CXL;
-        else if (srat_domain_known && !srat_domain_mixed &&
+        else if (facts->cedt_known && srat_domain_known && !srat_domain_mixed &&
                  srat_enabled_ranges == region->num_ranges)
                 region->type = PQOS_MEM_REGION_LOCAL;
         else

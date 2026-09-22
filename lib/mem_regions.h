@@ -51,13 +51,22 @@
  * than wrong, which is why every correlated field carries its own "matched"
  * flag instead of a zero that cannot be told from a measurement.
  *
- * Revisions are deliberately not checked. What is read from each table are the
- * fields that have kept their place across revisions - SRAT's memory affinity
- * entry, HMAT's locality matrices and proximity attributes, CEDT's fixed memory
- * windows - and every read is bounded by the length the structure itself
- * declares. Gating on a revision number would refuse firmware that is newer
- * than this code and laid out exactly as it expects, which is the common case;
- * a structure that is genuinely not what it claims is caught by its length.
+ * Revisions are not checked to decide where a field is. What is read from each
+ * table are the fields that have kept their place across revisions - SRAT's
+ * memory affinity entry, HMAT's locality matrices and proximity attributes,
+ * CEDT's fixed memory windows - and every read is bounded by the length the
+ * structure itself declares. Gating on a revision number for layout would
+ * refuse firmware that is newer than this code and laid out exactly as it
+ * expects, which is the common case; a structure that is genuinely not what it
+ * claims is caught by its length.
+ *
+ * Units are the exception, and HMAT is where it bites: revision 1 published
+ * every locality metric in tenths of the structure's base unit and revision 2
+ * publishes latency in picoseconds and bandwidth in MB/s, with no change to
+ * where anything sits. A length check cannot catch that - the table is
+ * perfectly well formed and means something else - so the revision is read and
+ * a revision this module has no units for contributes nothing rather than
+ * numbers scaled by the wrong rule.
  */
 
 #ifndef __PQOS_MEM_REGIONS_H__
@@ -81,6 +90,12 @@ extern "C" {
 #ifndef ACPI_TABLE_SIG_CEDT
 #define ACPI_TABLE_SIG_CEDT "CEDT"
 #endif
+/* Where the table would be if the platform has one. Needed because a CEDT that
+ * is absent and a CEDT that cannot be read mean different things here: the
+ * first says the platform publishes no CXL windows, the second leaves its
+ * windows unknown
+ */
+#define ACPI_CEDT_TABLE (ACPI_TABLE_FS_PATH "/" ACPI_TABLE_SIG_CEDT)
 
 /* SRAT sub-table types */
 #define ACPI_SRAT_TYPE_MEMORY_AFFINITY 1
@@ -117,7 +132,19 @@ extern "C" {
  * the other way a structure can qualify what it publishes
  */
 #define ACPI_HMAT_NON_SEQUENTIAL_TRANSFERS 0x20
-/* A latency entry counts picoseconds and the report states nanoseconds */
+/* The revisions of HMAT whose units this module knows. Revision 1 published
+ * every metric in tenths of the structure's base unit; revision 2 changed
+ * latency to picoseconds and bandwidth to MB/s. The structures kept their
+ * layout across the two, so the fields are read the same way either way - but
+ * the numbers in them mean different things, which is why this one revision
+ * check exists where the rest of the module has none
+ */
+#define ACPI_HMAT_REVISION_TENTHS      1
+#define ACPI_HMAT_REVISION_PICOSECONDS 2
+#define ACPI_HMAT_TENTHS_PER_UNIT      10
+/* A revision 2 latency entry counts picoseconds and the report states
+ * nanoseconds
+ */
 #define ACPI_HMAT_PS_PER_NS 1000
 /* A matrix entry of 0xffff says no value is available for that pair, so it is
  * a sentinel and not a measurement to be scaled by the base unit
