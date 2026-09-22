@@ -49,6 +49,11 @@
 /** What this module allocated, so that fini can release it */
 static struct pqos_mem_regions *m_regions = NULL;
 
+/** How many distinct local region IDs an MRE can carry, the field being a byte.
+ *  A table of any length describes no more regions than this
+ */
+#define MEM_REGION_IDS (UINT8_MAX + 1)
+
 /** One SRAT memory affinity range, as parsed */
 struct srat_range {
         uint64_t base;
@@ -1857,10 +1862,14 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
                 return PQOS_RETVAL_OK;
         }
 
+        /* the ranges are one per table entry and can be allocated now; the
+         * regions are counted first, below, so that their array is the size of
+         * what is there rather than of the table
+         */
         out->range = calloc(mrrm->num_mres, sizeof(*out->range));
-        out->region = calloc(mrrm->num_mres, sizeof(*out->region));
-        if (out->range == NULL || out->region == NULL) {
+        if (out->range == NULL) {
                 regions_free(out);
+
                 return PQOS_RETVAL_RESOURCE;
         }
 
@@ -1889,13 +1898,55 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
          * local ID MRRM did not mark valid belongs to no region: it is a range
          * the platform described without saying which region carries it.
          *
-         * Two passes, because each region's index array is sized to the ranges
-         * that land in it rather than to the whole table. One pass would have
-         * to assume the worst for every region, and the worst is the whole
-         * table: a local region ID is a byte, so 256 regions each holding room
-         * for every range is 256 times the space the indices need, and a table
-         * with many entries turns that into megabytes to hold kilobytes.
+         * Counted before anything is allocated, and counted twice over: how
+         * many distinct region IDs there are, and then how many ranges land in
+         * each. Sizing either array by the length of the table would assume the
+         * worst for every entry, and the worst is not the table's length - a
+         * local region ID is a byte, so a table of thousands of ranges still
+         * describes at most 256 regions, and each region holds only its own
+         * ranges rather than room for all of them.
          */
+        {
+                unsigned char seen[MEM_REGION_IDS];
+                unsigned found = 0;
+
+                memset(seen, 0, sizeof(seen));
+
+                for (i = 0; i < mrrm->num_mres; i++) {
+                        const uint8_t id = out->range[i].local_region_id;
+
+                        if (!out->range[i].local_region_id_valid || seen[id])
+                                continue;
+
+                        seen[id] = 1;
+                        found++;
+                }
+
+                /* every range the platform declined to place in a region: there
+                 * is nothing to group, and the ranges themselves still stand
+                 */
+                if (found == 0) {
+                        if (facts_read(&facts, out) != PQOS_RETVAL_OK) {
+                                regions_free(out);
+
+                                return PQOS_RETVAL_RESOURCE;
+                        }
+
+                        facts_free(&facts);
+                        m_regions = out;
+                        *regions = out;
+
+                        return PQOS_RETVAL_OK;
+                }
+
+                out->region = calloc(found, sizeof(*out->region));
+                if (out->region == NULL) {
+                        regions_free(out);
+
+                        return PQOS_RETVAL_RESOURCE;
+                }
+        }
+
         for (i = 0; i < mrrm->num_mres; i++) {
                 if (!out->range[i].local_region_id_valid)
                         continue;
