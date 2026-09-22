@@ -134,6 +134,79 @@ struct acpi_facts {
 };
 
 /**
+ * @brief Whether a locality structure holds what it declares
+ *
+ * Its length has to cover the fixed part, the two domain lists it declares and
+ * the matrix those two dimensions imply. A structure that does not is
+ * unreadable in the same way as one too short for its fixed part, and under
+ * this module's all-or-unknown rule for HMAT it costs the whole table: a matrix
+ * nobody can read may be the direction-specific one that would have overridden
+ * a generic figure, so skipping it and keeping the rest publishes an answer the
+ * unread structure contradicts.
+ *
+ * Each dimension is checked against what the structure has room for before it
+ * is multiplied by anything, and the room left over is carried from one check
+ * to the next. Adding the parts up first and comparing the total would be the
+ * obvious way and the wrong one: two counts that each pass on their own can sum
+ * to something whose product leaves size_t where that type is 32 bits, and the
+ * wrapped total then passes the comparison it was meant to fail, after which
+ * the matrix pointers address memory the table does not own.
+ *
+ * @param [in] e the structure, already known to fit the table
+ * @param [out] lists how many bytes its two domain lists occupy, where it holds
+ *              them; may be NULL
+ *
+ * @retval 1 a locality structure whose declared contents are all there
+ * @retval 0 anything else
+ */
+static int
+hmat_locality_fits(const struct acpi_hmat_entry *e, size_t *lists)
+{
+        const struct acpi_hmat_locality *l =
+            (const struct acpi_hmat_locality *)e;
+        size_t payload;
+        size_t names;
+        size_t free_bytes;
+        size_t values;
+
+        if (e->type != ACPI_HMAT_TYPE_LOCALITY || e->length < sizeof(*l))
+                return 0;
+
+        payload = e->length - sizeof(*l);
+
+        /* one list at a time, each against the room that is still free, so
+         * that no sum and no product is formed before it has been bounded
+         */
+        if (l->num_initiators > payload / sizeof(uint32_t))
+                return 0;
+
+        names = (size_t)l->num_initiators * sizeof(uint32_t);
+
+        if (l->num_targets > (payload - names) / sizeof(uint32_t))
+                return 0;
+
+        names += (size_t)l->num_targets * sizeof(uint32_t);
+        free_bytes = payload - names;
+
+        /* and the matrix, whose dimensions are multiplied by each other as well
+         * as by a cell: divide the room by both before multiplying either
+         */
+        if (l->num_targets != 0 &&
+            l->num_initiators > free_bytes / sizeof(uint16_t) / l->num_targets)
+                return 0;
+
+        values = (size_t)l->num_initiators * (size_t)l->num_targets *
+                 sizeof(uint16_t);
+        if (values > free_bytes)
+                return 0;
+
+        if (lists != NULL)
+                *lists = names;
+
+        return 1;
+}
+
+/**
  * @brief Whether a locality structure can publish a number at all
  *
  * Its entries are counts of a base unit, so a base unit of zero - which ACPI
@@ -157,7 +230,7 @@ hmat_locality_usable(const struct acpi_hmat_entry *e)
         const struct acpi_hmat_locality *l =
             (const struct acpi_hmat_locality *)e;
 
-        if (e->type != ACPI_HMAT_TYPE_LOCALITY || e->length < sizeof(*l))
+        if (!hmat_locality_fits(e, NULL))
                 return 0;
 
         if (l->entry_base_unit == 0) {
@@ -702,18 +775,26 @@ cedt_parse(struct acpi_facts *facts)
 
         facts->cedt_tbl = acpi_get_sig(ACPI_TABLE_SIG_CEDT);
         if (facts->cedt_tbl == NULL) {
-                /* No windows to correlate, and two different reasons for it. A
+                /* No windows to correlate, and more than one reason for it. A
                  * platform with no CEDT has no CXL host bridge to publish one,
                  * so it has no CXL windows and a region without one is what
                  * SRAT says it is. A CEDT that is there and cannot be read is
                  * the other thing entirely: the platform has CXL, and which of
-                 * its ranges sit in windows is now unknown. Only the first lets
-                 * a region be called local memory, so the two are told apart by
-                 * whether the table exists to be read at all
+                 * its ranges sit in windows is now unknown.
+                 *
+                 * Only the first lets a region be called local memory, and the
+                 * two are told apart by whether the table is there - which is
+                 * only answerable where the kernel lists the tables. Without
+                 * that directory they are found by scanning physical memory,
+                 * and nothing coming back can as easily mean the scan failed to
+                 * map what it needed: there being no file to find is then not
+                 * evidence of anything, and the windows stay unknown
                  */
-                facts->cedt_known = !pqos_file_exists(ACPI_CEDT_TABLE);
-                LOG_DEBUG("CEDT table not %s\n",
-                          facts->cedt_known ? "present" : "readable");
+                facts->cedt_known = pqos_dir_exists(ACPI_TABLE_FS_PATH) &&
+                                    !pqos_file_exists(ACPI_CEDT_TABLE);
+                LOG_DEBUG("CEDT table not found, and %s\n",
+                          facts->cedt_known ? "the platform lists none"
+                                            : "whether it has one is unknown");
 
                 return PQOS_RETVAL_OK;
         }
@@ -907,9 +988,10 @@ hmat_parse(struct acpi_facts *facts)
                  * matrices beside it are unaffected by dropping it
                  */
                 if (e->type == ACPI_HMAT_TYPE_LOCALITY) {
-                        if (e->length < sizeof(struct acpi_hmat_locality)) {
+                        if (!hmat_locality_fits(e, NULL)) {
                                 LOG_DEBUG("HMAT locality structure of length "
-                                          "%u at offset %zd is too short; "
+                                          "%u at offset %zd does not hold the "
+                                          "domains and matrix it declares; "
                                           "ignoring HMAT\n",
                                           e->length,
                                           pos - facts->hmat_tbl->generic);
@@ -982,6 +1064,21 @@ hmat_parse(struct acpi_facts *facts)
                                 continue;
                         }
 
+                        /* and the memory domain is reserved the same way, in
+                         * revision 1. Revision 2 deprecated that bit and means
+                         * the field whether it is set or not, so the question
+                         * is asked of revision 1 alone - a pair built from a
+                         * reserved field invents a target, and every locality
+                         * figure reported for the region hangs off it
+                         */
+                        if (facts->hmat_revision == ACPI_HMAT_REVISION_TENTHS &&
+                            (p->flags & ACPI_HMAT_MEMORY_VALID) == 0) {
+                                LOG_DEBUG("HMAT revision 1 proximity structure "
+                                          "without a valid memory domain\n");
+                                pos += e->length;
+                                continue;
+                        }
+
                         facts->hmat_initiator[facts->num_hmat_domains] =
                             p->initiator_domain;
                         facts->hmat_target[facts->num_hmat_domains] =
@@ -991,9 +1088,7 @@ hmat_parse(struct acpi_facts *facts)
                            facts->num_hmat < matrices) {
                         const struct acpi_hmat_locality *l =
                             (const struct acpi_hmat_locality *)pos;
-                        size_t payload = e->length - sizeof(*l);
-                        size_t lists;
-                        size_t values;
+                        size_t lists = 0;
 
                         /* the cache levels are described by structures of the
                          * same type, and their numbers are not the memory's
@@ -1004,50 +1099,13 @@ hmat_parse(struct acpi_facts *facts)
                                 continue;
                         }
 
-                        /* Each dimension is checked against what the structure
-                         * has room for before it is multiplied by anything.
-                         * Adding the parts up first and comparing the total
-                         * would be the obvious way and the wrong one: two
-                         * counts near UINT32_MAX make that sum wrap in size_t
-                         * and pass, after which the matrix pointers below
-                         * address memory the table does not own.
+                        /* the dimensions and the matrix were checked before any
+                         * of this was counted - hmat_locality_fits(), which the
+                         * pass above required of every locality structure in
+                         * the table - so the offsets below are inside the
+                         * structure and there is no failure left to handle here
                          */
-                        if (l->num_initiators > payload / sizeof(uint32_t) ||
-                            l->num_targets > payload / sizeof(uint32_t)) {
-                                LOG_DEBUG("HMAT locality structure declares "
-                                          "more domains than it holds\n");
-                                pos += e->length;
-                                continue;
-                        }
-
-                        lists = ((size_t)l->num_initiators +
-                                 (size_t)l->num_targets) *
-                                sizeof(uint32_t);
-                        if (lists > payload) {
-                                LOG_DEBUG("HMAT locality structure shorter "
-                                          "than its domain lists\n");
-                                pos += e->length;
-                                continue;
-                        }
-
-                        if (l->num_targets != 0 &&
-                            l->num_initiators > (payload - lists) /
-                                                    sizeof(uint16_t) /
-                                                    l->num_targets) {
-                                LOG_DEBUG("HMAT locality structure shorter "
-                                          "than the matrix it declares\n");
-                                pos += e->length;
-                                continue;
-                        }
-
-                        values = (size_t)l->num_initiators *
-                                 (size_t)l->num_targets * sizeof(uint16_t);
-                        if (values > payload - lists) {
-                                LOG_DEBUG("HMAT locality structure shorter "
-                                          "than the matrix it declares\n");
-                                pos += e->length;
-                                continue;
-                        }
+                        hmat_locality_fits(e, &lists);
 
                         facts->hmat[facts->num_hmat].data_type = l->data_type;
                         facts->hmat[facts->num_hmat].min_transfer_qualified =
@@ -1187,7 +1245,16 @@ hmat_value(const struct hmat_matrix *m,
                 if (m->initiators[i] != initiator)
                         continue;
                 for (j = 0; j < m->num_targets; j++) {
-                        const uint16_t raw = m->values[i * m->num_targets + j];
+                        /* the index in the type that addresses the matrix,
+                         * not in the type of its dimensions. Both are 32-bit
+                         * and their product is what indexes, so a table whose
+                         * dimensions multiplied past the type would read
+                         * somewhere else entirely - the validation that let the
+                         * matrix be parsed keeps that out of reach, and the
+                         * arithmetic here should not depend on it
+                         */
+                        const size_t at = (size_t)i * m->num_targets + j;
+                        const uint16_t raw = m->values[at];
 
                         if (m->targets[j] != target)
                                 continue;

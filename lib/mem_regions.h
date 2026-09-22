@@ -106,6 +106,11 @@ extern "C" {
  * unless the table says it is valid, so a pair must not be built from it
  */
 #define ACPI_HMAT_INITIATOR_VALID 0x1
+/* And the same for the memory domain, in revision 1. Revision 2 deprecated the
+ * bit and means the field whether or not it is set, so requiring it there would
+ * refuse conformant tables - this one is asked of revision 1 alone
+ */
+#define ACPI_HMAT_MEMORY_VALID 0x2
 
 /* HMAT structure types */
 #define ACPI_HMAT_TYPE_PROXIMITY_DOMAIN 0
