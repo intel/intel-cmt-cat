@@ -965,8 +965,12 @@ struct pqos_sysconfig {
         struct pqos_cores_domains *cores_domains; /**< Cores to domains info */
         struct pqos_channels_domains *channels_domains; /**< Channels to domains
                                                            info */
-        /** Memory regions, with what SRAT, HMAT and CEDT say about them */
-        struct pqos_mem_regions *mem_regions;
+        /** Memory regions, with what SRAT, HMAT and CEDT say about them. A
+         *  pointer to const, the description being the library's own: it is
+         *  built while the library initialises and released by pqos_fini(),
+         *  and the library reads these same fields back when it reports
+         */
+        const struct pqos_mem_regions *mem_regions;
 };
 
 /**

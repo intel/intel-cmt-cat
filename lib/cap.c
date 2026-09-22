@@ -1181,6 +1181,10 @@ pqos_fini(void)
         m_sysconf.cpu = NULL;
         m_sysconf.dev = NULL;
         m_sysconf.cores_domains = NULL;
+        /* released by mem_regions_fini() above, so the pointer must not outlive
+         * it: the published contract is that nothing here survives pqos_fini()
+         */
+        m_sysconf.mem_regions = NULL;
 
         m_init_done = 0;
 
