@@ -842,8 +842,19 @@ cap_print_region_acpi(const struct pqos_mem_regions *regions,
                 printf("\n  CXL Windows:\n");
                 printf("    CFMWS Match       : %s\n",
                        region->cfmws_match ? "Yes" : "No");
-                printf("    CXL Range Match   : %s\n",
-                       region->cxl_range_match ? "Yes" : "No");
+                /* coverage proved is coverage, whatever else the table did:
+                 * the windows that answered yes were read. Not proved is only a
+                 * no where every window was accounted for - with some of them
+                 * unread, one of those could have closed the gap, so the answer
+                 * is unknown for the same reason the line above gives it
+                 */
+                printf("    CXL Range Match   : ");
+                if (region->cxl_range_match)
+                        printf("Yes\n");
+                else if (!regions->cedt_complete)
+                        printf("Unknown\n");
+                else
+                        printf("No\n");
                 /* Three counts, one line each, and all three wherever this
                  * block appears - which is wherever CEDT describes the region.
                  * A platform with no CXL window has no such block at all,

@@ -645,9 +645,18 @@ cfmws_ways(const uint8_t encoded, unsigned *ways)
  * on it - a window counted by the first and skipped by the second, or the other
  * way about, leaves the array the wrong length.
  *
+ * The addresses it declares have to be a range as well. A window of no size, or
+ * one whose base and size do not end at an address, describes nothing that can
+ * be compared with a region's ranges - every comparison below refuses it - so
+ * it would sit in the array contributing nothing while the count of windows
+ * said the platform's windows were all accounted for. That is the one way a
+ * window can be unusable without being short, and it is refused here for the
+ * same reason: what it would have covered is unknown, not empty.
+ *
  * @param [in] e the structure, already known to fit the table
  *
- * @retval 1 a CFMWS whose declared length covers its targets
+ * @retval 1 a CFMWS this module can use: long enough for its targets, and
+ *         declaring a range of addresses
  * @retval 0 anything else
  */
 static int
@@ -655,6 +664,7 @@ cfmws_complete(const struct acpi_cedt_entry *e)
 {
         const struct acpi_cedt_cfmws *w = (const struct acpi_cedt_cfmws *)e;
         unsigned ways = 0;
+        uint64_t last;
 
         if (e->type != ACPI_CEDT_TYPE_CFMWS || e->length < sizeof(*w))
                 return 0;
@@ -662,8 +672,10 @@ cfmws_complete(const struct acpi_cedt_entry *e)
         if (!cfmws_ways(w->encoded_interleave_ways, &ways))
                 return 0;
 
-        return (size_t)(e->length - sizeof(*w)) >=
-               (size_t)ways * sizeof(uint32_t);
+        if ((size_t)(e->length - sizeof(*w)) < (size_t)ways * sizeof(uint32_t))
+                return 0;
+
+        return range_last(w->base_hpa, w->window_size, &last);
 }
 
 /**
@@ -752,8 +764,10 @@ cedt_parse(struct acpi_facts *facts)
                                  */
                                 refused = 1;
                                 LOG_DEBUG("CEDT: CXL window of length %u at "
-                                          "offset %zd does not carry the "
-                                          "interleave targets it declares\n",
+                                          "offset %zd cannot be used - it "
+                                          "declares more interleave targets "
+                                          "than it carries, or no range of "
+                                          "addresses\n",
                                           e->length,
                                           pos - facts->cedt_tbl->generic);
                         }
