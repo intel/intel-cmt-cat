@@ -883,6 +883,21 @@ struct pqos_mem_region {
  * The memory regions of the platform
  */
 struct pqos_mem_regions {
+        /** Which of the correlating tables the platform had, and the library
+         *  was able to read and use. A flag that is clear means the report has
+         *  nothing to say about that table, which is not the same as the table
+         *  having nothing to say about a range: a match flag on a region below
+         *  is only the second answer, and only where the table was there
+         */
+        int srat_available;
+        int hmat_available;
+        int cedt_available;
+        /** every CXL window the platform declares was read. Clear where CEDT
+         *  was cut short or holds a window whose own contents could not be
+         *  read, which leaves addresses no window accounted for and is why a
+         *  region with no window match can still be of an unknown type
+         */
+        int cedt_complete;
         /** MRRM assigns region IDs dynamically rather than statically */
         int dynamic_region_ids;
         /** how many regions MRRM says the platform supports, which is a

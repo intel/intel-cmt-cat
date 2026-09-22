@@ -92,6 +92,16 @@ struct acpi_facts {
         struct acpi_table *hmat_tbl;
         struct acpi_table *cedt_tbl;
 
+        /** the table was there and what it says was read. Clear where it is
+         *  absent, or unreadable, or was dropped for being malformed or of a
+         *  revision whose units are unknown - in all of which the report has
+         *  nothing to say about the table rather than something to say about
+         *  the ranges, and those are different answers
+         */
+        int srat_read;
+        int hmat_read;
+        int cedt_read;
+
         struct srat_range *srat;
         unsigned num_srat;
 
@@ -531,8 +541,11 @@ srat_parse(struct acpi_facts *facts)
                 return PQOS_RETVAL_OK;
         }
 
-        if (count == 0)
+        if (count == 0) {
+                facts->srat_read = 1;
+
                 return PQOS_RETVAL_OK;
+        }
 
         facts->srat = calloc(count, sizeof(*facts->srat));
         if (facts->srat == NULL)
@@ -547,7 +560,7 @@ srat_parse(struct acpi_facts *facts)
                 if (e->length < sizeof(*e) || (size_t)(end - pos) < e->length)
                         break;
                 if (e->type != ACPI_SRAT_TYPE_MEMORY_AFFINITY ||
-                    e->length < sizeof(*m)) {
+                    e->length < sizeof(struct acpi_srat_memory)) {
                         pos += e->length;
                         continue;
                 }
@@ -569,6 +582,7 @@ srat_parse(struct acpi_facts *facts)
                 pos += e->length;
         }
 
+        facts->srat_read = 1;
         LOG_DEBUG("SRAT: %u memory affinity range(s)\n", facts->num_srat);
 
         return PQOS_RETVAL_OK;
@@ -687,6 +701,8 @@ cedt_parse(struct acpi_facts *facts)
                 LOG_DEBUG("CEDT table too short\n");
                 return PQOS_RETVAL_OK;
         }
+
+        facts->cedt_read = 1;
 
         end = facts->cedt_tbl->generic + hdr->length;
 
@@ -1039,6 +1055,7 @@ hmat_parse(struct acpi_facts *facts)
                 pos += e->length;
         }
 
+        facts->hmat_read = 1;
         LOG_DEBUG("HMAT: %u locality matrix/matrices, %u proximity pair(s)\n",
                   facts->num_hmat, facts->num_hmat_domains);
 
@@ -1409,7 +1426,7 @@ locality_store(struct pqos_mem_locality *loc,
         const uint64_t value = pick->value;
         const int sized = valid && pick->min_transfer_qualified;
         const uint8_t minimum = sized ? pick->min_transfer_size : 0;
-        const int sequential = valid && pick->non_sequential;
+        const int non_sequential = valid && pick->non_sequential;
 
         switch (metric) {
         case LOCALITY_READ_LATENCY:
@@ -1417,28 +1434,28 @@ locality_store(struct pqos_mem_locality *loc,
                 loc->read_latency_valid = valid;
                 loc->read_latency_min_transfer_qualified = sized;
                 loc->read_latency_min_transfer = minimum;
-                loc->read_latency_non_sequential = sequential;
+                loc->read_latency_non_sequential = non_sequential;
                 break;
         case LOCALITY_WRITE_LATENCY:
                 loc->write_latency_ns = value;
                 loc->write_latency_valid = valid;
                 loc->write_latency_min_transfer_qualified = sized;
                 loc->write_latency_min_transfer = minimum;
-                loc->write_latency_non_sequential = sequential;
+                loc->write_latency_non_sequential = non_sequential;
                 break;
         case LOCALITY_READ_BANDWIDTH:
                 loc->read_bandwidth_mbs = value;
                 loc->read_bandwidth_valid = valid;
                 loc->read_bandwidth_min_transfer_qualified = sized;
                 loc->read_bandwidth_min_transfer = minimum;
-                loc->read_bandwidth_non_sequential = sequential;
+                loc->read_bandwidth_non_sequential = non_sequential;
                 break;
         case LOCALITY_WRITE_BANDWIDTH:
                 loc->write_bandwidth_mbs = value;
                 loc->write_bandwidth_valid = valid;
                 loc->write_bandwidth_min_transfer_qualified = sized;
                 loc->write_bandwidth_min_transfer = minimum;
-                loc->write_bandwidth_non_sequential = sequential;
+                loc->write_bandwidth_non_sequential = non_sequential;
                 break;
         default:
                 break;
@@ -1944,6 +1961,11 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
 
                 return PQOS_RETVAL_RESOURCE;
         }
+
+        out->srat_available = facts.srat_read;
+        out->hmat_available = facts.hmat_read;
+        out->cedt_available = facts.cedt_read;
+        out->cedt_complete = facts.cedt_known;
 
         for (i = 0; i < out->num_regions; i++)
                 region_describe(&facts, out, &out->region[i]);

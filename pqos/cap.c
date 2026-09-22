@@ -730,24 +730,42 @@ cap_print_raw_ranges(const struct pqos_mem_regions *regions)
  * SRAT is three-valued for that reason: whether it describes a CXL window is up
  * to the platform, so no entry there is not the same answer as "no".
  *
+ * @param [in] regions the description the region came from, for what the
+ *             platform's tables were able to say at all
  * @param [in] region the region
  */
 static void
-cap_print_region_acpi(const struct pqos_mem_region *region)
+cap_print_region_acpi(const struct pqos_mem_regions *regions,
+                      const struct pqos_mem_region *region)
 {
         printf("  ACPI:\n");
+        /* three answers per table, not two. A table the platform does not have,
+         * or that could not be read, has said nothing about this region - which
+         * is not the same as having been read and not describing it, and a
+         * reader cannot tell those apart from a "No"
+         */
         printf("    SRAT Match        : ");
-        if (region->srat_match)
+        if (!regions->srat_available)
+                printf("Not Available\n");
+        else if (region->srat_match)
                 printf("Yes\n");
         else if (region->type == PQOS_MEM_REGION_CXL)
                 printf("Optional / Platform dependent\n");
         else
                 printf("No\n");
 
+        /* HMAT is asked about the target domain SRAT gives the region, so
+         * where SRAT gives none the table was never consulted and a "No" here
+         * would be the same unchecked absence as one about a table that is not
+         * there. The reason line below says which of the two it was
+         */
         printf("    HMAT Match        : %s\n",
-               region->hmat_match ? "Yes" : "No");
+               (!regions->hmat_available || !region->srat_match)
+                   ? "Not Available"
+                   : (region->hmat_match ? "Yes" : "No"));
         printf("    CEDT Match        : %s\n",
-               region->cedt_match ? "Yes" : "No");
+               !regions->cedt_available ? "Not Available"
+                                        : (region->cedt_match ? "Yes" : "No"));
 
         printf("\n  Proximity:\n");
         if (region->proximity_valid) {
@@ -856,10 +874,13 @@ cap_print_locality_value(const struct pqos_mem_locality *loc,
 /**
  * @brief Prints the HMAT numbers of one region
  *
+ * @param [in] regions the description the region came from, for what the
+ *             platform's tables were able to say at all
  * @param [in] region the region
  */
 static void
-cap_print_region_locality(const struct pqos_mem_region *region)
+cap_print_region_locality(const struct pqos_mem_regions *regions,
+                          const struct pqos_mem_region *region)
 {
         const struct pqos_mem_locality *loc = &region->locality;
 
@@ -900,19 +921,27 @@ cap_print_region_locality(const struct pqos_mem_region *region)
                  * these tables answer.
                  *
                  * The order is the order the lookup happens in, so that each
-                 * line reports the step that actually stopped. Without an SRAT
-                 * target domain nothing was asked of HMAT at all, and saying
-                 * "no HMAT entry" there would assert an absence that was never
-                 * checked. With a target and no initiator paired with it, the
-                 * pair does not exist to be looked up. And where the pair is
-                 * described, a value marked unavailable is the platform saying
-                 * it has no number, a value that will not scale is a number
-                 * this report cannot state, and neither is the same as no
-                 * matrix carrying the pair.
+                 * line reports the step that actually stopped. A table the
+                 * platform does not have, or that could not be read, comes
+                 * first of all: saying "no entry" about a table nothing looked
+                 * in would assert an absence that was never checked, and so
+                 * would saying it about HMAT when SRAT never produced a target
+                 * domain to look up. With a target and no initiator paired with
+                 * it, the pair does not exist to be looked up. And where the
+                 * pair is described, a value marked unavailable is the platform
+                 * saying it has no number, a value that will not scale is a
+                 * number this report cannot state, and neither is the same as
+                 * no matrix carrying the pair.
                  */
-                if (!region->srat_match)
+                if (!regions->srat_available)
+                        printf("SRAT is not available, so these ranges have no "
+                               "proximity domain to look up\n");
+                else if (!region->srat_match)
                         printf("SRAT gives these ranges no proximity domain to "
                                "look up\n");
+                else if (!regions->hmat_available)
+                        printf("HMAT is not available, so the target domain "
+                               "has no locality to look up\n");
                 else if (!region->hmat_match)
                         printf("No HMAT entry pairs an initiator with target "
                                "domain %u\n",
@@ -982,8 +1011,8 @@ cap_print_region(const struct pqos_mem_regions *regions, const unsigned index)
         }
 
         printf("\n");
-        cap_print_region_acpi(region);
-        cap_print_region_locality(region);
+        cap_print_region_acpi(regions, region);
+        cap_print_region_locality(regions, region);
         printf("\n");
 }
 
