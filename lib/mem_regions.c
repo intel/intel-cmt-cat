@@ -1744,6 +1744,44 @@ facts_free(struct acpi_facts *facts)
 }
 
 /**
+ * @brief Reads the three correlating tables, and says which of them answered
+ *
+ * The flags are set whether or not there is anything to correlate: which tables
+ * the platform has is a fact about the platform, and a caller told nothing
+ * about them cannot tell an absent table from one that described no range of
+ * theirs.
+ *
+ * @param [out] facts what the tables contributed
+ * @param [out] regions the description to record their availability in
+ *
+ * @return Operational status
+ * @retval PQOS_RETVAL_OK the tables were read, or are not there
+ * @retval PQOS_RETVAL_RESOURCE out of memory
+ */
+static int
+facts_read(struct acpi_facts *facts, struct pqos_mem_regions *regions)
+{
+        memset(facts, 0, sizeof(*facts));
+
+        if (srat_parse(facts) != PQOS_RETVAL_OK ||
+            hmat_parse(facts) != PQOS_RETVAL_OK ||
+            cedt_parse(facts) != PQOS_RETVAL_OK) {
+                LOG_ERROR("Could not allocate memory to describe the memory "
+                          "regions\n");
+                facts_free(facts);
+
+                return PQOS_RETVAL_RESOURCE;
+        }
+
+        regions->srat_available = facts->srat_read;
+        regions->hmat_available = facts->hmat_read;
+        regions->cedt_available = facts->cedt_read;
+        regions->cedt_complete = facts->cedt_known;
+
+        return PQOS_RETVAL_OK;
+}
+
+/**
  * @brief Releases a region structure
  *
  * @param [in] regions the structure to release
@@ -1788,9 +1826,22 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
          * how region IDs are assigned and how many regions the platform
          * supports, and those are the two things the report can still state.
          * Refusing here left the caller with nothing at all, so the report said
-         * no information was available about a table that had been read
+         * no information was available about a table that had been read.
+         *
+         * The correlating tables are still looked for, with nothing to
+         * correlate them against, because whether the platform has them is a
+         * fact about the platform: leaving the flags clear would say it has
+         * none, which is a different statement from having no ranges for them
+         * to describe
          */
         if (mrrm->num_mres == 0) {
+                if (facts_read(&facts, out) != PQOS_RETVAL_OK) {
+                        regions_free(out);
+
+                        return PQOS_RETVAL_RESOURCE;
+                }
+
+                facts_free(&facts);
                 *regions = out;
                 m_regions = out;
 
@@ -1957,22 +2008,11 @@ mem_regions_init(const struct pqos_mrrm_info *mrrm,
                 region->total_size = region->total_size_valid ? total : 0;
         }
 
-        memset(&facts, 0, sizeof(facts));
-        if (srat_parse(&facts) != PQOS_RETVAL_OK ||
-            hmat_parse(&facts) != PQOS_RETVAL_OK ||
-            cedt_parse(&facts) != PQOS_RETVAL_OK) {
-                LOG_ERROR("Could not allocate memory to describe the memory "
-                          "regions\n");
-                facts_free(&facts);
+        if (facts_read(&facts, out) != PQOS_RETVAL_OK) {
                 regions_free(out);
 
                 return PQOS_RETVAL_RESOURCE;
         }
-
-        out->srat_available = facts.srat_read;
-        out->hmat_available = facts.hmat_read;
-        out->cedt_available = facts.cedt_read;
-        out->cedt_complete = facts.cedt_known;
 
         for (i = 0; i < out->num_regions; i++)
                 region_describe(&facts, out, &out->region[i]);

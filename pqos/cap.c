@@ -784,15 +784,20 @@ cap_print_region_acpi(const struct pqos_mem_regions *regions,
         else
                 printf("No\n");
 
-        /* HMAT is asked about the target domain SRAT gives the region, so
-         * where SRAT gives none the table was never consulted and a "No" here
-         * would be the same unchecked absence as one about a table that is not
-         * there. The reason line below says which of the two it was
+        /* Three ways not to match, and they are different statements. The
+         * table may not be there to read - "Not Available", as for SRAT above.
+         * It may be there and never have been asked, because HMAT is asked
+         * about the target domain SRAT gives the region and SRAT gave none -
+         * "Not Consulted", which is not the table's silence but the absence of
+         * a question. Or it may have been asked and had no entry - "No".
          */
-        printf("    HMAT Match        : %s\n",
-               (!regions->hmat_available || !region->srat_match)
-                   ? "Not Available"
-                   : (region->hmat_match ? "Yes" : "No"));
+        printf("    HMAT Match        : ");
+        if (!regions->hmat_available)
+                printf("Not Available\n");
+        else if (!region->srat_match)
+                printf("Not Consulted\n");
+        else
+                printf("%s\n", region->hmat_match ? "Yes" : "No");
         printf("    CEDT Match        : %s\n",
                !regions->cedt_available ? "Not Available"
                                         : (region->cedt_match ? "Yes" : "No"));
