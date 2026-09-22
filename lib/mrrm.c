@@ -185,10 +185,17 @@ mrrm_populate(struct pqos_mrrm_info **mrrm_info,
                 mre_count++;
         }
 
-        if (mre_count == 0) {
-                LOG_ERROR("MRRM table contains no MRE structures\n");
-                return PQOS_RETVAL_ERROR;
-        }
+        /* A table with no MRE structures is not an error. It still says how
+         * many memory regions the platform supports and how their IDs are
+         * assigned, which is what the header carries, and the MMIO interface
+         * addresses regions by ID rather than by address - so the only thing
+         * missing is the mapping from addresses to regions, and the only caller
+         * that wants it is the report, which says it has none. Refusing here
+         * failed pqos_init() outright and took the two answers the table does
+         * give down with it.
+         */
+        if (mre_count == 0)
+                LOG_INFO("MRRM table maps no memory ranges\n");
 
         p_mrrm_info = calloc(1, sizeof(*p_mrrm_info));
         if (p_mrrm_info == NULL) {
