@@ -798,9 +798,25 @@ cap_print_region_acpi(const struct pqos_mem_regions *regions,
                 printf("Not Consulted\n");
         else
                 printf("%s\n", region->hmat_match ? "Yes" : "No");
-        printf("    CEDT Match        : %s\n",
-               !regions->cedt_available ? "Not Available"
-                                        : (region->cedt_match ? "Yes" : "No"));
+        /* Four answers here, for the same reason the line above has three. A
+         * window overlapping the ranges is "Yes" whatever else the table did,
+         * since a window that was read cannot be taken back by one that was
+         * not. Without one, "No" needs every window to have been accounted for:
+         * where the table was cut short, or holds a window whose own contents
+         * could not be read, the addresses that window would have declared are
+         * exactly the ones in question, so the answer is "Unknown" - the same
+         * reasoning that leaves such a region's type unknown. SRAT and HMAT
+         * need no such answer: they are dropped whole or kept whole
+         */
+        printf("    CEDT Match        : ");
+        if (region->cedt_match)
+                printf("Yes\n");
+        else if (!regions->cedt_available)
+                printf("Not Available\n");
+        else if (!regions->cedt_complete)
+                printf("Unknown\n");
+        else
+                printf("No\n");
 
         printf("\n  Proximity:\n");
         if (region->proximity_valid) {
