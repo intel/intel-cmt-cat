@@ -999,8 +999,13 @@ cap_print_region_locality(const struct pqos_mem_regions *regions,
                         printf("SRAT is not available, so these ranges have no "
                                "proximity domain to look up\n");
                 else if (!region->srat_match)
-                        printf("SRAT gives these ranges no proximity domain to "
-                               "look up\n");
+                        /* one domain, covering every address, is what a target
+                         * is: SRAT describing part of the region, or describing
+                         * it from two domains, is not "no domain" and the line
+                         * does not say so
+                         */
+                        printf("SRAT does not place these ranges in a single "
+                               "proximity domain\n");
                 else if (!regions->hmat_available)
                         printf("HMAT is not available, so the target domain "
                                "has no locality to look up\n");
@@ -1042,10 +1047,14 @@ cap_print_region(const struct pqos_mem_regions *regions, const unsigned index)
                 printf("DDR / Local Memory\n");
                 break;
         default:
-                /* no table described these ranges well enough to say. Printing
-                 * one of the two above would be a guess dressed as a finding
+                /* no table placed these ranges well enough to say. Printing one
+                 * of the two above would be a guess dressed as a finding - and
+                 * the line does not say the tables are silent, because they may
+                 * have described the region in part, or from two domains, or
+                 * have windows nobody could read. Which of those it was, the
+                 * match lines above report one table at a time
                  */
-                printf("Unknown - not described by SRAT or CEDT\n");
+                printf("Unknown - the tables do not place these ranges\n");
                 break;
         }
         printf("  Local Region ID    : 0x%x\n", region->local_region_id);
