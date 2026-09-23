@@ -2094,7 +2094,8 @@ static const struct {
                               {"--dump", &sel_dump},
                               {"--dump-rmid-regs", &sel_dump_rmid_regs},
                               {"--print-io-devs", &sel_print_io_devs},
-                              {"--print-io-dev", &sel_print_io_dev}};
+                              {"--print-io-dev", &sel_print_io_dev},
+                              {"--enum-hybrid-cores", &sel_enum_hybrid_cores}};
 
 /**
  * @brief Refuse a command line that both prints and allocates
