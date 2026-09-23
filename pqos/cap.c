@@ -1037,7 +1037,12 @@ cap_print_region(const struct pqos_mem_regions *regions, const unsigned index)
         const struct pqos_mem_region *region = &regions->region[index];
         unsigned i;
 
-        printf("\nREGION %u:\n", index);
+        /* the region's own ID, not where it sits in the array: the platform
+         * numbers its regions and need not number them from zero without gaps,
+         * and a header counting blocks would read REGION 1 above a Local Region
+         * ID of 0x7. The two lines say the same thing on purpose
+         */
+        printf("\nREGION %u:\n", region->local_region_id);
         printf("  Type               : ");
         switch (region->type) {
         case PQOS_MEM_REGION_CXL:
