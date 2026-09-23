@@ -480,6 +480,7 @@ $(BIN_DIR)/test_hybrid: test_hybrid.c $(LIB_OBJS)
 	mkdir -p $(BIN_DIR)
 	$(CC) $(CFLAGS) $(WRAP) \
 		-Wl,--wrap=sched_getaffinity \
+		-Wl,--wrap=sched_setaffinity \
 		-Wl,--start-group \
 		$(LDFLAGS) $(LIB_OBJS) $< -Wl,--end-group -o $@
 

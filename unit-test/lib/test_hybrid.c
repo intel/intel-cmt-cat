@@ -34,6 +34,7 @@
 #include "test.h"
 
 #ifdef __linux__
+#include <errno.h>
 #include <sched.h>
 #endif
 
@@ -51,12 +52,39 @@ struct cpuid_data {
 };
 
 #ifdef __linux__
+/* Size the kernel insists on, and the smallest buffer it has accepted. The
+ * kernel compares sched_getaffinity()'s buffer with its own cpumask, which
+ * follows the processors it was configured for, and answers EINVAL for anything
+ * smaller. Zero means "accept any size", which is what every case that is not
+ * about the mask wants.
+ */
+static size_t g_kernel_set_size;
+static size_t g_accepted_set_size;
+
 int
 __wrap_sched_getaffinity(pid_t pid, size_t cpusetsize, cpu_set_t *mask)
 {
         (void)pid;
+        if (g_kernel_set_size != 0 && cpusetsize < g_kernel_set_size) {
+                errno = EINVAL;
+                return -1;
+        }
+        g_accepted_set_size = cpusetsize;
         CPU_ZERO_S(cpusetsize, mask);
         CPU_SET_S(0, cpusetsize, mask);
+        return 0;
+}
+
+int
+__wrap_sched_setaffinity(pid_t pid, size_t cpusetsize, const cpu_set_t *mask)
+{
+        /* the cases are about which processors are enumerated and with what
+         * mask, not about this thread really moving, and a real pin would make
+         * the result depend on the machine the tests run on
+         */
+        (void)pid;
+        (void)cpusetsize;
+        (void)mask;
         return 0;
 }
 #endif
@@ -225,6 +253,37 @@ test_discover_skips_inaccessible_topology_cpus(void **state)
 }
 #endif
 
+#ifdef __linux__
+static void
+test_discover_grows_the_affinity_mask(void **state)
+{
+        const size_t size =
+            sizeof(struct pqos_cpuinfo) + sizeof(struct pqos_coreinfo);
+        struct pqos_cpuinfo *cpu = calloc(1, size);
+        struct pqos_hybrid_capabilities *cap = NULL;
+
+        assert_non_null(cpu);
+        cpu->num_cores = 1;
+        cpu->cores[0].lcore = 0;
+
+        /* a kernel configured for 512 processors with one of them online: the
+         * mask the topology implies is far too small, and the old sizing made
+         * hybrid discovery - and so pqos_init() - fail here before a single
+         * CPUID had been executed
+         */
+        g_kernel_set_size = CPU_ALLOC_SIZE(512);
+        g_accepted_set_size = 0;
+        assert_int_equal(hybrid_cap_discover(&cap, cpu), PQOS_RETVAL_OK);
+        assert_non_null(cap);
+        assert_true(g_accepted_set_size >= g_kernel_set_size);
+        g_kernel_set_size = 0;
+
+        free(cap);
+        free(cpu);
+        (void)state;
+}
+#endif
+
 static void
 test_non_hybrid_is_not_a_hybrid_capability(void **state)
 {
@@ -248,6 +307,9 @@ main(void)
             cmocka_unit_test(test_resource_priority_support),
 #ifdef __linux__
             cmocka_unit_test(test_discover_skips_inaccessible_topology_cpus),
+#ifdef __linux__
+            cmocka_unit_test(test_discover_grows_the_affinity_mask),
+#endif
 #endif
             cmocka_unit_test(test_non_hybrid_is_not_a_hybrid_capability)};
 

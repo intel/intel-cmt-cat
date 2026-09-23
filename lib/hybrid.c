@@ -39,6 +39,7 @@
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #ifdef __FreeBSD__
 #include <sys/cpuset.h>
 
@@ -56,9 +57,18 @@ typedef cpuset_t cpu_set_t;
 #define CPUID_ASYM_MONITORING 0x27U
 #define CPUID_ASYM_ALLOCATION 0x28U
 
-#define HYBRID_BIT          (1U << 15)
-#define RDT_MONITORING_BIT  (1U << 12)
-#define RDT_ALLOCATION_BIT  (1U << 15)
+#define HYBRID_BIT         (1U << 15)
+#define RDT_MONITORING_BIT (1U << 12)
+#define RDT_ALLOCATION_BIT (1U << 15)
+/* Highest number of processors an affinity mask is grown to represent. The
+ * kernel's own cpumask follows the CPUs it was configured for, which no
+ * interface reports directly, so the mask is grown until the kernel accepts it
+ * - and something has to stop that walk on a kernel that refuses for another
+ * reason. 65536 bits is 8 KB, past any CONFIG_NR_CPUS in use and cheap enough
+ * to allocate once
+ */
+#define AFFINITY_MAX_CORES (1U << 16)
+
 #define ASYM_MONITORING_BIT (1U << 0)
 #define ASYM_ALLOCATION_BIT (1U << 1)
 #define MON_RESOURCE_MASK   (1U << 1)
@@ -505,6 +515,90 @@ get_affinity_mask(cpu_set_t *set, unsigned max_cores)
 }
 
 /**
+ * @brief Number of processors an affinity mask has to represent
+ *
+ * The kernel compares the buffer it is handed with its own cpumask, whose size
+ * follows the processors the kernel was *configured* for and not the ones that
+ * are online: sched_getaffinity() answers EINVAL for anything smaller. A count
+ * taken from the topology is therefore too small on a machine whose highest
+ * configured processors are offline, and hybrid discovery would fail there
+ * before a single CPUID was executed.
+ *
+ * So the count starts at the larger of the topology's highest processor and the
+ * number the C library reports as configured. Neither is the kernel's cpumask
+ * size - nothing exports it - which is why the caller grows the mask when even
+ * this is refused.
+ *
+ * @param [in] topology_cores processors the topology accounts for
+ *
+ * @return Number of processors to size the first mask for
+ */
+static unsigned
+affinity_mask_cores(unsigned topology_cores)
+{
+        long configured = sysconf(_SC_NPROCESSORS_CONF);
+
+        if (configured > 0 && (unsigned long)configured > topology_cores &&
+            (unsigned long)configured <= AFFINITY_MAX_CORES)
+                return (unsigned)configured;
+
+        return topology_cores;
+}
+
+/**
+ * @brief Reads the current affinity into a mask the kernel accepts
+ *
+ * Allocates the mask, and grows it while the kernel refuses the size with
+ * EINVAL: that is the one failure a larger buffer can answer, and the size it
+ * would accept is not reported anywhere. Any other error is the caller's to
+ * report, and so is a mask that has grown past what any kernel configures.
+ *
+ * @param [out] set mask the caller owns on success, and frees with CPU_FREE
+ * @param [in,out] cores processors to size the mask for, updated to the count
+ *                 the accepted mask represents
+ *
+ * @return Operation status
+ * @retval PQOS_RETVAL_OK mask read
+ * @retval PQOS_RETVAL_RESOURCE out of memory
+ * @retval PQOS_RETVAL_UNAVAILABLE the affinity could not be read
+ */
+static int
+read_affinity_mask(cpu_set_t **set, unsigned *cores)
+{
+        unsigned bits = *cores;
+
+        for (;;) {
+                cpu_set_t *mask = CPU_ALLOC(bits);
+
+                if (mask == NULL) {
+                        LOG_ERROR("Unable to allocate CPU affinity mask\n");
+                        return PQOS_RETVAL_RESOURCE;
+                }
+                CPU_ZERO_S(CPU_ALLOC_SIZE(bits), mask);
+                /* cleared so that the EINVAL below is this call's own: a
+                 * platform with no affinity interface answers -1 without
+                 * touching errno, and a stale EINVAL would grow the mask to
+                 * the bound for nothing
+                 */
+                errno = 0;
+                if (get_affinity_mask(mask, bits) == 0) {
+                        *set = mask;
+                        *cores = bits;
+                        return PQOS_RETVAL_OK;
+                }
+                CPU_FREE(mask);
+
+                if (errno != EINVAL || bits > AFFINITY_MAX_CORES / 2) {
+                        LOG_ERROR("Unable to retrieve CPU affinity for %u "
+                                  "processors: %s\n",
+                                  bits, strerror(errno));
+                        return PQOS_RETVAL_UNAVAILABLE;
+                }
+                bits *= 2;
+        }
+}
+
+/**
  * @brief Reads hybrid capabilities on one logical processor
  *
  * The original affinity mask is restored before returning.
@@ -578,18 +672,19 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
         size =
             sizeof(*hybrid) + (size_t)cpu->num_cores * sizeof(hybrid->cores[0]);
         hybrid = calloc(1, size);
-        original = CPU_ALLOC(max_cores);
-        if (hybrid == NULL || original == NULL) {
+        if (hybrid == NULL) {
                 ret = PQOS_RETVAL_RESOURCE;
                 goto error;
         }
-        CPU_ZERO_S(CPU_ALLOC_SIZE(max_cores), original);
-        if (get_affinity_mask(original, max_cores) != 0) {
-                LOG_ERROR("Unable to retrieve CPU affinity: %s\n",
-                          strerror(errno));
-                ret = PQOS_RETVAL_UNAVAILABLE;
+
+        /* the topology says which processors to enumerate; how wide the mask
+         * has to be is a question for the kernel, and the two differ wherever a
+         * configured processor is offline
+         */
+        max_cores = affinity_mask_cores(max_cores);
+        ret = read_affinity_mask(&original, &max_cores);
+        if (ret != PQOS_RETVAL_OK)
                 goto error;
-        }
 
         hybrid->mem_size = size;
         hybrid->status = PQOS_HYBRID_STATUS_YES;
