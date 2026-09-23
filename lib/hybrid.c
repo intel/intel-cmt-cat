@@ -658,6 +658,28 @@ hybrid_cap_discover(struct pqos_hybrid_capabilities **cap,
         if (cap == NULL || cpu == NULL || cpu->num_cores == 0)
                 return PQOS_RETVAL_PARAM;
         *cap = NULL;
+
+        /* CPUID.07H:EDX[15] and the leaves 27H and 28H are Intel definitions.
+         * Another vendor is free to use that bit and those leaf numbers for
+         * something else, and reserved bits are exactly what a vendor
+         * repurposes - so a processor this does not recognise is reported with
+         * an unknown status instead of having its CPUID read as though the
+         * Intel meaning applied. The requirement asks for that answer where the
+         * status cannot be determined reliably.
+         */
+        if (cpu->vendor != PQOS_VENDOR_INTEL) {
+                hybrid = calloc(1, sizeof(*hybrid));
+                if (hybrid == NULL)
+                        return PQOS_RETVAL_RESOURCE;
+                hybrid->mem_size = sizeof(*hybrid);
+                hybrid->status = PQOS_HYBRID_STATUS_UNKNOWN;
+                hybrid->num_cores = 0;
+                LOG_INFO("Asymmetric RDT enumeration is defined for Intel "
+                         "processors, so the hybrid status of this one is "
+                         "unknown\n");
+                *cap = hybrid;
+                return PQOS_RETVAL_OK;
+        }
         for (i = 0; i < cpu->num_cores; i++) {
                 if (cpu->cores[i].lcore == UINT_MAX) {
                         LOG_ERROR("Logical core identifier is too large\n");

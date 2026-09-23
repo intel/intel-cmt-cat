@@ -245,6 +245,10 @@ test_discover_skips_inaccessible_topology_cpus(void **state)
         assert_non_null(cpu);
         cpu->num_cores = 1;
         cpu->cores[0].lcore = 1;
+        /* the vendor is named because discovery is gated on it: the leaves this
+         * reads are Intel definitions
+         */
+        cpu->vendor = PQOS_VENDOR_INTEL;
         assert_int_equal(hybrid_cap_discover(&cap, cpu),
                          PQOS_RETVAL_UNAVAILABLE);
         assert_null(cap);
@@ -265,6 +269,7 @@ test_discover_grows_the_affinity_mask(void **state)
         assert_non_null(cpu);
         cpu->num_cores = 1;
         cpu->cores[0].lcore = 0;
+        cpu->vendor = PQOS_VENDOR_INTEL;
 
         /* a kernel configured for 512 processors with one of them online: the
          * mask the topology implies is far too small, and the old sizing made
@@ -283,6 +288,33 @@ test_discover_grows_the_affinity_mask(void **state)
         (void)state;
 }
 #endif
+
+static void
+test_discover_leaves_a_foreign_vendor_unknown(void **state)
+{
+        const size_t size =
+            sizeof(struct pqos_cpuinfo) + sizeof(struct pqos_coreinfo);
+        struct pqos_cpuinfo *cpu = calloc(1, size);
+        struct pqos_hybrid_capabilities *cap = NULL;
+
+        assert_non_null(cpu);
+        cpu->num_cores = 1;
+        cpu->cores[0].lcore = 0;
+        cpu->vendor = PQOS_VENDOR_AMD;
+
+        /* the hybrid bit and the two leaves are Intel definitions, so nothing
+         * is read here and the status says so rather than claiming the
+         * processor is not hybrid
+         */
+        assert_int_equal(hybrid_cap_discover(&cap, cpu), PQOS_RETVAL_OK);
+        assert_non_null(cap);
+        assert_int_equal(cap->status, PQOS_HYBRID_STATUS_UNKNOWN);
+        assert_int_equal(cap->num_cores, 0);
+
+        free(cap);
+        free(cpu);
+        (void)state;
+}
 
 static void
 test_non_hybrid_is_not_a_hybrid_capability(void **state)
@@ -307,6 +339,7 @@ main(void)
             cmocka_unit_test(test_resource_priority_support),
 #ifdef __linux__
             cmocka_unit_test(test_discover_skips_inaccessible_topology_cpus),
+            cmocka_unit_test(test_discover_leaves_a_foreign_vendor_unknown),
 #ifdef __linux__
             cmocka_unit_test(test_discover_grows_the_affinity_mask),
 #endif
