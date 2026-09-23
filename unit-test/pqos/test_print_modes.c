@@ -255,6 +255,14 @@ test_print_io_dev_is_a_print_mode(void **state)
         assert_mode_refuses_an_allocation(&sel_print_io_dev, "--print-io-dev");
 }
 
+static void
+test_enum_hybrid_cores_is_a_print_mode(void **state)
+{
+        UNUSED_ARG(state);
+        assert_mode_refuses_an_allocation(&sel_enum_hybrid_cores,
+                                          "--enum-hybrid-cores");
+}
+
 /* ======== the mode whose output moved ======== */
 
 /* -H used to print the profiles where the option was parsed, which is what put
@@ -309,6 +317,7 @@ main(void)
             cmocka_unit_test(test_dump_rmid_regs_is_a_print_mode),
             cmocka_unit_test(test_print_io_devs_is_a_print_mode),
             cmocka_unit_test(test_print_io_dev_is_a_print_mode),
+            cmocka_unit_test(test_enum_hybrid_cores_is_a_print_mode),
             /* last: the selection it leaves behind is the first of the list */
             cmocka_unit_test(test_profile_list_alone_prints_the_profiles)};
 
