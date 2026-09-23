@@ -110,12 +110,54 @@ test_enum_cores_uses_sysconfig_capability(void **state)
         (void)state;
 }
 
+static void
+test_enum_cores_rejects_a_list_on_a_non_hybrid_processor(void **state)
+{
+        const size_t cap_size =
+            sizeof(struct pqos_cap) + sizeof(struct pqos_capability);
+        const size_t hybrid_size = sizeof(struct pqos_hybrid_capabilities);
+        struct pqos_hybrid_capabilities *hybrid = calloc(1, hybrid_size);
+        struct pqos_cap *cap = calloc(1, cap_size);
+        struct pqos_sysconfig sys = {0};
+
+        assert_non_null(hybrid);
+        assert_non_null(cap);
+        hybrid->mem_size = hybrid_size;
+        hybrid->status = PQOS_HYBRID_STATUS_NO;
+        hybrid->num_cores = 0;
+
+        cap->mem_size = cap_size;
+        cap->num_cap = 1;
+        cap->capabilities[0].type = PQOS_CAP_TYPE_HYBRID;
+        cap->capabilities[0].u.hybrid = hybrid;
+        sys.cap = cap;
+
+        /* a malformed list is a command line error whatever the processor is,
+         * and this path used to report success for it: the platform was judged
+         * first and the list never looked at
+         */
+        assert_int_equal(hybrid_enum_cores(&sys, "0,,1"), -1);
+        assert_int_equal(hybrid_enum_cores(&sys, "4-2"), -1);
+
+        /* a well formed list on a processor that has no asymmetric capability
+         * is not an error, and says so
+         */
+        assert_int_equal(hybrid_enum_cores(&sys, "0-3"), 0);
+        assert_int_equal(hybrid_enum_cores(&sys, NULL), 0);
+
+        free(cap);
+        free(hybrid);
+        (void)state;
+}
+
 int
 main(void)
 {
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_parse_core_list),
-            cmocka_unit_test(test_enum_cores_uses_sysconfig_capability)};
+            cmocka_unit_test(test_enum_cores_uses_sysconfig_capability),
+            cmocka_unit_test(
+                test_enum_cores_rejects_a_list_on_a_non_hybrid_processor)};
 
         return cmocka_run_group_tests(tests, NULL, NULL);
 }

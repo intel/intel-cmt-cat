@@ -541,16 +541,24 @@ hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection)
                 return -1;
         }
         hybrid_print_status(sys);
-        if (cap->status != PQOS_HYBRID_STATUS_YES) {
-                printf("Asymmetric RDT capability enumeration is not "
-                       "available on this processor.\n");
-                return 0;
-        }
+
+        /* the selection is judged before the processor is: a malformed list is
+         * a command line error whatever the platform, and a non-hybrid one used
+         * to report success for it, which is the silent acceptance of an
+         * invalid selection the requirements forbid
+         */
         if (selection != NULL && hybrid_parse_core_list(selection, &selected,
                                                         &selected_count) != 0) {
                 fprintf(stderr, "Invalid logical processor list: %s\n",
                         selection);
                 return -1;
+        }
+
+        if (cap->status != PQOS_HYBRID_STATUS_YES) {
+                printf("Asymmetric RDT capability enumeration is not "
+                       "available on this processor.\n");
+                free(selected);
+                return 0;
         }
 
         if (selection == NULL) {
