@@ -337,12 +337,14 @@ main(void)
             cmocka_unit_test(test_cap_read_decodes_asymmetric_leaves),
             cmocka_unit_test(test_compare_ignores_reserved_and_reports_cbm),
             cmocka_unit_test(test_resource_priority_support),
-#ifdef __linux__
-            cmocka_unit_test(test_discover_skips_inaccessible_topology_cpus),
+            /* the vendor gate answers before any affinity call, so this one
+             * runs wherever the tests are built; the two below need the
+             * wrapped Linux syscalls
+             */
             cmocka_unit_test(test_discover_leaves_a_foreign_vendor_unknown),
 #ifdef __linux__
+            cmocka_unit_test(test_discover_skips_inaccessible_topology_cpus),
             cmocka_unit_test(test_discover_grows_the_affinity_mask),
-#endif
 #endif
             cmocka_unit_test(test_non_hybrid_is_not_a_hybrid_capability)};
 
