@@ -915,7 +915,6 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                                                   PQOS_INTER_OS
 #endif
         };
-        int log_owned = 0;
         int ret = PQOS_RETVAL_RESOURCE;
         unsigned i;
 
@@ -923,12 +922,11 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                 return PQOS_RETVAL_PARAM;
         *cap = NULL;
 
-        /* One discovery at a time in this process. Not for the topology, which
-         * each call now owns, but for the log below: a second caller would see
-         * the temporary log as initialized, take no ownership of it, and then
-         * find it gone when the first caller released it - and a DEBUG build
-         * asserts on that. Serializing the whole call is cheaper to reason
-         * about than reference counting a global, and this is not a hot path.
+        /* One discovery at a time in this process: not for the topology, which
+         * each call now owns, but because the rest of this path reads state the
+         * library's initialization also writes, and this call deliberately runs
+         * outside the API lock - taking that lock would need write access to
+         * /var/lock, and reading CPUID needs no privileges at all.
          */
         if (pthread_mutex_lock(&discover_mutex) != 0)
                 return PQOS_RETVAL_ERROR;
@@ -936,18 +934,18 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
         /* Every path below this reports what it found through the library log,
          * and log_printf() asserts that the log has been initialized - which it
          * has not, since this function exists to be called before pqos_init().
-         * A caller that has a log keeps it and sees those messages; for one
-         * that has none a silent log is brought up for the duration, so the
-         * calls are safe and nothing is written to a destination the caller
-         * never chose. What such a caller learns is the status returned, which
-         * is what the documentation promises it.
+         * Holding the log covers both callers: one that has a log keeps it and
+         * sees those messages, and for one that has none a silent log is
+         * brought up for the duration, so the calls are safe and nothing is
+         * written to a destination the caller never chose. The hold is what
+         * makes that safe against another thread's pqos_init() or pqos_fini(),
+         * which install and remove the same process-wide log under a different
+         * lock - see log_hold(). What a caller without a log learns is the
+         * status returned, which is what the documentation promises it.
          */
-        if (!log_is_initialized()) {
-                if (log_init(-1, NULL, NULL, LOG_VER_SILENT) != LOG_RETVAL_OK) {
-                        pthread_mutex_unlock(&discover_mutex);
-                        return PQOS_RETVAL_ERROR;
-                }
-                log_owned = 1;
+        if (log_hold() != LOG_RETVAL_OK) {
+                pthread_mutex_unlock(&discover_mutex);
+                return PQOS_RETVAL_ERROR;
         }
 
         for (i = 0; i < DIM(topologies); i++) {
@@ -971,8 +969,7 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                 LOG_ERROR("CPU topology could not be read, so the hybrid "
                           "capabilities of this platform are unknown\n");
 
-        if (log_owned)
-                log_fini();
+        log_release();
         pthread_mutex_unlock(&discover_mutex);
 
         return ret;

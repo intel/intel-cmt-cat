@@ -120,10 +120,48 @@ log_init(int fd_log,
 /**
  * @brief Shuts down PQoS log module
  *
+ * Deferred while the log is held: see log_hold().
+ *
  * @return Operation status
  * @retval LOG_RETVAL_OK on success
  */
 PQOS_LOCAL int log_fini(void);
+
+/**
+ * @brief Keeps the log usable for a path that may run before pqos_init()
+ *
+ * The log is one object per process and the library's initialization is not the
+ * only thing that installs it. A read-only path - pqos_hybrid_discover() is the
+ * one - may be called before pqos_init(), with no log of its own, and still has
+ * to report what it found; and it may equally be called while an application's
+ * log is installed, or while another thread is installing or removing one.
+ *
+ * Between this call and log_release(), whichever of those the caller met is
+ * what its messages go to, and it is still there:
+ *
+ * - with no log installed, a silent one is brought up for the duration, so that
+ *   log_printf() may be called and nothing is written to a destination the
+ *   caller never chose. log_release() removes it again - unless pqos_init() has
+ *   installed the application's log meanwhile, which is then left alone.
+ * - with a log already installed, it is used and not replaced, and a log_fini()
+ *   arriving from pqos_fini() is deferred until the last holder releases it.
+ *   Without that, the next message of this path would have nowhere to go, and a
+ *   DEBUG build would assert on it.
+ *
+ * Nesting is counted, so concurrent holders are safe.
+ *
+ * @return Operation status
+ * @retval LOG_RETVAL_OK on success
+ */
+PQOS_LOCAL int log_hold(void);
+
+/**
+ * @brief Symmetric operation to \a log_hold
+ *
+ * @return Operation status
+ * @retval LOG_RETVAL_OK on success
+ */
+PQOS_LOCAL int log_release(void);
 
 /**
  * @brief PQoS log function

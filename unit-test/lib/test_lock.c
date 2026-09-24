@@ -57,12 +57,47 @@
 
 /* ======== mocks ======== */
 
+int __real_pthread_mutex_init(pthread_mutex_t *restrict mutex,
+                              const pthread_mutexattr_t *restrict attr);
+int __real_pthread_mutex_destroy(pthread_mutex_t *mutex);
+int __real_pthread_mutex_lock(pthread_mutex_t *mutex);
+int __real_pthread_mutex_unlock(pthread_mutex_t *mutex);
+
+/**
+ * lock.c is not the only module here that takes a mutex - log.c takes one of
+ * its own around the log's state - and --wrap applies to the whole binary, so
+ * those calls arrive in the mocks below as well. The harness installs a silent
+ * log from a constructor, which is before cmocka can answer a mocked call at
+ * all, so a call from anywhere but lock.c goes to the real implementation.
+ *
+ * The mocks are live for the duration of the group, where the only mutex calls
+ * made are lock.c's: the cases call nothing else, and lock.c does not log.
+ */
+static int g_mutexes_mocked;
+
+static int
+mock_the_mutexes(void **state)
+{
+        (void)state;
+        g_mutexes_mocked = 1;
+        return 0;
+}
+
+static int
+stop_mocking_the_mutexes(void **state)
+{
+        (void)state;
+        g_mutexes_mocked = 0;
+        return 0;
+}
+
 int
 __wrap_pthread_mutex_init(pthread_mutex_t *restrict mutex,
-                          const pthread_mutexattr_t *restrict attr
-                          __attribute__((unused)))
+                          const pthread_mutexattr_t *restrict attr)
 {
         assert_non_null(mutex);
+        if (!g_mutexes_mocked)
+                return __real_pthread_mutex_init(mutex, attr);
         function_called();
         return mock();
 }
@@ -71,6 +106,8 @@ int
 __wrap_pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
         assert_non_null(mutex);
+        if (!g_mutexes_mocked)
+                return __real_pthread_mutex_destroy(mutex);
         function_called();
         return mock();
 }
@@ -79,6 +116,8 @@ int
 __wrap_pthread_mutex_lock(pthread_mutex_t *mutex)
 {
         assert_non_null(mutex);
+        if (!g_mutexes_mocked)
+                return __real_pthread_mutex_lock(mutex);
         function_called();
         return mock();
 }
@@ -87,6 +126,8 @@ int
 __wrap_pthread_mutex_unlock(pthread_mutex_t *mutex)
 {
         assert_non_null(mutex);
+        if (!g_mutexes_mocked)
+                return __real_pthread_mutex_unlock(mutex);
         function_called();
         return mock();
 }
@@ -546,5 +587,6 @@ main(void)
             cmocka_unit_test(test_lock_opens_close_on_exec),
         };
 
-        return cmocka_run_group_tests(tests, NULL, NULL);
+        return cmocka_run_group_tests(tests, mock_the_mutexes,
+                                      stop_mocking_the_mutexes);
 }
