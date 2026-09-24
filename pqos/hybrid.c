@@ -275,15 +275,24 @@ get_hybrid_cap(const struct pqos_sysconfig *sys)
         return item->u.hybrid;
 }
 
-void
-hybrid_print_status(const struct pqos_sysconfig *sys)
+/**
+ * @brief Prints the hybrid status line of a capability
+ *
+ * @param [in] cap capability to report, NULL being an unknown status
+ */
+static void
+print_status(const struct pqos_hybrid_capabilities *cap)
 {
-        const struct pqos_hybrid_capabilities *cap = get_hybrid_cap(sys);
-
         printf("Hybrid Processor: %s\n",
                cap == NULL || cap->status == PQOS_HYBRID_STATUS_UNKNOWN
                    ? "Unknown"
                    : (cap->status == PQOS_HYBRID_STATUS_YES ? "Yes" : "No"));
+}
+
+void
+hybrid_print_status(const struct pqos_sysconfig *sys)
+{
+        print_status(get_hybrid_cap(sys));
 }
 
 /**
@@ -532,9 +541,9 @@ find_core(const struct pqos_hybrid_capabilities *cap, unsigned lcore)
 }
 
 int
-hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection)
+hybrid_enum_cores(const struct pqos_hybrid_capabilities *cap,
+                  const char *selection)
 {
-        const struct pqos_hybrid_capabilities *cap = get_hybrid_cap(sys);
         unsigned *selected = NULL;
         unsigned selected_count = 0, i;
         int ret = 0;
@@ -544,7 +553,7 @@ hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection)
                         "Hybrid processor capability is not available\n");
                 return -1;
         }
-        hybrid_print_status(sys);
+        print_status(cap);
 
         /* the selection is judged before the processor is: a malformed list is
          * a command line error whatever the platform, and a non-hybrid one used

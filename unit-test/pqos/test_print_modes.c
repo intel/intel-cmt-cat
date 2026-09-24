@@ -69,6 +69,48 @@
 #include <cmocka.h>
 /* clang-format on */
 
+/** What the library was asked to do, so a case can require that it was not
+ *  asked to initialize an interface
+ */
+static unsigned g_init_calls;
+static unsigned g_discover_calls;
+static struct pqos_hybrid_capabilities g_hybrid;
+
+int
+__wrap_pqos_init(const struct pqos_config *config)
+{
+        UNUSED_ARG(config);
+        g_init_calls++;
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_pqos_fini(void)
+{
+        return PQOS_RETVAL_OK;
+}
+
+int
+__wrap_pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
+{
+        g_discover_calls++;
+        if (cap == NULL)
+                return PQOS_RETVAL_PARAM;
+
+        memset(&g_hybrid, 0, sizeof(g_hybrid));
+        g_hybrid.mem_size = sizeof(g_hybrid);
+        g_hybrid.status = PQOS_HYBRID_STATUS_NO;
+        g_hybrid.num_cores = 0;
+        *cap = &g_hybrid;
+        return PQOS_RETVAL_OK;
+}
+
+void
+__wrap_pqos_hybrid_free(struct pqos_hybrid_capabilities *cap)
+{
+        UNUSED_ARG(cap);
+}
+
 /** What the allocation side of the question answers, NULL for nothing asked */
 static const char *test_allocating;
 
@@ -132,6 +174,18 @@ run_pqos(int *ret, int argc, ...)
         sel_mon_reset = 0;
         sel_display = 0;
         sel_show_allocation_config = 0;
+        /* and the allocation side answers nothing, or a case that ran earlier
+         * would decide what this command line is refused for
+         */
+        test_allocating = NULL;
+        /* the interface constraint is remembered too, and a second selection is
+         * refused as such - so a case naming one has to start from none named
+         */
+        iface_constraint_mask = IFACE_ANY;
+        iface_constraint_origin = NULL;
+        user_interface_set = 0;
+        sel_interface_selected = 0;
+        sel_interface = PQOS_INTER_AUTO;
 
         argv[0] = strdup("pqos");
         assert_non_null(argv[0]);
@@ -410,6 +464,46 @@ test_the_command_line_refuses_a_mon_reset_with_the_enumeration(void **state)
         assert_true(output_has_text("-r/--mon-reset given with it"));
 }
 
+/* ======== the enumeration does not initialize an interface ======== */
+
+/**
+ * @brief Check that the enumeration reads CPUID and initializes nothing
+ *
+ * The capabilities it reports are CPUID's answer, so the requirement is that
+ * the mode works whichever interface is selected and programs nothing on the
+ * way - which is only true if the library is never initialized for it.
+ *
+ * @param [in] iface the interface selection to pass, NULL for none
+ */
+static void
+assert_enumeration_initializes_nothing(const char *iface)
+{
+        int ret = EXIT_FAILURE;
+
+        g_init_calls = 0;
+        g_discover_calls = 0;
+
+        if (iface == NULL)
+                run_pqos(&ret, 2, "--enum-hybrid-cores");
+        else
+                run_pqos(&ret, 3, iface, "--enum-hybrid-cores");
+
+        assert_int_equal(ret, EXIT_SUCCESS);
+        assert_int_equal(g_discover_calls, 1);
+        assert_int_equal(g_init_calls, 0);
+}
+
+static void
+test_the_enumeration_initializes_nothing_on_any_interface(void **state)
+{
+        UNUSED_ARG(state);
+
+        assert_enumeration_initializes_nothing(NULL);
+        assert_enumeration_initializes_nothing("--iface=os");
+        assert_enumeration_initializes_nothing("--iface=msr");
+        assert_enumeration_initializes_nothing("--iface=mmio");
+}
+
 /* ======== the mode whose output moved ======== */
 
 /* -H used to print the profiles where the option was parsed, which is what put
@@ -472,6 +566,8 @@ main(void)
                 test_the_command_line_refuses_an_alloc_reset_with_the_enumeration),
             cmocka_unit_test(
                 test_the_command_line_refuses_a_mon_reset_with_the_enumeration),
+            cmocka_unit_test(
+                test_the_enumeration_initializes_nothing_on_any_interface),
             /* last: the selection it leaves behind is the first of the list */
             cmocka_unit_test(test_profile_list_alone_prints_the_profiles)};
 

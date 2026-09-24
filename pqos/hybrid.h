@@ -71,6 +71,7 @@ void hybrid_print_status(const struct pqos_sysconfig *sys);
  * @retval 0 Success
  * @retval -1 Invalid selection or hybrid capability unavailable
  */
-int hybrid_enum_cores(const struct pqos_sysconfig *sys, const char *selection);
+int hybrid_enum_cores(const struct pqos_hybrid_capabilities *cap,
+                      const char *selection);
 
 #endif /* __HYBRID_H__ */

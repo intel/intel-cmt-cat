@@ -2562,6 +2562,30 @@ main(int argc, char **argv)
         if (check_read_only_print_options() != 0)
                 return EXIT_FAILURE;
 
+        /* The asymmetric capabilities are CPUID's answer and do not depend on
+         * an interface, so this mode asks the library for them directly and
+         * exits: pqos_init() would open MSR devices, mount resctrl and write a
+         * schemata to probe it, and program the monitoring and bandwidth mode
+         * on an ERDT platform, none of which reading CPUID needs. It also runs
+         * before the library is initialized so that a platform whose interface
+         * cannot be brought up still answers what CPUID says.
+         */
+        if (sel_enum_hybrid_cores) {
+                struct pqos_hybrid_capabilities *hybrid = NULL;
+
+                ret = pqos_hybrid_discover(&hybrid);
+                if (ret != PQOS_RETVAL_OK) {
+                        printf("Error discovering hybrid capabilities!\n");
+                        return EXIT_FAILURE;
+                }
+
+                exit_val = hybrid_enum_cores(hybrid, sel_hybrid_core_list) == 0
+                               ? EXIT_SUCCESS
+                               : EXIT_FAILURE;
+                pqos_hybrid_free(hybrid);
+                return exit_val;
+        }
+
         /* the profiles are the utility's own, so they are listed without the
          * library and before anything is reset, printed or applied
          */
@@ -2612,13 +2636,6 @@ main(int argc, char **argv)
                 goto error_exit_2;
         }
 
-        if (sel_enum_hybrid_cores) {
-                if (hybrid_enum_cores(p_sys, sel_hybrid_core_list) != 0)
-                        exit_val = EXIT_FAILURE;
-                else
-                        exit_val = EXIT_SUCCESS;
-                goto error_exit_2;
-        }
         l3cat_ids = pqos_cpu_get_l3cat_ids(p_sys->cpu, &l3cat_id_count);
         if (l3cat_ids == NULL) {
                 printf("Error retrieving CPU socket information!\n");

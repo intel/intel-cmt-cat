@@ -33,6 +33,8 @@
 #ifndef __TEST_PRINT_MODES_H
 #define __TEST_PRINT_MODES_H
 
+#include "pqos.h"
+
 /* What main() becomes when main.c is included by the test, declared before its
  * definition is read so that it does not look like one without a prototype
  */
@@ -43,5 +45,13 @@ int appmain(int argc, char **argv);
  * about the print side
  */
 const char *__wrap_alloc_requested_option(void);
+
+/* The wrapped library entry points: a case requires that the enumeration asks
+ * the library for the capabilities and never asks it to initialize an interface
+ */
+int __wrap_pqos_init(const struct pqos_config *config);
+int __wrap_pqos_fini(void);
+int __wrap_pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap);
+void __wrap_pqos_hybrid_free(struct pqos_hybrid_capabilities *cap);
 
 #endif /* __TEST_PRINT_MODES_H */

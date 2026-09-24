@@ -166,6 +166,10 @@ $(BIN_DIR)/test_print_modes: ./test_print_modes.c $(PQOS_OBJS)
 		-Wl,--wrap=putchar \
 		-Wl,--wrap=exit \
 		-Wl,--wrap=alloc_requested_option \
+		-Wl,--wrap=pqos_init \
+		-Wl,--wrap=pqos_fini \
+		-Wl,--wrap=pqos_hybrid_discover \
+		-Wl,--wrap=pqos_hybrid_free \
 		-Wl,--start-group \
 		$(LDFLAGS) $(filter-out ./obj/main.o,$(PQOS_OBJS)) $< -Wl,--end-group -o $@
 

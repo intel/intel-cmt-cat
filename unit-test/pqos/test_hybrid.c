@@ -72,19 +72,14 @@ test_parse_core_list(void **state)
 }
 
 static void
-test_enum_cores_uses_sysconfig_capability(void **state)
+test_enum_cores_reads_the_capability_it_is_given(void **state)
 {
-        const size_t cap_size =
-            sizeof(struct pqos_cap) + sizeof(struct pqos_capability);
         const size_t hybrid_size = sizeof(struct pqos_hybrid_capabilities) +
                                    sizeof(struct pqos_hybrid_core_capability);
         struct pqos_hybrid_capabilities *hybrid = calloc(1, hybrid_size);
-        struct pqos_cap *cap = calloc(1, cap_size);
-        struct pqos_sysconfig sys = {0};
         struct pqos_hybrid_core_capability *core;
 
         assert_non_null(hybrid);
-        assert_non_null(cap);
         hybrid->mem_size = hybrid_size;
         hybrid->status = PQOS_HYBRID_STATUS_YES;
         hybrid->num_cores = 1;
@@ -92,26 +87,26 @@ test_enum_cores_uses_sysconfig_capability(void **state)
         core->mem_size = sizeof(*core);
         core->lcore = 3;
         core->socket = 1;
+        core->physical_core_valid = 1;
+        core->physical_core = 2;
         core->core_type_valid = 1;
         core->core_type = 0x40;
         core->native_model_id = 4;
 
-        cap->mem_size = cap_size;
-        cap->num_cap = 1;
-        cap->capabilities[0].type = PQOS_CAP_TYPE_HYBRID;
-        cap->capabilities[0].u.hybrid = hybrid;
-        sys.cap = cap;
+        /* the capability the caller discovered, not a system configuration: the
+         * command reads CPUID and never initializes an interface, so there is
+         * no sysconfig to take it from
+         */
+        assert_int_equal(hybrid_enum_cores(hybrid, "3"), 0);
+        assert_int_equal(hybrid_enum_cores(hybrid, "4"), -1);
+        assert_int_equal(hybrid_enum_cores(NULL, "3"), -1);
 
-        assert_int_equal(hybrid_enum_cores(&sys, "3"), 0);
-        assert_int_equal(hybrid_enum_cores(&sys, "4"), -1);
-
-        free(cap);
         free(hybrid);
         (void)state;
 }
 
 static void
-test_enum_cores_rejects_a_list_on_a_non_hybrid_processor(void **state)
+test_print_status_reads_the_sysconfig(void **state)
 {
         const size_t cap_size =
             sizeof(struct pqos_cap) + sizeof(struct pqos_capability);
@@ -123,29 +118,48 @@ test_enum_cores_rejects_a_list_on_a_non_hybrid_processor(void **state)
         assert_non_null(hybrid);
         assert_non_null(cap);
         hybrid->mem_size = hybrid_size;
-        hybrid->status = PQOS_HYBRID_STATUS_NO;
-        hybrid->num_cores = 0;
-
+        hybrid->status = PQOS_HYBRID_STATUS_YES;
         cap->mem_size = cap_size;
         cap->num_cap = 1;
         cap->capabilities[0].type = PQOS_CAP_TYPE_HYBRID;
         cap->capabilities[0].u.hybrid = hybrid;
         sys.cap = cap;
 
+        /* -d and -D print the same line from the capability the library
+         * published, which is the one path that does have a sysconfig
+         */
+        hybrid_print_status(&sys);
+        hybrid_print_status(NULL);
+
+        free(cap);
+        free(hybrid);
+        (void)state;
+}
+
+static void
+test_enum_cores_rejects_a_list_on_a_non_hybrid_processor(void **state)
+{
+        const size_t hybrid_size = sizeof(struct pqos_hybrid_capabilities);
+        struct pqos_hybrid_capabilities *hybrid = calloc(1, hybrid_size);
+
+        assert_non_null(hybrid);
+        hybrid->mem_size = hybrid_size;
+        hybrid->status = PQOS_HYBRID_STATUS_NO;
+        hybrid->num_cores = 0;
+
         /* a malformed list is a command line error whatever the processor is,
          * and this path used to report success for it: the platform was judged
          * first and the list never looked at
          */
-        assert_int_equal(hybrid_enum_cores(&sys, "0,,1"), -1);
-        assert_int_equal(hybrid_enum_cores(&sys, "4-2"), -1);
+        assert_int_equal(hybrid_enum_cores(hybrid, "0,,1"), -1);
+        assert_int_equal(hybrid_enum_cores(hybrid, "4-2"), -1);
 
         /* a well formed list on a processor that has no asymmetric capability
          * is not an error, and says so
          */
-        assert_int_equal(hybrid_enum_cores(&sys, "0-3"), 0);
-        assert_int_equal(hybrid_enum_cores(&sys, NULL), 0);
+        assert_int_equal(hybrid_enum_cores(hybrid, "0-3"), 0);
+        assert_int_equal(hybrid_enum_cores(hybrid, NULL), 0);
 
-        free(cap);
         free(hybrid);
         (void)state;
 }
@@ -155,7 +169,8 @@ main(void)
 {
         const struct CMUnitTest tests[] = {
             cmocka_unit_test(test_parse_core_list),
-            cmocka_unit_test(test_enum_cores_uses_sysconfig_capability),
+            cmocka_unit_test(test_enum_cores_reads_the_capability_it_is_given),
+            cmocka_unit_test(test_print_status_reads_the_sysconfig),
             cmocka_unit_test(
                 test_enum_cores_rejects_a_list_on_a_non_hybrid_processor)};
 

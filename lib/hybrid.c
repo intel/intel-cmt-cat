@@ -32,6 +32,7 @@
 
 #include "hybrid.h"
 
+#include "cpuinfo.h"
 #include "log.h"
 #include "machine.h"
 #include "types.h"
@@ -821,4 +822,52 @@ error:
                 CPU_FREE(original);
         free(hybrid);
         return ret;
+}
+
+/**
+ * @brief Discovers the hybrid capabilities without initializing an interface
+ *
+ * Topology from CPUID first, because that answer does not depend on an
+ * operating system interface either; from the OS where CPUID's does not build.
+ * Both are reads: what this function exists to avoid is everything pqos_init()
+ * does after the topology - opening MSR devices, mounting resctrl and writing a
+ * schemata to probe it, and programming the monitoring and bandwidth mode on an
+ * ERDT platform.
+ */
+int
+pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
+{
+        const enum pqos_interface topologies[] = {PQOS_INTER_MSR,
+#ifdef __linux__
+                                                  PQOS_INTER_OS
+#endif
+        };
+        unsigned i;
+
+        if (cap == NULL)
+                return PQOS_RETVAL_PARAM;
+        *cap = NULL;
+
+        for (i = 0; i < DIM(topologies); i++) {
+                struct pqos_cpuinfo *cpu = NULL;
+                int ret;
+
+                if (cpuinfo_init(topologies[i], &cpu) != 0 || cpu == NULL)
+                        continue;
+
+                ret = hybrid_cap_discover(cap, cpu);
+                cpuinfo_fini();
+
+                return ret;
+        }
+
+        LOG_ERROR("CPU topology could not be read, so the hybrid capabilities "
+                  "of this platform are unknown\n");
+        return PQOS_RETVAL_RESOURCE;
+}
+
+void
+pqos_hybrid_free(struct pqos_hybrid_capabilities *cap)
+{
+        free(cap);
 }

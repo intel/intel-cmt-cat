@@ -1333,6 +1333,41 @@ struct pqos_pci_info {
 int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
 
 /**
+ * @brief Discovers the hybrid capabilities of the platform, reading only CPUID
+ *
+ * Answers the same data pqos_sysconfig_get() carries under
+ * PQOS_CAP_TYPE_HYBRID, for a caller that wants it without initializing an
+ * interface. Asymmetric capability enumeration is CPUID work and does not
+ * depend on the interface, while pqos_init() opens MSR devices, mounts resctrl
+ * and probes it by writing to schemata, and sets the monitoring and bandwidth
+ * mode on an ERDT platform - none of which a read of CPUID needs and none of
+ * which a caller asking only for this should cause.
+ *
+ * Topology comes from CPUID, or from the operating system where CPUID does not
+ * answer; both are reads. The capability is the caller's to release with
+ * pqos_hybrid_free().
+ *
+ * Call it before pqos_init(): the topology this builds is the library's own
+ * singleton, so it cannot be built while the library holds one.
+ *
+ * @param [out] cap location to store the hybrid capabilities at
+ *
+ * @return Operations status
+ * @retval PQOS_RETVAL_OK on success
+ * @retval PQOS_RETVAL_PARAM a parameter was NULL
+ * @retval PQOS_RETVAL_RESOURCE out of memory, or the topology is unavailable
+ * @retval PQOS_RETVAL_UNAVAILABLE the processors cannot be reached to be read
+ */
+int pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap);
+
+/**
+ * @brief Releases what pqos_hybrid_discover() returned
+ *
+ * @param [in] cap capabilities to release, NULL being nothing to do
+ */
+void pqos_hybrid_free(struct pqos_hybrid_capabilities *cap);
+
+/**
  * @brief Retrieves PQoS system configuration data
  *
  * @param sysconfig [out] Location to store PQoS system configuration data
