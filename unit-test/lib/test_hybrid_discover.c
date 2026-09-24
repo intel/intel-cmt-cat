@@ -66,6 +66,11 @@
 #define VENDOR_ECX 0x6c65746e
 #define VENDOR_EDX 0x49656e69
 
+/** and a vendor string that is none of the three the library knows */
+#define FOREIGN_EBX 0x4d4d5658
+#define FOREIGN_ECX 0x4d4d5658
+#define FOREIGN_EDX 0x4d4d5658
+
 /** How many times the operating system was asked for the topology, and what it
  *  should answer
  */
@@ -74,6 +79,9 @@ static int g_os_topology_available = 1;
 
 /** Whether the fake platform reports itself hybrid in leaf 7 */
 static int g_hybrid = 1;
+
+/** and whether it names a vendor the library knows */
+static int g_intel = 1;
 
 /**
  * The rendezvous the lifecycle cases below use: the topology read is the middle
@@ -84,12 +92,11 @@ static int g_hybrid = 1;
  */
 static pthread_mutex_t g_sync_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g_sync_cond = PTHREAD_COND_INITIALIZER;
-static int g_pause_in_topology;   /**< whether to stop there at all */
-static int g_reached_topology;    /**< the discovery is stopped there now */
-static int g_may_continue;        /**< the other thread is done */
-static int g_log_alive_inside;    /**< log_is_initialized() after it */
-static unsigned g_messages;       /**< messages the application received */
-static unsigned g_messages_after; /**< how many of them came from inside */
+static int g_pause_in_topology; /**< whether to stop there at all */
+static int g_reached_topology;  /**< the discovery is stopped there now */
+static int g_may_continue;      /**< the other thread is done */
+static int g_log_alive_inside;  /**< log_is_initialized() after it */
+static unsigned g_messages;     /**< messages the application received */
 static int g_discover_ret = PQOS_RETVAL_ERROR;
 static struct pqos_hybrid_capabilities *g_discover_cap;
 
@@ -100,12 +107,6 @@ static pthread_mutex_t g_fini_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g_fini_cond = PTHREAD_COND_INITIALIZER;
 static int g_fini_done;
 static int g_fini_ret = LOG_RETVAL_ERROR;
-/** whether the application's callback should finalize the log when it is next
- *  called, which is what an application finalizing from a callback does
- */
-static int g_callback_finalizes;
-/** and whether the discovery itself has returned */
-static int g_discovery_done;
 
 /**
  * @brief An application's log callback: it only counts
@@ -117,16 +118,6 @@ count_message(void *context, const size_t size, const char *message)
         (void)size;
         (void)message;
         g_messages++;
-
-        /* an application may finalize the library from its own log callback,
-         * and the callback runs on the thread of whatever logged - here, the
-         * discovery that is holding the log
-         */
-        if (g_callback_finalizes) {
-                g_callback_finalizes = 0;
-                g_fini_ret = log_fini();
-                g_fini_done = 1;
-        }
 }
 
 /**
@@ -148,9 +139,9 @@ __wrap_lcpuid(const unsigned leaf,
         switch (leaf) {
         case 0:
                 out->eax = 0x28;
-                out->ebx = VENDOR_EBX;
-                out->ecx = VENDOR_ECX;
-                out->edx = VENDOR_EDX;
+                out->ebx = g_intel ? VENDOR_EBX : FOREIGN_EBX;
+                out->ecx = g_intel ? VENDOR_ECX : FOREIGN_ECX;
+                out->edx = g_intel ? VENDOR_EDX : FOREIGN_EDX;
                 break;
         case 7:
                 if (subleaf == 0 && g_hybrid)
@@ -205,20 +196,9 @@ __wrap_os_cpuinfo_topology(int prepare_for_access)
                 pthread_mutex_unlock(&g_sync_mutex);
 
                 /* the other thread has installed or removed the log by now,
-                 * and this is the discovery still in the middle of its work:
-                 * whatever it was given at the start has to be here still, and
-                 * a message has to arrive somewhere
+                 * and this is the discovery still in the middle of its work
                  */
                 g_log_alive_inside = log_is_initialized();
-
-                /* counted as a difference, because the attempt to read the
-                 * topology from CPUID has already logged its own failure by
-                 * now: what this case is about is the one message logged after
-                 * the other thread's finalization
-                 */
-                g_messages_after = g_messages;
-                LOG_ERROR("a message from inside the discovery\n");
-                g_messages_after = g_messages - g_messages_after;
         }
 
         if (!g_os_topology_available)
@@ -291,11 +271,6 @@ discover_thread(void *arg)
         (void)arg;
         g_discover_ret = pqos_hybrid_discover(&g_discover_cap);
 
-        pthread_mutex_lock(&g_fini_mutex);
-        g_discovery_done = 1;
-        pthread_cond_broadcast(&g_fini_cond);
-        pthread_mutex_unlock(&g_fini_mutex);
-
         return NULL;
 }
 
@@ -312,7 +287,6 @@ start_paused_discovery(void)
         g_may_continue = 0;
         g_log_alive_inside = -1;
         g_messages = 0;
-        g_messages_after = 0;
         g_discover_ret = PQOS_RETVAL_ERROR;
         g_discover_cap = NULL;
 
@@ -343,7 +317,7 @@ finish_paused_discovery(pthread_t thread)
 }
 
 static void
-test_an_initialization_during_discovery_keeps_its_log(void **state)
+test_an_initialization_during_discovery_is_untouched(void **state)
 {
         pthread_t thread;
 
@@ -352,12 +326,19 @@ test_an_initialization_during_discovery_keeps_its_log(void **state)
 
         g_os_topology_available = 1;
 
-        /* a discovery with no log of its own brings up a silent one and is
-         * stopped in the middle of its work; the library is then initialized
-         * from another thread, which installs the application's log in place of
-         * it - exactly what pqos_init() does with it, without the hardware
+        /* a discovery with no log runs and is stopped in the middle of its
+         * work; the library is then initialized from another thread, which
+         * installs the application's log - exactly what pqos_init() does with
+         * it, without the hardware. The discovery must install nothing, so
+         * there is nothing of its own for it to take away with it
          */
         thread = start_paused_discovery();
+
+        /* stopped in the middle of its work, and there is still no log: nothing
+         * of this call's is installed in a process-wide object it does not own
+         */
+        assert_int_equal(log_is_initialized(), 0);
+
         assert_int_equal(log_init(-1, count_message, NULL, LOG_VER_DEFAULT),
                          LOG_RETVAL_OK);
         finish_paused_discovery(thread);
@@ -365,12 +346,11 @@ test_an_initialization_during_discovery_keeps_its_log(void **state)
         assert_int_equal(g_discover_ret, PQOS_RETVAL_OK);
         pqos_hybrid_free(g_discover_cap);
 
-        /* the discovery's release must let go of what it installed and not of
-         * what it found: the application's log is still there, and still
-         * receiving
+        /* the application's log is there and receiving, and it received nothing
+         * from the discovery that ran across it
          */
         assert_int_equal(log_is_initialized(), 1);
-        g_messages = 0;
+        assert_int_equal(g_messages, 0);
         LOG_ERROR("after the discovery\n");
         assert_int_equal(g_messages, 1);
 
@@ -424,7 +404,7 @@ finalization_returned_within(unsigned millis)
 }
 
 static void
-test_a_finalization_during_discovery_waits_for_it(void **state)
+test_a_finalization_during_discovery_is_not_delayed(void **state)
 {
         pthread_t thread;
         pthread_t finalizer;
@@ -438,107 +418,55 @@ test_a_finalization_during_discovery_waits_for_it(void **state)
         g_fini_done = 0;
         g_fini_ret = LOG_RETVAL_ERROR;
 
-        /* this discovery found a log installed, so it uses it and takes no
-         * ownership of it. The library is then finalized from another thread,
-         * which removes that log - and the discovery is still running
+        /* a discovery is stopped in the middle of its work and the library is
+         * finalized from another thread. The finalization must not be made to
+         * wait for it: pqos_fini() holds the API lock, and a read that may call
+         * back into the library cannot be waited for from under it
          */
         thread = start_paused_discovery();
         assert_int_equal(
             pthread_create(&finalizer, NULL, finalize_thread, NULL), 0);
-
-        /* the finalization must not report completion while the discovery is
-         * still logging through that log: its caller is free to close the
-         * descriptor and release the context the log is addressed to the moment
-         * pqos_fini() returns
-         */
-        assert_int_equal(finalization_returned_within(200), 0);
-        assert_int_equal(log_is_initialized(), 1);
+        assert_int_equal(finalization_returned_within(200), 1);
+        assert_int_equal(pthread_join(finalizer, NULL), 0);
+        assert_int_equal(g_fini_ret, LOG_RETVAL_OK);
+        assert_int_equal(log_is_initialized(), 0);
 
         finish_paused_discovery(thread);
-        assert_int_equal(pthread_join(finalizer, NULL), 0);
-
         assert_int_equal(g_discover_ret, PQOS_RETVAL_OK);
         pqos_hybrid_free(g_discover_cap);
 
-        /* the log the discovery was given was there when it looked, and the
-         * message it logged after the finalization arrived arrived
+        /* and the log the discovery ran beside was never written to by it,
+         * before the finalization or after it: the application's callback heard
+         * nothing from this call
          */
-        assert_int_equal(g_log_alive_inside, 1);
-        assert_int_equal(g_messages_after, 1);
-
-        /* and the finalization was honoured, once the discovery let go */
-        assert_int_equal(g_fini_done, 1);
-        assert_int_equal(g_fini_ret, LOG_RETVAL_OK);
-        assert_int_equal(log_is_initialized(), 0);
+        assert_int_equal(g_messages, 0);
         (void)state;
 }
 
-/**
- * @brief Whether the discovery has returned within \a millis milliseconds
- */
-static int
-discovery_returned_within(unsigned millis)
-{
-        struct timespec deadline;
-        int done;
-
-        clock_gettime(CLOCK_REALTIME, &deadline);
-        deadline.tv_nsec += (long)millis * 1000000L;
-        deadline.tv_sec += deadline.tv_nsec / 1000000000L;
-        deadline.tv_nsec %= 1000000000L;
-
-        pthread_mutex_lock(&g_fini_mutex);
-        while (!g_discovery_done) {
-                if (pthread_cond_timedwait(&g_fini_cond, &g_fini_mutex,
-                                           &deadline) == ETIMEDOUT)
-                        break;
-        }
-        done = g_discovery_done;
-        pthread_mutex_unlock(&g_fini_mutex);
-
-        return done;
-}
-
 static void
-test_a_finalization_from_a_log_callback_returns(void **state)
+test_a_vendor_the_library_does_not_know_is_answered(void **state)
 {
-        pthread_t thread;
+        struct pqos_hybrid_capabilities *cap = NULL;
 
-        while (log_is_initialized())
-                log_fini();
-        assert_int_equal(log_init(-1, count_message, NULL, LOG_VER_DEFAULT),
-                         LOG_RETVAL_OK);
-
+        g_os_topology_calls = 0;
         g_os_topology_available = 1;
-        g_pause_in_topology = 0;
-        g_discovery_done = 0;
-        g_fini_done = 0;
-        g_fini_ret = LOG_RETVAL_ERROR;
-        g_messages = 0;
-        g_discover_ret = PQOS_RETVAL_ERROR;
-        g_discover_cap = NULL;
+        g_intel = 0;
 
-        /* the first message the discovery logs reaches the application's
-         * callback, which finalizes the library from there - on the thread
-         * whose hold a waiting finalization would wait for. It has to come back
+        /* an unknown vendor has no cache leaf configuration in this library,
+         * and that configuration is what the CPUID topology is built from - not
+         * what the operating system's topology needs. The platform must still
+         * get its answer: unknown, because the leaves this reads are Intel
+         * definitions and another vendor is free to use those bits for
+         * something else
          */
-        g_callback_finalizes = 1;
-        assert_int_equal(pthread_create(&thread, NULL, discover_thread, NULL),
-                         0);
-        assert_int_equal(discovery_returned_within(2000), 1);
-        assert_int_equal(pthread_join(thread, NULL), 0);
+        assert_int_equal(pqos_hybrid_discover(&cap), PQOS_RETVAL_OK);
+        assert_non_null(cap);
+        assert_int_equal(cap->status, PQOS_HYBRID_STATUS_UNKNOWN);
+        assert_int_equal(cap->num_cores, 0);
+        assert_int_equal(g_os_topology_calls, 1);
 
-        assert_int_equal(g_fini_done, 1);
-        assert_int_equal(g_fini_ret, LOG_RETVAL_OK);
-        assert_int_equal(g_discover_ret, PQOS_RETVAL_OK);
-        pqos_hybrid_free(g_discover_cap);
-
-        /* the application's log went when it asked, and the discovery reported
-         * the rest of its work to the silent log left in its place - so the
-         * callback was called once, and the log is gone now the hold is
-         */
-        assert_int_equal(g_messages, 1);
-        assert_int_equal(log_is_initialized(), 0);
+        pqos_hybrid_free(cap);
+        g_intel = 1;
         (void)state;
 }
 
@@ -581,9 +509,11 @@ main(void)
                 test_discover_answers_no_without_the_per_core_array),
             cmocka_unit_test(test_discover_reports_no_topology_at_all),
             cmocka_unit_test(
-                test_an_initialization_during_discovery_keeps_its_log),
-            cmocka_unit_test(test_a_finalization_during_discovery_waits_for_it),
-            cmocka_unit_test(test_a_finalization_from_a_log_callback_returns),
+                test_an_initialization_during_discovery_is_untouched),
+            cmocka_unit_test(
+                test_a_finalization_during_discovery_is_not_delayed),
+            cmocka_unit_test(
+                test_a_vendor_the_library_does_not_know_is_answered),
 #endif
         };
 

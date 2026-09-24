@@ -120,57 +120,41 @@ log_init(int fd_log,
 /**
  * @brief Shuts down PQoS log module
  *
- * Waits for a log_hold() to be released before taking the log down, so that a
- * caller is free to close the descriptor and release the context it gave once
- * this returns: see log_hold().
- *
  * @return Operation status
  * @retval LOG_RETVAL_OK on success
  */
 PQOS_LOCAL int log_fini(void);
 
 /**
- * @brief Keeps the log usable for a path that may run before pqos_init()
+ * @brief Drops the messages this thread logs until log_resume()
  *
- * The log is one object per process and the library's initialization is not the
- * only thing that installs it. A read-only path - pqos_hybrid_discover() is the
- * one - may be called before pqos_init(), with no log of its own, and still has
- * to report what it found; and it may equally be called while an application's
- * log is installed, or while another thread is installing or removing one.
+ * For a path that may run before pqos_init(), or beside it, and must not write
+ * to the log either way - pqos_hybrid_discover() is the one. Two things stand
+ * in the way of such a path logging at all, and this answers both:
  *
- * Between this call and log_release(), whichever of those the caller met is
- * what its messages go to, and it is still there:
+ * - log_printf() asserts that the log has been initialized, and before
+ *   pqos_init() it has not, so a DEBUG build would abort on a message this path
+ *   had no destination for anyway.
+ * - where the log *is* initialized, the destination is the application's, and
+ *   this path runs outside pqos_init() and pqos_fini(). Writing to it would
+ * mean either writing to a descriptor a concurrent pqos_fini() has let the
+ *   application close, or making that pqos_fini() wait - and it holds the API
+ *   lock this path deliberately does not take, so waiting for a path that may
+ *   itself call into the library inverts the two locks.
  *
- * - with no log installed, a silent one is brought up for the duration, so that
- *   log_printf() may be called and nothing is written to a destination the
- *   caller never chose. log_release() removes it again - unless pqos_init() has
- *   installed the application's log meanwhile, which is then left alone.
- * - with a log already installed, it is used and not replaced, and a log_fini()
- *   arriving from pqos_fini() waits for the last holder to release it before it
- *   returns. Without that, the next message of this path would have nowhere to
- *   go - and worse, the application is free to close the descriptor and release
- *   the context it gave as soon as pqos_fini() returns, so a path still logging
- *   through them would be writing to whatever they have become. It waits for
- *   the holds of other threads only: a log callback runs outside the log's lock
- *   so that it may call back into the library, and an application that
- *   finalizes from one arrives on the very thread whose hold would be waited
- *   for. Such a finalization releases the application's log at once and leaves
- *   the holding path a silent log for what remains of it.
+ * Dropping the messages on this thread costs the caller nothing it is promised:
+ * what such a call reports is its return status. Nothing global is touched, so
+ * there is no lifetime to coordinate and no lock to invert: this is the calling
+ * thread's own state, and other threads log as usual throughout.
  *
- * Nesting is counted, so concurrent holders are safe.
- *
- * @return Operation status
- * @retval LOG_RETVAL_OK on success
+ * Nested suspensions are counted.
  */
-PQOS_LOCAL int log_hold(void);
+PQOS_LOCAL void log_suspend(void);
 
 /**
- * @brief Symmetric operation to \a log_hold
- *
- * @return Operation status
- * @retval LOG_RETVAL_OK on success
+ * @brief Symmetric operation to \a log_suspend
  */
-PQOS_LOCAL int log_release(void);
+PQOS_LOCAL void log_resume(void);
 
 /**
  * @brief PQoS log function

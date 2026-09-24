@@ -969,21 +969,18 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                 return PQOS_RETVAL_ERROR;
 
         /* Every path below this reports what it found through the library log,
-         * and log_printf() asserts that the log has been initialized - which it
-         * has not, since this function exists to be called before pqos_init().
-         * Holding the log covers both callers: one that has a log keeps it and
-         * sees those messages, and for one that has none a silent log is
-         * brought up for the duration, so the calls are safe and nothing is
-         * written to a destination the caller never chose. The hold is what
-         * makes that safe against another thread's pqos_init() or pqos_fini(),
-         * which install and remove the same process-wide log under a different
-         * lock - see log_hold(). What a caller without a log learns is the
-         * status returned, which is what the documentation promises it.
+         * and this call writes nothing to it. Before pqos_init() there is no
+         * log to write to and log_printf() asserts as much; after it there is
+         * one, but its destination belongs to the application and this call
+         * runs outside the library's lifecycle - so keeping that destination
+         * alive would mean making a concurrent pqos_fini() wait for a read that
+         * may itself call into the library, which inverts the API lock this
+         * path deliberately does not take. The messages are dropped on this
+         * thread for the duration; what the caller learns is the status
+         * returned, which is what the documentation promises it. See
+         * log_suspend().
          */
-        if (log_hold() != LOG_RETVAL_OK) {
-                pthread_mutex_unlock(&discover_mutex);
-                return PQOS_RETVAL_ERROR;
-        }
+        log_suspend();
 
         for (i = 0; i < DIM(topologies); i++) {
                 /* a topology of its own, not the library's singleton: two
@@ -1006,7 +1003,7 @@ pqos_hybrid_discover(struct pqos_hybrid_capabilities **cap)
                 LOG_ERROR("CPU topology could not be read, so the hybrid "
                           "capabilities of this platform are unknown\n");
 
-        log_release();
+        log_resume();
         pthread_mutex_unlock(&discover_mutex);
 
         return ret;

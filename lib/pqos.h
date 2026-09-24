@@ -1350,9 +1350,12 @@ int pqos_cap_get(const struct pqos_cap **cap, const struct pqos_cpuinfo **cpu);
  * Independent of the library's state: the topology it reads is built for this
  * call and released again, so it neither needs nor disturbs an initialized
  * library, and it can be called before pqos_init(), after it, or without it.
- * Concurrent calls are serialized inside the library. A pqos_init() running in
- * another thread does not lose its log to this call, and a pqos_fini() waits
- * for this call to finish rather than removing the log it is reporting through.
+ * Concurrent calls are serialized inside the library, and nothing else is: the
+ * call writes nothing to the library's log and installs none, because it may
+ * run outside pqos_init() and pqos_fini() - where a destination the application
+ * owns cannot be kept alive for it. What it found is the status it returns, and
+ * a pqos_init() or pqos_fini() in another thread is neither delayed nor
+ * disturbed by it.
  *
  * @param [out] cap location to store the hybrid capabilities at
  *
