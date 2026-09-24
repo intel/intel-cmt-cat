@@ -57,6 +57,7 @@
 
 #include "output.h"
 
+#include <getopt.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -103,6 +104,59 @@ assert_mode_refuses_an_allocation(int *selected, const char *name)
 }
 
 /* ======== the question with one side missing ======== */
+
+/**
+ * @brief Run the utility with the given command line
+ *
+ * The selections are cleared first: they are static and a command line only
+ * ever adds to them, so a case that ran earlier would otherwise decide what
+ * this one is refused for. main.c is included here, which is what makes both
+ * the flags and appmain() reachable.
+ *
+ * @param [out] ret where the status the utility returned is stored
+ * @param [in] argc number of arguments, including the utility name
+ * @param [in] ... the arguments after the utility name
+ */
+static void
+run_pqos(int *ret, int argc, ...)
+{
+        char *argv[8] = {NULL};
+        va_list args;
+        int i;
+
+        assert_true(argc > 0);
+        assert_true((size_t)argc <= DIM(argv));
+
+        sel_enum_hybrid_cores = 0;
+        sel_reset_alloc = 0;
+        sel_mon_reset = 0;
+        sel_display = 0;
+        sel_show_allocation_config = 0;
+
+        argv[0] = strdup("pqos");
+        assert_non_null(argv[0]);
+        va_start(args, argc);
+        for (i = 1; i < argc; i++) {
+                argv[i] = strdup(va_arg(args, const char *));
+                assert_non_null(argv[i]);
+        }
+        va_end(args);
+
+        optind = 1;
+        opterr = 0;
+        run_function(appmain, *ret, argc, argv);
+
+        /* and cleared again on the way out: the cases below this one run with
+         * what the ones above them selected, and a flag left set here would
+         * decide what they do
+         */
+        sel_enum_hybrid_cores = 0;
+        sel_reset_alloc = 0;
+        sel_mon_reset = 0;
+
+        for (i = 0; i < argc; i++)
+                free(argv[i]);
+}
 
 static void
 test_an_allocation_alone_is_accepted(void **state)
@@ -263,6 +317,99 @@ test_enum_hybrid_cores_is_a_print_mode(void **state)
                                           "--enum-hybrid-cores");
 }
 
+/* ======== the read-only mode and the resets ======== */
+
+/**
+ * @brief Check that a reset asked of the read-only enumeration is refused
+ *
+ * The mode exits before either reset handler, so a reset on the same command
+ * line used to be discarded in silence.
+ */
+static void
+assert_reset_is_refused(int *selected, const char *name)
+{
+        int ret = 0;
+
+        sel_enum_hybrid_cores = 1;
+        *selected = 1;
+
+        run_function(check_read_only_print_options, ret);
+
+        *selected = 0;
+        sel_enum_hybrid_cores = 0;
+
+        assert_int_equal(ret, -1);
+        assert_true(
+            output_has_text("--enum-hybrid-cores reads CPUID and exits"));
+        assert_true(output_has_text("%s given with it", name));
+}
+
+static void
+test_alloc_reset_with_the_enumeration_is_refused(void **state)
+{
+        UNUSED_ARG(state);
+        assert_reset_is_refused(&sel_reset_alloc, "-R/--alloc-reset");
+}
+
+static void
+test_mon_reset_with_the_enumeration_is_refused(void **state)
+{
+        UNUSED_ARG(state);
+        assert_reset_is_refused(&sel_mon_reset, "-r/--mon-reset");
+}
+
+static void
+test_a_reset_without_the_enumeration_is_accepted(void **state)
+{
+        int ret = -1;
+
+        UNUSED_ARG(state);
+
+        /* every other print mode resets before it prints, so a reset with one
+         * of those is not this check's business
+         */
+        sel_reset_alloc = 1;
+        sel_mon_reset = 1;
+        sel_display = 1;
+
+        run_function(check_read_only_print_options, ret);
+
+        sel_reset_alloc = 0;
+        sel_mon_reset = 0;
+        sel_display = 0;
+
+        assert_int_equal(ret, 0);
+}
+
+/* and the same two, driven through the whole utility, so they fail if the check
+ * stops being called as well as if it stops refusing
+ */
+static void
+test_the_command_line_refuses_an_alloc_reset_with_the_enumeration(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 3, "--enum-hybrid-cores", "-R");
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_has_text("-R/--alloc-reset given with it"));
+}
+
+static void
+test_the_command_line_refuses_a_mon_reset_with_the_enumeration(void **state)
+{
+        int ret = EXIT_SUCCESS;
+
+        UNUSED_ARG(state);
+
+        run_pqos(&ret, 3, "--enum-hybrid-cores", "-r");
+
+        assert_int_equal(ret, EXIT_FAILURE);
+        assert_true(output_has_text("-r/--mon-reset given with it"));
+}
+
 /* ======== the mode whose output moved ======== */
 
 /* -H used to print the profiles where the option was parsed, which is what put
@@ -318,6 +465,13 @@ main(void)
             cmocka_unit_test(test_print_io_devs_is_a_print_mode),
             cmocka_unit_test(test_print_io_dev_is_a_print_mode),
             cmocka_unit_test(test_enum_hybrid_cores_is_a_print_mode),
+            cmocka_unit_test(test_alloc_reset_with_the_enumeration_is_refused),
+            cmocka_unit_test(test_mon_reset_with_the_enumeration_is_refused),
+            cmocka_unit_test(test_a_reset_without_the_enumeration_is_accepted),
+            cmocka_unit_test(
+                test_the_command_line_refuses_an_alloc_reset_with_the_enumeration),
+            cmocka_unit_test(
+                test_the_command_line_refuses_a_mon_reset_with_the_enumeration),
             /* last: the selection it leaves behind is the first of the list */
             cmocka_unit_test(test_profile_list_alone_prints_the_profiles)};
 

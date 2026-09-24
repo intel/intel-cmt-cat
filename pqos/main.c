@@ -2098,6 +2098,55 @@ static const struct {
                               {"--print-io-dev", &sel_print_io_dev},
                               {"--enum-hybrid-cores", &sel_enum_hybrid_cores}};
 
+/** Options that carry out a reset, with the name to report them by. The
+ *  enumeration below exits before either is reached
+ */
+static const struct {
+        const char *name;
+        int *selected;
+} reset_options[] = {{"-R/--alloc-reset", &sel_reset_alloc},
+                     {"-r/--mon-reset", &sel_mon_reset}};
+
+/**
+ * @brief Refuse a command line that asks the read-only enumeration to reset
+ *
+ * --enum-hybrid-cores reads CPUID and exits before the library is initialized,
+ * which is what keeps it from touching the platform's configuration - so it
+ * exits above both reset handlers, and a reset asked for on the same command
+ * line was silently discarded: the enumeration printed, the tool exited 0, and
+ * the reset the user asked for never happened.
+ *
+ * Refused rather than carried out, because carrying it out is what this mode
+ * promises not to do. The allocation side of the same question is
+ * check_print_and_exit_options(), which this mode is registered with.
+ *
+ * @return Operation status
+ * @retval 0 the command line does not ask for both
+ * @retval -1 it does, and it was reported
+ */
+static int
+check_read_only_print_options(void)
+{
+        unsigned i;
+
+        if (sel_enum_hybrid_cores == 0)
+                return 0;
+
+        for (i = 0; i < DIM(reset_options); i++) {
+                if (*reset_options[i].selected == 0)
+                        continue;
+
+                printf("--enum-hybrid-cores reads CPUID and exits before the "
+                       "library is initialized, so the %s given with it would "
+                       "be dropped. Ask for the reset with a command of its "
+                       "own, then print!\n",
+                       reset_options[i].name);
+                return -1;
+        }
+
+        return 0;
+}
+
 /**
  * @brief Refuse a command line that both prints and allocates
  *
@@ -2508,6 +2557,9 @@ main(int argc, char **argv)
                 return EXIT_FAILURE;
 
         if (check_print_and_exit_options() != 0)
+                return EXIT_FAILURE;
+
+        if (check_read_only_print_options() != 0)
                 return EXIT_FAILURE;
 
         /* the profiles are the utility's own, so they are listed without the
