@@ -68,10 +68,10 @@ static int log_init_successful = 0; /**< log init gatekeeper */
  * install, a teardown and a message cannot see each other half done.
  */
 static pthread_mutex_t m_log_mutex = PTHREAD_MUTEX_INITIALIZER;
+/** signalled when the last holder leaves, for a log_fini() waiting on it */
+static pthread_cond_t m_log_released = PTHREAD_COND_INITIALIZER;
 /** how many pre-initialization readers are logging through it right now */
 static unsigned m_holders = 0;
-/** a log_fini() that arrived while it was held, to be honoured on release */
-static int m_fini_pending = 0;
 /** the log currently installed is the silent one a holder brought up */
 static int m_holder_installed = 0;
 
@@ -174,15 +174,11 @@ log_init(int fd_log,
                 return LOG_RETVAL_ERROR;
 
         ret = log_init_unlocked(fd_log, callback_log, context_log, verbosity);
-        if (ret == LOG_RETVAL_OK) {
-                /* whatever a holder may have installed, this log is the
-                 * caller's now: releasing the hold must leave it alone, and a
-                 * teardown deferred by the hold was asked of the log that has
-                 * just been replaced
-                 */
+        /* whatever a holder may have installed, this log is the caller's now:
+         * releasing the hold must leave it alone
+         */
+        if (ret == LOG_RETVAL_OK)
                 m_holder_installed = 0;
-                m_fini_pending = 0;
-        }
 
         pthread_mutex_unlock(&m_log_mutex);
 
@@ -197,14 +193,18 @@ log_fini(void)
         if (pthread_mutex_lock(&m_log_mutex) != 0)
                 return LOG_RETVAL_ERROR;
 
-        /* a pre-initialization reader is still reporting through this log:
-         * taking it away now would leave its next message with nowhere to go,
-         * so the last holder to leave performs this teardown
+        /* a pre-initialization reader is still reporting through this log, so
+         * wait for it. Returning while it goes on logging would be worse than
+         * the message it would lose: the caller is finalizing the library and
+         * is free to close the descriptor and release the context this log is
+         * addressed to as soon as this returns, and those are the application's
+         * own. The wait is bounded by that read, which opens nothing and holds
+         * no other lock
          */
-        if (m_holders > 0)
-                m_fini_pending = 1;
-        else
-                ret = log_fini_unlocked();
+        while (m_holders > 0)
+                pthread_cond_wait(&m_log_released, &m_log_mutex);
+
+        ret = log_fini_unlocked();
 
         pthread_mutex_unlock(&m_log_mutex);
 
@@ -243,15 +243,16 @@ log_release(void)
         if (m_holders > 0)
                 m_holders--;
 
-        /* the silent log this path brought up is its own to remove, and a
-         * teardown that arrived meanwhile has been waiting for this moment. A
-         * log installed by the library's initialization, on the other hand,
-         * outlives the hold
+        /* the silent log this path brought up is its own to remove; a log
+         * installed by the library's initialization outlives the hold. Either
+         * way a log_fini() may be waiting for this moment
          */
-        if (m_holders == 0 && (m_holder_installed || m_fini_pending)) {
-                ret = log_fini_unlocked();
-                m_holder_installed = 0;
-                m_fini_pending = 0;
+        if (m_holders == 0) {
+                if (m_holder_installed) {
+                        ret = log_fini_unlocked();
+                        m_holder_installed = 0;
+                }
+                pthread_cond_broadcast(&m_log_released);
         }
 
         pthread_mutex_unlock(&m_log_mutex);
@@ -262,7 +263,19 @@ log_release(void)
 int
 log_is_initialized(void)
 {
-        return log_init_successful == 1;
+        int initialized;
+
+        /* under the lock like every other read of this state: the answer is
+         * used to decide whether log_printf() may be called, and an install or
+         * a teardown in another thread must be wholly before this answer or
+         * wholly after it
+         */
+        if (pthread_mutex_lock(&m_log_mutex) != 0)
+                return 0;
+        initialized = log_init_successful == 1;
+        pthread_mutex_unlock(&m_log_mutex);
+
+        return initialized;
 }
 
 void
@@ -275,7 +288,8 @@ log_printf(int type, const char *str, ...)
         int opt;
         int fd;
         void *context;
-        void (*callback)(void *, const size_t, const char *);
+        void (*callback)(void *cb_context, const size_t cb_size,
+                         const char *cb_message);
 
         /* the destination is read once, under the lock, so that a message
          * cannot be written half to one log and half to another - and so that

@@ -54,10 +54,12 @@
 #include "pqos.h"
 #include "test.h"
 
+#include <errno.h>
 #include <pthread.h>
 #include <sched.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /** "GenuineIntel", as the vendor check reads it out of leaf 0 */
 #define VENDOR_EBX 0x756e6547
@@ -90,6 +92,14 @@ static unsigned g_messages;       /**< messages the application received */
 static unsigned g_messages_after; /**< how many of them came from inside */
 static int g_discover_ret = PQOS_RETVAL_ERROR;
 static struct pqos_hybrid_capabilities *g_discover_cap;
+
+/** and the finalization running against it: what it answered, and whether it
+ *  has answered at all yet
+ */
+static pthread_mutex_t g_fini_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_fini_cond = PTHREAD_COND_INITIALIZER;
+static int g_fini_done;
+static int g_fini_ret = LOG_RETVAL_ERROR;
 
 /**
  * @brief An application's log callback: it only counts
@@ -347,10 +357,55 @@ test_an_initialization_during_discovery_keeps_its_log(void **state)
         (void)state;
 }
 
+/**
+ * @brief Takes the log down, for a thread of its own, and says when it returned
+ */
+static void *
+finalize_thread(void *arg)
+{
+        int ret = log_fini();
+
+        (void)arg;
+        pthread_mutex_lock(&g_fini_mutex);
+        g_fini_ret = ret;
+        g_fini_done = 1;
+        pthread_cond_broadcast(&g_fini_cond);
+        pthread_mutex_unlock(&g_fini_mutex);
+
+        return NULL;
+}
+
+/**
+ * @brief Whether the finalization has returned within \a millis milliseconds
+ */
+static int
+finalization_returned_within(unsigned millis)
+{
+        struct timespec deadline;
+        int done;
+
+        clock_gettime(CLOCK_REALTIME, &deadline);
+        deadline.tv_nsec += (long)millis * 1000000L;
+        deadline.tv_sec += deadline.tv_nsec / 1000000000L;
+        deadline.tv_nsec %= 1000000000L;
+
+        pthread_mutex_lock(&g_fini_mutex);
+        while (!g_fini_done) {
+                if (pthread_cond_timedwait(&g_fini_cond, &g_fini_mutex,
+                                           &deadline) == ETIMEDOUT)
+                        break;
+        }
+        done = g_fini_done;
+        pthread_mutex_unlock(&g_fini_mutex);
+
+        return done;
+}
+
 static void
 test_a_finalization_during_discovery_waits_for_it(void **state)
 {
         pthread_t thread;
+        pthread_t finalizer;
 
         while (log_is_initialized())
                 log_fini();
@@ -358,26 +413,40 @@ test_a_finalization_during_discovery_waits_for_it(void **state)
                          LOG_RETVAL_OK);
 
         g_os_topology_available = 1;
+        g_fini_done = 0;
+        g_fini_ret = LOG_RETVAL_ERROR;
 
         /* this discovery found a log installed, so it uses it and takes no
          * ownership of it. The library is then finalized from another thread,
          * which removes that log - and the discovery is still running
          */
         thread = start_paused_discovery();
-        assert_int_equal(log_fini(), LOG_RETVAL_OK);
+        assert_int_equal(
+            pthread_create(&finalizer, NULL, finalize_thread, NULL), 0);
+
+        /* the finalization must not report completion while the discovery is
+         * still logging through that log: its caller is free to close the
+         * descriptor and release the context the log is addressed to the moment
+         * pqos_fini() returns
+         */
+        assert_int_equal(finalization_returned_within(200), 0);
+        assert_int_equal(log_is_initialized(), 1);
+
         finish_paused_discovery(thread);
+        assert_int_equal(pthread_join(finalizer, NULL), 0);
 
         assert_int_equal(g_discover_ret, PQOS_RETVAL_OK);
         pqos_hybrid_free(g_discover_cap);
 
-        /* the log the discovery was given had to outlive the finalization: it
-         * was there when the discovery looked, and the message it logged after
-         * the finalization arrived
+        /* the log the discovery was given was there when it looked, and the
+         * message it logged after the finalization arrived arrived
          */
         assert_int_equal(g_log_alive_inside, 1);
         assert_int_equal(g_messages_after, 1);
 
         /* and the finalization was honoured, once the discovery let go */
+        assert_int_equal(g_fini_done, 1);
+        assert_int_equal(g_fini_ret, LOG_RETVAL_OK);
         assert_int_equal(log_is_initialized(), 0);
         (void)state;
 }

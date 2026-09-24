@@ -120,7 +120,9 @@ log_init(int fd_log,
 /**
  * @brief Shuts down PQoS log module
  *
- * Deferred while the log is held: see log_hold().
+ * Waits for a log_hold() to be released before taking the log down, so that a
+ * caller is free to close the descriptor and release the context it gave once
+ * this returns: see log_hold().
  *
  * @return Operation status
  * @retval LOG_RETVAL_OK on success
@@ -144,9 +146,11 @@ PQOS_LOCAL int log_fini(void);
  *   caller never chose. log_release() removes it again - unless pqos_init() has
  *   installed the application's log meanwhile, which is then left alone.
  * - with a log already installed, it is used and not replaced, and a log_fini()
- *   arriving from pqos_fini() is deferred until the last holder releases it.
- *   Without that, the next message of this path would have nowhere to go, and a
- *   DEBUG build would assert on it.
+ *   arriving from pqos_fini() waits for the last holder to release it before it
+ *   returns. Without that, the next message of this path would have nowhere to
+ *   go - and worse, the application is free to close the descriptor and release
+ *   the context it gave as soon as pqos_fini() returns, so a path still logging
+ *   through them would be writing to whatever they have become.
  *
  * Nesting is counted, so concurrent holders are safe.
  *

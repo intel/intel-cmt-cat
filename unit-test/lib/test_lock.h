@@ -34,6 +34,7 @@
 #define __TEST_LOCK_H
 
 #include <aio.h>
+#include <pthread.h>
 #include <stddef.h>
 
 #define LOCKFILENO 9999
@@ -41,5 +42,10 @@
 int __real_open(const char *path, int oflags, int mode);
 int __real_close(int fildes);
 int __real_lockf(int fd, int cmd, off_t len);
+int __real_pthread_mutex_init(pthread_mutex_t *restrict mutex,
+                              const pthread_mutexattr_t *restrict attr);
+int __real_pthread_mutex_destroy(pthread_mutex_t *mutex);
+int __real_pthread_mutex_lock(pthread_mutex_t *mutex);
+int __real_pthread_mutex_unlock(pthread_mutex_t *mutex);
 
 #endif /* __TEST_LOCK_H */

@@ -57,12 +57,6 @@
 
 /* ======== mocks ======== */
 
-int __real_pthread_mutex_init(pthread_mutex_t *restrict mutex,
-                              const pthread_mutexattr_t *restrict attr);
-int __real_pthread_mutex_destroy(pthread_mutex_t *mutex);
-int __real_pthread_mutex_lock(pthread_mutex_t *mutex);
-int __real_pthread_mutex_unlock(pthread_mutex_t *mutex);
-
 /**
  * lock.c is not the only module here that takes a mutex - log.c takes one of
  * its own around the log's state - and --wrap applies to the whole binary, so
